@@ -1,0 +1,14 @@
+*.env
+
+build
+libs/*
+
+.vs/*
+*.log
+*.tmp
+
+*.json
+
+
+
+
