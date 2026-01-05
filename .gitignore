@@ -1,13 +1,11 @@
 *.env
-
 build
 libs/*
-
 .vs/*
 *.log
 *.tmp
-
 *.json
+proto_src/*
 
 
 
