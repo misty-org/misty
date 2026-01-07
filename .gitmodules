@@ -2,3 +2,15 @@
 	path = vendor/imgui
 	url = https://github.com/ocornut/imgui.git
 	branch = docking
+[submodule "vendor/octicons"]
+	path = vendor/octicons
+	url = git@github.com:primer/octicons.git
+[submodule "vendor/nanosvg"]
+	path = vendor/nanosvg
+	url = git@github.com:memononen/nanosvg.git
+[submodule "vendor/lunasvg"]
+	path = vendor/lunasvg
+	url = git@github.com:sammycage/lunasvg.git
+[submodule "vendor/stb"]
+	path = vendor/stb
+	url = git@github.com:nothings/stb.git

@@ -5,25 +5,27 @@
 #include <functional>
 #include <string>
 #include "imgui.h"
-#include "layer.h"
-#include "registry.h"
+#include "panel.h"
+#include "ui_registry.h"
+#include "app_view_registry.h"
 #include "file_explorer_panel.h"
 #include "tool_menu_panel.h"
 #include "navbar_panel.h"
-#include "layout.h"
 #include "worker_pool.h"
 #include "minidfs_client.h"
+#include "app_view.h"
+#include "file_explorer_view.h"
 
 
 namespace minidfs {
     class Application {
     public:
-        virtual ~Application() = default;
+		Application() = default;
+        ~Application() = default;
 
         void run();
-        void init_layers();
         void init_client();
-        void push_layer(std::unique_ptr<Layer> layer);
+        void init_views();
 
     protected:
         // Pure virtual functions (the "Interface")
@@ -34,9 +36,11 @@ namespace minidfs {
         virtual void cleanup() = 0;
 
     protected:
-        UIRegistry registry_;
+        UIRegistry ui_registry_;
+        AppViewRegistry app_view_registry_;
+
         WorkerPool worker_pool_;
         std::shared_ptr<MiniDFSClient> client_;
-        std::vector<std::unique_ptr<Layer>> layers_;
+
     };  
 };

@@ -1,13 +1,12 @@
 #pragma once
 
 #include "imgui.h"
-#include "registry.h"
 #include <string>
 
 namespace minidfs {
-    class Layer {
+    class Panel {
     public:
-        virtual ~Layer() = default;
+        virtual ~Panel() = default;
         virtual void render() = 0;
  
     };

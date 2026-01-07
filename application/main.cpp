@@ -8,11 +8,11 @@
 #endif
 
 #include "application.h"
-#include "layout.h"
+
 #include "file_explorer_panel.h"
 #include <memory>
-#include "registry.h"
-#include "layer.h"
+#include "ui_registry.h"
+#include "panel.h"
 
 std::unique_ptr<minidfs::Application> create_application() {
     #ifdef _WIN32
