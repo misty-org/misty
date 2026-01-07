@@ -3,14 +3,15 @@
 #include <memory>
 #include <mutex>
 #include "imgui.h"
-#include "registry.h"
-#include "layer.h"
+#include "ui_registry.h"
+#include "panel.h"
 #include "worker_pool.h"
 #include "file_explorer_state.h"
 #include "minidfs_client.h"
+#include "svg_loader.h"
 
 namespace minidfs {
-    class FileExplorerPanel : public Layer {
+    class FileExplorerPanel : public Panel {
     public:
         FileExplorerPanel(UIRegistry& registry, WorkerPool& worker_pool, std::shared_ptr<MiniDFSClient> client);
         ~FileExplorerPanel() override = default;
@@ -29,5 +30,6 @@ namespace minidfs {
         UIRegistry& registry_;
         WorkerPool& worker_pool_;
         std::shared_ptr<MiniDFSClient> client_;
+
     };
 };

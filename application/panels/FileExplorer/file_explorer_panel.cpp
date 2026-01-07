@@ -14,7 +14,33 @@ namespace minidfs {
     void FileExplorerPanel::render() {
         auto& state = registry_.get_state<FileExplorerState>("FileExplorer");
 
-        ImGui::Begin("File Explorer");
+        ImGuiViewport* viewport = ImGui::GetMainViewport();
+        ImGui::SetNextWindowViewport(viewport->ID);
+
+        // --- COORDINATE MATH ---
+        float navbar_offset = 77.0f;
+        float sidebar_width = viewport->WorkSize.x * 0.20f;
+        if (sidebar_width < 160.0f) sidebar_width = 160.0f; // Keep same clamp as ToolMenu
+
+        // The Explorer starts exactly where the ToolMenu ends
+        float explorer_x_pos = viewport->WorkPos.x + navbar_offset + sidebar_width;
+
+        // The width is whatever is left in the window
+        float explorer_width = viewport->WorkSize.x - (navbar_offset + sidebar_width);
+
+        ImGui::SetNextWindowPos(ImVec2(explorer_x_pos, viewport->WorkPos.y));
+        ImGui::SetNextWindowSize(ImVec2(explorer_width, viewport->WorkSize.y));
+        // -----------------------
+
+        ImGuiWindowFlags file_explorer_flags = ImGuiWindowFlags_NoTitleBar |
+            ImGuiWindowFlags_NoMove |
+            ImGuiWindowFlags_NoCollapse |
+            ImGuiWindowFlags_NoResize; // Force it to follow our math
+
+        // Lighten the background slightly so it's distinct from the sidebar
+        ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.18f, 0.18f, 0.18f, 1.0f));
+
+        ImGui::Begin("File Explorer", nullptr, file_explorer_flags);
 
         // Attempt to lock.
         std::unique_lock<std::mutex> lock(state.mu, std::try_to_lock);
@@ -30,7 +56,7 @@ namespace minidfs {
         else {
             ImGui::Text("Syncing...");
         }
-
+        ImGui::PopStyleColor();
         ImGui::End();
     }
 
@@ -54,9 +80,9 @@ namespace minidfs {
     void FileExplorerPanel::show_directory_contents(FileExplorerState& state) {
 
         // Table Flags: RowBg adds alternating row colors like Google Drive
-        static ImGuiTableFlags flags = ImGuiTableFlags_Resizable | ImGuiTableFlags_Reorderable |
+        static ImGuiTableFlags flags = ImGuiTableFlags_Reorderable | ImGuiTableFlags_Sortable |
             ImGuiTableFlags_Hideable | ImGuiTableFlags_RowBg |
-            ImGuiTableFlags_BordersOuter | ImGuiTableFlags_ScrollY;
+            ImGuiTableFlags_ScrollY | ImGuiTableFlags_Resizable;
 
         if (ImGui::BeginTable("FileTable", 4, flags)) {
             // 1. Setup Columns
@@ -82,6 +108,13 @@ namespace minidfs {
             else {
                 for (int i = 0; i < (int)state.files.size(); i++) {
                     show_file_item(state, i);
+                }
+            }
+
+            if (ImGuiTableSortSpecs* sorts_specs = ImGui::TableGetSortSpecs()) {
+                if (sorts_specs->SpecsDirty) {
+                    // Sort your state.files vector here based on sorts_specs->Specs->ColumnIndex
+                    sorts_specs->SpecsDirty = false;
                 }
             }
 
