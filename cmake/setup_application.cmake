@@ -66,6 +66,8 @@ if(WIN32)
     target_link_libraries(minidfs_client PRIVATE ws2_32)
     if(MSVC)
         target_link_options(minidfs_client PRIVATE "/ENTRY:mainCRTStartup")
+        set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT minidfs_client)
+        add_compile_options(/MP)
     endif()
 elseif(APPLE)
     file(GLOB MAC_SRCS "application/platform/mac/*.mm" "application/platform/mac/*.h")
@@ -77,6 +79,8 @@ elseif(APPLE)
 endif()
 target_include_directories(minidfs_client PRIVATE
     ${CMAKE_SOURCE_DIR}
+    ${IMGUI_DIR}
+    ${IMGUI_DIR}/backend
     ${CMAKE_SOURCE_DIR}/dfs
     ${CMAKE_SOURCE_DIR}/application
     ${CMAKE_SOURCE_DIR}/application/panels
@@ -91,5 +95,13 @@ target_link_libraries(minidfs_client PRIVATE
     imgui
     glfw
 )
+target_precompile_headers(minidfs_client PRIVATE 
+    "vendor/imgui/imgui.h"
+    "proto_src/minidfs.pb.h"
+    "proto_src/minidfs.grpc.pb.h"
+)
+
+
+
 
 
