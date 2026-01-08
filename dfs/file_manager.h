@@ -56,6 +56,8 @@ public:
     
     static std::filesystem::path ResolvePath(const std::string& mount_path, const std::string& file_path);
 
+	static std::filesystem::path ResolveAbsolutePath(const std::string& mount_path, const std::string& file_path);
+
     static std::string GetFileHash(const std::string& file_path);
 
     static std::filesystem::path VirtualPath(const std::string& mount_path, const std::string& file_path);

@@ -22,29 +22,45 @@ grpc::ServerUnaryReactor* MiniDFSImpl::ListFiles(
         Reactor(MiniDFSImpl* service, const minidfs::ListFilesReq* req, minidfs::ListFilesRes* res) 
             : service_(service)
         {
-            fs::path v_path = FileManager::VirtualPath(service_->mount_path_, req->path());
-			std::cout << "virutal path : " << v_path.generic_string() << std::endl; 
-            fs::path dir_path = FileManager::ResolvePath(service_->mount_path_, v_path.generic_string());
+            try {
+                // VirtualPath will validate and strip mount prefix
+                fs::path virtual_path = FileManager::VirtualPath(service_->mount_path_, req->path());
 
-			std::cout << "listing files for: " << dir_path.generic_string() << std::endl;
-            fflush(stdout);
-            bool is_dir = fs::is_directory(dir_path);
-            if (!fs::exists(dir_path)) {
-                Finish(grpc::Status(grpc::StatusCode::NOT_FOUND, "Directory not found"));
+                // Now resolve back to full path
+                fs::path dir_path = FileManager::ResolvePath(service_->mount_path_, virtual_path.string());
+
+                std::cout << "Listing files in directory: " << dir_path.generic_string() << std::endl;
+
+                if (!fs::exists(dir_path)) {
+                    Finish(grpc::Status(grpc::StatusCode::NOT_FOUND, "Directory not found"));
+                    return;
+                }
+                if (!fs::is_directory(dir_path)) {
+                    Finish(grpc::Status(grpc::StatusCode::FAILED_PRECONDITION, "Path is not a directory"));
+                    return;
+                }
+
+                for (const auto& entry : fs::directory_iterator(dir_path)) {
+                    //REMEMBER: add back VIRTUAL paths only, not local entry.path()
+                    minidfs::FileInfo* file_info = res->add_files();
+                    file_info->set_file_path(FileManager::VirtualPath(service_->mount_path_, entry.path().generic_string()).generic_string());
+                    file_info->set_is_dir(entry.is_directory());
+                    if (!entry.is_directory()) {
+                        file_info->set_hash(FileManager::GetFileHash(entry.path().generic_string()));
+                    }
+                }
+                Finish(grpc::Status::OK);
+
+            }
+            catch (const std::invalid_argument& e) {
+                Finish(grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, e.what()));
                 return;
             }
-            if (!is_dir) {
-                Finish(grpc::Status(grpc::StatusCode::FAILED_PRECONDITION, "Path is not a directory"));
+            catch (const std::exception& e) {
+                Finish(grpc::Status(grpc::StatusCode::INTERNAL, e.what()));
                 return;
             }
-
-            for (const auto& entry : fs::directory_iterator(dir_path)) {
-                minidfs::FileInfo* file_info = res->add_files();
-                file_info->set_file_path(entry.path().generic_string());
-                file_info->set_is_dir(is_dir);
-                file_info->set_hash(FileManager::GetFileHash(entry.path().generic_string()));
-            }
-            Finish(grpc::Status::OK);
+            
         }
         void OnDone() override {
             delete this;

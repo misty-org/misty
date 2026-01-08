@@ -9,7 +9,7 @@
 struct Worker {
     std::function<void()> on_task;
     std::function<void()> on_finish;
-    std::function<void()> on_error;
+    std::function<void(const std::string& err_msg)> on_error;
 };
 
 
@@ -19,7 +19,11 @@ namespace minidfs {
         explicit WorkerPool(size_t thread_count = std::thread::hardware_concurrency());
         ~WorkerPool();
 
-        void add(std::function<void()> on_task, std::function<void()> on_finish, std::function<void()> on_error);
+        void add(
+            std::function<void()> on_task, 
+            std::function<void()> on_finish, 
+            std::function<void(const std::string&)> on_error
+        );
     private:
         void worker_thread();
 

@@ -11,6 +11,10 @@ MiniDFSClient::~MiniDFSClient() {
     EndSync();
 }
 
+std::string MiniDFSClient::GetClientMountPath() const {
+    return mount_path_;
+}
+
 /* =========================
    File update streaming
    ========================= */

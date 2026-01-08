@@ -8,6 +8,8 @@
 #include "layer.h"
 #include "registry.h"
 #include "file_explorer_panel.h"
+#include "tool_menu_panel.h"
+#include "navbar_panel.h"
 #include "layout.h"
 #include "worker_pool.h"
 #include "minidfs_client.h"

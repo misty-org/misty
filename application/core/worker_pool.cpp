@@ -22,7 +22,7 @@ namespace minidfs {
         }
     }
 
-    void WorkerPool::add(std::function<void()> on_task, std::function<void()> on_finish, std::function<void()> on_error) {
+    void WorkerPool::add(std::function<void()> on_task, std::function<void()> on_finish, std::function<void(const std::string&)> on_error) {
         {
             std::unique_lock<std::mutex> lock(mu_);
             task_queue.push(Worker{on_task, on_finish, on_error});
@@ -49,9 +49,18 @@ namespace minidfs {
                 if (worker.on_finish) {
                     worker.on_finish();
                 }
-            } catch (...) {
+            }
+            catch (const std::runtime_error& e) {
                 if (worker.on_error) {
-                    worker.on_error();
+                    worker.on_error(std::string("Application Error: ") + e.what());
+                }
+                // These are errors YOU likely threw intentionally
+
+            }
+            catch (const std::exception& e) {
+                // These are standard library errors (like bad_alloc or filesystem)
+                if (worker.on_error) {
+                    worker.on_error(std::string("Application Error: ") + e.what());
                 }
             }
         }

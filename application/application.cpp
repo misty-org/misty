@@ -27,17 +27,21 @@ namespace minidfs {
         cleanup();
     }
 
-    void Application::init_layers() {   
-        push_layer(std::make_unique<FileExplorerPanel>(registry_, worker_pool_, client_));
-    }
-
-    void Application::init_client() {
-        auto channel = grpc::CreateChannel("localhost:50051", grpc::InsecureChannelCredentials());
-        client_ = std::make_shared<MiniDFSClient>(channel, "client");
-    }
-
     void Application::push_layer(std::unique_ptr<Layer> layer) {
         // emplace_back is great for unique_ptr
         layers_.emplace_back(std::move(layer));
     }
+
+    void Application::init_layers() {   
+        push_layer(std::make_unique<FileExplorerPanel>(registry_, worker_pool_, client_));
+        push_layer(std::make_unique<ToolMenuPanel>(registry_, worker_pool_, client_));
+        push_layer(std::make_unique<NavbarPanel>(registry_));
+    }
+
+    void Application::init_client() {
+        auto channel = grpc::CreateChannel("localhost:50051", grpc::InsecureChannelCredentials());
+        client_ = std::make_shared<MiniDFSClient>(channel, "minidfs");
+    }
+
+    
 };

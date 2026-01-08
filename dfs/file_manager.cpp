@@ -158,35 +158,32 @@ FileStatus FileManager::RemoveFile(const std::string& client_id, const std::stri
     return removed ? FileStatus::FILE_OK : FileStatus::FILE_ERROR;
 }
 
-fs::path FileManager::ResolvePath(const std::string& mount_path, const std::string& file_path) {
-    fs::path mount = fs::absolute(mount_path).lexically_normal();
-    fs::path full = (mount / fs::path(file_path).relative_path()).lexically_normal();
-
-    auto mount_str = mount.generic_string();
-    auto full_str = full.generic_string();
-
-    if (full_str.find(mount_str) != 0) {
-        throw std::runtime_error("Directory traversal attack detected!");
-    }
-
-    return full;
+fs::path FileManager::ResolvePath(const std::string& mount_path, const std::string& virtual_path) {
+    return fs::path(mount_path) / virtual_path;
 }
 
-fs::path FileManager::VirtualPath(const std::string& mount_path, const std::string& file_path) {
-    fs::path mount = fs::absolute(mount_path).lexically_normal();
-    fs::path full = fs::absolute(file_path).lexically_normal();
+fs::path FileManager::ResolveAbsolutePath(const std::string& mount_path, const std::string& virtual_path) {
+    return fs::absolute(fs::path(mount_path) / virtual_path);
+}
 
-    if (full == mount) {
-        return "";
+fs::path FileManager::VirtualPath(const std::string& mount_path, const std::string& local_path) {
+    fs::path path = fs::path(local_path).lexically_normal();
+    if (path.empty() || path == "." || path == "/") {
+        throw std::invalid_argument("Invalid local path");
     }
 
-    auto rel = fs::relative(full, mount);
+    fs::path mount = fs::path(mount_path).lexically_normal();
+    auto [m_end, p_end] = std::ranges::mismatch(mount, path);
 
-    if (rel.empty() || rel.string().find("..") == 0) {
-        throw std::runtime_error("File is outside of mount path!");
+    if (m_end != mount.end()) {
+        throw std::invalid_argument("Path is not under mount directory");
     }
 
-    return rel;
+    fs::path result;
+    for (auto it = p_end; it != path.end(); ++it) {
+        result /= *it;
+    }
+    return result;
 }
 
 std::string FileManager::GetFileHash(const std::string& file_path) {

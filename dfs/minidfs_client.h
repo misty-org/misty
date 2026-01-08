@@ -37,6 +37,8 @@ public:
 
     void BeginSync(const std::string& client_id);
     void EndSync();
+
+    std::string GetClientMountPath() const;
     
 private:
     std::shared_ptr<ClientFileSession> AcquireClientFileSession(const std::string& file_path);

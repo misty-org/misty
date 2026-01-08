@@ -3,6 +3,7 @@
 #include <string>
 #include <functional>
 #include <unordered_map>
+#include <mutex>
 #include <memory>
 
 
@@ -15,6 +16,7 @@ namespace minidfs {
     public:
         template<typename T>
         T& get_state(const std::string& key) {
+            std::lock_guard<std::recursive_mutex> lock(mu_);
             if (states_.find(key) == states_.end()) {
                 states_[key] = std::make_unique<T>();
             }
@@ -23,6 +25,7 @@ namespace minidfs {
 
         template<typename T>
         void update_state(const std::string& key, std::function<void(T&)> callback) {
+            std::lock_guard<std::recursive_mutex> lock(mu_);
             T& state = get_state<T>(key);
             if (callback) {
                 callback(state);
@@ -30,5 +33,6 @@ namespace minidfs {
         }
     private:
         std::unordered_map<std::string, std::unique_ptr<UIState>> states_;
+        std::recursive_mutex mu_;
     };
 };
