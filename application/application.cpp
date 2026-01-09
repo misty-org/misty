@@ -1,7 +1,4 @@
-#include "application.h"   
-#include "asset_manager.h" 
-#include <iostream>
-
+#include "application.h"
 
 namespace minidfs {
     void Application::run() {
@@ -39,7 +36,7 @@ namespace minidfs {
         }
 
         app_view_registry_.register_view(ViewID::FileExplorer, 
-            std::make_unique<FileExplorerView>(ui_registry_, worker_pool_, client_));
+            std::make_unique<minidfs::FileExplorer::FileExplorerView>(ui_registry_, worker_pool_, client_));
         app_view_registry_.register_view(ViewID::None, 
 			nullptr); // Placeholder
 

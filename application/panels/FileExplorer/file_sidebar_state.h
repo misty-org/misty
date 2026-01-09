@@ -3,8 +3,8 @@
 #include "ui_registry.h"
 #include <string>
 
-namespace minidfs {
-    struct ToolMenuState : public UIState {
+namespace minidfs::FileExplorer {
+    struct FileSidebarState : public UIState {
         // 1. Context: What directory are we currently acting on?
         std::string current_working_path = "/";
 

@@ -64,7 +64,16 @@ if(WIN32)
         target_link_options(minidfs_client PRIVATE "/ENTRY:mainCRTStartup")
         set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT minidfs_client)
         set_target_properties(minidfs_client PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "$<TARGET_FILE_DIR:minidfs_client>")
+        
+        # Enable multi-processor compilation
         add_compile_options(/MP)
+        
+        # Enable Hot Reload (Edit and Continue) for Debug builds
+        target_compile_options(minidfs_client PRIVATE $<$<CONFIG:Debug>:/ZI>)
+        target_link_options(minidfs_client PRIVATE $<$<CONFIG:Debug>:/INCREMENTAL>)
+        
+        # Also need /Od (disable optimizations) for Hot Reload to work properly
+        target_compile_options(minidfs_client PRIVATE $<$<CONFIG:Debug>:/Od>)
     endif()
 elseif(APPLE)
     file(GLOB MAC_SRCS "application/platform/mac/*.mm" "application/platform/mac/*.h")
@@ -84,7 +93,7 @@ target_include_directories(minidfs_client PRIVATE
     ${CMAKE_SOURCE_DIR}/application/panels/FileExplorer
     ${CMAKE_SOURCE_DIR}/application/panels/Auth
     ${CMAKE_SOURCE_DIR}/application/panels/Navbar
-    ${CMAKE_SOURCE_DIR}/application/panels/ToolMenu
+    ${CMAKE_SOURCE_DIR}/application/panels/FileSidebar
     ${CMAKE_SOURCE_DIR}/application/views
     ${CMAKE_SOURCE_DIR}/application/core
     ${CMAKE_SOURCE_DIR}/application/platform/mac
@@ -104,9 +113,7 @@ if(WIN32)
     target_link_libraries(minidfs_client PRIVATE dwmapi)
 endif()
 target_precompile_headers(minidfs_client PRIVATE 
-    "vendor/imgui/imgui.h"
-    "proto_src/minidfs.pb.h"
-    "proto_src/minidfs.grpc.pb.h"
+    "application/minidfs.h"
 )
 
 add_custom_command(TARGET minidfs_client POST_BUILD

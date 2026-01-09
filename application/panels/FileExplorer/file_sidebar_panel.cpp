@@ -1,12 +1,12 @@
-#include "tool_menu_panel.h"
+#include "file_sidebar_panel.h"
 
-namespace minidfs {
-    ToolMenuPanel::ToolMenuPanel(UIRegistry& registry, WorkerPool& worker_pool, std::shared_ptr<MiniDFSClient> client)
+namespace minidfs::FileExplorer {
+    FileSidebarPanel::FileSidebarPanel(UIRegistry& registry, WorkerPool& worker_pool, std::shared_ptr<MiniDFSClient> client)
         : registry_(registry), worker_pool_(worker_pool), client_(client) {
     }
 
-    void ToolMenuPanel::render() {
-        auto& state = registry_.get_state<ToolMenuState>("ToolMenu");
+    void FileSidebarPanel::render() {
+        auto& state = registry_.get_state<FileSidebarState>("FileSidebar");
 
         ImGuiViewport* viewport = ImGui::GetMainViewport();
         ImGui::SetNextWindowViewport(viewport->ID);
@@ -62,7 +62,7 @@ namespace minidfs {
         
     }
 
-    void ToolMenuPanel::show_main_navigation(ToolMenuState& state, float width, float padding) {
+    void FileSidebarPanel::show_main_navigation(FileSidebarState& state, float width, float padding) {
         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
         // Padding scales with window width
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(padding, 12));
@@ -84,7 +84,7 @@ namespace minidfs {
         ImGui::PopStyleVar(2);
     }
 
-    void ToolMenuPanel::show_quick_access(float width, float padding) {
+    void FileSidebarPanel::show_quick_access(float width, float padding) {
         ImGui::SetCursorPosX(padding);
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.7f, 0.7f, 0.7f, 1.0f));
         ImGui::Text("Quick access");
@@ -113,7 +113,7 @@ namespace minidfs {
         ImGui::PopStyleColor();
     }
 
-    void ToolMenuPanel::show_storage_info(float width, float padding) {
+    void FileSidebarPanel::show_storage_info(float width, float padding) {
         // Position at bottom (140px from bottom edge)
         ImGui::SetCursorPosY(ImGui::GetWindowHeight() - 140);
         ImGui::SetCursorPosX(padding);
@@ -132,7 +132,7 @@ namespace minidfs {
         ImGui::PopStyleVar();
     }
 
-    void ToolMenuPanel::show_modals(ToolMenuState& state) {
+    void FileSidebarPanel::show_modals(FileSidebarState& state) {
         if (state.show_new_file_modal) {
             ImGui::OpenPopup("Create New File");
             if (ImGui::BeginPopupModal("Create New File", &state.show_new_file_modal, ImGuiWindowFlags_AlwaysAutoResize)) {

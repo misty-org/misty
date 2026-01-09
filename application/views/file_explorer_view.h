@@ -7,12 +7,12 @@
 #include "app_view.h"
 #include "panel.h"
 #include "file_explorer_panel.h"
-#include "tool_menu_panel.h"
+#include "file_sidebar_panel.h"
 #include "navbar_panel.h"
 #include "app_view_registry.h"
 #include "ui_registry.h"
 
-namespace minidfs {
+namespace minidfs::FileExplorer {
     class FileExplorerView : public AppView {
     public:
         FileExplorerView(UIRegistry& ui_registry, WorkerPool& worker_pool, std::shared_ptr<MiniDFSClient> client);

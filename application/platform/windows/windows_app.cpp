@@ -16,8 +16,6 @@ namespace minidfs {
 		init_imgui();
     }
 
-
-
     void WindowsApp::cleanup() {
         ImGui_ImplOpenGL3_Shutdown();
         ImGui_ImplGlfw_Shutdown();
@@ -64,7 +62,7 @@ namespace minidfs {
         GLFWimage images[1]; 
         
         int channels;
-        images[0].pixels = stbi_load("icon_32x32.png", &images[0].width, &images[0].height, &channels, 4); 
+        images[0].pixels = stbi_load("assets/logo/mist_v1", &images[0].width, &images[0].height, &channels, 4); 
 
         if (images[0].pixels) {
             glfwSetWindowIcon(window_, 1, images);
