@@ -1,11 +1,9 @@
 #pragma once
-
 #include <string>
 #include <functional>
 #include <unordered_map>
 #include <mutex>
 #include <memory>
-
 
 namespace minidfs {
     struct UIState {
@@ -35,4 +33,4 @@ namespace minidfs {
         std::unordered_map<std::string, std::unique_ptr<UIState>> states_;
         std::recursive_mutex mu_;
     };
-};
+}

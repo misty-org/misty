@@ -32,7 +32,7 @@ namespace minidfs {
         ImGui::SetNextWindowSize(ImVec2(explorer_width, viewport->WorkSize.y));
         // -----------------------
 
-        ImGuiWindowFlags explorer_flags = ImGuiWindowFlags_NoTitleBar |
+        ImGuiWindowFlags file_explorer_flags = ImGuiWindowFlags_NoTitleBar |
             ImGuiWindowFlags_NoMove |
             ImGuiWindowFlags_NoCollapse |
             ImGuiWindowFlags_NoResize; // Force it to follow our math
@@ -40,7 +40,7 @@ namespace minidfs {
         // Lighten the background slightly so it's distinct from the sidebar
         ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.18f, 0.18f, 0.18f, 1.0f));
 
-        ImGui::Begin("File Explorer");
+        ImGui::Begin("File Explorer", nullptr, file_explorer_flags);
 
         // Attempt to lock.
         std::unique_lock<std::mutex> lock(state.mu, std::try_to_lock);
@@ -80,9 +80,9 @@ namespace minidfs {
     void FileExplorerPanel::show_directory_contents(FileExplorerState& state) {
 
         // Table Flags: RowBg adds alternating row colors like Google Drive
-        static ImGuiTableFlags flags = ImGuiTableFlags_Reorderable |
+        static ImGuiTableFlags flags = ImGuiTableFlags_Reorderable | ImGuiTableFlags_Sortable |
             ImGuiTableFlags_Hideable | ImGuiTableFlags_RowBg |
-            ImGuiTableFlags_BordersOuter | ImGuiTableFlags_ScrollY;
+            ImGuiTableFlags_ScrollY | ImGuiTableFlags_Resizable;
 
         if (ImGui::BeginTable("FileTable", 4, flags)) {
             // 1. Setup Columns
@@ -108,6 +108,13 @@ namespace minidfs {
             else {
                 for (int i = 0; i < (int)state.files.size(); i++) {
                     show_file_item(state, i);
+                }
+            }
+
+            if (ImGuiTableSortSpecs* sorts_specs = ImGui::TableGetSortSpecs()) {
+                if (sorts_specs->SpecsDirty) {
+                    // Sort your state.files vector here based on sorts_specs->Specs->ColumnIndex
+                    sorts_specs->SpecsDirty = false;
                 }
             }
 

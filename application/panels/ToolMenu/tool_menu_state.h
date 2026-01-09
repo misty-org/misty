@@ -1,6 +1,6 @@
 #pragma once
 
-#include "registry.h"
+#include "ui_registry.h"
 #include <string>
 
 namespace minidfs {

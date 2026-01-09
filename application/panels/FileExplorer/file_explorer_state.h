@@ -2,9 +2,9 @@
 
 #include <vector>
 #include <string>
-#include "layer.h"
+#include "panel.h"
 #include <unordered_set>
-#include "registry.h"
+#include "ui_registry.h"
 #include "minidfs_client.h"
 
 namespace minidfs {
@@ -14,7 +14,9 @@ namespace minidfs {
         std::unordered_set<std::string> selected_files;
         int last_selected_index = -1;
         bool is_loading = false;
+        bool is_hidden = false;
         std::string error_msg = "";
+        
         std::mutex mu;
 
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "registry.h"   
+#include "ui_registry.h"   
 
 namespace minidfs {
     struct NavbarState : public UIState {

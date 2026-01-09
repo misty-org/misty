@@ -29,17 +29,17 @@ namespace minidfs {
             ImGuiWindowFlags_NoScrollbar;
 
         ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.15f, 0.15f, 0.15f, 1.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
 
         if (ImGui::Begin("SideMenu", nullptr, sidebar_flags)) {
             // Use internal available width for all items
-            float content_width = ImGui::GetContentRegionAvail().x;
+            float content_width = ImGui::GetWindowWidth();
             float padding = content_width * 0.08f; // 8% internal padding
 
             // Title - Scaled position
             ImGui::SetCursorPos(ImVec2(padding, 20));
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
             ImGui::Text("Home");
-            ImGui::PopStyleColor();
+
 
             ImGui::Dummy(ImVec2(0, 10)); // Responsive spacing
 
@@ -58,6 +58,8 @@ namespace minidfs {
         }
         ImGui::End();
         ImGui::PopStyleColor();
+        ImGui::PopStyleVar();
+        
     }
 
     void ToolMenuPanel::show_main_navigation(ToolMenuState& state, float width, float padding) {

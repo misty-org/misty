@@ -1,8 +1,8 @@
+#pragma once
 
+#include "panel.h"
 
-#include "layer.h"
-
-#include "registry.h"
+#include "ui_registry.h"
 #include "worker_pool.h"
 #include "minidfs_client.h"
 #include "imgui.h"
@@ -11,7 +11,7 @@
 
 namespace minidfs {
 
-    class ToolMenuPanel : public Layer {
+    class ToolMenuPanel : public Panel {
     public:
         ToolMenuPanel(UIRegistry& registry, WorkerPool& worker_pool, std::shared_ptr<MiniDFSClient> client);
         void render();
