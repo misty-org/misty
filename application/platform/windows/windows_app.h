@@ -19,9 +19,10 @@ namespace minidfs {
         void cleanup() override;
 
     private:
+        static void glfw_error_callback(int error, const char* description);
+        static void glfw_window_size_callback(GLFWwindow* window, int width, int height);
         void setup_imgui_options();
     private:
-            // Move variables here so WindowsApp can inherit them
         GLFWwindow* window_ = nullptr;
         const char* glsl_version_ = "#version 130";
         ImVec4 clear_color_ = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);

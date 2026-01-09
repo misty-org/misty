@@ -17,9 +17,10 @@ namespace minidfs {
         void render();
 
     private:
-        void show_main_navigation(ToolMenuState& state);
-        void show_quick_access();
+        void show_main_navigation(ToolMenuState& state, float width, float padding);
+        void show_quick_access(float width, float padding);
         void show_modals(ToolMenuState& state);
+        void show_storage_info(float width, float padding);
 
         UIRegistry& registry_;
         WorkerPool& worker_pool_;

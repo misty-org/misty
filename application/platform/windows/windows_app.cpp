@@ -5,12 +5,18 @@
 #include <iostream>
 
 namespace minidfs {
-    static void glfw_error_callback(int error, const char* description) {
+    void WindowsApp::glfw_error_callback(int error, const char* description) {
         fprintf(stderr, "GLFW Error %d: %s\n", error, description);
+    }
+
+    void WindowsApp::glfw_window_size_callback(GLFWwindow* window, int width, int height) {
+        
     }
 
     void WindowsApp::init_platform() {
         glfwSetErrorCallback(glfw_error_callback);
+      
+
         if (!glfwInit()) throw std::runtime_error("Failed to initialize GLFW");
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
@@ -24,6 +30,9 @@ namespace minidfs {
         if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
             throw std::runtime_error("Failed to initialize GLAD");
         }
+
+        glfwSetWindowUserPointer(window_, this);
+        glfwSetWindowSizeCallback(window_, glfw_window_size_callback);
 
         setup_imgui_options();
 
@@ -71,6 +80,9 @@ namespace minidfs {
 
     void WindowsApp::prepare_frame() {
         glfwPollEvents();
+        int display_w, display_h;
+        glfwGetFramebufferSize(window_, &display_w, &display_h);
+        glViewport(0, 0, display_w, display_h);
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
@@ -79,19 +91,14 @@ namespace minidfs {
     void WindowsApp::render_frame() {
         ImGui::Render();
 
-        // Use window_ (inherited from base)
-        int display_w, display_h;
-        glfwGetFramebufferSize(window_, &display_w, &display_h);
-        glViewport(0, 0, display_w, display_h);
-
-        // Access clear_color_ (inherited from base)
+        // Clear with your color
         glClearColor(clear_color_.x * clear_color_.w, clear_color_.y * clear_color_.w,
             clear_color_.z * clear_color_.w, clear_color_.w);
         glClear(GL_COLOR_BUFFER_BIT);
 
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
-        // You must fetch 'io' locally within the function
+        // Viewport management for multi-window ImGui
         ImGuiIO& io = ImGui::GetIO();
         if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
             GLFWwindow* backup_current_context = glfwGetCurrentContext();

@@ -7,12 +7,25 @@ namespace minidfs {
     void NavbarPanel::render() {
         auto& state = registry_.get_state<NavbarState>("Navbar");
         
-        ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar;
-        
+        ImGuiViewport* viewport = ImGui::GetMainViewport();
+        ImGui::SetNextWindowViewport(viewport->ID);
+
+        // FIX: Anchor to the Application's top-left, not the Monitor's top-left
+        ImGui::SetNextWindowPos(viewport->WorkPos);
+
+        // Size should use WorkSize to account for OS taskbars/menus
+        ImGui::SetNextWindowSize(ImVec2(77.0f, viewport->WorkSize.y));
+
+        ImGuiWindowFlags navbar_flags = ImGuiWindowFlags_NoTitleBar |
+            ImGuiWindowFlags_NoMove |
+            ImGuiWindowFlags_NoCollapse |
+            ImGuiWindowFlags_NoResize |
+            ImGuiWindowFlags_NoScrollbar;
+
         // Dark background style
         ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.11f, 0.11f, 0.11f, 1.0f));
         
-        if (ImGui::Begin("Navbar", nullptr, flags)) {
+        if (ImGui::Begin("Navbar", nullptr, navbar_flags)) {
             ImGui::SetWindowSize(ImVec2(77, ImGui::GetIO().DisplaySize.y));
             
             // Logo at the top
