@@ -1,41 +1,50 @@
-#include "application.h"
+#include "application.h"   
+#include "asset_manager.h" 
 #include <iostream>
 
 
 namespace minidfs {
-
     void Application::run() {
         try {
             init_platform();
             init_client();
-            init_layers();
+
+            AssetManager::get().load_theme("assets/themes/default.css");
+            init_views();
+            
+
         } catch (const std::exception& e) {
             std::cout << "Exception caught in Application::run: " << e.what() << std::endl;
             cleanup();
         }
+
         
         while (is_running()) {
             prepare_frame();
             
-            for (auto& layer : layers_) {
-                layer->render();
-            }
+            app_view_registry_.render_view();
 
             render_frame();
+            
         }
+        
+        
 
         cleanup();
     }
 
-    void Application::push_layer(std::unique_ptr<Layer> layer) {
-        // emplace_back is great for unique_ptr
-        layers_.emplace_back(std::move(layer));
-    }
+    void Application::init_views() {
+        if (!client_) {
+            throw std::runtime_error("Client not initialized before initializing views.");
+        }
 
-    void Application::init_layers() {   
-        push_layer(std::make_unique<FileExplorerPanel>(registry_, worker_pool_, client_));
-        push_layer(std::make_unique<ToolMenuPanel>(registry_, worker_pool_, client_));
-        push_layer(std::make_unique<NavbarPanel>(registry_));
+        app_view_registry_.register_view(ViewID::FileExplorer, 
+            std::make_unique<FileExplorerView>(ui_registry_, worker_pool_, client_));
+        app_view_registry_.register_view(ViewID::None, 
+			nullptr); // Placeholder
+
+        AppViewRegistryController::init(&app_view_registry_);
+        AppViewRegistryController::switch_view(ViewID::FileExplorer);
     }
 
     void Application::init_client() {

@@ -1,0 +1,24 @@
+#pragma once
+#include <memory>
+#include "imgui.h"
+#include "ui_registry.h"
+#include "app_view_registry.h"
+#include "navbar_state.h"
+#include "panel.h"
+#include "svg_loader.h"
+
+
+namespace minidfs {
+    class NavbarPanel : public Panel {
+    public:
+        NavbarPanel(UIRegistry& ui_registry);
+        ~NavbarPanel() override = default;
+        void render();
+
+    private:
+        UIRegistry& ui_registry_;
+        
+        void render_nav_item(const char* icon, const char* label, int size, int index, NavbarState& state);
+        SVGTexture folder_icon_;
+    };
+}

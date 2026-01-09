@@ -2,6 +2,7 @@
 
 Minimal, educational distributed file system built in modern C++ using gRPC. It provides a simple server with file-locking and streaming I/O plus a cross-platform ImGui desktop client to browse, upload, download, and delete files under a mount directory.
 
+<img width="1780" height="950" alt="Screenshot 2026-01-07 012601" src="https://github.com/user-attachments/assets/069c5a25-bced-46ea-a614-76827bb50239" />
 
 ![C++20](https://img.shields.io/badge/C%2B%2B-20-blue)
 ![CMake](https://img.shields.io/badge/CMake-%3E%3D3.10-brightgreen)

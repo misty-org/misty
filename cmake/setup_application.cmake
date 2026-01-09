@@ -42,13 +42,9 @@ else()
     )
 endif()
 
-file(GLOB APP_SRCS
-    "application/*.cpp" 
-    "application/*.h" 
-    "application/panels/*.cpp"
-    "application/panels/*.h"
-    "application/core/*.cpp"
-    "application/core/*.h"
+file(GLOB_RECURSE APP_SRCS
+    "application/*.cpp"
+    "application/*.h"
 )
 add_executable(minidfs_client)
 if(WIN32)
@@ -85,10 +81,18 @@ target_include_directories(minidfs_client PRIVATE
     ${CMAKE_SOURCE_DIR}/dfs
     ${CMAKE_SOURCE_DIR}/application
     ${CMAKE_SOURCE_DIR}/application/panels
+    ${CMAKE_SOURCE_DIR}/application/panels/FileExplorer
+    ${CMAKE_SOURCE_DIR}/application/panels/Auth
+    ${CMAKE_SOURCE_DIR}/application/panels/Navbar
+    ${CMAKE_SOURCE_DIR}/application/panels/ToolMenu
+    ${CMAKE_SOURCE_DIR}/application/views
     ${CMAKE_SOURCE_DIR}/application/core
     ${CMAKE_SOURCE_DIR}/application/platform/mac
     ${CMAKE_SOURCE_DIR}/application/platform/windows
     ${CMAKE_SOURCE_DIR}/vendor/glad/include
+    ${CMAKE_SOURCE_DIR}/vendor/lunasvg/include
+    ${CMAKE_SOURCE_DIR}/vendor/stb
+    ${CMAKE_SOURCE_DIR}/proto_src
     ${IMGUI_INCLUDE_DIRS}
 )
 target_link_libraries(minidfs_client PRIVATE 
@@ -96,10 +100,19 @@ target_link_libraries(minidfs_client PRIVATE
     imgui
     glfw
 )
+if(WIN32)
+    target_link_libraries(minidfs_client PRIVATE dwmapi)
+endif()
 target_precompile_headers(minidfs_client PRIVATE 
     "vendor/imgui/imgui.h"
     "proto_src/minidfs.pb.h"
     "proto_src/minidfs.grpc.pb.h"
+)
+
+add_custom_command(TARGET minidfs_client POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_directory
+  "${CMAKE_CURRENT_SOURCE_DIR}/assets"
+  "$<TARGET_FILE_DIR:minidfs_client>/assets"
 )
 
 
