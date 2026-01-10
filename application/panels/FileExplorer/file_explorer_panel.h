@@ -1,14 +1,12 @@
 #pragma once
 
 #include <memory>
-#include <mutex>
-#include "imgui.h"
+
 #include "ui_registry.h"
 #include "panel.h"
 #include "worker_pool.h"
 #include "file_explorer_state.h"
 #include "minidfs_client.h"
-#include "svg_loader.h"
 
 namespace minidfs::FileExplorer {
     class FileExplorerPanel : public Panel {

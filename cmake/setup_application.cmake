@@ -8,13 +8,8 @@ set(IMGUI_SRCS
     ${IMGUI_DIR}/imgui_tables.cpp
     ${IMGUI_DIR}/imgui_widgets.cpp
     ${IMGUI_DIR}/backends/imgui_impl_glfw.cpp
+    ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
 )
-
-if(APPLE)
-    list(APPEND IMGUI_SRCS ${IMGUI_DIR}/backends/imgui_impl_metal.mm)
-else()
-    list(APPEND IMGUI_SRCS ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp)
-endif()
 
 find_package(glfw3 REQUIRED)
 add_library(imgui STATIC ${IMGUI_SRCS})
@@ -26,6 +21,7 @@ target_include_directories(imgui PUBLIC
 if(APPLE)
     target_link_libraries(imgui PRIVATE
         glfw
+        "-framework OpenGL"
         "-framework Cocoa"
         "-framework CoreFoundation"
         "-framework Metal"
@@ -45,6 +41,7 @@ endif()
 file(GLOB_RECURSE APP_SRCS
     "application/*.cpp"
     "application/*.h"
+    "vendor/glad/src/glad.cpp"
 )
 add_executable(minidfs_client)
 if(WIN32)
@@ -79,14 +76,11 @@ elseif(APPLE)
     file(GLOB MAC_SRCS "application/platform/mac/*.mm" "application/platform/mac/*.h")
     list(APPEND APP_SRCS ${MAC_SRCS})
     target_sources(minidfs_client PRIVATE ${APP_SRCS})
-    set_target_properties(minidfs_client PROPERTIES
-        MACOSX_BUNDLE TRUE
-    )
 endif()
 target_include_directories(minidfs_client PRIVATE
     ${CMAKE_SOURCE_DIR}
     ${IMGUI_DIR}
-    ${IMGUI_DIR}/backend
+    ${IMGUI_DIR}/backends
     ${CMAKE_SOURCE_DIR}/dfs
     ${CMAKE_SOURCE_DIR}/application
     ${CMAKE_SOURCE_DIR}/application/panels
@@ -100,6 +94,9 @@ target_include_directories(minidfs_client PRIVATE
     ${CMAKE_SOURCE_DIR}/application/platform/windows
     ${CMAKE_SOURCE_DIR}/vendor/glad/include
     ${CMAKE_SOURCE_DIR}/vendor/lunasvg/include
+    ${CMAKE_SOURCE_DIR}/vendor/stb_image
+    ${CMAKE_SOURCE_DIR}/vendor/imgui/backends
+    ${CMAKE_SOURCE_DIR}/vendor/imgui
     ${CMAKE_SOURCE_DIR}/vendor/stb
     ${CMAKE_SOURCE_DIR}/proto_src
     ${IMGUI_INCLUDE_DIRS}
@@ -111,6 +108,17 @@ target_link_libraries(minidfs_client PRIVATE
 )
 if(WIN32)
     target_link_libraries(minidfs_client PRIVATE dwmapi)
+elseif(APPLE)
+    target_link_libraries(minidfs_client PRIVATE
+        glfw
+        "-framework Cocoa"
+        "-framework CoreFoundation"
+        "-framework Metal"
+        "-framework MetalKit"
+        "-framework QuartzCore"
+        "-framework IOKit"
+        "-framework CoreGraphics"
+    )
 endif()
 target_precompile_headers(minidfs_client PRIVATE 
     "application/minidfs.h"

@@ -3,15 +3,19 @@
 #include <vector>
 #include <string>
 #include <stack>
-#include "panel.h"
 #include <unordered_set>
+#include <mutex>
+#include <filesystem>
+#include <cstring>
 #include "ui_registry.h"
-#include "minidfs.h"
+#include "minidfs.pb.h"
+
+namespace fs = std::filesystem;
 
 namespace minidfs::FileExplorer {
     struct FileExplorerState : public UIState {
         char current_path[512] = "";
-        std::vector<FileInfo> files;
+        std::vector<minidfs::FileInfo> files;
         std::unordered_set<std::string> selected_files;
         int last_selected_index = -1;
         bool is_loading = false;
@@ -29,9 +33,9 @@ namespace minidfs::FileExplorer {
         state.is_loading = true;
         std::string new_path = fs::absolute(fs::path(path)).generic_string();
         try {
-            std::vector<FileInfo> new_files;
+            std::vector<minidfs::FileInfo> new_files;
             for (const auto& entry : fs::directory_iterator(path)) {
-                FileInfo file_info;
+                minidfs::FileInfo file_info;
                 file_info.set_file_path(entry.path().generic_string());
                 file_info.set_is_dir(entry.is_directory());
                 new_files.push_back(file_info);
@@ -113,12 +117,12 @@ namespace minidfs::FileExplorer {
         ShellExecuteA(NULL, "open", path.c_str(), NULL, NULL, SW_SHOWNORMAL);
     }
 #elif __APPLE__
-    inline void FileExplorerPanel::open_file(const std::string& path) {
+    inline void open_file(const std::string& path) {
         std::string cmd = "open \"" + path + "\"";
         system(cmd.c_str());
     }
 #elif __linux__
-    inline void FileExplorerPanel::open_file(const std::string& path) {
+    inline void open_file(const std::string& path) {
         std::string cmd = "xdg-open \"" + path + "\"";
         system(cmd.c_str());
     }

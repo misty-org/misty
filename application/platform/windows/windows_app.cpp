@@ -1,3 +1,4 @@
+#ifdef _WIN32
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 #include "windows_app.h"
@@ -197,5 +198,5 @@ namespace minidfs {
 
     }
 }
-
+#endif 
 

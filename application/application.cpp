@@ -5,27 +5,19 @@ namespace minidfs {
         try {
             init_platform();
             init_client();
-
-            
             init_views();
             
         } catch (const std::exception& e) {
             std::cout << "Exception caught in Application::run: " << e.what() << std::endl;
             cleanup();
         }
-
-        
+        std::cout << "Entering main loop." << std::endl;
         while (is_running()) {
             prepare_frame();
             
             app_view_registry_.render_view();
-
             render_frame();
-            
         }
-        
-        
-
         cleanup();
     }
 

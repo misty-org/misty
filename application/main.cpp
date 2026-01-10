@@ -1,5 +1,3 @@
-
-
 #ifdef _WIN32
     #include <windows.h>
     #include "windows_app.h"
@@ -8,11 +6,7 @@
 #endif
 
 #include "application.h"
-
-#include "file_explorer_panel.h"
 #include <memory>
-#include "ui_registry.h"
-#include "panel.h"
 
 std::unique_ptr<minidfs::Application> create_application() {
     #ifdef _WIN32

@@ -1,3 +1,4 @@
+#ifdef _WIN32
 #pragma once
 
 #define GLFW_EXPOSE_NATIVE_WIN32
@@ -51,3 +52,5 @@ namespace minidfs {
         HWND hwnd_ = nullptr;
     };
 }
+
+#endif
