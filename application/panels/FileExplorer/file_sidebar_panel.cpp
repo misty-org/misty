@@ -5,138 +5,206 @@ namespace minidfs::FileExplorer {
     FileSidebarPanel::FileSidebarPanel(UIRegistry& registry, WorkerPool& worker_pool, std::shared_ptr<MiniDFSClient> client)
         : registry_(registry), worker_pool_(worker_pool), client_(client) {
 
-     
     }
 
     void FileSidebarPanel::render() {
         auto& state = registry_.get_state<FileSidebarState>("FileSidebar");
 
-        ImGuiViewport* viewport = ImGui::GetMainViewport();
-        ImGui::SetNextWindowViewport(viewport->ID);
-
-        width_ = viewport->WorkSize.x * 0.20f;
-        if (width_ < 160.0f) width_ = 160.0f;
-        offset_ = 77.0f;
-        padding_ = width_ * 0.08f;
-
-       
-        ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + offset_, viewport->WorkPos.y));
-        ImGui::SetNextWindowSize(ImVec2(width_, viewport->WorkSize.y));
-
-        ImGuiWindowFlags sidebar_flags = ImGuiWindowFlags_NoTitleBar |
-			ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags flags =
+            ImGuiWindowFlags_NoTitleBar |
+            ImGuiWindowFlags_NoResize |
             ImGuiWindowFlags_NoMove |
             ImGuiWindowFlags_NoCollapse |
             ImGuiWindowFlags_NoScrollbar;
 
         ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.15f, 0.15f, 0.15f, 1.0f));
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16.0f, 16.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 12.0f));
 
-        if (ImGui::Begin("FileSidebar", nullptr, sidebar_flags)) {
-            ImGui::SetCursorPos(ImVec2(padding_, 20));
-            
-            show_add_item(state);
+        if (ImGui::Begin("FileSidebar", nullptr, flags)) {
+            float width = ImGui::GetWindowWidth();
+            float padding = width * 0.08f;
 
+            show_create_new(state, width, padding);
 
-            ImGui::Dummy(ImVec2(0, 10)); // Responsive spacing
-
-            
-
-            ImGui::Spacing();
             ImGui::Separator();
-            ImGui::Spacing();
 
-            show_quick_access();
+            show_quick_access(width, padding);
+            show_storage_info(width, padding);
 
-            // Anchored Storage Info (Fixed to bottom)
-            show_storage_info();
+            show_chooser_modal(state);
+            show_create_entry_modal(state);
         }
+
         ImGui::End();
+        ImGui::PopStyleVar(2);
         ImGui::PopStyleColor();
-        ImGui::PopStyleVar();
-        
     }
 
-    void FileSidebarPanel::show_add_item(FileSidebarState& state) {
+    void FileSidebarPanel::show_create_new(FileSidebarState& state, float width, float padding) {
         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
-        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(padding_, 8));
-
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(padding, 8));
 
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.5f, 0.5f, 0.5f, 0.3f));
 
-        float b_width = width_ - (padding_ * 2);
-        float b_height = 48.0f;
-        
-		SVGTexture& plus_icon = AssetManager::get().get_svg_texture("plus-24", 24);
-		if (IconButton("##add_file", plus_icon.id, "New", ImVec2(b_width, b_height), 
-            nullptr, 18.0f)) {
-            
-            state.show_new_file_modal = true;
+        float b_width = width - (padding * 2);
+        SVGTexture& plus_icon = AssetManager::get().get_svg_texture("plus-24", 24);
+
+        if (IconButton("##add_file", plus_icon.id, "New", ImVec2(b_width, 48.0f), nullptr, 18.0f)) {
+            state.show_chooser_modal = true;
         }
-        
+
         ImGui::PopStyleColor(2);
         ImGui::PopStyleVar(2);
     }
 
-    void FileSidebarPanel::show_quick_access() {
-        float content_width = width_ - (padding_ * 2.0f);
-        ImGui::SetCursorPosX(padding_);
+    void FileSidebarPanel::show_chooser_modal(FileSidebarState& state)
+    {
+        if (state.show_chooser_modal)
+            ImGui::OpenPopup("New");
+
+        ImGuiViewport* vp = ImGui::GetMainViewport();
+        ImGui::SetNextWindowPos(
+            ImVec2(vp->WorkPos.x + 16, vp->WorkPos.y + 16),
+            ImGuiCond_Appearing);
+
+        ImGui::SetNextWindowSize(ImVec2(320, 360), ImGuiCond_Appearing);
+
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 8.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(24, 24));
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(12, 16));
+
+        if (ImGui::BeginPopupModal("New", &state.show_chooser_modal,
+            ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove))
+        {
+            float w = ImGui::GetContentRegionAvail().x;
+
+            ImGui::TextDisabled("Upload");
+            ImGui::Separator();
+
+            if (ImGui::Button("Upload Files", ImVec2(w, 40))) {
+                state.show_chooser_modal = false;
+            }
+
+            ImGui::TextDisabled("Create");
+            ImGui::Separator();
+
+            if (ImGui::Button("Create File", ImVec2(w, 40))) {
+                state.create_is_dir = false;
+                state.show_create_entry_modal = true;
+                state.show_chooser_modal = false;
+            }
+
+            if (ImGui::Button("Create Folder", ImVec2(w, 40))) {
+                state.create_is_dir = true;
+                state.show_create_entry_modal = true;
+                state.show_chooser_modal = false;
+            }
+
+            ImGui::EndPopup();
+        }
+
+        ImGui::PopStyleVar(3);
+    }
+
+
+    void FileSidebarPanel::show_create_entry_modal(FileSidebarState& state) {
+        if (state.show_create_entry_modal) {
+            ImGui::OpenPopup("Create");
+            state.show_create_entry_modal = false;
+        }
+
+        ImGui::SetNextWindowPos(
+            ImGui::GetMainViewport()->GetCenter(),
+            ImGuiCond_Appearing,
+            ImVec2(0.5f, 0.5f));
+
+        ImGui::SetNextWindowSize(ImVec2(420, 190), ImGuiCond_Appearing);
+
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 8.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(24, 24));
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(12, 16));
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(12, 10));
+
+        static char name[256] = "";
+
+        const char* title = state.create_is_dir ? "Create Folder" : "Create File";
+        const char* hint = state.create_is_dir ? "Folder name..." : "File name...";
+
+        if (ImGui::BeginPopupModal(title, nullptr,
+            ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove)) {
+
+            ImGui::Text("%s Name", state.create_is_dir ? "Folder" : "File");
+
+            ImGui::SetNextItemWidth(-1);
+            ImGui::InputTextWithHint("##name", hint, name, IM_ARRAYSIZE(name));
+
+            ImGui::Separator();
+
+            float spacing = ImGui::GetStyle().ItemSpacing.x;
+            float w = (ImGui::GetContentRegionAvail().x - spacing) * 0.5f;
+
+            if (ImGui::Button("Create", ImVec2(w, 36))) {
+                if (name[0]) {
+                    name[0] = '\0';
+                    ImGui::CloseCurrentPopup();
+                }
+            }
+
+            ImGui::SameLine();
+
+            if (ImGui::Button("Cancel", ImVec2(w, 36))) {
+                name[0] = '\0';
+                ImGui::CloseCurrentPopup();
+            }
+
+            ImGui::EndPopup();
+        }
+
+        ImGui::PopStyleVar(4);
+    }
+
+    void FileSidebarPanel::show_quick_access(float width, float padding) {
+        float content_width = width - (padding * 2);
+        ImGui::SetCursorPosX(padding);
 
         ImGui::BeginGroup();
 
-        // --- Sidebar Title ---
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.7f, 0.7f, 0.7f, 1.0f));
         ImGui::Text("Quick access");
         ImGui::PopStyleColor();
-        ImGui::Spacing();
 
-        // --- Style setup for Sidebar Buttons ---
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f, 8.0f));
-        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 10.0f));
-
-        // 1. Left-align the button text (x=0.0f, y=0.5f)
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 8.0f));
         ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.0f, 0.5f));
 
-        // 2. Transparency settings (Matching your "no color" preference)
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.3f, 0.3f, 0.3f));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.5f, 0.5f, 0.5f, 0.5f));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.3f, 0.3f, 0.3f, 0.5f));
 
-        // --- Navigation Buttons ---
-        if (ImGui::Button("Recent", ImVec2(content_width, 0))) {
-            // Logic for Recent
-        }
-
-        if (ImGui::Button("Starred", ImVec2(content_width, 0))) {
-            // Logic for Starred
-        }
-
-        if (ImGui::Button("Trash", ImVec2(content_width, 0))) {
-            // Logic for Trash
-        }
+        ImGui::Button("Recent", ImVec2(content_width, 0));
+        ImGui::Button("Starred", ImVec2(content_width, 0));
+        ImGui::Button("Trash", ImVec2(content_width, 0));
 
         ImGui::PopStyleColor(3);
-        ImGui::PopStyleVar(3); // Popping FramePadding, ItemSpacing, AND ButtonTextAlign
+        ImGui::PopStyleVar(3);
         ImGui::EndGroup();
     }
 
-    void FileSidebarPanel::show_storage_info() {
-        // Position at bottom (140px from bottom edge)
-        ImGui::SetCursorPosY(ImGui::GetWindowHeight() - 140);
-        ImGui::SetCursorPosX(padding_);
+    void FileSidebarPanel::show_storage_info(float width, float padding) {
+        ImGui::SetCursorPosY(ImGui::GetWindowContentRegionMax().y - 100.0f);
+        ImGui::SetCursorPosX(padding);
 
-        float b_width = width_ - (padding_ * 2);
+        float b_width = width - (padding * 2);
 
         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.4f, 0.2f, 0.15f, 1.0f));
 
-        // Multi-line text will now wrap or fit within b_width
-        if (ImGui::Button("Upload anything\n2.36 GB / 2 GB\nUpgrade", ImVec2(b_width, 80))) {
-            // Upgrade Logic
-        }
+        ImGui::Button("Upload anything\n2.36 GB / 2 GB\nUpgrade", ImVec2(b_width, 80));
 
         ImGui::PopStyleColor();
         ImGui::PopStyleVar();
     }
+
 }

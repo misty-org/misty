@@ -14,97 +14,97 @@ namespace minidfs::FileExplorer {
     void FileExplorerPanel::render() {
         auto& state = registry_.get_state<FileExplorerState>("FileExplorer");
 
-        ImGuiViewport* viewport = ImGui::GetMainViewport();
-        ImGui::SetNextWindowViewport(viewport->ID);
-
-        // --- COORDINATE MATH ---
-        float navbar_offset = 77.0f;
-        float sidebar_width = viewport->WorkSize.x * 0.20f;
-        if (sidebar_width < 160.0f) sidebar_width = 160.0f; // Keep same clamp as FileSidebar
-
-        // The Explorer starts exactly where the FileSidebar ends
-        float explorer_x_pos = viewport->WorkPos.x + navbar_offset + sidebar_width;
-
-        // The width is whatever is left in the window
-        float explorer_width = viewport->WorkSize.x - (navbar_offset + sidebar_width);
-
-        ImGui::SetNextWindowPos(ImVec2(explorer_x_pos, viewport->WorkPos.y));
-        ImGui::SetNextWindowSize(ImVec2(explorer_width, viewport->WorkSize.y));
-        // -----------------------
-
         ImGuiWindowFlags file_explorer_flags = ImGuiWindowFlags_NoTitleBar |
             ImGuiWindowFlags_NoMove |
             ImGuiWindowFlags_NoCollapse |
-            ImGuiWindowFlags_NoResize; // Force it to follow our math
+            ImGuiWindowFlags_NoResize;
 
-        // Lighten the background slightly so it's distinct from the sidebar
         ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.18f, 0.18f, 0.18f, 1.0f));
 
-        ImGui::Begin("File Explorer", nullptr, file_explorer_flags);
+        if (ImGui::Begin("File Explorer", nullptr, file_explorer_flags)) {
+            std::unique_lock<std::mutex> lock(state.mu, std::try_to_lock);
 
-        // Attempt to lock.
-        std::unique_lock<std::mutex> lock(state.mu, std::try_to_lock);
+            if (lock.owns_lock()) {
+                if (ImGui::BeginChild("TopBar", ImVec2(0, 50), false, ImGuiWindowFlags_NoScrollbar)) {
+                    ImGui::SetCursorPosY(8.0f);
+                    
+                    show_nav_history(state, 30.0f, 8.0f);
+                    
+                    ImGui::SameLine(0, 8.0f);
+                    ImGui::SetCursorPosY(7.0f);
 
-        if (lock.owns_lock()) {
-            // Pass 'state' into these functions so they don't have to call registry_.get_state() again
-            show_search_bar(state);
-            ImGui::Separator();
-            show_directory_contents(state);
-            show_error_modal(state);
-            
+                    
+                    show_search_bar(state);
+                }
+                ImGui::EndChild();
+
+                ImGui::Separator();
+                show_directory_contents(state);
+                show_error_modal(state);
+            }
+            else {
+                ImGui::Text("Syncing...");
+            }
         }
-        else {
-            ImGui::Text("Syncing...");
-        }
-        ImGui::PopStyleColor();
         ImGui::End();
+        ImGui::PopStyleColor();
+    }
+
+    void FileExplorerPanel::show_nav_history(FileExplorerState& state, float button_width, float spacing) {
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6.0f, 6.0f));
+
+        bool can_go_back = !state.back_history.empty();
+        if (!can_go_back) ImGui::BeginDisabled();
+        if (ImGui::Button("<", ImVec2(button_width, 0))) {
+            navigate_back();
+        }
+        if (!can_go_back) ImGui::EndDisabled();
+
+        ImGui::SameLine(0, spacing);
+
+        bool can_go_forward = !state.forward_history.empty();
+        if (!can_go_forward) ImGui::BeginDisabled();
+        if (ImGui::Button(">", ImVec2(button_width, 0))) {
+            navigate_forward();
+        }
+        if (!can_go_forward) ImGui::EndDisabled();
+
+        ImGui::PopStyleVar(2);
     }
 
     void FileExplorerPanel::show_search_bar(FileExplorerState& state) {
-        if (ImGui::BeginChild("FileExplorerSearchBar", ImVec2(0, 50), false, ImGuiWindowFlags_NoScrollbar)) {
 
-            // Center the search bar
-            float windowWidth = ImGui::GetContentRegionAvail().x;
-            float searchBarWidth = 600.0f; // Adjust this width as needed
-            float centerPosX = (windowWidth - searchBarWidth) * 0.5f;
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 8));
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
 
-            ImGui::SetCursorPosX(centerPosX);
-            ImGui::SetCursorPosY(10.0f); // Vertical centering
+        ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.21f, 0.21f, 0.21f, 1.0f));
 
-            // Search box styling
-            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 8));
-            ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
-            ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.95f, 0.95f, 0.97f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
 
-            ImGui::SetNextItemWidth(searchBarWidth);
+        float available_width = ImGui::GetContentRegionAvail().x;
+        ImGui::SetNextItemWidth(available_width);
 
-            if (ImGui::InputTextWithHint("##search", "Search or enter path...",
-                state.current_path,
-                sizeof(state.current_path) - 1,
-                ImGuiInputTextFlags_EnterReturnsTrue)) {
-                get_files(state.current_path);
-            }
-
-            ImGui::PopStyleColor(2);
-            ImGui::PopStyleVar(2);
+        if (ImGui::InputTextWithHint("##search", "Search or enter path...",
+            state.current_path,
+            sizeof(state.current_path) - 1,
+            ImGuiInputTextFlags_EnterReturnsTrue)) {
+            get_files(state.current_path);
         }
-        ImGui::EndChild();
+
+        ImGui::PopStyleColor();
+        ImGui::PopStyleVar(2);
     }
 
     void FileExplorerPanel::show_directory_contents(FileExplorerState& state) {
-
-        // Table Flags: RowBg adds alternating row colors like Google Drive
         static ImGuiTableFlags flags = ImGuiTableFlags_Reorderable | ImGuiTableFlags_Sortable |
             ImGuiTableFlags_Hideable | ImGuiTableFlags_RowBg |
             ImGuiTableFlags_ScrollY | ImGuiTableFlags_Resizable;
 
         if (ImGui::BeginTable("FileTable", 4, flags)) {
-            // 1. Setup Columns
             ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
             ImGui::TableSetupColumn("Size", ImGuiTableColumnFlags_WidthFixed, 80.0f);
             ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 80.0f);
-			ImGui::TableSetupColumn("Last Modified", ImGuiTableColumnFlags_WidthFixed, 150.0f);
+            ImGui::TableSetupColumn("Last Modified", ImGuiTableColumnFlags_WidthFixed, 150.0f);
             ImGui::TableHeadersRow();
 
             if (state.files.empty()) {
@@ -128,12 +128,10 @@ namespace minidfs::FileExplorer {
 
             if (ImGuiTableSortSpecs* sorts_specs = ImGui::TableGetSortSpecs()) {
                 if (sorts_specs->SpecsDirty) {
-                    // Sort your state.files vector here based on sorts_specs->Specs->ColumnIndex
                     sorts_specs->SpecsDirty = false;
                 }
             }
 
-            
             ImGui::EndTable();
         }
     }
@@ -143,7 +141,6 @@ namespace minidfs::FileExplorer {
         minidfs::FileInfo file = state.files[i];
         std::string display_name = fs::path(file.file_path()).filename().generic_string();
 
-        // 1. Correct check (Always use full_path)
         bool is_currently_selected = state.selected_files.count(file.file_path()) > 0;
 
         ImGui::TableNextRow();
@@ -169,29 +166,22 @@ namespace minidfs::FileExplorer {
             }
             state.last_selected_index = i;
 
-
-
             if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)) {
                 if (file.is_dir()) {
-                    get_files(FileManager::ResolvePath(client_->GetClientMountPath(), file.file_path()).generic_string());
+                    get_files(file.file_path()); // Direct path
                 }
                 else {
-                    open_file(FileManager::ResolveAbsolutePath(client_->GetClientMountPath(), file.file_path()).generic_string());
+                    open_file(file.file_path()); // Direct path
                 }
             }
-                
         }
     }
-
     
     void FileExplorerPanel::show_error_modal(FileExplorerState& state) {
-
         if (!state.error_msg.empty()) {
             ImGui::OpenPopup("Error Alert");
         }
         
-
-        // Always define the popup window layout
         if (ImGui::BeginPopupModal("Error Alert", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
             ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "SYSTEM ERROR");
             ImGui::Separator();
@@ -199,87 +189,83 @@ namespace minidfs::FileExplorer {
             ImGui::Spacing();
 
             if (ImGui::Button("OK", ImVec2(120, 0))) {
-                // This is crucial: Clear the error message so it doesn't reopen immediately
                 state.error_msg = "";
                 ImGui::CloseCurrentPopup();
             }
             ImGui::EndPopup();
         }
     }
-
-
-    //gRPC client calls
         
-    void FileExplorerPanel::get_files(const std::string& path) {
+    void FileExplorerPanel::get_files(const std::string& path, bool update_history) {
         auto& state = registry_.get_state<FileExplorerState>("FileExplorer");
 
-        state.is_loading = true;
-        auto client_ptr = client_;
-        auto results = std::make_shared<std::vector<minidfs::FileInfo>>();
-
-        worker_pool_.add(
-            [client_ptr, path, results]() {
-                if (client_ptr == nullptr) throw std::runtime_error("Not connected to MiniDFS");
-
-                minidfs::ListFilesRes response;
-                // Use the path passed from the UI
-                grpc::StatusCode status = client_ptr->ListFiles(path, &response);
-
-                if (status == grpc::StatusCode::OK || status == grpc::StatusCode::NOT_FOUND) {
-                    for (const auto& file : response.files()) {
-                        results->push_back(file);
-                    }
-                    return;
-                }
-                throw std::runtime_error("gRPC fetch failed");
-            },
-            [this, client_ptr, results, path]() {
-                registry_.update_state<FileExplorerState>("FileExplorer", [path, client_ptr, results](FileExplorerState& s) mutable {
-                    std::lock_guard<std::mutex> lock(s.mu);
-                    s.update_files(path, std::move(*results));
-                });
-            },
-            [this, results](const std::string& err_msg) {
-                registry_.update_state<FileExplorerState>("FileExplorer", [results, err_msg](FileExplorerState& s) {
-                    s.is_loading = false;
-                    s.error_msg = err_msg;
-                });
+        try {
+            std::vector<minidfs::FileInfo> new_files;
+            for (const auto& entry : fs::directory_iterator(path)) {
+                minidfs::FileInfo file_info;
+                file_info.set_file_path(entry.path().generic_string());
+                file_info.set_is_dir(entry.is_directory());
+                new_files.push_back(file_info);
             }
-        );
+            state.update_files(path, std::move(new_files), update_history);
+        }
+        catch (const std::exception& e) {
+            state.error_msg = e.what();
+            state.is_loading = false;
+        }
     }
 
-    void FileExplorerPanel::add_file(const std::string& file_path) {
-        registry_.update_state<FileExplorerState>("FileExplorer", [](FileExplorerState& s) {
-            s.is_loading = true;
-            s.error_msg = "";
-        });
+    void FileExplorerPanel::navigate_back() {
+        auto& state = registry_.get_state<FileExplorerState>("FileExplorer");
+        std::string previous_path = state.go_back();
+        if (!previous_path.empty()) {
+            get_files(previous_path, false);
+        }
+    }
 
+    void FileExplorerPanel::navigate_forward() {
+        auto& state = registry_.get_state<FileExplorerState>("FileExplorer");
+        std::string next_path = state.go_forward();
+        if (!next_path.empty()) {
+            get_files(next_path, false);
+        }
+    }
+
+    void FileExplorerPanel::create_file(const std::string& filename) {
         auto& state = registry_.get_state<FileExplorerState>("FileExplorer");
 
-        auto client_ptr = client_;
+        std::string full_path = (fs::path(state.current_path) / filename).string();
 
-        worker_pool_.add(
-            [client_ptr, file_path]() {
-                if (!client_ptr) throw std::runtime_error("gRPC Client lost");
-                grpc::StatusCode status = client_ptr->StoreFile(file_path, file_path);
-				if (status != grpc::StatusCode::OK) {
-                    throw std::runtime_error("gRPC store file failed");
-                }
-            },
-            [this]() {
-                registry_.update_state<FileExplorerState>("FileExplorer", [](FileExplorerState& s) {
-                    s.is_loading = false;
-                    s.error_msg = "";
-                });
-            },
-            [this](const std::string& err_msg) {
-                registry_.update_state<FileExplorerState>("FileExplorer", [err_msg](FileExplorerState& s) {
-                    s.is_loading = false;
-                    s.error_msg = err_msg;
-                });
-            }
-        );
+        try {
+            std::ofstream file(full_path);
+            file.close();
+
+            // Refresh view - don't update history for refresh
+            get_files(state.current_path, false);
+        }
+        catch (const std::exception& e) {
+            state.error_msg = e.what();
+        }
     }
+
+    void FileExplorerPanel::upload_file(const std::string& source_path) {
+        auto& state = registry_.get_state<FileExplorerState>("FileExplorer");
+
+        std::string filename = fs::path(source_path).filename().generic_string();
+        std::string dest_path = (fs::path(state.current_path) / filename).generic_string();
+
+        try {
+            fs::copy_file(source_path, dest_path, fs::copy_options::overwrite_existing);
+
+            // Refresh view - don't update history for refresh
+            get_files(state.current_path, false);
+        }
+        catch (const std::exception& e) {
+            state.error_msg = e.what();
+        }
+    }
+
+   
 #ifdef _WIN32
 #include <windows.h>
 #include <shellapi.h>
@@ -299,5 +285,3 @@ namespace minidfs::FileExplorer {
     }
 #endif
 }
-
-

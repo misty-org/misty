@@ -18,18 +18,16 @@ namespace minidfs::FileExplorer {
         void render();
 
     private:
-        void show_add_item(FileSidebarState& state);
-        void show_quick_access();
-        void show_storage_info();
+        void show_create_new(FileSidebarState& state, float width, float padding);
+        void show_chooser_modal(FileSidebarState& state);
+        void show_create_entry_modal(FileSidebarState& state);
+        void show_quick_access(float width, float padding);
+        void show_storage_info(float width, float padding);
 
     private:
         UIRegistry& registry_;
         WorkerPool& worker_pool_;
         std::shared_ptr<MiniDFSClient> client_;
-    private:
-        float width_ = 0;
-        float padding_ = 0;
-        float offset_ = 0;
     };
 
 }
