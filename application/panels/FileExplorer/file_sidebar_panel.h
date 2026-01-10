@@ -23,6 +23,7 @@ namespace minidfs::FileExplorer {
         void show_create_entry_modal(FileSidebarState& state);
         void show_quick_access(float width, float padding);
         void show_storage_info(float width, float padding);
+    
 
     private:
         UIRegistry& registry_;

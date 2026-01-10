@@ -8,7 +8,8 @@ namespace minidfs::FileExplorer {
     FileExplorerPanel::FileExplorerPanel(UIRegistry& registry, WorkerPool& worker_pool, std::shared_ptr<MiniDFSClient> client) 
         : registry_(registry), worker_pool_(worker_pool), client_(std::move(client)) {
 
-        get_files(client_->GetClientMountPath());
+        auto& state = registry_.get_state<FileExplorerState>("FileExplorer");
+        get_files(state, client_->GetClientMountPath());
     }
 
     void FileExplorerPanel::render() {
@@ -57,7 +58,7 @@ namespace minidfs::FileExplorer {
         bool can_go_back = !state.back_history.empty();
         if (!can_go_back) ImGui::BeginDisabled();
         if (ImGui::Button("<", ImVec2(button_width, 0))) {
-            navigate_back();
+            go_back(state);
         }
         if (!can_go_back) ImGui::EndDisabled();
 
@@ -66,7 +67,7 @@ namespace minidfs::FileExplorer {
         bool can_go_forward = !state.forward_history.empty();
         if (!can_go_forward) ImGui::BeginDisabled();
         if (ImGui::Button(">", ImVec2(button_width, 0))) {
-            navigate_forward();
+            go_forward(state);
         }
         if (!can_go_forward) ImGui::EndDisabled();
 
@@ -88,7 +89,7 @@ namespace minidfs::FileExplorer {
             state.current_path,
             sizeof(state.current_path) - 1,
             ImGuiInputTextFlags_EnterReturnsTrue)) {
-            get_files(state.current_path);
+            get_files(state, state.current_path);
         }
 
         ImGui::PopStyleColor();
@@ -168,7 +169,7 @@ namespace minidfs::FileExplorer {
 
             if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)) {
                 if (file.is_dir()) {
-                    get_files(file.file_path()); // Direct path
+                    get_files(state, file.file_path()); // Direct path
                 }
                 else {
                     open_file(file.file_path()); // Direct path
@@ -195,93 +196,5 @@ namespace minidfs::FileExplorer {
             ImGui::EndPopup();
         }
     }
-        
-    void FileExplorerPanel::get_files(const std::string& path, bool update_history) {
-        auto& state = registry_.get_state<FileExplorerState>("FileExplorer");
-
-        try {
-            std::vector<minidfs::FileInfo> new_files;
-            for (const auto& entry : fs::directory_iterator(path)) {
-                minidfs::FileInfo file_info;
-                file_info.set_file_path(entry.path().generic_string());
-                file_info.set_is_dir(entry.is_directory());
-                new_files.push_back(file_info);
-            }
-            state.update_files(path, std::move(new_files), update_history);
-        }
-        catch (const std::exception& e) {
-            state.error_msg = e.what();
-            state.is_loading = false;
-        }
-    }
-
-    void FileExplorerPanel::navigate_back() {
-        auto& state = registry_.get_state<FileExplorerState>("FileExplorer");
-        std::string previous_path = state.go_back();
-        if (!previous_path.empty()) {
-            get_files(previous_path, false);
-        }
-    }
-
-    void FileExplorerPanel::navigate_forward() {
-        auto& state = registry_.get_state<FileExplorerState>("FileExplorer");
-        std::string next_path = state.go_forward();
-        if (!next_path.empty()) {
-            get_files(next_path, false);
-        }
-    }
-
-    void FileExplorerPanel::create_file(const std::string& filename) {
-        auto& state = registry_.get_state<FileExplorerState>("FileExplorer");
-
-        std::string full_path = (fs::path(state.current_path) / filename).string();
-
-        try {
-            std::ofstream file(full_path);
-            file.close();
-
-            // Refresh view - don't update history for refresh
-            get_files(state.current_path, false);
-        }
-        catch (const std::exception& e) {
-            state.error_msg = e.what();
-        }
-    }
-
-    void FileExplorerPanel::upload_file(const std::string& source_path) {
-        auto& state = registry_.get_state<FileExplorerState>("FileExplorer");
-
-        std::string filename = fs::path(source_path).filename().generic_string();
-        std::string dest_path = (fs::path(state.current_path) / filename).generic_string();
-
-        try {
-            fs::copy_file(source_path, dest_path, fs::copy_options::overwrite_existing);
-
-            // Refresh view - don't update history for refresh
-            get_files(state.current_path, false);
-        }
-        catch (const std::exception& e) {
-            state.error_msg = e.what();
-        }
-    }
-
-   
-#ifdef _WIN32
-#include <windows.h>
-#include <shellapi.h>
-
-    void FileExplorerPanel::open_file(const std::string& path) {
-        ShellExecuteA(NULL, "open", path.c_str(), NULL, NULL, SW_SHOWNORMAL);
-    }
-#elif __APPLE__
-    void FileExplorerPanel::open_file(const std::string& path) {
-        std::string cmd = "open \"" + path + "\"";
-        system(cmd.c_str());
-    }
-#elif __linux__
-    void FileExplorerPanel::open_file(const std::string& path) {
-        std::string cmd = "xdg-open \"" + path + "\"";
-        system(cmd.c_str());
-    }
-#endif
+    
 }

@@ -23,13 +23,7 @@ namespace minidfs::FileExplorer {
         void show_directory_contents(FileExplorerState& state);
         void show_file_item(FileExplorerState& state, int i);
         void show_error_modal(FileExplorerState& state);
-    private:
-        void get_files(const std::string& path, bool update_history = true);
-        void navigate_back();
-        void navigate_forward();
-        void create_file(const std::string& filename);
-        void upload_file(const std::string& source_path);
-        void open_file(const std::string& path);
+        
     private:
         UIRegistry& registry_;
         WorkerPool& worker_pool_;
