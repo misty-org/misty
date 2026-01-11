@@ -7,7 +7,7 @@
 #include "ui_registry.h"
 #include "minidfs_client.h"
 
-namespace minidfs {
+namespace minidfs::FileExplorer {
     struct FileExplorerState : public UIState {
         char current_path[512];
         std::vector<minidfs::FileInfo> files;

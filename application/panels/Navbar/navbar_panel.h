@@ -15,10 +15,14 @@ namespace minidfs {
         ~NavbarPanel() override = default;
         void render();
 
+
     private:
+        void show_nav_item(const char* icon, const char* label, int size, int index, NavbarState& state);
+        void show_logo_icon();
+
+    private:
+		float nav_width_ = 77.0f;
         UIRegistry& ui_registry_;
-        
-        void render_nav_item(const char* icon, const char* label, int size, int index, NavbarState& state);
         SVGTexture folder_icon_;
     };
 }

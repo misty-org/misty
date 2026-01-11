@@ -1,9 +1,9 @@
-#include "file_explorer_panel.h"
+﻿#include "file_explorer_panel.h"
 #include <iostream>
 
 namespace fs = std::filesystem;
 
-namespace minidfs {
+namespace minidfs::FileExplorer {
     
     FileExplorerPanel::FileExplorerPanel(UIRegistry& registry, WorkerPool& worker_pool, std::shared_ptr<MiniDFSClient> client) 
         : registry_(registry), worker_pool_(worker_pool), client_(std::move(client)) {
@@ -20,9 +20,9 @@ namespace minidfs {
         // --- COORDINATE MATH ---
         float navbar_offset = 77.0f;
         float sidebar_width = viewport->WorkSize.x * 0.20f;
-        if (sidebar_width < 160.0f) sidebar_width = 160.0f; // Keep same clamp as ToolMenu
+        if (sidebar_width < 160.0f) sidebar_width = 160.0f; // Keep same clamp as FileSidebar
 
-        // The Explorer starts exactly where the ToolMenu ends
+        // The Explorer starts exactly where the FileSidebar ends
         float explorer_x_pos = viewport->WorkPos.x + navbar_offset + sidebar_width;
 
         // The width is whatever is left in the window
@@ -61,18 +61,33 @@ namespace minidfs {
     }
 
     void FileExplorerPanel::show_search_bar(FileExplorerState& state) {
-        if (ImGui::BeginChild("FileExplorerSearchBar", ImVec2(0, 35), false)) {
+        if (ImGui::BeginChild("FileExplorerSearchBar", ImVec2(0, 50), false, ImGuiWindowFlags_NoScrollbar)) {
 
-            if (ImGui::Button("Home")) {
-                get_files(client_->GetClientMountPath());
-            }
+            // Center the search bar
+            float windowWidth = ImGui::GetContentRegionAvail().x;
+            float searchBarWidth = 600.0f; // Adjust this width as needed
+            float centerPosX = (windowWidth - searchBarWidth) * 0.5f;
 
-            ImGui::SameLine();
+            ImGui::SetCursorPosX(centerPosX);
+            ImGui::SetCursorPosY(10.0f); // Vertical centering
 
+            // Search box styling
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 8));
+            ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
+            ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.95f, 0.95f, 0.97f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
 
-            if (ImGui::InputText("Search", state.current_path, sizeof(state.current_path) - 1, ImGuiInputTextFlags_EnterReturnsTrue)) {
+            ImGui::SetNextItemWidth(searchBarWidth);
+
+            if (ImGui::InputTextWithHint("##search", "Search or enter path...",
+                state.current_path,
+                sizeof(state.current_path) - 1,
+                ImGuiInputTextFlags_EnterReturnsTrue)) {
                 get_files(state.current_path);
             }
+
+            ImGui::PopStyleColor(2);
+            ImGui::PopStyleVar(2);
         }
         ImGui::EndChild();
     }

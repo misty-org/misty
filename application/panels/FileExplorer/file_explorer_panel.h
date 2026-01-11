@@ -10,7 +10,7 @@
 #include "minidfs_client.h"
 #include "svg_loader.h"
 
-namespace minidfs {
+namespace minidfs::FileExplorer {
     class FileExplorerPanel : public Panel {
     public:
         FileExplorerPanel(UIRegistry& registry, WorkerPool& worker_pool, std::shared_ptr<MiniDFSClient> client);

@@ -5,7 +5,15 @@
 #include "svg_loader.h"
 
 
+
+
 namespace minidfs {
+
+    struct ImageTexture {
+        GLuint id;
+        int width;
+        int height;
+    };
 
     class AssetManager {
     public:
@@ -16,7 +24,9 @@ namespace minidfs {
         void load_theme(const std::string& path);
 
         // Get an icon (Loads and caches if not found)
-        SVGTexture& get_icon(const std::string& name, int size = 24);
+        SVGTexture& get_svg_texture(const std::string& name, int size = 24);
+
+        ImageTexture& get_image_texture(const std::string& path);
 
         // In AssetManager.h
         const std::string& get_current_theme() const;
@@ -29,6 +39,7 @@ namespace minidfs {
         ~AssetManager() = default;
 
         std::string current_theme_;
-        std::unordered_map<std::string, SVGTexture> icon_map_;
+        std::unordered_map<std::string, SVGTexture> svg_textures_;
+        std::unordered_map<std::string, ImageTexture> image_textures_;
     };
 }

@@ -3,8 +3,7 @@
 #define GLFW_EXPOSE_NATIVE_WIN32
 
 #include <windows.h>
-#include <glad/glad.h>
-#include <GLFW/glfw3.h>
+#include "minidfs.h"
 #include <GLFW/glfw3native.h>
 #include <dwmapi.h>
 #include <windowsx.h>
