@@ -1,4 +1,5 @@
 *.env
+.cache
 build
 libs/*
 .vs/*
@@ -6,7 +7,7 @@ libs/*
 *.tmp
 *.json
 proto_src/*
-
+vendor/minidfs_sdk/*
 
 
 
