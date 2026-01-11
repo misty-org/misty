@@ -1,16 +1,34 @@
-include(FetchContent)
+# cmake/vendor.cmake
+list(APPEND CMAKE_PREFIX_PATH "${CMAKE_SOURCE_DIR}/vendor/minidfs_sdk/Release")
+list(APPEND CMAKE_PREFIX_PATH "${CMAKE_SOURCE_DIR}/vendor/minidfs_sdk/Debug")
 
-FetchContent_Declare(
-  lunasvg
-  GIT_REPOSITORY https://github.com/sammycage/lunasvg.git
-  GIT_TAG        v3.5.0
+find_package(gRPC CONFIG QUIET)
+find_package(Protobuf CONFIG QUIET)
+
+if(NOT gRPC_FOUND OR NOT Protobuf_FOUND)
+    message(FATAL_ERROR 
+        "\n--- DEPENDENCY MISSING ---\n"
+        "gRPC or Protobuf not found! Please install them using vcpkg:\n"
+        "  vcpkg install grpc:x64-windows\n"
+        "Then run CMake again with:\n"
+        "  -DCMAKE_TOOLCHAIN_FILE=[path_to_vcpkg]/scripts/buildsystems/vcpkg.cmake\n"
+        "--------------------------\n"
+    )
+endif()
+
+find_package(glfw3 CONFIG REQUIRED)
+find_package(lunasvg CONFIG REQUIRED)
+set_target_properties(lunasvg::lunasvg PROPERTIES
+    IMPORTED_LOCATION_DEBUG   "${CMAKE_SOURCE_DIR}/vendor/minidfs_sdk/Debug/lib/lunasvg.lib"
+    IMPORTED_LOCATION_RELEASE "${CMAKE_SOURCE_DIR}/vendor/minidfs_sdk/Release/lib/lunasvg.lib"
+)
+set_target_properties(plutovg::plutovg PROPERTIES
+    IMPORTED_LOCATION_DEBUG   "${CMAKE_SOURCE_DIR}/vendor/minidfs_sdk/Debug/lib/plutovg.lib"
+    IMPORTED_LOCATION_RELEASE "${CMAKE_SOURCE_DIR}/vendor/minidfs_sdk/Release/lib/plutovg.lib"
 )
 
-FetchContent_MakeAvailable(lunasvg)
 
-target_link_libraries(minidfs_client PRIVATE lunasvg)
-add_custom_command(TARGET minidfs_client POST_BUILD
-  COMMAND ${CMAKE_COMMAND} -E copy_directory
-  "${CMAKE_CURRENT_SOURCE_DIR}/vendor/octicons/icons"
-  "$<TARGET_FILE_DIR:minidfs_client>/assets/icons"
-)
+# Do the same for plutovg since lunasvg depends on it
+
+
+message(STATUS "SDK fully loaded. No more compiler checks needed!")

@@ -1,9 +1,9 @@
 # cmake/setup_tests.cmake
 find_package(GTest CONFIG REQUIRED)
 
-set(TEST_SRCS
-    "tests/file_manager_tests.cpp"
-    "tests/minidfs_single_client_tests.cpp"
+file(GLOB_RECURSE TEST_SRCS
+    "src/tests/*.cpp"
+    "src/tests/*.h"
 )
   
 # tests
