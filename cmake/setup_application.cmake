@@ -60,7 +60,6 @@ elseif(UNIX AND NOT APPLE)
         _GNU_SOURCE
     )
 endif()
-endif()
 
 target_include_directories(minidfs_client PRIVATE
     ${CMAKE_SOURCE_DIR}
