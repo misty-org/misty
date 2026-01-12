@@ -49,6 +49,17 @@ elseif(APPLE)
         "-framework CoreGraphics"
         "-framework CoreServices"
     )
+elseif(UNIX AND NOT APPLE)
+    file(GLOB LINUX_SRCS
+        "src/application/platform/linux/*.cpp"
+        "src/application/platform/linux/*.h"
+    )
+    list(APPEND APP_SRCS ${LINUX_SRCS})
+    target_sources(minidfs_client PRIVATE ${APP_SRCS})
+    target_compile_definitions(minidfs_client PRIVATE
+        _GNU_SOURCE
+    )
+endif()
 endif()
 
 target_include_directories(minidfs_client PRIVATE
