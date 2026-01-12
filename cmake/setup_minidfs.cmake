@@ -3,7 +3,7 @@ find_package(Protobuf CONFIG REQUIRED)
 find_package(gRPC CONFIG REQUIRED)
 
 set(PROTO_FILE ${CMAKE_SOURCE_DIR}/src/proto/minidfs.proto)
-set(GEN_PATH ${CMAKE_BINARY_DIR}/src/proto_src/proto) # Better to put in Binary Dir than Source Dir
+set(GEN_PATH ${CMAKE_SOURCE_DIR}/src/proto_src) # Better to put in Binary Dir than Source Dir
 file(MAKE_DIRECTORY ${GEN_PATH})
 
 get_target_property(PROTOC_BIN protobuf::protoc LOCATION)

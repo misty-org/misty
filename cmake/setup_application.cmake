@@ -14,12 +14,12 @@ set(IMGUI_SRCS
 file(GLOB_RECURSE APP_SRCS
     "src/application/*.cpp"
     "src/application/*.h"
+    "vendor/glad/src/glad.cpp"
     ${IMGUI_SRCS}
 )
 
 add_executable(minidfs_client)
 if(WIN32)
-    list(APPEND APP_SRCS "vendor/glad/src/glad.cpp")
     file(GLOB WIN32_SRCS "src/application/platform/windows/*.cpp" "src/application/platform/windows/*.h")
     list(APPEND APP_SRCS ${WIN32_SRCS})
     target_sources(minidfs_client PRIVATE ${APP_SRCS})
@@ -30,28 +30,27 @@ if(WIN32)
     endif()
     add_definitions(-DWIN32_LEAN_AND_MEAN)
     add_definitions(-DNOMINMAX)
-    target_link_libraries(minidfs_client PRIVATE ws2_32 opengl32)
+    target_link_libraries(minidfs_client PRIVATE ws2_32 dwmapi)
     if(MSVC)
         target_link_options(minidfs_client PRIVATE "/ENTRY:mainCRTStartup")
         set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT minidfs_client)
         set_target_properties(minidfs_client PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "$<TARGET_FILE_DIR:minidfs_client>")
-        
-        # Enable multi-processor compilation
         add_compile_options(/MP)
-        
-        # Enable Hot Reload (Edit and Continue) for Debug builds
         target_compile_options(minidfs_client PRIVATE $<$<CONFIG:Debug>:/ZI>)
         target_link_options(minidfs_client PRIVATE $<$<CONFIG:Debug>:/INCREMENTAL>)
-        
-        # Also need /Od (disable optimizations) for Hot Reload to work properly
         target_compile_options(minidfs_client PRIVATE $<$<CONFIG:Debug>:/Od>)
         add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
     endif()
 elseif(APPLE)
-    file(GLOB MAC_SRCS "application/platform/mac/*.mm" "application/platform/mac/*.h")
+    file(GLOB MAC_SRCS "application/platform/mac/*.cpp" "application/platform/mac/*.h")
     list(APPEND APP_SRCS ${MAC_SRCS})
     target_sources(minidfs_client PRIVATE ${APP_SRCS})
+    target_link_libraries(minidfs_client PRIVATE
+        "-framework CoreGraphics"
+        "-framework CoreServices"
+    )
 endif()
+
 target_include_directories(minidfs_client PRIVATE
     ${CMAKE_SOURCE_DIR}
     ${IMGUI_DIR}
@@ -77,27 +76,14 @@ target_include_directories(minidfs_client PRIVATE
     
     ${IMGUI_INCLUDE_DIRS}
 )
+
 target_link_libraries(minidfs_client PRIVATE 
     minidfs
     glfw
-    lunasvg::lunasvg
+    lunasvg
+    OpenGL::GL
 )
 
-if(WIN32)
-    target_link_libraries(minidfs_client PRIVATE dwmapi)
-elseif(APPLE)
-    target_link_libraries(minidfs_client PRIVATE
-        glfw
-        "-framework Cocoa"
-        "-framework CoreFoundation"
-        "-framework Metal"
-        "-framework MetalKit"
-        "-framework QuartzCore"
-        "-framework IOKit"
-        "-framework CoreGraphics"
-        "-framework CoreServices"
-    )
-endif()
 target_precompile_headers(minidfs_client PRIVATE 
     "src/application/minidfs.h"
 )

@@ -19,6 +19,7 @@
 #include <grpcpp/server_context.h>
 #include <grpcpp/impl/service_type.h>
 #include <grpcpp/support/sync_stream.h>
+#include <grpcpp/ports_def.inc>
 namespace minidfs {
 
 static const char* MiniDFSService_method_names[] = {
@@ -272,4 +273,5 @@ MiniDFSService::Service::~Service() {
 
 
 }  // namespace minidfs
+#include <grpcpp/ports_undef.inc>
 

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.16)
 cmake_policy(SET CMP0111 OLD)
 project(minidfs LANGUAGES CXX C OBJCXX VERSION 1.0)
 

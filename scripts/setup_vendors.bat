@@ -25,7 +25,7 @@ if /i NOT "%CONFIG%"=="Release" if /i NOT "%CONFIG%"=="Debug" if /i NOT "%CONFIG
 set "MINIDFS_DIR=%ROOT_DIR%\vendor\minidfs_sdk\%CONFIG%"
 set "GLFW_SRC=%ROOT_DIR%\vendor\glfw"
 set "LUNA_SRC=%ROOT_DIR%\vendor\lunasvg"
-set "GOOGLE_TEST_SRC=%ROOT_DIR%\vendor\googletest"
+set "GOOGLE_TEST_SRC=%ROOT_DIR%\vendor\gtest"
 
 echo ========================================================
 echo Pre-compiling Vendors into %MINIDFS_DIR%
@@ -47,13 +47,6 @@ cmake -B "%LUNA_SRC%\build_%CONFIG%" -S "%LUNA_SRC%" ^
     -DCMAKE_INSTALL_PREFIX="%MINIDFS_DIR%" ^
     -DLUNASVG_BUILD_SHARED=OFF
 cmake --build "%LUNA_SRC%\build_%CONFIG%" --config %CONFIG% --target install
-
-:: --- 5. Build Google Test ---
-echo Building Google Test [%CONFIG%]...
-cmake -B "%GOOGLE_TEST_SRC%\build_%CONFIG%" -S "%GOOGLE_TEST_SRC%" ^
-    -DCMAKE_INSTALL_PREFIX="%MINIDFS_DIR%" ^
-    -Dgtest_force_shared_crt=ON -Dgtest_build_tests=OFF
-cmake --build "%GOOGLE_TEST_SRC%\build_%CONFIG%" --config %CONFIG% --target install -j %NUMBER_OF_PROCESSORS%
 
 echo ========================================================
 echo SUCCESS!
