@@ -5,6 +5,7 @@ namespace minidfs::FileExplorer {
     FileSidebarPanel::FileSidebarPanel(UIRegistry& registry, WorkerPool& worker_pool, std::shared_ptr<MiniDFSClient> client)
         : registry_(registry), worker_pool_(worker_pool), client_(client) {
 
+
     }
 
     void FileSidebarPanel::render() {
@@ -110,58 +111,51 @@ namespace minidfs::FileExplorer {
 
 
     void FileSidebarPanel::show_create_entry_modal(FileSidebarState& state) {
+        const char* title = state.create_is_dir ? "Create Folder" : "Create File";
+
         if (state.show_create_entry_modal) {
-            ImGui::OpenPopup("Create");
+            ImGui::OpenPopup(title); // Match the title exactly
             state.show_create_entry_modal = false;
         }
 
-        ImGui::SetNextWindowPos(
-            ImGui::GetMainViewport()->GetCenter(),
-            ImGuiCond_Appearing,
-            ImVec2(0.5f, 0.5f));
-
-        ImGui::SetNextWindowSize(ImVec2(420, 190), ImGuiCond_Appearing);
+        // Centering and Styling
+        ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, { 0.5f, 0.5f });
+        ImGui::SetNextWindowSize({ 420, 190 }, ImGuiCond_Appearing);
 
         ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 8.0f);
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(24, 24));
-        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(12, 16));
-        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(12, 10));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { 24, 24 });
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { 12, 16 });
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, { 12, 10 });
 
-        static char name[256] = "";
-
-        const char* title = state.create_is_dir ? "Create Folder" : "Create File";
-        const char* hint = state.create_is_dir ? "Folder name..." : "File name...";
-
-        if (ImGui::BeginPopupModal(title, nullptr,
-            ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove)) {
+        if (ImGui::BeginPopupModal(title, nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove)) {
 
             ImGui::Text("%s Name", state.create_is_dir ? "Folder" : "File");
-
             ImGui::SetNextItemWidth(-1);
-            ImGui::InputTextWithHint("##name", hint, name, IM_ARRAYSIZE(name));
+            ImGui::InputTextWithHint("##name", "Enter name...", state.name_buffer, IM_ARRAYSIZE(state.name_buffer));
 
             ImGui::Separator();
 
-            float spacing = ImGui::GetStyle().ItemSpacing.x;
-            float w = (ImGui::GetContentRegionAvail().x - spacing) * 0.5f;
+            float w = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
 
-            if (ImGui::Button("Create", ImVec2(w, 36))) {
-                if (name[0]) {
-                    name[0] = '\0';
-                    ImGui::CloseCurrentPopup();
-                }
+            if (ImGui::Button("Create", { w, 36 }) && state.name_buffer[0]) {
+                // Use the pointer we stored in the state to avoid registry deadlocks!
+				auto& file_explorer_state = registry_.get_state<FileExplorerState>("FileExplorer");
+                fs::path p = fs::path(file_explorer_state.current_path) / state.name_buffer;
+                create_file(p.generic_string());
+
+                state.name_buffer[0] = '\0';
+                ImGui::CloseCurrentPopup();
             }
 
             ImGui::SameLine();
 
-            if (ImGui::Button("Cancel", ImVec2(w, 36))) {
-                name[0] = '\0';
+            if (ImGui::Button("Cancel", { w, 36 })) {
+                state.name_buffer[0] = '\0';
                 ImGui::CloseCurrentPopup();
             }
 
             ImGui::EndPopup();
         }
-
         ImGui::PopStyleVar(4);
     }
 
@@ -206,5 +200,4 @@ namespace minidfs::FileExplorer {
         ImGui::PopStyleColor();
         ImGui::PopStyleVar();
     }
-
 }

@@ -31,7 +31,6 @@
 #include "file_sidebar_panel.h"
 #include "navbar_panel.h"
 #include "worker_pool.h"
-#include "minidfs_client.h"
 #include "app_view.h"
 #include "file_explorer_view.h"
 #include "application.h"   

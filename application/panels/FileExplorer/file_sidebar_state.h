@@ -1,13 +1,11 @@
 #pragma once
 
 #include "ui_registry.h"
+#include "file_explorer_state.h"
 #include <string>
 
 namespace minidfs::FileExplorer {
     struct FileSidebarState : public UIState {
-        // 1. Context: What directory are we currently acting on?
-        std::string current_working_path = "/";
-
         // 2. Input Buffers: For "New File" or "New Folder" modals
         char name_buffer[256] = "";
         
@@ -19,4 +17,14 @@ namespace minidfs::FileExplorer {
         bool is_performing_action = false;
         std::string status_message = ""; 
     };
+
+    inline void create_file(const std::string& file_path) {
+        std::cout << "creating file at: " << file_path << std::endl;
+        std::ofstream file(file_path);
+        if (!file) {
+            // Optional: Handle error or log it
+            return;
+        }
+        file.close();
+    }
 }
