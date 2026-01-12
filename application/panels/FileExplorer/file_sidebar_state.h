@@ -11,10 +11,10 @@ namespace minidfs::FileExplorer {
         // 2. Input Buffers: For "New File" or "New Folder" modals
         char name_buffer[256] = "";
         
-        // 3. UI Flow Control: Which modal is currently open?
-        bool show_new_file_modal = false;
-        bool show_new_folder_modal = false;
-
+        bool show_chooser_modal = false;
+        bool show_create_entry_modal = false;
+        bool create_is_dir = false;
+        
         // 4. Action Feedback
         bool is_performing_action = false;
         std::string status_message = ""; 

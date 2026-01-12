@@ -14,7 +14,7 @@ namespace minidfs {
     public:
         template<typename T>
         T& get_state(const std::string& key) {
-            std::lock_guard<std::recursive_mutex> lock(mu_);
+            std::lock_guard<std::mutex> lock(mu_);
             if (states_.find(key) == states_.end()) {
                 states_[key] = std::make_unique<T>();
             }
@@ -23,14 +23,19 @@ namespace minidfs {
 
         template<typename T>
         void update_state(const std::string& key, std::function<void(T&)> callback) {
-            std::lock_guard<std::recursive_mutex> lock(mu_);
-            T& state = get_state<T>(key);
+            std::lock_guard<std::mutex> lock(mu_);
+            // Don't call get_state - directly access to avoid double lock
+            if (states_.find(key) == states_.end()) {
+                states_[key] = std::make_unique<T>();
+            }
+            T& state = static_cast<T&>(*states_[key]);
             if (callback) {
                 callback(state);
             }
         }
+
     private:
         std::unordered_map<std::string, std::unique_ptr<UIState>> states_;
-        std::recursive_mutex mu_;
+        std::mutex mu_; // Changed from recursive_mutex
     };
 }

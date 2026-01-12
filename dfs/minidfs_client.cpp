@@ -116,7 +116,6 @@ grpc::StatusCode MiniDFSClient::StoreFile(const std::string& client_id, const st
 
     std::ifstream infile(file_path, std::ios::binary);
     if (!infile) {
-        ReleaseClientFileSession(file_path);
         return grpc::StatusCode::NOT_FOUND;
     }
 

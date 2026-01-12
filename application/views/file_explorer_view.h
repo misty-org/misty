@@ -18,12 +18,19 @@ namespace minidfs::FileExplorer {
         FileExplorerView(UIRegistry& ui_registry, WorkerPool& worker_pool, std::shared_ptr<MiniDFSClient> client);
         ~FileExplorerView() = default;
 
+        void render() override;
+        ViewID get_view_id() override;
+
     private:
-        void init_layers();
+        void init_panels();
     private:
         UIRegistry& ui_registry_;
         WorkerPool& worker_pool_;
         std::shared_ptr<MiniDFSClient> client_;
+
+        std::shared_ptr<NavbarPanel> navbar_panel_;
+        std::shared_ptr<FileSidebarPanel> file_sidebar_panel_;
+        std::shared_ptr<FileExplorerPanel> file_explorer_panel_;
         
     };
 }

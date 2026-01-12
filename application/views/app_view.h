@@ -14,20 +14,14 @@ namespace minidfs {
 
     class AppView {
     public:
-        AppView(ViewID view_id);
+        AppView() = default;
         ~AppView() = default;
 
-        ViewID get_view_id() const;
+        virtual ViewID get_view_id() = 0;
 
-        void render();
+        virtual void render() = 0;
 
     protected:
-        
-        void add_layer(std::shared_ptr<Panel> layer);
-        void remove_layer(std::shared_ptr<Panel> layer);
-    
-    protected:
-        std::vector<std::shared_ptr<Panel>> panels_;
         ViewID view_id;
     };
 }
