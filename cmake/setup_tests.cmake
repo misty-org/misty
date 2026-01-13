@@ -1,15 +1,19 @@
 # cmake/setup_tests.cmake
-find_package(GTest CONFIG REQUIRED)
 
-set(TEST_SRCS
-    "tests/file_manager_tests.cpp"
-    "tests/minidfs_single_client_tests.cpp"
+set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
+set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)
+
+add_subdirectory(${CMAKE_SOURCE_DIR}/vendor/googletest)
+
+file(GLOB_RECURSE TEST_SRCS
+    "src/tests/*.cpp"
+    "src/tests/*.h"
 )
   
 # tests
 add_executable(minidfs_tests ${TEST_SRCS})
 target_link_libraries(minidfs_tests PRIVATE
     minidfs
-    GTest::gtest
-    GTest::gtest_main
+    gtest
+    gtest_main
 )
