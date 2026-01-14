@@ -49,6 +49,16 @@ elseif(APPLE)
         "-framework CoreGraphics"
         "-framework CoreServices"
     )
+elseif(UNIX AND NOT APPLE)
+    file(GLOB LINUX_SRCS
+        "src/application/platform/linux/*.cpp"
+        "src/application/platform/linux/*.h"
+    )
+    list(APPEND APP_SRCS ${LINUX_SRCS})
+    target_sources(minidfs_client PRIVATE ${APP_SRCS})
+    target_compile_definitions(minidfs_client PRIVATE
+        _GNU_SOURCE
+    )
 endif()
 
 target_include_directories(minidfs_client PRIVATE
@@ -98,6 +108,10 @@ add_custom_command(TARGET minidfs_client POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_CURRENT_SOURCE_DIR}/vendor/octicons/icons"
         "$<TARGET_FILE_DIR:minidfs_client>/assets/icons"
+
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/config"
+        "$<TARGET_FILE_DIR:minidfs_client>/config"
 )
 
 
