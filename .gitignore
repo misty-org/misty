@@ -6,8 +6,9 @@ libs/*
 *.log
 *.tmp
 *.json
-proto_src/*
+src/proto_src/*
 vendor/minidfs_sdk/*
+config/*
 
 
 
