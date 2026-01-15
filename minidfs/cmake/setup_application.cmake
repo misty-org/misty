@@ -32,14 +32,21 @@ if(WIN32)
     add_definitions(-DNOMINMAX)
     target_link_libraries(minidfs_client PRIVATE ws2_32 dwmapi)
     if(MSVC)
-        target_link_options(minidfs_client PRIVATE "/ENTRY:mainCRTStartup")
-        set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT minidfs_client)
-        set_target_properties(minidfs_client PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "$<TARGET_FILE_DIR:minidfs_client>")
-        add_compile_options(/MP)
+        # Use /MP for ALL configurations to speed up every build
+        target_compile_options(minidfs_client PRIVATE /MP)
+
+        # Edit and Continue flags (Use 'Debug' casing)
         target_compile_options(minidfs_client PRIVATE $<$<CONFIG:Debug>:/ZI>)
-        target_link_options(minidfs_client PRIVATE $<$<CONFIG:Debug>:/INCREMENTAL>)
-        target_compile_options(minidfs_client PRIVATE $<$<CONFIG:Debug>:/Od>)
-        add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
+        target_link_options(minidfs_client PRIVATE $<$<CONFIG:Debug>:/EDITANDCONTINUE>)
+
+        # CRITICAL: Fix the 'MDd' vs 'MT' mismatch error
+        set_property(TARGET minidfs_client PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
+
+        # Set Startup Project
+        set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT minidfs_client)
+        
+        # Set Debugging Working Directory so it finds your config/assets
+        set_target_properties(minidfs_client PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "$<TARGET_FILE_DIR:minidfs_client>")
     endif()
 elseif(APPLE)
     file(GLOB MAC_SRCS "application/platform/mac/*.cpp" "application/platform/mac/*.h")
@@ -109,9 +116,9 @@ add_custom_command(TARGET minidfs_client POST_BUILD
         "${CMAKE_CURRENT_SOURCE_DIR}/vendor/octicons/icons"
         "$<TARGET_FILE_DIR:minidfs_client>/assets/icons"
 
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${CMAKE_CURRENT_SOURCE_DIR}/config"
-        "$<TARGET_FILE_DIR:minidfs_client>/config"
+    COMMAND ${CMAKE_COMMAND} -E copy
+        "${CMAKE_CURRENT_SOURCE_DIR}/minidfs.conf"
+        "$<TARGET_FILE_DIR:minidfs_client>/minidfs.conf"
 )
 
 
