@@ -9,9 +9,8 @@ namespace minidfs {
     
     void FileSync::on_file_created(const std::string& path, bool is_dir) {
         try {
-            const std::string v_path = FileManager::VirtualPath(client_->GetClientMountPath(), path);
-            std::cout << "File created: " << v_path << ", is_dir: " << is_dir << std::endl;
-            client_->StoreFile(v_path);
+            std::cout << path << std::endl;
+            client_->StoreFile(path);
         } catch (const std::exception& error) {
             std::cerr << "Error in on_file_created: " << error.what() << std::endl;
             return;
@@ -20,9 +19,7 @@ namespace minidfs {
 
     void FileSync::on_file_removed(const std::string& path, bool is_dir) {
         try {
-            const std::string v_path = FileManager::VirtualPath(client_->GetClientMountPath(), path);
-            std::cout << "File removed: " << path << ", is_dir: " << is_dir << std::endl;
-            client_->RemoveFile(v_path);
+            client_->RemoveFile(path);
         } catch (const std::exception& error) {
             std::cerr << "Error in on_file_removed: " << error.what() << std::endl;
             return;

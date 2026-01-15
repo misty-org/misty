@@ -1,0 +1,100 @@
+syntax = "proto3";
+
+package minidfs;
+
+option go_package = ".;minidfs";
+
+enum FileOpType {
+    READ = 0;
+    WRITE = 1;
+    DEL = 2;
+}
+
+enum FileUpdateType {
+    CREATED = 0;
+    MODIFIED = 1;
+    DELETED = 2;
+}
+
+// service methods for minidfs
+service MiniDFSService {
+    
+    //List files in a directory
+    rpc ListFiles(ListFilesReq) returns (ListFilesRes);
+
+    // Store files on the server
+    rpc StoreFile(stream FileBuffer) returns (StoreFileRes);
+
+    // Fetch files from the server
+    rpc FetchFile(FetchFileReq) returns (stream FileBuffer);
+
+    // Get a file lock
+    rpc GetFileLock(FileLockReq) returns (FileLockRes);
+
+    // Delete file request
+    rpc RemoveFile(DeleteFileReq) returns (DeleteFileRes);
+
+    // Callback for file updates
+    rpc FileUpdateCallback(FileUpdate) returns (stream FileUpdate);
+
+}
+
+message FileBuffer {
+    string client_id = 1;
+    string file_path = 2;
+    bytes data = 3;
+    uint64 offset = 4;
+}
+
+message FileInfo {
+    string file_path = 1;
+    uint64 size = 2;
+    uint64 mtime = 3;
+    bool is_dir = 4;
+    string hash = 5;
+}
+
+message ListFilesReq {
+    string path = 1;
+}
+
+message ListFilesRes {
+    repeated FileInfo files = 1;
+}
+
+message StoreFileRes {
+    string msg = 1;
+    bool success = 2;
+}
+
+message FetchFileReq {
+    string client_id = 1;
+    string file_path = 2;
+}
+
+message DeleteFileReq {
+    string client_id = 1;
+    string file_path = 2;
+}
+
+message DeleteFileRes {
+    string msg = 1;
+    bool success = 2;
+}
+
+message FileLockReq {
+    string client_id = 1;
+    string file_path = 2;
+    FileOpType op = 3;
+}
+
+message FileLockRes {
+    bool success = 1;
+}
+
+message FileUpdate {
+    string client_id = 1;
+    FileUpdateType type = 2;
+    FileInfo file_info = 3;
+    uint64 version = 4;
+}

@@ -1,14 +1,13 @@
 *.env
 .cache
-build
+*/build
 libs/*
 .vs/*
 *.log
 *.tmp
 *.json
-src/proto_src/*
-vendor/minidfs_sdk/*
-config/*
+*/src/proto_src/*
+*/config/*
 
 
 

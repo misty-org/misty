@@ -7,6 +7,7 @@
 #include <iostream>
 #include "file_sync.h"
 
+
 namespace minidfs {
     class FileSyncWin32 : public FileSync {
     public:
@@ -19,8 +20,8 @@ namespace minidfs {
     
     private:
         void sync_loop();
-        void process_changes();
-        void process_overflow();
+        void handle_change();
+        void handle_overflow();
         void handle_action(DWORD action, const std::wstring& file_name);
     private:
         HANDLE directory_handle_;

@@ -24,9 +24,31 @@ namespace minidfs {
     }
 
     void Application::init_client() {
-        auto channel = grpc::CreateChannel("localhost:50051", grpc::InsecureChannelCredentials());
+        std::string mount_path, channel_address;
+        std::ifstream config_file("minidfs.conf");
+		if (config_file.is_open()) {
+            std::getline(config_file, mount_path);
+            std::getline(config_file, channel_address);
+            config_file.close();
+        } else {
+            throw std::runtime_error("Failed to open mount configuration file.");
+        }
+        if (mount_path.empty() || channel_address.empty()) {
+            throw std::runtime_error("Mount path is empty or invalid in configuration file.");
+        }
+        std::cout << channel_address << std::endl;
+
+        auto channel = grpc::CreateChannel(channel_address, grpc::InsecureChannelCredentials());
+        auto deadline = std::chrono::system_clock::now() + std::chrono::seconds(5);
+        if (channel->WaitForConnected(deadline)) {
+            std::cout << "gRPC Connection Successful!" << std::endl;
+        }
+        else {
+            // This doesn't throw, it just returns false if time runs out
+            std::cerr << "gRPC Connection Timeout: Is the server running?" << std::endl;
+        }
         client_ = std::make_shared<MiniDFSClient>(channel, 
-            "/Users/mtccool668/projects/minidfs/build/bin/minidfs", "c47f5011-5c7c-4955-9f90-eed53c09d445");
+            fs::path(mount_path).string(), "c47f5011-5c7c-4955-9f90-eed53c09d445");
     }
 
     void Application::init_file_sync() {
