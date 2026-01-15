@@ -6,8 +6,8 @@
 #include <fstream>
 #include <filesystem>
 #include <random>
-#include "dfs/minidfs_client.h"
-#include "dfs/minidfs_impl.h"
+#include "dfs/client/minidfs_client.h"
+#include "dfs/server/minidfs_impl.h"
 
 namespace fs = std::filesystem;
 
@@ -60,7 +60,7 @@ protected:
 
         // Client Setup
         shared_channel = grpc::CreateChannel("localhost:50051", grpc::InsecureChannelCredentials());
-        client = std::make_unique<MiniDFSClient>(shared_channel, client_mount);
+        client = std::make_unique<MiniDFSClient>(shared_channel, client_mount, "C:/Users/mtcco/projects/minidfs/build/bin/Debug");
     }
 
     void TearDown() override {
@@ -77,7 +77,7 @@ TEST_F(MiniDFSSingleClientTest, ListFilesEmptyDirectory) {
     fs::create_directories(dir_path);
 
     minidfs::ListFilesRes response;
-    grpc::StatusCode status = client->ListFiles(dir_path_client.string(), &response);
+    grpc::StatusCode status = client->ListFiles(dir_path.string(), &response);
     ASSERT_EQ(status, grpc::StatusCode::OK);
     EXPECT_EQ(response.files_size(), 0);
 }
@@ -90,7 +90,7 @@ TEST_F(MiniDFSSingleClientTest, ListFilesWithFiles) {
     CreateLocalFile((dir_path / "file2.txt").string(), "Content 2");
 
     minidfs::ListFilesRes response;
-    grpc::StatusCode status = client->ListFiles(dir_path_client.string(), &response);
+    grpc::StatusCode status = client->ListFiles(dir_path.string(), &response);
     ASSERT_EQ(status, grpc::StatusCode::OK);
     EXPECT_EQ(response.files_size(), 2);
 
@@ -128,7 +128,7 @@ TEST_F(MiniDFSSingleClientTest, ListFilesWithOtherDirectories) {
     fs::create_directories(dir_path / "subdir");
 
     minidfs::ListFilesRes response;
-    grpc::StatusCode status = client->ListFiles(dir_path_client.string(), &response);
+    grpc::StatusCode status = client->ListFiles(dir_path.string(), &response);
     ASSERT_EQ(status, grpc::StatusCode::OK);
     EXPECT_EQ(response.files_size(), 2);
 
@@ -146,7 +146,7 @@ TEST_F(MiniDFSSingleClientTest, StoreNonExistentFile) {
     const std::string client_id = "client1";
     const std::string client_file_path = client_mount + "/does_not_exist.txt";
 
-    grpc::StatusCode status = client->StoreFile(client_id, client_file_path);
+    grpc::StatusCode status = client->StoreFile(client_file_path);
     EXPECT_EQ(status, grpc::StatusCode::NOT_FOUND);
 }
 
@@ -157,7 +157,7 @@ TEST_F(MiniDFSSingleClientTest, StoreSmallFile) {
 
     CreateLocalFile(client_file_path.string(), content);
 
-    grpc::StatusCode status = client->StoreFile(client_id, client_file_path.string());
+    grpc::StatusCode status = client->StoreFile(client_file_path.string());
     ASSERT_EQ(status, grpc::StatusCode::OK);
 
     fs::path server_file_path = fs::path(server_mount) / fs::path(client_mount) / "test.txt";
@@ -183,7 +183,7 @@ TEST_F(MiniDFSSingleClientTest, StoreLargeFile) {
 
     ASSERT_EQ(fs::file_size(client_file_path), size);
 
-    grpc::StatusCode status = client->StoreFile(client_id, client_file_path.string());
+    grpc::StatusCode status = client->StoreFile(client_file_path.string());
     ASSERT_EQ(status, grpc::StatusCode::OK);
 
     fs::path server_file_path = fs::path(server_mount) / fs::path(client_mount) / "large_1gb.bin";
@@ -204,7 +204,7 @@ TEST_F(MiniDFSSingleClientTest, FetchSmallFile) {
     CreateLocalFile(server_file_path.string(), content);
 
     fs::path client_file_path = fs::path(client_mount) / "fetch_test.txt";
-    grpc::StatusCode status = client->FetchFile(client_id, client_file_path.string());
+    grpc::StatusCode status = client->FetchFile(client_file_path.string());
     ASSERT_EQ(status, grpc::StatusCode::OK);
     ASSERT_TRUE(fs::exists(client_file_path));
 
@@ -231,7 +231,7 @@ TEST_F(MiniDFSSingleClientTest, FetchLargeFile) {
     ASSERT_EQ(fs::file_size(server_file_path), size);
 
     fs::path client_file_path = fs::path(client_mount) / "large_fetch_1gb.bin";
-    grpc::StatusCode status = client->FetchFile(client_id, client_file_path.string());
+    grpc::StatusCode status = client->FetchFile(client_file_path.string());
     ASSERT_EQ(status, grpc::StatusCode::OK);
     ASSERT_TRUE(fs::exists(client_file_path));
     ASSERT_EQ(fs::file_size(client_file_path), size);
@@ -249,13 +249,13 @@ TEST_F(MiniDFSSingleClientTest, RemoveFile) {
 
     CreateLocalFile(client_file_path.string(), content);
 
-    grpc::StatusCode store_status = client->StoreFile(client_id, client_file_path.string());
+    grpc::StatusCode store_status = client->StoreFile(client_file_path.string());
     ASSERT_EQ(store_status, grpc::StatusCode::OK);
 
     fs::path server_file_path = fs::path(server_mount) / fs::path(client_mount) / "delete_test.txt";
     ASSERT_TRUE(fs::exists(server_file_path));
 
-    grpc::StatusCode delete_status = client->RemoveFile(client_id, client_file_path.string());
+    grpc::StatusCode delete_status = client->RemoveFile(client_file_path.string());
     ASSERT_EQ(delete_status, grpc::StatusCode::OK);
 
     EXPECT_FALSE(fs::exists(server_file_path));
@@ -265,6 +265,6 @@ TEST_F(MiniDFSSingleClientTest, DeleteNonExistentFile) {
     const std::string client_id = "client1";
     fs::path client_file_path = fs::path(client_mount) / "non_existent_delete.txt";
 
-    grpc::StatusCode delete_status = client->RemoveFile(client_id, client_file_path.string());
+    grpc::StatusCode delete_status = client->RemoveFile(client_file_path.string());
     ASSERT_EQ(delete_status, grpc::StatusCode::NOT_FOUND);
 }

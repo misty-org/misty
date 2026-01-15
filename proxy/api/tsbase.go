@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/kannachi323/minidfs/proxy/core"
+	"github.com/kannachi323/minidfs/proxy/core/tsbase"
 )
 
-func GetTSStatus(ts *core.TSBase) http.HandlerFunc {
+func GetTSStatus(ts *tsbase.TSBase) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		data := ts.GetStatus()
 
@@ -16,7 +16,7 @@ func GetTSStatus(ts *core.TSBase) http.HandlerFunc {
 	}
 }
 
-func GetPeers(ts *core.TSBase) http.HandlerFunc {
+func GetPeers(ts *tsbase.TSBase) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		peers, err := ts.GetPeers()
 		if err != nil {
@@ -29,7 +29,7 @@ func GetPeers(ts *core.TSBase) http.HandlerFunc {
 	}
 }
 
-func PingPeer(ts *core.TSBase) http.HandlerFunc {
+func PingServer(ts *tsbase.TSBase) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		hostname := r.URL.Query().Get("hostname")
 		if hostname == "" {
@@ -40,5 +40,14 @@ func PingPeer(ts *core.TSBase) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(ping)
+	}
+}
+
+func GetServerPeer(ts *tsbase.TSBase) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		serverPeer := ts.GetServerPeer()
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(serverPeer)
 	}
 }

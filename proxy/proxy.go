@@ -1,19 +1,20 @@
 package main
 
 import (
+	"log"
 	"os"
 	"path/filepath"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
 	"github.com/kannachi323/minidfs/proxy/api"
-	"github.com/kannachi323/minidfs/proxy/core"
+	"github.com/kannachi323/minidfs/proxy/core/tsbase"
 )
 
 type Proxy struct {
 	Router       *chi.Mux
 	APIRouter	 *chi.Mux
-	TSBase		 *core.TSBase
+	TSBase		 *tsbase.TSBase
 }
 
 func CreateProxy() *Proxy {
@@ -23,11 +24,16 @@ func CreateProxy() *Proxy {
 
 	s := &Proxy{
 		Router: chi.NewRouter(),
-		TSBase: core.CreateTSBase(dataDir),
 	}
 	s.Router.Route("/api", func(r chi.Router) {
 		s.APIRouter = r.(*chi.Mux)
 	})
+	base, err := tsbase.CreateTSBase(dataDir)
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+	s.TSBase = base
 
 	return s
 }
@@ -48,5 +54,5 @@ func (proxy *Proxy) MountHandlers() {
 
 	proxy.APIRouter.Get("/auth", api.GetTSStatus(proxy.TSBase));
 	proxy.APIRouter.Get("/peers", api.GetPeers(proxy.TSBase));
-	proxy.APIRouter.Get("/ping", api.PingPeer(proxy.TSBase))
+	proxy.APIRouter.Get("/ping", api.PingServer(proxy.TSBase))
 }
