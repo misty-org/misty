@@ -1,6 +1,11 @@
-#include "file_sync_win.h"
-
 #ifdef _WIN32
+
+#include "file_sync_win.h"
+#include "dfs/file_manager.h"
+#include <filesystem>
+
+
+namespace fs = std::filesystem;
 
 namespace minidfs {
     FileSyncWin32::FileSyncWin32(std::shared_ptr<MiniDFSClient> client)
@@ -26,16 +31,12 @@ namespace minidfs {
         if (stop_signal_ != NULL) CloseHandle(stop_signal_);
     }
 
-    void FileSyncWin32::start_sync() {
-        running_ = true;
-        sync_thread_ = std::thread(&FileSync::sync_loop, this);
-    }
-
     void FileSyncWin32::init_sync_resources() {
         if (client_ == nullptr) {
             throw std::runtime_error("MiniDFSClient is not initialized");
         }
         stop_signal_ = CreateEvent(NULL, TRUE, FALSE, NULL);
+		std::cout << client_->GetClientMountPath() << std::endl;
         directory_handle_ = CreateFile(
             client_->GetClientMountPath().c_str(),
             FILE_LIST_DIRECTORY,
@@ -54,6 +55,10 @@ namespace minidfs {
         }
     }
 
+     void FileSyncWin32::start_sync() {
+        running_ = true;
+        sync_thread_ = std::thread(&FileSyncWin32::sync_loop, this);
+    }
 
     void FileSyncWin32::sync_loop() {
         while (running_) {
@@ -97,7 +102,15 @@ namespace minidfs {
             auto* p_notify = reinterpret_cast<FILE_NOTIFY_INFORMATION*>(p_curr);
             std::wstring file_name(p_notify->FileName, p_notify->FileNameLength / sizeof(WCHAR));
 
-            handle_action(p_notify->Action, file_name);
+            std::u8string file_path = fs::path(file_name).u8string();
+            std::string path(file_path.begin(), file_path.end());
+            bool is_dir = fs::is_directory(path);
+
+            switch (p_notify->Action) {
+            case FILE_ACTION_ADDED:
+                on_file_created(path, is_dir);
+                break;
+            }
 
             if (p_notify->NextEntryOffset == 0) {
                 break;
@@ -111,13 +124,6 @@ namespace minidfs {
         std::cout << "Overflow detected in file change notifications." << std::endl;
     }
 
-    void FileSyncWin32::handle_action(DWORD action, const std::wstring& file_name) {
-        switch (action) {
-        case FILE_ACTION_ADDED:
-            std::wcout << L"File added: " << file_name << std::endl;
-            break;
-        }
-    }
 }
 
 
