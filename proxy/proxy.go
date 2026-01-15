@@ -1,43 +1,43 @@
 package main
 
 import (
-	"log"
 	"os"
 	"path/filepath"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
-	"github.com/kannachi323/minidfs/proxy/api"
-	"github.com/kannachi323/minidfs/proxy/core/tsbase"
+	"github.com/kannachi323/misty/proxy/api"
+	"github.com/kannachi323/misty/proxy/core/tsbase"
+	"github.com/kannachi323/misty/proxy/db"
 )
 
 type Proxy struct {
 	Router       *chi.Mux
 	APIRouter	 *chi.Mux
 	TSBase		 *tsbase.TSBase
+	Database     *db.Database
 }
 
-func CreateProxy() *Proxy {
+func CreateProxy() (*Proxy, error) {
 	home, _ := os.UserHomeDir()
 	dataDir := filepath.Join(home, ".minidfs", "tailscale")
 	os.MkdirAll(dataDir, 0700)
 
-	s := &Proxy{
+	proxy := &Proxy{
 		Router: chi.NewRouter(),
 	}
-	s.Router.Route("/api", func(r chi.Router) {
-		s.APIRouter = r.(*chi.Mux)
+	proxy.Router.Route("/api", func(r chi.Router) {
+		proxy.APIRouter = r.(*chi.Mux)
 	})
 	base, err := tsbase.CreateTSBase(dataDir)
 	if err != nil {
-		log.Println(err)
-		return nil
+		return nil, err
 	}
-	s.TSBase = base
+	proxy.TSBase = base
+	proxy.Database = &db.Database{}
 
-	return s
+	return proxy, nil
 }
-
 
 func (proxy *Proxy) MountHandlers() {
 	proxy.APIRouter.Use(cors.Handler(cors.Options{
@@ -49,10 +49,18 @@ func (proxy *Proxy) MountHandlers() {
 		MaxAge:           300, // Maximum value not ignored by any of major browsers
 	}))
 	
-	//DO NOT REMOVE THIS
+	//////--------------------------
+	// DO NOT REMOVE THIS
 	proxy.APIRouter.Get("/hello", api.HelloWorld())
+	//////--------------------------
 
-	proxy.APIRouter.Get("/auth", api.GetTSStatus(proxy.TSBase));
-	proxy.APIRouter.Get("/peers", api.GetPeers(proxy.TSBase));
-	proxy.APIRouter.Get("/ping", api.PingServer(proxy.TSBase))
+	proxy.APIRouter.Get("/ts-status", api.GetTSStatus(proxy.TSBase));
+	proxy.APIRouter.Get("/ts-peers", api.GetPeers(proxy.TSBase));
+	proxy.APIRouter.Get("/ts-ping", api.PingServer(proxy.TSBase))
+
+	proxy.APIRouter.Post("/register", api.RegisterUser(proxy.Database))
+	proxy.APIRouter.Post("/login", api.LoginUser(proxy.Database))
+
+	proxy.APIRouter.Post("/file", api.CreateFile(proxy.Database))
+	proxy.APIRouter.Get("/file", api.GetFile(proxy.Database))
 }

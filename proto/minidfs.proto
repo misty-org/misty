@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package minidfs;
 
+option go_package = ".;minidfs";
+
 enum FileOpType {
     READ = 0;
     WRITE = 1;
@@ -46,8 +48,10 @@ message FileBuffer {
 
 message FileInfo {
     string file_path = 1;
-    bool is_dir = 2;
-    string hash = 3;
+    uint64 size = 2;
+    uint64 mtime = 3;
+    bool is_dir = 4;
+    string hash = 5;
 }
 
 message ListFilesReq {

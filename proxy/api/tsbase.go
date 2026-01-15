@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/kannachi323/minidfs/proxy/core/tsbase"
+	"github.com/kannachi323/misty/proxy/core/tsbase"
 )
 
 func GetTSStatus(ts *tsbase.TSBase) http.HandlerFunc {

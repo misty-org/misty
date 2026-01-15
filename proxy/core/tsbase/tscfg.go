@@ -3,11 +3,11 @@ package tsbase
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 
-	"github.com/kannachi323/minidfs/proxy/core/utils"
-	"golang.org/x/crypto/bcrypt"
+	"github.com/kannachi323/misty/proxy/core/utils"
 )
 
 type TSConfig struct {
@@ -17,29 +17,33 @@ type TSConfig struct {
 
 }
 
+func GetConfigSecretPath() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		log.Println("Could not determine user home directory:", err)
+		return ""
+	}
+	secretPath := filepath.Join(home, ".minidfs", "tailscale", "secret.txt")
+
+	return secretPath
+}
+
 func GetConfigPath() string {
-	home, _ := os.UserHomeDir()
-	configPath := filepath.Join(home, ".minidfs", "config.json")
+	home, err := os.UserHomeDir()
+	if err != nil {
+		log.Println("Could not determine user home directory:", err)
+		return ""
+	}
+	configPath := filepath.Join(home, ".minidfs", "tailscale", "config.json")
 
 	return configPath
-}
-
-func IsValidServerID(hashedID string) bool {
-    home, _ := os.UserHomeDir()
-	secretPath := filepath.Join(home, ".minidfs", "secret.txt")
-
-	secretFile, err := os.ReadFile(secretPath)
-	if err != nil {
-		fmt.Printf("error reading secret file: %w", err)
-		return false
-	}
-    err = bcrypt.CompareHashAndPassword([]byte(hashedID), secretFile)
-    return err == nil
-}
+}	
 
 func (config *TSConfig) GetHashedBaseName() string {
-	home, _ := os.UserHomeDir()
-	secretPath := filepath.Join(home, ".minidfs", "secret.txt")
+	secretPath := GetConfigSecretPath()
+	if secretPath == "" {
+		return config.BaseName
+	}
 
 	secret, err := os.ReadFile(secretPath)
 	if err != nil {

@@ -2,8 +2,10 @@ package tsbase
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net/netip"
+	"time"
 
 	"tailscale.com/ipn"
 	"tailscale.com/tailcfg"
@@ -210,12 +212,21 @@ func (ts *TSBase) PingPeer(hostname string) *TSPing {
 
 	targetAddress := peer.PeerAddress
 	addr, _ := netip.ParseAddr(targetAddress)
-	pingRes, err := ts.TSClient.Ping(context.Background(), addr, tailcfg.PingICMP)
+    
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+
+	pingRes, err := ts.TSClient.Ping(ctx, addr, tailcfg.PingICMP)
 	if err != nil {
+        errMsg := err.Error()
+        if errors.Is(err, context.DeadlineExceeded) {
+            errMsg = "request timed out after 5 seconds"
+        }
+
 		return &TSPing{
 			IP: targetAddress,
 			Success: false,
-			Error: err.Error(),
+			Error: errMsg,
 		}
 	}
 
