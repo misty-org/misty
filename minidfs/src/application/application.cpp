@@ -1,4 +1,9 @@
 #include "application.h"
+#include "views/main_view.h"
+#include "views/register_view.h"
+#include "views/login_view.h"
+#include "views/ts_view.h"
+
 
 namespace minidfs {
     void Application::run() {
@@ -73,13 +78,15 @@ namespace minidfs {
             throw std::runtime_error("Client not initialized before initializing views.");
         }
 
-        app_view_registry_.register_view(ViewID::FileExplorer, 
-            std::make_unique<minidfs::FileExplorer::FileExplorerView>(ui_registry_, worker_pool_, client_));
-        app_view_registry_.register_view(ViewID::None, 
-			nullptr); // Placeholder
+        app_view_registry_.register_view(view::ViewID::FileExplorer, 
+            std::make_unique<view::MainView>(ui_registry_, worker_pool_, client_));
+        app_view_registry_.register_view(view::ViewID::Auth, std::make_unique<view::RegisterView>(ui_registry_));
+        app_view_registry_.register_view(view::ViewID::Login, std::make_unique<view::LoginView>(ui_registry_));
+        app_view_registry_.register_view(view::ViewID::TS, std::make_unique<view::TSView>(ui_registry_));
 
         AppViewRegistryController::init(&app_view_registry_);
-        AppViewRegistryController::switch_view(ViewID::FileExplorer);
+        AppViewRegistryController::switch_view(view::ViewID::Auth);
+    
     }
 
     

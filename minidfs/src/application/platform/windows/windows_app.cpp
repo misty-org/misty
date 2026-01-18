@@ -2,6 +2,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 #include "windows_app.h"
+#include "core/asset_manager.h"
 #include <cstdio>
 #include <iostream>
 
@@ -94,8 +95,8 @@ namespace minidfs {
         configure_imgui_io();
         configure_imgui_style();
 
-        AssetManager::get().load_themes();
-        AssetManager::get().load_fonts();
+        core::AssetManager::get().load_themes();
+        core::AssetManager::get().load_fonts();
 
       
         ImGui_ImplGlfw_InitForOpenGL(window_, true);
