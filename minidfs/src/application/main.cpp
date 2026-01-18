@@ -1,8 +1,8 @@
 #ifdef _WIN32
     #include <windows.h>
-    #include "windows_app.h"
+    #include "platform/windows/windows_app.h"
 #elif defined(__APPLE__)
-    #include "mac_app.h"
+    #include "platform/mac/mac_app.h"
 #endif
 
 #include "application.h"

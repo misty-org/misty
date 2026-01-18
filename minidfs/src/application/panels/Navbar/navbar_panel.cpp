@@ -1,7 +1,7 @@
-#include "navbar_panel.h"
-#include "asset_manager.h"
+#include "panels/Navbar/navbar_panel.h"
+#include "core/asset_manager.h"
 
-namespace minidfs {
+namespace minidfs::panel {
     NavbarPanel::NavbarPanel(UIRegistry& ui_registry) : ui_registry_(ui_registry) {
 
     }
@@ -41,7 +41,7 @@ namespace minidfs {
         const char* path = "assets/logo/mist_v1.png";
         const char* label = "mist_v1";
         
-        auto& logo_image = AssetManager::get().get_image_texture(path);
+        auto& logo_image = core::AssetManager::get().get_image_texture(path);
 
         float logo_size = 48.0f;
         ImVec2 padding(8.0f, 8.0f);
@@ -58,7 +58,8 @@ namespace minidfs {
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0, 0, 0, 0));
 
         if (ImGui::ImageButton(label, (void*)(intptr_t)logo_image.id, ImVec2(logo_size, logo_size))) {
-            std::cout << "Logo clicked!\n";
+            auto& state = ui_registry_.get_state<NavbarState>("Navbar");
+            state.handle_logo_click();
         }
 
         ImGui::PopStyleColor(3);
@@ -68,7 +69,7 @@ namespace minidfs {
 
     void NavbarPanel::show_nav_item(const char* icon_name, const char* label, int size, int index, NavbarState& state) {
         bool is_selected = (state.selected_item == index);
-        auto& icon = AssetManager::get().get_svg_texture(icon_name, size * 2);
+        auto& icon = core::AssetManager::get().get_svg_texture(icon_name, size * 2);
 
         float navbar_width = ImGui::GetWindowWidth();
 

@@ -3,7 +3,7 @@
 #define GLFW_INCLUDE_NONE
 
 #include "linux_app.h"
-#include "asset_manager.h"
+#include "core/asset_manager.h"
 #include "stb_image.h"
 
 #include "imgui_impl_glfw.h"
