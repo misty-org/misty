@@ -1,8 +1,8 @@
 #pragma once
-#include "ui_registry.h"
+#include "core/ui_registry.h"
 #include "navbar_state.h"
-#include "panel.h"
-#include "svg_loader.h"
+#include "panels/panel.h"
+#include "core/svg_loader.h"
 
 
 namespace minidfs::panel {

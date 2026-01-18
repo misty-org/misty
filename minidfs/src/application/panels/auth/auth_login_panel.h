@@ -1,9 +1,9 @@
 #pragma once
 
-#include "panel.h"
-#include "ui_registry.h"
+#include "panels/panel.h"
+#include "core/ui_registry.h"
 #include "auth_login_state.h"
-#include "svg_loader.h"
+#include "core/svg_loader.h"
 
 using namespace minidfs::core;
 

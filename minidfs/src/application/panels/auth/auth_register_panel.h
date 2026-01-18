@@ -1,7 +1,7 @@
 #pragma once
 
-#include "panel.h"
-#include "ui_registry.h"
+#include "panels/panel.h"
+#include "core/ui_registry.h"
 #include "auth_register_state.h"
 
 using namespace minidfs::core;

@@ -1,8 +1,14 @@
 #pragma once
-#include "ui_registry.h"
-#include "app_view_registry.h"
-#include "worker_pool.h"
+#include "core/ui_registry.h"
+#include "core/app_view_registry.h"
+#include "core/worker_pool.h"
+#include "dfs/file_sync/file_sync.h"
+
+#ifdef _WIN32
+#include "dfs/file_sync/file_sync_win.h"
+#elif defined(__APPLE__)
 #include "dfs/file_sync/file_sync_mac.h"
+#endif
 
 namespace minidfs {
     class Application {

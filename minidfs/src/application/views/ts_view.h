@@ -2,9 +2,9 @@
 
 #include <memory>
 
-#include "app_view.h"
-#include "ts_panel.h"
-#include "ui_registry.h"
+#include "views/app_view.h"
+#include "panels/setup/ts_panel.h"
+#include "core/ui_registry.h"
 
 using namespace minidfs::core;
 using namespace minidfs::panel;

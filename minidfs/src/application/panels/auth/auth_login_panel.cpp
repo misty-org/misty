@@ -1,11 +1,11 @@
 #include "auth_login_panel.h"
 #include "imgui.h"
-#include "util.h"
-#include "asset_manager.h"
-#include "app_view_registry.h"
+#include "core/util.h"
+#include "core/asset_manager.h"
+#include "core/app_view_registry.h"
 #include <cstring>
 #include <iostream>
-#include "panel_ui.h"
+#include "panels/panel_ui.h"
 
 namespace minidfs::panel {
     AuthLoginPanel::AuthLoginPanel(UIRegistry& registry)

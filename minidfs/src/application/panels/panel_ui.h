@@ -1,7 +1,7 @@
 #pragma once
 
 #include "imgui.h"
-#include "svg_loader.h"
+#include "core/svg_loader.h"
 
 namespace minidfs::panel {
     enum class IconButtonAlignH {

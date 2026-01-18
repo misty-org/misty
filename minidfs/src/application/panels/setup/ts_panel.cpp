@@ -1,6 +1,6 @@
 #include "ts_panel.h"
 #include "imgui.h"
-#include "util.h"
+#include "core/util.h"
 #include <cstring>
 
 namespace minidfs::panel {

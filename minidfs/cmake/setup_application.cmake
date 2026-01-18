@@ -68,6 +68,17 @@ elseif(UNIX AND NOT APPLE)
     )
 endif()
 
+# vendor includes
+target_include_directories(minidfs_client PRIVATE
+    ${CMAKE_SOURCE_DIR}/vendor/glad/include
+    ${CMAKE_SOURCE_DIR}/vendor/lunasvg/include
+    ${CMAKE_SOURCE_DIR}/vendor/stb_image
+    ${CMAKE_SOURCE_DIR}/vendor/imgui/backends
+    ${CMAKE_SOURCE_DIR}/vendor/imgui
+    ${CMAKE_SOURCE_DIR}/vendor/stb
+)
+
+# project includes
 target_include_directories(minidfs_client PRIVATE
     ${CMAKE_SOURCE_DIR}
     ${IMGUI_DIR}
@@ -75,23 +86,6 @@ target_include_directories(minidfs_client PRIVATE
     ${CMAKE_SOURCE_DIR}/src/proto_src
     ${CMAKE_SOURCE_DIR}/src/dfs
     ${CMAKE_SOURCE_DIR}/src/application
-    ${CMAKE_SOURCE_DIR}/src/application/panels
-    ${CMAKE_SOURCE_DIR}/src/application/panels/FileExplorer
-    ${CMAKE_SOURCE_DIR}/src/application/panels/Auth
-    ${CMAKE_SOURCE_DIR}/src/application/panels/Navbar
-    ${CMAKE_SOURCE_DIR}/src/application/panels/FileSidebar
-    ${CMAKE_SOURCE_DIR}/src/application/views
-    ${CMAKE_SOURCE_DIR}/src/application/core
-    ${CMAKE_SOURCE_DIR}/src/application/platform/mac
-    ${CMAKE_SOURCE_DIR}/src/application/platform/windows
-    ${CMAKE_SOURCE_DIR}/vendor/glad/include
-    ${CMAKE_SOURCE_DIR}/vendor/lunasvg/include
-    ${CMAKE_SOURCE_DIR}/vendor/stb_image
-    ${CMAKE_SOURCE_DIR}/vendor/imgui/backends
-    ${CMAKE_SOURCE_DIR}/vendor/imgui
-    ${CMAKE_SOURCE_DIR}/vendor/stb
-    
-    ${IMGUI_INCLUDE_DIRS}
 )
 
 target_link_libraries(minidfs_client PRIVATE 

@@ -3,7 +3,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 #include "mac_app.h"
-#include "asset_manager.h"
+#include "core/asset_manager.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 #include <cstdio>

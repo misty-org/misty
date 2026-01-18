@@ -2,8 +2,8 @@
 #include <string>
 #include <mutex>
 #include <cstring>
-#include "ui_registry.h"
-#include "app_view_registry.h"
+#include "core/ui_registry.h"
+#include "core/app_view_registry.h"
 
 namespace minidfs::panel {
 

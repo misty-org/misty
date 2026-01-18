@@ -7,7 +7,7 @@
 #include <mutex>
 #include <filesystem>
 #include <cstring>
-#include "ui_registry.h"
+#include "core/ui_registry.h"
 #include "minidfs.pb.h"
 
 namespace fs = std::filesystem;

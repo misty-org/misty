@@ -2,7 +2,7 @@
 #include <string>
 #include <mutex>
 #include <cstring>
-#include "ui_registry.h"
+#include "core/ui_registry.h"
 
 namespace minidfs::panel {
 

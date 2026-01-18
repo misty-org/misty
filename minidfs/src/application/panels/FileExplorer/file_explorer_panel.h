@@ -2,9 +2,9 @@
 
 #include <memory>
 
-#include "ui_registry.h"
-#include "panel.h"
-#include "worker_pool.h"
+#include "core/ui_registry.h"
+#include "panels/panel.h"
+#include "core/worker_pool.h"
 #include "file_explorer_state.h"
 
 

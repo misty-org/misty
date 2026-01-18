@@ -1,4 +1,4 @@
-#include "ts_view.h"
+#include "views/ts_view.h"
 #include "imgui.h"
 
 namespace minidfs::view {

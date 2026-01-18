@@ -1,7 +1,7 @@
-#include "file_sidebar_panel.h"
+#include "panels/FileExplorer/file_sidebar_panel.h"
 #include "file_explorer_state.h"
-#include "panel_ui.h"
-#include "asset_manager.h"
+#include "panels/panel_ui.h"
+#include "core/asset_manager.h"
 
 
 namespace minidfs::panel {
