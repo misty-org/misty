@@ -1,5 +1,5 @@
-#include "svg_loader.h"
-#include "asset_manager.h"
+#include "core/svg_loader.h"
+#include "core/asset_manager.h"
 #include <glad/glad.h>
 #include <lunasvg.h>
 #include <iostream>

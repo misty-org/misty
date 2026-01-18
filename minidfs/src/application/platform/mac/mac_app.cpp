@@ -3,11 +3,10 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 #include "mac_app.h"
-#include "asset_manager.h"
+#include "core/asset_manager.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 #include <cstdio>
-#include <iostream>
 
 namespace minidfs {
     void MacApp::init_platform() {
@@ -69,8 +68,8 @@ namespace minidfs {
         configure_imgui_io();
         configure_imgui_style();
 
-        AssetManager::get().load_themes();
-        AssetManager::get().load_fonts();
+        core::AssetManager::get().load_themes();
+        core::AssetManager::get().load_fonts();
 
       
         ImGui_ImplGlfw_InitForOpenGL(window_, true);
