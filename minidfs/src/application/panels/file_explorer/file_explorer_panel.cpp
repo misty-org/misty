@@ -44,7 +44,7 @@ namespace minidfs::panel {
 
                 ImGui::Separator();
                 show_directory_contents(state);
-                show_error_modal(state);
+                show_error_modal(state.error_msg, "FileExplorerError");
             }
             else {
                 ImGui::Text("Syncing...");
@@ -183,23 +183,5 @@ namespace minidfs::panel {
         }
     }
     
-    void FileExplorerPanel::show_error_modal(FileExplorerState& state) {
-        if (!state.error_msg.empty()) {
-            ImGui::OpenPopup("Error Alert");
-        }
-        
-        if (ImGui::BeginPopupModal("Error Alert", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
-            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "SYSTEM ERROR");
-            ImGui::Separator();
-            ImGui::TextWrapped("%s", state.error_msg.c_str());
-            ImGui::Spacing();
-
-            if (ImGui::Button("OK", ImVec2(120, 0))) {
-                state.error_msg = "";
-                ImGui::CloseCurrentPopup();
-            }
-            ImGui::EndPopup();
-        }
-    }
     
 }

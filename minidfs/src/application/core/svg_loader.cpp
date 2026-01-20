@@ -2,7 +2,6 @@
 #include "core/asset_manager.h"
 #include <glad/glad.h>
 #include <lunasvg.h>
-#include <iostream>
 
 namespace minidfs::core {
     SVGTexture load_svg(const std::string& path, int width, int height) {
@@ -14,7 +13,6 @@ namespace minidfs::core {
 
         // Automatically apply the global theme if one is loaded
         std::string css = AssetManager::get().get_current_theme();
-		std::cout << "Applying theme CSS to SVG: " << css << std::endl;
         if (!css.empty()) {
             document->applyStyleSheet(css);
         }

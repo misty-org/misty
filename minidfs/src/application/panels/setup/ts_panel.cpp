@@ -1,6 +1,7 @@
 #include "ts_panel.h"
 #include "imgui.h"
 #include "core/util.h"
+#include "core/imgui_utils.h"
 #include <cstring>
 
 namespace minidfs::panel {
@@ -22,27 +23,42 @@ namespace minidfs::panel {
             ImGuiWindowFlags_NoDocking;
 
         // Dark background
-        ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(32.0f, 40.0f));
-        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 10.0f));
-        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(12.0f, 8.0f));
+        core::CustomStyleColor bg(ImGuiCol_WindowBg, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
+        core::CustomStyleVar padding(ImGuiStyleVar_WindowPadding, ImVec2(32.0f, 40.0f));
+        core::CustomStyleVar item_spacing(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 10.0f));
+        core::CustomStyleVar frame_padding(ImGuiStyleVar_FramePadding, ImVec2(12.0f, 8.0f));
 
         if (ImGui::Begin("TailscalePanel", nullptr, flags)) {
-
-            float window_width = ImGui::GetWindowWidth();
-            float content_width = window_width - 64.0f; // Account for padding
-            ImGui::SetNextItemWidth(content_width);
-
-            show_header();
-            show_status_message(state);
-            show_login_url(state);
-            show_fetch_button(state);
-            show_open_browser_button(state);
+            render_content();
         }
 
         ImGui::End();
-        ImGui::PopStyleVar(3);
-        ImGui::PopStyleColor();
+    }
+
+    void TSPanel::render_content() {
+        auto& state = registry_.get_state<TSPanelState>("TSPanel");
+
+        state.poll_status_if_needed();
+
+        float window_width = ImGui::GetContentRegionAvail().x;
+        float content_width = window_width;
+
+        show_status_message(state);
+        show_login_url(state);
+        show_fetch_button(state);
+        show_open_browser_button(state);
+        
+        // Show device info inputs and register button when connected
+        if (state.is_connected && !state.has_registered_device) {
+            ImGui::Spacing();
+            ImGui::Separator();
+            ImGui::Spacing();
+            show_device_info_inputs(state);
+            ImGui::Spacing();
+            show_register_button(state);
+        }
+        
+        show_error_modal(state.error_msg, "TailscaleError");
     }
 
     void TSPanel::show_header() {
@@ -58,9 +74,7 @@ namespace minidfs::panel {
         float center_x = (window_width - text_size.x) * 0.5f;
         ImGui::SetCursorPosX(center_x);
         
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
-        ImGui::Text("%s", text);
-        ImGui::PopStyleColor();
+        core::ColoredText(ImVec4(1.0f, 1.0f, 1.0f, 1.0f), "%s", text);
         
         // Restore original font scale
         ImGui::SetWindowFontScale(1.0f);
@@ -71,33 +85,27 @@ namespace minidfs::panel {
 
     void TSPanel::show_status_message(TSPanelState& state) {
         if (!state.error_msg.empty()) {
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.3f, 0.3f, 1.0f));
-            ImGui::TextWrapped("%s", state.error_msg.c_str());
-            ImGui::PopStyleColor();
+            core::ColoredText(ImVec4(1.0f, 0.3f, 0.3f, 1.0f), "%s", state.error_msg.c_str());
             ImGui::Spacing();
         }
         
         if (!state.success_msg.empty()) {
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.3f, 1.0f, 0.3f, 1.0f));
-            ImGui::TextWrapped("%s", state.success_msg.c_str());
-            ImGui::PopStyleColor();
+            core::ColoredText(ImVec4(0.3f, 1.0f, 0.3f, 1.0f), "%s", state.success_msg.c_str());
             ImGui::Spacing();
         }
         
         if (state.is_fetching_url) {
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.8f, 0.8f, 1.0f));
-            ImGui::Text("Fetching login URL...");
-            ImGui::PopStyleColor();
+            core::ColoredText(ImVec4(0.8f, 0.8f, 0.8f, 1.0f), "Fetching login URL...");
             ImGui::Spacing();
         }
 
         if (state.has_fetched_url && !state.is_connected) {
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.8f, 0.8f, 1.0f));
-            ImGui::TextWrapped("Finish signing in to Tailscale in your browser, then return here.");
-            if (state.is_polling_status) {
-                ImGui::Text("Checking connection status...");
-            }
-            ImGui::PopStyleColor();
+            core::WithTextColor(ImVec4(0.8f, 0.8f, 0.8f, 1.0f), [&]() {
+                ImGui::TextWrapped("Finish signing in to Tailscale in your browser, then return here.");
+                if (state.is_polling_status) {
+                    ImGui::Text("Checking connection status...");
+                }
+            });
             ImGui::Spacing();
         }
     }
@@ -106,9 +114,7 @@ namespace minidfs::panel {
         if (!state.login_url.empty()) {
             float width = ImGui::GetContentRegionAvail().x;
             
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.8f, 0.8f, 1.0f));
-            ImGui::Text("Login URL:");
-            ImGui::PopStyleColor();
+            core::ColoredText(ImVec4(0.8f, 0.8f, 0.8f, 1.0f), "Login URL:");
             ImGui::Spacing();
             
             // Display the URL in a read-only text field
@@ -117,9 +123,8 @@ namespace minidfs::panel {
             strncpy(url_buffer, state.login_url.c_str(), sizeof(url_buffer) - 1);
             url_buffer[sizeof(url_buffer) - 1] = '\0';
             
-            ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.15f, 0.15f, 0.15f, 1.0f));
+            core::CustomStyleColor frame_bg(ImGuiCol_FrameBg, ImVec4(0.15f, 0.15f, 0.15f, 1.0f));
             ImGui::InputText("##login_url", url_buffer, sizeof(url_buffer), ImGuiInputTextFlags_ReadOnly);
-            ImGui::PopStyleColor();
             ImGui::Spacing();
         }
     }
@@ -127,21 +132,18 @@ namespace minidfs::panel {
     void TSPanel::show_fetch_button(TSPanelState& state) {
         float width = ImGui::GetContentRegionAvail().x;
         
-        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);
-        ImGui::PushStyleColor(ImGuiCol_Button, state.is_fetching_url ? ImVec4(0.3f, 0.3f, 0.3f, 1.0f) : ImVec4(0.2f, 0.5f, 0.9f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.6f, 1.0f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.15f, 0.4f, 0.8f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
-
+        core::ButtonColors colors = core::ButtonTheme::Primary();
+        if (state.is_fetching_url) {
+            colors.button = ImVec4(0.3f, 0.3f, 0.3f, 1.0f);
+        }
+        
         const char* button_text = state.is_fetching_url ? "Fetching..." : "Get Tailscale Login URL";
-        if (ImGui::Button(button_text, ImVec2(width, 40))) {
+        if (core::StyledButton(button_text, ImVec2(width, 40), colors)) {
             if (!state.is_fetching_url) {
                 state.handle_fetch_login_url();
             }
         }
 
-        ImGui::PopStyleColor(4);
-        ImGui::PopStyleVar();
         ImGui::Spacing();
     }
 
@@ -149,18 +151,40 @@ namespace minidfs::panel {
         if (!state.login_url.empty()) {
             float width = ImGui::GetContentRegionAvail().x;
             
-            ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.7f, 0.4f, 1.0f)); // Green button
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.8f, 0.5f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.15f, 0.6f, 0.3f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
-
-            if (ImGui::Button("Open Login URL in Browser", ImVec2(width, 40))) {
+            if (core::StyledButton("Open Login URL in Browser", ImVec2(width, 40), core::ButtonTheme::Success())) {
                 core::open_file_in_browser(state.login_url);
             }
+        }
+    }
 
-            ImGui::PopStyleColor(4);
-            ImGui::PopStyleVar();
+    void TSPanel::show_device_info_inputs(TSPanelState& state) {
+        core::WithFontScale(1.1f, []() {
+            core::ColoredText(ImVec4(1.0f, 1.0f, 1.0f, 1.0f), "Device Information");
+        });
+        ImGui::Spacing();
+
+        float width = ImGui::GetContentRegionAvail().x;
+        
+        // Device Name input
+        core::ColoredText(ImVec4(0.8f, 0.8f, 0.8f, 1.0f), "Device Name:");
+        ImGui::SetNextItemWidth(width);
+        ImGui::InputText("##device_name", state.device_name, IM_ARRAYSIZE(state.device_name));
+        ImGui::Spacing();
+        
+        // Mount Path input
+        core::ColoredText(ImVec4(0.8f, 0.8f, 0.8f, 1.0f), "Mount Path (Optional):");
+        ImGui::SetNextItemWidth(width);
+        ImGui::InputText("##mount_path", state.mount_path, IM_ARRAYSIZE(state.mount_path));
+        ImGui::Spacing();
+        
+        core::ColoredText(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "Enter a friendly name for this device and optionally specify a mount path.");
+    }
+
+    void TSPanel::show_register_button(TSPanelState& state) {
+        float width = ImGui::GetContentRegionAvail().x;
+        
+        if (core::StyledButton("Register Device", ImVec2(width, 40), core::ButtonTheme::Success())) {
+            state.register_device();
         }
     }
 }

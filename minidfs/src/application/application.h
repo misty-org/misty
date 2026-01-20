@@ -1,8 +1,8 @@
 #pragma once
 #include "core/ui_registry.h"
-#include "core/app_view_registry.h"
 #include "core/worker_pool.h"
 #include "dfs/file_sync/file_sync.h"
+#include "views/app_view.h"
 
 #ifdef _WIN32
 #include "dfs/file_sync/file_sync_win.h"
@@ -31,9 +31,6 @@ namespace minidfs {
 
     protected:
         core::UIRegistry ui_registry_;
-        core::AppViewRegistry app_view_registry_;
-
-
         core::WorkerPool worker_pool_;
         std::shared_ptr<MiniDFSClient> client_;
 

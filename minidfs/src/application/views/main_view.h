@@ -3,9 +3,9 @@
 #include <memory>
 
 #include "views/app_view.h"
-#include "panels/FileExplorer/file_explorer_panel.h"
-#include "panels/FileExplorer/file_sidebar_panel.h"
-#include "panels/Navbar/navbar_panel.h"
+#include "panels/file_explorer/file_explorer_panel.h"
+#include "panels/file_explorer/file_sidebar_panel.h"
+#include "panels/navbar/navbar_panel.h"
 #include "core/ui_registry.h"
 
 
