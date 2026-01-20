@@ -46,7 +46,7 @@ func RegisterDevice(ts *tsbase.TSBase, database *db.Database) http.HandlerFunc {
 		}
 
 		// Update/register the device in the database with additional info
-		err := devices.UpdateDeviceWithInfo(database.Conn, serverPeer, deviceInfo.DeviceName, deviceInfo.MountPath)
+		err := devices.UpdateDevice(database.Conn, serverPeer, deviceInfo.DeviceName, deviceInfo.MountPath)
 		if err != nil {
 			http.Error(w, "Failed to register device", http.StatusInternalServerError)
 			return
