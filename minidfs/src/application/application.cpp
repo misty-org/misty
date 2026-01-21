@@ -2,7 +2,8 @@
 #include "views/main_view.h"
 #include "views/register_view.h"
 #include "views/login_view.h"
-#include "views/ts_view.h"
+#include "views/devices_view.h"
+
 
 
 namespace minidfs {
@@ -22,7 +23,7 @@ namespace minidfs {
         while (is_running()) {
             prepare_frame();
             
-            app_view_registry_.render_view();
+            view::render_current_view();
             render_frame();
         }
         cleanup();
@@ -78,14 +79,12 @@ namespace minidfs {
             throw std::runtime_error("Client not initialized before initializing views.");
         }
 
-        app_view_registry_.register_view(view::ViewID::FileExplorer, 
+        view::register_view(view::ViewID::FileExplorer, 
             std::make_unique<view::MainView>(ui_registry_, worker_pool_, client_));
-        app_view_registry_.register_view(view::ViewID::Auth, std::make_unique<view::RegisterView>(ui_registry_));
-        app_view_registry_.register_view(view::ViewID::Login, std::make_unique<view::LoginView>(ui_registry_));
-        app_view_registry_.register_view(view::ViewID::TS, std::make_unique<view::TSView>(ui_registry_));
-
-        AppViewRegistryController::init(&app_view_registry_);
-        AppViewRegistryController::switch_view(view::ViewID::Auth);
+        view::register_view(view::ViewID::Auth, std::make_unique<view::RegisterView>(ui_registry_));
+        view::register_view(view::ViewID::Login, std::make_unique<view::LoginView>(ui_registry_));
+        view::register_view(view::ViewID::Devices, std::make_unique<view::DevicesView>(ui_registry_));
+        view::switch_view(view::ViewID::FileExplorer);
     
     }
 

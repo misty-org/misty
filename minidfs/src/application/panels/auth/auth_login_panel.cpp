@@ -2,7 +2,7 @@
 #include "imgui.h"
 #include "core/util.h"
 #include "core/asset_manager.h"
-#include "core/app_view_registry.h"
+#include "views/app_view.h"
 #include <cstring>
 #include <iostream>
 #include "panels/panel_ui.h"
@@ -39,6 +39,7 @@ namespace minidfs::panel {
             show_form_fields(state);
             show_login_button(state);
             show_signup_link();
+            show_error_modal(state.error_msg, "AuthLoginError");
         }
 
         ImGui::End();
@@ -119,7 +120,7 @@ namespace minidfs::panel {
         if (ImGui::IsItemHovered()) {
             ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
             if (ImGui::IsItemClicked()) {
-                core::AppViewRegistryController::switch_view(view::ViewID::Auth);
+                view::switch_view(view::ViewID::Auth);
             }
         }
         ImGui::PopStyleColor(2);

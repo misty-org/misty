@@ -6,6 +6,7 @@
 #include "panels/panel.h"
 #include "core/worker_pool.h"
 #include "file_explorer_state.h"
+#include "workspace_state.h"
 
 
 namespace minidfs::panel {
@@ -20,7 +21,6 @@ namespace minidfs::panel {
         void show_search_bar(panel::FileExplorerState& state);
         void show_directory_contents(panel::FileExplorerState& state);
         void show_file_item(panel::FileExplorerState& state, int i);
-        void show_error_modal(panel::FileExplorerState& state);
         
     private:
         core::UIRegistry& registry_;

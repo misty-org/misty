@@ -14,7 +14,9 @@ namespace minidfs::panel {
 
 
     private:
-        void show_nav_item(const char* icon, const char* label, int size, int index, NavbarState& state);
+        void show_nav_item(const char* icon, const char* label, 
+            int size, view::ViewID view_id, NavbarState& state);
+            
         void show_logo_icon();
 
     private:
