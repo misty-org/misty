@@ -2,7 +2,7 @@
 #include "imgui.h"
 #include "core/util.h"
 #include "core/asset_manager.h"
-#include "core/app_view_registry.h"
+#include "views/app_view.h"
 #include <cstring>
 #include <iostream>
 #include "panels/panel_ui.h"
@@ -40,6 +40,7 @@ namespace minidfs::panel {
             show_terms_checkbox(state);
             show_register_button(state);
             show_login_button();
+            show_error_modal(state.error_msg, "AuthRegisterError");
         }
 
         ImGui::End();
@@ -50,11 +51,9 @@ namespace minidfs::panel {
     void AuthRegisterPanel::show_header() {
         const char* text = "Welcome to Misty";
         
-        // Scale font to 1.5x
         float original_scale = ImGui::GetFontSize();
         ImGui::SetWindowFontScale(1.5f);
         
-        // Calculate text width and center it
         ImVec2 text_size = ImGui::CalcTextSize(text);
         float window_width = ImGui::GetWindowWidth();
         float center_x = (window_width - text_size.x) * 0.5f;
@@ -64,7 +63,6 @@ namespace minidfs::panel {
         ImGui::Text("%s", text);
         ImGui::PopStyleColor();
         
-        // Restore original font scale
         ImGui::SetWindowFontScale(1.0f);
         
         ImGui::Spacing();
@@ -168,7 +166,7 @@ namespace minidfs::panel {
         if (ImGui::IsItemHovered()) {
             ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
             if (ImGui::IsItemClicked()) {
-                core::AppViewRegistryController::switch_view(view::ViewID::Login);
+                view::switch_view(view::ViewID::Login);
             }
         }
         ImGui::PopStyleColor(2);

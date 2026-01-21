@@ -1,17 +1,22 @@
 #pragma once
 
 #include "core/ui_registry.h"
-#include "core/app_view_registry.h"
+#include "views/app_view.h"
 
 using namespace minidfs::core;
 
 namespace minidfs::panel {
     struct NavbarState : public UIState {
-        int selected_item = 0; // 0=Home, 1=Folders, 2=Activity, 3=More
+        view::ViewID selected_item = view::ViewID::FileExplorer;
 
         void handle_logo_click() {
             // Switch back to Auth view
-            core::AppViewRegistryController::switch_view(view::ViewID::Auth);
+            view::switch_view(view::ViewID::Auth);
+        }
+
+        void handle_nav_item(view::ViewID view_id) {
+            selected_item = view_id;
+            view::switch_view(view_id);
         }
     };
 }

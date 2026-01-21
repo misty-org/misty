@@ -11,7 +11,6 @@ type UserRegisterRequest struct {
 	Name    string `json:"name"`
 	Email   string `json:"email"`
 	Password string `json:"password"`
-	//TODO: add more fields as needed
 }
 
 type UserLoginRequest struct {

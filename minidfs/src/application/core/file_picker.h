@@ -11,7 +11,8 @@ namespace minidfs::core {
         std::string default_directory = "";
         std::vector<std::string> allowed_extensions;
         bool show_hidden_files = false;
-    }
+    };
+    
     struct FilePickerResult {
         bool success = false;
         std::vector<std::string> paths;
@@ -32,7 +33,7 @@ namespace minidfs::core {
             return result;
         }
 
-    }
+    };
 
     class FilePicker {
     public:
@@ -43,6 +44,6 @@ namespace minidfs::core {
     #elif __linux__
         static FilePickerResult show_dialog(const FilePickerOptions& options);
     #endif
-    }
+    };
 
-}
+};

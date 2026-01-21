@@ -13,6 +13,7 @@ set(IMGUI_SRCS
 
 file(GLOB_RECURSE APP_SRCS
     "src/application/*.cpp"
+    "src/application/*.mm"
     "src/application/*.h"
     "vendor/glad/src/glad.cpp"
     ${IMGUI_SRCS}
@@ -55,6 +56,7 @@ elseif(APPLE)
     target_link_libraries(minidfs_client PRIVATE
         "-framework CoreGraphics"
         "-framework CoreServices"
+        "-framework Cocoa"
     )
 elseif(UNIX AND NOT APPLE)
     file(GLOB LINUX_SRCS
@@ -76,6 +78,7 @@ target_include_directories(minidfs_client PRIVATE
     ${CMAKE_SOURCE_DIR}/vendor/imgui/backends
     ${CMAKE_SOURCE_DIR}/vendor/imgui
     ${CMAKE_SOURCE_DIR}/vendor/stb
+    ${CMAKE_SOURCE_DIR}/vendor/json/single_include
 )
 
 # project includes
@@ -90,6 +93,8 @@ target_include_directories(minidfs_client PRIVATE
 
 target_link_libraries(minidfs_client PRIVATE 
     minidfs
+    protobuf::libprotobuf
+    gRPC::grpc++
     glfw
     lunasvg
     OpenGL::GL
