@@ -1,9 +1,9 @@
 #pragma once
 
-#include "panel.h"
+#include "panels/panel.h"
 
-#include "ui_registry.h"
-#include "worker_pool.h"
+#include "core/ui_registry.h"
+#include "core/worker_pool.h"
 
 #include "file_sidebar_state.h"
 

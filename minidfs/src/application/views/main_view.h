@@ -2,11 +2,11 @@
 
 #include <memory>
 
-#include "app_view.h"
-#include "file_explorer_panel.h"
-#include "file_sidebar_panel.h"
-#include "navbar_panel.h"
-#include "ui_registry.h"
+#include "views/app_view.h"
+#include "panels/FileExplorer/file_explorer_panel.h"
+#include "panels/FileExplorer/file_sidebar_panel.h"
+#include "panels/Navbar/navbar_panel.h"
+#include "core/ui_registry.h"
 
 
 namespace minidfs::view {

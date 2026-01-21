@@ -1,11 +1,13 @@
 #include "auth_register_panel.h"
 #include "imgui.h"
-#include "util.h"
-#include "asset_manager.h"
+#include "core/util.h"
+#include "core/asset_manager.h"
+#include "core/app_view_registry.h"
 #include <cstring>
 #include <iostream>
+#include "panels/panel_ui.h"
 
-namespace minidfs::auth {
+namespace minidfs::panel {
     AuthRegisterPanel::AuthRegisterPanel(UIRegistry& registry)
         : registry_(registry) {
     }
@@ -13,25 +15,21 @@ namespace minidfs::auth {
     void AuthRegisterPanel::render() {
         auto& state = registry_.get_state<AuthRegisterState>("AuthRegister");
 
-        // Use monospace font for terminal aesthetic
-        ImGuiIO& io = ImGui::GetIO();
-        ImFont* mono_font = io.Fonts->Fonts[0]; // Default font (you can add monospace font to AssetManager if needed)
-
         ImGuiWindowFlags flags =
             ImGuiWindowFlags_NoTitleBar |
             ImGuiWindowFlags_NoResize |
             ImGuiWindowFlags_NoMove |
             ImGuiWindowFlags_NoCollapse |
-            ImGuiWindowFlags_NoScrollbar;
+            ImGuiWindowFlags_NoScrollbar |
+            ImGuiWindowFlags_NoDocking;
 
         // Dark background
         ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(32.0f, 24.0f));
-        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 14.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(32.0f, 40.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 10.0f));
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(12.0f, 8.0f));
 
         if (ImGui::Begin("AuthRegister", nullptr, flags)) {
-            if (mono_font) ImGui::PushFont(mono_font);
 
             float window_width = ImGui::GetWindowWidth();
             float content_width = window_width - 64.0f; // Account for padding
@@ -40,14 +38,8 @@ namespace minidfs::auth {
             show_header();
             show_form_fields(state);
             show_terms_checkbox(state);
-            show_create_button(state);
-            show_social_buttons();
-            show_login_link();
-
-            if (mono_font) ImGui::PopFont();
-
-            // Status bar at bottom
-            show_status_bar();
+            show_register_button(state);
+            show_login_button();
         }
 
         ImGui::End();
@@ -56,78 +48,65 @@ namespace minidfs::auth {
     }
 
     void AuthRegisterPanel::show_header() {
-        // Green arrow and heading
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 0.8f, 0.4f, 1.0f)); // Green
-        ImGui::Text("> ");
+        const char* text = "Welcome to Misty";
+        
+        // Scale font to 1.5x
+        float original_scale = ImGui::GetFontSize();
+        ImGui::SetWindowFontScale(1.5f);
+        
+        // Calculate text width and center it
+        ImVec2 text_size = ImGui::CalcTextSize(text);
+        float window_width = ImGui::GetWindowWidth();
+        float center_x = (window_width - text_size.x) * 0.5f;
+        ImGui::SetCursorPosX(center_x);
+        
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
+        ImGui::Text("%s", text);
         ImGui::PopStyleColor();
         
-        ImGui::SameLine();
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
-        ImGui::Text("Create Account_");
-        ImGui::PopStyleColor();
-
-        ImGui::Spacing();
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.6f, 0.6f, 0.6f, 1.0f));
-        ImGui::Text("Initialize your secure workspace access.");
-        ImGui::PopStyleColor();
-        ImGui::Spacing();
+        // Restore original font scale
+        ImGui::SetWindowFontScale(1.0f);
+        
         ImGui::Spacing();
     }
 
     void AuthRegisterPanel::show_form_fields(AuthRegisterState& state) {
         float width = ImGui::GetContentRegionAvail().x;
 
-        // FULL NAME
+        // Username
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.8f, 0.8f, 1.0f));
-        auto& person_icon = core::AssetManager::get().get_svg_texture("person-16", 16);
-        ImGui::Image(person_icon.id, ImVec2(16, 16));
-        ImGui::SameLine();
-        ImGui::Text("FULL NAME:");
+        auto& person_icon = core::AssetManager::get().get_svg_texture("person-16", 24);
+        IconText(person_icon, 16.0f, "Username", 1.0f, -2.0f);
         ImGui::PopStyleColor();
         ImGui::SetNextItemWidth(width);
-        ImGui::InputTextWithHint("##full_name", "John Doe", state.full_name, sizeof(state.full_name));
+        ImGui::InputTextWithHint("##username", "", state.full_name, sizeof(state.full_name));
 
-        ImGui::Spacing();
-
-        // EMAIL ADDRESS
+        // Email
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.8f, 0.8f, 1.0f));
-        auto& mail_icon = core::AssetManager::get().get_svg_texture("mail-16", 16);
-        ImGui::Image(mail_icon.id, ImVec2(16, 16));
-        ImGui::SameLine();
-        ImGui::Text("EMAIL ADDRESS:");
+        auto& mail_icon = core::AssetManager::get().get_svg_texture("mail-16", 24);
+        IconText(mail_icon, 16.0f, "Email", 2.0f, -2.0f);
         ImGui::PopStyleColor();
         ImGui::SetNextItemWidth(width);
-        ImGui::InputTextWithHint("##email", "user@domain.com", state.email, sizeof(state.email));
+        ImGui::InputTextWithHint("##email", "", state.email, sizeof(state.email));
 
-        ImGui::Spacing();
-
-        // PASSWORD
+        // Password
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.8f, 0.8f, 1.0f));
-        auto& lock_icon = core::AssetManager::get().get_svg_texture("lock-16", 16);
-        ImGui::Image(lock_icon.id, ImVec2(16, 16));
-        ImGui::SameLine();
-        ImGui::Text("PASSWORD:");
+        auto& lock_icon = core::AssetManager::get().get_svg_texture("lock-16", 24);
+        IconText(lock_icon, 16.0f, "Password", 1.0f, -2.0f);
         ImGui::PopStyleColor();
         ImGui::SetNextItemWidth(width);
-        ImGui::InputTextWithHint("##password", "........", state.password, sizeof(state.password), ImGuiInputTextFlags_Password);
+        ImGui::InputTextWithHint("##password", "", state.password, sizeof(state.password), ImGuiInputTextFlags_Password);
 
-        ImGui::Spacing();
-
-        // CONFIRM PASSWORD
+        // Confirm password
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.8f, 0.8f, 1.0f));
-        auto& lock_icon2 = core::AssetManager::get().get_svg_texture("lock-16", 16);
-        ImGui::Image(lock_icon2.id, ImVec2(16, 16));
-        ImGui::SameLine();
-        ImGui::Text("CONFIRM PASSWORD:");
+        auto& lock_icon2 = core::AssetManager::get().get_svg_texture("lock-16", 24);
+        IconText(lock_icon2, 16.0f, "Confirm password", 1.0f, -2.0f);
         ImGui::PopStyleColor();
         ImGui::SetNextItemWidth(width);
-        ImGui::InputTextWithHint("##confirm_password", "........", state.confirm_password, sizeof(state.confirm_password), ImGuiInputTextFlags_Password);
-
-        ImGui::Spacing();
+        ImGui::InputTextWithHint("##confirm_password", "", state.confirm_password, sizeof(state.confirm_password), ImGuiInputTextFlags_Password);
     }
 
     void AuthRegisterPanel::show_terms_checkbox(AuthRegisterState& state) {
-        ImGui::Spacing();
 
         // Checkbox styling
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.8f, 0.8f, 1.0f));
@@ -141,7 +120,7 @@ namespace minidfs::auth {
         ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0, 0, 0, 0)); // Transparent hover
         
         if (ImGui::Selectable("Terms of Service", false, ImGuiSelectableFlags_None)) {
-            this->open_terms_in_browser();
+            show_terms_in_browser();
         }
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNone)) {
             ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
@@ -159,11 +138,9 @@ namespace minidfs::auth {
         }
         
         ImGui::PopStyleColor(4); // Pop: checkbox text, link text, header bg, header hover
-
-        ImGui::Spacing();
     }
 
-    void AuthRegisterPanel::show_create_button(AuthRegisterState& state) {
+    void AuthRegisterPanel::show_register_button(AuthRegisterState& state) {
         float width = ImGui::GetContentRegionAvail().x;
         
         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);
@@ -178,58 +155,9 @@ namespace minidfs::auth {
 
         ImGui::PopStyleColor(4);
         ImGui::PopStyleVar();
-
-        ImGui::Spacing();
-        ImGui::Spacing();
     }
 
-    void AuthRegisterPanel::show_social_buttons() {
-        float width = ImGui::GetContentRegionAvail().x;
-        float button_width = (width - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
-
-        // Divider with text
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
-        ImGui::Separator();
-        ImGui::Spacing();
-        
-        float text_width = ImGui::CalcTextSize("OR_SIGNUP_WITH").x;
-        float start_x = (width - text_width) * 0.5f;
-        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + start_x);
-        ImGui::Text("OR_SIGNUP_WITH");
-        ImGui::PopStyleColor();
-
-        ImGui::Spacing();
-        ImGui::Spacing();
-
-        // GitHub button
-        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.25f, 0.25f, 0.25f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.35f, 0.35f, 0.35f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
-        
-        if (ImGui::Button("GitHub", ImVec2(button_width, 36))) {
-            // Handle GitHub login
-        }
-        ImGui::PopStyleColor(3);
-
-        ImGui::SameLine();
-
-        // Google button
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.25f, 0.25f, 0.25f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.35f, 0.35f, 0.35f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
-        
-        if (ImGui::Button("Google", ImVec2(button_width, 36))) {
-            // Handle Google login
-        }
-        ImGui::PopStyleColor(3);
-        ImGui::PopStyleVar();
-
-        ImGui::Spacing();
-        ImGui::Spacing();
-    }
-
-    void AuthRegisterPanel::show_login_link() {
+    void AuthRegisterPanel::show_login_button() {
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.7f, 0.7f, 0.7f, 1.0f));
         ImGui::Text("Already have an account? ");
         ImGui::SameLine();
@@ -240,13 +168,13 @@ namespace minidfs::auth {
         if (ImGui::IsItemHovered()) {
             ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
             if (ImGui::IsItemClicked()) {
-                // Handle login navigation
+                core::AppViewRegistryController::switch_view(view::ViewID::Login);
             }
         }
         ImGui::PopStyleColor(2);
     }
 
-    void AuthRegisterPanel::open_terms_in_browser() {
+    void AuthRegisterPanel::show_terms_in_browser() {
         auto& state = registry_.get_state<AuthRegisterState>("AuthRegister");
         std::string html_path = state.terms_of_service_path;
         if (html_path.empty()) {
@@ -255,41 +183,5 @@ namespace minidfs::auth {
         }
 
         core::open_file_in_browser(html_path);
-    }
-
-    void AuthRegisterPanel::show_status_bar() {
-        ImGuiViewport* viewport = ImGui::GetMainViewport();
-        float status_height = 24.0f;
-        ImVec2 status_pos = ImVec2(0, ImGui::GetWindowHeight() - status_height);
-        ImVec2 status_size = ImVec2(ImGui::GetWindowWidth(), status_height);
-
-        ImGui::SetCursorPos(status_pos);
-        
-        ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.08f, 0.08f, 0.08f, 1.0f));
-        ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 0.0f);
-        ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 0.0f);
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 4.0f));
-
-        if (ImGui::BeginChild("##status_bar", status_size, false, ImGuiWindowFlags_NoScrollbar)) {
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
-            
-            // Left side: STATUS
-            ImGui::Text("STATUS: ");
-            ImGui::SameLine();
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 0.8f, 0.0f, 1.0f)); // Green
-            ImGui::Text("READY");
-            ImGui::PopStyleColor();
-
-            // Right side: MEM
-            float text_width = ImGui::CalcTextSize("MEM: 45MB").x;
-            ImGui::SameLine(ImGui::GetWindowWidth() - text_width - 12.0f);
-            ImGui::Text("MEM: 45MB");
-            
-            ImGui::PopStyleColor();
-        }
-        ImGui::EndChild();
-
-        ImGui::PopStyleVar(3);
-        ImGui::PopStyleColor();
     }
 }

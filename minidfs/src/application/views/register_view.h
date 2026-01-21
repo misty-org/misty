@@ -2,18 +2,18 @@
 
 #include <memory>
 
-#include "app_view.h"
-#include "auth_register_panel.h"
-#include "ui_registry.h"
+#include "views/app_view.h"
+#include "panels/auth/auth_register_panel.h"
+#include "core/ui_registry.h"
 
 using namespace minidfs::core;
-using namespace minidfs::auth;
+using namespace minidfs::panel;
 
 namespace minidfs::view {
-    class AuthView : public AppView {
+    class RegisterView : public AppView {
     public:
-        AuthView(UIRegistry& ui_registry);
-        ~AuthView() override = default;
+        RegisterView(UIRegistry& ui_registry);
+        ~RegisterView() override = default;
 
         void render() override;
         ViewID get_view_id() override;

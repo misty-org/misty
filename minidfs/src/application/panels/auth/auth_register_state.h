@@ -2,10 +2,11 @@
 #include <string>
 #include <mutex>
 #include <cstring>
-#include "ui_registry.h"
-#include "app_view_registry.h"
+#include "core/ui_registry.h"
+#include "core/app_view_registry.h"
+#include "core/util.h"
 
-namespace minidfs::auth {
+namespace minidfs::panel {
 
     struct AuthRegisterState : public core::UIState {
         std::mutex mu;
@@ -33,9 +34,7 @@ namespace minidfs::auth {
         }
 
         void handle_create_account() {
-            // Switch to FileExplorer view after account creation
-            //TODO: Implement account creation logic
-            core::AppViewRegistryController::switch_view(view::ViewID::FileExplorer);
+            core::AppViewRegistryController::switch_view(view::ViewID::TS);
         }
     };
 

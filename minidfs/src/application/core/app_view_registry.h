@@ -3,7 +3,7 @@
 #include <unordered_map>
 #include <mutex>
 #include <memory>
-#include "app_view.h"
+#include "views/app_view.h"
 
 namespace minidfs::core {
 

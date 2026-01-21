@@ -1,7 +1,7 @@
-#include "file_sidebar_panel.h"
+#include "panels/FileExplorer/file_sidebar_panel.h"
 #include "file_explorer_state.h"
-#include "panel_ui.h"
-#include "asset_manager.h"
+#include "panels/panel_ui.h"
+#include "core/asset_manager.h"
 
 
 namespace minidfs::panel {
@@ -55,7 +55,7 @@ namespace minidfs::panel {
         float b_width = width - (padding * 2);
         core::SVGTexture& plus_icon = core::AssetManager::get().get_svg_texture("plus-24", 24);
 
-        if (IconButton("##add_file", plus_icon.id, "New", ImVec2(b_width, 48.0f), nullptr, 18.0f)) {
+        if (IconButton("##add_file", plus_icon, "New", ImVec2(b_width, 48.0f), nullptr, 18.0f)) {
             state.show_chooser_modal = true;
         }
 

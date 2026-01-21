@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ui_registry.h"
+#include "core/ui_registry.h"
 #include "core/ui_registry.h"
 #include <string>
 
