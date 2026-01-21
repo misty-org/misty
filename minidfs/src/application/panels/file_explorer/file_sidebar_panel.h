@@ -15,6 +15,7 @@ namespace minidfs::panel {
         void render();
 
     private:
+        void show_workspace_dropdown(FileSidebarState& state, float width, float padding);
         void show_create_new(FileSidebarState& state, float width, float padding);
         void show_chooser_modal(FileSidebarState& state);
         void show_create_entry_modal(FileSidebarState& state);

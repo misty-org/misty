@@ -1,0 +1,133 @@
+package api
+
+import (
+	"encoding/json"
+	"net/http"
+
+	"github.com/kannachi323/misty/proxy/core/devices"
+	"github.com/kannachi323/misty/proxy/core/tsbase"
+	"github.com/kannachi323/misty/proxy/db"
+)
+
+func GetDevices(database *db.Database) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		deviceList, err := devices.GetAllDevices(database.Conn)
+		if err != nil {
+			http.Error(w, "Failed to get devices", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(deviceList)
+	}
+}
+
+func RegisterDevice(ts *tsbase.TSBase, database *db.Database) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Get the server peer (current device)
+		serverPeer := ts.GetServerPeer()
+		if serverPeer == nil {
+			http.Error(w, "Server peer not available", http.StatusBadRequest)
+			return
+		}
+
+		// Parse request body for additional device information
+		var deviceInfo struct {
+			DeviceName string `json:"device_name"`
+			MountPath  string `json:"mount_path"`
+		}
+		
+		if r.Body != nil {
+			decoder := json.NewDecoder(r.Body)
+			if err := decoder.Decode(&deviceInfo); err != nil {
+				// If JSON parsing fails, continue with empty values
+				// (device_name and mount_path are optional)
+			}
+		}
+
+		// Update/register the device in the database with additional info
+		err := devices.UpdateDevice(database.Conn, serverPeer, deviceInfo.DeviceName, deviceInfo.MountPath)
+		if err != nil {
+			http.Error(w, "Failed to register device", http.StatusInternalServerError)
+			return
+		}
+
+		// Also sync all peers to the database
+		allPeers, err := ts.GetPeers()
+		if err == nil {
+			devices.SyncDevicesFromPeers(database.Conn, allPeers)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		response := map[string]interface{}{
+			"status":  "success",
+			"message": "Device registered successfully",
+		}
+		
+		if deviceInfo.DeviceName != "" {
+			response["device_name"] = deviceInfo.DeviceName
+		}
+		if deviceInfo.MountPath != "" {
+			response["mount_path"] = deviceInfo.MountPath
+		}
+		
+		json.NewEncoder(w).Encode(response)
+	}
+}
+
+func UpdateDevice(database *db.Database) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := r.URL.Query().Get("id")
+		if id == "" {
+			http.Error(w, "Device ID is required", http.StatusBadRequest)
+			return
+		}
+
+		var deviceInfo struct {
+			DeviceName string `json:"device_name"`
+			MountPath  string `json:"mount_path"`
+		}
+
+		if r.Body != nil {
+			decoder := json.NewDecoder(r.Body)
+			if err := decoder.Decode(&deviceInfo); err != nil {
+				http.Error(w, "Invalid JSON in request body", http.StatusBadRequest)
+				return
+			}
+		}
+
+		err := devices.UpdateDeviceInfo(database.Conn, id, deviceInfo.DeviceName, deviceInfo.MountPath)
+		if err != nil {
+			http.Error(w, "Failed to update device", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{
+			"status":  "success",
+			"message": "Device updated successfully",
+		})
+	}
+}
+
+func DeleteDevice(database *db.Database) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := r.URL.Query().Get("id")
+		if id == "" {
+			http.Error(w, "Device ID is required", http.StatusBadRequest)
+			return
+		}
+
+		err := devices.DeleteDevice(database.Conn, id)
+		if err != nil {
+			http.Error(w, "Failed to delete device", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{
+			"status":  "success",
+			"message": "Device deleted successfully",
+		})
+	}
+}

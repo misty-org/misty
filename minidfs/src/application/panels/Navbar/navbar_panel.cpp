@@ -1,5 +1,7 @@
-#include "panels/Navbar/navbar_panel.h"
+#include "panels/navbar/navbar_panel.h"
 #include "core/asset_manager.h"
+
+using namespace minidfs::view;
 
 namespace minidfs::panel {
     NavbarPanel::NavbarPanel(UIRegistry& ui_registry) : ui_registry_(ui_registry) {
@@ -23,13 +25,22 @@ namespace minidfs::panel {
 
             ImGui::Dummy(ImVec2(0, 20));
 
-            show_nav_item("home-24", "Home", 24, 0, state);
-            show_nav_item("file-directory-24", "Folders", 24, 1, state);
-            show_nav_item("bell-24", "Activity", 24, 2, state);
+            show_nav_item("home-24", "Home", 24, ViewID::FileExplorer, state);
+            show_nav_item("devices-24", "Devices", 24, view::ViewID::Devices, state);
+            show_nav_item("bell-24", "Activity", 24, ViewID::Activity, state);
 
+            // Calculate nav item height: icon size + button padding + text height + spacing
+            float icon_size = 24.0f;
+            float button_padding_y = 8.0f;
+            float text_height = ImGui::CalcTextSize("Settings").y;
+            float item_spacing = ImGui::GetStyle().ItemSpacing.y;
+            float nav_item_height = icon_size + (button_padding_y * 2.0f) + text_height + item_spacing;
+            
             float footer_y = ImGui::GetWindowHeight() - 80.0f;
+            ImGui::SetCursorPosY(footer_y - nav_item_height);
+            show_nav_item("gear-24", "Settings", 24, ViewID::Settings, state);
             ImGui::SetCursorPosY(footer_y);
-            show_nav_item("kebab-horizontal-24", "More", 24, 3, state);
+            show_nav_item("kebab-horizontal-24", "More", 24, ViewID::None, state);
         }
         ImGui::End();
 
@@ -67,8 +78,8 @@ namespace minidfs::panel {
         ImGui::PopID();
     }
 
-    void NavbarPanel::show_nav_item(const char* icon_name, const char* label, int size, int index, NavbarState& state) {
-        bool is_selected = (state.selected_item == index);
+    void NavbarPanel::show_nav_item(const char* icon_name, const char* label, int size, view::ViewID view_id, NavbarState& state) {
+        bool is_selected = (state.selected_item == view_id);
         auto& icon = core::AssetManager::get().get_svg_texture(icon_name, size * 2);
 
         float navbar_width = ImGui::GetWindowWidth();
@@ -94,7 +105,8 @@ namespace minidfs::panel {
 
         ImGuiID id = ImGui::GetID(label);
         if (ImGui::ImageButton(label, icon.id, ImVec2((float)size, (float)size))) {
-            state.selected_item = index;
+            state.selected_item = view_id;
+            state.handle_nav_item(view_id);
         }
 
         ImGui::PopStyleColor(3);

@@ -111,6 +111,12 @@ namespace minidfs::core {
         // Follow redirects
         curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
 
+        // Disable SSL verification for localhost (needed for self-signed certificates)
+        if (url.find("localhost") != std::string::npos || url.find("127.0.0.1") != std::string::npos) {
+            curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+            curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+        }
+
         // Perform request
         CURLcode res = curl_easy_perform(curl);
 

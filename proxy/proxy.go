@@ -63,4 +63,9 @@ func (proxy *Proxy) MountHandlers() {
 
 	proxy.APIRouter.Post("/file", api.CreateFile(proxy.Database))
 	proxy.APIRouter.Get("/file", api.GetFile(proxy.Database))
+
+	proxy.APIRouter.Get("/devices", api.GetDevices(proxy.Database))
+	proxy.APIRouter.Post("/devices", api.RegisterDevice(proxy.TSBase, proxy.Database))
+	proxy.APIRouter.Put("/devices", api.UpdateDevice(proxy.Database))
+	proxy.APIRouter.Delete("/devices", api.DeleteDevice(proxy.Database))
 }

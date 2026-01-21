@@ -91,6 +91,8 @@ target_include_directories(minidfs_client PRIVATE
 
 target_link_libraries(minidfs_client PRIVATE 
     minidfs
+    protobuf::libprotobuf
+    gRPC::grpc++
     glfw
     lunasvg
     OpenGL::GL

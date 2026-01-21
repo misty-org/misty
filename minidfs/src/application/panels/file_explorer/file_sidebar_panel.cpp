@@ -1,4 +1,4 @@
-#include "panels/FileExplorer/file_sidebar_panel.h"
+#include "panels/file_explorer/file_sidebar_panel.h"
 #include "file_explorer_state.h"
 #include "panels/panel_ui.h"
 #include "core/asset_manager.h"
@@ -29,6 +29,8 @@ namespace minidfs::panel {
             float width = ImGui::GetWindowWidth();
             float padding = width * 0.08f;
 
+            show_workspace_dropdown(state, width, padding);
+            ImGui::Spacing();
             show_create_new(state, width, padding);
 
             ImGui::Separator();
@@ -43,6 +45,39 @@ namespace minidfs::panel {
         ImGui::End();
         ImGui::PopStyleVar(2);
         ImGui::PopStyleColor();
+    }
+
+    void FileSidebarPanel::show_workspace_dropdown(FileSidebarState& state, float width, float padding) {
+        float dropdown_width = width - (padding * 2);
+        
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(12.0f, 8.0f));
+        ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
+        
+        ImGui::SetNextItemWidth(dropdown_width);
+        
+        // Build combo label with current workspace
+        const char* preview = state.workspaces.empty() 
+            ? "No Workspace" 
+            : state.workspaces[state.selected_workspace_index].c_str();
+        
+        if (ImGui::BeginCombo("##workspace_select", preview, ImGuiComboFlags_None)) {
+            for (size_t i = 0; i < state.workspaces.size(); ++i) {
+                bool is_selected = (state.selected_workspace_index == (int)i);
+                if (ImGui::Selectable(state.workspaces[i].c_str(), is_selected)) {
+                    state.selected_workspace_index = (int)i;
+                }
+                if (is_selected) {
+                    ImGui::SetItemDefaultFocus();
+                }
+            }
+            ImGui::EndCombo();
+        }
+        
+        ImGui::PopStyleColor(3);
+        ImGui::PopStyleVar(2);
     }
 
     void FileSidebarPanel::show_create_new(FileSidebarState& state, float width, float padding) {

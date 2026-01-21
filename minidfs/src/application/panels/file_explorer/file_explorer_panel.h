@@ -20,7 +20,6 @@ namespace minidfs::panel {
         void show_search_bar(panel::FileExplorerState& state);
         void show_directory_contents(panel::FileExplorerState& state);
         void show_file_item(panel::FileExplorerState& state, int i);
-        void show_error_modal(panel::FileExplorerState& state);
         
     private:
         core::UIRegistry& registry_;
