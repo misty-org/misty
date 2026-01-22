@@ -6,10 +6,10 @@ import (
 	"log"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/kannachi323/misty/proxy/core/tsbase"
 )
 
-// Device represents a device in the database
 type Device struct {
 	ID           string    `json:"id"`
 	PeerHostName string    `json:"peer_hostname"`
@@ -22,45 +22,30 @@ type Device struct {
 	UpdatedAt    time.Time `json:"updated_at"`
 }
 
-func UpdateDevice(db *sql.DB, peer *tsbase.TSPeer) error {
+// UpdateDevice inserts or updates a device. deviceName and mountPath are optional.
+func UpdateDevice(db *sql.DB, peer *tsbase.TSPeer, deviceName, mountPath string) error {
 	now := time.Now()
-	
-	_, err := db.Exec(`
-		INSERT INTO devices (id, peer_hostname, peer_type, peer_address, last_seen, created_at, updated_at)
-		VALUES (lower(hex(randomblob(16))), ?, ?, ?, ?, ?, ?)
-		ON CONFLICT(peer_hostname) DO UPDATE SET
-			peer_type = excluded.peer_type,
-			peer_address = excluded.peer_address,
-			last_seen = excluded.last_seen,
-			updated_at = excluded.updated_at
-	`, peer.PeerHostName, string(peer.PeerType), peer.PeerAddress, now, now, now)
-	
+
+	deviceID, err := uuid.NewUUID()
 	if err != nil {
-		log.Printf("Failed to insert/update device %s: %v", peer.PeerHostName, err)
+		log.Println("failed to create device id")
 		return err
 	}
 	
-	return nil
-}
-
-// UpdateDeviceWithInfo updates a device with additional info (device_name, mount_path)
-func UpdateDeviceWithInfo(db *sql.DB, peer *tsbase.TSPeer, deviceName, mountPath string) error {
-	now := time.Now()
-	
-	_, err := db.Exec(`
+	_, err = db.Exec(`
 		INSERT INTO devices (id, peer_hostname, peer_type, peer_address, device_name, mount_path, last_seen, created_at, updated_at)
-		VALUES (lower(hex(randomblob(16))), ?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(peer_hostname) DO UPDATE SET
 			peer_type = excluded.peer_type,
 			peer_address = excluded.peer_address,
-			device_name = excluded.device_name,
-			mount_path = excluded.mount_path,
+			device_name = COALESCE(excluded.device_name, devices.device_name),
+			mount_path = COALESCE(excluded.mount_path, devices.mount_path),
 			last_seen = excluded.last_seen,
 			updated_at = excluded.updated_at
-	`, peer.PeerHostName, string(peer.PeerType), peer.PeerAddress, deviceName, mountPath, now, now, now)
+	`, deviceID, peer.PeerHostName, string(peer.PeerType), peer.PeerAddress, deviceName, mountPath, now, now, now)
 	
 	if err != nil {
-		log.Printf("Failed to insert/update device with info %s: %v", peer.PeerHostName, err)
+		log.Printf("Failed to insert/update device %s: %v", peer.PeerHostName, err)
 		return err
 	}
 	
@@ -198,7 +183,7 @@ func GetAllDevices(db *sql.DB) ([]*Device, error) {
 
 func SyncDevicesFromPeers(db *sql.DB, peers []*tsbase.TSPeer) error {
 	for _, peer := range peers {
-		if err := UpdateDevice(db, peer); err != nil {
+		if err := UpdateDevice(db, peer, "", ""); err != nil {
 			log.Printf("Failed to sync device %s: %v", peer.PeerHostName, err)
 			// Continue with other devices even if one fails
 		}
