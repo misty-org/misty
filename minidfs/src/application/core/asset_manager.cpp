@@ -66,7 +66,6 @@ namespace minidfs::core {
         // 2. Try to load the requested icon
         std::string path = "assets/icons/" + key;
 
-        std::cout << "Loading icon: " << path << std::endl;
         SVGTexture tex = load_svg(path, size, size);
 
 

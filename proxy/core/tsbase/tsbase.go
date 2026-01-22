@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"tailscale.com/ipn"
+	"tailscale.com/ipn/ipnstate"
 	"tailscale.com/tailcfg"
 	"tailscale.com/tsnet"
 )
@@ -75,8 +76,9 @@ func (ts *TSBase) handleStateTransition(state ipn.State) {
 
 func (ts *TSBase) refreshNetworkMetadata() {
     log.Println("refreshing metadata")
-    // 1. Safety check
-    if ts.TSClient == nil { return }
+    if ts.TSClient == nil {
+        return
+    }
 
     status, err := ts.TSClient.Status(context.Background())
     if err != nil {
@@ -84,39 +86,80 @@ func (ts *TSBase) refreshNetworkMetadata() {
         return
     }
 
+    ts.updateConnectedIP(status)
+    serverHostName := ts.getServerHostName()
+    newPeerMap := ts.buildPeerMap(status, serverHostName)
+    ts.TSPeerMap = newPeerMap
+}
+
+func (ts *TSBase) updateConnectedIP(status *ipnstate.Status) {
     if len(status.TailscaleIPs) > 0 {
         ts.TSState.ConnectedIP = status.TailscaleIPs[0].String()
     }
+}
 
-    newPeerMap := make(map[string]*TSPeer)
-
+func (ts *TSBase) getServerHostName() string {
     config, _ := LoadConfig(GetConfigPath())
-    serverHostName := ""
     if config != nil {
-        serverHostName = config.GetHashedBaseName()
+        return config.GetHashedBaseName()
+    }
+    return ""
+}
+
+func (ts *TSBase) buildPeerMap(status *ipnstate.Status, serverHostName string) map[string]*TSPeer {
+    newPeerMap := make(map[string]*TSPeer)
+    
+    ts.addSelfToPeerMap(newPeerMap, serverHostName, status.TailscaleIPs)
+    ts.addPeersToMap(newPeerMap, status, serverHostName)
+    
+    return newPeerMap
+}
+
+func (ts *TSBase) addSelfToPeerMap(peerMap map[string]*TSPeer, hostName string, ips []netip.Addr) {
+    if hostName == "" || len(ips) == 0 {
+        return
     }
 
-    for _, node := range status.Peer {
-        peer := &TSPeer{
-            PeerHostName: node.HostName,
-            PeerType:     CLIENT,
-        }
-        
-        if node.HostName == serverHostName {
-            peer.PeerType = SERVER
-            ts.TSServerPeer = peer
-        }
+    selfPeer := &TSPeer{
+        PeerHostName: hostName,
+        PeerType:     SERVER,
+        PeerAddress:  ts.getFirstIPv4(ips),
+    }
+    
+    peerMap[hostName] = selfPeer
+    ts.TSServerPeer = selfPeer
+}
 
-        for _, ip := range node.TailscaleIPs {
-            if ip.Is4() {
-                peer.PeerAddress = ip.String()
-                break
+func (ts *TSBase) addPeersToMap(peerMap map[string]*TSPeer, status *ipnstate.Status, serverHostName string) {
+    for _, node := range status.Peer {
+        peerType := CLIENT
+        if node.HostName == serverHostName {
+            peerType = SERVER
+            if peerMap[serverHostName] == nil {
+                ts.TSServerPeer = &TSPeer{
+                    PeerHostName: node.HostName,
+                    PeerType:     SERVER,
+                    PeerAddress:  ts.getFirstIPv4(node.TailscaleIPs),
+                }
             }
         }
-        // CRITICAL: Put the peer in the map!
-        newPeerMap[node.HostName] = peer
+
+        peer := &TSPeer{
+            PeerHostName: node.HostName,
+            PeerType:     peerType,
+            PeerAddress:  ts.getFirstIPv4(node.TailscaleIPs),
+        }
+        peerMap[node.HostName] = peer
     }
-    ts.TSPeerMap = newPeerMap
+}
+
+func (ts *TSBase) getFirstIPv4(ips []netip.Addr) string {
+    for _, ip := range ips {
+        if ip.Is4() {
+            return ip.String()
+        }
+    }
+    return ""
 }
 
 func (ts *TSBase) StartTSConnection() {

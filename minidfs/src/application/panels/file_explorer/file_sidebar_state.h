@@ -14,6 +14,10 @@ namespace minidfs::panel {
         bool show_uploader_modal = false;
         bool create_is_dir = false;
         
+        // Workspace selection
+        int selected_workspace_index = 0;
+        std::vector<std::string> workspaces = {"Default Workspace"}; // TODO: Load from actual workspaces
+        
         // 4. Action Feedback
         bool is_performing_action = false;
         std::string status_message = ""; 

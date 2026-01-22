@@ -76,6 +76,7 @@ target_include_directories(minidfs_client PRIVATE
     ${CMAKE_SOURCE_DIR}/vendor/imgui/backends
     ${CMAKE_SOURCE_DIR}/vendor/imgui
     ${CMAKE_SOURCE_DIR}/vendor/stb
+    ${CMAKE_SOURCE_DIR}/vendor/json/single_include
 )
 
 # project includes
@@ -90,6 +91,8 @@ target_include_directories(minidfs_client PRIVATE
 
 target_link_libraries(minidfs_client PRIVATE 
     minidfs
+    protobuf::libprotobuf
+    gRPC::grpc++
     glfw
     lunasvg
     OpenGL::GL
