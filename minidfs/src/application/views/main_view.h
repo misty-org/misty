@@ -3,8 +3,8 @@
 #include <memory>
 
 #include "views/app_view.h"
-#include "panels/file_explorer/file_explorer_panel.h"
-#include "panels/file_explorer/file_sidebar_panel.h"
+#include "panels/home/file_explorer_panel.h"
+#include "panels/home/file_sidebar_panel.h"
 #include "panels/navbar/navbar_panel.h"
 #include "core/ui_registry.h"
 

@@ -18,13 +18,9 @@ namespace minidfs::panel {
     struct WorkspaceState : public core::UIState {
         std::mutex mu;
 
-        // All available workspaces
         std::vector<WorkspaceInfo> workspaces;
 
-        // Currently selected workspace index
         int selected_workspace_index = 0;
-
-        // Fetch state
         bool is_fetching = false;
         bool has_fetched = false;
         std::string error_msg = "";
