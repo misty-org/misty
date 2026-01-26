@@ -26,7 +26,7 @@ namespace minidfs::panel {
             ImGui::Dummy(ImVec2(0, 20));
 
             show_nav_item("home-24", "Home", 24, ViewID::FileExplorer, state);
-            show_nav_item("devices-24", "Devices", 24, view::ViewID::Devices, state);
+            show_nav_item("devices-24", "Services", 24, view::ViewID::Services, state);
             show_nav_item("bell-24", "Activity", 24, ViewID::Activity, state);
 
             // Calculate nav item height: icon size + button padding + text height + spacing
