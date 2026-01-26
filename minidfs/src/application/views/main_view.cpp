@@ -13,6 +13,7 @@ namespace minidfs::view {
         file_explorer_panel_ = std::make_shared<panel::FileExplorerPanel>(ui_registry_, worker_pool_, client_);
         file_sidebar_panel_ = std::make_shared<panel::FileSidebarPanel>(ui_registry_, worker_pool_, client_);
         navbar_panel_ = std::make_shared<panel::NavbarPanel>(ui_registry_);
+        notification_panel_ = std::make_shared<panel::NotificationPanel>(ui_registry_);
     }
 
     view::ViewID MainView::get_view_id() {
@@ -68,6 +69,9 @@ namespace minidfs::view {
         ImGui::SetNextWindowPos(explorer_pos);
         ImGui::SetNextWindowSize(ImVec2(explorer_w, explorer_h));
         file_explorer_panel_->render();
+
+        // Render notifications on top (no position/size needed, it positions itself)
+        notification_panel_->render();
     }
 
     

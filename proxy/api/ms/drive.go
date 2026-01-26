@@ -44,7 +44,6 @@ func GetDrive() http.HandlerFunc {
 			http.Error(w, "Failed to decode response", http.StatusInternalServerError)
 			return
 		}
-		fmt.Println(drive)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(drive)
 	}

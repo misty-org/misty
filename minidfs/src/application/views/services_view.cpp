@@ -10,6 +10,7 @@ namespace minidfs::view {
     void ServicesView::init_panels() {
         navbar_panel_ = std::make_shared<panel::NavbarPanel>(ui_registry_);
         services_panel_ = std::make_shared<panel::ServicesPanel>(ui_registry_);
+        notification_panel_ = std::make_shared<panel::NotificationPanel>(ui_registry_);
     }
 
     ViewID ServicesView::get_view_id() {
@@ -33,5 +34,8 @@ namespace minidfs::view {
         ImGui::SetNextWindowPos(ImVec2(sx, sy), ImGuiCond_Always);
         ImGui::SetNextWindowSize(ImVec2(sw, sh), ImGuiCond_Always);
         services_panel_->render();
+
+        // Render notifications on top
+        notification_panel_->render();
     }
 }

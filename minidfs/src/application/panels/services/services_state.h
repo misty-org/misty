@@ -43,6 +43,10 @@ namespace minidfs::panel {
                                               const std::string& response_body,
                                               const std::string& error)>;
 
+    using DownloadCallback = std::function<void(bool success,
+                                                 const std::string& local_path,
+                                                 const std::string& error)>;
+
     // Snapshot of a single OneDrive connection for UI (panel uses this for rendering)
     struct OneDriveCardState {
         bool profile_loaded = false;
@@ -74,6 +78,11 @@ namespace minidfs::panel {
                                   const std::string& drive_id,
                                   const std::string& folder_id,
                                   FilesCallback callback);
+        void download_file(const std::string& ms_user_id,
+                          const std::string& drive_id,
+                          const std::string& file_id,
+                          const std::string& local_path,
+                          DownloadCallback callback);
 
         // Helper functions to find connections
         std::set<MSConnection>::iterator find_by_token(const std::string& token);

@@ -6,6 +6,7 @@
 #include "panels/home/file_explorer_panel.h"
 #include "panels/home/file_sidebar_panel.h"
 #include "panels/navbar/navbar_panel.h"
+#include "panels/notification/notification_panel.h"
 #include "core/ui_registry.h"
 
 
@@ -28,6 +29,7 @@ namespace minidfs::view {
         std::shared_ptr<panel::NavbarPanel> navbar_panel_;
         std::shared_ptr<panel::FileSidebarPanel> file_sidebar_panel_;
         std::shared_ptr<panel::FileExplorerPanel> file_explorer_panel_;
-        
+        std::shared_ptr<panel::NotificationPanel> notification_panel_;
+
     };
 }
