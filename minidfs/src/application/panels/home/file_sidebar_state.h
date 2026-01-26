@@ -39,13 +39,6 @@ namespace minidfs::panel {
         size_t current_upload_index = 0;
         std::mutex upload_mutex;
 
-        // Microsoft OAuth state
-        std::string ms_access_token;
-        bool show_ms_login_modal = false;
-        bool is_ms_authenticated = false;
-        char ms_token_buffer[4096] = "";  // Buffer for pasting token
-        std::string ms_auth_error;
-
         // Helper to get current upload progress (thread-safe)
         FileUploadProgress get_current_upload() {
             std::lock_guard<std::mutex> lock(upload_mutex);
@@ -70,11 +63,6 @@ namespace minidfs::panel {
             cancel_upload.store(false);
             upload_queue.clear();
             current_upload_index = 0;
-        }
-
-        // Check if MS is authenticated
-        bool has_ms_token() const {
-            return !ms_access_token.empty();
         }
     };
 

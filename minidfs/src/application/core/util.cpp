@@ -2,19 +2,19 @@
 #include <iostream>
 #include <cstdlib>
 #include <map>
-#include <sstream>
-#include <iomanip>
 #include <ctime>
-#include <chrono>
 #include <nlohmann/json.hpp>
 
 #ifdef _WIN32
 #include <windows.h>
 #include <shellapi.h>
+#include <shlobj.h>
 #elif __APPLE__
-// No additional includes needed for macOS
+#include <pwd.h>
+#include <unistd.h>
 #elif __linux__
-// No additional includes needed for Linux
+#include <pwd.h>
+#include <unistd.h>
 #endif
 
 namespace minidfs::core {
@@ -52,38 +52,32 @@ namespace minidfs::core {
         return j.dump();
     }
 
-    bool is_device_online(const std::string& last_seen_timestamp) {
-        if (last_seen_timestamp.empty()) {
-            return false;
+    std::string get_user_home_dir() {
+#ifdef _WIN32
+        char path[MAX_PATH];
+        if (SUCCEEDED(SHGetFolderPathA(NULL, CSIDL_PROFILE, NULL, SHGFP_TYPE_CURRENT, path))) {
+            return std::string(path);
         }
-
-        try {
-            // Parse timestamp - Go time.Time JSON encodes as RFC3339 (ISO 8601)
-            // Format: "2024-01-20T12:34:56.123456789Z" or "2024-01-20T12:34:56Z"
-            std::tm tm = {};
-            std::istringstream ss(last_seen_timestamp);
-            
-            // Try RFC3339 format with timezone first
-            ss >> std::get_time(&tm, "%Y-%m-%dT%H:%M:%S");
-            if (ss.fail()) {
-                // Try without 'T' separator (SQLite format)
-                ss.clear();
-                ss.str(last_seen_timestamp);
-                ss >> std::get_time(&tm, "%Y-%m-%d %H:%M:%S");
-            }
-            
-            if (!ss.fail()) {
-                auto last_seen_time = std::chrono::system_clock::from_time_t(std::mktime(&tm));
-                auto now = std::chrono::system_clock::now();
-                auto diff = std::chrono::duration_cast<std::chrono::minutes>(now - last_seen_time);
-                
-                // Device is online if last_seen is within 2 minutes
-                return (diff.count() >= 0 && diff.count() <= 2);
-            }
-        } catch (...) {
-            // If parsing fails, assume offline
+        // Fallback to USERPROFILE environment variable
+        const char* home = std::getenv("USERPROFILE");
+        if (home) {
+            return std::string(home);
         }
-        
-        return false;
+        return "";
+#elif __APPLE__ || __linux__
+        // Try HOME environment variable first
+        const char* home = std::getenv("HOME");
+        if (home) {
+            return std::string(home);
+        }
+        // Fallback to getpwuid
+        struct passwd* pw = getpwuid(getuid());
+        if (pw && pw->pw_dir) {
+            return std::string(pw->pw_dir);
+        }
+        return "";
+#else
+        return "";
+#endif
     }
 }
