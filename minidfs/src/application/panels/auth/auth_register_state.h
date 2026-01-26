@@ -83,7 +83,7 @@ namespace minidfs::panel {
                 success_msg = "Account created successfully!";
                 clear_inputs();
                 // Switch view after successful registration
-                view::switch_view(view::ViewID::Devices);
+                view::switch_view(view::ViewID::Services);
             } else if (response.status_code == 400) {
                 error_msg = "Invalid registration data: " + response.body;
             } else if (response.status_code == 500) {

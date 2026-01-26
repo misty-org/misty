@@ -2,7 +2,7 @@
 #include "views/main_view.h"
 #include "views/register_view.h"
 #include "views/login_view.h"
-#include "views/devices_view.h"
+#include "views/services_view.h"
 
 
 
@@ -83,7 +83,7 @@ namespace minidfs {
             std::make_unique<view::MainView>(ui_registry_, worker_pool_, client_));
         view::register_view(view::ViewID::Auth, std::make_unique<view::RegisterView>(ui_registry_));
         view::register_view(view::ViewID::Login, std::make_unique<view::LoginView>(ui_registry_));
-        view::register_view(view::ViewID::Devices, std::make_unique<view::DevicesView>(ui_registry_));
+        view::register_view(view::ViewID::Services, std::make_unique<view::ServicesView>(ui_registry_));
         view::switch_view(view::ViewID::FileExplorer);
     
     }

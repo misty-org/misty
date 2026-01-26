@@ -1,12 +1,11 @@
-#include "panels/file_explorer/file_sidebar_panel.h"
+#include "panels/home/file_sidebar_panel.h"
 #include "file_explorer_state.h"
 #include "workspace_state.h"
-#include "panels/devices/devices_state.h"
+#include "panels/services/services_state.h"
 #include "panels/panel_ui.h"
 #include "core/asset_manager.h"
 #include "core/http_client.h"
 #include "core/file_picker.h"
-#include "core/util.h"
 #include <nlohmann/json.hpp>
 #include <filesystem>
 
@@ -21,16 +20,14 @@ namespace minidfs::panel {
     void FileSidebarPanel::render() {
         auto& state = registry_.get_state<FileSidebarState>("FileSidebar");
         auto& workspace_state = registry_.get_state<WorkspaceState>("Workspace");
-        auto& devices_state = registry_.get_state<DevicesState>("Devices");
+        auto& services_state = registry_.get_state<ServicesState>("Services");
 
-        // Fetch workspaces if not already fetched
         if (!workspace_state.has_fetched && !workspace_state.is_fetching) {
             workspace_state.fetch_workspaces();
         }
 
-        // Update workspace filter and fetch devices
-        devices_state.current_workspace_id = workspace_state.get_current_workspace_id();
-        devices_state.fetch_devices();
+        services_state.current_workspace_id = workspace_state.get_current_workspace_id();
+        services_state.fetch_devices();
 
         ImGuiWindowFlags flags =
             ImGuiWindowFlags_NoTitleBar |
@@ -54,11 +51,8 @@ namespace minidfs::panel {
             show_create_new(state, width, padding);
             ImGui::Separator();
             
-            show_home_section(workspace_state, devices_state, width, padding);
-            show_devices_section(devices_state, width, padding);
-            ImGui::Separator();
-
-            show_cloud_section(state, width, padding);
+            show_home_section(workspace_state, services_state, width, padding);
+            show_services_section(services_state, width, padding);
             ImGui::Separator();
 
             show_quick_access(width, padding);
@@ -68,7 +62,6 @@ namespace minidfs::panel {
             show_create_entry_modal(state);
             show_uploader_modal(state);
             show_upload_progress_modal(state);
-            show_ms_login_modal(state);
         }
 
         ImGui::End();
@@ -118,7 +111,7 @@ namespace minidfs::panel {
         ImGui::PopStyleVar(2);
     }
 
-    void FileSidebarPanel::show_home_section(WorkspaceState& workspace_state, DevicesState& devices_state, float width, float padding) {
+    void FileSidebarPanel::show_home_section(WorkspaceState& workspace_state, ServicesState& services_state, float width, float padding) {
         float content_width = width - (padding * 2);
         ImGui::SetCursorPosX(padding);
 
@@ -157,33 +150,54 @@ namespace minidfs::panel {
         ImGui::Dummy(ImVec2(0.0f, 4.0f));
     }
     
-    void FileSidebarPanel::show_devices_section(DevicesState& devices_state, float width, float padding) {
+    void FileSidebarPanel::show_services_section(ServicesState& services_state, float width, float padding) {
         float content_width = width - (padding * 2);
         ImGui::SetCursorPosX(padding);
 
         ImGui::BeginGroup();
 
-        // Devices section with scrollable area
-        if (!devices_state.devices.empty()) {
+        // Count services to show
+        bool has_cloud_services = services_state.has_ms_token();
+        bool has_devices = !services_state.devices.empty();
+        bool has_services = has_cloud_services || has_devices;
+
+        if (has_services) {
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.7f, 0.7f, 0.7f, 1.0f));
-            ImGui::Text("Devices");
+            ImGui::Text("Services");
             ImGui::PopStyleColor();
 
-            // Calculate max height for devices list (limit to ~4 items, then scroll)
-            float max_height = 140.0f;
-            float item_height = 150.0f;
-            float actual_height = std::min(max_height, item_height * devices_state.devices.size());
+            // Calculate height: cloud services + devices
+            int item_count = 0;
+            if (has_cloud_services) item_count++;
+            item_count += services_state.devices.size();
+
+            float max_height = 200.0f;
+            float item_height = 28.0f;
+            float actual_height = std::min(max_height, item_height * item_count + 8.0f);
 
             ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.18f, 0.18f, 0.18f, 1.0f));
             ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 6.0f);
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f, 8.0f));
 
-            if (ImGui::BeginChild("##devices_list", ImVec2(content_width, actual_height), true)) {
+            if (ImGui::BeginChild("##services_list", ImVec2(content_width, actual_height), true)) {
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.22f, 0.22f, 0.22f, 1.0f));
                 ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.32f, 0.32f, 0.32f, 1.0f));
                 ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.18f, 0.18f, 0.18f, 1.0f));
 
-                for (const auto& device : devices_state.devices) {
-                    // Status indicator
+                // Show cloud services (OneDrive)
+                if (has_cloud_services) {
+                    ImVec4 status_color = ImVec4(0.2f, 0.6f, 0.9f, 1.0f); // Blue for cloud
+                    std::string onedrive_label = "● OneDrive";
+                    float button_width = ImGui::GetContentRegionAvail().x;
+                    if (ImGui::Button(onedrive_label.c_str(), ImVec2(button_width, 24))) {
+                        // Could navigate to OneDrive root or show options
+                        // For now, just show it's connected
+                    }
+                    ImGui::Spacing();
+                }
+
+                // Show devices (Tailscale devices)
+                for (const auto& device : services_state.devices) {
                     ImVec4 status_color = device.is_online
                         ? ImVec4(0.3f, 0.8f, 0.4f, 1.0f)
                         : ImVec4(0.5f, 0.5f, 0.5f, 1.0f);
@@ -205,13 +219,12 @@ namespace minidfs::panel {
             }
             ImGui::EndChild();
 
-            ImGui::PopStyleVar();
+            ImGui::PopStyleVar(2);
             ImGui::PopStyleColor();
         }
 
         ImGui::EndGroup();
         
-        // Add bottom padding for consistent spacing
         ImGui::Spacing();
     }
 
@@ -383,11 +396,10 @@ namespace minidfs::panel {
     void FileSidebarPanel::show_uploader_modal(FileSidebarState& state) {
         if (!state.show_uploader_modal) return;
 
-        // Check if authenticated
-        if (!state.has_ms_token()) {
+        auto& services_state = registry_.get_state<ServicesState>("Services");
+        if (!services_state.has_ms_token()) {
             state.show_uploader_modal = false;
-            state.show_ms_login_modal = true;
-            state.ms_auth_error = "Please connect to OneDrive first.";
+            state.status_message = "Sign in to OneDrive via Services first.";
             return;
         }
 
@@ -484,174 +496,15 @@ namespace minidfs::panel {
         ImGui::PopStyleVar(2);
     }
 
-    void FileSidebarPanel::show_cloud_section(FileSidebarState& state, float width, float padding) {
-        float content_width = width - (padding * 2);
-        ImGui::SetCursorPosX(padding);
-
-        ImGui::BeginGroup();
-
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.7f, 0.7f, 0.7f, 1.0f));
-        ImGui::Text("Cloud Storage");
-        ImGui::PopStyleColor();
-
-        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f, 8.0f));
-        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 8.0f));
-        ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.0f, 0.5f));
-
-        if (state.has_ms_token()) {
-            // Connected state
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.4f, 0.3f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.5f, 0.4f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.15f, 0.35f, 0.25f, 1.0f));
-
-            if (ImGui::Button("OneDrive (Connected)", ImVec2(content_width, 32))) {
-                // Could show options or disconnect
-            }
-
-            ImGui::PopStyleColor(3);
-        } else {
-            // Not connected state
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.35f, 0.5f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.45f, 0.6f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.15f, 0.3f, 0.45f, 1.0f));
-
-            if (ImGui::Button("Connect to OneDrive", ImVec2(content_width, 32))) {
-                initiate_ms_login(state);
-            }
-
-            ImGui::PopStyleColor(3);
-        }
-
-        ImGui::PopStyleVar(3);
-        ImGui::EndGroup();
-
-        ImGui::Spacing();
-    }
-
-    void FileSidebarPanel::show_ms_login_modal(FileSidebarState& state) {
-        if (state.show_ms_login_modal) {
-            ImGui::OpenPopup("Connect to OneDrive");
-        }
-
-        ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, {0.5f, 0.5f});
-        ImGui::SetNextWindowSize({450, 280}, ImGuiCond_Appearing);
-
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 8.0f);
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {24, 24});
-        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, {12, 12});
-        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {12, 8});
-
-        if (ImGui::BeginPopupModal("Connect to OneDrive", &state.show_ms_login_modal,
-            ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove)) {
-
-            ImGui::TextWrapped("To upload files to OneDrive, you need to authenticate with Microsoft.");
-            ImGui::Spacing();
-
-            ImGui::TextWrapped("1. Click 'Open Browser' to sign in with Microsoft");
-            ImGui::TextWrapped("2. After signing in, copy the access token from the page");
-            ImGui::TextWrapped("3. Paste the token below and click 'Connect'");
-
-            ImGui::Spacing();
-            ImGui::Separator();
-            ImGui::Spacing();
-
-            // Error message
-            if (!state.ms_auth_error.empty()) {
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.4f, 0.4f, 1.0f));
-                ImGui::TextWrapped("%s", state.ms_auth_error.c_str());
-                ImGui::PopStyleColor();
-                ImGui::Spacing();
-            }
-
-            // Open browser button
-            float button_width = ImGui::GetContentRegionAvail().x;
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.35f, 0.5f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.45f, 0.6f, 1.0f));
-            if (ImGui::Button("Open Browser to Sign In", ImVec2(button_width, 36))) {
-                initiate_ms_login(state);
-            }
-            ImGui::PopStyleColor(2);
-
-            ImGui::Spacing();
-
-            // Token input
-            ImGui::Text("Access Token:");
-            ImGui::SetNextItemWidth(-1);
-            ImGui::InputTextWithHint("##ms_token", "Paste access token here...",
-                state.ms_token_buffer, sizeof(state.ms_token_buffer));
-
-            ImGui::Spacing();
-
-            // Connect / Cancel buttons
-            float half_width = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
-
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.5f, 0.3f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.6f, 0.4f, 1.0f));
-            if (ImGui::Button("Connect", ImVec2(half_width, 36))) {
-                if (strlen(state.ms_token_buffer) > 0) {
-                    state.ms_access_token = std::string(state.ms_token_buffer);
-                    state.is_ms_authenticated = true;
-                    state.ms_auth_error.clear();
-                    memset(state.ms_token_buffer, 0, sizeof(state.ms_token_buffer));
-                    state.show_ms_login_modal = false;
-                    ImGui::CloseCurrentPopup();
-                } else {
-                    state.ms_auth_error = "Please paste the access token.";
-                }
-            }
-            ImGui::PopStyleColor(2);
-
-            ImGui::SameLine();
-
-            if (ImGui::Button("Cancel", ImVec2(half_width, 36))) {
-                state.ms_auth_error.clear();
-                memset(state.ms_token_buffer, 0, sizeof(state.ms_token_buffer));
-                state.show_ms_login_modal = false;
-                ImGui::CloseCurrentPopup();
-            }
-
-            ImGui::EndPopup();
-        }
-
-        ImGui::PopStyleVar(4);
-    }
-
-    void FileSidebarPanel::initiate_ms_login(FileSidebarState& state) {
-        // Call proxy to get the OAuth URL
-        auto& http = core::HttpClient::get();
-        auto response = http.get("http://localhost:3000/api/ms/auth");
-
-        if (response.status_code != 200) {
-            state.ms_auth_error = "Failed to get auth URL. Is the proxy running?";
-            state.show_ms_login_modal = true;
-            return;
-        }
-
-        // Parse the auth URL from response
-        try {
-            auto json_response = nlohmann::json::parse(response.body);
-            std::string auth_url = json_response["auth_url"].get<std::string>();
-
-            // Open the URL in the system browser
-            core::open_file_in_browser(auth_url);
-
-            // Show the modal for token input
-            state.show_ms_login_modal = true;
-            state.ms_auth_error.clear();
-        } catch (const std::exception& e) {
-            state.ms_auth_error = "Failed to parse auth response.";
-            state.show_ms_login_modal = true;
-        }
-    }
-
     void FileSidebarPanel::start_file_upload(FileSidebarState& state, const std::vector<std::string>& file_paths) {
         if (file_paths.empty()) return;
 
-        // Check if we have a token
-        if (state.ms_access_token.empty()) {
-            state.status_message = "Not authenticated with Microsoft. Please sign in first.";
+        auto& services_state = registry_.get_state<ServicesState>("Services");
+        if (!services_state.has_ms_token()) {
+            state.status_message = "Not authenticated with Microsoft. Sign in via Services first.";
             return;
         }
+        std::string ms_token = services_state.ms_access_token;
 
         // Initialize upload queue
         {
@@ -682,10 +535,8 @@ namespace minidfs::panel {
         auto& file_explorer_state = registry_.get_state<FileExplorerState>("FileExplorer");
         std::string dest_path = file_explorer_state.current_path;
 
-        // Start upload in worker thread
         worker_pool_.add(
-            [this, &state, dest_path]() {
-                // Upload each file in the queue
+            [this, &state, dest_path, ms_token]() {
                 while (true) {
                     std::string file_path;
                     {
@@ -700,7 +551,7 @@ namespace minidfs::panel {
                         break;
                     }
 
-                    create_upload_session_and_upload(state, file_path, dest_path);
+                    create_upload_session_and_upload(state, file_path, dest_path, ms_token);
 
                     {
                         std::lock_guard<std::mutex> lock(state.upload_mutex);
@@ -724,18 +575,16 @@ namespace minidfs::panel {
         );
     }
 
-    void FileSidebarPanel::create_upload_session_and_upload(FileSidebarState& state, const std::string& file_path, const std::string& dest_path) {
+    void FileSidebarPanel::create_upload_session_and_upload(FileSidebarState& state, const std::string& file_path, const std::string& dest_path, const std::string& ms_token) {
         std::string file_name = fs::path(file_path).filename().string();
 
-        // Step 1: Create upload session via proxy
-        // POST to proxy endpoint to get uploadUrl
         nlohmann::json session_request;
-        session_request["path"] = "";  // Upload to OneDrive root or specify path
+        session_request["path"] = "";
         session_request["fileName"] = file_name;
 
         std::map<std::string, std::string> headers;
         headers["Content-Type"] = "application/json";
-        headers["Authorization"] = "Bearer " + state.ms_access_token;
+        headers["Authorization"] = "Bearer " + ms_token;
 
         // Call proxy to create upload session
         auto& http = core::HttpClient::get();
