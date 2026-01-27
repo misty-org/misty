@@ -8,6 +8,5 @@ file(GLOB_RECURSE TEST_SRCS
 add_executable(minidfs_tests ${TEST_SRCS})
 target_link_libraries(minidfs_tests PRIVATE
     minidfs
-    gtest
     gtest_main
 )
