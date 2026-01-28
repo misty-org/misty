@@ -12,7 +12,7 @@ namespace minidfs::view {
     }
 
     ViewID TSView::get_view_id() {
-        return view::ViewID::Devices;
+        return view::ViewID::Services;
     }
 
     void TSView::render() {

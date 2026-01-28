@@ -12,7 +12,7 @@ namespace minidfs::view {
         Settings,
         Workspace,
         Activity,
-        Devices,
+        Services,
         Default
     };
 
