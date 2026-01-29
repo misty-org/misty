@@ -1,5 +1,6 @@
 #include "file_explorer_panel.h"
 #include "workspace_state.h"
+#include "onedrive_state.h"
 #include "panels/services/services_state.h"
 #include "panels/activity/download_state.h"
 #include "panels/notification/notification_state.h"
@@ -108,7 +109,15 @@ namespace minidfs::panel {
                 navigate_to_onedrive_account(folder_name, relative_path, update_history, create_if_missing);
             }
         } else {
-            // Local path
+            // Local path - clear OneDrive upload context and notification tracking
+            {
+                auto& onedrive_state = registry_.get_state<OneDriveState>("OneDrive");
+                std::lock_guard<std::mutex> od_lock(onedrive_state.mu);
+                onedrive_state.current_ms_user_id.clear();
+                onedrive_state.current_drive_id.clear();
+                onedrive_state.current_folder_id.clear();
+            }
+            state.last_disconnected_notification_folder.clear();
             navigate_to_local_path(state, path, update_history);
         }
     }
@@ -148,6 +157,19 @@ namespace minidfs::panel {
     void FileExplorerPanel::navigate_to_onedrive_mount_root(bool update_history) {
         auto& state = registry_.get_state<FileExplorerState>("FileExplorer");
         auto& workspace = registry_.get_state<WorkspaceState>("Workspace");
+        auto& services = registry_.get_state<ServicesState>("Services");
+
+        // Clear disconnected notification tracking since we're at the account list level
+        state.last_disconnected_notification_folder.clear();
+
+        // Clear OneDrive upload context since we're at account list level
+        {
+            auto& onedrive_state = registry_.get_state<OneDriveState>("OneDrive");
+            std::lock_guard<std::mutex> od_lock(onedrive_state.mu);
+            onedrive_state.current_ms_user_id.clear();
+            onedrive_state.current_drive_id.clear();
+            onedrive_state.current_folder_id.clear();
+        }
 
         // Sync account mappings from services state
         sync_account_mappings();
@@ -164,8 +186,11 @@ namespace minidfs::panel {
             }
         }
 
-        // Build files list from account mappings (now in workspace state)
+        // Build files list from both connected accounts and local folders
         std::vector<UnifiedFileItem> files;
+        std::unordered_set<std::string> added_folders;
+
+        // First add connected accounts from mappings
         for (const auto& mapping : workspace.account_mappings) {
             UnifiedFileItem item;
             item.name = mapping.folder_name;
@@ -175,6 +200,29 @@ namespace minidfs::panel {
             item.od_ms_user_id = mapping.ms_user_id;
             item.od_drive_id = mapping.drive_id;
             files.push_back(item);
+            added_folders.insert(mapping.folder_name);
+        }
+
+        // Then scan the local OneDrive directory for folders without connected accounts
+        std::error_code ec;
+        if (fs::exists(new_path, ec) && fs::is_directory(new_path, ec)) {
+            for (const auto& entry : fs::directory_iterator(new_path, ec)) {
+                if (entry.is_directory()) {
+                    std::string folder_name = entry.path().filename().string();
+                    // Skip if already added from mappings or hidden folders
+                    if (added_folders.count(folder_name) > 0 || folder_name[0] == '.') {
+                        continue;
+                    }
+
+                    // This is a local folder without a connected account
+                    UnifiedFileItem item;
+                    item.name = folder_name;
+                    item.path = new_path + "/" + folder_name;
+                    item.is_dir = true;
+                    item.source = FileSource::LOCAL;  // Mark as local since not connected
+                    files.push_back(item);
+                }
+            }
         }
 
         state.files = std::move(files);
@@ -194,6 +242,10 @@ namespace minidfs::panel {
                                                           bool create_if_missing) {
         auto& state = registry_.get_state<FileExplorerState>("FileExplorer");
         auto& workspace = registry_.get_state<WorkspaceState>("Workspace");
+        auto& services = registry_.get_state<ServicesState>("Services");
+
+        // Check if this account is connected
+        bool is_connected = services.is_account_folder_connected(folder_name);
 
         // Find account mapping in workspace state
         AccountMapping* mapping = workspace.find_account_by_folder(folder_name);
@@ -203,14 +255,49 @@ namespace minidfs::panel {
             mapping = workspace.find_account_by_folder(folder_name);
         }
 
-        if (!mapping) {
-            state.error_msg = "Account not found: " + folder_name;
-            return;
-        }
-
         std::string target_path = path_utils::get_onedrive_root() + "/" + folder_name;
         if (!relative_path.empty()) {
             target_path += "/" + relative_path;
+        }
+
+        // If account not connected, show notification and fall through to local file browsing
+        if (!is_connected) {
+            // Only show notification if we haven't shown one for this folder already
+            if (state.last_disconnected_notification_folder != folder_name) {
+                auto& notifications = registry_.get_state<NotificationState>("Notifications");
+                notifications.add_notification(
+                    "Account Not Connected",
+                    "The OneDrive account '" + folder_name + "' is not connected. Showing local files only.",
+                    NotificationType::INFO,
+                    8.0f  // Show for 8 seconds
+                );
+                state.last_disconnected_notification_folder = folder_name;
+            }
+
+            // Fall through to show local files even without mapping
+            if (!mapping) {
+                // No mapping exists - just show local filesystem
+                if (!fs::exists(target_path)) {
+                    state.error_msg = "Path does not exist: " + target_path;
+                    return;
+                }
+                if (!fs::is_directory(target_path)) {
+                    state.error_msg = "Path is not a directory: " + target_path;
+                    return;
+                }
+
+                // Navigate as local path
+                navigate_to_local_path(state, target_path, update_history);
+                return;
+            }
+        } else {
+            // Account is connected - clear notification tracking
+            state.last_disconnected_notification_folder.clear();
+        }
+
+        if (!mapping) {
+            state.error_msg = "Account not found: " + folder_name;
+            return;
         }
 
         if (create_if_missing) {
@@ -391,6 +478,15 @@ namespace minidfs::panel {
         // Only update if we're still at this path
         if (std::string(state.current_path) != target_path) {
             return;
+        }
+
+        // Update OneDriveState with current folder context for uploads
+        {
+            auto& onedrive_state = registry_.get_state<OneDriveState>("OneDrive");
+            std::lock_guard<std::mutex> od_lock(onedrive_state.mu);
+            onedrive_state.current_ms_user_id = ms_user_id;
+            onedrive_state.current_drive_id = drive_id;
+            onedrive_state.current_folder_id = folder_id;
         }
 
         if (success) {

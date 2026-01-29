@@ -148,13 +148,16 @@ namespace minidfs::panel {
             success_msg = "";
         }
 
+        // Run the HTTP DELETE in a background thread to avoid blocking UI
         std::string app_user_id = core::EnvManager::get().get("USER_ID", "");
         std::string base = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
         if (!ms_user_id.empty() && !app_user_id.empty() && !base.empty()) {
-            std::string url = base + "/api/ms/token?user_id=" + app_user_id + "&ms_user_id=" + ms_user_id;
-            std::map<std::string, std::string> headers;
-            headers["Accept"] = "application/json";
-            core::HttpClient::get().del(url, headers);
+            std::thread([ms_user_id, app_user_id, base]() {
+                std::string url = base + "/api/ms/token?user_id=" + app_user_id + "&ms_user_id=" + ms_user_id;
+                std::map<std::string, std::string> headers;
+                headers["Accept"] = "application/json";
+                core::HttpClient::get().del(url, headers);
+            }).detach();
         }
     }
 
@@ -274,6 +277,34 @@ namespace minidfs::panel {
         ms_auth_error.clear();
     }
 
+    std::string ServicesState::get_token_for_user(const std::string& ms_user_id) {
+        std::lock_guard<std::mutex> lock(mu);
+        auto it = find_by_ms_user_id(ms_user_id);
+        if (it != ms_connections.end() && !it->access_token.empty()) {
+            return it->access_token;
+        }
+        return "";
+    }
+
+    bool ServicesState::is_account_folder_connected(const std::string& folder_name) {
+        std::lock_guard<std::mutex> lock(mu);
+        for (const auto& conn : ms_connections) {
+            // Derive folder name from email (e.g., "matthew@outlook.com" -> "matthew")
+            std::string email = conn.profile.email;
+            std::string derived_folder;
+            if (!email.empty()) {
+                size_t at_pos = email.find('@');
+                derived_folder = (at_pos != std::string::npos) ? email.substr(0, at_pos) : email;
+            }
+
+            if (derived_folder == folder_name) {
+                // Check if this connection is authenticated
+                return conn.is_authenticated && !conn.access_token.empty();
+            }
+        }
+        return false;
+    }
+
     std::string ServicesState::refresh_ms_token(const std::string& ms_user_id) {
         std::string base = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
         if (base.empty()) {
@@ -315,7 +346,10 @@ namespace minidfs::panel {
             std::lock_guard<std::mutex> lock(mu);
             auto it = find_by_ms_user_id(ms_user_id);
             if (it == ms_connections.end() || it->access_token.empty()) {
-                callback(ms_user_id, "", false, "No valid token for account");
+                // Call callback asynchronously to avoid deadlock with UI thread
+                std::thread([ms_user_id, callback]() {
+                    callback(ms_user_id, "", false, "No valid token for account");
+                }).detach();
                 return;
             }
             token = it->access_token;
@@ -367,7 +401,10 @@ namespace minidfs::panel {
             std::lock_guard<std::mutex> lock(mu);
             auto it = find_by_ms_user_id(ms_user_id);
             if (it == ms_connections.end() || it->access_token.empty()) {
-                callback(false, "", "No valid token for account");
+                // Call callback asynchronously to avoid deadlock with UI thread
+                std::thread([callback]() {
+                    callback(false, "", "No valid token for account");
+                }).detach();
                 return;
             }
             token = it->access_token;
@@ -414,7 +451,10 @@ namespace minidfs::panel {
             std::lock_guard<std::mutex> lock(mu);
             auto it = find_by_ms_user_id(ms_user_id);
             if (it == ms_connections.end() || it->access_token.empty()) {
-                callback(false, "", "No valid token for account");
+                // Call callback asynchronously to avoid deadlock with UI thread
+                std::thread([callback]() {
+                    callback(false, "", "No valid token for account");
+                }).detach();
                 return;
             }
             token = it->access_token;

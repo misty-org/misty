@@ -5,6 +5,7 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"net/url"
@@ -91,7 +92,8 @@ func GetOAuthLogin() http.HandlerFunc {
 			"state":         {stateEncoded},
 		}
 
-		authURL := "https://login.microsoftonline.com/common/oauth2/v2.0/authorize?" + params.Encode()
+		authURL := fmt.Sprintf("https://login.microsoftonline.com/common/oauth2/v2.0/authorize?%s", params.Encode())
+		fmt.Println(authURL)
 
 		// If response=json, return JSON (for API clients that handle cookies themselves)
 		// Otherwise, redirect directly to Microsoft (for browser-based flow)
@@ -153,10 +155,10 @@ func OAuthCallback(database *db.Database) http.HandlerFunc {
 		})
 
 		userID := state.UserID
+		tokenURL := fmt.Sprintf("https://login.microsoftonline.com/common/oauth2/v2.0/token")
 
-		resp, err := http.PostForm("https://login.microsoftonline.com/common/oauth2/v2.0/token", url.Values{
+		resp, err := http.PostForm(tokenURL, url.Values{
 			"client_id":     {config.ClientID},
-			"client_secret": {config.ClientSecret},
 			"code":          {code},
 			"redirect_uri":  {config.RedirectURI},
 			"grant_type":    {"authorization_code"},

@@ -76,11 +76,6 @@ type RefreshTokenResponse struct {
 
 func RefreshMSToken(database *db.Database) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-
 		userID := r.URL.Query().Get("user_id")
 		msUserID := r.URL.Query().Get("ms_user_id")
 		if userID == "" || msUserID == "" {
@@ -96,6 +91,7 @@ func RefreshMSToken(database *db.Database) http.HandlerFunc {
 
 		var existingToken *db.MSTokenRecord
 		for _, t := range tokens {
+			fmt.Println(t.MsUserID)
 			if t.MsUserID == msUserID {
 				existingToken = &t
 				break
@@ -114,7 +110,6 @@ func RefreshMSToken(database *db.Database) http.HandlerFunc {
 
 		resp, err := http.PostForm("https://login.microsoftonline.com/common/oauth2/v2.0/token", url.Values{
 			"client_id":     {config.ClientID},
-			"client_secret": {config.ClientSecret},
 			"refresh_token": {existingToken.RefreshToken},
 			"grant_type":    {"refresh_token"},
 			"scope":         {config.GetScopesString()},
@@ -130,6 +125,8 @@ func RefreshMSToken(database *db.Database) http.HandlerFunc {
 			http.Error(w, "Failed to parse token response", http.StatusInternalServerError)
 			return
 		}
+
+		fmt.Println(tokenResp)
 
 		if errMsg, ok := tokenResp["error"]; ok {
 			errDesc, _ := tokenResp["error_description"].(string)

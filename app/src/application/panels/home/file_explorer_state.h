@@ -127,6 +127,9 @@ namespace minidfs::panel {
         bool is_downloading(const std::string& path) const {
             return downloading_files.count(path) > 0;
         }
+
+        // Track last disconnected account notification to prevent spam
+        std::string last_disconnected_notification_folder;
     };
 
     // Navigate to local filesystem path

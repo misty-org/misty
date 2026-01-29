@@ -19,41 +19,41 @@ file(GLOB_RECURSE APP_SRCS
     ${IMGUI_SRCS}
 )
 
-add_executable(minidfs_client)
+add_executable(misty)
 if(WIN32)
     file(GLOB WIN32_SRCS "src/application/platform/windows/*.cpp" "src/application/platform/windows/*.h")
     list(APPEND APP_SRCS ${WIN32_SRCS})
-    target_sources(minidfs_client PRIVATE ${APP_SRCS})
+    target_sources(misty PRIVATE ${APP_SRCS})
     if(CMAKE_BUILD_TYPE STREQUAL "Release")
-        set_target_properties(minidfs_client PROPERTIES WIN32_EXECUTABLE TRUE)
+        set_target_properties(misty PROPERTIES WIN32_EXECUTABLE TRUE)
     else()
-        set_target_properties(minidfs_client PROPERTIES WIN32_EXECUTABLE FALSE)
+        set_target_properties(misty PROPERTIES WIN32_EXECUTABLE FALSE)
     endif()
     add_definitions(-DWIN32_LEAN_AND_MEAN)
     add_definitions(-DNOMINMAX)
-    target_link_libraries(minidfs_client PRIVATE ws2_32 dwmapi)
+    target_link_libraries(misty PRIVATE ws2_32 dwmapi)
     if(MSVC)
         # Use /MP for ALL configurations to speed up every build
-        target_compile_options(minidfs_client PRIVATE /MP)
+        target_compile_options(misty PRIVATE /MP)
 
         # Edit and Continue flags (Use 'Debug' casing)
-        target_compile_options(minidfs_client PRIVATE $<$<CONFIG:Debug>:/ZI>)
-        target_link_options(minidfs_client PRIVATE $<$<CONFIG:Debug>:/EDITANDCONTINUE>)
+        target_compile_options(misty PRIVATE $<$<CONFIG:Debug>:/ZI>)
+        target_link_options(misty PRIVATE $<$<CONFIG:Debug>:/EDITANDCONTINUE>)
 
         # CRITICAL: Fix the 'MDd' vs 'MT' mismatch error
-        set_property(TARGET minidfs_client PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
+        set_property(TARGET misty PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
 
         # Set Startup Project
-        set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT minidfs_client)
+        set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT misty)
         
         # Set Debugging Working Directory so it finds your config/assets
-        set_target_properties(minidfs_client PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "$<TARGET_FILE_DIR:minidfs_client>")
+        set_target_properties(misty PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "$<TARGET_FILE_DIR:misty>")
     endif()
 elseif(APPLE)
     file(GLOB MAC_SRCS "application/platform/mac/*.cpp" "application/platform/mac/*.h")
     list(APPEND APP_SRCS ${MAC_SRCS})
-    target_sources(minidfs_client PRIVATE ${APP_SRCS})
-    target_link_libraries(minidfs_client PRIVATE
+    target_sources(misty PRIVATE ${APP_SRCS})
+    target_link_libraries(misty PRIVATE
         "-framework CoreGraphics"
         "-framework CoreServices"
         "-framework Cocoa"
@@ -64,14 +64,14 @@ elseif(UNIX AND NOT APPLE)
         "src/application/platform/linux/*.h"
     )
     list(APPEND APP_SRCS ${LINUX_SRCS})
-    target_sources(minidfs_client PRIVATE ${APP_SRCS})
-    target_compile_definitions(minidfs_client PRIVATE
+    target_sources(misty PRIVATE ${APP_SRCS})
+    target_compile_definitions(misty PRIVATE
         _GNU_SOURCE
     )
 endif()
 
 # vendor includes
-target_include_directories(minidfs_client PRIVATE
+target_include_directories(misty PRIVATE
     ${CMAKE_SOURCE_DIR}/vendor/glad/include
     ${CMAKE_SOURCE_DIR}/vendor/lunasvg/include
     ${CMAKE_SOURCE_DIR}/vendor/stb_image
@@ -82,7 +82,7 @@ target_include_directories(minidfs_client PRIVATE
 )
 
 # project includes
-target_include_directories(minidfs_client PRIVATE
+target_include_directories(misty PRIVATE
     ${CMAKE_SOURCE_DIR}
     ${IMGUI_DIR}
     ${IMGUI_DIR}/backends
@@ -91,7 +91,7 @@ target_include_directories(minidfs_client PRIVATE
     ${CMAKE_SOURCE_DIR}/src/application
 )
 
-target_link_libraries(minidfs_client PRIVATE 
+target_link_libraries(misty PRIVATE 
     minidfs
     protobuf::libprotobuf
     gRPC::grpc++
@@ -101,24 +101,24 @@ target_link_libraries(minidfs_client PRIVATE
     CURL::libcurl
 )
 
-target_precompile_headers(minidfs_client PRIVATE 
+target_precompile_headers(misty PRIVATE 
     "src/application/minidfs.h"
 )
 
-add_custom_command(TARGET minidfs_client POST_BUILD
+add_custom_command(TARGET misty POST_BUILD
     # Operation 1: Copy main assets to build folder
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_CURRENT_SOURCE_DIR}/assets"
-        "$<TARGET_FILE_DIR:minidfs_client>/assets"
+        "$<TARGET_FILE_DIR:misty>/assets"
     
     # Operation 2: Copy icons to the build folder's assets/icons directory
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_CURRENT_SOURCE_DIR}/vendor/octicons/icons"
-        "$<TARGET_FILE_DIR:minidfs_client>/assets/icons"
+        "$<TARGET_FILE_DIR:misty>/assets/icons"
 
     COMMAND ${CMAKE_COMMAND} -E copy
         "${CMAKE_CURRENT_SOURCE_DIR}/minidfs.conf"
-        "$<TARGET_FILE_DIR:minidfs_client>/minidfs.conf"
+        "$<TARGET_FILE_DIR:misty>/minidfs.conf"
 )
 
 
