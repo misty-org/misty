@@ -13,7 +13,14 @@
 namespace fs = std::filesystem;
 
 namespace minidfs::panel {
+
+    enum class ExplorerMode {
+        LOCAL,
+        ONEDRIVE
+    };
+
     struct FileExplorerState : public core::UIState {
+        ExplorerMode mode = ExplorerMode::LOCAL;
         char current_path[512] = "";
         char search_path[512] = "";
         std::vector<minidfs::FileInfo> files;

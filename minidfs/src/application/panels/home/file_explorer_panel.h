@@ -6,7 +6,9 @@
 #include "panels/panel.h"
 #include "core/worker_pool.h"
 #include "file_explorer_state.h"
+#include "onedrive_state.h"
 #include "workspace_state.h"
+#include "panels/services/services_state.h"
 
 
 namespace minidfs::panel {
@@ -21,6 +23,13 @@ namespace minidfs::panel {
         void show_search_bar(panel::FileExplorerState& state);
         void show_directory_contents(panel::FileExplorerState& state);
         void show_file_item(panel::FileExplorerState& state, int i);
+
+        // OneDrive mode rendering
+        void render_onedrive_mode(panel::FileExplorerState& state, panel::OneDriveState& onedrive_state);
+        void show_onedrive_roots(panel::OneDriveState& onedrive_state);
+        void show_onedrive_items_table(panel::OneDriveState& onedrive_state, const std::vector<panel::OneDriveItem>& items);
+        void navigate_to_account_root(panel::OneDriveState& onedrive_state, panel::AccountRootContent& account);
+        void navigate_to_onedrive_folder(panel::OneDriveState& onedrive_state, const panel::OneDriveItem& folder);
         
     private:
         core::UIRegistry& registry_;
