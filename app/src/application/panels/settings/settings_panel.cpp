@@ -246,7 +246,7 @@ namespace misty::panel {
 
         // --- Clear Recent Files ---
         {
-            auto& explorer = registry_.get_state<FileExplorerState>("FileExplorer");
+            auto& explorer = registry_.get_state<FileExplorerState>("Files");
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.85f, 0.85f, 0.85f, 1.0f));
             ImGui::Text("Recent Files");
             ImGui::PopStyleColor();
@@ -293,7 +293,7 @@ namespace misty::panel {
 
         // --- Clear Starred Files ---
         {
-            auto& explorer = registry_.get_state<FileExplorerState>("FileExplorer");
+            auto& explorer = registry_.get_state<FileExplorerState>("Files");
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.85f, 0.85f, 0.85f, 1.0f));
             ImGui::Text("Starred Files");
             ImGui::PopStyleColor();
@@ -340,7 +340,7 @@ namespace misty::panel {
 
         // --- Empty Trash ---
         {
-            auto& explorer = registry_.get_state<FileExplorerState>("FileExplorer");
+            auto& explorer = registry_.get_state<FileExplorerState>("Files");
             uint64_t trash_size = get_directory_size(trash_dir);
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.85f, 0.85f, 0.85f, 1.0f));
             ImGui::Text("Trash");

@@ -10,14 +10,20 @@ namespace misty::core {
     public:
         static SessionManager& get();
 
-        // Store token in memory and persist to secure storage
-        void set_token(const std::string& token);
+        // Store both tokens in memory and persist to secure storage
+        void set_tokens(const std::string& access_token, const std::string& refresh_token);
 
-        // Clear token from memory and secure storage (logout)
+        // Update both tokens (used after a refresh)
+        void update_tokens(const std::string& access_token, const std::string& refresh_token);
+
+        // Clear all tokens from memory and secure storage (logout)
         void clear_token();
 
-        // Get the stored JWT token (empty string if none)
+        // Get the stored JWT access token (empty string if none)
         std::string get_token() const;
+
+        // Get the stored refresh token (empty string if none)
+        std::string get_refresh_token() const;
 
         // Check if user has a stored token
         bool is_authenticated() const;
@@ -31,12 +37,13 @@ namespace misty::core {
         SessionManager(const SessionManager&) = delete;
         SessionManager& operator=(const SessionManager&) = delete;
 
-        void load_token();
-        void save_token() const;
-        void delete_token() const;
+        void load_tokens();
+        void save_tokens() const;
+        void delete_tokens() const;
 
         mutable std::mutex mu_;
         std::string token_;
+        std::string refresh_token_;
     };
 
 }

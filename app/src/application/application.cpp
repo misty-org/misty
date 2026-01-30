@@ -56,26 +56,9 @@ namespace misty {
         }
     }
 
-    void Application::init_file_sync() {
-        if (!client_) {
-            throw std::runtime_error("Client not initialized before initializing FileSync.");
-        }
-
-        #ifdef _WIN32
-            file_sync_ = std::make_unique<misty::FileSyncWin32>(client_);
-        #elif defined(__APPLE__)
-            file_sync_ = std::make_unique<misty::FileSyncMac>(client_);
-        #else
-            file_sync_ = std::make_unique<misty::FileSyncLinux>(client_);
-        #endif
-
-        file_sync_->init_sync_resources();
-        file_sync_->start_sync();
-    }
-
     void Application::init_views() {
 
-        view::register_view(view::ViewID::FileExplorer,
+        view::register_view(view::ViewID::Files,
             std::make_unique<view::MainView>(ui_registry_, worker_pool_, client_));
         view::register_view(view::ViewID::Auth, std::make_unique<view::RegisterView>(ui_registry_));
         view::register_view(view::ViewID::Login, std::make_unique<view::LoginView>(ui_registry_));
@@ -85,7 +68,7 @@ namespace misty {
         view::register_view(view::ViewID::EditProfile, std::make_unique<view::EditProfileView>(ui_registry_));
         // If user has a stored token, go to main app; otherwise show login
         if (core::SessionManager::get().is_authenticated()) {
-            view::switch_view(view::ViewID::FileExplorer);
+            view::switch_view(view::ViewID::Files);
         } else {
             view::switch_view(view::ViewID::Login);
         }

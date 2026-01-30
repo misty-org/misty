@@ -1,15 +1,9 @@
 #pragma once
 #include "core/ui_registry.h"
 #include "core/worker_pool.h"
-#include "dfs/file_sync/file_sync.h"
 #include "core/file_sync_service.h"
 #include "views/app_view.h"
 
-#ifdef _WIN32
-#include "dfs/file_sync/file_sync_win.h"
-#elif defined(__APPLE__)
-#include "dfs/file_sync/file_sync_mac.h"
-#endif
 
 namespace misty {
     class Application {
@@ -20,7 +14,6 @@ namespace misty {
         void run();
         void init_client();
         void init_views();
-		void init_file_sync();
 
     protected:
         // Pure virtual functions (the "Interface")
@@ -34,15 +27,6 @@ namespace misty {
         core::UIRegistry ui_registry_;
         core::WorkerPool worker_pool_;
         std::shared_ptr<MistyClient> client_;
-
-        #ifdef _WIN32
-            std::unique_ptr<FileSyncWin32> file_sync_;
-        #elif defined(__APPLE__)
-            std::unique_ptr<FileSyncMac> file_sync_;
-        #elif defined(__linux__)
-            std::unique_ptr<FileSyncLinux> file_sync_;
-        #endif
-
         std::unique_ptr<core::FileSyncService> file_sync_service_;
 
     };  

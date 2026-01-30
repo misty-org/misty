@@ -136,7 +136,7 @@ namespace misty::panel {
                 buffers_initialized_ = false;
 
                 // Navigate back to previous view
-                view::switch_view(view::ViewID::FileExplorer);
+                view::switch_view(view::ViewID::Files);
             }
             ImGui::PopStyleColor(3);
 
@@ -148,7 +148,7 @@ namespace misty::panel {
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.8f, 0.8f, 1.0f));
             if (ImGui::Button("Cancel", ImVec2(100, 0))) {
                 buffers_initialized_ = false;
-                view::switch_view(view::ViewID::FileExplorer);
+                view::switch_view(view::ViewID::Files);
             }
             ImGui::PopStyleColor(3);
 

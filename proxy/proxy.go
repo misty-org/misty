@@ -8,6 +8,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
 	"github.com/kannachi323/misty/proxy/api"
+	"github.com/kannachi323/misty/proxy/api/dbx"
 	"github.com/kannachi323/misty/proxy/api/gd"
 	"github.com/kannachi323/misty/proxy/api/ms"
 	"github.com/kannachi323/misty/proxy/core/auth"
@@ -66,13 +67,16 @@ func (proxy *Proxy) MountHandlers() {
 	// Public routes (no auth required)
 	proxy.APIRouter.Post("/register", api.RegisterUser(proxy.Database))
 	proxy.APIRouter.Post("/login", api.LoginUser(proxy.Database))
-	proxy.APIRouter.Post("/logout", api.LogoutUser())
+	proxy.APIRouter.Post("/logout", api.LogoutUser(proxy.Database))
+	proxy.APIRouter.Post("/refresh", api.RefreshToken(proxy.Database))
 
 	// OAuth callbacks must remain public
 	proxy.APIRouter.Get("/ms/auth", ms.GetOAuthLogin())
 	proxy.APIRouter.Get("/ms/callback", ms.OAuthCallback(proxy.Database))
 	proxy.APIRouter.Get("/gd/auth", gd.GetOAuthLogin())
 	proxy.APIRouter.Get("/gd/callback", gd.OAuthCallback(proxy.Database))
+	proxy.APIRouter.Get("/dbx/auth", dbx.GetOAuthLogin())
+	proxy.APIRouter.Get("/dbx/callback", dbx.OAuthCallback(proxy.Database))
 
 	// Protected routes (JWT required)
 	proxy.APIRouter.Group(func(r chi.Router) {
@@ -102,6 +106,7 @@ func (proxy *Proxy) MountHandlers() {
 		r.Get("/ms/files", ms.GetFiles(proxy.Database))
 		r.Get("/ms/file", ms.GetFile(proxy.Database))
 		r.Get("/ms/file/download", ms.DownloadFile(proxy.Database))
+		r.Post("/ms/folder/create", ms.CreateFolder(proxy.Database))
 
 		// Google Drive endpoints
 		r.Get("/gd/users", gd.GetGDUsers(proxy.Database))
@@ -112,5 +117,17 @@ func (proxy *Proxy) MountHandlers() {
 		r.Get("/gd/file", gd.GetFile(proxy.Database))
 		r.Get("/gd/file/download", gd.DownloadFile(proxy.Database))
 		r.Post("/gd/file/upload", gd.GetUploadSession(proxy.Database))
+		r.Post("/gd/folder/create", gd.CreateFolder(proxy.Database))
+
+		// Dropbox endpoints
+		r.Get("/dbx/users", dbx.GetDBXUsers(proxy.Database))
+		r.Delete("/dbx/users", dbx.DeleteDBXToken(proxy.Database))
+		r.Get("/dbx/drive", dbx.GetSpaceUsage(proxy.Database))
+		r.Get("/dbx/drive/root", dbx.GetDriveRoot(proxy.Database))
+		r.Get("/dbx/files", dbx.GetFiles(proxy.Database))
+		r.Get("/dbx/file", dbx.GetFile(proxy.Database))
+		r.Get("/dbx/file/download", dbx.DownloadFile(proxy.Database))
+		r.Post("/dbx/file/upload", dbx.GetUploadSession(proxy.Database))
+		r.Post("/dbx/folder/create", dbx.CreateFolder(proxy.Database))
 	})
 }

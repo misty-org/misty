@@ -3,6 +3,8 @@
     #include "platform/windows/windows_app.h"
 #elif defined(__APPLE__)
     #include "platform/mac/mac_app.h"
+#elif defined(__linux__)
+    #include "platform/linux/linux_app.h"
 #endif
 
 #include "application.h"
@@ -14,6 +16,8 @@ std::unique_ptr<misty::Application> create_application() {
         return std::make_unique<misty::WindowsApp>();
     #elif defined(__APPLE__)
         return std::make_unique<misty::MacApp>();
+    #elif defined(__linux__)
+        return std::make_unique<misty::LinuxApp>();
     #else
         static_assert(sizeof(void*) == 0, "Unsupported platform");
     #endif

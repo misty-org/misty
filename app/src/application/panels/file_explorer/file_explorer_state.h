@@ -18,7 +18,8 @@ namespace misty::panel {
     enum class FileSource {
         LOCAL,
         ONEDRIVE,
-        GDRIVE
+        GDRIVE,
+        DROPBOX
     };
 
     // File synchronization status
@@ -51,6 +52,11 @@ namespace misty::panel {
         std::string gd_user_id;
         std::string gd_mime_type;
         std::string gd_web_url;
+
+        // Dropbox metadata (empty for non-Dropbox files)
+        std::string dbx_item_id;
+        std::string dbx_user_id;
+        std::string dbx_path_display;
     };
 
     // Path utilities for file explorer navigation
@@ -67,6 +73,46 @@ namespace misty::panel {
 
         inline std::string get_gdrive_root() {
             return mount_utils::get_gdrive_root();
+        }
+
+        inline std::string get_dropbox_root() {
+            return mount_utils::get_dropbox_root();
+        }
+
+        inline bool is_dropbox_path(const std::string& path) {
+            std::string root = get_dropbox_root();
+            return path.rfind(root, 0) == 0;
+        }
+
+        // Parse Dropbox path into (account_folder_name, relative_path)
+        // e.g., "~/misty/mnt/Dropbox/matthew/Documents"
+        //       -> ("matthew", "Documents")
+        inline std::pair<std::string, std::string> parse_dropbox_path(const std::string& path) {
+            std::string root = get_dropbox_root();
+            if (path.rfind(root, 0) != 0) {
+                return {"", ""};
+            }
+
+            std::string relative = path.substr(root.length());
+            if (relative.empty() || relative == "/") {
+                return {"", ""};  // At mount root, show accounts
+            }
+
+            // Remove leading slash
+            if (!relative.empty() && relative[0] == '/') {
+                relative = relative.substr(1);
+            }
+
+            size_t slash_pos = relative.find('/');
+            if (slash_pos == std::string::npos) {
+                // Just account name, at account root
+                return {relative, ""};
+            }
+
+            return {
+                relative.substr(0, slash_pos),
+                relative.substr(slash_pos + 1)
+            };
         }
 
         inline bool is_gdrive_path(const std::string& path) {
@@ -202,6 +248,7 @@ namespace misty::panel {
         // Clipboard state for copy/cut/paste
         ClipboardOp clipboard_op = ClipboardOp::NONE;
         std::vector<std::string> clipboard_paths;
+        std::vector<UnifiedFileItem> clipboard_items;  // Full metadata for cross-source paste
 
         // Rename state
         bool show_rename_modal = false;

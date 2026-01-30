@@ -37,10 +37,18 @@ namespace misty::panel {
         void show_gdrive_card_profile(const GDriveCardState& card, const std::string& gd_user_id);
         void show_gdrive_card_actions(ServicesState& state, const std::string& gd_user_id, bool is_connected);
 
+        // Dropbox card UI
+        void show_dropbox_tab(ServicesState& state);
+        void show_dbx_login_modal(ServicesState& state);
+        void show_dropbox_profile_card(ServicesState& state, const std::string& dbx_user_id);
+        void show_dropbox_card_header(bool is_connected);
+        void show_dropbox_card_profile(const DropboxCardState& card, const std::string& dbx_user_id);
+        void show_dropbox_card_actions(ServicesState& state, const std::string& dbx_user_id, bool is_connected);
+
     private:
         static constexpr float kCardWidth = 300.0f;
         static constexpr float kCardSpacing = 12.0f;
         UIRegistry& registry_;
-        int active_tab_ = 0; // 0 = OneDrive, 1 = Google Drive
+        int active_tab_ = 0; // 0 = OneDrive, 1 = Google Drive, 2 = Dropbox
     };
 }

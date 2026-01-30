@@ -1,6 +1,7 @@
 #ifdef __linux__
 
 #define GLFW_INCLUDE_NONE
+#define STB_IMAGE_IMPLEMENTATION
 
 #include "linux_app.h"
 #include "core/asset_manager.h"
@@ -104,8 +105,8 @@ void LinuxApp::init_imgui() {
     configure_imgui_io();
     configure_imgui_style();
 
-    AssetManager::get().load_themes();
-    AssetManager::get().load_fonts();
+    core::AssetManager::get().load_themes();
+    core::AssetManager::get().load_fonts();
 
     ImGui_ImplGlfw_InitForOpenGL(window_, true);
     ImGui_ImplOpenGL3_Init(glsl_version_);
@@ -129,8 +130,13 @@ void LinuxApp::configure_imgui_style() {
 
     ImGuiStyle& style = ImGui::GetStyle();
     style.FrameRounding = 6.0f;
-    style.GrabRounding = 6.0f;
-    style.ScrollbarRounding = 6.0f;
+    style.GrabRounding = 12.0f;
+    style.ScrollbarRounding = 12.0f;
+    style.ScrollbarSize = 10.0f;
+    style.Colors[ImGuiCol_ScrollbarBg] = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
+    style.Colors[ImGuiCol_ScrollbarGrab] = ImVec4(0.4f, 0.4f, 0.4f, 0.4f);
+    style.Colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(0.5f, 0.5f, 0.5f, 0.5f);
+    style.Colors[ImGuiCol_ScrollbarGrabActive] = ImVec4(0.6f, 0.6f, 0.6f, 0.6f);
 }
 
 void LinuxApp::prepare_frame() {
