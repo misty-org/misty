@@ -175,41 +175,13 @@ namespace minidfs::panel {
                 ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.18f, 0.18f, 0.18f, 1.0f));
 
                 // Show cloud services (OneDrive)
-                ImVec4 status_color = ImVec4(0.2f, 0.6f, 0.9f, 1.0f); // Blue for cloud
                 std::string onedrive_label = "● OneDrive";
                 float button_width = ImGui::GetContentRegionAvail().x;
                 if (ImGui::Button(onedrive_label.c_str(), ImVec2(button_width, 24))) {
                     auto& file_explorer_state = registry_.get_state<FileExplorerState>("FileExplorer");
-                    auto& onedrive_state = registry_.get_state<OneDriveState>("OneDrive");
 
-                    file_explorer_state.mode = ExplorerMode::ONEDRIVE;
-                    onedrive_state.view_mode = OneDriveViewMode::ACCOUNTS_VIEW;
-                    onedrive_state.account_roots.clear();
-                    onedrive_state.is_loading_roots = false;
-                    onedrive_state.pending_root_loads = 0;
-
-                    // Build account list from connected services
-                    // Each account shows as a "folder" - we load contents when they click it
-                    {
-                        std::lock_guard<std::mutex> lock(services_state.mu);
-                        for (const auto& conn : services_state.ms_connections) {
-                            if (!conn.is_authenticated || conn.access_token.empty()) continue;
-
-                            AccountRootContent account;
-                            account.ms_user_id = conn.profile.id;
-                            account.display_name = conn.profile.display_name;
-                            account.email = conn.profile.email;
-                            account.is_loading = false;
-
-                            // Try to load cached drive_id
-                            std::string cached_drive_id, cached_display, cached_email;
-                            if (load_drive_info_from_cache(conn.profile.id, cached_drive_id, cached_display, cached_email)) {
-                                account.drive_id = cached_drive_id;
-                            }
-
-                            onedrive_state.account_roots.push_back(account);
-                        }
-                    }
+                    // Set pending navigation - panel will handle the actual navigation
+                    file_explorer_state.pending_navigation_path = path_utils::get_onedrive_root();
                 }
 
                 ImGui::PopStyleColor(3);

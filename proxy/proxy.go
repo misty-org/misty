@@ -82,7 +82,6 @@ func (proxy *Proxy) MountHandlers() {
 	// Microsoft OAuth endpoints
 	proxy.APIRouter.Get("/ms/auth", ms.GetOAuthLogin())
 	proxy.APIRouter.Get("/ms/callback", ms.OAuthCallback(proxy.Database))
-	proxy.APIRouter.Get("/ms/callback/token", ms.UpdateMSToken(proxy.Database))
 	proxy.APIRouter.Get("/ms/token", ms.GetMSTokens(proxy.Database))
 	proxy.APIRouter.Post("/ms/token/refresh", ms.RefreshMSToken(proxy.Database))
 	proxy.APIRouter.Delete("/ms/token", ms.DeleteMSToken(proxy.Database))

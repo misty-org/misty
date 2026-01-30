@@ -264,26 +264,12 @@ namespace minidfs::panel {
         std::string user_id = core::EnvManager::get().get("USER_ID", "");
         if (user_id.empty()) throw std::runtime_error("USER_ID is not set");
 
+        // Open the auth endpoint directly in browser so it receives the CSRF cookie
+        // The server will redirect to Microsoft's auth URL
         std::string url = proxy_url + "/api/ms/auth?user_id=" + user_id;
-
-        auto& http = core::HttpClient::get();
-        auto response = http.get(url);
-
-        if (response.status_code != 200) {
-            ms_auth_error = "Failed to get auth URL. Is the proxy running?";
-            show_ms_login_modal = true;
-            return;
-        }
-        try {
-            auto json_response = nlohmann::json::parse(response.body);
-            std::string auth_url = json_response["auth_url"].get<std::string>();
-            core::open_file_in_browser(auth_url);
-            show_ms_login_modal = true;
-            ms_auth_error.clear();
-        } catch (const std::exception&) {
-            ms_auth_error = "Failed to parse auth response.";
-            show_ms_login_modal = true;
-        }
+        core::open_file_in_browser(url);
+        show_ms_login_modal = true;
+        ms_auth_error.clear();
     }
 
     std::string ServicesState::refresh_ms_token(const std::string& ms_user_id) {

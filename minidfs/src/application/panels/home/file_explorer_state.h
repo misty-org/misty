@@ -8,22 +8,125 @@
 #include <filesystem>
 #include <cstring>
 #include "core/ui_registry.h"
-#include "minidfs.pb.h"
 
 namespace fs = std::filesystem;
 
 namespace minidfs::panel {
 
-    enum class ExplorerMode {
+    // File source type - local filesystem or cloud service
+    enum class FileSource {
         LOCAL,
         ONEDRIVE
     };
 
+    // Unified file item that works for both local and OneDrive
+    struct UnifiedFileItem {
+        std::string name;              // Display name
+        std::string path;              // Full virtual path
+        bool is_dir = false;
+        int64_t size = 0;
+        std::string last_modified;
+        FileSource source = FileSource::LOCAL;
+
+        // OneDrive metadata (empty for local files)
+        std::string od_item_id;
+        std::string od_drive_id;
+        std::string od_ms_user_id;
+        std::string od_web_url;
+    };
+
+    // Account mapping for OneDrive accounts
+    struct AccountMapping {
+        std::string folder_name;    // Derived from email: "matthew_outlook"
+        std::string ms_user_id;     // Internal Microsoft user ID
+        std::string drive_id;       // Cached drive ID
+        std::string display_name;
+        std::string email;
+    };
+
+    // Path utilities for unified navigation
+    namespace path_utils {
+        inline std::string get_mount_root() {
+            const char* home = std::getenv("HOME");
+            if (!home) home = "~";
+            return std::string(home) + "/misty/mnt";
+        }
+
+        inline std::string get_onedrive_root() {
+            return get_mount_root() + "/OneDrive";
+        }
+
+        inline bool is_onedrive_path(const std::string& path) {
+            std::string root = get_onedrive_root();
+            return path.rfind(root, 0) == 0;
+        }
+
+        // Derive folder name from email: matthew@outlook.com → "matthew"
+        inline std::string derive_folder_name(const std::string& email) {
+            if (email.empty()) return "unknown";
+
+            size_t at_pos = email.find('@');
+            if (at_pos == std::string::npos) return email;
+
+            return email.substr(0, at_pos);
+        }
+
+        // Parse OneDrive path into (account_folder_name, relative_path)
+        // e.g., "~/misty/mnt/OneDrive/matthew_outlook/Documents"
+        //       → ("matthew_outlook", "Documents")
+        inline std::pair<std::string, std::string> parse_onedrive_path(const std::string& path) {
+            std::string root = get_onedrive_root();
+            if (path.rfind(root, 0) != 0) {
+                return {"", ""};
+            }
+
+            std::string relative = path.substr(root.length());
+            if (relative.empty() || relative == "/") {
+                return {"", ""};  // At mount root, show accounts
+            }
+
+            // Remove leading slash
+            if (!relative.empty() && relative[0] == '/') {
+                relative = relative.substr(1);
+            }
+
+            size_t slash_pos = relative.find('/');
+            if (slash_pos == std::string::npos) {
+                // Just account name, at account root
+                return {relative, ""};
+            }
+
+            return {
+                relative.substr(0, slash_pos),
+                relative.substr(slash_pos + 1)
+            };
+        }
+
+        // Split a path into components
+        inline std::vector<std::string> split_path(const std::string& path) {
+            std::vector<std::string> components;
+            std::string current;
+            for (char c : path) {
+                if (c == '/') {
+                    if (!current.empty()) {
+                        components.push_back(current);
+                        current.clear();
+                    }
+                } else {
+                    current += c;
+                }
+            }
+            if (!current.empty()) {
+                components.push_back(current);
+            }
+            return components;
+        }
+    }
+
     struct FileExplorerState : public core::UIState {
-        ExplorerMode mode = ExplorerMode::LOCAL;
         char current_path[512] = "";
         char search_path[512] = "";
-        std::vector<minidfs::FileInfo> files;
+        std::vector<UnifiedFileItem> files;
         std::unordered_set<std::string> selected_files;
         int last_selected_index = -1;
         bool is_loading = false;
@@ -33,49 +136,80 @@ namespace minidfs::panel {
         std::stack<std::string> forward_history;
         std::mutex mu;
 
+        // Pending navigation - set by external code, processed by panel
+        std::string pending_navigation_path;
+
+        // Account mappings for OneDrive accounts
+        std::vector<AccountMapping> account_mappings;
+
+        // Find account by folder name
+        AccountMapping* find_account_by_folder(const std::string& folder_name) {
+            for (auto& mapping : account_mappings) {
+                if (mapping.folder_name == folder_name) {
+                    return &mapping;
+                }
+            }
+            return nullptr;
+        }
     };
 
-    
-
-    inline void get_files(FileExplorerState& state, std::string path, bool update_history = true) {
+    // Navigate to local filesystem path
+    inline void navigate_to_local_path(FileExplorerState& state, const std::string& path, bool update_history = true) {
         state.is_loading = true;
 
-        
         try {
             std::string new_path = fs::canonical(fs::path(path)).generic_string();
             if (new_path == state.current_path) {
-                update_history = false; 
+                update_history = false;
             }
-        
-            std::vector<minidfs::FileInfo> new_files;
+
+            std::vector<UnifiedFileItem> new_files;
             for (const auto& entry : fs::directory_iterator(path)) {
-                minidfs::FileInfo file_info;
-                file_info.set_file_path(entry.path().generic_string());
-                file_info.set_is_dir(entry.is_directory());
-                new_files.push_back(file_info);
+                UnifiedFileItem item;
+                item.path = entry.path().generic_string();
+                item.name = entry.path().filename().generic_string();
+                item.is_dir = entry.is_directory();
+                item.source = FileSource::LOCAL;
+
+                if (!item.is_dir) {
+                    try {
+                        item.size = fs::file_size(entry.path());
+                    } catch (...) {
+                        item.size = 0;
+                    }
+                }
+
+                try {
+                    auto ftime = fs::last_write_time(entry.path());
+                    auto sctp = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
+                        ftime - fs::file_time_type::clock::now() + std::chrono::system_clock::now()
+                    );
+                    auto time_t_val = std::chrono::system_clock::to_time_t(sctp);
+                    char buf[32];
+                    std::strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M", std::localtime(&time_t_val));
+                    item.last_modified = buf;
+                } catch (...) {
+                    item.last_modified = "";
+                }
+
+                new_files.push_back(item);
             }
+
             if (update_history) {
-                // Save current path to back history if it's different
                 std::string current_path_str(state.current_path);
                 if (!current_path_str.empty() && current_path_str != new_path) {
                     state.back_history.push(current_path_str);
                 }
-
-                // Clear forward history when navigating to new path
                 while (!state.forward_history.empty()) {
                     state.forward_history.pop();
                 }
             }
 
-            // Update files and path
             state.files = std::move(new_files);
             strncpy(state.current_path, new_path.c_str(), sizeof(state.current_path) - 1);
             state.current_path[sizeof(state.current_path) - 1] = '\0';
-
-            //make sure search path matches current path
             strncpy(state.search_path, new_path.c_str(), sizeof(state.search_path) - 1);
 
-            // Reset UI state
             state.is_loading = false;
             state.selected_files.clear();
             state.last_selected_index = -1;
@@ -87,31 +221,9 @@ namespace minidfs::panel {
         }
     }
 
-    // Navigate back - returns the path to navigate to (empty if can't go back)
-    inline void go_back(FileExplorerState& state) {
-        if (state.back_history.empty()) return;
-
-        state.forward_history.push(std::string(state.current_path));
-
-        std::string target = state.back_history.top();
-        state.back_history.pop();
-
-        get_files(state, target, false);
-    }
-
-    // Navigate forward - returns the path to navigate to (empty if can't go forward)
-    inline void go_forward(FileExplorerState& state) {
-        if (state.forward_history.empty()) return;
-
-        // 1. Take the path we are about to leave and put it in BACK history
-        state.back_history.push(std::string(state.current_path));
-
-        // 2. Get the destination
-        std::string target = state.forward_history.top();
-        state.forward_history.pop();
-
-        // 3. Navigate WITHOUT updating history
-        get_files(state, target, false);
+    // Legacy function for compatibility - calls navigate_to_local_path
+    inline void get_files(FileExplorerState& state, std::string path, bool update_history = true) {
+        navigate_to_local_path(state, path, update_history);
     }
 
     inline bool can_go_back(FileExplorerState& state) { return !state.back_history.empty(); }
