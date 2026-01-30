@@ -51,6 +51,28 @@ CREATE TABLE IF NOT EXISTS gd_users (
     PRIMARY KEY (user_id, gd_user_id)
 );
 
+CREATE TABLE IF NOT EXISTS dbx_users (
+    user_id TEXT NOT NULL,
+    dbx_user_id TEXT NOT NULL,
+    access_token TEXT NOT NULL,
+    refresh_token TEXT,
+    display_name TEXT DEFAULT '',
+    email TEXT DEFAULT '',
+    PRIMARY KEY (user_id, dbx_user_id)
+);
+
+CREATE TABLE IF NOT EXISTS refresh_tokens (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash TEXT NOT NULL UNIQUE,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    revoked BOOLEAN NOT NULL DEFAULT FALSE
+);
+
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_token_hash ON refresh_tokens(token_hash);
+
 CREATE TABLE IF NOT EXISTS goose_db_version (
     id SERIAL PRIMARY KEY,
     version_id INTEGER NOT NULL,

@@ -204,7 +204,10 @@ namespace misty::core {
         HttpResponse response = execute_curl_request(method, url, body, merged_headers);
 
         // Auto-refresh on 401 if we're not already in a refresh call
-        if (response.status_code == 401 && !is_refreshing_.exchange(true)) {
+        // Guard: skip if session already expired or another thread is refreshing
+        if (response.status_code == 401 &&
+            !SessionManager::get().is_session_expired() &&
+            !is_refreshing_.exchange(true)) {
             if (attempt_token_refresh()) {
                 // Retry with new auth headers
                 auto retry_headers = SessionManager::get().get_auth_headers();
@@ -213,8 +216,9 @@ namespace misty::core {
                 }
                 response = execute_curl_request(method, url, body, retry_headers);
             } else {
-                // Refresh failed — clear tokens so callers know we're unauthenticated
-                SessionManager::get().clear_token();
+                // Refresh failed — mark session as expired so UI can prompt reconnect
+                // Tokens are preserved so the user can re-authenticate without re-entering credentials
+                SessionManager::get().mark_session_expired();
             }
             is_refreshing_.store(false);
         }

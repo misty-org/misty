@@ -2,6 +2,7 @@
 #include "panels/profile/profile_state.h"
 #include "panels/settings/settings_state.h"
 #include "core/asset_manager.h"
+#include "core/session_manager.h"
 #include "views/app_view.h"
 #include "imgui.h"
 
@@ -19,7 +20,7 @@ namespace misty::panel {
         ImGuiViewport* viewport = ImGui::GetMainViewport();
         float navbar_width = 77.0f;
         float popup_w = 280.0f;
-        float popup_h = 310.0f;
+        float popup_h = 340.0f;
 
         // Position: anchored to bottom-left, just right of the navbar
         float px = viewport->WorkPos.x + navbar_width + 6.0f;
@@ -151,6 +152,27 @@ namespace misty::panel {
             }
 
             ImGui::Spacing();
+
+            bool session_expired = core::SessionManager::get().is_session_expired();
+            {
+                // Session status
+                ImVec2 dot_cursor = ImGui::GetCursorScreenPos();
+                float dot_radius = 4.0f;
+                ImU32 dot_color = session_expired
+                    ? IM_COL32(220, 160, 40, 255)
+                    : IM_COL32(80, 220, 100, 255);
+
+                ImGui::GetWindowDrawList()->AddCircleFilled(
+                    ImVec2(dot_cursor.x + dot_radius + 2.0f, dot_cursor.y + ImGui::GetTextLineHeight() * 0.5f),
+                    dot_radius, dot_color, 16);
+
+                ImGui::SetCursorPosX(ImGui::GetCursorPosX() + dot_radius * 2.0f + 10.0f);
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.75f, 0.75f, 0.75f, 1.0f));
+                ImGui::Text("Session: %s", session_expired ? "Disconnected" : "Connected");
+                ImGui::PopStyleColor();
+            }
+
+            ImGui::Spacing();
             ImGui::PushStyleColor(ImGuiCol_Separator, ImVec4(0.25f, 0.25f, 0.25f, 1.0f));
             ImGui::Separator();
             ImGui::PopStyleColor();
@@ -177,15 +199,30 @@ namespace misty::panel {
 
             ImGui::Spacing();
 
-            // Sign Out button
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.5f, 0.15f, 0.15f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.65f, 0.2f, 0.2f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.9f, 0.9f, 1.0f));
-            if (ImGui::Button("Sign Out", ImVec2(btn_w, 0))) {
-                state.is_open = false;
-                // TODO: implement sign out
+            if (session_expired) {
+                // Reconnect button (session expired)
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.15f, 0.35f, 0.55f, 1.0f));
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.2f, 0.45f, 0.65f, 1.0f));
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
+                if (ImGui::Button("Reconnect", ImVec2(btn_w, 0))) {
+                    state.is_open = false;
+                    core::SessionManager::get().clear_token();
+                    core::SessionManager::get().clear_session_expired();
+                    view::switch_view(view::ViewID::Login);
+                }
+                ImGui::PopStyleColor(3);
+            } else {
+                // Sign Out button
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.5f, 0.15f, 0.15f, 1.0f));
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.65f, 0.2f, 0.2f, 1.0f));
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.9f, 0.9f, 1.0f));
+                if (ImGui::Button("Sign Out", ImVec2(btn_w, 0))) {
+                    state.is_open = false;
+                    core::SessionManager::get().clear_token();
+                    view::switch_view(view::ViewID::Login);
+                }
+                ImGui::PopStyleColor(3);
             }
-            ImGui::PopStyleColor(3);
 
             ImGui::PopStyleVar(3);
         }

@@ -28,6 +28,11 @@ namespace misty::core {
         // Check if user has a stored token
         bool is_authenticated() const;
 
+        // Session expiration (refresh failed but tokens preserved for reconnect)
+        void mark_session_expired();
+        bool is_session_expired() const;
+        void clear_session_expired();
+
         // Returns {"Authorization": "Bearer <token>"} if authenticated, empty map otherwise
         std::map<std::string, std::string> get_auth_headers() const;
 
@@ -44,6 +49,7 @@ namespace misty::core {
         mutable std::mutex mu_;
         std::string token_;
         std::string refresh_token_;
+        bool session_expired_ = false;
     };
 
 }

@@ -22,6 +22,14 @@ namespace misty::panel {
         DROPBOX
     };
 
+    // Context for cloud folder fetch - carries service-specific parameters
+    struct CloudFolderContext {
+        FileSource service;
+        std::string user_id;     // ms_user_id / gd_user_id / dbx_user_id
+        std::string folder_id;   // folder_id (OD/GD) or folder_path (DBX)
+        std::string drive_id;    // OneDrive only, empty for others
+    };
+
     // File synchronization status
     enum class SyncStatus {
         LOCAL,      // Not a cloud file (Gray)
