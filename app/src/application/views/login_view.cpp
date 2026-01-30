@@ -1,7 +1,7 @@
 #include "views/login_view.h"
 #include "imgui.h"
 
-namespace minidfs::view {
+namespace misty::view {
     LoginView::LoginView(UIRegistry& ui_registry)
         : ui_registry_(ui_registry) {
         init_panels();

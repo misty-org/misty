@@ -4,7 +4,7 @@
 #define GLFW_EXPOSE_NATIVE_WIN32
 
 #include <windows.h>
-#include "minidfs.h"
+#include "misty.h"
 #include <GLFW/glfw3native.h>
 #include <dwmapi.h>
 #include <windowsx.h>
@@ -14,7 +14,7 @@
 #include "imgui_impl_opengl3.h"
 #include "application.h"
 
-namespace minidfs {
+namespace misty {
     class WindowsApp : public Application {
     public:
         WindowsApp() = default;

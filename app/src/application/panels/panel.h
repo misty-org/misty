@@ -2,7 +2,7 @@
 
 #include <string>
 
-namespace minidfs::panel {
+namespace misty::panel {
     class Panel {
     public:
         virtual ~Panel() = default;

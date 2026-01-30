@@ -4,7 +4,7 @@
 #include <iomanip>
 #include <algorithm>
 
-namespace minidfs::panel {
+namespace misty::panel {
 
     ActivityPanel::ActivityPanel(core::UIRegistry& registry)
         : registry_(registry) {

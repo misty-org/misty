@@ -7,12 +7,13 @@
 
 #include "application.h"
 #include <memory>
+#include <curl/curl.h>
 
-std::unique_ptr<minidfs::Application> create_application() {
+std::unique_ptr<misty::Application> create_application() {
     #ifdef _WIN32
-        return std::make_unique<minidfs::WindowsApp>();
+        return std::make_unique<misty::WindowsApp>();
     #elif defined(__APPLE__)
-        return std::make_unique<minidfs::MacApp>();
+        return std::make_unique<misty::MacApp>();
     #else
         static_assert(sizeof(void*) == 0, "Unsupported platform");
     #endif
@@ -20,10 +21,12 @@ std::unique_ptr<minidfs::Application> create_application() {
 
 
 int main(int, char**) {
-    auto app = create_application();
+    curl_global_init(CURL_GLOBAL_DEFAULT);
 
+    auto app = create_application();
     app->run();
 
+    curl_global_cleanup();
     return 0;
 }
 

@@ -1,7 +1,7 @@
 #include "activity_view.h"
 #include "imgui.h"
 
-namespace minidfs::view {
+namespace misty::view {
     ActivityView::ActivityView(core::UIRegistry& ui_registry)
         : ui_registry_(ui_registry) {
         init_panels();

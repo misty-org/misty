@@ -10,7 +10,7 @@
 #include <iomanip>
 #include <sstream>
 #include <vector>
-#include "proto_src/minidfs.pb.h"
+#include "proto_src/misty.pb.h"
 
 #define CHUNK_SIZE 40 * 1024
 
@@ -69,7 +69,7 @@ private:
     std::unordered_map<std::string, std::unique_ptr<FileLock>> file_locks_;
 
 
-    friend class MiniDFSSingleClientTest;
-    friend class MiniDFSMultiClientTest;
-    friend class MiniDFSFileManagerTest;
+    friend class MistySingleClientTest;
+    friend class MistyMultiClientTest;
+    friend class MistyFileManagerTest;
 };

@@ -8,7 +8,7 @@
 #include "panels/notification/notification_panel.h"
 #include "core/ui_registry.h"
 
-namespace minidfs::view {
+namespace misty::view {
     class ActivityView : public AppView {
     public:
         ActivityView(core::UIRegistry& ui_registry);

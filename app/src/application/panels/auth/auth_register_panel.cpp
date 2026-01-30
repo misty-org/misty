@@ -7,7 +7,7 @@
 #include <iostream>
 #include "panels/panel_ui.h"
 
-namespace minidfs::panel {
+namespace misty::panel {
     AuthRegisterPanel::AuthRegisterPanel(UIRegistry& registry)
         : registry_(registry) {
     }

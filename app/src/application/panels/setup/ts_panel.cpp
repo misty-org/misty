@@ -3,8 +3,9 @@
 #include "core/util.h"
 #include "core/imgui_utils.h"
 #include <cstring>
+#include <mutex>
 
-namespace minidfs::panel {
+namespace misty::panel {
     TSPanel::TSPanel(UIRegistry& registry)
         : registry_(registry) {
     }
@@ -13,6 +14,7 @@ namespace minidfs::panel {
         auto& state = registry_.get_state<TSPanelState>("TSPanel");
 
         state.poll_status_if_needed();
+        TSPanelSnapshot snapshot = state.snapshot();
 
         ImGuiWindowFlags flags =
             ImGuiWindowFlags_NoTitleBar |
@@ -29,36 +31,35 @@ namespace minidfs::panel {
         core::CustomStyleVar frame_padding(ImGuiStyleVar_FramePadding, ImVec2(12.0f, 8.0f));
 
         if (ImGui::Begin("TailscalePanel", nullptr, flags)) {
-            render_content();
+            render_content(state, snapshot);
         }
 
         ImGui::End();
     }
 
-    void TSPanel::render_content() {
-        auto& state = registry_.get_state<TSPanelState>("TSPanel");
-
-        state.poll_status_if_needed();
-
+    void TSPanel::render_content(TSPanelState& state, const TSPanelSnapshot& snapshot) {
         float window_width = ImGui::GetContentRegionAvail().x;
         float content_width = window_width;
 
-        show_status_message(state);
-        show_login_url(state);
-        show_fetch_button(state);
-        show_open_browser_button(state);
+        show_status_message(snapshot);
+        show_login_url(snapshot);
+        show_fetch_button(state, snapshot);
+        show_open_browser_button(snapshot);
         
         // Show device info inputs and register button when connected
-        if (state.is_connected && !state.has_registered_device) {
+        if (snapshot.is_connected && !snapshot.has_registered_device) {
             ImGui::Spacing();
             ImGui::Separator();
             ImGui::Spacing();
             show_device_info_inputs(state);
             ImGui::Spacing();
-            show_register_button(state);
+            show_register_button(state, snapshot);
         }
         
-        show_error_modal(state.error_msg, "TailscaleError");
+        {
+            std::lock_guard<std::mutex> lock(state.mu);
+            show_error_modal(state.error_msg, "TailscaleError");
+        }
     }
 
     void TSPanel::show_header() {
@@ -83,26 +84,26 @@ namespace minidfs::panel {
         ImGui::Spacing();
     }
 
-    void TSPanel::show_status_message(TSPanelState& state) {
-        if (!state.error_msg.empty()) {
-            core::ColoredText(ImVec4(1.0f, 0.3f, 0.3f, 1.0f), "%s", state.error_msg.c_str());
+    void TSPanel::show_status_message(const TSPanelSnapshot& snapshot) {
+        if (!snapshot.error_msg.empty()) {
+            core::ColoredText(ImVec4(1.0f, 0.3f, 0.3f, 1.0f), "%s", snapshot.error_msg.c_str());
             ImGui::Spacing();
         }
         
-        if (!state.success_msg.empty()) {
-            core::ColoredText(ImVec4(0.3f, 1.0f, 0.3f, 1.0f), "%s", state.success_msg.c_str());
+        if (!snapshot.success_msg.empty()) {
+            core::ColoredText(ImVec4(0.3f, 1.0f, 0.3f, 1.0f), "%s", snapshot.success_msg.c_str());
             ImGui::Spacing();
         }
         
-        if (state.is_fetching_url) {
+        if (snapshot.is_fetching_url) {
             core::ColoredText(ImVec4(0.8f, 0.8f, 0.8f, 1.0f), "Fetching login URL...");
             ImGui::Spacing();
         }
 
-        if (state.has_fetched_url && !state.is_connected) {
+        if (snapshot.has_fetched_url && !snapshot.is_connected) {
             core::WithTextColor(ImVec4(0.8f, 0.8f, 0.8f, 1.0f), [&]() {
                 ImGui::TextWrapped("Finish signing in to Tailscale in your browser, then return here.");
-                if (state.is_polling_status) {
+                if (snapshot.is_polling_status) {
                     ImGui::Text("Checking connection status...");
                 }
             });
@@ -110,8 +111,8 @@ namespace minidfs::panel {
         }
     }
 
-    void TSPanel::show_login_url(TSPanelState& state) {
-        if (!state.login_url.empty()) {
+    void TSPanel::show_login_url(const TSPanelSnapshot& snapshot) {
+        if (!snapshot.login_url.empty()) {
             float width = ImGui::GetContentRegionAvail().x;
             
             core::ColoredText(ImVec4(0.8f, 0.8f, 0.8f, 1.0f), "Login URL:");
@@ -120,7 +121,7 @@ namespace minidfs::panel {
             // Display the URL in a read-only text field
             // Create a local buffer to avoid const_cast issues
             static char url_buffer[512] = "";
-            strncpy(url_buffer, state.login_url.c_str(), sizeof(url_buffer) - 1);
+            strncpy(url_buffer, snapshot.login_url.c_str(), sizeof(url_buffer) - 1);
             url_buffer[sizeof(url_buffer) - 1] = '\0';
             
             core::CustomStyleColor frame_bg(ImGuiCol_FrameBg, ImVec4(0.15f, 0.15f, 0.15f, 1.0f));
@@ -129,17 +130,17 @@ namespace minidfs::panel {
         }
     }
 
-    void TSPanel::show_fetch_button(TSPanelState& state) {
+    void TSPanel::show_fetch_button(TSPanelState& state, const TSPanelSnapshot& snapshot) {
         float width = ImGui::GetContentRegionAvail().x;
         
         core::ButtonColors colors = core::ButtonTheme::Primary();
-        if (state.is_fetching_url) {
+        if (snapshot.is_fetching_url) {
             colors.button = ImVec4(0.3f, 0.3f, 0.3f, 1.0f);
         }
         
-        const char* button_text = state.is_fetching_url ? "Fetching..." : "Get Tailscale Login URL";
+        const char* button_text = snapshot.is_fetching_url ? "Fetching..." : "Get Tailscale Login URL";
         if (core::StyledButton(button_text, ImVec2(width, 40), colors)) {
-            if (!state.is_fetching_url) {
+            if (!snapshot.is_fetching_url) {
                 state.handle_fetch_login_url();
             }
         }
@@ -147,12 +148,12 @@ namespace minidfs::panel {
         ImGui::Spacing();
     }
 
-    void TSPanel::show_open_browser_button(TSPanelState& state) {
-        if (!state.login_url.empty()) {
+    void TSPanel::show_open_browser_button(const TSPanelSnapshot& snapshot) {
+        if (!snapshot.login_url.empty()) {
             float width = ImGui::GetContentRegionAvail().x;
             
             if (core::StyledButton("Open Login URL in Browser", ImVec2(width, 40), core::ButtonTheme::Success())) {
-                core::open_file_in_browser(state.login_url);
+                core::open_file_in_browser(snapshot.login_url);
             }
         }
     }
@@ -180,11 +181,19 @@ namespace minidfs::panel {
         core::ColoredText(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "Enter a friendly name for this device and optionally specify a mount path.");
     }
 
-    void TSPanel::show_register_button(TSPanelState& state) {
+    void TSPanel::show_register_button(TSPanelState& state, const TSPanelSnapshot& snapshot) {
         float width = ImGui::GetContentRegionAvail().x;
         
-        if (core::StyledButton("Register Device", ImVec2(width, 40), core::ButtonTheme::Success())) {
-            state.register_device();
+        core::ButtonColors colors = core::ButtonTheme::Success();
+        if (snapshot.is_registering_device) {
+            colors.button = ImVec4(0.3f, 0.5f, 0.3f, 1.0f);
+        }
+
+        const char* label = snapshot.is_registering_device ? "Registering..." : "Register Device";
+        if (core::StyledButton(label, ImVec2(width, 40), colors)) {
+            if (!snapshot.is_registering_device) {
+                state.register_device();
+            }
         }
     }
 }

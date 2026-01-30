@@ -6,7 +6,7 @@
 #include <cstdio>
 #include <iostream>
 
-namespace minidfs {
+namespace misty {
 
     void WindowsApp::init_platform() {
         init_glfw();
@@ -34,7 +34,7 @@ namespace minidfs {
     }
 
     void WindowsApp::init_window() {
-        window_ = glfwCreateWindow(1280, 720, "MiniDFS Client", NULL, NULL);
+        window_ = glfwCreateWindow(1280, 720, "Misty Client", NULL, NULL);
         if (!window_) throw std::runtime_error("Failed to create GLFW window");
         glfwMakeContextCurrent(window_); //VERY IMPORTANT
         glfwSetWindowUserPointer(window_, this);

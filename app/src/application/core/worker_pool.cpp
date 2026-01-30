@@ -1,7 +1,7 @@
 #include "core/worker_pool.h"
 #include <iostream>
 
-namespace minidfs::core {
+namespace misty::core {
     WorkerPool::WorkerPool(size_t thread_count) {
         std::cout << "[DEBUG] Initializing WorkerPool with " << thread_count << " threads." << std::endl;
         for (size_t i = 0; i < thread_count; ++i) {

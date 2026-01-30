@@ -7,7 +7,7 @@
 #include <iostream>
 #include "panels/panel_ui.h"
 
-namespace minidfs::panel {
+namespace misty::panel {
     AuthLoginPanel::AuthLoginPanel(UIRegistry& registry)
         : registry_(registry) {
     }
@@ -100,8 +100,9 @@ namespace minidfs::panel {
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.6f, 1.0f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.15f, 0.4f, 0.8f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
-
-        if (ImGui::Button("Log in", ImVec2(width, 40))) {
+        
+        bool enter_pressed = ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter);
+        if (ImGui::Button("Log in", ImVec2(width, 40)) || enter_pressed) {
             state.handle_login();
         }
 

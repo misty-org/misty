@@ -5,7 +5,7 @@
 #include <mutex>
 #include <memory>
 
-namespace minidfs::core {
+namespace misty::core {
     struct UIState {
         virtual ~UIState() = default;
     };
