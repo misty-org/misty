@@ -66,7 +66,7 @@ namespace misty::panel {
                 std::map<std::string, std::string> headers;
                 headers["Content-Type"] = "application/json";
 
-                core::HttpResponse session_response = core::HttpClient::get().post(
+                core::HttpResponse session_response = core::HTTPClient::get().post(
                     upload_session_url,
                     request_body.dump(),
                     headers

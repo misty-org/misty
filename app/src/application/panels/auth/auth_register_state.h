@@ -77,7 +77,7 @@ namespace misty::panel {
                 is_submitting = false;
                 return;
             }
-            auto response = core::HttpClient::get().post(
+            auto response = core::HTTPClient::get().post(
                 proxy_url + "/api/register",
                 json_body,
                 headers

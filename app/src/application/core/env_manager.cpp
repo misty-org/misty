@@ -1,12 +1,25 @@
-#include "env_manager.h"
 #include <cctype>
+#ifdef _WIN32
+#include <windows.h>
+#include <shellapi.h>
+#include <shlobj.h>
+#elif __APPLE__
+#include <pwd.h>
+#include <unistd.h>
+#elif __linux__
+#include <pwd.h>
+#include <unistd.h>
+#endif
+
+#include "env_manager.h"
 #include "util.h"
+
 
 namespace misty::core {
     EnvManager& EnvManager::get() {
         static EnvManager instance;
         std::call_once(instance.load_flag_, [&]() {
-            std::string home_dir = get_user_home_dir();
+            std::string home_dir = instance.get_user_home_dir();
             if (home_dir.empty()) {
                 throw std::runtime_error("Could not determine user home directory");
             }
@@ -42,14 +55,6 @@ namespace misty::core {
             return it->second;
         }
         return default_value;
-    }
-
-    std::optional<std::string> EnvManager::get_optional(const std::string& key) const {
-        auto it = env_.find(key);
-        if (it != env_.end()) {
-            return it->second;
-        }
-        return std::nullopt;
     }
 
     bool EnvManager::has(const std::string& key) const {
@@ -118,4 +123,35 @@ namespace misty::core {
 
         return str;
     }
+
+    std::string EnvManager::get_user_home_dir() {
+#ifdef __WIN32
+        char path[MAX_PATH];
+        if (SUCCEEDED(SHGetFolderPathA(NULL, CSIDL_PROFILE, NULL, SHGFP_TYPE_CURRENT, path))) {
+            return std::string(path);
+        }
+        // Fallback to USERPROFILE environment variable
+        const char* home = std::getenv("USERPROFILE");
+        if (home) {
+            return std::string(home);
+        }
+        return "";
+        
+#elif __APPLE__ || __linux__
+        const char* home = std::getenv("HOME");
+        if (home) {
+            return std::string(home);
+        }
+        struct passwd* pw = getpwuid(getuid());
+        if (pw && pw->pw_dir) {
+            return std::string(pw->pw_dir);
+        }
+        return "";
+#endif
+
+        return "";
+
+    }
+
+    
 }
