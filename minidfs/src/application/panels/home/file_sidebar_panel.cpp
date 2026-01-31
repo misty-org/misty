@@ -7,6 +7,7 @@
 #include "core/file_picker.h"
 #include <nlohmann/json.hpp>
 #include <filesystem>
+#include <vector>
 
 
 namespace minidfs::panel {
@@ -173,12 +174,13 @@ namespace minidfs::panel {
                 ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.18f, 0.18f, 0.18f, 1.0f));
 
                 // Show cloud services (OneDrive)
-                ImVec4 status_color = ImVec4(0.2f, 0.6f, 0.9f, 1.0f); // Blue for cloud
                 std::string onedrive_label = "● OneDrive";
                 float button_width = ImGui::GetContentRegionAvail().x;
                 if (ImGui::Button(onedrive_label.c_str(), ImVec2(button_width, 24))) {
-                    // Could navigate to OneDrive root or show options
-                    // For now, just show it's connected
+                    auto& file_explorer_state = registry_.get_state<FileExplorerState>("FileExplorer");
+
+                    // Set pending navigation - panel will handle the actual navigation
+                    file_explorer_state.pending_navigation_path = mount_utils::get_onedrive_root();
                 }
 
                 ImGui::PopStyleColor(3);

@@ -74,37 +74,10 @@
             margin-bottom: 32px;
         }
 
-        .close-btn {
-            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-            color: white;
-            border: none;
-            padding: 14px 32px;
-            border-radius: 10px;
-            font-size: 1rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
-        }
-
-        .close-btn:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
-        }
-
-        .close-btn:active {
-            transform: translateY(0);
-        }
-
         .auto-close {
-            margin-top: 20px;
-            font-size: 0.85rem;
-            color: #94a3b8;
-        }
-
-        .countdown {
-            color: #3b82f6;
-            font-weight: 500;
+            margin-top: 24px;
+            font-size: 0.95rem;
+            color: #64748b;
         }
 
         .brand {
@@ -129,8 +102,7 @@
         </div>
         <h1 id="title">Loading...</h1>
         <p class="subtitle" id="subtitle"></p>
-        <button class="close-btn" onclick="closeTab()">Close Tab</button>
-        <p class="auto-close">This tab will automatically close in <span class="countdown" id="countdown">5</span> seconds</p>
+        <p class="auto-close">You can now close this tab</p>
         <div class="brand">Powered by <span>misty</span></div>
     </div>
 
@@ -143,77 +115,15 @@
             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
         </svg>`;
 
-        async function getTokenFromCookie() {
-            try {
-                const response = await fetch('/api/ms/callback/token', {
-                    method: 'GET',
-                    credentials: 'include', // Include cookies in request
-                    headers: {
-                        'Accept': 'application/json' // Request JSON response
-                    }
-                });
-                
-                if (!response.ok) {
-                    return { accessToken: '', hasToken: false };
-                }
-                
-                const data = await response.json();
-                return {
-                    accessToken: data.access_token || '',
-                    hasToken: data.has_token || false
-                };
-            } catch (error) {
-                console.error('Error fetching token:', error);
-                return { accessToken: '', hasToken: false };
-            }
-        }
+        // Success state is set by the server via template substitution
+        const isSuccess = {{ success }};
 
-        function getQueryParams() {
-            const params = new URLSearchParams(window.location.search);
-            const hash = window.location.hash.substring(1);
-            const hashParams = new URLSearchParams(hash);
-            
-            return {
-                error: params.get('error') || hashParams.get('error'),
-                code: params.get('code'), // OAuth authorization code also indicates success
-                access_token: params.get('access_token'),
-                refresh_token: params.get('refresh_token'),
-                user_id: params.get('user_id')
-            };
-        }
-
-        async function init() {
-            const { error, code, access_token, refresh_token, user_id } = getQueryParams();
+        function init() {
             const icon = document.getElementById('icon');
             const title = document.getElementById('title');
             const subtitle = document.getElementById('subtitle');
 
-            // Check if we have tokens in URL query parameters (from OAuth callback redirect)
-            const hasTokensInURL = access_token && refresh_token && user_id;
-
-            let isSuccess = false;
-            let accessToken = '';
-
-            if (hasTokensInURL) {
-                // Success - we have tokens in the URL (from OAuth callback)
-                isSuccess = true;
-                accessToken = access_token;
-                
-                // Optionally, you could store these in localStorage or send to parent window
-                // For now, we'll just show success since the backend already processed them
-                console.log('Tokens received:', {
-                    access_token: access_token ? '***' : '',
-                    refresh_token: refresh_token ? '***' : '',
-                    user_id: user_id
-                });
-            } else {
-                // Fallback: Get token from HTTP-only cookie via API (middleware validates/refreshes automatically)
-                const tokenData = await getTokenFromCookie();
-                accessToken = tokenData.accessToken;
-                isSuccess = tokenData.hasToken && !error;
-            }
-
-            if (isSuccess && !error) {
+            if (isSuccess) {
                 icon.classList.add('success');
                 icon.innerHTML = checkmarkSVG;
                 title.textContent = 'You are now connected to OneDrive!';
@@ -224,33 +134,9 @@
                 icon.innerHTML = errorSVG;
                 title.textContent = 'Could not connect';
                 title.classList.add('error');
-                subtitle.textContent = error ? `Error: ${error}` : 'Authorization was not completed';
+                subtitle.textContent = 'Authorization was not completed';
             }
 
-            startCountdown();
-        }
-
-        function startCountdown() {
-            let seconds = 5;
-            const countdownEl = document.getElementById('countdown');
-
-            const interval = setInterval(() => {
-                seconds--;
-                countdownEl.textContent = seconds;
-
-                if (seconds <= 0) {
-                    clearInterval(interval);
-                    closeTab();
-                }
-            }, 1000);
-        }
-
-        function closeTab() {
-            window.close();
-            // Fallback message if window.close() doesn't work (browser security)
-            setTimeout(() => {
-                document.querySelector('.auto-close').textContent = 'You can now close this tab manually';
-            }, 100);
         }
 
         init();

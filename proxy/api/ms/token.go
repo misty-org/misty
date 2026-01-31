@@ -34,38 +34,6 @@ func GetMSTokens(db *db.Database) http.HandlerFunc {
 	}
 }
 
-func UpdateMSToken(db *db.Database) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-
-		accessToken := r.URL.Query().Get("access_token")
-		refreshToken := r.URL.Query().Get("refresh_token")
-		userID := r.URL.Query().Get("user_id")
-		if accessToken == "" || refreshToken == "" || userID == "" {
-			http.Error(w, "access_token, refresh_token, and user_id are required", http.StatusBadRequest)
-			return
-		}
-
-		// Fetch Microsoft user profile from Graph /me before storing
-		profile, err := FetchMSUserProfile(accessToken)
-		if err != nil {
-			ServeMSAuthHTML(w, false)
-			return
-		}
-
-		err = db.StoreMSToken(userID, profile.ID, accessToken, refreshToken, profile.DisplayName, profile.Email())
-		if err != nil {
-			ServeMSAuthHTML(w, false)
-			return
-		}
-
-		ServeMSAuthHTML(w, true)
-	}
-}
-
 func DeleteMSToken(db *db.Database) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodDelete {

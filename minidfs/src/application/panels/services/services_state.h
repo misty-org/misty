@@ -3,6 +3,7 @@
 #include <string>
 #include <mutex>
 #include <set>
+#include <functional>
 #include "core/ui_registry.h"
 
 namespace minidfs::panel {
@@ -32,6 +33,20 @@ namespace minidfs::panel {
         }
     };
 
+    // Callback types for OneDrive API operations
+    using DriveCallback = std::function<void(const std::string& ms_user_id,
+                                              const std::string& drive_id,
+                                              bool success,
+                                              const std::string& error)>;
+
+    using FilesCallback = std::function<void(bool success,
+                                              const std::string& response_body,
+                                              const std::string& error)>;
+
+    using DownloadCallback = std::function<void(bool success,
+                                                 const std::string& local_path,
+                                                 const std::string& error)>;
+
     // Snapshot of a single OneDrive connection for UI (panel uses this for rendering)
     struct OneDriveCardState {
         bool profile_loaded = false;
@@ -56,6 +71,18 @@ namespace minidfs::panel {
         void initiate_ms_login();
         void disconnect_onedrive(const std::string& ms_user_id); // Disconnect a specific OneDrive connection
         std::string refresh_ms_token(const std::string& ms_user_id); // Attempt to refresh token, returns new access_token or empty on failure
+
+        // OneDrive file operations
+        void fetch_drive(const std::string& ms_user_id, DriveCallback callback);
+        void fetch_onedrive_files(const std::string& ms_user_id,
+                                  const std::string& drive_id,
+                                  const std::string& folder_id,
+                                  FilesCallback callback);
+        void download_file(const std::string& ms_user_id,
+                          const std::string& drive_id,
+                          const std::string& file_id,
+                          const std::string& local_path,
+                          DownloadCallback callback);
 
         // Helper functions to find connections
         std::set<MSConnection>::iterator find_by_token(const std::string& token);

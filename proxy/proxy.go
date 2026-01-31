@@ -68,9 +68,6 @@ func (proxy *Proxy) MountHandlers() {
 	proxy.APIRouter.Post("/register", api.RegisterUser(proxy.Database))
 	proxy.APIRouter.Post("/login", api.LoginUser(proxy.Database))
 
-	proxy.APIRouter.Post("/file", api.CreateFile(proxy.Database))
-	proxy.APIRouter.Get("/file", api.GetFile(proxy.Database))
-
 	proxy.APIRouter.Get("/devices", api.GetDevices(proxy.Database))
 	proxy.APIRouter.Post("/devices", api.RegisterDevice(proxy.TSBase, proxy.Database))
 	proxy.APIRouter.Put("/devices", api.UpdateDevice(proxy.Database))
@@ -85,10 +82,14 @@ func (proxy *Proxy) MountHandlers() {
 	// Microsoft OAuth endpoints
 	proxy.APIRouter.Get("/ms/auth", ms.GetOAuthLogin())
 	proxy.APIRouter.Get("/ms/callback", ms.OAuthCallback(proxy.Database))
-	proxy.APIRouter.Get("/ms/callback/token", ms.UpdateMSToken(proxy.Database))
 	proxy.APIRouter.Get("/ms/token", ms.GetMSTokens(proxy.Database))
 	proxy.APIRouter.Post("/ms/token/refresh", ms.RefreshMSToken(proxy.Database))
 	proxy.APIRouter.Delete("/ms/token", ms.DeleteMSToken(proxy.Database))
 
-	
+	proxy.APIRouter.Post("/ms/file/upload", ms.GetUploadSession())
+	proxy.APIRouter.Get("/ms/drive", ms.GetDrive())
+	proxy.APIRouter.Get("/ms/drive/root", ms.GetDriveRoot())
+	proxy.APIRouter.Get("/ms/files", ms.GetFiles())
+	proxy.APIRouter.Get("/ms/file", ms.GetFile())
+	proxy.APIRouter.Get("/ms/file/download", ms.DownloadFile())
 }

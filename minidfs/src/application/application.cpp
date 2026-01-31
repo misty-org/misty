@@ -3,6 +3,7 @@
 #include "views/register_view.h"
 #include "views/login_view.h"
 #include "views/services_view.h"
+#include "views/activity_view.h"
 
 
 
@@ -79,11 +80,12 @@ namespace minidfs {
             throw std::runtime_error("Client not initialized before initializing views.");
         }
 
-        view::register_view(view::ViewID::FileExplorer, 
+        view::register_view(view::ViewID::FileExplorer,
             std::make_unique<view::MainView>(ui_registry_, worker_pool_, client_));
         view::register_view(view::ViewID::Auth, std::make_unique<view::RegisterView>(ui_registry_));
         view::register_view(view::ViewID::Login, std::make_unique<view::LoginView>(ui_registry_));
         view::register_view(view::ViewID::Services, std::make_unique<view::ServicesView>(ui_registry_));
+        view::register_view(view::ViewID::Activity, std::make_unique<view::ActivityView>(ui_registry_));
         view::switch_view(view::ViewID::FileExplorer);
     }
 };

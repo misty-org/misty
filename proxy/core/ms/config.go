@@ -14,7 +14,9 @@ type MSConfig struct {
 	RedirectURI  string
 	Authority    string
 	Scopes       []string
+	GraphBase	string
 }
+
 
 var (
 	config     *MSConfig
@@ -37,6 +39,7 @@ func GetConfig() *MSConfig {
 				"https://graph.microsoft.com/Files.ReadWrite.All",
 				"offline_access",
 			},
+			GraphBase: "https://graph.microsoft.com/v1.0",
 		}
 	})
 	return config

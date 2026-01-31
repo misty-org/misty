@@ -6,6 +6,8 @@
 #include <iostream>
 #include <thread>
 #include <set>
+#include <fstream>
+#include <filesystem>
 
 
 namespace minidfs::panel {
@@ -46,28 +48,27 @@ namespace minidfs::panel {
                 if (response.status_code >= 200 && response.status_code < 300) {
                     try {
                         auto json = nlohmann::json::parse(response.body);
-                        // Response is an array of tokens
-                        if (json.is_array()) {
-                            for (const auto& token_obj : json) {
-                                std::string token = token_obj.value("access_token", std::string(""));
-                                std::string ms_user_id = token_obj.value("ms_user_id", std::string(""));
-                                std::string display_name = token_obj.value("display_name", std::string(""));
-                                std::string email = token_obj.value("email", std::string(""));
+                        std::cout << response.body << std::endl;
+                        if (!json.is_array()) {
+                            throw std::runtime_error("Invalid response format: expected array");
+                        }
+                        error_msg = "";
+                        for (const auto& token_obj : json) {
+                            std::string token = token_obj.value("access_token", std::string(""));
+                            std::string ms_user_id = token_obj.value("ms_user_id", std::string(""));
+                            std::string display_name = token_obj.value("display_name", std::string(""));
+                            std::string email = token_obj.value("email", std::string(""));
 
-                                if (!ms_user_id.empty()) {
-                                    MSConnection conn;
-                                    conn.access_token = token;
-                                    conn.is_authenticated = !token.empty();
-                                    conn.profile.id = ms_user_id;
-                                    conn.profile.display_name = display_name;
-                                    conn.profile.email = email;
-                                    conn.profile.loaded = !display_name.empty() || !email.empty();
-
-                                    auto result = ms_connections.insert(conn);
-                                }
+                            if (!ms_user_id.empty()) {
+                                MSConnection conn;
+                                conn.access_token = token;
+                                conn.is_authenticated = !token.empty();
+                                conn.profile.id = ms_user_id;
+                                conn.profile.display_name = display_name;
+                                conn.profile.email = email;
+                                conn.profile.loaded = !display_name.empty() || !email.empty();
+                                ms_connections.insert(conn);
                             }
-                        } else {
-                            error_msg = "Invalid response format: expected array";
                         }
                     } catch (const std::exception& ex) {
                         error_msg = std::string("Failed to parse token response: ") + ex.what();
@@ -265,26 +266,12 @@ namespace minidfs::panel {
         std::string user_id = core::EnvManager::get().get("USER_ID", "");
         if (user_id.empty()) throw std::runtime_error("USER_ID is not set");
 
+        // Open the auth endpoint directly in browser so it receives the CSRF cookie
+        // The server will redirect to Microsoft's auth URL
         std::string url = proxy_url + "/api/ms/auth?user_id=" + user_id;
-
-        auto& http = core::HttpClient::get();
-        auto response = http.get(url);
-
-        if (response.status_code != 200) {
-            ms_auth_error = "Failed to get auth URL. Is the proxy running?";
-            show_ms_login_modal = true;
-            return;
-        }
-        try {
-            auto json_response = nlohmann::json::parse(response.body);
-            std::string auth_url = json_response["auth_url"].get<std::string>();
-            core::open_file_in_browser(auth_url);
-            show_ms_login_modal = true;
-            ms_auth_error.clear();
-        } catch (const std::exception&) {
-            ms_auth_error = "Failed to parse auth response.";
-            show_ms_login_modal = true;
-        }
+        core::open_file_in_browser(url);
+        show_ms_login_modal = true;
+        ms_auth_error.clear();
     }
 
     std::string ServicesState::refresh_ms_token(const std::string& ms_user_id) {
@@ -320,6 +307,166 @@ namespace minidfs::panel {
         }
 
         return "";
+    }
+
+    void ServicesState::fetch_drive(const std::string& ms_user_id, DriveCallback callback) {
+        std::string token;
+        {
+            std::lock_guard<std::mutex> lock(mu);
+            auto it = find_by_ms_user_id(ms_user_id);
+            if (it == ms_connections.end() || it->access_token.empty()) {
+                callback(ms_user_id, "", false, "No valid token for account");
+                return;
+            }
+            token = it->access_token;
+        }
+
+        std::thread([this, ms_user_id, token, callback]() {
+            std::string base = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
+            if (base.empty()) {
+                callback(ms_user_id, "", false, "PROXY_SERVICE_URL not set");
+                return;
+            }
+
+            std::string url = base + "/api/ms/drive?ms_user_id=" + ms_user_id;
+
+            std::map<std::string, std::string> headers;
+            headers["Authorization"] = "Bearer " + token;
+            headers["Accept"] = "application/json";
+
+            core::HttpResponse response = core::HttpClient::get().get(url, headers);
+
+            if (response.status_code == 401) {
+                std::string new_token = refresh_ms_token(ms_user_id);
+                if (!new_token.empty()) {
+                    headers["Authorization"] = "Bearer " + new_token;
+                    response = core::HttpClient::get().get(url, headers);
+                }
+            }
+
+            if (response.status_code >= 200 && response.status_code < 300) {
+                try {
+                    auto json = nlohmann::json::parse(response.body);
+                    std::string drive_id = json.value("id", std::string(""));
+                    callback(ms_user_id, drive_id, true, "");
+                } catch (const std::exception& e) {
+                    callback(ms_user_id, "", false, std::string("Parse error: ") + e.what());
+                }
+            } else {
+                callback(ms_user_id, "", false, "HTTP " + std::to_string(response.status_code));
+            }
+        }).detach();
+    }
+
+    void ServicesState::fetch_onedrive_files(const std::string& ms_user_id,
+                                              const std::string& drive_id,
+                                              const std::string& folder_id,
+                                              FilesCallback callback) {
+        std::string token;
+        {
+            std::lock_guard<std::mutex> lock(mu);
+            auto it = find_by_ms_user_id(ms_user_id);
+            if (it == ms_connections.end() || it->access_token.empty()) {
+                callback(false, "", "No valid token for account");
+                return;
+            }
+            token = it->access_token;
+        }
+
+        std::thread([this, ms_user_id, drive_id, folder_id, token, callback]() {
+            std::string base = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
+            if (base.empty()) {
+                callback(false, "", "PROXY_SERVICE_URL not set");
+                return;
+            }
+
+            std::string url = base + "/api/ms/files?drive_id=" + drive_id + "&folder_id=" + folder_id;
+
+            std::map<std::string, std::string> headers;
+            headers["Authorization"] = "Bearer " + token;
+            headers["Accept"] = "application/json";
+
+            core::HttpResponse response = core::HttpClient::get().get(url, headers);
+
+            if (response.status_code == 401) {
+                std::string new_token = refresh_ms_token(ms_user_id);
+                if (!new_token.empty()) {
+                    headers["Authorization"] = "Bearer " + new_token;
+                    response = core::HttpClient::get().get(url, headers);
+                }
+            }
+
+            if (response.status_code >= 200 && response.status_code < 300) {
+                callback(true, response.body, "");
+            } else {
+                callback(false, "", "HTTP " + std::to_string(response.status_code));
+            }
+        }).detach();
+    }
+
+    void ServicesState::download_file(const std::string& ms_user_id,
+                                       const std::string& drive_id,
+                                       const std::string& file_id,
+                                       const std::string& local_path,
+                                       DownloadCallback callback) {
+        std::string token;
+        {
+            std::lock_guard<std::mutex> lock(mu);
+            auto it = find_by_ms_user_id(ms_user_id);
+            if (it == ms_connections.end() || it->access_token.empty()) {
+                callback(false, "", "No valid token for account");
+                return;
+            }
+            token = it->access_token;
+        }
+
+        std::thread([this, ms_user_id, drive_id, file_id, local_path, token, callback]() {
+            std::string base = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
+            if (base.empty()) {
+                callback(false, "", "PROXY_SERVICE_URL not set");
+                return;
+            }
+
+            // Ensure parent directory exists
+            std::filesystem::path path(local_path);
+            std::error_code ec;
+            std::filesystem::create_directories(path.parent_path(), ec);
+
+            std::string url = base + "/api/ms/file/download?drive_id=" + drive_id + "&file_id=" + file_id;
+
+            std::map<std::string, std::string> headers;
+            headers["Authorization"] = "Bearer " + token;
+
+            core::HttpResponse response = core::HttpClient::get().get(url, headers);
+
+            // Handle 401 - try to refresh token
+            if (response.status_code == 401) {
+                std::string new_token = refresh_ms_token(ms_user_id);
+                if (!new_token.empty()) {
+                    headers["Authorization"] = "Bearer " + new_token;
+                    response = core::HttpClient::get().get(url, headers);
+                }
+            }
+
+            if (response.status_code >= 200 && response.status_code < 300) {
+                // Write the file content to disk
+                std::ofstream file(local_path, std::ios::binary);
+                if (!file) {
+                    callback(false, "", "Failed to create local file: " + local_path);
+                    return;
+                }
+                file.write(response.body.data(), response.body.size());
+                file.close();
+
+                if (file.good()) {
+                    callback(true, local_path, "");
+                } else {
+                    callback(false, "", "Failed to write file to disk");
+                }
+            } else {
+                callback(false, "", "Download failed: HTTP " + std::to_string(response.status_code));
+            }
+        }).detach();
     }
 
 }
