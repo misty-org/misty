@@ -66,7 +66,7 @@ export default function Download() {
               </h3>
               <p className="text-sm text-text-muted mb-6">{platform.arch}</p>
               {platform.available ? (
-                <button className="w-full px-4 py-3 bg-primary hover:bg-primary-hover text-text text-sm font-medium rounded-xl transition-all duration-300 shadow-lg shadow-primary/10 hover:shadow-primary/20 hover:-translate-y-0.5">
+                <button className="w-full px-4 py-3 bg-zinc-100 hover:bg-gray-200 text-black text-sm font-medium rounded-xl transition-all duration-300 shadow-lg hover:-translate-y-0.5">
                   Download
                 </button>
               ) : (

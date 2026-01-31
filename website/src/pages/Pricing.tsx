@@ -64,7 +64,7 @@ export default function Pricing() {
 
             <NavLink
               to="/download"
-              className="w-full text-center px-6 py-3 bg-primary hover:bg-primary-hover text-text font-medium rounded-xl transition-all duration-300 shadow-lg shadow-primary/10 hover:shadow-primary/20 hover:-translate-y-0.5"
+              className="w-full text-center px-6 py-3 bg-zinc-100 hover:bg-gray-200 text-black font-medium rounded-xl transition-all duration-300 shadow-lg hover:-translate-y-0.5"
             >
               Get Basic
             </NavLink>

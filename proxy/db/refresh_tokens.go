@@ -27,7 +27,7 @@ func (db *Database) StoreRefreshToken(userID, rawToken string, expiresAt time.Ti
 
 	_, err := db.Conn.Exec(`
 		INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at)
-		VALUES ($1, $2, $3, $4)`,
+		VALUES (?, ?, ?, ?)`,
 		id, userID, tokenHash, expiresAt,
 	)
 	if err != nil {
@@ -47,7 +47,7 @@ func (db *Database) ValidateRefreshToken(rawToken string) (string, error) {
 
 	err := db.Conn.QueryRow(`
 		SELECT user_id, expires_at, revoked FROM refresh_tokens
-		WHERE token_hash = $1`,
+		WHERE token_hash = ?`,
 		tokenHash,
 	).Scan(&userID, &expiresAt, &revoked)
 	if err != nil {
@@ -71,7 +71,7 @@ func (db *Database) ValidateRefreshToken(rawToken string) (string, error) {
 func (db *Database) RevokeRefreshToken(rawToken string) error {
 	tokenHash := HashToken(rawToken)
 	_, err := db.Conn.Exec(`
-		UPDATE refresh_tokens SET revoked = TRUE WHERE token_hash = $1`,
+		UPDATE refresh_tokens SET revoked = 1 WHERE token_hash = ?`,
 		tokenHash,
 	)
 	if err != nil {
@@ -82,7 +82,7 @@ func (db *Database) RevokeRefreshToken(rawToken string) error {
 
 func (db *Database) RevokeAllUserRefreshTokens(userID string) error {
 	_, err := db.Conn.Exec(`
-		UPDATE refresh_tokens SET revoked = TRUE WHERE user_id = $1 AND revoked = FALSE`,
+		UPDATE refresh_tokens SET revoked = 1 WHERE user_id = ? AND revoked = 0`,
 		userID,
 	)
 	if err != nil {
@@ -93,7 +93,7 @@ func (db *Database) RevokeAllUserRefreshTokens(userID string) error {
 
 func (db *Database) CleanupExpiredRefreshTokens() error {
 	result, err := db.Conn.Exec(`
-		DELETE FROM refresh_tokens WHERE expires_at < $1 OR revoked = TRUE`,
+		DELETE FROM refresh_tokens WHERE expires_at < ? OR revoked = 1`,
 		time.Now(),
 	)
 	if err != nil {
@@ -109,7 +109,7 @@ func (db *Database) CleanupExpiredRefreshTokens() error {
 
 func (db *Database) GetUserEmailByID(userID string) (string, error) {
 	var email string
-	err := db.Conn.QueryRow(`SELECT email FROM users WHERE id = $1`, userID).Scan(&email)
+	err := db.Conn.QueryRow(`SELECT email FROM users WHERE id = ?`, userID).Scan(&email)
 	if err != nil {
 		log.Println("Failed to get user email by ID:", err)
 	}

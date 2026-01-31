@@ -14,7 +14,7 @@ func (db *Database) InsertUser(name, email, password string) error {
 
     _, err := db.Conn.Exec(`
         INSERT INTO users (id, name, email, password)
-        VALUES ($1, $2, $3, $4)`,
+        VALUES (?, ?, ?, ?)`,
         id, name, email, hashedPassword,
     )
     if err != nil {
@@ -33,7 +33,7 @@ func (db *Database) GetUser(email, password string) (*UserInfo, error) {
     var user UserInfo
     var storedHashedPassword string
     err := db.Conn.QueryRow(`
-        SELECT id, name, email, password FROM users WHERE email = $1`,
+        SELECT id, name, email, password FROM users WHERE email = ?`,
         email,
     ).Scan(&user.ID, &user.Name, &user.Email, &storedHashedPassword)
     if err != nil {

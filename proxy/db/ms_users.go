@@ -19,7 +19,7 @@ func (db *Database) StoreMSUser(userID, msUserID, accessToken, refreshToken, dis
 		return fmt.Errorf("ms_user_id is required")
 	}
 	query := `INSERT INTO ms_users (user_id, ms_user_id, access_token, refresh_token, display_name, email)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		VALUES (?, ?, ?, ?, ?, ?)
 		ON CONFLICT (user_id, ms_user_id) DO UPDATE SET
 			access_token = EXCLUDED.access_token,
 			refresh_token = EXCLUDED.refresh_token,
@@ -34,7 +34,7 @@ func (db *Database) StoreMSUser(userID, msUserID, accessToken, refreshToken, dis
 
 // GetMSUsers returns all user records for a specific user_id
 func (db *Database) GetMSUsers(userID string) ([]MSUserRecord, error) {
-	query := `SELECT user_id, ms_user_id, access_token, refresh_token, COALESCE(display_name, ''), COALESCE(email, '') FROM ms_users WHERE user_id = $1`
+	query := `SELECT user_id, ms_user_id, access_token, refresh_token, COALESCE(display_name, ''), COALESCE(email, '') FROM ms_users WHERE user_id = ?`
 	rows, err := db.Conn.Query(query, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get MS users: %w", err)
@@ -57,7 +57,7 @@ func (db *Database) GetMSUsers(userID string) ([]MSUserRecord, error) {
 
 // DeleteMSUser deletes the user record for (user_id, ms_user_id).
 func (db *Database) DeleteMSUser(userID, msUserID string) error {
-	query := `DELETE FROM ms_users WHERE user_id = $1 AND ms_user_id = $2`
+	query := `DELETE FROM ms_users WHERE user_id = ? AND ms_user_id = ?`
 	result, err := db.Conn.Exec(query, userID, msUserID)
 	if err != nil {
 		return fmt.Errorf("failed to delete MS user: %w", err)
