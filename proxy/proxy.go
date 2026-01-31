@@ -91,4 +91,5 @@ func (proxy *Proxy) MountHandlers() {
 	proxy.APIRouter.Get("/ms/drive/root", ms.GetDriveRoot())
 	proxy.APIRouter.Get("/ms/files", ms.GetFiles())
 	proxy.APIRouter.Get("/ms/file", ms.GetFile())
+	proxy.APIRouter.Get("/ms/file/download", ms.DownloadFile())
 }

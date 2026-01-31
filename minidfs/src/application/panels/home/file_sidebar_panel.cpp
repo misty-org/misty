@@ -7,7 +7,6 @@
 #include "core/file_picker.h"
 #include <nlohmann/json.hpp>
 #include <filesystem>
-#include <tuple>
 #include <vector>
 
 
@@ -181,7 +180,7 @@ namespace minidfs::panel {
                     auto& file_explorer_state = registry_.get_state<FileExplorerState>("FileExplorer");
 
                     // Set pending navigation - panel will handle the actual navigation
-                    file_explorer_state.pending_navigation_path = path_utils::get_onedrive_root();
+                    file_explorer_state.pending_navigation_path = mount_utils::get_onedrive_root();
                 }
 
                 ImGui::PopStyleColor(3);

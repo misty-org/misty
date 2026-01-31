@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <cstring>
 #include "core/ui_registry.h"
+#include "workspace_state.h"  // For AccountMapping and mount_utils
 
 namespace fs = std::filesystem;
 
@@ -35,25 +36,16 @@ namespace minidfs::panel {
         std::string od_web_url;
     };
 
-    // Account mapping for OneDrive accounts
-    struct AccountMapping {
-        std::string folder_name;    // Derived from email: "matthew_outlook"
-        std::string ms_user_id;     // Internal Microsoft user ID
-        std::string drive_id;       // Cached drive ID
-        std::string display_name;
-        std::string email;
-    };
-
-    // Path utilities for unified navigation
+    // Path utilities for file explorer navigation
+    // Note: Directory management (ensure_*) is in workspace_state.h mount_utils
     namespace path_utils {
+        // Convenience aliases to mount_utils
         inline std::string get_mount_root() {
-            const char* home = std::getenv("HOME");
-            if (!home) home = "~";
-            return std::string(home) + "/misty/mnt";
+            return mount_utils::get_mount_root();
         }
 
         inline std::string get_onedrive_root() {
-            return get_mount_root() + "/OneDrive";
+            return mount_utils::get_onedrive_root();
         }
 
         inline bool is_onedrive_path(const std::string& path) {
@@ -61,19 +53,9 @@ namespace minidfs::panel {
             return path.rfind(root, 0) == 0;
         }
 
-        // Derive folder name from email: matthew@outlook.com → "matthew"
-        inline std::string derive_folder_name(const std::string& email) {
-            if (email.empty()) return "unknown";
-
-            size_t at_pos = email.find('@');
-            if (at_pos == std::string::npos) return email;
-
-            return email.substr(0, at_pos);
-        }
-
         // Parse OneDrive path into (account_folder_name, relative_path)
-        // e.g., "~/misty/mnt/OneDrive/matthew_outlook/Documents"
-        //       → ("matthew_outlook", "Documents")
+        // e.g., "~/misty/mnt/OneDrive/matthew/Documents"
+        //       → ("matthew", "Documents")
         inline std::pair<std::string, std::string> parse_onedrive_path(const std::string& path) {
             std::string root = get_onedrive_root();
             if (path.rfind(root, 0) != 0) {
@@ -139,17 +121,11 @@ namespace minidfs::panel {
         // Pending navigation - set by external code, processed by panel
         std::string pending_navigation_path;
 
-        // Account mappings for OneDrive accounts
-        std::vector<AccountMapping> account_mappings;
+        // Download tracking - paths currently being downloaded
+        std::unordered_set<std::string> downloading_files;
 
-        // Find account by folder name
-        AccountMapping* find_account_by_folder(const std::string& folder_name) {
-            for (auto& mapping : account_mappings) {
-                if (mapping.folder_name == folder_name) {
-                    return &mapping;
-                }
-            }
-            return nullptr;
+        bool is_downloading(const std::string& path) const {
+            return downloading_files.count(path) > 0;
         }
     };
 

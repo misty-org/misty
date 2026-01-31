@@ -19,7 +19,9 @@ namespace minidfs::panel {
         void render() override;
 
         // Unified navigation - routes to local or OneDrive based on path
-        void navigate_to_path(const std::string& path, bool update_history = true);
+        // create_if_missing: if true, creates OneDrive directories locally when navigating
+        //                    set to false when user types path manually (should show error instead)
+        void navigate_to_path(const std::string& path, bool update_history = true, bool create_if_missing = true);
 
     private:
         void show_nav_history(panel::FileExplorerState& state, float button_width, float spacing);
@@ -32,7 +34,7 @@ namespace minidfs::panel {
 
         // OneDrive path navigation helpers
         void navigate_to_onedrive_mount_root(bool update_history);
-        void navigate_to_onedrive_account(const std::string& folder_name, const std::string& relative_path, bool update_history);
+        void navigate_to_onedrive_account(const std::string& folder_name, const std::string& relative_path, bool update_history, bool create_if_missing);
         void fetch_onedrive_folder(const AccountMapping& account, const std::string& folder_id, const std::string& target_path);
 
         // Resolve relative path to folder ID using cache
@@ -46,6 +48,9 @@ namespace minidfs::panel {
                                           bool success,
                                           const std::string& body,
                                           const std::string& error);
+
+        // Download OneDrive file and open it when complete
+        void download_and_open_file(const UnifiedFileItem& file);
 
     private:
         core::UIRegistry& registry_;

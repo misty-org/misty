@@ -1,6 +1,8 @@
 #include "file_explorer_panel.h"
 #include "workspace_state.h"
 #include "panels/services/services_state.h"
+#include "panels/activity/download_state.h"
+#include "panels/notification/notification_state.h"
 #include "core/util.h"
 #include "imgui.h"
 #include <nlohmann/json.hpp>
@@ -15,10 +17,16 @@ namespace minidfs::panel {
     FileExplorerPanel::FileExplorerPanel(UIRegistry& registry, WorkerPool& worker_pool, std::shared_ptr<MiniDFSClient> client)
         : registry_(registry), worker_pool_(worker_pool), client_(std::move(client)) {
 
-        auto& state = registry_.get_state<FileExplorerState>("FileExplorer");
         auto& workspace_state = registry_.get_state<WorkspaceState>("Workspace");
+        auto& file_explorer_state = registry_.get_state<FileExplorerState>("FileExplorer");
 
-        // Fetch workspaces first
+        // Ensure mount directories exist (~/misty/mnt and ~/misty/mnt/OneDrive)
+        workspace_state.ensure_directories();
+
+        // Sync account mappings to create account directories
+        sync_account_mappings();
+
+        // Fetch workspaces if not already done
         if (!workspace_state.has_fetched) {
             workspace_state.fetch_workspaces();
         }
@@ -35,7 +43,8 @@ namespace minidfs::panel {
             fs::create_directories(start_path, ec);
         }
 
-        navigate_to_path(start_path);
+        // Set as pending navigation - will be processed in render()
+        file_explorer_state.pending_navigation_path = start_path;
     }
 
     void FileExplorerPanel::render() {
@@ -84,7 +93,7 @@ namespace minidfs::panel {
         ImGui::PopStyleColor();
     }
 
-    void FileExplorerPanel::navigate_to_path(const std::string& path, bool update_history) {
+    void FileExplorerPanel::navigate_to_path(const std::string& path, bool update_history, bool create_if_missing) {
         auto& state = registry_.get_state<FileExplorerState>("FileExplorer");
 
         if (path_utils::is_onedrive_path(path)) {
@@ -96,7 +105,7 @@ namespace minidfs::panel {
                 navigate_to_onedrive_mount_root(update_history);
             } else {
                 // Navigate into specific account
-                navigate_to_onedrive_account(folder_name, relative_path, update_history);
+                navigate_to_onedrive_account(folder_name, relative_path, update_history, create_if_missing);
             }
         } else {
             // Local path
@@ -105,12 +114,15 @@ namespace minidfs::panel {
     }
 
     void FileExplorerPanel::sync_account_mappings() {
-        auto& state = registry_.get_state<FileExplorerState>("FileExplorer");
+        auto& workspace = registry_.get_state<WorkspaceState>("Workspace");
         auto& services = registry_.get_state<ServicesState>("Services");
+
+        // Ensure base mount directories exist
+        workspace.ensure_directories();
 
         std::lock_guard<std::mutex> svc_lock(services.mu);
 
-        state.account_mappings.clear();
+        workspace.account_mappings.clear();
         for (const auto& conn : services.ms_connections) {
             if (!conn.is_authenticated || conn.access_token.empty()) continue;
 
@@ -118,7 +130,10 @@ namespace minidfs::panel {
             mapping.ms_user_id = conn.profile.id;
             mapping.display_name = conn.profile.display_name;
             mapping.email = conn.profile.email;
-            mapping.folder_name = path_utils::derive_folder_name(conn.profile.email);
+            mapping.folder_name = mount_utils::derive_folder_name(conn.profile.email);
+
+            // Create the account directory on disk
+            mount_utils::ensure_account_directory(conn.profile.email);
 
             // Try to load cached drive_id
             std::string cached_drive_id, cached_display, cached_email;
@@ -126,12 +141,13 @@ namespace minidfs::panel {
                 mapping.drive_id = cached_drive_id;
             }
 
-            state.account_mappings.push_back(mapping);
+            workspace.account_mappings.push_back(mapping);
         }
     }
 
     void FileExplorerPanel::navigate_to_onedrive_mount_root(bool update_history) {
         auto& state = registry_.get_state<FileExplorerState>("FileExplorer");
+        auto& workspace = registry_.get_state<WorkspaceState>("Workspace");
 
         // Sync account mappings from services state
         sync_account_mappings();
@@ -148,9 +164,9 @@ namespace minidfs::panel {
             }
         }
 
-        // Build files list from account mappings
+        // Build files list from account mappings (now in workspace state)
         std::vector<UnifiedFileItem> files;
-        for (const auto& mapping : state.account_mappings) {
+        for (const auto& mapping : workspace.account_mappings) {
             UnifiedFileItem item;
             item.name = mapping.folder_name;
             item.path = new_path + "/" + mapping.folder_name;
@@ -174,15 +190,17 @@ namespace minidfs::panel {
 
     void FileExplorerPanel::navigate_to_onedrive_account(const std::string& folder_name,
                                                           const std::string& relative_path,
-                                                          bool update_history) {
+                                                          bool update_history,
+                                                          bool create_if_missing) {
         auto& state = registry_.get_state<FileExplorerState>("FileExplorer");
+        auto& workspace = registry_.get_state<WorkspaceState>("Workspace");
 
-        // Find account mapping
-        AccountMapping* mapping = state.find_account_by_folder(folder_name);
+        // Find account mapping in workspace state
+        AccountMapping* mapping = workspace.find_account_by_folder(folder_name);
         if (!mapping) {
             // Try syncing account mappings and retry
             sync_account_mappings();
-            mapping = state.find_account_by_folder(folder_name);
+            mapping = workspace.find_account_by_folder(folder_name);
         }
 
         if (!mapping) {
@@ -193,6 +211,26 @@ namespace minidfs::panel {
         std::string target_path = path_utils::get_onedrive_root() + "/" + folder_name;
         if (!relative_path.empty()) {
             target_path += "/" + relative_path;
+        }
+
+        if (create_if_missing) {
+            // Create the directory locally so the path is always valid on disk
+            std::error_code ec;
+            fs::create_directories(target_path, ec);
+            if (ec) {
+                state.error_msg = "Failed to create directory: " + target_path;
+                return;
+            }
+        } else {
+            // Check if path exists - if not, show error (user typed invalid path)
+            if (!fs::exists(target_path)) {
+                state.error_msg = "Path does not exist: " + target_path;
+                return;
+            }
+            if (!fs::is_directory(target_path)) {
+                state.error_msg = "Path is not a directory: " + target_path;
+                return;
+            }
         }
 
         // Resolve folder ID from cache
@@ -307,8 +345,8 @@ namespace minidfs::panel {
 
                     // Update account mapping with drive_id
                     {
-                        auto& state = registry_.get_state<FileExplorerState>("FileExplorer");
-                        for (auto& mapping : state.account_mappings) {
+                        auto& workspace = registry_.get_state<WorkspaceState>("Workspace");
+                        for (auto& mapping : workspace.account_mappings) {
                             if (mapping.ms_user_id == user_id) {
                                 mapping.drive_id = fetched_drive_id;
                                 save_drive_info_to_cache(user_id, fetched_drive_id,
@@ -458,7 +496,8 @@ namespace minidfs::panel {
             ImGuiInputTextFlags_EnterReturnsTrue);
 
         if (entered) {
-            navigate_to_path(state.search_path);
+            // Don't auto-create directories when user types path manually
+            navigate_to_path(state.search_path, true, false);
         }
 
         ImGui::PopStyleColor();
@@ -520,7 +559,15 @@ namespace minidfs::panel {
         ImGui::TableNextRow();
         ImGui::TableNextColumn();
 
-        std::string label = (file.is_dir ? "[DIR] " : "[FILE] ") + file.name;
+        // Check if file is currently downloading
+        bool is_downloading = state.is_downloading(file.path);
+
+        std::string label;
+        if (is_downloading) {
+            label = "[DOWNLOADING] " + file.name;
+        } else {
+            label = (file.is_dir ? "[DIR] " : "[FILE] ") + file.name;
+        }
 
         if (ImGui::Selectable(label.c_str(), is_currently_selected, ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowDoubleClick)) {
 
@@ -549,10 +596,15 @@ namespace minidfs::panel {
                     if (file.source == FileSource::LOCAL) {
                         open_file(file.path);
                     } else {
-                        // OneDrive file - open in browser
-                        if (!file.od_web_url.empty()) {
-                            core::open_file_in_browser(file.od_web_url);
+                        // OneDrive file - check if it exists locally first
+                        if (fs::exists(file.path)) {
+                            // File already downloaded, open it
+                            open_file(file.path);
+                        } else if (!state.is_downloading(file.path)) {
+                            // Download the file first, then open it
+                            download_and_open_file(file);
                         }
+                        // If already downloading, do nothing (user can wait)
                     }
                 }
             }
@@ -581,6 +633,82 @@ namespace minidfs::panel {
         if (!file.last_modified.empty()) {
             ImGui::Text("%s", file.last_modified.c_str());
         }
+    }
+
+    void FileExplorerPanel::download_and_open_file(const UnifiedFileItem& file) {
+        auto& state = registry_.get_state<FileExplorerState>("FileExplorer");
+        auto& services = registry_.get_state<ServicesState>("Services");
+        auto& downloads = registry_.get_state<DownloadState>("Downloads");
+        auto& notifications = registry_.get_state<NotificationState>("Notifications");
+
+        // Mark as downloading in file explorer state
+        state.downloading_files.insert(file.path);
+
+        // Register download in download state
+        uint64_t download_id = downloads.start_download(
+            file.name,
+            file.path,
+            "OneDrive",
+            file.size
+        );
+
+        // Show notification and store ID to dismiss later
+        uint64_t notif_id = notifications.add_notification(
+            "Downloading",
+            file.name,
+            NotificationType::DOWNLOAD,
+            15.0f
+        );
+
+        // Download the file
+        services.download_file(
+            file.od_ms_user_id,
+            file.od_drive_id,
+            file.od_item_id,
+            file.path,
+            [this, path = file.path, file_name = file.name, download_id, notif_id](
+                bool success, const std::string& local_path, const std::string& error) {
+
+                auto& state = registry_.get_state<FileExplorerState>("FileExplorer");
+                auto& downloads = registry_.get_state<DownloadState>("Downloads");
+                auto& notifications = registry_.get_state<NotificationState>("Notifications");
+
+                // Remove from downloading set
+                state.downloading_files.erase(path);
+
+                // Dismiss the "Downloading" notification
+                notifications.dismiss(notif_id);
+
+                if (success) {
+                    // Update download state
+                    downloads.complete_download(download_id);
+
+                    // Show success notification
+                    notifications.add_notification(
+                        "Download Complete",
+                        file_name,
+                        NotificationType::SUCCESS,
+                        5.0f
+                    );
+
+                    // Open the downloaded file
+                    open_file(local_path);
+                } else {
+                    // Update download state
+                    downloads.fail_download(download_id, error);
+
+                    // Show error notification
+                    notifications.add_notification(
+                        "Download Failed",
+                        file_name + ": " + error,
+                        NotificationType::ERROR,
+                        5.0f
+                    );
+
+                    state.error_msg = "Download failed: " + error;
+                }
+            }
+        );
     }
 
 }

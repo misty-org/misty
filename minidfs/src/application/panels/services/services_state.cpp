@@ -6,6 +6,8 @@
 #include <iostream>
 #include <thread>
 #include <set>
+#include <fstream>
+#include <filesystem>
 
 
 namespace minidfs::panel {
@@ -398,6 +400,71 @@ namespace minidfs::panel {
                 callback(true, response.body, "");
             } else {
                 callback(false, "", "HTTP " + std::to_string(response.status_code));
+            }
+        }).detach();
+    }
+
+    void ServicesState::download_file(const std::string& ms_user_id,
+                                       const std::string& drive_id,
+                                       const std::string& file_id,
+                                       const std::string& local_path,
+                                       DownloadCallback callback) {
+        std::string token;
+        {
+            std::lock_guard<std::mutex> lock(mu);
+            auto it = find_by_ms_user_id(ms_user_id);
+            if (it == ms_connections.end() || it->access_token.empty()) {
+                callback(false, "", "No valid token for account");
+                return;
+            }
+            token = it->access_token;
+        }
+
+        std::thread([this, ms_user_id, drive_id, file_id, local_path, token, callback]() {
+            std::string base = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
+            if (base.empty()) {
+                callback(false, "", "PROXY_SERVICE_URL not set");
+                return;
+            }
+
+            // Ensure parent directory exists
+            std::filesystem::path path(local_path);
+            std::error_code ec;
+            std::filesystem::create_directories(path.parent_path(), ec);
+
+            std::string url = base + "/api/ms/file/download?drive_id=" + drive_id + "&file_id=" + file_id;
+
+            std::map<std::string, std::string> headers;
+            headers["Authorization"] = "Bearer " + token;
+
+            core::HttpResponse response = core::HttpClient::get().get(url, headers);
+
+            // Handle 401 - try to refresh token
+            if (response.status_code == 401) {
+                std::string new_token = refresh_ms_token(ms_user_id);
+                if (!new_token.empty()) {
+                    headers["Authorization"] = "Bearer " + new_token;
+                    response = core::HttpClient::get().get(url, headers);
+                }
+            }
+
+            if (response.status_code >= 200 && response.status_code < 300) {
+                // Write the file content to disk
+                std::ofstream file(local_path, std::ios::binary);
+                if (!file) {
+                    callback(false, "", "Failed to create local file: " + local_path);
+                    return;
+                }
+                file.write(response.body.data(), response.body.size());
+                file.close();
+
+                if (file.good()) {
+                    callback(true, local_path, "");
+                } else {
+                    callback(false, "", "Failed to write file to disk");
+                }
+            } else {
+                callback(false, "", "Download failed: HTTP " + std::to_string(response.status_code));
             }
         }).detach();
     }
