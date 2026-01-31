@@ -42,16 +42,16 @@ func (db *Database) GetMSTokens(userID string) ([]MSTokenRecord, error) {
 	}
 	defer rows.Close()
 
-	var tokens []MSTokenRecord
+	tokens := make([]MSTokenRecord, 0)
 	for rows.Next() {
 		var t MSTokenRecord
 		if err := rows.Scan(&t.UserID, &t.MsUserID, &t.AccessToken, &t.RefreshToken, &t.DisplayName, &t.Email); err != nil {
-			return nil, fmt.Errorf("failed to scan MS token: %w", err)
+			return tokens, fmt.Errorf("failed to scan MS token: %w", err)
 		}
 		tokens = append(tokens, t)
 	}
 	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating tokens: %w", err)
+		return tokens, fmt.Errorf("error iterating tokens: %w", err)
 	}
 	return tokens, nil
 }
