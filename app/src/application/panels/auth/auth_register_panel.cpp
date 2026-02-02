@@ -2,6 +2,7 @@
 #include "imgui.h"
 #include "core/util.h"
 #include "core/asset_manager.h"
+#include "core/imgui_utils.h"
 #include "views/app_view.h"
 #include <cstring>
 #include <iostream>
@@ -140,19 +141,10 @@ namespace misty::panel {
 
     void AuthRegisterPanel::show_register_button(AuthRegisterState& state) {
         float width = ImGui::GetContentRegionAvail().x;
-        
-        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.5f, 0.9f, 1.0f)); // Blue button
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.6f, 1.0f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.15f, 0.4f, 0.8f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
 
-        if (ImGui::Button("Create account", ImVec2(width, 40))) {
+        if (core::StyledButton("Create account", ImVec2(width, 40), core::ButtonTheme::Primary())) {
             state.handle_create_account();
         }
-
-        ImGui::PopStyleColor(4);
-        ImGui::PopStyleVar();
     }
 
     void AuthRegisterPanel::show_login_button() {

@@ -68,11 +68,11 @@ namespace misty::core {
 
     // Helper to execute code with styled button colors
     struct ButtonColors {
-        ImVec4 button = ImVec4(0.2f, 0.5f, 0.9f, 1.0f);
-        ImVec4 hovered = ImVec4(0.3f, 0.6f, 1.0f, 1.0f);
-        ImVec4 active = ImVec4(0.15f, 0.4f, 0.8f, 1.0f);
-        ImVec4 text = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
-        float rounding = 6.0f;
+        ImVec4 button  = ImVec4(0.957f, 0.957f, 0.961f, 1.0f); // zinc-100 white
+        ImVec4 hovered = ImVec4(0.898f, 0.906f, 0.922f, 1.0f); // gray-200
+        ImVec4 active  = ImVec4(0.820f, 0.835f, 0.859f, 1.0f); // gray-300
+        ImVec4 text    = ImVec4(0.07f,  0.07f,  0.07f,  1.0f); // near-black
+        float rounding = 8.0f;
     };
 
     template<typename Func>
@@ -88,12 +88,13 @@ namespace misty::core {
     // Predefined button color schemes
     namespace ButtonTheme {
         inline ButtonColors Primary() {
+            // White CTA — matches website's bg-zinc-100 text-black button
             ButtonColors colors;
-            colors.button = ImVec4(0.2f, 0.5f, 0.9f, 1.0f);
-            colors.hovered = ImVec4(0.3f, 0.6f, 1.0f, 1.0f);
-            colors.active = ImVec4(0.15f, 0.4f, 0.8f, 1.0f);
-            colors.text = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
-            colors.rounding = 6.0f;
+            colors.button  = ImVec4(0.957f, 0.957f, 0.961f, 1.0f); // zinc-100
+            colors.hovered = ImVec4(0.898f, 0.906f, 0.922f, 1.0f); // gray-200
+            colors.active  = ImVec4(0.820f, 0.835f, 0.859f, 1.0f); // gray-300
+            colors.text    = ImVec4(0.07f,  0.07f,  0.07f,  1.0f); // near-black
+            colors.rounding = 8.0f;
             return colors;
         }
 

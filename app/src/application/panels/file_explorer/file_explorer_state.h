@@ -278,6 +278,8 @@ namespace misty::panel {
         int last_selected_index = -1;
         bool is_loading = false;
         bool is_hidden = false;
+        bool show_hidden = false;  // toggle dotfiles/hidden entries
+        bool grid_view = false;    // toggle grid vs list layout
         std::string error_msg = "";
         std::stack<std::string> back_history;
         std::stack<std::string> forward_history;
@@ -355,9 +357,12 @@ namespace misty::panel {
 
             std::vector<UnifiedFileItem> new_files;
             for (const auto& entry : fs::directory_iterator(path)) {
+                std::string fname = entry.path().filename().generic_string();
+                if (!state.show_hidden && !fname.empty() && fname[0] == '.') continue;
+
                 UnifiedFileItem item;
                 item.path = entry.path().generic_string();
-                item.name = entry.path().filename().generic_string();
+                item.name = fname;
                 item.is_dir = entry.is_directory();
                 item.source = FileSource::LOCAL;
                 item.status = SyncStatus::LOCAL;

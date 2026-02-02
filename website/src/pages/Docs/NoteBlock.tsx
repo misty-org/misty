@@ -1,3 +1,6 @@
+
+
+
 const styles = {
   tip: { border: "border-green-500/30", bg: "bg-green-500/5", icon: "text-green-400", label: "Tip" },
   note: { border: "border-blue-500/30", bg: "bg-blue-500/5", icon: "text-blue-400", label: "Note" },

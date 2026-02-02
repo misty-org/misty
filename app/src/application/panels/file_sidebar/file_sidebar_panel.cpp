@@ -77,11 +77,14 @@ namespace misty::panel {
 
 
             show_create_new(state, width, padding);
+
+            ImGui::PushStyleColor(ImGuiCol_Separator, ImVec4(0.30f, 0.30f, 0.32f, 1.0f));
             ImGui::Separator();
             show_local_section(width, padding);
             ImGui::Separator();
             show_services_section(services_state, width, padding);
             ImGui::Separator();
+            ImGui::PopStyleColor();
 
             show_quick_access(width, padding);
 
