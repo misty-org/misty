@@ -1,7 +1,7 @@
 #pragma once
 
 #include "imgui.h"
-#include "core/svg_loader.h"
+#include "core/ui/svg_loader.h"
 
 namespace misty::panel {
     enum class IconButtonAlignH {

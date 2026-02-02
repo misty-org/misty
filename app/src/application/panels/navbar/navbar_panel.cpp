@@ -1,6 +1,6 @@
 #include "panels/navbar/navbar_panel.h"
 #include "panels/profile/profile_state.h"
-#include "core/asset_manager.h"
+#include "core/manager/asset_manager.h"
 
 using namespace misty::view;
 

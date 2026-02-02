@@ -265,7 +265,7 @@ namespace misty::panel {
                 ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.85f, 0.3f, 0.25f, 1.0f));
                 if (ImGui::Button("Yes, Clear##recent")) {
                     explorer.recent_files.clear();
-                    explorer.save_state();
+                    explorer.dirty_ = true;
                     state.confirm_clear_recent = false;
                     state.status_message = "Recent files cleared.";
                     state.status_timer = 3.0f;
@@ -312,7 +312,7 @@ namespace misty::panel {
                 ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.85f, 0.3f, 0.25f, 1.0f));
                 if (ImGui::Button("Yes, Clear##starred")) {
                     explorer.starred_files.clear();
-                    explorer.save_state();
+                    explorer.dirty_ = true;
                     state.confirm_clear_starred = false;
                     state.status_message = "Starred files cleared.";
                     state.status_timer = 3.0f;

@@ -1,6 +1,6 @@
 #include "panels/profile/edit_profile_panel.h"
 #include "panels/profile/profile_state.h"
-#include "core/asset_manager.h"
+#include "core/manager/asset_manager.h"
 #include "views/app_view.h"
 #include "imgui.h"
 

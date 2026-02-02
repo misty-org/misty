@@ -1,10 +1,12 @@
 #pragma once
 
-#include "core/ui_registry.h"
+#include "core/ui/ui_registry.h"
 #include <string>
 #include <vector>
 #include <atomic>
 #include <mutex>
+#include <iostream>
+#include <fstream>
 
 namespace misty::panel {
 

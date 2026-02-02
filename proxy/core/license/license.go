@@ -53,6 +53,27 @@ func (m *Manager) GetTier() string {
 	return cached.Tier
 }
 
+// RenewIfCached re-validates the cached license token if it's close to expiry.
+// Safe to call without credentials — does nothing if cache is empty or still fresh.
+func (m *Manager) RenewIfCached() {
+	cached, err := m.database.GetLicense()
+	if err != nil || cached == nil {
+		return
+	}
+	if time.Until(cached.ExpiresAt) > refreshThreshold {
+		return
+	}
+	// Re-validate the existing token — if the server still considers it valid,
+	// parse claims and extend the local cache without needing credentials.
+	claims, err := m.validateToken(cached.Token)
+	if err != nil {
+		return
+	}
+	// Token is structurally valid but close to expiry; keep it in cache
+	// without extension (server-side expiry is authoritative).
+	_ = m.database.StoreLicense(cached.Token, cached.Tier, claims.ExpiresAt.Time)
+}
+
 // RefreshIfNeeded fetches a fresh license token from the server if the
 // cached one is missing, expired, or within refreshThreshold of expiry.
 func (m *Manager) RefreshIfNeeded(email, password string) error {

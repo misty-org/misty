@@ -2,7 +2,7 @@
 
 #include <string>
 #include <cstring>
-#include "core/ui_registry.h"
+#include "core/ui/ui_registry.h"
 
 namespace misty::panel {
 

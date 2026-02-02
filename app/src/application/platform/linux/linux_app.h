@@ -37,6 +37,7 @@ private:
 private:
     static void glfw_error_callback(int error, const char* description);
     static void glfw_window_size_callback(GLFWwindow* window, int width, int height);
+    static void glfw_window_focus_callback(GLFWwindow* window, int focused);
 
 private:
     GLFWwindow* window_ = nullptr;

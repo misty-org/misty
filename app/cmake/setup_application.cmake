@@ -102,9 +102,6 @@ target_link_libraries(misty PRIVATE
     CURL::libcurl
 )
 
-target_precompile_headers(misty PRIVATE 
-    "src/application/misty.h"
-)
 
 add_custom_command(TARGET misty POST_BUILD
     # Operation 1: Copy main assets to build folder

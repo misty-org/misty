@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/ui_registry.h"
+#include "core/ui/ui_registry.h"
 #include "panels/panel.h"
 #include "download_state.h"
 #include "upload_state.h"

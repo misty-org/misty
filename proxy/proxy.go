@@ -69,9 +69,9 @@ func (proxy *Proxy) MountHandlers() {
 
 	// Public routes (no auth required)
 	proxy.APIRouter.Post("/register", api.RegisterUser(proxy.Database))
-	proxy.APIRouter.Post("/login", api.LoginUser(proxy.Database))
+	proxy.APIRouter.Post("/login", api.LoginUser(proxy.Database, proxy.LicenseManager))
 	proxy.APIRouter.Post("/logout", api.LogoutUser(proxy.Database))
-	proxy.APIRouter.Post("/refresh", api.RefreshToken(proxy.Database))
+	proxy.APIRouter.Post("/refresh", api.RefreshToken(proxy.Database, proxy.LicenseManager))
 
 	// OAuth callbacks must remain public
 	proxy.APIRouter.Get("/ms/auth", ms.GetOAuthLogin())
@@ -114,6 +114,7 @@ func (proxy *Proxy) MountHandlers() {
 			r.Get("/ms/file", ms.GetFile(proxy.Database))
 			r.Get("/ms/file/download", ms.DownloadFile(proxy.Database))
 			r.Post("/ms/folder/create", ms.CreateFolder(proxy.Database))
+			r.Get("/ms/search", ms.SearchFiles(proxy.Database))
 
 			// Google Drive endpoints
 			r.Get("/gd/users", gd.GetGDUsers(proxy.Database))
@@ -125,6 +126,7 @@ func (proxy *Proxy) MountHandlers() {
 			r.Get("/gd/file/download", gd.DownloadFile(proxy.Database))
 			r.Post("/gd/file/upload", gd.GetUploadSession(proxy.Database))
 			r.Post("/gd/folder/create", gd.CreateFolder(proxy.Database))
+			r.Get("/gd/search", gd.SearchFiles(proxy.Database))
 
 			// Dropbox endpoints
 			r.Get("/dbx/users", dbx.GetDBXUsers(proxy.Database))
@@ -136,6 +138,7 @@ func (proxy *Proxy) MountHandlers() {
 			r.Get("/dbx/file/download", dbx.DownloadFile(proxy.Database))
 			r.Post("/dbx/file/upload", dbx.GetUploadSession(proxy.Database))
 			r.Post("/dbx/folder/create", dbx.CreateFolder(proxy.Database))
+			r.Get("/dbx/search", dbx.SearchFiles(proxy.Database))
 		})
 	})
 }

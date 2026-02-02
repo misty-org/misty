@@ -5,10 +5,10 @@
 #include <cstring>
 #include <chrono>
 #include <thread>
-#include "core/ui_registry.h"
-#include "core/http_client.h"
-#include "core/env_manager.h"
-#include "core/util.h"
+#include "core/ui/ui_registry.h"
+#include "core/net/http_client.h"
+#include "core/manager/env_manager.h"
+#include "core/system/util.h"
 #include "views/app_view.h"
 #include <nlohmann/json.hpp>
 

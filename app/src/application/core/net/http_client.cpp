@@ -6,10 +6,10 @@
 #include <vector>
 #include <cstring>
 
-#include "http_client.h"
-#include "session_manager.h"
-#include "env_manager.h"
-#include "util.h"
+#include "core/net/http_client.h"
+#include "core/manager/session_manager.h"
+#include "core/manager/env_manager.h"
+#include "core/system/util.h"
 
 namespace misty::core {
 
