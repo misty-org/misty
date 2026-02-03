@@ -4,7 +4,7 @@
 #include <unordered_map>
 #include <mutex>
 
-namespace minidfs::view {
+namespace misty::view {
     enum class ViewID {
         Auth,
         Login,
@@ -13,6 +13,7 @@ namespace minidfs::view {
         Workspace,
         Activity,
         Services,
+        EditProfile,
         Default
     };
 

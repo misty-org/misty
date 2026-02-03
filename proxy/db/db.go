@@ -5,34 +5,48 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
 
-	_ "modernc.org/sqlite"
+	_ "github.com/lib/pq"
 )
-
 
 type Database struct {
 	Conn *sql.DB
 }
 
-func (db *Database) GetDatabasePath() string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		log.Println("Could not determine user home directory:", err)
-		return ""
+func (db *Database) GetDSN() string {
+	host := os.Getenv("DB_HOST")
+	if host == "" {
+		host = "localhost"
 	}
-	databasePath := filepath.Join(home, "misty", "db", "data.db")
+	port := os.Getenv("DB_PORT")
+	if port == "" {
+		port = "5432"
+	}
+	user := os.Getenv("DB_USER")
+	if user == "" {
+		user = "misty"
+	}
+	password := os.Getenv("DB_PASSWORD")
+	if password == "" {
+		password = "misty"
+	}
+	dbname := os.Getenv("DB_NAME")
+	if dbname == "" {
+		dbname = "misty"
+	}
+	sslmode := os.Getenv("DB_SSLMODE")
+	if sslmode == "" {
+		sslmode = "disable"
+	}
 
-	return databasePath
+	return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
+		host, port, user, password, dbname, sslmode)
 }
 
 func (db *Database) StartDatabase() error {
-	databasePath := db.GetDatabasePath()
-	if databasePath == "" {
-		return fmt.Errorf("invalid database path")
-	}
+	dsn := db.GetDSN()
 
-	conn, err := sql.Open("sqlite", databasePath)
+	conn, err := sql.Open("postgres", dsn)
 	if err != nil {
 		log.Println("Failed to open database: ", err)
 		return err

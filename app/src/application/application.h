@@ -2,6 +2,7 @@
 #include "core/ui_registry.h"
 #include "core/worker_pool.h"
 #include "dfs/file_sync/file_sync.h"
+#include "core/file_sync_service.h"
 #include "views/app_view.h"
 
 #ifdef _WIN32
@@ -10,7 +11,7 @@
 #include "dfs/file_sync/file_sync_mac.h"
 #endif
 
-namespace minidfs {
+namespace misty {
     class Application {
     public:
 		Application() = default;
@@ -32,7 +33,7 @@ namespace minidfs {
     protected:
         core::UIRegistry ui_registry_;
         core::WorkerPool worker_pool_;
-        std::shared_ptr<MiniDFSClient> client_;
+        std::shared_ptr<MistyClient> client_;
 
         #ifdef _WIN32
             std::unique_ptr<FileSyncWin32> file_sync_;
@@ -41,6 +42,8 @@ namespace minidfs {
         #elif defined(__linux__)
             std::unique_ptr<FileSyncLinux> file_sync_;
         #endif
+
+        std::unique_ptr<core::FileSyncService> file_sync_service_;
 
     };  
 };

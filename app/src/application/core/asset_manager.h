@@ -6,7 +6,7 @@
 
 
 
-namespace minidfs::core {
+namespace misty::core {
     enum class FontID {
         DEFAULT,
         ROBOTO_SMALL,

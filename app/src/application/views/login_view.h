@@ -6,10 +6,10 @@
 #include "panels/auth/auth_login_panel.h"
 #include "core/ui_registry.h"
 
-using namespace minidfs::core;
-using namespace minidfs::panel;
+using namespace misty::core;
+using namespace misty::panel;
 
-namespace minidfs::view {
+namespace misty::view {
     class LoginView : public AppView {
     public:
         LoginView(UIRegistry& ui_registry);

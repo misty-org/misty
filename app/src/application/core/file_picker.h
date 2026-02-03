@@ -5,9 +5,9 @@
 
 namespace fs = std::filesystem;
 
-namespace minidfs::core {
+namespace misty::core {
     struct FilePickerOptions {
-        std::string title = "minidfs - Select Files";
+        std::string title = "misty - Select Files";
         std::string default_directory = "";
         std::vector<std::string> allowed_extensions;
         bool show_hidden_files = false;

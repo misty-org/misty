@@ -3,7 +3,7 @@
 #ifdef __APPLE__
 #import <Cocoa/Cocoa.h>
 
-namespace minidfs::core {
+namespace misty::core {
 
 FilePickerResult FilePicker::show_dialog(const FilePickerOptions& options) {
     FilePickerResult result;
