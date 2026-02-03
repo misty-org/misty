@@ -82,12 +82,14 @@ namespace minidfs::core {
     HttpResponse HttpClient::perform_request(const std::string& method, const std::string& url, const std::string& body, const std::map<std::string, std::string>& headers) {
         HttpResponse response;
         response.status_code = 0;
+        response.body = "";
 
         CURL* curl = curl_easy_init();
         if (!curl) {
             std::cerr << "Failed to initialize CURL" << std::endl;
             return response;
         }
+        curl_easy_setopt(curl, CURLOPT_CAINFO, "/etc/ssl/cert.pem");
 
         CurlData data;
 
@@ -126,12 +128,6 @@ namespace minidfs::core {
         // Set timeouts to prevent blocking forever
         curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 10L);  // 10 seconds to connect
         curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);          // 30 seconds total
-
-        // Disable SSL verification for localhost (needed for self-signed certificates)
-        if (url.find("localhost") != std::string::npos || url.find("127.0.0.1") != std::string::npos) {
-            curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-            curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
-        }
 
         // Perform request
         CURLcode res = curl_easy_perform(curl);

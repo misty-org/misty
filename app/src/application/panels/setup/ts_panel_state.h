@@ -6,6 +6,7 @@
 #include <chrono>
 #include "core/ui_registry.h"
 #include "core/http_client.h"
+#include "core/env_manager.h"
 #include "core/util.h"
 #include "views/app_view.h"
 #include <nlohmann/json.hpp>
@@ -35,9 +36,9 @@ namespace minidfs::panel {
         char device_name[256] = "";
         char mount_path[512] = "";
         
-        // Proxy endpoint URL (for curl request)
-        // User will integrate this, but we'll provide a placeholder
-        const std::string proxy_url = "http://localhost:3000/api/ts-status";
+        std::string get_proxy_url() const {
+            return core::EnvManager::get().get("PROXY_SERVICE_URL", "");
+        }
         
         void clear_state() {
             login_url = "";
@@ -60,7 +61,13 @@ namespace minidfs::panel {
             error_msg = "";
             success_msg = "";   
 
-            core::HttpResponse response = core::HttpClient::get().get(proxy_url);
+            std::string base = get_proxy_url();
+            if (base.empty()) {
+                error_msg = "PROXY_SERVICE_URL is not set";
+                is_fetching_url = false;
+                return;
+            }
+            core::HttpResponse response = core::HttpClient::get().get(base + "/api/ts-status");
             if (response.status_code >= 200 && response.status_code < 300) {
                 try {
                     auto json = nlohmann::json::parse(response.body);
@@ -96,7 +103,13 @@ namespace minidfs::panel {
             is_polling_status = true;
             error_msg = "";
 
-            core::HttpResponse response = core::HttpClient::get().get(proxy_url);
+            std::string base = get_proxy_url();
+            if (base.empty()) {
+                error_msg = "PROXY_SERVICE_URL is not set";
+                is_polling_status = false;
+                return;
+            }
+            core::HttpResponse response = core::HttpClient::get().get(base + "/api/ts-status");
             if (response.status_code >= 200 && response.status_code < 300) {
                 try {
                     auto json = nlohmann::json::parse(response.body);
@@ -131,8 +144,13 @@ namespace minidfs::panel {
             headers["Content-Type"] = "application/json";
             
             // Register the device in the database
+            std::string base = get_proxy_url();
+            if (base.empty()) {
+                error_msg = "PROXY_SERVICE_URL is not set";
+                return;
+            }
             core::HttpResponse register_response = core::HttpClient::get().post(
-                "http://localhost:3000/api/devices",
+                base + "/api/devices",
                 json_body,
                 headers
             );

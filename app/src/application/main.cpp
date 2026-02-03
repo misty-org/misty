@@ -7,6 +7,7 @@
 
 #include "application.h"
 #include <memory>
+#include <curl/curl.h>
 
 std::unique_ptr<minidfs::Application> create_application() {
     #ifdef _WIN32
@@ -20,10 +21,12 @@ std::unique_ptr<minidfs::Application> create_application() {
 
 
 int main(int, char**) {
-    auto app = create_application();
+    curl_global_init(CURL_GLOBAL_DEFAULT);
 
+    auto app = create_application();
     app->run();
 
+    curl_global_cleanup();
     return 0;
 }
 

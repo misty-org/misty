@@ -34,7 +34,7 @@ namespace minidfs::panel {
 
         // Use workspace mount path if available, otherwise fall back to client mount path
         std::string start_path = workspace_state.get_current_mount_path();
-        if (start_path.empty()) {
+        if (start_path.empty() && client_) {
             start_path = client_->GetClientMountPath();
         }
 

@@ -6,6 +6,7 @@
 #include <filesystem>
 #include "core/ui_registry.h"
 #include "core/http_client.h"
+#include "core/env_manager.h"
 #include <nlohmann/json.hpp>
 
 namespace fs = std::filesystem;
@@ -115,7 +116,13 @@ namespace minidfs::panel {
             is_fetching = true;
             error_msg = "";
 
-            core::HttpResponse response = core::HttpClient::get().get("http://localhost:3000/api/workspaces");
+            std::string proxy_url = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
+            if (proxy_url.empty()) {
+                error_msg = "PROXY_SERVICE_URL is not set";
+                is_fetching = false;
+                return;
+            }
+            core::HttpResponse response = core::HttpClient::get().get(proxy_url + "/api/workspaces");
             if (response.status_code >= 200 && response.status_code < 300) {
                 try {
                     auto json = nlohmann::json::parse(response.body);

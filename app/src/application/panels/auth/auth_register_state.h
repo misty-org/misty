@@ -6,6 +6,7 @@
 #include "core/ui_registry.h"
 #include "views/app_view.h"
 #include "core/http_client.h"
+#include "core/env_manager.h"
 #include "core/util.h"
 
 namespace minidfs::panel {
@@ -70,8 +71,14 @@ namespace minidfs::panel {
             headers["Content-Type"] = "application/json";
             
             // Make HTTP POST request
+            std::string proxy_url = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
+            if (proxy_url.empty()) {
+                error_msg = "PROXY_SERVICE_URL is not set";
+                is_submitting = false;
+                return;
+            }
             auto response = core::HttpClient::get().post(
-                "http://localhost:3000/api/register",
+                proxy_url + "/api/register",
                 json_body,
                 headers
             );
