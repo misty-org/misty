@@ -5,9 +5,9 @@
 #include "auth_login_state.h"
 #include "core/svg_loader.h"
 
-using namespace minidfs::core;
+using namespace misty::core;
 
-namespace minidfs::panel {
+namespace misty::panel {
     class AuthLoginPanel : public panel::Panel {
     public:
         AuthLoginPanel(UIRegistry& registry);

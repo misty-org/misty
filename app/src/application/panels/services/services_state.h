@@ -5,10 +5,11 @@
 #include <set>
 #include <functional>
 #include "core/ui_registry.h"
+#include "core/worker_pool.h"
 
-namespace minidfs::panel {
+namespace misty::panel {
 
-    // Microsoft account profile information from Graph API
+    // Microsoft account profile information (returned by proxy)
     struct MSUserProfile {
         std::string display_name;
         std::string email;
@@ -17,17 +18,12 @@ namespace minidfs::panel {
         bool loaded = false;
     };
 
-    // Represents a single OneDrive connection
+    // Represents a single OneDrive connection (no tokens stored client-side)
     struct MSConnection {
-        std::string access_token;
         MSUserProfile profile;
-        bool fetching_profile = false;
         bool is_authenticated = false;
 
-        bool has_token() const { return !access_token.empty(); }
-
         // Comparison operator for std::set - use profile.id (ms_user_id) as primary key
-        // This allows us to keep expired connections in the set with their profile info
         bool operator<(const MSConnection& other) const {
             return profile.id < other.profile.id;
         }
@@ -47,14 +43,45 @@ namespace minidfs::panel {
                                                  const std::string& local_path,
                                                  const std::string& error)>;
 
-    // Snapshot of a single OneDrive connection for UI (panel uses this for rendering)
+    // Snapshot of a single OneDrive connection for UI rendering
     struct OneDriveCardState {
         bool profile_loaded = false;
-        bool fetching = false;
-        bool should_fetch = false;
         bool is_connected = false;
-        std::string current_token;
         MSUserProfile profile;
+    };
+
+    // Google Drive account profile information (returned by proxy)
+    struct GDUserProfile {
+        std::string display_name;
+        std::string email;
+        std::string id;
+        bool loaded = false;
+    };
+
+    // Represents a single Google Drive connection (no tokens stored client-side)
+    struct GDConnection {
+        GDUserProfile profile;
+        bool is_authenticated = false;
+
+        bool operator<(const GDConnection& other) const {
+            return profile.id < other.profile.id;
+        }
+    };
+
+    // Callback types for Google Drive API operations
+    using GDFilesCallback = std::function<void(bool success,
+                                                const std::string& response_body,
+                                                const std::string& error)>;
+
+    using GDDownloadCallback = std::function<void(bool success,
+                                                   const std::string& local_path,
+                                                   const std::string& error)>;
+
+    // Snapshot of a single Google Drive connection for UI rendering
+    struct GDriveCardState {
+        bool profile_loaded = false;
+        bool is_connected = false;
+        GDUserProfile profile;
     };
 
     class ServicesState : public core::UIState {
@@ -62,19 +89,18 @@ namespace minidfs::panel {
         ServicesState();
         ~ServicesState();
 
-        bool has_ms_tokens(); // Check if any connection has a token
-        void check_connections(); // Check once on startup for existing connections
-        bool get_onedrive_card_state(const std::string& ms_user_id, OneDriveCardState& out);
-        void fetch_token(); // Fetch token from proxy and add as new connection
-        void fetch_ms_user_profile(const std::string& token); // Fetch user profile for a specific connection
-        void mark_disconnected(const std::string& ms_user_id); // Mark a specific connection as disconnected
-        void initiate_ms_login();
-        void disconnect_onedrive(const std::string& ms_user_id); // Disconnect a specific OneDrive connection
-        std::string refresh_ms_token(const std::string& ms_user_id); // Attempt to refresh token, returns new access_token or empty on failure
-        std::string get_token_for_user(const std::string& ms_user_id); // Get current access token for a user (thread-safe)
-        bool is_account_folder_connected(const std::string& folder_name); // Check if account by folder name is connected
+        // Must be called before any async methods. Idempotent.
+        void init(core::WorkerPool& pool);
 
-        // OneDrive file operations
+        bool has_ms_connections();
+        void check_connections();
+        bool get_onedrive_card_state(const std::string& ms_user_id, OneDriveCardState& out);
+        void mark_disconnected(const std::string& ms_user_id);
+        void initiate_ms_login();
+        void disconnect_onedrive(const std::string& ms_user_id);
+        bool is_account_folder_connected(const std::string& folder_name);
+
+        // OneDrive file operations (proxy handles tokens internally)
         void fetch_drive(const std::string& ms_user_id, DriveCallback callback);
         void fetch_onedrive_files(const std::string& ms_user_id,
                                   const std::string& drive_id,
@@ -86,15 +112,41 @@ namespace minidfs::panel {
                           const std::string& local_path,
                           DownloadCallback callback);
 
-        // Helper functions to find connections
-        std::set<MSConnection>::iterator find_by_token(const std::string& token);
+        // Helper to find connections
         std::set<MSConnection>::iterator find_by_ms_user_id(const std::string& ms_user_id);
+
+        // Google Drive connection management
+        bool has_gd_connections();
+        void check_gd_connections();
+        bool get_gdrive_card_state(const std::string& gd_user_id, GDriveCardState& out);
+        void mark_gd_disconnected(const std::string& gd_user_id);
+        void initiate_gd_login();
+        void disconnect_gdrive(const std::string& gd_user_id);
+        bool is_gd_account_folder_connected(const std::string& folder_name);
+
+        // Google Drive file operations
+        void fetch_gdrive_files(const std::string& gd_user_id,
+                                const std::string& folder_id,
+                                GDFilesCallback callback);
+        void download_gd_file(const std::string& gd_user_id,
+                              const std::string& file_id,
+                              const std::string& local_path,
+                              GDDownloadCallback callback);
+
+        std::set<GDConnection>::iterator find_by_gd_user_id(const std::string& gd_user_id);
 
         std::mutex mu;
         std::string error_msg = "";
         std::string success_msg = "";
-        std::set<MSConnection> ms_connections; // Multiple OneDrive connections
+        std::set<MSConnection> ms_connections;
         bool show_ms_login_modal = false;
         std::string ms_auth_error;
+
+        std::set<GDConnection> gd_connections;
+        bool show_gd_login_modal = false;
+        std::string gd_auth_error;
+
+    private:
+        core::WorkerPool* worker_pool_ = nullptr;
     };
 }

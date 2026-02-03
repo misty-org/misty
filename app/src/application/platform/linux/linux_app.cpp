@@ -14,7 +14,7 @@
 #include <iostream>
 #include <stdexcept>
 
-namespace minidfs {
+namespace misty {
 
 void LinuxApp::init_platform() {
     init_glfw();
@@ -47,7 +47,7 @@ void LinuxApp::init_glfw() {
 }
 
 void LinuxApp::init_window() {
-    window_ = glfwCreateWindow(1280, 720, "MiniDFS Client", nullptr, nullptr);
+    window_ = glfwCreateWindow(1280, 720, "Misty Client", nullptr, nullptr);
     if (!window_)
         throw std::runtime_error("Failed to create GLFW window");
 
@@ -182,6 +182,6 @@ void LinuxApp::glfw_window_size_callback(GLFWwindow*, int, int) {
     // intentionally empty
 }
 
-} // namespace minidfs
+} // namespace misty
 
 #endif // __linux__

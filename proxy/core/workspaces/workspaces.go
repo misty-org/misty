@@ -20,7 +20,7 @@ func CreateWorkspace(db *sql.DB, name, mountPoint string) (*Workspace, error) {
 
 	_, err := db.Exec(`
 		INSERT INTO workspaces (workspace_id, workspace_name, mount_path)
-		VALUES (?, ?, ?)
+		VALUES ($1, $2, $3)
 	`, workspaceID, name, mountPoint)
 
 	if err != nil {
@@ -41,7 +41,7 @@ func GetWorkspace(db *sql.DB, workspaceID string) (*Workspace, error) {
 
 	err := db.QueryRow(`
 		SELECT workspace_id, mount_path, workspace_name
-		FROM workspaces WHERE workspace_id = ?
+		FROM workspaces WHERE workspace_id = $1
 	`, workspaceID).Scan(
 		&workspace.WorkspaceID,
 		&workspace.MountPath,
@@ -98,8 +98,8 @@ func GetAllWorkspaces(db *sql.DB) ([]*Workspace, error) {
 func UpdateWorkspace(db *sql.DB, workspaceID, name, mountPoint string) error {
 	_, err := db.Exec(`
 		UPDATE workspaces
-		SET workspace_name = ?, mount_path = ?
-		WHERE workspace_id = ?
+		SET workspace_name = $1, mount_path = $2
+		WHERE workspace_id = $3
 	`, name, mountPoint, workspaceID)
 
 	if err != nil {
@@ -112,7 +112,7 @@ func UpdateWorkspace(db *sql.DB, workspaceID, name, mountPoint string) error {
 
 // DeleteWorkspace removes a workspace
 func DeleteWorkspace(db *sql.DB, workspaceID string) error {
-	_, err := db.Exec(`DELETE FROM workspaces WHERE workspace_id = ?`, workspaceID)
+	_, err := db.Exec(`DELETE FROM workspaces WHERE workspace_id = $1`, workspaceID)
 	if err != nil {
 		log.Printf("Failed to delete workspace %s: %v", workspaceID, err)
 		return err

@@ -9,34 +9,25 @@ import (
 	"net/http"
 
 	"github.com/kannachi323/misty/proxy/core/ms"
+	"github.com/kannachi323/misty/proxy/db"
 )
 
-
-func GetFiles() http.HandlerFunc {
+func GetFiles(database *db.Database) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		userID := r.URL.Query().Get("user_id")
+		msUserID := r.URL.Query().Get("ms_user_id")
 		driveID := r.URL.Query().Get("drive_id")
 		folderID := r.URL.Query().Get("folder_id")
 
-		if driveID == "" {
-			http.Error(w, "drive_id is required", http.StatusBadRequest)
+		if userID == "" || msUserID == "" || driveID == "" {
+			http.Error(w, "user_id, ms_user_id, and drive_id are required", http.StatusBadRequest)
 			return
 		}
 
-	
 		url := fmt.Sprintf("%s/drives/%s/items/%s/children", ms.GetConfig().GraphBase, driveID, folderID)
-	
-
-		graphReq, err := http.NewRequest(http.MethodGet, url, nil)
+		graphRes, err := ms.ExecGraphRequest(database, userID, msUserID, http.MethodGet, url, nil)
 		if err != nil {
-			http.Error(w, "Failed to create request", http.StatusInternalServerError)
-			return
-		}
-
-		graphReq.Header.Set("Authorization", r.Header.Get("Authorization"))
-
-		graphRes, err := http.DefaultClient.Do(graphReq)
-		if err != nil {
-			http.Error(w, "Failed to make request to Microsoft Graph", http.StatusInternalServerError)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		defer graphRes.Body.Close()
@@ -46,7 +37,7 @@ func GetFiles() http.HandlerFunc {
 			return
 		}
 
-		var res DriveItemsResponse
+		var res ms.DriveItemsResponse
 		if err := json.NewDecoder(graphRes.Body).Decode(&res); err != nil {
 			http.Error(w, "Failed to decode response", http.StatusInternalServerError)
 			return
@@ -56,43 +47,35 @@ func GetFiles() http.HandlerFunc {
 	}
 }
 
-func GetFile() http.HandlerFunc {
+func GetFile(database *db.Database) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		userID := r.URL.Query().Get("user_id")
+		msUserID := r.URL.Query().Get("ms_user_id")
 		driveID := r.URL.Query().Get("drive_id")
 		fileID := r.URL.Query().Get("file_id")
 
-		if driveID == "" {
-			http.Error(w, "drive_id is required", http.StatusBadRequest)
+		if userID == "" || msUserID == "" || driveID == "" {
+			http.Error(w, "user_id, ms_user_id, and drive_id are required", http.StatusBadRequest)
 			return
 		}
-		
+
 		url := fmt.Sprintf("%s/drives/%s/items/%s", ms.GetConfig().GraphBase, driveID, fileID)
-		graphReq, err := http.NewRequest(http.MethodGet, url, nil)
+		graphRes, err := ms.ExecGraphRequest(database, userID, msUserID, http.MethodGet, url, nil)
 		if err != nil {
-			http.Error(w, "Failed to create request", http.StatusInternalServerError)
-			return
-		}
-		graphReq.Header.Set("Authorization", r.Header.Get("Authorization"))
-		graphRes, err := http.DefaultClient.Do(graphReq)
-		if err != nil {
-			http.Error(w, "Failed to make request to Microsoft Graph", http.StatusInternalServerError)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		defer graphRes.Body.Close()
+
 		if graphRes.StatusCode != http.StatusOK {
 			http.Error(w, fmt.Sprintf("Graph API error: %d", graphRes.StatusCode), graphRes.StatusCode)
 			return
 		}
-		var res DriveItem
+
+		var res ms.DriveItem
 		if err := json.NewDecoder(graphRes.Body).Decode(&res); err != nil {
 			http.Error(w, "Failed to decode response", http.StatusInternalServerError)
 			return
-		}
-
-		log.Println(res)
-
-		if res.DownloadURL != "" {
-			log.Println("Download URL: " + res.DownloadURL);
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -100,30 +83,40 @@ func GetFile() http.HandlerFunc {
 	}
 }
 
-// DownloadFile streams file content from OneDrive
-// GET /api/ms/file/download?drive_id=xxx&file_id=xxx
-func DownloadFile() http.HandlerFunc {
+// DownloadFile streams file content from OneDrive.
+func DownloadFile(database *db.Database) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		userID := r.URL.Query().Get("user_id")
+		msUserID := r.URL.Query().Get("ms_user_id")
 		driveID := r.URL.Query().Get("drive_id")
 		fileID := r.URL.Query().Get("file_id")
 
-		if driveID == "" || fileID == "" {
-			http.Error(w, "drive_id and file_id are required", http.StatusBadRequest)
+		if userID == "" || msUserID == "" || driveID == "" || fileID == "" {
+			http.Error(w, "user_id, ms_user_id, drive_id, and file_id are required", http.StatusBadRequest)
 			return
 		}
 
-		// Request the file content from Microsoft Graph
-		// This endpoint returns a 302 redirect to the download URL
-		url := fmt.Sprintf("%s/drives/%s/items/%s/content", ms.GetConfig().GraphBase, driveID, fileID)
+		// Look up the access token from the DB (with auto-refresh)
+		accessToken, err := ms.GetAccessToken(database, userID, msUserID)
+		if err != nil {
+			// Try refresh
+			newToken, refreshErr := ms.RefreshToken(database, userID, msUserID)
+			if refreshErr != nil {
+				http.Error(w, "token lookup failed: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+			accessToken = newToken
+		}
 
+		url := fmt.Sprintf("%s/drives/%s/items/%s/content", ms.GetConfig().GraphBase, driveID, fileID)
 		graphReq, err := http.NewRequest(http.MethodGet, url, nil)
 		if err != nil {
 			http.Error(w, "Failed to create request", http.StatusInternalServerError)
 			return
 		}
-		graphReq.Header.Set("Authorization", r.Header.Get("Authorization"))
+		graphReq.Header.Set("Authorization", "Bearer "+accessToken)
 
-		// Create a client that doesn't follow redirects so we can handle the 302
+		// Don't follow redirects so we can handle the 302
 		client := &http.Client{
 			CheckRedirect: func(req *http.Request, via []*http.Request) error {
 				return http.ErrUseLastResponse
@@ -137,7 +130,25 @@ func DownloadFile() http.HandlerFunc {
 		}
 		defer graphRes.Body.Close()
 
-		// Handle 302 redirect - get the download URL and stream from it
+		// Handle 401 — refresh and retry
+		if graphRes.StatusCode == http.StatusUnauthorized {
+			graphRes.Body.Close()
+			newToken, refreshErr := ms.RefreshToken(database, userID, msUserID)
+			if refreshErr != nil {
+				http.Error(w, "Token expired and refresh failed", http.StatusUnauthorized)
+				return
+			}
+			graphReq, _ = http.NewRequest(http.MethodGet, url, nil)
+			graphReq.Header.Set("Authorization", "Bearer "+newToken)
+			graphRes, err = client.Do(graphReq)
+			if err != nil {
+				http.Error(w, "Failed to make request after refresh", http.StatusInternalServerError)
+				return
+			}
+			defer graphRes.Body.Close()
+		}
+
+		// Handle 302 redirect — get the download URL and stream from it
 		if graphRes.StatusCode == http.StatusFound || graphRes.StatusCode == http.StatusTemporaryRedirect {
 			downloadURL := graphRes.Header.Get("Location")
 			if downloadURL == "" {
@@ -145,7 +156,6 @@ func DownloadFile() http.HandlerFunc {
 				return
 			}
 
-			// Fetch the actual file content
 			downloadReq, err := http.NewRequest(http.MethodGet, downloadURL, nil)
 			if err != nil {
 				http.Error(w, "Failed to create download request", http.StatusInternalServerError)
@@ -164,7 +174,6 @@ func DownloadFile() http.HandlerFunc {
 				return
 			}
 
-			// Copy headers for content type and length
 			if ct := downloadRes.Header.Get("Content-Type"); ct != "" {
 				w.Header().Set("Content-Type", ct)
 			}
@@ -172,7 +181,6 @@ func DownloadFile() http.HandlerFunc {
 				w.Header().Set("Content-Length", cl)
 			}
 
-			// Stream the file content to the client
 			_, err = io.Copy(w, downloadRes.Body)
 			if err != nil {
 				log.Printf("Error streaming file: %v", err)
@@ -180,13 +188,11 @@ func DownloadFile() http.HandlerFunc {
 			return
 		}
 
-		// If not a redirect, check for errors
 		if graphRes.StatusCode != http.StatusOK {
 			http.Error(w, fmt.Sprintf("Graph API error: %d", graphRes.StatusCode), graphRes.StatusCode)
 			return
 		}
 
-		// Direct content response (unlikely but handle it)
 		if ct := graphRes.Header.Get("Content-Type"); ct != "" {
 			w.Header().Set("Content-Type", ct)
 		}
@@ -196,13 +202,20 @@ func DownloadFile() http.HandlerFunc {
 		io.Copy(w, graphRes.Body)
 	}
 }
-	
-func GetUploadSession() http.HandlerFunc {
+
+func GetUploadSession(database *db.Database) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var req UploadRequest
+		userID := r.URL.Query().Get("user_id")
+		msUserID := r.URL.Query().Get("ms_user_id")
+		if userID == "" || msUserID == "" {
+			http.Error(w, "user_id and ms_user_id query params are required", http.StatusBadRequest)
+			return
+		}
+
+		var req ms.UploadRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "Failed to decode request body", http.StatusBadRequest)
-			return;
+			return
 		}
 
 		url := fmt.Sprintf("%s/drives/%s/items/%s:/%s:/createUploadSession",
@@ -214,30 +227,23 @@ func GetUploadSession() http.HandlerFunc {
 				"name": req.FileName,
 			},
 		})
-		graphReq, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(payload))
-		if err != nil {
-			http.Error(w, "Failed to create request", http.StatusInternalServerError)
-			return;
-		}
-		graphReq.Header.Set("Authorization", r.Header.Get("Authorization"))
-		graphReq.Header.Set("Content-Type", "application/json")
 
-		graphRes, err := http.DefaultClient.Do(graphReq)
+		graphRes, err := ms.ExecGraphRequest(database, userID, msUserID, http.MethodPost, url, bytes.NewBuffer(payload))
 		if err != nil {
-			http.Error(w, "Failed to make request to Microsoft Graph", http.StatusInternalServerError)
-			return;
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
 		defer graphRes.Body.Close()
 
 		if graphRes.StatusCode != http.StatusOK {
-			http.Error(w, "Failed to create upload session", http.StatusInternalServerError)
-			return;
+			http.Error(w, "Failed to create upload session", graphRes.StatusCode)
+			return
 		}
 
-		var session UploadSession
+		var session ms.UploadSession
 		if err := json.NewDecoder(graphRes.Body).Decode(&session); err != nil {
 			http.Error(w, "Failed to decode response", http.StatusInternalServerError)
-			return;
+			return
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(session)

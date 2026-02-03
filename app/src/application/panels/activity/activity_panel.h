@@ -6,7 +6,7 @@
 #include "upload_state.h"
 #include "panels/notification/notification_state.h"
 
-namespace minidfs::panel {
+namespace misty::panel {
 
     enum class ActivityCategory {
         NOTIFICATIONS,

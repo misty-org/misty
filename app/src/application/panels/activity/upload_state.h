@@ -7,7 +7,7 @@
 #include <atomic>
 #include "core/ui_registry.h"
 
-namespace minidfs::panel {
+namespace misty::panel {
 
     enum class UploadStatus {
         PENDING,

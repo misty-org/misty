@@ -3,12 +3,15 @@
 #include <mutex>
 #include <cstring>
 #include <map>
+#include <nlohmann/json.hpp>
 #include "core/ui_registry.h"
 #include "views/app_view.h"
 #include "core/http_client.h"
+#include "core/env_manager.h"
+#include "core/session_manager.h"
 #include "core/util.h"
 
-namespace minidfs::panel {
+namespace misty::panel {
 
     struct AuthLoginState : public core::UIState {
         std::mutex mu;
@@ -55,8 +58,14 @@ namespace minidfs::panel {
             headers["Content-Type"] = "application/json";
             
             // Make HTTP POST request
+            std::string proxy_url = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
+            if (proxy_url.empty()) {
+                error_msg = "PROXY_SERVICE_URL is not set";
+                is_submitting = false;
+                return;
+            }
             auto response = core::HttpClient::get().post(
-                "http://localhost:3000/api/login",
+                proxy_url + "/api/login",
                 json_body,
                 headers
             );
@@ -65,6 +74,15 @@ namespace minidfs::panel {
             
             // Handle response
             if (response.status_code == 200 || response.status_code == 201) {
+                // Parse token from response and store it
+                try {
+                    auto json_resp = nlohmann::json::parse(response.body);
+                    if (json_resp.contains("token")) {
+                        core::SessionManager::get().set_token(json_resp["token"].get<std::string>());
+                    }
+                } catch (...) {
+                    // Token storage failed, but login succeeded
+                }
                 success_msg = "Login successful!";
                 clear_inputs();
                 // Switch view after successful login

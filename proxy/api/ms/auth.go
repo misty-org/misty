@@ -1,7 +1,6 @@
 package ms
 
 import (
-	"crypto/rand"
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
@@ -14,32 +13,11 @@ import (
 	"strings"
 
 	"github.com/kannachi323/misty/proxy/core/ms"
+	"github.com/kannachi323/misty/proxy/core/utils"
 	"github.com/kannachi323/misty/proxy/db"
 )
 
-const (
-	csrfCookieName = "ms_oauth_csrf"
-	csrfTokenBytes = 32
-)
 
-type OAuthLoginResponse struct {
-	AuthURL string `json:"auth_url"`
-}
-
-// generateCSRFToken creates a cryptographically secure random token
-func generateCSRFToken() (string, error) {
-	b := make([]byte, csrfTokenBytes)
-	if _, err := rand.Read(b); err != nil {
-		return "", err
-	}
-	return base64.URLEncoding.EncodeToString(b), nil
-}
-
-// OAuthState holds the data encoded in the OAuth state parameter
-type OAuthState struct {
-	UserID    string `json:"u"`
-	CSRFToken string `json:"c"`
-}
 
 func GetOAuthLogin() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -55,21 +33,15 @@ func GetOAuthLogin() http.HandlerFunc {
 			return
 		}
 
-		// Check if client wants redirect (browser) or JSON response (API)
-		// Default to redirect for browser-based OAuth flow
-		responseMode := r.URL.Query().Get("response")
-
-		// Generate CSRF token
-		csrfToken, err := generateCSRFToken()
+		csrfToken, err := utils.GenerateCSRFToken()
 		if err != nil {
 			log.Printf("Failed to generate CSRF token: %v", err)
 			http.Error(w, "Failed to initiate OAuth", http.StatusInternalServerError)
 			return
 		}
 
-		// Set CSRF token in HTTP-only cookie
 		http.SetCookie(w, &http.Cookie{
-			Name:     csrfCookieName,
+			Name:     utils.CSRFCookieName,
 			Value:    csrfToken,
 			Path:     "/api/ms/callback",
 			MaxAge:   600, // 10 minutes
@@ -78,8 +50,7 @@ func GetOAuthLogin() http.HandlerFunc {
 			SameSite: http.SameSiteLaxMode,
 		})
 
-		// Encode user_id and CSRF token in state parameter
-		state := OAuthState{UserID: userID, CSRFToken: csrfToken}
+		state := ms.OAuthState{UserID: userID, CSRFToken: csrfToken}
 		stateJSON, _ := json.Marshal(state)
 		stateEncoded := base64.URLEncoding.EncodeToString(stateJSON)
 
@@ -88,23 +59,12 @@ func GetOAuthLogin() http.HandlerFunc {
 			"redirect_uri":  {config.RedirectURI},
 			"response_type": {"code"},
 			"scope":         {config.GetScopesString()},
-			"prompt":        {"consent"},
+			"prompt":        {"login"},
 			"state":         {stateEncoded},
 		}
 
 		authURL := fmt.Sprintf("https://login.microsoftonline.com/common/oauth2/v2.0/authorize?%s", params.Encode())
-		fmt.Println(authURL)
-
-		// If response=json, return JSON (for API clients that handle cookies themselves)
-		// Otherwise, redirect directly to Microsoft (for browser-based flow)
-		if responseMode == "json" {
-			response := OAuthLoginResponse{AuthURL: authURL}
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(response)
-			return
-		}
-
-		// Default: redirect to Microsoft auth URL (browser gets the cookie)
+		
 		http.Redirect(w, r, authURL, http.StatusFound)
 	}
 }
@@ -116,7 +76,7 @@ func OAuthCallback(database *db.Database) http.HandlerFunc {
 		stateParam := r.URL.Query().Get("state")
 
 		// Decode state parameter to get user_id and CSRF token
-		var state OAuthState
+		var state ms.OAuthState
 		if stateParam != "" {
 			decoded, err := base64.URLEncoding.DecodeString(stateParam)
 			if err == nil {
@@ -131,7 +91,7 @@ func OAuthCallback(database *db.Database) http.HandlerFunc {
 		}
 
 		// Validate CSRF token from cookie
-		csrfCookie, err := r.Cookie(csrfCookieName)
+		csrfCookie, err := r.Cookie(utils.CSRFCookieName)
 		if err != nil || csrfCookie.Value == "" {
 			log.Printf("CSRF cookie missing or empty")
 			ServeMSAuthHTML(w, false)
@@ -147,7 +107,7 @@ func OAuthCallback(database *db.Database) http.HandlerFunc {
 
 		// Clear the CSRF cookie
 		http.SetCookie(w, &http.Cookie{
-			Name:     csrfCookieName,
+			Name:     utils.CSRFCookieName,
 			Value:    "",
 			Path:     "/api/ms/callback",
 			MaxAge:   -1,
@@ -196,7 +156,7 @@ func OAuthCallback(database *db.Database) http.HandlerFunc {
 			return
 		}
 
-		err = database.StoreMSToken(userID, profile.ID, accessToken, refreshToken, profile.DisplayName, profile.Email())
+		err = database.StoreMSUser(userID, profile.ID, accessToken, refreshToken, profile.DisplayName, profile.Email())
 		if err != nil {
 			log.Printf("Failed to store MS token: %v", err)
 			ServeMSAuthHTML(w, false)

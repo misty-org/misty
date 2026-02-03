@@ -4,9 +4,9 @@
 #include "core/ui_registry.h"
 #include "services_state.h"
 
-using namespace minidfs::core;
+using namespace misty::core;
 
-namespace minidfs::panel {
+namespace misty::panel {
     class ServicesPanel : public Panel {
     public:
         ServicesPanel(UIRegistry& registry);
@@ -16,6 +16,12 @@ namespace minidfs::panel {
     private:
         void show_header();
         void show_cloud_section(ServicesState& state);
+        void show_tab_bar();
+        void show_onedrive_tab(ServicesState& state);
+        void show_gdrive_tab(ServicesState& state);
+        void show_add_account_card(const char* label, bool& show_modal);
+        void try_same_line_or_wrap(int cards_drawn);
+
         void show_ms_login_modal(ServicesState& state);
         void show_onedrive_profile_card(ServicesState& state, const std::string& ms_user_id);
 
@@ -24,7 +30,17 @@ namespace minidfs::panel {
         void show_onedrive_card_profile(const OneDriveCardState& card, const std::string& ms_user_id);
         void show_onedrive_card_actions(ServicesState& state, const std::string& ms_user_id, bool is_connected);
 
+        // Google Drive card UI
+        void show_gd_login_modal(ServicesState& state);
+        void show_gdrive_profile_card(ServicesState& state, const std::string& gd_user_id);
+        void show_gdrive_card_header(bool is_connected);
+        void show_gdrive_card_profile(const GDriveCardState& card, const std::string& gd_user_id);
+        void show_gdrive_card_actions(ServicesState& state, const std::string& gd_user_id, bool is_connected);
+
     private:
+        static constexpr float kCardWidth = 300.0f;
+        static constexpr float kCardSpacing = 12.0f;
         UIRegistry& registry_;
+        int active_tab_ = 0; // 0 = OneDrive, 1 = Google Drive
     };
 }

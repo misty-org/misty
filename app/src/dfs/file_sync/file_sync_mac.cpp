@@ -5,8 +5,8 @@
 #include <string>
 
 
-namespace minidfs {
-    FileSyncMac::FileSyncMac(std::shared_ptr<MiniDFSClient> client)
+namespace misty {
+    FileSyncMac::FileSyncMac(std::shared_ptr<MistyClient> client)
         : FileSync(std::move(client)), stream_(nullptr) {
     }
 
@@ -42,7 +42,7 @@ namespace minidfs {
             NULL, &FileSyncMac::file_sync_callback, &context, pathsToWatch,
             kFSEventStreamEventIdSinceNow, 2, kFSEventStreamCreateFlagFileEvents
         );
-        dispatch_queue_t dq = dispatch_queue_create("com.minidfs.watcher", DISPATCH_QUEUE_SERIAL);
+        dispatch_queue_t dq = dispatch_queue_create("com.misty.watcher", DISPATCH_QUEUE_SERIAL);
         FSEventStreamSetDispatchQueue(stream_, dq);
         CFRelease(pathsToWatch);
         CFRelease(cfPath);

@@ -5,7 +5,6 @@
 **/.vs/
 **.log
 *.tmp
-*.json
 **/src/proto_src/
 **/config/
 **/bin/

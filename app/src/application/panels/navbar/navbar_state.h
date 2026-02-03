@@ -3,9 +3,9 @@
 #include "core/ui_registry.h"
 #include "views/app_view.h"
 
-using namespace minidfs::core;
+using namespace misty::core;
 
-namespace minidfs::panel {
+namespace misty::panel {
     struct NavbarState : public UIState {
         view::ViewID selected_item = view::ViewID::FileExplorer;
 

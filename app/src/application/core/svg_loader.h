@@ -2,7 +2,7 @@
 #include <string>
 #include <imgui.h>
 
-namespace minidfs::core {
+namespace misty::core {
     struct SVGTexture {
         ImTextureID id;
         int width, height;

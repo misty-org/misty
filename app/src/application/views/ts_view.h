@@ -6,10 +6,10 @@
 #include "panels/setup/ts_panel.h"
 #include "core/ui_registry.h"
 
-using namespace minidfs::core;
-using namespace minidfs::panel;
+using namespace misty::core;
+using namespace misty::panel;
 
-namespace minidfs::view {
+namespace misty::view {
     class TSView : public AppView {
     public:
         TSView(UIRegistry& ui_registry);
