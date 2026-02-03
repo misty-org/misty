@@ -1,7 +1,9 @@
 #include "panels/home/file_sidebar_panel.h"
 #include "file_explorer_state.h"
 #include "workspace_state.h"
+#include "onedrive_state.h"
 #include "panels/services/services_state.h"
+#include "panels/activity/upload_state.h"
 #include "panels/panel_ui.h"
 #include "core/asset_manager.h"
 #include "core/file_picker.h"
@@ -57,6 +59,7 @@ namespace minidfs::panel {
             show_chooser_modal(state);
             show_create_entry_modal(state);
             show_uploader_modal(state);
+            show_upload_progress_modal(state);
         }
 
         ImGui::End();
@@ -151,48 +154,45 @@ namespace minidfs::panel {
 
         ImGui::BeginGroup();
 
-        // Check if we have cloud services (assume connected if we have token)
-        // Note: has_ms_tokens() already acquires the mutex internally
-        bool has_cloud_services = services_state.has_ms_tokens();
+        // Always show the Services section - users can view local cached files even without connection
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.7f, 0.7f, 0.7f, 1.0f));
+        ImGui::Text("Services");
+        ImGui::PopStyleColor();
 
-        if (has_cloud_services) {
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.7f, 0.7f, 0.7f, 1.0f));
-            ImGui::Text("Services");
-            ImGui::PopStyleColor();
+        float max_height = 200.0f;
+        float item_height = 28.0f;
+        float actual_height = std::min(max_height, item_height + 8.0f);
 
-            float max_height = 200.0f;
-            float item_height = 28.0f;
-            float actual_height = std::min(max_height, item_height + 8.0f);
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.18f, 0.18f, 0.18f, 1.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 6.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f, 8.0f));
 
-            ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.18f, 0.18f, 0.18f, 1.0f));
-            ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 6.0f);
-            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f, 8.0f));
+        if (ImGui::BeginChild("##services_list", ImVec2(content_width, actual_height), true)) {
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.22f, 0.22f, 0.22f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.32f, 0.32f, 0.32f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.18f, 0.18f, 0.18f, 1.0f));
 
-            if (ImGui::BeginChild("##services_list", ImVec2(content_width, actual_height), true)) {
-                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.22f, 0.22f, 0.22f, 1.0f));
-                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.32f, 0.32f, 0.32f, 1.0f));
-                ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.18f, 0.18f, 0.18f, 1.0f));
+            // Show cloud services (OneDrive)
+            // Use different indicator based on connection status
+            bool has_connection = services_state.has_ms_tokens();
+            std::string onedrive_label = has_connection ? "● OneDrive" : "○ OneDrive";
+            float button_width = ImGui::GetContentRegionAvail().x;
+            if (ImGui::Button(onedrive_label.c_str(), ImVec2(button_width, 24))) {
+                auto& file_explorer_state = registry_.get_state<FileExplorerState>("FileExplorer");
 
-                // Show cloud services (OneDrive)
-                std::string onedrive_label = "● OneDrive";
-                float button_width = ImGui::GetContentRegionAvail().x;
-                if (ImGui::Button(onedrive_label.c_str(), ImVec2(button_width, 24))) {
-                    auto& file_explorer_state = registry_.get_state<FileExplorerState>("FileExplorer");
-
-                    // Set pending navigation - panel will handle the actual navigation
-                    file_explorer_state.pending_navigation_path = mount_utils::get_onedrive_root();
-                }
-
-                ImGui::PopStyleColor(3);
+                // Set pending navigation - panel will handle the actual navigation
+                file_explorer_state.pending_navigation_path = mount_utils::get_onedrive_root();
             }
-            ImGui::EndChild();
 
-            ImGui::PopStyleVar(2);
-            ImGui::PopStyleColor();
+            ImGui::PopStyleColor(3);
         }
+        ImGui::EndChild();
+
+        ImGui::PopStyleVar(2);
+        ImGui::PopStyleColor();
 
         ImGui::EndGroup();
-        
+
         ImGui::Spacing();
     }
 
@@ -371,6 +371,13 @@ namespace minidfs::panel {
             return;
         }
 
+        auto& onedrive_state = registry_.get_state<OneDriveState>("OneDrive");
+        if (!onedrive_state.has_upload_context()) {
+            state.show_uploader_modal = false;
+            state.status_message = "Navigate to a OneDrive folder first.";
+            return;
+        }
+
         // Open file picker (this blocks until user selects files or cancels)
         core::FilePickerOptions options;
         options.title = "Select Files to Upload";
@@ -379,7 +386,166 @@ namespace minidfs::panel {
         state.show_uploader_modal = false;
 
         if (result.has_selection()) {
-            //TODO: upload files to OneDrive
+            // Queue files for upload
+            {
+                std::lock_guard<std::mutex> lock(state.upload_mutex);
+                state.upload_queue.clear();
+                state.current_upload_index = 0;
+                state.cancel_upload.store(false);
+
+                for (const auto& path : result.paths) {
+                    FileUploadProgress progress;
+                    progress.file_path = path;
+                    progress.file_name = fs::path(path).filename().string();
+
+                    std::error_code ec;
+                    progress.file_size = fs::file_size(path, ec);
+                    if (ec) progress.file_size = 0;
+
+                    progress.bytes_uploaded = 0;
+                    progress.is_complete = false;
+                    progress.has_error = false;
+
+                    state.upload_queue.push_back(progress);
+                }
+            }
+
+            if (!state.upload_queue.empty()) {
+                state.is_uploading = true;
+                start_next_upload(state, services_state, onedrive_state);
+            }
+        }
+    }
+
+    void FileSidebarPanel::start_next_upload(FileSidebarState& state, ServicesState& services_state, OneDriveState& onedrive_state) {
+        size_t index;
+        std::string file_path;
+        std::string file_name;
+        int64_t file_size = 0;
+
+        {
+            std::lock_guard<std::mutex> lock(state.upload_mutex);
+            if (state.current_upload_index >= state.upload_queue.size()) {
+                state.is_uploading = false;
+                return;
+            }
+            index = state.current_upload_index;
+            file_path = state.upload_queue[index].file_path;
+            file_name = state.upload_queue[index].file_name;
+            file_size = static_cast<int64_t>(state.upload_queue[index].file_size);
+        }
+
+        // Register this upload in UploadState for activity tracking
+        auto& upload_state = registry_.get_state<UploadState>("Uploads");
+        uint64_t upload_id = upload_state.start_upload(file_name, file_path, "OneDrive", file_size);
+
+        // Progress callback - updates both the sidebar UI state and the activity UploadState
+        auto progress_cb = [&state, &upload_state, index, upload_id](size_t bytes_uploaded, size_t total_bytes) -> bool {
+            {
+                std::lock_guard<std::mutex> lock(state.upload_mutex);
+                if (index < state.upload_queue.size()) {
+                    state.upload_queue[index].bytes_uploaded = bytes_uploaded;
+                }
+            }
+            upload_state.update_progress(upload_id, static_cast<int64_t>(bytes_uploaded));
+            return !state.cancel_upload.load();
+        };
+
+        // Completion callback
+        auto completion_cb = [this, &state, &services_state, &onedrive_state, &upload_state, index, upload_id](bool success, const std::string& error_msg) {
+            {
+                std::lock_guard<std::mutex> lock(state.upload_mutex);
+                if (index < state.upload_queue.size()) {
+                    state.upload_queue[index].is_complete = true;
+                    state.upload_queue[index].has_error = !success;
+                    state.upload_queue[index].error_message = error_msg;
+                }
+                state.current_upload_index++;
+            }
+
+            // Update activity UploadState
+            if (success) {
+                upload_state.complete_upload(upload_id);
+            } else {
+                upload_state.fail_upload(upload_id, error_msg);
+            }
+
+            // Start next upload or finish
+            if (!state.cancel_upload.load()) {
+                start_next_upload(state, services_state, onedrive_state);
+            } else {
+                state.is_uploading = false;
+            }
+        };
+
+        onedrive_state.upload_file(services_state, file_path, progress_cb, completion_cb);
+    }
+
+    void FileSidebarPanel::show_upload_progress_modal(FileSidebarState& state) {
+        if (!state.is_uploading && state.upload_queue.empty()) return;
+
+        ImGuiViewport* vp = ImGui::GetMainViewport();
+        ImGui::SetNextWindowPos(
+            ImVec2(vp->WorkPos.x + vp->WorkSize.x - 340, vp->WorkPos.y + vp->WorkSize.y - 200),
+            ImGuiCond_Appearing);
+        ImGui::SetNextWindowSize(ImVec2(320, 180), ImGuiCond_Appearing);
+
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 8.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16, 16));
+
+        ImGuiWindowFlags flags = ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse;
+
+        bool show = true;
+        if (ImGui::Begin("Upload Progress", &show, flags)) {
+            std::lock_guard<std::mutex> lock(state.upload_mutex);
+
+            size_t total = state.upload_queue.size();
+            size_t completed = 0;
+            for (const auto& item : state.upload_queue) {
+                if (item.is_complete) completed++;
+            }
+
+            ImGui::Text("Uploading %zu of %zu files", completed + (state.is_uploading ? 1 : 0), total);
+            ImGui::Separator();
+
+            // Show current upload progress
+            if (state.current_upload_index < state.upload_queue.size()) {
+                const auto& current = state.upload_queue[state.current_upload_index];
+                ImGui::Text("%s", current.file_name.c_str());
+
+                float progress = current.file_size > 0
+                    ? static_cast<float>(current.bytes_uploaded) / static_cast<float>(current.file_size)
+                    : 0.0f;
+                ImGui::ProgressBar(progress, ImVec2(-1, 0));
+
+                if (current.has_error) {
+                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.3f, 0.3f, 1.0f));
+                    ImGui::TextWrapped("Error: %s", current.error_message.c_str());
+                    ImGui::PopStyleColor();
+                }
+            }
+
+            ImGui::Spacing();
+
+            // Cancel button
+            if (state.is_uploading) {
+                if (ImGui::Button("Cancel", ImVec2(-1, 0))) {
+                    state.cancel_upload.store(true);
+                }
+            } else {
+                if (ImGui::Button("Close", ImVec2(-1, 0))) {
+                    state.upload_queue.clear();
+                }
+            }
+        }
+        ImGui::End();
+
+        ImGui::PopStyleVar(2);
+
+        if (!show) {
+            state.cancel_upload.store(true);
+            state.upload_queue.clear();
+            state.is_uploading = false;
         }
     }
 }

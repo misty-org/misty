@@ -17,7 +17,7 @@ func main() {
 	proxy.MountHandlers()
 	proxy.TSBase.StartTSConnection()
 
-	if err := http.ListenAndServe("127.0.0.1:3000", proxy.Router); err != nil {
+	if err := http.ListenAndServe(":3000", proxy.Router); err != nil {
     	panic(err)
 	}
 

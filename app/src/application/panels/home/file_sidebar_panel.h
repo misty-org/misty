@@ -6,9 +6,8 @@
 #include "core/worker_pool.h"
 
 #include "file_sidebar_state.h"
-#include "file_explorer_state.h"
-#include "onedrive_state.h"
 #include "workspace_state.h"
+#include "onedrive_state.h"
 #include "panels/services/services_state.h"
 
 
@@ -27,6 +26,7 @@ namespace minidfs::panel {
         void show_create_entry_modal(FileSidebarState& state);
         void show_uploader_modal(FileSidebarState& state);
         void show_upload_progress_modal(FileSidebarState& state);
+        void start_next_upload(FileSidebarState& state, ServicesState& services_state, OneDriveState& onedrive_state);
         void show_quick_access(float width, float padding);
         void show_storage_info(float width, float padding);
         

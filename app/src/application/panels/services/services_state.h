@@ -71,6 +71,8 @@ namespace minidfs::panel {
         void initiate_ms_login();
         void disconnect_onedrive(const std::string& ms_user_id); // Disconnect a specific OneDrive connection
         std::string refresh_ms_token(const std::string& ms_user_id); // Attempt to refresh token, returns new access_token or empty on failure
+        std::string get_token_for_user(const std::string& ms_user_id); // Get current access token for a user (thread-safe)
+        bool is_account_folder_connected(const std::string& folder_name); // Check if account by folder name is connected
 
         // OneDrive file operations
         void fetch_drive(const std::string& ms_user_id, DriveCallback callback);

@@ -3,6 +3,7 @@ package ms
 import (
 	"log"
 	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/joho/godotenv"
@@ -10,7 +11,7 @@ import (
 
 type MSConfig struct {
 	ClientID     string
-	ClientSecret string
+	TenantID     string
 	RedirectURI  string
 	Authority    string
 	Scopes       []string
@@ -25,21 +26,29 @@ var (
 
 func GetConfig() *MSConfig {
 	configOnce.Do(func() {
-		if err := godotenv.Load(); err != nil {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			log.Println("Could not determine user home directory:", err)
+			return
+		}
+		envPath := filepath.Join(home, "misty", "misty.env")
+		if err := godotenv.Load(envPath); err != nil {
 			log.Println("No .env file found, relying on system environment variables")
 		}
 
 		config = &MSConfig{
 			ClientID:     os.Getenv("MS_CLIENT_ID"),
-			ClientSecret: os.Getenv("MS_CLIENT_SECRET"),
 			RedirectURI:  os.Getenv("MS_REDIRECT_URI"),
+			TenantID:     os.Getenv("MS_TENANT_ID"),
 			Authority:    "https://login.microsoftonline.com/common",
 			Scopes: []string{
 				"https://graph.microsoft.com/User.Read",
 				"https://graph.microsoft.com/Files.ReadWrite.All",
 				"offline_access",
+				"openid",
 			},
 			GraphBase: "https://graph.microsoft.com/v1.0",
+
 		}
 	})
 	return config

@@ -123,6 +123,10 @@ namespace minidfs::core {
         // Follow redirects
         curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
 
+        // Set timeouts to prevent blocking forever
+        curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 10L);  // 10 seconds to connect
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);          // 30 seconds total
+
         // Disable SSL verification for localhost (needed for self-signed certificates)
         if (url.find("localhost") != std::string::npos || url.find("127.0.0.1") != std::string::npos) {
             curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);

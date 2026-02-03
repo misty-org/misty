@@ -12,7 +12,7 @@ namespace minidfs {
         try {
             init_platform();
             init_client();
-            init_file_sync();
+            //init_file_sync();
             init_views();
 
             
@@ -43,19 +43,6 @@ namespace minidfs {
         if (mount_path.empty() || channel_address.empty()) {
             throw std::runtime_error("Mount path is empty or invalid in configuration file.");
         }
-        std::cout << channel_address << std::endl;
-
-        auto channel = grpc::CreateChannel(channel_address, grpc::InsecureChannelCredentials());
-        auto deadline = std::chrono::system_clock::now() + std::chrono::seconds(5);
-        if (channel->WaitForConnected(deadline)) {
-            std::cout << "gRPC Connection Successful!" << std::endl;
-        }
-        else {
-            // This doesn't throw, it just returns false if time runs out
-            std::cerr << "gRPC Connection Timeout: Is the server running?" << std::endl;
-        }
-        client_ = std::make_shared<MiniDFSClient>(channel, 
-            fs::path(mount_path).string(), "c47f5011-5c7c-4955-9f90-eed53c09d445");
     }
 
     void Application::init_file_sync() {
@@ -76,9 +63,6 @@ namespace minidfs {
     }
 
     void Application::init_views() {
-        if (!client_) {
-            throw std::runtime_error("Client not initialized before initializing views.");
-        }
 
         view::register_view(view::ViewID::FileExplorer,
             std::make_unique<view::MainView>(ui_registry_, worker_pool_, client_));

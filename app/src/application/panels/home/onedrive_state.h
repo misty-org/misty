@@ -3,13 +3,23 @@
 #include <string>
 #include <vector>
 #include <mutex>
+#include <atomic>
 #include <unordered_set>
 #include <fstream>
 #include <filesystem>
+#include <functional>
 #include <nlohmann/json.hpp>
 #include "core/ui_registry.h"
+#include "core/http_client.h"
+
+namespace minidfs {
+    namespace panel { class ServicesState; }
+}
 
 namespace minidfs::panel {
+
+    // Upload result callback: (success, error_message)
+    using UploadCallback = std::function<void(bool success, const std::string& error_msg)>;
 
     inline std::string get_onedrive_cache_dir() {
         const char* home = std::getenv("HOME");
@@ -181,5 +191,31 @@ namespace minidfs::panel {
             selected_items.clear();
             error_msg.clear();
         }
+
+        // Check if we have valid OneDrive context for uploads
+        bool has_upload_context() const {
+            return !current_drive_id.empty() && !current_folder_id.empty() && !current_ms_user_id.empty();
+        }
+
+        // Get current upload context (thread-safe copy)
+        struct UploadContext {
+            std::string drive_id;
+            std::string folder_id;
+            std::string ms_user_id;
+        };
+
+        UploadContext get_upload_context() {
+            std::lock_guard<std::mutex> lock(mu);
+            return {current_drive_id, current_folder_id, current_ms_user_id};
+        }
+
+        // Upload a file to the current OneDrive folder
+        // Runs asynchronously in a background thread
+        void upload_file(
+            ServicesState& services,
+            const std::string& local_path,
+            core::UploadProgressCallback progress_cb,
+            UploadCallback callback
+        );
     };
 }

@@ -2,6 +2,7 @@
 #include "imgui.h"
 #include <sstream>
 #include <iomanip>
+#include <algorithm>
 
 namespace minidfs::panel {
 
@@ -21,11 +22,26 @@ namespace minidfs::panel {
         if (ImGui::Begin("Activity", nullptr, flags)) {
             render_header();
             ImGui::Spacing();
-            render_filter_tabs();
+            render_category_tabs();
             ImGui::Spacing();
             ImGui::Separator();
             ImGui::Spacing();
-            render_download_list();
+
+            switch (current_category_) {
+                case ActivityCategory::NOTIFICATIONS:
+                    render_notification_list();
+                    break;
+                case ActivityCategory::DOWNLOADS:
+                    render_download_filter_tabs();
+                    ImGui::Spacing();
+                    render_download_list();
+                    break;
+                case ActivityCategory::UPLOADS:
+                    render_upload_filter_tabs();
+                    ImGui::Spacing();
+                    render_upload_list();
+                    break;
+            }
         }
         ImGui::End();
 
@@ -35,32 +51,159 @@ namespace minidfs::panel {
 
     void ActivityPanel::render_header() {
         auto& download_state = registry_.get_state<DownloadState>("Downloads");
+        auto& upload_state = registry_.get_state<UploadState>("Uploads");
 
-        ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[0]);  // Use default font, larger if available
+        ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[0]);
         ImGui::Text("Activity");
         ImGui::PopFont();
 
         ImGui::SameLine();
 
-        size_t active = download_state.active_count();
-        if (active > 0) {
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.7f, 1.0f, 1.0f));
-            ImGui::Text("(%zu active)", active);
-            ImGui::PopStyleColor();
-        }
+        size_t active_downloads = download_state.active_count();
+        size_t active_uploads = upload_state.active_count();
+        size_t total_active = active_downloads + active_uploads;
 
-        // Clear completed button
-        ImGui::SameLine(ImGui::GetWindowWidth() - 140);
-        if (ImGui::Button("Clear Completed")) {
-            download_state.clear_completed();
+        if (total_active > 0) {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.7f, 1.0f, 1.0f));
+            ImGui::Text("(%zu active)", total_active);
+            ImGui::PopStyleColor();
         }
     }
 
-    void ActivityPanel::render_filter_tabs() {
+    void ActivityPanel::render_category_tabs() {
+        auto& notification_state = registry_.get_state<NotificationState>("Notifications");
+        auto& download_state = registry_.get_state<DownloadState>("Downloads");
+        auto& upload_state = registry_.get_state<UploadState>("Uploads");
+
+        size_t notif_count = notification_state.history_count();
+        size_t download_count = download_state.total_count();
+        size_t upload_count = upload_state.total_count();
+
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(14.0f, 8.0f));
+
+        auto render_category = [this](const char* label, size_t count, ActivityCategory category) {
+            bool is_selected = (current_category_ == category);
+
+            if (is_selected) {
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
+            } else {
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.15f, 0.15f, 0.15f, 1.0f));
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.6f, 0.6f, 0.6f, 1.0f));
+            }
+
+            std::string btn_label = std::string(label) + " (" + std::to_string(count) + ")";
+            if (ImGui::Button(btn_label.c_str())) {
+                current_category_ = category;
+            }
+            ImGui::PopStyleColor(2);
+            ImGui::SameLine();
+        };
+
+        render_category("Notifications", notif_count, ActivityCategory::NOTIFICATIONS);
+        render_category("Downloads", download_count, ActivityCategory::DOWNLOADS);
+        render_category("Uploads", upload_count, ActivityCategory::UPLOADS);
+
+        ImGui::PopStyleVar(2);
+        ImGui::NewLine();
+    }
+
+    // =========================================================================
+    // Notifications
+    // =========================================================================
+
+    void ActivityPanel::render_notification_list() {
+        auto& notification_state = registry_.get_state<NotificationState>("Notifications");
+        auto history = notification_state.get_history();
+
+        if (history.empty()) {
+            render_notification_empty();
+            return;
+        }
+
+        // Clear history button
+        ImGui::SameLine(ImGui::GetWindowWidth() - 140);
+        if (ImGui::Button("Clear History")) {
+            notification_state.clear_history();
+            return;
+        }
+
+        ImGui::BeginChild("NotificationList", ImVec2(0, 0), false);
+
+        // Show newest first
+        for (int i = static_cast<int>(history.size()) - 1; i >= 0; --i) {
+            render_notification_item(history[i]);
+            ImGui::Spacing();
+        }
+
+        ImGui::EndChild();
+    }
+
+    void ActivityPanel::render_notification_item(const Notification& notif) {
+        ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 8.0f);
+
+        // Background color based on notification type
+        ImVec4 bg_color = get_notification_type_color(notif.type);
+        // Darken for the card background
+        bg_color.x *= 0.5f;
+        bg_color.y *= 0.5f;
+        bg_color.z *= 0.5f;
+        bg_color.w = 1.0f;
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, bg_color);
+
+        std::string child_id = "notif_" + std::to_string(notif.id);
+        if (ImGui::BeginChild(child_id.c_str(), ImVec2(0, 60), true)) {
+            // Type badge and title
+            const char* type_label = get_notification_type_label(notif.type);
+            ImVec4 type_color = get_notification_type_color(notif.type);
+
+            ImGui::PushStyleColor(ImGuiCol_Text, type_color);
+            ImGui::Text("[%s]", type_label);
+            ImGui::PopStyleColor();
+
+            ImGui::SameLine();
+            ImGui::Text("%s", notif.title.c_str());
+
+            // Time ago
+            ImGui::SameLine(ImGui::GetWindowWidth() - 100);
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+            ImGui::Text("%s", format_time_ago(notif.created_at).c_str());
+            ImGui::PopStyleColor();
+
+            // Message
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.7f, 0.7f, 0.7f, 1.0f));
+            ImGui::TextWrapped("%s", notif.message.c_str());
+            ImGui::PopStyleColor();
+        }
+        ImGui::EndChild();
+
+        ImGui::PopStyleColor();
+        ImGui::PopStyleVar();
+    }
+
+    void ActivityPanel::render_notification_empty() {
+        ImVec2 available = ImGui::GetContentRegionAvail();
+        ImVec2 text_size = ImGui::CalcTextSize("No notifications");
+
+        ImGui::SetCursorPos(ImVec2(
+            (available.x - text_size.x) * 0.5f,
+            available.y * 0.4f
+        ));
+
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+        ImGui::Text("No notifications");
+        ImGui::PopStyleColor();
+    }
+
+    // =========================================================================
+    // Downloads
+    // =========================================================================
+
+    void ActivityPanel::render_download_filter_tabs() {
         auto& download_state = registry_.get_state<DownloadState>("Downloads");
         auto all_downloads = download_state.get_all_downloads();
 
-        // Count items for each filter
         size_t all_count = all_downloads.size();
         size_t active_count = 0;
         size_t completed_count = 0;
@@ -85,26 +228,31 @@ namespace minidfs::panel {
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(12.0f, 6.0f));
 
         auto render_tab = [this](const char* label, size_t count, ActivityFilter filter) {
-            bool is_selected = (current_filter_ == filter);
+            bool is_selected = (download_filter_ == filter);
 
             if (is_selected) {
-                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.25f, 0.25f, 0.25f, 1.0f));
             } else {
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.15f, 0.15f, 0.15f, 1.0f));
             }
 
             std::string btn_label = std::string(label) + " (" + std::to_string(count) + ")";
             if (ImGui::Button(btn_label.c_str())) {
-                current_filter_ = filter;
+                download_filter_ = filter;
             }
             ImGui::PopStyleColor();
             ImGui::SameLine();
         };
 
-        render_tab("All", all_count, ActivityFilter::ALL);
-        render_tab("Active", active_count, ActivityFilter::ACTIVE);
-        render_tab("Completed", completed_count, ActivityFilter::COMPLETED);
-        render_tab("Failed", failed_count, ActivityFilter::FAILED);
+        render_tab("All##dl", all_count, ActivityFilter::ALL);
+        render_tab("Active##dl", active_count, ActivityFilter::ACTIVE);
+        render_tab("Completed##dl", completed_count, ActivityFilter::COMPLETED);
+        render_tab("Failed##dl", failed_count, ActivityFilter::FAILED);
+
+        ImGui::SameLine(ImGui::GetWindowWidth() - 160);
+        if (ImGui::Button("Clear Completed##dl")) {
+            download_state.clear_completed();
+        }
 
         ImGui::PopStyleVar(2);
         ImGui::NewLine();
@@ -114,11 +262,10 @@ namespace minidfs::panel {
         auto& download_state = registry_.get_state<DownloadState>("Downloads");
         auto downloads = download_state.get_all_downloads();
 
-        // Filter based on current selection
         std::vector<DownloadItem> filtered;
         for (const auto& item : downloads) {
             bool include = false;
-            switch (current_filter_) {
+            switch (download_filter_) {
                 case ActivityFilter::ALL:
                     include = true;
                     break;
@@ -138,11 +285,10 @@ namespace minidfs::panel {
         }
 
         if (filtered.empty()) {
-            render_empty_state();
+            render_download_empty();
             return;
         }
 
-        // Render in scrollable area
         ImGui::BeginChild("DownloadList", ImVec2(0, 0), false);
 
         for (const auto& item : filtered) {
@@ -154,14 +300,11 @@ namespace minidfs::panel {
     }
 
     void ActivityPanel::render_download_item(const DownloadItem& item) {
-        auto& download_state = registry_.get_state<DownloadState>("Downloads");
-
         ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 8.0f);
         ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.18f, 0.18f, 0.18f, 1.0f));
 
         std::string child_id = "download_" + std::to_string(item.id);
         if (ImGui::BeginChild(child_id.c_str(), ImVec2(0, 80), true)) {
-            // Status indicator color
             ImVec4 status_color;
             const char* status_text;
             switch (item.status) {
@@ -183,10 +326,8 @@ namespace minidfs::panel {
                     break;
             }
 
-            // File name
             ImGui::Text("%s", item.file_name.c_str());
 
-            // Source and status
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.6f, 0.6f, 0.6f, 1.0f));
             ImGui::Text("%s", item.source.c_str());
             ImGui::PopStyleColor();
@@ -196,13 +337,11 @@ namespace minidfs::panel {
             ImGui::Text("  %s", status_text);
             ImGui::PopStyleColor();
 
-            // Progress bar for active downloads
             if (item.is_active() && item.file_size > 0) {
                 float progress = item.get_progress();
                 ImGui::ProgressBar(progress, ImVec2(-1, 4));
             }
 
-            // Size info
             if (item.file_size > 0) {
                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
                 if (item.is_active()) {
@@ -214,7 +353,6 @@ namespace minidfs::panel {
                 ImGui::PopStyleColor();
             }
 
-            // Time info for completed items
             if (!item.is_active()) {
                 ImGui::SameLine(ImGui::GetWindowWidth() - 120);
                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
@@ -222,7 +360,6 @@ namespace minidfs::panel {
                 ImGui::PopStyleColor();
             }
 
-            // Error message for failed items
             if (item.status == DownloadStatus::FAILED && !item.error_message.empty()) {
                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.9f, 0.5f, 0.5f, 1.0f));
                 ImGui::TextWrapped("%s", item.error_message.c_str());
@@ -235,7 +372,7 @@ namespace minidfs::panel {
         ImGui::PopStyleVar();
     }
 
-    void ActivityPanel::render_empty_state() {
+    void ActivityPanel::render_download_empty() {
         ImVec2 available = ImGui::GetContentRegionAvail();
         ImVec2 text_size = ImGui::CalcTextSize("No downloads");
 
@@ -247,6 +384,228 @@ namespace minidfs::panel {
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
         ImGui::Text("No downloads");
         ImGui::PopStyleColor();
+    }
+
+    // =========================================================================
+    // Uploads
+    // =========================================================================
+
+    void ActivityPanel::render_upload_filter_tabs() {
+        auto& upload_state = registry_.get_state<UploadState>("Uploads");
+        auto all_uploads = upload_state.get_all_uploads();
+
+        size_t all_count = all_uploads.size();
+        size_t active_count = 0;
+        size_t completed_count = 0;
+        size_t failed_count = 0;
+
+        for (const auto& item : all_uploads) {
+            switch (item.status) {
+                case UploadStatus::PENDING:
+                case UploadStatus::UPLOADING:
+                    active_count++;
+                    break;
+                case UploadStatus::COMPLETED:
+                    completed_count++;
+                    break;
+                case UploadStatus::FAILED:
+                    failed_count++;
+                    break;
+            }
+        }
+
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(12.0f, 6.0f));
+
+        auto render_tab = [this](const char* label, size_t count, ActivityFilter filter) {
+            bool is_selected = (upload_filter_ == filter);
+
+            if (is_selected) {
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.25f, 0.25f, 0.25f, 1.0f));
+            } else {
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.15f, 0.15f, 0.15f, 1.0f));
+            }
+
+            std::string btn_label = std::string(label) + " (" + std::to_string(count) + ")";
+            if (ImGui::Button(btn_label.c_str())) {
+                upload_filter_ = filter;
+            }
+            ImGui::PopStyleColor();
+            ImGui::SameLine();
+        };
+
+        render_tab("All##ul", all_count, ActivityFilter::ALL);
+        render_tab("Active##ul", active_count, ActivityFilter::ACTIVE);
+        render_tab("Completed##ul", completed_count, ActivityFilter::COMPLETED);
+        render_tab("Failed##ul", failed_count, ActivityFilter::FAILED);
+
+        ImGui::SameLine(ImGui::GetWindowWidth() - 160);
+        if (ImGui::Button("Clear Completed##ul")) {
+            upload_state.clear_completed();
+        }
+
+        ImGui::PopStyleVar(2);
+        ImGui::NewLine();
+    }
+
+    void ActivityPanel::render_upload_list() {
+        auto& upload_state = registry_.get_state<UploadState>("Uploads");
+        auto uploads = upload_state.get_all_uploads();
+
+        std::vector<UploadItem> filtered;
+        for (const auto& item : uploads) {
+            bool include = false;
+            switch (upload_filter_) {
+                case ActivityFilter::ALL:
+                    include = true;
+                    break;
+                case ActivityFilter::ACTIVE:
+                    include = item.is_active();
+                    break;
+                case ActivityFilter::COMPLETED:
+                    include = (item.status == UploadStatus::COMPLETED);
+                    break;
+                case ActivityFilter::FAILED:
+                    include = (item.status == UploadStatus::FAILED);
+                    break;
+            }
+            if (include) {
+                filtered.push_back(item);
+            }
+        }
+
+        if (filtered.empty()) {
+            render_upload_empty();
+            return;
+        }
+
+        ImGui::BeginChild("UploadList", ImVec2(0, 0), false);
+
+        for (const auto& item : filtered) {
+            render_upload_item(item);
+            ImGui::Spacing();
+        }
+
+        ImGui::EndChild();
+    }
+
+    void ActivityPanel::render_upload_item(const UploadItem& item) {
+        ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 8.0f);
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.18f, 0.18f, 0.18f, 1.0f));
+
+        std::string child_id = "upload_" + std::to_string(item.id);
+        if (ImGui::BeginChild(child_id.c_str(), ImVec2(0, 80), true)) {
+            ImVec4 status_color;
+            const char* status_text;
+            switch (item.status) {
+                case UploadStatus::UPLOADING:
+                    status_color = ImVec4(0.4f, 0.8f, 0.6f, 1.0f);
+                    status_text = "Uploading...";
+                    break;
+                case UploadStatus::PENDING:
+                    status_color = ImVec4(0.7f, 0.7f, 0.4f, 1.0f);
+                    status_text = "Pending";
+                    break;
+                case UploadStatus::COMPLETED:
+                    status_color = ImVec4(0.4f, 0.8f, 0.4f, 1.0f);
+                    status_text = "Completed";
+                    break;
+                case UploadStatus::FAILED:
+                    status_color = ImVec4(0.9f, 0.4f, 0.4f, 1.0f);
+                    status_text = "Failed";
+                    break;
+            }
+
+            ImGui::Text("%s", item.file_name.c_str());
+
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.6f, 0.6f, 0.6f, 1.0f));
+            ImGui::Text("%s", item.destination.c_str());
+            ImGui::PopStyleColor();
+
+            ImGui::SameLine();
+            ImGui::PushStyleColor(ImGuiCol_Text, status_color);
+            ImGui::Text("  %s", status_text);
+            ImGui::PopStyleColor();
+
+            if (item.is_active() && item.file_size > 0) {
+                float progress = item.get_progress();
+                ImGui::ProgressBar(progress, ImVec2(-1, 4));
+            }
+
+            if (item.file_size > 0) {
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+                if (item.is_active()) {
+                    ImGui::Text("%s / %s", format_file_size(item.uploaded_bytes).c_str(),
+                               format_file_size(item.file_size).c_str());
+                } else {
+                    ImGui::Text("%s", format_file_size(item.file_size).c_str());
+                }
+                ImGui::PopStyleColor();
+            }
+
+            if (!item.is_active()) {
+                ImGui::SameLine(ImGui::GetWindowWidth() - 120);
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+                ImGui::Text("%s", format_time_ago(item.completed_at).c_str());
+                ImGui::PopStyleColor();
+            }
+
+            if (item.status == UploadStatus::FAILED && !item.error_message.empty()) {
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.9f, 0.5f, 0.5f, 1.0f));
+                ImGui::TextWrapped("%s", item.error_message.c_str());
+                ImGui::PopStyleColor();
+            }
+        }
+        ImGui::EndChild();
+
+        ImGui::PopStyleColor();
+        ImGui::PopStyleVar();
+    }
+
+    void ActivityPanel::render_upload_empty() {
+        ImVec2 available = ImGui::GetContentRegionAvail();
+        ImVec2 text_size = ImGui::CalcTextSize("No uploads");
+
+        ImGui::SetCursorPos(ImVec2(
+            (available.x - text_size.x) * 0.5f,
+            available.y * 0.4f
+        ));
+
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+        ImGui::Text("No uploads");
+        ImGui::PopStyleColor();
+    }
+
+    // =========================================================================
+    // Helpers
+    // =========================================================================
+
+    ImVec4 ActivityPanel::get_notification_type_color(NotificationType type) {
+        switch (type) {
+            case NotificationType::SUCCESS:
+                return ImVec4(0.4f, 0.8f, 0.4f, 1.0f);
+            case NotificationType::ERROR:
+                return ImVec4(0.9f, 0.4f, 0.4f, 1.0f);
+            case NotificationType::DOWNLOAD:
+                return ImVec4(0.4f, 0.7f, 1.0f, 1.0f);
+            case NotificationType::INFO:
+            default:
+                return ImVec4(0.7f, 0.7f, 0.7f, 1.0f);
+        }
+    }
+
+    const char* ActivityPanel::get_notification_type_label(NotificationType type) {
+        switch (type) {
+            case NotificationType::SUCCESS:
+                return "OK";
+            case NotificationType::ERROR:
+                return "ERR";
+            case NotificationType::DOWNLOAD:
+                return "DL";
+            case NotificationType::INFO:
+            default:
+                return "INFO";
+        }
     }
 
     std::string ActivityPanel::format_file_size(int64_t bytes) {
