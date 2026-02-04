@@ -2,11 +2,14 @@
 
 #include <string>
 #include <vector>
+#include <memory>
 #include <mutex>
+#include <atomic>
 #include <filesystem>
 #include "core/ui_registry.h"
 #include "core/http_client.h"
 #include "core/env_manager.h"
+#include "core/worker_pool.h"
 #include <nlohmann/json.hpp>
 
 namespace fs = std::filesystem;
@@ -73,8 +76,8 @@ namespace minidfs::panel {
         std::vector<WorkspaceInfo> workspaces;
 
         int selected_workspace_index = 0;
-        bool is_fetching = false;
-        bool has_fetched = false;
+        std::atomic<bool> is_fetching = false;
+        std::atomic<bool> has_fetched = false;
         std::string error_msg = "";
 
         // Cloud account mappings (managed by workspace, used by file explorer)
@@ -108,52 +111,79 @@ namespace minidfs::panel {
             return ws ? ws->workspace_id : "";
         }
 
-        void fetch_workspaces() {
-            if (is_fetching) {
-                return;
-            }
-
-            is_fetching = true;
-            error_msg = "";
-
-            std::string proxy_url = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
-            if (proxy_url.empty()) {
-                error_msg = "PROXY_SERVICE_URL is not set";
-                is_fetching = false;
-                return;
-            }
-            core::HttpResponse response = core::HttpClient::get().get(proxy_url + "/api/workspaces");
-            if (response.status_code >= 200 && response.status_code < 300) {
-                try {
-                    auto json = nlohmann::json::parse(response.body);
-
-                    std::vector<WorkspaceInfo> new_workspaces;
-
-                    if (json.is_array()) {
-                        for (const auto& ws_json : json) {
-                            WorkspaceInfo ws;
-                            ws.workspace_id = ws_json.value("workspace_id", "");
-                            ws.workspace_name = ws_json.value("workspace_name", "");
-                            ws.mount_path = ws_json.value("mount_path", "");
-                            new_workspaces.push_back(ws);
-                        }
-                    }
-
-                    {
-                        std::lock_guard<std::mutex> lock(mu);
-                        workspaces = std::move(new_workspaces);
-                    }
-
-                    has_fetched = true;
-
-                } catch (const std::exception& ex) {
-                    error_msg = std::string("Failed to parse workspaces JSON: ") + ex.what();
+        void fetch_workspaces_async(core::WorkerPool& worker_pool) {
+            {
+                std::lock_guard<std::mutex> lock(mu);
+                if (is_fetching) {
+                    return;
                 }
-            } else {
-                error_msg = "Failed to fetch workspaces (" + std::to_string(response.status_code) + ")";
+                is_fetching = true;
+                error_msg = "";
             }
 
-            is_fetching = false;
+            struct FetchResult {
+                bool success = false;
+                std::vector<WorkspaceInfo> workspaces;
+                std::string error_msg;
+            };
+
+            auto result = std::make_shared<FetchResult>();
+
+            worker_pool.add(
+                [this, result]() {
+                    std::string proxy_url = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
+                    if (proxy_url.empty()) {
+                        result->error_msg = "PROXY_SERVICE_URL is not set";
+                        return;
+                    }
+
+                    core::HttpResponse response = core::HttpClient::get().get(proxy_url + "/api/workspaces");
+                    if (response.status_code >= 200 && response.status_code < 300) {
+                        try {
+                            auto json = nlohmann::json::parse(response.body);
+                            if (!json.is_array()) {
+                                result->error_msg = "Invalid workspaces response (expected array)";
+                                return;
+                            }
+
+                            std::vector<WorkspaceInfo> new_workspaces;
+                            for (const auto& ws_json : json) {
+                                WorkspaceInfo ws;
+                                ws.workspace_id = ws_json.value("workspace_id", "");
+                                ws.workspace_name = ws_json.value("workspace_name", "");
+                                ws.mount_path = ws_json.value("mount_path", "");
+                                new_workspaces.push_back(ws);
+                            }
+
+                            result->success = true;
+                            result->workspaces = std::move(new_workspaces);
+                        } catch (const std::exception& ex) {
+                            result->error_msg = std::string("Failed to parse workspaces JSON: ") + ex.what();
+                        }
+                    } else {
+                        result->error_msg = "Failed to fetch workspaces (" + std::to_string(response.status_code) + ")";
+                    }
+                },
+                [this, result]() {
+                    std::lock_guard<std::mutex> lock(mu);
+                    if (result->success) {
+                        workspaces = std::move(result->workspaces);
+                        if (selected_workspace_index >= static_cast<int>(workspaces.size())) {
+                            selected_workspace_index = static_cast<int>(workspaces.empty() ? 0 : workspaces.size() - 1);
+                        }
+                        has_fetched = true;
+                        error_msg.clear();
+                    } else if (!result->error_msg.empty()) {
+                        error_msg = result->error_msg;
+                    }
+                    is_fetching = false;
+                },
+                [this](const std::string& err) {
+                    std::lock_guard<std::mutex> lock(mu);
+                    error_msg = err;
+                    is_fetching = false;
+                }
+            );
         }
 
         // Select workspace by index and return whether it changed

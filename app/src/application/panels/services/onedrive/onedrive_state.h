@@ -12,10 +12,6 @@
 #include "core/ui_registry.h"
 #include "core/http_client.h"
 
-namespace minidfs {
-    namespace panel { class ServicesState; }
-}
-
 namespace minidfs::panel {
 
     // Upload result callback: (success, error_message)
@@ -212,7 +208,6 @@ namespace minidfs::panel {
         // Upload a file to the current OneDrive folder
         // Runs asynchronously in a background thread
         void upload_file(
-            ServicesState& services,
             const std::string& local_path,
             core::UploadProgressCallback progress_cb,
             UploadCallback callback

@@ -3,7 +3,6 @@
 #include "util.h"
 
 namespace minidfs::core {
-
     EnvManager& EnvManager::get() {
         static EnvManager instance;
         if (!instance.loaded_) {

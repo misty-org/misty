@@ -1,11 +1,9 @@
-#include "file_explorer_panel.h"
-#include "workspace_state.h"
-#include "onedrive_state.h"
+#include "panels/file_explorer/file_explorer_panel.h"
+#include "panels/workspace/workspace_state.h"
+#include "panels/services/onedrive/onedrive_state.h"
 #include "panels/services/services_state.h"
 #include "panels/activity/download_state.h"
 #include "panels/notification/notification_state.h"
-#include "core/util.h"
-#include "imgui.h"
 #include <nlohmann/json.hpp>
 
 
@@ -29,7 +27,7 @@ namespace minidfs::panel {
 
         // Fetch workspaces if not already done
         if (!workspace_state.has_fetched) {
-            workspace_state.fetch_workspaces();
+            workspace_state.fetch_workspaces_async(worker_pool_);
         }
 
         // Use workspace mount path if available, otherwise fall back to client mount path
@@ -37,6 +35,7 @@ namespace minidfs::panel {
         if (start_path.empty() && client_) {
             start_path = client_->GetClientMountPath();
         }
+        initial_start_path_ = start_path;
 
         // Create directory if it doesn't exist
         if (!start_path.empty()) {
@@ -50,6 +49,24 @@ namespace minidfs::panel {
 
     void FileExplorerPanel::render() {
         auto& state = registry_.get_state<FileExplorerState>("FileExplorer");
+        auto& workspace_state = registry_.get_state<WorkspaceState>("Workspace");
+
+        if (!workspace_mount_applied_) {
+            if (workspace_state.has_fetched && !workspace_state.is_fetching) {
+                std::string workspace_path = workspace_state.get_current_mount_path();
+                if (!workspace_path.empty()) {
+                    std::string current_path = state.current_path;
+                    bool no_history = state.back_history.empty() && state.forward_history.empty();
+                    bool is_at_initial = current_path.empty() || current_path == initial_start_path_;
+                    if (no_history && is_at_initial && state.pending_navigation_path.empty()) {
+                        state.pending_navigation_path = workspace_path;
+                    }
+                    workspace_mount_applied_ = true;
+                } else {
+                    workspace_mount_applied_ = true;
+                }
+            }
+        }
 
         // Check for pending navigation from external code (e.g., sidebar)
         if (!state.pending_navigation_path.empty()) {
@@ -133,7 +150,7 @@ namespace minidfs::panel {
 
         workspace.account_mappings.clear();
         for (const auto& conn : services.ms_connections) {
-            if (!conn.is_authenticated || conn.access_token.empty()) continue;
+            if (!conn.is_authenticated) continue;
 
             AccountMapping mapping;
             mapping.ms_user_id = conn.profile.id;

@@ -1,5 +1,15 @@
 package ms
 
+type OAuthLoginResponse struct {
+	AuthURL string `json:"auth_url"`
+}
+
+type OAuthState struct {
+	UserID    string `json:"u"`
+	CSRFToken string `json:"c"`
+}
+
+
 type DriveResponse struct {
 	ODataContext string `json:"@odata.context,omitempty"`
 	Drive

@@ -6,8 +6,8 @@
 #include "core/worker_pool.h"
 
 #include "file_sidebar_state.h"
-#include "workspace_state.h"
-#include "onedrive_state.h"
+#include "panels/workspace/workspace_state.h"
+#include "panels/services/onedrive/onedrive_state.h"
 #include "panels/services/services_state.h"
 
 

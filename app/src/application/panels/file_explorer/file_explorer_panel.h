@@ -5,10 +5,8 @@
 #include "core/ui_registry.h"
 #include "panels/panel.h"
 #include "core/worker_pool.h"
-#include "file_explorer_state.h"
-#include "onedrive_state.h"
-#include "workspace_state.h"
-#include "panels/services/services_state.h"
+#include "panels/file_explorer/file_explorer_state.h"
+#include "panels/workspace/workspace_state.h"
 
 
 namespace minidfs::panel {
@@ -56,6 +54,9 @@ namespace minidfs::panel {
         core::UIRegistry& registry_;
         core::WorkerPool& worker_pool_;
         std::shared_ptr<MiniDFSClient> client_;
+
+        std::string initial_start_path_;
+        bool workspace_mount_applied_ = false;
 
     };
 };

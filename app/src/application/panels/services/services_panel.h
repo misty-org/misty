@@ -24,6 +24,13 @@ namespace minidfs::panel {
         void show_onedrive_card_profile(const OneDriveCardState& card, const std::string& ms_user_id);
         void show_onedrive_card_actions(ServicesState& state, const std::string& ms_user_id, bool is_connected);
 
+        // Google Drive card UI
+        void show_gd_login_modal(ServicesState& state);
+        void show_gdrive_profile_card(ServicesState& state, const std::string& gd_user_id);
+        void show_gdrive_card_header(bool is_connected);
+        void show_gdrive_card_profile(const GDriveCardState& card, const std::string& gd_user_id);
+        void show_gdrive_card_actions(ServicesState& state, const std::string& gd_user_id, bool is_connected);
+
     private:
         UIRegistry& registry_;
     };

@@ -8,7 +8,7 @@
 #include <filesystem>
 #include <cstring>
 #include "core/ui_registry.h"
-#include "workspace_state.h"  // For AccountMapping and mount_utils
+#include "panels/workspace/workspace_state.h"  // For AccountMapping and mount_utils
 
 namespace fs = std::filesystem;
 

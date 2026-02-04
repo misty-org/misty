@@ -1,7 +1,8 @@
-#include "panels/home/file_sidebar_panel.h"
-#include "file_explorer_state.h"
-#include "workspace_state.h"
-#include "onedrive_state.h"
+#include "panels/file_sidebar/file_sidebar_panel.h"
+#include "panels/file_sidebar/file_sidebar_state.h"
+#include "panels/workspace/workspace_state.h"
+#include "panels/file_explorer/file_explorer_state.h"
+#include "panels/services/onedrive/onedrive_state.h"
 #include "panels/services/services_state.h"
 #include "panels/activity/upload_state.h"
 #include "panels/panel_ui.h"
@@ -23,7 +24,7 @@ namespace minidfs::panel {
         auto& services_state = registry_.get_state<ServicesState>("Services");
 
         if (!workspace_state.has_fetched && !workspace_state.is_fetching) {
-            workspace_state.fetch_workspaces();
+            workspace_state.fetch_workspaces_async(worker_pool_);
         }
 
 
@@ -174,7 +175,7 @@ namespace minidfs::panel {
 
             // Show cloud services (OneDrive)
             // Use different indicator based on connection status
-            bool has_connection = services_state.has_ms_tokens();
+            bool has_connection = services_state.has_ms_connections();
             std::string onedrive_label = has_connection ? "● OneDrive" : "○ OneDrive";
             float button_width = ImGui::GetContentRegionAvail().x;
             if (ImGui::Button(onedrive_label.c_str(), ImVec2(button_width, 24))) {
@@ -365,7 +366,7 @@ namespace minidfs::panel {
         if (!state.show_uploader_modal) return;
 
         auto& services_state = registry_.get_state<ServicesState>("Services");
-        if (!services_state.has_ms_tokens()) {
+        if (!services_state.has_ms_connections()) {
             state.show_uploader_modal = false;
             state.status_message = "Sign in to OneDrive via Services first.";
             return;
@@ -478,7 +479,7 @@ namespace minidfs::panel {
             }
         };
 
-        onedrive_state.upload_file(services_state, file_path, progress_cb, completion_cb);
+        onedrive_state.upload_file(file_path, progress_cb, completion_cb);
     }
 
     void FileSidebarPanel::show_upload_progress_modal(FileSidebarState& state) {

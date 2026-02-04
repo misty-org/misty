@@ -8,6 +8,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
 	"github.com/kannachi323/misty/proxy/api"
+	"github.com/kannachi323/misty/proxy/api/gd"
 	"github.com/kannachi323/misty/proxy/api/ms"
 	"github.com/kannachi323/misty/proxy/core/tsbase"
 	"github.com/kannachi323/misty/proxy/db"
@@ -82,14 +83,23 @@ func (proxy *Proxy) MountHandlers() {
 	// Microsoft OAuth endpoints
 	proxy.APIRouter.Get("/ms/auth", ms.GetOAuthLogin())
 	proxy.APIRouter.Get("/ms/callback", ms.OAuthCallback(proxy.Database))
-	proxy.APIRouter.Get("/ms/token", ms.GetMSTokens(proxy.Database))
-	proxy.APIRouter.Get("/ms/token/refresh", ms.RefreshMSToken(proxy.Database))
-	proxy.APIRouter.Delete("/ms/token", ms.DeleteMSToken(proxy.Database))
+	proxy.APIRouter.Get("/ms/users", ms.GetMSUsers(proxy.Database))
+	proxy.APIRouter.Delete("/ms/users", ms.DeleteMSToken(proxy.Database))
+	proxy.APIRouter.Post("/ms/file/upload", ms.GetUploadSession(proxy.Database))
+	proxy.APIRouter.Get("/ms/drive", ms.GetDrive(proxy.Database))
+	proxy.APIRouter.Get("/ms/drive/root", ms.GetDriveRoot(proxy.Database))
+	proxy.APIRouter.Get("/ms/files", ms.GetFiles(proxy.Database))
+	proxy.APIRouter.Get("/ms/file", ms.GetFile(proxy.Database))
+	proxy.APIRouter.Get("/ms/file/download", ms.DownloadFile(proxy.Database))
 
-	proxy.APIRouter.Post("/ms/file/upload", ms.GetUploadSession())
-	proxy.APIRouter.Get("/ms/drive", ms.GetDrive())
-	proxy.APIRouter.Get("/ms/drive/root", ms.GetDriveRoot())
-	proxy.APIRouter.Get("/ms/files", ms.GetFiles())
-	proxy.APIRouter.Get("/ms/file", ms.GetFile())
-	proxy.APIRouter.Get("/ms/file/download", ms.DownloadFile())
+	proxy.APIRouter.Get("/gd/auth", gd.GetOAuthLogin())
+	proxy.APIRouter.Get("/gd/callback", gd.OAuthCallback(proxy.Database))
+	proxy.APIRouter.Get("/gd/users", gd.GetGDUsers(proxy.Database))
+	proxy.APIRouter.Delete("/gd/users", gd.DeleteGDToken(proxy.Database))
+	proxy.APIRouter.Get("/gd/drive", gd.GetAbout(proxy.Database))
+	proxy.APIRouter.Get("/gd/drive/root", gd.GetDriveRoot(proxy.Database))
+	proxy.APIRouter.Get("/gd/files", gd.GetFiles(proxy.Database))
+	proxy.APIRouter.Get("/gd/file", gd.GetFile(proxy.Database))
+	proxy.APIRouter.Get("/gd/file/download", gd.DownloadFile(proxy.Database))
+	proxy.APIRouter.Post("/gd/file/upload", gd.GetUploadSession(proxy.Database))
 }
