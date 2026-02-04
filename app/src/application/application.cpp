@@ -3,11 +3,13 @@
 #include "views/main_view.h"
 #include "views/register_view.h"
 #include "views/login_view.h"
+#include "views/onboarding_view.h"
 #include "views/services_view.h"
 #include "views/activity_view.h"
 #include "views/settings_view.h"
 #include "views/edit_profile_view.h"
 #include "panels/file_explorer/file_explorer_state.h"
+#include "panels/onboarding/onboarding_state.h"
 
 
 
@@ -77,15 +79,19 @@ namespace misty {
             std::make_unique<view::MainView>(ui_registry_, worker_pool_, client_));
         view::register_view(view::ViewID::Auth, std::make_unique<view::RegisterView>(ui_registry_));
         view::register_view(view::ViewID::Login, std::make_unique<view::LoginView>(ui_registry_));
+        view::register_view(view::ViewID::Onboarding,
+            std::make_unique<view::OnboardingView>(ui_registry_, worker_pool_));
         view::register_view(view::ViewID::Services, std::make_unique<view::ServicesView>(ui_registry_));
         view::register_view(view::ViewID::Activity, std::make_unique<view::ActivityView>(ui_registry_));
         view::register_view(view::ViewID::Settings, std::make_unique<view::SettingsView>(ui_registry_));
         view::register_view(view::ViewID::EditProfile, std::make_unique<view::EditProfileView>(ui_registry_));
-        // If user has a stored token, go to main app; otherwise show login
+
         if (core::SessionManager::get().is_authenticated()) {
             view::switch_view(view::ViewID::Files);
-        } else {
+        } else if (panel::OnboardingState::is_complete()) {
             view::switch_view(view::ViewID::Login);
+        } else {
+            view::switch_view(view::ViewID::Onboarding);
         }
     }
 };
