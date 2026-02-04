@@ -88,6 +88,7 @@ type UserLoginResponse struct {
 	Email        string `json:"email"`
 	Token        string `json:"token"`
 	RefreshToken string `json:"refresh_token"`
+	LicenseToken string `json:"license_token"`
 }
 
 func LoginUser(db *db.Database, lm *license.Manager) http.HandlerFunc {
@@ -168,11 +169,12 @@ func LoginUser(db *db.Database, lm *license.Manager) http.HandlerFunc {
 			return
 		}
 
-		go func() {
-			if err := lm.RefreshIfNeeded(req.Email, req.Password); err != nil {
-				log.Printf("License refresh failed: %v", err)
-			}
-		}()
+		// Fetch license synchronously so the token is available in the response.
+		// Login still succeeds if the license server is unreachable.
+		licenseToken, err := lm.RefreshIfNeeded(req.Email, req.Password)
+		if err != nil {
+			log.Printf("License refresh failed: %v", err)
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(UserLoginResponse{
@@ -181,6 +183,7 @@ func LoginUser(db *db.Database, lm *license.Manager) http.HandlerFunc {
 			Email:        req.Email,
 			Token:        token,
 			RefreshToken: refreshToken,
+			LicenseToken: licenseToken,
 		})
 	}
 }
@@ -192,6 +195,7 @@ type RefreshRequest struct {
 type RefreshResponse struct {
 	Token        string `json:"token"`
 	RefreshToken string `json:"refresh_token"`
+	LicenseToken string `json:"license_token"`
 }
 
 func RefreshToken(db *db.Database, lm *license.Manager) http.HandlerFunc {
@@ -247,6 +251,7 @@ func RefreshToken(db *db.Database, lm *license.Manager) http.HandlerFunc {
 		json.NewEncoder(w).Encode(RefreshResponse{
 			Token:        newAccessToken,
 			RefreshToken: newRefreshToken,
+			LicenseToken: lm.GetCachedToken(),
 		})
 	}
 }

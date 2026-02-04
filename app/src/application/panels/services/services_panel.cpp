@@ -1,7 +1,9 @@
 #include "services_panel.h"
 #include "imgui.h"
 #include "core/ui/imgui_utils.h"
+#include "core/manager/asset_manager.h"
 #include <nlohmann/json.hpp>
+#include <cmath>
 #include <cstring>
 
 namespace misty::panel {
@@ -22,8 +24,29 @@ namespace misty::panel {
         core::WithWindowStyle(ImVec4(0.18f, 0.18f, 0.18f, 1.0f), ImVec2(32.0f, 24.0f), [&]() {
         if (ImGui::Begin("ServicesPanel", nullptr, flags)) {
             show_header();
+            ImGui::SameLine();
+            {
+                float avail = ImGui::GetContentRegionAvail().x;
+                ImGui::SetCursorPosX(ImGui::GetCursorPosX() + avail - 84.0f);
+                ImGui::PushStyleColor(ImGuiCol_Button,        ImVec4(0.22f, 0.22f, 0.25f, 1.0f));
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.30f, 0.30f, 0.33f, 1.0f));
+                ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.18f, 0.18f, 0.20f, 1.0f));
+                ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);
+                bool refreshing = state.is_refreshing;
+                if (refreshing) ImGui::BeginDisabled();
+                if (ImGui::Button("Refresh", ImVec2(84.0f, 28.0f))) {
+                    state.refresh_connections();
+                }
+                if (refreshing) ImGui::EndDisabled();
+                ImGui::PopStyleVar();
+                ImGui::PopStyleColor(3);
+            }
             ImGui::Spacing();
             show_cloud_section(state);
+
+            if (state.is_refreshing) {
+                show_loading_overlay();
+            }
         }
         ImGui::End();
         });
@@ -62,104 +85,37 @@ namespace misty::panel {
     }
 
     void ServicesPanel::show_tab_bar() {
-        // Tab colors
-        ImVec4 active_text = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
+        ImVec4 active_text   = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
         ImVec4 inactive_text = ImVec4(0.5f, 0.5f, 0.5f, 1.0f);
-        ImVec4 od_accent = ImVec4(0.2f, 0.5f, 0.9f, 1.0f);   // blue
-        ImVec4 gd_accent = ImVec4(0.2f, 0.7f, 0.4f, 1.0f);    // green
+        ImVec4 transparent   = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
+        ImU32  underline_col = IM_COL32(255, 255, 255, 210);
 
-        ImVec4 transparent = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
-
-        float tab_width = 140.0f;
+        float tab_width  = 140.0f;
         float tab_height = 32.0f;
 
-        // OneDrive tab
-        ImGui::PushStyleColor(ImGuiCol_Button, transparent);
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.25f, 0.25f, 0.25f, 0.5f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, transparent);
-        ImGui::PushStyleColor(ImGuiCol_Text, active_tab_ == 0 ? active_text : inactive_text);
-        if (ImGui::Button("OneDrive", ImVec2(tab_width, tab_height))) {
-            active_tab_ = 0;
-        }
-        ImGui::PopStyleColor(4);
+        const char* tab_labels[] = { "OneDrive", "Google Drive", "Dropbox", "iCloud" };
 
-        // Draw underline for active tab
-        if (active_tab_ == 0) {
-            ImDrawList* draw_list = ImGui::GetWindowDrawList();
-            ImVec2 p_min = ImGui::GetItemRectMin();
-            ImVec2 p_max = ImGui::GetItemRectMax();
-            draw_list->AddLine(
-                ImVec2(p_min.x, p_max.y),
-                ImVec2(p_max.x, p_max.y),
-                ImGui::ColorConvertFloat4ToU32(od_accent), 2.5f);
-        }
+        for (int i = 0; i < 4; i++) {
+            if (i > 0) ImGui::SameLine(0.0f, 4.0f);
 
-        ImGui::SameLine(0.0f, 4.0f);
+            ImGui::PushID(i);
+            ImGui::PushStyleColor(ImGuiCol_Button,        transparent);
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.25f, 0.25f, 0.25f, 0.5f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive,  transparent);
+            ImGui::PushStyleColor(ImGuiCol_Text, active_tab_ == i ? active_text : inactive_text);
+            if (ImGui::Button(tab_labels[i], ImVec2(tab_width, tab_height)))
+                active_tab_ = i;
+            ImGui::PopStyleColor(4);
 
-        // Google Drive tab
-        ImGui::PushStyleColor(ImGuiCol_Button, transparent);
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.25f, 0.25f, 0.25f, 0.5f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, transparent);
-        ImGui::PushStyleColor(ImGuiCol_Text, active_tab_ == 1 ? active_text : inactive_text);
-        if (ImGui::Button("Google Drive", ImVec2(tab_width, tab_height))) {
-            active_tab_ = 1;
-        }
-        ImGui::PopStyleColor(4);
-
-        if (active_tab_ == 1) {
-            ImDrawList* draw_list = ImGui::GetWindowDrawList();
-            ImVec2 p_min = ImGui::GetItemRectMin();
-            ImVec2 p_max = ImGui::GetItemRectMax();
-            draw_list->AddLine(
-                ImVec2(p_min.x, p_max.y),
-                ImVec2(p_max.x, p_max.y),
-                ImGui::ColorConvertFloat4ToU32(gd_accent), 2.5f);
-        }
-
-        ImGui::SameLine(0.0f, 4.0f);
-
-        // Dropbox tab
-        ImVec4 dbx_accent = ImVec4(0.0f, 0.38f, 1.0f, 1.0f);  // Dropbox blue
-        ImGui::PushStyleColor(ImGuiCol_Button, transparent);
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.25f, 0.25f, 0.25f, 0.5f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, transparent);
-        ImGui::PushStyleColor(ImGuiCol_Text, active_tab_ == 2 ? active_text : inactive_text);
-        if (ImGui::Button("Dropbox", ImVec2(tab_width, tab_height))) {
-            active_tab_ = 2;
-        }
-        ImGui::PopStyleColor(4);
-
-        if (active_tab_ == 2) {
-            ImDrawList* draw_list = ImGui::GetWindowDrawList();
-            ImVec2 p_min = ImGui::GetItemRectMin();
-            ImVec2 p_max = ImGui::GetItemRectMax();
-            draw_list->AddLine(
-                ImVec2(p_min.x, p_max.y),
-                ImVec2(p_max.x, p_max.y),
-                ImGui::ColorConvertFloat4ToU32(dbx_accent), 2.5f);
-        }
-
-        ImGui::SameLine(0.0f, 4.0f);
-
-        // iCloud tab
-        ImVec4 icl_accent = ImVec4(0.0f, 0.58f, 0.84f, 1.0f);  // iCloud blue
-        ImGui::PushStyleColor(ImGuiCol_Button, transparent);
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.25f, 0.25f, 0.25f, 0.5f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, transparent);
-        ImGui::PushStyleColor(ImGuiCol_Text, active_tab_ == 3 ? active_text : inactive_text);
-        if (ImGui::Button("iCloud", ImVec2(tab_width, tab_height))) {
-            active_tab_ = 3;
-        }
-        ImGui::PopStyleColor(4);
-
-        if (active_tab_ == 3) {
-            ImDrawList* draw_list = ImGui::GetWindowDrawList();
-            ImVec2 p_min = ImGui::GetItemRectMin();
-            ImVec2 p_max = ImGui::GetItemRectMax();
-            draw_list->AddLine(
-                ImVec2(p_min.x, p_max.y),
-                ImVec2(p_max.x, p_max.y),
-                ImGui::ColorConvertFloat4ToU32(icl_accent), 2.5f);
+            if (active_tab_ == i) {
+                ImVec2 p_min = ImGui::GetItemRectMin();
+                ImVec2 p_max = ImGui::GetItemRectMax();
+                ImGui::GetWindowDrawList()->AddLine(
+                    ImVec2(p_min.x, p_max.y),
+                    ImVec2(p_max.x, p_max.y),
+                    underline_col, 2.0f);
+            }
+            ImGui::PopID();
         }
 
         // Separator under tab bar
@@ -378,48 +334,44 @@ namespace misty::panel {
     }
 
     void ServicesPanel::show_onedrive_card_profile(const OneDriveCardState& card, const std::string& ms_user_id) {
-        if (card.profile_loaded && (!card.profile.display_name.empty() || !card.profile.email.empty())) {
-            if (!card.profile.display_name.empty()) {
-                core::ColoredText(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "Account");
-                core::ColoredText(ImVec4(1.0f, 1.0f, 1.0f, 1.0f), "%s", card.profile.display_name.c_str());
-                ImGui::Spacing();
-            }
-            if (!card.profile.email.empty()) {
-                core::ColoredText(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "Email");
-                core::ColoredText(ImVec4(0.8f, 0.8f, 0.8f, 1.0f), "%s", card.profile.email.c_str());
-            }
+        if (card.profile_loaded && !card.profile.email.empty()) {
+            core::ColoredText(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "Email");
+            core::ColoredText(ImVec4(0.8f, 0.8f, 0.8f, 1.0f), "%s", card.profile.email.c_str());
             return;
         }
-        core::ColoredText(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "Account");
-        core::ColoredText(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "ID: %s", ms_user_id.substr(0, 8).c_str());
+        core::ColoredText(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "ID");
+        core::ColoredText(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "%s", ms_user_id.substr(0, 8).c_str());
     }
 
     void ServicesPanel::show_onedrive_card_actions(ServicesState& state, const std::string& ms_user_id, bool is_connected) {
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10.0f, 7.0f));
         if (is_connected) {
             ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.5f, 0.2f, 0.2f, 1.0f));
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.6f, 0.3f, 0.3f, 1.0f));
             ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.45f, 0.15f, 0.15f, 1.0f));
-            if (ImGui::Button("Disconnect", ImVec2(ImGui::GetContentRegionAvail().x, 28.0f))) {
+            if (ImGui::Button("Disconnect", ImVec2(ImGui::GetContentRegionAvail().x, 32.0f))) {
                 state.disconnect_onedrive(ms_user_id);
             }
             ImGui::PopStyleColor(3);
+            ImGui::PopStyleVar();
             return;
         }
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.35f, 0.5f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.45f, 0.6f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.15f, 0.3f, 0.45f, 1.0f));
-        if (ImGui::Button("Reconnect", ImVec2(ImGui::GetContentRegionAvail().x * 0.48f, 28.0f))) {
-            state.show_ms_login_modal = true;
+        if (ImGui::Button("Reconnect", ImVec2(ImGui::GetContentRegionAvail().x * 0.48f, 32.0f))) {
+            state.initiate_ms_login();
         }
         ImGui::PopStyleColor(3);
         ImGui::SameLine();
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.4f, 0.4f, 0.4f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.25f, 0.25f, 0.25f, 1.0f));
-        if (ImGui::Button("Remove", ImVec2(ImGui::GetContentRegionAvail().x, 28.0f))) {
+        if (ImGui::Button("Remove", ImVec2(ImGui::GetContentRegionAvail().x, 32.0f))) {
             state.disconnect_onedrive(ms_user_id);
         }
         ImGui::PopStyleColor(3);
+        ImGui::PopStyleVar();
     }
 
     void ServicesPanel::show_onedrive_profile_card(ServicesState& state, const std::string& ms_user_id) {
@@ -430,11 +382,12 @@ namespace misty::panel {
 
         ImGui::PushID(ms_user_id.c_str());
         ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 8.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 12.0f));
         ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.14f, 0.14f, 0.14f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.3f, 0.3f, 0.3f, 0.5f));
         ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 1.0f);
 
-        if (ImGui::BeginChild("OneDriveCard", ImVec2(kCardWidth, 0.0f), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders)) {
+        if (ImGui::BeginChild("OneDriveCard", ImVec2(kCardWidth, 0.0f), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding)) {
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8.0f, 6.0f));
             show_onedrive_card_header(card.is_connected);
             ImGui::Spacing();
@@ -449,7 +402,7 @@ namespace misty::panel {
         }
         ImGui::EndChild();
 
-        ImGui::PopStyleVar(2);
+        ImGui::PopStyleVar(3);
         ImGui::PopStyleColor(2);
         ImGui::PopID();
     }
@@ -623,48 +576,44 @@ namespace misty::panel {
     }
 
     void ServicesPanel::show_gdrive_card_profile(const GDriveCardState& card, const std::string& gd_user_id) {
-        if (card.profile_loaded && (!card.profile.display_name.empty() || !card.profile.email.empty())) {
-            if (!card.profile.display_name.empty()) {
-                core::ColoredText(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "Account");
-                core::ColoredText(ImVec4(1.0f, 1.0f, 1.0f, 1.0f), "%s", card.profile.display_name.c_str());
-                ImGui::Spacing();
-            }
-            if (!card.profile.email.empty()) {
-                core::ColoredText(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "Email");
-                core::ColoredText(ImVec4(0.8f, 0.8f, 0.8f, 1.0f), "%s", card.profile.email.c_str());
-            }
+        if (card.profile_loaded && !card.profile.email.empty()) {
+            core::ColoredText(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "Email");
+            core::ColoredText(ImVec4(0.8f, 0.8f, 0.8f, 1.0f), "%s", card.profile.email.c_str());
             return;
         }
-        core::ColoredText(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "Account");
-        core::ColoredText(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "ID: %s", gd_user_id.substr(0, 8).c_str());
+        core::ColoredText(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "ID");
+        core::ColoredText(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "%s", gd_user_id.substr(0, 8).c_str());
     }
 
     void ServicesPanel::show_gdrive_card_actions(ServicesState& state, const std::string& gd_user_id, bool is_connected) {
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10.0f, 7.0f));
         if (is_connected) {
             ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.5f, 0.2f, 0.2f, 1.0f));
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.6f, 0.3f, 0.3f, 1.0f));
             ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.45f, 0.15f, 0.15f, 1.0f));
-            if (ImGui::Button("Disconnect##gd", ImVec2(ImGui::GetContentRegionAvail().x, 28.0f))) {
+            if (ImGui::Button("Disconnect##gd", ImVec2(ImGui::GetContentRegionAvail().x, 32.0f))) {
                 state.disconnect_gdrive(gd_user_id);
             }
             ImGui::PopStyleColor(3);
+            ImGui::PopStyleVar();
             return;
         }
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.13f, 0.44f, 0.24f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.18f, 0.54f, 0.34f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.10f, 0.38f, 0.20f, 1.0f));
-        if (ImGui::Button("Reconnect##gd", ImVec2(ImGui::GetContentRegionAvail().x * 0.48f, 28.0f))) {
-            state.show_gd_login_modal = true;
+        if (ImGui::Button("Reconnect##gd", ImVec2(ImGui::GetContentRegionAvail().x * 0.48f, 32.0f))) {
+            state.initiate_gd_login();
         }
         ImGui::PopStyleColor(3);
         ImGui::SameLine();
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.4f, 0.4f, 0.4f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.25f, 0.25f, 0.25f, 1.0f));
-        if (ImGui::Button("Remove##gd", ImVec2(ImGui::GetContentRegionAvail().x, 28.0f))) {
+        if (ImGui::Button("Remove##gd", ImVec2(ImGui::GetContentRegionAvail().x, 32.0f))) {
             state.disconnect_gdrive(gd_user_id);
         }
         ImGui::PopStyleColor(3);
+        ImGui::PopStyleVar();
     }
 
     void ServicesPanel::show_gdrive_profile_card(ServicesState& state, const std::string& gd_user_id) {
@@ -675,11 +624,12 @@ namespace misty::panel {
 
         ImGui::PushID(("gd_" + gd_user_id).c_str());
         ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 8.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 12.0f));
         ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.14f, 0.14f, 0.14f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.3f, 0.3f, 0.3f, 0.5f));
         ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 1.0f);
 
-        if (ImGui::BeginChild("GDriveCard", ImVec2(kCardWidth, 0.0f), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders)) {
+        if (ImGui::BeginChild("GDriveCard", ImVec2(kCardWidth, 0.0f), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding)) {
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8.0f, 6.0f));
             show_gdrive_card_header(card.is_connected);
             ImGui::Spacing();
@@ -694,7 +644,7 @@ namespace misty::panel {
         }
         ImGui::EndChild();
 
-        ImGui::PopStyleVar(2);
+        ImGui::PopStyleVar(3);
         ImGui::PopStyleColor(2);
         ImGui::PopID();
     }
@@ -764,48 +714,44 @@ namespace misty::panel {
     }
 
     void ServicesPanel::show_dropbox_card_profile(const DropboxCardState& card, const std::string& dbx_user_id) {
-        if (card.profile_loaded && (!card.profile.display_name.empty() || !card.profile.email.empty())) {
-            if (!card.profile.display_name.empty()) {
-                core::ColoredText(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "Account");
-                core::ColoredText(ImVec4(1.0f, 1.0f, 1.0f, 1.0f), "%s", card.profile.display_name.c_str());
-                ImGui::Spacing();
-            }
-            if (!card.profile.email.empty()) {
-                core::ColoredText(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "Email");
-                core::ColoredText(ImVec4(0.8f, 0.8f, 0.8f, 1.0f), "%s", card.profile.email.c_str());
-            }
+        if (card.profile_loaded && !card.profile.email.empty()) {
+            core::ColoredText(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "Email");
+            core::ColoredText(ImVec4(0.8f, 0.8f, 0.8f, 1.0f), "%s", card.profile.email.c_str());
             return;
         }
-        core::ColoredText(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "Account");
-        core::ColoredText(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "ID: %s", dbx_user_id.substr(0, 8).c_str());
+        core::ColoredText(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "ID");
+        core::ColoredText(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "%s", dbx_user_id.substr(0, 8).c_str());
     }
 
     void ServicesPanel::show_dropbox_card_actions(ServicesState& state, const std::string& dbx_user_id, bool is_connected) {
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10.0f, 7.0f));
         if (is_connected) {
             ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.5f, 0.2f, 0.2f, 1.0f));
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.6f, 0.3f, 0.3f, 1.0f));
             ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.45f, 0.15f, 0.15f, 1.0f));
-            if (ImGui::Button("Disconnect##dbx", ImVec2(ImGui::GetContentRegionAvail().x, 28.0f))) {
+            if (ImGui::Button("Disconnect##dbx", ImVec2(ImGui::GetContentRegionAvail().x, 32.0f))) {
                 state.disconnect_dropbox(dbx_user_id);
             }
             ImGui::PopStyleColor(3);
+            ImGui::PopStyleVar();
             return;
         }
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.24f, 0.63f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.05f, 0.34f, 0.73f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.0f, 0.18f, 0.53f, 1.0f));
-        if (ImGui::Button("Reconnect##dbx", ImVec2(ImGui::GetContentRegionAvail().x * 0.48f, 28.0f))) {
-            state.show_dbx_login_modal = true;
+        if (ImGui::Button("Reconnect##dbx", ImVec2(ImGui::GetContentRegionAvail().x * 0.48f, 32.0f))) {
+            state.initiate_dbx_login();
         }
         ImGui::PopStyleColor(3);
         ImGui::SameLine();
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.4f, 0.4f, 0.4f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.25f, 0.25f, 0.25f, 1.0f));
-        if (ImGui::Button("Remove##dbx", ImVec2(ImGui::GetContentRegionAvail().x, 28.0f))) {
+        if (ImGui::Button("Remove##dbx", ImVec2(ImGui::GetContentRegionAvail().x, 32.0f))) {
             state.disconnect_dropbox(dbx_user_id);
         }
         ImGui::PopStyleColor(3);
+        ImGui::PopStyleVar();
     }
 
     void ServicesPanel::show_dropbox_profile_card(ServicesState& state, const std::string& dbx_user_id) {
@@ -816,11 +762,12 @@ namespace misty::panel {
 
         ImGui::PushID(("dbx_" + dbx_user_id).c_str());
         ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 8.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 12.0f));
         ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.14f, 0.14f, 0.14f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.3f, 0.3f, 0.3f, 0.5f));
         ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 1.0f);
 
-        if (ImGui::BeginChild("DropboxCard", ImVec2(kCardWidth, 0.0f), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders)) {
+        if (ImGui::BeginChild("DropboxCard", ImVec2(kCardWidth, 0.0f), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding)) {
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8.0f, 6.0f));
             show_dropbox_card_header(card.is_connected);
             ImGui::Spacing();
@@ -835,7 +782,7 @@ namespace misty::panel {
         }
         ImGui::EndChild();
 
-        ImGui::PopStyleVar(2);
+        ImGui::PopStyleVar(3);
         ImGui::PopStyleColor(2);
         ImGui::PopID();
     }
@@ -1181,25 +1128,27 @@ namespace misty::panel {
     }
 
     void ServicesPanel::show_icloud_card_profile(const ICloudCardState& card, const std::string& email) {
-        core::ColoredText(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "Apple ID");
+        core::ColoredText(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "Email");
         core::ColoredText(ImVec4(0.8f, 0.8f, 0.8f, 1.0f), "%s", email.c_str());
     }
 
     void ServicesPanel::show_icloud_card_actions(ServicesState& state, const std::string& email, bool is_connected) {
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10.0f, 7.0f));
         if (is_connected) {
             ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.5f, 0.2f, 0.2f, 1.0f));
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.6f, 0.3f, 0.3f, 1.0f));
             ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.45f, 0.15f, 0.15f, 1.0f));
-            if (ImGui::Button("Disconnect##icl", ImVec2(ImGui::GetContentRegionAvail().x, 28.0f))) {
+            if (ImGui::Button("Disconnect##icl", ImVec2(ImGui::GetContentRegionAvail().x, 32.0f))) {
                 state.disconnect_icloud(email);
             }
             ImGui::PopStyleColor(3);
+            ImGui::PopStyleVar();
             return;
         }
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.37f, 0.54f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.0f, 0.47f, 0.64f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.0f, 0.30f, 0.45f, 1.0f));
-        if (ImGui::Button("Reconnect##icl", ImVec2(ImGui::GetContentRegionAvail().x * 0.48f, 28.0f))) {
+        if (ImGui::Button("Reconnect##icl", ImVec2(ImGui::GetContentRegionAvail().x * 0.48f, 32.0f))) {
             state.show_icl_login_modal = true;
         }
         ImGui::PopStyleColor(3);
@@ -1207,10 +1156,11 @@ namespace misty::panel {
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.4f, 0.4f, 0.4f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.25f, 0.25f, 0.25f, 1.0f));
-        if (ImGui::Button("Remove##icl", ImVec2(ImGui::GetContentRegionAvail().x, 28.0f))) {
+        if (ImGui::Button("Remove##icl", ImVec2(ImGui::GetContentRegionAvail().x, 32.0f))) {
             state.disconnect_icloud(email);
         }
         ImGui::PopStyleColor(3);
+        ImGui::PopStyleVar();
     }
 
     void ServicesPanel::show_icloud_profile_card(ServicesState& state, const std::string& email) {
@@ -1221,11 +1171,12 @@ namespace misty::panel {
 
         ImGui::PushID(("icl_" + email).c_str());
         ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 8.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 12.0f));
         ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.14f, 0.14f, 0.14f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.3f, 0.3f, 0.3f, 0.5f));
         ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 1.0f);
 
-        if (ImGui::BeginChild("ICloudCard", ImVec2(kCardWidth, 0.0f), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders)) {
+        if (ImGui::BeginChild("ICloudCard", ImVec2(kCardWidth, 0.0f), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding)) {
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8.0f, 6.0f));
             show_icloud_card_header(card.is_connected);
             ImGui::Spacing();
@@ -1240,7 +1191,7 @@ namespace misty::panel {
         }
         ImGui::EndChild();
 
-        ImGui::PopStyleVar(2);
+        ImGui::PopStyleVar(3);
         ImGui::PopStyleColor(2);
         ImGui::PopID();
     }
@@ -1451,6 +1402,51 @@ namespace misty::panel {
 
         ImGui::PopStyleColor(2);
         ImGui::PopStyleVar(5);
+    }
+
+    // ==================== Loading Overlay ====================
+
+    void ServicesPanel::show_loading_overlay() {
+        // Sprite sheet: 2560x1280, 10 cols x 5 rows = 50 frames, 256x256 per frame
+        static constexpr int   COLS        = 10;
+        static constexpr int   ROWS        = 5;
+        static constexpr int   TOTAL       = COLS * ROWS;
+        static constexpr float FRAME_RATE  = 20.0f; // fps
+        static constexpr float SPRITE_SIZE = 128.0f; // display size in pixels
+
+        auto& sprite = core::AssetManager::get().get_image_texture("assets/misty_sprite.png");
+
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+        ImVec2 p  = ImGui::GetWindowPos();
+        ImVec2 sz = ImGui::GetWindowSize();
+
+        // Semi-transparent dark background
+        dl->AddRectFilled(p, ImVec2(p.x + sz.x, p.y + sz.y), IM_COL32(15, 15, 18, 160));
+
+        // Current frame based on elapsed time
+        int frame = static_cast<int>(ImGui::GetTime() * FRAME_RATE) % TOTAL;
+        int col   = frame % COLS;
+        int row   = frame / COLS;
+
+        float uv_w = 1.0f / COLS;
+        float uv_h = 1.0f / ROWS;
+        ImVec2 uv0(col * uv_w,        row * uv_h);
+        ImVec2 uv1((col + 1) * uv_w,  (row + 1) * uv_h);
+
+        // Gentle vertical bob — runs every render frame so it's smooth at any Hz
+        float t    = static_cast<float>(ImGui::GetTime());
+        float bob  = std::sin(t * 3.0f) * 6.0f; // ±6px, ~0.5 Hz cycle
+
+        float cx   = p.x + sz.x * 0.5f;
+        float cy   = p.y + sz.y * 0.5f + bob;
+        float half = SPRITE_SIZE * 0.5f;
+
+        dl->AddImage(
+            (ImTextureID)(intptr_t)sprite.id,
+            ImVec2(cx - half, cy - half),
+            ImVec2(cx + half, cy + half),
+            uv0, uv1
+        );
     }
 
 }
