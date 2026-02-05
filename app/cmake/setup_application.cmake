@@ -117,8 +117,11 @@ add_custom_command(TARGET misty POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy
         "${CMAKE_CURRENT_SOURCE_DIR}/misty.conf"
         "$<TARGET_FILE_DIR:misty>/misty.conf"
-)
 
+    COMMAND ${CMAKE_COMMAND} -E copy
+        "${CMAKE_CURRENT_SOURCE_DIR}/commands.msy"
+        "$<TARGET_FILE_DIR:misty>/commands.msy"
+)
 
 
 

@@ -75,6 +75,7 @@ namespace misty {
       
         ImGui_ImplGlfw_InitForOpenGL(window_, true);
         ImGui_ImplOpenGL3_Init(glsl_version_);
+        glfwSetScrollCallback(window_, glfw_scroll_callback);
     }
 
 
@@ -103,7 +104,7 @@ namespace misty {
         style.ScrollbarRounding = 6.0f;
         style.WindowRounding   = 0.0f;
         style.PopupRounding    = 0.0f;
-        style.ScrollbarSize    = 8.0f;
+        style.ScrollbarSize    = 10.0f;
 
         // Website palette: #09090B / #111113 / #18181B / #27272A / #D4D4D8 / #3B82F6
         style.Colors[ImGuiCol_Text]                 = ImVec4(0.831f, 0.831f, 0.847f, 1.0f); // #D4D4D8
@@ -187,6 +188,11 @@ namespace misty {
     void MacApp::glfw_window_focus_callback(GLFWwindow* window, int focused) {
         if (!focused)
             static_cast<Application*>(glfwGetWindowUserPointer(window))->on_focus_lost();
+    }
+
+    void MacApp::glfw_scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
+        constexpr double kScrollWheelScale = 0.10;
+        ImGui_ImplGlfw_ScrollCallback(window, xoffset * kScrollWheelScale, yoffset * kScrollWheelScale);
     }
 }
 #endif

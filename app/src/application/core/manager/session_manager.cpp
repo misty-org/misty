@@ -158,6 +158,30 @@ namespace misty::core {
         session_expired_ = false;
     }
 
+    void SessionManager::mark_proxy_available() {
+        std::lock_guard<std::mutex> lock(mu_);
+        proxy_available_ = true;
+        proxy_status_message_.clear();
+    }
+
+    void SessionManager::mark_proxy_unavailable(const std::string& message) {
+        std::lock_guard<std::mutex> lock(mu_);
+        proxy_available_ = false;
+        proxy_status_message_ = message.empty()
+            ? "Misty background service is unavailable. Local files remain available, but cloud and sync features are paused."
+            : message;
+    }
+
+    bool SessionManager::is_proxy_available() const {
+        std::lock_guard<std::mutex> lock(mu_);
+        return proxy_available_;
+    }
+
+    std::string SessionManager::get_proxy_status_message() const {
+        std::lock_guard<std::mutex> lock(mu_);
+        return proxy_status_message_;
+    }
+
     std::map<std::string, std::string> SessionManager::get_auth_headers() const {
         std::lock_guard<std::mutex> lock(mu_);
         std::map<std::string, std::string> headers;

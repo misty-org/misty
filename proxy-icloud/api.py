@@ -6,7 +6,6 @@ from icloud_drive_manager import ICloudDriveManager, ICloudDriveStatus, ErrorCod
 
 import shutil
 
-
 manager = ICloudDriveManager()
 
 router = APIRouter()
