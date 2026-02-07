@@ -6,27 +6,37 @@
 
 namespace misty::core {
 
-std::optional<std::string> ApplicationPicker::pick() {
-    @autoreleasepool {
-        NSOpenPanel* panel = [NSOpenPanel openPanel];
-        [panel setCanChooseFiles:NO];
-        [panel setCanChooseDirectories:YES];
-        [panel setAllowsMultipleSelection:NO];
-        [panel setCanCreateDirectories:NO];
-        [panel setResolvesAliases:YES];
-        [panel setTreatsFilePackagesAsDirectories:NO];
-        [panel setTitle:@"Choose Application"];
-        [panel setAllowedFileTypes:@[@"app"]];
+void ApplicationPicker::pick(std::function<void(std::optional<std::string>)> callback) {
+    // Defer to the next main-queue drain (after the current ImGui frame finishes)
+    // so runModal doesn't block mid-render. runModal runs its own NSModalPanelRunLoopMode
+    // event loop, which is the only reliable way to drive NSOpenPanel in a GLFW app —
+    // beginWithCompletionHandler: conflicts with GLFW's glfwPollEvents() run-loop usage.
+    dispatch_async(dispatch_get_main_queue(), ^{
+        @autoreleasepool {
+            NSOpenPanel* panel = [NSOpenPanel openPanel];
+            // .app bundles are opaque packages (not directories), so file selection
+            // must be enabled — directory selection alone cannot pick them.
+            [panel setCanChooseFiles:YES];
+            [panel setCanChooseDirectories:NO];
+            [panel setAllowsMultipleSelection:NO];
+            [panel setCanCreateDirectories:NO];
+            [panel setResolvesAliases:YES];
+            [panel setTreatsFilePackagesAsDirectories:NO];
+            [panel setTitle:@"Choose Application"];
+            [panel setAllowedFileTypes:@[@"app"]];
+            [panel setDirectoryURL:[NSURL fileURLWithPath:@"/Applications"]];
 
-        if ([panel runModal] == NSModalResponseOK) {
-            NSURL* url = [[panel URLs] firstObject];
-            if (url != nil) {
-                return std::string([[[url path] stringByStandardizingPath] UTF8String]);
+            NSInteger result = [panel runModal];
+            if (result == NSModalResponseOK) {
+                NSURL* url = [[panel URLs] firstObject];
+                if (url != nil) {
+                    callback(std::string([[[url path] stringByStandardizingPath] UTF8String]));
+                    return;
+                }
             }
+            callback(std::nullopt);
         }
-    }
-
-    return std::nullopt;
+    });
 }
 
 } // namespace misty::core

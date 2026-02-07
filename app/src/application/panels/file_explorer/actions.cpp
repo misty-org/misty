@@ -458,14 +458,25 @@ namespace misty::panel {
         std::vector<std::string> to_delete(state.selected_files.begin(), state.selected_files.end());
         for (const auto& path : to_delete) {
             printf("Explorer: Deleting path: %s\n", path.c_str());
+            auto purge_from_recent = [&](const std::string& p) {
+                auto it = std::remove_if(state.recent_files.begin(), state.recent_files.end(),
+                    [&](const UnifiedFileItem& f) { return f.path == p; });
+                if (it != state.recent_files.end()) {
+                    state.recent_files.erase(it, state.recent_files.end());
+                    state.dirty_ = true;
+                }
+            };
+
             if (is_trash_view) {
                 // Permanent Delete
                 perform_delete(state, path);
-                
-                // Remove from state.trash_files
+
+                // Remove from trash list and recent (trash path may still be in recent
+                // if track_move ran before this permanent delete)
                 auto it = std::remove_if(state.trash_files.begin(), state.trash_files.end(),
                     [&](const UnifiedFileItem& item) { return item.path == path; });
                 state.trash_files.erase(it, state.trash_files.end());
+                purge_from_recent(path);
             } else {
                 // Move to Trash (Local only, Cloud deletes directly)
                 bool is_cloud = path_utils::is_onedrive_path(path) || path_utils::is_gdrive_path(path) || path_utils::is_dropbox_path(path) || path_utils::is_icloud_path(path);
@@ -473,6 +484,7 @@ namespace misty::panel {
                 if (is_cloud) {
                      printf("Explorer: Deleting cloud file directly\n");
                      perform_delete(state, path);
+                     purge_from_recent(path);
                 } else {
                     // Local: Move to ~/misty/.cache/trash
                     std::string trash_dir = std::string(std::getenv("HOME")) + "/misty/.cache/trash";

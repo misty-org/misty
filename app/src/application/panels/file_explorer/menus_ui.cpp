@@ -1,5 +1,6 @@
 #include "panels/file_explorer/file_explorer_panel.h"
 
+#include <cstring>
 #include <cstdio>
 
 #include "core/commands/command_manager.h"
@@ -41,21 +42,6 @@ bool FileExplorerPanel::open_context_menu_target(FileExplorerState& state) {
     return core::open_path_default(file->path);
 }
 
-bool FileExplorerPanel::open_context_menu_target_with_dialog(FileExplorerState& state) {
-    const UnifiedFileItem* file = find_context_menu_target(state);
-    if (!file || file->is_dir || !fs::exists(file->path)) {
-        return false;
-    }
-
-    auto app = core::ApplicationPicker::pick();
-    if (!app.has_value()) {
-        return false;
-    }
-
-    OpenWithManager::get().set_association_for_path(file->path, *app);
-    return core::open_path_with_application(*app, file->path);
-}
-
 void FileExplorerPanel::show_context_menu(FileExplorerState& state) {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 8.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(10.0f, 6.0f));
@@ -94,9 +80,16 @@ void FileExplorerPanel::show_context_menu(FileExplorerState& state) {
             }
 
             if (ImGui::MenuItem("Open With...", nullptr, false, can_open_directly)) {
-                if (!open_context_menu_target_with_dialog(state)) {
-                    auto& notif = registry_.get_state<NotificationState>("Notifications");
-                    notif.add_notification("Open With Failed", "Could not open file with the selected application.", NotificationType::ERROR);
+                std::string target_path = target_file ? target_file->path : "";
+                if (!target_path.empty()) {
+                    core::ApplicationPicker::pick([this, target_path](std::optional<std::string> app) {
+                        if (!app.has_value()) return;
+                        OpenWithManager::get().set_association_for_path(target_path, *app);
+                        if (!core::open_path_with_application(*app, target_path)) {
+                            auto& notif = registry_.get_state<NotificationState>("Notifications");
+                            notif.add_notification("Open With Failed", "Could not open file.", NotificationType::ERROR);
+                        }
+                    });
                 }
             }
 
@@ -164,6 +157,7 @@ void FileExplorerPanel::show_context_menu(FileExplorerState& state) {
     ImGui::PopStyleColor(2);
     ImGui::PopStyleVar(3);
 }
+
 
 void FileExplorerPanel::show_rename_modal(FileExplorerState& state) {
     if (state.show_rename_modal) {
