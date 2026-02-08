@@ -32,8 +32,8 @@ export default function Sidebar({
                   onClick={() => { onSelect(id); onClose(); }}
                   className={`flex items-center gap-2 text-left px-3 py-1.5 rounded-lg text-sm transition-colors cursor-pointer ${
                     active
-                      ? "bg-primary/10 text-primary font-medium"
-                      : "text-text-muted hover:text-text hover:bg-elevated"
+                      ? "bg-primary/10 text-white font-medium"
+                      : "text-text hover:text-white hover:bg-elevated"
                   }`}
                 >
                   {sec.label}
@@ -53,7 +53,7 @@ export default function Sidebar({
 
   return (
     <>
-      <aside className="sticky top-16 h-[calc(100vh-4rem)] overflow-y-auto border-r border-border-subtle hidden lg:block">{inner}</aside>
+      <aside className="sticky top-16 h-[calc(100vh-4rem)] self-start overflow-y-auto border-r border-border-subtle hidden lg:block scrollbar-hide">{inner}</aside>
       {open && (
         <>
           <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={onClose} />

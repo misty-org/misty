@@ -4,13 +4,14 @@ import FeatureDemo from "./FeatureDemo";
 import MainHero from "./MainHero";
 import ServiceProviders from "./FeaturesProviders";
 import FeaturesShowcase from "./FeaturesShowcase";
-import Documentation from "./Documentation";
+import Docs from "./DocsSection";
+import BlogPreview from "./BlogPreview";
 import Changelog from "./Changelog";
 import EndingOutro from "./EndingOutro";
 
 export default function Home() {
   return (
-    <div className="max-w-280 mx-auto px-4 sm:px-6 lg:px-8 flex flex-col gap-30">
+    <div className="max-w-280 mx-auto px-4 sm:px-6 lg:px-8 flex flex-col gap-20">
       <div className="fixed inset-0 w-full h-full -z-50 pointer-events-none">
         <ParticleField/>
       </div>
@@ -32,7 +33,11 @@ export default function Home() {
       </section>
 
       <section>
-        <Documentation/>
+        <Docs/>
+      </section>
+
+      <section>
+        <BlogPreview/>
       </section>
 
       <section>

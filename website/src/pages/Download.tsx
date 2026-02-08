@@ -120,7 +120,7 @@ function ReleaseItem({
 
 export default function Download() {
   return (
-    <div className="max-w-6xl mx-auto px-6 py-20">
+    <div className="max-w-280 mx-auto px-4 sm:px-6 lg:px-8 pt-32 pb-20">
       {/* Header */}
       <div className="text-center mb-16">
         
@@ -134,18 +134,18 @@ export default function Download() {
       </div>
 
       {/* Platform cards */}
-      <div className="grid md:grid-cols-3 gap-5 max-w-3xl mx-auto mb-20">
+      <div className="grid md:grid-cols-3 gap-5 mb-20">
         {platforms.map((platform) => (
           <GlowCard key={platform.name} className="h-full">
             <div className="p-7 text-center flex flex-col items-center">
-              <div className={`w-16 h-16 rounded-2xl bg-gradient-to-b ${platform.accent} flex items-center justify-center mb-5 text-text-secondary`}>
+              <div className={`w-16 h-16 rounded-2xl bg-linear-to-b ${platform.accent} flex items-center justify-center mb-5 text-text-secondary`}>
                 {platform.icon}
               </div>
               <h3 className="text-lg font-semibold text-text mb-1">
                 {platform.name}
               </h3>
               <p className="text-sm text-text-muted mb-6">{platform.arch}</p>
-              <button className="w-full px-4 py-3 bg-zinc-100 hover:bg-gray-200 text-black text-sm font-medium rounded-xl transition-all duration-300 shadow-lg hover:-translate-y-0.5">
+              <button className="w-full px-4 py-3 bg-white hover:bg-zinc-200 text-black text-sm font-medium rounded-xl transition-colors duration-300 shadow-lg">
                 Download
               </button>
             </div>
@@ -154,7 +154,7 @@ export default function Download() {
       </div>
 
       {/* Releases */}
-      <div className="max-w-2xl mx-auto mb-20">
+      <div className="mb-20">
         <h2 className="text-lg font-semibold text-text mb-6">Releases</h2>
         <div>
           {releases.map((release) => (
@@ -169,7 +169,7 @@ export default function Download() {
       </div>
 
       {/* System requirements */}
-      <div className="max-w-2xl mx-auto">
+      <div>
         <h2 className="text-xl font-semibold text-text mb-6 text-center">
           System Requirements
         </h2>

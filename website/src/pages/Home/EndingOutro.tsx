@@ -11,7 +11,7 @@ export default function MoreSocials() {
 
       <a
         href="/docs/getting-started"
-        className="px-8 py-3 rounded-full bg-zinc-100 text-black font-semibold text-sm hover:scale-105 transition-transform shadow-lg"
+        className="px-8 py-3 rounded-full bg-white text-black font-semibold text-sm hover:bg-zinc-200 transition-colors shadow-lg"
       >
         Download Now
       </a>

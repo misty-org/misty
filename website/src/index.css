@@ -6,13 +6,13 @@
   --color-elevated: #18181B;
   --color-border: #27272A;
   --color-border-subtle: #1E1E21;
-  --color-text: #D4D4D8;
-  --color-text-muted: #71717A;
-  --color-text-secondary: #A1A1AA;
-  --color-primary: #3B82F6;
-  --color-primary-hover: #60A5FA;
-  --color-primary-active: #2563EB;
-  --color-primary-glow: #3B82F633;
+  --color-text: #FFFFFF;
+  --color-text-muted: #D4D4D8;
+  --color-text-secondary: #D4D4D8;
+  --color-primary: #E4E4E7;
+  --color-primary-hover: #F4F4F5;
+  --color-primary-active: #D4D4D8;
+  --color-primary-glow: #E4E4E733;
   --color-success: #22C55E;
   --color-success-hover: #4ADE80;
   --color-danger: #EF4444;
@@ -34,8 +34,8 @@ body {
 }
 
 ::selection {
-  background-color: var(--color-primary);
-  color: white;
+  background-color: rgba(244, 244, 245, 0.15);
+  color: #FAFAFA;
 }
 
 /* Animations */
@@ -99,7 +99,7 @@ body {
 
 /* Gradient text */
 .gradient-text {
-  background: linear-gradient(135deg, #D4D4D8 0%, #3B82F6 50%, #60A5FA 100%);
+  background: linear-gradient(135deg, #F0C040 0%, #F5D870 50%, #E8B020 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -108,24 +108,33 @@ body {
 /* Grid background pattern */
 .grid-bg {
   background-image: 
-    linear-gradient(rgba(59, 130, 246, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(59, 130, 246, 0.03) 1px, transparent 1px);
+    linear-gradient(rgba(228, 228, 231, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(228, 228, 231, 0.03) 1px, transparent 1px);
   background-size: 60px 60px;
 }
 
 /* Radial glow */
 .radial-glow {
-  background: radial-gradient(ellipse 300px 200px at 50% 0%, rgba(59, 130, 246, 0.12), transparent);
+  background: radial-gradient(ellipse 300px 200px at 50% 0%, rgba(228, 228, 231, 0.08), transparent);
 }
 @media (min-width: 640px) {
   .radial-glow {
-    background: radial-gradient(ellipse 600px 400px at 50% 0%, rgba(59, 130, 246, 0.12), transparent);
+    background: radial-gradient(ellipse 600px 400px at 50% 0%, rgba(228, 228, 231, 0.08), transparent);
   }
 }
 
 /* Disable Inter contextual alternates in inputs (fixes @ jiggle) */
 input, textarea {
   font-variant-ligatures: no-contextual;
+}
+
+/* Hide scrollbar but keep scrollable */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }
 
 /* Scrollbar styling */
@@ -169,3 +178,40 @@ input, textarea {
 .animate-fade-up-2 { animation: fade-up 0.6s 0.15s ease both; }
 .animate-fade-up-3 { animation: fade-up 0.6s 0.25s ease both; }
 .animate-spin-slow { animation: spin 0.6s linear infinite; }
+
+/* Streak animation for "Fast" section */
+@keyframes streak {
+  0% { transform: translateX(-100%); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translateX(300%); opacity: 0; }
+}
+.animate-streak {
+  animation: streak 2.5s ease-in-out infinite;
+}
+.animate-streak-2 {
+  animation: streak 2.5s 0.6s ease-in-out infinite;
+}
+.animate-streak-3 {
+  animation: streak 2.5s 1.2s ease-in-out infinite;
+}
+
+/* Progress bar fill animations */
+@keyframes fill-1 {
+  0% { width: 20%; }
+  50% { width: 75%; }
+  100% { width: 20%; }
+}
+@keyframes fill-2 {
+  0% { width: 60%; }
+  40% { width: 100%; }
+  60% { width: 100%; }
+  100% { width: 60%; }
+}
+@keyframes fill-3 {
+  0% { width: 5%; }
+  100% { width: 65%; }
+}
+.animate-fill-1 { animation: fill-1 4s ease-in-out infinite; }
+.animate-fill-2 { animation: fill-2 5s ease-in-out infinite; }
+.animate-fill-3 { animation: fill-3 6s ease-in-out infinite alternate; }
