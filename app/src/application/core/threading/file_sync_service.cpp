@@ -60,27 +60,19 @@ namespace misty::core {
     } else if (file.source == panel::FileSource::LOCAL) {
                         new_status = panel::SyncStatus::LOCAL;
                     } else {
-                        // Cloud file (OneDrive/GDrive)
+                        // Remote file
                         std::error_code ec;
                         if (fs::exists(file.path, ec) && !ec) {
-                            // Exists locally
-                            if (file.source == panel::FileSource::GDRIVE 
-                                && file.gd_mime_type.rfind("application/vnd.google-apps.", 0) == 0
-                                && file.size == 0) {
-                                // GDrive doc link
-                                new_status = panel::SyncStatus::SYNCED;
-                            } else {
-                                // Check size
-                                try {
-                                    uintmax_t local_size = fs::file_size(file.path, ec);
-                                    if (!ec && local_size == (uintmax_t)file.size) {
-                                        new_status = panel::SyncStatus::SYNCED;
-                                    } else {
-                                        new_status = panel::SyncStatus::MODIFIED;
-                                    }
-                                } catch (...) {
+                            // Exists locally — check size
+                            try {
+                                uintmax_t local_size = fs::file_size(file.path, ec);
+                                if (!ec && local_size == (uintmax_t)file.size) {
+                                    new_status = panel::SyncStatus::SYNCED;
+                                } else {
                                     new_status = panel::SyncStatus::MODIFIED;
                                 }
+                            } catch (...) {
+                                new_status = panel::SyncStatus::MODIFIED;
                             }
                         } else {
                             new_status = panel::SyncStatus::NOT_SYNCED;

@@ -4,14 +4,14 @@ import { MdOutlineEmail } from "react-icons/md"
 export default function MoreSocials() {
   return (
     <div className="text-center flex flex-col justify-evenly items-center gap-10">
-      <h2 className="text-3xl md:text-5xl font-bold text-text tracking-tight flex flex-col gap-2">
-        <span>It's time for <span className="gradient-text">simple</span> file management.</span>
+      <h2 className="text-2xl md:text-4xl font-bold text-text tracking-tight flex flex-col gap-2">
+        <span>It's time for <span className="text-white">simple</span> file management.</span>
         <span>Try Misty now.</span>
       </h2>
 
       <a
         href="/docs/getting-started"
-        className="px-8 py-3 rounded-full bg-white text-black font-semibold text-sm hover:bg-zinc-200 transition-colors shadow-lg"
+        className="px-5 py-2 rounded-full bg-white text-black font-semibold text-sm hover:bg-zinc-200 transition-colors shadow-lg"
       >
         Download Now
       </a>

@@ -5,7 +5,7 @@ export default function FeaturesShowcase() {
     <div className="flex flex-col gap-4">
       {/* Misty helps you — full width */}
       <div className="glass-card rounded-2xl p-10 md:p-14">
-        <h3 className="text-2xl font-bold text-text mb-6">Misty helps you</h3>
+        <h3 className="text-xl font-bold text-text mb-6">Misty helps you</h3>
         <ul className="flex flex-col gap-4 text-sm md:text-base text-text-muted">
           <li className="flex items-start gap-3">
             <svg className="w-5 h-5 text-primary shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -48,8 +48,8 @@ export default function FeaturesShowcase() {
               <HiOutlineBolt className="w-6 h-6 text-text" />
             </div>
           </div>
-          <h2 className="text-3xl md:text-4xl font-bold text-text tracking-tight mb-4">
-            <span className="gradient-text">Fast</span>, zero bloat.
+          <h2 className="text-2xl md:text-3xl font-bold text-text tracking-tight mb-4">
+            <span className="text-white">Fast</span>, zero bloat.
           </h2>
           <p className="text-text-muted max-w-xl mx-auto text-pretty">
             Files stream on demand — no full sync, no waiting. Search across every provider at once and never lose your place.
@@ -63,7 +63,7 @@ export default function FeaturesShowcase() {
           <div className="w-10 h-10 rounded-lg bg-surface border border-border flex items-center justify-center mb-5">
             <HiOutlineMagnifyingGlass className="w-5 h-5 text-text-muted" />
           </div>
-          <h3 className="text-2xl font-bold text-text mb-3">Unified search</h3>
+          <h3 className="text-xl font-bold text-text mb-3">Unified search</h3>
           <p className="text-text-muted text-pretty mb-5">
             One query across every connected provider. No more switching between tabs to find a file.
           </p>
@@ -80,7 +80,7 @@ export default function FeaturesShowcase() {
           <div className="w-10 h-10 rounded-lg bg-surface border border-border flex items-center justify-center mb-5">
             <HiOutlineArrowsRightLeft className="w-5 h-5 text-text-muted" />
           </div>
-          <h3 className="text-2xl font-bold text-text mb-3">Background transfers</h3>
+          <h3 className="text-xl font-bold text-text mb-3">Background transfers</h3>
           <p className="text-text-muted text-pretty mb-5">
             Moves and copies run quietly while you keep working. Large transfers don't block anything.
           </p>
@@ -115,8 +115,8 @@ export default function FeaturesShowcase() {
             <HiOutlineShieldCheck className="w-6 h-6 text-text" />
           </div>
         </div>
-        <h2 className="text-3xl md:text-4xl font-bold text-text tracking-tight mb-4">
-          <span className="gradient-text">Secure</span> by design.
+        <h2 className="text-2xl md:text-3xl font-bold text-text tracking-tight mb-4">
+          <span className="text-white">Secure</span> by design.
         </h2>
         <p className="text-text-muted max-w-xl mx-auto text-pretty">
           Your credentials never leave your machine. Direct connections over OAuth — no relay servers, no middlemen, no data we can see.
@@ -129,7 +129,7 @@ export default function FeaturesShowcase() {
           <div className="w-10 h-10 rounded-lg bg-surface border border-border flex items-center justify-center mb-5">
             <HiOutlineLockClosed className="w-5 h-5 text-text-muted" />
           </div>
-          <h3 className="text-2xl font-bold text-text mb-3">Local-only</h3>
+          <h3 className="text-xl font-bold text-text mb-3">Local-only</h3>
           <p className="text-text-muted text-pretty mb-5">
             All processing happens on your device. Nothing is routed through our servers.
           </p>
@@ -155,7 +155,7 @@ export default function FeaturesShowcase() {
           <div className="w-10 h-10 rounded-lg bg-surface border border-border flex items-center justify-center mb-5">
             <HiOutlineSignal className="w-5 h-5 text-text-muted" />
           </div>
-          <h3 className="text-2xl font-bold text-text mb-3">Direct connections</h3>
+          <h3 className="text-xl font-bold text-text mb-3">Direct connections</h3>
           <p className="text-text-muted text-pretty mb-5">
             Every API call goes straight from your machine to the provider. Optional Tailscale support for secure remote access.
           </p>

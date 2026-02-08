@@ -51,38 +51,13 @@ void UploadState::fail_upload(uint64_t id, const std::string& error) {
     cleanup_old_history();
 }
 
-void UploadState::set_onedrive_retry_context(uint64_t id,
-                                             const std::string& ms_user_id,
-                                             const std::string& drive_id,
-                                             const std::string& folder_id) {
+void UploadState::set_retry_context(uint64_t id,
+                                    const std::string& remote_name,
+                                    const std::string& remote_path) {
     std::lock_guard<std::mutex> lock(mu);
     transfer_state::update_item_by_id(uploads_, id, [&](UploadItem& item) {
-        item.provider = UploadProvider::ONEDRIVE;
-        item.od_ms_user_id = ms_user_id;
-        item.od_drive_id = drive_id;
-        item.od_folder_id = folder_id;
-    });
-}
-
-void UploadState::set_gdrive_retry_context(uint64_t id,
-                                           const std::string& gd_user_id,
-                                           const std::string& folder_id) {
-    std::lock_guard<std::mutex> lock(mu);
-    transfer_state::update_item_by_id(uploads_, id, [&](UploadItem& item) {
-        item.provider = UploadProvider::GDRIVE;
-        item.gd_user_id = gd_user_id;
-        item.gd_folder_id = folder_id;
-    });
-}
-
-void UploadState::set_dropbox_retry_context(uint64_t id,
-                                            const std::string& dbx_user_id,
-                                            const std::string& folder_path) {
-    std::lock_guard<std::mutex> lock(mu);
-    transfer_state::update_item_by_id(uploads_, id, [&](UploadItem& item) {
-        item.provider = UploadProvider::DROPBOX;
-        item.dbx_user_id = dbx_user_id;
-        item.dbx_folder_path = folder_path;
+        item.remote_name = remote_name;
+        item.remote_path = remote_path;
     });
 }
 
