@@ -318,7 +318,7 @@ void FileExplorerPanel::show_new_entry_modal(FileExplorerState& state) {
                 if (state.new_entry_is_dir) {
                     fs::create_directory(p, ec);
                     if (!ec && is_cloud_dir) {
-                        auto [remote_name, remote_path] = path_utils::parse_remote_path(current_dir);
+                        auto [remote_name, remote_path] = path_utils::parse_remote_name_and_path(current_dir);
                         if (!remote_name.empty()) {
                             std::string folder_path = remote_path.empty() ? name : remote_path + "/" + name;
                             auto& services = registry_.get_state<ServicesState>("Services");

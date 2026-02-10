@@ -1,6 +1,7 @@
 package rclone
 
 import (
+	_ "embed"
 	"context"
 	"os"
 	"path/filepath"
@@ -19,21 +20,36 @@ import (
 	_ "github.com/rclone/rclone/backend/sftp"
 )
 
-var initOnce sync.Once
+//go:embed assets/oauth_callback.html
+var oauthCallbackHTML []byte
+
+var (
+	initOnce            sync.Once
+	oauthTemplatePath   string
+)
 
 func Init() {
 	initOnce.Do(func() {
 		home, _ := os.UserHomeDir()
-		configPath := filepath.Join(home, "misty", "rclone.conf")
+		mistyDir := filepath.Join(home, "misty")
+		configPath := filepath.Join(mistyDir, "rclone.conf")
 
 		// Ensure parent directory exists
-		os.MkdirAll(filepath.Dir(configPath), 0700)
+		os.MkdirAll(mistyDir, 0700)
 
 		// Set rclone config file path before installing
 		_ = config.SetConfigPath(configPath)
 
 		// Initialize the config file backend
 		configfile.Install()
+
+		// Materialize the embedded OAuth callback template to disk so rclone
+		// can read it via config_template_file. We rewrite on every start so
+		// updates ship with the binary.
+		tmplPath := filepath.Join(mistyDir, "oauth_callback.html")
+		if err := os.WriteFile(tmplPath, oauthCallbackHTML, 0600); err == nil {
+			oauthTemplatePath = tmplPath
+		}
 
 		// Set reasonable defaults for library use
 		ci := fs.GetConfig(context.Background())
@@ -44,4 +60,10 @@ func Init() {
 func GetConfigPath() string {
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, "misty", "rclone.conf")
+}
+
+// OAuthTemplatePath returns the on-disk path to the embedded OAuth callback
+// HTML template, or "" if it could not be materialized.
+func OAuthTemplatePath() string {
+	return oauthTemplatePath
 }

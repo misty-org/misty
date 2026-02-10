@@ -2,6 +2,7 @@ package remote
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"path"
 
@@ -14,14 +15,18 @@ func DownloadFile() http.HandlerFunc {
 		filePath := r.URL.Query().Get("path")
 
 		if remoteName == "" || filePath == "" {
+			log.Printf("download: bad request remote=%q path=%q", remoteName, filePath)
 			http.Error(w, "remote and path query parameters are required", http.StatusBadRequest)
 			return
 		}
 
 		if !rclone.RemoteExists(remoteName) {
+			log.Printf("download: remote %q not found", remoteName)
 			http.Error(w, "remote not found", http.StatusNotFound)
 			return
 		}
+
+		log.Printf("download: remote=%q path=%q", remoteName, filePath)
 
 		fileName := path.Base(filePath)
 		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, fileName))
@@ -29,11 +34,14 @@ func DownloadFile() http.HandlerFunc {
 
 		written, err := rclone.DownloadFile(r.Context(), remoteName, filePath, w)
 		if err != nil {
+			log.Printf("download: rclone failed remote=%q path=%q written=%d: %v", remoteName, filePath, written, err)
 			// Only send error if we haven't started writing the body yet
 			if written == 0 {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
 			return
 		}
+
+		log.Printf("download: ok remote=%q path=%q bytes=%d", remoteName, filePath, written)
 	}
 }
