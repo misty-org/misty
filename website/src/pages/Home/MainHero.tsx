@@ -9,8 +9,7 @@ export default function MainHero() {
       </h1>
 
       <p className="text-base text-text-muted max-w-2xl mx-auto mb-12 leading-relaxed text-pretty">
-        Browse, move, and organize all your cloud and local files in
-        one single window.
+        Misty helps you managel all your remote and local storage cloud in one single interface
       </p>
 
       <div className="flex gap-5 justify-center flex-wrap">

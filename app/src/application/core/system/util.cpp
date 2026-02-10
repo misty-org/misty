@@ -16,10 +16,12 @@
 #elif __APPLE__
 #include <mach-o/dyld.h>
 #include <pwd.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #include <sys/stat.h>
 #elif __linux__
 #include <pwd.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #include <sys/stat.h>
 #endif
@@ -29,6 +31,84 @@ extern char** environ;
 #endif
 
 namespace misty::core {
+    namespace {
+        int run_process_blocking(const std::string& executable_path,
+                                 const std::vector<std::string>& args,
+                                 const std::string& working_directory = "") {
+#ifdef _WIN32
+            (void)executable_path;
+            (void)args;
+            (void)working_directory;
+            return -1;
+#else
+            pid_t pid = fork();
+            if (pid < 0) {
+                return -1;
+            }
+            if (pid == 0) {
+                if (!working_directory.empty()) {
+                    chdir(working_directory.c_str());
+                }
+
+                std::vector<char*> argv;
+                argv.push_back(const_cast<char*>(executable_path.c_str()));
+                for (const auto& arg : args) {
+                    argv.push_back(const_cast<char*>(arg.c_str()));
+                }
+                argv.push_back(nullptr);
+
+                execve(executable_path.c_str(), argv.data(), environ);
+                _exit(127);
+            }
+
+            int status = 0;
+            if (waitpid(pid, &status, 0) < 0) {
+                return -1;
+            }
+            if (WIFEXITED(status)) {
+                return WEXITSTATUS(status);
+            }
+            return -1;
+#endif
+        }
+
+#ifdef __APPLE__
+        std::string shell_quote(const std::string& value) {
+            std::string quoted = "'";
+            for (char c : value) {
+                if (c == '\'') {
+                    quoted += "'\\''";
+                } else {
+                    quoted += c;
+                }
+            }
+            quoted += "'";
+            return quoted;
+        }
+
+        std::string applescript_quote(const std::string& value) {
+            std::string quoted = "\"";
+            for (char c : value) {
+                if (c == '\\' || c == '"') {
+                    quoted += '\\';
+                }
+                quoted += c;
+            }
+            quoted += "\"";
+            return quoted;
+        }
+
+        bool run_osascript(const std::vector<std::string>& script_lines) {
+            std::vector<std::string> args;
+            for (const auto& line : script_lines) {
+                args.push_back("-e");
+                args.push_back(line);
+            }
+            return run_process_blocking("/usr/bin/osascript", args) == 0;
+        }
+#endif
+    }
+
     bool open_path_default(const std::string& path) {
         if (path.empty()) {
             return false;
@@ -86,6 +166,48 @@ namespace misty::core {
         return status == 0;
 #else
         std::cerr << "Warning: open_file_in_browser not implemented for this platform" << std::endl;
+        return false;
+#endif
+    }
+
+    bool move_path_with_user_approval(const std::filesystem::path& source_path,
+                                      const std::filesystem::path& target_path) {
+        if (source_path.empty() || target_path.empty()) {
+            return false;
+        }
+
+#ifdef __APPLE__
+        std::error_code ec;
+        if (!target_path.parent_path().empty()) {
+            std::filesystem::create_directories(target_path.parent_path(), ec);
+        }
+
+        const std::string command =
+            "/bin/mkdir -p " + shell_quote(target_path.parent_path().string()) +
+            " && /bin/mv " + shell_quote(source_path.string()) +
+            " " + shell_quote(target_path.string());
+        return run_osascript({
+            "do shell script " + applescript_quote(command) + " with administrator privileges",
+        });
+#else
+        (void)source_path;
+        (void)target_path;
+        return false;
+#endif
+    }
+
+    bool delete_path_with_user_approval(const std::filesystem::path& path) {
+        if (path.empty()) {
+            return false;
+        }
+
+#ifdef __APPLE__
+        const std::string command = "/bin/rm -rf " + shell_quote(path.string());
+        return run_osascript({
+            "do shell script " + applescript_quote(command) + " with administrator privileges",
+        });
+#else
+        (void)path;
         return false;
 #endif
     }

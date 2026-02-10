@@ -2,6 +2,7 @@
 #include "panels/search/fuzzy_match.h"
 #include "panels/file_explorer/file_explorer_state.h"
 #include "panels/services/services_state.h"
+#include "panels/workspace/workspace_state.h"
 #include "core/net/http_client.h"
 #include "core/manager/env_manager.h"
 #include "core/manager/asset_manager.h"
@@ -210,9 +211,17 @@ void SearchPanel::launch_api_searches(SearchState& state, const std::string& que
     for (auto& remote : remotes) {
         std::string remote_name = remote.name;
         std::string display_name = remote.display_name.empty() ? remote.name : remote.display_name;
+        std::string folder_name = remote.alias.empty() ? remote.name : remote.alias;
+        auto& workspace = ui_registry_.get_state<WorkspaceState>("Workspace");
+        for (const auto& mapping : workspace.remote_mappings) {
+            if (mapping.remote_name == remote_name) {
+                folder_name = mapping.folder_name;
+                break;
+            }
+        }
 
         services.search_files(remote_name, query, "",
-            [this, &state, generation, remote_name, display_name, query, finish_task]
+            [this, &state, generation, remote_name, display_name, folder_name, query, finish_task]
             (bool success, const std::string& body, const std::string& /*error*/) {
                 if (!success) {
                     finish_task();
@@ -247,7 +256,7 @@ void SearchPanel::launch_api_searches(SearchState& state, const std::string& que
                     r.dedup_key    = dedup;
                     r.remote_name  = remote_name;
                     r.remote_path  = item_path;
-                    r.virtual_path = mount_root + "/" + display_name + "/" + remote_name + (item_path.empty() ? "" : "/" + item_path);
+                    r.virtual_path = mount_root + "/" + display_name + "/" + folder_name + (item_path.empty() ? "" : "/" + item_path);
                     r.path_display = display_name + (item_path.empty() ? "" : " › " + item_path);
 
                     // Trim filename from path_display to show parent
@@ -388,7 +397,9 @@ void SearchPanel::render_results(SearchState& state) {
         // Path (right-aligned)
         if (!r.path_display.empty()) {
             float path_w = ImGui::CalcTextSize(r.path_display.c_str()).x + 8.0f;
-            ImGui::SameLine(ImGui::GetWindowWidth() - path_w - 4.0f);
+            ImGui::SameLine();
+            ImGui::Dummy(ImVec2(std::max(0.0f, ImGui::GetContentRegionAvail().x - path_w), 0.0f));
+            ImGui::SameLine();
             ImGui::TextDisabled("%s", r.path_display.c_str());
         }
 

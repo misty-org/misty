@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/rclone/rclone/fs"
 	"github.com/rclone/rclone/fs/config"
@@ -77,6 +76,7 @@ func ConfigStart(ctx context.Context, name, providerType string, params map[stri
 
 	out, err := config.CreateRemote(ctx, name, providerType, keyValues, config.UpdateRemoteOpt{
 		NonInteractive: true,
+		All:            providerNeedsFullConfig(providerType),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("config start: %w", err)
@@ -133,8 +133,10 @@ func advance(ctx context.Context, name string, out *fs.ConfigOut) (*ConfigStep, 
 			}, nil
 		}
 
-		// User-facing question (state does NOT start with "*")
-		if out.Option != nil && !strings.HasPrefix(out.State, "*") {
+		// Any ConfigOut with an Option is a user-facing question. Internal
+		// rclone config-all states use "*all-..." tokens, but they still
+		// require real user input for backends like S3 and SFTP.
+		if out.Option != nil {
 			return &ConfigStep{
 				Name:   name,
 				State:  out.State,
@@ -163,6 +165,15 @@ func advance(ctx context.Context, name string, out *fs.ConfigOut) (*ConfigStep, 
 	}
 
 	return nil, fmt.Errorf("config flow did not terminate within %d steps", maxSteps)
+}
+
+func providerNeedsFullConfig(providerType string) bool {
+	switch providerType {
+	case "s3", "sftp":
+		return true
+	default:
+		return false
+	}
 }
 
 // kindOf classifies an Option into a render hint for the client.

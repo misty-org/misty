@@ -1,5 +1,9 @@
 #pragma once
 
+#include <cfloat>
+#include <cmath>
+
+#include "core/manager/asset_manager.h"
 #include "imgui.h"
 
 namespace misty::core {
@@ -134,12 +138,59 @@ namespace misty::core {
         return result;
     }
 
+    inline float FillWidth() {
+        return -FLT_MIN;
+    }
+
+    inline float AvailableWidth(float reserve = 0.0f) {
+        return (ImGui::GetContentRegionAvail().x > reserve)
+            ? (ImGui::GetContentRegionAvail().x - reserve)
+            : 1.0f;
+    }
+
     inline void ColoredText(const ImVec4& color, const char* fmt, ...) {
         CustomStyleColor style(ImGuiCol_Text, color);
         va_list args;
         va_start(args, fmt);
         ImGui::TextV(fmt, args);
         va_end(args);
+    }
+
+    inline void DrawMistyLoadingAnimation(const ImVec2& min,
+                                          const ImVec2& max,
+                                          float sprite_size = 128.0f,
+                                          ImU32 overlay_color = IM_COL32(15, 15, 18, 160)) {
+        static constexpr int   COLS       = 10;
+        static constexpr int   ROWS       = 5;
+        static constexpr int   TOTAL      = COLS * ROWS;
+        static constexpr float FRAME_RATE = 20.0f;
+
+        auto& sprite = AssetManager::get().get_image_texture("assets/misty_sprite.png");
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+        dl->AddRectFilled(min, max, overlay_color);
+
+        int frame = static_cast<int>(ImGui::GetTime() * FRAME_RATE) % TOTAL;
+        int col = frame % COLS;
+        int row = frame / COLS;
+
+        float uv_w = 1.0f / COLS;
+        float uv_h = 1.0f / ROWS;
+        ImVec2 uv0(col * uv_w, row * uv_h);
+        ImVec2 uv1((col + 1) * uv_w, (row + 1) * uv_h);
+
+        float t = static_cast<float>(ImGui::GetTime());
+        float bob = std::sin(t * 3.0f) * 6.0f;
+
+        float cx = min.x + (max.x - min.x) * 0.5f;
+        float cy = min.y + (max.y - min.y) * 0.5f + bob;
+        float half = sprite_size * 0.5f;
+
+        dl->AddImage(
+            (ImTextureID)(intptr_t)sprite.id,
+            ImVec2(cx - half, cy - half),
+            ImVec2(cx + half, cy + half),
+            uv0, uv1
+        );
     }
 
     template<typename Func>

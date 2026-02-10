@@ -156,6 +156,7 @@ namespace misty::panel {
         std::unordered_set<std::string> selected_files;
         int last_selected_index = -1;
         bool is_loading = false;
+        bool show_loading_animation = false;
         bool is_hidden = false;
         bool show_hidden = false;  // toggle dotfiles/hidden entries
         bool grid_view = false;    // toggle grid vs list layout
@@ -163,6 +164,7 @@ namespace misty::panel {
         std::stack<std::string> back_history;
         std::stack<std::string> forward_history;
         std::mutex mu;
+        std::atomic<uint64_t> navigation_generation{0};
 
         // Pending navigation - set by external code, processed by panel
         std::string pending_navigation_path;
@@ -194,6 +196,15 @@ namespace misty::panel {
         bool show_new_entry_modal = false;
         bool new_entry_is_dir = false;
         char new_entry_name_buffer[256] = {};
+
+        // Permission retry modal for local deletes that need elevated approval
+        bool show_permission_delete_modal = false;
+        bool permission_delete_permanent = false;
+        std::vector<std::string> permission_delete_paths;
+
+        // Permanent delete confirmation for items already in the virtual trash
+        bool show_permanent_delete_modal = false;
+        std::vector<std::string> permanent_delete_paths;
 
 
         // Virtual Folders Data
@@ -240,6 +251,7 @@ namespace misty::panel {
     // Navigate to local filesystem path
     inline void navigate_to_local_path(FileExplorerState& state, const std::string& path, bool update_history = true) {
         state.is_loading = true;
+        state.show_loading_animation = false;
 
         try {
             std::string new_path = fs::canonical(fs::path(path)).generic_string();
@@ -299,6 +311,7 @@ namespace misty::panel {
             strncpy(state.search_path, new_path.c_str(), sizeof(state.search_path) - 1);
 
             state.is_loading = false;
+            state.show_loading_animation = false;
             state.selected_files.clear();
             state.last_selected_index = -1;
             state.error_msg = "";
@@ -306,6 +319,7 @@ namespace misty::panel {
         catch (const std::exception& e) {
             state.error_msg = e.what();
             state.is_loading = false;
+            state.show_loading_animation = false;
         }
     }
 

@@ -6,11 +6,51 @@
 #include "panels/services/services_state.h"
 #include "panels/services/remote/remote_state.h"
 #include <algorithm>
+#include <cstdlib>
 #include <cstdio>
+#include <system_error>
 
 namespace fs = std::filesystem;
 
 namespace misty::panel {
+    namespace {
+        bool is_permission_error(const std::error_code& ec) {
+            if (!ec) return false;
+            return ec == std::make_error_code(std::errc::permission_denied) ||
+                   ec == std::make_error_code(std::errc::operation_not_permitted);
+        }
+
+        std::string local_trash_dir() {
+            const char* home = std::getenv("HOME");
+            return std::string(home ? home : "/tmp") + "/misty/.cache/trash";
+        }
+
+        std::string unique_trash_target_path(const std::string& source_path) {
+            const std::string trash_dir = local_trash_dir();
+            std::error_code ec;
+            fs::create_directories(trash_dir, ec);
+
+            const fs::path source(source_path);
+            std::string target = (fs::path(trash_dir) / source.filename()).string();
+
+            int counter = 1;
+            while (fs::exists(target)) {
+                target = (fs::path(trash_dir) /
+                    (source.stem().string() + "_" + std::to_string(counter++) + source.extension().string())).string();
+            }
+            return target;
+        }
+
+        void purge_from_recent(FileExplorerState& state, const std::string& path) {
+            auto it = std::remove_if(state.recent_files.begin(), state.recent_files.end(),
+                [&](const UnifiedFileItem& f) { return f.path == path; });
+            if (it != state.recent_files.end()) {
+                state.recent_files.erase(it, state.recent_files.end());
+                state.dirty_ = true;
+            }
+        }
+    }
+
     void FileExplorerPanel::perform_paste(FileExplorerState& state) {
         std::string dest_dir(state.current_path);
         bool dest_is_cloud = path_utils::is_remote_path(dest_dir);
@@ -302,60 +342,59 @@ namespace misty::panel {
         bool is_trash_view = std::string(state.current_path) == FileExplorerState::VIRTUAL_PATH_TRASH;
 
         std::vector<std::string> to_delete(state.selected_files.begin(), state.selected_files.end());
+        if (to_delete.empty()) return;
+
+        if (is_trash_view) {
+            state.permanent_delete_paths = std::move(to_delete);
+            state.show_permanent_delete_modal = true;
+            return;
+        }
+
+        std::vector<std::string> permission_paths;
+        size_t success_count = 0;
         for (const auto& path : to_delete) {
-            auto purge_from_recent = [&](const std::string& p) {
-                auto it = std::remove_if(state.recent_files.begin(), state.recent_files.end(),
-                    [&](const UnifiedFileItem& f) { return f.path == p; });
-                if (it != state.recent_files.end()) {
-                    state.recent_files.erase(it, state.recent_files.end());
-                    state.dirty_ = true;
+            bool is_cloud = path_utils::is_remote_path(path);
+
+            if (is_cloud) {
+                if (perform_delete(state, path)) {
+                    purge_from_recent(state, path);
+                    ++success_count;
                 }
-            };
-
-            if (is_trash_view) {
-                perform_delete(state, path);
-                auto it = std::remove_if(state.trash_files.begin(), state.trash_files.end(),
-                    [&](const UnifiedFileItem& item) { return item.path == path; });
-                state.trash_files.erase(it, state.trash_files.end());
-                purge_from_recent(path);
             } else {
-                bool is_cloud = path_utils::is_remote_path(path);
-
-                if (is_cloud) {
-                     perform_delete(state, path);
-                     purge_from_recent(path);
+                std::error_code ec;
+                std::string target = unique_trash_target_path(path);
+                fs::rename(path, target, ec);
+                if (ec) {
+                    if (is_permission_error(ec)) {
+                        permission_paths.push_back(path);
+                        continue;
+                    }
+                    state.error_msg = "Failed to move to trash: " + ec.message();
                 } else {
-                    // Local: Move to ~/misty/.cache/trash
-                    std::string trash_dir = std::string(std::getenv("HOME")) + "/misty/.cache/trash";
-                    std::error_code ec;
-                    fs::create_directories(trash_dir, ec);
-
-                    std::string filename = fs::path(path).filename().string();
-                    std::string target = trash_dir + "/" + filename;
-
-                    int counter = 1;
-                    while (fs::exists(target)) {
-                        target = trash_dir + "/" + fs::path(path).stem().string() + "_" + std::to_string(counter++) + fs::path(path).extension().string();
-                    }
-
-                    fs::rename(path, target, ec);
-                    if (ec) {
-                        state.error_msg = "Failed to move to trash: " + ec.message();
-                    } else {
-                         UnifiedFileItem item;
-                         item.path = target;
-                         item.name = fs::path(target).filename().string();
-                         item.is_dir = fs::is_directory(target);
-                         item.status = SyncStatus::DELETED;
-                         state.move_to_trash(item);
-                         state.track_move(path, item);
-                    }
+                     UnifiedFileItem item;
+                     item.path = target;
+                     item.name = fs::path(target).filename().string();
+                     item.is_dir = fs::is_directory(target);
+                     item.status = SyncStatus::DELETED;
+                     state.move_to_trash(item);
+                     state.track_move(path, item);
+                     purge_from_recent(state, path);
+                     state.selected_files.erase(path);
+                     ++success_count;
                 }
             }
         }
 
-        auto& notif = registry_.get_state<NotificationState>("Notifications");
-        notif.add_notification("Deleted", "Deleted " + std::to_string(to_delete.size()) + " items", NotificationType::SUCCESS);
+        if (success_count > 0) {
+            auto& notif = registry_.get_state<NotificationState>("Notifications");
+            notif.add_notification("Deleted", "Deleted " + std::to_string(success_count) + " items", NotificationType::SUCCESS);
+        }
+
+        if (!permission_paths.empty()) {
+            state.permission_delete_paths = std::move(permission_paths);
+            state.permission_delete_permanent = is_trash_view;
+            state.show_permission_delete_modal = true;
+        }
 
         navigate_to_path(std::string(state.current_path), false);
     }
@@ -378,13 +417,113 @@ namespace misty::panel {
         }
     }
 
-    void FileExplorerPanel::perform_delete(FileExplorerState& state, const std::string& path) {
+    bool FileExplorerPanel::perform_delete(FileExplorerState& state,
+                                           const std::string& path,
+                                           bool* requires_permission) {
+        if (requires_permission) *requires_permission = false;
+
         std::error_code ec;
         fs::remove_all(path, ec);
         if (ec) {
+            if (requires_permission && is_permission_error(ec)) {
+                *requires_permission = true;
+                return false;
+            }
             state.error_msg = "Failed to delete: " + ec.message();
+            return false;
         }
         state.selected_files.erase(path);
+        return true;
+    }
+
+    void FileExplorerPanel::confirm_permanent_delete(FileExplorerState& state) {
+        const std::vector<std::string> to_delete = state.permanent_delete_paths;
+        state.show_permanent_delete_modal = false;
+        state.permanent_delete_paths.clear();
+
+        if (to_delete.empty()) return;
+
+        std::vector<std::string> permission_paths;
+        size_t success_count = 0;
+        for (const auto& path : to_delete) {
+            bool requires_permission = false;
+            if (!perform_delete(state, path, &requires_permission)) {
+                if (requires_permission) permission_paths.push_back(path);
+                continue;
+            }
+            auto it = std::remove_if(state.trash_files.begin(), state.trash_files.end(),
+                [&](const UnifiedFileItem& item) { return item.path == path; });
+            state.trash_files.erase(it, state.trash_files.end());
+            purge_from_recent(state, path);
+            ++success_count;
+        }
+
+        if (success_count > 0) {
+            auto& notif = registry_.get_state<NotificationState>("Notifications");
+            notif.add_notification("Deleted", "Deleted " + std::to_string(success_count) + " items", NotificationType::SUCCESS);
+        }
+
+        if (!permission_paths.empty()) {
+            state.permission_delete_paths = std::move(permission_paths);
+            state.permission_delete_permanent = true;
+            state.show_permission_delete_modal = true;
+        }
+
+        navigate_to_path(std::string(state.current_path), false);
+    }
+
+    void FileExplorerPanel::retry_permission_delete(FileExplorerState& state) {
+        const std::vector<std::string> paths = state.permission_delete_paths;
+        const bool permanent_delete = state.permission_delete_permanent;
+
+        state.show_permission_delete_modal = false;
+        state.permission_delete_paths.clear();
+        state.permission_delete_permanent = false;
+
+        if (paths.empty()) return;
+
+        size_t success_count = 0;
+        for (const auto& path : paths) {
+            bool success = false;
+            if (permanent_delete) {
+                success = core::delete_path_with_user_approval(path);
+                if (success) {
+                    auto it = std::remove_if(state.trash_files.begin(), state.trash_files.end(),
+                        [&](const UnifiedFileItem& item) { return item.path == path; });
+                    state.trash_files.erase(it, state.trash_files.end());
+                }
+            } else {
+                const std::string target = unique_trash_target_path(path);
+                success = core::move_path_with_user_approval(path, target);
+                if (success) {
+                    UnifiedFileItem item;
+                    item.path = target;
+                    item.name = fs::path(target).filename().string();
+                    item.is_dir = fs::is_directory(target);
+                    item.status = SyncStatus::DELETED;
+                    state.move_to_trash(item);
+                    state.track_move(path, item);
+                }
+            }
+
+            if (!success) {
+                state.error_msg = permanent_delete
+                    ? "Failed to delete item after permission confirmation."
+                    : "Failed to move item to trash after permission confirmation.";
+                continue;
+            }
+
+            purge_from_recent(state, path);
+            state.selected_files.erase(path);
+            ++success_count;
+        }
+
+        if (success_count > 0) {
+            auto& notif = registry_.get_state<NotificationState>("Notifications");
+            notif.add_notification("Deleted", "Deleted " + std::to_string(success_count) + " items", NotificationType::SUCCESS);
+        }
+
+        navigate_to_path(std::string(state.current_path), false);
     }
 
 }
