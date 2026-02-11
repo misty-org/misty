@@ -160,37 +160,29 @@ namespace minidfs::panel {
         ImGui::Text("Services");
         ImGui::PopStyleColor();
 
-        float max_height = 200.0f;
-        float item_height = 28.0f;
-        float actual_height = std::min(max_height, item_height + 8.0f);
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.22f, 0.22f, 0.22f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.32f, 0.32f, 0.32f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.18f, 0.18f, 0.18f, 1.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 4.0f));
 
-        ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.18f, 0.18f, 0.18f, 1.0f));
-        ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 6.0f);
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f, 8.0f));
-
-        if (ImGui::BeginChild("##services_list", ImVec2(content_width, actual_height), true)) {
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.22f, 0.22f, 0.22f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.32f, 0.32f, 0.32f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.18f, 0.18f, 0.18f, 1.0f));
-
-            // Show cloud services (OneDrive)
-            // Use different indicator based on connection status
-            bool has_connection = services_state.has_ms_connections();
-            std::string onedrive_label = has_connection ? "● OneDrive" : "○ OneDrive";
-            float button_width = ImGui::GetContentRegionAvail().x;
-            if (ImGui::Button(onedrive_label.c_str(), ImVec2(button_width, 24))) {
+        {
+            float button_width = content_width;
+            if (ImGui::Button("OneDrive", ImVec2(button_width, 28))) {
                 auto& file_explorer_state = registry_.get_state<FileExplorerState>("FileExplorer");
 
                 // Set pending navigation - panel will handle the actual navigation
                 file_explorer_state.pending_navigation_path = mount_utils::get_onedrive_root();
             }
 
-            ImGui::PopStyleColor(3);
-        }
-        ImGui::EndChild();
+            if (ImGui::Button("Google Drive", ImVec2(button_width, 28))) {
+                auto& file_explorer_state = registry_.get_state<FileExplorerState>("FileExplorer");
 
-        ImGui::PopStyleVar(2);
-        ImGui::PopStyleColor();
+                file_explorer_state.pending_navigation_path = mount_utils::get_gdrive_root();
+            }
+        }
+
+        ImGui::PopStyleVar();
+        ImGui::PopStyleColor(3);
 
         ImGui::EndGroup();
 
@@ -348,7 +340,12 @@ namespace minidfs::panel {
     }
 
     void FileSidebarPanel::show_storage_info(float width, float padding) {
-        ImGui::SetCursorPosY(ImGui::GetWindowContentRegionMax().y - 100.0f);
+        float button_height = 80.0f;
+        float bottom_padding = 16.0f;
+        float target_y = ImGui::GetWindowHeight() - button_height - bottom_padding;
+        if (target_y > ImGui::GetCursorPosY()) {
+            ImGui::SetCursorPosY(target_y);
+        }
         ImGui::SetCursorPosX(padding);
 
         float b_width = width - (padding * 2);

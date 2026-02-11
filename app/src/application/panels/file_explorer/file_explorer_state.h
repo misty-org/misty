@@ -17,7 +17,8 @@ namespace minidfs::panel {
     // File source type - local filesystem or cloud service
     enum class FileSource {
         LOCAL,
-        ONEDRIVE
+        ONEDRIVE,
+        GDRIVE
     };
 
     // Unified file item that works for both local and OneDrive
@@ -34,6 +35,12 @@ namespace minidfs::panel {
         std::string od_drive_id;
         std::string od_ms_user_id;
         std::string od_web_url;
+
+        // Google Drive metadata (empty for local/OneDrive files)
+        std::string gd_item_id;
+        std::string gd_user_id;
+        std::string gd_mime_type;
+        std::string gd_web_url;
     };
 
     // Path utilities for file explorer navigation
@@ -46,6 +53,46 @@ namespace minidfs::panel {
 
         inline std::string get_onedrive_root() {
             return mount_utils::get_onedrive_root();
+        }
+
+        inline std::string get_gdrive_root() {
+            return mount_utils::get_gdrive_root();
+        }
+
+        inline bool is_gdrive_path(const std::string& path) {
+            std::string root = get_gdrive_root();
+            return path.rfind(root, 0) == 0;
+        }
+
+        // Parse Google Drive path into (account_folder_name, relative_path)
+        // e.g., "~/misty/mnt/GoogleDrive/matthew/Documents"
+        //       → ("matthew", "Documents")
+        inline std::pair<std::string, std::string> parse_gdrive_path(const std::string& path) {
+            std::string root = get_gdrive_root();
+            if (path.rfind(root, 0) != 0) {
+                return {"", ""};
+            }
+
+            std::string relative = path.substr(root.length());
+            if (relative.empty() || relative == "/") {
+                return {"", ""};  // At mount root, show accounts
+            }
+
+            // Remove leading slash
+            if (!relative.empty() && relative[0] == '/') {
+                relative = relative.substr(1);
+            }
+
+            size_t slash_pos = relative.find('/');
+            if (slash_pos == std::string::npos) {
+                // Just account name, at account root
+                return {relative, ""};
+            }
+
+            return {
+                relative.substr(0, slash_pos),
+                relative.substr(slash_pos + 1)
+            };
         }
 
         inline bool is_onedrive_path(const std::string& path) {

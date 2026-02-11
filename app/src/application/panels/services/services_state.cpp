@@ -416,6 +416,23 @@ namespace minidfs::panel {
         gd_auth_error.clear();
     }
 
+    bool ServicesState::is_gd_account_folder_connected(const std::string& folder_name) {
+        std::lock_guard<std::mutex> lock(mu);
+        for (const auto& conn : gd_connections) {
+            std::string email = conn.profile.email;
+            std::string derived_folder;
+            if (!email.empty()) {
+                size_t at_pos = email.find('@');
+                derived_folder = (at_pos != std::string::npos) ? email.substr(0, at_pos) : email;
+            }
+
+            if (derived_folder == folder_name) {
+                return conn.is_authenticated;
+            }
+        }
+        return false;
+    }
+
     void ServicesState::fetch_gdrive_files(const std::string& gd_user_id,
                                             const std::string& folder_id,
                                             GDFilesCallback callback) {

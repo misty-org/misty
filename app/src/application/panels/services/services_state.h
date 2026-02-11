@@ -118,6 +118,7 @@ namespace minidfs::panel {
         void mark_gd_disconnected(const std::string& gd_user_id);
         void initiate_gd_login();
         void disconnect_gdrive(const std::string& gd_user_id);
+        bool is_gd_account_folder_connected(const std::string& folder_name);
 
         // Google Drive file operations
         void fetch_gdrive_files(const std::string& gd_user_id,

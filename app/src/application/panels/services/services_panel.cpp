@@ -24,9 +24,6 @@ namespace minidfs::panel {
             show_header();
             ImGui::Spacing();
             show_cloud_section(state);
-            show_ms_login_modal(state);
-            show_gd_login_modal(state);
-            show_error_modal(state.error_msg, "ServicesError");
         }
         ImGui::End();
         });
@@ -42,14 +39,103 @@ namespace minidfs::panel {
     }
 
     void ServicesPanel::show_cloud_section(ServicesState& state) {
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.7f, 0.7f, 0.7f, 1.0f));
-        ImGui::Text("Cloud Storage");
+        show_tab_bar();
+
+        ImGui::Spacing();
+        ImGui::Spacing();
+
+        if (active_tab_ == 0) {
+            show_onedrive_tab(state);
+        } else {
+            show_gdrive_tab(state);
+        }
+
+        show_ms_login_modal(state);
+        show_gd_login_modal(state);
+        show_error_modal(state.error_msg, "ServicesError");
+    }
+
+    void ServicesPanel::show_tab_bar() {
+        // Tab colors
+        ImVec4 active_text = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
+        ImVec4 inactive_text = ImVec4(0.5f, 0.5f, 0.5f, 1.0f);
+        ImVec4 od_accent = ImVec4(0.2f, 0.5f, 0.9f, 1.0f);   // blue
+        ImVec4 gd_accent = ImVec4(0.2f, 0.7f, 0.4f, 1.0f);    // green
+
+        ImVec4 transparent = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
+
+        float tab_width = 140.0f;
+        float tab_height = 32.0f;
+
+        // OneDrive tab
+        ImGui::PushStyleColor(ImGuiCol_Button, transparent);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.25f, 0.25f, 0.25f, 0.5f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, transparent);
+        ImGui::PushStyleColor(ImGuiCol_Text, active_tab_ == 0 ? active_text : inactive_text);
+        if (ImGui::Button("OneDrive", ImVec2(tab_width, tab_height))) {
+            active_tab_ = 0;
+        }
+        ImGui::PopStyleColor(4);
+
+        // Draw underline for active tab
+        if (active_tab_ == 0) {
+            ImDrawList* draw_list = ImGui::GetWindowDrawList();
+            ImVec2 p_min = ImGui::GetItemRectMin();
+            ImVec2 p_max = ImGui::GetItemRectMax();
+            draw_list->AddLine(
+                ImVec2(p_min.x, p_max.y),
+                ImVec2(p_max.x, p_max.y),
+                ImGui::ColorConvertFloat4ToU32(od_accent), 2.5f);
+        }
+
+        ImGui::SameLine(0.0f, 4.0f);
+
+        // Google Drive tab
+        ImGui::PushStyleColor(ImGuiCol_Button, transparent);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.25f, 0.25f, 0.25f, 0.5f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, transparent);
+        ImGui::PushStyleColor(ImGuiCol_Text, active_tab_ == 1 ? active_text : inactive_text);
+        if (ImGui::Button("Google Drive", ImVec2(tab_width, tab_height))) {
+            active_tab_ = 1;
+        }
+        ImGui::PopStyleColor(4);
+
+        if (active_tab_ == 1) {
+            ImDrawList* draw_list = ImGui::GetWindowDrawList();
+            ImVec2 p_min = ImGui::GetItemRectMin();
+            ImVec2 p_max = ImGui::GetItemRectMax();
+            draw_list->AddLine(
+                ImVec2(p_min.x, p_max.y),
+                ImVec2(p_max.x, p_max.y),
+                ImGui::ColorConvertFloat4ToU32(gd_accent), 2.5f);
+        }
+
+        // Separator under tab bar
+        ImGui::Spacing();
+        ImGui::PushStyleColor(ImGuiCol_Separator, ImVec4(0.3f, 0.3f, 0.3f, 0.5f));
+        ImGui::Separator();
         ImGui::PopStyleColor();
+    }
 
+    void ServicesPanel::try_same_line_or_wrap(int cards_drawn) {
+        if (cards_drawn > 0) {
+            float cursor_x = ImGui::GetCursorPosX();
+            float avail = ImGui::GetContentRegionAvail().x;
+            if (cursor_x + kCardWidth + kCardSpacing <= avail + ImGui::GetCursorPosX()) {
+                // Check if another card fits on this line
+                float next_end = ImGui::GetItemRectMax().x - ImGui::GetWindowPos().x + kCardSpacing + kCardWidth;
+                float window_width = ImGui::GetContentRegionAvail().x + ImGui::GetCursorPosX();
+                if (next_end <= window_width) {
+                    ImGui::SameLine(0.0f, kCardSpacing);
+                }
+            }
+        }
+    }
+
+    void ServicesPanel::show_onedrive_tab(ServicesState& state) {
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f, 8.0f));
-        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 8.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, kCardSpacing));
 
-        // Show all OneDrive connections (including disconnected ones)
         std::vector<std::string> connection_ids;
         {
             std::lock_guard<std::mutex> lock(state.mu);
@@ -60,50 +146,18 @@ namespace minidfs::panel {
             }
         }
 
-        // Display each connection card
+        int cards_drawn = 0;
         for (const auto& ms_user_id : connection_ids) {
+            try_same_line_or_wrap(cards_drawn);
             show_onedrive_profile_card(state, ms_user_id);
-            ImGui::Spacing();
+            cards_drawn++;
         }
 
-        // Always show "Connect to OneDrive" button to allow adding more connections
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.35f, 0.5f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.45f, 0.6f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.15f, 0.3f, 0.45f, 1.0f));
-        if (ImGui::Button("Add OneDrive", ImVec2(280.0f, 32))) {
-            state.show_ms_login_modal = true;
-        }
-        ImGui::PopStyleColor(3);
+        // "Add Account" card
+        try_same_line_or_wrap(cards_drawn);
+        show_add_account_card("Add Account", state.show_ms_login_modal);
 
-        ImGui::Spacing();
-        ImGui::Spacing();
-
-        // Show all Google Drive connections
-        std::vector<std::string> gd_connection_ids;
-        {
-            std::lock_guard<std::mutex> lock(state.mu);
-            for (const auto& conn : state.gd_connections) {
-                if (!conn.profile.id.empty()) {
-                    gd_connection_ids.push_back(conn.profile.id);
-                }
-            }
-        }
-
-        for (const auto& gd_user_id : gd_connection_ids) {
-            show_gdrive_profile_card(state, gd_user_id);
-            ImGui::Spacing();
-        }
-
-        // "Connect to Google Drive" button
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.13f, 0.44f, 0.24f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.18f, 0.54f, 0.34f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.10f, 0.38f, 0.20f, 1.0f));
-        if (ImGui::Button("Add Google Drive", ImVec2(280.0f, 32))) {
-            state.show_gd_login_modal = true;
-        }
-        ImGui::PopStyleColor(3);
-
-        // Show error message if any
+        // Error display
         {
             std::lock_guard<std::mutex> lock(state.mu);
             if (!state.error_msg.empty()) {
@@ -115,6 +169,137 @@ namespace minidfs::panel {
         }
 
         ImGui::PopStyleVar(2);
+    }
+
+    void ServicesPanel::show_gdrive_tab(ServicesState& state) {
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f, 8.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, kCardSpacing));
+
+        std::vector<std::string> gd_connection_ids;
+        {
+            std::lock_guard<std::mutex> lock(state.mu);
+            for (const auto& conn : state.gd_connections) {
+                if (!conn.profile.id.empty()) {
+                    gd_connection_ids.push_back(conn.profile.id);
+                }
+            }
+        }
+
+        int cards_drawn = 0;
+        for (const auto& gd_user_id : gd_connection_ids) {
+            try_same_line_or_wrap(cards_drawn);
+            show_gdrive_profile_card(state, gd_user_id);
+            cards_drawn++;
+        }
+
+        // "Add Account" card
+        try_same_line_or_wrap(cards_drawn);
+        show_add_account_card("Add Account", state.show_gd_login_modal);
+
+        // Error display
+        {
+            std::lock_guard<std::mutex> lock(state.mu);
+            if (!state.error_msg.empty()) {
+                ImGui::Spacing();
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.4f, 0.4f, 1.0f));
+                ImGui::TextWrapped("%s", state.error_msg.c_str());
+                ImGui::PopStyleColor();
+            }
+        }
+
+        ImGui::PopStyleVar(2);
+    }
+
+    void ServicesPanel::show_add_account_card(const char* label, bool& show_modal) {
+        ImGui::PushID(label);
+        ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 8.0f);
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.16f, 0.16f, 0.16f, 0.5f));
+        ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 0.0f, 0.0f, 0.0f)); // hide default border
+        ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 0.0f);
+
+        float card_height = 160.0f;
+        if (ImGui::BeginChild("AddCard", ImVec2(kCardWidth, card_height), ImGuiChildFlags_None)) {
+            // Draw dashed border manually
+            ImDrawList* draw_list = ImGui::GetWindowDrawList();
+            ImVec2 p_min = ImGui::GetWindowPos();
+            ImVec2 p_max = ImVec2(p_min.x + kCardWidth, p_min.y + card_height);
+            ImU32 border_col = IM_COL32(120, 120, 120, 150);
+
+            // Draw dashed rectangle using line segments
+            float dash_len = 8.0f;
+            float gap_len = 5.0f;
+            float rounding = 8.0f;
+
+            // Use a dotted rect approximation by drawing many small segments
+            auto draw_dashed_line = [&](ImVec2 a, ImVec2 b) {
+                float dx = b.x - a.x;
+                float dy = b.y - a.y;
+                float len = sqrtf(dx * dx + dy * dy);
+                if (len < 1.0f) return;
+                float nx = dx / len;
+                float ny = dy / len;
+                float pos = 0.0f;
+                bool drawing = true;
+                while (pos < len) {
+                    float seg = drawing ? dash_len : gap_len;
+                    float end_pos = (pos + seg > len) ? len : pos + seg;
+                    if (drawing) {
+                        draw_list->AddLine(
+                            ImVec2(a.x + nx * pos, a.y + ny * pos),
+                            ImVec2(a.x + nx * end_pos, a.y + ny * end_pos),
+                            border_col, 1.5f);
+                    }
+                    pos = end_pos;
+                    drawing = !drawing;
+                }
+            };
+
+            float inset = 0.5f;
+            ImVec2 tl(p_min.x + inset, p_min.y + inset);
+            ImVec2 tr(p_max.x - inset, p_min.y + inset);
+            ImVec2 br(p_max.x - inset, p_max.y - inset);
+            ImVec2 bl(p_min.x + inset, p_max.y - inset);
+
+            draw_dashed_line(ImVec2(tl.x + rounding, tl.y), ImVec2(tr.x - rounding, tr.y)); // top
+            draw_dashed_line(ImVec2(tr.x, tr.y + rounding), ImVec2(br.x, br.y - rounding)); // right
+            draw_dashed_line(ImVec2(br.x - rounding, br.y), ImVec2(bl.x + rounding, bl.y)); // bottom
+            draw_dashed_line(ImVec2(bl.x, bl.y - rounding), ImVec2(tl.x, tl.y + rounding)); // left
+
+            // Center the "+" and label
+            float total_content_height = ImGui::GetFontSize() * 2.5f + 8.0f;
+            float start_y = (card_height - total_content_height) * 0.5f;
+
+            ImGui::SetCursorPosY(start_y);
+
+            // "+" symbol
+            core::WithFontScale(2.0f, [&]() {
+                float plus_width = ImGui::CalcTextSize("+").x;
+                ImGui::SetCursorPosX((kCardWidth - plus_width) * 0.5f);
+                core::ColoredText(ImVec4(0.5f, 0.5f, 0.5f, 0.8f), "+");
+            });
+
+            ImGui::Spacing();
+
+            // Label
+            float label_width = ImGui::CalcTextSize(label).x;
+            ImGui::SetCursorPosX((kCardWidth - label_width) * 0.5f);
+            core::ColoredText(ImVec4(0.5f, 0.5f, 0.5f, 0.8f), "%s", label);
+        }
+        ImGui::EndChild();
+
+        // Make the card clickable
+        if (ImGui::IsItemClicked()) {
+            show_modal = true;
+        }
+
+        // Hover effect
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+        }
+
+        ImGui::PopStyleVar(2);
+        ImGui::PopStyleColor(2);
+        ImGui::PopID();
     }
 
     void ServicesPanel::show_onedrive_card_header(bool is_connected) {
@@ -197,7 +382,7 @@ namespace minidfs::panel {
         ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.3f, 0.3f, 0.3f, 0.5f));
         ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 1.0f);
 
-        if (ImGui::BeginChild("OneDriveCard", ImVec2(320.0f, 0.0f), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders)) {
+        if (ImGui::BeginChild("OneDriveCard", ImVec2(kCardWidth, 0.0f), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders)) {
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8.0f, 6.0f));
             show_onedrive_card_header(card.is_connected);
             ImGui::Spacing();
@@ -362,7 +547,7 @@ namespace minidfs::panel {
         ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.3f, 0.3f, 0.3f, 0.5f));
         ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 1.0f);
 
-        if (ImGui::BeginChild("GDriveCard", ImVec2(320.0f, 0.0f), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders)) {
+        if (ImGui::BeginChild("GDriveCard", ImVec2(kCardWidth, 0.0f), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders)) {
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8.0f, 6.0f));
             show_gdrive_card_header(card.is_connected);
             ImGui::Spacing();

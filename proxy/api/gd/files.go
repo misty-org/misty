@@ -103,8 +103,8 @@ func GetFile(database *db.Database) http.HandlerFunc {
 }
 
 // DownloadFile streams file content from Google Drive.
-// Unlike OneDrive, Google Drive downloads require the Authorization header
-// throughout — there is no pre-signed redirect URL.
+// Only handles binary files (alt=media). Google Workspace files (Docs, Sheets,
+// etc.) should be opened in the browser via webViewLink instead.
 func DownloadFile(database *db.Database) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID := r.URL.Query().Get("user_id")

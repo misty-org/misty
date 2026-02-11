@@ -1,6 +1,7 @@
 #include "panels/file_explorer/file_explorer_panel.h"
 #include "panels/workspace/workspace_state.h"
 #include "panels/services/onedrive/onedrive_state.h"
+#include "panels/services/gdrive/gdrive_state.h"
 #include "panels/services/services_state.h"
 #include "panels/activity/download_state.h"
 #include "panels/notification/notification_state.h"
@@ -24,6 +25,7 @@ namespace minidfs::panel {
 
         // Sync account mappings to create account directories
         sync_account_mappings();
+        sync_gd_account_mappings();
 
         // Fetch workspaces if not already done
         if (!workspace_state.has_fetched) {
@@ -125,14 +127,29 @@ namespace minidfs::panel {
                 // Navigate into specific account
                 navigate_to_onedrive_account(folder_name, relative_path, update_history, create_if_missing);
             }
+        } else if (path_utils::is_gdrive_path(path)) {
+            // Google Drive path - parse and route
+            auto [folder_name, relative_path] = path_utils::parse_gdrive_path(path);
+
+            if (folder_name.empty()) {
+                navigate_to_gdrive_mount_root(update_history);
+            } else {
+                navigate_to_gdrive_account(folder_name, relative_path, update_history, create_if_missing);
+            }
         } else {
-            // Local path - clear OneDrive upload context and notification tracking
+            // Local path - clear OneDrive and GDrive upload context and notification tracking
             {
                 auto& onedrive_state = registry_.get_state<OneDriveState>("OneDrive");
                 std::lock_guard<std::mutex> od_lock(onedrive_state.mu);
                 onedrive_state.current_ms_user_id.clear();
                 onedrive_state.current_drive_id.clear();
                 onedrive_state.current_folder_id.clear();
+            }
+            {
+                auto& gdrive_state = registry_.get_state<GDriveState>("GDrive");
+                std::lock_guard<std::mutex> gd_lock(gdrive_state.mu);
+                gdrive_state.current_gd_user_id.clear();
+                gdrive_state.current_folder_id.clear();
             }
             state.last_disconnected_notification_folder.clear();
             navigate_to_local_path(state, path, update_history);
@@ -708,16 +725,25 @@ namespace minidfs::panel {
                     // Open file
                     if (file.source == FileSource::LOCAL) {
                         open_file(file.path);
-                    } else {
+                    } else if (file.source == FileSource::ONEDRIVE) {
                         // OneDrive file - check if it exists locally first
                         if (fs::exists(file.path)) {
-                            // File already downloaded, open it
                             open_file(file.path);
                         } else if (!state.is_downloading(file.path)) {
-                            // Download the file first, then open it
                             download_and_open_file(file);
                         }
-                        // If already downloading, do nothing (user can wait)
+                    } else if (file.source == FileSource::GDRIVE) {
+                        // Google Workspace files (Docs, Sheets, etc.) - open in browser
+                        if (file.gd_mime_type.rfind("application/vnd.google-apps.", 0) == 0
+                            && file.gd_mime_type != "application/vnd.google-apps.folder") {
+                            if (!file.gd_web_url.empty()) {
+                                open_file(file.gd_web_url);
+                            }
+                        } else if (fs::exists(file.path)) {
+                            open_file(file.path);
+                        } else if (!state.is_downloading(file.path)) {
+                            download_and_open_gd_file(file);
+                        }
                     }
                 }
             }
@@ -746,6 +772,411 @@ namespace minidfs::panel {
         if (!file.last_modified.empty()) {
             ImGui::Text("%s", file.last_modified.c_str());
         }
+    }
+
+    // ==================== Google Drive Methods ====================
+
+    void FileExplorerPanel::sync_gd_account_mappings() {
+        auto& workspace = registry_.get_state<WorkspaceState>("Workspace");
+        auto& services = registry_.get_state<ServicesState>("Services");
+
+        workspace.ensure_directories();
+
+        std::lock_guard<std::mutex> svc_lock(services.mu);
+
+        workspace.gd_account_mappings.clear();
+        for (const auto& conn : services.gd_connections) {
+            if (!conn.is_authenticated) continue;
+
+            GDAccountMapping mapping;
+            mapping.gd_user_id = conn.profile.id;
+            mapping.display_name = conn.profile.display_name;
+            mapping.email = conn.profile.email;
+            mapping.folder_name = mount_utils::derive_folder_name(conn.profile.email);
+
+            mount_utils::ensure_gd_account_directory(conn.profile.email);
+
+            workspace.gd_account_mappings.push_back(mapping);
+        }
+    }
+
+    void FileExplorerPanel::navigate_to_gdrive_mount_root(bool update_history) {
+        auto& state = registry_.get_state<FileExplorerState>("FileExplorer");
+        auto& workspace = registry_.get_state<WorkspaceState>("Workspace");
+
+        state.last_disconnected_notification_folder.clear();
+
+        // Clear GDrive upload context
+        {
+            auto& gdrive_state = registry_.get_state<GDriveState>("GDrive");
+            std::lock_guard<std::mutex> gd_lock(gdrive_state.mu);
+            gdrive_state.current_gd_user_id.clear();
+            gdrive_state.current_folder_id.clear();
+        }
+
+        sync_gd_account_mappings();
+
+        std::string new_path = path_utils::get_gdrive_root();
+
+        if (update_history) {
+            std::string current_path_str(state.current_path);
+            if (!current_path_str.empty() && current_path_str != new_path) {
+                state.back_history.push(current_path_str);
+            }
+            while (!state.forward_history.empty()) {
+                state.forward_history.pop();
+            }
+        }
+
+        std::vector<UnifiedFileItem> files;
+        std::unordered_set<std::string> added_folders;
+
+        // Add connected accounts from mappings
+        for (const auto& mapping : workspace.gd_account_mappings) {
+            UnifiedFileItem item;
+            item.name = mapping.folder_name;
+            item.path = new_path + "/" + mapping.folder_name;
+            item.is_dir = true;
+            item.source = FileSource::GDRIVE;
+            item.gd_user_id = mapping.gd_user_id;
+            files.push_back(item);
+            added_folders.insert(mapping.folder_name);
+        }
+
+        // Scan local GoogleDrive directory for folders without connected accounts
+        std::error_code ec;
+        if (fs::exists(new_path, ec) && fs::is_directory(new_path, ec)) {
+            for (const auto& entry : fs::directory_iterator(new_path, ec)) {
+                if (entry.is_directory()) {
+                    std::string folder_name = entry.path().filename().string();
+                    if (added_folders.count(folder_name) > 0 || folder_name[0] == '.') {
+                        continue;
+                    }
+
+                    UnifiedFileItem item;
+                    item.name = folder_name;
+                    item.path = new_path + "/" + folder_name;
+                    item.is_dir = true;
+                    item.source = FileSource::LOCAL;
+                    files.push_back(item);
+                }
+            }
+        }
+
+        state.files = std::move(files);
+        strncpy(state.current_path, new_path.c_str(), sizeof(state.current_path) - 1);
+        state.current_path[sizeof(state.current_path) - 1] = '\0';
+        strncpy(state.search_path, new_path.c_str(), sizeof(state.search_path) - 1);
+
+        state.is_loading = false;
+        state.selected_files.clear();
+        state.last_selected_index = -1;
+        state.error_msg = "";
+    }
+
+    void FileExplorerPanel::navigate_to_gdrive_account(const std::string& folder_name,
+                                                        const std::string& relative_path,
+                                                        bool update_history,
+                                                        bool create_if_missing) {
+        auto& state = registry_.get_state<FileExplorerState>("FileExplorer");
+        auto& workspace = registry_.get_state<WorkspaceState>("Workspace");
+        auto& services = registry_.get_state<ServicesState>("Services");
+
+        bool is_connected = services.is_gd_account_folder_connected(folder_name);
+
+        GDAccountMapping* mapping = workspace.find_gd_account_by_folder(folder_name);
+        if (!mapping) {
+            sync_gd_account_mappings();
+            mapping = workspace.find_gd_account_by_folder(folder_name);
+        }
+
+        std::string target_path = path_utils::get_gdrive_root() + "/" + folder_name;
+        if (!relative_path.empty()) {
+            target_path += "/" + relative_path;
+        }
+
+        if (!is_connected) {
+            if (state.last_disconnected_notification_folder != folder_name) {
+                auto& notifications = registry_.get_state<NotificationState>("Notifications");
+                notifications.add_notification(
+                    "Account Not Connected",
+                    "The Google Drive account '" + folder_name + "' is not connected. Showing local files only.",
+                    NotificationType::INFO,
+                    8.0f
+                );
+                state.last_disconnected_notification_folder = folder_name;
+            }
+
+            if (!mapping) {
+                if (!fs::exists(target_path)) {
+                    state.error_msg = "Path does not exist: " + target_path;
+                    return;
+                }
+                if (!fs::is_directory(target_path)) {
+                    state.error_msg = "Path is not a directory: " + target_path;
+                    return;
+                }
+                navigate_to_local_path(state, target_path, update_history);
+                return;
+            }
+        } else {
+            state.last_disconnected_notification_folder.clear();
+        }
+
+        if (!mapping) {
+            state.error_msg = "Account not found: " + folder_name;
+            return;
+        }
+
+        if (create_if_missing) {
+            std::error_code ec;
+            fs::create_directories(target_path, ec);
+            if (ec) {
+                state.error_msg = "Failed to create directory: " + target_path;
+                return;
+            }
+        } else {
+            if (!fs::exists(target_path)) {
+                state.error_msg = "Path does not exist: " + target_path;
+                return;
+            }
+            if (!fs::is_directory(target_path)) {
+                state.error_msg = "Path is not a directory: " + target_path;
+                return;
+            }
+        }
+
+        std::string folder_id = resolve_gd_folder_id_from_cache(*mapping, relative_path);
+
+        if (update_history) {
+            std::string current_path_str(state.current_path);
+            if (!current_path_str.empty() && current_path_str != target_path) {
+                state.back_history.push(current_path_str);
+            }
+            while (!state.forward_history.empty()) {
+                state.forward_history.pop();
+            }
+        }
+
+        strncpy(state.current_path, target_path.c_str(), sizeof(state.current_path) - 1);
+        state.current_path[sizeof(state.current_path) - 1] = '\0';
+        strncpy(state.search_path, target_path.c_str(), sizeof(state.search_path) - 1);
+
+        state.selected_files.clear();
+        state.last_selected_index = -1;
+        state.error_msg = "";
+
+        // Try to load from cache first
+        std::vector<GDriveItem> cached_items;
+        if (load_gd_items_from_cache(mapping->gd_user_id, folder_id, cached_items)) {
+            std::vector<UnifiedFileItem> files;
+            for (const auto& gd_item : cached_items) {
+                UnifiedFileItem item;
+                item.name = gd_item.name;
+                item.path = target_path + "/" + gd_item.name;
+                item.is_dir = gd_item.is_folder;
+                item.size = gd_item.size;
+                item.last_modified = gd_item.modified_time.length() >= 10
+                                     ? gd_item.modified_time.substr(0, 10) : "";
+                item.source = FileSource::GDRIVE;
+                item.gd_item_id = gd_item.id;
+                item.gd_user_id = gd_item.gd_user_id;
+                item.gd_mime_type = gd_item.mime_type;
+                item.gd_web_url = gd_item.web_url;
+                files.push_back(item);
+            }
+            state.files = std::move(files);
+            state.is_loading = false;
+        } else {
+            state.files.clear();
+            state.is_loading = true;
+        }
+
+        fetch_gdrive_folder(*mapping, folder_id, target_path);
+    }
+
+    std::string FileExplorerPanel::resolve_gd_folder_id_from_cache(const GDAccountMapping& account,
+                                                                     const std::string& relative_path) {
+        if (relative_path.empty()) {
+            return "root";
+        }
+
+        auto components = path_utils::split_path(relative_path);
+        std::string folder_id = "root";
+
+        for (const auto& name : components) {
+            std::vector<GDriveItem> items;
+            if (!load_gd_items_from_cache(account.gd_user_id, folder_id, items)) {
+                return folder_id;
+            }
+
+            bool found = false;
+            for (const auto& item : items) {
+                if (item.is_folder && item.name == name) {
+                    folder_id = item.id;
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found) {
+                return folder_id;
+            }
+        }
+
+        return folder_id;
+    }
+
+    void FileExplorerPanel::fetch_gdrive_folder(const GDAccountMapping& account,
+                                                  const std::string& folder_id,
+                                                  const std::string& target_path) {
+        auto& services = registry_.get_state<ServicesState>("Services");
+        std::string gd_user_id = account.gd_user_id;
+
+        services.fetch_gdrive_files(gd_user_id, folder_id,
+            [this, gd_user_id, folder_id, target_path](bool success,
+                                                         const std::string& body,
+                                                         const std::string& error) {
+                handle_gd_folder_fetch_response(gd_user_id, folder_id, target_path, success, body, error);
+            });
+    }
+
+    void FileExplorerPanel::handle_gd_folder_fetch_response(const std::string& gd_user_id,
+                                                              const std::string& folder_id,
+                                                              const std::string& target_path,
+                                                              bool success,
+                                                              const std::string& body,
+                                                              const std::string& error) {
+        auto& state = registry_.get_state<FileExplorerState>("FileExplorer");
+        std::lock_guard<std::mutex> lock(state.mu);
+
+        state.is_loading = false;
+
+        if (std::string(state.current_path) != target_path) {
+            return;
+        }
+
+        // Update GDriveState with current folder context for uploads
+        {
+            auto& gdrive_state = registry_.get_state<GDriveState>("GDrive");
+            std::lock_guard<std::mutex> gd_lock(gdrive_state.mu);
+            gdrive_state.current_gd_user_id = gd_user_id;
+            gdrive_state.current_folder_id = folder_id;
+        }
+
+        if (success) {
+            std::vector<GDriveItem> gd_items;
+            std::vector<UnifiedFileItem> files;
+
+            try {
+                auto json = nlohmann::json::parse(body);
+                auto values = json.value("files", nlohmann::json::array());
+
+                for (const auto& item : values) {
+                    GDriveItem gdi;
+                    gdi.id = item.value("id", std::string(""));
+                    gdi.name = item.value("name", std::string(""));
+                    // Google Drive API returns size as a string
+                    if (item.contains("size")) {
+                        if (item["size"].is_string()) {
+                            try { gdi.size = std::stoll(item["size"].get<std::string>()); } catch (...) { gdi.size = 0; }
+                        } else {
+                            gdi.size = item["size"].get<int64_t>();
+                        }
+                    }
+                    gdi.web_url = item.value("webViewLink", std::string(""));
+                    gdi.created_time = item.value("createdTime", std::string(""));
+                    gdi.modified_time = item.value("modifiedTime", std::string(""));
+                    gdi.mime_type = item.value("mimeType", std::string(""));
+                    gdi.is_folder = (gdi.mime_type == "application/vnd.google-apps.folder");
+                    gdi.gd_user_id = gd_user_id;
+                    gd_items.push_back(gdi);
+
+                    UnifiedFileItem ufi;
+                    ufi.name = gdi.name;
+                    ufi.path = target_path + "/" + gdi.name;
+                    ufi.is_dir = gdi.is_folder;
+                    ufi.size = gdi.size;
+                    ufi.last_modified = gdi.modified_time.length() >= 10
+                                        ? gdi.modified_time.substr(0, 10) : "";
+                    ufi.source = FileSource::GDRIVE;
+                    ufi.gd_item_id = gdi.id;
+                    ufi.gd_user_id = gd_user_id;
+                    ufi.gd_mime_type = gdi.mime_type;
+                    ufi.gd_web_url = gdi.web_url;
+                    files.push_back(ufi);
+                }
+
+                state.files = std::move(files);
+                save_gd_items_to_cache(gd_user_id, folder_id, gd_items);
+
+            } catch (const std::exception& e) {
+                if (state.files.empty()) {
+                    state.error_msg = std::string("Parse error: ") + e.what();
+                }
+            }
+        } else if (state.files.empty()) {
+            state.error_msg = error;
+        }
+    }
+
+    void FileExplorerPanel::download_and_open_gd_file(const UnifiedFileItem& file) {
+        auto& state = registry_.get_state<FileExplorerState>("FileExplorer");
+        auto& services = registry_.get_state<ServicesState>("Services");
+        auto& downloads = registry_.get_state<DownloadState>("Downloads");
+        auto& notifications = registry_.get_state<NotificationState>("Notifications");
+
+        state.downloading_files.insert(file.path);
+
+        uint64_t download_id = downloads.start_download(
+            file.name,
+            file.path,
+            "Google Drive",
+            file.size
+        );
+
+        uint64_t notif_id = notifications.add_notification(
+            "Downloading",
+            file.name,
+            NotificationType::DOWNLOAD,
+            15.0f
+        );
+
+        services.download_gd_file(
+            file.gd_user_id,
+            file.gd_item_id,
+            file.path,
+            [this, path = file.path, file_name = file.name, download_id, notif_id](
+                bool success, const std::string& local_path, const std::string& error) {
+
+                auto& state = registry_.get_state<FileExplorerState>("FileExplorer");
+                auto& downloads = registry_.get_state<DownloadState>("Downloads");
+                auto& notifications = registry_.get_state<NotificationState>("Notifications");
+
+                state.downloading_files.erase(path);
+                notifications.dismiss(notif_id);
+
+                if (success) {
+                    downloads.complete_download(download_id);
+                    notifications.add_notification(
+                        "Download Complete",
+                        file_name,
+                        NotificationType::SUCCESS,
+                        5.0f
+                    );
+                    open_file(local_path);
+                } else {
+                    downloads.fail_download(download_id, error);
+                    notifications.add_notification(
+                        "Download Failed",
+                        file_name + ": " + error,
+                        NotificationType::ERROR,
+                        5.0f
+                    );
+                    state.error_msg = "Download failed: " + error;
+                }
+            }
+        );
     }
 
     void FileExplorerPanel::download_and_open_file(const UnifiedFileItem& file) {

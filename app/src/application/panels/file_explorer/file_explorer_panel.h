@@ -50,6 +50,28 @@ namespace minidfs::panel {
         // Download OneDrive file and open it when complete
         void download_and_open_file(const UnifiedFileItem& file);
 
+        // Sync Google Drive account mappings from services state
+        void sync_gd_account_mappings();
+
+        // Google Drive path navigation helpers
+        void navigate_to_gdrive_mount_root(bool update_history);
+        void navigate_to_gdrive_account(const std::string& folder_name, const std::string& relative_path, bool update_history, bool create_if_missing);
+        void fetch_gdrive_folder(const GDAccountMapping& account, const std::string& folder_id, const std::string& target_path);
+
+        // Resolve relative path to folder ID using Google Drive cache
+        std::string resolve_gd_folder_id_from_cache(const GDAccountMapping& account, const std::string& relative_path);
+
+        // Handle async Google Drive folder fetch response
+        void handle_gd_folder_fetch_response(const std::string& gd_user_id,
+                                              const std::string& folder_id,
+                                              const std::string& target_path,
+                                              bool success,
+                                              const std::string& body,
+                                              const std::string& error);
+
+        // Download Google Drive file and open it when complete
+        void download_and_open_gd_file(const UnifiedFileItem& file);
+
     private:
         core::UIRegistry& registry_;
         core::WorkerPool& worker_pool_;

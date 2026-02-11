@@ -31,6 +31,14 @@ namespace minidfs::panel {
         std::string email;
     };
 
+    // Account mapping for Google Drive
+    struct GDAccountMapping {
+        std::string folder_name;    // Derived from email: "matthew"
+        std::string gd_user_id;     // Internal Google user ID
+        std::string display_name;
+        std::string email;
+    };
+
     // Directory management utilities for mount points
     namespace mount_utils {
         inline std::string get_mount_root() {
@@ -41,6 +49,10 @@ namespace minidfs::panel {
 
         inline std::string get_onedrive_root() {
             return get_mount_root() + "/OneDrive";
+        }
+
+        inline std::string get_gdrive_root() {
+            return get_mount_root() + "/GoogleDrive";
         }
 
         // Derive folder name from email: matthew@outlook.com → "matthew"
@@ -58,12 +70,22 @@ namespace minidfs::panel {
             std::error_code ec;
             fs::create_directories(get_mount_root(), ec);
             fs::create_directories(get_onedrive_root(), ec);
+            fs::create_directories(get_gdrive_root(), ec);
         }
 
         // Create account directory and return the path
         inline std::string ensure_account_directory(const std::string& email) {
             std::string folder_name = derive_folder_name(email);
             std::string account_path = get_onedrive_root() + "/" + folder_name;
+            std::error_code ec;
+            fs::create_directories(account_path, ec);
+            return account_path;
+        }
+
+        // Create Google Drive account directory and return the path
+        inline std::string ensure_gd_account_directory(const std::string& email) {
+            std::string folder_name = derive_folder_name(email);
+            std::string account_path = get_gdrive_root() + "/" + folder_name;
             std::error_code ec;
             fs::create_directories(account_path, ec);
             return account_path;
@@ -82,6 +104,7 @@ namespace minidfs::panel {
 
         // Cloud account mappings (managed by workspace, used by file explorer)
         std::vector<AccountMapping> account_mappings;
+        std::vector<GDAccountMapping> gd_account_mappings;
 
         // Get currently selected workspace
         WorkspaceInfo* get_current_workspace() {
@@ -202,6 +225,16 @@ namespace minidfs::panel {
         // Find account by folder name
         AccountMapping* find_account_by_folder(const std::string& folder_name) {
             for (auto& mapping : account_mappings) {
+                if (mapping.folder_name == folder_name) {
+                    return &mapping;
+                }
+            }
+            return nullptr;
+        }
+
+        // Find Google Drive account by folder name
+        GDAccountMapping* find_gd_account_by_folder(const std::string& folder_name) {
+            for (auto& mapping : gd_account_mappings) {
                 if (mapping.folder_name == folder_name) {
                     return &mapping;
                 }
