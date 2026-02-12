@@ -9,11 +9,11 @@
 #include <memory>
 #include <curl/curl.h>
 
-std::unique_ptr<minidfs::Application> create_application() {
+std::unique_ptr<misty::Application> create_application() {
     #ifdef _WIN32
-        return std::make_unique<minidfs::WindowsApp>();
+        return std::make_unique<misty::WindowsApp>();
     #elif defined(__APPLE__)
-        return std::make_unique<minidfs::MacApp>();
+        return std::make_unique<misty::MacApp>();
     #else
         static_assert(sizeof(void*) == 0, "Unsupported platform");
     #endif

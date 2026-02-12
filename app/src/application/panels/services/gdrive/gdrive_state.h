@@ -12,7 +12,7 @@
 #include "core/ui_registry.h"
 #include "core/http_client.h"
 
-namespace minidfs::panel {
+namespace misty::panel {
 
     // Upload result callback: (success, error_message)
     using GDUploadCallback = std::function<void(bool success, const std::string& error_msg)>;

@@ -5,8 +5,8 @@ file(GLOB_RECURSE TEST_SRCS
     "src/tests/*.h"
 )
 # tests
-add_executable(minidfs_tests ${TEST_SRCS})
-target_link_libraries(minidfs_tests PRIVATE
-    minidfs
+add_executable(misty_tests ${TEST_SRCS})
+target_link_libraries(misty_tests PRIVATE
+    misty_core
     gtest_main
 )

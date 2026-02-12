@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-package minidfs;
+package misty;
 
-option go_package = ".;minidfs";
+option go_package = ".;misty";
 
 enum FileOpType {
     READ = 0;
@@ -16,8 +16,8 @@ enum FileUpdateType {
     DELETED = 2;
 }
 
-// service methods for minidfs
-service MiniDFSService {
+// service methods for misty
+service MistyService {
     
     //List files in a directory
     rpc ListFiles(ListFilesReq) returns (ListFilesRes);

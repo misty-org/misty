@@ -12,7 +12,7 @@
 #include "views/app_view.h"
 #include <nlohmann/json.hpp>
 
-namespace minidfs::panel {
+namespace misty::panel {
 
     struct TSPanelSnapshot {
         std::string login_url;

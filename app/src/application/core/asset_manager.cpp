@@ -5,7 +5,7 @@
 #include <sstream>
 #include <iostream>
 
-namespace minidfs::core {
+namespace misty::core {
     void AssetManager::shutdown() {
         for (auto& [name, texture] : svg_textures_) {
             unload_svg(texture);

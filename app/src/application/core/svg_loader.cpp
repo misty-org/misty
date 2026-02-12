@@ -3,7 +3,7 @@
 #include <glad/glad.h>
 #include <lunasvg.h>
 
-namespace minidfs::core {
+namespace misty::core {
     SVGTexture load_svg(const std::string& path, int width, int height) {
         auto document = lunasvg::Document::loadFromFile(path);
         if (!document) {

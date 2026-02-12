@@ -7,8 +7,8 @@
 
 namespace fs = std::filesystem;
 
-namespace minidfs {
-    FileSyncWin32::FileSyncWin32(std::shared_ptr<MiniDFSClient> client)
+namespace misty {
+    FileSyncWin32::FileSyncWin32(std::shared_ptr<MistyClient> client)
         : FileSync(std::move(client)) {
         
     }
@@ -33,7 +33,7 @@ namespace minidfs {
 
     void FileSyncWin32::init_sync_resources() {
         if (client_ == nullptr) {
-            throw std::runtime_error("MiniDFSClient is not initialized");
+            throw std::runtime_error("MistyClient is not initialized");
         }
         stop_signal_ = CreateEvent(NULL, TRUE, FALSE, NULL);
 		std::cout << client_->GetClientMountPath() << std::endl;

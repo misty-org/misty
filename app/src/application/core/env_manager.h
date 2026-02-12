@@ -4,7 +4,7 @@
 #include <unordered_map>
 #include <optional>
 
-namespace minidfs::core {
+namespace misty::core {
     class EnvManager {
     public:
         static EnvManager& get();

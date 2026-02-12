@@ -19,8 +19,8 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 
-#include "minidfs.grpc.pb.h"
-#include "minidfs.pb.h"
-#include "dfs/server/minidfs_impl.h"
-#include "dfs/client/minidfs_client.h"
+#include "misty.grpc.pb.h"
+#include "misty.pb.h"
+#include "dfs/server/misty_impl.h"
+#include "dfs/client/misty_client.h"
 

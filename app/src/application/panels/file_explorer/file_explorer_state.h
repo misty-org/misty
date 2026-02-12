@@ -12,13 +12,21 @@
 
 namespace fs = std::filesystem;
 
-namespace minidfs::panel {
+namespace misty::panel {
 
     // File source type - local filesystem or cloud service
     enum class FileSource {
         LOCAL,
         ONEDRIVE,
         GDRIVE
+    };
+
+    // File synchronization status
+    enum class SyncStatus {
+        LOCAL,      // Not a cloud file (Gray)
+        SYNCED,     // Cloud file, fully downloaded and matches cloud (Green)
+        MODIFIED,   // Cloud file, downloaded but modified locally (Yellow)
+        NOT_SYNCED  // Cloud file, not downloaded (Red)
     };
 
     // Unified file item that works for both local and OneDrive
@@ -29,6 +37,7 @@ namespace minidfs::panel {
         int64_t size = 0;
         std::string last_modified;
         FileSource source = FileSource::LOCAL;
+        SyncStatus status = SyncStatus::LOCAL;  // Default to local (Gray)
 
         // OneDrive metadata (empty for local files)
         std::string od_item_id;
@@ -152,7 +161,17 @@ namespace minidfs::panel {
         }
     }
 
+    // Clipboard operation type for copy/cut
+    enum class ClipboardOp { NONE, COPY, CUT };
+
     struct FileExplorerState : public core::UIState {
+        FileExplorerState() {
+            std::memset(current_path, 0, sizeof(current_path));
+            std::memset(search_path, 0, sizeof(search_path));
+            std::memset(rename_buffer, 0, sizeof(rename_buffer));
+            std::memset(new_entry_name_buffer, 0, sizeof(new_entry_name_buffer));
+        }
+
         char current_path[512] = "";
         char search_path[512] = "";
         std::vector<UnifiedFileItem> files;
@@ -177,6 +196,48 @@ namespace minidfs::panel {
 
         // Track last disconnected account notification to prevent spam
         std::string last_disconnected_notification_folder;
+
+        // Clipboard state for copy/cut/paste
+        ClipboardOp clipboard_op = ClipboardOp::NONE;
+        std::vector<std::string> clipboard_paths;
+
+        // Rename state
+        bool show_rename_modal = false;
+        char rename_buffer[256] = "";
+        std::string rename_target_path;
+
+        // Context menu target
+        std::string context_menu_target_path;
+
+        // New entry modal (from background context menu)
+        bool show_new_entry_modal = false;
+        bool new_entry_is_dir = false;
+        char new_entry_name_buffer[256] = {};
+
+        // Virtual Folders Data
+        static constexpr const char* VIRTUAL_PATH_RECENT = "misty://recent";
+        static constexpr const char* VIRTUAL_PATH_STARRED = "misty://starred";
+        static constexpr const char* VIRTUAL_PATH_TRASH = "misty://trash";
+
+        std::deque<UnifiedFileItem> recent_files;
+        std::vector<UnifiedFileItem> starred_files;
+        std::vector<UnifiedFileItem> trash_files;
+        
+        // Helper to check if a file is starred
+        bool is_starred(const std::string& path) const;
+
+        // Helper to toggle star status
+        void toggle_star(const UnifiedFileItem& item);
+
+        // Helper to add recent file
+        void add_recent(const UnifiedFileItem& item);
+        
+        // Helper to move to trash
+        void move_to_trash(const UnifiedFileItem& item);
+
+        // State persistence
+        void load_state();
+        void save_state();
     };
 
     // Navigate to local filesystem path
@@ -196,6 +257,7 @@ namespace minidfs::panel {
                 item.name = entry.path().filename().generic_string();
                 item.is_dir = entry.is_directory();
                 item.source = FileSource::LOCAL;
+                item.status = SyncStatus::LOCAL;
 
                 if (!item.is_dir) {
                     try {

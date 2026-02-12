@@ -14,7 +14,7 @@
 
 namespace fs = std::filesystem;
 
-namespace minidfs::panel {
+namespace misty::panel {
 
     struct WorkspaceInfo {
         std::string workspace_id;

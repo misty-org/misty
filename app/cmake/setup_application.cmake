@@ -92,7 +92,7 @@ target_include_directories(misty PRIVATE
 )
 
 target_link_libraries(misty PRIVATE 
-    minidfs
+    misty_core
     protobuf::libprotobuf
     gRPC::grpc++
     glfw
@@ -102,7 +102,7 @@ target_link_libraries(misty PRIVATE
 )
 
 target_precompile_headers(misty PRIVATE 
-    "src/application/minidfs.h"
+    "src/application/misty.h"
 )
 
 add_custom_command(TARGET misty POST_BUILD
@@ -117,8 +117,8 @@ add_custom_command(TARGET misty POST_BUILD
         "$<TARGET_FILE_DIR:misty>/assets/icons"
 
     COMMAND ${CMAKE_COMMAND} -E copy
-        "${CMAKE_CURRENT_SOURCE_DIR}/minidfs.conf"
-        "$<TARGET_FILE_DIR:misty>/minidfs.conf"
+        "${CMAKE_CURRENT_SOURCE_DIR}/misty.conf"
+        "$<TARGET_FILE_DIR:misty>/misty.conf"
 )
 
 

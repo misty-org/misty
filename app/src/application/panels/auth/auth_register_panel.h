@@ -4,9 +4,9 @@
 #include "core/ui_registry.h"
 #include "auth_register_state.h"
 
-using namespace minidfs::core;
+using namespace misty::core;
 
-namespace minidfs::panel {
+namespace misty::panel {
     class AuthRegisterPanel : public panel::Panel {
     public:
         AuthRegisterPanel(UIRegistry& registry);

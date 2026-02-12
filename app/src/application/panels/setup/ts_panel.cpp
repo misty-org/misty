@@ -5,7 +5,7 @@
 #include <cstring>
 #include <mutex>
 
-namespace minidfs::panel {
+namespace misty::panel {
     TSPanel::TSPanel(UIRegistry& registry)
         : registry_(registry) {
     }

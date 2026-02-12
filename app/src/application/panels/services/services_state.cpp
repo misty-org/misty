@@ -10,7 +10,7 @@
 #include <filesystem>
 
 
-namespace minidfs::panel {
+namespace misty::panel {
 
     ServicesState::ServicesState() {
         check_connections();

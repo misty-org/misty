@@ -1,25 +1,25 @@
 
 #include <filesystem>
 #include <chrono>
-#include "minidfs_impl.h"
+#include "misty_impl.h"
 
 namespace fs = std::filesystem;
 
-MiniDFSImpl::MiniDFSImpl(const std::string& mount_path) {
+MistyImpl::MistyImpl(const std::string& mount_path) {
     file_manager_ = std::unique_ptr<FileManager>(new FileManager());
     pubsub_manager_ = std::unique_ptr<PubSubManager>(new PubSubManager());
     mount_path_ = mount_path;
     version_ = 0;
 }
 
-grpc::ServerUnaryReactor* MiniDFSImpl::ListFiles(
+grpc::ServerUnaryReactor* MistyImpl::ListFiles(
     grpc::CallbackServerContext* context,
-    const minidfs::ListFilesReq* request,
-    minidfs::ListFilesRes* response)
+    const misty::ListFilesReq* request,
+    misty::ListFilesRes* response)
 {
     class Reactor final: public grpc::ServerUnaryReactor {
     public:
-        Reactor(MiniDFSImpl* service, const minidfs::ListFilesReq* req, minidfs::ListFilesRes* res) 
+        Reactor(MistyImpl* service, const misty::ListFilesReq* req, misty::ListFilesRes* res) 
             : service_(service)
         {
             try {
@@ -42,7 +42,7 @@ grpc::ServerUnaryReactor* MiniDFSImpl::ListFiles(
 
                 for (const auto& entry : fs::directory_iterator(dir_path)) {
                     //REMEMBER: add back VIRTUAL paths only, not local entry.path()
-                    minidfs::FileInfo* file_info = res->add_files();
+                    misty::FileInfo* file_info = res->add_files();
                     file_info->set_file_path(FileManager::VirtualPath(service_->mount_path_, entry.path().generic_string()).generic_string());
                     file_info->set_is_dir(entry.is_directory());
                     if (!entry.is_directory()) {
@@ -66,31 +66,31 @@ grpc::ServerUnaryReactor* MiniDFSImpl::ListFiles(
             delete this;
         }
     private:
-        MiniDFSImpl* service_;
+        MistyImpl* service_;
     };
 
     return new Reactor(this, request, response);
 }
 
-grpc::ServerUnaryReactor* MiniDFSImpl::GetFileLock(
+grpc::ServerUnaryReactor* MistyImpl::GetFileLock(
     grpc::CallbackServerContext* context,
-    const minidfs::FileLockReq* request,
-    minidfs::FileLockRes* response)
+    const misty::FileLockReq* request,
+    misty::FileLockRes* response)
 {
     class Reactor final : public grpc::ServerUnaryReactor {
     public:
-        Reactor(MiniDFSImpl* service, const minidfs::FileLockReq* req, minidfs::FileLockRes* res) 
+        Reactor(MistyImpl* service, const misty::FileLockReq* req, misty::FileLockRes* res) 
             : service_(service)
         {
             bool ok = false;
             file_path_ = FileManager::ResolvePath(service_->mount_path_, req->file_path());
             client_id_ = req->client_id();
             
-            if (req->op() == minidfs::FileOpType::READ) {
+            if (req->op() == misty::FileOpType::READ) {
                 ok = service_->file_manager_->AcquireReadLock(client_id_, file_path_.generic_string());
-            } else if (req->op() == minidfs::FileOpType::WRITE) {
+            } else if (req->op() == misty::FileOpType::WRITE) {
                 ok = service_->file_manager_->AcquireWriteLock(client_id_, file_path_.generic_string(), true);
-            } else if (req->op() == minidfs::FileOpType::DEL) {
+            } else if (req->op() == misty::FileOpType::DEL) {
 				ok = service_->file_manager_->AcquireWriteLock(client_id_, file_path_.generic_string(), false);
             }
             
@@ -108,7 +108,7 @@ grpc::ServerUnaryReactor* MiniDFSImpl::GetFileLock(
         }
 
     private:
-        MiniDFSImpl* service_;
+        MistyImpl* service_;
         fs::path file_path_;
         std::string client_id_;
     };
@@ -117,16 +117,16 @@ grpc::ServerUnaryReactor* MiniDFSImpl::GetFileLock(
 }
 
 
-grpc::ServerUnaryReactor* MiniDFSImpl::RemoveFile(
+grpc::ServerUnaryReactor* MistyImpl::RemoveFile(
     grpc::CallbackServerContext* context,
-    const minidfs::DeleteFileReq* request,
-    minidfs::DeleteFileRes* response)
+    const misty::DeleteFileReq* request,
+    misty::DeleteFileRes* response)
 {
     class Reactor : public grpc::ServerUnaryReactor {
     public:
-        Reactor(MiniDFSImpl* service,
-                const minidfs::DeleteFileReq* req,
-                minidfs::DeleteFileRes* res)
+        Reactor(MistyImpl* service,
+                const misty::DeleteFileReq* req,
+                misty::DeleteFileRes* res)
             : service_(service), req_(req), res_(res)
         {
             std::error_code ec;
@@ -163,27 +163,27 @@ grpc::ServerUnaryReactor* MiniDFSImpl::RemoveFile(
             service_->file_manager_->ReleaseWriteLock(
                 req_->client_id(), file_path_.generic_string());
             service_->pubsub_manager_->Publish(req_->client_id(),
-                file_path_.generic_string(), minidfs::FileUpdateType::DELETED);
+                file_path_.generic_string(), misty::FileUpdateType::DELETED);
             delete this;
         }
 
     private:
-        MiniDFSImpl* service_;
-        const minidfs::DeleteFileReq* req_;
-        minidfs::DeleteFileRes* res_;
+        MistyImpl* service_;
+        const misty::DeleteFileReq* req_;
+        misty::DeleteFileRes* res_;
         fs::path file_path_;
     };
 
     return new Reactor(this, request, response);
 }
 
-grpc::ServerReadReactor<minidfs::FileBuffer>* MiniDFSImpl::StoreFile(
+grpc::ServerReadReactor<misty::FileBuffer>* MistyImpl::StoreFile(
     grpc::CallbackServerContext* context,
-    minidfs::StoreFileRes* response)
+    misty::StoreFileRes* response)
 {
-    class Reactor : public grpc::ServerReadReactor<minidfs::FileBuffer> {
+    class Reactor : public grpc::ServerReadReactor<misty::FileBuffer> {
     public:
-        Reactor(MiniDFSImpl* service, minidfs::StoreFileRes* res)
+        Reactor(MistyImpl* service, misty::StoreFileRes* res)
             : service_(service), response_(res), offset_(0)
         {
             StartRead(&current_);
@@ -195,7 +195,7 @@ grpc::ServerReadReactor<minidfs::FileBuffer>* MiniDFSImpl::StoreFile(
                 response_->set_msg("File stored successfully");
                 service_->file_manager_->ReleaseWriteLock(client_id_, file_path_.generic_string());
                 service_->IncrementVersion();
-                service_->pubsub_manager_->Publish(client_id_, file_path_.generic_string(), minidfs::FileUpdateType::MODIFIED);
+                service_->pubsub_manager_->Publish(client_id_, file_path_.generic_string(), misty::FileUpdateType::MODIFIED);
                 
                 Finish(grpc::Status::OK);
                 return;
@@ -226,9 +226,9 @@ grpc::ServerReadReactor<minidfs::FileBuffer>* MiniDFSImpl::StoreFile(
         }
 
     private:
-        MiniDFSImpl* service_;
-        minidfs::StoreFileRes* response_;
-        minidfs::FileBuffer current_;
+        MistyImpl* service_;
+        misty::StoreFileRes* response_;
+        misty::FileBuffer current_;
         uint64_t offset_;
         fs::path file_path_;
         std::string client_id_;
@@ -237,13 +237,13 @@ grpc::ServerReadReactor<minidfs::FileBuffer>* MiniDFSImpl::StoreFile(
     return new Reactor(this, response);
 }
 
-grpc::ServerWriteReactor<minidfs::FileBuffer>* MiniDFSImpl::FetchFile(
+grpc::ServerWriteReactor<misty::FileBuffer>* MistyImpl::FetchFile(
     grpc::CallbackServerContext* context,
-    const minidfs::FetchFileReq* request)
+    const misty::FetchFileReq* request)
 {
-    class Reactor : public grpc::ServerWriteReactor<minidfs::FileBuffer> {
+    class Reactor : public grpc::ServerWriteReactor<misty::FileBuffer> {
     public:
-        Reactor(MiniDFSImpl* service, const minidfs::FetchFileReq* req)
+        Reactor(MistyImpl* service, const misty::FetchFileReq* req)
             : service_(service), req_(req), offset_(0)
         {   
             file_path_ = FileManager::ResolvePath(
@@ -299,37 +299,37 @@ grpc::ServerWriteReactor<minidfs::FileBuffer>* MiniDFSImpl::FetchFile(
             }
         }
 
-        MiniDFSImpl* service_;
-        const minidfs::FetchFileReq* req_;
+        MistyImpl* service_;
+        const misty::FetchFileReq* req_;
         fs::path file_path_;
         std::string client_id_;
         uint64_t offset_;
-        minidfs::FileBuffer buffer_;
+        misty::FileBuffer buffer_;
     };
     
     return new Reactor(this, request);
 }
 
-grpc::ServerWriteReactor<minidfs::FileUpdate>* MiniDFSImpl::FileUpdateCallback(
+grpc::ServerWriteReactor<misty::FileUpdate>* MistyImpl::FileUpdateCallback(
     grpc::CallbackServerContext* context, 
-    const minidfs::FileUpdate* request)
+    const misty::FileUpdate* request)
 {
-    class Reactor : public grpc::ServerWriteReactor<minidfs::FileUpdate>, public IPubSubReactor {
+    class Reactor : public grpc::ServerWriteReactor<misty::FileUpdate>, public IPubSubReactor {
     public:
-        Reactor(MiniDFSImpl* service, const std::string& client_id) {
+        Reactor(MistyImpl* service, const std::string& client_id) {
             service_ = service;
             client_id_ = client_id;
         }
 
-        void NotifyUpdate(const std::string& file_path, minidfs::FileUpdateType type) override {
+        void NotifyUpdate(const std::string& file_path, misty::FileUpdateType type) override {
             std::lock_guard<std::mutex> lock(mu_);  
             
-            minidfs::FileInfo file_info;
+            misty::FileInfo file_info;
             file_info.set_file_path(file_path);
             file_info.set_is_dir(fs::is_directory(file_path));
             file_info.set_hash(FileManager::GetFileHash(file_path));
 
-            minidfs::FileUpdate res;
+            misty::FileUpdate res;
             res.set_type(type);
             res.set_version(service_->LoadVersion());
             res.mutable_file_info()->CopyFrom(file_info);
@@ -364,9 +364,9 @@ grpc::ServerWriteReactor<minidfs::FileUpdate>* MiniDFSImpl::FileUpdateCallback(
 
     private:
         std::string client_id_;
-        MiniDFSImpl* service_;
+        MistyImpl* service_;
         std::mutex mu_;
-        std::queue<minidfs::FileUpdate> queue_;
+        std::queue<misty::FileUpdate> queue_;
     };
 
     auto* reactor = new Reactor(this, request->client_id());

@@ -9,7 +9,7 @@
 #include "core/env_manager.h"
 #include "core/util.h"
 
-namespace minidfs::panel {
+namespace misty::panel {
 
     struct AuthLoginState : public core::UIState {
         std::mutex mu;

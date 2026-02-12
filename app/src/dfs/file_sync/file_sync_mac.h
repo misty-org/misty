@@ -5,10 +5,10 @@
 #include <iostream>
 #include "file_sync.h"
 
-namespace minidfs {
+namespace misty {
     class FileSyncMac : public FileSync {
     public:
-        FileSyncMac(std::shared_ptr<MiniDFSClient> client);
+        FileSyncMac(std::shared_ptr<MistyClient> client);
         ~FileSyncMac();
 
         void init_sync_resources() override;

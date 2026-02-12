@@ -3,7 +3,7 @@ set(ROOT_DIR ${CMAKE_SOURCE_DIR}/..)
 find_package(Protobuf CONFIG REQUIRED)
 find_package(gRPC CONFIG REQUIRED)
 
-set(PROTO_FILE ${ROOT_DIR}/proto/minidfs.proto)
+set(PROTO_FILE ${ROOT_DIR}/proto/misty.proto)
 set(GEN_PATH ${CMAKE_SOURCE_DIR}/src/proto_src)
 file(MAKE_DIRECTORY ${GEN_PATH})
 
@@ -11,8 +11,8 @@ set(PROTOC_BIN $<TARGET_FILE:protobuf::protoc>)
 set(GRPC_CPP_PLUGIN $<TARGET_FILE:gRPC::grpc_cpp_plugin>)
 
 set(GEN_FILES 
-    "${GEN_PATH}/minidfs.pb.h" "${GEN_PATH}/minidfs.pb.cc"
-    "${GEN_PATH}/minidfs.grpc.pb.h" "${GEN_PATH}/minidfs.grpc.pb.cc"
+    "${GEN_PATH}/misty.pb.h" "${GEN_PATH}/misty.pb.cc"
+    "${GEN_PATH}/misty.grpc.pb.h" "${GEN_PATH}/misty.grpc.pb.cc"
 )
 
 add_custom_command(
@@ -24,7 +24,7 @@ add_custom_command(
     COMMENT "Generating gRPC and Proto files"
 )
 
-add_custom_target(minidfs_proto DEPENDS ${GEN_FILES})
+add_custom_target(misty_proto DEPENDS ${GEN_FILES})
 
 # --- 2. Combined Library ---
 file(GLOB_RECURSE MINIDFS_SRCS
@@ -33,18 +33,18 @@ file(GLOB_RECURSE MINIDFS_SRCS
     ${GEN_FILES}
 )
 
-add_library(minidfs STATIC ${MINIDFS_SRCS})
-add_dependencies(minidfs minidfs_proto)
+add_library(misty_core STATIC ${MINIDFS_SRCS})
+add_dependencies(misty_core misty_proto)
 
 # --- 3. Clean Scoped Includes ---
-target_include_directories(minidfs 
+target_include_directories(misty_core 
     PUBLIC 
         ${CMAKE_SOURCE_DIR}/src # Use one root
         $<BUILD_INTERFACE:${GEN_PATH}> # Allow finding generated headers
 )
 
 # --- 4. Linking ---
-target_link_libraries(minidfs PUBLIC
+target_link_libraries(misty_core PUBLIC
     protobuf::libprotobuf
     gRPC::grpc++
 )

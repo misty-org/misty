@@ -6,20 +6,20 @@
 #include <fstream>
 #include <filesystem>
 #include <random>
-#include "dfs/client/minidfs_client.h"
-#include "dfs/server/minidfs_impl.h"
+#include "dfs/client/misty_client.h"
+#include "dfs/server/misty_impl.h"
 
 namespace fs = std::filesystem;
 
-class MiniDFSSingleClientTest : public ::testing::Test {
+class MistySingleClientTest : public ::testing::Test {
 protected:
     const std::string server_mount = "server";
     const std::string client_mount = "client";
 
-    std::unique_ptr<MiniDFSImpl> server_impl;
+    std::unique_ptr<MistyImpl> server_impl;
     std::unique_ptr<grpc::Server> server;
     std::shared_ptr<grpc::Channel> shared_channel;
-    std::unique_ptr<MiniDFSClient> client;
+    std::unique_ptr<MistyClient> client;
 
     void CreateLocalFile(const std::string& file_path, const std::string& content) {
         fs::path p(file_path);
@@ -52,7 +52,7 @@ protected:
         fs::create_directories(client_mount);
 
         // Server Setup
-        server_impl = std::make_unique<MiniDFSImpl>(server_mount);
+        server_impl = std::make_unique<MistyImpl>(server_mount);
         grpc::ServerBuilder builder;
         builder.AddListeningPort("localhost:50051", grpc::InsecureServerCredentials());
         builder.RegisterService(server_impl.get());
@@ -60,7 +60,7 @@ protected:
 
         // Client Setup
         shared_channel = grpc::CreateChannel("localhost:50051", grpc::InsecureChannelCredentials());
-        client = std::make_unique<MiniDFSClient>(shared_channel, client_mount, "C:/Users/mtcco/projects/minidfs/build/bin/Debug");
+        client = std::make_unique<MistyClient>(shared_channel, client_mount, "C:/Users/mtcco/projects/misty/build/bin/Debug");
     }
 
     void TearDown() override {
@@ -71,25 +71,25 @@ protected:
     }
 };
 
-TEST_F(MiniDFSSingleClientTest, ListFilesEmptyDirectory) {
+TEST_F(MistySingleClientTest, ListFilesEmptyDirectory) {
     fs::path dir_path = fs::path(server_mount) / fs::path(client_mount) / "list_test";
     fs::path dir_path_client = fs::path(client_mount) / "list_test";
     fs::create_directories(dir_path);
 
-    minidfs::ListFilesRes response;
+    misty::ListFilesRes response;
     grpc::StatusCode status = client->ListFiles(dir_path.string(), &response);
     ASSERT_EQ(status, grpc::StatusCode::OK);
     EXPECT_EQ(response.files_size(), 0);
 }
 
-TEST_F(MiniDFSSingleClientTest, ListFilesWithFiles) {
+TEST_F(MistySingleClientTest, ListFilesWithFiles) {
     fs::path dir_path = fs::path(server_mount) / fs::path(client_mount) / "list_test";
     fs::path dir_path_client = fs::path(client_mount) / "list_test";
     fs::create_directories(dir_path);
     CreateLocalFile((dir_path / "file1.txt").string(), "Content 1");
     CreateLocalFile((dir_path / "file2.txt").string(), "Content 2");
 
-    minidfs::ListFilesRes response;
+    misty::ListFilesRes response;
     grpc::StatusCode status = client->ListFiles(dir_path.string(), &response);
     ASSERT_EQ(status, grpc::StatusCode::OK);
     EXPECT_EQ(response.files_size(), 2);
@@ -102,32 +102,32 @@ TEST_F(MiniDFSSingleClientTest, ListFilesWithFiles) {
     EXPECT_NE(std::find(file_names.begin(), file_names.end(), "file2.txt"), file_names.end());
 }
 
-TEST_F(MiniDFSSingleClientTest, ListFilesNonExistentDirectory) {
+TEST_F(MistySingleClientTest, ListFilesNonExistentDirectory) {
     fs::path dir_path_client = fs::path(client_mount) / "non_existent_dir";
 
-    minidfs::ListFilesRes response;
+    misty::ListFilesRes response;
     grpc::StatusCode status = client->ListFiles(dir_path_client.string(), &response);
     ASSERT_EQ(status, grpc::StatusCode::NOT_FOUND);
 }
 
-TEST_F(MiniDFSSingleClientTest, ListFilesNonValidDirectory) {
+TEST_F(MistySingleClientTest, ListFilesNonValidDirectory) {
     fs::path file_path = fs::path(server_mount) / fs::path(client_mount) / "not_a_dir.txt";
     fs::path file_path_client = fs::path(client_mount) / "not_a_dir.txt";
     CreateLocalFile(file_path.string(), "I am a file, not a directory.");
 
-    minidfs::ListFilesRes response;
+    misty::ListFilesRes response;
     grpc::StatusCode status = client->ListFiles(file_path_client.string(), &response);
     ASSERT_EQ(status, grpc::StatusCode::FAILED_PRECONDITION);
 }
 
-TEST_F(MiniDFSSingleClientTest, ListFilesWithOtherDirectories) {
+TEST_F(MistySingleClientTest, ListFilesWithOtherDirectories) {
     fs::path dir_path = fs::path(server_mount) / fs::path(client_mount) / "list_test";
     fs::path dir_path_client = fs::path(client_mount) / "list_test";
     fs::create_directories(dir_path);
     CreateLocalFile((dir_path / "file1.txt").string(), "Content 1");
     fs::create_directories(dir_path / "subdir");
 
-    minidfs::ListFilesRes response;
+    misty::ListFilesRes response;
     grpc::StatusCode status = client->ListFiles(dir_path.string(), &response);
     ASSERT_EQ(status, grpc::StatusCode::OK);
     EXPECT_EQ(response.files_size(), 2);
@@ -142,7 +142,7 @@ TEST_F(MiniDFSSingleClientTest, ListFilesWithOtherDirectories) {
     EXPECT_NE(std::find(file_names.begin(), file_names.end(), "file1.txt"), file_names.end());
 }
 
-TEST_F(MiniDFSSingleClientTest, StoreNonExistentFile) {
+TEST_F(MistySingleClientTest, StoreNonExistentFile) {
     const std::string client_id = "client1";
     const std::string client_file_path = client_mount + "/does_not_exist.txt";
 
@@ -150,10 +150,10 @@ TEST_F(MiniDFSSingleClientTest, StoreNonExistentFile) {
     EXPECT_EQ(status, grpc::StatusCode::NOT_FOUND);
 }
 
-TEST_F(MiniDFSSingleClientTest, StoreSmallFile) {
+TEST_F(MistySingleClientTest, StoreSmallFile) {
     const std::string client_id = "client1";
     fs::path client_file_path = fs::path(client_mount) / "test.txt";
-    const std::string content = "Hello, MiniDFS!";
+    const std::string content = "Hello, Misty!";
 
     CreateLocalFile(client_file_path.string(), content);
 
@@ -168,7 +168,7 @@ TEST_F(MiniDFSSingleClientTest, StoreSmallFile) {
         FileManager::GetFileHash(server_file_path.string()));
 }
 
-TEST_F(MiniDFSSingleClientTest, StoreLargeFile) {
+TEST_F(MistySingleClientTest, StoreLargeFile) {
     const std::string client_id = "client1";
     fs::path client_file_path = fs::path(client_mount) / "large_1gb.bin";
     
@@ -196,7 +196,7 @@ TEST_F(MiniDFSSingleClientTest, StoreLargeFile) {
     );
 }
 
-TEST_F(MiniDFSSingleClientTest, FetchSmallFile) {
+TEST_F(MistySingleClientTest, FetchSmallFile) {
     const std::string client_id = "client1";
     fs::path server_file_path = fs::path(server_mount) / fs::path(client_mount) / "fetch_test.txt";
     const std::string content = "Fetching this file from server.";
@@ -214,7 +214,7 @@ TEST_F(MiniDFSSingleClientTest, FetchSmallFile) {
     );
 }
 
-TEST_F(MiniDFSSingleClientTest, FetchLargeFile) {
+TEST_F(MistySingleClientTest, FetchLargeFile) {
     const std::string client_id = "client1";
     fs::path server_file_path = fs::path(server_mount) / fs::path(client_mount) / "large_fetch_1gb.bin";
 
@@ -242,7 +242,7 @@ TEST_F(MiniDFSSingleClientTest, FetchLargeFile) {
     );
 }
 
-TEST_F(MiniDFSSingleClientTest, RemoveFile) {
+TEST_F(MistySingleClientTest, RemoveFile) {
     const std::string client_id = "client1";
     fs::path client_file_path = fs::path(client_mount) / "delete_test.txt";
     const std::string content = "This file will be deleted from the server.";
@@ -261,7 +261,7 @@ TEST_F(MiniDFSSingleClientTest, RemoveFile) {
     EXPECT_FALSE(fs::exists(server_file_path));
 }
 
-TEST_F(MiniDFSSingleClientTest, DeleteNonExistentFile) {
+TEST_F(MistySingleClientTest, DeleteNonExistentFile) {
     const std::string client_id = "client1";
     fs::path client_file_path = fs::path(client_mount) / "non_existent_delete.txt";
 

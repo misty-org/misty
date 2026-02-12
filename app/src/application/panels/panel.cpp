@@ -1,7 +1,7 @@
 #include "panel.h"
 #include "imgui.h"
 
-namespace minidfs::panel {
+namespace misty::panel {
     void Panel::show_error_modal(std::string& error_msg, const char* modal_id) {
         if (!error_msg.empty()) {
             ImGui::OpenPopup(modal_id);

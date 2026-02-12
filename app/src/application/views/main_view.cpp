@@ -1,9 +1,9 @@
 #include "views/main_view.h"
 
 
-namespace minidfs::view {
+namespace misty::view {
     MainView::MainView(UIRegistry& ui_registry,
-        WorkerPool& worker_pool, std::shared_ptr<MiniDFSClient> client) : 
+        WorkerPool& worker_pool, std::shared_ptr<MistyClient> client) : 
         ui_registry_(ui_registry), worker_pool_(worker_pool), client_(client) {
 
         init_panels();

@@ -2,7 +2,7 @@
 #include <cctype>
 #include "util.h"
 
-namespace minidfs::core {
+namespace misty::core {
     EnvManager& EnvManager::get() {
         static EnvManager instance;
         if (!instance.loaded_) {

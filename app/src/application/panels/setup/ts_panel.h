@@ -4,9 +4,9 @@
 #include "core/ui_registry.h"
 #include "ts_panel_state.h"
 
-using namespace minidfs::core;
+using namespace misty::core;
 
-namespace minidfs::panel {
+namespace misty::panel {
     struct TSPanelSnapshot;
     class TSPanel : public panel::Panel {
     public:

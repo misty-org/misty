@@ -1,7 +1,7 @@
 #include "app_view.h"
 #include <mutex>
 
-namespace minidfs::view {
+namespace misty::view {
 
     // ViewRegistry implementation
     void ViewRegistry::init_default_view() {

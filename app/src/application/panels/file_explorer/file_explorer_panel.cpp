@@ -6,15 +6,16 @@
 #include "panels/activity/download_state.h"
 #include "panels/notification/notification_state.h"
 #include <nlohmann/json.hpp>
+#include <cstdio>
 
 
 namespace fs = std::filesystem;
 
-using namespace minidfs::core;
+using namespace misty::core;
 
-namespace minidfs::panel {
+namespace misty::panel {
 
-    FileExplorerPanel::FileExplorerPanel(UIRegistry& registry, WorkerPool& worker_pool, std::shared_ptr<MiniDFSClient> client)
+    FileExplorerPanel::FileExplorerPanel(UIRegistry& registry, WorkerPool& worker_pool, std::shared_ptr<MistyClient> client)
         : registry_(registry), worker_pool_(worker_pool), client_(std::move(client)) {
 
         auto& workspace_state = registry_.get_state<WorkspaceState>("Workspace");
@@ -22,6 +23,9 @@ namespace minidfs::panel {
 
         // Ensure mount directories exist (~/misty/mnt and ~/misty/mnt/OneDrive)
         workspace_state.ensure_directories();
+
+        // Load persistent state (Recent, Starred)
+        file_explorer_state.load_state();
 
         // Sync account mappings to create account directories
         sync_account_mappings();
@@ -73,6 +77,7 @@ namespace minidfs::panel {
         // Check for pending navigation from external code (e.g., sidebar)
         if (!state.pending_navigation_path.empty()) {
             std::string path = state.pending_navigation_path;
+            printf("Explorer: Detected pending navigation to: %s\n", path.c_str());
             state.pending_navigation_path.clear();
             navigate_to_path(path);
         }
@@ -114,7 +119,74 @@ namespace minidfs::panel {
     }
 
     void FileExplorerPanel::navigate_to_path(const std::string& path, bool update_history, bool create_if_missing) {
+        printf("Explorer: navigate_to_path called with: %s\n", path.c_str());
         auto& state = registry_.get_state<FileExplorerState>("FileExplorer");
+
+        // Virtual Paths Logic
+        if (path.rfind("misty://", 0) == 0) {
+            printf("Explorer: Handling virtual path: %s\n", path.c_str());
+            state.is_loading = true;
+            state.files.clear();
+            
+            if (path == FileExplorerState::VIRTUAL_PATH_RECENT) {
+                printf("Explorer: Loading Recent Files (count: %zu)\n", state.recent_files.size());
+                state.files.assign(state.recent_files.begin(), state.recent_files.end());
+            } else if (path == FileExplorerState::VIRTUAL_PATH_STARRED) {
+                printf("Explorer: Loading Starred Files (count: %zu)\n", state.starred_files.size());
+                state.files = state.starred_files;
+            } else if (path == FileExplorerState::VIRTUAL_PATH_TRASH) {
+                printf("Explorer: Loading Trash Files\n");
+                // Read from disk to ensure persistence
+                state.files.clear();
+                state.trash_files.clear(); // Re-sync cache
+                
+                std::string trash_dir = std::string(std::getenv("HOME")) + "/misty/.cache/trash";
+                if (fs::exists(trash_dir)) {
+                    printf("Explorer: Reading trash dir: %s\n", trash_dir.c_str());
+                    for (const auto& entry : fs::directory_iterator(trash_dir)) {
+                        UnifiedFileItem item;
+                        item.path = entry.path().string();
+                        item.name = entry.path().filename().string();
+                        item.is_dir = entry.is_directory();
+                        item.source = FileSource::LOCAL; // It's local now
+                        
+                         try {
+                            if (!item.is_dir) item.size = fs::file_size(entry.path());
+                            
+                            auto ftime = fs::last_write_time(entry.path());
+                            auto sctp = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
+                                ftime - fs::file_time_type::clock::now() + std::chrono::system_clock::now()
+                            );
+                            auto time_t_val = std::chrono::system_clock::to_time_t(sctp);
+                            char buf[32];
+                            std::strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M", std::localtime(&time_t_val));
+                            item.last_modified = buf;
+                        } catch (...) {}
+
+                        state.files.push_back(item);
+                        state.trash_files.push_back(item);
+                    }
+                }
+            }
+            
+            if (update_history) {
+                std::string current_path_str(state.current_path);
+                if (!current_path_str.empty() && current_path_str != path) {
+                    state.back_history.push(current_path_str);
+                }
+                while (!state.forward_history.empty()) state.forward_history.pop();
+            }
+            
+            strncpy(state.current_path, path.c_str(), sizeof(state.current_path) - 1);
+            state.current_path[sizeof(state.current_path) - 1] = '\0';
+            strncpy(state.search_path, path.c_str(), sizeof(state.search_path) - 1);
+            
+            state.selected_files.clear();
+            state.last_selected_index = -1;
+            state.is_loading = false;
+            printf("Explorer: Virtual path loaded. File count: %zu\n", state.files.size());
+            return;
+        }
 
         if (path_utils::is_onedrive_path(path)) {
             // OneDrive path - parse and route
@@ -559,6 +631,26 @@ namespace minidfs::panel {
                     ufi.od_drive_id = drive_id;
                     ufi.od_ms_user_id = ms_user_id;
                     ufi.od_web_url = odi.web_url;
+
+                    // Determine sync status
+                    if (ufi.is_dir) {
+                        ufi.status = SyncStatus::LOCAL; // Directories are navigable
+                    } else {
+                        // Check if file exists locally
+                        std::error_code ec;
+                        if (fs::exists(ufi.path, ec)) {
+                           // Check size or modification time
+                           uintmax_t local_size = fs::file_size(ufi.path, ec);
+                           if (!ec && local_size == (uintmax_t)ufi.size) {
+                               ufi.status = SyncStatus::SYNCED;
+                           } else {
+                               ufi.status = SyncStatus::MODIFIED;
+                           }
+                        } else {
+                            ufi.status = SyncStatus::NOT_SYNCED;
+                        }
+                    }
+
                     files.push_back(ufi);
                 }
 
@@ -639,17 +731,48 @@ namespace minidfs::panel {
             ImGuiTableFlags_Hideable | ImGuiTableFlags_RowBg |
             ImGuiTableFlags_ScrollY | ImGuiTableFlags_Resizable;
 
+        // Keyboard shortcuts
         if (state.is_loading) {
             ImGui::Text("Loading...");
             return;
         }
 
-        if (ImGui::BeginTable("FileTable", 4, flags)) {
+        // Keyboard shortcuts - only allowed when not loading
+        ImGuiIO& io = ImGui::GetIO();
+        if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && !io.WantTextInput) {
+            // Check both Ctrl and Super (Cmd) to be robust across configurations
+            bool ctrl = io.KeyCtrl || io.KeySuper;
+
+            if (ctrl && ImGui::IsKeyPressed(ImGuiKey_C)) {
+                perform_copy(state);
+            }
+            if (ctrl && ImGui::IsKeyPressed(ImGuiKey_X)) {
+                perform_cut(state);
+            }
+            if (ctrl && ImGui::IsKeyPressed(ImGuiKey_V)) {
+                if (state.clipboard_op != ClipboardOp::NONE && !state.clipboard_paths.empty()) {
+                    perform_paste(state);
+                }
+            }
+            if (ImGui::IsKeyPressed(ImGuiKey_Delete) || ImGui::IsKeyPressed(ImGuiKey_Backspace)) {
+                if (!state.selected_files.empty()) {
+                    perform_delete_selected(state);
+                }
+            }
+            if (ImGui::IsKeyPressed(ImGuiKey_F2)) {
+                if (!state.selected_files.empty()) {
+                    initiate_rename(state);
+                }
+            }
+        }
+
+        if (ImGui::BeginTable("FileTable", 5, flags)) {
             ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
             ImGui::TableSetupColumn("Size", ImGuiTableColumnFlags_WidthFixed, 80.0f);
             ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 80.0f);
             ImGui::TableSetupColumn("Last Modified", ImGuiTableColumnFlags_WidthFixed, 150.0f);
-            ImGui::TableHeadersRow();
+            ImGui::TableSetupColumn("Status", ImGuiTableColumnFlags_WidthFixed, 60.0f);
+            ImGui::TableHeadersRow(); 
 
             if (state.files.empty()) {
                 ImGui::TableNextRow();
@@ -669,15 +792,35 @@ namespace minidfs::panel {
                     show_file_item(state, i);
                 }
             }
-
             if (ImGuiTableSortSpecs* sorts_specs = ImGui::TableGetSortSpecs()) {
                 if (sorts_specs->SpecsDirty) {
                     sorts_specs->SpecsDirty = false;
                 }
             }
 
+            // Context menu popup (must be inside the table scope for ID stack)
+            show_context_menu(state);
+
+            // Background right-click (empty space in table)
+            // Use IsMouseClicked to match item behavior and avoid "double menu" on release
+            // Also ensure FileContextMenu isn't already open
+            if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)
+                && ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup)
+                && !ImGui::IsAnyItemHovered()
+                && !ImGui::IsPopupOpen("FileContextMenu")) {
+                state.context_menu_target_path.clear();
+                state.selected_files.clear();
+                ImGui::OpenPopup("BackgroundContextMenu");
+            }
+
+            show_background_context_menu(state);
+
             ImGui::EndTable();
         }
+
+        // Modals (rendered outside table)
+        show_rename_modal(state);
+        show_new_entry_modal(state);
     }
 
     void FileExplorerPanel::show_file_item(FileExplorerState& state, int i) {
@@ -701,7 +844,7 @@ namespace minidfs::panel {
 
         if (ImGui::Selectable(label.c_str(), is_currently_selected, ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowDoubleClick)) {
 
-            if (io.KeyCtrl) {
+             if (io.KeyCtrl) {
                 if (is_currently_selected) state.selected_files.erase(file.path);
                 else state.selected_files.insert(file.path);
             }
@@ -724,29 +867,46 @@ namespace minidfs::panel {
                 else {
                     // Open file
                     if (file.source == FileSource::LOCAL) {
+                        state.add_recent(file);
                         open_file(file.path);
                     } else if (file.source == FileSource::ONEDRIVE) {
-                        // OneDrive file - check if it exists locally first
                         if (fs::exists(file.path)) {
+                            state.add_recent(file);
                             open_file(file.path);
                         } else if (!state.is_downloading(file.path)) {
+                            // We can't add to recent until downloaded? Or add now?
+                            // Add now is fine
+                             state.add_recent(file);
                             download_and_open_file(file);
                         }
                     } else if (file.source == FileSource::GDRIVE) {
-                        // Google Workspace files (Docs, Sheets, etc.) - open in browser
                         if (file.gd_mime_type.rfind("application/vnd.google-apps.", 0) == 0
                             && file.gd_mime_type != "application/vnd.google-apps.folder") {
                             if (!file.gd_web_url.empty()) {
+                                state.add_recent(file);
                                 open_file(file.gd_web_url);
                             }
                         } else if (fs::exists(file.path)) {
+                            state.add_recent(file);
                             open_file(file.path);
                         } else if (!state.is_downloading(file.path)) {
+                            state.add_recent(file);
                             download_and_open_gd_file(file);
                         }
                     }
                 }
             }
+        }
+
+        // Right-click context menu
+        if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
+            state.context_menu_target_path = file.path;
+            if (!is_currently_selected) {
+                state.selected_files.clear();
+                state.selected_files.insert(file.path);
+                state.last_selected_index = i;
+            }
+            ImGui::OpenPopup("FileContextMenu");
         }
 
         // Size column
@@ -761,6 +921,8 @@ namespace minidfs::panel {
             } else {
                 ImGui::Text("%.1f GB", file.size / (1024.0 * 1024.0 * 1024.0));
             }
+        } else {
+             ImGui::Text("-");
         }
 
         // Type column
@@ -771,7 +933,512 @@ namespace minidfs::panel {
         ImGui::TableNextColumn();
         if (!file.last_modified.empty()) {
             ImGui::Text("%s", file.last_modified.c_str());
+        } else {
+            ImGui::Text("-");
         }
+
+        // Status column (Right side)
+        ImGui::TableNextColumn();
+        
+        ImU32 dot_color = IM_COL32(150, 150, 150, 255); // Gray (Local)
+        if (file.status == SyncStatus::SYNCED) dot_color = IM_COL32(46, 204, 113, 255);      // Green
+        else if (file.status == SyncStatus::MODIFIED) dot_color = IM_COL32(241, 196, 15, 255); // Yellow
+        else if (file.status == SyncStatus::NOT_SYNCED) dot_color = IM_COL32(231, 76, 60, 255); // Red
+        
+        ImVec2 p_dot = ImGui::GetCursorScreenPos();
+        float cell_h = ImGui::GetTextLineHeightWithSpacing();
+        // Left align with padding
+        ImGui::GetWindowDrawList()->AddCircleFilled(ImVec2(p_dot.x + 20.0f, p_dot.y + cell_h * 0.5f), 4.0f, dot_color);
+    }
+
+    // ==================== Context Menu & File Operations ====================
+
+    void FileExplorerPanel::show_context_menu(FileExplorerState& state) {
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 8.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(10.0f, 6.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 6.0f);
+        ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.15f, 0.15f, 0.15f, 0.95f));
+        ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.3f, 0.3f, 0.3f, 0.6f));
+
+        if (ImGui::BeginPopup("FileContextMenu")) {
+
+            // Determine if target is a local file
+            // REMOVED: bool is_local = ...
+            // We now check individual file status to determine capabilities.
+
+            bool show_menu = false;
+            SyncStatus status = SyncStatus::LOCAL; // Default
+            
+            for (const auto& f : state.files) {
+                if (f.path == state.context_menu_target_path) {
+                    status = f.status;
+                    show_menu = true;
+                    break;
+                }
+            }
+
+            if (show_menu) {
+                // Determine if we can modify this file (Copy/Cut/Rename/Delete)
+                // Determine if we can modify this file (Copy/Cut/Rename/Delete)
+                // Logical rule: Can modify if it's local OR (synced/modified and exists locally)
+                // The user said: "allow ... for those files that are "local" or have green/yellow dots"
+                // Actually if it's NOT_SYNCED (Red), we probably can't Copy/Cut content locally, but we might be able to Rename/Delete the cloud reference?
+                // User said: "since we know we 'downloaded' them".
+                // So strict check: LOCAL or SYNCED or MODIFIED.
+                
+                // However, show_context_menu logic handles "is_local" based on path prefix.
+                // If it's a cloud path, is_local is false.
+                // Wait, the existing code: bool is_local = !path_utils::is_onedrive_path(...)
+                // This variable 'is_local' means "Associated with Local File Source" in a broad sense?
+                // Actually my variable 'is_local' in show_context_menu determines if we show the menu AT ALL.
+                // Lines 811: bool is_local = true (default) is overridden?
+                // No, line 822: if (is_local) ...
+                
+                // I need to check the status of the specific target file.
+                // But context_menu_target_path is just a string.
+                // I need to find the SyncStatus of that file.
+                // I can look it up in state.files?
+                SyncStatus target_status = SyncStatus::LOCAL;
+                for(const auto& f : state.files) {
+                    if(f.path == state.context_menu_target_path) {
+                        target_status = f.status;
+                        break;
+                    }
+                }
+                
+                bool can_modify = (target_status == SyncStatus::LOCAL || 
+                                   target_status == SyncStatus::SYNCED || 
+                                   target_status == SyncStatus::MODIFIED);
+
+                if (can_modify) {
+                    if (ImGui::MenuItem("Copy", "Cmd+C")) {
+                        perform_copy(state);
+                    }
+
+                    if (ImGui::MenuItem("Cut", "Cmd+X")) {
+                        perform_cut(state);
+                    }
+                } else {
+                    ImGui::MenuItem("Copy", "Cmd+C", false, false);
+                    ImGui::MenuItem("Cut", "Cmd+X", false, false);
+                }
+
+                bool can_paste = state.clipboard_op != ClipboardOp::NONE && !state.clipboard_paths.empty();
+                // Paste should be allowed in directory regardless of sync status of the directory itself?
+                // Usually yes.
+                if (ImGui::MenuItem("Paste", "Cmd+V", false, can_paste)) {
+                    perform_paste(state);
+                }
+
+                ImGui::Separator();
+
+                if (can_modify) {
+                    if (ImGui::MenuItem("Rename", "F2")) {
+                        initiate_rename(state);
+                    }
+                } else {
+                    ImGui::MenuItem("Rename", "F2", false, false);
+                }
+
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.4f, 0.4f, 1.0f));
+                if (ImGui::MenuItem("Delete", "Del")) { 
+                    perform_delete_selected(state);
+                }
+                ImGui::PopStyleColor();
+
+                ImGui::Separator();
+
+                // Star/Unstar
+                bool is_starred = state.is_starred(state.context_menu_target_path);
+                if (ImGui::MenuItem(is_starred ? "Remove from Starred" : "Add to Starred")) {
+                    for (const auto& f : state.files) {
+                        if (f.path == state.context_menu_target_path) {
+                            state.toggle_star(f);
+                            break;
+                        }
+                    }
+                }
+                
+                ImGui::Separator();
+
+                if (ImGui::MenuItem("New File")) {
+                    state.new_entry_is_dir = false;
+                    state.new_entry_name_buffer[0] = '\0';
+                    state.show_new_entry_modal = true;
+                }
+
+                if (ImGui::MenuItem("New Folder")) {
+                    state.new_entry_is_dir = true;
+                    state.new_entry_name_buffer[0] = '\0';
+                    state.show_new_entry_modal = true;
+                }
+            } else {
+                // Cloud file - limited menu
+                if (ImGui::MenuItem("Copy Path")) {
+                    ImGui::SetClipboardText(state.context_menu_target_path.c_str());
+                }
+            }
+
+            ImGui::EndPopup();
+        }
+
+        ImGui::PopStyleColor(2);
+        ImGui::PopStyleVar(3);
+    }
+
+    void FileExplorerPanel::show_rename_modal(FileExplorerState& state) {
+        if (state.show_rename_modal) {
+            ImGui::OpenPopup("Rename##Modal");
+        }
+
+        ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+        ImGui::SetNextWindowSize(ImVec2(400, 0), ImGuiCond_Appearing);
+
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 8.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(20.0f, 16.0f));
+        ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.16f, 0.16f, 0.16f, 1.0f));
+
+        if (ImGui::BeginPopupModal("Rename##Modal", &state.show_rename_modal,
+            ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize)) {
+
+            ImGui::Text("Enter new name:");
+            ImGui::Spacing();
+
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 8));
+            ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
+            ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.21f, 0.21f, 0.21f, 1.0f));
+
+            float width = ImGui::GetContentRegionAvail().x;
+            ImGui::SetNextItemWidth(width);
+
+            bool entered = ImGui::InputText("##rename_input", state.rename_buffer,
+                sizeof(state.rename_buffer), ImGuiInputTextFlags_EnterReturnsTrue);
+
+            // Auto-focus the input on first appearance
+            if (ImGui::IsWindowAppearing()) {
+                ImGui::SetKeyboardFocusHere(-1);
+            }
+
+            ImGui::PopStyleColor();
+            ImGui::PopStyleVar(2);
+
+            ImGui::Spacing();
+            ImGui::Spacing();
+
+            float button_width = (width - 8.0f) * 0.5f;
+
+            ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
+
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.5f, 0.9f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.6f, 1.0f, 1.0f));
+            if (ImGui::Button("Rename", ImVec2(button_width, 32)) || entered) {
+                std::string new_name(state.rename_buffer);
+                if (!new_name.empty() && !state.rename_target_path.empty()) {
+                    fs::path old_path(state.rename_target_path);
+                    fs::path new_path = old_path.parent_path() / new_name;
+                    std::error_code ec;
+                    fs::rename(old_path, new_path, ec);
+                    if (!ec) {
+                        // Refresh
+                        navigate_to_path(std::string(state.current_path), false);
+                    }
+                }
+                state.show_rename_modal = false;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::PopStyleColor(2);
+
+            ImGui::SameLine(0, 8.0f);
+
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.4f, 0.4f, 0.4f, 1.0f));
+            if (ImGui::Button("Cancel", ImVec2(button_width, 32))) {
+                state.show_rename_modal = false;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::PopStyleColor(2);
+
+            ImGui::PopStyleVar();
+
+            ImGui::EndPopup();
+        }
+
+        ImGui::PopStyleColor();
+        ImGui::PopStyleVar(2);
+    }
+
+    void FileExplorerPanel::show_background_context_menu(FileExplorerState& state) {
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 8.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(10.0f, 6.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 6.0f);
+        ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.15f, 0.15f, 0.15f, 0.95f));
+        ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.3f, 0.3f, 0.3f, 0.6f));
+
+        if (ImGui::BeginPopup("BackgroundContextMenu")) {
+            bool is_local = !path_utils::is_onedrive_path(state.current_path)
+                         && !path_utils::is_gdrive_path(state.current_path);
+
+            if (is_local) {
+                bool can_paste = state.clipboard_op != ClipboardOp::NONE && !state.clipboard_paths.empty();
+                if (ImGui::MenuItem("Paste", "Cmd+V", false, can_paste)) {
+                    perform_paste(state);
+                }
+
+                ImGui::Separator();
+
+                if (ImGui::MenuItem("New File")) {
+                    state.new_entry_is_dir = false;
+                    state.new_entry_name_buffer[0] = '\0';
+                    state.show_new_entry_modal = true;
+                }
+
+                if (ImGui::MenuItem("New Folder")) {
+                    state.new_entry_is_dir = true;
+                    state.new_entry_name_buffer[0] = '\0';
+                    state.show_new_entry_modal = true;
+                }
+            } else {
+                ImGui::TextDisabled("No actions available");
+            }
+
+            ImGui::EndPopup();
+        }
+
+        ImGui::PopStyleColor(2);
+        ImGui::PopStyleVar(3);
+    }
+
+    void FileExplorerPanel::show_new_entry_modal(FileExplorerState& state) {
+        const char* title = state.new_entry_is_dir ? "New Folder##explorer" : "New File##explorer";
+
+        if (state.show_new_entry_modal) {
+            ImGui::OpenPopup(title);
+            state.show_new_entry_modal = false;
+        }
+
+        ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+        ImGui::SetNextWindowSize(ImVec2(400, 0), ImGuiCond_Appearing);
+
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 8.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(20.0f, 16.0f));
+        ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.16f, 0.16f, 0.16f, 1.0f));
+
+        if (ImGui::BeginPopupModal(title, nullptr,
+            ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize)) {
+
+            ImGui::Text("%s name:", state.new_entry_is_dir ? "Folder" : "File");
+            ImGui::Spacing();
+
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 8));
+            ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
+            ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.21f, 0.21f, 0.21f, 1.0f));
+
+            float width = ImGui::GetContentRegionAvail().x;
+            ImGui::SetNextItemWidth(width);
+
+            bool entered = ImGui::InputText("##new_entry_input", state.new_entry_name_buffer,
+                sizeof(state.new_entry_name_buffer), ImGuiInputTextFlags_EnterReturnsTrue);
+
+            if (ImGui::IsWindowAppearing()) {
+                ImGui::SetKeyboardFocusHere(-1);
+            }
+
+            ImGui::PopStyleColor();
+            ImGui::PopStyleVar(2);
+
+            ImGui::Spacing();
+            ImGui::Spacing();
+
+            float button_width = (width - 8.0f) * 0.5f;
+
+            ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
+
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.5f, 0.9f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.6f, 1.0f, 1.0f));
+            if (ImGui::Button("Create##new_entry", ImVec2(button_width, 32)) || entered) {
+                std::string name(state.new_entry_name_buffer);
+                if (!name.empty()) {
+                    fs::path p = fs::path(state.current_path) / name;
+                    std::error_code ec;
+                    if (state.new_entry_is_dir) {
+                        fs::create_directory(p, ec);
+                    } else {
+                        // Create empty file by opening and closing
+                        if (auto f = std::fopen(p.string().c_str(), "w")) {
+                            std::fclose(f);
+                        }
+                    }
+                    if (!ec) {
+                        navigate_to_path(std::string(state.current_path), false);
+                    }
+                }
+                state.new_entry_name_buffer[0] = '\0';
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::PopStyleColor(2);
+
+            ImGui::SameLine(0, 8.0f);
+
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.4f, 0.4f, 0.4f, 1.0f));
+            if (ImGui::Button("Cancel##new_entry", ImVec2(button_width, 32))) {
+                state.new_entry_name_buffer[0] = '\0';
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::PopStyleColor(2);
+
+            ImGui::PopStyleVar();
+
+            ImGui::EndPopup();
+        }
+
+        ImGui::PopStyleColor();
+        ImGui::PopStyleVar(2);
+    }
+
+    void FileExplorerPanel::perform_paste(FileExplorerState& state) {
+        std::string dest_dir(state.current_path);
+
+        for (const auto& src_path : state.clipboard_paths) {
+            fs::path src(src_path);
+            fs::path dest = fs::path(dest_dir) / src.filename();
+
+            // Avoid overwriting - append suffix if destination exists
+            if (fs::exists(dest)) {
+                std::string stem = dest.stem().string();
+                std::string ext = dest.extension().string();
+                int counter = 1;
+                while (fs::exists(dest)) {
+                    dest = fs::path(dest_dir) / (stem + " (" + std::to_string(counter) + ")" + ext);
+                    counter++;
+                }
+            }
+
+            std::error_code ec;
+            if (state.clipboard_op == ClipboardOp::COPY) {
+                if (fs::is_directory(src)) {
+                    fs::copy(src, dest, fs::copy_options::recursive, ec);
+                } else {
+                    fs::copy_file(src, dest, ec);
+                }
+            } else if (state.clipboard_op == ClipboardOp::CUT) {
+                fs::rename(src, dest, ec);
+            }
+        }
+
+        // Clear clipboard after cut (keep after copy so user can paste multiple times)
+        if (state.clipboard_op == ClipboardOp::CUT) {
+            state.clipboard_op = ClipboardOp::NONE;
+            state.clipboard_paths.clear();
+        }
+
+        // Refresh directory
+        navigate_to_path(std::string(state.current_path), false);
+    }
+
+    void FileExplorerPanel::perform_copy(FileExplorerState& state) {
+        state.clipboard_op = ClipboardOp::COPY;
+        state.clipboard_paths.clear();
+        // If context menu target is set and valid, use that. Otherwise use selected files.
+        // But usually context menu setting *also* sets selection if not selected.
+        // Shortcuts will rely on selection.
+        for (const auto& sel : state.selected_files) {
+            state.clipboard_paths.push_back(sel);
+        }
+    }
+
+    void FileExplorerPanel::perform_cut(FileExplorerState& state) {
+        state.clipboard_op = ClipboardOp::CUT;
+        state.clipboard_paths.clear();
+        for (const auto& sel : state.selected_files) {
+            state.clipboard_paths.push_back(sel);
+        }
+    }
+
+    void FileExplorerPanel::perform_delete_selected(FileExplorerState& state) {
+        bool is_trash_view = std::string(state.current_path) == FileExplorerState::VIRTUAL_PATH_TRASH;
+        printf("Explorer: perform_delete_selected. is_trash_view=%d\n", is_trash_view);
+        
+        std::vector<std::string> to_delete(state.selected_files.begin(), state.selected_files.end());
+        for (const auto& path : to_delete) {
+            printf("Explorer: Deleting path: %s\n", path.c_str());
+            if (is_trash_view) {
+                // Permanent Delete
+                perform_delete(state, path);
+                
+                // Remove from state.trash_files
+                auto it = std::remove_if(state.trash_files.begin(), state.trash_files.end(),
+                    [&](const UnifiedFileItem& item) { return item.path == path; });
+                state.trash_files.erase(it, state.trash_files.end());
+            } else {
+                // Move to Trash (Local only, Cloud deletes directly)
+                bool is_cloud = path_utils::is_onedrive_path(path) || path_utils::is_gdrive_path(path);
+                
+                if (is_cloud) {
+                     printf("Explorer: Deleting cloud file directly\n");
+                     perform_delete(state, path);
+                } else {
+                    // Local: Move to ~/misty/.cache/trash
+                    std::string trash_dir = std::string(std::getenv("HOME")) + "/misty/.cache/trash";
+                    printf("Explorer: Moving to trash dir: %s\n", trash_dir.c_str());
+                    std::error_code ec;
+                    fs::create_directories(trash_dir, ec);
+                    
+                    std::string filename = fs::path(path).filename().string();
+                    std::string target = trash_dir + "/" + filename;
+                    
+                    // Handle duplicate names in trash
+                    int counter = 1;
+                    while (fs::exists(target)) {
+                        target = trash_dir + "/" + fs::path(path).stem().string() + "_" + std::to_string(counter++) + fs::path(path).extension().string();
+                    }
+
+                    printf("Explorer: Renaming %s to %s\n", path.c_str(), target.c_str());
+                    fs::rename(path, target, ec);
+                    if (ec) {
+                        printf("Explorer: Failed to move to trash: %s\n", ec.message().c_str());
+                        state.error_msg = "Failed to move to trash: " + ec.message();
+                    } else {
+                         // Add to virtual trash list
+                         UnifiedFileItem item;
+                         item.path = target; // Point to trash location
+                         item.name = fs::path(target).filename().string(); // Use new name
+                         item.is_dir = fs::is_directory(target);
+                         state.move_to_trash(item);
+                    }
+                }
+            }
+        }
+        // Refresh directory
+        navigate_to_path(std::string(state.current_path), false);
+    }
+
+    void FileExplorerPanel::initiate_rename(FileExplorerState& state) {
+        // Prefer context menu target if set, otherwise single selected file
+        std::string target;
+        if (!state.context_menu_target_path.empty()) {
+            target = state.context_menu_target_path;
+        } else if (state.selected_files.size() == 1) {
+            target = *state.selected_files.begin();
+        }
+
+        if (!target.empty()) {
+            state.rename_target_path = target;
+            fs::path p(target);
+            std::string filename = p.filename().string();
+            strncpy(state.rename_buffer, filename.c_str(), sizeof(state.rename_buffer) - 1);
+            state.rename_buffer[sizeof(state.rename_buffer) - 1] = '\0';
+            state.show_rename_modal = true;
+        }
+    }
+
+    void FileExplorerPanel::perform_delete(FileExplorerState& state, const std::string& path) {
+        std::error_code ec;
+        fs::remove_all(path, ec);
+        if (ec) {
+            state.error_msg = "Failed to delete: " + ec.message();
+        }
+        state.selected_files.erase(path);
     }
 
     // ==================== Google Drive Methods ====================
@@ -1104,6 +1771,31 @@ namespace minidfs::panel {
                     ufi.gd_user_id = gd_user_id;
                     ufi.gd_mime_type = gdi.mime_type;
                     ufi.gd_web_url = gdi.web_url;
+
+                    // Determine sync status
+                    if (ufi.is_dir) {
+                        ufi.status = SyncStatus::LOCAL;
+                    } else {
+                        // Check if file exists locally
+                        std::error_code ec;
+                        if (fs::exists(ufi.path, ec)) {
+                           // Check size or modification time (GDrive size might be 0 for online docs)
+                           if (gdi.size == 0 && gdi.mime_type.rfind("application/vnd.google-apps.", 0) == 0) {
+                               // Online doc - if it exists locally it's probably a link file
+                               ufi.status = SyncStatus::SYNCED;
+                           } else {
+                               uintmax_t local_size = fs::file_size(ufi.path, ec);
+                               if (!ec && local_size == (uintmax_t)ufi.size) {
+                                   ufi.status = SyncStatus::SYNCED;
+                               } else {
+                                   ufi.status = SyncStatus::MODIFIED;
+                               }
+                           }
+                        } else {
+                            ufi.status = SyncStatus::NOT_SYNCED;
+                        }
+                    }
+
                     files.push_back(ufi);
                 }
 

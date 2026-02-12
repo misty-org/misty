@@ -6,7 +6,7 @@
 #include <atomic>
 #include <mutex>
 
-namespace minidfs::panel {
+namespace misty::panel {
 
     // State for a single file upload
     struct FileUploadProgress {

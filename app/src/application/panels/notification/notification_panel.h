@@ -4,7 +4,7 @@
 #include "panels/panel.h"
 #include "notification_state.h"
 
-namespace minidfs::panel {
+namespace misty::panel {
 
     class NotificationPanel : public Panel {
     public:

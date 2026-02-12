@@ -3,40 +3,40 @@
 #include <grpcpp/grpcpp.h>
 #include <atomic>
 #include <queue>
-#include "proto_src/minidfs.grpc.pb.h"
+#include "proto_src/misty.grpc.pb.h"
 #include "dfs/file_manager.h"
 #include "pubsub_manager.h"
 
-class MiniDFSImpl final : public minidfs::MiniDFSService::CallbackService {
+class MistyImpl final : public misty::MistyService::CallbackService {
 public:
-    explicit MiniDFSImpl(const std::string& mount_path);
+    explicit MistyImpl(const std::string& mount_path);
 
     grpc::ServerUnaryReactor* ListFiles(
         grpc::CallbackServerContext* context, 
-        const minidfs::ListFilesReq* request, 
-        minidfs::ListFilesRes* response) override;
+        const misty::ListFilesReq* request, 
+        misty::ListFilesRes* response) override;
 
     grpc::ServerUnaryReactor* GetFileLock(
         grpc::CallbackServerContext* context, 
-        const minidfs::FileLockReq* request, 
-        minidfs::FileLockRes* response) override;
+        const misty::FileLockReq* request, 
+        misty::FileLockRes* response) override;
 
     grpc::ServerUnaryReactor* RemoveFile(
         grpc::CallbackServerContext* context, 
-        const minidfs::DeleteFileReq* request, 
-        minidfs::DeleteFileRes* response) override;
+        const misty::DeleteFileReq* request, 
+        misty::DeleteFileRes* response) override;
 
-    grpc::ServerReadReactor<minidfs::FileBuffer>* StoreFile(
+    grpc::ServerReadReactor<misty::FileBuffer>* StoreFile(
         grpc::CallbackServerContext* context, 
-        minidfs::StoreFileRes* response) override;
+        misty::StoreFileRes* response) override;
 
-    grpc::ServerWriteReactor<minidfs::FileBuffer>* FetchFile(
+    grpc::ServerWriteReactor<misty::FileBuffer>* FetchFile(
         grpc::CallbackServerContext* context, 
-        const minidfs::FetchFileReq* request) override;
+        const misty::FetchFileReq* request) override;
     
-    grpc::ServerWriteReactor<minidfs::FileUpdate>* FileUpdateCallback(
+    grpc::ServerWriteReactor<misty::FileUpdate>* FileUpdateCallback(
         grpc::CallbackServerContext* context, 
-        const minidfs::FileUpdate* request) override;
+        const misty::FileUpdate* request) override;
 
     std::atomic<uint64_t> LoadVersion() const {
         return version_.load();
@@ -57,6 +57,6 @@ private:
     std::atomic<uint64_t> version_;
 
 
-    friend class MiniDFSSingleClientTest;
-    friend class MiniDFSMultiClientTest;
+    friend class MistySingleClientTest;
+    friend class MistyMultiClientTest;
 };

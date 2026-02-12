@@ -4,7 +4,7 @@
 #define GLFW_EXPOSE_NATIVE_COCOA
 
 #include "application.h"
-#include "minidfs.h"
+#include "misty.h"
 #include "imgui.h"
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
@@ -12,7 +12,7 @@
 // Objective-C types are hidden behind a private PImpl to
 // keep this header consumable from pure C++ translation units.
 
-namespace minidfs {
+namespace misty {
     struct MacAppObjC; // Forward-declared ObjC-backed state (defined in mac_app.mm)
     class MacApp : public Application {
     public:

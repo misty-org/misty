@@ -5,7 +5,7 @@
 #include "core/svg_loader.h"
 
 
-namespace minidfs::panel {
+namespace misty::panel {
     class NavbarPanel : public Panel {
     public:
         NavbarPanel(UIRegistry& ui_registry);

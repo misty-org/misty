@@ -8,10 +8,10 @@
 #include "file_sync.h"
 
 
-namespace minidfs {
+namespace misty {
     class FileSyncWin32 : public FileSync {
     public:
-        FileSyncWin32(std::shared_ptr<MiniDFSClient> client);
+        FileSyncWin32(std::shared_ptr<MistyClient> client);
         ~FileSyncWin32();
 
         void init_sync_resources() override;

@@ -6,7 +6,7 @@
 #include <functional>
 #include "core/ui_registry.h"
 
-namespace minidfs::panel {
+namespace misty::panel {
 
     // Microsoft account profile information (returned by proxy)
     struct MSUserProfile {

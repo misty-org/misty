@@ -10,7 +10,7 @@ namespace fs = std::filesystem;
 
 const std::string test_mount = "file_manager";
 
-class MiniDFSFileManagerTest : public ::testing::Test {
+class MistyFileManagerTest : public ::testing::Test {
 protected:
     FileManager fm;
     void SetUp() override {
@@ -22,7 +22,7 @@ protected:
     }
 };
 
-TEST_F(MiniDFSFileManagerTest, AcquireWriteLockExclusive) {
+TEST_F(MistyFileManagerTest, AcquireWriteLockExclusive) {
     ASSERT_TRUE(fm.AcquireWriteLock("client1", "a.txt", true));
 
     std::atomic<bool> acquired{false};
@@ -36,7 +36,7 @@ TEST_F(MiniDFSFileManagerTest, AcquireWriteLockExclusive) {
     t.join();
 }
 
-TEST_F(MiniDFSFileManagerTest, AcquireWriteLockAfterRelease) {
+TEST_F(MistyFileManagerTest, AcquireWriteLockAfterRelease) {
     ASSERT_TRUE(fm.AcquireWriteLock("client1", "a.txt", true));
     fm.ReleaseWriteLock("client1", "a.txt");
 
@@ -44,7 +44,7 @@ TEST_F(MiniDFSFileManagerTest, AcquireWriteLockAfterRelease) {
     fm.ReleaseWriteLock("client2", "a.txt");
 }
 
-TEST_F(MiniDFSFileManagerTest, AcquireWriteLockDifferentFiles) {
+TEST_F(MistyFileManagerTest, AcquireWriteLockDifferentFiles) {
     ASSERT_TRUE(fm.AcquireWriteLock("client1", "a.txt", true));
 
     EXPECT_TRUE(fm.AcquireWriteLock("client2", "b.txt", true));
@@ -53,12 +53,12 @@ TEST_F(MiniDFSFileManagerTest, AcquireWriteLockDifferentFiles) {
     fm.ReleaseWriteLock("client2", "b.txt");
 }
 
-TEST_F(MiniDFSFileManagerTest, WriteWithoutLockFails) {
+TEST_F(MistyFileManagerTest, WriteWithoutLockFails) {
     std::string data = "hello";
     EXPECT_FALSE(fm.WriteFile("client1", "a.txt", 0, data.data(), data.size()));
 }
 
-TEST_F(MiniDFSFileManagerTest, WriteWithLockSucceeds) {
+TEST_F(MistyFileManagerTest, WriteWithLockSucceeds) {
     fs::path file_path = FileManager::ResolvePath(test_mount, "a.txt");
     std::string data = "hello";
 
@@ -69,7 +69,7 @@ TEST_F(MiniDFSFileManagerTest, WriteWithLockSucceeds) {
     EXPECT_TRUE(fs::exists(file_path));
 }
 
-TEST_F(MiniDFSFileManagerTest, WriteAtOffset) {
+TEST_F(MistyFileManagerTest, WriteAtOffset) {
     std::string initial_data = "AAAAA";
     std::string patch_data = "BB";
     fs::path file_path = FileManager::ResolvePath(test_mount, "offset.txt");
@@ -88,7 +88,7 @@ TEST_F(MiniDFSFileManagerTest, WriteAtOffset) {
     EXPECT_EQ(std::string(buffer, 5), "AABBA");
 }
 
-TEST_F(MiniDFSFileManagerTest, WriteInNestedDirectory) {
+TEST_F(MistyFileManagerTest, WriteInNestedDirectory) {
     fs::path file_path = FileManager::ResolvePath(test_mount, "level1/level2/deep_file.txt");
     std::string data = "depth_test";
 
@@ -99,7 +99,7 @@ TEST_F(MiniDFSFileManagerTest, WriteInNestedDirectory) {
     EXPECT_TRUE(fs::exists(file_path));
 }
 
-TEST_F(MiniDFSFileManagerTest, SparseWriteTest) {
+TEST_F(MistyFileManagerTest, SparseWriteTest) {
     std::string data = "end";
     uint64_t large_offset = 10;
     fs::path file_path = FileManager::ResolvePath(test_mount, "sparse.bin");
@@ -119,7 +119,7 @@ TEST_F(MiniDFSFileManagerTest, SparseWriteTest) {
     fm.ReleaseReadLock("client1", file_path.string());
 }
 
-TEST_F(MiniDFSFileManagerTest, WriteLockEnforcement) {
+TEST_F(MistyFileManagerTest, WriteLockEnforcement) {
     std::string data = "secret";
     fs::path file_path = FileManager::ResolvePath(test_mount, "lock.txt");
 
@@ -131,13 +131,13 @@ TEST_F(MiniDFSFileManagerTest, WriteLockEnforcement) {
     EXPECT_TRUE(fs::exists(file_path.string()));
 }
 
-TEST_F(MiniDFSFileManagerTest, ReadWithoutLockFails) {
+TEST_F(MistyFileManagerTest, ReadWithoutLockFails) {
     char buffer[10];
     size_t bytes_read = 0;
     EXPECT_FALSE(fm.ReadFile("client1", "a.txt", 0, buffer, &bytes_read));
 }
 
-TEST_F(MiniDFSFileManagerTest, ReadWithLockSucceeds) {
+TEST_F(MistyFileManagerTest, ReadWithLockSucceeds) {
     std::string data = "hello";
     fs::path file_path = FileManager::ResolvePath(test_mount, "a.txt");
 
@@ -156,7 +156,7 @@ TEST_F(MiniDFSFileManagerTest, ReadWithLockSucceeds) {
     EXPECT_EQ(std::string(buffer, bytes_read), data);
 }
 
-TEST_F(MiniDFSFileManagerTest, ReadLockMultipleClients) {
+TEST_F(MistyFileManagerTest, ReadLockMultipleClients) {
     std::string data = "concurrent";
     fs::path file_path = FileManager::ResolvePath(test_mount, "shared.txt");
 
@@ -192,7 +192,7 @@ TEST_F(MiniDFSFileManagerTest, ReadLockMultipleClients) {
     EXPECT_EQ(success_count.load(), num_clients);
 }
 
-TEST_F(MiniDFSFileManagerTest, RemoveFileWithLock) {
+TEST_F(MistyFileManagerTest, RemoveFileWithLock) {
     std::string data = "to be deleted";
     fs::path file_path = FileManager::ResolvePath(test_mount, "delete_me.txt");
 
@@ -207,7 +207,7 @@ TEST_F(MiniDFSFileManagerTest, RemoveFileWithLock) {
     EXPECT_FALSE(fs::exists(file_path.string()));
 }
 
-TEST_F(MiniDFSFileManagerTest, RemoveFileWithoutLockFails) {
+TEST_F(MistyFileManagerTest, RemoveFileWithoutLockFails) {
     std::string data = "cannot delete";
     fs::path file_path = FileManager::ResolvePath(test_mount, "nodelete.txt");
 
@@ -219,19 +219,19 @@ TEST_F(MiniDFSFileManagerTest, RemoveFileWithoutLockFails) {
     EXPECT_TRUE(fs::exists(file_path.string()));
 }
 
-TEST_F(MiniDFSFileManagerTest, DeleteNonExistentFileFails) {
+TEST_F(MistyFileManagerTest, DeleteNonExistentFileFails) {
     fs::path file_path = FileManager::ResolvePath(test_mount, "nonexistent.txt");
     ASSERT_TRUE(fm.AcquireWriteLock("client1", file_path.string(), false));
     EXPECT_EQ(fm.RemoveFile("client1", file_path.string()), FileStatus::FILE_NOT_FOUND);
     fm.ReleaseWriteLock("client1", file_path.string());
 }
 
-TEST_F(MiniDFSFileManagerTest, ResolvePathTest) {
+TEST_F(MistyFileManagerTest, ResolvePathTest) {
     fs::path resolved = FileManager::ResolvePath(test_mount, "subdir/file.txt");
     EXPECT_EQ(resolved, fs::path(test_mount) / "subdir" / "file.txt");
 }
 
-TEST_F(MiniDFSFileManagerTest, ReadersBlockedByPendingWriter) {
+TEST_F(MistyFileManagerTest, ReadersBlockedByPendingWriter) {
     const std::string filename = "pending_writer.txt";
     std::atomic<bool> reader_entered{false};
 
@@ -254,7 +254,7 @@ TEST_F(MiniDFSFileManagerTest, ReadersBlockedByPendingWriter) {
     EXPECT_TRUE(reader_entered.load());
 }
 
-TEST_F(MiniDFSFileManagerTest, OneWriterThreeReadersStressTest) {
+TEST_F(MistyFileManagerTest, OneWriterThreeReadersStressTest) {
     fs::path file_path = FileManager::ResolvePath(test_mount, "stress.txt");
     const std::string writer_id = "writer";
     constexpr int kIterations = 100;
@@ -293,7 +293,7 @@ TEST_F(MiniDFSFileManagerTest, OneWriterThreeReadersStressTest) {
     r3.join();
 }
 
-TEST_F(MiniDFSFileManagerTest, ManyWritersAndReaders) {
+TEST_F(MistyFileManagerTest, ManyWritersAndReaders) {
     fs::path file_path = FileManager::ResolvePath(test_mount, "stress_many.txt");
     constexpr int kWriters = 100;
     constexpr int kReaders = 1000;
@@ -329,7 +329,7 @@ TEST_F(MiniDFSFileManagerTest, ManyWritersAndReaders) {
     for (auto& r : readers) r.join();
 }
 
-TEST_F(MiniDFSFileManagerTest, ManyReadersBlockedByPendingWriters) {
+TEST_F(MistyFileManagerTest, ManyReadersBlockedByPendingWriters) {
     fs::path file_path = FileManager::ResolvePath(test_mount, "pending_writer_stress.txt");
     constexpr int kWriters = 50;
     constexpr int kReaders = 200;
@@ -372,7 +372,7 @@ TEST_F(MiniDFSFileManagerTest, ManyReadersBlockedByPendingWriters) {
     EXPECT_EQ(readers_entered.load(), kReaders);
 }
 
-TEST_F(MiniDFSFileManagerTest, ManyReaderWriterChaosTest) { 
+TEST_F(MistyFileManagerTest, ManyReaderWriterChaosTest) { 
     fs::path file_path = FileManager::ResolvePath(test_mount, "chaos.txt");
     constexpr int kWriters = 100;
     constexpr int kReaders = 500;

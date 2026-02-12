@@ -4,7 +4,7 @@
 #include <nlohmann/json.hpp>
 #include <cstring>
 
-namespace minidfs::panel {
+namespace misty::panel {
     ServicesPanel::ServicesPanel(UIRegistry& registry)
         : registry_(registry) {
     }
@@ -408,61 +408,141 @@ namespace minidfs::panel {
         }
 
         ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-        ImGui::SetNextWindowSize(ImVec2(480, 480), ImGuiCond_Appearing);
+        ImGui::SetNextWindowSize(ImVec2(480, 0), ImGuiCond_Appearing);
 
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 8.0f);
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(24.0f, 24.0f));
-        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(12.0f, 12.0f));
-        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(12.0f, 8.0f));
+        ImVec4 accent = ImVec4(0.21f, 0.50f, 0.89f, 1.0f); // OneDrive blue
+
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 12.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(28.0f, 28.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(12.0f, 10.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(12.0f, 10.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
+        ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.11f, 0.11f, 0.12f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.22f, 0.22f, 0.24f, 1.0f));
 
         if (ImGui::BeginPopupModal("Connect to OneDrive", &state.show_ms_login_modal,
-            ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove)) {
+            ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize)) {
 
-            ImGui::TextWrapped("To upload files to OneDrive, you need to authenticate with Microsoft.");
+            // --- Header ---
+            core::WithFontScale(1.6f, [&]() {
+                core::ColoredText(accent, "Connect to OneDrive");
+            });
+            core::ColoredText(ImVec4(0.55f, 0.55f, 0.58f, 1.0f), "Link your Microsoft account to sync files");
             ImGui::Spacing();
-            ImGui::TextWrapped("1. Click 'Sign in to OneDrive' to open the browser and sign in to your Microsoft account");
-            ImGui::TextWrapped("2. After signing in, return here.");
-            ImGui::Spacing();
-            ImGui::Separator();
             ImGui::Spacing();
 
+            // --- Steps card ---
+            ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.15f, 0.15f, 0.16f, 1.0f));
+            ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 8.0f);
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16.0f, 14.0f));
+
+            if (ImGui::BeginChild("##steps_card", ImVec2(ImGui::GetContentRegionAvail().x, 0),
+                ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysUseWindowPadding)) {
+
+                ImDrawList* dl = ImGui::GetWindowDrawList();
+                const char* steps[] = {
+                    "Click \"Sign in\" to open the browser",
+                    "Sign in to your Microsoft account",
+                    "Return here when complete"
+                };
+                ImU32 badge_col = ImGui::ColorConvertFloat4ToU32(accent);
+                for (int i = 0; i < 3; i++) {
+                    ImVec2 cursor = ImGui::GetCursorScreenPos();
+                    // Draw numbered circle badge
+                    float radius = 10.0f;
+                    ImVec2 center(cursor.x + radius, cursor.y + ImGui::GetFontSize() * 0.5f);
+                    dl->AddCircleFilled(center, radius, badge_col);
+                    // Number inside badge
+                    char num[2] = { (char)('1' + i), '\0' };
+                    ImVec2 num_size = ImGui::CalcTextSize(num);
+                    dl->AddText(ImVec2(center.x - num_size.x * 0.5f, center.y - num_size.y * 0.5f),
+                        IM_COL32(255, 255, 255, 255), num);
+                    // Step text
+                    ImGui::Dummy(ImVec2(radius * 2 + 10.0f, 0.0f));
+                    ImGui::SameLine();
+                    core::ColoredText(ImVec4(0.82f, 0.82f, 0.84f, 1.0f), "%s", steps[i]);
+                    if (i < 2) ImGui::Spacing();
+                }
+            }
+            ImGui::EndChild();
+            ImGui::PopStyleVar(2);
+            ImGui::PopStyleColor();
+
+            ImGui::Spacing();
+            ImGui::Spacing();
+
+            // --- Error / Success messages ---
             {
                 std::lock_guard<std::mutex> lock(state.mu);
                 if (!state.ms_auth_error.empty()) {
-                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.4f, 0.4f, 1.0f));
-                    ImGui::TextWrapped("%s", state.ms_auth_error.c_str());
+                    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.35f, 0.12f, 0.12f, 0.6f));
+                    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 6.0f);
+                    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 10.0f));
+                    if (ImGui::BeginChild("##ms_err", ImVec2(ImGui::GetContentRegionAvail().x, 0),
+                        ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysUseWindowPadding)) {
+                        // Red left accent
+                        ImDrawList* dl = ImGui::GetWindowDrawList();
+                        ImVec2 p = ImGui::GetWindowPos();
+                        dl->AddRectFilled(p, ImVec2(p.x + 3.0f, p.y + ImGui::GetWindowHeight()),
+                            IM_COL32(240, 80, 80, 255), 2.0f);
+                        core::ColoredText(ImVec4(1.0f, 0.5f, 0.5f, 1.0f), "%s", state.ms_auth_error.c_str());
+                    }
+                    ImGui::EndChild();
+                    ImGui::PopStyleVar(2);
                     ImGui::PopStyleColor();
                     ImGui::Spacing();
                 }
                 if (!state.success_msg.empty()) {
-                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.3f, 0.8f, 0.4f, 1.0f));
-                    ImGui::TextWrapped("%s", state.success_msg.c_str());
+                    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.12f, 0.28f, 0.16f, 0.6f));
+                    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 6.0f);
+                    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 10.0f));
+                    if (ImGui::BeginChild("##ms_ok", ImVec2(ImGui::GetContentRegionAvail().x, 0),
+                        ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysUseWindowPadding)) {
+                        ImDrawList* dl = ImGui::GetWindowDrawList();
+                        ImVec2 p = ImGui::GetWindowPos();
+                        dl->AddRectFilled(p, ImVec2(p.x + 3.0f, p.y + ImGui::GetWindowHeight()),
+                            IM_COL32(76, 175, 80, 255), 2.0f);
+                        core::ColoredText(ImVec4(0.4f, 0.85f, 0.5f, 1.0f), "%s", state.success_msg.c_str());
+                    }
+                    ImGui::EndChild();
+                    ImGui::PopStyleVar(2);
                     ImGui::PopStyleColor();
                     ImGui::Spacing();
                 }
             }
 
+            // --- Action buttons ---
             float button_width = ImGui::GetContentRegionAvail().x;
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.35f, 0.5f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.45f, 0.6f, 1.0f));
-            if (ImGui::Button("Sign in to OneDrive", ImVec2(button_width, 36))) {
-                state.initiate_ms_login();
-            }
-            ImGui::PopStyleColor(2);
+
+            core::WithButtonStyle({accent,
+                ImVec4(accent.x + 0.08f, accent.y + 0.08f, accent.z + 0.08f, 1.0f),
+                ImVec4(accent.x - 0.05f, accent.y - 0.05f, accent.z - 0.05f, 1.0f),
+                ImVec4(1.0f, 1.0f, 1.0f, 1.0f), 8.0f}, [&]() {
+                if (ImGui::Button("Sign in with Microsoft", ImVec2(button_width, 44))) {
+                    state.initiate_ms_login();
+                }
+            });
+
             ImGui::Spacing();
 
-            if (ImGui::Button("Done", ImVec2(button_width, 36))) {
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.25f, 0.25f, 0.27f, 0.4f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.2f, 0.2f, 0.22f, 0.4f));
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55f, 0.55f, 0.58f, 1.0f));
+            if (ImGui::Button("Cancel", ImVec2(button_width, 36))) {
                 std::lock_guard<std::mutex> lock(state.mu);
                 state.ms_auth_error.clear();
                 state.success_msg.clear();
                 state.show_ms_login_modal = false;
                 state.check_connections();
-
                 ImGui::CloseCurrentPopup();
             }
+            ImGui::PopStyleColor(4);
+
             ImGui::EndPopup();
         }
-        ImGui::PopStyleVar(4);
+        ImGui::PopStyleColor(2);
+        ImGui::PopStyleVar(5);
     }
 
     // ==================== Google Drive Card UI ====================
@@ -573,61 +653,137 @@ namespace minidfs::panel {
         }
 
         ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-        ImGui::SetNextWindowSize(ImVec2(480, 480), ImGuiCond_Appearing);
+        ImGui::SetNextWindowSize(ImVec2(480, 0), ImGuiCond_Appearing);
 
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 8.0f);
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(24.0f, 24.0f));
-        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(12.0f, 12.0f));
-        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(12.0f, 8.0f));
+        ImVec4 accent = ImVec4(0.20f, 0.66f, 0.33f, 1.0f); // Google Drive green
+
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 12.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(28.0f, 28.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(12.0f, 10.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(12.0f, 10.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
+        ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.11f, 0.11f, 0.12f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.22f, 0.22f, 0.24f, 1.0f));
 
         if (ImGui::BeginPopupModal("Connect to Google Drive", &state.show_gd_login_modal,
-            ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove)) {
+            ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize)) {
 
-            ImGui::TextWrapped("To upload files to Google Drive, you need to authenticate with Google.");
+            // --- Header ---
+            core::WithFontScale(1.6f, [&]() {
+                core::ColoredText(accent, "Connect to Google Drive");
+            });
+            core::ColoredText(ImVec4(0.55f, 0.55f, 0.58f, 1.0f), "Link your Google account to sync files");
             ImGui::Spacing();
-            ImGui::TextWrapped("1. Click 'Sign in to Google Drive' to open the browser and sign in to your Google account");
-            ImGui::TextWrapped("2. After signing in, return here.");
-            ImGui::Spacing();
-            ImGui::Separator();
             ImGui::Spacing();
 
+            // --- Steps card ---
+            ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.15f, 0.15f, 0.16f, 1.0f));
+            ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 8.0f);
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16.0f, 14.0f));
+
+            if (ImGui::BeginChild("##gd_steps_card", ImVec2(ImGui::GetContentRegionAvail().x, 0),
+                ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysUseWindowPadding)) {
+
+                ImDrawList* dl = ImGui::GetWindowDrawList();
+                const char* steps[] = {
+                    "Click \"Sign in\" to open the browser",
+                    "Sign in to your Google account",
+                    "Return here when complete"
+                };
+                ImU32 badge_col = ImGui::ColorConvertFloat4ToU32(accent);
+                for (int i = 0; i < 3; i++) {
+                    ImVec2 cursor = ImGui::GetCursorScreenPos();
+                    float radius = 10.0f;
+                    ImVec2 center(cursor.x + radius, cursor.y + ImGui::GetFontSize() * 0.5f);
+                    dl->AddCircleFilled(center, radius, badge_col);
+                    char num[2] = { (char)('1' + i), '\0' };
+                    ImVec2 num_size = ImGui::CalcTextSize(num);
+                    dl->AddText(ImVec2(center.x - num_size.x * 0.5f, center.y - num_size.y * 0.5f),
+                        IM_COL32(255, 255, 255, 255), num);
+                    ImGui::Dummy(ImVec2(radius * 2 + 10.0f, 0.0f));
+                    ImGui::SameLine();
+                    core::ColoredText(ImVec4(0.82f, 0.82f, 0.84f, 1.0f), "%s", steps[i]);
+                    if (i < 2) ImGui::Spacing();
+                }
+            }
+            ImGui::EndChild();
+            ImGui::PopStyleVar(2);
+            ImGui::PopStyleColor();
+
+            ImGui::Spacing();
+            ImGui::Spacing();
+
+            // --- Error / Success messages ---
             {
                 std::lock_guard<std::mutex> lock(state.mu);
                 if (!state.gd_auth_error.empty()) {
-                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.4f, 0.4f, 1.0f));
-                    ImGui::TextWrapped("%s", state.gd_auth_error.c_str());
+                    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.35f, 0.12f, 0.12f, 0.6f));
+                    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 6.0f);
+                    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 10.0f));
+                    if (ImGui::BeginChild("##gd_err", ImVec2(ImGui::GetContentRegionAvail().x, 0),
+                        ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysUseWindowPadding)) {
+                        ImDrawList* dl = ImGui::GetWindowDrawList();
+                        ImVec2 p = ImGui::GetWindowPos();
+                        dl->AddRectFilled(p, ImVec2(p.x + 3.0f, p.y + ImGui::GetWindowHeight()),
+                            IM_COL32(240, 80, 80, 255), 2.0f);
+                        core::ColoredText(ImVec4(1.0f, 0.5f, 0.5f, 1.0f), "%s", state.gd_auth_error.c_str());
+                    }
+                    ImGui::EndChild();
+                    ImGui::PopStyleVar(2);
                     ImGui::PopStyleColor();
                     ImGui::Spacing();
                 }
                 if (!state.success_msg.empty()) {
-                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.3f, 0.8f, 0.4f, 1.0f));
-                    ImGui::TextWrapped("%s", state.success_msg.c_str());
+                    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.12f, 0.28f, 0.16f, 0.6f));
+                    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 6.0f);
+                    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 10.0f));
+                    if (ImGui::BeginChild("##gd_ok", ImVec2(ImGui::GetContentRegionAvail().x, 0),
+                        ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysUseWindowPadding)) {
+                        ImDrawList* dl = ImGui::GetWindowDrawList();
+                        ImVec2 p = ImGui::GetWindowPos();
+                        dl->AddRectFilled(p, ImVec2(p.x + 3.0f, p.y + ImGui::GetWindowHeight()),
+                            IM_COL32(76, 175, 80, 255), 2.0f);
+                        core::ColoredText(ImVec4(0.4f, 0.85f, 0.5f, 1.0f), "%s", state.success_msg.c_str());
+                    }
+                    ImGui::EndChild();
+                    ImGui::PopStyleVar(2);
                     ImGui::PopStyleColor();
                     ImGui::Spacing();
                 }
             }
 
+            // --- Action buttons ---
             float button_width = ImGui::GetContentRegionAvail().x;
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.13f, 0.44f, 0.24f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.18f, 0.54f, 0.34f, 1.0f));
-            if (ImGui::Button("Sign in to Google Drive", ImVec2(button_width, 36))) {
-                state.initiate_gd_login();
-            }
-            ImGui::PopStyleColor(2);
+
+            core::WithButtonStyle({accent,
+                ImVec4(accent.x + 0.08f, accent.y + 0.08f, accent.z + 0.08f, 1.0f),
+                ImVec4(accent.x - 0.05f, accent.y - 0.05f, accent.z - 0.05f, 1.0f),
+                ImVec4(1.0f, 1.0f, 1.0f, 1.0f), 8.0f}, [&]() {
+                if (ImGui::Button("Sign in with Google", ImVec2(button_width, 44))) {
+                    state.initiate_gd_login();
+                }
+            });
+
             ImGui::Spacing();
 
-            if (ImGui::Button("Done##gd", ImVec2(button_width, 36))) {
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.25f, 0.25f, 0.27f, 0.4f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.2f, 0.2f, 0.22f, 0.4f));
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55f, 0.55f, 0.58f, 1.0f));
+            if (ImGui::Button("Cancel##gd", ImVec2(button_width, 36))) {
                 std::lock_guard<std::mutex> lock(state.mu);
                 state.gd_auth_error.clear();
                 state.success_msg.clear();
                 state.show_gd_login_modal = false;
                 state.check_gd_connections();
-
                 ImGui::CloseCurrentPopup();
             }
+            ImGui::PopStyleColor(4);
+
             ImGui::EndPopup();
         }
-        ImGui::PopStyleVar(4);
+        ImGui::PopStyleColor(2);
+        ImGui::PopStyleVar(5);
     }
 
 }

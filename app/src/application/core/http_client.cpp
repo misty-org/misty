@@ -6,7 +6,7 @@
 #include <vector>
 #include <cstring>
 
-namespace minidfs::core {
+namespace misty::core {
 
     // Align chunk size to 320KB boundary (required by Microsoft Graph)
     static size_t align_chunk_size(size_t requested_size) {

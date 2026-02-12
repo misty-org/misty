@@ -9,10 +9,10 @@
 #include "panels/workspace/workspace_state.h"
 
 
-namespace minidfs::panel {
+namespace misty::panel {
     class FileExplorerPanel : public panel::Panel {
     public:
-        FileExplorerPanel(core::UIRegistry& registry, core::WorkerPool& worker_pool, std::shared_ptr<MiniDFSClient> client);
+        FileExplorerPanel(core::UIRegistry& registry, core::WorkerPool& worker_pool, std::shared_ptr<MistyClient> client);
         ~FileExplorerPanel() override = default;
         void render() override;
 
@@ -26,6 +26,20 @@ namespace minidfs::panel {
         void show_search_bar(panel::FileExplorerState& state);
         void show_directory_contents(panel::FileExplorerState& state);
         void show_file_item(panel::FileExplorerState& state, int i);
+
+        // Context menu + file operations
+        void show_context_menu(panel::FileExplorerState& state);
+        void show_background_context_menu(panel::FileExplorerState& state);
+        void show_new_entry_modal(panel::FileExplorerState& state);
+        void show_rename_modal(panel::FileExplorerState& state);
+        
+        // File operation helpers
+        void perform_copy(panel::FileExplorerState& state);
+        void perform_cut(panel::FileExplorerState& state);
+        void perform_paste(panel::FileExplorerState& state);
+        void perform_delete_selected(panel::FileExplorerState& state);
+        void perform_delete(panel::FileExplorerState& state, const std::string& path);
+        void initiate_rename(panel::FileExplorerState& state);
 
         // Sync account mappings from services state
         void sync_account_mappings();
@@ -75,7 +89,7 @@ namespace minidfs::panel {
     private:
         core::UIRegistry& registry_;
         core::WorkerPool& worker_pool_;
-        std::shared_ptr<MiniDFSClient> client_;
+        std::shared_ptr<MistyClient> client_;
 
         std::string initial_start_path_;
         bool workspace_mount_applied_ = false;

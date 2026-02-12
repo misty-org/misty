@@ -1,9 +1,9 @@
 #include "panels/navbar/navbar_panel.h"
 #include "core/asset_manager.h"
 
-using namespace minidfs::view;
+using namespace misty::view;
 
-namespace minidfs::panel {
+namespace misty::panel {
     NavbarPanel::NavbarPanel(UIRegistry& ui_registry) : ui_registry_(ui_registry) {
 
     }

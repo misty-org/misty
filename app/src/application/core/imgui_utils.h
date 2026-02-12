@@ -2,7 +2,7 @@
 
 #include "imgui.h"
 
-namespace minidfs::core {
+namespace misty::core {
 
     class CustomStyleColor {
     public:

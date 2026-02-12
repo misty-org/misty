@@ -6,7 +6,7 @@
 #include <filesystem>
 #include <iostream>
 
-namespace minidfs::panel {
+namespace misty::panel {
 
     void OneDriveState::upload_file(
         const std::string& local_path,
