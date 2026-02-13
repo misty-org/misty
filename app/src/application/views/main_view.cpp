@@ -12,6 +12,9 @@ namespace misty::view {
     void MainView::init_panels() {
         file_explorer_panel_ = std::make_shared<panel::FileExplorerPanel>(ui_registry_, worker_pool_, client_);
         file_sidebar_panel_ = std::make_shared<panel::FileSidebarPanel>(ui_registry_, worker_pool_, client_);
+        file_sidebar_panel_->set_mount_path_provider([this]() -> std::string {
+            return client_ ? client_->GetClientMountPath() : "";
+        });
         navbar_panel_ = std::make_shared<panel::NavbarPanel>(ui_registry_);
         notification_panel_ = std::make_shared<panel::NotificationPanel>(ui_registry_);
     }

@@ -4,6 +4,7 @@
 
 #include "core/ui_registry.h"
 #include "core/worker_pool.h"
+#include <functional>
 
 #include "file_sidebar_state.h"
 
@@ -17,8 +18,13 @@ namespace misty::panel {
         FileSidebarPanel(core::UIRegistry& registry, core::WorkerPool& worker_pool, std::shared_ptr<MistyClient> client);
         void render();
 
+        void set_mount_path_provider(std::function<std::string()> provider) {
+            mount_path_provider_ = provider;
+        }
+
     private:
         void show_services_section(ServicesState& services_state, float width, float padding);
+        void show_mounts_section(float width, float padding);
         void show_create_new(FileSidebarState& state, float width, float padding);
         void show_chooser_modal(FileSidebarState& state);
         void show_create_entry_modal(FileSidebarState& state);
@@ -32,6 +38,7 @@ namespace misty::panel {
         core::UIRegistry& registry_;
         core::WorkerPool& worker_pool_;
         std::shared_ptr<MistyClient> client_;
+        std::function<std::string()> mount_path_provider_;
     };
 
 }

@@ -22,8 +22,7 @@ namespace misty::panel {
         auto& state = registry_.get_state<FileSidebarState>("FileSidebar");
         auto& workspace_state = registry_.get_state<WorkspaceState>("Workspace");
         auto& services_state = registry_.get_state<ServicesState>("Services");
-
-
+        services_state.init(worker_pool_);
 
 
         ImGuiWindowFlags flags =
@@ -46,6 +45,8 @@ namespace misty::panel {
             show_create_new(state, width, padding);
             ImGui::Separator();
             show_services_section(services_state, width, padding);
+            ImGui::Separator();
+            show_mounts_section(width, padding);
             ImGui::Separator();
 
             show_quick_access(width, padding);
@@ -95,6 +96,45 @@ namespace misty::panel {
                 auto& file_explorer_state = registry_.get_state<FileExplorerState>("FileExplorer");
 
                 file_explorer_state.pending_navigation_path = mount_utils::get_gdrive_root();
+            }
+        }
+
+        ImGui::PopStyleVar();
+        ImGui::PopStyleColor(3);
+
+        ImGui::EndGroup();
+
+        ImGui::Spacing();
+    }
+
+    void FileSidebarPanel::show_mounts_section(float width, float padding) {
+        float content_width = width - (padding * 2);
+        ImGui::SetCursorPosX(padding);
+
+        ImGui::BeginGroup();
+
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.7f, 0.7f, 0.7f, 1.0f));
+        ImGui::Text("Mounts");
+        ImGui::PopStyleColor();
+
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.22f, 0.22f, 0.22f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.32f, 0.32f, 0.32f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.18f, 0.18f, 0.18f, 1.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 4.0f));
+
+        {
+            float button_width = content_width;
+            
+            // For now only show Root mount
+            if (ImGui::Button("Root", ImVec2(button_width, 28))) {
+                auto& file_explorer_state = registry_.get_state<FileExplorerState>("FileExplorer");
+                
+                if (mount_path_provider_) {
+                    std::string path = mount_path_provider_();
+                    if (!path.empty()) {
+                        file_explorer_state.pending_navigation_path = path;
+                    }
+                }
             }
         }
 
@@ -405,6 +445,7 @@ namespace misty::panel {
             }
         };
 
+        onedrive_state.set_worker_pool(worker_pool_);
         onedrive_state.upload_file(file_path, progress_cb, completion_cb);
     }
 

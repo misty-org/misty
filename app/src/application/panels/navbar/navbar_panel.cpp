@@ -1,11 +1,12 @@
 #include "panels/navbar/navbar_panel.h"
+#include "panels/profile/profile_state.h"
 #include "core/asset_manager.h"
 
 using namespace misty::view;
 
 namespace misty::panel {
-    NavbarPanel::NavbarPanel(UIRegistry& ui_registry) : ui_registry_(ui_registry) {
-
+    NavbarPanel::NavbarPanel(UIRegistry& ui_registry) : ui_registry_(ui_registry),
+        profile_panel_(ui_registry) {
     }
 
     void NavbarPanel::render() {
@@ -40,30 +41,33 @@ namespace misty::panel {
             ImGui::SetCursorPosY(footer_y - nav_item_height);
             show_nav_item("gear-24", "Settings", 24, ViewID::Settings, state);
             ImGui::SetCursorPosY(footer_y);
-            show_nav_item("kebab-horizontal-24", "More", 24, ViewID::Default, state);
+            show_profile_button();
         }
         ImGui::End();
 
         ImGui::PopStyleVar(); 
         ImGui::PopStyleColor(); 
+
+        // Render profile popup on top (outside navbar window)
+        profile_panel_.render();
     }
 
     void NavbarPanel::show_logo_icon() {
-        const char* path = "assets/logo/mist_v1.png";
+        const char* path = "assets/icons/misty_full.png";
         const char* label = "mist_v1";
         
         auto& logo_image = core::AssetManager::get().get_image_texture(path);
 
         float logo_size = 48.0f;
-        ImVec2 padding(8.0f, 8.0f);
+        ImVec2 padding(4.0f, 4.0f);
         float button_size = logo_size + padding.x * 2.0f;
 
         float current_width = ImGui::GetWindowWidth();
         ImGui::SetCursorPosX((current_width - button_size) * 0.5f);
 
         ImGui::PushID("nav_logo");
-        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, padding);
-        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 20.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, padding);   
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 16.0f);
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.18f, 0.18f, 0.18f, 1));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0, 0, 0, 0));
@@ -120,6 +124,49 @@ namespace misty::panel {
         ImVec4 textColor = is_selected ? ImVec4(1, 1, 1, 1) : ImVec4(0.6f, 0.6f, 0.6f, 1.0f);
         ImGui::PushStyleColor(ImGuiCol_Text, textColor);
         ImGui::Text("%s", label);
+        ImGui::PopStyleColor();
+
+        ImGui::Spacing();
+    }
+
+    void NavbarPanel::show_profile_button() {
+        auto& profile_state = ui_registry_.get_state<ProfileState>("Profile");
+        auto& icon = core::AssetManager::get().get_svg_texture("person-24", 48);
+
+        float navbar_width = ImGui::GetWindowWidth();
+        int size = 24;
+        float padding_x = 8.0f;
+        float button_total_width = (float)size + (padding_x * 2.0f);
+        float centered_x = (navbar_width - button_total_width) * 0.5f;
+
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(padding_x, 8.0f));
+
+        if (profile_state.is_open) {
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
+        } else {
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.11f, 0.11f, 0.11f, 0.0f));
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.6f, 0.6f, 0.6f, 1.0f));
+        }
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.18f, 0.18f, 0.18f, 1.0f));
+
+        ImGui::SetCursorPosX(std::floor(centered_x));
+
+        if (ImGui::ImageButton("Profile", icon.id, ImVec2((float)size, (float)size))) {
+            profile_state.is_open = !profile_state.is_open;
+        }
+
+        ImGui::PopStyleColor(3);
+        ImGui::PopStyleVar(2);
+
+        float text_width = ImGui::CalcTextSize("Profile").x;
+        float text_centered_x = (navbar_width - text_width) * 0.5f;
+        ImGui::SetCursorPosX(std::floor(text_centered_x));
+
+        ImVec4 textColor = profile_state.is_open ? ImVec4(1, 1, 1, 1) : ImVec4(0.6f, 0.6f, 0.6f, 1.0f);
+        ImGui::PushStyleColor(ImGuiCol_Text, textColor);
+        ImGui::Text("Profile");
         ImGui::PopStyleColor();
 
         ImGui::Spacing();

@@ -26,7 +26,8 @@ namespace misty::panel {
         LOCAL,      // Not a cloud file (Gray)
         SYNCED,     // Cloud file, fully downloaded and matches cloud (Green)
         MODIFIED,   // Cloud file, downloaded but modified locally (Yellow)
-        NOT_SYNCED  // Cloud file, not downloaded (Red)
+        NOT_SYNCED,  // Cloud file, not downloaded (Red)
+        DELETED     // Soft deleted (Black)
     };
 
     // Unified file item that works for both local and OneDrive
@@ -173,6 +174,7 @@ namespace misty::panel {
         }
 
         char current_path[512] = "";
+        std::string last_opened_path = "";
         char search_path[512] = "";
         std::vector<UnifiedFileItem> files;
         std::unordered_set<std::string> selected_files;
@@ -234,6 +236,9 @@ namespace misty::panel {
         
         // Helper to move to trash
         void move_to_trash(const UnifiedFileItem& item);
+
+        // Helper to track file moves/renames/deletions in virtual lists
+        void track_move(const std::string& old_path, const UnifiedFileItem& new_item);
 
         // State persistence
         void load_state();

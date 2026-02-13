@@ -3,6 +3,7 @@
 #include <chrono>
 #include <filesystem>
 #include <iostream>
+#include <unordered_map>
 
 namespace fs = std::filesystem;
 
@@ -31,58 +32,92 @@ namespace misty::core {
     void FileSyncService::update_loop() {
         while (running_) {
             try {
-                // Access FileExplorer state
-                // Note: We need to be careful about thread safety.
-                // FileExplorerState has a mutex 'mu'.
-                
-                // We use try_lock to avoid blocking UI thread if it's busy?
-                // Or just lock. UI is fast.
-                
-                auto& state = registry_.get_state<panel::FileExplorerState>("FileExplorer");
-                
-                bool updated = false;
+                // 1. Snapshot state (hold lock briefly)
+                std::vector<panel::UnifiedFileItem> snapshot_files;
+                std::string snapshot_path;
                 {
+                    auto& state = registry_.get_state<panel::FileExplorerState>("FileExplorer");
                     std::lock_guard<std::mutex> lock(state.mu);
-                    
-                    for (auto& file : state.files) {
-                        panel::SyncStatus old_status = file.status;
-                        panel::SyncStatus new_status = old_status; // Default keep same
+                    snapshot_files = state.files;
+                    snapshot_path = state.current_path;
+                }
 
-                        if (file.is_dir) {
-                            new_status = panel::SyncStatus::LOCAL;
-                        } else if (file.source == panel::FileSource::LOCAL) {
-                            new_status = panel::SyncStatus::LOCAL;
-                        } else {
-                            // Cloud file (OneDrive/GDrive)
-                            std::error_code ec;
-                            if (fs::exists(file.path, ec) && !ec) {
-                                // Exists locally
-                                if (file.source == panel::FileSource::GDRIVE 
-                                    && file.gd_mime_type.rfind("application/vnd.google-apps.", 0) == 0
-                                    && file.size == 0) {
-                                    // GDrive doc link
-                                    new_status = panel::SyncStatus::SYNCED;
-                                } else {
-                                    // Check size
-                                    try {
-                                        uintmax_t local_size = fs::file_size(file.path, ec);
-                                        if (!ec && local_size == (uintmax_t)file.size) {
-                                            new_status = panel::SyncStatus::SYNCED;
-                                        } else {
-                                            new_status = panel::SyncStatus::MODIFIED;
-                                        }
-                                    } catch (...) {
+                if (snapshot_files.empty()) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+                    continue;
+                }
+
+                // 2. Process IO (no lock)
+                std::vector<std::pair<std::string, panel::SyncStatus>> updates;
+                bool any_update = false;
+
+                for (const auto& file : snapshot_files) {
+                    panel::SyncStatus old_status = file.status;
+                    panel::SyncStatus new_status = old_status;
+
+                    if (file.is_dir) {
+                        new_status = panel::SyncStatus::LOCAL;
+    } else if (file.source == panel::FileSource::LOCAL) {
+                        new_status = panel::SyncStatus::LOCAL;
+                    } else {
+                        // Cloud file (OneDrive/GDrive)
+                        std::error_code ec;
+                        if (fs::exists(file.path, ec) && !ec) {
+                            // Exists locally
+                            if (file.source == panel::FileSource::GDRIVE 
+                                && file.gd_mime_type.rfind("application/vnd.google-apps.", 0) == 0
+                                && file.size == 0) {
+                                // GDrive doc link
+                                new_status = panel::SyncStatus::SYNCED;
+                            } else {
+                                // Check size
+                                try {
+                                    uintmax_t local_size = fs::file_size(file.path, ec);
+                                    if (!ec && local_size == (uintmax_t)file.size) {
+                                        new_status = panel::SyncStatus::SYNCED;
+                                    } else {
                                         new_status = panel::SyncStatus::MODIFIED;
                                     }
+                                } catch (...) {
+                                    new_status = panel::SyncStatus::MODIFIED;
                                 }
-                            } else {
-                                new_status = panel::SyncStatus::NOT_SYNCED;
                             }
+                        } else {
+                            new_status = panel::SyncStatus::NOT_SYNCED;
+                        }
+                    }
+
+                    // Check for trash (Global Override)
+                    const char* home = std::getenv("HOME");
+                    if (home) {
+                        if (file.path.find("/misty/.cache/trash") != std::string::npos) {
+                            new_status = panel::SyncStatus::DELETED;
+                        }
+                    }
+
+                    if (new_status != old_status) {
+                        updates.push_back({file.path, new_status});
+                        any_update = true;
+                    }
+                }
+
+                // 3. Apply updates (hold lock briefly)
+                if (any_update) {
+                    auto& state = registry_.get_state<panel::FileExplorerState>("FileExplorer");
+                    std::lock_guard<std::mutex> lock(state.mu);
+                    
+                    // Only apply if we are still in the same directory
+                    if (state.current_path == snapshot_path) {
+                        std::unordered_map<std::string, size_t> path_map;
+                        for (size_t i = 0; i < state.files.size(); ++i) {
+                            path_map[state.files[i].path] = i;
                         }
 
-                        if (new_status != old_status) {
-                            file.status = new_status;
-                            updated = true;
+                        for (const auto& update : updates) {
+                            auto it = path_map.find(update.first);
+                            if (it != path_map.end()) {
+                                state.files[it->second].status = update.second;
+                            }
                         }
                     }
                 }

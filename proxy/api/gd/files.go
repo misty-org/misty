@@ -34,31 +34,60 @@ func GetFiles(database *db.Database) http.HandlerFunc {
 		}
 
 		query := url.Values{
-			"q":       {fmt.Sprintf("'%s' in parents and trashed = false", folderID)},
-			"fields":  {"files(id,name,mimeType,size,webViewLink,createdTime,modifiedTime,parents,iconLink),nextPageToken"},
-			"orderBy": {"folder,name"},
+			"q":        {fmt.Sprintf("'%s' in parents and trashed = false", folderID)},
+			"fields":   {"files(id,name,mimeType,size,webViewLink,createdTime,modifiedTime,parents,iconLink),nextPageToken"},
+			"orderBy":  {"folder,name"},
+			"pageSize": {"1000"},
 		}
 
-		apiURL := fmt.Sprintf("%s/drive/v3/files?%s", config.APIBase, query.Encode())
-		apiRes, err := gd.ExecAPIRequest(database, userID, gdUserID, http.MethodGet, apiURL, nil)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		defer apiRes.Body.Close()
+		var allFiles []gd.GDriveFile
+		pageToken := ""
 
-		if apiRes.StatusCode != http.StatusOK {
-			http.Error(w, fmt.Sprintf("Google Drive API error: %d", apiRes.StatusCode), apiRes.StatusCode)
-			return
-		}
+		for i := 0; i < 50; i++ { // safety cap
+			if pageToken != "" {
+				query.Set("pageToken", pageToken)
+			}
 
-		var res gd.GDriveFileList
-		if err := json.NewDecoder(apiRes.Body).Decode(&res); err != nil {
-			http.Error(w, "Failed to decode response", http.StatusInternalServerError)
-			return
+			// log.Printf("GDrive: Fetching page %d for folder %s (token: %s)", i+1, folderID, pageToken)
+
+			apiURL := fmt.Sprintf("%s/drive/v3/files?%s", config.APIBase, query.Encode())
+			apiRes, err := gd.ExecAPIRequest(database, userID, gdUserID, http.MethodGet, apiURL, nil)
+			if err != nil {
+				log.Printf("GDrive API request failed: %v", err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			if apiRes.StatusCode != http.StatusOK {
+				apiRes.Body.Close()
+				log.Printf("GDrive API error status: %d", apiRes.StatusCode)
+				http.Error(w, fmt.Sprintf("Google Drive API error: %d", apiRes.StatusCode), apiRes.StatusCode)
+				return
+			}
+
+			var page gd.GDriveFileList
+			if err := json.NewDecoder(apiRes.Body).Decode(&page); err != nil {
+				apiRes.Body.Close()
+				log.Printf("Failed to decode response: %v", err)
+				http.Error(w, "Failed to decode response", http.StatusInternalServerError)
+				return
+			}
+			apiRes.Body.Close()
+
+			log.Printf("GDrive: Page %d fetched %d items. Next token: %s", i+1, len(page.Files), page.NextPageToken)
+			allFiles = append(allFiles, page.Files...)
+
+			if page.NextPageToken == "" {
+				break
+			}
+			pageToken = page.NextPageToken
 		}
+		
+		log.Printf("GDrive: Total files fetched: %d", len(allFiles))
+
+		result := gd.GDriveFileList{Files: allFiles}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(res)
+		json.NewEncoder(w).Encode(result)
 	}
 }
 

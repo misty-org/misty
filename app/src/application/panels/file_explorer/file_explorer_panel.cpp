@@ -5,6 +5,7 @@
 #include "panels/services/services_state.h"
 #include "panels/activity/download_state.h"
 #include "panels/notification/notification_state.h"
+#include "core/asset_manager.h"
 #include <nlohmann/json.hpp>
 #include <cstdio>
 
@@ -27,6 +28,10 @@ namespace misty::panel {
         // Load persistent state (Recent, Starred)
         file_explorer_state.load_state();
 
+        // Initialize services state with worker pool
+        auto& services_state = registry_.get_state<ServicesState>("Services");
+        services_state.init(worker_pool_);
+
         // Sync account mappings to create account directories
         sync_account_mappings();
         sync_gd_account_mappings();
@@ -41,6 +46,37 @@ namespace misty::panel {
         if (start_path.empty() && client_) {
             start_path = client_->GetClientMountPath();
         }
+
+        // Restore last opened path if valid
+        if (!file_explorer_state.last_opened_path.empty()) {
+            std::string saved_path = file_explorer_state.last_opened_path;
+            
+            printf("DEBUG: Constructor - Found last_opened_path: %s\n", saved_path.c_str());
+
+            bool is_valid = true;
+            
+            // Check if it's a virtual path
+            if (saved_path.rfind("misty://", 0) == 0) {
+                 // Always valid
+            } else if (path_utils::is_onedrive_path(saved_path) || path_utils::is_gdrive_path(saved_path)) {
+                 // Assume valid for cloud paths (will show error or reconnect if not)
+            } else {
+                 // Check local existence
+                 if (!fs::exists(saved_path) || !fs::is_directory(saved_path)) {
+                     is_valid = false;
+                 }
+            }
+            
+            if (is_valid) {
+                start_path = saved_path;
+                printf("DEBUG: Constructor - Using saved path: %s\n", start_path.c_str());
+            } else {
+                printf("DEBUG: Constructor - Saved path was invalid\n");
+            }
+        } else {
+             printf("DEBUG: Constructor - No last_opened_path found\n");
+        }
+
         initial_start_path_ = start_path;
 
         // Create directory if it doesn't exist
@@ -61,13 +97,19 @@ namespace misty::panel {
             if (workspace_state.has_fetched && !workspace_state.is_fetching) {
                 std::string workspace_path = workspace_state.get_current_mount_path();
                 if (!workspace_path.empty()) {
-                    std::string current_path = state.current_path;
-                    bool no_history = state.back_history.empty() && state.forward_history.empty();
-                    bool is_at_initial = current_path.empty() || current_path == initial_start_path_;
-                    if (no_history && is_at_initial && state.pending_navigation_path.empty()) {
-                        state.pending_navigation_path = workspace_path;
+                    printf("DEBUG: render - workspace_path=%s, last_opened_path=%s, initial_start_path_=%s\n", 
+                        workspace_path.c_str(), state.last_opened_path.c_str(), initial_start_path_.c_str());
+                    if (!state.last_opened_path.empty() && initial_start_path_ == state.last_opened_path) {
+                        workspace_mount_applied_ = true;
+                    } else {
+                        std::string current_path = state.current_path;
+                        bool no_history = state.back_history.empty() && state.forward_history.empty();
+                        bool is_at_initial = current_path.empty() || current_path == initial_start_path_;
+                        if (no_history && is_at_initial && state.pending_navigation_path.empty()) {
+                            state.pending_navigation_path = workspace_path;
+                        }
+                        workspace_mount_applied_ = true;
                     }
-                    workspace_mount_applied_ = true;
                 } else {
                     workspace_mount_applied_ = true;
                 }
@@ -90,29 +132,24 @@ namespace misty::panel {
         ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.18f, 0.18f, 0.18f, 1.0f));
 
         if (ImGui::Begin("File Explorer", nullptr, file_explorer_flags)) {
-            std::unique_lock<std::mutex> lock(state.mu, std::try_to_lock);
+            std::lock_guard<std::mutex> lock(state.mu);
 
-            if (lock.owns_lock()) {
-                // Unified rendering - same for local and OneDrive
-                if (ImGui::BeginChild("TopBar", ImVec2(0, 50), false, ImGuiWindowFlags_NoScrollbar)) {
-                    ImGui::SetCursorPosY(8.0f);
+            // Unified rendering - same for local and OneDrive
+            if (ImGui::BeginChild("TopBar", ImVec2(0, 50), false, ImGuiWindowFlags_NoScrollbar)) {
+                ImGui::SetCursorPosY(8.0f);
 
-                    show_nav_history(state, 30.0f, 8.0f);
+                show_nav_history(state, 30.0f, 8.0f);
 
-                    ImGui::SameLine(0, 8.0f);
-                    ImGui::SetCursorPosY(7.0f);
+                ImGui::SameLine(0, 8.0f);
+                ImGui::SetCursorPosY(7.0f);
 
-                    show_search_bar(state);
-                }
-                ImGui::EndChild();
-
-                ImGui::Separator();
-                show_directory_contents(state);
-                show_error_modal(state.error_msg, "FileExplorerError");
+                show_search_bar(state);
             }
-            else {
-                ImGui::Text("Syncing...");
-            }
+            ImGui::EndChild();
+
+            ImGui::Separator();
+            show_directory_contents(state);
+            show_error_modal(state.error_msg, "FileExplorerError");
         }
         ImGui::End();
         ImGui::PopStyleColor();
@@ -149,6 +186,7 @@ namespace misty::panel {
                         item.name = entry.path().filename().string();
                         item.is_dir = entry.is_directory();
                         item.source = FileSource::LOCAL; // It's local now
+                        item.status = SyncStatus::DELETED;
                         
                          try {
                             if (!item.is_dir) item.size = fs::file_size(entry.path());
@@ -226,6 +264,9 @@ namespace misty::panel {
             state.last_disconnected_notification_folder.clear();
             navigate_to_local_path(state, path, update_history);
         }
+        
+        // Persist state after successful navigation
+        state.save_state();
     }
 
     void FileExplorerPanel::sync_account_mappings() {
@@ -708,8 +749,9 @@ namespace misty::panel {
 
         ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.21f, 0.21f, 0.21f, 1.0f));
 
-
-        float available_width = ImGui::GetContentRegionAvail().x;
+        float refresh_btn_size = 32.0f;
+        float spacing = 8.0f;
+        float available_width = ImGui::GetContentRegionAvail().x - refresh_btn_size - spacing;
         ImGui::SetNextItemWidth(available_width);
 
         bool entered = ImGui::InputTextWithHint("##search", "Search or enter path...",
@@ -723,6 +765,40 @@ namespace misty::panel {
         }
 
         ImGui::PopStyleColor();
+
+        // Refresh button
+        ImGui::SameLine(0, spacing);
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.21f, 0.21f, 0.21f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.28f, 0.28f, 0.28f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.16f, 0.16f, 0.16f, 1.0f));
+
+        auto& sync_tex = core::AssetManager::get().get_svg_texture("sync-16", 16);
+        if (sync_tex.id != 0) {
+            if (ImGui::ImageButton("##refresh", sync_tex.id,
+                    ImVec2(16, 16), ImVec2(0, 0), ImVec2(1, 1),
+                    ImVec4(0, 0, 0, 0), ImVec4(0.7f, 0.7f, 0.7f, 1.0f))) {
+                // Re-navigate to current path to force a refetch
+                std::string current(state.current_path);
+                if (!current.empty()) {
+                    navigate_to_path(current, false);
+                }
+            }
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("Refresh");
+            }
+        } else {
+            if (ImGui::Button("R", ImVec2(refresh_btn_size, 0))) {
+                std::string current(state.current_path);
+                if (!current.empty()) {
+                    navigate_to_path(current, false);
+                }
+            }
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("Refresh");
+            }
+        }
+
+        ImGui::PopStyleColor(3);
         ImGui::PopStyleVar(2);
     }
 
@@ -829,22 +905,52 @@ namespace misty::panel {
 
         bool is_currently_selected = state.selected_files.count(file.path) > 0;
 
-        ImGui::TableNextRow();
-        ImGui::TableNextColumn();
-
-        // Check if file is currently downloading
-        bool is_downloading = state.is_downloading(file.path);
-
-        std::string label;
-        if (is_downloading) {
-            label = "[DOWNLOADING] " + file.name;
+        // Determine icon based on file type/state
+        std::string icon_name = "file-16";
+        if (state.is_downloading(file.path)) {
+            icon_name = "download-16";
+        } else if (file.is_dir) {
+            icon_name = "file-directory-16";
         } else {
-            label = (file.is_dir ? "[DIR] " : "[FILE] ") + file.name;
+            // Check extension
+            std::string ext = fs::path(file.name).extension().string();
+            // Simple extension mapping
+            if (ext == ".cpp" || ext == ".h" || ext == ".hpp" || ext == ".c" || ext == ".cc" || 
+                ext == ".js" || ext == ".ts" || ext == ".html" || ext == ".css" || ext == ".json" ||
+                ext == ".py" || ext == ".go" || ext == ".rs" || ext == ".java") {
+                icon_name = "file-code-16";
+            } else if (ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".gif" || ext == ".svg" || ext == ".webp") {
+                icon_name = "file-media-16";
+            } else if (ext == ".mp4" || ext == ".mov" || ext == ".avi" || ext == ".mkv") {
+                icon_name = "video-16";
+            } else if (ext == ".zip" || ext == ".tar" || ext == ".gz" || ext == ".7z" || ext == ".rar") {
+                icon_name = "file-zip-16";
+            }
         }
 
-        if (ImGui::Selectable(label.c_str(), is_currently_selected, ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowDoubleClick)) {
+        auto& icon = AssetManager::get().get_svg_texture(icon_name, 16);
 
-             if (io.KeyCtrl) {
+        // Increase row height for improved padding
+        float row_height = 32.0f;
+        ImGui::TableNextRow(ImGuiTableRowFlags_None, row_height);
+        ImGui::TableNextColumn();
+
+        // Unique ID for Selectable
+        std::string label_id = "##";
+        if (!file.gd_item_id.empty()) {
+            label_id += file.gd_item_id;
+        } else if (!file.od_item_id.empty()) {
+            label_id += file.od_item_id;
+        } else {
+            label_id += file.path;
+        }
+
+        // Draw Selectable (full row width/height, handles background and interaction)
+        ImVec2 p = ImGui::GetCursorScreenPos();
+        
+        // Render Selectable
+        if (ImGui::Selectable(label_id.c_str(), is_currently_selected, ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowDoubleClick, ImVec2(0, row_height))) {
+            if (io.KeyCtrl) {
                 if (is_currently_selected) state.selected_files.erase(file.path);
                 else state.selected_files.insert(file.path);
             }
@@ -859,46 +965,9 @@ namespace misty::panel {
                 state.selected_files.insert(file.path);
             }
             state.last_selected_index = i;
-
-            if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)) {
-                if (file.is_dir) {
-                    navigate_to_path(file.path);
-                }
-                else {
-                    // Open file
-                    if (file.source == FileSource::LOCAL) {
-                        state.add_recent(file);
-                        open_file(file.path);
-                    } else if (file.source == FileSource::ONEDRIVE) {
-                        if (fs::exists(file.path)) {
-                            state.add_recent(file);
-                            open_file(file.path);
-                        } else if (!state.is_downloading(file.path)) {
-                            // We can't add to recent until downloaded? Or add now?
-                            // Add now is fine
-                             state.add_recent(file);
-                            download_and_open_file(file);
-                        }
-                    } else if (file.source == FileSource::GDRIVE) {
-                        if (file.gd_mime_type.rfind("application/vnd.google-apps.", 0) == 0
-                            && file.gd_mime_type != "application/vnd.google-apps.folder") {
-                            if (!file.gd_web_url.empty()) {
-                                state.add_recent(file);
-                                open_file(file.gd_web_url);
-                            }
-                        } else if (fs::exists(file.path)) {
-                            state.add_recent(file);
-                            open_file(file.path);
-                        } else if (!state.is_downloading(file.path)) {
-                            state.add_recent(file);
-                            download_and_open_gd_file(file);
-                        }
-                    }
-                }
-            }
         }
 
-        // Right-click context menu
+        // Context menu logic (moved here to apply to the entire Selectable row)
         if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
             state.context_menu_target_path = file.path;
             if (!is_currently_selected) {
@@ -909,8 +978,59 @@ namespace misty::panel {
             ImGui::OpenPopup("FileContextMenu");
         }
 
+        // Double click logic (must check IsItemHovered on the selectable)
+        if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)) {
+            if (file.is_dir) {
+                navigate_to_path(file.path);
+            }
+            else {
+                // Open file logic
+                if (file.source == FileSource::LOCAL) {
+                    state.add_recent(file);
+                    open_file(file.path);
+                } else if (file.source == FileSource::ONEDRIVE) {
+                    if (fs::exists(file.path)) {
+                        state.add_recent(file);
+                        open_file(file.path);
+                    } else if (!state.is_downloading(file.path)) {
+                        state.add_recent(file);
+                        download_and_open_file(file);
+                    }
+                } else if (file.source == FileSource::GDRIVE) {
+                    if (file.gd_mime_type.rfind("application/vnd.google-apps.", 0) == 0
+                        && file.gd_mime_type != "application/vnd.google-apps.folder") {
+                        if (!file.gd_web_url.empty()) {
+                            state.add_recent(file);
+                            open_file(file.gd_web_url);
+                        }
+                    } else if (fs::exists(file.path)) {
+                        state.add_recent(file);
+                        open_file(file.path);
+                    } else if (!state.is_downloading(file.path)) {
+                        state.add_recent(file);
+                        download_and_open_gd_file(file);
+                    }
+                }
+            }
+        }
+
+        // Draw Icon and Name
+        // Center icon and text vertically in the row
+        float content_padding_y = (row_height - 16.0f) / 2.0f;
+        ImGui::SetCursorScreenPos(ImVec2(p.x + 4.0f, p.y + content_padding_y));
+        ImGui::Image(icon.id, ImVec2(16, 16));
+        
+        ImGui::SameLine(0, 8.0f);
+        // Center text vertically
+        float text_y_offset = (row_height - ImGui::GetTextLineHeight()) / 2.0f;
+        ImGui::SetCursorScreenPos(ImVec2(ImGui::GetCursorScreenPos().x, p.y + text_y_offset));
+        ImGui::TextUnformatted(file.name.c_str());
+
+
+
         // Size column
         ImGui::TableNextColumn();
+        ImGui::SetCursorPosY(ImGui::GetCursorPosY() + text_y_offset);
         if (!file.is_dir && file.size > 0) {
             if (file.size < 1024) {
                 ImGui::Text("%lld B", file.size);
@@ -922,15 +1042,17 @@ namespace misty::panel {
                 ImGui::Text("%.1f GB", file.size / (1024.0 * 1024.0 * 1024.0));
             }
         } else {
-             ImGui::Text("-");
+            ImGui::Text("-");
         }
 
         // Type column
         ImGui::TableNextColumn();
+        ImGui::SetCursorPosY(ImGui::GetCursorPosY() + text_y_offset);
         ImGui::Text("%s", file.is_dir ? "Folder" : "File");
 
         // Modified column
         ImGui::TableNextColumn();
+        ImGui::SetCursorPosY(ImGui::GetCursorPosY() + text_y_offset);
         if (!file.last_modified.empty()) {
             ImGui::Text("%s", file.last_modified.c_str());
         } else {
@@ -940,15 +1062,16 @@ namespace misty::panel {
         // Status column (Right side)
         ImGui::TableNextColumn();
         
-        ImU32 dot_color = IM_COL32(150, 150, 150, 255); // Gray (Local)
-        if (file.status == SyncStatus::SYNCED) dot_color = IM_COL32(46, 204, 113, 255);      // Green
+        ImU32 dot_color;
+        if (file.status == SyncStatus::DELETED)    dot_color = IM_COL32(0, 0, 0, 255);     // Black
+        else if (file.status == SyncStatus::SYNCED) dot_color = IM_COL32(0, 150, 0, 255); // Green
+        else if (file.status == SyncStatus::LOCAL) dot_color = IM_COL32(150, 150, 150, 255);
         else if (file.status == SyncStatus::MODIFIED) dot_color = IM_COL32(241, 196, 15, 255); // Yellow
         else if (file.status == SyncStatus::NOT_SYNCED) dot_color = IM_COL32(231, 76, 60, 255); // Red
-        
+
         ImVec2 p_dot = ImGui::GetCursorScreenPos();
-        float cell_h = ImGui::GetTextLineHeightWithSpacing();
-        // Left align with padding
-        ImGui::GetWindowDrawList()->AddCircleFilled(ImVec2(p_dot.x + 20.0f, p_dot.y + cell_h * 0.5f), 4.0f, dot_color);
+        // Allow for custom centering since we manually place the dot
+        ImGui::GetWindowDrawList()->AddCircleFilled(ImVec2(p_dot.x + 20.0f, p.y + row_height * 0.5f), 4.0f, dot_color);
     }
 
     // ==================== Context Menu & File Operations ====================
@@ -1006,11 +1129,29 @@ namespace misty::panel {
                     }
                 }
                 
-                bool can_modify = (target_status == SyncStatus::LOCAL || 
-                                   target_status == SyncStatus::SYNCED || 
-                                   target_status == SyncStatus::MODIFIED);
+                // Check if all selected files are available locally (LOCAL, SYNCED, or MODIFIED)
+                bool all_local_available = true;
+                bool is_trash_view = (std::string(state.current_path) == FileExplorerState::VIRTUAL_PATH_TRASH);
+                
+                // If selection is empty, nothing is available
+                if (state.selected_files.empty()) {
+                    all_local_available = false;
+                } else {
+                    for (const auto& f : state.files) {
+                        if (state.selected_files.count(f.path) > 0) {
+                            bool is_avail = (f.status == SyncStatus::LOCAL || 
+                                             f.status == SyncStatus::SYNCED || 
+                                             f.status == SyncStatus::MODIFIED);
+                            if (!is_avail) {
+                                all_local_available = false;
+                                break; 
+                            }
+                        }
+                    }
+                }
 
-                if (can_modify) {
+                // Copy/Cut require local availability
+                if (all_local_available) {
                     if (ImGui::MenuItem("Copy", "Cmd+C")) {
                         perform_copy(state);
                     }
@@ -1032,7 +1173,8 @@ namespace misty::panel {
 
                 ImGui::Separator();
 
-                if (can_modify) {
+                // Rename requires local availability AND single selection
+                if (all_local_available && state.selected_files.size() == 1) {
                     if (ImGui::MenuItem("Rename", "F2")) {
                         initiate_rename(state);
                     }
@@ -1041,8 +1183,13 @@ namespace misty::panel {
                 }
 
                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.4f, 0.4f, 1.0f));
-                if (ImGui::MenuItem("Delete", "Del")) { 
-                    perform_delete_selected(state);
+                // Delete requires local availability OR being in trash
+                if (all_local_available || is_trash_view) {
+                    if (ImGui::MenuItem("Delete", "Del")) { 
+                        perform_delete_selected(state);
+                    }
+                } else {
+                    ImGui::MenuItem("Delete", "Del", false, false); 
                 }
                 ImGui::PopStyleColor();
 
@@ -1054,6 +1201,12 @@ namespace misty::panel {
                     for (const auto& f : state.files) {
                         if (f.path == state.context_menu_target_path) {
                             state.toggle_star(f);
+                            auto& notif = registry_.get_state<NotificationState>("Notifications");
+                            if (is_starred) {
+                                notif.add_notification("Starred", "Removed from starred", NotificationType::SUCCESS);
+                            } else {
+                                notif.add_notification("Starred", "Added to starred", NotificationType::SUCCESS);
+                            }
                             break;
                         }
                     }
@@ -1139,6 +1292,9 @@ namespace misty::panel {
                     std::error_code ec;
                     fs::rename(old_path, new_path, ec);
                     if (!ec) {
+                        auto& notif = registry_.get_state<NotificationState>("Notifications");
+                        notif.add_notification("Renamed", "Renamed to " + new_name, NotificationType::SUCCESS);
+                        
                         // Refresh
                         navigate_to_path(std::string(state.current_path), false);
                     }
@@ -1269,6 +1425,8 @@ namespace misty::panel {
                         }
                     }
                     if (!ec) {
+                        auto& notif = registry_.get_state<NotificationState>("Notifications");
+                        notif.add_notification("Created", std::string(state.new_entry_is_dir ? "Folder " : "File ") + name + " created", NotificationType::SUCCESS);
                         navigate_to_path(std::string(state.current_path), false);
                     }
                 }
@@ -1326,10 +1484,14 @@ namespace misty::panel {
             }
         }
 
+        auto& notif = registry_.get_state<NotificationState>("Notifications");
+        std::string msg = (state.clipboard_op == ClipboardOp::COPY ? "Copied " : "Moved ") + std::to_string(state.clipboard_paths.size()) + " items";
+        notif.add_notification("Success", msg, NotificationType::SUCCESS);
+
         // Clear clipboard after cut (keep after copy so user can paste multiple times)
         if (state.clipboard_op == ClipboardOp::CUT) {
             state.clipboard_op = ClipboardOp::NONE;
-            state.clipboard_paths.clear();
+            state.clipboard_paths.clear(); // Clear paths
         }
 
         // Refresh directory
@@ -1345,6 +1507,8 @@ namespace misty::panel {
         for (const auto& sel : state.selected_files) {
             state.clipboard_paths.push_back(sel);
         }
+        auto& notif = registry_.get_state<NotificationState>("Notifications");
+        notif.add_notification("Clipboard", "Copied " + std::to_string(state.clipboard_paths.size()) + " items", NotificationType::INFO);
     }
 
     void FileExplorerPanel::perform_cut(FileExplorerState& state) {
@@ -1353,6 +1517,8 @@ namespace misty::panel {
         for (const auto& sel : state.selected_files) {
             state.clipboard_paths.push_back(sel);
         }
+        auto& notif = registry_.get_state<NotificationState>("Notifications");
+        notif.add_notification("Clipboard", "Cut " + std::to_string(state.clipboard_paths.size()) + " items", NotificationType::INFO);
     }
 
     void FileExplorerPanel::perform_delete_selected(FileExplorerState& state) {
@@ -1404,11 +1570,19 @@ namespace misty::panel {
                          item.path = target; // Point to trash location
                          item.name = fs::path(target).filename().string(); // Use new name
                          item.is_dir = fs::is_directory(target);
+                         item.status = SyncStatus::DELETED; // Mark as soft deleted
                          state.move_to_trash(item);
+                         
+                         // Update Recent/Starred if they point to this file
+                         state.track_move(path, item);
                     }
                 }
             }
         }
+        
+        auto& notif = registry_.get_state<NotificationState>("Notifications");
+        notif.add_notification("Deleted", "Deleted " + std::to_string(to_delete.size()) + " items", NotificationType::SUCCESS);
+
         // Refresh directory
         navigate_to_path(std::string(state.current_path), false);
     }

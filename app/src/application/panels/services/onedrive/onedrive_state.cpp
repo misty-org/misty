@@ -2,7 +2,6 @@
 #include "core/env_manager.h"
 #include "core/http_client.h"
 #include <nlohmann/json.hpp>
-#include <thread>
 #include <filesystem>
 #include <iostream>
 
@@ -36,78 +35,88 @@ namespace misty::panel {
 
         std::string file_name = std::filesystem::path(local_path).filename().string();
 
-        // Run upload in background thread
-        std::thread([this, ctx, local_path, file_name, file_size, progress_cb, callback]() {
+        if (!worker_pool_) {
+            callback(false, "WorkerPool not set");
+            return;
+        }
 
-            std::string base_url = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
-            if (base_url.empty()) {
-                callback(false, "PROXY_SERVICE_URL not configured");
-                return;
-            }
-            std::string user_id = core::EnvManager::get().get("USER_ID", "");
-            if (user_id.empty()) {
-                callback(false, "USER_ID not configured");
-                return;
-            }
+        worker_pool_->add(
+            [this, ctx, local_path, file_name, file_size, progress_cb, callback]() {
 
-            // Step 1: Create upload session via proxy (proxy handles tokens internally)
-            std::string upload_session_url = base_url + "/api/ms/file/upload?user_id=" + user_id
-                + "&ms_user_id=" + ctx.ms_user_id;
-
-            nlohmann::json request_body;
-            request_body["drive_id"] = ctx.drive_id;
-            request_body["parent_id"] = ctx.folder_id;
-            request_body["file_name"] = file_name;
-            request_body["file_size"] = file_size;
-
-            std::map<std::string, std::string> headers;
-            headers["Content-Type"] = "application/json";
-
-            core::HttpResponse session_response = core::HttpClient::get().post(
-                upload_session_url,
-                request_body.dump(),
-                headers
-            );
-
-            if (session_response.status_code < 200 || session_response.status_code >= 300) {
-                callback(false, "Failed to create upload session: HTTP " + std::to_string(session_response.status_code));
-                return;
-            }
-
-            // Parse upload session response
-            std::string upload_url;
-            try {
-                auto json = nlohmann::json::parse(session_response.body);
-                upload_url = json.value("uploadUrl", std::string(""));
-                if (upload_url.empty()) {
-                    callback(false, "No uploadUrl in session response");
+                std::string base_url = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
+                if (base_url.empty()) {
+                    callback(false, "PROXY_SERVICE_URL not configured");
                     return;
                 }
-            } catch (const std::exception& e) {
-                callback(false, std::string("Failed to parse upload session: ") + e.what());
-                return;
+                std::string user_id = core::EnvManager::get().get("USER_ID", "");
+                if (user_id.empty()) {
+                    callback(false, "USER_ID not configured");
+                    return;
+                }
+
+                // Step 1: Create upload session via proxy (proxy handles tokens internally)
+                std::string upload_session_url = base_url + "/api/ms/file/upload?user_id=" + user_id
+                    + "&ms_user_id=" + ctx.ms_user_id;
+
+                nlohmann::json request_body;
+                request_body["drive_id"] = ctx.drive_id;
+                request_body["parent_id"] = ctx.folder_id;
+                request_body["file_name"] = file_name;
+                request_body["file_size"] = file_size;
+
+                std::map<std::string, std::string> headers;
+                headers["Content-Type"] = "application/json";
+
+                core::HttpResponse session_response = core::HttpClient::get().post(
+                    upload_session_url,
+                    request_body.dump(),
+                    headers
+                );
+
+                if (session_response.status_code < 200 || session_response.status_code >= 300) {
+                    callback(false, "Failed to create upload session: HTTP " + std::to_string(session_response.status_code));
+                    return;
+                }
+
+                // Parse upload session response
+                std::string upload_url;
+                try {
+                    auto json = nlohmann::json::parse(session_response.body);
+                    upload_url = json.value("uploadUrl", std::string(""));
+                    if (upload_url.empty()) {
+                        callback(false, "No uploadUrl in session response");
+                        return;
+                    }
+                } catch (const std::exception& e) {
+                    callback(false, std::string("Failed to parse upload session: ") + e.what());
+                    return;
+                }
+
+                std::cout << "[OneDriveState] Got upload URL, starting chunked upload for: " << file_name << std::endl;
+
+                // Step 2: Upload file using chunked upload
+                // Note: The uploadUrl from Microsoft doesn't need Authorization header
+                core::ChunkedUploadResult result = core::HttpClient::get().chunked_upload(
+                    upload_url,
+                    local_path,
+                    10 * 1024 * 1024,  // 10MB chunks
+                    progress_cb,
+                    nullptr  // TODO: Pass cancel flag from state
+                );
+
+                if (result.success) {
+                    std::cout << "[OneDriveState] Upload complete: " << file_name << std::endl;
+                    callback(true, "");
+                } else {
+                    std::cout << "[OneDriveState] Upload failed: " << result.error_message << std::endl;
+                    callback(false, result.error_message);
+                }
+            },
+            []() {},
+            [callback](const std::string& err) {
+                callback(false, err);
             }
-
-            std::cout << "[OneDriveState] Got upload URL, starting chunked upload for: " << file_name << std::endl;
-
-            // Step 2: Upload file using chunked upload
-            // Note: The uploadUrl from Microsoft doesn't need Authorization header
-            core::ChunkedUploadResult result = core::HttpClient::get().chunked_upload(
-                upload_url,
-                local_path,
-                10 * 1024 * 1024,  // 10MB chunks
-                progress_cb,
-                nullptr  // TODO: Pass cancel flag from state
-            );
-
-            if (result.success) {
-                std::cout << "[OneDriveState] Upload complete: " << file_name << std::endl;
-                callback(true, "");
-            } else {
-                std::cout << "[OneDriveState] Upload failed: " << result.error_message << std::endl;
-                callback(false, result.error_message);
-            }
-        }).detach();
+        );
     }
 
 }

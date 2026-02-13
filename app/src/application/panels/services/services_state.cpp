@@ -4,7 +4,6 @@
 #include "core/util.h"
 #include <nlohmann/json.hpp>
 #include <iostream>
-#include <thread>
 #include <set>
 #include <fstream>
 #include <filesystem>
@@ -12,12 +11,16 @@
 
 namespace misty::panel {
 
-    ServicesState::ServicesState() {
+    ServicesState::ServicesState() = default;
+
+    ServicesState::~ServicesState() = default;
+
+    void ServicesState::init(core::WorkerPool& pool) {
+        if (worker_pool_) return; // already initialized
+        worker_pool_ = &pool;
         check_connections();
         check_gd_connections();
     }
-
-    ServicesState::~ServicesState() = default;
 
     bool ServicesState::has_ms_connections() {
         std::lock_guard<std::mutex> lock(mu);
@@ -25,57 +28,61 @@ namespace misty::panel {
     }
 
     void ServicesState::check_connections() {
-        std::thread([this]() {
-            std::string base = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
-            if (base.empty()) {
-                return;
-            }
-            std::string user_id = core::EnvManager::get().get("USER_ID", "");
-            if (user_id.empty()) {
-                return;
-            }
-            std::string url = base + "/api/ms/users?user_id=" + user_id;
+        if (!worker_pool_) return;
 
-            std::map<std::string, std::string> headers;
-            headers["Accept"] = "application/json";
+        worker_pool_->add(
+            [this]() {
+                std::string base = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
+                if (base.empty()) return;
+                std::string user_id = core::EnvManager::get().get("USER_ID", "");
+                if (user_id.empty()) return;
 
-            std::cout << "Fetching connections from " << url << std::endl;
+                std::string url = base + "/api/ms/users?user_id=" + user_id;
 
-            core::HttpResponse response = core::HttpClient::get().get(url, headers);
+                std::map<std::string, std::string> headers;
+                headers["Accept"] = "application/json";
 
-            {
-                std::lock_guard<std::mutex> lock(mu);
-                if (response.status_code >= 200 && response.status_code < 300) {
-                    try {
-                        auto json = nlohmann::json::parse(response.body);
-                        if (!json.is_array()) {
-                            throw std::runtime_error("Invalid response format: expected array");
-                        }
-                        error_msg = "";
-                        for (const auto& obj : json) {
-                            std::string ms_user_id = obj.value("ms_user_id", std::string(""));
-                            std::string display_name = obj.value("display_name", std::string(""));
-                            std::string email = obj.value("email", std::string(""));
+                std::cout << "Fetching connections from " << url << std::endl;
 
-                            if (!ms_user_id.empty()) {
-                                MSConnection conn;
-                                conn.is_authenticated = obj.value("connected", false);
-                                conn.profile.id = ms_user_id;
-                                conn.profile.display_name = display_name;
-                                conn.profile.email = email;
-                                conn.profile.loaded = !display_name.empty() || !email.empty();
-                                ms_connections.insert(conn);
+                core::HttpResponse response = core::HttpClient::get().get(url, headers);
+
+                {
+                    std::lock_guard<std::mutex> lock(mu);
+                    if (response.status_code >= 200 && response.status_code < 300) {
+                        try {
+                            auto json = nlohmann::json::parse(response.body);
+                            if (!json.is_array()) {
+                                throw std::runtime_error("Invalid response format: expected array");
                             }
-                        }
-                    } catch (const std::exception& ex) {
-                        error_msg = std::string("Failed to parse connection response: ") + ex.what();
-                    }
-                } else {
-                    error_msg = "Failed to fetch connections (" + std::to_string(response.status_code) + ")";
-                }
-            }
-        }).detach();
+                            error_msg = "";
+                            for (const auto& obj : json) {
+                                std::string ms_user_id = obj.value("ms_user_id", std::string(""));
+                                std::string display_name = obj.value("display_name", std::string(""));
+                                std::string email = obj.value("email", std::string(""));
 
+                                if (!ms_user_id.empty()) {
+                                    MSConnection conn;
+                                    conn.is_authenticated = obj.value("connected", false);
+                                    conn.profile.id = ms_user_id;
+                                    conn.profile.display_name = display_name;
+                                    conn.profile.email = email;
+                                    conn.profile.loaded = !display_name.empty() || !email.empty();
+                                    ms_connections.insert(conn);
+                                }
+                            }
+                        } catch (const std::exception& ex) {
+                            error_msg = std::string("Failed to parse connection response: ") + ex.what();
+                        }
+                    } else {
+                        error_msg = "Failed to fetch connections (" + std::to_string(response.status_code) + ")";
+                    }
+                }
+            },
+            []() {},
+            [](const std::string& err) {
+                std::cerr << "check_connections error: " << err << std::endl;
+            }
+        );
     }
 
     std::set<MSConnection>::iterator ServicesState::find_by_ms_user_id(const std::string& ms_user_id) {
@@ -124,12 +131,20 @@ namespace misty::panel {
         std::string app_user_id = core::EnvManager::get().get("USER_ID", "");
         std::string base = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
         if (!ms_user_id.empty() && !app_user_id.empty() && !base.empty()) {
-            std::thread([ms_user_id, app_user_id, base]() {
-                std::string url = base + "/api/ms/users?user_id=" + app_user_id + "&ms_user_id=" + ms_user_id;
-                std::map<std::string, std::string> headers;
-                headers["Accept"] = "application/json";
-                core::HttpClient::get().del(url, headers);
-            }).detach();
+            if (worker_pool_) {
+                worker_pool_->add(
+                    [ms_user_id, app_user_id, base]() {
+                        std::string url = base + "/api/ms/users?user_id=" + app_user_id + "&ms_user_id=" + ms_user_id;
+                        std::map<std::string, std::string> headers;
+                        headers["Accept"] = "application/json";
+                        core::HttpClient::get().del(url, headers);
+                    },
+                    []() {},
+                    [](const std::string& err) {
+                        std::cerr << "disconnect_onedrive error: " << err << std::endl;
+                    }
+                );
+            }
         }
     }
 
@@ -164,77 +179,93 @@ namespace misty::panel {
     }
 
     void ServicesState::fetch_drive(const std::string& ms_user_id, DriveCallback callback) {
-        std::thread([this, ms_user_id, callback]() {
-            std::string base = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
-            if (base.empty()) {
-                callback(ms_user_id, "", false, "PROXY_SERVICE_URL not set");
-                return;
-            }
-            std::string user_id = core::EnvManager::get().get("USER_ID", "");
-            if (user_id.empty()) {
-                callback(ms_user_id, "", false, "USER_ID not set");
-                return;
-            }
+        if (!worker_pool_) return;
 
-            std::string url = base + "/api/ms/drive?user_id=" + user_id + "&ms_user_id=" + ms_user_id;
-
-            std::map<std::string, std::string> headers;
-            headers["Accept"] = "application/json";
-
-            core::HttpResponse response = core::HttpClient::get().get(url, headers);
-
-            if (response.status_code >= 200 && response.status_code < 300) {
-                try {
-                    auto json = nlohmann::json::parse(response.body);
-                    std::string drive_id = json.value("id", std::string(""));
-                    callback(ms_user_id, drive_id, true, "");
-                } catch (const std::exception& e) {
-                    callback(ms_user_id, "", false, std::string("Parse error: ") + e.what());
+        worker_pool_->add(
+            [this, ms_user_id, callback]() {
+                std::string base = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
+                if (base.empty()) {
+                    callback(ms_user_id, "", false, "PROXY_SERVICE_URL not set");
+                    return;
                 }
-            } else if (response.status_code == 401) {
-                mark_disconnected(ms_user_id);
-                callback(ms_user_id, "", false, "Session expired. Please reconnect.");
-            } else {
-                callback(ms_user_id, "", false, "HTTP " + std::to_string(response.status_code));
+                std::string user_id = core::EnvManager::get().get("USER_ID", "");
+                if (user_id.empty()) {
+                    callback(ms_user_id, "", false, "USER_ID not set");
+                    return;
+                }
+
+                std::string url = base + "/api/ms/drive?user_id=" + user_id + "&ms_user_id=" + ms_user_id;
+
+                std::map<std::string, std::string> headers;
+                headers["Accept"] = "application/json";
+
+                core::HttpResponse response = core::HttpClient::get().get(url, headers);
+
+                if (response.status_code >= 200 && response.status_code < 300) {
+                    try {
+                        auto json = nlohmann::json::parse(response.body);
+                        std::string drive_id = json.value("id", std::string(""));
+                        callback(ms_user_id, drive_id, true, "");
+                    } catch (const std::exception& e) {
+                        callback(ms_user_id, "", false, std::string("Parse error: ") + e.what());
+                    }
+                } else if (response.status_code == 401) {
+                    mark_disconnected(ms_user_id);
+                    callback(ms_user_id, "", false, "Session expired. Please reconnect.");
+                } else {
+                    callback(ms_user_id, "", false, "HTTP " + std::to_string(response.status_code));
+                }
+            },
+            []() {},
+            [ms_user_id, callback](const std::string& err) {
+                callback(ms_user_id, "", false, err);
             }
-        }).detach();
+        );
     }
 
     void ServicesState::fetch_onedrive_files(const std::string& ms_user_id,
                                               const std::string& drive_id,
                                               const std::string& folder_id,
                                               FilesCallback callback) {
-        std::thread([this, ms_user_id, drive_id, folder_id, callback]() {
-            std::string base = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
-            if (base.empty()) {
-                callback(false, "", "PROXY_SERVICE_URL not set");
-                return;
+        if (!worker_pool_) return;
+
+        worker_pool_->add(
+            [this, ms_user_id, drive_id, folder_id, callback]() {
+                std::string base = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
+                if (base.empty()) {
+                    callback(false, "", "PROXY_SERVICE_URL not set");
+                    return;
+                }
+                std::string user_id = core::EnvManager::get().get("USER_ID", "");
+                if (user_id.empty()) {
+                    callback(false, "", "USER_ID not set");
+                    return;
+                }
+
+                std::string url = base + "/api/ms/files?user_id=" + user_id
+                    + "&ms_user_id=" + ms_user_id
+                    + "&drive_id=" + drive_id
+                    + "&folder_id=" + folder_id;
+
+                std::map<std::string, std::string> headers;
+                headers["Accept"] = "application/json";
+
+                core::HttpResponse response = core::HttpClient::get().get(url, headers);
+
+                if (response.status_code >= 200 && response.status_code < 300) {
+                    callback(true, response.body, "");
+                } else if (response.status_code == 401) {
+                    mark_disconnected(ms_user_id);
+                    callback(false, "", "Session expired. Please reconnect.");
+                } else {
+                    callback(false, "", "HTTP " + std::to_string(response.status_code));
+                }
+            },
+            []() {},
+            [callback](const std::string& err) {
+                callback(false, "", err);
             }
-            std::string user_id = core::EnvManager::get().get("USER_ID", "");
-            if (user_id.empty()) {
-                callback(false, "", "USER_ID not set");
-                return;
-            }
-
-            std::string url = base + "/api/ms/files?user_id=" + user_id
-                + "&ms_user_id=" + ms_user_id
-                + "&drive_id=" + drive_id
-                + "&folder_id=" + folder_id;
-
-            std::map<std::string, std::string> headers;
-            headers["Accept"] = "application/json";
-
-            core::HttpResponse response = core::HttpClient::get().get(url, headers);
-
-            if (response.status_code >= 200 && response.status_code < 300) {
-                callback(true, response.body, "");
-            } else if (response.status_code == 401) {
-                mark_disconnected(ms_user_id);
-                callback(false, "", "Session expired. Please reconnect.");
-            } else {
-                callback(false, "", "HTTP " + std::to_string(response.status_code));
-            }
-        }).detach();
+        );
     }
 
     void ServicesState::download_file(const std::string& ms_user_id,
@@ -242,51 +273,59 @@ namespace misty::panel {
                                        const std::string& file_id,
                                        const std::string& local_path,
                                        DownloadCallback callback) {
-        std::thread([this, ms_user_id, drive_id, file_id, local_path, callback]() {
-            std::string base = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
-            if (base.empty()) {
-                callback(false, "", "PROXY_SERVICE_URL not set");
-                return;
-            }
-            std::string user_id = core::EnvManager::get().get("USER_ID", "");
-            if (user_id.empty()) {
-                callback(false, "", "USER_ID not set");
-                return;
-            }
+        if (!worker_pool_) return;
 
-            // Ensure parent directory exists
-            std::filesystem::path path(local_path);
-            std::error_code ec;
-            std::filesystem::create_directories(path.parent_path(), ec);
-
-            std::string url = base + "/api/ms/file/download?user_id=" + user_id
-                + "&ms_user_id=" + ms_user_id
-                + "&drive_id=" + drive_id
-                + "&file_id=" + file_id;
-
-            core::HttpResponse response = core::HttpClient::get().get(url);
-
-            if (response.status_code >= 200 && response.status_code < 300) {
-                std::ofstream file(local_path, std::ios::binary);
-                if (!file) {
-                    callback(false, "", "Failed to create local file: " + local_path);
+        worker_pool_->add(
+            [this, ms_user_id, drive_id, file_id, local_path, callback]() {
+                std::string base = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
+                if (base.empty()) {
+                    callback(false, "", "PROXY_SERVICE_URL not set");
                     return;
                 }
-                file.write(response.body.data(), response.body.size());
-                file.close();
-
-                if (file.good()) {
-                    callback(true, local_path, "");
-                } else {
-                    callback(false, "", "Failed to write file to disk");
+                std::string user_id = core::EnvManager::get().get("USER_ID", "");
+                if (user_id.empty()) {
+                    callback(false, "", "USER_ID not set");
+                    return;
                 }
-            } else if (response.status_code == 401) {
-                mark_disconnected(ms_user_id);
-                callback(false, "", "Session expired. Please reconnect.");
-            } else {
-                callback(false, "", "Download failed: HTTP " + std::to_string(response.status_code));
+
+                // Ensure parent directory exists
+                std::filesystem::path path(local_path);
+                std::error_code ec;
+                std::filesystem::create_directories(path.parent_path(), ec);
+
+                std::string url = base + "/api/ms/file/download?user_id=" + user_id
+                    + "&ms_user_id=" + ms_user_id
+                    + "&drive_id=" + drive_id
+                    + "&file_id=" + file_id;
+
+                core::HttpResponse response = core::HttpClient::get().get(url);
+
+                if (response.status_code >= 200 && response.status_code < 300) {
+                    std::ofstream file(local_path, std::ios::binary);
+                    if (!file) {
+                        callback(false, "", "Failed to create local file: " + local_path);
+                        return;
+                    }
+                    file.write(response.body.data(), response.body.size());
+                    file.close();
+
+                    if (file.good()) {
+                        callback(true, local_path, "");
+                    } else {
+                        callback(false, "", "Failed to write file to disk");
+                    }
+                } else if (response.status_code == 401) {
+                    mark_disconnected(ms_user_id);
+                    callback(false, "", "Session expired. Please reconnect.");
+                } else {
+                    callback(false, "", "Download failed: HTTP " + std::to_string(response.status_code));
+                }
+            },
+            []() {},
+            [callback](const std::string& err) {
+                callback(false, "", err);
             }
-        }).detach();
+        );
     }
 
     // ==================== Google Drive Methods ====================
@@ -297,55 +336,60 @@ namespace misty::panel {
     }
 
     void ServicesState::check_gd_connections() {
-        std::thread([this]() {
-            std::string base = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
-            if (base.empty()) {
-                return;
-            }
-            std::string user_id = core::EnvManager::get().get("USER_ID", "");
-            if (user_id.empty()) {
-                return;
-            }
-            std::string url = base + "/api/gd/users?user_id=" + user_id;
+        if (!worker_pool_) return;
 
-            std::map<std::string, std::string> headers;
-            headers["Accept"] = "application/json";
+        worker_pool_->add(
+            [this]() {
+                std::string base = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
+                if (base.empty()) return;
+                std::string user_id = core::EnvManager::get().get("USER_ID", "");
+                if (user_id.empty()) return;
 
-            std::cout << "Fetching GD connections from " << url << std::endl;
+                std::string url = base + "/api/gd/users?user_id=" + user_id;
 
-            core::HttpResponse response = core::HttpClient::get().get(url, headers);
+                std::map<std::string, std::string> headers;
+                headers["Accept"] = "application/json";
 
-            {
-                std::lock_guard<std::mutex> lock(mu);
-                if (response.status_code >= 200 && response.status_code < 300) {
-                    try {
-                        auto json = nlohmann::json::parse(response.body);
-                        if (!json.is_array()) {
-                            throw std::runtime_error("Invalid response format: expected array");
-                        }
-                        for (const auto& obj : json) {
-                            std::string gd_user_id = obj.value("gd_user_id", std::string(""));
-                            std::string display_name = obj.value("display_name", std::string(""));
-                            std::string email = obj.value("email", std::string(""));
+                std::cout << "Fetching GD connections from " << url << std::endl;
 
-                            if (!gd_user_id.empty()) {
-                                GDConnection conn;
-                                conn.is_authenticated = obj.value("connected", false);
-                                conn.profile.id = gd_user_id;
-                                conn.profile.display_name = display_name;
-                                conn.profile.email = email;
-                                conn.profile.loaded = !display_name.empty() || !email.empty();
-                                gd_connections.insert(conn);
+                core::HttpResponse response = core::HttpClient::get().get(url, headers);
+
+                {
+                    std::lock_guard<std::mutex> lock(mu);
+                    if (response.status_code >= 200 && response.status_code < 300) {
+                        try {
+                            auto json = nlohmann::json::parse(response.body);
+                            if (!json.is_array()) {
+                                throw std::runtime_error("Invalid response format: expected array");
                             }
+                            for (const auto& obj : json) {
+                                std::string gd_user_id = obj.value("gd_user_id", std::string(""));
+                                std::string display_name = obj.value("display_name", std::string(""));
+                                std::string email = obj.value("email", std::string(""));
+
+                                if (!gd_user_id.empty()) {
+                                    GDConnection conn;
+                                    conn.is_authenticated = obj.value("connected", false);
+                                    conn.profile.id = gd_user_id;
+                                    conn.profile.display_name = display_name;
+                                    conn.profile.email = email;
+                                    conn.profile.loaded = !display_name.empty() || !email.empty();
+                                    gd_connections.insert(conn);
+                                }
+                            }
+                        } catch (const std::exception& ex) {
+                            error_msg = std::string("Failed to parse GD connection response: ") + ex.what();
                         }
-                    } catch (const std::exception& ex) {
-                        error_msg = std::string("Failed to parse GD connection response: ") + ex.what();
+                    } else {
+                        error_msg = "Failed to fetch GD connections (" + std::to_string(response.status_code) + ")";
                     }
-                } else {
-                    error_msg = "Failed to fetch GD connections (" + std::to_string(response.status_code) + ")";
                 }
+            },
+            []() {},
+            [](const std::string& err) {
+                std::cerr << "check_gd_connections error: " << err << std::endl;
             }
-        }).detach();
+        );
     }
 
     std::set<GDConnection>::iterator ServicesState::find_by_gd_user_id(const std::string& gd_user_id) {
@@ -394,12 +438,20 @@ namespace misty::panel {
         std::string app_user_id = core::EnvManager::get().get("USER_ID", "");
         std::string base = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
         if (!gd_user_id.empty() && !app_user_id.empty() && !base.empty()) {
-            std::thread([gd_user_id, app_user_id, base]() {
-                std::string url = base + "/api/gd/users?user_id=" + app_user_id + "&gd_user_id=" + gd_user_id;
-                std::map<std::string, std::string> headers;
-                headers["Accept"] = "application/json";
-                core::HttpClient::get().del(url, headers);
-            }).detach();
+            if (worker_pool_) {
+                worker_pool_->add(
+                    [gd_user_id, app_user_id, base]() {
+                        std::string url = base + "/api/gd/users?user_id=" + app_user_id + "&gd_user_id=" + gd_user_id;
+                        std::map<std::string, std::string> headers;
+                        headers["Accept"] = "application/json";
+                        core::HttpClient::get().del(url, headers);
+                    },
+                    []() {},
+                    [](const std::string& err) {
+                        std::cerr << "disconnect_gdrive error: " << err << std::endl;
+                    }
+                );
+            }
         }
     }
 
@@ -436,86 +488,102 @@ namespace misty::panel {
     void ServicesState::fetch_gdrive_files(const std::string& gd_user_id,
                                             const std::string& folder_id,
                                             GDFilesCallback callback) {
-        std::thread([this, gd_user_id, folder_id, callback]() {
-            std::string base = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
-            if (base.empty()) {
-                callback(false, "", "PROXY_SERVICE_URL not set");
-                return;
+        if (!worker_pool_) return;
+
+        worker_pool_->add(
+            [this, gd_user_id, folder_id, callback]() {
+                std::string base = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
+                if (base.empty()) {
+                    callback(false, "", "PROXY_SERVICE_URL not set");
+                    return;
+                }
+                std::string user_id = core::EnvManager::get().get("USER_ID", "");
+                if (user_id.empty()) {
+                    callback(false, "", "USER_ID not set");
+                    return;
+                }
+
+                std::string url = base + "/api/gd/files?user_id=" + user_id
+                    + "&gd_user_id=" + gd_user_id
+                    + "&folder_id=" + folder_id;
+
+                std::map<std::string, std::string> headers;
+                headers["Accept"] = "application/json";
+
+                core::HttpResponse response = core::HttpClient::get().get(url, headers);
+
+                if (response.status_code >= 200 && response.status_code < 300) {
+                    callback(true, response.body, "");
+                } else if (response.status_code == 401) {
+                    mark_gd_disconnected(gd_user_id);
+                    callback(false, "", "Session expired. Please reconnect.");
+                } else {
+                    callback(false, "", "HTTP " + std::to_string(response.status_code));
+                }
+            },
+            []() {},
+            [callback](const std::string& err) {
+                callback(false, "", err);
             }
-            std::string user_id = core::EnvManager::get().get("USER_ID", "");
-            if (user_id.empty()) {
-                callback(false, "", "USER_ID not set");
-                return;
-            }
-
-            std::string url = base + "/api/gd/files?user_id=" + user_id
-                + "&gd_user_id=" + gd_user_id
-                + "&folder_id=" + folder_id;
-
-            std::map<std::string, std::string> headers;
-            headers["Accept"] = "application/json";
-
-            core::HttpResponse response = core::HttpClient::get().get(url, headers);
-
-            if (response.status_code >= 200 && response.status_code < 300) {
-                callback(true, response.body, "");
-            } else if (response.status_code == 401) {
-                mark_gd_disconnected(gd_user_id);
-                callback(false, "", "Session expired. Please reconnect.");
-            } else {
-                callback(false, "", "HTTP " + std::to_string(response.status_code));
-            }
-        }).detach();
+        );
     }
 
     void ServicesState::download_gd_file(const std::string& gd_user_id,
                                           const std::string& file_id,
                                           const std::string& local_path,
                                           GDDownloadCallback callback) {
-        std::thread([this, gd_user_id, file_id, local_path, callback]() {
-            std::string base = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
-            if (base.empty()) {
-                callback(false, "", "PROXY_SERVICE_URL not set");
-                return;
-            }
-            std::string user_id = core::EnvManager::get().get("USER_ID", "");
-            if (user_id.empty()) {
-                callback(false, "", "USER_ID not set");
-                return;
-            }
+        if (!worker_pool_) return;
 
-            // Ensure parent directory exists
-            std::filesystem::path path(local_path);
-            std::error_code ec;
-            std::filesystem::create_directories(path.parent_path(), ec);
-
-            std::string url = base + "/api/gd/file/download?user_id=" + user_id
-                + "&gd_user_id=" + gd_user_id
-                + "&file_id=" + file_id;
-
-            core::HttpResponse response = core::HttpClient::get().get(url);
-
-            if (response.status_code >= 200 && response.status_code < 300) {
-                std::ofstream file(local_path, std::ios::binary);
-                if (!file) {
-                    callback(false, "", "Failed to create local file: " + local_path);
+        worker_pool_->add(
+            [this, gd_user_id, file_id, local_path, callback]() {
+                std::string base = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
+                if (base.empty()) {
+                    callback(false, "", "PROXY_SERVICE_URL not set");
                     return;
                 }
-                file.write(response.body.data(), response.body.size());
-                file.close();
-
-                if (file.good()) {
-                    callback(true, local_path, "");
-                } else {
-                    callback(false, "", "Failed to write file to disk");
+                std::string user_id = core::EnvManager::get().get("USER_ID", "");
+                if (user_id.empty()) {
+                    callback(false, "", "USER_ID not set");
+                    return;
                 }
-            } else if (response.status_code == 401) {
-                mark_gd_disconnected(gd_user_id);
-                callback(false, "", "Session expired. Please reconnect.");
-            } else {
-                callback(false, "", "Download failed: HTTP " + std::to_string(response.status_code));
+
+                // Ensure parent directory exists
+                std::filesystem::path path(local_path);
+                std::error_code ec;
+                std::filesystem::create_directories(path.parent_path(), ec);
+
+                std::string url = base + "/api/gd/file/download?user_id=" + user_id
+                    + "&gd_user_id=" + gd_user_id
+                    + "&file_id=" + file_id;
+
+                core::HttpResponse response = core::HttpClient::get().get(url);
+
+                if (response.status_code >= 200 && response.status_code < 300) {
+                    std::ofstream file(local_path, std::ios::binary);
+                    if (!file) {
+                        callback(false, "", "Failed to create local file: " + local_path);
+                        return;
+                    }
+                    file.write(response.body.data(), response.body.size());
+                    file.close();
+
+                    if (file.good()) {
+                        callback(true, local_path, "");
+                    } else {
+                        callback(false, "", "Failed to write file to disk");
+                    }
+                } else if (response.status_code == 401) {
+                    mark_gd_disconnected(gd_user_id);
+                    callback(false, "", "Session expired. Please reconnect.");
+                } else {
+                    callback(false, "", "Download failed: HTTP " + std::to_string(response.status_code));
+                }
+            },
+            []() {},
+            [callback](const std::string& err) {
+                callback(false, "", err);
             }
-        }).detach();
+        );
     }
 
 }

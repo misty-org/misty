@@ -5,6 +5,7 @@
 #include "views/services_view.h"
 #include "views/activity_view.h"
 #include "views/settings_view.h"
+#include "views/edit_profile_view.h"
 
 
 
@@ -80,6 +81,7 @@ namespace misty {
         view::register_view(view::ViewID::Services, std::make_unique<view::ServicesView>(ui_registry_));
         view::register_view(view::ViewID::Activity, std::make_unique<view::ActivityView>(ui_registry_));
         view::register_view(view::ViewID::Settings, std::make_unique<view::SettingsView>(ui_registry_));
+        view::register_view(view::ViewID::EditProfile, std::make_unique<view::EditProfileView>(ui_registry_));
         view::switch_view(view::ViewID::FileExplorer);
     }
 };

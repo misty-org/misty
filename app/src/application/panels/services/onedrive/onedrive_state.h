@@ -11,6 +11,7 @@
 #include <nlohmann/json.hpp>
 #include "core/ui_registry.h"
 #include "core/http_client.h"
+#include "core/worker_pool.h"
 
 namespace misty::panel {
 
@@ -205,12 +206,16 @@ namespace misty::panel {
             return {current_drive_id, current_folder_id, current_ms_user_id};
         }
 
+        void set_worker_pool(core::WorkerPool& pool) { worker_pool_ = &pool; }
+
         // Upload a file to the current OneDrive folder
-        // Runs asynchronously in a background thread
+        // Runs asynchronously via WorkerPool
         void upload_file(
             const std::string& local_path,
             core::UploadProgressCallback progress_cb,
             UploadCallback callback
         );
+
+        core::WorkerPool* worker_pool_ = nullptr;
     };
 }

@@ -13,6 +13,7 @@ namespace misty::view {
         Workspace,
         Activity,
         Services,
+        EditProfile,
         Default
     };
 

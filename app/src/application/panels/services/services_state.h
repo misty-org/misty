@@ -5,6 +5,7 @@
 #include <set>
 #include <functional>
 #include "core/ui_registry.h"
+#include "core/worker_pool.h"
 
 namespace misty::panel {
 
@@ -88,6 +89,9 @@ namespace misty::panel {
         ServicesState();
         ~ServicesState();
 
+        // Must be called before any async methods. Idempotent.
+        void init(core::WorkerPool& pool);
+
         bool has_ms_connections();
         void check_connections();
         bool get_onedrive_card_state(const std::string& ms_user_id, OneDriveCardState& out);
@@ -141,5 +145,8 @@ namespace misty::panel {
         std::set<GDConnection> gd_connections;
         bool show_gd_login_modal = false;
         std::string gd_auth_error;
+
+    private:
+        core::WorkerPool* worker_pool_ = nullptr;
     };
 }

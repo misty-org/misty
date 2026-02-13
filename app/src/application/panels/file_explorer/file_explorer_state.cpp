@@ -44,8 +44,16 @@ namespace panel {
         item.last_modified = j.value("last_modified", "");
         item.source = (FileSource)j.value("source", (int)FileSource::LOCAL);
         
-        // Infer status/other fields based on path existence if needed
-        // For now, keep simple
+        // Infer status based on path (e.g. if in trash)
+        const char* home = std::getenv("HOME");
+        if (home) {
+            std::string trash_dir = std::string(home) + "/misty/.cache/trash";
+            // Check if path starts with trash_dir
+            if (item.path.rfind(trash_dir, 0) == 0) {
+                 item.status = SyncStatus::DELETED;
+            }
+        }
+        
         return item;
     }
 
@@ -69,6 +77,10 @@ namespace panel {
                 for (const auto& item_json : j["starred_files"]) {
                     starred_files.push_back(deserialize_item(item_json));
                 }
+            }
+
+            if (j.contains("last_opened_path")) {
+                last_opened_path = j["last_opened_path"].get<std::string>();
             }
             
             printf("FileExplorerState: Loaded state from %s (Recent: %zu, Starred: %zu)\n", 
@@ -97,6 +109,9 @@ namespace panel {
             for (const auto& item : starred_files) {
                 j["starred_files"].push_back(serialize_item(item));
             }
+
+            // Save last opened path
+            j["last_opened_path"] = std::string(current_path);
 
             std::ofstream f(path);
             f << j.dump(4);
@@ -141,10 +156,36 @@ namespace panel {
     }
 
     void FileExplorerState::move_to_trash(const UnifiedFileItem& item) {
-        trash_files.push_back(item);
+        // Remove if exists to avoid duplicates
+        auto it = std::remove_if(trash_files.begin(), trash_files.end(),
+            [&](const UnifiedFileItem& f) { return f.path == item.path; });
+        trash_files.erase(it, trash_files.end());
+
+        UnifiedFileItem trash_item = item;
+        trash_item.status = SyncStatus::DELETED;
+        trash_files.push_back(trash_item);
         // Note: Trash persistence is handled by the physical directory, so we don't necessarily need to save trash_files to JSON
         // unless we want to cache it. But navigate_to_path re-reads it.
         // So no save_state() needed here for now.
+    }
+
+    void FileExplorerState::track_move(const std::string& old_path, const UnifiedFileItem& new_item) {
+        // Update Recent Files
+        for (auto& f : recent_files) {
+            if (f.path == old_path) {
+                f = new_item; // Update metadata (path, name, status)
+                // If soft deleted, status is already set in new_item
+            }
+        }
+        
+        // Update Starred Files
+        for (auto& f : starred_files) {
+            if (f.path == old_path) {
+                f = new_item;
+            }
+        }
+        
+        save_state();
     }
 
 } // namespace panel
