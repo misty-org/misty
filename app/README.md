@@ -122,6 +122,7 @@ See additional notes in [TESTS.md](TESTS.md).
 
 - Read the service definitions in [proto/minidfs.proto](proto/minidfs.proto).
 - Check UI panels and workflow in [application/panels](application/panels).
+- Extension packaging and runtime notes live in [docs/EXTENSIONS.md](docs/EXTENSIONS.md).
 - Open an issue or discussion in your fork if you need help.
 
 ## Contributing & Maintainers
