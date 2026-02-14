@@ -3,8 +3,8 @@ import { NavLink, Outlet, useLocation } from "react-router";
 
 const navItems = [
   { to: "/", label: "Home" },
-  { to: "/docs", label: "Docs" },
   { to: "/download", label: "Download" },
+  { to: "/pricing", label: "Pricing" },
   { to: "/about", label: "About" },
 ];
 
@@ -150,8 +150,8 @@ export default function Layout() {
                 <span className="text-sm font-medium text-text-muted">Misty</span>
               </div>
               <p className="text-sm text-text-muted/60 max-w-xs">
-                A distributed file system that connects your devices through
-                Tailscale and syncs with the cloud.
+                All your cloud files and devices in one place.
+                Simple, private, and free.
               </p>
             </div>
 
@@ -161,8 +161,8 @@ export default function Layout() {
                 <NavLink to="/download" className="text-sm text-text-muted/60 hover:text-text transition-colors">
                   Download
                 </NavLink>
-                <NavLink to="/docs" className="text-sm text-text-muted/60 hover:text-text transition-colors">
-                  Documentation
+                <NavLink to="/pricing" className="text-sm text-text-muted/60 hover:text-text transition-colors">
+                  Pricing
                 </NavLink>
               </div>
               <div className="flex flex-col gap-3">
@@ -187,7 +187,7 @@ export default function Layout() {
               Built with care. Open source.
             </span>
             <span className="text-xs text-text-muted/40">
-              Misty Distributed File System
+              Misty File Manager
             </span>
           </div>
         </div>

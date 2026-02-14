@@ -1,44 +1,6 @@
 import { AnimateIn } from "../components/AnimateIn";
 import { GlowCard } from "../components/GlowCard";
 
-const stack = [
-  {
-    layer: "Desktop Client",
-    tech: "C++20, ImGui, OpenGL 3.3, GLFW",
-    description:
-      "Cross-platform native application with a custom dark-themed UI. Handles file browsing, workspace management, and cloud service integration.",
-    color: "bg-text-muted",
-  },
-  {
-    layer: "DFS Core",
-    tech: "C++20, gRPC, Protobuf",
-    description:
-      "Minimal distributed file system with streaming I/O, file locking, and chunked transfers. Designed as an educational project with practical utility.",
-    color: "bg-primary",
-  },
-  {
-    layer: "API Proxy",
-    tech: "Go, chi, SQLite, gRPC",
-    description:
-      "Lightweight HTTP gateway that bridges REST clients to the gRPC backend. Manages authentication, devices, and workspaces.",
-    color: "bg-success",
-  },
-  {
-    layer: "Networking",
-    tech: "Tailscale, WireGuard",
-    description:
-      "Secure mesh networking for peer-to-peer file sharing. No port forwarding or public exposure required.",
-    color: "bg-primary-hover",
-  },
-  {
-    layer: "Cloud Integration",
-    tech: "OAuth2, OneDrive API, Google Drive API",
-    description:
-      "Mount cloud storage providers as virtual workspaces. Browse and manage cloud files alongside local storage.",
-    color: "bg-danger",
-  },
-];
-
 const values = [
   {
     title: "Open Source",
@@ -59,11 +21,11 @@ const values = [
     ),
   },
   {
-    title: "Educational",
-    description: "Built as a learning project for distributed systems, then grown into a real tool.",
+    title: "Simple by Design",
+    description: "No complicated setup, no learning curve. Just install and start managing your files.",
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.438 60.438 0 00-.491 6.347A48.627 48.627 0 0112 20.904a48.627 48.627 0 018.232-4.41 60.46 60.46 0 00-.491-6.347m-15.482 0a50.636 50.636 0 00-2.658-.813A59.906 59.906 0 0112 3.493a59.903 59.903 0 0110.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0112 13.489a50.702 50.702 0 017.74-3.342M6.75 15a.75.75 0 100-1.5.75.75 0 000 1.5zm0 0v-3.675A55.378 55.378 0 0112 8.443m-7.007 11.55A5.981 5.981 0 006.75 15.75v-1.5" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
       </svg>
     ),
   },
@@ -77,26 +39,25 @@ export default function About() {
         <div className="max-w-3xl mb-20">
           <span className="text-xs font-medium text-primary uppercase tracking-wider">About</span>
           <h1 className="text-4xl md:text-5xl font-bold text-text mt-3 mb-8 text-balance">
-            A file system built for
+            Built for
             <br />
-            <span className="gradient-text">the modern developer</span>
+            <span className="gradient-text">everyone</span>
           </h1>
           <div className="flex flex-col gap-5 text-text-muted leading-relaxed">
             <p>
-              Misty is an experimental distributed file system that started as an
-              educational project and grew into a practical tool for managing files
-              across devices.
+              We all use multiple cloud services. Google Drive for some things,
+              OneDrive for others, maybe Dropbox too. Plus files scattered across
+              laptops, desktops, and external drives. It's a mess.
             </p>
             <p>
-              It combines a minimal gRPC-based DFS core with Tailscale-aware
-              peer-to-peer networking, cloud storage integration, and a native
-              cross-platform desktop client. The goal is simple: your files should be
-              accessible wherever you are, without relying entirely on third-party
-              cloud providers.
+              Misty brings everything together into one simple app. Connect your
+              cloud accounts, link your devices, and browse all your files in a
+              single, unified view. No more switching between tabs and apps to
+              find what you need.
             </p>
             <p>
-              The project is open source and actively developed. Contributions,
-              feedback, and bug reports are welcome.
+              The project is open source and free to use. We believe file
+              management should be simple, private, and accessible to everyone.
             </p>
           </div>
         </div>
@@ -124,41 +85,14 @@ export default function About() {
         </div>
       </AnimateIn>
 
-      {/* Tech Stack */}
-      <AnimateIn animation="fade-in">
-        <div>
-          <h2 className="text-2xl font-bold text-text mb-8">Tech Stack</h2>
-          <div className="flex flex-col gap-4">
-            {stack.map((item, i) => (
-              <AnimateIn key={item.layer} delay={i * 80} animation="fade-in-up">
-                <GlowCard>
-                  <div className="p-6 flex flex-col md:flex-row md:items-start gap-5">
-                    <div className="md:w-52 shrink-0 flex items-start gap-3">
-                      <div className={`w-1.5 h-10 rounded-full ${item.color} shrink-0`} />
-                      <div>
-                        <h3 className="text-text font-semibold text-sm">{item.layer}</h3>
-                        <p className="text-xs text-primary font-mono mt-1">{item.tech}</p>
-                      </div>
-                    </div>
-                    <p className="text-text-muted text-sm leading-relaxed">
-                      {item.description}
-                    </p>
-                  </div>
-                </GlowCard>
-              </AnimateIn>
-            ))}
-          </div>
-        </div>
-      </AnimateIn>
-
       {/* GitHub CTA */}
       <AnimateIn delay={200} animation="fade-in-up">
-        <div className="mt-20 text-center">
+        <div className="text-center">
           <div className="glass-card rounded-2xl p-10 max-w-xl mx-auto">
-            <h3 className="text-xl font-bold text-text mb-3">Contribute</h3>
+            <h3 className="text-xl font-bold text-text mb-3">Open Source</h3>
             <p className="text-text-muted text-sm mb-6 leading-relaxed">
-              Misty is open source and welcomes contributions of all kinds -- code,
-              documentation, bug reports, and feature requests.
+              Misty is completely open source. Check out the code, report issues,
+              or contribute on GitHub.
             </p>
             <a
               href="https://github.com/kannachi323/misty"

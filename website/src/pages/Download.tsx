@@ -41,7 +41,7 @@ const requirements = [
   { label: "OS", value: "Windows 10+, macOS 12+, or Linux (coming soon)" },
   { label: "RAM", value: "4 GB minimum, 8 GB recommended" },
   { label: "Storage", value: "100 MB for the application" },
-  { label: "Network", value: "Tailscale (optional, for P2P)" },
+  { label: "Network", value: "Internet connection for cloud access" },
 ];
 
 export default function Download() {
@@ -60,8 +60,8 @@ export default function Download() {
             Download Misty
           </h1>
           <p className="text-text-muted max-w-lg mx-auto text-pretty leading-relaxed">
-            Get the native desktop client for your platform. Built with ImGui and
-            OpenGL for a fast, lightweight experience.
+            Fast, lightweight, and free. Get the Misty desktop app for your
+            platform and bring all your files together.
           </p>
         </div>
       </AnimateIn>
@@ -113,24 +113,6 @@ export default function Download() {
               </div>
             ))}
           </div>
-        </div>
-      </AnimateIn>
-
-      {/* Build from source */}
-      <AnimateIn animation="fade-in" delay={200}>
-        <div className="mt-16 text-center">
-          <p className="text-sm text-text-muted">
-            Misty is open source.{" "}
-            <a
-              href="https://github.com/kannachi323/misty"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-primary hover:text-primary-hover transition-colors font-medium"
-            >
-              Build from source
-            </a>{" "}
-            if you prefer.
-          </p>
         </div>
       </AnimateIn>
     </div>
