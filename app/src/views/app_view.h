@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <string>
 #include <unordered_map>
 #include <mutex>
 
@@ -14,6 +15,7 @@ namespace misty::view {
         Workspace,
         Activity,
         Services,
+        Extensions,
         Vault,
         EditProfile,
         Default
@@ -26,6 +28,8 @@ namespace misty::view {
 
         virtual ViewID get_view_id() = 0;
         virtual void render() = 0;
+        virtual std::string active_explorer_state_key() const { return "Files"; }
+        virtual bool invoke_command(const std::string& command_id) { (void)command_id; return false; }
 
     protected:
         ViewID view_id;
@@ -39,6 +43,7 @@ namespace misty::view {
         void switch_view(ViewID id);
         void render_current_view();
         ViewID get_current_view_id() const;
+        AppView* get_current_view() const;
 
         static ViewRegistry& get();
 

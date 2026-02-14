@@ -45,6 +45,11 @@ namespace misty::view {
         return current_view_id_;
     }
 
+    AppView* ViewRegistry::get_current_view() const {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return current_view_;
+    }
+
     ViewRegistry& ViewRegistry::get() {
         static ViewRegistry instance;
         return instance;

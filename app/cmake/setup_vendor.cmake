@@ -4,6 +4,7 @@ find_package(gRPC CONFIG QUIET)
 find_package(Protobuf CONFIG QUIET)
 find_package(OpenGL REQUIRED)
 find_package(CURL REQUIRED)
+find_package(OpenSSL REQUIRED)
 
 if(NOT gRPC_FOUND OR NOT Protobuf_FOUND OR  NOT OpenGL_FOUND)
     message(FATAL_ERROR 
