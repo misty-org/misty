@@ -37,20 +37,32 @@ func RegisterUser(db *db.Database) http.HandlerFunc {
 	}
 }
 
+type UserLoginResponse struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Email string `json:"email"`
+}
+
 func LoginUser(db *db.Database) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var user UserLoginRequest
-		if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
+		var req UserLoginRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "Invalid login request data", http.StatusBadRequest)
 			return
 		}
 		defer r.Body.Close()
 
-		err := db.GetUser(user.Email, user.Password)
+		user, err := db.GetUser(req.Email, req.Password)
 		if err != nil {
 			http.Error(w, "Invalid email or password", http.StatusUnauthorized)
 			return
 		}
-		w.WriteHeader(http.StatusOK)
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(UserLoginResponse{
+			ID:    user.ID,
+			Name:  user.Name,
+			Email: user.Email,
+		})
 	}
 }

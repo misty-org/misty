@@ -23,22 +23,29 @@ func (db *Database) InsertUser(name, email, password string) error {
     return err
 }
 
-func (db *Database) GetUser(email, password string) error {
+type UserInfo struct {
+    ID    string
+    Name  string
+    Email string
+}
+
+func (db *Database) GetUser(email, password string) (*UserInfo, error) {
+    var user UserInfo
     var storedHashedPassword string
     err := db.Conn.QueryRow(`
-        SELECT password FROM users WHERE email = ?`, 
+        SELECT id, name, email, password FROM users WHERE email = ?`,
         email,
-    ).Scan(&storedHashedPassword)
+    ).Scan(&user.ID, &user.Name, &user.Email, &storedHashedPassword)
     if err != nil {
         log.Println("Failed to get user:", err)
-        return err
+        return nil, err
     }
 
     err = bcrypt.CompareHashAndPassword([]byte(storedHashedPassword), []byte(password))
     if err != nil {
         log.Println("Invalid password:", err)
-        return err
+        return nil, err
     }
 
-    return nil
+    return &user, nil
 }

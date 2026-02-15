@@ -28,8 +28,9 @@ export function ParticleField() {
     };
     resizeCanvas();
 
-    // Initialize particles
-    const particleCount = 60;
+    // Initialize particles — fewer on mobile for performance
+    const isMobile = canvas.offsetWidth < 640;
+    const particleCount = isMobile ? 30 : 60;
     particlesRef.current = Array.from({ length: particleCount }, () => ({
       x: Math.random() * canvas.offsetWidth,
       y: Math.random() * canvas.offsetHeight,
@@ -58,18 +59,19 @@ export function ParticleField() {
         ctx.fill();
       }
 
-      // Draw connections
+      // Draw connections — shorter range on mobile
+      const connectionDist = canvas.offsetWidth < 640 ? 80 : 120;
       for (let i = 0; i < particles.length; i++) {
         for (let j = i + 1; j < particles.length; j++) {
           const dx = particles[i].x - particles[j].x;
           const dy = particles[i].y - particles[j].y;
           const distance = Math.sqrt(dx * dx + dy * dy);
 
-          if (distance < 120) {
+          if (distance < connectionDist) {
             ctx.beginPath();
             ctx.moveTo(particles[i].x, particles[i].y);
             ctx.lineTo(particles[j].x, particles[j].y);
-            ctx.strokeStyle = `rgba(59, 130, 246, ${0.06 * (1 - distance / 120)})`;
+            ctx.strokeStyle = `rgba(59, 130, 246, ${0.06 * (1 - distance / connectionDist)})`;
             ctx.lineWidth = 0.5;
             ctx.stroke();
           }
