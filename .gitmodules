@@ -1,33 +1,33 @@
-[submodule "app/vendor/octicons"]
-	path = app/vendor/octicons
+[submodule "client/vendor/octicons"]
+	path = client/vendor/octicons
 	url = git@github.com:primer/octicons.git
 	shallow = true
-[submodule "app/vendor/nanosvg"]
-	path = app/vendor/nanosvg
+[submodule "client/vendor/nanosvg"]
+	path = client/vendor/nanosvg
 	url = git@github.com:memononen/nanosvg.git
 	shallow = true
-[submodule "app/vendor/lunasvg"]
-	path = app/vendor/lunasvg
+[submodule "client/vendor/lunasvg"]
+	path = client/vendor/lunasvg
 	url = git@github.com:sammycage/lunasvg.git
 	shallow = true
-[submodule "app/vendor/stb"]
-	path = app/vendor/stb
+[submodule "client/vendor/stb"]
+	path = client/vendor/stb
 	url = git@github.com:nothings/stb.git
 	shallow = true
-[submodule "app/vendor/googletest"]
-	path = app/vendor/googletest
+[submodule "client/vendor/googletest"]
+	path = client/vendor/googletest
 	url = git@github.com:google/googletest.git
 	shallow = true
-[submodule "app/vendor/glfw"]
-	path = app/vendor/glfw
+[submodule "client/vendor/glfw"]
+	path = client/vendor/glfw
 	url = git@github.com:glfw/glfw.git
 	shallow = true
-[submodule "app/vendor/json"]
-	path = app/vendor/json
+[submodule "client/vendor/json"]
+	path = client/vendor/json
 	url = git@github.com:nlohmann/json.git
 	shallow = true
-[submodule "app/vendor/imgui"]
-	path = app/vendor/imgui
+[submodule "client/vendor/imgui"]
+	path = client/vendor/imgui
 	url = https://github.com/ocornut/imgui.git
 	branch = docking
 	shallow = true

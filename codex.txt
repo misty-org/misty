@@ -1,0 +1,498 @@
+Misty Codex Handoff
+===================
+
+Updated: 2026-04-16
+
+Purpose
+-------
+This file is a high-signal handoff for a fresh Codex session. It summarizes the repo shape, current product behavior, the proxy/client split, and the new sync-index architecture that was just implemented.
+
+
+High-Level Product
+------------------
+Misty is a desktop file manager / cloud browser with:
+- a native client in `client/` using C++ + ImGui
+- a local proxy/backend in `proxy/` using Go
+- rclone-backed remote storage integration
+- local filesystem browsing
+- remote browsing, download, upload, create folder, delete
+- a restic-backed vault/backup feature under `proxy/core/restic` and `client/src/panels/vault`
+
+The client is the UI and local interaction layer. The proxy is the authority for remote operations, persistence, auth/config orchestration, and now sync metadata indexing.
+
+
+Repo Shape
+----------
+- `client/`
+  - desktop app
+  - CMake build
+  - ImGui-based panels and views
+  - file explorer lives under `client/src/panels/file_explorer`
+  - services / remote connection state under `client/src/panels/services`
+- `proxy/`
+  - Go service
+  - SQLite-backed
+  - rclone integration under `proxy/core/rclone`
+  - remote HTTP handlers under `proxy/api/remote`
+  - vault/restic backend under `proxy/api/vault`, `proxy/core/restic`
+- `TODO.txt`
+  - current ship list / implementation checklist
+- `codex.txt`
+  - this handoff file
+
+Important repo context:
+- There has been an `app/` -> `client/` move in the worktree history. Do not assume the worktree is pristine.
+- There are unrelated dirty changes in this repo. Do not revert unrelated edits.
+
+
+Current Architecture
+--------------------
+
+1. Client
+- Native C++ app using ImGui.
+- File explorer is panel-driven.
+- `UnifiedFileItem` is the shared row model for local and remote items.
+- Remote navigation goes through `ServicesState`, which calls proxy HTTP endpoints.
+- A worker pool is used heavily to keep render-thread work off the UI thread.
+- The file explorer keeps stale-while-revalidate behavior for remote directory views.
+
+2. Proxy
+- Go HTTP server with SQLite.
+- Uses rclone config/remotes locally.
+- Exposes endpoints for remote listing, download/upload, delete, etc.
+- Now also owns sync metadata indexing for remote-backed directories.
+- SQLite is the source of truth for sync metadata shown in the client.
+
+3. Remote mount model
+- Local mount root is `~/misty/mnt`.
+- Remote path shape is effectively:
+  - `~/misty/mnt/{ProviderFolder}/{FolderName}/{relative_path}`
+- Example provider folders:
+  - `OneDrive`
+  - `Google Drive`
+  - `Dropbox`
+- Alias/folder naming is derived from `~/misty/remotes.json`.
+
+
+New Sync Architecture
+---------------------
+This is the major architectural change that landed.
+
+Old behavior:
+- The client had a lightweight `FileSyncService` that inferred remote sync state by comparing local file existence and local size against remote listing data.
+- UI state was driven by colored dots and `SyncStatus`.
+- It was weak, row-local, and not suitable for real sync semantics.
+
+New behavior:
+- The proxy owns per-root and per-file sync metadata in SQLite.
+- The client renders explicit `LOC`, `REM`, `MOD` state plus a separate sync icon column.
+- Remote file explorer rows now come from indexed metadata rather than ad hoc client-side inference.
+
+UI model:
+- `LOC`
+  - local working copy exists and is considered in sync unless marked dirty
+- `REM`
+  - remote-only item, not pulled locally
+- `MOD`
+  - local working copy exists and metadata diverges from remote
+
+Sync icon model:
+- clean icon
+  - in sync / no action needed
+- dirty icon
+  - some divergence exists
+- tooltip may expose `push`, `pull`, or `conflict`
+
+Internal model:
+- The UI is intentionally simplified.
+- Backend truth still carries:
+  - `local_exists`
+  - `remote_exists`
+  - `is_dirty`
+  - `sync_direction` = `none | push | pull | conflict`
+
+
+Sync SQLite Schema
+------------------
+The proxy now ensures these tables exist at startup:
+
+1. `sync_roots`
+- one row per remote root
+- fields include:
+  - `id`
+  - `remote_name`
+  - `remote_type`
+  - `provider_folder`
+  - `folder_name`
+  - `mount_root`
+  - `enabled`
+  - `dirty_bit`
+  - `last_refetch_at`
+  - `last_poll_at`
+  - timestamps
+
+2. `sync_entries`
+- one row per indexed file/dir
+- fields include:
+  - `id`
+  - `root_id`
+  - `rel_path`
+  - `parent_rel_path`
+  - `name`
+  - `is_dir`
+  - `local_exists`
+  - `remote_exists`
+  - `is_dirty`
+  - `sync_direction`
+  - `local_mtime`
+  - `local_size`
+  - `remote_mtime`
+  - `remote_size`
+  - `remote_revision`
+  - `mime_type`
+  - `state_code`
+  - timestamps
+
+Indexes exist on:
+- `(root_id, parent_rel_path, name)`
+- `(root_id, is_dirty)`
+- `(root_id, updated_at)`
+
+Important implementation note:
+- Schema bootstrap currently happens in code via `ensureSyncSchema()` in `proxy/db/db.go`.
+- There is also a migration file and `init.sql` update for consistency, but runtime startup relies on the in-code schema ensure path.
+
+
+Sync Reconciliation Rules
+-------------------------
+Current reconciliation lives in `proxy/core/syncindex/service.go`.
+
+Directory refetch flow:
+1. validate remote exists in rclone
+2. ensure/create `sync_roots` row
+3. list the remote directory via rclone
+4. scan the corresponding local mount directory
+5. merge immediate children by name
+6. compute row state and dirty direction
+7. upsert `sync_entries`
+8. delete stale children for that parent path
+9. recompute root dirty bit
+10. return indexed directory rows
+
+Current metadata comparison:
+- for files:
+  - size
+  - mtime
+- mtimes are considered matching within 2 seconds
+- directories are treated as matching if both exist
+
+Current state mapping:
+- local only => `LOC`, dirty, `push`
+- remote only => `REM`, clean, `none`
+- local + remote and metadata match => `LOC`, clean, `none`
+- local + remote and metadata differ => `MOD`, dirty, direction inferred from newer mtime:
+  - newer local => `push`
+  - newer remote => `pull`
+  - otherwise => `conflict`
+
+Limitations of current Phase 1 sync:
+- no background poller yet
+- no push/pull action framework yet
+- no hashing yet
+- no remote revision-based conflict logic yet
+- no OS file watcher usage by design
+- sync truth is per-file in SQLite, but refresh is still manual/UI-driven
+
+
+New Sync API
+------------
+New proxy endpoints:
+
+1. `POST /api/sync/refetch`
+- request body:
+  - `remote`
+  - `path`
+- purpose:
+  - update sync metadata/index for one remote directory
+
+2. `GET /api/sync/list?remote=...&path=...`
+- purpose:
+  - read indexed rows for a remote directory
+
+Rollout behavior:
+- existing `/api/files` remains intact
+- remote explorer now uses sync APIs for remote-backed directory reads
+- this was done without removing the old endpoint, so rollback/parallel behavior remains possible
+
+
+Client Changes That Landed
+--------------------------
+
+1. Remote explorer fetch flow changed
+- `client/src/panels/file_explorer/remote.cpp`
+- remote navigation now does:
+  - load cached indexed response if present
+  - `POST /api/sync/refetch`
+  - then `GET /api/sync/list`
+  - cache the indexed response
+  - render rows from that indexed response
+
+2. Remote services API expanded
+- `client/src/panels/services/services_state.h`
+- `client/src/panels/services/remote_state_impl.cpp`
+- new methods:
+  - `refetch_sync_items(...)`
+  - `fetch_sync_items(...)`
+
+3. File row model expanded
+- `client/src/panels/file_explorer/file_explorer_state.h`
+- `UnifiedFileItem` now carries:
+  - `state_code`
+  - `sync_dirty`
+  - `sync_direction`
+
+4. File table UI changed
+- `client/src/panels/file_explorer/content_ui.cpp`
+- list view now uses:
+  - `State` column
+  - `Sync` column
+- old colored status-dot rendering for remote rows was replaced
+- sync icon uses SVG assets, not color-only semantics
+
+5. Refresh semantics changed for remote paths
+- `client/src/panels/file_explorer/toolbar_ui.cpp`
+- refresh tooltip says `Refetch Items` for remote-backed paths
+
+6. Legacy sync poller is disabled for remote rows
+- `client/src/core/threading/file_sync_service.cpp`
+- local-only legacy behavior remains, but remote row truth is no longer overwritten by the old size-only client poller
+
+7. Loading overlay behavior
+- Remote listing still blocks interaction while loading.
+- Spinner animation is delayed by about 120ms to avoid flashing on fast cached/remote fetches.
+- Fast paths show current content instead of flashing a spinner immediately.
+
+8. Row identity / sort stability
+- Earlier work fixed the remote explorer flicker by:
+  - applying sort before row render
+  - using stable widget IDs based on file identity instead of row index
+
+
+Proxy Changes That Landed
+-------------------------
+
+1. Sync index service
+- new package:
+  - `proxy/core/syncindex`
+- key files:
+  - `models.go`
+  - `paths.go`
+  - `service.go`
+
+2. Sync DB access helpers
+- `proxy/db/sync_index.go`
+- provides upsert/list/delete helpers for roots and entries
+
+3. Sync schema startup ensure
+- `proxy/db/db.go`
+
+4. Sync endpoints
+- `proxy/api/remote/sync.go`
+- wired into proxy router
+
+5. Proxy startup wiring
+- `proxy/main.go`
+- `proxy/proxy.go`
+- proxy now constructs and stores a `SyncIndex` service
+
+6. Migration / init consistency
+- `proxy/db/migrations/20260416000000_create_sync_index_tables.sql`
+- `proxy/init.sql`
+
+
+Other Recent File Explorer Changes
+----------------------------------
+These were also done recently and matter for understanding current behavior:
+
+1. Delete menu gating for remote files
+- Delete availability was fixed so remote files are treated as deletable in the menu logic.
+
+2. Remote delete through cloud proxy
+- There was a client bug calling the wrong endpoint path for delete.
+- That was corrected to use the proxy’s actual API route.
+
+3. Remote delete moved off UI thread
+- Remote delete now uses the explorer worker pool rather than blocking the main thread.
+
+4. Cache invalidation after remote delete
+- Remote listing cache is cleared after successful delete so stale rows do not immediately reappear.
+
+
+Current Capabilities
+--------------------
+
+File explorer:
+- browse local directories
+- browse remote provider/account folders
+- browse remote directories through sync-indexed listings
+- create folders remotely
+- download remote files locally
+- upload local files to remote
+- delete local and remote items
+- stale-while-revalidate remote listings
+- list and grid views
+- state/sync columns in list view for remote rows
+
+Remote connection management:
+- provider login/connect via proxy/rclone
+- disconnect remote
+- alias remotes through `~/misty/remotes.json`
+
+Vault:
+- restic-backed backup/restore/check/stats/etc.
+- job streaming and live progress in client
+
+
+Current Limitations / Caveats
+-----------------------------
+
+1. Sync Phase 1 only
+- This is not full automatic bi-directional sync.
+- It is indexed metadata + manual refetch + UI state.
+
+2. No background remote poller yet
+- The architecture supports it conceptually, but it has not been implemented.
+- Remote changes are discovered when refetch occurs.
+
+3. No OS file watchers by design
+- This was an explicit product decision.
+- Local dirty detection should remain polling/metadata based, not event-based.
+
+4. No dedicated push/pull UI yet
+- The backend stores `sync_direction`, but the UX is still only state + icon + tooltip.
+
+5. Grid view is less sync-rich than list view
+- The main new sync UI work is in the list/table presentation.
+
+6. Path mapping correctness matters
+- Sync correctness depends on consistent remote -> local mount path reconstruction.
+- That logic currently relies on:
+  - rclone remote type
+  - provider display-name mapping
+  - alias data from `~/misty/remotes.json`
+- If this mapping drifts between client and proxy, sync status becomes misleading.
+
+7. SQLite scale assumptions
+- Row-per-file is acceptable.
+- Full-tree refetch on very large remotes every 15-30s would not be acceptable.
+- Future polling should be scoped to active/visible/recent roots or paths.
+
+
+Tests Added
+-----------
+New test coverage now exists for the sync Phase 1 path:
+
+1. schema bootstrap
+- `proxy/db/db_test.go`
+
+2. reconciliation rules
+- `proxy/core/syncindex/service_test.go`
+
+3. sync API handlers
+- `proxy/api/remote/sync_test.go`
+
+These are targeted tests and do not require a live cloud remote.
+
+
+Build / Verification State
+--------------------------
+Verified during this session:
+- `env GOCACHE=/tmp/misty-go-cache go test ./db ./core/syncindex ./api/remote`
+- `env GOCACHE=/tmp/misty-go-cache go build ./...`
+- `cmake --build client/build`
+
+These all passed.
+
+One unrelated historical note:
+- `proxy/tests/TestVaultSmoke` can fail in restricted sandbox environments because `httptest.NewServer` may not be allowed to bind ports there. That is an environment issue, not necessarily a product regression.
+
+
+What TODO Says Now
+------------------
+`TODO.txt` now has `Phase 1 sync index rollout` fully checked off.
+
+That means the following Phase 1 goals are done:
+- proxy-owned sync tables
+- startup schema ensure
+- proxy sync service
+- remote -> mount path mapping on proxy
+- `POST /api/sync/refetch`
+- `GET /api/sync/list`
+- client remote browsing switched to refetch + list
+- `LOC` / `REM` / `MOD` row metadata
+- list-view `State` + icon-only `Sync` columns
+- missing sync icon assets
+- remote refresh repurposed as `Refetch Items`
+- legacy remote row sync inference disabled
+- proxy/client builds verified
+- proxy tests added
+
+
+Recommended Next Steps
+----------------------
+If a future Codex session continues this work, the best next steps are:
+
+1. Add a proxy-side polling loop
+- root/path scoped, not global full-tree scans
+- update `sync_entries` periodically for active or dirty roots
+
+2. Add explicit push/pull actions
+- use `sync_direction`
+- wire into row actions / context menu
+
+3. Improve conflict detection
+- use remote revisions/etags when available
+- add optional hashing only when metadata is ambiguous
+
+4. Expand sync UI beyond table view
+- grid view
+- filter/sort affordances based on dirty state
+
+5. Centralize mount-path derivation further
+- reduce the chance of drift between proxy and client assumptions
+
+6. Eventually retire legacy sync remnants
+- once all local/remote sync state is driven by a better unified model
+
+
+Files Most Relevant To This Sync Work
+-------------------------------------
+Proxy:
+- `proxy/db/db.go`
+- `proxy/db/sync_index.go`
+- `proxy/core/syncindex/models.go`
+- `proxy/core/syncindex/paths.go`
+- `proxy/core/syncindex/service.go`
+- `proxy/api/remote/sync.go`
+- `proxy/db/migrations/20260416000000_create_sync_index_tables.sql`
+- `proxy/init.sql`
+
+Client:
+- `client/src/panels/services/services_state.h`
+- `client/src/panels/services/remote_state_impl.cpp`
+- `client/src/panels/file_explorer/file_explorer_state.h`
+- `client/src/panels/file_explorer/remote.cpp`
+- `client/src/panels/file_explorer/content_ui.cpp`
+- `client/src/panels/file_explorer/toolbar_ui.cpp`
+- `client/src/core/threading/file_sync_service.cpp`
+- `client/assets/icons/x-circle-fill-16.svg`
+
+
+Practical Notes For The Next Codex
+----------------------------------
+- Assume the workspace may be dirty.
+- Do not revert unrelated files.
+- If modifying sync behavior, treat SQLite-backed proxy state as the source of truth for remote rows.
+- Avoid reintroducing client-only remote sync inference.
+- Avoid filesystem watcher designs; product direction is polling/manual-refetch based.
+- Preserve UI responsiveness by keeping remote operations off the render thread.

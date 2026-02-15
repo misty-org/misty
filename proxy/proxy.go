@@ -14,6 +14,7 @@ import (
 	"github.com/kannachi323/misty/proxy/core/auth"
 	"github.com/kannachi323/misty/proxy/core/license"
 	"github.com/kannachi323/misty/proxy/core/tsbase"
+	"github.com/kannachi323/misty/proxy/core/syncindex"
 	"github.com/kannachi323/misty/proxy/db"
 )
 
@@ -22,6 +23,8 @@ type Proxy struct {
 	APIRouter      *chi.Mux
 	TSBase         *tsbase.TSBase
 	Database       *db.Database
+	SyncIndex      *syncindex.Service
+	SyncPoller     *syncindex.Poller
 	LicenseManager *license.Manager
 	VaultService   *vault.Service
 	AIService      *ai.Service
@@ -106,6 +109,10 @@ func (proxy *Proxy) MountHandlers() {
 		r.Post("/remotes/config/continue", remote.ConfigContinue())
 		r.Delete("/remotes/config", remote.ConfigCancel())
 		r.Get("/files", remote.ListFiles())
+		r.Post("/sync/refetch", remote.SyncRefetch(proxy.SyncIndex))
+		r.Get("/sync/list", remote.SyncList(proxy.SyncIndex))
+		r.Post("/sync/dirty", remote.SyncDirty(proxy.SyncIndex))
+		r.Post("/sync/run-now", remote.SyncRunNow(proxy.SyncPoller))
 		r.Get("/file/download", remote.DownloadFile())
 		r.Post("/file/upload", remote.UploadFile())
 		r.Post("/mkdir", remote.MkDir())
