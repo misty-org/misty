@@ -176,7 +176,9 @@ namespace misty::panel {
         }
 
         // Queue into sidebar upload queue
-        auto [remote_name, remote_path] = path_utils::parse_remote_name_and_path(dest_dir);
+        std::string remote_name;
+        std::string remote_path;
+        resolve_remote_path_context(dest_dir, remote_name, remote_path);
 
         auto& sidebar_state = registry_.get_state<FileSidebarState>("FileSidebar");
         std::string dest_str = dest.string();
@@ -252,15 +254,15 @@ namespace misty::panel {
 
         services.download_file(
             item.remote_name, item.remote_path, dest_path,
-            [this, download_id](size_t bytes_downloaded, size_t) -> bool {
-                auto& downloads = registry_.get_state<DownloadState>("Downloads");
+            [registry = &registry_, download_id](size_t bytes_downloaded, size_t) -> bool {
+                auto& downloads = registry->get_state<DownloadState>("Downloads");
                 downloads.update_progress(download_id, static_cast<int64_t>(bytes_downloaded));
                 return true;
             },
-            [this, file_name = item.name, download_id, notif_id](
+            [registry = &registry_, file_name = item.name, download_id, notif_id](
                 bool success, const std::string& local_path, const std::string& error) {
-                auto& downloads = registry_.get_state<DownloadState>("Downloads");
-                auto& notifications = registry_.get_state<NotificationState>("Notifications");
+                auto& downloads = registry->get_state<DownloadState>("Downloads");
+                auto& notifications = registry->get_state<NotificationState>("Notifications");
                 notifications.dismiss(notif_id);
                 if (success) {
                     downloads.complete_download(download_id);
@@ -282,7 +284,9 @@ namespace misty::panel {
         try { file_size = static_cast<int64_t>(fs::file_size(local_path)); } catch (...) {}
 
         if (path_utils::is_remote_path(dest_dir)) {
-            auto [remote_name, remote_path] = path_utils::parse_remote_name_and_path(dest_dir);
+            std::string remote_name;
+            std::string remote_path;
+            resolve_remote_path_context(dest_dir, remote_name, remote_path);
 
             if (remote_name.empty()) {
                 notifications.add_notification("Upload Failed", "Cannot upload to mount root. Navigate into a remote folder.", NotificationType::ERROR);
@@ -294,14 +298,14 @@ namespace misty::panel {
             notifications.add_notification("Uploading", file_name, NotificationType::DOWNLOAD, 15.0f);
 
             services.upload_file(remote_name, remote_path, local_path,
-                [this, upload_id](size_t bytes_uploaded, size_t total_bytes) -> bool {
-                    auto& uploads = registry_.get_state<UploadState>("Uploads");
+                [registry = &registry_, upload_id](size_t bytes_uploaded, size_t total_bytes) -> bool {
+                    auto& uploads = registry->get_state<UploadState>("Uploads");
                     uploads.update_progress(upload_id, static_cast<int64_t>(bytes_uploaded));
                     return true;
                 },
-                [this, file_name, upload_id](bool success, const std::string& error_msg) {
-                    auto& uploads = registry_.get_state<UploadState>("Uploads");
-                    auto& notifications = registry_.get_state<NotificationState>("Notifications");
+                [registry = &registry_, file_name, upload_id](bool success, const std::string& error_msg) {
+                    auto& uploads = registry->get_state<UploadState>("Uploads");
+                    auto& notifications = registry->get_state<NotificationState>("Notifications");
                     if (success) {
                         uploads.complete_upload(upload_id);
                         notifications.add_notification("Upload Complete", file_name, NotificationType::SUCCESS, 5.0f);
@@ -426,8 +430,11 @@ namespace misty::panel {
         const bool has_remote_targets = !remote_targets.empty();
         if (has_remote_targets) {
             const std::string origin_path(state.current_path);
+            state.is_loading = true;
+            state.show_loading_animation = true;
+            state.loading_animation_ready_at = std::chrono::steady_clock::now();
             worker_pool_.add(
-                [this, remote_targets = std::move(remote_targets), origin_path]() {
+                [registry = &registry_, state_key = state_key_, remote_targets = std::move(remote_targets), origin_path]() {
                     struct RemoteDeleteResult {
                         std::string id;
                         std::string path;
@@ -439,17 +446,19 @@ namespace misty::panel {
                     results.reserve(remote_targets.size());
                     for (const auto& target : remote_targets) {
                         std::string error;
-                        const bool success = delete_remote_file(target.item, &error);
+                        const bool success = FileExplorerPanel::delete_remote_file_impl(target.item, &error);
                         results.push_back({target.id, target.path, success, std::move(error)});
                     }
 
-                    auto& state = registry_.get_state<FileExplorerState>(state_key_);
-                    auto& notif = registry_.get_state<NotificationState>("Notifications");
+                    auto& state = registry->get_state<FileExplorerState>(state_key);
+                    auto& notif = registry->get_state<NotificationState>("Notifications");
 
                     size_t remote_success_count = 0;
                     std::string first_error;
                     {
                         std::lock_guard<std::mutex> lock(state.mu);
+                        state.is_loading = false;
+                        state.show_loading_animation = false;
                         for (const auto& result : results) {
                             state.selected_files.erase(result.id);
                             if (!result.success) {
@@ -479,11 +488,13 @@ namespace misty::panel {
                     }
                 },
                 []() {},
-                [this](const std::string& err) {
-                    auto& state = registry_.get_state<FileExplorerState>(state_key_);
-                    auto& notif = registry_.get_state<NotificationState>("Notifications");
+                [registry = &registry_, state_key = state_key_](const std::string& err) {
+                    auto& state = registry->get_state<FileExplorerState>(state_key);
+                    auto& notif = registry->get_state<NotificationState>("Notifications");
                     {
                         std::lock_guard<std::mutex> lock(state.mu);
+                        state.is_loading = false;
+                        state.show_loading_animation = false;
                         state.error_msg = err;
                     }
                     notif.add_notification("Delete Failed", err, NotificationType::ERROR);
@@ -613,6 +624,11 @@ namespace misty::panel {
 
     bool FileExplorerPanel::delete_remote_file(const UnifiedFileItem& file,
                                                 std::string* error_message) {
+        return delete_remote_file_impl(file, error_message);
+    }
+
+    bool FileExplorerPanel::delete_remote_file_impl(const UnifiedFileItem& file,
+                                                    std::string* error_message) {
         std::string proxy_url = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
         if (proxy_url.empty()) {
             if (error_message) *error_message = "Proxy not configured.";

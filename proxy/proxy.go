@@ -13,8 +13,8 @@ import (
 	"github.com/kannachi323/misty/proxy/core/ai"
 	"github.com/kannachi323/misty/proxy/core/auth"
 	"github.com/kannachi323/misty/proxy/core/license"
-	"github.com/kannachi323/misty/proxy/core/tsbase"
 	"github.com/kannachi323/misty/proxy/core/syncindex"
+	"github.com/kannachi323/misty/proxy/core/tsbase"
 	"github.com/kannachi323/misty/proxy/db"
 )
 
@@ -24,7 +24,7 @@ type Proxy struct {
 	TSBase         *tsbase.TSBase
 	Database       *db.Database
 	SyncIndex      *syncindex.Service
-	SyncPoller     *syncindex.Poller
+	SyncManager    *syncindex.Manager
 	LicenseManager *license.Manager
 	VaultService   *vault.Service
 	AIService      *ai.Service
@@ -109,10 +109,12 @@ func (proxy *Proxy) MountHandlers() {
 		r.Post("/remotes/config/continue", remote.ConfigContinue())
 		r.Delete("/remotes/config", remote.ConfigCancel())
 		r.Get("/files", remote.ListFiles())
-		r.Post("/sync/refetch", remote.SyncRefetch(proxy.SyncIndex))
+		r.Post("/sync/refetch", remote.SyncRefetch(proxy.SyncManager))
 		r.Get("/sync/list", remote.SyncList(proxy.SyncIndex))
-		r.Post("/sync/dirty", remote.SyncDirty(proxy.SyncIndex))
-		r.Post("/sync/run-now", remote.SyncRunNow(proxy.SyncPoller))
+		r.Post("/sync/dirty", remote.SyncDirty(proxy.SyncManager))
+		r.Post("/sync/run-now", remote.SyncRunNow(proxy.SyncManager))
+		r.Put("/sync/watch-dir", remote.SyncWatchDir(proxy.SyncManager))
+		r.Delete("/sync/watch-dir", remote.SyncUnwatchDir(proxy.SyncManager))
 		r.Get("/file/download", remote.DownloadFile())
 		r.Post("/file/upload", remote.UploadFile())
 		r.Post("/mkdir", remote.MkDir())

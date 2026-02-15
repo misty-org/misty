@@ -107,11 +107,11 @@ void FileExplorerPanel::show_context_menu(FileExplorerState& state) {
             if (ImGui::MenuItem("Open With...", nullptr, false, can_open_directly)) {
                 std::string target_path = target_file ? target_file->path : "";
                 if (!target_path.empty()) {
-                    core::ApplicationPicker::pick([this, target_path](std::optional<std::string> app) {
+                    core::ApplicationPicker::pick([registry = &registry_, target_path](std::optional<std::string> app) {
                         if (!app.has_value()) return;
                         OpenWithManager::get().set_association_for_path(target_path, *app);
                         if (!core::open_path_with_application(*app, target_path)) {
-                            auto& notif = registry_.get_state<NotificationState>("Notifications");
+                            auto& notif = registry->get_state<NotificationState>("Notifications");
                             notif.add_notification("Open With Failed", "Could not open file.", NotificationType::ERROR);
                         }
                     });
@@ -371,12 +371,14 @@ void FileExplorerPanel::show_new_entry_modal(FileExplorerState& state) {
 
             if (!name.empty()) {
                 fs::path p = fs::path(current_dir) / name;
-                std::error_code ec;
+                    std::error_code ec;
 
                 if (state.new_entry_is_dir) {
                     fs::create_directory(p, ec);
                     if (!ec && is_cloud_dir) {
-                        auto [remote_name, remote_path] = path_utils::parse_remote_name_and_path(current_dir);
+                        std::string remote_name;
+                        std::string remote_path;
+                        resolve_remote_path_context(current_dir, remote_name, remote_path);
                         if (!remote_name.empty()) {
                             std::string folder_path = remote_path.empty() ? name : remote_path + "/" + name;
                             auto& services = registry_.get_state<ServicesState>("Services");
@@ -384,8 +386,8 @@ void FileExplorerPanel::show_new_entry_modal(FileExplorerState& state) {
                                                      /*is_dir*/ true, "", 0,
                                                      [](bool, const std::string&, const std::string&) {});
                             services.create_folder(remote_name, folder_path,
-                                [this, name](bool success, const std::string&, const std::string& error) {
-                                    auto& notif = registry_.get_state<NotificationState>("Notifications");
+                                [registry = &registry_, name](bool success, const std::string&, const std::string& error) {
+                                    auto& notif = registry->get_state<NotificationState>("Notifications");
                                     if (success) notif.add_notification("Created", "Folder " + name + " created", NotificationType::SUCCESS);
                                     else notif.add_notification("Cloud Error", "Failed to create folder: " + error, NotificationType::ERROR);
                                 });
@@ -394,7 +396,9 @@ void FileExplorerPanel::show_new_entry_modal(FileExplorerState& state) {
                 } else {
                     if (auto f = std::fopen(p.string().c_str(), "w")) std::fclose(f);
                     if (is_cloud_dir) {
-                        auto [remote_name, remote_path] = path_utils::parse_remote_name_and_path(current_dir);
+                        std::string remote_name;
+                        std::string remote_path;
+                        resolve_remote_path_context(current_dir, remote_name, remote_path);
                         if (!remote_name.empty()) {
                             std::string file_path = remote_path.empty() ? name : remote_path + "/" + name;
                             auto& services = registry_.get_state<ServicesState>("Services");

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <string>
 #include <vector>
 #include <unordered_set>
@@ -40,6 +41,7 @@ struct SearchState : public core::UIState {
     bool pending_submit = false;    // set by input bar, consumed by render() after lock release
     int pending_navigate_index = -1; // set by Enter key, consumed by render() after lock release
     int selected_index = 0;
+    std::chrono::steady_clock::time_point last_input_change_at{};
 
     // Results — cache results are instant, api_results stream in
     std::vector<SearchResult> cache_results;

@@ -42,6 +42,7 @@ namespace misty::panel {
         update_navigation_history(state, mount_root, update_history);
         state.files = std::move(new_files);
         set_active_path(state, mount_root);
+        state.current_dir_watched = false;
         reset_selection(state);
         state.is_loading = false;
         state.show_loading_animation = false;
@@ -90,6 +91,7 @@ namespace misty::panel {
         update_navigation_history(state, target_path, update_history);
         state.files = std::move(new_files);
         set_active_path(state, target_path);
+        state.current_dir_watched = false;
         reset_selection(state);
         state.is_loading = false;
         state.show_loading_animation = false;
@@ -172,9 +174,6 @@ namespace misty::panel {
                                                   uint64_t navigation_generation) {
         auto& state = registry_.get_state<FileExplorerState>(state_key_);
 
-        printf("fetch_remote_folder: remote=%s path=%s target=%s\n",
-               remote_name.c_str(), remote_path.c_str(), target_path.c_str());
-
         // Mark loading immediately on the UI thread so interactions are blocked
         // while the listing resolves, but delay the spinner slightly so fast
         // cache hits don't flash the animation for a single frame.
@@ -198,22 +197,24 @@ namespace misty::panel {
         //      metadata, then follows with GET /api/sync/list so UI reads come
         //      from indexed sync rows rather than the mutation response.
         worker_pool_.add(
-            [this, remote_name, remote_path, target_path, navigation_generation]() {
-                auto& services = registry_.get_state<ServicesState>("Services");
+            [registry = &registry_, state_key = state_key_, remote_name, remote_path, target_path, navigation_generation]() {
+                auto& services = registry->get_state<ServicesState>("Services");
 
                 std::string cached_body;
                 bool had_cache = core::listing_cache::load(remote_name, remote_path, cached_body);
                 if (had_cache) {
-                    handle_remote_folder_fetch(remote_name, target_path, navigation_generation, true, cached_body, "");
+                    FileExplorerPanel::apply_remote_folder_fetch(
+                        *registry, state_key, remote_name, target_path, navigation_generation, true, cached_body, "");
                 }
 
                 services.refetch_sync_items(remote_name, remote_path,
-                    [this, remote_name, remote_path, target_path, had_cache, navigation_generation]
+                    [registry, state_key, remote_name, remote_path, target_path, had_cache, navigation_generation]
                     (bool success, const std::string&, const std::string& error) {
                         if (!success) {
                             if (!had_cache) {
                                 // No cache to fall back on — surface the error.
-                                handle_remote_folder_fetch(remote_name, target_path, navigation_generation, false, "", error);
+                                FileExplorerPanel::apply_remote_folder_fetch(
+                                    *registry, state_key, remote_name, target_path, navigation_generation, false, "", error);
                             } else {
                                 // Already showed cached content; revalidation failed silently.
                                 printf("revalidate failed for %s/%s: %s\n",
@@ -222,15 +223,17 @@ namespace misty::panel {
                             return;
                         }
 
-                        auto& services = registry_.get_state<ServicesState>("Services");
+                        auto& services = registry->get_state<ServicesState>("Services");
                         services.fetch_sync_items(remote_name, remote_path,
-                            [this, remote_name, remote_path, target_path, had_cache, navigation_generation]
+                            [registry, state_key, remote_name, remote_path, target_path, had_cache, navigation_generation]
                             (bool list_success, const std::string& list_body, const std::string& list_error) {
                                 if (list_success) {
                                     core::listing_cache::save(remote_name, remote_path, list_body);
-                                    handle_remote_folder_fetch(remote_name, target_path, navigation_generation, true, list_body, "");
+                                    FileExplorerPanel::apply_remote_folder_fetch(
+                                        *registry, state_key, remote_name, target_path, navigation_generation, true, list_body, "");
                                 } else if (!had_cache) {
-                                    handle_remote_folder_fetch(remote_name, target_path, navigation_generation, false, "", list_error);
+                                    FileExplorerPanel::apply_remote_folder_fetch(
+                                        *registry, state_key, remote_name, target_path, navigation_generation, false, "", list_error);
                                 } else {
                                     printf("sync list failed for %s/%s: %s\n",
                                            remote_name.c_str(), remote_path.c_str(), list_error.c_str());
@@ -239,8 +242,9 @@ namespace misty::panel {
                     });
             },
             []() {},
-            [this, target_path, navigation_generation](const std::string& err) {
-                handle_remote_folder_fetch("", target_path, navigation_generation, false, "", err);
+            [registry = &registry_, state_key = state_key_, target_path, navigation_generation](const std::string& err) {
+                FileExplorerPanel::apply_remote_folder_fetch(
+                    *registry, state_key, "", target_path, navigation_generation, false, "", err);
             }
         );
     }
@@ -250,11 +254,24 @@ namespace misty::panel {
                                                          uint64_t navigation_generation,
                                                          bool success,
                                                          const std::string& body,
-                                                         const std::string& error) {
-        auto& state = registry_.get_state<FileExplorerState>(state_key_);
+                                                         const std::string& error,
+                                                         bool preserve_selection) {
+        apply_remote_folder_fetch(
+            registry_, state_key_, remote_name, target_path, navigation_generation, success, body, error, preserve_selection);
+    }
+
+    void FileExplorerPanel::apply_remote_folder_fetch(core::UIRegistry& registry,
+                                                      const std::string& state_key,
+                                                      const std::string& remote_name,
+                                                      const std::string& target_path,
+                                                      uint64_t navigation_generation,
+                                                      bool success,
+                                                      const std::string& body,
+                                                      const std::string& error,
+                                                      bool preserve_selection) {
+        auto& state = registry.get_state<FileExplorerState>(state_key);
 
         if (!success) {
-            printf("handle_remote_folder_fetch FAILED: %s\n", error.c_str());
             std::lock_guard<std::mutex> lock(state.mu);
             if (state.navigation_generation.load(std::memory_order_relaxed) != navigation_generation ||
                 std::string(state.current_path) != target_path) {
@@ -272,9 +289,9 @@ namespace misty::panel {
             auto items_json = json.value("items", nlohmann::json::array());
             std::string resp_remote = json.value("remote", remote_name);
             std::string resp_path = json.value("path", std::string(""));
-
+            const bool watched = json.value("watched", false);
             // Look up provider folder for constructing local paths
-            auto& workspace = registry_.get_state<WorkspaceState>("Workspace");
+            auto& workspace = registry.get_state<WorkspaceState>("Workspace");
             std::string provider_folder;
             std::string folder_name = resp_remote;
             for (const auto& mapping : workspace.remote_mappings) {
@@ -319,22 +336,39 @@ namespace misty::panel {
 
                 new_files.push_back(std::move(item));
             }
-
-            printf("handle_remote_folder_fetch: got %zu items for %s\n", new_files.size(), resp_remote.c_str());
-
             std::lock_guard<std::mutex> lock(state.mu);
             if (state.navigation_generation.load(std::memory_order_relaxed) != navigation_generation ||
                 std::string(state.current_path) != target_path) {
                 return;
             }
+            std::unordered_set<std::string> selected_paths;
+            if (preserve_selection) {
+                for (const auto& sel_id : state.selected_files) {
+                    selected_paths.insert(state.path_for_selection(sel_id));
+                }
+            }
             state.files = std::move(new_files);
-            reset_selection(state);
+            state.current_dir_watched = watched;
+            state.sync_watch_request_in_flight = false;
+            if (preserve_selection) {
+                state.selected_files.clear();
+                state.last_selected_index = -1;
+                for (int index = 0; index < static_cast<int>(state.files.size()); ++index) {
+                    if (selected_paths.count(state.files[index].path) == 0) {
+                        continue;
+                    }
+                    state.selected_files.insert(state.files[index].id);
+                    state.last_selected_index = index;
+                }
+            } else {
+                state.selected_files.clear();
+                state.last_selected_index = -1;
+            }
             state.is_loading = false;
             state.show_loading_animation = false;
             state.sort_dirty = true;
             state.error_msg.clear();
         } catch (const std::exception& e) {
-            printf("handle_remote_folder_fetch PARSE ERROR: %s\n", e.what());
             std::lock_guard<std::mutex> lock(state.mu);
             if (state.navigation_generation.load(std::memory_order_relaxed) != navigation_generation ||
                 std::string(state.current_path) != target_path) {
@@ -369,16 +403,16 @@ namespace misty::panel {
 
         services.download_file(
             file.remote_name, file.remote_path, local_path,
-            [this, download_id](size_t bytes_downloaded, size_t) -> bool {
-                auto& downloads = registry_.get_state<DownloadState>("Downloads");
+            [registry = &registry_, download_id](size_t bytes_downloaded, size_t) -> bool {
+                auto& downloads = registry->get_state<DownloadState>("Downloads");
                 downloads.update_progress(download_id, static_cast<int64_t>(bytes_downloaded));
                 return true;
             },
-            [this, file_name = file.name, file_path = file.path, download_id, notif_id](
+            [registry = &registry_, state_key = state_key_, file_name = file.name, file_path = file.path, download_id, notif_id](
                 bool success, const std::string& local_path, const std::string& error) {
-                auto& downloads = registry_.get_state<DownloadState>("Downloads");
-                auto& notifications = registry_.get_state<NotificationState>("Notifications");
-                auto& state = registry_.get_state<FileExplorerState>(state_key_);
+                auto& downloads = registry->get_state<DownloadState>("Downloads");
+                auto& notifications = registry->get_state<NotificationState>("Notifications");
+                auto& state = registry->get_state<FileExplorerState>(state_key);
 
                 notifications.dismiss(notif_id);
                 state.downloading_files.erase(file_path);

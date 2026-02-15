@@ -22,6 +22,7 @@ type Poller struct {
 	service    *Service
 	reconciler *Reconciler
 	interval   time.Duration
+	timeout    time.Duration
 
 	startOnce sync.Once
 	stopOnce  sync.Once
@@ -33,10 +34,12 @@ func NewPoller(service *Service, interval time.Duration) *Poller {
 	if interval <= 0 {
 		interval = 30 * time.Second
 	}
+	timeout := pollTimeoutForInterval(interval)
 	return &Poller{
 		service:    service,
 		reconciler: NewReconciler(service),
 		interval:   interval,
+		timeout:    timeout,
 		stop:       make(chan struct{}),
 		done:       make(chan struct{}),
 	}
@@ -54,6 +57,22 @@ func PollIntervalFromEnv(defaultSec int) time.Duration {
 		defaultSec = 30
 	}
 	return time.Duration(defaultSec) * time.Second
+}
+
+func pollTimeoutForInterval(interval time.Duration) time.Duration {
+	if interval <= 0 {
+		interval = 30 * time.Second
+	}
+	if s := os.Getenv("MISTY_SYNC_POLL_TIMEOUT_SEC"); s != "" {
+		if n, err := strconv.Atoi(s); err == nil && n > 0 {
+			return time.Duration(n) * time.Second
+		}
+	}
+	timeout := interval * 4
+	if timeout < 2*time.Minute {
+		timeout = 2 * time.Minute
+	}
+	return timeout
 }
 
 func (p *Poller) Start() {
@@ -86,7 +105,7 @@ func (p *Poller) run() {
 		case <-p.stop:
 			return
 		case <-ticker.C:
-			ctx, cancel := context.WithTimeout(context.Background(), p.interval)
+			ctx, cancel := context.WithTimeout(context.Background(), p.timeout)
 			if err := p.Tick(ctx); err != nil {
 				log.Println("syncindex poller:", err)
 			}
