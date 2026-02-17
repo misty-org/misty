@@ -25,6 +25,9 @@ namespace misty {
         void render_frame() override;
         bool is_running() override;
         void cleanup() override;
+        std::pair<int, int> window_size() const override;
+        void set_window_size(int width, int height) override;
+        void center_window() override;
 
     
     private:

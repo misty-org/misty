@@ -1,5 +1,6 @@
 #include "panels/navbar/navbar_panel.h"
 #include "panels/profile/profile_state.h"
+#include "panels/activity/activity_state.h"
 #include "core/manager/asset_manager.h"
 
 #include <cmath>
@@ -8,7 +9,8 @@ using namespace misty::view;
 
 namespace misty::panel {
     NavbarPanel::NavbarPanel(UIRegistry& ui_registry) : ui_registry_(ui_registry),
-        profile_panel_(ui_registry) {
+        profile_panel_(ui_registry),
+        activity_panel_(ui_registry) {
     }
 
     void NavbarPanel::render() {
@@ -32,7 +34,7 @@ namespace misty::panel {
             show_nav_item("devices-24", "Services", 24, view::ViewID::Services, state);
             show_nav_item("apps-16", "Plugins", 24, view::ViewID::Extensions, state);
             show_nav_item("shield-lock-24", "Vault", 24, view::ViewID::Vault, state);
-            show_nav_item("bell-24", "Activity", 24, ViewID::Activity, state);
+            show_activity_button();
 
             // Calculate nav item height: icon size + button padding + text height + spacing
             float icon_size = 24.0f;
@@ -52,8 +54,9 @@ namespace misty::panel {
         ImGui::PopStyleVar(); 
         ImGui::PopStyleColor(); 
 
-        // Render profile popup on top (outside navbar window)
+        // Render popups on top (outside navbar window)
         profile_panel_.render();
+        activity_panel_.render();
     }
 
     void NavbarPanel::show_logo_icon() {
@@ -146,13 +149,8 @@ namespace misty::panel {
         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(padding_x, 8.0f));
 
-        if (profile_state.is_open) {
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
-        } else {
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.11f, 0.11f, 0.11f, 0.0f));
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.6f, 0.6f, 0.6f, 1.0f));
-        }
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.11f, 0.11f, 0.11f, 0.0f));
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.6f, 0.6f, 0.6f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.18f, 0.18f, 0.18f, 1.0f));
 
         ImGui::SetCursorPosX(std::floor(centered_x));
@@ -168,9 +166,44 @@ namespace misty::panel {
         float text_centered_x = (navbar_width - text_width) * 0.5f;
         ImGui::SetCursorPosX(std::floor(text_centered_x));
 
-        ImVec4 textColor = profile_state.is_open ? ImVec4(1, 1, 1, 1) : ImVec4(0.6f, 0.6f, 0.6f, 1.0f);
-        ImGui::PushStyleColor(ImGuiCol_Text, textColor);
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.6f, 0.6f, 0.6f, 1.0f));
         ImGui::Text("Profile");
+        ImGui::PopStyleColor();
+
+        ImGui::Spacing();
+    }
+
+    void NavbarPanel::show_activity_button() {
+        auto& activity_state = ui_registry_.get_state<ActivityState>("Activity");
+        auto& icon = core::AssetManager::get().get_svg_texture("bell-24", 48);
+
+        float navbar_w = ImGui::GetWindowWidth();
+        int size = 24;
+        float padding_x = 8.0f;
+        float button_total_width = (float)size + (padding_x * 2.0f);
+        float centered_x = (navbar_w - button_total_width) * 0.5f;
+
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(padding_x, 8.0f));
+
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.11f, 0.11f, 0.11f, 0.0f));
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.6f, 0.6f, 0.6f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.18f, 0.18f, 0.18f, 1.0f));
+
+        ImGui::SetCursorPosX(std::floor(centered_x));
+
+        if (ImGui::ImageButton("Activity", icon.id, ImVec2((float)size, (float)size))) {
+            activity_state.is_open = !activity_state.is_open;
+        }
+
+        ImGui::PopStyleColor(3);
+        ImGui::PopStyleVar(2);
+
+        float text_w = ImGui::CalcTextSize("Activity").x;
+        ImGui::SetCursorPosX(std::floor((navbar_w - text_w) * 0.5f));
+        ImVec4 text_color = activity_state.is_open ? ImVec4(1, 1, 1, 1) : ImVec4(0.6f, 0.6f, 0.6f, 1.0f);
+        ImGui::PushStyleColor(ImGuiCol_Text, text_color);
+        ImGui::Text("Activity");
         ImGui::PopStyleColor();
 
         ImGui::Spacing();

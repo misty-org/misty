@@ -8,7 +8,7 @@ import (
 
 func HelloWorld() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("Hello World"))
 		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("Hello World"))
 	}
 }
