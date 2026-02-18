@@ -165,7 +165,7 @@ namespace misty::core {
         static constexpr int   TOTAL      = COLS * ROWS;
         static constexpr float FRAME_RATE = 20.0f;
 
-        auto& sprite = AssetManager::get().get_image_texture("assets/misty_sprite.png");
+        auto& sprite = AssetManager::get().get_image_texture("assets/animations/misty_sprite.png");
         ImDrawList* dl = ImGui::GetWindowDrawList();
         dl->AddRectFilled(min, max, overlay_color);
 
