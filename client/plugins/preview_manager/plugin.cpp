@@ -1,6 +1,6 @@
 #define MISTY_PLUGIN_BUILD 1
 
-#include "core/extensions/misty_plugin_sdk.h"
+#include "core/plugins/misty_plugin_sdk.h"
 
 #include <algorithm>
 #include <cctype>

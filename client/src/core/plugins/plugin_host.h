@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-#include "core/extensions/misty_plugin_sdk.h"
+#include "core/plugins/misty_plugin_sdk.h"
 #include "core/ui/ui_registry.h"
 
 namespace misty::core {

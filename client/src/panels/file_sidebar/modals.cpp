@@ -2,8 +2,6 @@
 
 #include "panels/file_explorer/file_explorer_state.h"
 
-#include <cstdio>
-
 namespace misty::panel {
     void FileSidebarPanel::show_chooser_modal(FileSidebarState& state)
     {
@@ -105,23 +103,6 @@ namespace misty::panel {
             ImGui::EndPopup();
         }
         ImGui::PopStyleVar(4);
-    }
-
-    // ─── Devices section ──────────────────────────────────────────────────────
-
-    static std::string format_bytes(uint64_t bytes) {
-        if (bytes == 0) return "";
-        if (bytes < 1024ULL * 1024)
-            return std::to_string(bytes / 1024) + " KB";
-        double gb = static_cast<double>(bytes) / (1024.0 * 1024.0 * 1024.0);
-        if (gb >= 1.0) {
-            char buf[32];
-            std::snprintf(buf, sizeof(buf), "%.1f GB", gb);
-            return buf;
-        }
-        char buf[32];
-        std::snprintf(buf, sizeof(buf), "%.0f MB", static_cast<double>(bytes) / (1024.0 * 1024.0));
-        return buf;
     }
 
     void FileSidebarPanel::show_add_device_modal() {

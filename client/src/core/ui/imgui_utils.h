@@ -201,4 +201,45 @@ namespace misty::core {
         ImGui::SetWindowFontScale(1.0f); // Restore default scale
     }
 
+    struct ButtonFields {
+        const char* label = "";
+        float width;
+    };
+
+
+    class StyleScope {
+    public:
+        StyleScope() = default;
+        StyleScope(const StyleScope&) = delete;
+        StyleScope& operator=(const StyleScope&) = delete;
+
+        void var(ImGuiStyleVar idx, float value) {
+            ImGui::PushStyleVar(idx, value);
+            ++vars_;
+        }
+
+        void var(ImGuiStyleVar idx, const ImVec2& value) {
+            ImGui::PushStyleVar(idx, value);
+            ++vars_;
+        }
+
+        void color(ImGuiCol idx, const ImVec4& value) {
+            ImGui::PushStyleColor(idx, value);
+            ++colors_;
+        }
+
+        ~StyleScope() {
+            if (colors_ > 0) ImGui::PopStyleColor(colors_);
+            if (vars_ > 0) ImGui::PopStyleVar(vars_);
+        }
+    private:
+        int vars_ = 0;
+        int colors_ = 0;
+    };
+
+    template<typename Func>
+    inline void WithStyle(Func&& func) {
+        StyleScope style;
+        func(style);
+    }
 }
