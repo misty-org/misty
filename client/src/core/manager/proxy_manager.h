@@ -11,6 +11,7 @@ public:
     static ProxyManager& get();
 
     bool ensure_running();
+    bool restart_proxy();
 
 private:
     ProxyManager() = default;
@@ -23,6 +24,7 @@ private:
     bool launch_proxy_process();
     bool wait_until_ready(std::chrono::milliseconds timeout) const;
     std::string resolve_proxy_executable() const;
+    bool terminate_existing_proxies(const std::string& proxy_executable) const;
 
     mutable std::mutex mu_;
     std::chrono::steady_clock::time_point last_launch_attempt_{};

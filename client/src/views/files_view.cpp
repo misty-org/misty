@@ -25,7 +25,7 @@ namespace misty::view {
     void FilesView::init_panels() {
         file_sidebar_panel_ = std::make_shared<panel::FileSidebarPanel>(ui_registry_, worker_pool_, client_);
         file_sidebar_panel_->set_mount_path_provider([this]() -> std::string {
-            return client_ ? client_->GetClientMountPath() : "";
+            return panel::path_utils::get_mount_root();
         });
         file_sidebar_panel_->set_active_explorer_state_key_provider([this]() -> std::string {
             return active_explorer_state_key();

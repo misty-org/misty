@@ -9,10 +9,11 @@
 
 #include "core/threading/worker_pool.h"
 #include "core/ui/ui_registry.h"
-#include "dfs/client/misty_client.h"
 #include "panels/file_explorer/file_explorer_panel.h"
 #include "panels/search/search_panel.h"
 #include "imgui.h"
+
+class MistyClient;
 
 namespace misty::panel {
     class FileTreePanel {

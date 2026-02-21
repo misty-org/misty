@@ -2,6 +2,7 @@
 
 #include "core/cache/listing_cache.h"
 #include "core/manager/env_manager.h"
+#include "core/manager/proxy_manager.h"
 #include "core/net/http_client.h"
 #include "core/system/util.h"
 
@@ -173,6 +174,8 @@ namespace misty::panel {
             load_remote_aliases_locked();
         }
         refresh_connections();
+        refresh_provider_types();
+        refresh_rclone_health();
     }
 
     void ServicesState::load_remote_aliases_locked() {
@@ -290,6 +293,172 @@ namespace misty::panel {
                 error_msg = err;
                 is_refreshing = false;
                 initial_load_done = true;
+            }
+        );
+    }
+
+    void ServicesState::refresh_provider_types() {
+        if (!worker_pool_) return;
+
+        {
+            std::lock_guard<std::mutex> lock(mu);
+            if (provider_types_loading || provider_types_loaded) {
+                return;
+            }
+            provider_types_loading = true;
+        }
+
+        worker_pool_->add(
+            [this]() {
+                std::string base = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
+                if (base.empty()) {
+                    std::lock_guard<std::mutex> lock(mu);
+                    provider_types_loading = false;
+                    return;
+                }
+
+                std::map<std::string, std::string> headers;
+                headers["Accept"] = "application/json";
+                auto response = core::HTTPClient::get().get(base + "/api/remotes/types", headers);
+
+                std::vector<ProviderType> loaded;
+                if (response.status_code >= 200 && response.status_code < 300) {
+                    try {
+                        json arr = json::parse(response.body);
+                        if (arr.is_array()) {
+                            for (const auto& obj : arr) {
+                                if (!obj.is_object()) continue;
+                                ProviderType provider;
+                                provider.type = obj.value("type", std::string(""));
+                                provider.display_name = obj.value("name", std::string(""));
+                                if (provider.type.empty()) continue;
+                                if (provider.display_name.empty()) {
+                                    provider.display_name = display_name_for_type(provider.type);
+                                }
+                                loaded.push_back(std::move(provider));
+                            }
+                        }
+                    } catch (...) {
+                    }
+                }
+
+                std::lock_guard<std::mutex> lock(mu);
+                if (!loaded.empty()) {
+                    provider_types = std::move(loaded);
+                    provider_types_loaded = true;
+                }
+                provider_types_loading = false;
+            },
+            []() {},
+            [this](const std::string&) {
+                std::lock_guard<std::mutex> lock(mu);
+                provider_types_loading = false;
+            }
+        );
+    }
+
+    void ServicesState::refresh_rclone_health(bool force) {
+        if (!worker_pool_) return;
+
+        {
+            std::lock_guard<std::mutex> lock(mu);
+            if (rclone_health.loading) return;
+            if (!force && rclone_health.loaded) return;
+            rclone_health.loading = true;
+            if (force) {
+                rclone_health.error.clear();
+            }
+        }
+
+        worker_pool_->add(
+            [this]() {
+                std::string base = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
+                if (base.empty()) {
+                    std::lock_guard<std::mutex> lock(mu);
+                    rclone_health.loading = false;
+                    rclone_health.loaded = true;
+                    rclone_health.ready = false;
+                    rclone_health.error = "PROXY_SERVICE_URL not set";
+                    return;
+                }
+
+                std::map<std::string, std::string> headers;
+                headers["Accept"] = "application/json";
+                auto response = core::HTTPClient::get().get(base + "/api/remotes/health", headers);
+
+                RcloneHealth loaded;
+                loaded.loaded = true;
+                if (response.status_code >= 200 && response.status_code < 300) {
+                    try {
+                        json obj = json::parse(response.body);
+                        if (obj.is_object()) {
+                            loaded.ready = obj.value("ready", false);
+                            loaded.link_present = obj.value("link_present", false);
+                            loaded.rclone_path = obj.value("rclone_path", std::string(""));
+                            loaded.rclone_version = obj.value("rclone_version", std::string(""));
+                            loaded.config_path = obj.value("config_path", std::string(""));
+                            loaded.link_path = obj.value("link_path", std::string(""));
+                            loaded.link_target = obj.value("link_target", std::string(""));
+                            loaded.error = obj.value("error", std::string(""));
+                        } else {
+                            loaded.error = "Failed to parse rclone health.";
+                        }
+                    } catch (const std::exception& ex) {
+                        loaded.error = std::string("Failed to parse rclone health: ") + ex.what();
+                    }
+                } else {
+                    loaded.error = "Failed to fetch rclone health (HTTP " + std::to_string(response.status_code) + ")";
+                    const std::string body = trim_copy(response.body);
+                    if (!body.empty()) {
+                        loaded.error += ": " + first_line(body);
+                    }
+                }
+
+                std::lock_guard<std::mutex> lock(mu);
+                rclone_health = std::move(loaded);
+                rclone_health.loading = false;
+            },
+            []() {},
+            [this](const std::string& err) {
+                std::lock_guard<std::mutex> lock(mu);
+                rclone_health.loading = false;
+                rclone_health.loaded = true;
+                rclone_health.ready = false;
+                rclone_health.error = err;
+            }
+        );
+    }
+
+    void ServicesState::restart_proxy() {
+        if (!worker_pool_) return;
+
+        {
+            std::lock_guard<std::mutex> lock(mu);
+            if (proxy_restart_in_flight) return;
+            proxy_restart_in_flight = true;
+            success_msg.clear();
+            error_msg.clear();
+        }
+
+        worker_pool_->add(
+            [this]() {
+                const bool ok = core::ProxyManager::get().restart_proxy();
+                std::lock_guard<std::mutex> lock(mu);
+                proxy_restart_in_flight = false;
+                if (ok) {
+                    success_msg = "Proxy restarted";
+                } else {
+                    error_msg = "Failed to restart proxy";
+                }
+            },
+            [this]() {
+                refresh_rclone_health(true);
+                refresh_connections();
+            },
+            [this](const std::string& err) {
+                std::lock_guard<std::mutex> lock(mu);
+                proxy_restart_in_flight = false;
+                error_msg = err.empty() ? "Failed to restart proxy" : err;
             }
         );
     }
