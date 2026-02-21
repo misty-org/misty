@@ -17,7 +17,7 @@
 #include <unistd.h>
 #endif
 
-namespace minidfs::core {
+namespace misty::core {
     bool open_file_in_browser(const std::string& path) {
         if (path.empty()) {
             std::cerr << "Warning: Cannot open empty path" << std::endl;

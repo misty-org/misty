@@ -1,4 +1,5 @@
 #include "http_client.h"
+#include "session_manager.h"
 #include <curl/curl.h>
 #include <sstream>
 #include <iostream>
@@ -6,7 +7,7 @@
 #include <vector>
 #include <cstring>
 
-namespace minidfs::core {
+namespace misty::core {
 
     // Align chunk size to 320KB boundary (required by Microsoft Graph)
     static size_t align_chunk_size(size_t requested_size) {
@@ -112,9 +113,15 @@ namespace minidfs::core {
             curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
         }
 
+        // Merge auth headers (caller-provided headers take priority)
+        auto merged_headers = SessionManager::get().get_auth_headers();
+        for (const auto& [key, value] : headers) {
+            merged_headers[key] = value;
+        }
+
         // Set headers
         struct curl_slist* header_list = nullptr;
-        for (const auto& [key, value] : headers) {
+        for (const auto& [key, value] : merged_headers) {
             std::string header = key + ": " + value;
             header_list = curl_slist_append(header_list, header.c_str());
         }

@@ -32,24 +32,24 @@ func UpdateDevice(db *sql.DB, peer *tsbase.TSPeer, deviceName, mountPath string)
 		log.Println("failed to create device id")
 		return err
 	}
-	
+
 	_, err = db.Exec(`
 		INSERT INTO devices (id, peer_hostname, peer_type, peer_address, device_name, mount_path, last_seen, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		ON CONFLICT(peer_hostname) DO UPDATE SET
-			peer_type = excluded.peer_type,
-			peer_address = excluded.peer_address,
-			device_name = COALESCE(excluded.device_name, devices.device_name),
-			mount_path = COALESCE(excluded.mount_path, devices.mount_path),
-			last_seen = excluded.last_seen,
-			updated_at = excluded.updated_at
+			peer_type = EXCLUDED.peer_type,
+			peer_address = EXCLUDED.peer_address,
+			device_name = COALESCE(EXCLUDED.device_name, devices.device_name),
+			mount_path = COALESCE(EXCLUDED.mount_path, devices.mount_path),
+			last_seen = EXCLUDED.last_seen,
+			updated_at = EXCLUDED.updated_at
 	`, deviceID, peer.PeerHostName, string(peer.PeerType), peer.PeerAddress, deviceName, mountPath, now, now, now)
-	
+
 	if err != nil {
 		log.Printf("Failed to insert/update device %s: %v", peer.PeerHostName, err)
 		return err
 	}
-	
+
 	return nil
 }
 
@@ -60,7 +60,7 @@ func GetDevice(db *sql.DB, hostname string) (*Device, error) {
 	var workspaceID sql.NullString
 	err := db.QueryRow(`
 		SELECT id, peer_hostname, peer_type, peer_address, device_name, mount_path, workspace_id, last_seen, created_at, updated_at
-		FROM devices WHERE peer_hostname = ?
+		FROM devices WHERE peer_hostname = $1
 	`, hostname).Scan(
 		&device.ID,
 		&device.PeerHostName,
@@ -94,7 +94,7 @@ func GetDeviceByID(db *sql.DB, id string) (*Device, error) {
 	var workspaceID sql.NullString
 	err := db.QueryRow(`
 		SELECT id, peer_hostname, peer_type, peer_address, device_name, mount_path, workspace_id, last_seen, created_at, updated_at
-		FROM devices WHERE id = ?
+		FROM devices WHERE id = $1
 	`, id).Scan(
 		&device.ID,
 		&device.PeerHostName,
@@ -123,7 +123,7 @@ func GetDeviceByID(db *sql.DB, id string) (*Device, error) {
 
 // DeleteDevice removes a device from the database by ID
 func DeleteDevice(db *sql.DB, id string) error {
-	_, err := db.Exec(`DELETE FROM devices WHERE id = ?`, id)
+	_, err := db.Exec(`DELETE FROM devices WHERE id = $1`, id)
 	if err != nil {
 		log.Printf("Failed to delete device %s: %v", id, err)
 		return err
@@ -134,18 +134,18 @@ func DeleteDevice(db *sql.DB, id string) error {
 // UpdateDeviceInfo updates device_name and mount_path for a device
 func UpdateDeviceInfo(db *sql.DB, id string, deviceName, mountPath string) error {
 	now := time.Now()
-	
+
 	_, err := db.Exec(`
-		UPDATE devices 
-		SET device_name = ?, mount_path = ?, updated_at = ?
-		WHERE id = ?
+		UPDATE devices
+		SET device_name = $1, mount_path = $2, updated_at = $3
+		WHERE id = $4
 	`, deviceName, mountPath, now, id)
-	
+
 	if err != nil {
 		log.Printf("Failed to update device info %s: %v", id, err)
 		return err
 	}
-	
+
 	return nil
 }
 
@@ -197,7 +197,7 @@ func GetAllDevices(db *sql.DB) ([]*Device, error) {
 func GetDevicesByWorkspace(db *sql.DB, workspaceID string) ([]*Device, error) {
 	rows, err := db.Query(`
 		SELECT id, peer_hostname, peer_type, peer_address, device_name, mount_path, workspace_id, last_seen, created_at, updated_at
-		FROM devices WHERE workspace_id = ? ORDER BY peer_hostname
+		FROM devices WHERE workspace_id = $1 ORDER BY peer_hostname
 	`, workspaceID)
 	if err != nil {
 		log.Printf("Failed to query devices by workspace: %v", err)

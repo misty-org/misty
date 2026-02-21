@@ -1,8 +1,8 @@
 #include "file_sync.h"
 #include "dfs/file_manager.h"
 
-namespace minidfs {
-    FileSync::FileSync(std::shared_ptr<MiniDFSClient> client)
+namespace misty {
+    FileSync::FileSync(std::shared_ptr<MistyClient> client)
         : client_(std::move(client)) {
         
     }

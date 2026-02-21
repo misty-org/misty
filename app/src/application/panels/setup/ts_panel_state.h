@@ -4,6 +4,7 @@
 #include <mutex>
 #include <cstring>
 #include <chrono>
+#include <thread>
 #include "core/ui_registry.h"
 #include "core/http_client.h"
 #include "core/env_manager.h"
@@ -11,7 +12,22 @@
 #include "views/app_view.h"
 #include <nlohmann/json.hpp>
 
-namespace minidfs::panel {
+namespace misty::panel {
+
+    struct TSPanelSnapshot {
+        std::string login_url;
+        std::string status;
+        bool is_connected = false;
+        bool is_polling_status = false;
+        int poll_interval_ms = 2000;
+        bool is_fetching_url = false;
+        bool has_fetched_url = false;
+        bool has_registered_device = false;
+        bool should_switch_view_on_register = true;
+        bool is_registering_device = false;
+        std::string error_msg;
+        std::string success_msg;
+    };
 
     struct TSPanelState : public core::UIState {
         std::mutex mu;
@@ -31,6 +47,7 @@ namespace minidfs::panel {
         bool should_switch_view_on_register = true; // Can be disabled when used in modal
         std::string error_msg = "";
         std::string success_msg = "";
+        bool is_registering_device = false;
         
         // Device information inputs
         char device_name[256] = "";
@@ -54,117 +71,196 @@ namespace minidfs::panel {
             last_status_check = {};
             device_name[0] = '\0';
             mount_path[0] = '\0';
+            is_registering_device = false;
+        }
+
+        TSPanelSnapshot snapshot() {
+            std::lock_guard<std::mutex> lock(mu);
+            TSPanelSnapshot snap;
+            snap.login_url = login_url;
+            snap.status = status;
+            snap.is_connected = is_connected;
+            snap.is_polling_status = is_polling_status;
+            snap.poll_interval_ms = poll_interval_ms;
+            snap.is_fetching_url = is_fetching_url;
+            snap.has_fetched_url = has_fetched_url;
+            snap.has_registered_device = has_registered_device;
+            snap.should_switch_view_on_register = should_switch_view_on_register;
+            snap.error_msg = error_msg;
+            snap.success_msg = success_msg;
+            snap.is_registering_device = is_registering_device;
+            return snap;
         }
 
         void handle_fetch_login_url() {
-            is_fetching_url = true;
-            error_msg = "";
-            success_msg = "";   
-
-            std::string base = get_proxy_url();
-            if (base.empty()) {
-                error_msg = "PROXY_SERVICE_URL is not set";
-                is_fetching_url = false;
-                return;
-            }
-            core::HttpResponse response = core::HttpClient::get().get(base + "/api/ts-status");
-            if (response.status_code >= 200 && response.status_code < 300) {
-                try {
-                    auto json = nlohmann::json::parse(response.body);
-                    if (json.contains("auth_url") && json["auth_url"].is_string()) {
-                        login_url = json["auth_url"].get<std::string>();
-                        has_fetched_url = true;
-                        success_msg = "Login URL fetched.";
-                        status = json.value("status", "");
-                    } else {
-                        error_msg = "Missing auth_url in response.";
-                    }
-                } catch (const std::exception& ex) {
-                    error_msg = std::string("Invalid JSON: ") + ex.what();
+            {
+                std::lock_guard<std::mutex> lock(mu);
+                if (is_fetching_url) {
+                    return;
                 }
-            } else {
-                error_msg = "Proxy request failed (" + std::to_string(response.status_code) + ")";
+                is_fetching_url = true;
+                error_msg = "";
+                success_msg = "";
             }
 
-            is_fetching_url = false;
+            std::thread([this]() {
+                std::string error;
+                std::string new_login_url;
+                std::string new_status;
+                bool fetched_url = false;
+                std::string base = get_proxy_url();
+                if (base.empty()) {
+                    error = "PROXY_SERVICE_URL is not set";
+                } else {
+                    core::HttpResponse response = core::HttpClient::get().get(base + "/api/ts-status");
+                    if (response.status_code >= 200 && response.status_code < 300) {
+                        try {
+                            auto json = nlohmann::json::parse(response.body);
+                            if (json.contains("auth_url") && json["auth_url"].is_string()) {
+                                new_login_url = json["auth_url"].get<std::string>();
+                                new_status = json.value("status", "");
+                                fetched_url = true;
+                            } else {
+                                error = "Missing auth_url in response.";
+                            }
+                        } catch (const std::exception& ex) {
+                            error = std::string("Invalid JSON: ") + ex.what();
+                        }
+                    } else {
+                        error = "Proxy request failed (" + std::to_string(response.status_code) + ")";
+                    }
+                }
+
+                std::lock_guard<std::mutex> lock(mu);
+                if (fetched_url) {
+                    login_url = new_login_url;
+                    status = new_status;
+                    has_fetched_url = true;
+                    success_msg = "Login URL fetched.";
+                    error_msg.clear();
+                } else if (!error.empty()) {
+                    error_msg = error;
+                }
+                is_fetching_url = false;
+            }).detach();
         }
 
         void poll_status_if_needed() {
-            if (is_connected) {
-                return;
-            }
-
             auto now = std::chrono::steady_clock::now();
-            if (last_status_check != std::chrono::steady_clock::time_point{} &&
-                std::chrono::duration_cast<std::chrono::milliseconds>(now - last_status_check).count() < poll_interval_ms) {
-                return;
+            {
+                std::lock_guard<std::mutex> lock(mu);
+                if (is_connected || is_polling_status) {
+                    return;
+                }
+                if (last_status_check != std::chrono::steady_clock::time_point{} &&
+                    std::chrono::duration_cast<std::chrono::milliseconds>(now - last_status_check).count() < poll_interval_ms) {
+                    return;
+                }
+                is_polling_status = true;
+                error_msg = "";
+                last_status_check = now;
             }
 
-            is_polling_status = true;
-            error_msg = "";
+            std::thread([this]() {
+                std::string error;
+                std::string new_status;
+                bool became_connected = false;
+                std::string base = get_proxy_url();
+                if (base.empty()) {
+                    error = "PROXY_SERVICE_URL is not set";
+                } else {
+                    core::HttpResponse response = core::HttpClient::get().get(base + "/api/ts-status");
+                    if (response.status_code >= 200 && response.status_code < 300) {
+                        try {
+                            auto json = nlohmann::json::parse(response.body);
+                            new_status = json.value("status", "");
+                            if (new_status == "connected") {
+                                became_connected = true;
+                            }
+                        } catch (const std::exception& ex) {
+                            error = std::string("Invalid JSON: ") + ex.what();
+                        }
+                    } else {
+                        error = "Proxy request failed (" + std::to_string(response.status_code) + ")";
+                    }
+                }
 
-            std::string base = get_proxy_url();
-            if (base.empty()) {
-                error_msg = "PROXY_SERVICE_URL is not set";
-                is_polling_status = false;
-                return;
-            }
-            core::HttpResponse response = core::HttpClient::get().get(base + "/api/ts-status");
-            if (response.status_code >= 200 && response.status_code < 300) {
-                try {
-                    auto json = nlohmann::json::parse(response.body);
-                    status = json.value("status", "");
-                    if (status == "connected") {
+                std::lock_guard<std::mutex> lock(mu);
+                if (!error.empty()) {
+                    error_msg = error;
+                } else {
+                    status = new_status;
+                    if (became_connected) {
                         is_connected = true;
                     }
-                } catch (const std::exception& ex) {
-                    error_msg = std::string("Invalid JSON: ") + ex.what();
                 }
-            } else {
-                error_msg = "Proxy request failed (" + std::to_string(response.status_code) + ")";
-            }
-
-            last_status_check = now;
-            is_polling_status = false;
+                is_polling_status = false;
+            }).detach();
         }
         
         void register_device() {
-            // Build JSON object with device information
-            std::map<std::string, std::string> json_fields;
-            if (strlen(device_name) > 0) {
-                json_fields["device_name"] = std::string(device_name);
-            }
-            if (strlen(mount_path) > 0) {
-                json_fields["mount_path"] = std::string(mount_path);
-            }
-            std::string json_body = core::build_json_object(json_fields);
-            
-            // Set headers
-            std::map<std::string, std::string> headers;
-            headers["Content-Type"] = "application/json";
-            
-            // Register the device in the database
-            std::string base = get_proxy_url();
-            if (base.empty()) {
-                error_msg = "PROXY_SERVICE_URL is not set";
-                return;
-            }
-            core::HttpResponse register_response = core::HttpClient::get().post(
-                base + "/api/devices",
-                json_body,
-                headers
-            );
-            
-            if (register_response.status_code >= 200 && register_response.status_code < 300) {
-                success_msg = "Device registered successfully.";
-                has_registered_device = true;
-                // Only switch view if this is the default behavior (not when used in modal)
-                if (should_switch_view_on_register) {
-                    view::switch_view(view::ViewID::FileExplorer);
+            std::string device_name_copy;
+            std::string mount_path_copy;
+            {
+                std::lock_guard<std::mutex> lock(mu);
+                if (is_registering_device) {
+                    return;
                 }
-            } else {
-                error_msg = "Failed to register device (" + std::to_string(register_response.status_code) + ")";
+                is_registering_device = true;
+                error_msg.clear();
+                success_msg.clear();
+                if (strlen(device_name) > 0) {
+                    device_name_copy = std::string(device_name);
+                }
+                if (strlen(mount_path) > 0) {
+                    mount_path_copy = std::string(mount_path);
+                }
             }
+
+            std::thread([this, device_name_copy, mount_path_copy]() {
+                std::map<std::string, std::string> json_fields;
+                if (!device_name_copy.empty()) {
+                    json_fields["device_name"] = device_name_copy;
+                }
+                if (!mount_path_copy.empty()) {
+                    json_fields["mount_path"] = mount_path_copy;
+                }
+                std::string json_body = core::build_json_object(json_fields);
+
+                std::map<std::string, std::string> headers;
+                headers["Content-Type"] = "application/json";
+
+                std::string base = get_proxy_url();
+                std::string error;
+                bool success = false;
+                if (base.empty()) {
+                    error = "PROXY_SERVICE_URL is not set";
+                } else {
+                    core::HttpResponse register_response = core::HttpClient::get().post(
+                        base + "/api/devices",
+                        json_body,
+                        headers
+                    );
+
+                    if (register_response.status_code >= 200 && register_response.status_code < 300) {
+                        success = true;
+                    } else {
+                        error = "Failed to register device (" + std::to_string(register_response.status_code) + ")";
+                    }
+                }
+
+                std::lock_guard<std::mutex> lock(mu);
+                if (success) {
+                    success_msg = "Device registered successfully.";
+                    has_registered_device = true;
+                    if (should_switch_view_on_register) {
+                        view::switch_view(view::ViewID::FileExplorer);
+                    }
+                } else if (!error.empty()) {
+                    error_msg = error;
+                }
+                is_registering_device = false;
+            }).detach();
         }
     };
 

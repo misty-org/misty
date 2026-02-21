@@ -5,7 +5,7 @@
 #include "application.h"
 #include <GLFW/glfw3.h>
 
-namespace minidfs {
+namespace misty {
 
 class LinuxApp : public Application {
 public:
@@ -43,6 +43,6 @@ private:
     const char* glsl_version_ = "#version 330";
 };
 
-} // namespace minidfs
+} // namespace misty
 
 #endif // __linux__

@@ -1,7 +1,7 @@
 #include "views/register_view.h"
 #include "imgui.h"
 
-namespace minidfs::view {
+namespace misty::view {
     RegisterView::RegisterView(UIRegistry& ui_registry)
         : ui_registry_(ui_registry) {
         init_panels();

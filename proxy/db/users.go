@@ -9,13 +9,13 @@ import (
 
 func (db *Database) InsertUser(name, email, password string) error {
     id := uuid.New().String()
-    
+
     hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 
     _, err := db.Conn.Exec(`
-        INSERT INTO users (id, name, email, password) 
-        VALUES (?, ?, ?, ?)`, 
-        id, name, email, hashedPassword, 0,
+        INSERT INTO users (id, name, email, password)
+        VALUES ($1, $2, $3, $4)`,
+        id, name, email, hashedPassword,
     )
     if err != nil {
         log.Println("Failed to create user:", err)
@@ -23,22 +23,29 @@ func (db *Database) InsertUser(name, email, password string) error {
     return err
 }
 
-func (db *Database) GetUser(email, password string) error {
+type UserInfo struct {
+    ID    string
+    Name  string
+    Email string
+}
+
+func (db *Database) GetUser(email, password string) (*UserInfo, error) {
+    var user UserInfo
     var storedHashedPassword string
     err := db.Conn.QueryRow(`
-        SELECT password FROM users WHERE email = ?`, 
+        SELECT id, name, email, password FROM users WHERE email = $1`,
         email,
-    ).Scan(&storedHashedPassword)
+    ).Scan(&user.ID, &user.Name, &user.Email, &storedHashedPassword)
     if err != nil {
         log.Println("Failed to get user:", err)
-        return err
+        return nil, err
     }
 
     err = bcrypt.CompareHashAndPassword([]byte(storedHashedPassword), []byte(password))
     if err != nil {
         log.Println("Invalid password:", err)
-        return err
+        return nil, err
     }
 
-    return nil
+    return &user, nil
 }

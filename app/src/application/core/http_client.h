@@ -5,7 +5,7 @@
 #include <functional>
 #include <atomic>
 
-namespace minidfs::core {
+namespace misty::core {
 
     struct HttpResponse {
         int status_code;

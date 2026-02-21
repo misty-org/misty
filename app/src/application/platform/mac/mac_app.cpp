@@ -8,7 +8,7 @@
 #include "imgui_impl_opengl3.h"
 #include <cstdio>
 
-namespace minidfs {
+namespace misty {
     void MacApp::init_platform() {
         init_glfw();
         init_window();
@@ -34,7 +34,7 @@ namespace minidfs {
     }
 
     void MacApp::init_window() {
-        window_ = glfwCreateWindow(1280, 720, "MiniDFS Client", NULL, NULL);
+        window_ = glfwCreateWindow(1280, 720, "Misty Client", NULL, NULL);
         if (!window_) throw std::runtime_error("Failed to create GLFW window");
         glfwMakeContextCurrent(window_); //VERY IMPORTANT
         glfwSetWindowUserPointer(window_, this);

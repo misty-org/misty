@@ -1,7 +1,7 @@
 #include "notification_panel.h"
 #include "imgui.h"
 
-namespace minidfs::panel {
+namespace misty::panel {
 
     NotificationPanel::NotificationPanel(core::UIRegistry& registry)
         : registry_(registry) {

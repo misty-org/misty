@@ -1,18 +1,26 @@
 #include "application.h"
+#include "core/session_manager.h"
 #include "views/main_view.h"
 #include "views/register_view.h"
 #include "views/login_view.h"
 #include "views/services_view.h"
 #include "views/activity_view.h"
+#include "views/settings_view.h"
+#include "views/edit_profile_view.h"
 
 
 
-namespace minidfs {
+namespace misty {
     void Application::run() {
         try {
             init_platform();
             init_client();
             //init_file_sync();
+            
+            // Initialize and start background file status sync
+            file_sync_service_ = std::make_unique<core::FileSyncService>(ui_registry_);
+            file_sync_service_->start();
+
             init_views();
 
             
@@ -27,12 +35,15 @@ namespace minidfs {
             view::render_current_view();
             render_frame();
         }
+        if (file_sync_service_) {
+            file_sync_service_->stop();
+        }
         cleanup();
     }
 
     void Application::init_client() {
         std::string mount_path, channel_address;
-        std::ifstream config_file("minidfs.conf");
+        std::ifstream config_file("misty.conf");
 		if (config_file.is_open()) {
             std::getline(config_file, mount_path);
             std::getline(config_file, channel_address);
@@ -51,11 +62,11 @@ namespace minidfs {
         }
 
         #ifdef _WIN32
-            file_sync_ = std::make_unique<minidfs::FileSyncWin32>(client_);
+            file_sync_ = std::make_unique<misty::FileSyncWin32>(client_);
         #elif defined(__APPLE__)
-            file_sync_ = std::make_unique<minidfs::FileSyncMac>(client_);
+            file_sync_ = std::make_unique<misty::FileSyncMac>(client_);
         #else
-            file_sync_ = std::make_unique<minidfs::FileSyncLinux>(client_);
+            file_sync_ = std::make_unique<misty::FileSyncLinux>(client_);
         #endif
 
         file_sync_->init_sync_resources();
@@ -70,6 +81,13 @@ namespace minidfs {
         view::register_view(view::ViewID::Login, std::make_unique<view::LoginView>(ui_registry_));
         view::register_view(view::ViewID::Services, std::make_unique<view::ServicesView>(ui_registry_));
         view::register_view(view::ViewID::Activity, std::make_unique<view::ActivityView>(ui_registry_));
-        view::switch_view(view::ViewID::FileExplorer);
+        view::register_view(view::ViewID::Settings, std::make_unique<view::SettingsView>(ui_registry_));
+        view::register_view(view::ViewID::EditProfile, std::make_unique<view::EditProfileView>(ui_registry_));
+        // If user has a stored token, go to main app; otherwise show login
+        if (core::SessionManager::get().is_authenticated()) {
+            view::switch_view(view::ViewID::FileExplorer);
+        } else {
+            view::switch_view(view::ViewID::Login);
+        }
     }
 };

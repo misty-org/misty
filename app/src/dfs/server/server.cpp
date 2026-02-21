@@ -4,19 +4,19 @@
 
 #include <grpcpp/grpcpp.h>
 #include <filesystem>
-#include "dfs/server/minidfs_impl.h"
+#include "dfs/server/misty_impl.h"
 
 namespace fs = std::filesystem;
 
 int main(int argc, char** argv) {
-    std::string mount_path = "server/minidfs";
+    std::string mount_path = "server/misty";
     if (argc > 1) {
         mount_path = argv[1];
     }
     fs::create_directories(mount_path);
 
     std::string server_address("0.0.0.0:50051");
-    MiniDFSImpl service(mount_path);
+    MistyImpl service(mount_path);
 
     grpc::ServerBuilder builder;
     builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
