@@ -9,13 +9,13 @@ import (
 
 func (db *Database) InsertUser(name, email, password string) error {
     id := uuid.New().String()
-    
+
     hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 
     _, err := db.Conn.Exec(`
-        INSERT INTO users (id, name, email, password) 
-        VALUES (?, ?, ?, ?)`, 
-        id, name, email, hashedPassword, 0,
+        INSERT INTO users (id, name, email, password)
+        VALUES ($1, $2, $3, $4)`,
+        id, name, email, hashedPassword,
     )
     if err != nil {
         log.Println("Failed to create user:", err)
@@ -33,7 +33,7 @@ func (db *Database) GetUser(email, password string) (*UserInfo, error) {
     var user UserInfo
     var storedHashedPassword string
     err := db.Conn.QueryRow(`
-        SELECT id, name, email, password FROM users WHERE email = ?`,
+        SELECT id, name, email, password FROM users WHERE email = $1`,
         email,
     ).Scan(&user.ID, &user.Name, &user.Email, &storedHashedPassword)
     if err != nil {

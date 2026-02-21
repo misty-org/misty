@@ -1,4 +1,5 @@
 #include "application.h"
+#include "core/session_manager.h"
 #include "views/main_view.h"
 #include "views/register_view.h"
 #include "views/login_view.h"
@@ -82,6 +83,11 @@ namespace misty {
         view::register_view(view::ViewID::Activity, std::make_unique<view::ActivityView>(ui_registry_));
         view::register_view(view::ViewID::Settings, std::make_unique<view::SettingsView>(ui_registry_));
         view::register_view(view::ViewID::EditProfile, std::make_unique<view::EditProfileView>(ui_registry_));
-        view::switch_view(view::ViewID::FileExplorer);
+        // If user has a stored token, go to main app; otherwise show login
+        if (core::SessionManager::get().is_authenticated()) {
+            view::switch_view(view::ViewID::FileExplorer);
+        } else {
+            view::switch_view(view::ViewID::Login);
+        }
     }
 };

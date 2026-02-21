@@ -46,11 +46,8 @@ namespace misty::panel {
             ImGui::Separator();
             show_services_section(services_state, width, padding);
             ImGui::Separator();
-            show_mounts_section(width, padding);
-            ImGui::Separator();
 
             show_quick_access(width, padding);
-            show_storage_info(width, padding);
 
             show_chooser_modal(state);
             show_create_entry_modal(state);
@@ -62,10 +59,6 @@ namespace misty::panel {
         ImGui::PopStyleVar(2);
         ImGui::PopStyleColor();
     }
-
-
-
-
     
     void FileSidebarPanel::show_services_section(ServicesState& services_state, float width, float padding) {
         float content_width = width - (padding * 2);
@@ -107,44 +100,6 @@ namespace misty::panel {
         ImGui::Spacing();
     }
 
-    void FileSidebarPanel::show_mounts_section(float width, float padding) {
-        float content_width = width - (padding * 2);
-        ImGui::SetCursorPosX(padding);
-
-        ImGui::BeginGroup();
-
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.7f, 0.7f, 0.7f, 1.0f));
-        ImGui::Text("Mounts");
-        ImGui::PopStyleColor();
-
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.22f, 0.22f, 0.22f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.32f, 0.32f, 0.32f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.18f, 0.18f, 0.18f, 1.0f));
-        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 4.0f));
-
-        {
-            float button_width = content_width;
-            
-            // For now only show Root mount
-            if (ImGui::Button("Root", ImVec2(button_width, 28))) {
-                auto& file_explorer_state = registry_.get_state<FileExplorerState>("FileExplorer");
-                
-                if (mount_path_provider_) {
-                    std::string path = mount_path_provider_();
-                    if (!path.empty()) {
-                        file_explorer_state.pending_navigation_path = path;
-                    }
-                }
-            }
-        }
-
-        ImGui::PopStyleVar();
-        ImGui::PopStyleColor(3);
-
-        ImGui::EndGroup();
-
-        ImGui::Spacing();
-    }
 
     void FileSidebarPanel::show_create_new(FileSidebarState& state, float width, float padding) {
         ImGui::SetCursorPosX(padding);
@@ -308,25 +263,6 @@ namespace misty::panel {
         ImGui::Spacing();
     }
 
-    void FileSidebarPanel::show_storage_info(float width, float padding) {
-        float button_height = 80.0f;
-        float bottom_padding = 16.0f;
-        float target_y = ImGui::GetWindowHeight() - button_height - bottom_padding;
-        if (target_y > ImGui::GetCursorPosY()) {
-            ImGui::SetCursorPosY(target_y);
-        }
-        ImGui::SetCursorPosX(padding);
-
-        float b_width = width - (padding * 2);
-
-        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.4f, 0.2f, 0.15f, 1.0f));
-
-        ImGui::Button("Upload anything\n2.36 GB / 2 GB\nUpgrade", ImVec2(b_width, 80));
-
-        ImGui::PopStyleColor();
-        ImGui::PopStyleVar();
-    }
 
     void FileSidebarPanel::show_uploader_modal(FileSidebarState& state) {
         if (!state.show_uploader_modal) return;

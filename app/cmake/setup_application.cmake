@@ -57,6 +57,7 @@ elseif(APPLE)
         "-framework CoreGraphics"
         "-framework CoreServices"
         "-framework Cocoa"
+        "-framework Security"
     )
 elseif(UNIX AND NOT APPLE)
     file(GLOB LINUX_SRCS

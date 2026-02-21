@@ -10,6 +10,7 @@ import (
 	"github.com/kannachi323/misty/proxy/api"
 	"github.com/kannachi323/misty/proxy/api/gd"
 	"github.com/kannachi323/misty/proxy/api/ms"
+	"github.com/kannachi323/misty/proxy/core/auth"
 	"github.com/kannachi323/misty/proxy/core/tsbase"
 	"github.com/kannachi323/misty/proxy/db"
 )
@@ -32,7 +33,7 @@ func CreateProxy() (*Proxy, error) {
 	proxy.Router.Route("/api", func(r chi.Router) {
 		proxy.APIRouter = r.(*chi.Mux)
 	})
-	
+
 	// Serve static files
 	workDir, _ := os.Getwd()
 	staticDir := filepath.Join(workDir, "static")
@@ -56,50 +57,60 @@ func (proxy *Proxy) MountHandlers() {
 		AllowCredentials: true,
 		MaxAge:           300, // Maximum value not ignored by any of major browsers
 	}))
-	
+
 	//////--------------------------
 	// DO NOT REMOVE THIS
 	proxy.APIRouter.Get("/hello", api.HelloWorld())
 	//////--------------------------
 
-	proxy.APIRouter.Get("/ts-status", api.GetTSStatus(proxy.TSBase));
-	proxy.APIRouter.Get("/ts-peers", api.GetPeers(proxy.TSBase));
-	proxy.APIRouter.Get("/ts-ping", api.PingServer(proxy.TSBase))
-
+	// Public routes (no auth required)
 	proxy.APIRouter.Post("/register", api.RegisterUser(proxy.Database))
 	proxy.APIRouter.Post("/login", api.LoginUser(proxy.Database))
+	proxy.APIRouter.Post("/logout", api.LogoutUser())
 
-	proxy.APIRouter.Get("/devices", api.GetDevices(proxy.Database))
-	proxy.APIRouter.Post("/devices", api.RegisterDevice(proxy.TSBase, proxy.Database))
-	proxy.APIRouter.Put("/devices", api.UpdateDevice(proxy.Database))
-	proxy.APIRouter.Delete("/devices", api.DeleteDevice(proxy.Database))
-
-	proxy.APIRouter.Get("/workspaces", api.GetWorkspaces(proxy.Database))
-	proxy.APIRouter.Get("/workspace", api.GetWorkspace(proxy.Database))
-	proxy.APIRouter.Post("/workspaces", api.CreateWorkspace(proxy.Database))
-	proxy.APIRouter.Put("/workspaces", api.UpdateWorkspace(proxy.Database))
-	proxy.APIRouter.Delete("/workspaces", api.DeleteWorkspace(proxy.Database))
-
-	// Microsoft OAuth endpoints
+	// OAuth callbacks must remain public
 	proxy.APIRouter.Get("/ms/auth", ms.GetOAuthLogin())
 	proxy.APIRouter.Get("/ms/callback", ms.OAuthCallback(proxy.Database))
-	proxy.APIRouter.Get("/ms/users", ms.GetMSUsers(proxy.Database))
-	proxy.APIRouter.Delete("/ms/users", ms.DeleteMSToken(proxy.Database))
-	proxy.APIRouter.Post("/ms/file/upload", ms.GetUploadSession(proxy.Database))
-	proxy.APIRouter.Get("/ms/drive", ms.GetDrive(proxy.Database))
-	proxy.APIRouter.Get("/ms/drive/root", ms.GetDriveRoot(proxy.Database))
-	proxy.APIRouter.Get("/ms/files", ms.GetFiles(proxy.Database))
-	proxy.APIRouter.Get("/ms/file", ms.GetFile(proxy.Database))
-	proxy.APIRouter.Get("/ms/file/download", ms.DownloadFile(proxy.Database))
-
 	proxy.APIRouter.Get("/gd/auth", gd.GetOAuthLogin())
 	proxy.APIRouter.Get("/gd/callback", gd.OAuthCallback(proxy.Database))
-	proxy.APIRouter.Get("/gd/users", gd.GetGDUsers(proxy.Database))
-	proxy.APIRouter.Delete("/gd/users", gd.DeleteGDToken(proxy.Database))
-	proxy.APIRouter.Get("/gd/drive", gd.GetAbout(proxy.Database))
-	proxy.APIRouter.Get("/gd/drive/root", gd.GetDriveRoot(proxy.Database))
-	proxy.APIRouter.Get("/gd/files", gd.GetFiles(proxy.Database))
-	proxy.APIRouter.Get("/gd/file", gd.GetFile(proxy.Database))
-	proxy.APIRouter.Get("/gd/file/download", gd.DownloadFile(proxy.Database))
-	proxy.APIRouter.Post("/gd/file/upload", gd.GetUploadSession(proxy.Database))
+
+	// Protected routes (JWT required)
+	proxy.APIRouter.Group(func(r chi.Router) {
+		r.Use(auth.JWTMiddleware)
+
+		r.Get("/ts-status", api.GetTSStatus(proxy.TSBase))
+		r.Get("/ts-peers", api.GetPeers(proxy.TSBase))
+		r.Get("/ts-ping", api.PingServer(proxy.TSBase))
+
+		r.Get("/devices", api.GetDevices(proxy.Database))
+		r.Post("/devices", api.RegisterDevice(proxy.TSBase, proxy.Database))
+		r.Put("/devices", api.UpdateDevice(proxy.Database))
+		r.Delete("/devices", api.DeleteDevice(proxy.Database))
+
+		r.Get("/workspaces", api.GetWorkspaces(proxy.Database))
+		r.Get("/workspace", api.GetWorkspace(proxy.Database))
+		r.Post("/workspaces", api.CreateWorkspace(proxy.Database))
+		r.Put("/workspaces", api.UpdateWorkspace(proxy.Database))
+		r.Delete("/workspaces", api.DeleteWorkspace(proxy.Database))
+
+		// Microsoft endpoints
+		r.Get("/ms/users", ms.GetMSUsers(proxy.Database))
+		r.Delete("/ms/users", ms.DeleteMSToken(proxy.Database))
+		r.Post("/ms/file/upload", ms.GetUploadSession(proxy.Database))
+		r.Get("/ms/drive", ms.GetDrive(proxy.Database))
+		r.Get("/ms/drive/root", ms.GetDriveRoot(proxy.Database))
+		r.Get("/ms/files", ms.GetFiles(proxy.Database))
+		r.Get("/ms/file", ms.GetFile(proxy.Database))
+		r.Get("/ms/file/download", ms.DownloadFile(proxy.Database))
+
+		// Google Drive endpoints
+		r.Get("/gd/users", gd.GetGDUsers(proxy.Database))
+		r.Delete("/gd/users", gd.DeleteGDToken(proxy.Database))
+		r.Get("/gd/drive", gd.GetAbout(proxy.Database))
+		r.Get("/gd/drive/root", gd.GetDriveRoot(proxy.Database))
+		r.Get("/gd/files", gd.GetFiles(proxy.Database))
+		r.Get("/gd/file", gd.GetFile(proxy.Database))
+		r.Get("/gd/file/download", gd.DownloadFile(proxy.Database))
+		r.Post("/gd/file/upload", gd.GetUploadSession(proxy.Database))
+	})
 }

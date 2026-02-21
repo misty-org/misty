@@ -3,10 +3,12 @@
 #include <mutex>
 #include <cstring>
 #include <map>
+#include <nlohmann/json.hpp>
 #include "core/ui_registry.h"
 #include "views/app_view.h"
 #include "core/http_client.h"
 #include "core/env_manager.h"
+#include "core/session_manager.h"
 #include "core/util.h"
 
 namespace misty::panel {
@@ -72,6 +74,15 @@ namespace misty::panel {
             
             // Handle response
             if (response.status_code == 200 || response.status_code == 201) {
+                // Parse token from response and store it
+                try {
+                    auto json_resp = nlohmann::json::parse(response.body);
+                    if (json_resp.contains("token")) {
+                        core::SessionManager::get().set_token(json_resp["token"].get<std::string>());
+                    }
+                } catch (...) {
+                    // Token storage failed, but login succeeded
+                }
                 success_msg = "Login successful!";
                 clear_inputs();
                 // Switch view after successful login

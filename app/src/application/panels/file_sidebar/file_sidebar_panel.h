@@ -24,7 +24,6 @@ namespace misty::panel {
 
     private:
         void show_services_section(ServicesState& services_state, float width, float padding);
-        void show_mounts_section(float width, float padding);
         void show_create_new(FileSidebarState& state, float width, float padding);
         void show_chooser_modal(FileSidebarState& state);
         void show_create_entry_modal(FileSidebarState& state);
@@ -32,7 +31,6 @@ namespace misty::panel {
         void show_upload_progress_modal(FileSidebarState& state);
         void start_next_upload(FileSidebarState& state, ServicesState& services_state, OneDriveState& onedrive_state);
         void show_quick_access(float width, float padding);
-        void show_storage_info(float width, float padding);
         
     private:
         core::UIRegistry& registry_;

@@ -1,8 +1,8 @@
 import { NavLink } from "react-router";
 import { GlowCard } from "../components/GlowCard";
 import { ParticleField } from "../components/ParticleField";
-import { SiGoogledrive, SiIcloud, SiDropbox } from "react-icons/si";
-import { FaMicrosoft } from "react-icons/fa6";
+import { SiGoogledrive, SiIcloud, SiDropbox } from "react-icons/si";  
+import { GrOnedrive } from "react-icons/gr";
 
 const features = [
   {
@@ -149,7 +149,7 @@ export default function Home() {
                 {/* OneDrive */}
                 <div className="flex flex-col items-center gap-2 group">
                   <div className="w-14 h-14 rounded-2xl bg-surface flex items-center justify-center border border-border/50 transition-all duration-300 group-hover:border-primary/30 group-hover:shadow-lg group-hover:shadow-primary/10">
-                    <FaMicrosoft className="w-7 h-7 text-text-secondary" />
+                    <GrOnedrive className="w-7 h-7 text-text-secondary" />
                   </div>
                   <span className="text-xs text-text-muted">OneDrive</span>
                 </div>
