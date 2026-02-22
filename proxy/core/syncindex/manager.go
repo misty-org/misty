@@ -10,8 +10,9 @@ import (
 )
 
 type Manager struct {
-	service       *Service
-	watchInterval time.Duration
+	service             *Service
+	watchInterval       time.Duration
+	watchRefreshTimeout time.Duration
 
 	mu      sync.Mutex
 	watched map[string]struct{}
@@ -27,11 +28,12 @@ func NewManager(service *Service, watchInterval time.Duration) *Manager {
 		watchInterval = watchIntervalFromEnv(30)
 	}
 	return &Manager{
-		service:       service,
-		watchInterval: watchInterval,
-		watched:       map[string]struct{}{},
-		stop:          make(chan struct{}),
-		done:          make(chan struct{}),
+		service:             service,
+		watchInterval:       watchInterval,
+		watchRefreshTimeout: pollRefetchTimeoutForInterval(watchInterval),
+		watched:             map[string]struct{}{},
+		stop:                make(chan struct{}),
+		done:                make(chan struct{}),
 	}
 }
 
@@ -73,7 +75,7 @@ func (m *Manager) RefreshDirectory(ctx context.Context, remoteName, dirPath stri
 	if m == nil || m.service == nil {
 		return nil, nil
 	}
-	return m.service.RefreshDirectory(ctx, remoteName, dirPath)
+	return m.service.RefetchDirectory(ctx, remoteName, dirPath)
 }
 
 func (m *Manager) MarkLocalDirty(ctx context.Context, remoteName, relPath string, localExists, isDir bool, mtime string, size int64) error {
@@ -81,6 +83,13 @@ func (m *Manager) MarkLocalDirty(ctx context.Context, remoteName, relPath string
 		return nil
 	}
 	return m.service.MarkLocalDirty(ctx, remoteName, relPath, localExists, isDir, mtime, size)
+}
+
+func (m *Manager) MarkLocalSynced(ctx context.Context, remoteName, relPath string) error {
+	if m == nil || m.service == nil {
+		return nil
+	}
+	return m.service.MarkLocalSynced(ctx, remoteName, relPath)
 }
 
 func (m *Manager) WatchDir(remoteName, dirPath string) error {
@@ -128,35 +137,13 @@ func (m *Manager) reloadWatchedDirs() error {
 
 func (m *Manager) run() {
 	defer close(m.done)
-	ticker := time.NewTicker(m.watchInterval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-m.stop:
-			return
-		case <-ticker.C:
-			m.tickWatched()
-		}
-	}
+	<-m.stop
 }
 
 func (m *Manager) tickWatched() {
-	m.mu.Lock()
-	keys := make([]string, 0, len(m.watched))
-	for key := range m.watched {
-		keys = append(keys, key)
-	}
-	m.mu.Unlock()
-
-	for _, key := range keys {
-		remoteName, dirPath := parseWatchKey(key)
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-		if _, err := m.RefreshDirectory(ctx, remoteName, dirPath); err != nil {
-			log.Printf("syncindex watched refresh %s:%s: %v", remoteName, dirPath, err)
-		}
-		cancel()
-	}
+	// Automatic watched-directory refresh is intentionally disabled.
+	// Remote revalidation should only happen through explicit user actions
+	// such as Sync Now.
 }
 
 func watchKey(remoteName, dirPath string) string {

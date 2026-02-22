@@ -277,6 +277,118 @@ func TestUploadFileMissingFileName(t *testing.T) {
 	}
 }
 
+func TestDownloadFolderHandler(t *testing.T) {
+	root, cleanup := setupAPI(t)
+	defer cleanup()
+
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	source := filepath.Join(root, "source-folder")
+	if err := os.MkdirAll(filepath.Join(source, "sub", "empty"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(source, "sub", "doc.txt"), []byte("folder data"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	localPath := filepath.Join(home, "misty", "tmp", "downloaded")
+	body, _ := json.Marshal(map[string]string{
+		"remote":     testRemote,
+		"path":       source,
+		"local_path": localPath,
+	})
+
+	rr := doRequest(DownloadFolder(), "POST", "/api/folder/download", bytes.NewReader(body))
+	if rr.Code != http.StatusOK {
+		t.Fatalf("DownloadFolder: expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	data, err := os.ReadFile(filepath.Join(localPath, "sub", "doc.txt"))
+	if err != nil {
+		t.Fatal("downloaded file not found:", err)
+	}
+	if string(data) != "folder data" {
+		t.Errorf("expected folder data, got %q", string(data))
+	}
+	if info, err := os.Stat(filepath.Join(localPath, "sub", "empty")); err != nil || !info.IsDir() {
+		t.Fatalf("expected empty subdirectory to be copied, info=%v err=%v", info, err)
+	}
+}
+
+func TestUploadFolderHandler(t *testing.T) {
+	root, cleanup := setupAPI(t)
+	defer cleanup()
+
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	localPath := filepath.Join(home, "misty", "tmp", "upload-folder")
+	if err := os.MkdirAll(filepath.Join(localPath, "sub"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(localPath, "sub", "doc.txt"), []byte("upload folder"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	dest := filepath.Join(root, "uploaded-folder")
+	body, _ := json.Marshal(map[string]string{
+		"remote":     testRemote,
+		"path":       dest,
+		"local_path": localPath,
+	})
+
+	rr := doRequest(UploadFolder(), "POST", "/api/folder/upload", bytes.NewReader(body))
+	if rr.Code != http.StatusOK {
+		t.Fatalf("UploadFolder: expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	data, err := os.ReadFile(filepath.Join(dest, "sub", "doc.txt"))
+	if err != nil {
+		t.Fatal("uploaded file not found:", err)
+	}
+	if string(data) != "upload folder" {
+		t.Errorf("expected upload folder, got %q", string(data))
+	}
+}
+
+func TestTransferFolderHandler(t *testing.T) {
+	root, cleanup := setupAPI(t)
+	defer cleanup()
+
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	source := filepath.Join(root, "source-folder")
+	if err := os.MkdirAll(filepath.Join(source, "nested"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(source, "nested", "doc.txt"), []byte("transfer folder"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	dest := filepath.Join(root, "dest", "source-folder")
+	body, _ := json.Marshal(map[string]string{
+		"source_remote": testRemote,
+		"source_path":   source,
+		"dest_remote":   testRemote,
+		"dest_path":     dest,
+	})
+
+	rr := doRequest(TransferFolder(), "POST", "/api/folder/transfer", bytes.NewReader(body))
+	if rr.Code != http.StatusOK {
+		t.Fatalf("TransferFolder: expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	data, err := os.ReadFile(filepath.Join(dest, "nested", "doc.txt"))
+	if err != nil {
+		t.Fatal("transferred file not found:", err)
+	}
+	if string(data) != "transfer folder" {
+		t.Errorf("expected transfer folder, got %q", string(data))
+	}
+}
+
 func TestMkDirHandler(t *testing.T) {
 	root, cleanup := setupAPI(t)
 	defer cleanup()

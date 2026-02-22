@@ -1,6 +1,7 @@
 package remote
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
@@ -76,14 +77,46 @@ func SyncDirty(manager *syncindex.Manager) http.HandlerFunc {
 	}
 }
 
-// SyncRunNow triggers an out-of-band refetch + reconcile pass without waiting
-// for the 30s poll ticker. The body is optional; when a "remote" is provided,
-// only that root is processed, which keeps latency low when the user hits
-// Refresh while browsing a specific cloud. Response reports how much work was
-// done so the UI can decide whether a toast/banner is warranted.
-func SyncRunNow(manager *syncindex.Manager) http.HandlerFunc {
+func SyncMarkSynced(manager *syncindex.Manager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if manager == nil {
+			http.Error(w, "sync service unavailable", http.StatusServiceUnavailable)
+			return
+		}
+
+		var req struct {
+			Remote string `json:"remote"`
+			Path   string `json:"path"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+		if req.Remote == "" {
+			http.Error(w, "remote is required", http.StatusBadRequest)
+			return
+		}
+		if req.Path == "" {
+			http.Error(w, "path is required", http.StatusBadRequest)
+			return
+		}
+
+		if err := manager.MarkLocalSynced(r.Context(), req.Remote, req.Path); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+// SyncRunNow triggers an out-of-band poller pass without waiting for the
+// periodic ticker. The body is optional; when a "remote" is provided, only
+// that root is processed, which keeps latency low when the user hits Refresh
+// while browsing a specific cloud.
+func SyncRunNow(poller *syncindex.Poller) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if poller == nil {
 			http.Error(w, "sync service unavailable", http.StatusServiceUnavailable)
 			return
 		}
@@ -98,19 +131,21 @@ func SyncRunNow(manager *syncindex.Manager) http.HandlerFunc {
 				return
 			}
 		}
-		if req.Remote == "" {
-			http.Error(w, "remote is required", http.StatusBadRequest)
-			return
-		}
-
-		resp, err := manager.RefreshDirectory(r.Context(), req.Remote, req.Path)
+		runCtx, cancel := context.WithTimeout(context.Background(), syncindex.RunNowTimeout())
+		defer cancel()
+		refetchedDirs, dirtyBefore, err := poller.RunNow(runCtx, req.Remote)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"remote":         req.Remote,
+			"path":           req.Path,
+			"refetched_dirs": refetchedDirs,
+			"dirty_before":   dirtyBefore,
+		})
 	}
 }
 

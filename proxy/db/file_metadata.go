@@ -170,6 +170,52 @@ func ListFileMetadataByParent(conn *sql.DB, remoteName, parentRelPath string) ([
 	return out, rows.Err()
 }
 
+func ListFileMetadataByRemote(conn *sql.DB, remoteName string) ([]FileMetadata, error) {
+	rows, err := conn.Query(`
+		SELECT remote_name, rel_path, parent_rel_path, name, is_dir,
+		       local_exists, local_mtime, local_size,
+		       remote_exists, remote_mtime, remote_size, remote_revision, mime_type,
+		       local_dirty, last_local_event_at, last_local_seen_at, last_remote_seen_at,
+		       last_compared_at, last_synced_at, last_error, updated_at
+		FROM file_metadata
+		WHERE remote_name = ?
+		ORDER BY parent_rel_path, name
+	`, remoteName)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []FileMetadata
+	for rows.Next() {
+		var row FileMetadata
+		var isDir, localExists, remoteExists, localDirty int
+		var localMTime, remoteMTime, lastLocalEvent, lastLocalSeen, lastRemoteSeen, lastCompared, lastSynced sql.NullString
+		if err := rows.Scan(
+			&row.RemoteName, &row.RelPath, &row.ParentRelPath, &row.Name, &isDir,
+			&localExists, &localMTime, &row.LocalSize,
+			&remoteExists, &remoteMTime, &row.RemoteSize, &row.RemoteRevision, &row.MimeType,
+			&localDirty, &lastLocalEvent, &lastLocalSeen, &lastRemoteSeen,
+			&lastCompared, &lastSynced, &row.LastError, &row.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		row.IsDir = isDir != 0
+		row.LocalExists = localExists != 0
+		row.LocalMTime = localMTime.String
+		row.RemoteExists = remoteExists != 0
+		row.RemoteMTime = remoteMTime.String
+		row.LocalDirty = localDirty != 0
+		row.LastLocalEvent = lastLocalEvent.String
+		row.LastLocalSeen = lastLocalSeen.String
+		row.LastRemoteSeen = lastRemoteSeen.String
+		row.LastComparedAt = lastCompared.String
+		row.LastSyncedAt = lastSynced.String
+		out = append(out, row)
+	}
+	return out, rows.Err()
+}
+
 func DeleteFileMetadata(exec sqlExecer, remoteName, relPath string) error {
 	_, err := exec.Exec(`DELETE FROM file_metadata WHERE remote_name = ? AND rel_path = ?`, remoteName, relPath)
 	return err

@@ -8,9 +8,11 @@
 #include <string>
 
 #include "core/cache/listing_cache.h"
+#include "core/manager/env_manager.h"
 #include "core/net/http_client.h"
 #include "core/threading/worker_pool.h"
 #include "panels/activity/download_state.h"
+#include "panels/activity/activity_state.h"
 #include "panels/activity/upload_state.h"
 #include "panels/file_sidebar/file_sidebar_state.h"
 #include "panels/notification/notification_state.h"
@@ -69,6 +71,13 @@ struct StubDownloadBehavior {
 
 std::string g_last_navigate_path;
 std::string g_last_refresh_path;
+struct FolderTransferCall {
+    bool called = false;
+    std::string source_remote;
+    std::string source_path;
+    std::string dest_remote;
+    std::string dest_path;
+} g_folder_transfer;
 
 } // namespace
 
@@ -145,12 +154,27 @@ void ServicesState::unwatch_sync_dir(const std::string&, const std::string&, Fil
 void ServicesState::run_sync_now(const std::string&, FilesCallback) {}
 void ServicesState::fetch_sync_items(const std::string&, const std::string&, FilesCallback) {}
 void ServicesState::mark_local_dirty(const std::string&, const std::string&, bool, bool, const std::string&, int64_t, FilesCallback) {}
+void ServicesState::mark_local_synced(const std::string&, const std::string&, FilesCallback) {}
 void ServicesState::upload_file(const std::string&, const std::string&, const std::string&, core::UploadProgressCallback progress_cb, UploadCallback callback) {
     if (progress_cb) {
         progress_cb(4, 4);
     }
     if (callback) {
         callback(true, "");
+    }
+}
+void ServicesState::transfer_folder(const std::string& source_remote,
+                                    const std::string& source_path,
+                                    const std::string& dest_remote,
+                                    const std::string& dest_path,
+                                    FilesCallback callback) {
+    g_folder_transfer.called = true;
+    g_folder_transfer.source_remote = source_remote;
+    g_folder_transfer.source_path = source_path;
+    g_folder_transfer.dest_remote = dest_remote;
+    g_folder_transfer.dest_path = dest_path;
+    if (callback) {
+        callback(true, R"({"status":"transferred"})", "");
     }
 }
 void ServicesState::create_folder(const std::string&, const std::string&, CreateFolderCallback) {}
@@ -251,6 +275,7 @@ protected:
         g_last_navigate_path.clear();
         g_last_refresh_path.clear();
         g_download_behavior = {};
+        g_folder_transfer = {};
 
         auto& workspace = registry_.get_state<misty::panel::WorkspaceState>("Workspace");
         misty::panel::RemoteAccountMapping mapping;
@@ -363,29 +388,60 @@ TEST_F(FileExplorerActionsTest, CloudPasteToLocalUsesDownloadPathForNotSyncedFil
     EXPECT_TRUE(fs::exists(dest_dir / "remote.txt"));
 }
 
-TEST_F(FileExplorerActionsTest, CloudPasteToCloudQueuesMountedUploadWhenLocalMirrorExists) {
-    const fs::path local_mirror = home_.path() / "misty" / "mnt" / "OneDrive" / "alice" / "existing.txt";
-    write_file(local_mirror, "mirror");
-
+TEST_F(FileExplorerActionsTest, CloudPasteToCloudStagesDownloadThenQueuesCleanupUpload) {
     const fs::path target_dir = home_.path() / "misty" / "mnt" / "OneDrive" / "alice" / "Target";
     fs::create_directories(target_dir);
 
     misty::panel::FileExplorerState state;
     misty::panel::UnifiedFileItem item;
-    item.name = "existing.txt";
-    item.path = local_mirror.string();
+    item.name = "remote.txt";
+    item.path = (home_.path() / "misty" / "mnt" / "OneDrive" / "alice" / "remote.txt").string();
     item.remote_name = "onedrive-alice";
-    item.remote_path = "existing.txt";
+    item.remote_path = "remote.txt";
     item.source = misty::panel::FileSource::REMOTE;
-    item.status = misty::panel::SyncStatus::SYNCED;
+    item.status = misty::panel::SyncStatus::NOT_SYNCED;
+    item.size = 10;
 
-    panel_.perform_paste_to_cloud(state, item, target_dir.string(), misty::panel::ClipboardOp::COPY);
+    panel_.perform_drop_items(state, {item}, target_dir.string(), misty::panel::ClipboardOp::COPY);
 
     auto& sidebar = registry_.get_state<misty::panel::FileSidebarState>("FileSidebar");
     ASSERT_EQ(sidebar.upload_queue.size(), 1u);
     EXPECT_EQ(sidebar.upload_queue[0].remote_name, "onedrive-alice");
     EXPECT_EQ(sidebar.upload_queue[0].remote_path, "Target");
-    EXPECT_TRUE(fs::exists(target_dir / "existing.txt"));
+    EXPECT_EQ(sidebar.upload_queue[0].file_name, "remote.txt");
+    EXPECT_TRUE(sidebar.upload_queue[0].cleanup_after_upload);
+    EXPECT_EQ(sidebar.upload_queue[0].cleanup_path, sidebar.upload_queue[0].file_path);
+    EXPECT_TRUE(sidebar.pending_upload_start);
+    EXPECT_TRUE(fs::exists(sidebar.upload_queue[0].file_path));
+    EXPECT_FALSE(fs::exists(target_dir / "remote.txt"));
+
+    auto& downloads = registry_.get_state<misty::panel::DownloadState>("Downloads");
+    const auto items = downloads.get_all_downloads();
+    ASSERT_EQ(items.size(), 1u);
+    EXPECT_EQ(items[0].status, misty::panel::DownloadStatus::COMPLETED);
+}
+
+TEST_F(FileExplorerActionsTest, CloudFolderPasteToCloudUsesProxyFolderTransfer) {
+    const fs::path target_dir = home_.path() / "misty" / "mnt" / "OneDrive" / "alice" / "Target";
+    fs::create_directories(target_dir);
+
+    misty::panel::FileExplorerState state;
+    misty::panel::UnifiedFileItem item;
+    item.name = "Folder";
+    item.path = (home_.path() / "misty" / "mnt" / "OneDrive" / "alice" / "Folder").string();
+    item.remote_name = "onedrive-alice";
+    item.remote_path = "Folder";
+    item.source = misty::panel::FileSource::REMOTE;
+    item.status = misty::panel::SyncStatus::NOT_SYNCED;
+    item.is_dir = true;
+
+    panel_.perform_drop_items(state, {item}, target_dir.string(), misty::panel::ClipboardOp::COPY);
+
+    EXPECT_TRUE(g_folder_transfer.called);
+    EXPECT_EQ(g_folder_transfer.source_remote, "onedrive-alice");
+    EXPECT_EQ(g_folder_transfer.source_path, "Folder");
+    EXPECT_EQ(g_folder_transfer.dest_remote, "onedrive-alice");
+    EXPECT_EQ(g_folder_transfer.dest_path, "Target/Folder");
 }
 
 TEST(UploadStateTest, FailedUploadRetainsRetryContext) {

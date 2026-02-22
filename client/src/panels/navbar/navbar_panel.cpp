@@ -176,6 +176,7 @@ namespace misty::panel {
     void NavbarPanel::show_activity_button() {
         auto& activity_state = ui_registry_.get_state<ActivityState>("Activity");
         auto& icon = core::AssetManager::get().get_svg_texture("bell-24", 48);
+        const size_t unread_count = activity_state.unread_count();
 
         float navbar_w = ImGui::GetWindowWidth();
         int size = 24;
@@ -194,6 +195,41 @@ namespace misty::panel {
 
         if (ImGui::ImageButton("Activity", icon.id, ImVec2((float)size, (float)size))) {
             activity_state.is_open = !activity_state.is_open;
+        }
+
+        if (unread_count > 0) {
+            const std::string badge_text = unread_count > 99 ? "99+" : std::to_string(unread_count);
+            const ImVec2 badge_text_size = ImGui::CalcTextSize(badge_text.c_str());
+            const float badge_pad_x = 5.0f;
+            const float badge_pad_y = 2.0f;
+            const ImVec2 badge_size(
+                badge_text_size.x + badge_pad_x * 2.0f,
+                badge_text_size.y + badge_pad_y * 2.0f
+            );
+
+            ImDrawList* draw_list = ImGui::GetWindowDrawList();
+            const ImVec2 button_min = ImGui::GetItemRectMin();
+            const ImVec2 button_max = ImGui::GetItemRectMax();
+            const ImVec2 badge_min(
+                button_max.x - badge_size.x * 0.55f,
+                button_min.y - 2.0f
+            );
+            const ImVec2 badge_max(
+                badge_min.x + badge_size.x,
+                badge_min.y + badge_size.y
+            );
+
+            draw_list->AddRectFilled(
+                badge_min,
+                badge_max,
+                IM_COL32(216, 62, 62, 255),
+                badge_size.y * 0.5f
+            );
+            draw_list->AddText(
+                ImVec2(badge_min.x + badge_pad_x, badge_min.y + badge_pad_y - 1.0f),
+                IM_COL32(255, 255, 255, 255),
+                badge_text.c_str()
+            );
         }
 
         ImGui::PopStyleColor(3);

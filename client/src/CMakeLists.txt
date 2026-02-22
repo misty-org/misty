@@ -124,6 +124,7 @@ set(MISTY_SANDBOX_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/core/plugins/plugin_signing.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/core/commands/command_manager.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/core/system/util.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/panels/activity/activity_state.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/views/app_view.cpp"
     "${CMAKE_SOURCE_DIR}/vendor/glad/src/glad.cpp"
     ${MISTY_IMGUI_SOURCES}

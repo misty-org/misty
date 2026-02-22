@@ -12,11 +12,21 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <unordered_set>
 #include <nlohmann/json.hpp>
 
 namespace misty::panel {
     namespace fs = std::filesystem;
     using json = nlohmann::json;
+
+    namespace {
+        constexpr long kSyncListConnectTimeoutSeconds = 10L;
+        constexpr long kSyncListTotalTimeoutSeconds = 60L;
+        constexpr long kSyncRefetchConnectTimeoutSeconds = 10L;
+        constexpr long kSyncRefetchTotalTimeoutSeconds = 120L;
+        constexpr long kSyncRunNowConnectTimeoutSeconds = 10L;
+        constexpr long kSyncRunNowTotalTimeoutSeconds = 1800L;
+    }
 
     ServicesState::ServicesState() = default;
     ServicesState::~ServicesState() = default;
@@ -180,6 +190,7 @@ namespace misty::panel {
 
     void ServicesState::load_remote_aliases_locked() {
         remote_aliases_.clear();
+        remote_mount_metadata_.clear();
 
         const fs::path path = remote_metadata_path();
         if (!fs::exists(path)) return;
@@ -194,9 +205,20 @@ namespace misty::panel {
 
             for (auto it = remotes.begin(); it != remotes.end(); ++it) {
                 if (!it.value().is_object()) continue;
-                std::string alias = trim_copy(it.value().value("alias", std::string("")));
+                const json& remote = it.value();
+                std::string alias = trim_copy(remote.value("alias", std::string("")));
                 if (!alias.empty()) {
                     remote_aliases_[it.key()] = alias;
+                }
+
+                const std::string provider_folder = trim_copy(remote.value("provider_folder", std::string("")));
+                const std::string folder_name = trim_copy(remote.value("folder_name", std::string("")));
+                if (!provider_folder.empty() || !folder_name.empty()) {
+                    remote_mount_metadata_[it.key()] = RemoteMountMetadata{
+                        it.key(),
+                        provider_folder,
+                        folder_name,
+                    };
                 }
             }
         } catch (const std::exception& ex) {
@@ -211,11 +233,35 @@ namespace misty::panel {
             fs::create_directories(path.parent_path());
 
             json remotes = json::object();
-            for (const auto& [remote_name, alias] : remote_aliases_) {
-                if (alias.empty()) continue;
-                remotes[remote_name] = {
-                    {"alias", alias},
-                };
+            std::unordered_set<std::string> remote_names;
+            for (const auto& [remote_name, _] : remote_aliases_) {
+                remote_names.insert(remote_name);
+            }
+            for (const auto& [remote_name, _] : remote_mount_metadata_) {
+                remote_names.insert(remote_name);
+            }
+
+            for (const auto& remote_name : remote_names) {
+                json remote = json::object();
+
+                auto alias_it = remote_aliases_.find(remote_name);
+                if (alias_it != remote_aliases_.end() && !alias_it->second.empty()) {
+                    remote["alias"] = alias_it->second;
+                }
+
+                auto mount_it = remote_mount_metadata_.find(remote_name);
+                if (mount_it != remote_mount_metadata_.end()) {
+                    if (!mount_it->second.provider_folder.empty()) {
+                        remote["provider_folder"] = mount_it->second.provider_folder;
+                    }
+                    if (!mount_it->second.folder_name.empty()) {
+                        remote["folder_name"] = mount_it->second.folder_name;
+                    }
+                }
+
+                if (!remote.empty()) {
+                    remotes[remote_name] = std::move(remote);
+                }
             }
 
             std::ofstream file(path);
@@ -521,6 +567,30 @@ namespace misty::panel {
         return true;
     }
 
+    void ServicesState::sync_remote_mount_metadata(const std::vector<RemoteMountMetadata>& mappings) {
+        std::lock_guard<std::mutex> lock(mu);
+
+        std::unordered_set<std::string> seen_remote_names;
+        for (const auto& mapping : mappings) {
+            if (mapping.remote_name.empty()) {
+                continue;
+            }
+
+            seen_remote_names.insert(mapping.remote_name);
+            remote_mount_metadata_[mapping.remote_name] = mapping;
+        }
+
+        for (auto it = remote_mount_metadata_.begin(); it != remote_mount_metadata_.end();) {
+            if (seen_remote_names.count(it->first) == 0) {
+                it = remote_mount_metadata_.erase(it);
+            } else {
+                ++it;
+            }
+        }
+
+        save_remote_aliases_locked();
+    }
+
     void ServicesState::initiate_login(const std::string& provider_type, const std::string& remote_name) {
         if (!worker_pool_) return;
 
@@ -577,6 +647,7 @@ namespace misty::panel {
                 mappings_dirty = true;
             }
             remote_aliases_.erase(remote_name);
+            remote_mount_metadata_.erase(remote_name);
             save_remote_aliases_locked();
             error_msg.clear();
             success_msg.clear();
@@ -665,7 +736,12 @@ namespace misty::panel {
                 headers["Accept"] = "application/json";
                 headers["Content-Type"] = "application/json";
 
-                auto response = core::HTTPClient::get().post(url, body, headers);
+                auto response = core::HTTPClient::get().post_with_timeouts(
+                    url,
+                    body,
+                    kSyncRefetchConnectTimeoutSeconds,
+                    kSyncRefetchTotalTimeoutSeconds,
+                    headers);
                 if (response.status_code >= 200 && response.status_code < 300) {
                     callback(true, response.body, "");
                 } else {
@@ -783,7 +859,12 @@ namespace misty::panel {
                 headers["Accept"] = "application/json";
                 headers["Content-Type"] = "application/json";
 
-                auto response = core::HTTPClient::get().post(url, body, headers);
+                auto response = core::HTTPClient::get().post_with_timeouts(
+                    url,
+                    body,
+                    kSyncRunNowConnectTimeoutSeconds,
+                    kSyncRunNowTotalTimeoutSeconds,
+                    headers);
                 if (response.status_code >= 200 && response.status_code < 300) {
                     callback(true, response.body, "");
                 } else {
@@ -946,6 +1027,49 @@ namespace misty::panel {
         );
     }
 
+    void ServicesState::mark_local_synced(const std::string& remote,
+                                          const std::string& path,
+                                          FilesCallback callback) {
+        if (!worker_pool_) {
+            if (callback) callback(false, "", "worker pool unavailable");
+            return;
+        }
+
+        worker_pool_->add(
+            [remote, path, callback]() {
+                std::string base = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
+                if (base.empty()) {
+                    if (callback) callback(false, "", "PROXY_SERVICE_URL not set");
+                    return;
+                }
+
+                std::string url = base + "/api/sync/mark-synced";
+                std::string body = core::build_json_object({
+                    {"remote", remote},
+                    {"path", path},
+                });
+
+                std::map<std::string, std::string> headers;
+                headers["Accept"] = "application/json";
+                headers["Content-Type"] = "application/json";
+
+                auto response = core::HTTPClient::get().post(url, body, headers);
+                if (response.status_code >= 200 && response.status_code < 300) {
+                    if (callback) callback(true, response.body, "");
+                } else {
+                    std::string err = "HTTP " + std::to_string(response.status_code);
+                    if (!response.body.empty()) err += ": " + response.body;
+                    std::cerr << "mark_local_synced(" << remote << ", " << path << "): " << err << std::endl;
+                    if (callback) callback(false, "", err);
+                }
+            },
+            []() {},
+            [callback](const std::string& err) {
+                if (callback) callback(false, "", err);
+            }
+        );
+    }
+
     void ServicesState::fetch_sync_items(const std::string& remote,
                                          const std::string& path,
                                          FilesCallback callback) {
@@ -965,7 +1089,11 @@ namespace misty::panel {
                 std::map<std::string, std::string> headers;
                 headers["Accept"] = "application/json";
 
-                auto response = core::HTTPClient::get().get(url, headers);
+                auto response = core::HTTPClient::get().get_with_timeouts(
+                    url,
+                    kSyncListConnectTimeoutSeconds,
+                    kSyncListTotalTimeoutSeconds,
+                    headers);
                 if (response.status_code >= 200 && response.status_code < 300) {
                     callback(true, response.body, "");
                 } else {
@@ -990,14 +1118,16 @@ namespace misty::panel {
         if (!worker_pool_) return;
 
         // Block the local-side watcher from reporting our own writes until
-        // the download finishes. The wrapping callback always unsuppresses,
-        // so a failure path can't leave the path blocked forever.
+        // the download callback finishes its local cleanup (for example,
+        // restoring remote modtime). The wrapping callback always
+        // unsuppresses, so a failure path can't leave the path blocked
+        // forever.
         suppress_fs_path(local_path);
         auto wrapped = [this, local_path, callback](bool success,
                                                      const std::string& out_path,
                                                      const std::string& err) {
-            this->unsuppress_fs_path(local_path);
             if (callback) callback(success, out_path, err);
+            this->unsuppress_fs_path(local_path);
         };
 
         worker_pool_->add(
@@ -1080,6 +1210,47 @@ namespace misty::panel {
             []() {},
             [callback](const std::string& err) {
                 callback(false, err);
+            }
+        );
+    }
+
+    void ServicesState::transfer_folder(const std::string& source_remote,
+                                        const std::string& source_path,
+                                        const std::string& dest_remote,
+                                        const std::string& dest_path,
+                                        FilesCallback callback) {
+        if (!worker_pool_) return;
+
+        worker_pool_->add(
+            [source_remote, source_path, dest_remote, dest_path, callback]() {
+                std::string base = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
+                if (base.empty()) {
+                    callback(false, "", "PROXY_SERVICE_URL not set");
+                    return;
+                }
+
+                json body;
+                body["source_remote"] = source_remote;
+                body["source_path"] = source_path;
+                body["dest_remote"] = dest_remote;
+                body["dest_path"] = dest_path;
+
+                std::map<std::string, std::string> headers;
+                headers["Accept"] = "application/json";
+                headers["Content-Type"] = "application/json";
+
+                auto response = core::HTTPClient::get().post(base + "/api/folder/transfer", body.dump(), headers);
+                if (response.status_code >= 200 && response.status_code < 300) {
+                    callback(true, response.body, "");
+                } else {
+                    std::string err = "HTTP " + std::to_string(response.status_code);
+                    if (!response.body.empty()) err += ": " + response.body;
+                    callback(false, "", err);
+                }
+            },
+            []() {},
+            [callback](const std::string& err) {
+                callback(false, "", err);
             }
         );
     }

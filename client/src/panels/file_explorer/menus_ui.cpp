@@ -18,6 +18,20 @@ using namespace misty::core;
 
 namespace misty::panel {
 
+namespace {
+    bool can_use_local_mirror(const UnifiedFileItem& item) {
+        if (item.path.empty()) {
+            return false;
+        }
+        if (item.source != FileSource::REMOTE) {
+            return true;
+        }
+        return item.status == SyncStatus::SYNCED ||
+               item.status == SyncStatus::MODIFIED ||
+               fs::exists(item.path);
+    }
+}
+
 const UnifiedFileItem* FileExplorerPanel::find_context_menu_target(const FileExplorerState& state) const {
     for (const auto& file : state.files) {
         if (file.path == state.context_menu_target_path) {
@@ -66,7 +80,7 @@ void FileExplorerPanel::show_context_menu(FileExplorerState& state) {
             bool any_remote_with_local_mirror = false;
             for (const auto& f : state.files) {
                 if (state.selected_files.count(f.id) == 0) continue;
-                bool is_avail = (f.status == SyncStatus::LOCAL || f.status == SyncStatus::SYNCED || f.status == SyncStatus::MODIFIED);
+                const bool is_avail = can_use_local_mirror(f);
                 if (!is_avail) {
                     all_local_available = false;
                     if (f.source != FileSource::REMOTE) {
@@ -211,27 +225,68 @@ void FileExplorerPanel::show_rename_modal(FileExplorerState& state) {
             if (!new_name.empty() && !state.rename_target_path.empty()) {
                 fs::path old_path(state.rename_target_path);
                 fs::path new_path = old_path.parent_path() / new_name;
-                std::error_code ec;
-                fs::rename(old_path, new_path, ec);
-                if (!ec) {
-                    auto& notif = registry_.get_state<NotificationState>("Notifications");
-                    notif.add_notification("Renamed to " + new_name);
-                    FileOperationRecord record;
-                    record.kind = FileOperationKind::RenameLocal;
-                    record.origin_dir = old_path.parent_path().string();
-                    record.destination_dir = new_path.parent_path().string();
-                    record.description = "Renamed " + old_path.filename().string() + " to " + new_name;
-                    record.items.push_back({
-                        old_path.string(),
-                        new_path.string(),
-                        new_name,
-                        fs::is_directory(new_path)
+                const std::string current_dir(state.current_path);
+                const std::string old_name = old_path.filename().string();
+
+                auto& activity = registry_.get_state<ActivityState>("Activity");
+                activity.add_entry("File", "Renaming " + old_name + " in the background.", ActivityEntryType::INFO);
+
+                struct RenameResult {
+                    std::string error;
+                    bool is_dir = false;
+                };
+
+                auto result = std::make_shared<RenameResult>();
+                worker_pool_.add(
+                    [result, old_path, new_path]() {
+                        std::error_code ec;
+                        fs::rename(old_path, new_path, ec);
+                        if (ec) {
+                            result->error = ec.message();
+                            return;
+                        }
+
+                        std::error_code type_ec;
+                        result->is_dir = fs::is_directory(new_path, type_ec);
+                    },
+                    [this, result, current_dir, old_path, new_path, old_name, new_name]() {
+                        if (!result->error.empty()) {
+                            auto& activity = registry_.get_state<ActivityState>("Activity");
+                            activity.add_entry("File", "Rename failed: " + old_name + ": " + result->error,
+                                ActivityEntryType::ERROR);
+                            request_background_move_refresh(current_dir, current_dir);
+                            return;
+                        }
+
+                        auto& notif = registry_.get_state<NotificationState>("Notifications");
+                        notif.add_notification("Renamed to " + new_name);
+
+                        auto& activity = registry_.get_state<ActivityState>("Activity");
+                        activity.add_entry("File", "Renamed " + old_name + " to " + new_name,
+                            ActivityEntryType::SUCCESS);
+
+                        FileOperationRecord record;
+                        record.kind = FileOperationKind::RenameLocal;
+                        record.origin_dir = old_path.parent_path().string();
+                        record.destination_dir = new_path.parent_path().string();
+                        record.description = "Renamed " + old_name + " to " + new_name;
+                        record.items.push_back({
+                            old_path.string(),
+                            new_path.string(),
+                            new_name,
+                            result->is_dir
+                        });
+                        record_file_operation(std::move(record));
+                        request_background_move_refresh(current_dir, current_dir);
+                    },
+                    [this, current_dir, old_name](const std::string& err_msg) {
+                        auto& activity = registry_.get_state<ActivityState>("Activity");
+                        activity.add_entry("File", "Rename failed: " + old_name + ": " + err_msg,
+                            ActivityEntryType::ERROR);
+                        request_background_move_refresh(current_dir, current_dir);
                     });
-                    record_file_operation(std::move(record));
-                    navigate_to_path(std::string(state.current_path), false);
-                    notify_shared_path_refresh(std::string(state.current_path));
-                }
             }
+            state.rename_buffer[0] = '\0';
             state.show_rename_modal = false;
             ImGui::CloseCurrentPopup();
         }

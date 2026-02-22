@@ -58,6 +58,45 @@ CREATE TABLE IF NOT EXISTS watched_dirs (
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     PRIMARY KEY (remote_name, rel_path)
+);
+CREATE TABLE IF NOT EXISTS sync_roots (
+    id TEXT PRIMARY KEY,
+    remote_name TEXT NOT NULL UNIQUE,
+    remote_type TEXT NOT NULL DEFAULT '',
+    provider_folder TEXT NOT NULL DEFAULT '',
+    folder_name TEXT NOT NULL DEFAULT '',
+    mount_root TEXT NOT NULL,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    dirty_bit INTEGER NOT NULL DEFAULT 0,
+    last_refetch_at TEXT,
+    last_poll_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS sync_entries (
+    id TEXT PRIMARY KEY,
+    root_id TEXT NOT NULL REFERENCES sync_roots(id) ON DELETE CASCADE,
+    rel_path TEXT NOT NULL,
+    parent_rel_path TEXT NOT NULL DEFAULT '',
+    name TEXT NOT NULL,
+    is_dir INTEGER NOT NULL DEFAULT 0,
+    local_exists INTEGER NOT NULL DEFAULT 0,
+    remote_exists INTEGER NOT NULL DEFAULT 0,
+    is_dirty INTEGER NOT NULL DEFAULT 0,
+    sync_direction TEXT NOT NULL DEFAULT 'none',
+    local_mtime TEXT,
+    local_size INTEGER,
+    remote_mtime TEXT,
+    remote_size INTEGER,
+    remote_revision TEXT NOT NULL DEFAULT '',
+    mime_type TEXT NOT NULL DEFAULT '',
+    state_code TEXT NOT NULL DEFAULT '',
+    last_seen_local_at TEXT,
+    last_seen_remote_at TEXT,
+    retry_count INTEGER NOT NULL DEFAULT 0,
+    last_error TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
 );`); err != nil {
 		t.Fatalf("create test schema: %v", err)
 	}
@@ -226,5 +265,31 @@ func TestMarkLocalDirtyMarksRealLocalChange(t *testing.T) {
 	}
 	if !got.LocalDirty {
 		t.Fatal("real local change should mark row dirty")
+	}
+}
+
+func TestMarkLocalDirtyCreatesSyncQueueEntry(t *testing.T) {
+	database := setupServiceTestDB(t)
+	service := NewService(database)
+
+	if err := service.MarkLocalDirty(context.Background(), "drive-test", "docs/report.txt", true, false,
+		"2026-04-19T20:05:00Z", 256); err != nil {
+		t.Fatalf("MarkLocalDirty: %v", err)
+	}
+
+	root, err := dbpkg.GetSyncRootByRemoteName(database.Conn, "drive-test")
+	if err != nil || root == nil {
+		t.Fatalf("GetSyncRootByRemoteName: %v (root=%v)", err, root)
+	}
+
+	entries, err := dbpkg.ListSyncEntriesByParent(database.Conn, root.ID, "docs")
+	if err != nil {
+		t.Fatalf("ListSyncEntriesByParent: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 sync entry, got %d", len(entries))
+	}
+	if !entries[0].IsDirty || entries[0].SyncDirection != "push" {
+		t.Fatalf("unexpected sync entry: %+v", entries[0])
 	}
 }
