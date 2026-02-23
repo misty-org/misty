@@ -6,6 +6,8 @@
 #include <vector>
 #include <cstring>
 #include <filesystem>
+#include <chrono>
+#include <atomic>
 
 #include "core/net/http_client.h"
 #include "core/manager/session_manager.h"
@@ -14,6 +16,30 @@
 #include "core/system/util.h"
 
 namespace misty::core {
+    namespace fs = std::filesystem;
+
+    namespace {
+        fs::path staging_download_path_for(const fs::path& final_path) {
+            static std::atomic<uint64_t> counter{0};
+
+            const char* home = std::getenv("HOME");
+            fs::path root = fs::path(home ? home : "/tmp") / "misty" / "tmp" / "downloads";
+            std::error_code ec;
+            fs::create_directories(root, ec);
+
+            const auto now = std::chrono::steady_clock::now().time_since_epoch();
+            const auto ticks = std::chrono::duration_cast<std::chrono::microseconds>(now).count();
+
+            fs::path staged_name = final_path.filename();
+            if (staged_name.empty()) {
+                staged_name = "download";
+            }
+
+            return root / (std::to_string(ticks) + "-" +
+                           std::to_string(counter.fetch_add(1, std::memory_order_relaxed)) + "-" +
+                           staged_name.string());
+        }
+    }
 
     struct CurlData {
         std::string response_body;
@@ -24,6 +50,13 @@ namespace misty::core {
         std::ofstream file;
         DownloadProgressCallback progress_cb;
         std::string error_message;
+    };
+
+    struct StreamResponseData {
+        std::string response_body;
+        std::map<std::string, std::string> response_headers;
+        std::string partial_line;
+        StreamLineCallback line_callback;
     };
 
     static size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
@@ -59,6 +92,63 @@ namespace misty::core {
             data->response_headers[key] = value;
         }
         
+        return total_size;
+    }
+
+    static size_t StreamHeaderCallback(char* buffer, size_t size, size_t nitems, void* userp) {
+        size_t total_size = size * nitems;
+        StreamResponseData* data = static_cast<StreamResponseData*>(userp);
+        if (!data) {
+            return 0;
+        }
+
+        std::string header_line(buffer, total_size);
+        if (header_line.length() >= 2) {
+            header_line = header_line.substr(0, header_line.length() - 2);
+        }
+
+        size_t colon_pos = header_line.find(':');
+        if (colon_pos != std::string::npos) {
+            std::string key = header_line.substr(0, colon_pos);
+            std::string value = header_line.substr(colon_pos + 1);
+
+            key.erase(0, key.find_first_not_of(" \t"));
+            key.erase(key.find_last_not_of(" \t") + 1);
+            value.erase(0, value.find_first_not_of(" \t"));
+            value.erase(value.find_last_not_of(" \t") + 1);
+
+            data->response_headers[key] = value;
+        }
+
+        return total_size;
+    }
+
+    static size_t StreamWriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
+        size_t total_size = size * nmemb;
+        StreamResponseData* data = static_cast<StreamResponseData*>(userp);
+        if (!data) {
+            return 0;
+        }
+
+        const char* bytes = static_cast<const char*>(contents);
+        data->response_body.append(bytes, total_size);
+        data->partial_line.append(bytes, total_size);
+
+        std::size_t newline_pos = std::string::npos;
+        while ((newline_pos = data->partial_line.find('\n')) != std::string::npos) {
+            std::string line = data->partial_line.substr(0, newline_pos);
+            data->partial_line.erase(0, newline_pos + 1);
+            if (!line.empty() && line.back() == '\r') {
+                line.pop_back();
+            }
+            if (line.empty()) {
+                continue;
+            }
+            if (data->line_callback && !data->line_callback(line)) {
+                return 0;
+            }
+        }
+
         return total_size;
     }
 
@@ -109,7 +199,7 @@ namespace misty::core {
         if (status_code == 0) {
             std::string proxy_url = EnvManager::get().get("PROXY_SERVICE_URL", "");
             if (!proxy_url.empty()) {
-                HttpResponse health = execute_curl_request_with_timeouts("GET", proxy_url + "/api/ready", "", {}, 2L, 5L);
+                HttpResponse health = execute_curl_request_with_timeouts("GET", proxy_url + "/api/health", "", {}, 2L, 5L);
                 if (health.status_code != 0) {
                     SessionManager::get().mark_proxy_available();
                     return;
@@ -150,6 +240,91 @@ namespace misty::core {
                     retry_headers[key] = value;
                 }
                 response = execute_curl_request_with_timeouts("GET", url, "", retry_headers, connect_timeout_seconds, total_timeout_seconds);
+                update_proxy_status(url, response.status_code);
+            } else if (refresh_result == RefreshResult::Failed) {
+                SessionManager::get().mark_session_expired();
+            }
+            is_refreshing_.store(false);
+        }
+
+        return response;
+    }
+
+    HttpResponse HTTPClient::get_stream_with_timeouts(const std::string& url,
+                                                      long connect_timeout_seconds,
+                                                      long total_timeout_seconds,
+                                                      StreamLineCallback line_callback,
+                                                      const std::map<std::string, std::string>& headers) {
+        auto merged_headers = SessionManager::get().get_auth_headers();
+        for (const auto& [key, value] : headers) {
+            merged_headers[key] = value;
+        }
+
+        auto execute_stream_request = [&](const std::map<std::string, std::string>& request_headers) {
+            HttpResponse response;
+            response.status_code = 0;
+
+            CURL* curl = curl_easy_init();
+            if (!curl) {
+                std::cerr << "Failed to initialize CURL" << std::endl;
+                return response;
+            }
+
+            StreamResponseData data;
+            data.line_callback = line_callback;
+
+            curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+            curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, StreamWriteCallback);
+            curl_easy_setopt(curl, CURLOPT_WRITEDATA, &data);
+            curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, StreamHeaderCallback);
+            curl_easy_setopt(curl, CURLOPT_HEADERDATA, &data);
+            curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+            curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, connect_timeout_seconds);
+            curl_easy_setopt(curl, CURLOPT_TIMEOUT, total_timeout_seconds);
+
+            struct curl_slist* header_list = nullptr;
+            for (const auto& [key, value] : request_headers) {
+                std::string header = key + ": " + value;
+                header_list = curl_slist_append(header_list, header.c_str());
+            }
+            if (header_list) {
+                curl_easy_setopt(curl, CURLOPT_HTTPHEADER, header_list);
+            }
+
+            CURLcode res = curl_easy_perform(curl);
+            if (res == CURLE_OK) {
+                long response_code = 0;
+                curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response_code);
+                response.status_code = static_cast<int>(response_code);
+                response.body = data.response_body;
+                response.headers = data.response_headers;
+            } else {
+                std::cerr << "CURL error: " << curl_easy_strerror(res) << std::endl;
+            }
+
+            if (header_list) {
+                curl_slist_free_all(header_list);
+            }
+            curl_easy_cleanup(curl);
+            return response;
+        };
+
+        HttpResponse response = execute_stream_request(merged_headers);
+        if (response.status_code == 0 && is_proxy_url(url) && ProxyManager::get().ensure_running()) {
+            response = execute_stream_request(merged_headers);
+        }
+        update_proxy_status(url, response.status_code);
+
+        if (response.status_code == 401 &&
+            !SessionManager::get().is_session_expired() &&
+            !is_refreshing_.exchange(true)) {
+            RefreshResult refresh_result = attempt_token_refresh();
+            if (refresh_result == RefreshResult::Success) {
+                auto retry_headers = SessionManager::get().get_auth_headers();
+                for (const auto& [key, value] : headers) {
+                    retry_headers[key] = value;
+                }
+                response = execute_stream_request(retry_headers);
                 update_proxy_status(url, response.status_code);
             } else if (refresh_result == RefreshResult::Failed) {
                 SessionManager::get().mark_session_expired();
@@ -224,10 +399,6 @@ namespace misty::core {
             std::cerr << "Failed to initialize CURL" << std::endl;
             return response;
         }
-        std::string ca_cert = EnvManager::get().get("SSL_CERT_PATH", "");
-        if (!ca_cert.empty()) {
-            curl_easy_setopt(curl, CURLOPT_CAINFO, ca_cert.c_str());
-        }
 
         CurlData data;
 
@@ -243,9 +414,11 @@ namespace misty::core {
         // Set HTTP method
         if (method == "POST") {
             curl_easy_setopt(curl, CURLOPT_POSTFIELDS, body.c_str());
+            curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE_LARGE, static_cast<curl_off_t>(body.size()));
         } else if (method == "PUT") {
             curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PUT");
             curl_easy_setopt(curl, CURLOPT_POSTFIELDS, body.c_str());
+            curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE_LARGE, static_cast<curl_off_t>(body.size()));
         } else if (method == "DELETE") {
             curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
         }
@@ -306,11 +479,11 @@ namespace misty::core {
         result.final_status_code = 0;
 
         fs::path final_path(local_path);
-        fs::path temp_path = final_path;
-        temp_path += ".part";
+        fs::path temp_path = staging_download_path_for(final_path);
 
         std::error_code ec;
         fs::create_directories(final_path.parent_path(), ec);
+        fs::create_directories(temp_path.parent_path(), ec);
 
         DownloadFileData data;
         data.file.open(temp_path, std::ios::binary | std::ios::trunc);
@@ -425,12 +598,8 @@ namespace misty::core {
                 auto json_resp = nlohmann::json::parse(response.body);
                 std::string new_token = json_resp["token"].get<std::string>();
                 std::string new_refresh = json_resp["refresh_token"].get<std::string>();
-                SessionManager::get().update_tokens(new_token, new_refresh);
-                if (json_resp.contains("license_token")) {
-                    auto lic = json_resp["license_token"].get<std::string>();
-                    if (!lic.empty()) {
-                        SessionManager::get().set_license_token(lic);
-                    }
+                if (!SessionManager::get().update_tokens(new_token, new_refresh)) {
+                    std::cerr << "[HTTPClient] Token refresh succeeded but session persistence failed" << std::endl;
                 }
                 std::cerr << "[HTTPClient] Token refresh succeeded" << std::endl;
                 return RefreshResult::Success;

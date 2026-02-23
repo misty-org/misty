@@ -1,12 +1,11 @@
-// Package jobs provides a small in-process job manager for long-running
-// operations (backups, restores, prunes, integrity checks). Each job runs in
-// its own goroutine, can be cancelled via context, and exposes a fan-out
-// stream of progress events for SSE/WebSocket subscribers.
+// Package utils provides small reusable primitives shared across proxy
+// subsystems. jobs.go contains the in-process job manager used for long-running
+// operations that need cancellable execution and progress fan-out.
 //
-// The package is intentionally generic — events carry an opaque Payload so
-// callers can stream restic-specific (or any other) progress structs without
-// the jobs package needing to know about them.
-package jobs
+// The job manager is intentionally generic: events carry an opaque Payload so
+// callers can stream restic-specific or other subsystem-specific progress
+// structs without this package knowing their shape.
+package utils
 
 import (
 	"context"

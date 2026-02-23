@@ -74,26 +74,33 @@ namespace misty::panel {
             
             // Handle response
             if (response.status_code == 200 || response.status_code == 201) {
-                // Parse tokens from response and store them
                 try {
                     auto json_resp = nlohmann::json::parse(response.body);
-                    if (json_resp.contains("token") && json_resp.contains("refresh_token")) {
-                        core::SessionManager::get().set_tokens(
-                            json_resp["token"].get<std::string>(),
-                            json_resp["refresh_token"].get<std::string>()
-                        );
-                    } else if (json_resp.contains("token")) {
-                        core::SessionManager::get().set_tokens(json_resp["token"].get<std::string>(), "");
+
+                    if (!json_resp.contains("token") || !json_resp.contains("refresh_token")) {
+                        error_msg = "Login response is missing session tokens";
+                        return;
                     }
-                    if (json_resp.contains("license_token") && !json_resp["license_token"].get<std::string>().empty()) {
-                        core::SessionManager::get().set_license_token(json_resp["license_token"].get<std::string>());
+
+                    const std::string token = json_resp["token"].get<std::string>();
+                    const std::string refresh_token = json_resp["refresh_token"].get<std::string>();
+                    if (token.empty() || refresh_token.empty()) {
+                        error_msg = "Login response included an empty session token";
+                        return;
                     }
+
+                    if (!core::SessionManager::get().set_tokens(token, refresh_token)) {
+                        error_msg = "Login succeeded but the session could not be saved locally";
+                        return;
+                    }
+
                     if (json_resp.contains("id") && !json_resp["id"].get<std::string>().empty()) {
                         core::SessionManager::get().set_user_id(json_resp["id"].get<std::string>());
                     }
                     core::SessionManager::get().set_email(std::string(email));
-                } catch (...) {
-                    // Token storage failed, but login succeeded
+                } catch (const std::exception& e) {
+                    error_msg = std::string("Login response could not be processed: ") + e.what();
+                    return;
                 }
                 success_msg = "Login successful!";
                 clear_inputs();

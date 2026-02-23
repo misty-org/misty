@@ -10,29 +10,28 @@ import (
 	"github.com/kannachi323/misty/proxy/api"
 	"github.com/kannachi323/misty/proxy/api/remote"
 	"github.com/kannachi323/misty/proxy/api/vault"
-	"github.com/kannachi323/misty/proxy/core/ai"
-	"github.com/kannachi323/misty/proxy/core/auth"
-	"github.com/kannachi323/misty/proxy/core/license"
+	"github.com/kannachi323/misty/proxy/core/setup"
 	"github.com/kannachi323/misty/proxy/core/syncindex"
 	"github.com/kannachi323/misty/proxy/db"
+	authmw "github.com/kannachi323/misty/proxy/middleware"
 )
 
 type Proxy struct {
-	Router         *chi.Mux
-	APIRouter      *chi.Mux
-	Port           int
-	Database       *db.Database
-	SyncIndex      *syncindex.Service
-	SyncManager    *syncindex.Manager
-	SyncPoller     *syncindex.Poller
-	LicenseManager *license.Manager
-	VaultService   *vault.Service
-	AIService      *ai.Service
+	Router       *chi.Mux
+	APIRouter    *chi.Mux
+	Port         int
+	ServerURL    string
+	Database     *db.Database
+	SyncIndex    *syncindex.Service
+	SyncManager  *syncindex.Manager
+	SyncPoller   *syncindex.Poller
+	VaultService *vault.Service
 }
 
-func CreateProxy() (*Proxy, error) {
+func CreateProxy(cfg setup.Config) (*Proxy, error) {
 	proxy := &Proxy{
-		Router: chi.NewRouter(),
+		Router:    chi.NewRouter(),
+		ServerURL: cfg.Server.URL,
 	}
 	proxy.Router.Route("/api", func(r chi.Router) {
 		proxy.APIRouter = r.(*chi.Mux)
@@ -43,9 +42,7 @@ func CreateProxy() (*Proxy, error) {
 	staticDir := filepath.Join(workDir, "static")
 	proxy.Router.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.Dir(staticDir))))
 	proxy.Database = &db.Database{}
-	proxy.LicenseManager = license.NewManager(proxy.Database)
 	proxy.VaultService = vault.NewService()
-	proxy.AIService = ai.NewServiceFromEnv()
 
 	return proxy, nil
 }
@@ -62,28 +59,19 @@ func (proxy *Proxy) MountHandlers() {
 
 	//////--------------------------
 	// DO NOT REMOVE THIS
-	proxy.APIRouter.Get("/hello", api.HelloWorld())
+	proxy.APIRouter.Get("/remotes/health", remote.Health())
 	//////--------------------------
 
 	// Public routes (no auth required)
-	proxy.APIRouter.Post("/register", api.RegisterUser(proxy.Database))
-	proxy.APIRouter.Post("/login", api.LoginUser(proxy.Database, proxy.LicenseManager))
+	proxy.APIRouter.Post("/register", api.RegisterUser(proxy.Database, proxy.ServerURL))
+	proxy.APIRouter.Post("/login", api.LoginUser(proxy.Database, proxy.ServerURL))
 	proxy.APIRouter.Post("/logout", api.LogoutUser(proxy.Database))
-	proxy.APIRouter.Post("/refresh", api.RefreshToken(proxy.Database, proxy.LicenseManager))
-	proxy.APIRouter.Get("/ready", api.Ready(proxy.Port))
-	proxy.APIRouter.Get("/remotes/health", remote.Health())
+	proxy.APIRouter.Post("/refresh", api.RefreshToken(proxy.Database))
+	proxy.APIRouter.Get("/health", api.Health())
 
 	// Protected routes (JWT required)
 	proxy.APIRouter.Group(func(r chi.Router) {
-		r.Use(auth.JWTMiddleware)
-
-		r.Get("/license", api.GetLicense(proxy.LicenseManager))
-		r.Post("/ai/file-context", api.AskFileContext(proxy.AIService))
-
-		r.Get("/devices", api.GetDevices(proxy.Database))
-		r.Post("/devices", api.RegisterDevice(proxy.Database))
-		r.Put("/devices", api.UpdateDevice(proxy.Database))
-		r.Delete("/devices", api.DeleteDevice(proxy.Database))
+		r.Use(authmw.JWTMiddleware(proxy.Database))
 
 		// ---- rclone unified endpoints ----
 		r.Get("/remotes", remote.ListRemotes())
@@ -108,18 +96,15 @@ func (proxy *Proxy) MountHandlers() {
 		r.Delete("/file", remote.DeleteFile())
 		r.Get("/search", remote.Search())
 		r.Get("/about", remote.AboutRemote())
+		r.Post("/remotes", remote.CreateRemote())
+		r.Post("/remotes/config/start", remote.ConfigStart())
 
-		r.Group(func(r chi.Router) {
-			r.Use(proxy.LicenseManager.RequireRemoteQuota(3, nil))
-			r.Post("/remotes", remote.CreateRemote())
-			r.Post("/remotes/config/start", remote.ConfigStart())
-		})
-
-		// ---- mvault (restic) endpoints ----
+		// vault
 		v := proxy.VaultService
 
 		r.Get("/vault/health", v.Health())
 		r.Get("/vault/repos", v.ListRepos())
+		r.Post("/vault/repos", v.CreateRepo())
 		r.Delete("/vault/repos", v.DeleteRepo())
 		r.Get("/vault/repos/stats", v.RepoStats())
 		r.Post("/vault/repos/check", v.CheckRepo())
@@ -128,6 +113,7 @@ func (proxy *Proxy) MountHandlers() {
 		r.Get("/vault/snapshots", v.ListSnapshots())
 		r.Get("/vault/snapshots/files", v.BrowseSnapshot())
 
+		r.Post("/vault/backup", v.StartBackup())
 		r.Post("/vault/restore", v.StartRestore())
 		r.Post("/vault/forget", v.StartForget())
 
@@ -136,10 +122,5 @@ func (proxy *Proxy) MountHandlers() {
 		r.Get("/vault/jobs/{id}/stream", v.StreamJob())
 		r.Post("/vault/jobs/{id}/cancel", v.CancelJob())
 
-		r.Group(func(r chi.Router) {
-			r.Use(proxy.LicenseManager.RequireVaultQuota(1, nil))
-			r.Post("/vault/repos", v.CreateRepo())
-			r.Post("/vault/backup", v.StartBackup())
-		})
 	})
 }

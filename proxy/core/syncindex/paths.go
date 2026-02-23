@@ -28,7 +28,7 @@ func remotesMetadataPath() string {
 	if err != nil || home == "" {
 		home = "."
 	}
-	return filepath.Join(home, "misty", "remotes.json")
+	return filepath.Join(home, "misty", "rclone", "remotes.json")
 }
 
 type remoteMetadata struct {

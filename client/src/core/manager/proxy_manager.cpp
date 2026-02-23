@@ -169,11 +169,6 @@ bool ProxyManager::wait_until_ready(std::chrono::milliseconds timeout) const {
 }
 
 std::string ProxyManager::resolve_proxy_executable() const {
-    const std::string configured = EnvManager::get().get("MISTY_PROXY_PATH", "");
-    if (!configured.empty() && fs::exists(configured)) {
-        return configured;
-    }
-
     const fs::path exe_dir = get_executable_path().parent_path();
     const std::vector<fs::path> candidates = {
         exe_dir / kProxyBinaryName,

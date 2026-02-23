@@ -12,6 +12,34 @@
 namespace fs = std::filesystem;
 
 namespace misty::core {
+namespace {
+
+fs::path legacy_open_with_path() {
+    return fs::path(EnvManager::get().get_user_home_dir()) / ".misty" / "open_with.json";
+}
+
+fs::path settings_path() {
+    return fs::path(EnvManager::get().get_user_home_dir()) / "misty" / "config" / "settings.json";
+}
+
+nlohmann::json load_settings_document(const fs::path& path) {
+    std::ifstream file(path);
+    if (!file.is_open()) {
+        return nlohmann::json::object();
+    }
+
+    try {
+        nlohmann::json json;
+        file >> json;
+        if (json.is_object()) {
+            return json;
+        }
+    } catch (...) {
+    }
+    return nlohmann::json::object();
+}
+
+} // namespace
 
 OpenWithManager& OpenWithManager::get() {
     static OpenWithManager instance;
@@ -50,23 +78,31 @@ void OpenWithManager::load_if_needed() {
     }
     loaded_ = true;
 
-    std::ifstream file(storage_path());
-    if (!file.is_open()) {
-        return;
-    }
-
-    try {
-        nlohmann::json json;
-        file >> json;
+    auto load_associations = [&](const nlohmann::json& json) {
         if (!json.is_object()) {
-            return;
+            return false;
         }
         for (auto it = json.begin(); it != json.end(); ++it) {
             if (it.value().is_string()) {
                 associations_[it.key()] = it.value().get<std::string>();
             }
         }
-    } catch (...) {
+        return true;
+    };
+
+    const fs::path path = storage_path();
+    nlohmann::json settings = load_settings_document(path);
+    const bool has_open_with_settings =
+        settings.contains("open_with") && settings["open_with"].is_object();
+    if (has_open_with_settings && load_associations(settings["open_with"])) {
+        return;
+    }
+
+    nlohmann::json legacy = load_settings_document(legacy_open_with_path());
+    if (load_associations(legacy)) {
+        save();
+        std::error_code ec;
+        fs::remove(legacy_open_with_path(), ec);
     }
 }
 
@@ -75,16 +111,19 @@ void OpenWithManager::save() const {
     std::error_code ec;
     fs::create_directories(path.parent_path(), ec);
 
-    nlohmann::json json = nlohmann::json::object();
+    nlohmann::json open_with = nlohmann::json::object();
     for (const auto& [key, value] : associations_) {
-        json[key] = value;
+        open_with[key] = value;
     }
+
+    nlohmann::json settings = load_settings_document(path);
+    settings["open_with"] = std::move(open_with);
 
     std::ofstream file(path);
     if (!file.is_open()) {
         return;
     }
-    file << json.dump(2);
+    file << settings.dump(2);
 }
 
 std::string OpenWithManager::association_key_for_path(const std::string& file_path) const {
@@ -101,7 +140,7 @@ std::string OpenWithManager::association_key_for_path(const std::string& file_pa
 }
 
 std::string OpenWithManager::storage_path() const {
-    return (fs::path(EnvManager::get().get_user_home_dir()) / ".misty" / "open_with.json").string();
+    return settings_path().string();
 }
 
 } // namespace misty::core

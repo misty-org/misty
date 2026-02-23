@@ -3,6 +3,7 @@
 #include "core/threading/worker_pool.h"
 #include "core/threading/file_sync_service.h"
 #include "panels/errors/errors_panel.h"
+#include "panels/transfers/transfer_window_panel.h"
 #include "views/app_view.h"
 #include <memory>
 #include <utility>
@@ -37,6 +38,7 @@ namespace misty {
         std::shared_ptr<MistyClient> client_;
         std::unique_ptr<core::FileSyncService> file_sync_service_;
         panel::ErrorsPanel errors_panel_;
+        std::unique_ptr<panel::TransferWindowPanel> transfer_window_panel_;
 
     };  
 };

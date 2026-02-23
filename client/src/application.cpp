@@ -105,6 +105,7 @@ namespace misty {
 
             init_views();
             append_startup_log("startup: views initialized");
+            transfer_window_panel_ = std::make_unique<panel::TransferWindowPanel>(ui_registry_);
 
             
         } catch (const std::exception& e) {
@@ -121,6 +122,9 @@ namespace misty {
             prepare_frame();
 
             view::render_current_view();
+            if (transfer_window_panel_) {
+                transfer_window_panel_->render();
+            }
             errors_panel_.render();
             core::PluginHost::get().process_shortcuts();
             core::PluginHost::get().render_open_panels();

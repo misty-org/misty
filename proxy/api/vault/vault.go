@@ -8,17 +8,16 @@ import (
 	"net/http"
 
 	"github.com/kannachi323/misty/proxy/core/restic"
-
-	"github.com/kannachi323/misty/proxy/core/jobs"
+	jobutil "github.com/kannachi323/misty/proxy/core/utils"
 )
 
 // Service is the long-lived state shared across MVault HTTP handlers.
 type Service struct {
-	Jobs *jobs.Manager
+	Jobs *jobutil.Manager
 }
 
 func NewService() *Service {
-	return &Service{Jobs: jobs.NewManager()}
+	return &Service{Jobs: jobutil.NewManager()}
 }
 
 // lookupRepoByQuery resolves the repo from the "repo" query parameter and

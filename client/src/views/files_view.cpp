@@ -34,6 +34,12 @@ namespace misty::view {
         notification_panel_ = std::make_shared<panel::NotificationPanel>(ui_registry_);
         claude_panel_ = std::make_shared<panel::ClaudePanel>(ui_registry_, worker_pool_);
         filetree_panel_ = std::make_shared<panel::FileTreePanel>(ui_registry_, worker_pool_, client_);
+        file_sidebar_panel_->set_file_drop_handler(
+            [this](const std::string& source_state_key, const std::string& dest_path, panel::ClipboardOp op) {
+                if (filetree_panel_) {
+                    filetree_panel_->drop_selected_items_to_path(source_state_key, dest_path, op);
+                }
+            });
     }
 
     view::ViewID FilesView::get_view_id() {
