@@ -214,9 +214,13 @@ void TransferWindowPanel::render() {
         return;
     }
 
+    ImGuiViewport* viewport = ImGui::GetMainViewport();
+    if (!ImGui::IsPopupOpen("Transfers")) {
+        ImGui::OpenPopup("Transfers");
+    }
+
     const bool reset_layout = window_state.consume_layout_reset_request();
     if (reset_layout) {
-        ImGuiViewport* viewport = ImGui::GetMainViewport();
         const ImVec2 size(860.0f, 520.0f);
         const ImVec2 pos(
             viewport->WorkPos.x + (viewport->WorkSize.x - size.x) * 0.5f,
@@ -227,21 +231,18 @@ void TransferWindowPanel::render() {
         ImGui::SetNextWindowSize(ImVec2(860.0f, 520.0f), ImGuiCond_FirstUseEver);
     }
 
+    ImGui::SetNextWindowViewport(viewport->ID);
+
     if (window_state.consume_focus_request()) {
         ImGui::SetNextWindowFocus();
     }
 
-    if (window_state.prefer_external_viewport()) {
-        ImGuiWindowClass window_class;
-        window_class.DockingAllowUnclassed = true;
-        ImGui::SetNextWindowClass(&window_class);
-    }
-
     bool open = true;
-    ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse;
+    ImGuiWindowFlags flags =
+        ImGuiWindowFlags_NoCollapse |
+        ImGuiWindowFlags_NoDocking;
 
-    if (!ImGui::Begin("Transfers", &open, flags)) {
-        ImGui::End();
+    if (!ImGui::BeginPopupModal("Transfers", &open, flags)) {
         if (!open) {
             window_state.close();
         }
@@ -260,7 +261,7 @@ void TransferWindowPanel::render() {
     ImGui::BeginChild("##transfer_header", ImVec2(0.0f, 92.0f), true, ImGuiWindowFlags_NoScrollbar);
 
     ImGui::TextUnformatted("File Transfer Monitor");
-    ImGui::TextDisabled("Dockable utility window for uploads and downloads. Detached OS windows are ready once multi-viewport is enabled.");
+    ImGui::TextDisabled("Floating transfer window for uploads and downloads.");
 
     ImGui::Spacing();
     ImGui::Text("Active %zu", summary.active);
@@ -373,7 +374,7 @@ void TransferWindowPanel::render() {
         ImGui::EndTable();
     }
 
-    ImGui::End();
+    ImGui::EndPopup();
 }
 
 }  // namespace misty::panel

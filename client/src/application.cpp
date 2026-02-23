@@ -17,6 +17,7 @@
 #include "panels/file_explorer/file_explorer_state.h"
 #include "panels/onboarding/onboarding_state.h"
 #include "panels/onboarding/boot_loader.h"
+#include "panels/transfers/transfer_window_state.h"
 
 #include <cstdlib>
 #include <filesystem>
@@ -94,8 +95,6 @@ namespace misty {
             append_startup_log("startup: plugins discovered");
             core::CommandManager::get().load();
             append_startup_log("startup: commands loaded");
-            core::ProxyManager::get().ensure_running();
-            append_startup_log("startup: proxy ensure_running returned");
             //init_file_sync();
             
             // Initialize and start background file status sync
@@ -121,13 +120,18 @@ namespace misty {
         while (is_running()) {
             prepare_frame();
 
-            view::render_current_view();
-            if (transfer_window_panel_) {
-                transfer_window_panel_->render();
+            if (core::CommandManager::get().matches("app.toggle_transfers")) {
+                ui_registry_.get_state<panel::TransferWindowState>(
+                    panel::kTransferWindowStateKey).toggle();
             }
+
+            view::render_current_view();
             errors_panel_.render();
             core::PluginHost::get().process_shortcuts();
             core::PluginHost::get().render_open_panels();
+            if (transfer_window_panel_) {
+                transfer_window_panel_->render();
+            }
             render_frame();
         }
         if (file_sync_service_) {

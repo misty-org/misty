@@ -30,7 +30,7 @@ namespace misty::view {
 
     private:
         void init_panels();
-        void schedule_proxy_probe();
+        void schedule_proxy_probe(bool force = false);
         float render_proxy_status_banner(const ImVec2& pos, float width);
 
     private:

@@ -28,6 +28,74 @@ struct DefaultCommandEntry {
     const char* shortcut;
 };
 
+void write_command_block(std::ostream& out, const DefaultCommandEntry& entry) {
+    out << entry.id << " {\n";
+    out << "  key = \"" << entry.shortcut << "\"\n";
+    out << "}\n\n";
+}
+
+std::unordered_map<std::string, std::string> parse_command_file_shortcuts(const std::filesystem::path& path) {
+    std::unordered_map<std::string, std::string> shortcuts;
+
+    std::ifstream input(path);
+    if (!input.is_open()) {
+        return shortcuts;
+    }
+
+    std::string current_command;
+    std::string line;
+    while (std::getline(input, line)) {
+        const std::string trimmed = trim_copy(line);
+        if (trimmed.empty() || trimmed[0] == '#') {
+            continue;
+        }
+
+        const size_t brace = trimmed.find('{');
+        if (brace != std::string::npos) {
+            current_command = trim_copy(trimmed.substr(0, brace));
+            continue;
+        }
+
+        if (trimmed == "}") {
+            current_command.clear();
+            continue;
+        }
+
+        const size_t eq = trimmed.find('=');
+        if (eq == std::string::npos) {
+            continue;
+        }
+
+        const std::string key = trim_copy(trimmed.substr(0, eq));
+        std::string value = trim_copy(trimmed.substr(eq + 1));
+        if (value.size() >= 2 && value.front() == '"' && value.back() == '"') {
+            value = value.substr(1, value.size() - 2);
+        }
+
+        if (!current_command.empty()) {
+#if defined(__APPLE__)
+            if (key == "mac") {
+                shortcuts[current_command] = value;
+            } else if (key == "key" && !shortcuts.contains(current_command)) {
+                shortcuts[current_command] = value;
+            }
+#else
+            if (key == "key") {
+                shortcuts[current_command] = value;
+            }
+#endif
+            continue;
+        }
+
+        // Legacy fallback: command.id = Shortcut
+        if (!key.empty() && !value.empty()) {
+            shortcuts[key] = value;
+        }
+    }
+
+    return shortcuts;
+}
+
 const std::vector<DefaultCommandEntry>& default_command_entries() {
 #if defined(__APPLE__)
 #define MISTY_PRIMARY_SHORTCUT "Cmd"
@@ -66,6 +134,7 @@ const std::vector<DefaultCommandEntry>& default_command_entries() {
         {"explorer.tab_8", MISTY_PRIMARY_SHORTCUT "+8"},
         {"explorer.tab_9", MISTY_PRIMARY_SHORTCUT "+9"},
         {"app.open_settings", MISTY_PRIMARY_SHORTCUT "+Comma"},
+        {"app.toggle_transfers", MISTY_PRIMARY_SHORTCUT "+Shift+Y"},
         {"auth.submit", "Enter"},
         {"modal.confirm", "Enter"},
         {"modal.cancel", "Escape"},
@@ -100,11 +169,14 @@ void ensure_user_commands_file(const std::filesystem::path& user_path) {
 
     file << "# Misty keyboard commands\n";
     file << "# Runtime source of truth: ~/misty/config/commands.msy\n";
-    file << "# Format: command.id = Shortcut\n";
-    file << "# Modifiers: Cmd, Ctrl, Shift, Alt\n\n";
+    file << "# Format:\n";
+    file << "# command.id {\n";
+    file << "#   key = \"CmdOrCtrl+K\"\n";
+    file << "#   mac = \"Enter\"   # optional platform override\n";
+    file << "# }\n\n";
 
     for (const auto& entry : default_command_entries()) {
-        file << entry.id << " = " << entry.shortcut << "\n";
+        write_command_block(file, entry);
     }
 }
 
@@ -113,28 +185,10 @@ void sync_missing_user_commands(const std::filesystem::path& user_path) {
         return;
     }
 
-    std::ifstream input(user_path);
-    if (!input.is_open()) {
-        return;
-    }
-
+    const auto parsed = parse_command_file_shortcuts(user_path);
     std::unordered_set<std::string> existing_keys;
-    std::string line;
-    while (std::getline(input, line)) {
-        const std::string trimmed = trim_copy(line);
-        if (trimmed.empty() || trimmed[0] == '#') {
-            continue;
-        }
-
-        const size_t eq = trimmed.find('=');
-        if (eq == std::string::npos) {
-            continue;
-        }
-
-        const std::string key = trim_copy(trimmed.substr(0, eq));
-        if (!key.empty()) {
-            existing_keys.insert(key);
-        }
+    for (const auto& [key, _] : parsed) {
+        existing_keys.insert(key);
     }
 
     std::ofstream output(user_path, std::ios::app);
@@ -151,7 +205,7 @@ void sync_missing_user_commands(const std::filesystem::path& user_path) {
             output << "\n# Added automatically after upgrading Misty\n";
             wrote_header = true;
         }
-        output << entry.id << " = " << entry.shortcut << "\n";
+        write_command_block(output, entry);
     }
 }
 
@@ -174,18 +228,43 @@ void sync_updated_default_shortcuts(const std::filesystem::path& user_path) {
     }
 
     std::vector<std::string> lines;
+    std::string current_command;
     std::string line;
     bool updated = false;
     while (std::getline(input, line)) {
         const std::string trimmed = trim_copy(line);
-        if (!trimmed.empty() && trimmed[0] != '#') {
+        const size_t brace = trimmed.find('{');
+        if (!trimmed.empty() && trimmed[0] != '#' && brace != std::string::npos) {
+            current_command = trim_copy(trimmed.substr(0, brace));
+        } else if (trimmed == "}") {
+            current_command.clear();
+        } else if (!trimmed.empty() && trimmed[0] != '#') {
             const size_t eq = trimmed.find('=');
             if (eq != std::string::npos) {
                 const std::string key = trim_copy(trimmed.substr(0, eq));
-                const std::string value = trim_copy(trimmed.substr(eq + 1));
-                if (key == "explorer.close_pane" && value == legacy_close) {
-                    line = "explorer.close_pane = " + updated_close;
-                    updated = true;
+                std::string value = trim_copy(trimmed.substr(eq + 1));
+                if (value.size() >= 2 && value.front() == '"' && value.back() == '"') {
+                    value = value.substr(1, value.size() - 2);
+                }
+
+                if (current_command == "explorer.close_pane") {
+#if defined(__APPLE__)
+                    if ((key == "mac" || key == "key") && value == legacy_close) {
+                        line = "  " + key + " = \"" + updated_close + "\"";
+                        updated = true;
+                    }
+#else
+                    if (key == "key" && value == legacy_close) {
+                        line = "  key = \"" + updated_close + "\"";
+                        updated = true;
+                    }
+#endif
+                } else if (current_command.empty()) {
+                    const std::string parsed_key = trim_copy(trimmed.substr(0, eq));
+                    if (parsed_key == "explorer.close_pane" && value == legacy_close) {
+                        line = "explorer.close_pane = " + updated_close;
+                        updated = true;
+                    }
                 }
             }
         }
@@ -277,21 +356,11 @@ void CommandManager::load_defaults() {
 }
 
 void CommandManager::load_from_file(const std::string& path) {
-    std::ifstream file(path);
-    if (!file.is_open()) return;
-
-    std::string line;
-    while (std::getline(file, line)) {
-        std::string trimmed = trim(line);
-        if (trimmed.empty() || trimmed[0] == '#') continue;
-
-        size_t eq = trimmed.find('=');
-        if (eq == std::string::npos) continue;
-
-        std::string key = trim(trimmed.substr(0, eq));
-        std::string value = trim(trimmed.substr(eq + 1));
-        if (key.empty() || value.empty()) continue;
-
+    const auto parsed = parse_command_file_shortcuts(path);
+    for (const auto& [key, value] : parsed) {
+        if (key.empty() || value.empty()) {
+            continue;
+        }
         user_shortcut_overrides_[key] = value;
         shortcuts_[key] = parse_shortcut(value);
     }
@@ -306,7 +375,7 @@ CommandManager::Shortcut CommandManager::parse_shortcut(const std::string& value
         std::string normalized = upper(trim(token));
         if (normalized.empty()) continue;
 
-        if (normalized == "PRIMARY") shortcut.primary = true;
+        if (normalized == "PRIMARY" || normalized == "CMDORCTRL") shortcut.primary = true;
         else if (normalized == "SHIFT") shortcut.shift = true;
         else if (normalized == "ALT" || normalized == "OPTION") shortcut.alt = true;
         else if (normalized == "CTRL" || normalized == "CONTROL") shortcut.ctrl = true;

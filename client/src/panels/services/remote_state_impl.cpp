@@ -7,11 +7,13 @@
 #include "core/system/util.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cctype>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <thread>
 #include <unordered_set>
 #include <nlohmann/json.hpp>
 
@@ -20,6 +22,8 @@ namespace misty::panel {
     using json = nlohmann::json;
 
     namespace {
+        constexpr int kInitialRemotesFetchMaxAttempts = 8;
+        constexpr auto kInitialRemotesFetchRetryInterval = std::chrono::seconds(2);
         constexpr long kSyncListConnectTimeoutSeconds = 10L;
         constexpr long kSyncListTotalTimeoutSeconds = 60L;
         constexpr long kSyncRefetchConnectTimeoutSeconds = 10L;
@@ -226,9 +230,7 @@ namespace misty::panel {
             std::lock_guard<std::mutex> lock(mu);
             load_remote_aliases_locked();
         }
-        refresh_connections();
-        refresh_provider_types();
-        refresh_rclone_health();
+        refresh_connections(true);
     }
 
     void ServicesState::load_remote_aliases_locked() {
@@ -316,59 +318,110 @@ namespace misty::panel {
     }
 
     void ServicesState::refresh_connections() {
+        refresh_connections(false);
+    }
+
+    void ServicesState::refresh_connections(bool allow_background_retry) {
         if (!worker_pool_) return;
 
         {
             std::lock_guard<std::mutex> lock(mu);
+            if (is_refreshing) {
+                return;
+            }
             error_msg.clear();
             is_refreshing = true;
         }
 
         worker_pool_->add(
-            [this]() {
-                std::string base = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
-                if (base.empty()) {
-                    std::lock_guard<std::mutex> lock(mu);
-                    error_msg = "PROXY_SERVICE_URL not set";
-                    is_refreshing = false;
-                    initial_load_done = true;
-                    return;
+            [this, allow_background_retry]() {
+                struct RefreshOutcome {
+                    bool success = false;
+                    bool should_retry = false;
+                    std::set<RemoteConnection> fetched_connections;
+                    std::string error;
+                };
+
+                const int max_attempts = allow_background_retry ? kInitialRemotesFetchMaxAttempts : 1;
+                RefreshOutcome final_outcome;
+
+                for (int attempt = 1; attempt <= max_attempts; ++attempt) {
+                    RefreshOutcome attempt_outcome;
+                    std::string base = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
+                    if (base.empty()) {
+                        attempt_outcome.error = "PROXY_SERVICE_URL not set";
+                    } else {
+                        std::map<std::string, std::string> headers;
+                        headers["Accept"] = "application/json";
+
+                        auto response = core::HTTPClient::get().get(base + "/api/remotes", headers);
+                        if (response.status_code >= 200 && response.status_code < 300) {
+                            try {
+                                auto parsed = nlohmann::json::parse(response.body);
+                                if (!parsed.is_array()) {
+                                    attempt_outcome.error = "Failed to parse remotes: expected array response";
+                                } else {
+                                    std::unordered_map<std::string, std::string> aliases;
+                                    {
+                                        std::lock_guard<std::mutex> lock(mu);
+                                        aliases = remote_aliases_;
+                                    }
+
+                                    for (const auto& obj : parsed) {
+                                        RemoteConnection conn;
+                                        conn.name = obj.value("name", std::string(""));
+                                        conn.type = obj.value("type", std::string(""));
+                                        conn.display_name = display_name_for_type(conn.type);
+                                        auto alias_it = aliases.find(conn.name);
+                                        if (alias_it != aliases.end()) {
+                                            conn.alias = alias_it->second;
+                                        }
+                                        conn.connected = true;
+                                        if (!conn.name.empty()) {
+                                            attempt_outcome.fetched_connections.insert(std::move(conn));
+                                        }
+                                    }
+                                    attempt_outcome.success = true;
+                                }
+                            } catch (const std::exception& ex) {
+                                attempt_outcome.error = std::string("Failed to parse remotes: ") + ex.what();
+                            }
+                        } else {
+                            attempt_outcome.should_retry = (response.status_code == 0);
+                            if (response.status_code > 0) {
+                                attempt_outcome.error = "Failed to fetch remotes (HTTP " +
+                                    std::to_string(response.status_code) + ")";
+                                if (!response.body.empty()) {
+                                    attempt_outcome.error += ": " + response.body;
+                                }
+                            } else {
+                                attempt_outcome.error = "Failed to fetch remotes";
+                                if (allow_background_retry && attempt == max_attempts) {
+                                    attempt_outcome.error += " after " + std::to_string(max_attempts) +
+                                        " attempts";
+                                }
+                            }
+                        }
+                    }
+
+                    final_outcome = std::move(attempt_outcome);
+                    if (final_outcome.success) {
+                        break;
+                    }
+                    if (!(allow_background_retry && final_outcome.should_retry && attempt < max_attempts)) {
+                        break;
+                    }
+                    std::this_thread::sleep_for(kInitialRemotesFetchRetryInterval);
                 }
-
-                std::map<std::string, std::string> headers;
-                headers["Accept"] = "application/json";
-
-                auto response = core::HTTPClient::get().get(base + "/api/remotes", headers);
 
                 {
                     std::lock_guard<std::mutex> lock(mu);
-                    if (response.status_code >= 200 && response.status_code < 300) {
-                        try {
-                            auto json = nlohmann::json::parse(response.body);
-                            if (json.is_array()) {
-                                std::set<RemoteConnection> new_connections;
-                                for (const auto& obj : json) {
-                                    RemoteConnection conn;
-                                    conn.name = obj.value("name", std::string(""));
-                                    conn.type = obj.value("type", std::string(""));
-                                    conn.display_name = display_name_for_type(conn.type);
-                                    auto alias_it = remote_aliases_.find(conn.name);
-                                    if (alias_it != remote_aliases_.end()) {
-                                        conn.alias = alias_it->second;
-                                    }
-                                    conn.connected = true;
-                                    if (!conn.name.empty()) {
-                                        new_connections.insert(conn);
-                                    }
-                                }
-                                connections = std::move(new_connections);
-                                mappings_dirty = true;
-                            }
-                        } catch (const std::exception& ex) {
-                            error_msg = std::string("Failed to parse remotes: ") + ex.what();
-                        }
+                    if (final_outcome.success) {
+                        connections = std::move(final_outcome.fetched_connections);
+                        mappings_dirty = true;
+                        error_msg.clear();
                     } else {
-                        error_msg = "Failed to fetch remotes (HTTP " + std::to_string(response.status_code) + "): " + response.body;
+                        error_msg = final_outcome.error;
                         std::cerr << "refresh_connections: " << error_msg << std::endl;
                     }
                     is_refreshing = false;
