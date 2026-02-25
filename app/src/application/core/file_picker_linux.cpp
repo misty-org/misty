@@ -5,7 +5,7 @@
 #include <array>
 #include <sstream>
 
-namespace minidfs::core {
+namespace misty::core {
 
 FilePickerResult FilePicker::show_dialog(const FilePickerOptions& options) {
     FilePickerResult result;

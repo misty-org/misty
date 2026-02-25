@@ -1,6 +1,7 @@
 #ifdef __linux__
 
 #define GLFW_INCLUDE_NONE
+#define STB_IMAGE_IMPLEMENTATION
 
 #include "linux_app.h"
 #include "core/asset_manager.h"
@@ -104,8 +105,8 @@ void LinuxApp::init_imgui() {
     configure_imgui_io();
     configure_imgui_style();
 
-    AssetManager::get().load_themes();
-    AssetManager::get().load_fonts();
+    core::AssetManager::get().load_themes();
+    core::AssetManager::get().load_fonts();
 
     ImGui_ImplGlfw_InitForOpenGL(window_, true);
     ImGui_ImplOpenGL3_Init(glsl_version_);

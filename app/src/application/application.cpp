@@ -56,23 +56,6 @@ namespace misty {
         }
     }
 
-    void Application::init_file_sync() {
-        if (!client_) {
-            throw std::runtime_error("Client not initialized before initializing FileSync.");
-        }
-
-        #ifdef _WIN32
-            file_sync_ = std::make_unique<misty::FileSyncWin32>(client_);
-        #elif defined(__APPLE__)
-            file_sync_ = std::make_unique<misty::FileSyncMac>(client_);
-        #else
-            file_sync_ = std::make_unique<misty::FileSyncLinux>(client_);
-        #endif
-
-        file_sync_->init_sync_resources();
-        file_sync_->start_sync();
-    }
-
     void Application::init_views() {
 
         view::register_view(view::ViewID::FileExplorer,
