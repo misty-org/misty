@@ -7,7 +7,7 @@ using namespace misty::core;
 
 namespace misty::panel {
     struct NavbarState : public UIState {
-        view::ViewID selected_item = view::ViewID::FileExplorer;
+        view::ViewID selected_item = view::ViewID::Files;
 
         void handle_logo_click() {
             // Switch back to Auth view

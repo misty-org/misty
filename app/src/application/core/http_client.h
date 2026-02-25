@@ -34,11 +34,6 @@ namespace misty::core {
         HttpResponse del(const std::string& url, const std::map<std::string, std::string>& headers = {});
 
         // Chunked upload for large files (Microsoft Graph upload session)
-        // upload_url: The uploadUrl from createUploadSession response
-        // file_path: Local file path to upload
-        // chunk_size: Size of each chunk in bytes (default 10MB, must be multiple of 320KB)
-        // progress_cb: Optional callback for progress updates
-        // cancel_flag: Optional atomic bool to signal cancellation
         ChunkedUploadResult chunked_upload(
             const std::string& upload_url,
             const std::string& file_path,
@@ -54,6 +49,9 @@ namespace misty::core {
         HttpClient& operator=(const HttpClient&) = delete;
 
         HttpResponse perform_request(const std::string& method, const std::string& url, const std::string& body = "", const std::map<std::string, std::string>& headers = {});
+        bool attempt_token_refresh();
+
+        std::atomic<bool> is_refreshing_{false};
     };
 
 }

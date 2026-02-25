@@ -18,7 +18,7 @@ namespace misty::panel {
         SettingsSection active_section = SettingsSection::General;
 
         // General
-        int startup_view_index = 0; // 0=FileExplorer, 1=Services, 2=Activity
+        int startup_view_index = 0; // 0=Files, 1=Services, 2=Activity
 
         // Server
         char server_address[256] = "localhost:50051";

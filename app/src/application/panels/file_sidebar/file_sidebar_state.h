@@ -8,6 +8,9 @@
 
 namespace misty::panel {
 
+    // Target cloud service for uploads
+    enum class UploadTarget { ONEDRIVE, GDRIVE, DROPBOX };
+
     // State for a single file upload
     struct FileUploadProgress {
         std::string file_path;
@@ -17,6 +20,7 @@ namespace misty::panel {
         bool is_complete = false;
         bool has_error = false;
         std::string error_message;
+        UploadTarget target_service = UploadTarget::ONEDRIVE;
     };
 
     struct FileSidebarState : public core::UIState {
@@ -34,6 +38,7 @@ namespace misty::panel {
 
         // Upload state
         bool is_uploading = false;
+        bool pending_upload_start = false;  // Set by external code to trigger upload processing
         std::atomic<bool> cancel_upload{false};
         std::vector<FileUploadProgress> upload_queue;
         size_t current_upload_index = 0;

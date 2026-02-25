@@ -77,8 +77,13 @@ namespace misty::panel {
                 // Parse token from response and store it
                 try {
                     auto json_resp = nlohmann::json::parse(response.body);
-                    if (json_resp.contains("token")) {
-                        core::SessionManager::get().set_token(json_resp["token"].get<std::string>());
+                    if (json_resp.contains("token") && json_resp.contains("refresh_token")) {
+                        core::SessionManager::get().set_tokens(
+                            json_resp["token"].get<std::string>(),
+                            json_resp["refresh_token"].get<std::string>()
+                        );
+                    } else if (json_resp.contains("token")) {
+                        core::SessionManager::get().set_tokens(json_resp["token"].get<std::string>(), "");
                     }
                 } catch (...) {
                     // Token storage failed, but login succeeded
@@ -86,7 +91,7 @@ namespace misty::panel {
                 success_msg = "Login successful!";
                 clear_inputs();
                 // Switch view after successful login
-                view::switch_view(view::ViewID::FileExplorer);
+                view::switch_view(view::ViewID::Files);
             } else if (response.status_code == 400) {
                 error_msg = "Invalid login data: " + response.body;
             } else if (response.status_code == 401) {

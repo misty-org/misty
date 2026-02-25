@@ -12,7 +12,7 @@ import (
 func (db *Database) InsertFile(f *minidfs.FileInfo) error {
 	_, err := db.Conn.Exec(`
 		INSERT INTO files (file_path, hash, size, mtime, is_dir)
-		VALUES ($1, $2, $3, $4, $5)`,
+		VALUES (?, ?, ?, ?, ?)`,
 		f.FilePath, f.Hash, f.Size, f.Mtime, f.IsDir,
 	)
 	if err != nil {
@@ -29,7 +29,7 @@ func (db *Database) GetFile(path string) (*minidfs.FileInfo, error) {
 
 	err := db.Conn.QueryRow(`
 		SELECT file_path, hash, size, mtime, is_dir
-		FROM files WHERE file_path = $1`,
+		FROM files WHERE file_path = ?`,
 		path,
 	).Scan(&f.FilePath, &f.Hash, &f.Size, &f.Mtime, &f.IsDir)
 

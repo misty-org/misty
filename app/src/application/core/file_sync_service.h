@@ -2,7 +2,6 @@
 
 #include <thread>
 #include <atomic>
-#include <memory>
 #include "core/ui_registry.h"
 
 namespace misty::core {
@@ -23,4 +22,4 @@ namespace misty::core {
         std::thread worker_thread_;
     };
 
-} // namespace misty::core
+} 

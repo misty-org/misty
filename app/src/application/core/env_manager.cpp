@@ -5,14 +5,14 @@
 namespace misty::core {
     EnvManager& EnvManager::get() {
         static EnvManager instance;
-        if (!instance.loaded_) {
+        std::call_once(instance.load_flag_, [&]() {
             std::string home_dir = get_user_home_dir();
             if (home_dir.empty()) {
                 throw std::runtime_error("Could not determine user home directory");
             }
             instance.set_env_file_path(home_dir + "/misty/misty.env");
             instance.load_env_file();
-        }
+        });
         return instance;
     }
 

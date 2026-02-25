@@ -1,4 +1,5 @@
 #include "views/main_view.h"
+#include <algorithm>
 
 
 namespace misty::view {
@@ -20,7 +21,7 @@ namespace misty::view {
     }
 
     view::ViewID MainView::get_view_id() {
-        return view::ViewID::FileExplorer;
+        return view::ViewID::Files;
     }
     
     void MainView::render() {
@@ -29,9 +30,7 @@ namespace misty::view {
         // ---------------------------------------------------------
         // 1. Define Layout Constraints
         // ---------------------------------------------------------
-        float navbar_width = 77.0f;    // Vertical bar on the left
-        float sidebar_ratio = 0.20f;   // 20% of the remaining space
-        float min_sidebar_w = 160.0f;
+        float navbar_width = 77.0f;
 
         // ---------------------------------------------------------
         // 2. Calculate Geometry (Left-to-Right Flow)
@@ -42,23 +41,61 @@ namespace misty::view {
         ImVec2 navbar_size = ImVec2(navbar_width, viewport->WorkSize.y);
 
         // --- Sidebar Geometry (Middle Column) ---
-        // Takes 20% of the space LEFT OVER after the navbar
-        float remaining_x = viewport->WorkSize.x - navbar_width;
-        float sidebar_w = std::max(min_sidebar_w, remaining_x * sidebar_ratio);
+        float sidebar_w = sidebar_width_;
         float sidebar_h = viewport->WorkSize.y;
-
-        // Position starts after the navbar width
         ImVec2 sidebar_pos = ImVec2(viewport->WorkPos.x + navbar_width, viewport->WorkPos.y);
 
         // --- Explorer Geometry (Right Column) ---
-        float explorer_w = remaining_x - sidebar_w;
+        float explorer_w = viewport->WorkSize.x - navbar_width - sidebar_w;
         float explorer_h = viewport->WorkSize.y;
-
-        // Position starts after navbar AND sidebar
         ImVec2 explorer_pos = ImVec2(sidebar_pos.x + sidebar_w, viewport->WorkPos.y);
 
         // ---------------------------------------------------------
-        // 3. Render
+        // 3. Resize Handle (between sidebar and explorer)
+        // ---------------------------------------------------------
+        float handle_x0 = explorer_pos.x - kResizeHandleWidth * 0.5f;
+        float handle_x1 = handle_x0 + kResizeHandleWidth;
+        float handle_y0 = viewport->WorkPos.y;
+        float handle_y1 = handle_y0 + viewport->WorkSize.y;
+
+        ImGuiIO& io = ImGui::GetIO();
+        bool hovered = io.MousePos.x >= handle_x0 && io.MousePos.x <= handle_x1
+                    && io.MousePos.y >= handle_y0 && io.MousePos.y <= handle_y1;
+
+        if (hovered || is_resizing_sidebar_) {
+            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+        }
+
+        if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+            is_resizing_sidebar_ = true;
+        }
+
+        if (is_resizing_sidebar_) {
+            if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+                float new_width = io.MousePos.x - sidebar_pos.x;
+                sidebar_width_ = std::clamp(new_width, kSidebarMinWidth, kSidebarMaxWidth);
+
+                // Recalculate positions after resize
+                sidebar_w = sidebar_width_;
+                explorer_w = viewport->WorkSize.x - navbar_width - sidebar_w;
+                explorer_pos.x = sidebar_pos.x + sidebar_w;
+            } else {
+                is_resizing_sidebar_ = false;
+            }
+        }
+
+        // Draw a subtle line for the handle on hover
+        if (hovered || is_resizing_sidebar_) {
+            ImDrawList* fg = ImGui::GetForegroundDrawList();
+            float line_x = sidebar_pos.x + sidebar_w;
+            fg->AddLine(
+                ImVec2(line_x, viewport->WorkPos.y),
+                ImVec2(line_x, viewport->WorkPos.y + viewport->WorkSize.y),
+                IM_COL32(100, 100, 100, 180), 2.0f);
+        }
+
+        // ---------------------------------------------------------
+        // 4. Render
         // ---------------------------------------------------------
 
         ImGui::SetNextWindowPos(navbar_pos);

@@ -1,7 +1,9 @@
 package main
 
 import (
+	"log"
 	"net/http"
+	"time"
 )
 
 func main() {
@@ -13,6 +15,17 @@ func main() {
 	if err := proxy.Database.StartDatabase(); err != nil {
 		panic(err)
 	}
+
+	// Periodically clean up expired/revoked refresh tokens
+	go func() {
+		ticker := time.NewTicker(1 * time.Hour)
+		defer ticker.Stop()
+		for range ticker.C {
+			if err := proxy.Database.CleanupExpiredRefreshTokens(); err != nil {
+				log.Println("Refresh token cleanup error:", err)
+			}
+		}
+	}()
 
 	proxy.MountHandlers()
 	proxy.TSBase.StartTSConnection()

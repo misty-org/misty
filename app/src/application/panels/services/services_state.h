@@ -84,6 +84,45 @@ namespace misty::panel {
         GDUserProfile profile;
     };
 
+    // Dropbox account profile information (returned by proxy)
+    struct DBXUserProfile {
+        std::string display_name;
+        std::string email;
+        std::string id;  // dbx_user_id (account_id)
+        bool loaded = false;
+    };
+
+    // Represents a single Dropbox connection (no tokens stored client-side)
+    struct DBXConnection {
+        DBXUserProfile profile;
+        bool is_authenticated = false;
+
+        bool operator<(const DBXConnection& other) const {
+            return profile.id < other.profile.id;
+        }
+    };
+
+    // Callback types for Dropbox API operations
+    using DBXFilesCallback = std::function<void(bool success,
+                                                const std::string& response_body,
+                                                const std::string& error)>;
+
+    using DBXDownloadCallback = std::function<void(bool success,
+                                                    const std::string& local_path,
+                                                    const std::string& error)>;
+
+    // Generic callback for folder creation: (success, response_body, error)
+    using CreateFolderCallback = std::function<void(bool success,
+                                                     const std::string& response_body,
+                                                     const std::string& error)>;
+
+    // Snapshot of a single Dropbox connection for UI rendering
+    struct DropboxCardState {
+        bool profile_loaded = false;
+        bool is_connected = false;
+        DBXUserProfile profile;
+    };
+
     class ServicesState : public core::UIState {
     public:
         ServicesState();
@@ -111,6 +150,11 @@ namespace misty::panel {
                           const std::string& file_id,
                           const std::string& local_path,
                           DownloadCallback callback);
+        void create_onedrive_folder(const std::string& ms_user_id,
+                                    const std::string& drive_id,
+                                    const std::string& parent_id,
+                                    const std::string& folder_name,
+                                    CreateFolderCallback callback);
 
         // Helper to find connections
         std::set<MSConnection>::iterator find_by_ms_user_id(const std::string& ms_user_id);
@@ -132,8 +176,36 @@ namespace misty::panel {
                               const std::string& file_id,
                               const std::string& local_path,
                               GDDownloadCallback callback);
+        void create_gdrive_folder(const std::string& gd_user_id,
+                                  const std::string& parent_id,
+                                  const std::string& folder_name,
+                                  CreateFolderCallback callback);
 
         std::set<GDConnection>::iterator find_by_gd_user_id(const std::string& gd_user_id);
+
+        // Dropbox connection management
+        bool has_dbx_connections();
+        void check_dbx_connections();
+        bool get_dropbox_card_state(const std::string& dbx_user_id, DropboxCardState& out);
+        void mark_dbx_disconnected(const std::string& dbx_user_id);
+        void initiate_dbx_login();
+        void disconnect_dropbox(const std::string& dbx_user_id);
+        bool is_dbx_account_folder_connected(const std::string& folder_name);
+
+        // Dropbox file operations
+        void fetch_dropbox_files(const std::string& dbx_user_id,
+                                 const std::string& folder_path,
+                                 DBXFilesCallback callback);
+        void download_dbx_file(const std::string& dbx_user_id,
+                               const std::string& file_path,
+                               const std::string& local_path,
+                               DBXDownloadCallback callback);
+        void create_dbx_folder(const std::string& dbx_user_id,
+                               const std::string& folder_path,
+                               const std::string& folder_name,
+                               CreateFolderCallback callback);
+
+        std::set<DBXConnection>::iterator find_by_dbx_user_id(const std::string& dbx_user_id);
 
         std::mutex mu;
         std::string error_msg = "";
@@ -145,6 +217,10 @@ namespace misty::panel {
         std::set<GDConnection> gd_connections;
         bool show_gd_login_modal = false;
         std::string gd_auth_error;
+
+        std::set<DBXConnection> dbx_connections;
+        bool show_dbx_login_modal = false;
+        std::string dbx_auth_error;
 
     private:
         core::WorkerPool* worker_pool_ = nullptr;
