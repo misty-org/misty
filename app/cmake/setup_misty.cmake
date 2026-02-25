@@ -30,10 +30,9 @@ add_custom_target(misty_proto DEPENDS ${GEN_FILES})
 file(GLOB_RECURSE MINIDFS_SRCS
     "src/dfs/*.cpp"
     "src/dfs/*.h"
-    ${GEN_FILES}
 )
 
-add_library(misty_core STATIC ${MINIDFS_SRCS})
+add_library(misty_core STATIC ${MINIDFS_SRCS} ${GEN_FILES})
 add_dependencies(misty_core misty_proto)
 
 # --- 3. Clean Scoped Includes ---

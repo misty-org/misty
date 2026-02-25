@@ -1,12 +1,16 @@
 package auth
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"os"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 )
+
+const RefreshTokenExpiry = 14 * 24 * time.Hour // 14 days
 
 type Claims struct {
 	UserID string `json:"user_id"`
@@ -31,12 +35,20 @@ func GenerateToken(userID, email string) (string, error) {
 		RegisteredClaims: jwt.RegisteredClaims{
 			ID:        uuid.New().String(),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)),
 		},
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString(jwtSecret)
+}
+
+func GenerateRefreshToken() (string, error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return base64.URLEncoding.EncodeToString(b), nil
 }
 
 func ValidateToken(tokenString string) (*Claims, error) {

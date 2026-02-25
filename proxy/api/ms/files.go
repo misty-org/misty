@@ -249,3 +249,49 @@ func GetUploadSession(database *db.Database) http.HandlerFunc {
 		json.NewEncoder(w).Encode(session)
 	}
 }
+
+func CreateFolder(database *db.Database) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID := r.URL.Query().Get("user_id")
+		msUserID := r.URL.Query().Get("ms_user_id")
+		if userID == "" || msUserID == "" {
+			http.Error(w, "user_id and ms_user_id query params are required", http.StatusBadRequest)
+			return
+		}
+
+		var req struct {
+			DriveID    string `json:"drive_id"`
+			ParentID   string `json:"parent_id"`
+			FolderName string `json:"name"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Failed to decode request body", http.StatusBadRequest)
+			return
+		}
+
+		payload, _ := json.Marshal(map[string]interface{}{
+			"name":   req.FolderName,
+			"folder": map[string]interface{}{},
+			"@microsoft.graph.conflictBehavior": "rename",
+		})
+
+		url := fmt.Sprintf("%s/drives/%s/items/%s/children",
+			ms.GetConfig().GraphBase, req.DriveID, req.ParentID)
+
+		graphRes, err := ms.ExecGraphRequest(database, userID, msUserID, http.MethodPost, url, bytes.NewBuffer(payload))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer graphRes.Body.Close()
+
+		if graphRes.StatusCode != http.StatusCreated && graphRes.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(graphRes.Body)
+			http.Error(w, fmt.Sprintf("Failed to create folder: %d %s", graphRes.StatusCode, string(body)), graphRes.StatusCode)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		io.Copy(w, graphRes.Body)
+	}
+}

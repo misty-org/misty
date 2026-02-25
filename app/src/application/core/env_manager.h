@@ -3,6 +3,7 @@
 #include <string>
 #include <unordered_map>
 #include <optional>
+#include <mutex>
 
 namespace misty::core {
     class EnvManager {
@@ -35,5 +36,6 @@ namespace misty::core {
         std::string env_file_path_ = "";
         std::unordered_map<std::string, std::string> env_;
         bool loaded_ = false;
+        std::once_flag load_flag_;
     };
 }
