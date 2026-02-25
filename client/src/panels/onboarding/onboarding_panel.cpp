@@ -1,6 +1,7 @@
 #include "panels/onboarding/onboarding_panel.h"
 #include "panels/services/services_state.h"
 #include "core/manager/asset_manager.h"
+#include "core/manager/font_manager.h"
 #include "core/ui/ui_style.h"
 #include "views/app_view.h"
 #include "imgui.h"
@@ -156,7 +157,7 @@ namespace misty::panel {
         ImGui::Spacing();
 
         // Title
-        ImGui::PushFont(core::AssetManager::get().get_font(core::FontID::ROBOTO_LARGE));
+        ImGui::PushFont(core::FontManager::get().get_font(core::FontID::ROBOTO_LARGE));
         centered_text("Welcome to Misty", IM_COL32(240, 240, 240, 255));
         ImGui::PopFont();
 
@@ -200,7 +201,7 @@ namespace misty::panel {
         show_progress_dots(1, 4);
         ImGui::Spacing();
 
-        ImGui::PushFont(core::AssetManager::get().get_font(core::FontID::ROBOTO_LARGE));
+        ImGui::PushFont(core::FontManager::get().get_font(core::FontID::ROBOTO_LARGE));
         centered_text("What is Misty?", IM_COL32(240, 240, 240, 255));
         ImGui::PopFont();
 
@@ -285,7 +286,7 @@ namespace misty::panel {
         show_progress_dots(2, 4);
         ImGui::Spacing();
 
-        ImGui::PushFont(core::AssetManager::get().get_font(core::FontID::ROBOTO_LARGE));
+        ImGui::PushFont(core::FontManager::get().get_font(core::FontID::ROBOTO_LARGE));
         centered_text("Create your account", IM_COL32(240, 240, 240, 255));
         ImGui::PopFont();
 
@@ -361,7 +362,7 @@ namespace misty::panel {
         show_progress_dots(3, 4);
         ImGui::Spacing();
 
-        ImGui::PushFont(core::AssetManager::get().get_font(core::FontID::ROBOTO_LARGE));
+        ImGui::PushFont(core::FontManager::get().get_font(core::FontID::ROBOTO_LARGE));
         centered_text("Connect your cloud storage", IM_COL32(240, 240, 240, 255));
         ImGui::PopFont();
 
@@ -468,7 +469,7 @@ namespace misty::panel {
         show_progress_dots(4, 4);
         ImGui::Spacing();
 
-        ImGui::PushFont(core::AssetManager::get().get_font(core::FontID::ROBOTO_LARGE));
+        ImGui::PushFont(core::FontManager::get().get_font(core::FontID::ROBOTO_LARGE));
         centered_text("Here's how Misty works", IM_COL32(240, 240, 240, 255));
         ImGui::PopFont();
 
@@ -602,7 +603,7 @@ namespace misty::panel {
 
         ImGui::Spacing();
 
-        ImGui::PushFont(core::AssetManager::get().get_font(core::FontID::ROBOTO_LARGE));
+        ImGui::PushFont(core::FontManager::get().get_font(core::FontID::ROBOTO_LARGE));
         centered_text("Unlock the full experience", IM_COL32(240, 240, 240, 255));
         ImGui::PopFont();
 

@@ -5,6 +5,7 @@
 
 #include "core/plugins/plugin_host.h"
 #include "core/manager/asset_manager.h"
+#include "core/manager/font_manager.h"
 #include "core/ui/ui_style.h"
 #include "imgui.h"
 #include "panels/activity/activity_state.h"
@@ -87,7 +88,7 @@ void PluginsPanel::render() {
         if (ImGui::BeginChild("PluginsList", ImVec2(0, 0), false)) {
             if (!plugins.empty()) {
                 {
-                    misty::UI::WithFont(core::AssetManager::get().get_font(core::FontID::ROBOTO_BOLD), [&]() {
+                    misty::UI::WithFont(core::FontManager::get().get_font(core::FontID::ROBOTO_BOLD), [&]() {
                         ImGui::Text("Plugins");
                     });
                 }
@@ -118,7 +119,7 @@ void PluginsPanel::render_header(std::size_t plugin_count) {
 
         ImGui::TableSetColumnIndex(0);
         {
-            misty::UI::WithFont(core::AssetManager::get().get_font(core::FontID::ROBOTO_BOLD_LARGE), [&]() {
+            misty::UI::WithFont(core::FontManager::get().get_font(core::FontID::ROBOTO_BOLD_LARGE), [&]() {
                 ImGui::Text("Plugins");
             });
         }
@@ -146,7 +147,7 @@ void PluginsPanel::render_empty_state(const std::vector<std::string>& roots) {
     ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.16f, 0.16f, 0.18f, 1.0f));
 
     if (ImGui::BeginChild("PluginsEmpty", ImVec2(0, 180.0f), true)) {
-        misty::UI::WithFont(core::AssetManager::get().get_font(core::FontID::ROBOTO_BOLD), [&]() {
+        misty::UI::WithFont(core::FontManager::get().get_font(core::FontID::ROBOTO_BOLD), [&]() {
             ImGui::Text("No plugins discovered");
         });
         ImGui::Spacing();
@@ -174,7 +175,7 @@ void PluginsPanel::render_plugin_card(const core::PluginInfo& plugin) {
 
     if (ImGui::BeginChild(card_id.c_str(), ImVec2(0, base_height), true)) {
         {
-            misty::UI::WithFont(core::AssetManager::get().get_font(core::FontID::ROBOTO_BOLD), [&]() {
+            misty::UI::WithFont(core::FontManager::get().get_font(core::FontID::ROBOTO_BOLD), [&]() {
                 ImGui::Text("%s", plugin.name.c_str());
             });
         }

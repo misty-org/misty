@@ -836,7 +836,9 @@ namespace misty::panel {
         ImGuiWindowFlags file_explorer_flags = ImGuiWindowFlags_NoTitleBar |
             ImGuiWindowFlags_NoMove |
             ImGuiWindowFlags_NoCollapse |
-            ImGuiWindowFlags_NoResize;
+            ImGuiWindowFlags_NoResize |
+            ImGuiWindowFlags_NoScrollbar |
+            ImGuiWindowFlags_NoScrollWithMouse;
 
         auto& search_state = registry_.get_state<SearchState>(search_state_key_);
 
@@ -872,7 +874,8 @@ namespace misty::panel {
                 : 0.0f;
             state.chat_overlay_height = chat_h;
 
-            if (ImGui::BeginChild("##explorer_content_region", ImVec2(0.0f, content_height), false)) {
+            if (ImGui::BeginChild("##explorer_content_region", ImVec2(0.0f, content_height), false,
+                                  ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse)) {
                 ImVec2 content_avail = ImGui::GetContentRegionAvail();
                 const bool show_preview = preview_pane_open_;
                 const float max_preview_width = std::max(0.0f, content_avail.x - kPreviewSplitterWidth);
@@ -1039,7 +1042,7 @@ namespace misty::panel {
         worker_pool_.add(
             [registry = &registry_, state_key = state_key_, path, show_hidden, navigation_generation]() {
                 auto& state = registry->get_state<FileExplorerState>(state_key);
-                std::string new_path = fs::path(path).lexically_normal().generic_string();
+                std::string new_path = path_utf8_generic_string(fs::path(path).lexically_normal());
                 if (new_path.empty()) {
                     new_path = path;
                 }
@@ -1071,11 +1074,11 @@ namespace misty::panel {
                 try {
                     for (const auto& entry : fs::directory_iterator(
                              path, fs::directory_options::skip_permission_denied)) {
-                        std::string fname = entry.path().filename().generic_string();
+                        std::string fname = path_utf8_filename(entry.path());
                         if (!show_hidden && !fname.empty() && fname[0] == '.') continue;
 
                         UnifiedFileItem item;
-                        item.path   = entry.path().generic_string();
+                        item.path   = path_utf8_generic_string(entry.path());
                         item.id     = item.path;
                         item.name   = fname;
                         std::error_code ec;
@@ -1177,9 +1180,9 @@ namespace misty::panel {
                     printf("Explorer: Reading trash dir: %s\n", trash_dir.c_str());
                     for (const auto& entry : fs::directory_iterator(trash_dir)) {
                         UnifiedFileItem item;
-                        item.path = entry.path().string();
+                        item.path = path_utf8_string(entry.path());
                         item.id = item.path;
-                        item.name = entry.path().filename().string();
+                        item.name = path_utf8_filename(entry.path());
                         item.is_dir = entry.is_directory();
                         item.source = FileSource::LOCAL; // It's local now
                         item.status = SyncStatus::DELETED;
