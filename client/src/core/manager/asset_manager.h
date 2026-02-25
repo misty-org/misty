@@ -13,8 +13,10 @@ namespace misty::core {
         DEFAULT,
         ROBOTO_SMALL,
         ROBOTO_LARGE,
+        ROBOTO_XLARGE,
         ROBOTO_BOLD,
         ROBOTO_BOLD_LARGE,
+        ROBOTO_BOLD_XLARGE,
         ROBOTO_ITALIC,
         ROBOTO_BOLD_ITALIC,
     };

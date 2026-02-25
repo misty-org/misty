@@ -1,15 +1,60 @@
 #include "vault_panel.h"
 
 #include <cmath>
+#include <cstdarg>
+#include <cstdio>
 #include <cstring>
 #include <sstream>
 
 #include "core/system/util.h"
-#include "core/ui/imgui_utils.h"
+#include "core/ui/ui_style.h"
 
 namespace misty::panel {
 
     namespace {
+        struct ButtonStyle {
+            ImVec4 button;
+            ImVec4 hovered;
+            ImVec4 active;
+            ImVec4 text;
+            float rounding;
+        };
+
+        ButtonStyle primary_button_style() {
+            return {
+                ImVec4(0.957f, 0.957f, 0.961f, 1.0f),
+                ImVec4(0.898f, 0.906f, 0.922f, 1.0f),
+                ImVec4(0.820f, 0.835f, 0.859f, 1.0f),
+                ImVec4(0.07f, 0.07f, 0.07f, 1.0f),
+                8.0f,
+            };
+        }
+
+        bool styled_button(const char* label, const ImVec2& size, const ButtonStyle& style) {
+            bool pressed = false;
+            misty::UI::WithStyle([&](misty::UI::StyleScope& scoped) {
+                scoped.var(ImGuiStyleVar_FrameRounding, style.rounding);
+                scoped.color(ImGuiCol_Button, style.button);
+                scoped.color(ImGuiCol_ButtonHovered, style.hovered);
+                scoped.color(ImGuiCol_ButtonActive, style.active);
+                scoped.color(ImGuiCol_Text, style.text);
+                pressed = ImGui::Button(label, size);
+            });
+            return pressed;
+        }
+
+        void text_colored(const ImVec4& color, const char* fmt, ...) {
+            char buffer[1024];
+            va_list args;
+            va_start(args, fmt);
+            std::vsnprintf(buffer, sizeof(buffer), fmt, args);
+            va_end(args);
+
+            misty::UI::WithTextColor(color, [&]() {
+                ImGui::TextUnformatted(buffer);
+            });
+        }
+
         std::vector<std::string> split_lines(const char* buf) {
             std::vector<std::string> out;
             if (!buf) return out;
@@ -48,7 +93,10 @@ namespace misty::panel {
             ImGuiWindowFlags_NoMove |
             ImGuiWindowFlags_NoCollapse;
 
-        core::WithWindowStyle(ImVec4(0.12f, 0.12f, 0.12f, 1.0f), ImVec2(32.0f, 24.0f), [&]() {
+        misty::UI::WithWindowStyle({
+            .bg_color = ImVec4(0.12f, 0.12f, 0.12f, 1.0f),
+            .padding = ImVec2(32.0f, 24.0f),
+        }, [&]() {
             if (ImGui::Begin("VaultPanel", nullptr, flags)) {
                 show_header(state);
                 ImGui::Spacing();
@@ -84,10 +132,10 @@ namespace misty::panel {
 
     void VaultPanel::show_header(VaultState& state) {
         ImGui::BeginGroup();
-        core::WithFontScale(1.8f, []() {
-            core::ColoredText(ImVec4(1.0f, 1.0f, 1.0f, 1.0f), "Vault");
+        misty::UI::WithFontScale(1.8f, []() {
+            text_colored(ImVec4(1.0f, 1.0f, 1.0f, 1.0f), "Vault");
         });
-        core::ColoredText(ImVec4(0.7f, 0.7f, 0.7f, 1.0f),
+        text_colored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f),
             "Encrypted, deduplicated backups powered by restic.");
         ImGui::EndGroup();
 
@@ -105,14 +153,14 @@ namespace misty::panel {
         }
 
         if (refreshing) ImGui::BeginDisabled();
-        if (core::StyledButton("Refresh", ImVec2(refresh_w, 30.0f), core::ButtonTheme::Primary())) {
+        if (styled_button("Refresh", ImVec2(refresh_w, 30.0f), primary_button_style())) {
             state.refresh_repos();
         }
         if (refreshing) ImGui::EndDisabled();
 
         ImGui::SameLine(0, 8.0f);
 
-        if (core::StyledButton("+ New Repository", ImVec2(new_w, 30.0f), core::ButtonTheme::Primary())) {
+        if (styled_button("+ New Repository", ImVec2(new_w, 30.0f), primary_button_style())) {
             std::lock_guard<std::mutex> lock(state.mu);
             state.show_create_repo_modal = true;
             state.create_name_buf[0] = 0;
@@ -171,8 +219,8 @@ namespace misty::panel {
             ImGui::PopStyleColor();
 
             ImGui::Spacing();
-            core::WithFontScale(1.2f, [&]() {
-                core::ColoredText(ImVec4(1.0f, 1.0f, 1.0f, 1.0f), "%s", repo.name.c_str());
+            misty::UI::WithFontScale(1.2f, [&]() {
+                text_colored(ImVec4(1.0f, 1.0f, 1.0f, 1.0f), "%s", repo.name.c_str());
             });
             ImGui::Spacing();
             ImGui::Spacing();
@@ -261,8 +309,8 @@ namespace misty::panel {
 
         ImGui::PushID("snapshots");
         ImGui::BeginGroup();
-        core::WithFontScale(1.3f, [&]() {
-            core::ColoredText(ImVec4(1.0f, 1.0f, 1.0f, 1.0f), "Snapshots — %s", repo_name.c_str());
+        misty::UI::WithFontScale(1.3f, [&]() {
+            text_colored(ImVec4(1.0f, 1.0f, 1.0f, 1.0f), "Snapshots — %s", repo_name.c_str());
         });
         ImGui::SameLine();
         float avail = ImGui::GetContentRegionAvail().x;
@@ -404,8 +452,8 @@ namespace misty::panel {
         if (ImGui::BeginPopupModal("##vault_create_repo", nullptr,
                                    ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
                                    ImGuiWindowFlags_NoMove     | ImGuiWindowFlags_AlwaysAutoResize)) {
-            core::WithFontScale(1.3f, []() {
-                core::ColoredText(ImVec4(0.95f, 0.95f, 0.95f, 1.0f), "New vault repository");
+            misty::UI::WithFontScale(1.3f, []() {
+                text_colored(ImVec4(0.95f, 0.95f, 0.95f, 1.0f), "New vault repository");
             });
             ImGui::Spacing();
             ImGui::TextWrapped(
@@ -469,8 +517,8 @@ namespace misty::panel {
         if (ImGui::BeginPopupModal("##vault_backup", nullptr,
                                    ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
                                    ImGuiWindowFlags_NoMove     | ImGuiWindowFlags_AlwaysAutoResize)) {
-            core::WithFontScale(1.3f, [&]() {
-                core::ColoredText(ImVec4(0.95f, 0.95f, 0.95f, 1.0f), "Backup → %s", repo_name.c_str());
+            misty::UI::WithFontScale(1.3f, [&]() {
+                text_colored(ImVec4(0.95f, 0.95f, 0.95f, 1.0f), "Backup → %s", repo_name.c_str());
             });
             ImGui::Spacing();
             ImGui::Text("Paths (one per line)");
@@ -525,8 +573,8 @@ namespace misty::panel {
         if (ImGui::BeginPopupModal("##vault_restore", nullptr,
                                    ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
                                    ImGuiWindowFlags_NoMove     | ImGuiWindowFlags_AlwaysAutoResize)) {
-            core::WithFontScale(1.3f, [&]() {
-                core::ColoredText(ImVec4(0.95f, 0.95f, 0.95f, 1.0f),
+            misty::UI::WithFontScale(1.3f, [&]() {
+                text_colored(ImVec4(0.95f, 0.95f, 0.95f, 1.0f),
                                   "Restore snapshot %s → %s", snap_id.c_str(), repo_name.c_str());
             });
             ImGui::Spacing();

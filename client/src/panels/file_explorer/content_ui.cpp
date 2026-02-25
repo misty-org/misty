@@ -7,7 +7,9 @@
 #include <cstring>
 
 #include "core/commands/command_manager.h"
-#include "core/ui/imgui_utils.h"
+#include "core/manager/asset_manager.h"
+#include "core/ui/ui_animate.h"
+#include "core/ui/ui_style.h"
 #include "panels/notification/notification_state.h"
 #include "panels/search/search_state.h"
 #include "panels/services/services_state.h"
@@ -632,7 +634,7 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state) {
     if (show_loading_animation && overlay_size.x > 0.0f && overlay_size.y > 0.0f) {
         ImGui::SetCursorScreenPos(overlay_min);
         ImGui::InvisibleButton("##file_loading_blocker", overlay_size);
-        core::DrawMistyLoadingAnimation(overlay_min, overlay_max);
+        misty::UI::DrawMistyLoadingAnimation(overlay_min, overlay_max);
     }
 
     show_rename_modal(state);

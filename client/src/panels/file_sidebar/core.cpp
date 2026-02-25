@@ -1,13 +1,10 @@
 #include "file_sidebar_panel.h"
 
-#include "core/manager/asset_manager.h"
 #include "panels/file_explorer/file_explorer_state.h"
 #include "panels/services/services_state.h"
-#include "panels/workspace/workspace_state.h"
+#include "panels/file_sidebar/remote_mount_state.h"
 
-#include <algorithm>
 #include <cmath>
-#include <cstdio>
 #include <cstdlib>
 #include <set>
 
@@ -138,7 +135,7 @@ namespace misty::panel {
 
     void FileSidebarPanel::render() {
         auto& state = registry_.get_state<FileSidebarState>("FileSidebar");
-        auto& workspace_state = registry_.get_state<WorkspaceState>("Workspace");
+        auto& workspace_state = registry_.get_state<RemoteMountState>("RemoteMounts");
         auto& services_state = registry_.get_state<ServicesState>("Services");
         services_state.init(worker_pool_);
 
