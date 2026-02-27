@@ -57,14 +57,12 @@ namespace misty::panel {
         // Resolve relative path to folder ID using cache
         std::string resolve_folder_id_from_cache(const AccountMapping& account, const std::string& relative_path);
 
-        // Handle async folder fetch response
-        void handle_folder_fetch_response(const std::string& ms_user_id,
-                                          const std::string& drive_id,
-                                          const std::string& folder_id,
-                                          const std::string& target_path,
-                                          bool success,
-                                          const std::string& body,
-                                          const std::string& error);
+        // Handle async cloud folder fetch response (OneDrive, GDrive, Dropbox)
+        void handle_folder_fetch(const CloudFolderContext& ctx,
+                                 const std::string& target_path,
+                                 bool success,
+                                 const std::string& body,
+                                 const std::string& error);
 
         // Download OneDrive file and open it when complete
         void download_and_open_file(const UnifiedFileItem& file);
@@ -80,13 +78,7 @@ namespace misty::panel {
         // Resolve relative path to folder ID using Google Drive cache
         std::string resolve_gd_folder_id_from_cache(const GDAccountMapping& account, const std::string& relative_path);
 
-        // Handle async Google Drive folder fetch response
-        void handle_gd_folder_fetch_response(const std::string& gd_user_id,
-                                              const std::string& folder_id,
-                                              const std::string& target_path,
-                                              bool success,
-                                              const std::string& body,
-                                              const std::string& error);
+
 
         // Download Google Drive file and open it when complete
         void download_and_open_gd_file(const UnifiedFileItem& file);
@@ -99,13 +91,7 @@ namespace misty::panel {
         void navigate_to_dropbox_account(const std::string& folder_name, const std::string& relative_path, bool update_history, bool create_if_missing);
         void fetch_dropbox_folder(const DBXAccountMapping& account, const std::string& folder_path, const std::string& target_path);
 
-        // Handle async Dropbox folder fetch response
-        void handle_dbx_folder_fetch_response(const std::string& dbx_user_id,
-                                               const std::string& folder_path,
-                                               const std::string& target_path,
-                                               bool success,
-                                               const std::string& body,
-                                               const std::string& error);
+
 
         // Download Dropbox file and open it when complete
         void download_and_open_dbx_file(const UnifiedFileItem& file);

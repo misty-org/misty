@@ -615,7 +615,7 @@ namespace misty::panel {
                         [this, user_id, fetched_drive_id, folder_id, target_path](bool success,
                                                                                    const std::string& body,
                                                                                    const std::string& error) {
-                            handle_folder_fetch_response(user_id, fetched_drive_id, folder_id, target_path, success, body, error);
+                            handle_folder_fetch({FileSource::ONEDRIVE, user_id, folder_id, fetched_drive_id}, target_path, success, body, error);
                         });
                 });
         } else {
@@ -624,18 +624,16 @@ namespace misty::panel {
                 [this, ms_user_id, drive_id, folder_id, target_path](bool success,
                                                                       const std::string& body,
                                                                       const std::string& error) {
-                    handle_folder_fetch_response(ms_user_id, drive_id, folder_id, target_path, success, body, error);
+                    handle_folder_fetch({FileSource::ONEDRIVE, ms_user_id, folder_id, drive_id}, target_path, success, body, error);
                 });
         }
     }
 
-    void FileExplorerPanel::handle_folder_fetch_response(const std::string& ms_user_id,
-                                                          const std::string& drive_id,
-                                                          const std::string& folder_id,
-                                                          const std::string& target_path,
-                                                          bool success,
-                                                          const std::string& body,
-                                                          const std::string& error) {
+    void FileExplorerPanel::handle_folder_fetch(const CloudFolderContext& ctx,
+                                                  const std::string& target_path,
+                                                  bool success,
+                                                  const std::string& body,
+                                                  const std::string& error) {
         auto& state = registry_.get_state<FileExplorerState>("Files");
         std::lock_guard<std::mutex> lock(state.mu);
 
@@ -646,22 +644,47 @@ namespace misty::panel {
             return;
         }
 
-        // Update OneDriveState with current folder context for uploads
-        {
+        // Update upload context for the active service, clear others
+        switch (ctx.service) {
+            case FileSource::ONEDRIVE: {
+                auto& onedrive_state = registry_.get_state<OneDriveState>("OneDrive");
+                std::lock_guard<std::mutex> od_lock(onedrive_state.mu);
+                onedrive_state.current_ms_user_id = ctx.user_id;
+                onedrive_state.current_drive_id = ctx.drive_id;
+                onedrive_state.current_folder_id = ctx.folder_id;
+                break;
+            }
+            case FileSource::GDRIVE: {
+                auto& gdrive_state = registry_.get_state<GDriveState>("GDrive");
+                std::lock_guard<std::mutex> gd_lock(gdrive_state.mu);
+                gdrive_state.current_gd_user_id = ctx.user_id;
+                gdrive_state.current_folder_id = ctx.folder_id;
+                break;
+            }
+            case FileSource::DROPBOX: {
+                auto& dropbox_state = registry_.get_state<DropboxState>("Dropbox");
+                std::lock_guard<std::mutex> dbx_lock(dropbox_state.mu);
+                dropbox_state.current_dbx_user_id = ctx.user_id;
+                dropbox_state.current_folder_path = ctx.folder_id;
+                break;
+            }
+            default: break;
+        }
+        // Clear inactive services' upload contexts
+        if (ctx.service != FileSource::ONEDRIVE) {
             auto& onedrive_state = registry_.get_state<OneDriveState>("OneDrive");
             std::lock_guard<std::mutex> od_lock(onedrive_state.mu);
-            onedrive_state.current_ms_user_id = ms_user_id;
-            onedrive_state.current_drive_id = drive_id;
-            onedrive_state.current_folder_id = folder_id;
+            onedrive_state.current_ms_user_id.clear();
+            onedrive_state.current_drive_id.clear();
+            onedrive_state.current_folder_id.clear();
         }
-        // Clear other services' upload contexts
-        {
+        if (ctx.service != FileSource::GDRIVE) {
             auto& gdrive_state = registry_.get_state<GDriveState>("GDrive");
             std::lock_guard<std::mutex> gd_lock(gdrive_state.mu);
             gdrive_state.current_gd_user_id.clear();
             gdrive_state.current_folder_id.clear();
         }
-        {
+        if (ctx.service != FileSource::DROPBOX) {
             auto& dropbox_state = registry_.get_state<DropboxState>("Dropbox");
             std::lock_guard<std::mutex> dbx_lock(dropbox_state.mu);
             dropbox_state.current_dbx_user_id.clear();
@@ -669,67 +692,156 @@ namespace misty::panel {
         }
 
         if (success) {
-            std::vector<OneDriveItem> od_items;
             std::vector<UnifiedFileItem> files;
 
             try {
                 auto json = nlohmann::json::parse(body);
-                auto values = json.value("value", nlohmann::json::array());
 
-                for (const auto& item : values) {
-                    OneDriveItem odi;
-                    odi.id = item.value("id", std::string(""));
-                    odi.name = item.value("name", std::string(""));
-                    odi.size = item.value("size", int64_t(0));
-                    odi.web_url = item.value("webUrl", std::string(""));
-                    odi.last_modified_date_time = item.value("lastModifiedDateTime", std::string(""));
-                    odi.is_folder = item.contains("folder");
-                    if (odi.is_folder && item["folder"].contains("childCount")) {
-                        odi.folder_child_count = item["folder"]["childCount"].get<int>();
+                switch (ctx.service) {
+                    case FileSource::ONEDRIVE: {
+                        std::vector<OneDriveItem> od_items;
+                        auto values = json.value("value", nlohmann::json::array());
+
+                        for (const auto& item : values) {
+                            OneDriveItem odi;
+                            odi.id = item.value("id", std::string(""));
+                            odi.name = item.value("name", std::string(""));
+                            odi.size = item.value("size", int64_t(0));
+                            odi.web_url = item.value("webUrl", std::string(""));
+                            odi.last_modified_date_time = item.value("lastModifiedDateTime", std::string(""));
+                            odi.is_folder = item.contains("folder");
+                            if (odi.is_folder && item["folder"].contains("childCount")) {
+                                odi.folder_child_count = item["folder"]["childCount"].get<int>();
+                            }
+                            odi.drive_id = ctx.drive_id;
+                            odi.ms_user_id = ctx.user_id;
+                            od_items.push_back(odi);
+
+                            UnifiedFileItem ufi;
+                            ufi.name = odi.name;
+                            ufi.path = target_path + "/" + odi.name;
+                            ufi.is_dir = odi.is_folder;
+                            ufi.size = odi.size;
+                            ufi.last_modified = odi.last_modified_date_time.length() >= 10
+                                                ? odi.last_modified_date_time.substr(0, 10) : "";
+                            ufi.source = FileSource::ONEDRIVE;
+                            ufi.od_item_id = odi.id;
+                            ufi.od_drive_id = ctx.drive_id;
+                            ufi.od_ms_user_id = ctx.user_id;
+                            ufi.od_web_url = odi.web_url;
+                            files.push_back(ufi);
+                        }
+
+                        state.files = std::move(files);
+                        save_items_to_cache(ctx.user_id, ctx.folder_id, od_items);
+                        break;
                     }
-                    odi.drive_id = drive_id;
-                    odi.ms_user_id = ms_user_id;
-                    od_items.push_back(odi);
+                    case FileSource::GDRIVE: {
+                        std::vector<GDriveItem> gd_items;
+                        auto values = json.value("files", nlohmann::json::array());
 
-                    // Convert to UnifiedFileItem
-                    UnifiedFileItem ufi;
-                    ufi.name = odi.name;
-                    ufi.path = target_path + "/" + odi.name;
-                    ufi.is_dir = odi.is_folder;
-                    ufi.size = odi.size;
-                    ufi.last_modified = odi.last_modified_date_time.length() >= 10
-                                        ? odi.last_modified_date_time.substr(0, 10) : "";
-                    ufi.source = FileSource::ONEDRIVE;
-                    ufi.od_item_id = odi.id;
-                    ufi.od_drive_id = drive_id;
-                    ufi.od_ms_user_id = ms_user_id;
-                    ufi.od_web_url = odi.web_url;
+                        for (const auto& item : values) {
+                            GDriveItem gdi;
+                            gdi.id = item.value("id", std::string(""));
+                            gdi.name = item.value("name", std::string(""));
+                            if (item.contains("size")) {
+                                if (item["size"].is_string()) {
+                                    try { gdi.size = std::stoll(item["size"].get<std::string>()); } catch (...) { gdi.size = 0; }
+                                } else {
+                                    gdi.size = item["size"].get<int64_t>();
+                                }
+                            }
+                            gdi.web_url = item.value("webViewLink", std::string(""));
+                            gdi.created_time = item.value("createdTime", std::string(""));
+                            gdi.modified_time = item.value("modifiedTime", std::string(""));
+                            gdi.mime_type = item.value("mimeType", std::string(""));
+                            gdi.is_folder = (gdi.mime_type == "application/vnd.google-apps.folder");
+                            gdi.gd_user_id = ctx.user_id;
+                            gd_items.push_back(gdi);
 
-                    // Determine sync status
+                            UnifiedFileItem ufi;
+                            ufi.name = gdi.name;
+                            ufi.path = target_path + "/" + gdi.name;
+                            ufi.is_dir = gdi.is_folder;
+                            ufi.size = gdi.size;
+                            ufi.last_modified = gdi.modified_time.length() >= 10
+                                                ? gdi.modified_time.substr(0, 10) : "";
+                            ufi.source = FileSource::GDRIVE;
+                            ufi.gd_item_id = gdi.id;
+                            ufi.gd_user_id = ctx.user_id;
+                            ufi.gd_mime_type = gdi.mime_type;
+                            ufi.gd_web_url = gdi.web_url;
+                            files.push_back(ufi);
+                        }
+
+                        state.files = std::move(files);
+                        save_gd_items_to_cache(ctx.user_id, ctx.folder_id, gd_items);
+                        break;
+                    }
+                    case FileSource::DROPBOX: {
+                        std::vector<DropboxItem> dbx_items;
+                        auto entries = json.value("entries", nlohmann::json::array());
+
+                        for (const auto& entry : entries) {
+                            DropboxItem dbi;
+                            std::string tag = entry.value(".tag", std::string(""));
+                            dbi.id = entry.value("id", std::string(""));
+                            dbi.name = entry.value("name", std::string(""));
+                            dbi.path_display = entry.value("path_display", std::string(""));
+                            dbi.path_lower = entry.value("path_lower", std::string(""));
+                            dbi.is_folder = (tag == "folder");
+                            if (!dbi.is_folder) {
+                                dbi.size = entry.value("size", int64_t(0));
+                                dbi.server_modified = entry.value("server_modified", std::string(""));
+                            }
+                            dbi.dbx_user_id = ctx.user_id;
+                            dbx_items.push_back(dbi);
+
+                            UnifiedFileItem ufi;
+                            ufi.name = dbi.name;
+                            ufi.path = target_path + "/" + dbi.name;
+                            ufi.is_dir = dbi.is_folder;
+                            ufi.size = dbi.size;
+                            ufi.last_modified = dbi.server_modified.length() >= 10
+                                                ? dbi.server_modified.substr(0, 10) : "";
+                            ufi.source = FileSource::DROPBOX;
+                            ufi.dbx_item_id = dbi.id;
+                            ufi.dbx_user_id = ctx.user_id;
+                            ufi.dbx_path_display = dbi.path_display;
+                            files.push_back(ufi);
+                        }
+
+                        state.files = std::move(files);
+                        save_dbx_items_to_cache(ctx.user_id, ctx.folder_id, dbx_items);
+                        break;
+                    }
+                    default: break;
+                }
+
+                // Determine sync status for all items
+                for (auto& ufi : state.files) {
                     if (ufi.is_dir) {
-                        ufi.status = SyncStatus::LOCAL; // Directories are navigable
+                        ufi.status = SyncStatus::LOCAL;
                     } else {
-                        // Check if file exists locally
                         std::error_code ec;
                         if (fs::exists(ufi.path, ec)) {
-                           // Check size or modification time
-                           uintmax_t local_size = fs::file_size(ufi.path, ec);
-                           if (!ec && local_size == (uintmax_t)ufi.size) {
-                               ufi.status = SyncStatus::SYNCED;
-                           } else {
-                               ufi.status = SyncStatus::MODIFIED;
-                           }
+                            // GDrive special case: online docs with size 0
+                            if (ufi.source == FileSource::GDRIVE && ufi.size == 0 &&
+                                ufi.gd_mime_type.rfind("application/vnd.google-apps.", 0) == 0) {
+                                ufi.status = SyncStatus::SYNCED;
+                            } else {
+                                uintmax_t local_size = fs::file_size(ufi.path, ec);
+                                if (!ec && local_size == (uintmax_t)ufi.size) {
+                                    ufi.status = SyncStatus::SYNCED;
+                                } else {
+                                    ufi.status = SyncStatus::MODIFIED;
+                                }
+                            }
                         } else {
                             ufi.status = SyncStatus::NOT_SYNCED;
                         }
                     }
-
-                    files.push_back(ufi);
                 }
-
-                state.files = std::move(files);
-                // Save to cache
-                save_items_to_cache(ms_user_id, folder_id, od_items);
 
             } catch (const std::exception& e) {
                 if (state.files.empty()) {
@@ -2322,126 +2434,8 @@ namespace misty::panel {
             [this, gd_user_id, folder_id, target_path](bool success,
                                                          const std::string& body,
                                                          const std::string& error) {
-                handle_gd_folder_fetch_response(gd_user_id, folder_id, target_path, success, body, error);
+                handle_folder_fetch({FileSource::GDRIVE, gd_user_id, folder_id, ""}, target_path, success, body, error);
             });
-    }
-
-    void FileExplorerPanel::handle_gd_folder_fetch_response(const std::string& gd_user_id,
-                                                              const std::string& folder_id,
-                                                              const std::string& target_path,
-                                                              bool success,
-                                                              const std::string& body,
-                                                              const std::string& error) {
-        auto& state = registry_.get_state<FileExplorerState>("Files");
-        std::lock_guard<std::mutex> lock(state.mu);
-
-        state.is_loading = false;
-
-        if (std::string(state.current_path) != target_path) {
-            return;
-        }
-
-        // Update GDriveState with current folder context for uploads
-        {
-            auto& gdrive_state = registry_.get_state<GDriveState>("GDrive");
-            std::lock_guard<std::mutex> gd_lock(gdrive_state.mu);
-            gdrive_state.current_gd_user_id = gd_user_id;
-            gdrive_state.current_folder_id = folder_id;
-        }
-        // Clear other services' upload contexts
-        {
-            auto& onedrive_state = registry_.get_state<OneDriveState>("OneDrive");
-            std::lock_guard<std::mutex> od_lock(onedrive_state.mu);
-            onedrive_state.current_ms_user_id.clear();
-            onedrive_state.current_drive_id.clear();
-            onedrive_state.current_folder_id.clear();
-        }
-        {
-            auto& dropbox_state = registry_.get_state<DropboxState>("Dropbox");
-            std::lock_guard<std::mutex> dbx_lock(dropbox_state.mu);
-            dropbox_state.current_dbx_user_id.clear();
-            dropbox_state.current_folder_path.clear();
-        }
-
-        if (success) {
-            std::vector<GDriveItem> gd_items;
-            std::vector<UnifiedFileItem> files;
-
-            try {
-                auto json = nlohmann::json::parse(body);
-                auto values = json.value("files", nlohmann::json::array());
-
-                for (const auto& item : values) {
-                    GDriveItem gdi;
-                    gdi.id = item.value("id", std::string(""));
-                    gdi.name = item.value("name", std::string(""));
-                    // Google Drive API returns size as a string
-                    if (item.contains("size")) {
-                        if (item["size"].is_string()) {
-                            try { gdi.size = std::stoll(item["size"].get<std::string>()); } catch (...) { gdi.size = 0; }
-                        } else {
-                            gdi.size = item["size"].get<int64_t>();
-                        }
-                    }
-                    gdi.web_url = item.value("webViewLink", std::string(""));
-                    gdi.created_time = item.value("createdTime", std::string(""));
-                    gdi.modified_time = item.value("modifiedTime", std::string(""));
-                    gdi.mime_type = item.value("mimeType", std::string(""));
-                    gdi.is_folder = (gdi.mime_type == "application/vnd.google-apps.folder");
-                    gdi.gd_user_id = gd_user_id;
-                    gd_items.push_back(gdi);
-
-                    UnifiedFileItem ufi;
-                    ufi.name = gdi.name;
-                    ufi.path = target_path + "/" + gdi.name;
-                    ufi.is_dir = gdi.is_folder;
-                    ufi.size = gdi.size;
-                    ufi.last_modified = gdi.modified_time.length() >= 10
-                                        ? gdi.modified_time.substr(0, 10) : "";
-                    ufi.source = FileSource::GDRIVE;
-                    ufi.gd_item_id = gdi.id;
-                    ufi.gd_user_id = gd_user_id;
-                    ufi.gd_mime_type = gdi.mime_type;
-                    ufi.gd_web_url = gdi.web_url;
-
-                    // Determine sync status
-                    if (ufi.is_dir) {
-                        ufi.status = SyncStatus::LOCAL;
-                    } else {
-                        // Check if file exists locally
-                        std::error_code ec;
-                        if (fs::exists(ufi.path, ec)) {
-                           // Check size or modification time (GDrive size might be 0 for online docs)
-                           if (gdi.size == 0 && gdi.mime_type.rfind("application/vnd.google-apps.", 0) == 0) {
-                               // Online doc - if it exists locally it's probably a link file
-                               ufi.status = SyncStatus::SYNCED;
-                           } else {
-                               uintmax_t local_size = fs::file_size(ufi.path, ec);
-                               if (!ec && local_size == (uintmax_t)ufi.size) {
-                                   ufi.status = SyncStatus::SYNCED;
-                               } else {
-                                   ufi.status = SyncStatus::MODIFIED;
-                               }
-                           }
-                        } else {
-                            ufi.status = SyncStatus::NOT_SYNCED;
-                        }
-                    }
-
-                    files.push_back(ufi);
-                }
-
-                state.files = std::move(files);
-                save_gd_items_to_cache(gd_user_id, folder_id, gd_items);
-
-            } catch (const std::exception& e) {
-                if (state.files.empty()) {
-                    state.error_msg = std::string("Parse error: ") + e.what();
-                }
-            }
-        } else if (state.files.empty()) {
-            state.error_msg = error;
-        }
     }
 
     void FileExplorerPanel::download_and_open_gd_file(const UnifiedFileItem& file) {
@@ -2815,113 +2809,8 @@ namespace misty::panel {
             [this, dbx_user_id, folder_path, target_path](bool success,
                                                             const std::string& body,
                                                             const std::string& error) {
-                handle_dbx_folder_fetch_response(dbx_user_id, folder_path, target_path, success, body, error);
+                handle_folder_fetch({FileSource::DROPBOX, dbx_user_id, folder_path, ""}, target_path, success, body, error);
             });
-    }
-
-    void FileExplorerPanel::handle_dbx_folder_fetch_response(const std::string& dbx_user_id,
-                                                               const std::string& folder_path,
-                                                               const std::string& target_path,
-                                                               bool success,
-                                                               const std::string& body,
-                                                               const std::string& error) {
-        auto& state = registry_.get_state<FileExplorerState>("Files");
-        std::lock_guard<std::mutex> lock(state.mu);
-
-        state.is_loading = false;
-
-        if (std::string(state.current_path) != target_path) {
-            return;
-        }
-
-        // Update DropboxState with current folder context for uploads
-        {
-            auto& dropbox_state = registry_.get_state<DropboxState>("Dropbox");
-            std::lock_guard<std::mutex> dbx_lock(dropbox_state.mu);
-            dropbox_state.current_dbx_user_id = dbx_user_id;
-            dropbox_state.current_folder_path = folder_path;
-        }
-        // Clear other services' upload contexts
-        {
-            auto& onedrive_state = registry_.get_state<OneDriveState>("OneDrive");
-            std::lock_guard<std::mutex> od_lock(onedrive_state.mu);
-            onedrive_state.current_ms_user_id.clear();
-            onedrive_state.current_drive_id.clear();
-            onedrive_state.current_folder_id.clear();
-        }
-        {
-            auto& gdrive_state = registry_.get_state<GDriveState>("GDrive");
-            std::lock_guard<std::mutex> gd_lock(gdrive_state.mu);
-            gdrive_state.current_gd_user_id.clear();
-            gdrive_state.current_folder_id.clear();
-        }
-
-        if (success) {
-            std::vector<DropboxItem> dbx_items;
-            std::vector<UnifiedFileItem> files;
-
-            try {
-                auto json = nlohmann::json::parse(body);
-                auto entries = json.value("entries", nlohmann::json::array());
-
-                for (const auto& entry : entries) {
-                    DropboxItem dbi;
-                    std::string tag = entry.value(".tag", std::string(""));
-                    dbi.id = entry.value("id", std::string(""));
-                    dbi.name = entry.value("name", std::string(""));
-                    dbi.path_display = entry.value("path_display", std::string(""));
-                    dbi.path_lower = entry.value("path_lower", std::string(""));
-                    dbi.is_folder = (tag == "folder");
-                    if (!dbi.is_folder) {
-                        dbi.size = entry.value("size", int64_t(0));
-                        dbi.server_modified = entry.value("server_modified", std::string(""));
-                    }
-                    dbi.dbx_user_id = dbx_user_id;
-                    dbx_items.push_back(dbi);
-
-                    UnifiedFileItem ufi;
-                    ufi.name = dbi.name;
-                    ufi.path = target_path + "/" + dbi.name;
-                    ufi.is_dir = dbi.is_folder;
-                    ufi.size = dbi.size;
-                    ufi.last_modified = dbi.server_modified.length() >= 10
-                                        ? dbi.server_modified.substr(0, 10) : "";
-                    ufi.source = FileSource::DROPBOX;
-                    ufi.dbx_item_id = dbi.id;
-                    ufi.dbx_user_id = dbx_user_id;
-                    ufi.dbx_path_display = dbi.path_display;
-
-                    // Determine sync status
-                    if (ufi.is_dir) {
-                        ufi.status = SyncStatus::LOCAL;
-                    } else {
-                        std::error_code ec;
-                        if (fs::exists(ufi.path, ec)) {
-                            uintmax_t local_size = fs::file_size(ufi.path, ec);
-                            if (!ec && local_size == (uintmax_t)ufi.size) {
-                                ufi.status = SyncStatus::SYNCED;
-                            } else {
-                                ufi.status = SyncStatus::MODIFIED;
-                            }
-                        } else {
-                            ufi.status = SyncStatus::NOT_SYNCED;
-                        }
-                    }
-
-                    files.push_back(ufi);
-                }
-
-                state.files = std::move(files);
-                save_dbx_items_to_cache(dbx_user_id, folder_path, dbx_items);
-
-            } catch (const std::exception& e) {
-                if (state.files.empty()) {
-                    state.error_msg = std::string("Parse error: ") + e.what();
-                }
-            }
-        } else if (state.files.empty()) {
-            state.error_msg = error;
-        }
     }
 
     void FileExplorerPanel::download_and_open_dbx_file(const UnifiedFileItem& file) {

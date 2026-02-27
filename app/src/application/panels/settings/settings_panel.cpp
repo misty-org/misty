@@ -32,9 +32,13 @@ namespace misty::panel {
             float content_w = total_w - sidebar_w;
 
             // Left sidebar
+            ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.13f, 0.13f, 0.13f, 1.0f));
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 20.0f));
             ImGui::BeginChild("##settings_sidebar", ImVec2(sidebar_w, 0), false);
             render_sidebar(state, sidebar_w);
             ImGui::EndChild();
+            ImGui::PopStyleVar();
+            ImGui::PopStyleColor();
 
             ImGui::SameLine(0, 0);
 
@@ -55,13 +59,8 @@ namespace misty::panel {
     // Sidebar
     // ---------------------------------------------------------------
     void SettingsPanel::render_sidebar(SettingsState& state, float width) {
-        ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.13f, 0.13f, 0.13f, 1.0f));
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 20.0f));
-
-        ImGui::BeginChild("##sidebar_inner", ImVec2(width, 0), false);
-
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
-        ImGui::SetCursorPosX(16.0f);
+        ImGui::SetCursorPosX(24.0f);
         ImGui::Text("SETTINGS");
         ImGui::PopStyleColor();
         ImGui::Spacing();
@@ -73,11 +72,6 @@ namespace misty::panel {
         render_section_button("Cloud Services", SettingsSection::Services, state, btn_w);
         render_section_button("Server",         SettingsSection::Server,   state, btn_w);
         render_section_button("About",          SettingsSection::About,    state, btn_w);
-
-        ImGui::EndChild();
-
-        ImGui::PopStyleVar();
-        ImGui::PopStyleColor();
     }
 
     void SettingsPanel::render_section_button(const char* label, SettingsSection section,
@@ -162,7 +156,6 @@ namespace misty::panel {
         ImGui::PopStyleColor();
         ImGui::PopStyleVar(2);
 
-        ImGui::Spacing();
         ImGui::Spacing();
         ImGui::Separator();
         ImGui::Spacing();
@@ -426,7 +419,6 @@ namespace misty::panel {
         ImGui::Checkbox("Enable auto-sync", &state.auto_sync_enabled);
 
         ImGui::Spacing();
-        ImGui::Spacing();
         ImGui::Separator();
         ImGui::Spacing();
         ImGui::Spacing();
@@ -446,7 +438,8 @@ namespace misty::panel {
             } else {
                 for (const auto& conn : services.ms_connections) {
                     ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.16f, 0.16f, 0.16f, 1.0f));
-                    ImGui::BeginChild(("##od_" + conn.profile.id).c_str(), ImVec2(0, 60), true,
+                    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 10.0f));
+                    ImGui::BeginChild(("##od_" + conn.profile.id).c_str(), ImVec2(0, 64), true,
                                       ImGuiWindowFlags_NoScrollbar);
 
                     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
@@ -457,7 +450,8 @@ namespace misty::panel {
                     ImGui::Text("%s", conn.profile.email.c_str());
                     ImGui::PopStyleColor();
 
-                    ImGui::SameLine(ImGui::GetWindowWidth() - 100);
+                    float btn_w = ImGui::CalcTextSize("Disconnect").x + 32.0f;
+                    ImGui::SameLine(ImGui::GetContentRegionMax().x - btn_w);
                     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.5f, 0.15f, 0.15f, 1.0f));
                     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.65f, 0.2f, 0.2f, 1.0f));
                     if (ImGui::Button(("Disconnect##od_" + conn.profile.id).c_str())) {
@@ -466,6 +460,7 @@ namespace misty::panel {
                     ImGui::PopStyleColor(2);
 
                     ImGui::EndChild();
+                    ImGui::PopStyleVar();
                     ImGui::PopStyleColor();
                     ImGui::Spacing();
                 }
@@ -492,7 +487,8 @@ namespace misty::panel {
             } else {
                 for (const auto& conn : services.gd_connections) {
                     ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.16f, 0.16f, 0.16f, 1.0f));
-                    ImGui::BeginChild(("##gd_" + conn.profile.id).c_str(), ImVec2(0, 60), true,
+                    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 10.0f));
+                    ImGui::BeginChild(("##gd_" + conn.profile.id).c_str(), ImVec2(0, 64), true,
                                       ImGuiWindowFlags_NoScrollbar);
 
                     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
@@ -503,7 +499,8 @@ namespace misty::panel {
                     ImGui::Text("%s", conn.profile.email.c_str());
                     ImGui::PopStyleColor();
 
-                    ImGui::SameLine(ImGui::GetWindowWidth() - 100);
+                    float btn_w = ImGui::CalcTextSize("Disconnect").x + 32.0f;
+                    ImGui::SameLine(ImGui::GetContentRegionMax().x - btn_w);
                     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.5f, 0.15f, 0.15f, 1.0f));
                     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.65f, 0.2f, 0.2f, 1.0f));
                     if (ImGui::Button(("Disconnect##gd_" + conn.profile.id).c_str())) {
@@ -512,6 +509,7 @@ namespace misty::panel {
                     ImGui::PopStyleColor(2);
 
                     ImGui::EndChild();
+                    ImGui::PopStyleVar();
                     ImGui::PopStyleColor();
                     ImGui::Spacing();
                 }
@@ -652,7 +650,6 @@ namespace misty::panel {
         );
         label("C++ Standard", "C++20");
 
-        ImGui::Spacing();
         ImGui::Spacing();
         ImGui::Separator();
         ImGui::Spacing();

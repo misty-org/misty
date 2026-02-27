@@ -218,6 +218,22 @@ namespace misty::core {
         return !token_.empty();
     }
 
+    void SessionManager::mark_session_expired() {
+        std::lock_guard<std::mutex> lock(mu_);
+        session_expired_ = true;
+        std::cerr << "[SessionManager] session expired — user must re-authenticate" << std::endl;
+    }
+
+    bool SessionManager::is_session_expired() const {
+        std::lock_guard<std::mutex> lock(mu_);
+        return session_expired_;
+    }
+
+    void SessionManager::clear_session_expired() {
+        std::lock_guard<std::mutex> lock(mu_);
+        session_expired_ = false;
+    }
+
     std::map<std::string, std::string> SessionManager::get_auth_headers() const {
         std::lock_guard<std::mutex> lock(mu_);
         std::map<std::string, std::string> headers;
