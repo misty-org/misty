@@ -254,7 +254,7 @@ namespace misty::panel {
                     success_msg = "Device registered successfully.";
                     has_registered_device = true;
                     if (should_switch_view_on_register) {
-                        view::switch_view(view::ViewID::FileExplorer);
+                        view::switch_view(view::ViewID::Files);
                     }
                 } else if (!error.empty()) {
                     error_msg = error;

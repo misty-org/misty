@@ -130,8 +130,13 @@ void LinuxApp::configure_imgui_style() {
 
     ImGuiStyle& style = ImGui::GetStyle();
     style.FrameRounding = 6.0f;
-    style.GrabRounding = 6.0f;
-    style.ScrollbarRounding = 6.0f;
+    style.GrabRounding = 12.0f;
+    style.ScrollbarRounding = 12.0f;
+    style.ScrollbarSize = 10.0f;
+    style.Colors[ImGuiCol_ScrollbarBg] = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
+    style.Colors[ImGuiCol_ScrollbarGrab] = ImVec4(0.4f, 0.4f, 0.4f, 0.4f);
+    style.Colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(0.5f, 0.5f, 0.5f, 0.5f);
+    style.Colors[ImGuiCol_ScrollbarGrabActive] = ImVec4(0.6f, 0.6f, 0.6f, 0.6f);
 }
 
 void LinuxApp::prepare_frame() {

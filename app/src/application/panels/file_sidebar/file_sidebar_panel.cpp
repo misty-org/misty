@@ -11,6 +11,40 @@
 #include <nlohmann/json.hpp>
 #include <filesystem>
 #include <vector>
+#include <cstdlib>
+
+namespace {
+    // A simple list item with a subtle left-to-right hover gradient.
+    // Returns true when clicked.
+    bool HoverListItem(const char* label, float width, float height = 28.0f) {
+        ImVec2 cursor = ImGui::GetCursorScreenPos();
+        ImVec2 item_size(width, height);
+
+        ImGui::PushID(label);
+        bool pressed = ImGui::InvisibleButton(label, item_size);
+        bool hovered = ImGui::IsItemHovered();
+        bool active  = ImGui::IsItemActive();
+
+        if (hovered || active) {
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            ImU32 col_left  = active
+                ? IM_COL32(255, 255, 255, 30)
+                : IM_COL32(255, 255, 255, 20);
+            ImU32 col_right = IM_COL32(255, 255, 255, 0);
+            dl->AddRectFilledMultiColor(
+                cursor,
+                ImVec2(cursor.x + item_size.x, cursor.y + item_size.y),
+                col_left, col_right, col_right, col_left);
+        }
+
+        // Draw text vertically centered
+        ImVec2 text_pos(cursor.x + 8.0f, cursor.y + (height - ImGui::GetTextLineHeight()) * 0.5f);
+        ImGui::GetWindowDrawList()->AddText(text_pos, IM_COL32(220, 220, 220, 255), label);
+
+        ImGui::PopID();
+        return pressed;
+    }
+}
 
 
 namespace misty::panel {
@@ -41,8 +75,10 @@ namespace misty::panel {
             float padding = width * 0.08f;
 
 
-                
+
             show_create_new(state, width, padding);
+            ImGui::Separator();
+            show_local_section(width, padding);
             ImGui::Separator();
             show_services_section(services_state, width, padding);
             ImGui::Separator();
@@ -52,6 +88,16 @@ namespace misty::panel {
             show_chooser_modal(state);
             show_create_entry_modal(state);
             show_uploader_modal(state);
+
+            // Check for externally-queued uploads (e.g., from paste-to-cloud)
+            if (state.pending_upload_start) {
+                state.pending_upload_start = false;
+                if (!state.upload_queue.empty() && !state.is_uploading) {
+                    state.is_uploading = true;
+                    start_next_upload(state);
+                }
+            }
+
             show_upload_progress_modal(state);
         }
 
@@ -71,29 +117,107 @@ namespace misty::panel {
         ImGui::Text("Services");
         ImGui::PopStyleColor();
 
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.22f, 0.22f, 0.22f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.32f, 0.32f, 0.32f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.18f, 0.18f, 0.18f, 1.0f));
-        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 4.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 2.0f));
 
         {
-            float button_width = content_width;
-            if (ImGui::Button("OneDrive", ImVec2(button_width, 28))) {
-                auto& file_explorer_state = registry_.get_state<FileExplorerState>("FileExplorer");
-
-                // Set pending navigation - panel will handle the actual navigation
+            if (HoverListItem("OneDrive", content_width)) {
+                auto& file_explorer_state = registry_.get_state<FileExplorerState>("Files");
                 file_explorer_state.pending_navigation_path = mount_utils::get_onedrive_root();
             }
 
-            if (ImGui::Button("Google Drive", ImVec2(button_width, 28))) {
-                auto& file_explorer_state = registry_.get_state<FileExplorerState>("FileExplorer");
-
+            if (HoverListItem("Google Drive", content_width)) {
+                auto& file_explorer_state = registry_.get_state<FileExplorerState>("Files");
                 file_explorer_state.pending_navigation_path = mount_utils::get_gdrive_root();
+            }
+
+            if (HoverListItem("Dropbox", content_width)) {
+                auto& file_explorer_state = registry_.get_state<FileExplorerState>("Files");
+                file_explorer_state.pending_navigation_path = mount_utils::get_dropbox_root();
             }
         }
 
         ImGui::PopStyleVar();
-        ImGui::PopStyleColor(3);
+
+        ImGui::EndGroup();
+
+        ImGui::Spacing();
+    }
+
+    void FileSidebarPanel::show_local_section(float width, float padding) {
+        float content_width = width - (padding * 2);
+        ImGui::SetCursorPosX(padding);
+
+        ImGui::BeginGroup();
+
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.7f, 0.7f, 0.7f, 1.0f));
+        ImGui::Text("Local");
+        ImGui::PopStyleColor();
+
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 2.0f));
+
+        const char* home = std::getenv("HOME");
+        if (!home) {
+            home = std::getenv("USERPROFILE");
+        }
+
+        if (home) {
+            std::string home_path = home;
+
+            if (HoverListItem("Home", content_width)) {
+                auto& file_explorer_state = registry_.get_state<FileExplorerState>("Files");
+                file_explorer_state.pending_navigation_path = home_path;
+            }
+
+            std::string desktop_path = home_path + "/Desktop";
+            if (fs::exists(desktop_path)) {
+                if (HoverListItem("Desktop", content_width)) {
+                    auto& file_explorer_state = registry_.get_state<FileExplorerState>("Files");
+                    file_explorer_state.pending_navigation_path = desktop_path;
+                }
+            }
+
+            std::string documents_path = home_path + "/Documents";
+            if (fs::exists(documents_path)) {
+                if (HoverListItem("Documents", content_width)) {
+                    auto& file_explorer_state = registry_.get_state<FileExplorerState>("Files");
+                    file_explorer_state.pending_navigation_path = documents_path;
+                }
+            }
+
+            std::string downloads_path = home_path + "/Downloads";
+            if (fs::exists(downloads_path)) {
+                if (HoverListItem("Downloads", content_width)) {
+                    auto& file_explorer_state = registry_.get_state<FileExplorerState>("Files");
+                    file_explorer_state.pending_navigation_path = downloads_path;
+                }
+            }
+
+            std::string pictures_path = home_path + "/Pictures";
+            if (fs::exists(pictures_path)) {
+                if (HoverListItem("Pictures", content_width)) {
+                    auto& file_explorer_state = registry_.get_state<FileExplorerState>("Files");
+                    file_explorer_state.pending_navigation_path = pictures_path;
+                }
+            }
+
+            std::string music_path = home_path + "/Music";
+            if (fs::exists(music_path)) {
+                if (HoverListItem("Music", content_width)) {
+                    auto& file_explorer_state = registry_.get_state<FileExplorerState>("Files");
+                    file_explorer_state.pending_navigation_path = music_path;
+                }
+            }
+
+            std::string videos_path = home_path + "/Videos";
+            if (fs::exists(videos_path)) {
+                if (HoverListItem("Videos", content_width)) {
+                    auto& file_explorer_state = registry_.get_state<FileExplorerState>("Files");
+                    file_explorer_state.pending_navigation_path = videos_path;
+                }
+            }
+        }
+
+        ImGui::PopStyleVar();
 
         ImGui::EndGroup();
 
@@ -201,7 +325,7 @@ namespace misty::panel {
 
             if (ImGui::Button("Create", { w, 36 }) && state.name_buffer[0]) {
                 // Use the pointer we stored in the state to avoid registry deadlocks!
-				auto& file_explorer_state = registry_.get_state<FileExplorerState>("FileExplorer");
+				auto& file_explorer_state = registry_.get_state<FileExplorerState>("Files");
                 fs::path p = fs::path(file_explorer_state.current_path) / state.name_buffer;
                 create_file(p.generic_string());
 
@@ -231,32 +355,22 @@ namespace misty::panel {
         ImGui::Text("Quick access");
         ImGui::PopStyleColor();
 
-        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f, 8.0f));
-        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 8.0f));
-        ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.0f, 0.5f));
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 2.0f));
 
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.3f, 0.3f, 0.3f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.5f, 0.5f, 0.5f, 0.5f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.3f, 0.3f, 0.3f, 0.5f));
-
-        if (ImGui::Button("Recent", ImVec2(content_width, 0))) {
-             printf("Sidebar: Clicked Recent\n");
-             auto& file_explorer_state = registry_.get_state<FileExplorerState>("FileExplorer");
+        if (HoverListItem("Recent", content_width)) {
+             auto& file_explorer_state = registry_.get_state<FileExplorerState>("Files");
              file_explorer_state.pending_navigation_path = FileExplorerState::VIRTUAL_PATH_RECENT;
         }
-        if (ImGui::Button("Starred", ImVec2(content_width, 0))) {
-             printf("Sidebar: Clicked Starred\n");
-             auto& file_explorer_state = registry_.get_state<FileExplorerState>("FileExplorer");
+        if (HoverListItem("Starred", content_width)) {
+             auto& file_explorer_state = registry_.get_state<FileExplorerState>("Files");
              file_explorer_state.pending_navigation_path = FileExplorerState::VIRTUAL_PATH_STARRED;
         }
-        if (ImGui::Button("Trash", ImVec2(content_width, 0))) {
-             printf("Sidebar: Clicked Trash\n");
-             auto& file_explorer_state = registry_.get_state<FileExplorerState>("FileExplorer");
+        if (HoverListItem("Trash", content_width)) {
+             auto& file_explorer_state = registry_.get_state<FileExplorerState>("Files");
              file_explorer_state.pending_navigation_path = FileExplorerState::VIRTUAL_PATH_TRASH;
         }
 
-        ImGui::PopStyleColor(3);
-        ImGui::PopStyleVar(3);
+        ImGui::PopStyleVar();
         ImGui::EndGroup();
         
         // Add bottom padding for consistent spacing
@@ -267,17 +381,28 @@ namespace misty::panel {
     void FileSidebarPanel::show_uploader_modal(FileSidebarState& state) {
         if (!state.show_uploader_modal) return;
 
-        auto& services_state = registry_.get_state<ServicesState>("Services");
-        if (!services_state.has_ms_connections()) {
-            state.show_uploader_modal = false;
-            state.status_message = "Sign in to OneDrive via Services first.";
-            return;
-        }
+        // Detect which cloud service has upload context
+        UploadTarget target_service = UploadTarget::ONEDRIVE;
+        bool has_context = false;
 
         auto& onedrive_state = registry_.get_state<OneDriveState>("OneDrive");
-        if (!onedrive_state.has_upload_context()) {
+        auto& gdrive_state = registry_.get_state<GDriveState>("GDrive");
+        auto& dropbox_state = registry_.get_state<DropboxState>("Dropbox");
+
+        if (onedrive_state.has_upload_context()) {
+            target_service = UploadTarget::ONEDRIVE;
+            has_context = true;
+        } else if (gdrive_state.has_upload_context()) {
+            target_service = UploadTarget::GDRIVE;
+            has_context = true;
+        } else if (dropbox_state.has_upload_context()) {
+            target_service = UploadTarget::DROPBOX;
+            has_context = true;
+        }
+
+        if (!has_context) {
             state.show_uploader_modal = false;
-            state.status_message = "Navigate to a OneDrive folder first.";
+            state.status_message = "Navigate to a cloud folder first.";
             return;
         }
 
@@ -300,6 +425,7 @@ namespace misty::panel {
                     FileUploadProgress progress;
                     progress.file_path = path;
                     progress.file_name = fs::path(path).filename().string();
+                    progress.target_service = target_service;
 
                     std::error_code ec;
                     progress.file_size = fs::file_size(path, ec);
@@ -315,16 +441,17 @@ namespace misty::panel {
 
             if (!state.upload_queue.empty()) {
                 state.is_uploading = true;
-                start_next_upload(state, services_state, onedrive_state);
+                start_next_upload(state);
             }
         }
     }
 
-    void FileSidebarPanel::start_next_upload(FileSidebarState& state, ServicesState& services_state, OneDriveState& onedrive_state) {
+    void FileSidebarPanel::start_next_upload(FileSidebarState& state) {
         size_t index;
         std::string file_path;
         std::string file_name;
         int64_t file_size = 0;
+        UploadTarget target_service;
 
         {
             std::lock_guard<std::mutex> lock(state.upload_mutex);
@@ -336,11 +463,15 @@ namespace misty::panel {
             file_path = state.upload_queue[index].file_path;
             file_name = state.upload_queue[index].file_name;
             file_size = static_cast<int64_t>(state.upload_queue[index].file_size);
+            target_service = state.upload_queue[index].target_service;
         }
+
+        std::string service_name = (target_service == UploadTarget::ONEDRIVE) ? "OneDrive" :
+                                   (target_service == UploadTarget::GDRIVE) ? "Google Drive" : "Dropbox";
 
         // Register this upload in UploadState for activity tracking
         auto& upload_state = registry_.get_state<UploadState>("Uploads");
-        uint64_t upload_id = upload_state.start_upload(file_name, file_path, "OneDrive", file_size);
+        uint64_t upload_id = upload_state.start_upload(file_name, file_path, service_name, file_size);
 
         // Progress callback - updates both the sidebar UI state and the activity UploadState
         auto progress_cb = [&state, &upload_state, index, upload_id](size_t bytes_uploaded, size_t total_bytes) -> bool {
@@ -355,7 +486,7 @@ namespace misty::panel {
         };
 
         // Completion callback
-        auto completion_cb = [this, &state, &services_state, &onedrive_state, &upload_state, index, upload_id](bool success, const std::string& error_msg) {
+        auto completion_cb = [this, &state, &upload_state, index, upload_id](bool success, const std::string& error_msg) {
             {
                 std::lock_guard<std::mutex> lock(state.upload_mutex);
                 if (index < state.upload_queue.size()) {
@@ -375,14 +506,26 @@ namespace misty::panel {
 
             // Start next upload or finish
             if (!state.cancel_upload.load()) {
-                start_next_upload(state, services_state, onedrive_state);
+                start_next_upload(state);
             } else {
                 state.is_uploading = false;
             }
         };
 
-        onedrive_state.set_worker_pool(worker_pool_);
-        onedrive_state.upload_file(file_path, progress_cb, completion_cb);
+        // Dispatch to the appropriate service
+        if (target_service == UploadTarget::ONEDRIVE) {
+            auto& onedrive_state = registry_.get_state<OneDriveState>("OneDrive");
+            onedrive_state.set_worker_pool(worker_pool_);
+            onedrive_state.upload_file(file_path, progress_cb, completion_cb);
+        } else if (target_service == UploadTarget::GDRIVE) {
+            auto& gdrive_state = registry_.get_state<GDriveState>("GDrive");
+            gdrive_state.set_worker_pool(worker_pool_);
+            gdrive_state.upload_file(file_path, progress_cb, completion_cb);
+        } else if (target_service == UploadTarget::DROPBOX) {
+            auto& dropbox_state = registry_.get_state<DropboxState>("Dropbox");
+            dropbox_state.set_worker_pool(worker_pool_);
+            dropbox_state.upload_file(file_path, progress_cb, completion_cb);
+        }
     }
 
     void FileSidebarPanel::show_upload_progress_modal(FileSidebarState& state) {

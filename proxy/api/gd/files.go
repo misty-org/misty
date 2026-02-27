@@ -300,3 +300,54 @@ func GetUploadSession(database *db.Database) http.HandlerFunc {
 		})
 	}
 }
+
+func CreateFolder(database *db.Database) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID := r.URL.Query().Get("user_id")
+		gdUserID := r.URL.Query().Get("gd_user_id")
+		if userID == "" || gdUserID == "" {
+			http.Error(w, "user_id and gd_user_id query params are required", http.StatusBadRequest)
+			return
+		}
+
+		var req struct {
+			Name     string `json:"name"`
+			ParentID string `json:"parent_id"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Failed to decode request body", http.StatusBadRequest)
+			return
+		}
+
+		parentID := req.ParentID
+		if parentID == "" {
+			parentID = "root"
+		}
+
+		metadata := map[string]interface{}{
+			"name":     req.Name,
+			"mimeType": "application/vnd.google-apps.folder",
+			"parents":  []string{parentID},
+		}
+		metadataBytes, _ := json.Marshal(metadata)
+
+		config := gd.GetConfig()
+		apiURL := fmt.Sprintf("%s/drive/v3/files", config.APIBase)
+
+		apiRes, err := gd.ExecAPIRequest(database, userID, gdUserID, http.MethodPost, apiURL, bytes.NewReader(metadataBytes))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer apiRes.Body.Close()
+
+		if apiRes.StatusCode != http.StatusOK && apiRes.StatusCode != http.StatusCreated {
+			body, _ := io.ReadAll(apiRes.Body)
+			http.Error(w, fmt.Sprintf("Failed to create folder: %d %s", apiRes.StatusCode, string(body)), apiRes.StatusCode)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		io.Copy(w, apiRes.Body)
+	}
+}

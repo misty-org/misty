@@ -1,6 +1,9 @@
 #include "http_client.h"
 #include "session_manager.h"
+#include "env_manager.h"
+#include "util.h"
 #include <curl/curl.h>
+#include <nlohmann/json.hpp>
 #include <sstream>
 #include <iostream>
 #include <fstream>
@@ -80,7 +83,8 @@ namespace misty::core {
         return perform_request("DELETE", url, "", headers);
     }
 
-    HttpResponse HttpClient::perform_request(const std::string& method, const std::string& url, const std::string& body, const std::map<std::string, std::string>& headers) {
+    // Makes a single HTTP request (no retry logic)
+    static HttpResponse execute_curl_request(const std::string& method, const std::string& url, const std::string& body, const std::map<std::string, std::string>& headers) {
         HttpResponse response;
         response.status_code = 0;
         response.body = "";
@@ -113,15 +117,9 @@ namespace misty::core {
             curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
         }
 
-        // Merge auth headers (caller-provided headers take priority)
-        auto merged_headers = SessionManager::get().get_auth_headers();
-        for (const auto& [key, value] : headers) {
-            merged_headers[key] = value;
-        }
-
         // Set headers
         struct curl_slist* header_list = nullptr;
-        for (const auto& [key, value] : merged_headers) {
+        for (const auto& [key, value] : headers) {
             std::string header = key + ": " + value;
             header_list = curl_slist_append(header_list, header.c_str());
         }
@@ -154,6 +152,72 @@ namespace misty::core {
             curl_slist_free_all(header_list);
         }
         curl_easy_cleanup(curl);
+
+        return response;
+    }
+
+    bool HttpClient::attempt_token_refresh() {
+        std::string refresh_token = SessionManager::get().get_refresh_token();
+        if (refresh_token.empty()) {
+            return false;
+        }
+
+        std::string proxy_url = EnvManager::get().get("PROXY_SERVICE_URL", "");
+        if (proxy_url.empty()) {
+            return false;
+        }
+
+        std::map<std::string, std::string> json_fields;
+        json_fields["refresh_token"] = refresh_token;
+        std::string json_body = build_json_object(json_fields);
+
+        std::map<std::string, std::string> headers;
+        headers["Content-Type"] = "application/json";
+
+        auto response = execute_curl_request("POST", proxy_url + "/api/refresh", json_body, headers);
+
+        if (response.status_code == 200) {
+            try {
+                auto json_resp = nlohmann::json::parse(response.body);
+                std::string new_token = json_resp["token"].get<std::string>();
+                std::string new_refresh = json_resp["refresh_token"].get<std::string>();
+                SessionManager::get().update_tokens(new_token, new_refresh);
+                std::cerr << "[HttpClient] Token refresh succeeded" << std::endl;
+                return true;
+            } catch (...) {
+                std::cerr << "[HttpClient] Failed to parse refresh response" << std::endl;
+            }
+        } else {
+            std::cerr << "[HttpClient] Token refresh failed with status " << response.status_code << std::endl;
+        }
+
+        return false;
+    }
+
+    HttpResponse HttpClient::perform_request(const std::string& method, const std::string& url, const std::string& body, const std::map<std::string, std::string>& headers) {
+        // Merge auth headers (caller-provided headers take priority)
+        auto merged_headers = SessionManager::get().get_auth_headers();
+        for (const auto& [key, value] : headers) {
+            merged_headers[key] = value;
+        }
+
+        HttpResponse response = execute_curl_request(method, url, body, merged_headers);
+
+        // Auto-refresh on 401 if we're not already in a refresh call
+        if (response.status_code == 401 && !is_refreshing_.exchange(true)) {
+            if (attempt_token_refresh()) {
+                // Retry with new auth headers
+                auto retry_headers = SessionManager::get().get_auth_headers();
+                for (const auto& [key, value] : headers) {
+                    retry_headers[key] = value;
+                }
+                response = execute_curl_request(method, url, body, retry_headers);
+            } else {
+                // Refresh failed — clear tokens so callers know we're unauthenticated
+                SessionManager::get().clear_token();
+            }
+            is_refreshing_.store(false);
+        }
 
         return response;
     }

@@ -2,9 +2,12 @@
 #include "panels/workspace/workspace_state.h"
 #include "panels/services/onedrive/onedrive_state.h"
 #include "panels/services/gdrive/gdrive_state.h"
+#include "panels/services/dropbox/dropbox_state.h"
 #include "panels/services/services_state.h"
 #include "panels/activity/download_state.h"
+#include "panels/activity/upload_state.h"
 #include "panels/notification/notification_state.h"
+#include "panels/file_sidebar/file_sidebar_state.h"
 #include "core/asset_manager.h"
 #include <nlohmann/json.hpp>
 #include <cstdio>
@@ -20,7 +23,7 @@ namespace misty::panel {
         : registry_(registry), worker_pool_(worker_pool), client_(std::move(client)) {
 
         auto& workspace_state = registry_.get_state<WorkspaceState>("Workspace");
-        auto& file_explorer_state = registry_.get_state<FileExplorerState>("FileExplorer");
+        auto& file_explorer_state = registry_.get_state<FileExplorerState>("Files");
 
         // Ensure mount directories exist (~/misty/mnt and ~/misty/mnt/OneDrive)
         workspace_state.ensure_directories();
@@ -35,6 +38,7 @@ namespace misty::panel {
         // Sync account mappings to create account directories
         sync_account_mappings();
         sync_gd_account_mappings();
+        sync_dbx_account_mappings();
 
         // Fetch workspaces if not already done
         if (!workspace_state.has_fetched) {
@@ -58,7 +62,7 @@ namespace misty::panel {
             // Check if it's a virtual path
             if (saved_path.rfind("misty://", 0) == 0) {
                  // Always valid
-            } else if (path_utils::is_onedrive_path(saved_path) || path_utils::is_gdrive_path(saved_path)) {
+            } else if (path_utils::is_onedrive_path(saved_path) || path_utils::is_gdrive_path(saved_path) || path_utils::is_dropbox_path(saved_path)) {
                  // Assume valid for cloud paths (will show error or reconnect if not)
             } else {
                  // Check local existence
@@ -90,7 +94,7 @@ namespace misty::panel {
     }
 
     void FileExplorerPanel::render() {
-        auto& state = registry_.get_state<FileExplorerState>("FileExplorer");
+        auto& state = registry_.get_state<FileExplorerState>("Files");
         auto& workspace_state = registry_.get_state<WorkspaceState>("Workspace");
 
         if (!workspace_mount_applied_) {
@@ -157,7 +161,7 @@ namespace misty::panel {
 
     void FileExplorerPanel::navigate_to_path(const std::string& path, bool update_history, bool create_if_missing) {
         printf("Explorer: navigate_to_path called with: %s\n", path.c_str());
-        auto& state = registry_.get_state<FileExplorerState>("FileExplorer");
+        auto& state = registry_.get_state<FileExplorerState>("Files");
 
         // Virtual Paths Logic
         if (path.rfind("misty://", 0) == 0) {
@@ -246,6 +250,15 @@ namespace misty::panel {
             } else {
                 navigate_to_gdrive_account(folder_name, relative_path, update_history, create_if_missing);
             }
+        } else if (path_utils::is_dropbox_path(path)) {
+            // Dropbox path - parse and route
+            auto [folder_name, relative_path] = path_utils::parse_dropbox_path(path);
+
+            if (folder_name.empty()) {
+                navigate_to_dropbox_mount_root(update_history);
+            } else {
+                navigate_to_dropbox_account(folder_name, relative_path, update_history, create_if_missing);
+            }
         } else {
             // Local path - clear OneDrive and GDrive upload context and notification tracking
             {
@@ -260,6 +273,12 @@ namespace misty::panel {
                 std::lock_guard<std::mutex> gd_lock(gdrive_state.mu);
                 gdrive_state.current_gd_user_id.clear();
                 gdrive_state.current_folder_id.clear();
+            }
+            {
+                auto& dropbox_state = registry_.get_state<DropboxState>("Dropbox");
+                std::lock_guard<std::mutex> dbx_lock(dropbox_state.mu);
+                dropbox_state.current_dbx_user_id.clear();
+                dropbox_state.current_folder_path.clear();
             }
             state.last_disconnected_notification_folder.clear();
             navigate_to_local_path(state, path, update_history);
@@ -302,7 +321,7 @@ namespace misty::panel {
     }
 
     void FileExplorerPanel::navigate_to_onedrive_mount_root(bool update_history) {
-        auto& state = registry_.get_state<FileExplorerState>("FileExplorer");
+        auto& state = registry_.get_state<FileExplorerState>("Files");
         auto& workspace = registry_.get_state<WorkspaceState>("Workspace");
         auto& services = registry_.get_state<ServicesState>("Services");
 
@@ -387,7 +406,7 @@ namespace misty::panel {
                                                           const std::string& relative_path,
                                                           bool update_history,
                                                           bool create_if_missing) {
-        auto& state = registry_.get_state<FileExplorerState>("FileExplorer");
+        auto& state = registry_.get_state<FileExplorerState>("Files");
         auto& workspace = registry_.get_state<WorkspaceState>("Workspace");
         auto& services = registry_.get_state<ServicesState>("Services");
 
@@ -568,7 +587,7 @@ namespace misty::panel {
                                                            bool success,
                                                            const std::string& error) {
                     if (!success) {
-                        auto& state = registry_.get_state<FileExplorerState>("FileExplorer");
+                        auto& state = registry_.get_state<FileExplorerState>("Files");
                         std::lock_guard<std::mutex> lock(state.mu);
                         state.is_loading = false;
                         if (state.files.empty()) {
@@ -617,7 +636,7 @@ namespace misty::panel {
                                                           bool success,
                                                           const std::string& body,
                                                           const std::string& error) {
-        auto& state = registry_.get_state<FileExplorerState>("FileExplorer");
+        auto& state = registry_.get_state<FileExplorerState>("Files");
         std::lock_guard<std::mutex> lock(state.mu);
 
         state.is_loading = false;
@@ -634,6 +653,19 @@ namespace misty::panel {
             onedrive_state.current_ms_user_id = ms_user_id;
             onedrive_state.current_drive_id = drive_id;
             onedrive_state.current_folder_id = folder_id;
+        }
+        // Clear other services' upload contexts
+        {
+            auto& gdrive_state = registry_.get_state<GDriveState>("GDrive");
+            std::lock_guard<std::mutex> gd_lock(gdrive_state.mu);
+            gdrive_state.current_gd_user_id.clear();
+            gdrive_state.current_folder_id.clear();
+        }
+        {
+            auto& dropbox_state = registry_.get_state<DropboxState>("Dropbox");
+            std::lock_guard<std::mutex> dbx_lock(dropbox_state.mu);
+            dropbox_state.current_dbx_user_id.clear();
+            dropbox_state.current_folder_path.clear();
         }
 
         if (success) {
@@ -804,7 +836,7 @@ namespace misty::panel {
 
     void FileExplorerPanel::show_directory_contents(FileExplorerState& state) {
         static ImGuiTableFlags flags = ImGuiTableFlags_Reorderable | ImGuiTableFlags_Sortable |
-            ImGuiTableFlags_Hideable | ImGuiTableFlags_RowBg |
+            ImGuiTableFlags_Hideable |
             ImGuiTableFlags_ScrollY | ImGuiTableFlags_Resizable;
 
         // Keyboard shortcuts
@@ -826,7 +858,7 @@ namespace misty::panel {
                 perform_cut(state);
             }
             if (ctrl && ImGui::IsKeyPressed(ImGuiKey_V)) {
-                if (state.clipboard_op != ClipboardOp::NONE && !state.clipboard_paths.empty()) {
+                if (state.clipboard_op != ClipboardOp::NONE && !state.clipboard_items.empty()) {
                     perform_paste(state);
                 }
             }
@@ -841,6 +873,11 @@ namespace misty::panel {
                 }
             }
         }
+
+        // Light gray selection; hover on selected items stays the same gray
+        ImGui::PushStyleColor(ImGuiCol_Header,        ImVec4(0.45f, 0.45f, 0.45f, 0.35f));  // selected
+        ImGui::PushStyleColor(ImGuiCol_HeaderHovered,  ImVec4(0.45f, 0.45f, 0.45f, 0.35f)); // selected + hovered (no change)
+        ImGui::PushStyleColor(ImGuiCol_HeaderActive,   ImVec4(0.45f, 0.45f, 0.45f, 0.45f)); // click
 
         if (ImGui::BeginTable("FileTable", 5, flags)) {
             ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
@@ -894,6 +931,8 @@ namespace misty::panel {
             ImGui::EndTable();
         }
 
+        ImGui::PopStyleColor(3);
+
         // Modals (rendered outside table)
         show_rename_modal(state);
         show_new_entry_modal(state);
@@ -937,7 +976,9 @@ namespace misty::panel {
 
         // Unique ID for Selectable
         std::string label_id = "##";
-        if (!file.gd_item_id.empty()) {
+        if (!file.dbx_item_id.empty()) {
+            label_id += file.dbx_item_id;
+        } else if (!file.gd_item_id.empty()) {
             label_id += file.gd_item_id;
         } else if (!file.od_item_id.empty()) {
             label_id += file.od_item_id;
@@ -947,7 +988,7 @@ namespace misty::panel {
 
         // Draw Selectable (full row width/height, handles background and interaction)
         ImVec2 p = ImGui::GetCursorScreenPos();
-        
+
         // Render Selectable
         if (ImGui::Selectable(label_id.c_str(), is_currently_selected, ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowDoubleClick, ImVec2(0, row_height))) {
             if (io.KeyCtrl) {
@@ -967,6 +1008,18 @@ namespace misty::panel {
             state.last_selected_index = i;
         }
 
+        // Draw hover gradient (left-to-right fade) when not selected
+        if (ImGui::IsItemHovered() && !is_currently_selected) {
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            ImVec2 row_min = p;
+            ImVec2 row_max = ImVec2(p.x + ImGui::GetContentRegionAvail().x, p.y + row_height);
+            ImU32 col_left  = ImGui::IsItemActive()
+                ? IM_COL32(255, 255, 255, 30)
+                : IM_COL32(255, 255, 255, 20);
+            ImU32 col_right = IM_COL32(255, 255, 255, 0);
+            dl->AddRectFilledMultiColor(row_min, row_max, col_left, col_right, col_right, col_left);
+        }
+
         // Context menu logic (moved here to apply to the entire Selectable row)
         if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
             state.context_menu_target_path = file.path;
@@ -981,7 +1034,11 @@ namespace misty::panel {
         // Double click logic (must check IsItemHovered on the selectable)
         if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)) {
             if (file.is_dir) {
-                navigate_to_path(file.path);
+                // Copy path before navigating — navigate_to_path replaces state.files,
+                // which invalidates the `file` reference.
+                std::string nav_path = file.path;
+                navigate_to_path(nav_path);
+                return; // state.files replaced; `file` ref is dangling
             }
             else {
                 // Open file logic
@@ -1009,6 +1066,14 @@ namespace misty::panel {
                     } else if (!state.is_downloading(file.path)) {
                         state.add_recent(file);
                         download_and_open_gd_file(file);
+                    }
+                } else if (file.source == FileSource::DROPBOX) {
+                    if (fs::exists(file.path)) {
+                        state.add_recent(file);
+                        open_file(file.path);
+                    } else if (!state.is_downloading(file.path)) {
+                        state.add_recent(file);
+                        download_and_open_dbx_file(file);
                     }
                 }
             }
@@ -1164,9 +1229,7 @@ namespace misty::panel {
                     ImGui::MenuItem("Cut", "Cmd+X", false, false);
                 }
 
-                bool can_paste = state.clipboard_op != ClipboardOp::NONE && !state.clipboard_paths.empty();
-                // Paste should be allowed in directory regardless of sync status of the directory itself?
-                // Usually yes.
+                bool can_paste = state.clipboard_op != ClipboardOp::NONE && !state.clipboard_items.empty();
                 if (ImGui::MenuItem("Paste", "Cmd+V", false, can_paste)) {
                     perform_paste(state);
                 }
@@ -1331,30 +1394,29 @@ namespace misty::panel {
         ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.3f, 0.3f, 0.3f, 0.6f));
 
         if (ImGui::BeginPopup("BackgroundContextMenu")) {
-            bool is_local = !path_utils::is_onedrive_path(state.current_path)
-                         && !path_utils::is_gdrive_path(state.current_path);
+            bool is_cloud = path_utils::is_onedrive_path(state.current_path)
+                          || path_utils::is_gdrive_path(state.current_path)
+                          || path_utils::is_dropbox_path(state.current_path);
+            bool is_local = !is_cloud;
 
-            if (is_local) {
-                bool can_paste = state.clipboard_op != ClipboardOp::NONE && !state.clipboard_paths.empty();
-                if (ImGui::MenuItem("Paste", "Cmd+V", false, can_paste)) {
-                    perform_paste(state);
-                }
+            // Paste is available in both local and cloud directories
+            bool can_paste = state.clipboard_op != ClipboardOp::NONE && !state.clipboard_items.empty();
+            if (ImGui::MenuItem("Paste", "Cmd+V", false, can_paste)) {
+                perform_paste(state);
+            }
 
-                ImGui::Separator();
+            ImGui::Separator();
 
-                if (ImGui::MenuItem("New File")) {
-                    state.new_entry_is_dir = false;
-                    state.new_entry_name_buffer[0] = '\0';
-                    state.show_new_entry_modal = true;
-                }
+            if (ImGui::MenuItem("New File")) {
+                state.new_entry_is_dir = false;
+                state.new_entry_name_buffer[0] = '\0';
+                state.show_new_entry_modal = true;
+            }
 
-                if (ImGui::MenuItem("New Folder")) {
-                    state.new_entry_is_dir = true;
-                    state.new_entry_name_buffer[0] = '\0';
-                    state.show_new_entry_modal = true;
-                }
-            } else {
-                ImGui::TextDisabled("No actions available");
+            if (ImGui::MenuItem("New Folder")) {
+                state.new_entry_is_dir = true;
+                state.new_entry_name_buffer[0] = '\0';
+                state.show_new_entry_modal = true;
             }
 
             ImGui::EndPopup();
@@ -1413,21 +1475,84 @@ namespace misty::panel {
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.6f, 1.0f, 1.0f));
             if (ImGui::Button("Create##new_entry", ImVec2(button_width, 32)) || entered) {
                 std::string name(state.new_entry_name_buffer);
+                std::string current_dir(state.current_path);
+                bool is_cloud_dir = path_utils::is_onedrive_path(current_dir)
+                                 || path_utils::is_gdrive_path(current_dir)
+                                 || path_utils::is_dropbox_path(current_dir);
+
                 if (!name.empty()) {
-                    fs::path p = fs::path(state.current_path) / name;
+                    fs::path p = fs::path(current_dir) / name;
                     std::error_code ec;
+
                     if (state.new_entry_is_dir) {
+                        // Create local directory
                         fs::create_directory(p, ec);
+
+                        // Also create on cloud if in cloud directory
+                        if (!ec && is_cloud_dir) {
+                            auto& services = registry_.get_state<ServicesState>("Services");
+                            auto& notif = registry_.get_state<NotificationState>("Notifications");
+
+                            if (path_utils::is_onedrive_path(current_dir)) {
+                                auto& od_state = registry_.get_state<OneDriveState>("OneDrive");
+                                if (od_state.has_upload_context()) {
+                                    auto ctx = od_state.get_upload_context();
+                                    services.create_onedrive_folder(ctx.ms_user_id, ctx.drive_id, ctx.folder_id, name,
+                                        [this, name](bool success, const std::string&, const std::string& error) {
+                                            auto& notif = registry_.get_state<NotificationState>("Notifications");
+                                            if (success) {
+                                                notif.add_notification("Created", "Folder " + name + " created on OneDrive", NotificationType::SUCCESS);
+                                            } else {
+                                                notif.add_notification("Cloud Error", "Failed to create folder on OneDrive: " + error, NotificationType::ERROR);
+                                            }
+                                        });
+                                }
+                            } else if (path_utils::is_gdrive_path(current_dir)) {
+                                auto& gd_state = registry_.get_state<GDriveState>("GDrive");
+                                if (gd_state.has_upload_context()) {
+                                    auto ctx = gd_state.get_upload_context();
+                                    services.create_gdrive_folder(ctx.gd_user_id, ctx.folder_id, name,
+                                        [this, name](bool success, const std::string&, const std::string& error) {
+                                            auto& notif = registry_.get_state<NotificationState>("Notifications");
+                                            if (success) {
+                                                notif.add_notification("Created", "Folder " + name + " created on Google Drive", NotificationType::SUCCESS);
+                                            } else {
+                                                notif.add_notification("Cloud Error", "Failed to create folder on Google Drive: " + error, NotificationType::ERROR);
+                                            }
+                                        });
+                                }
+                            } else if (path_utils::is_dropbox_path(current_dir)) {
+                                auto& dbx_state = registry_.get_state<DropboxState>("Dropbox");
+                                if (dbx_state.has_upload_context()) {
+                                    auto ctx = dbx_state.get_upload_context();
+                                    services.create_dbx_folder(ctx.dbx_user_id, ctx.folder_path, name,
+                                        [this, name](bool success, const std::string&, const std::string& error) {
+                                            auto& notif = registry_.get_state<NotificationState>("Notifications");
+                                            if (success) {
+                                                notif.add_notification("Created", "Folder " + name + " created on Dropbox", NotificationType::SUCCESS);
+                                            } else {
+                                                notif.add_notification("Cloud Error", "Failed to create folder on Dropbox: " + error, NotificationType::ERROR);
+                                            }
+                                        });
+                                }
+                            }
+                        }
                     } else {
-                        // Create empty file by opening and closing
+                        // Create empty file locally
                         if (auto f = std::fopen(p.string().c_str(), "w")) {
                             std::fclose(f);
                         }
+
+                        // Upload to cloud if in cloud directory
+                        if (is_cloud_dir) {
+                            trigger_upload(p.string(), current_dir);
+                        }
                     }
+
                     if (!ec) {
                         auto& notif = registry_.get_state<NotificationState>("Notifications");
                         notif.add_notification("Created", std::string(state.new_entry_is_dir ? "Folder " : "File ") + name + " created", NotificationType::SUCCESS);
-                        navigate_to_path(std::string(state.current_path), false);
+                        navigate_to_path(current_dir, false);
                     }
                 }
                 state.new_entry_name_buffer[0] = '\0';
@@ -1456,12 +1581,166 @@ namespace misty::panel {
 
     void FileExplorerPanel::perform_paste(FileExplorerState& state) {
         std::string dest_dir(state.current_path);
+        bool dest_is_cloud = path_utils::is_onedrive_path(dest_dir)
+                          || path_utils::is_gdrive_path(dest_dir)
+                          || path_utils::is_dropbox_path(dest_dir);
 
-        for (const auto& src_path : state.clipboard_paths) {
-            fs::path src(src_path);
+        bool queued_cloud_uploads = false;
+
+        for (const auto& item : state.clipboard_items) {
+            bool src_is_cloud = (item.source == FileSource::ONEDRIVE
+                              || item.source == FileSource::GDRIVE
+                              || item.source == FileSource::DROPBOX);
+
+            if (!src_is_cloud && !dest_is_cloud) {
+                // Local -> Local
+                perform_paste_local_to_local(state, item, dest_dir);
+            } else if (!dest_is_cloud && src_is_cloud) {
+                // Cloud -> Local
+                perform_paste_cloud_to_local(state, item, dest_dir);
+            } else if (dest_is_cloud) {
+                // Local/Cloud -> Cloud (queues into sidebar upload queue)
+                perform_paste_to_cloud(state, item, dest_dir);
+                queued_cloud_uploads = true;
+            }
+        }
+
+        // Trigger the sidebar upload queue if we queued any cloud uploads
+        if (queued_cloud_uploads) {
+            auto& sidebar_state = registry_.get_state<FileSidebarState>("FileSidebar");
+            sidebar_state.pending_upload_start = true;
+        }
+
+        // Clear clipboard after cut (keep after copy so user can paste multiple times)
+        if (state.clipboard_op == ClipboardOp::CUT) {
+            state.clipboard_op = ClipboardOp::NONE;
+            state.clipboard_paths.clear();
+            state.clipboard_items.clear();
+        }
+
+        // Refresh directory
+        navigate_to_path(std::string(state.current_path), false);
+    }
+
+    void FileExplorerPanel::perform_paste_local_to_local(FileExplorerState& state, const UnifiedFileItem& item, const std::string& dest_dir) {
+        fs::path src(item.path);
+        fs::path dest = fs::path(dest_dir) / src.filename();
+
+        // Avoid overwriting - append suffix if destination exists
+        if (fs::exists(dest)) {
+            std::string stem = dest.stem().string();
+            std::string ext = dest.extension().string();
+            int counter = 1;
+            while (fs::exists(dest)) {
+                dest = fs::path(dest_dir) / (stem + " (" + std::to_string(counter) + ")" + ext);
+                counter++;
+            }
+        }
+
+        std::error_code ec;
+        if (state.clipboard_op == ClipboardOp::COPY) {
+            if (fs::is_directory(src)) {
+                fs::copy(src, dest, fs::copy_options::recursive, ec);
+            } else {
+                fs::copy_file(src, dest, ec);
+            }
+        } else if (state.clipboard_op == ClipboardOp::CUT) {
+            fs::rename(src, dest, ec);
+        }
+
+        if (ec) {
+            auto& notif = registry_.get_state<NotificationState>("Notifications");
+            notif.add_notification("Paste Failed", ec.message(), NotificationType::ERROR);
+        } else {
+            auto& notif = registry_.get_state<NotificationState>("Notifications");
+            std::string action = (state.clipboard_op == ClipboardOp::COPY) ? "Copied" : "Moved";
+            notif.add_notification("Success", action + " " + item.name, NotificationType::SUCCESS);
+        }
+    }
+
+    void FileExplorerPanel::perform_paste_to_cloud(FileExplorerState& state, const UnifiedFileItem& item, const std::string& dest_dir) {
+        // Skip directories — cloud upload only supports files
+        if (item.is_dir) {
+            auto& notif = registry_.get_state<NotificationState>("Notifications");
+            notif.add_notification("Paste Skipped", "Folder upload not supported: " + item.name, NotificationType::INFO);
+            return;
+        }
+
+        // Source file must exist locally (either local file or synced cloud file)
+        if (!fs::exists(item.path)) {
+            auto& notif = registry_.get_state<NotificationState>("Notifications");
+            notif.add_notification("Paste Failed", "File not available locally: " + item.name + ". Download it first.", NotificationType::ERROR);
+            return;
+        }
+
+        // Copy the file into the mount directory
+        fs::path src(item.path);
+        fs::path dest = fs::path(dest_dir) / src.filename();
+
+        // Deduplicate name
+        if (fs::exists(dest)) {
+            std::string stem = dest.stem().string();
+            std::string ext = dest.extension().string();
+            int counter = 1;
+            while (fs::exists(dest)) {
+                dest = fs::path(dest_dir) / (stem + " (" + std::to_string(counter) + ")" + ext);
+                counter++;
+            }
+        }
+
+        std::error_code ec;
+        if (state.clipboard_op == ClipboardOp::CUT) {
+            fs::rename(src, dest, ec);
+        } else {
+            fs::copy_file(src, dest, ec);
+        }
+
+        if (ec) {
+            auto& notif = registry_.get_state<NotificationState>("Notifications");
+            notif.add_notification("Paste Failed", "Failed to copy to mount: " + ec.message(), NotificationType::ERROR);
+            return;
+        }
+
+        // Determine upload target from destination path
+        UploadTarget target;
+        if (path_utils::is_onedrive_path(dest_dir)) {
+            target = UploadTarget::ONEDRIVE;
+        } else if (path_utils::is_gdrive_path(dest_dir)) {
+            target = UploadTarget::GDRIVE;
+        } else {
+            target = UploadTarget::DROPBOX;
+        }
+
+        // Queue into sidebar upload queue for batch processing
+        auto& sidebar_state = registry_.get_state<FileSidebarState>("FileSidebar");
+        std::string dest_str = dest.string();
+        std::string file_name = dest.filename().string();
+        size_t file_size = 0;
+        try { file_size = fs::file_size(dest_str); } catch (...) {}
+
+        {
+            std::lock_guard<std::mutex> lock(sidebar_state.upload_mutex);
+            FileUploadProgress progress;
+            progress.file_path = dest_str;
+            progress.file_name = file_name;
+            progress.file_size = file_size;
+            progress.target_service = target;
+            sidebar_state.upload_queue.push_back(std::move(progress));
+        }
+    }
+
+    void FileExplorerPanel::perform_paste_cloud_to_local(FileExplorerState& state, const UnifiedFileItem& item, const std::string& dest_dir) {
+        if (item.is_dir) {
+            auto& notif = registry_.get_state<NotificationState>("Notifications");
+            notif.add_notification("Paste Skipped", "Folder download not supported: " + item.name, NotificationType::INFO);
+            return;
+        }
+
+        // If file is synced locally, just copy it
+        if (item.status == SyncStatus::SYNCED || item.status == SyncStatus::MODIFIED || fs::exists(item.path)) {
+            fs::path src(item.path);
             fs::path dest = fs::path(dest_dir) / src.filename();
 
-            // Avoid overwriting - append suffix if destination exists
             if (fs::exists(dest)) {
                 std::string stem = dest.stem().string();
                 std::string ext = dest.extension().string();
@@ -1473,39 +1752,197 @@ namespace misty::panel {
             }
 
             std::error_code ec;
-            if (state.clipboard_op == ClipboardOp::COPY) {
-                if (fs::is_directory(src)) {
-                    fs::copy(src, dest, fs::copy_options::recursive, ec);
-                } else {
-                    fs::copy_file(src, dest, ec);
-                }
-            } else if (state.clipboard_op == ClipboardOp::CUT) {
+            if (state.clipboard_op == ClipboardOp::CUT) {
                 fs::rename(src, dest, ec);
+            } else {
+                fs::copy_file(src, dest, ec);
             }
+
+            if (ec) {
+                auto& notif = registry_.get_state<NotificationState>("Notifications");
+                notif.add_notification("Paste Failed", ec.message(), NotificationType::ERROR);
+            } else {
+                auto& notif = registry_.get_state<NotificationState>("Notifications");
+                std::string action = (state.clipboard_op == ClipboardOp::COPY) ? "Copied" : "Moved";
+                notif.add_notification("Success", action + " " + item.name, NotificationType::SUCCESS);
+            }
+            return;
         }
 
-        auto& notif = registry_.get_state<NotificationState>("Notifications");
-        std::string msg = (state.clipboard_op == ClipboardOp::COPY ? "Copied " : "Moved ") + std::to_string(state.clipboard_paths.size()) + " items";
-        notif.add_notification("Success", msg, NotificationType::SUCCESS);
+        // NOT_SYNCED — download from cloud to dest
+        auto& services = registry_.get_state<ServicesState>("Services");
+        auto& downloads = registry_.get_state<DownloadState>("Downloads");
+        auto& notifications = registry_.get_state<NotificationState>("Notifications");
 
-        // Clear clipboard after cut (keep after copy so user can paste multiple times)
-        if (state.clipboard_op == ClipboardOp::CUT) {
-            state.clipboard_op = ClipboardOp::NONE;
-            state.clipboard_paths.clear(); // Clear paths
+        std::string dest_path = (fs::path(dest_dir) / item.name).string();
+
+        uint64_t download_id = downloads.start_download(
+            item.name, dest_path,
+            item.source == FileSource::ONEDRIVE ? "OneDrive" :
+            item.source == FileSource::GDRIVE ? "Google Drive" : "Dropbox",
+            item.size
+        );
+
+        uint64_t notif_id = notifications.add_notification(
+            "Downloading for Paste",
+            item.name,
+            NotificationType::DOWNLOAD,
+            15.0f
+        );
+
+        if (item.source == FileSource::ONEDRIVE) {
+            services.download_file(
+                item.od_ms_user_id, item.od_drive_id, item.od_item_id, dest_path,
+                [this, file_name = item.name, download_id, notif_id](
+                    bool success, const std::string& local_path, const std::string& error) {
+                    auto& downloads = registry_.get_state<DownloadState>("Downloads");
+                    auto& notifications = registry_.get_state<NotificationState>("Notifications");
+                    notifications.dismiss(notif_id);
+                    if (success) {
+                        downloads.complete_download(download_id);
+                        notifications.add_notification("Paste Complete", file_name, NotificationType::SUCCESS, 5.0f);
+                    } else {
+                        downloads.fail_download(download_id, error);
+                        notifications.add_notification("Paste Failed", file_name + ": " + error, NotificationType::ERROR, 5.0f);
+                    }
+                });
+        } else if (item.source == FileSource::GDRIVE) {
+            services.download_gd_file(
+                item.gd_user_id, item.gd_item_id, dest_path,
+                [this, file_name = item.name, download_id, notif_id](
+                    bool success, const std::string& local_path, const std::string& error) {
+                    auto& downloads = registry_.get_state<DownloadState>("Downloads");
+                    auto& notifications = registry_.get_state<NotificationState>("Notifications");
+                    notifications.dismiss(notif_id);
+                    if (success) {
+                        downloads.complete_download(download_id);
+                        notifications.add_notification("Paste Complete", file_name, NotificationType::SUCCESS, 5.0f);
+                    } else {
+                        downloads.fail_download(download_id, error);
+                        notifications.add_notification("Paste Failed", file_name + ": " + error, NotificationType::ERROR, 5.0f);
+                    }
+                });
+        } else if (item.source == FileSource::DROPBOX) {
+            services.download_dbx_file(
+                item.dbx_user_id, item.dbx_path_display, dest_path,
+                [this, file_name = item.name, download_id, notif_id](
+                    bool success, const std::string& local_path, const std::string& error) {
+                    auto& downloads = registry_.get_state<DownloadState>("Downloads");
+                    auto& notifications = registry_.get_state<NotificationState>("Notifications");
+                    notifications.dismiss(notif_id);
+                    if (success) {
+                        downloads.complete_download(download_id);
+                        notifications.add_notification("Paste Complete", file_name, NotificationType::SUCCESS, 5.0f);
+                    } else {
+                        downloads.fail_download(download_id, error);
+                        notifications.add_notification("Paste Failed", file_name + ": " + error, NotificationType::ERROR, 5.0f);
+                    }
+                });
         }
+    }
 
-        // Refresh directory
-        navigate_to_path(std::string(state.current_path), false);
+    void FileExplorerPanel::trigger_upload(const std::string& local_path, const std::string& dest_dir) {
+        auto& uploads = registry_.get_state<UploadState>("Uploads");
+        auto& notifications = registry_.get_state<NotificationState>("Notifications");
+
+        std::string file_name = fs::path(local_path).filename().string();
+        int64_t file_size = 0;
+        try { file_size = static_cast<int64_t>(fs::file_size(local_path)); } catch (...) {}
+
+        if (path_utils::is_onedrive_path(dest_dir)) {
+            auto& od_state = registry_.get_state<OneDriveState>("OneDrive");
+            if (!od_state.has_upload_context()) {
+                notifications.add_notification("Upload Failed", "No OneDrive upload context. Navigate to a OneDrive folder first.", NotificationType::ERROR);
+                return;
+            }
+            uint64_t upload_id = uploads.start_upload(file_name, local_path, "OneDrive", file_size);
+            notifications.add_notification("Uploading", file_name, NotificationType::DOWNLOAD, 15.0f);
+
+            od_state.upload_file(local_path,
+                [this, upload_id](size_t bytes_uploaded, size_t total_bytes) -> bool {
+                    auto& uploads = registry_.get_state<UploadState>("Uploads");
+                    uploads.update_progress(upload_id, static_cast<int64_t>(bytes_uploaded));
+                    return true;
+                },
+                [this, file_name, upload_id](bool success, const std::string& error_msg) {
+                    auto& uploads = registry_.get_state<UploadState>("Uploads");
+                    auto& notifications = registry_.get_state<NotificationState>("Notifications");
+                    if (success) {
+                        uploads.complete_upload(upload_id);
+                        notifications.add_notification("Upload Complete", file_name, NotificationType::SUCCESS, 5.0f);
+                    } else {
+                        uploads.fail_upload(upload_id, error_msg);
+                        notifications.add_notification("Upload Failed", file_name + ": " + error_msg, NotificationType::ERROR, 5.0f);
+                    }
+                });
+        } else if (path_utils::is_gdrive_path(dest_dir)) {
+            auto& gd_state = registry_.get_state<GDriveState>("GDrive");
+            if (!gd_state.has_upload_context()) {
+                notifications.add_notification("Upload Failed", "No Google Drive upload context. Navigate to a Google Drive folder first.", NotificationType::ERROR);
+                return;
+            }
+            uint64_t upload_id = uploads.start_upload(file_name, local_path, "Google Drive", file_size);
+            notifications.add_notification("Uploading", file_name, NotificationType::DOWNLOAD, 15.0f);
+
+            gd_state.upload_file(local_path,
+                [this, upload_id](size_t bytes_uploaded, size_t total_bytes) -> bool {
+                    auto& uploads = registry_.get_state<UploadState>("Uploads");
+                    uploads.update_progress(upload_id, static_cast<int64_t>(bytes_uploaded));
+                    return true;
+                },
+                [this, file_name, upload_id](bool success, const std::string& error_msg) {
+                    auto& uploads = registry_.get_state<UploadState>("Uploads");
+                    auto& notifications = registry_.get_state<NotificationState>("Notifications");
+                    if (success) {
+                        uploads.complete_upload(upload_id);
+                        notifications.add_notification("Upload Complete", file_name, NotificationType::SUCCESS, 5.0f);
+                    } else {
+                        uploads.fail_upload(upload_id, error_msg);
+                        notifications.add_notification("Upload Failed", file_name + ": " + error_msg, NotificationType::ERROR, 5.0f);
+                    }
+                });
+        } else if (path_utils::is_dropbox_path(dest_dir)) {
+            auto& dbx_state = registry_.get_state<DropboxState>("Dropbox");
+            if (!dbx_state.has_upload_context()) {
+                notifications.add_notification("Upload Failed", "No Dropbox upload context. Navigate to a Dropbox folder first.", NotificationType::ERROR);
+                return;
+            }
+            uint64_t upload_id = uploads.start_upload(file_name, local_path, "Dropbox", file_size);
+            notifications.add_notification("Uploading", file_name, NotificationType::DOWNLOAD, 15.0f);
+
+            dbx_state.upload_file(local_path,
+                [this, upload_id](size_t bytes_uploaded, size_t total_bytes) -> bool {
+                    auto& uploads = registry_.get_state<UploadState>("Uploads");
+                    uploads.update_progress(upload_id, static_cast<int64_t>(bytes_uploaded));
+                    return true;
+                },
+                [this, file_name, upload_id](bool success, const std::string& error_msg) {
+                    auto& uploads = registry_.get_state<UploadState>("Uploads");
+                    auto& notifications = registry_.get_state<NotificationState>("Notifications");
+                    if (success) {
+                        uploads.complete_upload(upload_id);
+                        notifications.add_notification("Upload Complete", file_name, NotificationType::SUCCESS, 5.0f);
+                    } else {
+                        uploads.fail_upload(upload_id, error_msg);
+                        notifications.add_notification("Upload Failed", file_name + ": " + error_msg, NotificationType::ERROR, 5.0f);
+                    }
+                });
+        }
     }
 
     void FileExplorerPanel::perform_copy(FileExplorerState& state) {
         state.clipboard_op = ClipboardOp::COPY;
         state.clipboard_paths.clear();
-        // If context menu target is set and valid, use that. Otherwise use selected files.
-        // But usually context menu setting *also* sets selection if not selected.
-        // Shortcuts will rely on selection.
+        state.clipboard_items.clear();
         for (const auto& sel : state.selected_files) {
             state.clipboard_paths.push_back(sel);
+            // Look up full metadata from state.files
+            for (const auto& f : state.files) {
+                if (f.path == sel) {
+                    state.clipboard_items.push_back(f);
+                    break;
+                }
+            }
         }
         auto& notif = registry_.get_state<NotificationState>("Notifications");
         notif.add_notification("Clipboard", "Copied " + std::to_string(state.clipboard_paths.size()) + " items", NotificationType::INFO);
@@ -1514,8 +1951,15 @@ namespace misty::panel {
     void FileExplorerPanel::perform_cut(FileExplorerState& state) {
         state.clipboard_op = ClipboardOp::CUT;
         state.clipboard_paths.clear();
+        state.clipboard_items.clear();
         for (const auto& sel : state.selected_files) {
             state.clipboard_paths.push_back(sel);
+            for (const auto& f : state.files) {
+                if (f.path == sel) {
+                    state.clipboard_items.push_back(f);
+                    break;
+                }
+            }
         }
         auto& notif = registry_.get_state<NotificationState>("Notifications");
         notif.add_notification("Clipboard", "Cut " + std::to_string(state.clipboard_paths.size()) + " items", NotificationType::INFO);
@@ -1538,8 +1982,8 @@ namespace misty::panel {
                 state.trash_files.erase(it, state.trash_files.end());
             } else {
                 // Move to Trash (Local only, Cloud deletes directly)
-                bool is_cloud = path_utils::is_onedrive_path(path) || path_utils::is_gdrive_path(path);
-                
+                bool is_cloud = path_utils::is_onedrive_path(path) || path_utils::is_gdrive_path(path) || path_utils::is_dropbox_path(path);
+
                 if (is_cloud) {
                      printf("Explorer: Deleting cloud file directly\n");
                      perform_delete(state, path);
@@ -1642,7 +2086,7 @@ namespace misty::panel {
     }
 
     void FileExplorerPanel::navigate_to_gdrive_mount_root(bool update_history) {
-        auto& state = registry_.get_state<FileExplorerState>("FileExplorer");
+        auto& state = registry_.get_state<FileExplorerState>("Files");
         auto& workspace = registry_.get_state<WorkspaceState>("Workspace");
 
         state.last_disconnected_notification_folder.clear();
@@ -1719,7 +2163,7 @@ namespace misty::panel {
                                                         const std::string& relative_path,
                                                         bool update_history,
                                                         bool create_if_missing) {
-        auto& state = registry_.get_state<FileExplorerState>("FileExplorer");
+        auto& state = registry_.get_state<FileExplorerState>("Files");
         auto& workspace = registry_.get_state<WorkspaceState>("Workspace");
         auto& services = registry_.get_state<ServicesState>("Services");
 
@@ -1888,7 +2332,7 @@ namespace misty::panel {
                                                               bool success,
                                                               const std::string& body,
                                                               const std::string& error) {
-        auto& state = registry_.get_state<FileExplorerState>("FileExplorer");
+        auto& state = registry_.get_state<FileExplorerState>("Files");
         std::lock_guard<std::mutex> lock(state.mu);
 
         state.is_loading = false;
@@ -1903,6 +2347,20 @@ namespace misty::panel {
             std::lock_guard<std::mutex> gd_lock(gdrive_state.mu);
             gdrive_state.current_gd_user_id = gd_user_id;
             gdrive_state.current_folder_id = folder_id;
+        }
+        // Clear other services' upload contexts
+        {
+            auto& onedrive_state = registry_.get_state<OneDriveState>("OneDrive");
+            std::lock_guard<std::mutex> od_lock(onedrive_state.mu);
+            onedrive_state.current_ms_user_id.clear();
+            onedrive_state.current_drive_id.clear();
+            onedrive_state.current_folder_id.clear();
+        }
+        {
+            auto& dropbox_state = registry_.get_state<DropboxState>("Dropbox");
+            std::lock_guard<std::mutex> dbx_lock(dropbox_state.mu);
+            dropbox_state.current_dbx_user_id.clear();
+            dropbox_state.current_folder_path.clear();
         }
 
         if (success) {
@@ -1987,7 +2445,7 @@ namespace misty::panel {
     }
 
     void FileExplorerPanel::download_and_open_gd_file(const UnifiedFileItem& file) {
-        auto& state = registry_.get_state<FileExplorerState>("FileExplorer");
+        auto& state = registry_.get_state<FileExplorerState>("Files");
         auto& services = registry_.get_state<ServicesState>("Services");
         auto& downloads = registry_.get_state<DownloadState>("Downloads");
         auto& notifications = registry_.get_state<NotificationState>("Notifications");
@@ -2015,7 +2473,7 @@ namespace misty::panel {
             [this, path = file.path, file_name = file.name, download_id, notif_id](
                 bool success, const std::string& local_path, const std::string& error) {
 
-                auto& state = registry_.get_state<FileExplorerState>("FileExplorer");
+                auto& state = registry_.get_state<FileExplorerState>("Files");
                 auto& downloads = registry_.get_state<DownloadState>("Downloads");
                 auto& notifications = registry_.get_state<NotificationState>("Notifications");
 
@@ -2046,7 +2504,7 @@ namespace misty::panel {
     }
 
     void FileExplorerPanel::download_and_open_file(const UnifiedFileItem& file) {
-        auto& state = registry_.get_state<FileExplorerState>("FileExplorer");
+        auto& state = registry_.get_state<FileExplorerState>("Files");
         auto& services = registry_.get_state<ServicesState>("Services");
         auto& downloads = registry_.get_state<DownloadState>("Downloads");
         auto& notifications = registry_.get_state<NotificationState>("Notifications");
@@ -2079,7 +2537,7 @@ namespace misty::panel {
             [this, path = file.path, file_name = file.name, download_id, notif_id](
                 bool success, const std::string& local_path, const std::string& error) {
 
-                auto& state = registry_.get_state<FileExplorerState>("FileExplorer");
+                auto& state = registry_.get_state<FileExplorerState>("Files");
                 auto& downloads = registry_.get_state<DownloadState>("Downloads");
                 auto& notifications = registry_.get_state<NotificationState>("Notifications");
 
@@ -2115,6 +2573,410 @@ namespace misty::panel {
                         5.0f
                     );
 
+                    state.error_msg = "Download failed: " + error;
+                }
+            }
+        );
+    }
+
+    // ==================== Dropbox Navigation ====================
+
+    void FileExplorerPanel::sync_dbx_account_mappings() {
+        auto& workspace = registry_.get_state<WorkspaceState>("Workspace");
+        auto& services = registry_.get_state<ServicesState>("Services");
+
+        workspace.ensure_directories();
+
+        std::lock_guard<std::mutex> svc_lock(services.mu);
+
+        workspace.dbx_account_mappings.clear();
+        for (const auto& conn : services.dbx_connections) {
+            if (!conn.is_authenticated) continue;
+
+            DBXAccountMapping mapping;
+            mapping.dbx_user_id = conn.profile.id;
+            mapping.display_name = conn.profile.display_name;
+            mapping.email = conn.profile.email;
+            mapping.folder_name = mount_utils::derive_folder_name(conn.profile.email);
+
+            mount_utils::ensure_dbx_account_directory(conn.profile.email);
+
+            workspace.dbx_account_mappings.push_back(mapping);
+        }
+    }
+
+    void FileExplorerPanel::navigate_to_dropbox_mount_root(bool update_history) {
+        auto& state = registry_.get_state<FileExplorerState>("Files");
+        auto& workspace = registry_.get_state<WorkspaceState>("Workspace");
+
+        state.last_disconnected_notification_folder.clear();
+
+        // Clear Dropbox upload context
+        {
+            auto& dropbox_state = registry_.get_state<DropboxState>("Dropbox");
+            std::lock_guard<std::mutex> dbx_lock(dropbox_state.mu);
+            dropbox_state.current_dbx_user_id.clear();
+            dropbox_state.current_folder_path.clear();
+        }
+
+        sync_dbx_account_mappings();
+
+        std::string new_path = path_utils::get_dropbox_root();
+
+        if (update_history) {
+            std::string current_path_str(state.current_path);
+            if (!current_path_str.empty() && current_path_str != new_path) {
+                state.back_history.push(current_path_str);
+            }
+            while (!state.forward_history.empty()) {
+                state.forward_history.pop();
+            }
+        }
+
+        std::vector<UnifiedFileItem> files;
+        std::unordered_set<std::string> added_folders;
+
+        // Add connected accounts from mappings
+        for (const auto& mapping : workspace.dbx_account_mappings) {
+            UnifiedFileItem item;
+            item.name = mapping.folder_name;
+            item.path = new_path + "/" + mapping.folder_name;
+            item.is_dir = true;
+            item.source = FileSource::DROPBOX;
+            item.dbx_user_id = mapping.dbx_user_id;
+            files.push_back(item);
+            added_folders.insert(mapping.folder_name);
+        }
+
+        // Scan local Dropbox directory for folders without connected accounts
+        std::error_code ec;
+        if (fs::exists(new_path, ec) && fs::is_directory(new_path, ec)) {
+            for (const auto& entry : fs::directory_iterator(new_path, ec)) {
+                if (entry.is_directory()) {
+                    std::string folder_name = entry.path().filename().string();
+                    if (added_folders.count(folder_name) > 0 || folder_name[0] == '.') {
+                        continue;
+                    }
+
+                    UnifiedFileItem item;
+                    item.name = folder_name;
+                    item.path = new_path + "/" + folder_name;
+                    item.is_dir = true;
+                    item.source = FileSource::LOCAL;
+                    files.push_back(item);
+                }
+            }
+        }
+
+        state.files = std::move(files);
+        strncpy(state.current_path, new_path.c_str(), sizeof(state.current_path) - 1);
+        state.current_path[sizeof(state.current_path) - 1] = '\0';
+        strncpy(state.search_path, new_path.c_str(), sizeof(state.search_path) - 1);
+
+        state.is_loading = false;
+        state.selected_files.clear();
+        state.last_selected_index = -1;
+        state.error_msg = "";
+    }
+
+    void FileExplorerPanel::navigate_to_dropbox_account(const std::string& folder_name,
+                                                         const std::string& relative_path,
+                                                         bool update_history,
+                                                         bool create_if_missing) {
+        auto& state = registry_.get_state<FileExplorerState>("Files");
+        auto& workspace = registry_.get_state<WorkspaceState>("Workspace");
+        auto& services = registry_.get_state<ServicesState>("Services");
+
+        bool is_connected = services.is_dbx_account_folder_connected(folder_name);
+
+        DBXAccountMapping* mapping = workspace.find_dbx_account_by_folder(folder_name);
+        if (!mapping) {
+            sync_dbx_account_mappings();
+            mapping = workspace.find_dbx_account_by_folder(folder_name);
+        }
+
+        std::string target_path = path_utils::get_dropbox_root() + "/" + folder_name;
+        if (!relative_path.empty()) {
+            target_path += "/" + relative_path;
+        }
+
+        if (!is_connected) {
+            if (state.last_disconnected_notification_folder != folder_name) {
+                auto& notifications = registry_.get_state<NotificationState>("Notifications");
+                notifications.add_notification(
+                    "Account Not Connected",
+                    "The Dropbox account '" + folder_name + "' is not connected. Showing local files only.",
+                    NotificationType::INFO,
+                    8.0f
+                );
+                state.last_disconnected_notification_folder = folder_name;
+            }
+
+            if (!mapping) {
+                if (!fs::exists(target_path)) {
+                    state.error_msg = "Path does not exist: " + target_path;
+                    return;
+                }
+                if (!fs::is_directory(target_path)) {
+                    state.error_msg = "Path is not a directory: " + target_path;
+                    return;
+                }
+                navigate_to_local_path(state, target_path, update_history);
+                return;
+            }
+        } else {
+            state.last_disconnected_notification_folder.clear();
+        }
+
+        if (!mapping) {
+            state.error_msg = "Account not found: " + folder_name;
+            return;
+        }
+
+        if (create_if_missing) {
+            std::error_code ec;
+            fs::create_directories(target_path, ec);
+            if (ec) {
+                state.error_msg = "Failed to create directory: " + target_path;
+                return;
+            }
+        } else {
+            if (!fs::exists(target_path)) {
+                state.error_msg = "Path does not exist: " + target_path;
+                return;
+            }
+            if (!fs::is_directory(target_path)) {
+                state.error_msg = "Path is not a directory: " + target_path;
+                return;
+            }
+        }
+
+        // For Dropbox, folder_path is relative to the Dropbox root
+        // e.g., relative_path = "Documents/Photos" → folder_path = "/Documents/Photos"
+        // Empty relative_path → folder_path = "" (root)
+        std::string dbx_folder_path = "";
+        if (!relative_path.empty()) {
+            dbx_folder_path = "/" + relative_path;
+        }
+
+        if (update_history) {
+            std::string current_path_str(state.current_path);
+            if (!current_path_str.empty() && current_path_str != target_path) {
+                state.back_history.push(current_path_str);
+            }
+            while (!state.forward_history.empty()) {
+                state.forward_history.pop();
+            }
+        }
+
+        strncpy(state.current_path, target_path.c_str(), sizeof(state.current_path) - 1);
+        state.current_path[sizeof(state.current_path) - 1] = '\0';
+        strncpy(state.search_path, target_path.c_str(), sizeof(state.search_path) - 1);
+
+        state.selected_files.clear();
+        state.last_selected_index = -1;
+        state.error_msg = "";
+
+        // Try to load from cache first
+        std::vector<DropboxItem> cached_items;
+        if (load_dbx_items_from_cache(mapping->dbx_user_id, dbx_folder_path, cached_items)) {
+            std::vector<UnifiedFileItem> files;
+            for (const auto& dbx_item : cached_items) {
+                UnifiedFileItem item;
+                item.name = dbx_item.name;
+                item.path = target_path + "/" + dbx_item.name;
+                item.is_dir = dbx_item.is_folder;
+                item.size = dbx_item.size;
+                item.last_modified = dbx_item.server_modified.length() >= 10
+                                     ? dbx_item.server_modified.substr(0, 10) : "";
+                item.source = FileSource::DROPBOX;
+                item.dbx_item_id = dbx_item.id;
+                item.dbx_user_id = dbx_item.dbx_user_id;
+                item.dbx_path_display = dbx_item.path_display;
+                files.push_back(item);
+            }
+            state.files = std::move(files);
+            state.is_loading = false;
+        } else {
+            state.files.clear();
+            state.is_loading = true;
+        }
+
+        fetch_dropbox_folder(*mapping, dbx_folder_path, target_path);
+    }
+
+    void FileExplorerPanel::fetch_dropbox_folder(const DBXAccountMapping& account,
+                                                   const std::string& folder_path,
+                                                   const std::string& target_path) {
+        auto& services = registry_.get_state<ServicesState>("Services");
+        std::string dbx_user_id = account.dbx_user_id;
+
+        services.fetch_dropbox_files(dbx_user_id, folder_path,
+            [this, dbx_user_id, folder_path, target_path](bool success,
+                                                            const std::string& body,
+                                                            const std::string& error) {
+                handle_dbx_folder_fetch_response(dbx_user_id, folder_path, target_path, success, body, error);
+            });
+    }
+
+    void FileExplorerPanel::handle_dbx_folder_fetch_response(const std::string& dbx_user_id,
+                                                               const std::string& folder_path,
+                                                               const std::string& target_path,
+                                                               bool success,
+                                                               const std::string& body,
+                                                               const std::string& error) {
+        auto& state = registry_.get_state<FileExplorerState>("Files");
+        std::lock_guard<std::mutex> lock(state.mu);
+
+        state.is_loading = false;
+
+        if (std::string(state.current_path) != target_path) {
+            return;
+        }
+
+        // Update DropboxState with current folder context for uploads
+        {
+            auto& dropbox_state = registry_.get_state<DropboxState>("Dropbox");
+            std::lock_guard<std::mutex> dbx_lock(dropbox_state.mu);
+            dropbox_state.current_dbx_user_id = dbx_user_id;
+            dropbox_state.current_folder_path = folder_path;
+        }
+        // Clear other services' upload contexts
+        {
+            auto& onedrive_state = registry_.get_state<OneDriveState>("OneDrive");
+            std::lock_guard<std::mutex> od_lock(onedrive_state.mu);
+            onedrive_state.current_ms_user_id.clear();
+            onedrive_state.current_drive_id.clear();
+            onedrive_state.current_folder_id.clear();
+        }
+        {
+            auto& gdrive_state = registry_.get_state<GDriveState>("GDrive");
+            std::lock_guard<std::mutex> gd_lock(gdrive_state.mu);
+            gdrive_state.current_gd_user_id.clear();
+            gdrive_state.current_folder_id.clear();
+        }
+
+        if (success) {
+            std::vector<DropboxItem> dbx_items;
+            std::vector<UnifiedFileItem> files;
+
+            try {
+                auto json = nlohmann::json::parse(body);
+                auto entries = json.value("entries", nlohmann::json::array());
+
+                for (const auto& entry : entries) {
+                    DropboxItem dbi;
+                    std::string tag = entry.value(".tag", std::string(""));
+                    dbi.id = entry.value("id", std::string(""));
+                    dbi.name = entry.value("name", std::string(""));
+                    dbi.path_display = entry.value("path_display", std::string(""));
+                    dbi.path_lower = entry.value("path_lower", std::string(""));
+                    dbi.is_folder = (tag == "folder");
+                    if (!dbi.is_folder) {
+                        dbi.size = entry.value("size", int64_t(0));
+                        dbi.server_modified = entry.value("server_modified", std::string(""));
+                    }
+                    dbi.dbx_user_id = dbx_user_id;
+                    dbx_items.push_back(dbi);
+
+                    UnifiedFileItem ufi;
+                    ufi.name = dbi.name;
+                    ufi.path = target_path + "/" + dbi.name;
+                    ufi.is_dir = dbi.is_folder;
+                    ufi.size = dbi.size;
+                    ufi.last_modified = dbi.server_modified.length() >= 10
+                                        ? dbi.server_modified.substr(0, 10) : "";
+                    ufi.source = FileSource::DROPBOX;
+                    ufi.dbx_item_id = dbi.id;
+                    ufi.dbx_user_id = dbx_user_id;
+                    ufi.dbx_path_display = dbi.path_display;
+
+                    // Determine sync status
+                    if (ufi.is_dir) {
+                        ufi.status = SyncStatus::LOCAL;
+                    } else {
+                        std::error_code ec;
+                        if (fs::exists(ufi.path, ec)) {
+                            uintmax_t local_size = fs::file_size(ufi.path, ec);
+                            if (!ec && local_size == (uintmax_t)ufi.size) {
+                                ufi.status = SyncStatus::SYNCED;
+                            } else {
+                                ufi.status = SyncStatus::MODIFIED;
+                            }
+                        } else {
+                            ufi.status = SyncStatus::NOT_SYNCED;
+                        }
+                    }
+
+                    files.push_back(ufi);
+                }
+
+                state.files = std::move(files);
+                save_dbx_items_to_cache(dbx_user_id, folder_path, dbx_items);
+
+            } catch (const std::exception& e) {
+                if (state.files.empty()) {
+                    state.error_msg = std::string("Parse error: ") + e.what();
+                }
+            }
+        } else if (state.files.empty()) {
+            state.error_msg = error;
+        }
+    }
+
+    void FileExplorerPanel::download_and_open_dbx_file(const UnifiedFileItem& file) {
+        auto& state = registry_.get_state<FileExplorerState>("Files");
+        auto& services = registry_.get_state<ServicesState>("Services");
+        auto& downloads = registry_.get_state<DownloadState>("Downloads");
+        auto& notifications = registry_.get_state<NotificationState>("Notifications");
+
+        state.downloading_files.insert(file.path);
+
+        uint64_t download_id = downloads.start_download(
+            file.name,
+            file.path,
+            "Dropbox",
+            file.size
+        );
+
+        uint64_t notif_id = notifications.add_notification(
+            "Downloading",
+            file.name,
+            NotificationType::DOWNLOAD,
+            15.0f
+        );
+
+        services.download_dbx_file(
+            file.dbx_user_id,
+            file.dbx_path_display,
+            file.path,
+            [this, path = file.path, file_name = file.name, download_id, notif_id](
+                bool success, const std::string& local_path, const std::string& error) {
+
+                auto& state = registry_.get_state<FileExplorerState>("Files");
+                auto& downloads = registry_.get_state<DownloadState>("Downloads");
+                auto& notifications = registry_.get_state<NotificationState>("Notifications");
+
+                state.downloading_files.erase(path);
+                notifications.dismiss(notif_id);
+
+                if (success) {
+                    downloads.complete_download(download_id);
+                    notifications.add_notification(
+                        "Download Complete",
+                        file_name,
+                        NotificationType::SUCCESS,
+                        5.0f
+                    );
+                    open_file(local_path);
+                } else {
+                    downloads.fail_download(download_id, error);
+                    notifications.add_notification(
+                        "Download Failed",
+                        file_name + ": " + error,
+                        NotificationType::ERROR,
+                        5.0f
+                    );
                     state.error_msg = "Download failed: " + error;
                 }
             }

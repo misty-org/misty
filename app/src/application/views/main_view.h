@@ -31,5 +31,13 @@ namespace misty::view {
         std::shared_ptr<panel::FileExplorerPanel> file_explorer_panel_;
         std::shared_ptr<panel::NotificationPanel> notification_panel_;
 
+        // Resizable sidebar
+        float sidebar_width_ = 260.0f;
+        bool is_resizing_sidebar_ = false;
+
+        static constexpr float kSidebarMinWidth = 180.0f;
+        static constexpr float kSidebarMaxWidth = 400.0f;
+        static constexpr float kResizeHandleWidth = 6.0f;
+
     };
 }

@@ -36,7 +36,7 @@ namespace misty::core {
                 std::vector<panel::UnifiedFileItem> snapshot_files;
                 std::string snapshot_path;
                 {
-                    auto& state = registry_.get_state<panel::FileExplorerState>("FileExplorer");
+                    auto& state = registry_.get_state<panel::FileExplorerState>("Files");
                     std::lock_guard<std::mutex> lock(state.mu);
                     snapshot_files = state.files;
                     snapshot_path = state.current_path;
@@ -103,7 +103,7 @@ namespace misty::core {
 
                 // 3. Apply updates (hold lock briefly)
                 if (any_update) {
-                    auto& state = registry_.get_state<panel::FileExplorerState>("FileExplorer");
+                    auto& state = registry_.get_state<panel::FileExplorerState>("Files");
                     std::lock_guard<std::mutex> lock(state.mu);
                     
                     // Only apply if we are still in the same directory
