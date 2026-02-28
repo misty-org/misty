@@ -1,0 +1,34 @@
+import { FaDiscord, FaGithub } from "react-icons/fa";
+import { MdOutlineEmail } from "react-icons/md"
+
+export default function MoreSocials() {
+  return (
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center flex flex-col justify-evenly items-center gap-10">
+      <h2 className="text-3xl md:text-5xl font-bold text-text tracking-tight">
+        Your files, everywhere.<br />One app.
+      </h2>
+
+      <a
+        href="/docs/getting-started"
+        className="px-8 py-3 rounded-full bg-white text-black font-semibold text-sm hover:scale-105 transition-transform shadow-lg"
+      >
+        Download Now
+      </a>
+      <div className="flex items-center gap-4 px-5 py-2.5 rounded-full border border-white/10 bg-white/5 backdrop-blur-sm">
+        <span className="text-sm text-text-muted">Join our community</span>
+        <div className="w-px h-4 bg-white/10" />
+        <div className="flex items-center gap-3">
+          <a href="https://discord.gg/your-invite" target="_blank" rel="noopener noreferrer" className="text-text-muted hover:text-white transition-colors" aria-label="Discord">
+            <FaDiscord className="text-3xl" />
+          </a>
+          <a href="https://github.com/your-repo/misty-web/discussions" target="_blank" rel="noopener noreferrer" className="text-text-muted hover:text-white transition-colors" aria-label="GitHub Discussions">
+            <FaGithub className="text-2xl" />
+          </a>
+          <a href="mailto:hello@misty.app" className="text-text-muted hover:text-white transition-colors" aria-label="Email">
+            <MdOutlineEmail className="text-3xl" />
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -46,8 +46,8 @@ export default function Navbar() {
       scrolled ? "glass shadow-lg shadow-bg/50" : "bg-transparent"
     }`}>
       <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-        <NavLink to="/" className="flex items-center gap-3 group">
-          <img src="/misty.png" alt="Misty logo" className="w-8 h-8 transition-transform duration-300 group-hover:scale-110" />
+        <NavLink to="/" className="flex items-center gap-1">
+          <img src="/misty_full.png" alt="Misty logo" className="w-12 h-12 transition-transform duration-300 group-hover:scale-110" />
           <span className="text-lg font-semibold text-text tracking-tight transition-colors group-hover:text-primary">Misty</span>
         </NavLink>
 
