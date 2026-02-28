@@ -301,22 +301,12 @@ void media_section(SettingsState& state) {
 } // namespace
 
 bool appearance_tab(SettingsState& state) {
-    bool clicked = UI::button("##settings_appearance", {
-        .width = UI::Size::fill(),
-        .height = UI::Size::px(32.0f),
-        .variant = UI::ButtonVariant::Nav,
-        .hover_color = ImVec4(0.2f, 0.2f, 0.2f, 1.0f),
-        .selected = state.active_section == SettingsSection::Appearance,
-        .padding = UI::Spacing::xy(8.0f, 8.0f),
-        .rounding = 8.0f,
-    }, [&]() {
-        UI::text({
-            .text = "Appearance",
-            .width = UI::Size::fill(),
-            .align = UI::Align::Start,
-            .justify = UI::Justify::Center,
-        });
-    });
+    bool clicked = settings_nav_item(
+        "##settings_appearance",
+        "Appearance",
+        "eye-16",
+        state.active_section == SettingsSection::Appearance
+    );
 
     if (clicked) {
         state.active_section = SettingsSection::Appearance;
@@ -326,25 +316,13 @@ bool appearance_tab(SettingsState& state) {
 }
 
 void appearance_content(SettingsState& state) {
-    UI::div("appearance_content", {
-        .mode = UI::Mode::LayoutOnly,
-        .width = UI::Size::fill(),
-        .height = UI::Size::auto_size(),
-        .padding = UI::Spacing::xy(28.0f, 20.0f),
-    }, [&]() {
-        UI::column("##appearance_body", {
-            .width = UI::Size::fill(),
-            .height = UI::Size::auto_size(),
-            .gap = UI::Spacing::xy(0.0f, 24.0f),
-        }, [&]() {
-            settings_page_title("Appearance");
-            theme_section(state);
-            layout_section(state);
-            typography_section(state);
-            fonts_section(state);
-            media_section(state);
-        });
-    });
+    settings_page("appearance_content", "Appearance", [&]() {
+        theme_section(state);
+        layout_section(state);
+        typography_section(state);
+        fonts_section(state);
+        media_section(state);
+    }, UI::Spacing::xy(0.0f, 24.0f));
 }
 
 } // namespace misty::panel

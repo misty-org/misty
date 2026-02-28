@@ -98,22 +98,12 @@ void conflict_section(SettingsState& state) {
 } // namespace
 
 bool sync_tab(SettingsState& state) {
-    const bool clicked = UI::button("##settings_sync", {
-        .width = UI::Size::fill(),
-        .height = UI::Size::px(32.0f),
-        .variant = UI::ButtonVariant::Nav,
-        .hover_color = ImVec4(0.2f, 0.2f, 0.2f, 1.0f),
-        .selected = state.active_section == SettingsSection::Sync,
-        .padding = UI::Spacing::xy(8.0f, 8.0f),
-        .rounding = 8.0f,
-    }, [&]() {
-        UI::text({
-            .text = "Sync",
-            .width = UI::Size::fill(),
-            .align = UI::Align::Start,
-            .justify = UI::Justify::Center,
-        });
-    });
+    const bool clicked = settings_nav_item(
+        "##settings_sync",
+        "Sync",
+        "sync-16",
+        state.active_section == SettingsSection::Sync
+    );
 
     if (clicked) {
         state.active_section = SettingsSection::Sync;
@@ -123,22 +113,10 @@ bool sync_tab(SettingsState& state) {
 }
 
 void sync_content(SettingsState& state) {
-    UI::div("sync_content", {
-        .mode = UI::Mode::LayoutOnly,
-        .width = UI::Size::fill(),
-        .height = UI::Size::auto_size(),
-        .padding = UI::Spacing::xy(28.0f, 20.0f),
-    }, [&]() {
-        UI::column("##sync_body", {
-            .width = UI::Size::fill(),
-            .height = UI::Size::auto_size(),
-            .gap = UI::Spacing::xy(0.0f, 18.0f),
-        }, [&]() {
-            settings_page_title("Sync");
-            status_section(state);
-            rules_section(state);
-            conflict_section(state);
-        });
+    settings_page("sync_content", "Sync", [&]() {
+        status_section(state);
+        rules_section(state);
+        conflict_section(state);
     });
 }
 

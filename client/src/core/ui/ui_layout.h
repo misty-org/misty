@@ -75,11 +75,18 @@ public:
     };
 
     struct Spacing {
-        float x = 0.0f;
-        float y = 0.0f;
+        float left = 0.0f;
+        float right = 0.0f;
+        float top = 0.0f;
+        float bottom = 0.0f;
 
-        static constexpr Spacing uniform(float value) { return {value, value}; }
-        static constexpr Spacing xy(float x, float y) { return {x, y}; }
+        static constexpr Spacing uniform(float value) { return {value, value, value, value}; }
+        static constexpr Spacing xy(float x, float y) { return {x, x, y, y}; }
+        static constexpr Spacing left_right(float left, float right) { return {left, right, 0.0f, 0.0f}; }
+        static constexpr Spacing top_bottom(float top, float bottom) { return {0.0f, 0.0f, top, bottom}; }
+        static constexpr Spacing sides(float left, float right, float top, float bottom) {
+            return {left, right, top, bottom};
+        }
     };
 
     struct BoxStyle {
@@ -171,6 +178,16 @@ public:
         float rounding = 0.0f;
     };
 
+    struct ImageProps {
+        ImTextureID texture_id = 0;
+        Size width = Size::auto_size();
+        Size height = Size::auto_size();
+        Align align = Align::Start;
+        Justify justify = Justify::Start;
+        ImVec4 tint_color = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
+        ImVec4 border_color = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
+    };
+
     struct ImageButtonProps {
         ImTextureID texture_id = 0;
         Size width = Size::auto_size();
@@ -204,6 +221,7 @@ using ButtonProps = Layout::ButtonProps;
 using InputTextProps = Layout::InputTextProps;
 using SelectProps = Layout::SelectProps;
 using DividerProps = Layout::DividerProps;
+using ImageProps = Layout::ImageProps;
 using ImageButtonProps = Layout::ImageButtonProps;
 
 bool div(const char* id, const BoxStyle& style, const std::function<void()>& content = {});
@@ -218,6 +236,7 @@ void raw(const std::function<void()>& content);
 void spacer(float width, float height = 0.0f);
 void divider(const DividerProps& props = {});
 void text(const TextProps& props);
+void image(const ImageProps& props);
 bool button(const char* id, const ButtonProps& props, const std::function<void()>& content = {});
 bool image_button(const char* id, const ImageButtonProps& props);
 bool input_text(const InputTextProps& props);
