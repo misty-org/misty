@@ -9,13 +9,18 @@
 #include "core/manager/asset_manager.h"
 #include "panels/search/search_panel.h"
 #include "panels/search/search_state.h"
-#include "panels/services/services_state.h"
-
 using namespace misty::core;
 
 namespace misty::panel {
 namespace {
 constexpr float kPathFieldTrim = 96.0f;
+constexpr ImVec4 kExplorerChromeBg = ImVec4(0.14f, 0.14f, 0.15f, 1.0f);
+constexpr ImVec4 kExplorerChromeBgHover = ImVec4(0.18f, 0.18f, 0.20f, 1.0f);
+constexpr ImVec4 kExplorerChromeBgActive = ImVec4(0.11f, 0.11f, 0.12f, 1.0f);
+
+int oversampled_icon_size(float display_size) {
+    return std::max(16, static_cast<int>(std::ceil(display_size * 2.0f)));
+}
 
 struct BreadcrumbSegment {
     std::string label;
@@ -36,28 +41,6 @@ std::vector<BreadcrumbSegment> build_breadcrumb_segments(const std::string& curr
     }
     if (current_path == FileExplorerState::VIRTUAL_PATH_TRASH) {
         return {{"Trash", current_path}};
-    }
-
-    if (path_utils::is_remote_path(current_path) || current_path == path_utils::get_mount_root() || current_path == path_utils::get_mount_root() + "/") {
-        const std::string mount_root = path_utils::get_mount_root();
-        segments.push_back({"Cloud", mount_root});
-        const auto info = path_utils::parse_remote_path(current_path);
-        if (!info.provider_folder.empty()) {
-            const std::string provider_path = mount_root + "/" + info.provider_folder;
-            segments.push_back({info.provider_folder, provider_path});
-            if (!info.remote_name.empty()) {
-                std::string remote_path = provider_path + "/" + info.remote_name;
-                segments.push_back({info.remote_name, remote_path});
-                if (!info.relative_path.empty()) {
-                    std::string cumulative = remote_path;
-                    for (const auto& part : path_utils::split_path(info.relative_path)) {
-                        cumulative += "/" + part;
-                        segments.push_back({part, cumulative});
-                    }
-                }
-            }
-        }
-        return segments;
     }
 
     const char* home = std::getenv("HOME");
@@ -182,15 +165,13 @@ void FileExplorerPanel::show_nav_history(FileExplorerState& state, float button_
     }
 
     ImGui::SameLine(0, spacing);
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.21f, 0.21f, 0.21f, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.28f, 0.28f, 0.28f, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.16f, 0.16f, 0.16f, 1.0f));
-    const bool sync_in_flight = state.sync_request_in_flight;
+    ImGui::PushStyleColor(ImGuiCol_Button, kExplorerChromeBg);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, kExplorerChromeBgHover);
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, kExplorerChromeBgActive);
     const char* refresh_icon_name = "sync-16";
     const ImVec4 refresh_tint(0.7f, 0.7f, 0.7f, 1.0f);
 
-    if (sync_in_flight) ImGui::BeginDisabled();
-    auto& sync_tex = AssetManager::get().get_svg_texture(refresh_icon_name, 16);
+    auto& sync_tex = AssetManager::get().get_svg_texture(refresh_icon_name, oversampled_icon_size(16.0f));
     if (sync_tex.id != 0) {
         if (ImGui::ImageButton("##refresh", sync_tex.id, ImVec2(16, 16), ImVec2(0, 0), ImVec2(1, 1),
                 ImVec4(0, 0, 0, 0), refresh_tint)) {
@@ -199,15 +180,8 @@ void FileExplorerPanel::show_nav_history(FileExplorerState& state, float button_
     } else if (ImGui::Button("R", ImVec2(button_width, 0))) {
         request_manual_refresh(state);
     }
-    if (sync_in_flight) ImGui::EndDisabled();
     if (ImGui::IsItemHovered()) {
-        if (sync_in_flight) {
-            ImGui::SetTooltip("Syncing remote changes...");
-        } else if (path_utils::is_remote_path(state.current_path)) {
-            ImGui::SetTooltip("Sync Now (%s)", CommandManager::get().label("explorer.refresh").c_str());
-        } else {
-            ImGui::SetTooltip("Refresh (%s)", CommandManager::get().label("explorer.refresh").c_str());
-        }
+        ImGui::SetTooltip("Refresh (%s)", CommandManager::get().label("explorer.refresh").c_str());
     }
     ImGui::PopStyleColor(3);
     ImGui::PopStyleVar(2);
@@ -220,10 +194,8 @@ void FileExplorerPanel::show_search_bar(FileExplorerState& state, SearchState& s
     const float control_height = ImGui::GetFrameHeight();
     const float action_btn_size = std::max(16.0f, control_height - 10.0f);
     const float spacing = 3.0f;
-    const bool is_local = !path_utils::is_remote_path(state.current_path);
-    const auto remote_info = path_utils::parse_remote_path(state.current_path);
-    const bool can_toggle_watch = !is_local && !remote_info.provider_folder.empty() && !remote_info.remote_name.empty();
-    const int action_button_count = is_local ? 4 : (can_toggle_watch ? 4 : 3);
+    const bool is_local = true;
+    const int action_button_count = 4;
     const float total_available = ImGui::GetContentRegionAvail().x;
     const float action_width = action_btn_size * action_button_count +
                                spacing * static_cast<float>(std::max(0, action_button_count - 1));
@@ -236,7 +208,7 @@ void FileExplorerPanel::show_search_bar(FileExplorerState& state, SearchState& s
         search_state.focus_query = true;
     }
 
-    ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.21f, 0.21f, 0.21f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, kExplorerChromeBg);
     ImGui::SetNextItemWidth(path_width);
     const bool path_submitted = ImGui::InputTextWithHint("##path_input", "Jump to path", state.search_path,
                                                          sizeof(state.search_path), ImGuiInputTextFlags_EnterReturnsTrue);
@@ -249,13 +221,13 @@ void FileExplorerPanel::show_search_bar(FileExplorerState& state, SearchState& s
     }
 
     ImGui::SameLine(0, spacing);
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.21f, 0.21f, 0.21f, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.28f, 0.28f, 0.28f, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.16f, 0.16f, 0.16f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_Button, kExplorerChromeBg);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, kExplorerChromeBgHover);
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, kExplorerChromeBgActive);
     const ImVec4 search_tint = search_state.is_open
         ? ImVec4(0.95f, 0.95f, 0.95f, 1.0f)
         : ImVec4(0.7f, 0.7f, 0.7f, 1.0f);
-    auto& search_tex = AssetManager::get().get_svg_texture("search-16", 16);
+    auto& search_tex = AssetManager::get().get_svg_texture("search-16", oversampled_icon_size(action_btn_size));
     if (search_tex.id != 0) {
         if (ImGui::ImageButton("##togglesearch", search_tex.id, ImVec2(action_btn_size, action_btn_size),
                 ImVec2(0, 0), ImVec2(1, 1), ImVec4(0, 0, 0, 0), search_tint)) {
@@ -273,39 +245,17 @@ void FileExplorerPanel::show_search_bar(FileExplorerState& state, SearchState& s
     }
     ImGui::PopStyleColor(3);
 
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.21f, 0.21f, 0.21f, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.28f, 0.28f, 0.28f, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.16f, 0.16f, 0.16f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_Button, kExplorerChromeBg);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, kExplorerChromeBgHover);
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, kExplorerChromeBgActive);
 
     const ImVec4 inactive_tint(0.7f, 0.7f, 0.7f, 1.0f);
     const ImVec4 active_tint(0.95f, 0.95f, 0.95f, 1.0f);
-    if (can_toggle_watch) {
-        ImGui::SameLine(0, spacing);
-        const bool watch_busy = state.sync_watch_request_in_flight;
-        const bool watched = state.current_dir_watched;
-        const char* watch_icon_name = watched ? "git-branch-check-16" : "git-branch-16";
-        const ImVec4 watch_tint = watched ? ImVec4(0.96f, 0.83f, 0.29f, 1.0f) : inactive_tint;
-        auto& watch_tex = AssetManager::get().get_svg_texture(watch_icon_name, 16);
-        if (watch_busy) ImGui::BeginDisabled();
-        if (watch_tex.id != 0) {
-            if (ImGui::ImageButton("##togglewatchdir", watch_tex.id, ImVec2(action_btn_size, action_btn_size),
-                    ImVec2(0, 0), ImVec2(1, 1), ImVec4(0, 0, 0, 0), watch_tint)) {
-                toggle_current_sync_watch(state);
-            }
-        } else if (ImGui::Button(watched ? "B*" : "B", ImVec2(action_btn_size, action_btn_size))) {
-            toggle_current_sync_watch(state);
-        }
-        if (watch_busy) ImGui::EndDisabled();
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip(watched ? "Unwatch Sync Directory" : "Watch Sync Directory");
-        }
-    }
-
     ImGui::SameLine(0, spacing);
     ImVec4 icon_tint = state.grid_view
         ? active_tint
         : inactive_tint;
-    auto& grid_tex = AssetManager::get().get_svg_texture("apps-16", 16);
+    auto& grid_tex = AssetManager::get().get_svg_texture("apps-16", oversampled_icon_size(action_btn_size));
     if (grid_tex.id != 0) {
         if (ImGui::ImageButton("##gridview", grid_tex.id, ImVec2(action_btn_size, action_btn_size), ImVec2(0, 0), ImVec2(1, 1),
                 ImVec4(0, 0, 0, 0), icon_tint)) {
@@ -322,7 +272,7 @@ void FileExplorerPanel::show_search_bar(FileExplorerState& state, SearchState& s
     icon_tint = !state.grid_view
         ? active_tint
         : inactive_tint;
-    auto& list_tex = AssetManager::get().get_svg_texture("rows-16", 16);
+    auto& list_tex = AssetManager::get().get_svg_texture("rows-16", oversampled_icon_size(action_btn_size));
     if (list_tex.id != 0) {
         if (ImGui::ImageButton("##listview", list_tex.id, ImVec2(action_btn_size, action_btn_size), ImVec2(0, 0), ImVec2(1, 1),
                 ImVec4(0, 0, 0, 0), icon_tint)) {
@@ -339,7 +289,7 @@ void FileExplorerPanel::show_search_bar(FileExplorerState& state, SearchState& s
     ImVec4 preview_tint = preview_pane_open_
         ? active_tint
         : inactive_tint;
-    auto& preview_tex = AssetManager::get().get_svg_texture("file-media-16", 16);
+    auto& preview_tex = AssetManager::get().get_svg_texture("file-media-16", oversampled_icon_size(action_btn_size));
     if (preview_tex.id != 0) {
         if (ImGui::ImageButton("##togglepreview", preview_tex.id, ImVec2(action_btn_size, action_btn_size),
                 ImVec2(0, 0), ImVec2(1, 1), ImVec4(0, 0, 0, 0), preview_tint)) {
@@ -357,7 +307,9 @@ void FileExplorerPanel::show_search_bar(FileExplorerState& state, SearchState& s
         icon_tint = state.show_hidden
             ? active_tint
             : inactive_tint;
-        auto& hidden_tex = AssetManager::get().get_svg_texture(state.show_hidden ? "eye-16" : "eye-closed-16", 16);
+        auto& hidden_tex = AssetManager::get().get_svg_texture(
+            state.show_hidden ? "eye-16" : "eye-closed-16",
+            oversampled_icon_size(action_btn_size));
         if (hidden_tex.id != 0) {
             if (ImGui::ImageButton("##togglehidden", hidden_tex.id, ImVec2(action_btn_size, action_btn_size), ImVec2(0, 0), ImVec2(1, 1),
                     ImVec4(0, 0, 0, 0), icon_tint)) {

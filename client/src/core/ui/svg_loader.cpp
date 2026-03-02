@@ -4,17 +4,18 @@
 #include <lunasvg.h>
 
 namespace misty::core {
-    SVGTexture load_svg(const std::string& path, int width, int height) {
+    SVGTexture load_svg(const std::string& path, int width, int height, bool apply_theme) {
         auto document = lunasvg::Document::loadFromFile(path);
         if (!document) {
             // Log error or return null texture
             return { 0, 0, 0 };
         }
 
-        // Automatically apply the global theme if one is loaded
-        std::string css = AssetManager::get().get_current_theme();
-        if (!css.empty()) {
-            document->applyStyleSheet(css);
+        if (apply_theme) {
+            std::string css = AssetManager::get().get_current_theme();
+            if (!css.empty()) {
+                document->applyStyleSheet(css);
+            }
         }
 
         auto bitmap = document->renderToBitmap(width, height);

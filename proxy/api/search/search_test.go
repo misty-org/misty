@@ -13,6 +13,8 @@ import (
 	coresearch "github.com/kannachi323/misty/proxy/core/search"
 )
 
+func intPtr(v int) *int { return &v }
+
 func doRequest(handler http.HandlerFunc, method, url string, body []byte) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(method, url, bytes.NewReader(body))
 	if body != nil {
@@ -36,7 +38,7 @@ func TestSearchHandlerReturnsScoredMatches(t *testing.T) {
 		Query:  "report",
 		Path:   root,
 		Source: SearchSourceLocal,
-		Depth:  SearchScope{Scope: SearchDepthCWD, Depth: 0},
+		Depth:  SearchScope{Scope: SearchDepthCWD, Depth: intPtr(0)},
 	})
 	rr := doRequest(Search(), http.MethodPost, "/api/search", body)
 	if rr.Code != http.StatusOK {
@@ -78,7 +80,7 @@ func TestSearchHandlerHonorsDepth(t *testing.T) {
 		Query:  "report",
 		Path:   root,
 		Source: SearchSourceLocal,
-		Depth:  SearchScope{Scope: SearchDepthDepth, Depth: 1},
+		Depth:  SearchScope{Scope: SearchDepthDepth, Depth: intPtr(1)},
 	})
 	rr := doRequest(Search(), http.MethodPost, "/api/search", body)
 	if rr.Code != http.StatusOK {
@@ -103,7 +105,7 @@ func TestSearchHandlerRejectsUnsupportedSource(t *testing.T) {
 		Query:  "report",
 		Path:   root,
 		Source: SearchSourceRemote,
-		Depth:  SearchScope{Scope: SearchDepthCWD, Depth: 0},
+		Depth:  SearchScope{Scope: SearchDepthCWD, Depth: intPtr(0)},
 	})
 	rr := doRequest(Search(), http.MethodPost, "/api/search", body)
 	if rr.Code != http.StatusNotImplemented {

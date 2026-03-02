@@ -1,5 +1,6 @@
 #include "panels/search/search_impl.h"
 
+#include <algorithm>
 #include <stdexcept>
 #include <utility>
 
@@ -12,7 +13,7 @@ using json = nlohmann::json;
 
 namespace {
 
-std::string search_source_to_string(misty::panel::SearchSource source) {
+std::string search_source_str(misty::panel::SearchSource source) {
     switch (source) {
         case misty::panel::SearchSource::LOCAL:
             return "LOCAL";
@@ -24,7 +25,7 @@ std::string search_source_to_string(misty::panel::SearchSource source) {
     return "LOCAL";
 }
 
-std::string search_depth_to_string(misty::panel::SearchDepth depth) {
+std::string search_depth_str(misty::panel::SearchDepth depth) {
     switch (depth) {
         case misty::panel::SearchDepth::CWD:
             return "CWD";
@@ -38,29 +39,34 @@ std::string search_depth_to_string(misty::panel::SearchDepth depth) {
     return "CWD";
 }
 
-int normalize_search_depth(const misty::panel::SearchScope& scope) {
+misty::panel::SearchScopeValue normalize_search_scope(const misty::panel::SearchScope& scope) {
     switch (scope.scope_) {
         case misty::panel::SearchDepth::CWD:
-            return 0;
+            return {misty::panel::SearchDepth::CWD, 0};
         case misty::panel::SearchDepth::DEPTH:
-            return scope.depth_ < 0 ? 0 : scope.depth_;
+            return {misty::panel::SearchDepth::DEPTH, std::max(0, scope.depth_)};
         case misty::panel::SearchDepth::SYSTEM:
-            return 64;
+            return {misty::panel::SearchDepth::SYSTEM, std::nullopt};
         case misty::panel::SearchDepth::WORKSPACE:
-            return 8;
+            return {misty::panel::SearchDepth::WORKSPACE, std::nullopt};
     }
-    return 0;
+    return {misty::panel::SearchDepth::CWD, 0};
 }
 
 json build_search_request(const misty::panel::SearchQuery& query) {
+    const misty::panel::SearchScopeValue scope = normalize_search_scope(query.depth);
+    json depth = {
+        {"scope", search_depth_str(scope.scope_)},
+    };
+    if (scope.depth_limit.has_value()) {
+        depth["depth"] = *scope.depth_limit;
+    }
+
     return json{
         {"query", query.query},
         {"path", query.path},
-        {"source", search_source_to_string(query.source)},
-        {"depth", {
-            {"scope", search_depth_to_string(query.depth.scope_)},
-            {"depth", normalize_search_depth(query.depth)},
-        }},
+        {"source", search_source_str(query.source)},
+        {"depth", std::move(depth)},
     };
 }
 
@@ -123,12 +129,10 @@ void SearchImpl::search(const SearchQuery& query,
         std::map<std::string, std::string> headers;
         headers["Accept"] = "application/json";
         headers["Content-Type"] = "application/json";
-        const core::HttpResponse response = core::HTTPClient::get().post_with_timeouts(
+        const core::HttpResponse response = core::HTTPClient::get().post(
             url,
             body,
-            1L,
-            3L,
-            headers
+            {.headers = headers, .timeouts = {1L, 3L}}
         );
         if (response.status_code < 200 || response.status_code >= 300) {
             throw std::runtime_error(

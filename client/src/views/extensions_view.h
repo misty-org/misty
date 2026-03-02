@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "core/manager/plugin_manager.h"
 #include "core/ui/ui_registry.h"
 #include "panels/plugins/plugins_panel.h"
 #include "panels/navbar/navbar_panel.h"
@@ -17,6 +18,8 @@ public:
 
     void render() override;
     ViewID get_view_id() override;
+    ViewCapabilities capabilities() const override;
+    PluginOpenResult open_plugin_panel(const std::string& panel_id, PluginOpenMode mode) override;
 
 private:
     void init_panels();

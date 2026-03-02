@@ -30,37 +30,38 @@ namespace misty::core {
 
     using StreamLineCallback = std::function<bool(const std::string& line)>;
 
-  
+    struct HttpTimeoutOptions {
+        long connect_timeout_seconds = 10L;
+        long total_timeout_seconds = 30L;
+    };
+
+    struct HttpRequestOptions {
+        std::map<std::string, std::string> headers;
+        HttpTimeoutOptions timeouts;
+    };
 
     HttpResponse execute_raw_http_request(const std::string& method,
                                           const std::string& url,
                                           const std::string& body = "",
-                                          const std::map<std::string, std::string>& headers = {},
-                                          long connect_timeout_seconds = 10L,
-                                          long total_timeout_seconds = 30L);
+                                          const HttpRequestOptions& options = {});
 
     class HTTPClient {
     public:
         static HTTPClient& get();
 
-        HttpResponse get(const std::string& url, const std::map<std::string, std::string>& headers = {});
-        HttpResponse get_with_timeouts(const std::string& url,
-                                       long connect_timeout_seconds,
-                                       long total_timeout_seconds,
-                                       const std::map<std::string, std::string>& headers = {});
-        HttpResponse get_stream_with_timeouts(const std::string& url,
-                                              long connect_timeout_seconds,
-                                              long total_timeout_seconds,
-                                              StreamLineCallback line_callback,
-                                              const std::map<std::string, std::string>& headers = {});
-        HttpResponse post_with_timeouts(const std::string& url,
-                                        const std::string& body,
-                                        long connect_timeout_seconds,
-                                        long total_timeout_seconds,
-                                        const std::map<std::string, std::string>& headers = {});
-        HttpResponse post(const std::string& url, const std::string& body, const std::map<std::string, std::string>& headers = {});
-        HttpResponse put(const std::string& url, const std::string& body, const std::map<std::string, std::string>& headers = {});
-        HttpResponse del(const std::string& url, const std::map<std::string, std::string>& headers = {});
+        HttpResponse get(const std::string& url,
+                         const HttpRequestOptions& options = {});
+        HttpResponse get_stream(const std::string& url,
+                                StreamLineCallback line_callback,
+                                const HttpRequestOptions& options = {});
+        HttpResponse post(const std::string& url,
+                          const std::string& body,
+                          const HttpRequestOptions& options = {});
+        HttpResponse put(const std::string& url,
+                         const std::string& body,
+                         const HttpRequestOptions& options = {});
+        HttpResponse del(const std::string& url,
+                         const HttpRequestOptions& options = {});
 
         UploadResult chunked_upload (
             const std::string& upload_url,
@@ -86,7 +87,10 @@ namespace misty::core {
         HTTPClient(const HTTPClient&) = delete;
         HTTPClient& operator=(const HTTPClient&) = delete;
 
-        HttpResponse perform_request(const std::string& method, const std::string& url, const std::string& body = "", const std::map<std::string, std::string>& headers = {});
+        HttpResponse perform_request(const std::string& method,
+                                    const std::string& url,
+                                    const std::string& body,
+                                    const HttpRequestOptions& options);
         bool is_proxy_url(const std::string& url) const;
         void update_proxy_status(const std::string& url, int status_code);
 

@@ -1,13 +1,14 @@
 #pragma once
 
-#include <string>
-#include <mutex>
 #include <atomic>
+#include <chrono>
+#include <functional>
 #include <memory>
+#include <mutex>
 #include <set>
+#include <string>
 #include <unordered_map>
 #include <vector>
-#include <functional>
 #include "core/ui/ui_registry.h"
 #include "core/net/http_client.h"
 #include "core/threading/worker_pool.h"
@@ -226,6 +227,7 @@ namespace misty::panel {
         std::string error_msg;
         std::string success_msg;
         bool is_refreshing = false;
+        std::chrono::steady_clock::time_point refresh_indicator_until{};
         bool initial_load_done = false;
 
         std::set<RemoteConnection> connections;
