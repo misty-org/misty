@@ -2,7 +2,6 @@
 #include <cstdio>
 #include <algorithm>
 #include <fstream>
-#include <iostream>
 #include <filesystem>
 #include <nlohmann/json.hpp>
 
@@ -53,7 +52,7 @@ namespace panel {
                  item.status = SyncStatus::DELETED;
             }
         }
-        
+
         return item;
     }
 
@@ -82,8 +81,8 @@ namespace panel {
             if (j.contains("last_opened_path")) {
                 last_opened_path = j["last_opened_path"].get<std::string>();
             }
-            
-            printf("FileExplorerState: Loaded state from %s (Recent: %zu, Starred: %zu)\n", 
+
+            printf("FileExplorerState: Loaded state from %s (Recent: %zu, Starred: %zu)\n",
                 path.c_str(), recent_files.size(), starred_files.size());
 
         } catch (const std::exception& e) {
@@ -115,7 +114,7 @@ namespace panel {
 
             std::ofstream f(path);
             f << j.dump(4);
-            
+
             printf("FileExplorerState: Saved state to %s\n", path.c_str());
 
         } catch (const std::exception& e) {

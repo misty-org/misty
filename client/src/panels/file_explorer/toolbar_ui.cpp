@@ -7,6 +7,7 @@
 
 #include "core/commands/command_manager.h"
 #include "core/manager/asset_manager.h"
+#include "panels/search/search_panel.h"
 #include "panels/search/search_state.h"
 #include "panels/services/services_state.h"
 
@@ -93,16 +94,16 @@ std::vector<BreadcrumbSegment> build_breadcrumb_segments(const std::string& curr
 }
 
 void clear_scoped_search(SearchState& search_state) {
+    std::lock_guard<std::mutex> lock(search_state.mu);
     search_state.is_open = false;
-    search_state.pending_submit = false;
-    search_state.pending_navigate_index = -1;
+    search_state.focus_query = false;
     search_state.selected_index = 0;
-    search_state.cache_results.clear();
-    search_state.api_results.clear();
-    search_state.seen_ids.clear();
-    search_state.pending_api_tasks.store(0);
-    search_state.api_search_done = true;
+    search_state.results.clear();
+    search_state.search_pending = false;
+    search_state.search_in_flight = false;
+    ++search_state.request_generation;
     search_state.last_submitted_query.clear();
+    search_state.last_err.clear();
 }
 
 void discard_current_history_entries(std::stack<std::string>& history, const std::string& current_path) {
@@ -121,61 +122,6 @@ void push_history_entry_if_distinct(std::stack<std::string>& history, const std:
     history.push(path);
 }
 } // namespace
-
-void FileExplorerPanel::show_inline_search(FileExplorerState& state, SearchState& search_state) {
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 7));
-    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
-    ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.18f, 0.18f, 0.18f, 1.0f));
-
-    const float close_w = 28.0f;
-    const float spacing = 6.0f;
-    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - close_w - spacing);
-
-    if (search_state.just_opened) {
-        ImGui::SetKeyboardFocusHere();
-        search_state.just_opened = false;
-    }
-
-    bool changed = ImGui::InputTextWithHint("##inline_search", "Search files and cloud providers...",
-        search_state.query_buf, sizeof(search_state.query_buf));
-
-    ImGui::PopStyleColor();
-
-    ImGui::SameLine(0, spacing);
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.35f, 0.35f, 0.35f, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.25f, 0.25f, 0.25f, 1.0f));
-    if (ImGui::Button("x", ImVec2(close_w, 0))) {
-        search_state.is_open = false;
-        std::memset(search_state.query_buf, 0, sizeof(search_state.query_buf));
-    }
-    ImGui::PopStyleColor(3);
-    ImGui::PopStyleVar(2);
-
-    if (CommandManager::get().matches("search.cancel")) {
-        search_state.is_open = false;
-        std::memset(search_state.query_buf, 0, sizeof(search_state.query_buf));
-        return;
-    }
-
-    static auto last_change = std::chrono::steady_clock::now();
-    if (changed) last_change = std::chrono::steady_clock::now();
-    float elapsed_ms = std::chrono::duration<float, std::milli>(std::chrono::steady_clock::now() - last_change).count();
-    std::string q(search_state.query_buf);
-    if (q.size() >= 2 && q != search_state.last_submitted_query && elapsed_ms >= 500.0f) {
-        search_state.pending_submit = true;
-    }
-
-    if (CommandManager::get().matches("search.prev", true) && search_state.selected_index > 0) {
-        --search_state.selected_index;
-    }
-    if (CommandManager::get().matches("search.next", true)) {
-        ++search_state.selected_index;
-    }
-    if (CommandManager::get().matches("search.confirm")) {
-        search_state.pending_navigate_index = search_state.selected_index;
-    }
-}
 
 void FileExplorerPanel::show_nav_history(FileExplorerState& state, float button_width, float spacing) {
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
@@ -281,13 +227,13 @@ void FileExplorerPanel::show_search_bar(FileExplorerState& state, SearchState& s
     const float total_available = ImGui::GetContentRegionAvail().x;
     const float action_width = action_btn_size * action_button_count +
                                spacing * static_cast<float>(std::max(0, action_button_count - 1));
-    const float search_width = std::clamp(total_available * 0.18f, 130.0f, 190.0f);
-    const float reserved_trailing_width = action_width + search_width + spacing;
+    const float search_button_width = action_btn_size;
+    const float reserved_trailing_width = action_width + search_button_width + spacing;
     const float path_width = std::max(120.0f, total_available - reserved_trailing_width - spacing - kPathFieldTrim);
 
     if (CommandManager::get().matches("search.toggle")) {
         search_state.is_open = true;
-        search_state.just_opened = true;
+        search_state.focus_query = true;
     }
 
     ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.21f, 0.21f, 0.21f, 1.0f));
@@ -303,49 +249,29 @@ void FileExplorerPanel::show_search_bar(FileExplorerState& state, SearchState& s
     }
 
     ImGui::SameLine(0, spacing);
-    ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.21f, 0.21f, 0.21f, 1.0f));
-    ImGui::SetNextItemWidth(search_width);
-    if (search_state.just_opened) {
-        ImGui::SetKeyboardFocusHere();
-        search_state.just_opened = false;
-    }
-    bool changed = ImGui::InputTextWithHint("##scope_search", "Find in folder...  (:pdf)", search_state.query_buf,
-                                            sizeof(search_state.query_buf), ImGuiInputTextFlags_EnterReturnsTrue);
-    const bool submitted = ImGui::IsItemDeactivatedAfterEdit();
-    const bool input_active = ImGui::IsItemActive();
-    ImGui::PopStyleColor();
-
-    std::string query(search_state.query_buf);
-    if (changed) {
-        search_state.last_input_change_at = std::chrono::steady_clock::now();
-        search_state.pending_submit = false;
-        search_state.pending_navigate_index = -1;
-        search_state.selected_index = 0;
-        if (query.empty()) {
-            clear_scoped_search(search_state);
-        } else {
-            search_state.is_open = true;
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.21f, 0.21f, 0.21f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.28f, 0.28f, 0.28f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.16f, 0.16f, 0.16f, 1.0f));
+    const ImVec4 search_tint = search_state.is_open
+        ? ImVec4(0.95f, 0.95f, 0.95f, 1.0f)
+        : ImVec4(0.7f, 0.7f, 0.7f, 1.0f);
+    auto& search_tex = AssetManager::get().get_svg_texture("search-16", 16);
+    if (search_tex.id != 0) {
+        if (ImGui::ImageButton("##togglesearch", search_tex.id, ImVec2(action_btn_size, action_btn_size),
+                ImVec2(0, 0), ImVec2(1, 1), ImVec4(0, 0, 0, 0), search_tint)) {
+            if (search_panel_) {
+                search_panel_->toggle();
+            }
+        }
+    } else if (ImGui::Button("S", ImVec2(action_btn_size, action_btn_size))) {
+        if (search_panel_) {
+            search_panel_->toggle();
         }
     }
-    if (submitted && ((!query.empty() && query[0] == ':' && query.size() > 1) || query.size() >= 2)) {
-        search_state.pending_submit = true;
-        search_state.is_open = true;
-    } else if (!query.empty()) {
-        const auto elapsed = std::chrono::steady_clock::now() - search_state.last_input_change_at;
-        const bool type_filter = query[0] == ':' && query.size() > 1;
-        if ((type_filter || query.size() >= 2) &&
-            query != search_state.last_submitted_query &&
-            elapsed >= std::chrono::milliseconds(type_filter ? 0 : 180)) {
-            search_state.pending_submit = true;
-            search_state.is_open = true;
-        }
-    } else if (!input_active) {
-        clear_scoped_search(search_state);
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Search in folder (%s)", CommandManager::get().label("search.toggle").c_str());
     }
-    if (CommandManager::get().matches("search.cancel")) {
-        std::memset(search_state.query_buf, 0, sizeof(search_state.query_buf));
-        clear_scoped_search(search_state);
-    }
+    ImGui::PopStyleColor(3);
 
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.21f, 0.21f, 0.21f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.28f, 0.28f, 0.28f, 1.0f));

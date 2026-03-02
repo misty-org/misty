@@ -1683,16 +1683,14 @@ namespace misty::panel {
         {
             std::lock_guard<std::mutex> lock(search_state.mu);
             search_state.is_open = snapshot.search_open;
-            search_state.just_opened = snapshot.search_open;
-            search_state.pending_submit = false;
-            search_state.pending_navigate_index = -1;
+            search_state.focus_query = false;
             search_state.selected_index = 0;
-            search_state.cache_results.clear();
-            search_state.api_results.clear();
-            search_state.seen_ids.clear();
-            search_state.pending_api_tasks.store(0);
-            search_state.api_search_done = true;
+            search_state.results.clear();
+            search_state.search_pending = false;
+            search_state.search_in_flight = false;
+            ++search_state.request_generation;
             search_state.last_submitted_query.clear();
+            search_state.last_err.clear();
             std::memset(search_state.query_buf, 0, sizeof(search_state.query_buf));
             std::strncpy(search_state.query_buf, snapshot.search_query.c_str(), sizeof(search_state.query_buf) - 1);
         }
