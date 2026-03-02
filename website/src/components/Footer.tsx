@@ -38,7 +38,7 @@ const socials = [
 
 export default function Footer() {
   return (
-    <footer className="border-t border-border/50 max-w-6xl mx-auto px-6 py-12">
+    <footer className="border-t border-border/50 py-12">
       <div className="flex flex-col md:flex-row justify-between items-start gap-8">
         {/* Brand */}
         <div className="flex flex-col gap-3">

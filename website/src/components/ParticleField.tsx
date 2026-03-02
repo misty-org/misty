@@ -34,8 +34,8 @@ export function ParticleField() {
     particlesRef.current = Array.from({ length: particleCount }, () => ({
       x: Math.random() * canvas.offsetWidth,
       y: Math.random() * canvas.offsetHeight,
-      vx: (Math.random() - 0.5) * 1.5,
-      vy: (Math.random() - 0.5) * 1.5,
+      vx: (Math.random() - 0.5) * 0.75,
+      vy: (Math.random() - 0.5) * 0.75,
       size: Math.random() * 1.5 + 0.5,
       opacity: Math.random() * 0.4 + 0.1,
     }));

@@ -11,6 +11,7 @@ require (
 
 require (
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
+	github.com/mattn/go-sqlite3 v1.14.34 // indirect
 	github.com/pierrec/lz4/v4 v4.1.22 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251029180050-ab9386a59fda // indirect

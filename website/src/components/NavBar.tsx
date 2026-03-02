@@ -3,7 +3,6 @@ import { NavLink, useNavigate, useLocation } from "react-router";
 import { useAuth } from "../AuthContext";
 
 const navItems = [
-  { to: "/", label: "Home" },
   { to: "/download", label: "Download" },
   { to: "/pricing", label: "Pricing" },
 ];
@@ -46,9 +45,9 @@ export default function Navbar() {
       scrolled ? "glass shadow-lg shadow-bg/50" : "bg-transparent"
     }`}>
       <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-        <NavLink to="/" className="flex items-center gap-1">
+        <NavLink to="/" className="group flex items-center gap-1">
           <img src="/misty_full.png" alt="Misty logo" className="w-12 h-12 transition-transform duration-300 group-hover:scale-110" />
-          <span className="text-lg font-semibold text-text tracking-tight transition-colors group-hover:text-primary">Misty</span>
+          <span className="text-lg font-semibold text-text tracking-tight">Misty</span>
         </NavLink>
 
         {/* Desktop nav */}

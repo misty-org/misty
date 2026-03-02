@@ -3,7 +3,7 @@ import { GrOnedrive } from "react-icons/gr";
 
 export default function FeaturesProviders() {
   return (
-      <div className="max-w-6xl mx-auto px-6">
+      <div>
         
         {/* Section Header */}
         <div className="text-center mb-16 md:mb-20">
@@ -17,7 +17,7 @@ export default function FeaturesProviders() {
         </div>
 
         {/* 2-Column Grid */}
-        <div className="grid md:grid-cols-2 gap-10 lg:gap-16 max-w-5xl mx-auto items-center">
+        <div className="grid md:grid-cols-2 gap-10 lg:gap-16 items-center">
           <div className="glass-card rounded-2xl p-8 border-primary/20 shadow-lg shadow-primary/5">
             <h3 className="text-xl font-bold text-text mb-6">Misty helps you</h3>
             <ul className="flex flex-col gap-4 text-sm md:text-base text-text-muted">
@@ -64,7 +64,7 @@ export default function FeaturesProviders() {
               <p className="text-sm font-medium text-text-muted text-center md:text-left m-0">
                 Connect and sync with popular platforms
               </p>
-              <button className="h-8 px-4 rounded-full bg-white text-black text-xs font-bold hover:bg-gray-200 transition-all duration-300 shadow-md hover:shadow-white/20 flex items-center gap-1.5 group shrink-0">
+              <button className="h-8 px-4 rounded-full bg-zinc-100 text-black text-xs font-bold hover:bg-gray-200 transition-all duration-300 shadow-md hover:shadow-zinc-100/20 flex items-center gap-1.5 group shrink-0">
                 Learn more
                 <span className="group-hover:translate-x-1 transition-transform duration-300">
                   &rarr;

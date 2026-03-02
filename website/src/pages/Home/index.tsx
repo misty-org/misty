@@ -10,7 +10,7 @@ import EndingOutro from "./EndingOutro";
 
 export default function Home() {
   return (
-    <div className="flex flex-col gap-30">
+    <div className="max-w-280 mx-auto px-4 sm:px-6 lg:px-8 flex flex-col gap-30">
       <div className="fixed inset-0 w-full h-full -z-50 pointer-events-none">
         <ParticleField/>
       </div>

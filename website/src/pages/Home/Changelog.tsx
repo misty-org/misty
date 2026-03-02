@@ -40,7 +40,7 @@ export default function Changelog() {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div>
       <h2 className="text-3xl md:text-4xl font-bold text-text tracking-tight mb-4">
         Changelog
       </h2>
@@ -95,7 +95,7 @@ export default function Changelog() {
       </div>
       <p className="text-sm text-text-muted mt-6">
         
-        <a href="https://forms.gle/your-form-id" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline text-white/80">
+        <a href="https://forms.gle/your-form-id" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline text-zinc-300">
           See recent updates and changes to Misty &rarr;
         </a>
       </p>

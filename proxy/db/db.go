@@ -2,11 +2,11 @@ package db
 
 import (
 	"database/sql"
-	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 
-	_ "github.com/lib/pq"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 type Database struct {
@@ -14,39 +14,18 @@ type Database struct {
 }
 
 func (db *Database) GetDSN() string {
-	host := os.Getenv("DB_HOST")
-	if host == "" {
-		host = "localhost"
+	path := os.Getenv("DB_PATH")
+	if path == "" {
+		home, _ := os.UserHomeDir()
+		path = filepath.Join(home, "misty", "db", "data.db")
 	}
-	port := os.Getenv("DB_PORT")
-	if port == "" {
-		port = "5432"
-	}
-	user := os.Getenv("DB_USER")
-	if user == "" {
-		user = "misty"
-	}
-	password := os.Getenv("DB_PASSWORD")
-	if password == "" {
-		password = "misty"
-	}
-	dbname := os.Getenv("DB_NAME")
-	if dbname == "" {
-		dbname = "misty"
-	}
-	sslmode := os.Getenv("DB_SSLMODE")
-	if sslmode == "" {
-		sslmode = "disable"
-	}
-
-	return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
-		host, port, user, password, dbname, sslmode)
+	return path
 }
 
 func (db *Database) StartDatabase() error {
 	dsn := db.GetDSN()
 
-	conn, err := sql.Open("postgres", dsn)
+	conn, err := sql.Open("sqlite3", dsn+"?_foreign_keys=on")
 	if err != nil {
 		log.Println("Failed to open database: ", err)
 		return err

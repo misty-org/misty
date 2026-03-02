@@ -19,7 +19,7 @@ func (db *Database) StoreDBXUser(userID, dbxUserID, accessToken, refreshToken, d
 		return fmt.Errorf("dbx_user_id is required")
 	}
 	query := `INSERT INTO dbx_users (user_id, dbx_user_id, access_token, refresh_token, display_name, email)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		VALUES (?, ?, ?, ?, ?, ?)
 		ON CONFLICT (user_id, dbx_user_id) DO UPDATE SET
 			access_token = EXCLUDED.access_token,
 			refresh_token = EXCLUDED.refresh_token,
@@ -34,7 +34,7 @@ func (db *Database) StoreDBXUser(userID, dbxUserID, accessToken, refreshToken, d
 
 // GetDBXUsers returns all user records for a specific user_id
 func (db *Database) GetDBXUsers(userID string) ([]DBXUserRecord, error) {
-	query := `SELECT user_id, dbx_user_id, access_token, refresh_token, COALESCE(display_name, ''), COALESCE(email, '') FROM dbx_users WHERE user_id = $1`
+	query := `SELECT user_id, dbx_user_id, access_token, refresh_token, COALESCE(display_name, ''), COALESCE(email, '') FROM dbx_users WHERE user_id = ?`
 	rows, err := db.Conn.Query(query, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get DBX users: %w", err)
@@ -57,7 +57,7 @@ func (db *Database) GetDBXUsers(userID string) ([]DBXUserRecord, error) {
 
 // DeleteDBXUser deletes the user record for (user_id, dbx_user_id).
 func (db *Database) DeleteDBXUser(userID, dbxUserID string) error {
-	query := `DELETE FROM dbx_users WHERE user_id = $1 AND dbx_user_id = $2`
+	query := `DELETE FROM dbx_users WHERE user_id = ? AND dbx_user_id = ?`
 	result, err := db.Conn.Exec(query, userID, dbxUserID)
 	if err != nil {
 		return fmt.Errorf("failed to delete DBX user: %w", err)
