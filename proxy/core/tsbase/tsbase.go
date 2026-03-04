@@ -23,7 +23,7 @@ func CreateTSBase(dataDir string) (*TSBase, error) {
 	server := &tsnet.Server{
 		Hostname: hashedBaseName,
 		Dir:      dataDir,
-		Logf: func(format string, args ...any) {},
+		Logf: nil,
 	}
 	localClient, err := server.LocalClient()
 	if err != nil {
@@ -75,7 +75,6 @@ func (ts *TSBase) handleStateTransition(state ipn.State) {
 }
 
 func (ts *TSBase) refreshNetworkMetadata() {
-    log.Println("refreshing metadata")
     if ts.TSClient == nil {
         return
     }

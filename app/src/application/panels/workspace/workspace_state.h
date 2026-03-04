@@ -47,6 +47,12 @@ namespace misty::panel {
         std::string email;
     };
 
+    // Account mapping for iCloud (email is the only identifier)
+    struct ICLAccountMapping {
+        std::string folder_name;    // Derived from email: "matthew"
+        std::string email;          // Apple ID email (primary identifier)
+    };
+
     // Directory management utilities for mount points
     namespace mount_utils {
         inline std::string get_mount_root() {
@@ -67,6 +73,10 @@ namespace misty::panel {
             return get_mount_root() + "/Dropbox";
         }
 
+        inline std::string get_icloud_root() {
+            return get_mount_root() + "/iCloud";
+        }
+
         // Derive folder name from email: matthew@outlook.com → "matthew"
         inline std::string derive_folder_name(const std::string& email) {
             if (email.empty()) return "unknown";
@@ -84,6 +94,7 @@ namespace misty::panel {
             fs::create_directories(get_onedrive_root(), ec);
             fs::create_directories(get_gdrive_root(), ec);
             fs::create_directories(get_dropbox_root(), ec);
+            fs::create_directories(get_icloud_root(), ec);
         }
 
         // Create account directory and return the path
@@ -112,6 +123,15 @@ namespace misty::panel {
             fs::create_directories(account_path, ec);
             return account_path;
         }
+
+        // Create iCloud account directory and return the path
+        inline std::string ensure_icl_account_directory(const std::string& email) {
+            std::string folder_name = derive_folder_name(email);
+            std::string account_path = get_icloud_root() + "/" + folder_name;
+            std::error_code ec;
+            fs::create_directories(account_path, ec);
+            return account_path;
+        }
     }
 
     struct WorkspaceState : public core::UIState {
@@ -128,6 +148,7 @@ namespace misty::panel {
         std::vector<AccountMapping> account_mappings;
         std::vector<GDAccountMapping> gd_account_mappings;
         std::vector<DBXAccountMapping> dbx_account_mappings;
+        std::vector<ICLAccountMapping> icl_account_mappings;
 
         // Get currently selected workspace
         WorkspaceInfo* get_current_workspace() {
@@ -183,7 +204,7 @@ namespace misty::panel {
                         return;
                     }
 
-                    core::HttpResponse response = core::HttpClient::get().get(proxy_url + "/api/workspaces");
+                    core::HttpResponse response = core::HTTPClient::get().get(proxy_url + "/api/workspaces");
                     if (response.status_code >= 200 && response.status_code < 300) {
                         try {
                             auto json = nlohmann::json::parse(response.body);
@@ -268,6 +289,16 @@ namespace misty::panel {
         // Find Dropbox account by folder name
         DBXAccountMapping* find_dbx_account_by_folder(const std::string& folder_name) {
             for (auto& mapping : dbx_account_mappings) {
+                if (mapping.folder_name == folder_name) {
+                    return &mapping;
+                }
+            }
+            return nullptr;
+        }
+
+        // Find iCloud account by folder name
+        ICLAccountMapping* find_icl_account_by_folder(const std::string& folder_name) {
+            for (auto& mapping : icl_account_mappings) {
                 if (mapping.folder_name == folder_name) {
                     return &mapping;
                 }

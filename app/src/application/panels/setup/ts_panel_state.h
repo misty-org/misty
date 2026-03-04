@@ -112,7 +112,7 @@ namespace misty::panel {
                 if (base.empty()) {
                     error = "PROXY_SERVICE_URL is not set";
                 } else {
-                    core::HttpResponse response = core::HttpClient::get().get(base + "/api/ts-status");
+                    core::HttpResponse response = core::HTTPClient::get().get(base + "/api/ts-status");
                     if (response.status_code >= 200 && response.status_code < 300) {
                         try {
                             auto json = nlohmann::json::parse(response.body);
@@ -169,7 +169,7 @@ namespace misty::panel {
                 if (base.empty()) {
                     error = "PROXY_SERVICE_URL is not set";
                 } else {
-                    core::HttpResponse response = core::HttpClient::get().get(base + "/api/ts-status");
+                    core::HttpResponse response = core::HTTPClient::get().get(base + "/api/ts-status");
                     if (response.status_code >= 200 && response.status_code < 300) {
                         try {
                             auto json = nlohmann::json::parse(response.body);
@@ -236,7 +236,7 @@ namespace misty::panel {
                 if (base.empty()) {
                     error = "PROXY_SERVICE_URL is not set";
                 } else {
-                    core::HttpResponse register_response = core::HttpClient::get().post(
+                    core::HttpResponse register_response = core::HTTPClient::get().post(
                         base + "/api/devices",
                         json_body,
                         headers
