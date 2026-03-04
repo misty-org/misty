@@ -21,25 +21,20 @@ namespace misty::core {
 
     class AssetManager {
     public:
-        // Singleton Access
         static AssetManager& get();
 
         void load_fonts();
 
-        // Load a CSS theme file into memory
         void load_themes();
 
-        // Get an icon (Loads and caches if not found)
         SVGTexture& get_svg_texture(const std::string& name, int size = 24);
 
         ImageTexture& get_image_texture(const std::string& path);
 
-        // In AssetManager.h
         const std::string& get_current_theme() const;
 
         ImFont* get_font(const FontID& fond_id) const;
 
-        // Cleanup GPU resources
         void shutdown();
 
     private:

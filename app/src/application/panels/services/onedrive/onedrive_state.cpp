@@ -67,7 +67,7 @@ namespace misty::panel {
                 std::map<std::string, std::string> headers;
                 headers["Content-Type"] = "application/json";
 
-                core::HttpResponse session_response = core::HttpClient::get().post(
+                core::HttpResponse session_response = core::HTTPClient::get().post(
                     upload_session_url,
                     request_body.dump(),
                     headers
@@ -96,10 +96,11 @@ namespace misty::panel {
 
                 // Step 2: Upload file using chunked upload
                 // Note: The uploadUrl from Microsoft doesn't need Authorization header
-                core::ChunkedUploadResult result = core::HttpClient::get().chunked_upload(
+                core::UploadResult result = core::HTTPClient::get().chunked_upload(
                     upload_url,
                     local_path,
                     10 * 1024 * 1024,  // 10MB chunks
+                    320 * 1024,        // Microsoft Graph requires 320KB alignment
                     progress_cb,
                     nullptr  // TODO: Pass cancel flag from state
                 );
