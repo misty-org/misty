@@ -12,15 +12,17 @@ import (
 	"github.com/kannachi323/misty/proxy/api/gd"
 	"github.com/kannachi323/misty/proxy/api/ms"
 	"github.com/kannachi323/misty/proxy/core/auth"
+	"github.com/kannachi323/misty/proxy/core/license"
 	"github.com/kannachi323/misty/proxy/core/tsbase"
 	"github.com/kannachi323/misty/proxy/db"
 )
 
 type Proxy struct {
-	Router       *chi.Mux
-	APIRouter	 *chi.Mux
-	TSBase		 *tsbase.TSBase
-	Database     *db.Database
+	Router          *chi.Mux
+	APIRouter       *chi.Mux
+	TSBase          *tsbase.TSBase
+	Database        *db.Database
+	LicenseManager  *license.Manager
 }
 
 func CreateProxy() (*Proxy, error) {
@@ -45,6 +47,7 @@ func CreateProxy() (*Proxy, error) {
 	}
 	proxy.TSBase = base
 	proxy.Database = &db.Database{}
+	proxy.LicenseManager = license.NewManager(proxy.Database)
 
 	return proxy, nil
 }
@@ -97,37 +100,42 @@ func (proxy *Proxy) MountHandlers() {
 		r.Put("/workspaces", api.UpdateWorkspace(proxy.Database))
 		r.Delete("/workspaces", api.DeleteWorkspace(proxy.Database))
 
-		// Microsoft endpoints
-		r.Get("/ms/users", ms.GetMSUsers(proxy.Database))
-		r.Delete("/ms/users", ms.DeleteMSToken(proxy.Database))
-		r.Post("/ms/file/upload", ms.GetUploadSession(proxy.Database))
-		r.Get("/ms/drive", ms.GetDrive(proxy.Database))
-		r.Get("/ms/drive/root", ms.GetDriveRoot(proxy.Database))
-		r.Get("/ms/files", ms.GetFiles(proxy.Database))
-		r.Get("/ms/file", ms.GetFile(proxy.Database))
-		r.Get("/ms/file/download", ms.DownloadFile(proxy.Database))
-		r.Post("/ms/folder/create", ms.CreateFolder(proxy.Database))
+		// Pro-only: cloud provider integrations
+		r.Group(func(r chi.Router) {
+			r.Use(proxy.LicenseManager.RequirePro)
 
-		// Google Drive endpoints
-		r.Get("/gd/users", gd.GetGDUsers(proxy.Database))
-		r.Delete("/gd/users", gd.DeleteGDToken(proxy.Database))
-		r.Get("/gd/drive", gd.GetAbout(proxy.Database))
-		r.Get("/gd/drive/root", gd.GetDriveRoot(proxy.Database))
-		r.Get("/gd/files", gd.GetFiles(proxy.Database))
-		r.Get("/gd/file", gd.GetFile(proxy.Database))
-		r.Get("/gd/file/download", gd.DownloadFile(proxy.Database))
-		r.Post("/gd/file/upload", gd.GetUploadSession(proxy.Database))
-		r.Post("/gd/folder/create", gd.CreateFolder(proxy.Database))
+			// Microsoft endpoints
+			r.Get("/ms/users", ms.GetMSUsers(proxy.Database))
+			r.Delete("/ms/users", ms.DeleteMSToken(proxy.Database))
+			r.Post("/ms/file/upload", ms.GetUploadSession(proxy.Database))
+			r.Get("/ms/drive", ms.GetDrive(proxy.Database))
+			r.Get("/ms/drive/root", ms.GetDriveRoot(proxy.Database))
+			r.Get("/ms/files", ms.GetFiles(proxy.Database))
+			r.Get("/ms/file", ms.GetFile(proxy.Database))
+			r.Get("/ms/file/download", ms.DownloadFile(proxy.Database))
+			r.Post("/ms/folder/create", ms.CreateFolder(proxy.Database))
 
-		// Dropbox endpoints
-		r.Get("/dbx/users", dbx.GetDBXUsers(proxy.Database))
-		r.Delete("/dbx/users", dbx.DeleteDBXToken(proxy.Database))
-		r.Get("/dbx/drive", dbx.GetSpaceUsage(proxy.Database))
-		r.Get("/dbx/drive/root", dbx.GetDriveRoot(proxy.Database))
-		r.Get("/dbx/files", dbx.GetFiles(proxy.Database))
-		r.Get("/dbx/file", dbx.GetFile(proxy.Database))
-		r.Get("/dbx/file/download", dbx.DownloadFile(proxy.Database))
-		r.Post("/dbx/file/upload", dbx.GetUploadSession(proxy.Database))
-		r.Post("/dbx/folder/create", dbx.CreateFolder(proxy.Database))
+			// Google Drive endpoints
+			r.Get("/gd/users", gd.GetGDUsers(proxy.Database))
+			r.Delete("/gd/users", gd.DeleteGDToken(proxy.Database))
+			r.Get("/gd/drive", gd.GetAbout(proxy.Database))
+			r.Get("/gd/drive/root", gd.GetDriveRoot(proxy.Database))
+			r.Get("/gd/files", gd.GetFiles(proxy.Database))
+			r.Get("/gd/file", gd.GetFile(proxy.Database))
+			r.Get("/gd/file/download", gd.DownloadFile(proxy.Database))
+			r.Post("/gd/file/upload", gd.GetUploadSession(proxy.Database))
+			r.Post("/gd/folder/create", gd.CreateFolder(proxy.Database))
+
+			// Dropbox endpoints
+			r.Get("/dbx/users", dbx.GetDBXUsers(proxy.Database))
+			r.Delete("/dbx/users", dbx.DeleteDBXToken(proxy.Database))
+			r.Get("/dbx/drive", dbx.GetSpaceUsage(proxy.Database))
+			r.Get("/dbx/drive/root", dbx.GetDriveRoot(proxy.Database))
+			r.Get("/dbx/files", dbx.GetFiles(proxy.Database))
+			r.Get("/dbx/file", dbx.GetFile(proxy.Database))
+			r.Get("/dbx/file/download", dbx.DownloadFile(proxy.Database))
+			r.Post("/dbx/file/upload", dbx.GetUploadSession(proxy.Database))
+			r.Post("/dbx/folder/create", dbx.CreateFolder(proxy.Database))
+		})
 	})
 }
