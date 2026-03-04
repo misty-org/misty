@@ -4,7 +4,6 @@
 #include "core/manager/asset_manager.h"
 #include "core/manager/font_manager.h"
 #include "core/ui/ui_style.h"
-
 #include <cmath>
 
 using namespace misty::view;
@@ -112,7 +111,12 @@ namespace misty::panel {
             ImGuiWindowFlags_NoCollapse |
             ImGuiWindowFlags_NoResize |
             ImGuiWindowFlags_NoScrollbar |
-            ImGuiWindowFlags_NoScrollWithMouse;
+            ImGuiWindowFlags_NoScrollWithMouse |
+            ImGuiWindowFlags_NoSavedSettings;
+
+        if (ImGuiViewport* main_viewport = ImGui::GetMainViewport()) {
+            ImGui::SetNextWindowViewport(main_viewport->ID);
+        }
 
         UI::WithStyle([&](UI::StyleScope& style) {
             style.color(ImGuiCol_WindowBg, ImVec4(0.10f, 0.10f, 0.12f, 1.0f)); // dark charcoal

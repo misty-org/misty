@@ -13,6 +13,7 @@ void ExtensionsView::init_panels() {
     navbar_panel_ = std::make_shared<panel::NavbarPanel>(ui_registry_);
     plugins_panel_ = std::make_shared<panel::PluginsPanel>(ui_registry_);
     notification_panel_ = std::make_shared<panel::NotificationPanel>(ui_registry_);
+    context_menu_panel_ = std::make_shared<panel::ContextMenuPanel>(ui_registry_);
 }
 
 ViewID ExtensionsView::get_view_id() {
@@ -54,6 +55,7 @@ void ExtensionsView::render() {
     ImGui::SetNextWindowSize(ImVec2(sw, sh), ImGuiCond_Always);
     plugins_panel_->render();
 
+    context_menu_panel_->render();
     notification_panel_->render();
 }
 

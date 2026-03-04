@@ -7,9 +7,10 @@ if(BUILD_TESTING AND (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STRE
     if(MISTY_TEST_SOURCES)
         set(MISTY_TEST_SUPPORT_SOURCES
             "${CMAKE_SOURCE_DIR}/src/core/file_master/file_master_local.cpp"
+            "${CMAKE_SOURCE_DIR}/src/core/file_transfer/file_transfer.cpp"
             "${CMAKE_SOURCE_DIR}/src/core/sync/fs_watcher.h"
             "${CMAKE_SOURCE_DIR}/src/core/threading/worker_pool.cpp"
-            "${CMAKE_SOURCE_DIR}/src/panels/file_explorer/file_explorer_state.cpp"
+            "${CMAKE_SOURCE_DIR}/src/panels/file_explorer/state/file_explorer_state.cpp"
             "${CMAKE_SOURCE_DIR}/src/panels/search/search_state.cpp"
             "${CMAKE_SOURCE_DIR}/src/panels/activity/activity_state.cpp"
             "${CMAKE_SOURCE_DIR}/src/panels/activity/upload_state.cpp"
