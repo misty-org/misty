@@ -42,7 +42,10 @@ namespace misty::panel {
         };
 
         struct ClosedPaneSnapshot {
-            Pane pane;
+            std::string pane_id;
+            std::vector<TabController::ClosedTabSnapshot> tabs;
+            std::vector<TabController::ClosedTabSnapshot> closed_tabs;
+            std::int16_t active_tab_idx = -1;
             PaneRestoreMode restore_mode = PaneRestoreMode::SameLane;
             int lane_index = -1;
             int row_index = -1;
@@ -75,5 +78,6 @@ namespace misty::panel {
         static constexpr float kPaneMinWidth = 280.0f;
         static constexpr float kPaneMinHeight = 220.0f;
         static constexpr int kMaxPaneCount = 4;
+        static constexpr std::size_t kMaxClosedPanes = 4;
     };
 }

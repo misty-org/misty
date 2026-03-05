@@ -1,7 +1,6 @@
 #pragma once
 
 #include "core/file_master/file_master.h"
-#include "core/file_transfer/file_transfer.h"
 #include "core/threading/worker_pool.h"
 
 /* This should support both same-device and cross-device file operations locally.
@@ -15,16 +14,16 @@ namespace misty::core {
 
 class FileMasterLocal : public IFileMaster {
 public:
-    FileMasterLocal(WorkerPool& worker_pool, FileTransfer& transfers);
+    explicit FileMasterLocal(WorkerPool& worker_pool);
 
     void rename(const FileMasterProps& props, FileMasterCompletion callback) override;
     void remove(const FileMasterProps& props, FileMasterCompletion callback) override;
     void copy(const FileMasterProps& props, FileMasterCompletion callback) override;
     void cut(const FileMasterProps& props, FileMasterCompletion callback) override;
+    void list(const FileMasterProps& props, FileMasterCompletion callback) override;
 
 private:
     WorkerPool& worker_pool_;
-    FileTransfer& transfers_;
 };
 
 } // namespace misty::core

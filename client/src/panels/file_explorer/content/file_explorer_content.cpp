@@ -5,6 +5,9 @@
 #include <cstdio>
 #include <cstring>
 
+#include "core/file_master/file_master_util.h"
+#include "panels/file_explorer/state/remote_mount_state.h"
+#include "panels/providers/state/providers_state.h"
 
 namespace fs = std::filesystem;
 
@@ -12,10 +15,16 @@ using namespace misty::core;
 
 namespace misty::panel {
     namespace {
+        struct RemoteBrowseTarget {
+            std::string provider_folder;
+            std::string remote_name;
+            std::string remote_path;
+        };
+
         std::string file_explorer_tab_title_for_path(const std::string& path) {
             if (path.empty()) {
                 return "Files";
-            }
+            }   
 
             if (path == FileExplorerState::VIRTUAL_PATH_RECENT) {
                 return "Recent";
@@ -44,6 +53,57 @@ namespace misty::panel {
             return fs::current_path().string();
         }
 
+        bool is_remote_mount_path(const std::string& path) {
+            const std::string mount_root = mount_utils::get_mount_root();
+            return !path.empty() && path.rfind(mount_root, 0) == 0;
+        }
+
+        bool is_provider_mount_root(const std::string& path) {
+            if (!is_remote_mount_path(path)) {
+                return false;
+            }
+
+            const fs::path relative = fs::path(path).lexically_relative(mount_utils::get_mount_root());
+            std::size_t components = 0;
+            for (const auto& part : relative) {
+                if (!part.empty() && part != ".") {
+                    ++components;
+                }
+            }
+            return components == 1;
+        }
+
+        std::optional<RemoteBrowseTarget> remote_browse_target_for(const std::string& path) {
+            if (!is_remote_mount_path(path)) {
+                return std::nullopt;
+            }
+
+            const fs::path relative = fs::path(path).lexically_relative(mount_utils::get_mount_root());
+            std::vector<std::string> parts;
+            for (const auto& part : relative) {
+                const std::string value = part.string();
+                if (!value.empty() && value != ".") {
+                    parts.push_back(value);
+                }
+            }
+
+            if (parts.size() < 2) {
+                return std::nullopt;
+            }
+
+            RemoteBrowseTarget target;
+            target.provider_folder = parts[0];
+            target.remote_name = parts[1];
+            if (parts.size() > 2) {
+                fs::path remote_path;
+                for (std::size_t i = 2; i < parts.size(); ++i) {
+                    remote_path /= parts[i];
+                }
+                target.remote_path = "/" + remote_path.generic_string();
+            }
+            return target;
+        }
+
     }
 
     std::string FileExplorerPanel::tab_title() const {
@@ -62,6 +122,7 @@ namespace misty::panel {
         props.state_key = state_key_ + "_tab_" + std::to_string(tab_idx);
         props.panel_id = panel_id() + "_tab_" + std::to_string(tab_idx);
         props.restore_persistent_state = false;
+        props.owns_state_cleanup = true;
 
         std::string initial_path = default_local_start_path();
         if (const auto* active_explorer = dynamic_cast<const FileExplorerPanel*>(active_panel())) {
@@ -197,6 +258,11 @@ namespace misty::panel {
         state.chat_overlay_open = !state.chat_overlay_open;
         state.chat_focus_input = state.chat_overlay_open;
         state.chat_resizing = false;
+        if (!state.chat_overlay_open) {
+            state.chat_input_buffer[0] = '\0';
+            state.chat_messages.clear();
+            state.chat_error_msg.clear();
+        }
     }
 
     void FileExplorerPanel::render_chat_overlay(FileExplorerState& state,
@@ -248,7 +314,7 @@ namespace misty::panel {
         state.is_loading = true;
         state.show_loading_animation = false;
         state.error_msg  = "";
-        reset_selection(state);
+        state.clear_transient_ui_state();
         state.files.clear();
         state.sort_dirty = true;
 
@@ -297,9 +363,81 @@ namespace misty::panel {
                         state.is_loading = false;
                         state.show_loading_animation = false;
                         state.sort_dirty = true;
+                        state.note_listing_changed();
                     }
                     return true;
                 };
+
+                if (is_provider_mount_root(path)) {
+                    const fs::path relative = fs::path(path).lexically_relative(mount_utils::get_mount_root());
+                    const std::string provider_folder = relative.filename().string();
+                    const auto cards = registry->get_state<ProvidersState>("Providers").provider_cards_snapshot();
+
+                    for (const auto& card : cards) {
+                        if (card.provider_id != provider_folder) {
+                            continue;
+                        }
+
+                        UnifiedFileItem item;
+                        item.name = card.account_label.empty() ? card.id : card.account_label;
+                        item.path = (fs::path(mount_utils::get_mount_root()) / provider_folder / item.name).string();
+                        item.id = item.path;
+                        item.is_dir = true;
+                        item.size = 0;
+                        item.mime_type = card.provider_label;
+                        item.status = SyncStatus::LOCAL;
+                        batch.push_back(std::move(item));
+                    }
+
+                    flush_batch(true);
+                    return;
+                }
+
+                if (auto remote_target = remote_browse_target_for(path); remote_target.has_value()) {
+                    FileMasterProps props;
+                    props.remote_source.remote_name = remote_target->remote_name;
+                    props.remote_source.provider_type = remote_target->provider_folder;
+                    props.remote_source.remote_path = remote_target->remote_path;
+
+                    std::vector<FileMasterListItem> remote_items;
+                    FileMasterResult remote_result = list_remote_path(props, remote_items);
+                    if (!remote_result.success) {
+                        std::lock_guard<std::mutex> lk(state.mu);
+                        if (state.navigation_generation.load(std::memory_order_relaxed) != navigation_generation) {
+                            return;
+                        }
+                        state.error_msg = remote_result.error_message;
+                        state.is_loading = false;
+                        state.show_loading_animation = false;
+                        state.sort_dirty = true;
+                        state.note_listing_changed();
+                        return;
+                    }
+
+                    const fs::path remote_root =
+                        fs::path(mount_utils::get_mount_root()) /
+                        remote_target->provider_folder /
+                        remote_target->remote_name;
+
+                    for (auto& remote_item : remote_items) {
+                        UnifiedFileItem item;
+                        item.name = remote_item.name.empty()
+                            ? fs::path(remote_item.path).filename().string()
+                            : remote_item.name;
+                        fs::path remote_item_path = fs::path(remote_item.path).relative_path();
+                        item.path = (remote_root / remote_item_path).string();
+                        item.id = item.path;
+                        item.is_dir = remote_item.is_dir;
+                        item.size = remote_item.size;
+                        item.last_modified = remote_item.last_modified;
+                        item.mime_type = remote_item.mime_type;
+                        item.status = SyncStatus::LOCAL;
+                        batch.push_back(std::move(item));
+                    }
+
+                    flush_batch(true);
+                    return;
+                }
 
                 try {
                     for (const auto& entry : fs::directory_iterator(
@@ -352,6 +490,7 @@ namespace misty::panel {
                     state.is_loading = false;
                     state.show_loading_animation = false;
                     state.sort_dirty = true;
+                    state.note_listing_changed();
                     return;
                 }
 
@@ -368,6 +507,7 @@ namespace misty::panel {
                 state.is_loading = false;
                 state.show_loading_animation = false;
                 state.sort_dirty = true;
+                state.note_listing_changed();
             }
         );
     }
@@ -444,6 +584,7 @@ namespace misty::panel {
             state.is_loading = false;
             state.show_loading_animation = false;
             state.sort_dirty = true;
+            state.note_listing_changed();
             printf("Explorer: Virtual path loaded. File count: %zu\n", state.files.size());
             return;
         }

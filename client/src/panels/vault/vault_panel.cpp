@@ -279,7 +279,7 @@ namespace misty::panel {
         }
 
         // Confirm-delete popup, scoped to this card's PushID stack so the
-        // popup ID resolves correctly (same trick ServicesPanel uses).
+        // popup ID resolves correctly (same trick ProvidersPanel uses).
         ImVec2 vp_center = ImGui::GetMainViewport()->GetCenter();
         ImGui::SetNextWindowPos(vp_center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
         if (ImGui::BeginPopupModal("##vault_confirm_delete", nullptr,

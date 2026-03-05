@@ -21,6 +21,7 @@ struct FileExplorerPanelProps {
     std::string panel_id = "primary";
     bool restore_persistent_state = true;
     std::string initial_path_override;
+    bool owns_state_cleanup = false;
 };
 
 class FileExplorerPanel : public panel::MultiPanel {
@@ -32,6 +33,9 @@ public:
     ~FileExplorerPanel() override;
     void render() override;
     std::string tab_title() const override;
+    std::string save_restore_state() const override;
+    void load_restore_state(const std::string& state) override;
+    void release_state() override;
 
     void render_sidebar();
     void render_content();
@@ -126,6 +130,7 @@ private:
     core::WorkerPool& worker_pool_;
     std::shared_ptr<FileSidebarPanel> sidebar_panel_;
     std::string state_key_;
+    bool owns_state_cleanup_ = false;
 };
 
 }  // namespace misty::panel

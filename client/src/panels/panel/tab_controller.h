@@ -28,6 +28,14 @@ namespace misty::panel {
             std::string display_title() const;
         };
 
+        struct ClosedTabSnapshot {
+            std::string context_key;
+            std::string state_key;
+            std::string title;
+            std::string restore_state;
+            std::int16_t idx = -1;
+        };
+
         TabController() = default;
         ~TabController() = default;
 
@@ -47,11 +55,26 @@ namespace misty::panel {
 
         void restore_tab();
         int tab_count() const;
+        std::vector<ClosedTabSnapshot> take_closed_tab_snapshots();
+        std::vector<ClosedTabSnapshot> export_tab_snapshots() const;
+        void restore_tabs_from_snapshots(
+            const std::vector<ClosedTabSnapshot>& snapshots,
+            const std::function<Tab(std::int16_t)>& create_tab,
+            std::int16_t restored_active_tab_idx);
+        void release_all_tabs();
+        void restore_closed_tab_snapshots(const std::vector<ClosedTabSnapshot>& snapshots);
+        std::int16_t active_tab_index() const { return active_tab_idx; }
+        void set_restore_tab_factory(std::function<Tab(std::int16_t)> factory) {
+            restore_tab_factory_ = std::move(factory);
+        }
 
     protected:
         std::int16_t active_tab_idx = -1;
         std::unordered_map<std::int16_t, Tab> tabs;
         std::vector<std::int16_t> tab_order;
-        std::vector<Tab> closed_tabs;
+        std::vector<ClosedTabSnapshot> closed_tabs;
+        std::function<Tab(std::int16_t)> restore_tab_factory_;
+
+        static constexpr std::size_t kMaxClosedTabs = 8;
     };
 }

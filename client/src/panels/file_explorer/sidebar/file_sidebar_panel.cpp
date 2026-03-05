@@ -1,11 +1,12 @@
 #include "file_sidebar_panel.h"
 
 #include "panels/file_explorer/state/file_explorer_state.h"
-#include "panels/services/services_state.h"
+#include "panels/providers/state/providers_state.h"
 #include "panels/file_explorer/state/remote_mount_state.h"
 
 #include <cmath>
 #include <cstdlib>
+#include <map>
 #include <set>
 
 namespace fs = std::filesystem;
@@ -141,9 +142,7 @@ namespace misty::panel {
     void FileSidebarPanel::render() {
         auto& state = registry_.get_state<FileSidebarState>("FileSidebar");
         auto& workspace_state = registry_.get_state<RemoteMountState>("RemoteMounts");
-        auto& services_state = registry_.get_state<ServicesState>("Services");
-        services_state.init(worker_pool_);
-
+        auto& providers_state = registry_.get_state<ProvidersState>("Providers");
 
         ImGuiWindowFlags flags =
             ImGuiWindowFlags_NoTitleBar |
@@ -171,7 +170,7 @@ namespace misty::panel {
             ImGui::Separator();
             show_local_section(width, padding);
             ImGui::Separator();
-            show_services_section(services_state, width, padding);
+            show_providers_section(providers_state, width, padding);
             ImGui::Separator();
             show_devices_section(width, padding);
             ImGui::Separator();
@@ -202,40 +201,41 @@ namespace misty::panel {
         ImGui::PopStyleColor();
     }
     
-    void FileSidebarPanel::show_services_section(ServicesState& services_state, float width, float padding) {
+    void FileSidebarPanel::show_providers_section(ProvidersState& providers_state, float width, float padding) {
         float content_width = width - (padding * 2);
         ImGui::SetCursorPosX(padding);
 
         ImGui::BeginGroup();
 
-        if (SectionHeader("services_hdr", "Services", services_collapsed_, content_width))
-            services_collapsed_ = !services_collapsed_;
+        if (SectionHeader("providers_hdr", "Providers", providers_collapsed_, content_width))
+            providers_collapsed_ = !providers_collapsed_;
 
-        if (!services_collapsed_) {
+        if (!providers_collapsed_) {
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 2.0f));
 
-            auto& services = registry_.get_state<ServicesState>("Services");
-            std::vector<RemoteConnection> remotes;
-            {
-                std::lock_guard<std::mutex> lock(services.mu);
-                remotes.assign(services.connections.begin(), services.connections.end());
-            }
-
-            if (remotes.empty()) {
-                ImGui::TextDisabled("  No services connected");
+            const std::vector<ProviderCard> cards = providers_state.provider_cards_snapshot();
+            if (cards.empty()) {
+                ImGui::TextDisabled("  No providers configured");
             } else {
-                // Show one entry per provider type (e.g. "OneDrive", "Google Drive")
-                std::set<std::string> seen_providers;
-                for (auto& remote : remotes) {
-                    std::string provider = remote.display_name.empty() ? remote.name : remote.display_name;
-                    if (seen_providers.count(provider)) continue;
-                    seen_providers.insert(provider);
+                std::map<std::string, std::string> providers;
+                for (const auto& card : cards) {
+                    const std::string provider_folder = card.provider_id.empty() ? "remote" : card.provider_id;
+                    const std::string provider_label = card.provider_label.empty() ? provider_folder : card.provider_label;
+                    providers.emplace(provider_folder, provider_label);
+                }
 
-                    if (HoverListItem(provider.c_str(), content_width)) {
+                for (const auto& [provider_folder, provider_label] : providers) {
+                    const std::filesystem::path mount_path =
+                        std::filesystem::path(mount_utils::get_mount_root()) /
+                        provider_folder;
+
+                    if (HoverListItem(provider_label.c_str(), content_width)) {
+                        mount_utils::ensure_provider_directory(provider_folder);
+
                         const std::string explorer_state_key =
                             active_explorer_state_key_provider_ ? active_explorer_state_key_provider_() : "Files";
                         auto& file_explorer_state = registry_.get_state<FileExplorerState>(explorer_state_key);
-                        file_explorer_state.pending_navigation_path = mount_utils::get_mount_root() + "/" + provider;
+                        file_explorer_state.pending_navigation_path = mount_path.string();
                     }
                 }
             }
