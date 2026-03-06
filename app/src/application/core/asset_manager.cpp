@@ -57,19 +57,14 @@ namespace misty::core {
     SVGTexture& AssetManager::get_svg_texture(const std::string& name, int size) {
         std::string key = name + ".svg";
 
-        // 1. Check if it's already in the cache
         auto it = svg_textures_.find(key);
         if (it != svg_textures_.end()) {
             return it->second;
         }
 
-        // 2. Try to load the requested icon
         std::string path = "assets/icons/" + key;
-
         SVGTexture tex = load_svg(path, size, size);
 
-
-        // 4. Cache whatever we ended up with (actual icon, fallback, or null)
         svg_textures_[key] = tex;
         return svg_textures_[key];
     }
@@ -80,7 +75,6 @@ namespace misty::core {
             return it->second;
         }
 
-        // Load the image
         int width, height, channels;
         unsigned char* image_data = stbi_load(path.c_str(), &width, &height, &channels, 4); // Force RGBA
 
@@ -92,25 +86,20 @@ namespace misty::core {
             return image_textures_[path];
         }
 
-        // Create OpenGL texture
         GLuint texture;
         glGenTextures(1, &texture);
         glBindTexture(GL_TEXTURE_2D, texture);
 
-        // Setup filtering parameters
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glGenerateMipmap(GL_TEXTURE_2D);
 
-        // Upload pixels to texture
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image_data);
 
-        // Free image data
         stbi_image_free(image_data);
 
-        // Cache and return
         tex.id = texture;
         tex.width = width;
         tex.height = height;

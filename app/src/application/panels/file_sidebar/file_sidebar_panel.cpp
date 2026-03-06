@@ -134,6 +134,11 @@ namespace misty::panel {
                 auto& file_explorer_state = registry_.get_state<FileExplorerState>("Files");
                 file_explorer_state.pending_navigation_path = mount_utils::get_dropbox_root();
             }
+
+            if (HoverListItem("iCloud", content_width)) {
+                auto& file_explorer_state = registry_.get_state<FileExplorerState>("Files");
+                file_explorer_state.pending_navigation_path = mount_utils::get_icloud_root();
+            }
         }
 
         ImGui::PopStyleVar();

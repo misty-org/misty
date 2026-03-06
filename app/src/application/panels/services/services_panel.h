@@ -45,10 +45,22 @@ namespace misty::panel {
         void show_dropbox_card_profile(const DropboxCardState& card, const std::string& dbx_user_id);
         void show_dropbox_card_actions(ServicesState& state, const std::string& dbx_user_id, bool is_connected);
 
+        // iCloud card UI
+        void show_icloud_tab(ServicesState& state);
+        void show_icl_login_modal(ServicesState& state);
+        void show_icloud_profile_card(ServicesState& state, const std::string& email);
+        void show_icloud_card_header(bool is_connected);
+        void show_icloud_card_profile(const ICloudCardState& card, const std::string& email);
+        void show_icloud_card_actions(ServicesState& state, const std::string& email, bool is_connected);
+
     private:
         static constexpr float kCardWidth = 300.0f;
         static constexpr float kCardSpacing = 12.0f;
         UIRegistry& registry_;
-        int active_tab_ = 0; // 0 = OneDrive, 1 = Google Drive, 2 = Dropbox
+        int active_tab_ = 0; // 0 = OneDrive, 1 = Google Drive, 2 = Dropbox, 3 = iCloud
+
+        char icl_email_buf_[256] = {};
+        char icl_password_buf_[256] = {};
+        char icl_2fa_buf_[16] = {};
     };
 }
