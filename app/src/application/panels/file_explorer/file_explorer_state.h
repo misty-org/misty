@@ -19,7 +19,8 @@ namespace misty::panel {
         LOCAL,
         ONEDRIVE,
         GDRIVE,
-        DROPBOX
+        DROPBOX,
+        ICLOUD
     };
 
     // Context for cloud folder fetch - carries service-specific parameters
@@ -65,6 +66,10 @@ namespace misty::panel {
         std::string dbx_item_id;
         std::string dbx_user_id;
         std::string dbx_path_display;
+
+        // iCloud metadata (empty for non-iCloud files)
+        std::string icl_email;         // Apple ID email (account identifier)
+        std::string icl_path_display;  // Full path in iCloud Drive (e.g. "Documents/report.pdf")
     };
 
     // Path utilities for file explorer navigation
@@ -85,6 +90,44 @@ namespace misty::panel {
 
         inline std::string get_dropbox_root() {
             return mount_utils::get_dropbox_root();
+        }
+
+        inline std::string get_icloud_root() {
+            return mount_utils::get_icloud_root();
+        }
+
+        inline bool is_icloud_path(const std::string& path) {
+            std::string root = get_icloud_root();
+            return path.rfind(root, 0) == 0;
+        }
+
+        // Parse iCloud path into (account_folder_name, relative_path)
+        // e.g., "~/misty/mnt/iCloud/matthew/Documents/report.pdf"
+        //       -> ("matthew", "Documents/report.pdf")
+        inline std::pair<std::string, std::string> parse_icloud_path(const std::string& path) {
+            std::string root = get_icloud_root();
+            if (path.rfind(root, 0) != 0) {
+                return {"", ""};
+            }
+
+            std::string relative = path.substr(root.length());
+            if (relative.empty() || relative == "/") {
+                return {"", ""};  // At mount root, show accounts
+            }
+
+            if (!relative.empty() && relative[0] == '/') {
+                relative = relative.substr(1);
+            }
+
+            size_t slash_pos = relative.find('/');
+            if (slash_pos == std::string::npos) {
+                return {relative, ""};  // Just account name, at account root
+            }
+
+            return {
+                relative.substr(0, slash_pos),
+                relative.substr(slash_pos + 1)
+            };
         }
 
         inline bool is_dropbox_path(const std::string& path) {

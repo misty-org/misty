@@ -1,4 +1,5 @@
 **/.env
+**/.venv
 **/.cache/
 **/build
 **/libs/
@@ -8,3 +9,4 @@
 **/src/proto_src/
 **/config/
 **/bin/
+**/sessions

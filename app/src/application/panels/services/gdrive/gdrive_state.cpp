@@ -66,7 +66,7 @@ namespace misty::panel {
                 std::map<std::string, std::string> headers;
                 headers["Content-Type"] = "application/json";
 
-                core::HttpResponse session_response = core::HttpClient::get().post(
+                core::HttpResponse session_response = core::HTTPClient::get().post(
                     upload_session_url,
                     request_body.dump(),
                     headers
@@ -94,10 +94,11 @@ namespace misty::panel {
                 std::cout << "[GDriveState] Got upload URL, starting chunked upload for: " << file_name << std::endl;
 
                 // Step 2: Upload file using chunked upload
-                core::ChunkedUploadResult result = core::HttpClient::get().chunked_upload(
+                core::UploadResult result = core::HTTPClient::get().chunked_upload(
                     upload_url,
                     local_path,
                     10 * 1024 * 1024,  // 10MB chunks
+                    256 * 1024,        // Google Drive requires 256KB alignment
                     progress_cb,
                     nullptr
                 );

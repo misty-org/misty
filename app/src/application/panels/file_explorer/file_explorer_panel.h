@@ -91,10 +91,19 @@ namespace misty::panel {
         void navigate_to_dropbox_account(const std::string& folder_name, const std::string& relative_path, bool update_history, bool create_if_missing);
         void fetch_dropbox_folder(const DBXAccountMapping& account, const std::string& folder_path, const std::string& target_path);
 
-
-
         // Download Dropbox file and open it when complete
         void download_and_open_dbx_file(const UnifiedFileItem& file);
+
+        // Sync iCloud account mappings from services state
+        void sync_icl_account_mappings();
+
+        // iCloud path navigation helpers
+        void navigate_to_icloud_mount_root(bool update_history);
+        void navigate_to_icloud_account(const std::string& folder_name, const std::string& relative_path, bool update_history, bool create_if_missing);
+        void fetch_icloud_folder(const ICLAccountMapping& account, const std::string& icl_folder_path, const std::string& target_path);
+
+        // Download iCloud file and open it when complete
+        void download_and_open_icl_file(const UnifiedFileItem& file);
 
     private:
         core::UIRegistry& registry_;

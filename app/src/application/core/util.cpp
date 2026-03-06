@@ -44,40 +44,4 @@ namespace misty::core {
 #endif
     }
 
-    std::string build_json_object(const std::map<std::string, std::string>& fields) {
-        nlohmann::json j;
-        for (const auto& [key, value] : fields) {
-            j[key] = value;
-        }
-        return j.dump();
-    }
-
-    std::string get_user_home_dir() {
-#ifdef _WIN32
-        char path[MAX_PATH];
-        if (SUCCEEDED(SHGetFolderPathA(NULL, CSIDL_PROFILE, NULL, SHGFP_TYPE_CURRENT, path))) {
-            return std::string(path);
-        }
-        // Fallback to USERPROFILE environment variable
-        const char* home = std::getenv("USERPROFILE");
-        if (home) {
-            return std::string(home);
-        }
-        return "";
-#elif __APPLE__ || __linux__
-        // Try HOME environment variable first
-        const char* home = std::getenv("HOME");
-        if (home) {
-            return std::string(home);
-        }
-        // Fallback to getpwuid
-        struct passwd* pw = getpwuid(getuid());
-        if (pw && pw->pw_dir) {
-            return std::string(pw->pw_dir);
-        }
-        return "";
-#else
-        return "";
-#endif
-    }
 }

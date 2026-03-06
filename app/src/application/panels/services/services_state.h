@@ -116,6 +116,38 @@ namespace misty::panel {
                                                      const std::string& response_body,
                                                      const std::string& error)>;
 
+    // iCloud account profile (email is the primary identifier)
+    struct ICLUserProfile {
+        std::string email;
+        bool loaded = false;
+    };
+
+    // Represents a single iCloud connection (session stored server-side by proxy)
+    struct ICLConnection {
+        ICLUserProfile profile;
+        bool is_authenticated = false;
+
+        bool operator<(const ICLConnection& other) const {
+            return profile.email < other.profile.email;
+        }
+    };
+
+    // Callback types for iCloud API operations
+    using ICLFilesCallback = std::function<void(bool success,
+                                                const std::string& response_body,
+                                                const std::string& error)>;
+
+    using ICLDownloadCallback = std::function<void(bool success,
+                                                    const std::string& local_path,
+                                                    const std::string& error)>;
+
+    // Snapshot of a single iCloud connection for UI rendering
+    struct ICloudCardState {
+        bool profile_loaded = false;
+        bool is_connected = false;
+        ICLUserProfile profile;
+    };
+
     // Snapshot of a single Dropbox connection for UI rendering
     struct DropboxCardState {
         bool profile_loaded = false;
@@ -207,6 +239,29 @@ namespace misty::panel {
 
         std::set<DBXConnection>::iterator find_by_dbx_user_id(const std::string& dbx_user_id);
 
+        // iCloud connection management
+        bool has_icl_connections();
+        void check_icl_connections();
+        bool get_icloud_card_state(const std::string& email, ICloudCardState& out);
+        void mark_icl_disconnected(const std::string& email);
+        void initiate_icl_login(const std::string& email, const std::string& password);
+        void verify_icl_2fa(const std::string& email, const std::string& code);
+        void disconnect_icloud(const std::string& email);
+
+        bool is_icl_account_folder_connected(const std::string& folder_name);
+
+        // iCloud file operations
+        void fetch_icloud_files(const std::string& email,
+                                const std::string& path,
+                                ICLFilesCallback callback);
+        void download_icl_file(const std::string& email,
+                               const std::string& filename,
+                               const std::string& folder_path,
+                               const std::string& local_path,
+                               ICLDownloadCallback callback);
+
+        std::set<ICLConnection>::iterator find_by_icl_email(const std::string& email);
+
         std::mutex mu;
         std::string error_msg = "";
         std::string success_msg = "";
@@ -221,6 +276,12 @@ namespace misty::panel {
         std::set<DBXConnection> dbx_connections;
         bool show_dbx_login_modal = false;
         std::string dbx_auth_error;
+
+        std::set<ICLConnection> icl_connections;
+        bool show_icl_login_modal = false;
+        std::string icl_auth_error;
+        bool icl_awaiting_2fa = false;
+        std::string icl_pending_2fa_email;
 
     private:
         core::WorkerPool* worker_pool_ = nullptr;

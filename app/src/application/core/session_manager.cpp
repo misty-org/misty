@@ -31,7 +31,8 @@ namespace misty::core {
         CFDictionarySetValue(query, kSecClass, kSecClassGenericPassword);
         CFDictionarySetValue(query, kSecAttrService, service);
         CFDictionarySetValue(query, kSecAttrAccount, acct);
-        CFDictionarySetValue(query, kSecUseDataProtectionKeychain, kCFBooleanTrue);
+        // kSecUseDataProtectionKeychain requires sandbox entitlements and will
+        // silently fail on unsigned/dev builds — use the standard login keychain.
 
         CFRelease(service);
         CFRelease(acct);

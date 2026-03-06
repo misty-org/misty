@@ -1,7 +1,3 @@
-#include "http_client.h"
-#include "session_manager.h"
-#include "env_manager.h"
-#include "util.h"
 #include <curl/curl.h>
 #include <nlohmann/json.hpp>
 #include <sstream>
@@ -10,16 +6,12 @@
 #include <vector>
 #include <cstring>
 
-namespace misty::core {
+#include "http_client.h"
+#include "session_manager.h"
+#include "env_manager.h"
+#include "util.h"
 
-    // Align chunk size to 320KB boundary (required by Microsoft Graph)
-    static size_t align_chunk_size(size_t requested_size) {
-        const size_t alignment = 320 * 1024;  // 320 KB
-        if (requested_size < alignment) {
-            return alignment;
-        }
-        return (requested_size / alignment) * alignment;
-    }
+namespace misty::core {
 
     struct CurlData {
         std::string response_body;
@@ -62,24 +54,24 @@ namespace misty::core {
         return total_size;
     }
 
-    HttpClient& HttpClient::get() {
-        static HttpClient instance;
+    HTTPClient& HTTPClient::get() {
+        static HTTPClient instance;
         return instance;
     }
 
-    HttpResponse HttpClient::get(const std::string& url, const std::map<std::string, std::string>& headers) {
+    HttpResponse HTTPClient::get(const std::string& url, const std::map<std::string, std::string>& headers) {
         return perform_request("GET", url, "", headers);
     }
 
-    HttpResponse HttpClient::post(const std::string& url, const std::string& body, const std::map<std::string, std::string>& headers) {
+    HttpResponse HTTPClient::post(const std::string& url, const std::string& body, const std::map<std::string, std::string>& headers) {
         return perform_request("POST", url, body, headers);
     }
 
-    HttpResponse HttpClient::put(const std::string& url, const std::string& body, const std::map<std::string, std::string>& headers) {
+    HttpResponse HTTPClient::put(const std::string& url, const std::string& body, const std::map<std::string, std::string>& headers) {
         return perform_request("PUT", url, body, headers);
     }
 
-    HttpResponse HttpClient::del(const std::string& url, const std::map<std::string, std::string>& headers) {
+    HttpResponse HTTPClient::del(const std::string& url, const std::map<std::string, std::string>& headers) {
         return perform_request("DELETE", url, "", headers);
     }
 
@@ -94,7 +86,10 @@ namespace misty::core {
             std::cerr << "Failed to initialize CURL" << std::endl;
             return response;
         }
-        curl_easy_setopt(curl, CURLOPT_CAINFO, "/etc/ssl/cert.pem");
+        std::string ca_cert = EnvManager::get().get("SSL_CERT_PATH", "");
+        if (!ca_cert.empty()) {
+            curl_easy_setopt(curl, CURLOPT_CAINFO, ca_cert.c_str());
+        }
 
         CurlData data;
 
@@ -156,7 +151,7 @@ namespace misty::core {
         return response;
     }
 
-    bool HttpClient::attempt_token_refresh() {
+    bool HTTPClient::attempt_token_refresh() {
         std::string refresh_token = SessionManager::get().get_refresh_token();
         if (refresh_token.empty()) {
             return false;
@@ -182,19 +177,19 @@ namespace misty::core {
                 std::string new_token = json_resp["token"].get<std::string>();
                 std::string new_refresh = json_resp["refresh_token"].get<std::string>();
                 SessionManager::get().update_tokens(new_token, new_refresh);
-                std::cerr << "[HttpClient] Token refresh succeeded" << std::endl;
+                std::cerr << "[HTTPClient] Token refresh succeeded" << std::endl;
                 return true;
             } catch (...) {
-                std::cerr << "[HttpClient] Failed to parse refresh response" << std::endl;
+                std::cerr << "[HTTPClient] Failed to parse refresh response" << std::endl;
             }
         } else {
-            std::cerr << "[HttpClient] Token refresh failed with status " << response.status_code << std::endl;
+            std::cerr << "[HTTPClient] Token refresh failed with status " << response.status_code << std::endl;
         }
 
         return false;
     }
 
-    HttpResponse HttpClient::perform_request(const std::string& method, const std::string& url, const std::string& body, const std::map<std::string, std::string>& headers) {
+    HttpResponse HTTPClient::perform_request(const std::string& method, const std::string& url, const std::string& body, const std::map<std::string, std::string>& headers) {
         // Merge auth headers (caller-provided headers take priority)
         auto merged_headers = SessionManager::get().get_auth_headers();
         for (const auto& [key, value] : headers) {
@@ -226,14 +221,21 @@ namespace misty::core {
         return response;
     }
 
-    ChunkedUploadResult HttpClient::chunked_upload(
+    UploadResult HTTPClient::chunked_upload(
         const std::string& upload_url,
         const std::string& file_path,
         size_t chunk_size,
+        size_t chunk_alignment,
         UploadProgressCallback progress_cb,
         std::atomic<bool>* cancel_flag
     ) {
-        ChunkedUploadResult result;
+        UploadResult result;
+
+        // Align chunk size if required by the service (e.g. 320KB for OneDrive, 256KB for GDrive)
+        if (chunk_alignment > 0) {
+            chunk_size = (chunk_size / chunk_alignment) * chunk_alignment;
+            if (chunk_size == 0) chunk_size = chunk_alignment;
+        }
 
         // Open file and get size
         std::ifstream file(file_path, std::ios::binary | std::ios::ate);
@@ -250,11 +252,8 @@ namespace misty::core {
             return result;
         }
 
-        // Align chunk size to 320KB boundary
-        size_t aligned_chunk_size = align_chunk_size(chunk_size);
-
         // Allocate buffer for chunks
-        std::vector<char> buffer(aligned_chunk_size);
+        std::vector<char> buffer(chunk_size);
 
         size_t bytes_uploaded = 0;
 
@@ -267,7 +266,7 @@ namespace misty::core {
 
             // Calculate this chunk's size
             size_t remaining = file_size - bytes_uploaded;
-            size_t current_chunk_size = std::min(aligned_chunk_size, remaining);
+            size_t current_chunk_size = std::min(chunk_size, remaining);
 
             // Read chunk from file
             file.read(buffer.data(), current_chunk_size);
@@ -366,6 +365,30 @@ namespace misty::core {
             result.error_message = "Upload ended unexpectedly without completion response";
         }
 
+        return result;
+    }
+
+    std::string build_json_object(const std::map<std::string, std::string>& fields) {
+        nlohmann::json j;
+        for (const auto& [key, value] : fields) {
+            j[key] = value;
+        }
+        return j.dump();
+    }
+
+    std::string url_encode(const std::string& str) {
+        std::string result;
+        result.reserve(str.size());
+        for (unsigned char c : str) {
+            if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+                (c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.' || c == '~') {
+                result += c;
+            } else {
+                char buf[4];
+                snprintf(buf, sizeof(buf), "%%%02X", c);
+                result += buf;
+            }
+        }
         return result;
     }
 

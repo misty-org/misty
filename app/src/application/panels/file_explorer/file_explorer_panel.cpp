@@ -3,6 +3,7 @@
 #include "panels/services/onedrive/onedrive_state.h"
 #include "panels/services/gdrive/gdrive_state.h"
 #include "panels/services/dropbox/dropbox_state.h"
+#include "panels/services/icloud/icloud_state.h"
 #include "panels/services/services_state.h"
 #include "panels/activity/download_state.h"
 #include "panels/activity/upload_state.h"
@@ -39,6 +40,7 @@ namespace misty::panel {
         sync_account_mappings();
         sync_gd_account_mappings();
         sync_dbx_account_mappings();
+        sync_icl_account_mappings();
 
         // Fetch workspaces if not already done
         if (!workspace_state.has_fetched) {
@@ -62,7 +64,7 @@ namespace misty::panel {
             // Check if it's a virtual path
             if (saved_path.rfind("misty://", 0) == 0) {
                  // Always valid
-            } else if (path_utils::is_onedrive_path(saved_path) || path_utils::is_gdrive_path(saved_path) || path_utils::is_dropbox_path(saved_path)) {
+            } else if (path_utils::is_onedrive_path(saved_path) || path_utils::is_gdrive_path(saved_path) || path_utils::is_dropbox_path(saved_path) || path_utils::is_icloud_path(saved_path)) {
                  // Assume valid for cloud paths (will show error or reconnect if not)
             } else {
                  // Check local existence
@@ -259,8 +261,17 @@ namespace misty::panel {
             } else {
                 navigate_to_dropbox_account(folder_name, relative_path, update_history, create_if_missing);
             }
+        } else if (path_utils::is_icloud_path(path)) {
+            // iCloud path - parse and route
+            auto [folder_name, relative_path] = path_utils::parse_icloud_path(path);
+
+            if (folder_name.empty()) {
+                navigate_to_icloud_mount_root(update_history);
+            } else {
+                navigate_to_icloud_account(folder_name, relative_path, update_history, create_if_missing);
+            }
         } else {
-            // Local path - clear OneDrive and GDrive upload context and notification tracking
+            // Local path - clear cloud upload contexts and notification tracking
             {
                 auto& onedrive_state = registry_.get_state<OneDriveState>("OneDrive");
                 std::lock_guard<std::mutex> od_lock(onedrive_state.mu);
@@ -279,6 +290,12 @@ namespace misty::panel {
                 std::lock_guard<std::mutex> dbx_lock(dropbox_state.mu);
                 dropbox_state.current_dbx_user_id.clear();
                 dropbox_state.current_folder_path.clear();
+            }
+            {
+                auto& icloud_state = registry_.get_state<ICloudState>("iCloud");
+                std::lock_guard<std::mutex> icl_lock(icloud_state.mu);
+                icloud_state.current_email.clear();
+                icloud_state.current_folder_path.clear();
             }
             state.last_disconnected_notification_folder.clear();
             navigate_to_local_path(state, path, update_history);
@@ -668,6 +685,13 @@ namespace misty::panel {
                 dropbox_state.current_folder_path = ctx.folder_id;
                 break;
             }
+            case FileSource::ICLOUD: {
+                auto& icloud_state = registry_.get_state<ICloudState>("iCloud");
+                std::lock_guard<std::mutex> icl_lock(icloud_state.mu);
+                icloud_state.current_email = ctx.user_id;
+                icloud_state.current_folder_path = ctx.folder_id;
+                break;
+            }
             default: break;
         }
         // Clear inactive services' upload contexts
@@ -689,6 +713,12 @@ namespace misty::panel {
             std::lock_guard<std::mutex> dbx_lock(dropbox_state.mu);
             dropbox_state.current_dbx_user_id.clear();
             dropbox_state.current_folder_path.clear();
+        }
+        if (ctx.service != FileSource::ICLOUD) {
+            auto& icloud_state = registry_.get_state<ICloudState>("iCloud");
+            std::lock_guard<std::mutex> icl_lock(icloud_state.mu);
+            icloud_state.current_email.clear();
+            icloud_state.current_folder_path.clear();
         }
 
         if (success) {
@@ -813,6 +843,43 @@ namespace misty::panel {
 
                         state.files = std::move(files);
                         save_dbx_items_to_cache(ctx.user_id, ctx.folder_id, dbx_items);
+                        break;
+                    }
+                    case FileSource::ICLOUD: {
+                        std::vector<ICloudItem> icl_items;
+                        auto items_arr = json.value("items", nlohmann::json::array());
+                        // Build folder path prefix for iCloud Drive path tracking
+                        std::string icl_parent_path = ctx.folder_id; // e.g., "" or "Documents"
+
+                        for (const auto& item : items_arr) {
+                            std::string name = item.value("name", std::string(""));
+                            bool is_folder = item.value("is_folder", false);
+                            if (name.empty()) continue;
+
+                            // Security: reject path traversal attempts in names
+                            if (name.find('/') != std::string::npos || name.find("..") != std::string::npos) {
+                                continue;
+                            }
+
+                            ICloudItem icl_item;
+                            icl_item.name = name;
+                            icl_item.path = icl_parent_path.empty() ? name : icl_parent_path + "/" + name;
+                            icl_item.is_folder = is_folder;
+                            icl_item.email = ctx.user_id;
+                            icl_items.push_back(icl_item);
+
+                            UnifiedFileItem ufi;
+                            ufi.name = name;
+                            ufi.path = target_path + "/" + name;
+                            ufi.is_dir = is_folder;
+                            ufi.source = FileSource::ICLOUD;
+                            ufi.icl_email = ctx.user_id;
+                            ufi.icl_path_display = icl_item.path;
+                            files.push_back(ufi);
+                        }
+
+                        state.files = std::move(files);
+                        save_icl_items_to_cache(ctx.user_id, ctx.folder_id, icl_items);
                         break;
                     }
                     default: break;
@@ -1178,6 +1245,16 @@ namespace misty::panel {
                     } else if (!state.is_downloading(file.path)) {
                         state.add_recent(file);
                         download_and_open_gd_file(file);
+                    }
+                } else if (file.source == FileSource::ICLOUD) {
+                    if (file.is_dir) {
+                        navigate_to_path(file.path);
+                    } else if (fs::exists(file.path)) {
+                        state.add_recent(file);
+                        open_file(file.path);
+                    } else if (!state.is_downloading(file.path)) {
+                        state.add_recent(file);
+                        download_and_open_icl_file(file);
                     }
                 } else if (file.source == FileSource::DROPBOX) {
                     if (fs::exists(file.path)) {
@@ -1695,14 +1772,16 @@ namespace misty::panel {
         std::string dest_dir(state.current_path);
         bool dest_is_cloud = path_utils::is_onedrive_path(dest_dir)
                           || path_utils::is_gdrive_path(dest_dir)
-                          || path_utils::is_dropbox_path(dest_dir);
+                          || path_utils::is_dropbox_path(dest_dir)
+                          || path_utils::is_icloud_path(dest_dir);
 
         bool queued_cloud_uploads = false;
 
         for (const auto& item : state.clipboard_items) {
             bool src_is_cloud = (item.source == FileSource::ONEDRIVE
                               || item.source == FileSource::GDRIVE
-                              || item.source == FileSource::DROPBOX);
+                              || item.source == FileSource::DROPBOX
+                              || item.source == FileSource::ICLOUD);
 
             if (!src_is_cloud && !dest_is_cloud) {
                 // Local -> Local
@@ -1891,7 +1970,8 @@ namespace misty::panel {
         uint64_t download_id = downloads.start_download(
             item.name, dest_path,
             item.source == FileSource::ONEDRIVE ? "OneDrive" :
-            item.source == FileSource::GDRIVE ? "Google Drive" : "Dropbox",
+            item.source == FileSource::GDRIVE ? "Google Drive" :
+            item.source == FileSource::DROPBOX ? "Dropbox" : "iCloud",
             item.size
         );
 
@@ -1937,6 +2017,29 @@ namespace misty::panel {
         } else if (item.source == FileSource::DROPBOX) {
             services.download_dbx_file(
                 item.dbx_user_id, item.dbx_path_display, dest_path,
+                [this, file_name = item.name, download_id, notif_id](
+                    bool success, const std::string& local_path, const std::string& error) {
+                    auto& downloads = registry_.get_state<DownloadState>("Downloads");
+                    auto& notifications = registry_.get_state<NotificationState>("Notifications");
+                    notifications.dismiss(notif_id);
+                    if (success) {
+                        downloads.complete_download(download_id);
+                        notifications.add_notification("Paste Complete", file_name, NotificationType::SUCCESS, 5.0f);
+                    } else {
+                        downloads.fail_download(download_id, error);
+                        notifications.add_notification("Paste Failed", file_name + ": " + error, NotificationType::ERROR, 5.0f);
+                    }
+                });
+        } else if (item.source == FileSource::ICLOUD) {
+            // Split icl_path_display into folder_path + filename
+            std::string icl_filename = item.name;
+            std::string icl_folder;
+            size_t slash = item.icl_path_display.rfind('/');
+            if (slash != std::string::npos) {
+                icl_folder = item.icl_path_display.substr(0, slash);
+            }
+            services.download_icl_file(
+                item.icl_email, icl_filename, icl_folder, dest_path,
                 [this, file_name = item.name, download_id, notif_id](
                     bool success, const std::string& local_path, const std::string& error) {
                     auto& downloads = registry_.get_state<DownloadState>("Downloads");
@@ -2094,7 +2197,7 @@ namespace misty::panel {
                 state.trash_files.erase(it, state.trash_files.end());
             } else {
                 // Move to Trash (Local only, Cloud deletes directly)
-                bool is_cloud = path_utils::is_onedrive_path(path) || path_utils::is_gdrive_path(path) || path_utils::is_dropbox_path(path);
+                bool is_cloud = path_utils::is_onedrive_path(path) || path_utils::is_gdrive_path(path) || path_utils::is_dropbox_path(path) || path_utils::is_icloud_path(path);
 
                 if (is_cloud) {
                      printf("Explorer: Deleting cloud file directly\n");
@@ -2838,6 +2941,295 @@ namespace misty::panel {
         services.download_dbx_file(
             file.dbx_user_id,
             file.dbx_path_display,
+            file.path,
+            [this, path = file.path, file_name = file.name, download_id, notif_id](
+                bool success, const std::string& local_path, const std::string& error) {
+
+                auto& state = registry_.get_state<FileExplorerState>("Files");
+                auto& downloads = registry_.get_state<DownloadState>("Downloads");
+                auto& notifications = registry_.get_state<NotificationState>("Notifications");
+
+                state.downloading_files.erase(path);
+                notifications.dismiss(notif_id);
+
+                if (success) {
+                    downloads.complete_download(download_id);
+                    notifications.add_notification(
+                        "Download Complete",
+                        file_name,
+                        NotificationType::SUCCESS,
+                        5.0f
+                    );
+                    open_file(local_path);
+                } else {
+                    downloads.fail_download(download_id, error);
+                    notifications.add_notification(
+                        "Download Failed",
+                        file_name + ": " + error,
+                        NotificationType::ERROR,
+                        5.0f
+                    );
+                    state.error_msg = "Download failed: " + error;
+                }
+            }
+        );
+    }
+
+    // ==================== iCloud Navigation ====================
+
+    void FileExplorerPanel::sync_icl_account_mappings() {
+        auto& workspace = registry_.get_state<WorkspaceState>("Workspace");
+        auto& services = registry_.get_state<ServicesState>("Services");
+
+        workspace.ensure_directories();
+
+        std::lock_guard<std::mutex> svc_lock(services.mu);
+
+        workspace.icl_account_mappings.clear();
+        for (const auto& conn : services.icl_connections) {
+            if (!conn.is_authenticated) continue;
+
+            ICLAccountMapping mapping;
+            mapping.email = conn.profile.email;
+            mapping.folder_name = mount_utils::derive_folder_name(conn.profile.email);
+
+            mount_utils::ensure_icl_account_directory(conn.profile.email);
+
+            workspace.icl_account_mappings.push_back(mapping);
+        }
+    }
+
+    void FileExplorerPanel::navigate_to_icloud_mount_root(bool update_history) {
+        auto& state = registry_.get_state<FileExplorerState>("Files");
+        auto& workspace = registry_.get_state<WorkspaceState>("Workspace");
+
+        state.last_disconnected_notification_folder.clear();
+
+        // Clear iCloud context since we're at account list level
+        {
+            auto& icloud_state = registry_.get_state<ICloudState>("iCloud");
+            std::lock_guard<std::mutex> icl_lock(icloud_state.mu);
+            icloud_state.current_email.clear();
+            icloud_state.current_folder_path.clear();
+        }
+
+        sync_icl_account_mappings();
+
+        std::string new_path = path_utils::get_icloud_root();
+
+        if (update_history) {
+            std::string current_path_str(state.current_path);
+            if (!current_path_str.empty() && current_path_str != new_path) {
+                state.back_history.push(current_path_str);
+            }
+            while (!state.forward_history.empty()) {
+                state.forward_history.pop();
+            }
+        }
+
+        std::vector<UnifiedFileItem> files;
+        std::unordered_set<std::string> added_folders;
+
+        // Add connected accounts from mappings
+        for (const auto& mapping : workspace.icl_account_mappings) {
+            UnifiedFileItem item;
+            item.name = mapping.folder_name;
+            item.path = new_path + "/" + mapping.folder_name;
+            item.is_dir = true;
+            item.source = FileSource::ICLOUD;
+            item.icl_email = mapping.email;
+            files.push_back(item);
+            added_folders.insert(mapping.folder_name);
+        }
+
+        // Scan local iCloud directory for folders without connected accounts
+        std::error_code ec;
+        if (fs::exists(new_path, ec) && fs::is_directory(new_path, ec)) {
+            for (const auto& entry : fs::directory_iterator(new_path, ec)) {
+                if (entry.is_directory()) {
+                    std::string folder_name = entry.path().filename().string();
+                    if (added_folders.count(folder_name) > 0 || folder_name[0] == '.') {
+                        continue;
+                    }
+
+                    UnifiedFileItem item;
+                    item.name = folder_name;
+                    item.path = new_path + "/" + folder_name;
+                    item.is_dir = true;
+                    item.source = FileSource::LOCAL;
+                    files.push_back(item);
+                }
+            }
+        }
+
+        state.files = std::move(files);
+        strncpy(state.current_path, new_path.c_str(), sizeof(state.current_path) - 1);
+        state.current_path[sizeof(state.current_path) - 1] = '\0';
+        strncpy(state.search_path, new_path.c_str(), sizeof(state.search_path) - 1);
+
+        state.is_loading = false;
+        state.selected_files.clear();
+        state.last_selected_index = -1;
+        state.error_msg = "";
+    }
+
+    void FileExplorerPanel::navigate_to_icloud_account(const std::string& folder_name,
+                                                         const std::string& relative_path,
+                                                         bool update_history,
+                                                         bool create_if_missing) {
+        auto& state = registry_.get_state<FileExplorerState>("Files");
+        auto& workspace = registry_.get_state<WorkspaceState>("Workspace");
+        auto& services = registry_.get_state<ServicesState>("Services");
+
+        bool is_connected = services.is_icl_account_folder_connected(folder_name);
+
+        ICLAccountMapping* mapping = workspace.find_icl_account_by_folder(folder_name);
+        if (!mapping) {
+            sync_icl_account_mappings();
+            mapping = workspace.find_icl_account_by_folder(folder_name);
+        }
+
+        std::string target_path = path_utils::get_icloud_root() + "/" + folder_name;
+        if (!relative_path.empty()) {
+            target_path += "/" + relative_path;
+        }
+
+        if (!is_connected) {
+            if (state.last_disconnected_notification_folder != folder_name) {
+                auto& notifications = registry_.get_state<NotificationState>("Notifications");
+                notifications.add_notification(
+                    "Account Not Connected",
+                    "The iCloud account '" + folder_name + "' is not connected. Showing local files only.",
+                    NotificationType::INFO,
+                    8.0f
+                );
+                state.last_disconnected_notification_folder = folder_name;
+            }
+
+            if (!mapping) {
+                if (!fs::exists(target_path)) {
+                    state.error_msg = "Path does not exist: " + target_path;
+                    return;
+                }
+                navigate_to_local_path(state, target_path, update_history);
+                return;
+            }
+        } else {
+            state.last_disconnected_notification_folder.clear();
+        }
+
+        if (!mapping) {
+            state.error_msg = "Account not found: " + folder_name;
+            return;
+        }
+
+        if (create_if_missing) {
+            std::error_code ec;
+            fs::create_directories(target_path, ec);
+            if (ec) {
+                state.error_msg = "Failed to create directory: " + target_path;
+                return;
+            }
+        } else {
+            if (!fs::exists(target_path)) {
+                state.error_msg = "Path does not exist: " + target_path;
+                return;
+            }
+        }
+
+        // iCloud folder path is relative_path (e.g., "Documents/Photos")
+        std::string icl_folder_path = relative_path; // empty = root
+
+        if (update_history) {
+            std::string current_path_str(state.current_path);
+            if (!current_path_str.empty() && current_path_str != target_path) {
+                state.back_history.push(current_path_str);
+            }
+            while (!state.forward_history.empty()) {
+                state.forward_history.pop();
+            }
+        }
+
+        strncpy(state.current_path, target_path.c_str(), sizeof(state.current_path) - 1);
+        state.current_path[sizeof(state.current_path) - 1] = '\0';
+        strncpy(state.search_path, target_path.c_str(), sizeof(state.search_path) - 1);
+
+        state.selected_files.clear();
+        state.last_selected_index = -1;
+        state.error_msg = "";
+
+        // Try to load from cache first
+        std::vector<ICloudItem> cached_items;
+        if (load_icl_items_from_cache(mapping->email, icl_folder_path, cached_items)) {
+            std::vector<UnifiedFileItem> files;
+            for (const auto& icl_item : cached_items) {
+                UnifiedFileItem item;
+                item.name = icl_item.name;
+                item.path = target_path + "/" + icl_item.name;
+                item.is_dir = icl_item.is_folder;
+                item.source = FileSource::ICLOUD;
+                item.icl_email = icl_item.email;
+                item.icl_path_display = icl_item.path;
+                files.push_back(item);
+            }
+            state.files = std::move(files);
+            state.is_loading = false;
+        } else {
+            state.files.clear();
+            state.is_loading = true;
+        }
+
+        fetch_icloud_folder(*mapping, icl_folder_path, target_path);
+    }
+
+    void FileExplorerPanel::fetch_icloud_folder(const ICLAccountMapping& account,
+                                                  const std::string& icl_folder_path,
+                                                  const std::string& target_path) {
+        auto& services = registry_.get_state<ServicesState>("Services");
+        std::string email = account.email;
+
+        services.fetch_icloud_files(email, icl_folder_path,
+            [this, email, icl_folder_path, target_path](bool success,
+                                                          const std::string& body,
+                                                          const std::string& error) {
+                handle_folder_fetch({FileSource::ICLOUD, email, icl_folder_path, ""}, target_path, success, body, error);
+            });
+    }
+
+    void FileExplorerPanel::download_and_open_icl_file(const UnifiedFileItem& file) {
+        auto& state = registry_.get_state<FileExplorerState>("Files");
+        auto& services = registry_.get_state<ServicesState>("Services");
+        auto& downloads = registry_.get_state<DownloadState>("Downloads");
+        auto& notifications = registry_.get_state<NotificationState>("Notifications");
+
+        state.downloading_files.insert(file.path);
+
+        uint64_t download_id = downloads.start_download(
+            file.name,
+            file.path,
+            "iCloud",
+            file.size
+        );
+
+        uint64_t notif_id = notifications.add_notification(
+            "Downloading",
+            file.name,
+            NotificationType::DOWNLOAD,
+            15.0f
+        );
+
+        // Split icl_path_display into folder_path + filename
+        std::string icl_filename = file.name;
+        std::string icl_folder;
+        size_t slash = file.icl_path_display.rfind('/');
+        if (slash != std::string::npos) {
+            icl_folder = file.icl_path_display.substr(0, slash);
+        }
+
+        services.download_icl_file(
+            file.icl_email,
+            icl_filename,
+            icl_folder,
             file.path,
             [this, path = file.path, file_name = file.name, download_id, notif_id](
                 bool success, const std::string& local_path, const std::string& error) {

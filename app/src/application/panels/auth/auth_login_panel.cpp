@@ -1,6 +1,6 @@
 #include "auth_login_panel.h"
 #include "imgui.h"
-#include "core/util.h"
+#include "core/http_client.h"
 #include "core/asset_manager.h"
 #include "views/app_view.h"
 #include <cstring>

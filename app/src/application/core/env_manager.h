@@ -14,13 +14,13 @@ namespace misty::core {
 
         std::string get(const std::string& key, const std::string& default_value) const;
 
-        std::optional<std::string> get_optional(const std::string& key) const;
-
         bool has(const std::string& key) const;
 
         void reload();
 
         void set_env_file_path(const std::string& path);
+
+        std::string get_user_home_dir();
 
     private:
         EnvManager() = default;
