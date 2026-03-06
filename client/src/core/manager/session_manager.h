@@ -1,5 +1,6 @@
 #pragma once
 
+#include <condition_variable>
 #include <functional>
 #include <map>
 #include <mutex>
@@ -17,10 +18,11 @@ namespace misty::core {
 
         static SessionManager& get();
 
-        // Store both tokens in memory and persist to secure storage
+        // Store the current access token in memory. Durable session state lives
+        // in the local proxy database.
         bool set_tokens(const std::string& access_token, const std::string& refresh_token);
 
-        // Update both tokens (used after a refresh)
+        // Update the in-memory access token (used after a refresh)
         bool update_tokens(const std::string& access_token, const std::string& refresh_token);
 
         // Clear all tokens from memory and secure storage (logout)
@@ -31,6 +33,9 @@ namespace misty::core {
 
         // Get the stored refresh token (empty string if none)
         std::string get_refresh_token() const;
+
+        bool bootstrap_session();
+        bool ensure_session_ready();
 
         // User ID from the proxy — used to scope cloud provider API calls
         void set_user_id(const std::string& user_id);
@@ -67,6 +72,7 @@ namespace misty::core {
         void load_tokens();
         bool save_tokens() const;
         void delete_tokens() const;
+        bool apply_session_response(const std::string& body);
 
         mutable std::mutex mu_;
         std::string token_;
@@ -76,6 +82,10 @@ namespace misty::core {
         bool session_expired_ = false;
         bool proxy_available_ = true;
         std::string proxy_status_message_;
+
+        mutable std::mutex bootstrap_mu_;
+        std::condition_variable bootstrap_cv_;
+        bool bootstrap_in_flight_ = false;
     };
 
 }

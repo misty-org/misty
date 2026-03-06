@@ -6,5 +6,7 @@ func AuthRoutes() []Route {
 		{Method: "POST", Path: "/login", Group: "auth"},
 		{Method: "POST", Path: "/logout", Group: "auth"},
 		{Method: "POST", Path: "/refresh", Group: "auth"},
+		{Method: "GET", Path: "/session", Group: "auth"},
+		{Method: "POST", Path: "/session/refresh", Group: "auth"},
 	}
 }

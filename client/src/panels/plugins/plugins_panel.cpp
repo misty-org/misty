@@ -29,6 +29,9 @@ constexpr float kSidebarMinWidth = 220.0f;
 constexpr float kSidebarMaxWidth = 360.0f;
 constexpr float kContentMinWidth = 320.0f;
 constexpr float kDividerWidth = 1.0f;
+constexpr float kPluginsSidebarScrollbarSize = 4.0f;
+constexpr UI::Spacing kPluginsSidebarPadding = UI::Spacing::sides(16.0f, 16.0f, 20.0f, 20.0f);
+constexpr UI::Spacing kPluginsSectionBodyPadding = UI::Spacing::sides(0.0f, 0.0f, 6.0f, 0.0f);
 namespace fs = std::filesystem;
 
 std::string trim_copy(std::string value) {
@@ -412,17 +415,19 @@ void PluginsPanel::shell() {
         .height = UI::Size::fill(),
     }, [&]() {
         sidebar(sidebar_width);
-        splitter();
         content();
     });
 }
 
 void PluginsPanel::sidebar(float sidebar_width) {
+    UI::StyleScope style;
+    style.var(ImGuiStyleVar_ScrollbarSize, kPluginsSidebarScrollbarSize);
+
     UI::div("##plugins_sidebar", {
         .mode = UI::Mode::ChildWindow,
         .width = UI::Size::px(sidebar_width),
         .height = UI::Size::fill(),
-        .padding = kSettingsSidebarPadding,
+        .padding = kPluginsSidebarPadding,
         .gap = UI::Spacing::xy(0.0f, 12.0f),
     }, [&]() {
         const std::string launcher_shortcut =
@@ -489,7 +494,7 @@ void PluginsPanel::section(const PluginsSectionProps& props) {
                 .id = props.id,
                 .label = props.label,
                 .collapsed = *props.collapsed,
-                .width = ImGui::GetContentRegionAvail().x,
+                .width = UI::available_size().x,
             })) {
                 *props.collapsed = !*props.collapsed;
             }
@@ -504,7 +509,7 @@ void PluginsPanel::section(const PluginsSectionProps& props) {
         .mode = UI::Mode::LayoutOnly,
         .width = UI::Size::fill(),
         .height = UI::Size::auto_size(),
-        .padding = UI::Spacing::xy(4.0f, 6.0f),
+        .padding = kPluginsSectionBodyPadding,
         .gap = UI::Spacing::xy(0.0f, 10.0f),
     }, [&]() {
         cards(props.id, std::string_view(props.id) != "marketplace_hdr");

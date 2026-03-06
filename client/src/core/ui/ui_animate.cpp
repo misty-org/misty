@@ -2,31 +2,45 @@
 
 #include <algorithm>
 #include <cmath>
-#include <utility>
-
-#include "core/manager/asset_manager.h"
 
 namespace misty::UI {
 
 namespace {
-
-std::pair<ImVec2, ImVec2> frame_uv(int frame, int cols, int rows) {
-    const int col = frame % cols;
-    const int row = frame / cols;
-    const float uv_w = 1.0f / static_cast<float>(cols);
-    const float uv_h = 1.0f / static_cast<float>(rows);
-    return {
-        ImVec2(col * uv_w, row * uv_h),
-        ImVec2((col + 1) * uv_w, (row + 1) * uv_h),
-    };
-}
+constexpr float kDotLoopSeconds = 1.35f;
+constexpr int kDotCount = 3;
 
 float smooth_mix(float t) {
     t = std::clamp(t, 0.0f, 1.0f);
     return t * t * (3.0f - 2.0f * t);
 }
 
+void draw_loading_dots(ImDrawList* draw_list, const ImVec2& center, float extent, float time) {
+    const float radius = std::clamp(extent * 0.055f, 4.0f, 8.0f);
+    const float gap = radius * 3.1f;
+    const float start_x = center.x - gap;
+
+    for (int i = 0; i < kDotCount; ++i) {
+        const float phase = std::fmod(time / kDotLoopSeconds + static_cast<float>(i) / kDotCount, 1.0f);
+        const float wave = smooth_mix(0.5f + 0.5f * std::sin((phase * 2.0f - 0.5f) * 3.14159265f));
+        const float scale = 0.76f + wave * 0.34f;
+        const int alpha = static_cast<int>(120.0f + wave * 120.0f);
+        const ImVec2 dot_center(
+            start_x + static_cast<float>(i) * gap,
+            center.y - wave * radius * 0.42f);
+
+        draw_list->AddCircleFilled(
+            dot_center,
+            radius * scale,
+            IM_COL32(232, 234, 238, alpha),
+            32);
+    }
+}
+
 } // namespace
+
+float MistyLoadingAnimationLoopSeconds() {
+    return kDotLoopSeconds;
+}
 
 void DrawMistyLoadingAnimation(
     const ImVec2& min,
@@ -34,53 +48,18 @@ void DrawMistyLoadingAnimation(
     float sprite_size,
     ImU32 overlay_color
 ) {
-    static constexpr int COLS = 8;
-    static constexpr int ROWS = 2;
-    static constexpr int TOTAL = COLS * ROWS;
-    static constexpr float FRAME_RATE = 10.0f;
-    static constexpr float BOB_RATE = 2.1f;
-    static constexpr float BOB_DISTANCE = 4.0f;
-
-    auto& sprite = misty::core::AssetManager::get().get_image_texture("assets/animations/misty_sprite.png");
     ImDrawList* draw_list = ImGui::GetForegroundDrawList(ImGui::GetWindowViewport());
     draw_list->PushClipRect(min, max, true);
     draw_list->AddRectFilled(min, max, overlay_color);
 
-    const float frame_time = static_cast<float>(ImGui::GetTime()) * FRAME_RATE;
-    const int frame = static_cast<int>(std::floor(frame_time)) % TOTAL;
-    const int next_frame = (frame + 1) % TOTAL;
-    const float mix = smooth_mix(frame_time - std::floor(frame_time));
-    const auto [uv0, uv1] = frame_uv(frame, COLS, ROWS);
-    const auto [next_uv0, next_uv1] = frame_uv(next_frame, COLS, ROWS);
+    const float t = static_cast<float>(ImGui::GetTime());
+    const float cx = min.x + (max.x - min.x) * 0.5f;
+    const float cy = min.y + (max.y - min.y) * 0.5f;
+    const float max_extent = std::min(max.x - min.x, max.y - min.y) * 0.35f;
+    const float dot_extent = std::min(sprite_size, max_extent);
+    const ImVec2 center(cx, cy);
 
-    float t = static_cast<float>(ImGui::GetTime());
-    float bob = std::sin(t * BOB_RATE) * BOB_DISTANCE;
-
-    float cx = min.x + (max.x - min.x) * 0.5f;
-    float cy = min.y + (max.y - min.y) * 0.5f + bob;
-    const float max_sprite_size = std::min(max.x - min.x, max.y - min.y) * 0.35f;
-    const float sprite_extent = std::min(sprite_size, max_sprite_size);
-    float half = sprite_extent * 0.5f;
-
-    draw_list->AddImage(
-        (ImTextureID)(intptr_t)sprite.id,
-        ImVec2(cx - half, cy - half),
-        ImVec2(cx + half, cy + half),
-        uv0,
-        uv1,
-        IM_COL32(255, 255, 255, static_cast<int>((1.0f - mix) * 255.0f))
-    );
-
-    if (mix > 0.0f) {
-        draw_list->AddImage(
-            (ImTextureID)(intptr_t)sprite.id,
-            ImVec2(cx - half, cy - half),
-            ImVec2(cx + half, cy + half),
-            next_uv0,
-            next_uv1,
-            IM_COL32(255, 255, 255, static_cast<int>(mix * 255.0f))
-        );
-    }
+    draw_loading_dots(draw_list, center, dot_extent, t);
 
     draw_list->PopClipRect();
 }
