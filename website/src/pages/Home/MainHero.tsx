@@ -16,10 +16,15 @@ export default function MainHero() {
             Access files across multiple cloud providers in a single window. 
           </p>
 
-          <div className="flex gap-4 justify-center flex-wrap">
+          <div className="flex gap-5 justify-center flex-wrap">
             <NavLink to="/register">
               <span className="inline-flex items-center justify-center px-8 py-3.5 bg-zinc-100 text-black font-bold rounded-full transition-all duration-300 shadow-lg hover:bg-gray-200 hover:shadow-zinc-100/20 hover:-translate-y-0.5">
                 Get Started
+              </span>
+            </NavLink>
+            <NavLink to="/waitlist">
+              <span className="inline-flex items-center justify-center px-8 py-3.5 bg-[#3b82f6] text-black font-bold rounded-full transition-all duration-300 shadow-lg hover:bg-gray-200 hover:shadow-zinc-100/20 hover:-translate-y-0.5">
+                Join Waitlist
               </span>
             </NavLink>
           </div>

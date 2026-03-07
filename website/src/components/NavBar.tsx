@@ -7,6 +7,11 @@ const navItems = [
   { to: "/pricing", label: "Pricing" },
 ];
 
+const docsLinks = [
+  { to: "/docs", label: "Getting Started" },
+  { to: "/docs/api", label: "API Reference" },
+];
+
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -69,6 +74,34 @@ export default function Navbar() {
               )}
             </NavLink>
           ))}
+          {/* Docs dropdown */}
+          <div className="relative group">
+            <NavLink
+              to="/docs"
+              className={`relative px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 block ${
+                location.pathname.startsWith("/docs") ? "text-text" : "text-text-muted hover:text-text"
+              }`}
+            >
+              Docs
+              {location.pathname.startsWith("/docs") && <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-primary rounded-full" />}
+            </NavLink>
+            <div className="absolute left-1/2 -translate-x-1/2 top-full pt-1 w-44 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+              <div className="glass-card rounded-xl overflow-hidden shadow-xl shadow-bg/50">
+                {docsLinks.map(({ to, label }) => (
+                  <NavLink
+                    key={to}
+                    to={to}
+                    end
+                    className={({ isActive }) => `block px-4 py-2.5 text-sm transition-colors ${
+                      isActive ? "text-primary bg-primary/10" : "text-text-muted hover:text-text hover:bg-elevated"
+                    }`}
+                  >
+                    {label}
+                  </NavLink>
+                ))}
+              </div>
+            </div>
+          </div>
           <div className="ml-4 pl-4 border-l border-border">
             {user ? (
               <div className="relative">
@@ -116,6 +149,14 @@ export default function Navbar() {
           <div className="flex flex-col gap-1">
             {navItems.map(({ to, label }) => (
               <NavLink key={to} to={to} end={to === "/"} className={({ isActive }) => `px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                isActive ? "text-primary bg-primary/10" : "text-text-muted hover:text-text hover:bg-elevated"
+              }`}>
+                {label}
+              </NavLink>
+            ))}
+            <span className="px-4 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-widest text-text-muted">Docs</span>
+            {docsLinks.map(({ to, label }) => (
+              <NavLink key={to} to={to} end className={({ isActive }) => `px-4 pl-6 py-2 rounded-lg text-sm font-medium transition-colors ${
                 isActive ? "text-primary bg-primary/10" : "text-text-muted hover:text-text hover:bg-elevated"
               }`}>
                 {label}

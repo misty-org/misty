@@ -123,6 +123,11 @@ body {
   }
 }
 
+/* Disable Inter contextual alternates in inputs (fixes @ jiggle) */
+input, textarea {
+  font-variant-ligatures: no-contextual;
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 6px;
@@ -146,4 +151,95 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+
+.wl-grid {
+      background-image:
+        linear-gradient(#1e1e22 1px, transparent 1px),
+        linear-gradient(90deg, #1e1e22 1px, transparent 1px);
+      background-size: 48px 48px;
+    }
+@keyframes fade-up {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.animate-fade-up   { animation: fade-up 0.6s ease both; }
+.animate-fade-up-2 { animation: fade-up 0.6s 0.15s ease both; }
+.animate-fade-up-3 { animation: fade-up 0.6s 0.25s ease both; }
+.animate-spin-slow { animation: spin 0.6s linear infinite; }
+
+/* ─── Docs three-panel layout ─── */
+.docs-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  min-height: 100vh;
+  padding-top: 4rem; /* clear fixed navbar */
+}
+@media (min-width: 1024px) {
+  .docs-layout {
+    grid-template-columns: 240px 1fr 200px;
+  }
+}
+
+.docs-sidebar {
+  position: sticky;
+  top: 4rem;
+  height: calc(100vh - 4rem);
+  overflow-y: auto;
+  border-right: 1px solid var(--color-border-subtle);
+}
+
+.docs-center {
+  padding: 2rem 1.5rem;
+  min-width: 0;
+}
+@media (min-width: 640px) {
+  .docs-center {
+    padding: 2.5rem 2rem;
+  }
+}
+
+.docs-right {
+  position: sticky;
+  top: 4rem;
+  height: calc(100vh - 4rem);
+  overflow-y: auto;
+  border-left: 1px solid var(--color-border-subtle);
+}
+
+.docs-code-block {
+  border-radius: 0.75rem;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  background: rgba(9, 9, 11, 0.6);
+}
+.docs-code-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--color-border);
+  background: rgba(17, 17, 19, 0.5);
+}
+
+/* Mobile sidebar overlay */
+.docs-sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+}
+.docs-sidebar-mobile {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 50;
+  width: 280px;
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+  overflow-y: auto;
 }
