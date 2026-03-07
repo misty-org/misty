@@ -127,7 +127,7 @@ FileExplorerPanel::FileExplorerPanel(UIRegistry& registry,
     });
 
     if (state_key_ == "Files" && props.panel_id == "primary") {
-        file_sync_ = std::make_unique<core::FileSync>(get_mount_root());
+        file_sync_ = std::make_unique<core::FileSyncMaster>(get_mount_root());
         file_sync_->start();
     }
 
