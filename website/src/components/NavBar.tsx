@@ -15,6 +15,7 @@ const docsLinks = [
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [docsOpen, setDocsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -24,20 +25,18 @@ export default function Navbar() {
     ? user.name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2)
     : "";
 
-  // Close menus on route change
   useEffect(() => {
     setMenuOpen(false);
     setProfileOpen(false);
+    setDocsOpen(false);
   }, [location]);
 
-  // Handle scroll effect
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Close profile dropdown on outside click
   useEffect(() => {
     if (!profileOpen) return;
     const handleClick = () => setProfileOpen(false);
@@ -75,9 +74,14 @@ export default function Navbar() {
             </NavLink>
           ))}
           {/* Docs dropdown */}
-          <div className="relative group">
+          <div
+            className="relative"
+            onMouseEnter={() => setDocsOpen(true)}
+            onMouseLeave={() => setDocsOpen(false)}
+          >
             <NavLink
               to="/docs"
+              onClick={() => setDocsOpen(false)}
               className={`relative px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 block ${
                 location.pathname.startsWith("/docs") ? "text-text" : "text-text-muted hover:text-text"
               }`}
@@ -85,7 +89,7 @@ export default function Navbar() {
               Docs
               {location.pathname.startsWith("/docs") && <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-primary rounded-full" />}
             </NavLink>
-            <div className="absolute left-1/2 -translate-x-1/2 top-full pt-1 w-44 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+            <div className={`absolute left-1/2 -translate-x-1/2 top-full pt-1 w-44 transition-all duration-200 ${docsOpen ? "opacity-100 visible" : "opacity-0 invisible"}`}>
               <div className="glass-card rounded-xl overflow-hidden shadow-xl shadow-bg/50">
                 {docsLinks.map(({ to, label }) => (
                   <NavLink

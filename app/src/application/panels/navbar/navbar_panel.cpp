@@ -18,7 +18,7 @@ namespace misty::panel {
             ImGuiWindowFlags_NoResize |
             ImGuiWindowFlags_NoScrollbar;
 
-        ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.133f, 0.133f, 0.133f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.067f, 0.067f, 0.075f, 1.0f)); // #111113 surface
         ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
 
         if (ImGui::Begin("Navbar", nullptr, navbar_flags)) {
