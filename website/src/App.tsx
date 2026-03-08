@@ -1,18 +1,21 @@
 import { useEffect } from "react";
-import { Outlet, useLocation } from "react-router";
+import { Outlet, useMatches, ScrollRestoration } from "react-router";
 import { AuthProvider } from "./AuthContext";
 import Navbar from "./components/NavBar";
 
 export default function App() {
-  const location = useLocation();
+  const matches = useMatches();
 
-  // Global scroll to top on route change
   useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [location]);
+    const match = [...matches].reverse().find((m) => (m.handle as any)?.title);
+    console.log(match?.handle)
+    document.title = (match?.handle as any)?.title
+  }, [matches]);
 
   return (
     <AuthProvider>
+      <ScrollRestoration />
+
       <div className="min-h-screen flex flex-col">
         <Navbar />
         
