@@ -122,9 +122,42 @@ namespace misty {
     void WindowsApp::configure_imgui_style() {
         ImGui::StyleColorsDark();
         ImGuiStyle& style = ImGui::GetStyle();
-        style.FrameRounding = 6.0f;
-        style.GrabRounding = 6.0f;
+
+        style.FrameRounding    = 8.0f;
+        style.GrabRounding     = 8.0f;
         style.ScrollbarRounding = 6.0f;
+        style.WindowRounding   = 0.0f;
+        style.PopupRounding    = 0.0f;
+        style.ScrollbarSize    = 8.0f;
+
+        style.Colors[ImGuiCol_Text]                 = ImVec4(0.831f, 0.831f, 0.847f, 1.0f);
+        style.Colors[ImGuiCol_TextDisabled]         = ImVec4(0.443f, 0.443f, 0.478f, 1.0f);
+        style.Colors[ImGuiCol_WindowBg]             = ImVec4(0.067f, 0.067f, 0.075f, 1.0f);
+        style.Colors[ImGuiCol_PopupBg]              = ImVec4(0.067f, 0.067f, 0.075f, 1.0f);
+        style.Colors[ImGuiCol_Border]               = ImVec4(0.153f, 0.153f, 0.165f, 1.0f);
+        style.Colors[ImGuiCol_FrameBg]              = ImVec4(0.094f, 0.094f, 0.106f, 1.0f);
+        style.Colors[ImGuiCol_FrameBgHovered]       = ImVec4(0.153f, 0.153f, 0.165f, 1.0f);
+        style.Colors[ImGuiCol_FrameBgActive]        = ImVec4(0.153f, 0.153f, 0.165f, 1.0f);
+        style.Colors[ImGuiCol_TitleBg]              = ImVec4(0.035f, 0.035f, 0.043f, 1.0f);
+        style.Colors[ImGuiCol_TitleBgActive]        = ImVec4(0.094f, 0.094f, 0.106f, 1.0f);
+        style.Colors[ImGuiCol_MenuBarBg]            = ImVec4(0.067f, 0.067f, 0.075f, 1.0f);
+        style.Colors[ImGuiCol_ScrollbarBg]          = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
+        style.Colors[ImGuiCol_ScrollbarGrab]        = ImVec4(0.153f, 0.153f, 0.165f, 1.0f);
+        style.Colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(0.22f, 0.22f, 0.24f, 1.0f);
+        style.Colors[ImGuiCol_ScrollbarGrabActive]  = ImVec4(0.443f, 0.443f, 0.478f, 1.0f);
+        style.Colors[ImGuiCol_CheckMark]            = ImVec4(0.231f, 0.510f, 0.965f, 1.0f);
+        style.Colors[ImGuiCol_SliderGrab]           = ImVec4(0.231f, 0.510f, 0.965f, 1.0f);
+        style.Colors[ImGuiCol_SliderGrabActive]     = ImVec4(0.145f, 0.388f, 0.922f, 1.0f);
+        style.Colors[ImGuiCol_Button]               = ImVec4(0.153f, 0.153f, 0.165f, 1.0f);
+        style.Colors[ImGuiCol_ButtonHovered]        = ImVec4(0.22f, 0.22f, 0.24f, 1.0f);
+        style.Colors[ImGuiCol_ButtonActive]         = ImVec4(0.10f, 0.10f, 0.11f, 1.0f);
+        style.Colors[ImGuiCol_Header]               = ImVec4(0.094f, 0.094f, 0.106f, 1.0f);
+        style.Colors[ImGuiCol_HeaderHovered]        = ImVec4(0.153f, 0.153f, 0.165f, 1.0f);
+        style.Colors[ImGuiCol_HeaderActive]         = ImVec4(0.153f, 0.153f, 0.165f, 1.0f);
+        style.Colors[ImGuiCol_Separator]            = ImVec4(0.153f, 0.153f, 0.165f, 1.0f);
+        style.Colors[ImGuiCol_Tab]                  = ImVec4(0.094f, 0.094f, 0.106f, 1.0f);
+        style.Colors[ImGuiCol_TabHovered]           = ImVec4(0.153f, 0.153f, 0.165f, 1.0f);
+        style.Colors[ImGuiCol_TabSelected]          = ImVec4(0.153f, 0.153f, 0.165f, 1.0f);
 	}
 
     void WindowsApp::prepare_frame() {

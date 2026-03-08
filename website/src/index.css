@@ -123,6 +123,11 @@ body {
   }
 }
 
+/* Disable Inter contextual alternates in inputs (fixes @ jiggle) */
+input, textarea {
+  font-variant-ligatures: no-contextual;
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 6px;
@@ -147,3 +152,20 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+
+.wl-grid {
+      background-image:
+        linear-gradient(#1e1e22 1px, transparent 1px),
+        linear-gradient(90deg, #1e1e22 1px, transparent 1px);
+      background-size: 48px 48px;
+    }
+@keyframes fade-up {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.animate-fade-up   { animation: fade-up 0.6s ease both; }
+.animate-fade-up-2 { animation: fade-up 0.6s 0.15s ease both; }
+.animate-fade-up-3 { animation: fade-up 0.6s 0.25s ease both; }
+.animate-spin-slow { animation: spin 0.6s linear infinite; }

@@ -27,6 +27,7 @@ namespace misty::panel {
         void show_search_bar(panel::FileExplorerState& state);
         void show_directory_contents(panel::FileExplorerState& state);
         void show_file_item(panel::FileExplorerState& state, int i);
+        void show_grid_item(panel::FileExplorerState& state, int i, float cell_w, float cell_h);
 
         // Context menu + file operations
         void show_context_menu(panel::FileExplorerState& state);
