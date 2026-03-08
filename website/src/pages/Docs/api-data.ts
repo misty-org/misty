@@ -5,7 +5,7 @@ export const apiSections: Section[] = [
   {
     id: "self-hosting",
     label: "Self-Hosting",
-    category: "getting-started",
+    category: "api",
     title: "Self-Hosting",
     prose: [
       "When you self-host Misty, you run the proxy service on your own infrastructure — a home server, a VPS, or inside your private network. In this setup, the Misty desktop app isn't managing the proxy for you, so you interact with the API directly.",

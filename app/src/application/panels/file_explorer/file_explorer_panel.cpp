@@ -11,6 +11,7 @@
 #include "panels/file_sidebar/file_sidebar_state.h"
 #include "core/asset_manager.h"
 #include <nlohmann/json.hpp>
+#include <algorithm>
 #include <cstdio>
 
 
@@ -960,9 +961,10 @@ namespace misty::panel {
 
         ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.21f, 0.21f, 0.21f, 1.0f));
 
-        float refresh_btn_size = 32.0f;
+        float btn_size = 32.0f;
         float spacing = 8.0f;
-        float available_width = ImGui::GetContentRegionAvail().x - refresh_btn_size - spacing;
+        // Two buttons: refresh + options (···)
+        float available_width = ImGui::GetContentRegionAvail().x - (btn_size + spacing) * 2;
         ImGui::SetNextItemWidth(available_width);
 
         bool entered = ImGui::InputTextWithHint("##search", "Search or enter path...",
@@ -977,18 +979,17 @@ namespace misty::panel {
 
         ImGui::PopStyleColor();
 
-        // Refresh button
-        ImGui::SameLine(0, spacing);
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.21f, 0.21f, 0.21f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.28f, 0.28f, 0.28f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.16f, 0.16f, 0.16f, 1.0f));
 
+        // Refresh button
+        ImGui::SameLine(0, spacing);
         auto& sync_tex = core::AssetManager::get().get_svg_texture("sync-16", 16);
         if (sync_tex.id != 0) {
             if (ImGui::ImageButton("##refresh", sync_tex.id,
                     ImVec2(16, 16), ImVec2(0, 0), ImVec2(1, 1),
                     ImVec4(0, 0, 0, 0), ImVec4(0.7f, 0.7f, 0.7f, 1.0f))) {
-                // Re-navigate to current path to force a refetch
                 std::string current(state.current_path);
                 if (!current.empty()) {
                     navigate_to_path(current, false);
@@ -998,7 +999,7 @@ namespace misty::panel {
                 ImGui::SetTooltip("Refresh");
             }
         } else {
-            if (ImGui::Button("R", ImVec2(refresh_btn_size, 0))) {
+            if (ImGui::Button("R", ImVec2(btn_size, 0))) {
                 std::string current(state.current_path);
                 if (!current.empty()) {
                     navigate_to_path(current, false);
@@ -1009,7 +1010,52 @@ namespace misty::panel {
             }
         }
 
+        // Options (···) button
+        ImGui::SameLine(0, spacing);
+        if (ImGui::Button("···", ImVec2(btn_size, 0))) {
+            ImGui::OpenPopup("ViewOptionsPopup");
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("View Options");
+        }
+
         ImGui::PopStyleColor(3);
+
+        // View options popup
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 8.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(10.0f, 6.0f));
+        ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.15f, 0.15f, 0.15f, 0.95f));
+        ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.3f, 0.3f, 0.3f, 0.6f));
+
+        if (ImGui::BeginPopup("ViewOptionsPopup")) {
+            if (ImGui::MenuItem("List View", nullptr, !state.grid_view)) {
+                state.grid_view = false;
+            }
+            if (ImGui::MenuItem("Grid View", nullptr, state.grid_view)) {
+                state.grid_view = true;
+            }
+
+            bool is_local = !path_utils::is_onedrive_path(state.current_path)
+                         && !path_utils::is_gdrive_path(state.current_path)
+                         && !path_utils::is_dropbox_path(state.current_path)
+                         && !path_utils::is_icloud_path(state.current_path);
+            if (is_local) {
+                ImGui::Separator();
+                if (ImGui::MenuItem("Show Hidden Files", nullptr, state.show_hidden)) {
+                    state.show_hidden = !state.show_hidden;
+                    std::string current(state.current_path);
+                    if (!current.empty()) {
+                        navigate_to_path(current, false);
+                    }
+                }
+            }
+
+            ImGui::EndPopup();
+        }
+
+        ImGui::PopStyleColor(2);
+        ImGui::PopStyleVar(2);
+
         ImGui::PopStyleVar(2);
     }
 
@@ -1058,56 +1104,93 @@ namespace misty::panel {
         ImGui::PushStyleColor(ImGuiCol_HeaderHovered,  ImVec4(0.45f, 0.45f, 0.45f, 0.35f)); // selected + hovered (no change)
         ImGui::PushStyleColor(ImGuiCol_HeaderActive,   ImVec4(0.45f, 0.45f, 0.45f, 0.45f)); // click
 
-        if (ImGui::BeginTable("FileTable", 5, flags)) {
-            ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
-            ImGui::TableSetupColumn("Size", ImGuiTableColumnFlags_WidthFixed, 80.0f);
-            ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 80.0f);
-            ImGui::TableSetupColumn("Last Modified", ImGuiTableColumnFlags_WidthFixed, 150.0f);
-            ImGui::TableSetupColumn("Status", ImGuiTableColumnFlags_WidthFixed, 60.0f);
-            ImGui::TableHeadersRow(); 
+        if (state.grid_view) {
+            // Grid layout
+            const float cell_w = 100.0f;
+            const float cell_h = 90.0f;
+            const float padding = 8.0f;
+            float avail_w = ImGui::GetContentRegionAvail().x;
+            int cols = std::max(1, (int)(avail_w / (cell_w + padding)));
+
+            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(padding, padding));
 
             if (state.files.empty()) {
-                ImGui::TableNextRow();
-                ImGui::TableNextColumn();
-                float column_width = ImGui::GetColumnWidth();
-
-                const char* text = "No files found...";
-                float text_width = ImGui::CalcTextSize(text).x;
-                float padding = (column_width - text_width) * 0.5f;
-                if (padding > 0) {
-                    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + padding);
-                }
-                ImGui::TextDisabled("%s", text);
-            }
-            else {
+                ImGui::TextDisabled("No files found...");
+            } else {
+                // Wrap in a child window for scrolling
+                ImGui::BeginChild("##grid_scroll", ImVec2(0, 0), false, ImGuiWindowFlags_NoScrollbar);
                 for (int i = 0; i < (int)state.files.size(); i++) {
-                    show_file_item(state, i);
+                    if (i % cols != 0) ImGui::SameLine();
+                    show_grid_item(state, i, cell_w, cell_h);
                 }
-            }
-            if (ImGuiTableSortSpecs* sorts_specs = ImGui::TableGetSortSpecs()) {
-                if (sorts_specs->SpecsDirty) {
-                    sorts_specs->SpecsDirty = false;
+
+                // Background right-click in grid
+                if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)
+                    && ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup)
+                    && !ImGui::IsAnyItemHovered()
+                    && !ImGui::IsPopupOpen("FileContextMenu")) {
+                    state.context_menu_target_path.clear();
+                    state.selected_files.clear();
+                    ImGui::OpenPopup("BackgroundContextMenu");
                 }
+
+                show_context_menu(state);
+                show_background_context_menu(state);
+                ImGui::EndChild();
             }
 
-            // Context menu popup (must be inside the table scope for ID stack)
-            show_context_menu(state);
+            ImGui::PopStyleVar();
+        } else {
+            // List/table layout
+            if (ImGui::BeginTable("FileTable", 5, flags)) {
+                ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
+                ImGui::TableSetupColumn("Size", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+                ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+                ImGui::TableSetupColumn("Last Modified", ImGuiTableColumnFlags_WidthFixed, 150.0f);
+                ImGui::TableSetupColumn("Status", ImGuiTableColumnFlags_WidthFixed, 60.0f);
+                ImGui::TableHeadersRow();
 
-            // Background right-click (empty space in table)
-            // Use IsMouseClicked to match item behavior and avoid "double menu" on release
-            // Also ensure FileContextMenu isn't already open
-            if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)
-                && ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup)
-                && !ImGui::IsAnyItemHovered()
-                && !ImGui::IsPopupOpen("FileContextMenu")) {
-                state.context_menu_target_path.clear();
-                state.selected_files.clear();
-                ImGui::OpenPopup("BackgroundContextMenu");
+                if (state.files.empty()) {
+                    ImGui::TableNextRow();
+                    ImGui::TableNextColumn();
+                    float column_width = ImGui::GetColumnWidth();
+
+                    const char* text = "No files found...";
+                    float text_width = ImGui::CalcTextSize(text).x;
+                    float padding = (column_width - text_width) * 0.5f;
+                    if (padding > 0) {
+                        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + padding);
+                    }
+                    ImGui::TextDisabled("%s", text);
+                }
+                else {
+                    for (int i = 0; i < (int)state.files.size(); i++) {
+                        show_file_item(state, i);
+                    }
+                }
+                if (ImGuiTableSortSpecs* sorts_specs = ImGui::TableGetSortSpecs()) {
+                    if (sorts_specs->SpecsDirty) {
+                        sorts_specs->SpecsDirty = false;
+                    }
+                }
+
+                // Context menu popup (must be inside the table scope for ID stack)
+                show_context_menu(state);
+
+                // Background right-click (empty space in table)
+                if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)
+                    && ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup)
+                    && !ImGui::IsAnyItemHovered()
+                    && !ImGui::IsPopupOpen("FileContextMenu")) {
+                    state.context_menu_target_path.clear();
+                    state.selected_files.clear();
+                    ImGui::OpenPopup("BackgroundContextMenu");
+                }
+
+                show_background_context_menu(state);
+
+                ImGui::EndTable();
             }
-
-            show_background_context_menu(state);
-
-            ImGui::EndTable();
         }
 
         ImGui::PopStyleColor(3);
@@ -1326,6 +1409,125 @@ namespace misty::panel {
         ImVec2 p_dot = ImGui::GetCursorScreenPos();
         // Allow for custom centering since we manually place the dot
         ImGui::GetWindowDrawList()->AddCircleFilled(ImVec2(p_dot.x + 20.0f, p.y + row_height * 0.5f), 4.0f, dot_color);
+    }
+
+    // ==================== Grid Item ====================
+
+    void FileExplorerPanel::show_grid_item(FileExplorerState& state, int i, float cell_w, float cell_h) {
+        ImGuiIO& io = ImGui::GetIO();
+        const UnifiedFileItem& file = state.files[i];
+        bool is_selected = state.selected_files.count(file.path) > 0;
+
+        // Determine icon
+        std::string icon_name = "file-16";
+        if (state.is_downloading(file.path)) {
+            icon_name = "download-16";
+        } else if (file.is_dir) {
+            icon_name = "file-directory-16";
+        } else {
+            std::string ext = fs::path(file.name).extension().string();
+            if (ext == ".cpp" || ext == ".h" || ext == ".hpp" || ext == ".c" || ext == ".cc" ||
+                ext == ".js" || ext == ".ts" || ext == ".html" || ext == ".css" || ext == ".json" ||
+                ext == ".py" || ext == ".go" || ext == ".rs" || ext == ".java") {
+                icon_name = "file-code-16";
+            } else if (ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".gif" || ext == ".svg" || ext == ".webp") {
+                icon_name = "file-media-16";
+            } else if (ext == ".mp4" || ext == ".mov" || ext == ".avi" || ext == ".mkv") {
+                icon_name = "video-16";
+            } else if (ext == ".zip" || ext == ".tar" || ext == ".gz" || ext == ".7z" || ext == ".rar") {
+                icon_name = "file-zip-16";
+            }
+        }
+        auto& icon = AssetManager::get().get_svg_texture(icon_name, 32);
+
+        ImVec2 cell_pos = ImGui::GetCursorScreenPos();
+
+        // InvisibleButton for interaction (sized to full cell)
+        std::string btn_id = "##grid_" + std::to_string(i);
+        bool clicked = ImGui::InvisibleButton(btn_id.c_str(), ImVec2(cell_w, cell_h));
+
+        bool hovered = ImGui::IsItemHovered();
+        bool double_clicked = hovered && ImGui::IsMouseDoubleClicked(0);
+
+        // Background fill
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+        ImVec2 cell_max = ImVec2(cell_pos.x + cell_w, cell_pos.y + cell_h);
+        if (is_selected) {
+            dl->AddRectFilled(cell_pos, cell_max, IM_COL32(255, 255, 255, 40), 6.0f);
+        } else if (hovered) {
+            dl->AddRectFilled(cell_pos, cell_max, IM_COL32(255, 255, 255, 20), 6.0f);
+        }
+
+        // Icon (centered, 32px)
+        const float icon_size = 32.0f;
+        float icon_x = cell_pos.x + (cell_w - icon_size) * 0.5f;
+        float icon_y = cell_pos.y + 10.0f;
+        if (icon.id != 0) {
+            dl->AddImage(icon.id, ImVec2(icon_x, icon_y), ImVec2(icon_x + icon_size, icon_y + icon_size));
+        }
+
+        // Name (centered, clipped to cell width)
+        float text_y = icon_y + icon_size + 6.0f;
+        ImVec2 name_size = ImGui::CalcTextSize(file.name.c_str(), nullptr, false, cell_w - 4.0f);
+        float text_x = cell_pos.x + (cell_w - std::min(name_size.x, cell_w - 4.0f)) * 0.5f;
+        dl->AddText(ImGui::GetFont(), ImGui::GetFontSize(),
+            ImVec2(text_x, text_y),
+            is_selected ? IM_COL32(255, 255, 255, 255) : IM_COL32(212, 212, 216, 255),
+            file.name.c_str(), nullptr, cell_w - 4.0f);
+
+        // Click selection
+        if (clicked) {
+            if (io.KeyCtrl) {
+                if (is_selected) state.selected_files.erase(file.path);
+                else state.selected_files.insert(file.path);
+            } else if (io.KeyShift && state.last_selected_index != -1) {
+                state.selected_files.clear();
+                int start = std::min(state.last_selected_index, i);
+                int end = std::max(state.last_selected_index, i);
+                for (int j = start; j <= end; j++) state.selected_files.insert(state.files[j].path);
+            } else {
+                state.selected_files.clear();
+                state.selected_files.insert(file.path);
+            }
+            state.last_selected_index = i;
+        }
+
+        // Double-click navigation / open
+        if (double_clicked) {
+            if (file.is_dir) {
+                std::string nav_path = file.path;
+                navigate_to_path(nav_path);
+                return;
+            } else {
+                if (file.source == FileSource::LOCAL) {
+                    state.add_recent(file);
+                    open_file(file.path);
+                } else if (file.source == FileSource::ONEDRIVE) {
+                    if (fs::exists(file.path)) { state.add_recent(file); open_file(file.path); }
+                    else if (!state.is_downloading(file.path)) { state.add_recent(file); download_and_open_file(file); }
+                } else if (file.source == FileSource::GDRIVE) {
+                    if (fs::exists(file.path)) { state.add_recent(file); open_file(file.path); }
+                    else if (!state.is_downloading(file.path)) { state.add_recent(file); download_and_open_gd_file(file); }
+                } else if (file.source == FileSource::DROPBOX) {
+                    if (fs::exists(file.path)) { state.add_recent(file); open_file(file.path); }
+                    else if (!state.is_downloading(file.path)) { state.add_recent(file); download_and_open_dbx_file(file); }
+                } else if (file.source == FileSource::ICLOUD) {
+                    if (fs::exists(file.path)) { state.add_recent(file); open_file(file.path); }
+                    else if (!state.is_downloading(file.path)) { state.add_recent(file); download_and_open_icl_file(file); }
+                }
+            }
+        }
+
+        // Right-click context menu
+        if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
+            state.context_menu_target_path = file.path;
+            if (!is_selected) {
+                state.selected_files.clear();
+                state.selected_files.insert(file.path);
+                state.last_selected_index = i;
+            }
+            ImGui::OpenPopup("FileContextMenu");
+        }
     }
 
     // ==================== Context Menu & File Operations ====================
@@ -1606,6 +1808,14 @@ namespace misty::panel {
                 state.new_entry_is_dir = true;
                 state.new_entry_name_buffer[0] = '\0';
                 state.show_new_entry_modal = true;
+            }
+
+            if (is_local) {
+                ImGui::Separator();
+                if (ImGui::MenuItem("Show Hidden Files", nullptr, state.show_hidden)) {
+                    state.show_hidden = !state.show_hidden;
+                    navigate_to_path(std::string(state.current_path), false);
+                }
             }
 
             ImGui::EndPopup();

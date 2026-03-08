@@ -1,20 +1,29 @@
 import { useState } from "react";
-import { guideSections, guideCategories } from "./data";
+import type { Category } from "./data";
+import { guideSections } from "./guide-data";
+import { apiSections, apiCategories } from "./api-data";
 import Sidebar from "./Sidebar";
 import CenterPanel from "./CenterPanel";
 import RightPanel from "./RightPanel";
+
+const guideCategories: Category[] = [
+  { key: "getting-started", label: "Getting Started", ids: ["introduction", "quick-start"] },
+];
+
+const allSections = [...guideSections, ...apiSections];
+const allCategories = [...guideCategories, ...apiCategories];
 
 export default function Docs() {
   const [activeId, setActiveId] = useState("introduction");
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const section = guideSections.find((s) => s.id === activeId)!;
+  const section = allSections.find((s) => s.id === activeId)!;
 
   return (
     <div className="docs-layout">
       <Sidebar
-        sections={guideSections}
-        categories={guideCategories}
+        sections={allSections}
+        categories={allCategories}
         activeId={activeId}
         onSelect={setActiveId}
         open={sidebarOpen}

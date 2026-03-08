@@ -45,7 +45,7 @@ export default function Download() {
           <span className="text-xs font-medium text-text-muted">Latest Release</span>
         </div>
         <h1 className="text-3xl md:text-5xl font-bold text-text mb-5 text-balance">
-          Download Misty
+          Download
         </h1>
         <p className="text-text-muted max-w-lg mx-auto text-pretty leading-relaxed">
           Fast, lightweight, and free. Get the Misty desktop app for your

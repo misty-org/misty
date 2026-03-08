@@ -1,7 +1,7 @@
 import type { Section, GuideSection, ApiSection } from "./data";
 
 function getAnchors(section: Section): { id: string; label: string }[] {
-  if (section.category === "getting-started") {
+  if (section.category === "guide") {
     const guide = section as GuideSection;
     const anchors: { id: string; label: string }[] = [
       { id: `${section.id}-overview`, label: "Overview" },
@@ -10,13 +10,15 @@ function getAnchors(section: Section): { id: string; label: string }[] {
       anchors.push({ id: `${section.id}-${n.kind}`, label: n.kind.charAt(0).toUpperCase() + n.kind.slice(1) });
     }
     return anchors;
+  } else if (section.category === "api") {
+    const api = section as ApiSection;
+    return api.endpoints.map((ep, i) => ({
+      id: `${section.id}-ep-${i}`,
+      label: `${ep.method} ${ep.path}`,
+    }));
   }
 
-  const api = section as ApiSection;
-  return api.endpoints.map((ep, i) => ({
-    id: `${section.id}-ep-${i}`,
-    label: `${ep.method} ${ep.path}`,
-  }));
+  return [];
 }
 
 export default function RightPanel({ section }: { section: Section }) {

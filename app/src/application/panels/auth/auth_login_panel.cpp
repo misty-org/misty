@@ -2,6 +2,7 @@
 #include "imgui.h"
 #include "core/http_client.h"
 #include "core/asset_manager.h"
+#include "core/imgui_utils.h"
 #include "views/app_view.h"
 #include <cstring>
 #include <iostream>
@@ -24,7 +25,7 @@ namespace misty::panel {
             ImGuiWindowFlags_NoDocking;
 
         // Dark background
-        ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.067f, 0.067f, 0.075f, 1.0f)); // #111113
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(32.0f, 40.0f));
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 10.0f));
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(12.0f, 8.0f));
@@ -94,20 +95,11 @@ namespace misty::panel {
 
     void AuthLoginPanel::show_login_button(AuthLoginState& state) {
         float width = ImGui::GetContentRegionAvail().x;
-        
-        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.5f, 0.9f, 1.0f)); // Blue button
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.6f, 1.0f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.15f, 0.4f, 0.8f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
-        
+
         bool enter_pressed = ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter);
-        if (ImGui::Button("Log in", ImVec2(width, 40)) || enter_pressed) {
+        if (core::StyledButton("Log in", ImVec2(width, 40), core::ButtonTheme::Primary()) || enter_pressed) {
             state.handle_login();
         }
-
-        ImGui::PopStyleColor(4);
-        ImGui::PopStyleVar();
     }
 
     void AuthLoginPanel::show_signup_link() {
