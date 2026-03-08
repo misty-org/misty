@@ -30,11 +30,13 @@ private:
     void sidebar(float sidebar_width);
     void section(const PluginsSectionProps& props);
     void cards(const char* id, bool installed_only);
+    void segmented_filter();
     void splitter();
     void content();
 
     bool marketplace_collapsed_ = false;
     bool installed_collapsed_ = false;
+    bool installed_filter_ = false;
     char search_query_[128] = {};
     std::string selected_plugin_id_ = "preview_manager";
     std::vector<PluginListEntry> plugins_;

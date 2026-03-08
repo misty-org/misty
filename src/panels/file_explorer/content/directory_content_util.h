@@ -13,10 +13,9 @@ namespace misty::panel {
  */
 enum class FileTableColumn : int {
     Name = 0,
-    Size = 1,
-    Type = 2,
-    LastModified = 3,
-    State = 4,
+    LastModified = 1,
+    Size = 2,
+    Type = 3,
 };
 
 /**
@@ -112,5 +111,10 @@ void sort_files(FileListing& listing, const ImGuiTableSortSpecs& sort_specs);
  * @brief Renders the size cell for a table row.
  */
 void render_file_size_cell(const FileItem& file);
+
+/**
+ * @brief Renders the lifecycle/sync state cell for a table row.
+ */
+void render_file_state_cell(const FileListing& listing, const FileItem& file);
 
 }  // namespace misty::panel

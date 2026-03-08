@@ -1,140 +1,146 @@
 #include "file_sidebar_panel.h"
 
+#include "core/manager/asset_manager.h"
 #include "core/manager/session_manager.h"
 #include "panels/file_explorer/state/file_explorer_state.h"
 #include "panels/file_explorer/state/remote_mount_state.h"
+#include "panels/providers/cards/provider_cards_util.h"
+#include "panels/navbar/navbar_state.h"
+#include "panels/providers/state/providers_state.h"
 #include "panels/providers/state/providers_state_util.h"
+#include "views/app_view.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
+#include <string>
 
 namespace fs = std::filesystem;
 
 namespace {
-    // Draws a clickable section header with a collapse triangle indicator.
-    // Returns true when clicked (caller should toggle their collapsed bool).
-    bool SectionHeader(const char* id, const char* label, bool collapsed, float width) {
+    bool SamePath(const std::string& lhs, const std::string& rhs) {
+        if (lhs == rhs) return true;
+        if (lhs.empty() || rhs.empty()) return false;
+        try {
+            return fs::weakly_canonical(fs::path(lhs)) == fs::weakly_canonical(fs::path(rhs));
+        } catch (...) {
+            return fs::path(lhs).lexically_normal() == fs::path(rhs).lexically_normal();
+        }
+    }
+
+    bool SectionHeader(const char* id, const char* label, bool collapsed, float width, bool show_chevron = true) {
         ImVec2 cursor = ImGui::GetCursorScreenPos();
-        float h = ImGui::GetTextLineHeight() + 4.0f;
+        float h = ImGui::GetTextLineHeight() + 5.0f;
 
         ImGui::PushID(id);
         bool clicked = ImGui::InvisibleButton("##hdr", ImVec2(width, h));
-        bool hovered = ImGui::IsItemHovered();
         ImGui::PopID();
 
         ImDrawList* dl = ImGui::GetWindowDrawList();
 
-        // Label at the left
-        dl->AddText(ImVec2(cursor.x + 4.0f, cursor.y + 2.0f),
-                    IM_COL32(178, 178, 178, 255), label);
+        dl->AddText(ImVec2(cursor.x + 2.0f, cursor.y + 1.0f),
+                    IM_COL32(210, 214, 222, 255), label);
 
-        // Triangle to the right of the label, only visible on hover
-        if (hovered) {
-            float text_w = ImGui::CalcTextSize(label).x;
-            float tri_x  = cursor.x + 4.0f + text_w + 6.0f;
-            float mid_y  = cursor.y + h * 0.5f;
-            ImU32 tri_col = IM_COL32(160, 160, 160, 220);
-
-            if (collapsed) {
-                dl->AddTriangleFilled(
-                    ImVec2(tri_x,        mid_y - 4.0f),
-                    ImVec2(tri_x,        mid_y + 4.0f),
-                    ImVec2(tri_x + 7.0f, mid_y),
-                    tri_col);
-            } else {
-                dl->AddTriangleFilled(
-                    ImVec2(tri_x - 4.0f, mid_y - 2.0f),
-                    ImVec2(tri_x + 4.0f, mid_y - 2.0f),
-                    ImVec2(tri_x,        mid_y + 4.0f),
-                    tri_col);
-            }
+        if (show_chevron) {
+            constexpr float icon_size = 14.0f;
+            const ImVec2 icon_min(cursor.x + width - icon_size - 2.0f,
+                                  cursor.y + (h - icon_size) * 0.5f);
+            auto& icon = misty::core::AssetManager::get().get_svg_texture(
+                collapsed ? "chevron-right-16" : "chevron-down-16",
+                static_cast<int>(icon_size));
+            dl->AddImage(icon.id,
+                         icon_min,
+                         ImVec2(icon_min.x + icon_size, icon_min.y + icon_size),
+                         ImVec2(0, 0),
+                         ImVec2(1, 1),
+                         IM_COL32(225, 229, 238, 235));
         }
 
         return clicked;
     }
 
-    // Draws a circular-arrow refresh icon as an invisible button.
-    // Returns true when clicked.
-    bool RefreshButton(const char* id, float size = 14.0f) {
+    bool PlusButton(const char* id, float size = 18.0f) {
         ImGui::PushID(id);
-        bool clicked = ImGui::InvisibleButton("##", ImVec2(size, size));
+        const bool clicked = ImGui::InvisibleButton("##plus", ImVec2(size, size));
         bool hovered = ImGui::IsItemHovered();
         bool active  = ImGui::IsItemActive();
         ImGui::PopID();
 
         ImVec2 p0 = ImGui::GetItemRectMin();
-        float cx = p0.x + size * 0.5f;
-        float cy = p0.y + size * 0.5f;
-        float r  = size * 0.33f;
-
-        ImU32 col = active  ? IM_COL32(230, 230, 230, 255)
-                  : hovered ? IM_COL32(190, 190, 190, 255)
-                            : IM_COL32(120, 120, 120, 200);
-
+        const float cx = p0.x + size * 0.5f;
+        const float cy = p0.y + size * 0.5f;
+        const ImU32 col = active ? IM_COL32(255, 255, 255, 255)
+                         : hovered ? IM_COL32(230, 236, 248, 255)
+                                   : IM_COL32(205, 211, 224, 245);
         ImDrawList* dl = ImGui::GetWindowDrawList();
-
-        // Arc: ~300° clockwise (screen-space: increasing θ = clockwise because y is down)
-        static constexpr float kPi = 3.14159265f;
-        float a0 = kPi * 0.30f;   // start ~1:30 position
-        float a1 = kPi * 2.20f;   // end   ~12:30 position (just past top)
-        dl->PathArcTo(ImVec2(cx, cy), r, a0, a1, 24);
-        dl->PathStroke(col, false, 1.5f);
-
-        // Arrowhead at end of arc.
-        // Tangent direction at angle a1 (clockwise in screen space): (-sin, cos)
-        float tx = -std::sinf(a1), ty = std::cosf(a1);
-        // Outward normal at a1: (cos, sin)
-        float nx = std::cosf(a1), ny = std::sinf(a1);
-        ImVec2 tip{ cx + r * std::cosf(a1), cy + r * std::sinf(a1) };
-        float hw = 2.4f, hl = 4.2f;
-        dl->AddTriangleFilled(
-            tip,
-            ImVec2(tip.x - tx * hl - nx * hw, tip.y - ty * hl - ny * hw),
-            ImVec2(tip.x - tx * hl + nx * hw, tip.y - ty * hl + ny * hw),
-            col);
+        dl->AddLine(ImVec2(cx - 4.0f, cy), ImVec2(cx + 4.0f, cy), col, 1.7f);
+        dl->AddLine(ImVec2(cx, cy - 4.0f), ImVec2(cx, cy + 4.0f), col, 1.7f);
 
         return clicked;
     }
 
-    // A simple list item with a subtle left-to-right hover gradient.
-    // Returns true when clicked.
-    bool HoverListItem(const char* label, float width, float height = 28.0f) {
+    bool SidebarIconItem(const char* id,
+                         const char* label,
+                         const char* icon_name_or_path,
+                         float width,
+                         bool selected,
+                         float height = 36.0f,
+                         bool icon_path = false) {
         ImVec2 cursor = ImGui::GetCursorScreenPos();
         ImVec2 item_size(width, height);
 
-        ImGui::PushID(label);
-        bool pressed = ImGui::InvisibleButton(label, item_size);
+        ImGui::PushID(id);
+        bool pressed = ImGui::InvisibleButton("##item", item_size);
         bool hovered = ImGui::IsItemHovered();
         bool active  = ImGui::IsItemActive();
+        ImGui::PopID();
 
-        if (hovered || active) {
-            ImDrawList* dl = ImGui::GetWindowDrawList();
-            ImU32 col_left  = active
-                ? IM_COL32(255, 255, 255, 30)
-                : IM_COL32(255, 255, 255, 20);
-            ImU32 col_right = IM_COL32(255, 255, 255, 0);
-            dl->AddRectFilledMultiColor(
-                cursor,
-                ImVec2(cursor.x + item_size.x, cursor.y + item_size.y),
-                col_left, col_right, col_right, col_left);
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+
+        if (selected) {
+            dl->AddRectFilled(cursor, ImVec2(cursor.x + item_size.x, cursor.y + item_size.y),
+                              IM_COL32(39, 46, 65, 235), 7.0f);
+        } else if (hovered || active) {
+            const ImU32 row_col = active ? IM_COL32(255, 255, 255, 34) : IM_COL32(255, 255, 255, 20);
+            dl->AddRectFilled(cursor, ImVec2(cursor.x + item_size.x, cursor.y + item_size.y),
+                              row_col, 7.0f);
         }
 
-        // Draw text vertically centered
-        ImVec2 text_pos(cursor.x + 8.0f, cursor.y + (height - ImGui::GetTextLineHeight()) * 0.5f);
-        ImGui::GetWindowDrawList()->AddText(text_pos, IM_COL32(220, 220, 220, 255), label);
+        constexpr float icon_size = 18.0f;
+        ImVec2 icon_min(cursor.x + 10.0f, cursor.y + (height - icon_size) * 0.5f);
+        auto& icon = icon_path
+            ? misty::core::AssetManager::get().get_svg_texture_path(
+                icon_name_or_path,
+                static_cast<int>(icon_size),
+                false)
+            : misty::core::AssetManager::get().get_svg_texture(icon_name_or_path, static_cast<int>(icon_size));
+        dl->AddImage(icon.id, icon_min, ImVec2(icon_min.x + icon_size, icon_min.y + icon_size),
+                     ImVec2(0, 0), ImVec2(1, 1),
+                     icon_path
+                         ? IM_COL32(255, 255, 255, 255)
+                         : selected ? IM_COL32(145, 190, 255, 255) : IM_COL32(236, 239, 246, 245));
 
-        ImGui::PopID();
+        ImVec2 text_pos(cursor.x + 36.0f, cursor.y + (height - ImGui::GetTextLineHeight()) * 0.5f);
+        dl->AddText(text_pos,
+                    selected ? IM_COL32(151, 194, 255, 255)
+                             : (hovered || active ? IM_COL32(246, 248, 252, 255) : IM_COL32(230, 233, 240, 245)),
+                    label);
         return pressed;
+    }
+
+    bool HoverListItem(const char* label, float width, float height = 28.0f) {
+        return SidebarIconItem(label, label, "file-directory-24", width, false, height);
     }
 }
 
 namespace misty::panel {
     namespace {
-        constexpr ImVec4 kFileSidebarBg = ImVec4(0.12f, 0.12f, 0.13f, 1.0f);
-        constexpr ImVec4 kFileSidebarSeparator = ImVec4(0.22f, 0.22f, 0.24f, 1.0f);
+        constexpr ImVec4 kFileSidebarBg = ImVec4(0.075f, 0.085f, 0.10f, 1.0f);
+        constexpr ImVec4 kFileSidebarSeparator = ImVec4(0.20f, 0.23f, 0.28f, 1.0f);
         constexpr int kSidebarProviderFetchAttempts = 4;
         constexpr auto kSidebarProviderFetchRetryDelay = std::chrono::milliseconds(500);
+        constexpr auto kSidebarProviderRefreshInterval = std::chrono::seconds(5);
     }
 
     FileSidebarPanel::FileSidebarPanel(core::UIRegistry& registry, core::WorkerPool& worker_pool)
@@ -158,23 +164,20 @@ namespace misty::panel {
         }
 
         ImGui::PushStyleColor(ImGuiCol_WindowBg, kFileSidebarBg);
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16.0f, 16.0f));
-        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 12.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f, 10.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 6.0f));
 
         if (ImGui::Begin("FileSidebar", nullptr, flags)) {
             float width = ImGui::GetWindowWidth();
-            float padding = width * 0.08f;
+            float padding = std::clamp(width * 0.05f, 8.0f, 14.0f);
             
             
             ImGui::PushStyleColor(ImGuiCol_Separator, kFileSidebarSeparator);
             show_quick_access(width, padding);
-            ImGui::Separator();
-            show_local_section(width, padding);
-            ImGui::Separator();
+            ImGui::Dummy(ImVec2(0.0f, 12.0f));
             show_providers_section(state, width, padding);
-            ImGui::Separator();
+            ImGui::Dummy(ImVec2(0.0f, 10.0f));
             show_devices_section(width, padding);
-            ImGui::Separator();
             ImGui::PopStyleColor();
 
       
@@ -192,12 +195,16 @@ namespace misty::panel {
     }
 
     void FileSidebarPanel::ensure_provider_entries_loaded(FileSidebarState& state) {
+        const auto now = std::chrono::steady_clock::now();
         {
             std::lock_guard<std::mutex> lock(state.providers_mutex);
-            if (state.providers_loaded || state.providers_loading) {
+            const bool stale = state.providers_last_refresh_at == std::chrono::steady_clock::time_point{} ||
+                               now - state.providers_last_refresh_at >= kSidebarProviderRefreshInterval;
+            if (state.providers_loading || !stale) {
                 return;
             }
             state.providers_loading = true;
+            state.providers_last_refresh_at = now;
             state.providers_error.clear();
         }
 
@@ -223,6 +230,7 @@ namespace misty::panel {
                     std::lock_guard<std::mutex> lock(state.providers_mutex);
                     state.providers_loading = false;
                     state.providers_loaded = fetch.response.status_code != 401;
+                    state.providers_last_refresh_at = std::chrono::steady_clock::now();
                     state.providers_error = fetch.last_error;
                     return;
                 }
@@ -240,6 +248,7 @@ namespace misty::panel {
                 state.provider_entries = std::move(entries);
                 state.providers_loading = false;
                 state.providers_loaded = true;
+                state.providers_last_refresh_at = std::chrono::steady_clock::now();
                 state.providers_error.clear();
             },
             []() {},
@@ -247,6 +256,7 @@ namespace misty::panel {
                 std::lock_guard<std::mutex> lock(state.providers_mutex);
                 state.providers_loading = false;
                 state.providers_loaded = true;
+                state.providers_last_refresh_at = std::chrono::steady_clock::now();
                 state.providers_error = err;
             }
         );
@@ -258,11 +268,21 @@ namespace misty::panel {
 
         ImGui::BeginGroup();
 
-        if (SectionHeader("providers_hdr", "Providers", providers_collapsed_, content_width))
+        const ImVec2 header_pos = ImGui::GetCursorScreenPos();
+        if (SectionHeader("remote_hdr", "Remote", providers_collapsed_, content_width, false))
             providers_collapsed_ = !providers_collapsed_;
+        ImGui::SameLine();
+        ImGui::SetCursorScreenPos(ImVec2(header_pos.x + content_width - 21.0f, header_pos.y));
+        if (PlusButton("provider_add")) {
+            registry_.get_state<NavbarState>("Navbar").selected_item = view::ViewID::Providers;
+            auto& providers_state = registry_.get_state<ProvidersState>("Providers");
+            providers_state.on_add_provider();
+            view::switch_view(view::ViewID::Providers);
+        }
+        ImGui::SetCursorScreenPos(ImVec2(header_pos.x, header_pos.y + ImGui::GetTextLineHeight() + 5.0f));
 
         if (!providers_collapsed_) {
-            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 2.0f));
+            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 5.0f));
 
             std::vector<SidebarProviderEntry> entries;
             bool loading = false;
@@ -273,7 +293,8 @@ namespace misty::panel {
             }
 
             if (entries.empty()) {
-                ImGui::TextDisabled(loading ? "  Loading providers..." : "  No providers configured");
+                ImGui::SetCursorPosX(padding + 4.0f);
+                ImGui::TextDisabled("%s", loading ? "Loading remote..." : "No remotes connected");
             } else {
                 for (const auto& entry : entries) {
                     const std::filesystem::path mount_path =
@@ -281,7 +302,14 @@ namespace misty::panel {
                         entry.provider_folder /
                         entry.remote_name;
 
-                    if (HoverListItem(entry.label.c_str(), content_width)) {
+                    const std::string provider_icon = provider_logo_path_for_id(entry.provider_folder);
+                    if (SidebarIconItem(entry.remote_name.c_str(),
+                                        entry.label.c_str(),
+                                        provider_icon.empty() ? "cloud-24" : provider_icon.c_str(),
+                                        content_width,
+                                        false,
+                                        34.0f,
+                                        !provider_icon.empty())) {
                         ensure_child_directory(RemoteMountChild{
                             RemoteMountParent{entry.provider_folder, entry.provider_folder, ""},
                             entry.remote_name,
@@ -399,26 +427,47 @@ namespace misty::panel {
 
         ImGui::BeginGroup();
 
-        if (SectionHeader("quick_access_hdr", "Quick access", quick_access_collapsed_, content_width))
+        if (SectionHeader("quick_access_hdr", "Quick access", quick_access_collapsed_, content_width, false))
             quick_access_collapsed_ = !quick_access_collapsed_;
 
         if (!quick_access_collapsed_) {
-            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 2.0f));
+            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 5.0f));
 
-            if (HoverListItem("Recent", content_width)) {
-                 if (navigation_handler_) {
-                     navigation_handler_(FileExplorerState::VIRTUAL_PATH_RECENT);
-                 }
+            std::string current_path;
+            const std::string active_key = active_explorer_state_key_provider_ ? active_explorer_state_key_provider_() : "Files";
+            auto& explorer_state = registry_.get_state<FileExplorerState>(active_key);
+            {
+                std::lock_guard<std::mutex> lock(explorer_state.mu);
+                current_path = explorer_state.current_path;
             }
-            if (HoverListItem("Starred", content_width)) {
-                 if (navigation_handler_) {
-                     navigation_handler_(FileExplorerState::VIRTUAL_PATH_STARRED);
-                 }
+
+            const char* home_env = std::getenv("HOME");
+            if (!home_env) {
+                home_env = std::getenv("USERPROFILE");
             }
-            if (HoverListItem("Trash", content_width)) {
-                 if (navigation_handler_) {
-                     navigation_handler_(FileExplorerState::VIRTUAL_PATH_TRASH);
-                 }
+            if (home_env) {
+                const std::string home_path = home_env;
+                struct Shortcut {
+                    const char* label;
+                    const char* icon;
+                    std::string path;
+                };
+                const std::vector<Shortcut> shortcuts = {
+                    {"Home", "file-directory-open-fill-24", home_path},
+                    {"Desktop", "devices-24", home_path + "/Desktop"},
+                    {"Documents", "file-16", home_path + "/Documents"},
+                    {"Downloads", "download-16", home_path + "/Downloads"},
+                    {"Projects", "file-directory-24", home_path + "/Projects"},
+                };
+
+                for (const Shortcut& shortcut : shortcuts) {
+                    const bool selected = SamePath(current_path, shortcut.path);
+                    if (SidebarIconItem(shortcut.label, shortcut.label, shortcut.icon, content_width, selected)) {
+                        if (navigation_handler_) {
+                            navigation_handler_(shortcut.path);
+                        }
+                    }
+                }
             }
 
             ImGui::PopStyleVar();

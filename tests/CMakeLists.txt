@@ -20,6 +20,7 @@ if(BUILD_TESTING AND (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STRE
             "${CMAKE_SOURCE_DIR}/src/core/file_sync/file_sync_master.cpp"
             "${CMAKE_SOURCE_DIR}/src/core/file_sync/file_sync_poller.cpp"
             "${CMAKE_SOURCE_DIR}/src/core/file_sync/file_sync_runner.cpp"
+            "${CMAKE_SOURCE_DIR}/src/core/file_sync/file_sync_store.cpp"
             "${CMAKE_SOURCE_DIR}/src/core/file_sync/file_sync_watcher.cpp"
             "${CMAKE_SOURCE_DIR}/src/core/file_sync/file_sync_watcher.h"
             "${CMAKE_SOURCE_DIR}/src/core/threading/worker_pool.cpp"
