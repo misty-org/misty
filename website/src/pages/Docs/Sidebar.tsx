@@ -53,11 +53,11 @@ export default function Sidebar({
 
   return (
     <>
-      <aside className="docs-sidebar hidden lg:block">{inner}</aside>
+      <aside className="sticky top-16 h-[calc(100vh-4rem)] overflow-y-auto border-r border-border-subtle hidden lg:block">{inner}</aside>
       {open && (
         <>
-          <div className="docs-sidebar-overlay" onClick={onClose} />
-          <aside className="docs-sidebar-mobile">{inner}</aside>
+          <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+          <aside className="fixed top-0 left-0 bottom-0 z-50 w-[280px] bg-surface border-r border-border overflow-y-auto">{inner}</aside>
         </>
       )}
     </>

@@ -13,7 +13,7 @@ export default function CenterPanel({ section }: { section: Section }) {
 
 export function GuideCenterPanel({ section }: { section: GuideSection }) {
   return (
-    <div className="docs-center">
+    <div className="px-6 py-8 sm:px-8 sm:py-10 min-w-0">
       <h1 className="text-2xl font-bold text-text mb-6">{section.title}</h1>
       <div id={`${section.id}-overview`} className="flex flex-col gap-4 text-sm leading-relaxed text-text-secondary scroll-mt-20">
         {section.prose.map((p, i) => (
@@ -34,7 +34,7 @@ export function GuideCenterPanel({ section }: { section: GuideSection }) {
 
 export function ApiCenterPanel({ section }: { section: ApiSection }) {
   return (
-    <div className="docs-center">
+    <div className="px-6 py-8 sm:px-8 sm:py-10 min-w-0">
       <div className="flex items-center gap-3 mb-2">
         <h1 className="text-2xl font-bold text-text">{section.title}</h1>
         {section.badge && (

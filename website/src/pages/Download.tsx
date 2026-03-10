@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { GlowCard } from "../components/GlowCard";
 import { SiApple, SiLinux } from "react-icons/si";
 import { FaWindows } from "react-icons/fa6";
+import { HiOutlineArrowDownTray, HiOutlineChevronDown } from "react-icons/hi2";
 
 const platforms = [
   {
@@ -21,36 +23,114 @@ const platforms = [
     name: "Linux",
     arch: "x86_64 / ARM64",
     icon: <SiLinux className="w-8 h-8" />,
-    available: false,
+    available: true,
     accent: "from-success/20 to-success/5",
   },
 ];
 
 const requirements = [
-  { label: "OS", value: "Windows 10+, macOS 12+, or Linux (coming soon)" },
+  { label: "OS", value: "Windows 10+, macOS 12+, or Linux" },
   { label: "RAM", value: "4 GB minimum, 8 GB recommended" },
   { label: "Storage", value: "100 MB for the application" },
   { label: "Network", value: "Internet connection for cloud access" },
 ];
+
+const releases = [
+  {
+    version: "v0.3.0",
+    date: "March 2026",
+    notes: [
+      "Linux support for x86_64 and ARM64",
+      "New drag-and-drop transfer interface",
+      "Improved connection stability for Google Drive and OneDrive",
+      "Dark mode refinements and accessibility improvements",
+    ],
+  },
+  {
+    version: "v0.2.1",
+    date: "February 2026",
+    notes: [
+      "Fixed crash when reconnecting expired OAuth sessions",
+      "Improved file upload progress reporting",
+      "Minor UI polish and animation fixes",
+    ],
+  },
+  {
+    version: "v0.2.0",
+    date: "January 2026",
+    notes: [
+      "Multi-account support for all providers",
+      "Misty clipboard for cross-provider file operations",
+      "Batch rename and bulk actions",
+      "Performance improvements for large directories",
+    ],
+  },
+  {
+    version: "v0.1.0",
+    date: "December 2025",
+    notes: [
+      "Initial release with Windows and macOS support",
+      "Google Drive, OneDrive, and iCloud integration",
+      "Unified file browser with search",
+      "Secure local-only proxy architecture",
+    ],
+  },
+];
+
+function ReleaseItem({
+  version,
+  date,
+  notes,
+}: {
+  version: string;
+  date: string;
+  notes: string[];
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="border-b border-border last:border-none">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between gap-4 py-4 text-left text-sm font-medium text-text hover:text-text transition-colors cursor-pointer"
+      >
+        <span>
+          {version}{" "}
+          <span className="text-text-muted font-normal">— {date}</span>
+        </span>
+        <HiOutlineChevronDown
+          className={`w-4 h-4 shrink-0 text-text-muted transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+      {open && (
+        <ul className="pb-4 pl-4 space-y-1.5">
+          {notes.map((note) => (
+            <li
+              key={note}
+              className="text-sm text-text-muted leading-relaxed list-disc"
+            >
+              {note}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 export default function Download() {
   return (
     <div className="max-w-6xl mx-auto px-6 py-20">
       {/* Header */}
       <div className="text-center mb-16">
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-border bg-surface/50 mb-6">
-          <svg className="w-3.5 h-3.5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-          </svg>
-          <span className="text-xs font-medium text-text-muted">Latest Release</span>
-        </div>
+        
         <h1 className="text-3xl md:text-5xl font-bold text-text mb-5 text-balance">
           Download
         </h1>
-        <p className="text-text-muted max-w-lg mx-auto text-pretty leading-relaxed">
-          Fast, lightweight, and free. Get the Misty desktop app for your
-          platform and bring all your files together.
-        </p>
+        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-border bg-surface/50 mb-6">
+          <HiOutlineArrowDownTray className="w-3.5 h-3.5 text-primary" />
+          <span className="text-xs font-medium text-text-muted">Latest Release</span>
+        </div>
       </div>
 
       {/* Platform cards */}
@@ -65,18 +145,27 @@ export default function Download() {
                 {platform.name}
               </h3>
               <p className="text-sm text-text-muted mb-6">{platform.arch}</p>
-              {platform.available ? (
-                <button className="w-full px-4 py-3 bg-zinc-100 hover:bg-gray-200 text-black text-sm font-medium rounded-xl transition-all duration-300 shadow-lg hover:-translate-y-0.5">
-                  Download
-                </button>
-              ) : (
-                <span className="inline-flex items-center justify-center w-full px-4 py-3 bg-elevated text-text-muted text-sm font-medium rounded-xl border border-border">
-                  Coming Soon
-                </span>
-              )}
+              <button className="w-full px-4 py-3 bg-zinc-100 hover:bg-gray-200 text-black text-sm font-medium rounded-xl transition-all duration-300 shadow-lg hover:-translate-y-0.5">
+                Download
+              </button>
             </div>
           </GlowCard>
         ))}
+      </div>
+
+      {/* Releases */}
+      <div className="max-w-2xl mx-auto mb-20">
+        <h2 className="text-lg font-semibold text-text mb-6">Releases</h2>
+        <div>
+          {releases.map((release) => (
+            <ReleaseItem
+              key={release.version}
+              version={release.version}
+              date={release.date}
+              notes={release.notes}
+            />
+          ))}
+        </div>
       </div>
 
       {/* System requirements */}

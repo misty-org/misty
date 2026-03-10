@@ -8,8 +8,8 @@ export default function CodeBlock({ label, code }: { label: string; code: string
     setTimeout(() => setCopied(false), 1500);
   };
   return (
-    <div className="docs-code-block">
-      <div className="docs-code-header">
+    <div className="rounded-xl overflow-hidden border border-border bg-[rgba(9,9,11,0.6)]">
+      <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-[rgba(17,17,19,0.5)]">
         <span className="text-xs font-medium text-text-muted">{label}</span>
         <button onClick={copy} className="text-xs text-text-muted hover:text-text transition-colors cursor-pointer">
           {copied ? "Copied!" : "Copy"}
