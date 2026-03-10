@@ -6,7 +6,7 @@
 #include <chrono>
 #include <atomic>
 #include <functional>
-#include "core/ui/ui_registry.h"
+#include "core/ui/state_registry.h"
 
 namespace misty::panel {
 
@@ -39,7 +39,7 @@ namespace misty::panel {
         }
     };
 
-    class DownloadState : public core::UIState {
+    class DownloadState : public core::StateEntry {
     public:
         static constexpr size_t MAX_HISTORY = 50;
 

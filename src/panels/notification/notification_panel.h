@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/ui/ui_registry.h"
+#include "core/ui/state_registry.h"
 #include "panels/panel/panel.h"
 #include "notification_state.h"
 
@@ -8,7 +8,7 @@ namespace misty::panel {
 
     class NotificationPanel : public Panel {
     public:
-        NotificationPanel(core::UIRegistry& registry);
+        NotificationPanel(core::StateRegistry& registry);
         ~NotificationPanel() override = default;
 
         void render() override;
@@ -16,7 +16,7 @@ namespace misty::panel {
     private:
         void render_capsule(const Notification& notif);
 
-        core::UIRegistry& registry_;
+        core::StateRegistry& registry_;
 
         static constexpr float CAPSULE_HEIGHT = 32.0f;
         static constexpr float CAPSULE_MAX_WIDTH = 300.0f;

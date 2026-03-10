@@ -29,15 +29,37 @@ namespace misty::panel {
     ImU32 grid_item_icon_color(const FileListing& listing, const FileItem& file);
 
     namespace {
-        constexpr float kExplorerLeftInset = 8.0f;
         constexpr ImVec4 kInspectorBg = ImVec4(0.075f, 0.085f, 0.10f, 1.0f);
         constexpr ImVec4 kInspectorCardBg = ImVec4(0.105f, 0.115f, 0.135f, 0.96f);
         constexpr ImVec4 kInspectorBorder = ImVec4(0.22f, 0.25f, 0.31f, 1.0f);
         constexpr ImVec4 kInspectorMuted = ImVec4(0.58f, 0.61f, 0.68f, 1.0f);
         constexpr ImVec4 kMistyAccent = ImVec4(0.36f, 0.58f, 0.95f, 1.0f);
+        constexpr float kToolbarPadX = 8.0f;
+        constexpr float kToolbarPadY = 4.0f;
+        constexpr float kToolbarButtonHeight = 34.0f;
+        constexpr float kToolbarHeight = kToolbarButtonHeight + kToolbarPadY * 2.0f;
+        constexpr float kPanePathHeaderHeight = 28.0f;
 
         std::string remote_sync_key(const std::string& remote_name, const std::string& remote_path) {
             return remote_name + ":" + remote_path;
+        }
+
+        std::string fit_text_with_ellipsis(const std::string& text, float max_width) {
+            if (text.empty() || ImGui::CalcTextSize(text.c_str()).x <= max_width) {
+                return text;
+            }
+
+            constexpr const char* kEllipsis = "...";
+            const float ellipsis_width = ImGui::CalcTextSize(kEllipsis).x;
+            if (ellipsis_width >= max_width) {
+                return kEllipsis;
+            }
+
+            std::string clipped = text;
+            while (!clipped.empty() && ImGui::CalcTextSize((clipped + kEllipsis).c_str()).x > max_width) {
+                clipped.pop_back();
+            }
+            return clipped + kEllipsis;
         }
 
         void hydrate_local_sync_states(std::vector<FileItem>& items) {
@@ -141,6 +163,95 @@ namespace misty::panel {
             return out;
         }
 
+        std::string format_status_time(std::chrono::system_clock::time_point value) {
+            if (value.time_since_epoch().count() == 0) {
+                return {};
+            }
+            const std::time_t raw = std::chrono::system_clock::to_time_t(value);
+            std::tm local {};
+#if defined(_WIN32)
+            localtime_s(&local, &raw);
+#else
+            localtime_r(&raw, &local);
+#endif
+            char buffer[32];
+            if (std::strftime(buffer, sizeof(buffer), "%I:%M %p", &local) == 0) {
+                return {};
+            }
+            std::string out(buffer);
+            if (!out.empty() && out.front() == '0') {
+                out.erase(out.begin());
+            }
+            return out;
+        }
+
+        bool is_hidden_listing_item(const FileItem& item) {
+            const std::string name = item.name.empty() ? fs::path(item.path).filename().string() : item.name;
+            return !name.empty() && name.front() == '.';
+        }
+
+        std::string item_count_label(std::size_t count) {
+            std::ostringstream out;
+            out << count << (count == 1 ? " item" : " items");
+            return out.str();
+        }
+
+        std::string build_directory_status_text(const FileListing& listing,
+                                                const FileExplorerPanel::TransientUiState& ui,
+                                                const std::string& current_path) {
+            const bool is_remote = remote_browse_target_for(current_path).has_value();
+            if (listing.is_loading) {
+                return is_remote ? "Syncing..." : "Loading...";
+            }
+
+            std::ostringstream out;
+            if (!ui.selected_files.empty()) {
+                out << ui.selected_files.size() << " selected";
+            } else {
+                out << item_count_label(listing.files.size());
+                if (ui.show_hidden) {
+                    const auto hidden_count = std::count_if(listing.files.begin(), listing.files.end(), is_hidden_listing_item);
+                    if (hidden_count > 0) {
+                        out << " (" << hidden_count << " hidden)";
+                    }
+                }
+            }
+
+            const auto freshness = is_remote
+                ? format_status_time(listing.last_synced_at)
+                : format_status_time(listing.last_refreshed_at);
+            if (!freshness.empty()) {
+                out << " - Last " << (is_remote ? "synced " : "refreshed ") << freshness;
+            }
+            return out.str();
+        }
+
+        void render_misty_ai_status_slot(float width, float height) {
+            constexpr float kIconSize = 16.0f;
+            const ImVec2 cursor = ImGui::GetCursorScreenPos();
+            const ImVec2 size(width, height);
+            ImGui::InvisibleButton("##misty_ai_status_placeholder", size);
+            const bool hovered = ImGui::IsItemHovered();
+
+            const ImVec2 center(cursor.x + width * 0.5f, cursor.y + height * 0.5f);
+            auto& icon = core::AssetManager::get().get_svg_texture_path(
+                "assets/icons/cloud-24.svg",
+                static_cast<int>(kIconSize * 2.0f));
+            if (icon.id != 0) {
+                const ImVec2 icon_min(center.x - kIconSize * 0.5f, center.y - kIconSize * 0.5f);
+                const ImU32 tint = hovered ? IM_COL32(150, 176, 220, 165) : IM_COL32(118, 130, 154, 130);
+                ImGui::GetWindowDrawList()->AddImage(icon.id,
+                                                     icon_min,
+                                                     ImVec2(icon_min.x + kIconSize, icon_min.y + kIconSize),
+                                                     ImVec2(0, 0),
+                                                     ImVec2(1, 1),
+                                                     tint);
+            }
+            if (hovered) {
+                ImGui::SetTooltip("Ask MistyAI about this folder");
+            }
+        }
+
         std::string modified_time_for_path(const std::string& path) {
             if (path.empty() || path.rfind("misty://", 0) == 0) {
                 return {};
@@ -198,16 +309,15 @@ namespace misty::panel {
 
         void begin_inspector_card(const char* id, float height = 0.0f) {
             ImGui::PushStyleColor(ImGuiCol_ChildBg, kInspectorCardBg);
-            ImGui::PushStyleColor(ImGuiCol_Border, kInspectorBorder);
             ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 7.0f);
-            ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 1.0f);
-            ImGui::BeginChild(id, ImVec2(0.0f, height), true, ImGuiWindowFlags_NoScrollbar);
+            ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 0.0f);
+            ImGui::BeginChild(id, ImVec2(0.0f, height), false, ImGuiWindowFlags_NoScrollbar);
         }
 
         void end_inspector_card() {
             ImGui::EndChild();
             ImGui::PopStyleVar(2);
-            ImGui::PopStyleColor(2);
+            ImGui::PopStyleColor();
         }
 
         bool inspector_action_tile(const char* id,
@@ -296,6 +406,11 @@ namespace misty::panel {
     }
 
     std::string FileExplorerPanel::tab_title() const {
+        if (const auto* active_explorer = dynamic_cast<const FileExplorerPanel*>(active_panel())) {
+            if (active_explorer != this) {
+                return active_explorer->tab_title();
+            }
+        }
         const auto& state = registry_.get_state<FileExplorerState>(state_key_);
         if (state.current_path[0] != '\0') {
             return file_explorer_tab_title_for_path(state.current_path);
@@ -498,19 +613,7 @@ namespace misty::panel {
     void FileExplorerPanel::render_panel_contents() {
         auto& state = registry_.get_state<FileExplorerState>(state_key_);
         auto& listing = active_listing();
-        auto& search_state = registry_.get_state<SearchState>(search_state_key_);
         std::unique_lock<std::mutex> lock(state.mu);
-
-        if (ImGui::BeginChild("TopBar", ImVec2(0.0f, 62.0f), false, ImGuiWindowFlags_NoScrollbar)) {
-            ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.075f, 0.085f, 0.10f, 1.0f));
-            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + kExplorerLeftInset);
-            ImGui::SetCursorPosY(9.0f);
-            show_command_toolbar(state, search_state);
-            ImGui::PopStyleColor();
-        }
-        ImGui::EndChild();
-
-        ImGui::Separator();
 
         const float available_h = ImGui::GetContentRegionAvail().y;
         const float status_bar_height = 30.0f;
@@ -548,8 +651,32 @@ namespace misty::panel {
         ImGui::EndChild();
 
         ImGui::Separator();
+        const std::string status_text = build_directory_status_text(listing, ui_, state.current_path);
         if (ImGui::BeginChild("BottomStatusBar", ImVec2(0.0f, status_bar_height), false, ImGuiWindowFlags_NoScrollbar)) {
-            ImGui::Dummy(ImVec2(1.0f, 1.0f));
+            constexpr float kStatusPadX = 10.0f;
+            constexpr float kStatusPadY = 5.0f;
+            constexpr float kRightActionWidth = 34.0f;
+            const ImVec2 avail = ImGui::GetContentRegionAvail();
+            const float zone_width = std::max(0.0f, avail.x - kStatusPadX * 2.0f);
+            const float left_width = std::max(0.0f, zone_width * 0.5f);
+            const float right_width = std::max(0.0f, zone_width - left_width);
+            const float content_height = std::max(0.0f, avail.y - kStatusPadY * 2.0f);
+
+            ImGui::SetCursorPos(ImVec2(kStatusPadX, kStatusPadY));
+            ImGui::BeginChild("##status_left", ImVec2(left_width, content_height), false,
+                              ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+            ImGui::PushStyleColor(ImGuiCol_Text, kInspectorMuted);
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextUnformatted(status_text.c_str());
+            ImGui::PopStyleColor();
+            ImGui::EndChild();
+
+            ImGui::SameLine(0.0f, 0.0f);
+            ImGui::BeginChild("##status_right", ImVec2(right_width, content_height), false,
+                              ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+            ImGui::SetCursorPosX(std::max(0.0f, right_width - kRightActionWidth));
+            render_misty_ai_status_slot(kRightActionWidth, content_height);
+            ImGui::EndChild();
         }
         ImGui::EndChild();
         ImGui::PopStyleColor(5);
@@ -558,8 +685,97 @@ namespace misty::panel {
         update_periodic_save(state);
     }
 
+    float FileExplorerPanel::pane_header_height(const Panel& panel, bool is_active, bool has_multiple_panes) const {
+        (void)panel;
+        (void)is_active;
+        return has_multiple_panes ? kPanePathHeaderHeight : 0.0f;
+    }
+
+    void FileExplorerPanel::render_pane_header(Panel& panel, bool is_active, bool has_multiple_panes) {
+        if (!has_multiple_panes) {
+            return;
+        }
+
+        auto* explorer = dynamic_cast<FileExplorerPanel*>(&panel);
+        if (!explorer) {
+            return;
+        }
+
+        std::string current_path;
+        {
+            auto& state = registry_.get_state<FileExplorerState>(explorer->state_key_);
+            std::lock_guard<std::mutex> lock(state.mu);
+            current_path = state.current_path;
+        }
+
+        const std::string title = current_path.empty() ? "Files" : file_explorer_tab_title_for_path(current_path);
+        ImGui::PushStyleColor(ImGuiCol_ChildBg,
+                              is_active ? ImVec4(0.088f, 0.102f, 0.126f, 1.0f)
+                                        : ImVec4(0.070f, 0.078f, 0.092f, 1.0f));
+        if (ImGui::BeginChild("##explorer_pane_path_header",
+                              ImVec2(0.0f, kPanePathHeaderHeight),
+                              false,
+                              ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse)) {
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            const ImVec2 min = ImGui::GetWindowPos();
+            const ImVec2 max(min.x + ImGui::GetWindowWidth(), min.y + kPanePathHeaderHeight);
+            const ImU32 border = is_active ? IM_COL32(76, 122, 202, 210) : IM_COL32(46, 50, 60, 180);
+            const ImU32 title_col = is_active ? IM_COL32(238, 242, 249, 255) : IM_COL32(178, 185, 198, 255);
+            const ImU32 path_col = is_active ? IM_COL32(154, 164, 184, 255) : IM_COL32(112, 120, 136, 255);
+            dl->AddRectFilled(ImVec2(min.x, min.y), ImVec2(min.x + 3.0f, max.y),
+                              is_active ? ImGui::ColorConvertFloat4ToU32(kMistyAccent) : IM_COL32(70, 76, 90, 180));
+            dl->AddLine(ImVec2(min.x, max.y - 1.0f), ImVec2(max.x, max.y - 1.0f), border, 1.0f);
+
+            constexpr float kPadX = 10.0f;
+            const float text_y = min.y + (kPanePathHeaderHeight - ImGui::GetTextLineHeight()) * 0.5f;
+            const float title_width = std::min(ImGui::CalcTextSize(title.c_str()).x, std::max(52.0f, ImGui::GetWindowWidth() * 0.34f));
+            const std::string visible_title = fit_text_with_ellipsis(title, title_width);
+            dl->AddText(ImVec2(min.x + kPadX, text_y), title_col, visible_title.c_str());
+
+            const float path_x = min.x + kPadX + title_width + 12.0f;
+            const float path_width = std::max(0.0f, max.x - path_x - kPadX);
+            if (path_width > 24.0f && !current_path.empty()) {
+                const std::string visible_path = fit_text_with_ellipsis(current_path, path_width);
+                ImGui::PushClipRect(ImVec2(path_x, min.y), ImVec2(max.x - kPadX, max.y), true);
+                dl->AddText(ImVec2(path_x, text_y), path_col, visible_path.c_str());
+                ImGui::PopClipRect();
+            }
+
+            if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup)) {
+                ImGui::SetTooltip("%s", current_path.empty() ? title.c_str() : current_path.c_str());
+            }
+        }
+        ImGui::EndChild();
+        ImGui::PopStyleColor();
+    }
+
     void FileExplorerPanel::render() {
         MultiPanel::render();
+    }
+
+    float FileExplorerPanel::toolbar_height() const {
+        return kToolbarHeight;
+    }
+
+    void FileExplorerPanel::render_active_toolbar() {
+        if (auto* active_explorer = dynamic_cast<FileExplorerPanel*>(active_panel())) {
+            if (active_explorer != this) {
+                active_explorer->render_active_toolbar();
+                return;
+            }
+        }
+
+        auto& state = registry_.get_state<FileExplorerState>(state_key_);
+        auto& search_state = registry_.get_state<SearchState>(search_state_key_);
+        std::unique_lock<std::mutex> lock(state.mu);
+
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.075f, 0.085f, 0.10f, 1.0f));
+        if (ImGui::BeginChild("TopBar", ImVec2(0.0f, kToolbarHeight), false, ImGuiWindowFlags_NoScrollbar)) {
+            ImGui::SetCursorPos(ImVec2(kToolbarPadX, kToolbarPadY));
+            show_command_toolbar(state, search_state);
+        }
+        ImGui::EndChild();
+        ImGui::PopStyleColor();
     }
 
     void FileExplorerPanel::render_inspector() {
@@ -585,11 +801,12 @@ namespace misty::panel {
         ImGui::PushStyleColor(ImGuiCol_Separator, kInspectorBorder);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16.0f, 18.0f));
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8.0f, 10.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
         if (ImGui::Begin("FileInspector", nullptr, flags)) {
             render_inspector_contents();
         }
         ImGui::End();
-        ImGui::PopStyleVar(2);
+        ImGui::PopStyleVar(3);
         ImGui::PopStyleColor(2);
     }
 
@@ -707,7 +924,13 @@ namespace misty::panel {
                                                          bool force_remote_refresh) {
         auto& state = registry_.get_state<FileExplorerState>(state_key_);
         auto& listing = active_listing();
-        const bool is_remote_listing = remote_browse_target_for(path).has_value();
+        const auto remote_target = remote_browse_target_for(path);
+        const bool is_remote_listing = remote_target.has_value();
+        bool use_cached_remote_listing = false;
+        if (remote_target.has_value() && !force_remote_refresh) {
+            std::vector<FileMasterListItem> cached_items;
+            use_cached_remote_listing = load_cached_remote_path(remote_list_props_for(*remote_target), cached_items);
+        }
         const auto now = std::chrono::steady_clock::now();
         const auto minimum_animation_duration = std::chrono::duration_cast<std::chrono::steady_clock::duration>(
             std::chrono::duration<float>(misty::UI::MistyLoadingAnimationLoopSeconds()));
@@ -716,7 +939,7 @@ namespace misty::panel {
         // UI interactive and stream rows in batches instead of blocking until
         // the whole directory has been stat'ed.
         listing.is_loading = true;
-        if (is_remote_listing) {
+        if (is_remote_listing && !use_cached_remote_listing) {
             listing.loading.begin(load_generation, now, minimum_animation_duration);
         } else {
             listing.loading.cancel();
@@ -752,6 +975,7 @@ namespace misty::panel {
              show_hidden,
              load_generation,
              is_remote_listing,
+             use_cached_remote_listing,
              force_remote_refresh]() {
                 auto& state = registry->get_state<FileExplorerState>(state_key);
                 auto& listing = registry->get_state<FileListingsState>(kFileListingsStateKey).get_or_create(state_key);
@@ -773,7 +997,11 @@ namespace misty::panel {
                     }
                     if (final_flush) {
                         listing.is_loading = false;
-                        if (is_remote_listing) {
+                        const auto status_time = std::chrono::system_clock::now();
+                        if (!is_remote_listing) {
+                            listing.last_refreshed_at = status_time;
+                        }
+                        if (is_remote_listing && !use_cached_remote_listing) {
                             listing.loading.complete(
                                 load_generation,
                                 std::chrono::steady_clock::now());
@@ -797,32 +1025,28 @@ namespace misty::panel {
                 }
 
                 if (auto remote_target = remote_browse_target_for(path); remote_target.has_value()) {
-                    const bool cache_has_entries =
-                        fs::exists(path) &&
-                        fs::is_directory(path) &&
-                        fs::directory_iterator(path) != fs::directory_iterator();
-                    if (!force_remote_refresh && cache_has_entries) {
-                        try {
-                            for (const auto& entry : fs::directory_iterator(
-                                     path, fs::directory_options::skip_permission_denied)) {
-                                if (should_skip_local_entry(entry, show_hidden)) continue;
-                                FileItem item = make_local_file_item(entry);
-                                item.type = FileType::REMOTE;
-                                item.sync_remote_name = remote_target->remote_name;
-                                const fs::path rel = fs::path(item.path).lexically_relative(
-                                    fs::path(get_mount_root()) / remote_target->provider_folder / remote_target->remote_name);
-                                item.sync_remote_path = rel.generic_string();
-                                batch.push_back(std::move(item));
-                            }
-                            hydrate_remote_sync_states(batch);
-                            flush_batch(true);
-                            return;
-                        } catch (const std::exception&) {
+                    std::vector<FileMasterListItem> remote_items;
+                    const FileMasterProps remote_props = remote_list_props_for(*remote_target);
+                    if (!force_remote_refresh &&
+                        load_cached_remote_path(remote_props, remote_items)) {
+                        {
+                            std::error_code ec;
+                            fs::create_directories(path, ec);
                         }
+                        batch = remote_mount_items_for(*remote_target, remote_items);
+                        hydrate_remote_sync_states(batch);
+                        if (auto cached_time = cached_remote_path_time(remote_props)) {
+                            std::lock_guard<std::mutex> lk(state.mu);
+                            if (listing.load_generation.load(std::memory_order_relaxed) != load_generation) {
+                                return;
+                            }
+                            listing.last_synced_at = *cached_time;
+                        }
+                        flush_batch(true);
+                        return;
                     }
 
-                    std::vector<FileMasterListItem> remote_items;
-                    FileMasterResult remote_result = list_remote_path(remote_list_props_for(*remote_target), remote_items);
+                    FileMasterResult remote_result = list_remote_path(remote_props, remote_items);
                     if (!remote_result.success) {
                         std::lock_guard<std::mutex> lk(state.mu);
                         if (listing.load_generation.load(std::memory_order_relaxed) != load_generation) {
@@ -838,8 +1062,20 @@ namespace misty::panel {
                         return;
                     }
 
+                    {
+                        std::error_code ec;
+                        fs::create_directories(path, ec);
+                    }
                     batch = remote_mount_items_for(*remote_target, remote_items);
                     hydrate_remote_sync_states(batch);
+                    const auto fetched_time = cached_remote_path_time(remote_props).value_or(std::chrono::system_clock::now());
+                    {
+                        std::lock_guard<std::mutex> lk(state.mu);
+                        if (listing.load_generation.load(std::memory_order_relaxed) != load_generation) {
+                            return;
+                        }
+                        listing.last_synced_at = fetched_time;
+                    }
 
                     flush_batch(true);
                     return;
@@ -919,6 +1155,7 @@ namespace misty::panel {
             reset_selection(ui_);
             listing.is_loading = false;
             listing.loading.cancel();
+            listing.last_refreshed_at = std::chrono::system_clock::now();
             listing.sort_dirty = true;
             listing.note_listing_changed();
             {

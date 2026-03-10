@@ -4,7 +4,7 @@
 
 #include "views/app_view.h"
 #include "panels/auth/auth_login_panel.h"
-#include "core/ui/ui_registry.h"
+#include "core/ui/state_registry.h"
 
 using namespace misty::core;
 using namespace misty::panel;
@@ -12,7 +12,7 @@ using namespace misty::panel;
 namespace misty::view {
     class LoginView : public AppView {
     public:
-        LoginView(UIRegistry& ui_registry);
+        LoginView(StateRegistry& state_registry);
         ~LoginView() override = default;
 
         void render() override;
@@ -21,7 +21,7 @@ namespace misty::view {
     private:
         void init_panels();
     private:
-        UIRegistry& ui_registry_;
+        StateRegistry& state_registry_;
 
         std::shared_ptr<AuthLoginPanel> auth_login_panel_;
     };

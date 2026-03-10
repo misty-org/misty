@@ -7,7 +7,7 @@
 #include <vector>
 
 #include "core/threading/worker_pool.h"
-#include "core/ui/ui_registry.h"
+#include "core/ui/state_registry.h"
 #include "panels/file_explorer/state/file_listings_state.h"
 
 namespace misty::panel {
@@ -20,7 +20,7 @@ inline constexpr const char* kLibraryStateKey = "Files_Library";
 /**
  * @brief Shared persisted state for explorer Recent, Starred, and last opened path.
  */
-struct LibraryState : public core::UIState {
+struct LibraryState : public core::StateEntry {
     std::deque<FileItem> recent_files;
     std::vector<FileItem> starred_files;
     std::string last_opened_path;

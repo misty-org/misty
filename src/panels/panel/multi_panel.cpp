@@ -21,6 +21,53 @@ namespace misty::panel {
             return std::clamp(ratio * total, effective_min, total - effective_min);
         }
 
+        core::WorkspaceTabSnapshot to_workspace_tab(const TabController::ClosedTabSnapshot& snapshot) {
+            core::WorkspaceTabSnapshot out;
+            out.context_key = snapshot.context_key;
+            out.state_key = snapshot.state_key;
+            out.title = snapshot.title;
+            out.restore_state = snapshot.restore_state;
+            out.idx = snapshot.idx;
+            return out;
+        }
+
+        TabController::ClosedTabSnapshot from_workspace_tab(const core::WorkspaceTabSnapshot& snapshot) {
+            TabController::ClosedTabSnapshot out;
+            out.context_key = snapshot.context_key;
+            out.state_key = snapshot.state_key;
+            out.title = snapshot.title;
+            out.restore_state = snapshot.restore_state;
+            out.idx = snapshot.idx;
+            return out;
+        }
+
+        std::vector<core::WorkspaceTabSnapshot> to_workspace_tabs(
+            const std::vector<TabController::ClosedTabSnapshot>& snapshots) {
+            std::vector<core::WorkspaceTabSnapshot> out;
+            out.reserve(snapshots.size());
+            for (const auto& snapshot : snapshots) {
+                out.push_back(to_workspace_tab(snapshot));
+            }
+            return out;
+        }
+
+        std::vector<TabController::ClosedTabSnapshot> from_workspace_tabs(
+            const std::vector<core::WorkspaceTabSnapshot>& snapshots) {
+            std::vector<TabController::ClosedTabSnapshot> out;
+            out.reserve(snapshots.size());
+            for (const auto& snapshot : snapshots) {
+                out.push_back(from_workspace_tab(snapshot));
+            }
+            return out;
+        }
+
+        void draw_split_divider(const ImVec2& min, const ImVec2& max, bool hovered, bool active) {
+            const ImU32 color = active ? IM_COL32(82, 92, 112, 210)
+                              : hovered ? IM_COL32(68, 76, 92, 185)
+                                        : IM_COL32(48, 52, 62, 150);
+            ImGui::GetWindowDrawList()->AddRectFilled(min, max, color);
+        }
+
     }
 
     // initialize the panel with a default pane and grid lane
@@ -54,6 +101,163 @@ namespace misty::panel {
         return tab ? tab->panel.get() : nullptr;
     }
 
+    float MultiPanel::pane_header_height(const Panel& panel, bool is_active, bool has_multiple_panes) const {
+        (void)panel;
+        (void)is_active;
+        (void)has_multiple_panes;
+        return 0.0f;
+    }
+
+    void MultiPanel::render_pane_header(Panel& panel, bool is_active, bool has_multiple_panes) {
+        (void)panel;
+        (void)is_active;
+        (void)has_multiple_panes;
+    }
+
+    core::WorkspaceExplorerSnapshot MultiPanel::export_workspace_snapshot() const {
+        const_cast<MultiPanel*>(this)->default_multi_panel();
+
+        core::WorkspaceExplorerSnapshot snapshot;
+        snapshot.active_pane_id = active_pane_id;
+        snapshot.next_tab_idx = next_tab_idx_;
+        snapshot.next_pane_idx = next_pane_idx_;
+        snapshot.grid_pane_ids = grid_pane_ids();
+        snapshot.grid_split_ratio = grid_split_ratio_;
+        snapshot.lane_split_ratios = {lane_split_ratios_[0], lane_split_ratios_[1]};
+
+        for (const auto& lane : snapshot.grid_pane_ids) {
+            for (const auto& pane_id : lane) {
+                const Pane* pane = get_pane(pane_id);
+                if (!pane) {
+                    continue;
+                }
+                core::WorkspacePaneSnapshot pane_snapshot;
+                pane_snapshot.pane_id = pane->pane_id;
+                pane_snapshot.tabs = to_workspace_tabs(pane->tab_controller.export_tab_snapshots());
+                pane_snapshot.closed_tabs = to_workspace_tabs(pane->tab_controller.closed_tabs);
+                pane_snapshot.active_tab_idx = pane->tab_controller.active_tab_index();
+                snapshot.panes.push_back(std::move(pane_snapshot));
+            }
+        }
+
+        for (const auto& [pane_id, pane] : panes) {
+            const auto already_exported = std::any_of(snapshot.panes.begin(), snapshot.panes.end(),
+                [&](const core::WorkspacePaneSnapshot& exported) { return exported.pane_id == pane_id; });
+            if (already_exported) {
+                continue;
+            }
+            core::WorkspacePaneSnapshot pane_snapshot;
+            pane_snapshot.pane_id = pane.pane_id;
+            pane_snapshot.tabs = to_workspace_tabs(pane.tab_controller.export_tab_snapshots());
+            pane_snapshot.closed_tabs = to_workspace_tabs(pane.tab_controller.closed_tabs);
+            pane_snapshot.active_tab_idx = pane.tab_controller.active_tab_index();
+            snapshot.panes.push_back(std::move(pane_snapshot));
+        }
+
+        for (const auto& closed_pane : closed_pane_snapshots_) {
+            core::WorkspaceClosedPaneSnapshot pane_snapshot;
+            pane_snapshot.pane_id = closed_pane.pane_id;
+            pane_snapshot.tabs = to_workspace_tabs(closed_pane.tabs);
+            pane_snapshot.closed_tabs = to_workspace_tabs(closed_pane.closed_tabs);
+            pane_snapshot.active_tab_idx = closed_pane.active_tab_idx;
+            pane_snapshot.restore_mode = closed_pane.restore_mode == PaneRestoreMode::NewLane ? "new_lane" : "same_lane";
+            pane_snapshot.lane_index = closed_pane.lane_index;
+            pane_snapshot.row_index = closed_pane.row_index;
+            snapshot.closed_panes.push_back(std::move(pane_snapshot));
+        }
+
+        return snapshot;
+    }
+
+    void MultiPanel::restore_workspace_snapshot(const core::WorkspaceExplorerSnapshot& snapshot) {
+        if (snapshot.panes.empty()) {
+            initialized_ = false;
+            default_multi_panel();
+            return;
+        }
+
+        for (auto& [_, pane] : panes) {
+            pane.tab_controller.release_all_tabs();
+        }
+        panes.clear();
+        grid_.lanes.clear();
+        closed_pane_snapshots_.clear();
+
+        next_tab_idx_ = std::max<std::int16_t>(1, snapshot.next_tab_idx);
+        next_pane_idx_ = std::max<std::int16_t>(1, snapshot.next_pane_idx);
+        grid_split_ratio_ = std::clamp(snapshot.grid_split_ratio, 0.05f, 0.95f);
+        if (!snapshot.lane_split_ratios.empty()) {
+            lane_split_ratios_[0] = std::clamp(snapshot.lane_split_ratios[0], 0.05f, 0.95f);
+        }
+        if (snapshot.lane_split_ratios.size() > 1) {
+            lane_split_ratios_[1] = std::clamp(snapshot.lane_split_ratios[1], 0.05f, 0.95f);
+        }
+
+        for (const auto& pane_snapshot : snapshot.panes) {
+            if (pane_snapshot.pane_id.empty()) {
+                continue;
+            }
+
+            Pane pane;
+            pane.pane_id = pane_snapshot.pane_id;
+            pane.tab_controller.set_restore_tab_factory(
+                [this](std::int16_t restore_tab_idx) { return create_default_tab(restore_tab_idx); });
+            pane.tab_controller.restore_tabs_from_snapshots(
+                from_workspace_tabs(pane_snapshot.tabs),
+                [this](std::int16_t tab_idx) { return create_default_tab(tab_idx); },
+                pane_snapshot.active_tab_idx);
+            pane.tab_controller.restore_closed_tab_snapshots(from_workspace_tabs(pane_snapshot.closed_tabs));
+            if (pane.tab_controller.tab_count() == 0) {
+                pane.tab_controller.add_tab(create_default_tab(next_tab_idx_++));
+            }
+            add_pane(pane);
+        }
+
+        for (const auto& lane_snapshot : snapshot.grid_pane_ids) {
+            MultiPanelGrid::GridLane lane;
+            for (const auto& pane_id : lane_snapshot) {
+                if (panes.find(pane_id) != panes.end()) {
+                    lane.pane_ids.push_back(pane_id);
+                }
+            }
+            if (!lane.pane_ids.empty()) {
+                grid_.lanes.push_back(std::move(lane));
+            }
+        }
+
+        if (grid_.lanes.empty() && !panes.empty()) {
+            grid_.lanes.push_back(MultiPanelGrid::GridLane{.pane_ids = {panes.begin()->first}});
+        }
+
+        for (const auto& closed_snapshot : snapshot.closed_panes) {
+            ClosedPaneSnapshot closed_pane;
+            closed_pane.pane_id = closed_snapshot.pane_id;
+            closed_pane.tabs = from_workspace_tabs(closed_snapshot.tabs);
+            closed_pane.closed_tabs = from_workspace_tabs(closed_snapshot.closed_tabs);
+            closed_pane.active_tab_idx = closed_snapshot.active_tab_idx;
+            closed_pane.restore_mode =
+                closed_snapshot.restore_mode == "new_lane" ? PaneRestoreMode::NewLane : PaneRestoreMode::SameLane;
+            closed_pane.lane_index = closed_snapshot.lane_index;
+            closed_pane.row_index = closed_snapshot.row_index;
+            closed_pane_snapshots_.push_back(std::move(closed_pane));
+        }
+        if (closed_pane_snapshots_.size() > kMaxClosedPanes) {
+            closed_pane_snapshots_.erase(
+                closed_pane_snapshots_.begin(),
+                closed_pane_snapshots_.end() - static_cast<std::ptrdiff_t>(kMaxClosedPanes));
+        }
+
+        normalize_grid();
+        if (panes.find(snapshot.active_pane_id) != panes.end()) {
+            active_pane_id = snapshot.active_pane_id;
+        } else if (!grid_.lanes.empty() && !grid_.lanes.front().pane_ids.empty()) {
+            active_pane_id = grid_.lanes.front().pane_ids.front();
+        } else {
+            active_pane_id.clear();
+        }
+        initialized_ = true;
+    }
+
     void MultiPanel::default_multi_panel() {
         if (initialized_) {
             return;
@@ -83,12 +287,6 @@ namespace misty::panel {
             return;
         }
 
-        if (core::CommandManager::get().matches("explorer.new_tab")) {
-            create_new_tab(*active_pane);
-        }
-        if (core::CommandManager::get().matches("explorer.restore_tab")) {
-            active_pane->tab_controller.restore_tab();
-        }
         if (core::CommandManager::get().matches("explorer.split_vertical")) {
             split_active_vertical();
         }
@@ -101,16 +299,6 @@ namespace misty::panel {
         if (core::CommandManager::get().matches("explorer.restore_pane")) {
             restore_last_closed_pane();
         }
-    }
-
-    void MultiPanel::create_new_tab(Pane& pane) {
-        const std::int16_t tab_idx = next_tab_idx_++;
-        TabController::Tab tab = create_default_tab(tab_idx);
-        if (!tab.panel) {
-            error_msg_ = "Failed to create a default tab.";
-            return;
-        }
-        pane.tab_controller.add_tab(tab);
     }
 
     void MultiPanel::close_tab(Pane& pane, std::int16_t tab_idx) {
@@ -356,23 +544,31 @@ namespace misty::panel {
             return;
         }
 
-        const float total_height = std::max(0.0f, size.y - kPaneHandleWidth);
+        const float total_height = std::max(0.0f, size.y - kPaneDividerThickness);
         const float top_height = split_size(lane_split_ratios_[lane_index], total_height, kPaneMinHeight);
         const float bottom_height = std::max(0.0f, total_height - top_height);
 
         render_pane(lane[0], pos, ImVec2(size.x, top_height));
+        render_pane(lane[1],
+                    ImVec2(pos.x, pos.y + top_height + kPaneDividerThickness),
+                    ImVec2(size.x, bottom_height));
 
-        const ImVec2 splitter_pos(pos.x, pos.y + top_height);
+        const ImVec2 divider_min(pos.x, pos.y + top_height);
+        const ImVec2 divider_max(pos.x + size.x, divider_min.y + kPaneDividerThickness);
+        const ImVec2 splitter_pos(pos.x, divider_min.y - (kPaneHandleWidth - kPaneDividerThickness) * 0.5f);
         ImGui::SetCursorScreenPos(splitter_pos);
         ImGui::InvisibleButton(("##pane_lane_splitter_" + std::to_string(lane_index)).c_str(), ImVec2(size.x, kPaneHandleWidth));
+        const bool splitter_hovered = ImGui::IsItemHovered();
         if (ImGui::IsItemActive()) {
             lane_split_ratios_[lane_index] = std::clamp(
                 lane_split_ratios_[lane_index] + ImGui::GetIO().MouseDelta.y / std::max(1.0f, total_height),
                 0.1f,
                 0.9f);
         }
-
-        render_pane(lane[1], ImVec2(pos.x, pos.y + top_height + kPaneHandleWidth), ImVec2(size.x, bottom_height));
+        if (splitter_hovered || ImGui::IsItemActive()) {
+            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
+        }
+        draw_split_divider(divider_min, divider_max, splitter_hovered, ImGui::IsItemActive());
     }
 
     void MultiPanel::render_pane(const std::string& pane_id, const ImVec2& pos, const ImVec2& size) {
@@ -382,25 +578,14 @@ namespace misty::panel {
             return;
         }
 
-        const bool is_active_pane = pane_id == active_pane_id;
         ImGui::SetCursorScreenPos(pos);
         const std::string child_id = "##pane_" + pane_id;
-        const bool is_split_layout = pane_count() > 1;
         UI::WithStyle([&](UI::StyleScope& style) {
-            style.var(ImGuiStyleVar_ChildBorderSize, 1.0f);
-            if (is_active_pane) {
-                style.color(ImGuiCol_Border, is_split_layout
-                    ? ImVec4(0.46f, 0.48f, 0.52f, 0.70f)
-                    : ImVec4(1.0f, 1.0f, 1.0f, 0.95f));
-            } else {
-                style.color(ImGuiCol_Border, ImVec4(0.24f, 0.24f, 0.26f, 1.0f));
-                style.color(ImGuiCol_ChildBg, ImVec4(0.12f, 0.12f, 0.12f, 1.0f));
-            }
-
+            style.var(ImGuiStyleVar_ChildBorderSize, 0.0f);
             constexpr ImGuiWindowFlags pane_flags =
                 ImGuiWindowFlags_NoScrollbar |
                 ImGuiWindowFlags_NoScrollWithMouse;
-            if (ImGui::BeginChild(child_id.c_str(), size, ImGuiChildFlags_Borders, pane_flags)) {
+            if (ImGui::BeginChild(child_id.c_str(), size, ImGuiChildFlags_None, pane_flags)) {
                 const bool pane_clicked =
                     ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup | ImGuiHoveredFlags_ChildWindows) &&
                     ImGui::IsMouseClicked(ImGuiMouseButton_Left);
@@ -409,30 +594,19 @@ namespace misty::panel {
                     active_pane_id = pane_id;
                 }
 
-                bool create_new_tab_requested = false;
-                std::int16_t close_tab_idx = -1;
-                pane->tab_controller.render_tab_bar(
-                    pane_id,
-                    &create_new_tab_requested,
-                    &close_tab_idx,
-                    [this](const TabController::Tab& tab) {
-                        if (!tab.panel) {
-                            error_msg_ = "Active tab has no panel.";
-                            return;
-                        }
-
-                        if (auto* multi_panel = dynamic_cast<MultiPanel*>(tab.panel.get())) {
-                            multi_panel->render_panel_contents();
-                        } else {
-                            tab.panel->render();
-                        }
-                    });
-
-                if (close_tab_idx >= 0) {
-                    close_tab(*pane, close_tab_idx);
-                }
-                if (create_new_tab_requested) {
-                    create_new_tab(*pane);
+                const TabController::Tab* tab = pane->tab_controller.get_active_tab();
+                if (!tab || !tab->panel) {
+                    error_msg_ = "Active pane has no panel.";
+                } else if (auto* multi_panel = dynamic_cast<MultiPanel*>(tab->panel.get())) {
+                    const bool is_active_pane = pane_id == active_pane_id;
+                    const bool has_multiple_panes = pane_count() > 1;
+                    const float header_height = pane_header_height(*tab->panel, is_active_pane, has_multiple_panes);
+                    if (header_height > 0.0f && ImGui::GetContentRegionAvail().y > header_height) {
+                        render_pane_header(*tab->panel, is_active_pane, has_multiple_panes);
+                    }
+                    multi_panel->render_panel_contents();
+                } else {
+                    tab->panel->render();
                 }
             }
             ImGui::EndChild();
@@ -468,25 +642,31 @@ namespace misty::panel {
             } else if (grid_.lanes.size() == 1) {
                 render_grid_lane(0, origin, avail);
             } else {
-                const float total_width = std::max(0.0f, avail.x - kPaneHandleWidth);
+                const float total_width = std::max(0.0f, avail.x - kPaneDividerThickness);
                 const float left_width = split_size(grid_split_ratio_, total_width, kPaneMinWidth);
                 const float right_width = std::max(0.0f, total_width - left_width);
 
                 render_grid_lane(0, origin, ImVec2(left_width, avail.y));
+                render_grid_lane(1,
+                                 ImVec2(origin.x + left_width + kPaneDividerThickness, origin.y),
+                                 ImVec2(right_width, avail.y));
 
-                const ImVec2 splitter_pos(origin.x + left_width, origin.y);
+                const ImVec2 divider_min(origin.x + left_width, origin.y);
+                const ImVec2 divider_max(divider_min.x + kPaneDividerThickness, origin.y + avail.y);
+                const ImVec2 splitter_pos(divider_min.x - (kPaneHandleWidth - kPaneDividerThickness) * 0.5f, origin.y);
                 ImGui::SetCursorScreenPos(splitter_pos);
                 ImGui::InvisibleButton("##multi_panel_grid_splitter", ImVec2(kPaneHandleWidth, avail.y));
+                const bool splitter_hovered = ImGui::IsItemHovered();
                 if (ImGui::IsItemActive()) {
                     grid_split_ratio_ = std::clamp(
                         grid_split_ratio_ + ImGui::GetIO().MouseDelta.x / std::max(1.0f, total_width),
                         0.1f,
                         0.9f);
                 }
-
-                render_grid_lane(1,
-                                 ImVec2(origin.x + left_width + kPaneHandleWidth, origin.y),
-                                 ImVec2(right_width, avail.y));
+                if (splitter_hovered || ImGui::IsItemActive()) {
+                    ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+                }
+                draw_split_divider(divider_min, divider_max, splitter_hovered, ImGui::IsItemActive());
             }
         }
 

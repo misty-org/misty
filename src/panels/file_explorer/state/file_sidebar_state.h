@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/ui/ui_registry.h"
+#include "core/ui/state_registry.h"
 #include <chrono>
 #include <string>
 #include <vector>
@@ -20,7 +20,7 @@ namespace misty::panel {
     /**
      * @brief UI and worker state owned by the file explorer sidebar.
      */
-    struct FileSidebarState : public core::UIState {
+    struct FileSidebarState : public core::StateEntry {
         // Input Buffers: For "New File" or "New Folder" modals
         char name_buffer[256] = "";
 

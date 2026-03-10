@@ -15,7 +15,11 @@ namespace misty::panel {
         constexpr ImVec4 kText = ImVec4(0.94f, 0.95f, 0.97f, 1.0f);
         constexpr ImVec4 kMuted = ImVec4(0.62f, 0.66f, 0.70f, 1.0f);
         constexpr ImVec4 kAccent = ImVec4(0.48f, 0.86f, 0.59f, 1.0f);
+        constexpr ImVec4 kWarning = ImVec4(0.96f, 0.68f, 0.28f, 1.0f);
         constexpr float kConnectedRowHeight = 72.0f;
+        constexpr float kConnectedHeaderHeight = 40.0f;
+        constexpr float kRcloneHeaderHeight = 34.0f;
+        constexpr float kRcloneRowHeight = 56.0f;
         constexpr float kThinScrollbarSize = 8.0f;
 
         std::string strip_metric_label(const std::string& label, const std::string& value) {
@@ -24,15 +28,6 @@ namespace misty::panel {
                 return value.substr(prefix.size());
             }
             return value;
-        }
-
-        void draw_vertical_divider(float height) {
-            const ImVec2 pos = ImGui::GetCursorScreenPos();
-            ImGui::GetWindowDrawList()->AddLine(
-                ImVec2(pos.x, pos.y + 2.0f),
-                ImVec2(pos.x, pos.y + height - 2.0f),
-                ImGui::GetColorU32(kBorder));
-            ImGui::Dummy(ImVec2(1.0f, height));
         }
 
         void draw_section_header(const char* label, size_t count) {
@@ -124,21 +119,37 @@ namespace misty::panel {
             return pressed;
         }
 
-        void draw_health_metric(const char* label, const std::string& value, float width) {
-            ImGui::BeginGroup();
-            const ImVec2 start = ImGui::GetCursorScreenPos();
-            if (label && label[0] != '\0') {
-                ImGui::PushStyleColor(ImGuiCol_Text, kMuted);
-                ImGui::TextUnformatted(label);
-                ImGui::PopStyleColor();
-                ImGui::SameLine(0.0f, 10.0f);
+        void draw_connected_accounts_header(float row_width) {
+            const ImVec2 header_start = ImGui::GetCursorScreenPos();
+            ImDrawList* draw_list = ImGui::GetWindowDrawList();
+            draw_list->AddRectFilled(
+                header_start,
+                ImVec2(header_start.x + row_width, header_start.y + kConnectedHeaderHeight),
+                ImGui::GetColorU32(ImVec4(0.11f, 0.13f, 0.15f, 1.0f)));
+            draw_list->AddLine(
+                ImVec2(header_start.x, header_start.y + kConnectedHeaderHeight),
+                ImVec2(header_start.x + row_width, header_start.y + kConnectedHeaderHeight),
+                ImGui::GetColorU32(kBorder));
+
+            const float label_y = header_start.y + 11.0f;
+            const struct {
+                const char* label;
+                float x;
+            } columns[] = {
+                {"Provider", 22.0f},
+                {"Status", row_width * 0.34f},
+                {"Details", row_width * 0.50f},
+                {"Actions", row_width - 390.0f},
+            };
+
+            ImGui::PushStyleColor(ImGuiCol_Text, kMuted);
+            for (const auto& column : columns) {
+                ImGui::SetCursorScreenPos(ImVec2(header_start.x + column.x, label_y));
+                ImGui::TextUnformatted(column.label);
             }
-            ImGui::PushStyleColor(ImGuiCol_Text, kText);
-            ImGui::TextUnformatted(value.empty() ? "-" : value.c_str());
             ImGui::PopStyleColor();
-            ImGui::SetCursorScreenPos(start);
-            ImGui::Dummy(ImVec2(width, 24.0f));
-            ImGui::EndGroup();
+
+            ImGui::SetCursorScreenPos(ImVec2(header_start.x, header_start.y + kConnectedHeaderHeight));
         }
 
         bool provider_logs_button(const ImVec2& size) {
@@ -150,77 +161,199 @@ namespace misty::panel {
             draw_list->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + size.y), ImGui::GetColorU32(bg), 8.0f);
             draw_list->AddRect(pos, ImVec2(pos.x + size.x, pos.y + size.y), ImGui::GetColorU32(kBorder), 8.0f);
             auto& icon = core::AssetManager::get().get_svg_texture("log-24", 18);
+            constexpr float icon_size = 16.0f;
+            const ImVec2 text_size = ImGui::CalcTextSize("Logs");
+            const float center_y = pos.y + size.y * 0.5f;
             if (icon.id != 0) {
                 draw_list->AddImage(
                     icon.id,
-                    ImVec2(pos.x + 14.0f, pos.y + 8.0f),
-                    ImVec2(pos.x + 30.0f, pos.y + 24.0f),
+                    ImVec2(pos.x + 14.0f, center_y - icon_size * 0.5f),
+                    ImVec2(pos.x + 14.0f + icon_size, center_y + icon_size * 0.5f),
                     ImVec2(0.0f, 0.0f),
                     ImVec2(1.0f, 1.0f),
                     ImGui::GetColorU32(kText));
             }
-            draw_list->AddText(ImVec2(pos.x + 38.0f, pos.y + 8.0f), ImGui::GetColorU32(kText), "Logs");
-            draw_list->AddCircleFilled(ImVec2(pos.x + size.x - 18.0f, pos.y + size.y * 0.5f), 4.0f, IM_COL32(79, 216, 119, 255));
+            draw_list->AddText(ImVec2(pos.x + 38.0f, center_y - text_size.y * 0.5f), ImGui::GetColorU32(kText), "Logs");
+            draw_list->AddCircleFilled(ImVec2(pos.x + size.x - 18.0f, center_y), 4.0f, IM_COL32(79, 216, 119, 255));
             return pressed;
+        }
+
+        void draw_rclone_header(ImDrawList* draw_list,
+                                const ImVec2& min,
+                                const ImVec2& max,
+                                float status_min_x,
+                                float rc_min_x,
+                                float uptime_min_x,
+                                float version_min_x,
+                                float actions_min_x) {
+            draw_list->AddRectFilled(
+                min,
+                ImVec2(max.x, min.y + kRcloneHeaderHeight),
+                ImGui::GetColorU32(ImVec4(0.11f, 0.13f, 0.15f, 1.0f)));
+            draw_list->AddLine(
+                ImVec2(min.x, min.y + kRcloneHeaderHeight),
+                ImVec2(max.x, min.y + kRcloneHeaderHeight),
+                ImGui::GetColorU32(kBorder));
+
+            const float label_y = min.y + 8.0f;
+            const struct {
+                const char* label;
+                float x;
+            } columns[] = {
+                {"Service", min.x + 22.0f},
+                {"Status", status_min_x + 22.0f},
+                {"RC", rc_min_x + 22.0f},
+                {"Uptime", uptime_min_x + 22.0f},
+                {"Version", version_min_x + 22.0f},
+                {"Actions", actions_min_x},
+            };
+
+            for (const auto& column : columns) {
+                draw_list->AddText(ImVec2(column.x, label_y), ImGui::GetColorU32(kMuted), column.label);
+            }
+        }
+
+        void draw_centered_text_pair(ImDrawList* draw_list,
+                                     const ImVec2& min,
+                                     const ImVec2& max,
+                                     const char* label,
+                                     const std::string& value) {
+            const char* display_value = value.empty() ? "-" : value.c_str();
+            const bool has_label = label && label[0] != '\0';
+            const float gap = has_label ? 10.0f : 0.0f;
+            const ImVec2 label_size = has_label ? ImGui::CalcTextSize(label) : ImVec2(0.0f, 0.0f);
+            const ImVec2 value_size = ImGui::CalcTextSize(display_value);
+            const float total_width = label_size.x + gap + value_size.x;
+            float x = min.x + std::max(0.0f, (max.x - min.x - total_width) * 0.5f);
+            const float y = min.y + (max.y - min.y - value_size.y) * 0.5f;
+
+            if (has_label) {
+                draw_list->AddText(ImVec2(x, y), ImGui::GetColorU32(kMuted), label);
+                x += label_size.x + gap;
+            }
+            draw_list->AddText(ImVec2(x, y), ImGui::GetColorU32(kText), display_value);
+        }
+
+        void draw_centered_icon_text(ImDrawList* draw_list,
+                                     const ImVec2& min,
+                                     const ImVec2& max,
+                                     ImTextureID icon_id,
+                                     float icon_size,
+                                     const char* text,
+                                     ImU32 text_color) {
+            constexpr float gap = 10.0f;
+            const ImVec2 text_size = ImGui::CalcTextSize(text);
+            const float total_width = (icon_id != 0 ? icon_size + gap : 0.0f) + text_size.x;
+            float x = min.x + std::max(0.0f, (max.x - min.x - total_width) * 0.5f);
+            const float center_y = (min.y + max.y) * 0.5f;
+
+            if (icon_id != 0) {
+                draw_list->AddImage(
+                    icon_id,
+                    ImVec2(x, center_y - icon_size * 0.5f),
+                    ImVec2(x + icon_size, center_y + icon_size * 0.5f));
+                x += icon_size + gap;
+            }
+            draw_list->AddText(ImVec2(x, center_y - text_size.y * 0.5f), text_color, text);
+        }
+
+        void draw_centered_status(ImDrawList* draw_list,
+                                  const ImVec2& min,
+                                  const ImVec2& max,
+                                  const char* text,
+                                  ImU32 dot_color,
+                                  ImU32 text_color) {
+            const ImVec2 text_size = ImGui::CalcTextSize(text);
+            constexpr float dot_radius = 4.0f;
+            constexpr float gap = 14.0f;
+            const float total_width = dot_radius * 2.0f + gap + text_size.x;
+            const float x = min.x + std::max(0.0f, (max.x - min.x - total_width) * 0.5f);
+            const float center_y = (min.y + max.y) * 0.5f;
+            draw_list->AddCircleFilled(ImVec2(x + dot_radius, center_y), dot_radius, dot_color);
+            draw_list->AddText(ImVec2(x + dot_radius * 2.0f + gap, center_y - text_size.y * 0.5f),
+                               text_color,
+                               text);
         }
     }
 
     void ProvidersPanel::show_health_card(const ProvidersHealthCard& health) {
         const float width = ImGui::GetContentRegionAvail().x;
-        const float logo_block_width = 176.0f;
-        const float status_width = 122.0f;
-        const float rc_width = 210.0f;
-        const float uptime_width = 170.0f;
-        const float version_width = 110.0f;
         const float logs_width = 112.0f;
 
         ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 8.0f);
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(20.0f, 12.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
         ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.13f, 0.15f, 0.17f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_Border, kBorder);
-        if (ImGui::BeginChild("##providers_health_strip", ImVec2(width, 58.0f), true,
+        if (ImGui::BeginChild("##providers_health_strip", ImVec2(width, kRcloneHeaderHeight + kRcloneRowHeight), true,
                               ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse)) {
+            ImDrawList* draw_list = ImGui::GetWindowDrawList();
+            const ImVec2 window_pos = ImGui::GetWindowPos();
+            const ImVec2 content_min = ImGui::GetWindowContentRegionMin();
+            const ImVec2 content_max = ImGui::GetWindowContentRegionMax();
+            const ImVec2 min(window_pos.x + content_min.x, window_pos.y + content_min.y);
+            const ImVec2 max(window_pos.x + content_max.x, window_pos.y + content_max.y);
+            const ImVec2 row_min(min.x, min.y + kRcloneHeaderHeight);
+            const ImVec2 row_max(max.x, max.y);
+            const float center_y = (row_min.y + row_max.y) * 0.5f;
+
+            const float content_pad_x = 20.0f;
+            const float logs_x = max.x - content_pad_x - logs_width;
+            const float cells_max_x = logs_x - 34.0f;
+            const float cells_width = std::max(1.0f, cells_max_x - (min.x + content_pad_x));
+            const float brand_min_x = min.x + content_pad_x;
+            const float brand_max_x = brand_min_x + cells_width * 0.16f;
+            const float status_min_x = brand_max_x;
+            const float status_max_x = status_min_x + cells_width * 0.15f;
+            const float rc_min_x = status_max_x;
+            const float rc_max_x = rc_min_x + cells_width * 0.21f;
+            const float uptime_min_x = rc_max_x;
+            const float uptime_max_x = uptime_min_x + cells_width * 0.18f;
+            const float version_min_x = uptime_max_x;
+            const float version_max_x = version_min_x + cells_width * 0.16f;
+
+            draw_rclone_header(draw_list,
+                                min,
+                                max,
+                                status_min_x,
+                                rc_min_x,
+                                uptime_min_x,
+                                version_min_x,
+                                logs_x);
+
             auto& rclone = core::AssetManager::get().get_svg_texture("rclone-24", 52);
-            if (rclone.id != 0) {
-                ImGui::Image(rclone.id, ImVec2(26.0f, 26.0f));
-            } else {
-                ImGui::Dummy(ImVec2(26.0f, 26.0f));
-            }
-            ImGui::SameLine(0.0f, 10.0f);
-            ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 2.0f);
-            ImGui::PushStyleColor(ImGuiCol_Text, kText);
-            ImGui::SetWindowFontScale(1.05f);
-            ImGui::TextUnformatted("rclone");
-            ImGui::SetWindowFontScale(1.0f);
-            ImGui::PopStyleColor();
+            draw_centered_icon_text(
+                draw_list,
+                ImVec2(brand_min_x, row_min.y),
+                ImVec2(brand_max_x, row_max.y),
+                rclone.id,
+                26.0f,
+                "rclone",
+                ImGui::GetColorU32(kText));
 
-            ImGui::SameLine(logo_block_width, 0.0f);
-            ImGui::PushStyleColor(ImGuiCol_Text, health.is_ready ? kAccent : kMuted);
-            ImGui::TextUnformatted(health.is_ready ? "Running" : "Unavailable");
-            ImGui::PopStyleColor();
-            const ImVec2 status_text_min = ImGui::GetItemRectMin();
-            ImGui::GetWindowDrawList()->AddCircleFilled(
-                ImVec2(status_text_min.x - 12.0f, status_text_min.y + ImGui::GetTextLineHeight() * 0.5f),
-                4.0f,
-                ImGui::GetColorU32(health.is_ready ? kAccent : kMuted));
+            const char* status_text = health.is_ready ? "Running" : "Unavailable";
+            draw_centered_status(
+                draw_list,
+                ImVec2(status_min_x, row_min.y),
+                ImVec2(status_max_x, row_max.y),
+                status_text,
+                ImGui::GetColorU32(health.is_ready ? kAccent : kMuted),
+                ImGui::GetColorU32(health.is_ready ? kText : kMuted));
 
-            ImGui::SameLine(status_width + logo_block_width, 0.0f);
-            draw_vertical_divider(24.0f);
-            ImGui::SameLine(0.0f, 28.0f);
-            draw_health_metric("RC", strip_metric_label("Port", health.port_text), rc_width);
+            const std::string rc_port = strip_metric_label("Port", health.port_text);
+            draw_centered_text_pair(
+                draw_list,
+                ImVec2(rc_min_x, row_min.y),
+                ImVec2(rc_max_x, row_max.y),
+                "",
+                rc_port.empty() ? std::string{} : "localhost:" + rc_port);
 
-            ImGui::SameLine(0.0f, 0.0f);
-            draw_vertical_divider(24.0f);
-            ImGui::SameLine(0.0f, 28.0f);
-            draw_health_metric("Uptime", health.uptime_text, uptime_width);
+            draw_centered_text_pair(draw_list, ImVec2(uptime_min_x, row_min.y), ImVec2(uptime_max_x, row_max.y),
+                                    "", health.uptime_text);
 
-            ImGui::SameLine(0.0f, 0.0f);
-            draw_vertical_divider(24.0f);
-            ImGui::SameLine(0.0f, 28.0f);
-            draw_health_metric("", health.version_text.empty() ? "rclone" : health.version_text, version_width);
+            draw_centered_text_pair(draw_list, ImVec2(version_min_x, row_min.y), ImVec2(version_max_x, row_max.y),
+                                    "", health.version_text.empty() ? "rclone" : health.version_text);
 
-            const float log_x = std::max(ImGui::GetCursorPosX() + 12.0f, ImGui::GetWindowContentRegionMax().x - logs_width);
-            ImGui::SameLine(log_x, 0.0f);
+            ImGui::SetCursorScreenPos(ImVec2(logs_x, center_y - 17.0f));
             provider_logs_button(ImVec2(logs_width, 34.0f));
         }
         ImGui::EndChild();
@@ -246,20 +379,27 @@ namespace misty::panel {
             return;
         }
 
+        ImGui::Dummy(ImVec2(0.0f, 10.0f));
         const float width = ImGui::GetContentRegionAvail().x;
-        const float height = std::max(48.0f, max_list_height);
+        const float content_height = kConnectedHeaderHeight + kConnectedRowHeight * static_cast<float>(filtered_cards.size());
+        const float available_height = std::max(48.0f, max_list_height);
+        const float height = std::max(48.0f, std::min(content_height, available_height));
+        const bool needs_scroll = content_height > available_height + 0.5f;
         ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 8.0f);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
         ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, kThinScrollbarSize);
         ImGui::PushStyleColor(ImGuiCol_ChildBg, kCardBg);
         ImGui::PushStyleColor(ImGuiCol_Border, kBorder);
-        if (ImGui::BeginChild("##connected_accounts", ImVec2(width, height), true,
-                              ImGuiWindowFlags_None)) {
+        const ImGuiWindowFlags list_flags = needs_scroll
+            ? ImGuiWindowFlags_None
+            : (ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+        if (ImGui::BeginChild("##connected_accounts", ImVec2(width, height), true, list_flags)) {
+            const float row_width = ImGui::GetContentRegionAvail().x;
+            draw_connected_accounts_header(row_width);
             for (size_t index = 0; index < filtered_cards.size(); ++index) {
                 const ProviderCard& card = filtered_cards[index];
                 ImGui::PushID(card.id.c_str());
                 const ImVec2 row_start = ImGui::GetCursorScreenPos();
-                const float row_width = ImGui::GetContentRegionAvail().x;
 
                 ImGui::SetCursorScreenPos(ImVec2(row_start.x + 22.0f, row_start.y + 17.0f));
                 draw_provider_logo(card, 38.0f);
@@ -276,19 +416,19 @@ namespace misty::panel {
                 ImGui::TextUnformatted(card.account_label.empty() ? card.id.c_str() : card.account_label.c_str());
                 ImGui::PopStyleColor();
 
-                const ImVec4 state_color = card.needs_reconnect ? ImVec4(0.96f, 0.68f, 0.28f, 1.0f) : kAccent;
+                const ImVec4 state_color = card.needs_reconnect ? kWarning : kAccent;
                 const ImVec2 status_pos(row_start.x + row_width * 0.34f, row_start.y + 26.0f);
                 ImGui::GetWindowDrawList()->AddCircleFilled(
                     ImVec2(status_pos.x + 4.0f, status_pos.y + ImGui::GetTextLineHeight() * 0.5f),
                     3.0f,
                     ImGui::GetColorU32(state_color));
                 ImGui::SetCursorScreenPos(ImVec2(status_pos.x + 16.0f, status_pos.y));
-                ImGui::PushStyleColor(ImGuiCol_Text, state_color);
+                ImGui::PushStyleColor(ImGuiCol_Text, card.needs_reconnect ? kWarning : kText);
                 ImGui::TextUnformatted(card.needs_reconnect ? "Reconnect" : "Connected");
                 ImGui::PopStyleColor();
 
                 if (card.status_label != "Connected") {
-                    ImGui::SetCursorScreenPos(ImVec2(row_start.x + row_width * 0.48f, row_start.y + 26.0f));
+                    ImGui::SetCursorScreenPos(ImVec2(row_start.x + row_width * 0.50f, row_start.y + 26.0f));
                     ImGui::PushStyleColor(ImGuiCol_Text, kMuted);
                     ImGui::TextUnformatted(card.status_label.c_str());
                     ImGui::PopStyleColor();

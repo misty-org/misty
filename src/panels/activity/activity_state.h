@@ -6,7 +6,7 @@
 #include <chrono>
 #include <atomic>
 #include "imgui.h"
-#include "core/ui/ui_registry.h"
+#include "core/ui/state_registry.h"
 
 namespace misty::panel {
 
@@ -24,7 +24,7 @@ namespace misty::panel {
         ActivityEntryType type;
     };
 
-    class ActivityState : public core::UIState {
+    class ActivityState : public core::StateEntry {
     public:
         ActivityState();
 

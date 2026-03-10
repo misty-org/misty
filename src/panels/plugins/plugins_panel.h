@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-#include "core/ui/ui_registry.h"
+#include "core/ui/state_registry.h"
 #include "panels/panel/panel.h"
 #include "panels/plugins/plugins_components.h"
 #include "panels/plugins/plugins_detail.h"
@@ -12,7 +12,7 @@ namespace misty::panel {
 
 class PluginsPanel : public Panel {
 public:
-    explicit PluginsPanel(core::UIRegistry& ui_registry);
+    explicit PluginsPanel(core::StateRegistry& state_registry);
     ~PluginsPanel() override = default;
 
     void render() override;
