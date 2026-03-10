@@ -25,7 +25,7 @@ export default function RightPanel({ section }: { section: Section }) {
   const anchors = getAnchors(section);
 
   return (
-    <aside className="docs-right hidden lg:block">
+    <aside className="sticky top-16 h-[calc(100vh-4rem)] overflow-y-auto border-l border-border-subtle hidden lg:block">
       <div className="py-6 px-5">
         <span className="text-[11px] font-semibold uppercase tracking-widest text-text-muted mb-3 block">
           Contents

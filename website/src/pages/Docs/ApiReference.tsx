@@ -11,7 +11,7 @@ export default function ApiReference() {
   const section = apiSections.find((s) => s.id === activeId)!;
 
   return (
-    <div className="docs-layout">
+    <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr_200px] min-h-screen pt-16">
       <Sidebar
         sections={apiSections}
         categories={apiCategories}

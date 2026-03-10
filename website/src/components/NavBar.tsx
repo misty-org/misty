@@ -12,10 +12,18 @@ const docsLinks = [
   { to: "/docs/api", label: "API Reference" },
 ];
 
+const resourcesLinks = [
+  { to: "/changelog", label: "Changelog" },
+  { to: "/blog", label: "Blog" },
+  { to: "/roadmap", label: "Roadmap" },
+  { to: "/forum", label: "Forum" },
+];
+
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [docsOpen, setDocsOpen] = useState(false);
+  const [resourcesOpen, setResourcesOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -29,6 +37,7 @@ export default function Navbar() {
     setMenuOpen(false);
     setProfileOpen(false);
     setDocsOpen(false);
+    setResourcesOpen(false);
   }, [location]);
 
   useEffect(() => {
@@ -106,6 +115,39 @@ export default function Navbar() {
               </div>
             </div>
           </div>
+          {/* Resources dropdown */}
+          <div
+            className="relative"
+            onMouseEnter={() => setResourcesOpen(true)}
+            onMouseLeave={() => setResourcesOpen(false)}
+          >
+            <NavLink
+              to="/changelog"
+              onClick={() => setDocsOpen(false)}
+              className={`relative px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 block ${
+                location.pathname.startsWith("/changelog") ? "text-text" : "text-text-muted hover:text-text"
+              }`}
+            >
+              Resources
+              {location.pathname.startsWith("/docs") && <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-primary rounded-full" />}
+            </NavLink>
+            <div className={`absolute left-1/2 -translate-x-1/2 top-full pt-1 w-44 transition-all duration-200 ${resourcesOpen ? "opacity-100 visible" : "opacity-0 invisible"}`}>
+              <div className="bg-surface border border-border rounded-xl overflow-hidden shadow-xl shadow-bg/50">
+                {resourcesLinks.map(({ to, label }) => (
+                  <NavLink
+                    key={to}
+                    to={to}
+                    end
+                    className={({ isActive }) => `block px-4 py-2.5 text-sm transition-colors ${
+                      isActive ? "text-primary bg-primary/10" : "text-text-muted hover:text-text hover:bg-elevated"
+                    }`}
+                  >
+                    {label}
+                  </NavLink>
+                ))}
+              </div>
+            </div>
+          </div>
           <div className="ml-4 pl-4 border-l border-border">
             {user ? (
               <div className="relative">
@@ -160,6 +202,14 @@ export default function Navbar() {
             ))}
             <span className="px-4 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-widest text-text-muted">Docs</span>
             {docsLinks.map(({ to, label }) => (
+              <NavLink key={to} to={to} end className={({ isActive }) => `px-4 pl-6 py-2 rounded-lg text-sm font-medium transition-colors ${
+                isActive ? "text-primary bg-primary/10" : "text-text-muted hover:text-text hover:bg-elevated"
+              }`}>
+                {label}
+              </NavLink>
+            ))}
+            <span className="px-4 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-widest text-text-muted">Resources</span>
+            {resourcesLinks.map(({ to, label }) => (
               <NavLink key={to} to={to} end className={({ isActive }) => `px-4 pl-6 py-2 rounded-lg text-sm font-medium transition-colors ${
                 isActive ? "text-primary bg-primary/10" : "text-text-muted hover:text-text hover:bg-elevated"
               }`}>
