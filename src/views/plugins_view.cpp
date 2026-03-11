@@ -1,33 +1,33 @@
-#include "views/extensions_view.h"
+#include "views/plugins_view.h"
 
 #include "imgui.h"
 
 namespace misty::view {
 
-ExtensionsView::ExtensionsView(core::StateRegistry& state_registry)
+PluginsView::PluginsView(core::StateRegistry& state_registry)
     : state_registry_(state_registry) {
     init_panels();
 }
 
-void ExtensionsView::init_panels() {
+void PluginsView::init_panels() {
     navbar_panel_ = std::make_shared<panel::NavbarPanel>(state_registry_);
     plugins_panel_ = std::make_shared<panel::PluginsPanel>(state_registry_);
     notification_panel_ = std::make_shared<panel::NotificationPanel>(state_registry_);
     context_menu_panel_ = std::make_shared<panel::ContextMenuPanel>(state_registry_);
 }
 
-ViewID ExtensionsView::get_view_id() {
-    return ViewID::Extensions;
+ViewID PluginsView::get_view_id() {
+    return ViewID::Plugins;
 }
 
-ViewCapabilities ExtensionsView::capabilities() const {
+ViewCapabilities PluginsView::capabilities() const {
     return {
         .tabs = true,
         .split = false,
     };
 }
 
-PluginOpenResult ExtensionsView::open_plugin_panel(const std::string& panel_id, PluginOpenMode mode) {
+PluginOpenResult PluginsView::open_plugin_panel(const std::string& panel_id, PluginOpenMode mode) {
     if (mode == PluginOpenMode::Split) {
         return PluginOpenResult::Unsupported;
     }
@@ -36,7 +36,7 @@ PluginOpenResult ExtensionsView::open_plugin_panel(const std::string& panel_id, 
         : PluginOpenResult::Failed;
 }
 
-void ExtensionsView::render() {
+void PluginsView::render() {
     ImGuiViewport* viewport = ImGui::GetMainViewport();
     float navbar_width = 77.0f;
     ImVec2 navbar_pos = viewport->WorkPos;

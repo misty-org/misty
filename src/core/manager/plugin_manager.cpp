@@ -108,8 +108,8 @@ std::string view_id_to_string(view::ViewID view_id) {
         case view::ViewID::Workspace: return "Workspace";
         case view::ViewID::Activity: return "Activity";
         case view::ViewID::Providers: return "Providers";
-        case view::ViewID::Extensions: return "Extensions";
-        case view::ViewID::Vault: return "Vault";
+        case view::ViewID::Plugins: return "Plugins";
+        case view::ViewID::Dock: return "Dock";
         case view::ViewID::Transfers: return "Transfers";
         case view::ViewID::Default: return "Default";
     }
@@ -128,8 +128,8 @@ std::optional<view::ViewID> view_id_from_string(const char* raw) {
     if (value == "workspace") return view::ViewID::Workspace;
     if (value == "activity") return view::ViewID::Activity;
     if (value == "providers") return view::ViewID::Providers;
-    if (value == "extensions" || value == "plugins") return view::ViewID::Extensions;
-    if (value == "vault") return view::ViewID::Vault;
+    if (value == "plugins") return view::ViewID::Plugins;
+    if (value == "dock") return view::ViewID::Dock;
     if (value == "transfers" || value == "transfer") return view::ViewID::Transfers;
     return std::nullopt;
 }
@@ -138,19 +138,19 @@ using LauncherViewMask = std::uint32_t;
 constexpr LauncherViewMask kLauncherViewFiles = 1u << 0;
 constexpr LauncherViewMask kLauncherViewSettings = 1u << 1;
 constexpr LauncherViewMask kLauncherViewProviders = 1u << 2;
-constexpr LauncherViewMask kLauncherViewExtensions = 1u << 3;
-constexpr LauncherViewMask kLauncherViewVault = 1u << 4;
+constexpr LauncherViewMask kLauncherViewPlugins = 1u << 3;
 constexpr LauncherViewMask kLauncherViewTransfers = 1u << 5;
+constexpr LauncherViewMask kLauncherViewDock = 1u << 6;
 constexpr LauncherViewMask kLauncherViewAll =
     kLauncherViewFiles |
     kLauncherViewSettings |
     kLauncherViewProviders |
-    kLauncherViewExtensions |
-    kLauncherViewVault |
-    kLauncherViewTransfers;
+    kLauncherViewPlugins |
+    kLauncherViewTransfers |
+    kLauncherViewDock;
 
 struct PluginLauncherMetadata {
-    LauncherViewMask allowed_views = kLauncherViewExtensions;
+    LauncherViewMask allowed_views = kLauncherViewPlugins;
     bool show_in_launcher = true;
     bool requires_selected_file = false;
     std::string subtitle;
@@ -164,8 +164,8 @@ LauncherViewMask launcher_mask_for_view(view::ViewID view_id) {
         case view::ViewID::Files: return kLauncherViewFiles;
         case view::ViewID::Settings: return kLauncherViewSettings;
         case view::ViewID::Providers: return kLauncherViewProviders;
-        case view::ViewID::Extensions: return kLauncherViewExtensions;
-        case view::ViewID::Vault: return kLauncherViewVault;
+        case view::ViewID::Plugins: return kLauncherViewPlugins;
+        case view::ViewID::Dock: return kLauncherViewDock;
         case view::ViewID::Transfers: return kLauncherViewTransfers;
         default: return 0;
     }
@@ -196,12 +196,13 @@ void add_launcher_view_token(LauncherViewMask& mask, const std::string& token) {
         mask |= kLauncherViewProviders;
         return;
     }
-    if (normalized == "plugins" || normalized == "extensions" || normalized == "plugins view" || normalized == "extensions view") {
-        mask |= kLauncherViewExtensions;
+    if (normalized == "plugins" || normalized == "plugins view") {
+        mask |= kLauncherViewPlugins;
         return;
     }
-    if (normalized == "vault" || normalized == "vault_view" || normalized == "vault panel") {
-        mask |= kLauncherViewVault;
+    if (normalized == "dock" || normalized == "dock_view" || normalized == "dock view") {
+        mask |= kLauncherViewDock;
+        return;
     }
 }
 
@@ -269,8 +270,8 @@ std::string launcher_view_label(LauncherViewMask mask) {
     if ((mask & kLauncherViewFiles) != 0) labels.push_back("Files");
     if ((mask & kLauncherViewSettings) != 0) labels.push_back("Settings");
     if ((mask & kLauncherViewProviders) != 0) labels.push_back("Providers");
-    if ((mask & kLauncherViewExtensions) != 0) labels.push_back("Plugins");
-    if ((mask & kLauncherViewVault) != 0) labels.push_back("Vault");
+    if ((mask & kLauncherViewPlugins) != 0) labels.push_back("Plugins");
+    if ((mask & kLauncherViewDock) != 0) labels.push_back("Dock");
 
     std::string out;
     for (size_t i = 0; i < labels.size(); ++i) {
@@ -280,6 +281,17 @@ std::string launcher_view_label(LauncherViewMask mask) {
         out += labels[i];
     }
     return out.empty() ? "Plugins" : out;
+}
+
+std::vector<std::string> launcher_view_tokens(LauncherViewMask mask) {
+    std::vector<std::string> labels;
+    if ((mask & kLauncherViewFiles) != 0) labels.push_back("Files");
+    if ((mask & kLauncherViewSettings) != 0) labels.push_back("Settings");
+    if ((mask & kLauncherViewProviders) != 0) labels.push_back("Providers");
+    if ((mask & kLauncherViewPlugins) != 0) labels.push_back("Plugins");
+    if ((mask & kLauncherViewDock) != 0) labels.push_back("Dock");
+    if ((mask & kLauncherViewTransfers) != 0) labels.push_back("Transfers");
+    return labels;
 }
 
 PluginLauncherMetadata load_launcher_metadata(const fs::path& plugin_dir,
@@ -324,7 +336,7 @@ PluginLauncherMetadata load_launcher_metadata(const fs::path& plugin_dir,
         }
     }
     if (allowed_views == 0) {
-        allowed_views = kLauncherViewExtensions;
+        allowed_views = kLauncherViewPlugins;
     }
     metadata.allowed_views = allowed_views;
     metadata.show_in_launcher = launcher_json.value("show_in_launcher", true);
@@ -764,7 +776,8 @@ struct PluginManager::Impl {
         plugin_panel.render = panel.render;
         plugin_panel.user_data = panel.user_data;
         plugin_panel.is_open = panel.default_open != 0;
-        plugin_panel.window_type = PluginWindowType::Panel;
+        plugin_panel.window_type =
+            panel.window_type == MISTY_WINDOW_TYPE_EXTERNAL ? PluginWindowType::External : PluginWindowType::Panel;
         plugin_panel.default_width = panel.default_width > 0.0f ? panel.default_width : 480.0f;
         plugin_panel.default_height = panel.default_height > 0.0f ? panel.default_height : 360.0f;
         plugin_panel.plugin_index = plugin_index;
@@ -1275,6 +1288,7 @@ bool PluginManager::load_plugin_directory(const fs::path& plugin_dir, bool bundl
     Impl::LoadedPlugin plugin;
     plugin.info = info;
     plugin.launcher = load_launcher_metadata(plugin_dir, info, json);
+    plugin.info.launcher_views = launcher_view_tokens(plugin.launcher.allowed_views);
     std::string open_error;
     if (!plugin.library.open(resolved_library, &open_error)) {
         plugin.info.diagnostics.push_back(open_error.empty() ? "Failed to load plugin library." : open_error);
@@ -1600,7 +1614,7 @@ void PluginManager::render_launcher_overlay() {
                         ImGui::Image(icon.id, ImVec2(rendered_size, rendered_size));
                     }
                 } else {
-                    auto& icon = AssetManager::get().get_svg_texture("apps-16", 40);
+                    auto& icon = AssetManager::get().get_svg_texture("apps-24", 40);
                     if (icon.id) {
                         const float rendered_size = 26.0f;
                         ImGui::SetCursorScreenPos(ImVec2(

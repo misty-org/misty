@@ -28,6 +28,8 @@ namespace misty::core {
                 "assets/icons/file-directory-24.svg",
                 "assets/icons/devices-24.svg",
                 "assets/icons/apps-16.svg",
+                "assets/icons/apps-24.svg",
+                "assets/icons/dock-24.svg",
                 "assets/icons/shield-lock-24.svg",
                 "assets/icons/transfer-24.svg",
                 "assets/icons/gear-24.svg",

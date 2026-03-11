@@ -45,6 +45,14 @@ namespace misty::panel {
         active_tab_idx = idx;
     }
 
+    void TabController::request_tab_selection(std::int16_t idx) {
+        if (tabs.find(idx) == tabs.end()) {
+            return;
+        }
+        active_tab_idx = idx;
+        pending_selected_tab_idx = idx;
+    }
+
     const TabController::Tab* TabController::get_tab(std::int16_t idx) const {
         const auto it = tabs.find(idx);
         return it == tabs.end() ? nullptr : &it->second;
@@ -59,6 +67,7 @@ namespace misty::panel {
             return;
         }
 
+        bool pending_selection_rendered = false;
         for (std::int16_t tab_id : tab_order) {
             const Tab* tab = get_tab(tab_id);
             if (!tab) {
@@ -68,7 +77,10 @@ namespace misty::panel {
             const std::string label = tab->display_title() + "###tab_" + scope_id + "_" + std::to_string(tab_id);
             bool is_open = true;
             const ImGuiTabItemFlags flags =
-                tab_id == active_tab_idx ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None;
+                tab_id == pending_selected_tab_idx ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None;
+            if (tab_id == pending_selected_tab_idx) {
+                pending_selection_rendered = true;
+            }
             if (ImGui::BeginTabItem(label.c_str(), &is_open, flags)) {
                 set_active_tab(tab_id);
                 if (render_tab_content) {
@@ -87,6 +99,9 @@ namespace misty::panel {
         }
 
         ImGui::EndTabBar();
+        if (pending_selection_rendered) {
+            pending_selected_tab_idx = -1;
+        }
     }
 
     void TabController::add_tab(const Tab& tab) {
@@ -99,7 +114,7 @@ namespace misty::panel {
         if (!already_present) {
             tab_order.push_back(tab.idx);
         }
-        active_tab_idx = tab.idx;
+        request_tab_selection(tab.idx);
     }
 
     void TabController::remove_tab(std::int16_t idx) {
