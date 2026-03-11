@@ -1,7 +1,7 @@
 #pragma once
 
 #include "panels/panel.h"
-#include "core/ui_registry.h"
+#include "core/ui/ui_registry.h"
 #include "services_state.h"
 
 using namespace misty::core;

@@ -4,19 +4,16 @@ import { GrOnedrive } from "react-icons/gr";
 export default function FeaturesProviders() {
   return (
       <div>
-        
-        {/* Section Header */}
         <div className="text-center mb-16 md:mb-20">
           <h2 className="text-3xl md:text-4xl font-bold text-text mb-4 text-balance">
             Your files are everywhere
           </h2>
           <p className="text-text-muted max-w-2xl mx-auto text-pretty">
             Some photos on Google Drive. Work documents on OneDrive. Shared folders
-            on Dropbox. And everything else scattered across all your devices. 
+            on Dropbox. You shouldn't have to switch applications just to find important files.
           </p>
         </div>
 
-        {/* 2-Column Grid */}
         <div className="grid md:grid-cols-2 gap-10 lg:gap-16 items-center">
           <div className="glass-card rounded-2xl p-8 border-primary/20 shadow-lg shadow-primary/5">
             <h3 className="text-xl font-bold text-text mb-6">Misty helps you</h3>
@@ -34,7 +31,9 @@ export default function FeaturesProviders() {
                 <svg className="w-5 h-5 text-primary shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                 </svg>
-                <span>Drag and drop files seamlessly between different platforms</span>
+                <span>Drag and drop files seamlessly between different platforms, enabling local file operations
+                  with cloud storage.
+                </span>
               </li>
 
               {/* 3. The Global Search */}
@@ -42,7 +41,7 @@ export default function FeaturesProviders() {
                 <svg className="w-5 h-5 text-primary shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                 </svg>
-                <span>Fast searching across all your connected cloud storage at once</span>
+                <span>Fast search queries across all your connected cloud providers at once</span>
               </li>
 
               {/* 4. The Power-User Feature */}

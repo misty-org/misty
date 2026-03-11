@@ -1,8 +1,9 @@
 #pragma once
-#include "core/ui_registry.h"
-#include "core/worker_pool.h"
-#include "core/file_sync_service.h"
+#include "core/ui/ui_registry.h"
+#include "core/threading/worker_pool.h"
+#include "core/threading/file_sync_service.h"
 #include "views/app_view.h"
+#include "dfs/client/misty_client.h"
 
 
 namespace misty {
@@ -14,6 +15,7 @@ namespace misty {
         void run();
         void init_client();
         void init_views();
+        void on_focus_lost();
 
     protected:
         // Pure virtual functions (the "Interface")

@@ -9,11 +9,12 @@ export default function MainHero() {
 
         <div className="pt-12 pb-16 md:mt-20 text-center relative">
           <h1 className="text-5xl md:text-7xl lg:text-6xl font-bold text-neutral-300 tracking-tight mb-6 text-balance flex flex-col gap-2">
-            <span>The <span className="gradient-text">everything</span> file manager</span>
+              <span>A <span className="gradient-text">file manager</span> for all your <span className="gradient-text">clouds</span></span>
           </h1>
 
           <p className="text-lg text-text-muted max-w-2xl mx-auto mb-12 leading-relaxed text-pretty">
-            Access files across multiple cloud providers in a single window. 
+            No mounted drives, no browser tabs. Browse, move, and organize all your cloud and
+            local files in one single window.
           </p>
 
           <div className="flex gap-5 justify-center flex-wrap">

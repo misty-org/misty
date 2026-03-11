@@ -13,12 +13,14 @@ import Blog from "./pages/Blog";
 import Roadmap from "./pages/Roadmap";
 import Forum from "./pages/Forum";
 
+
+
 export const router = createBrowserRouter([
   {
     path: "/",
     element: <App />,
     children: [
-      { index: true, element: <Home />, handle: { title: "Misty" } },
+      { index: true, element: <Home />, handle: { title: "Misty - Home" } },
       { path: "docs", element: <Docs />, handle: { title: "Misty - Docs" } },
       { path: "docs/api", element: <ApiReference />, handle: { title: "Misty - API Reference" } },
       { path: "download", element: <Download />, handle: { title: "Misty - Download" } },

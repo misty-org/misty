@@ -4,10 +4,16 @@ import (
 	"log"
 	"net/http"
 	"time"
+
+	"github.com/joho/godotenv"
 )
 
 func main() {
-  	proxy, err := CreateProxy()
+	if err := godotenv.Load(); err != nil {
+		log.Println("No .env file found, using environment variables")
+	}
+
+	proxy, err := CreateProxy()
 	if err != nil {
 		panic(err)
 	}
