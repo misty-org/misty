@@ -18,6 +18,8 @@ namespace misty::view {
         });
         navbar_panel_ = std::make_shared<panel::NavbarPanel>(ui_registry_);
         notification_panel_ = std::make_shared<panel::NotificationPanel>(ui_registry_);
+        search_panel_ = std::make_shared<panel::SearchPanel>(ui_registry_, worker_pool_);
+        file_explorer_panel_->set_search_panel(search_panel_.get());
     }
 
     view::ViewID MainView::get_view_id() {
@@ -59,6 +61,11 @@ namespace misty::view {
         float handle_y1 = handle_y0 + viewport->WorkSize.y;
 
         ImGuiIO& io = ImGui::GetIO();
+
+        // Cmd+K (macOS) or Ctrl+K (Linux/Windows) toggles the search panel
+        bool cmd_k = (io.KeySuper || io.KeyCtrl) && ImGui::IsKeyPressed(ImGuiKey_K, false);
+        if (cmd_k) search_panel_->toggle();
+
         bool hovered = io.MousePos.x >= handle_x0 && io.MousePos.x <= handle_x1
                     && io.MousePos.y >= handle_y0 && io.MousePos.y <= handle_y1;
 
@@ -112,6 +119,9 @@ namespace misty::view {
 
         // Render notifications on top (no position/size needed, it positions itself)
         notification_panel_->render();
+
+        // Search modal renders last so it sits above everything
+        search_panel_->render();
     }
 
     

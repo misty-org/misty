@@ -9,9 +9,12 @@
 #include "panels/activity/upload_state.h"
 #include "panels/notification/notification_state.h"
 #include "panels/file_sidebar/file_sidebar_state.h"
+#include "panels/search/search_state.h"
+#include "panels/search/search_panel.h"
 #include "core/asset_manager.h"
 #include <nlohmann/json.hpp>
 #include <algorithm>
+#include <chrono>
 #include <cstdio>
 
 
@@ -136,27 +139,96 @@ namespace misty::panel {
             ImGuiWindowFlags_NoCollapse |
             ImGuiWindowFlags_NoResize;
 
+        auto& search_state = registry_.get_state<SearchState>("Search");
+
         ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.18f, 0.18f, 0.18f, 1.0f));
 
         if (ImGui::Begin("File Explorer", nullptr, file_explorer_flags)) {
-            std::lock_guard<std::mutex> lock(state.mu);
+            std::unique_lock<std::mutex> lock(state.mu);
 
-            // Unified rendering - same for local and OneDrive
+            // TopBar
             if (ImGui::BeginChild("TopBar", ImVec2(0, 50), false, ImGuiWindowFlags_NoScrollbar)) {
                 ImGui::SetCursorPosY(8.0f);
-
                 show_nav_history(state, 30.0f, 8.0f);
-
                 ImGui::SameLine(0, 8.0f);
                 ImGui::SetCursorPosY(7.0f);
-
                 show_search_bar(state);
             }
             ImGui::EndChild();
 
             ImGui::Separator();
+            if (search_state.is_open) {
+                show_inline_search(state, search_state);  // input bar only; no locks inside
+            }
+
+            // Save window-relative position of the list area before rendering it.
+            // We'll reuse this to position the overlay child on top.
+            ImVec2 list_start   = ImGui::GetCursorPos();
+            float  list_height  = ImGui::GetContentRegionAvail().y;
+
             show_directory_contents(state);
             show_error_modal(state.error_msg, "FileExplorerError");
+
+            // ── Search results overlay ──────────────────────────────────────────
+            // Drawn inside the same File Explorer window, but after the directory
+            // list child — so it sits on top with no cross-window z-order issues.
+            if (search_state.is_open) {
+                float overlay_h = std::min(350.0f, list_height);
+                // Reposition cursor back to list_start to overlap the file list
+                ImGui::SetCursorPos(list_start);
+                ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.14f, 0.14f, 0.14f, 0.97f));
+                if (ImGui::BeginChild("##search_overlay", {0, overlay_h}, false,
+                        ImGuiWindowFlags_NoScrollbar)) {
+                    bool has_results = false;
+                    {
+                        std::lock_guard<std::mutex> lk(search_state.mu);
+                        has_results = !search_state.cache_results.empty() ||
+                                      !search_state.api_results.empty();
+                    }
+                    int pending = search_state.pending_api_tasks.load();
+                    if (has_results) {
+                        if (pending > 0) {
+                            float t = static_cast<float>(ImGui::GetTime());
+                            const char* frames[] = { "|", "/", "-", "\\" };
+                            ImGui::TextDisabled("Searching... %s", frames[(int)(t * 8.0f) % 4]);
+                        }
+                        if (search_panel_) search_panel_->render_results(search_state);
+                    } else if (!search_state.last_submitted_query.empty()) {
+                        if (pending > 0) {
+                            float t = static_cast<float>(ImGui::GetTime());
+                            const char* frames[] = { "|", "/", "-", "\\" };
+                            ImGui::TextDisabled("Searching... %s", frames[(int)(t * 8.0f) % 4]);
+                        } else {
+                            ImGui::TextDisabled("No files found");
+                        }
+                    }
+                }
+                ImGui::EndChild();
+                ImGui::PopStyleColor();
+            }
+
+            lock.unlock();
+
+            // Deferred submit — after fe_state.mu is released
+            if (search_state.pending_submit && search_panel_) {
+                search_state.pending_submit = false;
+                std::string q(search_state.query_buf);
+                if (q.size() >= 2) search_panel_->submit_search(q);
+            }
+
+            // Deferred Enter navigation — after fe_state.mu is released
+            if (search_state.pending_navigate_index >= 0 && search_panel_) {
+                int idx = search_state.pending_navigate_index;
+                search_state.pending_navigate_index = -1;
+                std::lock_guard<std::mutex> lk(search_state.mu);
+                std::vector<const SearchResult*> all;
+                for (auto& r : search_state.cache_results) all.push_back(&r);
+                for (auto& r : search_state.api_results)   all.push_back(&r);
+                if (idx < static_cast<int>(all.size())) {
+                    search_panel_->navigate_to_result(*all[idx]);
+                    search_state.is_open = false;
+                }
+            }
         }
         ImGui::End();
         ImGui::PopStyleColor();
@@ -921,6 +993,66 @@ namespace misty::panel {
         }
     }
 
+    void FileExplorerPanel::show_inline_search(FileExplorerState& state, SearchState& search_state) {
+        // Input bar (full width minus close button)
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 7));
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
+        ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.18f, 0.18f, 0.18f, 1.0f));
+
+        const float close_w = 28.0f;
+        const float spacing = 6.0f;
+        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - close_w - spacing);
+
+        if (search_state.just_opened) {
+            ImGui::SetKeyboardFocusHere();
+            search_state.just_opened = false;
+        }
+
+        bool changed = ImGui::InputTextWithHint("##inline_search", "Search files and cloud providers...",
+            search_state.query_buf, sizeof(search_state.query_buf));
+
+        ImGui::PopStyleColor();
+
+        // Close button
+        ImGui::SameLine(0, spacing);
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.35f, 0.35f, 0.35f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.25f, 0.25f, 0.25f, 1.0f));
+        // Close — no mutex acquired (fe_state.mu is held; results cleared on next open)
+        if (ImGui::Button("x", ImVec2(close_w, 0))) {
+            search_state.is_open = false;
+            std::memset(search_state.query_buf, 0, sizeof(search_state.query_buf));
+        }
+        ImGui::PopStyleColor(3);
+        ImGui::PopStyleVar(2);
+
+        // Esc to close — no mutex acquired
+        if (ImGui::IsKeyPressed(ImGuiKey_Escape, false)) {
+            search_state.is_open = false;
+            std::memset(search_state.query_buf, 0, sizeof(search_state.query_buf));
+            return;
+        }
+
+        // Debounce: set flag only — submit_search is called AFTER fe_state.mu is released
+        static auto last_change = std::chrono::steady_clock::now();
+        if (changed) last_change = std::chrono::steady_clock::now();
+        float elapsed_ms = std::chrono::duration<float, std::milli>(
+            std::chrono::steady_clock::now() - last_change).count();
+        std::string q(search_state.query_buf);
+        if (q.size() >= 2 && q != search_state.last_submitted_query && elapsed_ms >= 500.0f)
+            search_state.pending_submit = true;
+
+        // Arrow navigation — selected_index is main-thread-only, no lock needed
+        if (ImGui::IsKeyPressed(ImGuiKey_UpArrow, true) && search_state.selected_index > 0)
+            --search_state.selected_index;
+        if (ImGui::IsKeyPressed(ImGuiKey_DownArrow, true))
+            ++search_state.selected_index;
+
+        // Enter: defer navigation until after fe_state.mu is released
+        if (ImGui::IsKeyPressed(ImGuiKey_Enter, false))
+            search_state.pending_navigate_index = search_state.selected_index;
+    }
+
     void FileExplorerPanel::show_nav_history(FileExplorerState& state, float button_width, float spacing) {
         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6.0f, 6.0f));
@@ -951,6 +1083,27 @@ namespace misty::panel {
         }
         if (!can_fwd) ImGui::EndDisabled();
 
+        // Refresh button
+        ImGui::SameLine(0, spacing);
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.21f, 0.21f, 0.21f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.28f, 0.28f, 0.28f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.16f, 0.16f, 0.16f, 1.0f));
+        auto& sync_tex = core::AssetManager::get().get_svg_texture("sync-16", 16);
+        if (sync_tex.id != 0) {
+            if (ImGui::ImageButton("##refresh", sync_tex.id, ImVec2(16, 16), ImVec2(0, 0), ImVec2(1, 1),
+                    ImVec4(0, 0, 0, 0), ImVec4(0.7f, 0.7f, 0.7f, 1.0f))) {
+                std::string current(state.current_path);
+                if (!current.empty()) navigate_to_path(current, false);
+            }
+        } else {
+            if (ImGui::Button("R", ImVec2(button_width, 0))) {
+                std::string current(state.current_path);
+                if (!current.empty()) navigate_to_path(current, false);
+            }
+        }
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Refresh");
+        ImGui::PopStyleColor(3);
+
         ImGui::PopStyleVar(2);
     }
 
@@ -959,56 +1112,42 @@ namespace misty::panel {
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 8));
         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
 
+        const float btn_size = 32.0f;
+        const float spacing = 8.0f;
+        // Two buttons: search icon + options (···)
+        const float total_available = ImGui::GetContentRegionAvail().x;
+        const float path_width = std::max(100.0f, total_available - (btn_size + spacing) * 2);
+
+        // --- Path bar ---
         ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.21f, 0.21f, 0.21f, 1.0f));
-
-        float btn_size = 32.0f;
-        float spacing = 8.0f;
-        // Two buttons: refresh + options (···)
-        float available_width = ImGui::GetContentRegionAvail().x - (btn_size + spacing) * 2;
-        ImGui::SetNextItemWidth(available_width);
-
-        bool entered = ImGui::InputTextWithHint("##search", "Search or enter path...",
+        ImGui::SetNextItemWidth(path_width);
+        bool entered = ImGui::InputTextWithHint("##path", "Go to path...",
             state.search_path,
             sizeof(state.search_path) - 1,
             ImGuiInputTextFlags_EnterReturnsTrue);
-
         if (entered) {
-            // Don't auto-create directories when user types path manually
             navigate_to_path(state.search_path, true, false);
         }
-
         ImGui::PopStyleColor();
 
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.21f, 0.21f, 0.21f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.28f, 0.28f, 0.28f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.16f, 0.16f, 0.16f, 1.0f));
 
-        // Refresh button
+        // --- Search icon (opens inline search) ---
         ImGui::SameLine(0, spacing);
-        auto& sync_tex = core::AssetManager::get().get_svg_texture("sync-16", 16);
-        if (sync_tex.id != 0) {
-            if (ImGui::ImageButton("##refresh", sync_tex.id,
+        auto& search_tex = core::AssetManager::get().get_svg_texture("search-16", 16);
+        if (search_tex.id != 0) {
+            if (ImGui::ImageButton("##opensearch", search_tex.id,
                     ImVec2(16, 16), ImVec2(0, 0), ImVec2(1, 1),
                     ImVec4(0, 0, 0, 0), ImVec4(0.7f, 0.7f, 0.7f, 1.0f))) {
-                std::string current(state.current_path);
-                if (!current.empty()) {
-                    navigate_to_path(current, false);
-                }
-            }
-            if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("Refresh");
+                registry_.get_state<SearchState>("Search").is_open = true;
             }
         } else {
-            if (ImGui::Button("R", ImVec2(btn_size, 0))) {
-                std::string current(state.current_path);
-                if (!current.empty()) {
-                    navigate_to_path(current, false);
-                }
-            }
-            if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("Refresh");
-            }
+            if (ImGui::Button("S", ImVec2(btn_size, 0)))
+                registry_.get_state<SearchState>("Search").is_open = true;
         }
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Search (Cmd+K)");
 
         // Options (···) button
         ImGui::SameLine(0, spacing);
@@ -1211,7 +1350,7 @@ namespace misty::panel {
         if (state.is_downloading(file.path)) {
             icon_name = "download-16";
         } else if (file.is_dir) {
-            icon_name = "file-directory-16";
+            icon_name = "file-directory-fill-16";
         } else {
             // Check extension
             std::string ext = fs::path(file.name).extension().string();
@@ -1354,9 +1493,16 @@ namespace misty::panel {
         // Draw Icon and Name
         // Center icon and text vertically in the row
         float content_padding_y = (row_height - 16.0f) / 2.0f;
-        ImGui::SetCursorScreenPos(ImVec2(p.x + 4.0f, p.y + content_padding_y));
-        ImGui::Image(icon.id, ImVec2(16, 16));
-        
+        ImVec2 icon_p = ImVec2(p.x + 4.0f, p.y + content_padding_y);
+        ImGui::SetCursorScreenPos(icon_p);
+        if (icon.id != 0) {
+            ImU32 icon_col = file.is_dir ? IM_COL32(230, 191, 76, 255) : IM_COL32(255, 255, 255, 255);
+            ImGui::GetWindowDrawList()->AddImage(
+                icon.id, icon_p, ImVec2(icon_p.x + 16, icon_p.y + 16),
+                ImVec2(0, 0), ImVec2(1, 1), icon_col);
+        }
+        ImGui::Dummy(ImVec2(16, 16));
+
         ImGui::SameLine(0, 8.0f);
         // Center text vertically
         float text_y_offset = (row_height - ImGui::GetTextLineHeight()) / 2.0f;
@@ -1423,7 +1569,7 @@ namespace misty::panel {
         if (state.is_downloading(file.path)) {
             icon_name = "download-16";
         } else if (file.is_dir) {
-            icon_name = "file-directory-16";
+            icon_name = "file-directory-fill-16";
         } else {
             std::string ext = fs::path(file.name).extension().string();
             if (ext == ".cpp" || ext == ".h" || ext == ".hpp" || ext == ".c" || ext == ".cc" ||
@@ -1463,7 +1609,9 @@ namespace misty::panel {
         float icon_x = cell_pos.x + (cell_w - icon_size) * 0.5f;
         float icon_y = cell_pos.y + 10.0f;
         if (icon.id != 0) {
-            dl->AddImage(icon.id, ImVec2(icon_x, icon_y), ImVec2(icon_x + icon_size, icon_y + icon_size));
+            ImU32 icon_col = file.is_dir ? IM_COL32(230, 191, 76, 255) : IM_COL32(255, 255, 255, 255);
+            dl->AddImage(icon.id, ImVec2(icon_x, icon_y), ImVec2(icon_x + icon_size, icon_y + icon_size),
+                ImVec2(0, 0), ImVec2(1, 1), icon_col);
         }
 
         // Name (centered, clipped to cell width)

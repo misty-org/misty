@@ -7,6 +7,7 @@
 #include "panels/file_sidebar/file_sidebar_panel.h"
 #include "panels/navbar/navbar_panel.h"
 #include "panels/notification/notification_panel.h"
+#include "panels/search/search_panel.h"
 #include "core/ui_registry.h"
 
 
@@ -30,6 +31,7 @@ namespace misty::view {
         std::shared_ptr<panel::FileSidebarPanel> file_sidebar_panel_;
         std::shared_ptr<panel::FileExplorerPanel> file_explorer_panel_;
         std::shared_ptr<panel::NotificationPanel> notification_panel_;
+        std::shared_ptr<panel::SearchPanel> search_panel_;
 
         // Resizable sidebar
         float sidebar_width_ = 260.0f;
