@@ -3,11 +3,14 @@ import { Outlet, useMatches, ScrollRestoration } from "react-router";
 import { AuthProvider } from "./AuthContext";
 import Navbar from "./components/NavBar";
 
+type Handle = { title: string }
+
+
 export default function App() {
   const matches = useMatches();
 
   useEffect(() => {
-    const match = [...matches].reverse().find((m) => (m.handle as any)?.title);
+    const match = [...matches].reverse().find((m) => (m.handle as Handle)?.title);
     console.log(match?.handle)
     document.title = (match?.handle as any)?.title
   }, [matches]);
