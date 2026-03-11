@@ -4,7 +4,6 @@
 #include <fstream>
 #include <iostream>
 #include <filesystem>
-#include "application/core/asset_manager.h" // For getting app data path if needed, or just use HOME
 #include <nlohmann/json.hpp>
 
 namespace misty {
@@ -131,15 +130,15 @@ namespace panel {
     }
 
     void FileExplorerState::toggle_star(const UnifiedFileItem& item) {
-        auto it = std::find_if(starred_files.begin(), starred_files.end(), 
+        auto it = std::find_if(starred_files.begin(), starred_files.end(),
             [&](const UnifiedFileItem& f) { return f.path == item.path; });
-        
+
         if (it != starred_files.end()) {
             starred_files.erase(it);
         } else {
             starred_files.push_back(item);
         }
-        save_state(); // Persist change
+        dirty_ = true;
     }
 
     void FileExplorerState::add_recent(const UnifiedFileItem& item) {
@@ -147,12 +146,12 @@ namespace panel {
         auto it = std::remove_if(recent_files.begin(), recent_files.end(),
             [&](const UnifiedFileItem& f) { return f.path == item.path; });
         recent_files.erase(it, recent_files.end());
-        
+
         recent_files.push_front(item);
         if (recent_files.size() > 20) {
             recent_files.pop_back();
         }
-        save_state(); // Persist change
+        dirty_ = true;
     }
 
     void FileExplorerState::move_to_trash(const UnifiedFileItem& item) {
@@ -185,7 +184,74 @@ namespace panel {
             }
         }
         
-        save_state();
+        dirty_ = true;
+    }
+
+    // -------------------------------------------------------------------------
+    // save_async — non-blocking write-behind
+    //
+    // 1. Bail early if nothing changed, or if a write is already in progress.
+    // 2. Snapshot state under mu (fast — just copies vectors + a string).
+    // 3. Clear dirty_ while still holding the lock so any mutation that races
+    //    in after the snapshot will re-set it and be picked up next cycle.
+    // 4. Hand the JSON string to a worker thread for the actual file I/O.
+    //    Atomic write (write temp → rename) prevents half-written files on crash.
+    // -------------------------------------------------------------------------
+    void FileExplorerState::save_async(core::WorkerPool& pool) {
+        if (!dirty_.load(std::memory_order_relaxed)) return;
+        if (save_in_flight_.exchange(true))           return; // already writing
+
+        // Snapshot under lock
+        std::string json_str;
+        {
+            std::lock_guard<std::mutex> lk(mu);
+            dirty_.store(false, std::memory_order_relaxed);
+
+            json j;
+            j["recent_files"]   = json::array();
+            for (const auto& item : recent_files)
+                j["recent_files"].push_back(serialize_item(item));
+
+            j["starred_files"]  = json::array();
+            for (const auto& item : starred_files)
+                j["starred_files"].push_back(serialize_item(item));
+
+            j["last_opened_path"] = std::string(current_path);
+
+            json_str = j.dump(4);
+        }
+
+        std::string dest = get_state_file_path();
+        if (dest.empty()) { save_in_flight_.store(false); return; }
+
+        // The lambda captures in_flight by raw pointer — safe because the state
+        // object outlives the worker (it lives in UIRegistry for the app lifetime).
+        auto* in_flight = &save_in_flight_;
+
+        pool.add(
+            [json_str = std::move(json_str), dest, in_flight]() {
+                std::string tmp = dest + ".tmp";
+                try {
+                    fs::create_directories(fs::path(dest).parent_path());
+                    {
+                        std::ofstream f(tmp);
+                        if (f) f << json_str;
+                    }
+                    // Atomic rename — on most filesystems this is a single syscall
+                    std::error_code ec;
+                    fs::rename(tmp, dest, ec);
+                    if (ec) fs::remove(tmp, ec); // clean up temp on failure
+                } catch (...) {
+                    std::error_code ec;
+                    fs::remove(tmp, ec);
+                }
+                in_flight->store(false);
+            },
+            []() {},                               // on_finish (unused)
+            [in_flight](const std::string&) {      // on_error
+                in_flight->store(false);
+            }
+        );
     }
 
 } // namespace panel

@@ -6,7 +6,7 @@
 #include "panels/services/services_panel.h"
 #include "panels/navbar/navbar_panel.h"
 #include "panels/notification/notification_panel.h"
-#include "core/ui_registry.h"
+#include "core/ui/ui_registry.h"
 
 namespace misty::view {
     class ServicesView : public AppView {

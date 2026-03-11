@@ -7,6 +7,7 @@ namespace misty::panel {
             ImGui::OpenPopup(modal_id);
         }
         
+        ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
         if (ImGui::BeginPopupModal(modal_id, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
             ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Error");
             ImGui::Separator();

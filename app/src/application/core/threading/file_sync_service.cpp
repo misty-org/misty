@@ -1,4 +1,4 @@
-#include "core/file_sync_service.h"
+#include "core/threading/file_sync_service.h"
 #include "panels/file_explorer/file_explorer_state.h"
 #include <chrono>
 #include <filesystem>

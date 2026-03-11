@@ -2,20 +2,26 @@
 
 #include <memory>
 
-#include "core/ui_registry.h"
+#include "core/ui/ui_registry.h"
+#include "dfs/client/misty_client.h"
 #include "panels/panel.h"
-#include "core/worker_pool.h"
+#include "core/threading/worker_pool.h"
 #include "panels/file_explorer/file_explorer_state.h"
 #include "panels/workspace/workspace_state.h"
 #include "panels/activity/upload_state.h"
+#include "panels/search/search_state.h"
 
 
 namespace misty::panel {
+    class SearchPanel;  // forward declaration
+
     class FileExplorerPanel : public panel::Panel {
     public:
         FileExplorerPanel(core::UIRegistry& registry, core::WorkerPool& worker_pool, std::shared_ptr<MistyClient> client);
         ~FileExplorerPanel() override = default;
         void render() override;
+
+        void set_search_panel(SearchPanel* panel) { search_panel_ = panel; }
 
         // Unified navigation - routes to local or OneDrive based on path
         // create_if_missing: if true, creates OneDrive directories locally when navigating
@@ -25,6 +31,7 @@ namespace misty::panel {
     private:
         void show_nav_history(panel::FileExplorerState& state, float button_width, float spacing);
         void show_search_bar(panel::FileExplorerState& state);
+        void show_inline_search(panel::FileExplorerState& state, SearchState& search_state);
         void show_directory_contents(panel::FileExplorerState& state);
         void show_file_item(panel::FileExplorerState& state, int i);
         void show_grid_item(panel::FileExplorerState& state, int i, float cell_w, float cell_h);
@@ -46,6 +53,10 @@ namespace misty::panel {
         void perform_delete_selected(panel::FileExplorerState& state);
         void perform_delete(panel::FileExplorerState& state, const std::string& path);
         void initiate_rename(panel::FileExplorerState& state);
+
+        // Async local filesystem navigation — dispatches I/O to worker pool
+        // so the UI thread is never blocked by slow drives or USB spin-up.
+        void navigate_to_local_path_async(const std::string& path, bool update_history);
 
         // Sync account mappings from services state
         void sync_account_mappings();
@@ -113,6 +124,7 @@ namespace misty::panel {
 
         std::string initial_start_path_;
         bool workspace_mount_applied_ = false;
+        SearchPanel* search_panel_ = nullptr;
 
     };
 };

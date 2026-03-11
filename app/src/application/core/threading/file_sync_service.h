@@ -2,7 +2,7 @@
 
 #include <thread>
 #include <atomic>
-#include "core/ui_registry.h"
+#include "core/ui/ui_registry.h"
 
 namespace misty::core {
 

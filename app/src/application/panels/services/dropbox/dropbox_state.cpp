@@ -1,6 +1,6 @@
 #include "dropbox_state.h"
-#include "core/env_manager.h"
-#include "core/http_client.h"
+#include "core/manager/env_manager.h"
+#include "core/net/http_client.h"
 #include <nlohmann/json.hpp>
 #include <filesystem>
 #include <iostream>
