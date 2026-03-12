@@ -15,6 +15,7 @@
 #include "panels/file_explorer/file_explorer_panel.h"
 #include "panels/navbar/navbar_panel.h"
 #include "panels/notification/notification_panel.h"
+#include "panels/panel/tab_bar.h"
 
 namespace misty::view {
     class FilesView : public view::AppView {
@@ -49,6 +50,7 @@ namespace misty::view {
         std::vector<panel::FileSidebarPanel::WorkspaceEntry> workspace_sidebar_entries() const;
         void load_workspaces();
         void save_workspaces() const;
+        void autosave_workspaces_if_due();
         void render_workspace_tabs(const ImVec2& pos, float width);
         std::string workspace_id(std::int16_t workspace_idx) const;
         std::int16_t workspace_idx_from_id(const std::string& id) const;
@@ -100,12 +102,13 @@ namespace misty::view {
         bool is_resizing_inspector_ = false;
         float claude_panel_width_ = 380.0f;
         bool is_resizing_claude_panel_ = false;
+        double last_workspace_autosave_at_ = 0.0;
         std::shared_ptr<std::atomic_bool> proxy_probe_in_flight_ =
             std::make_shared<std::atomic_bool>(false);
 
         static constexpr float kSidebarMinWidth = 180.0f;
         static constexpr float kSidebarMaxWidth = 400.0f;
-        static constexpr float kWorkspaceTabBarHeight = 32.0f;
+        static constexpr float kWorkspaceTabBarHeight = panel::kTabBarHeight;
         static constexpr float kInspectorMinWidth = 240.0f;
         static constexpr float kInspectorMaxWidth = 430.0f;
         static constexpr float kExplorerMinWidth = 360.0f;

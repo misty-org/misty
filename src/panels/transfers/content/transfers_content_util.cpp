@@ -73,6 +73,7 @@ bool matches_search(const core::FileTransferRecord& row, const char* search_quer
         row.remote_source_path + "\n" +
         row.remote_dest_name + "\n" +
         row.remote_dest_path + "\n" +
+        job_id_text(row) + "\n" +
         row.error_message;
     return contains_case_insensitive(haystack, query);
 }
@@ -115,12 +116,11 @@ std::vector<core::FileTransferRecord> sorted_rows(std::vector<core::FileTransfer
 }
 
 std::vector<core::FileTransferRecord> visible_rows(const std::vector<core::FileTransferRecord>& rows,
-                                                   core::FileTransferFilter filter,
                                                    const char* search_query) {
     std::vector<core::FileTransferRecord> visible;
     visible.reserve(rows.size());
     for (const auto& row : rows) {
-        if (matches_filter(row, filter) && matches_search(row, search_query)) {
+        if (matches_search(row, search_query)) {
             visible.push_back(row);
         }
     }
@@ -155,6 +155,11 @@ const char* status_label(const core::FileTransferRecord& row) {
         case core::FileTransferStatus::Completed: return "Completed";
         case core::FileTransferStatus::Pending:
         case core::FileTransferStatus::InProgress:
+            if (row.transfer_type == core::FileTransferType::Upload &&
+                row.total_bytes > 0 &&
+                row.transferred_bytes >= row.total_bytes) {
+                return "Finalizing";
+            }
             switch (row.transfer_type) {
                 case core::FileTransferType::Upload: return "Uploading";
                 case core::FileTransferType::Download: return "Downloading";
@@ -187,18 +192,29 @@ float progress_fraction(const core::FileTransferRecord& row) {
         1.0f);
 }
 
-std::string transfer_endpoint(const core::FileTransferRecord& row) {
-    if (!row.remote_dest_name.empty() || !row.remote_dest_path.empty()) {
-        return row.remote_dest_name + ":" + row.remote_dest_path;
+std::string job_id_text(const core::FileTransferRecord& row) {
+    if (row.job_id == 0) {
+        return "--";
     }
+    return "#" + std::to_string(row.job_id);
+}
+
+std::string source_endpoint(const core::FileTransferRecord& row) {
     if (!row.remote_source_name.empty() || !row.remote_source_path.empty()) {
         return row.remote_source_name + ":" + row.remote_source_path;
     }
-    if (!row.local_dest_path.empty()) {
-        return row.local_dest_path;
-    }
     if (!row.local_source_path.empty()) {
         return row.local_source_path;
+    }
+    return row.file_name;
+}
+
+std::string target_endpoint(const core::FileTransferRecord& row) {
+    if (!row.remote_dest_name.empty() || !row.remote_dest_path.empty()) {
+        return row.remote_dest_name + ":" + row.remote_dest_path;
+    }
+    if (!row.local_dest_path.empty()) {
+        return row.local_dest_path;
     }
     return "";
 }

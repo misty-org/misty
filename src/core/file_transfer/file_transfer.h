@@ -51,6 +51,7 @@ struct FileTransferRecord {
     std::string remote_source_path;
     std::string remote_dest_name;
     std::string remote_dest_path;
+    uint64_t job_id = 0;
     int64_t total_bytes = 0;
     int64_t transferred_bytes = 0;
     FileTransferStatus status = FileTransferStatus::Pending;
@@ -58,14 +59,7 @@ struct FileTransferRecord {
     std::chrono::steady_clock::time_point started_at{};
     std::chrono::steady_clock::time_point completed_at{};
 
-    //very simple way to check if the transfer is still active
-    bool is_alive() const {
-        if (error_message != "" || status == FileTransferStatus::Failed ||
-            status == FileTransferStatus::Completed) {
-            return false;
-        }
-        return status == FileTransferStatus::Pending || status == FileTransferStatus::InProgress;
-    }
+    bool is_alive() const;
 };
 
 class FileTransfer : public StateEntry {
@@ -74,7 +68,7 @@ public:
 
     void set_local_context(uint64_t id, const std::string& local_path);
     void set_remote_context(uint64_t id, const std::string& remote_name, const std::string& remote_path);
-    void update_progress(uint64_t id, int64_t transferred_bytes);
+    void update_progress(uint64_t id, int64_t transferred_bytes, int64_t total_bytes = -1);
 
     uint64_t start_transfer(FileTransferRecord snapshot);
     void complete_transfer(uint64_t id);

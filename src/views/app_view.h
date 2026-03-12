@@ -25,8 +25,6 @@ namespace misty::view {
     };
 
     enum class ViewID {
-        Auth,
-        Login,
         Files,
         Settings,
         Workspace,

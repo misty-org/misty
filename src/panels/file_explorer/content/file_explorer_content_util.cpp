@@ -38,6 +38,18 @@ std::string remote_sync_path_for_item(const RemoteBrowseTarget& target,
     return base.generic_string();
 }
 
+std::string remote_dest_path_for(const RemoteBrowseTarget& target, const std::string& name) {
+    fs::path dest = target.remote_path.empty()
+        ? fs::path("/")
+        : fs::path(target.remote_path);
+    dest /= name;
+    std::string result = dest.generic_string();
+    if (result.empty() || result.front() != '/') {
+        result.insert(result.begin(), '/');
+    }
+    return result;
+}
+
 void materialize_remote_cache_item(const fs::path& path, bool is_dir) {
     if (!is_dir) {
         return;
@@ -172,6 +184,36 @@ core::FileMasterProps remote_list_props_for(const RemoteBrowseTarget& target) {
     return props;
 }
 
+core::FileMasterProps local_file_master_props_for(const FileItem& item,
+                                                  const std::string& dest_path) {
+    core::FileMasterProps props;
+    props.file_name = item.name;
+    props.local_source.path = item.path;
+    props.local_dest.path = dest_path;
+    return props;
+}
+
+core::FileMasterProps remote_file_master_props_for(const FileItem& item,
+                                                   const std::string& dest_path) {
+    core::FileMasterProps props;
+    props.file_name = item.name;
+    if (is_remote_file_master_item(item)) {
+        props.remote_source.remote_name = item.sync_remote_name;
+        props.remote_source.remote_path = item.sync_remote_path;
+    } else {
+        props.local_source.path = item.path;
+    }
+
+    if (auto remote_target = remote_browse_target_for(dest_path); remote_target.has_value()) {
+        props.remote_dest.remote_name = remote_target->remote_name;
+        props.remote_dest.provider_type = remote_target->provider_folder;
+        props.remote_dest.remote_path = remote_dest_path_for(*remote_target, item.name);
+    } else if (!dest_path.empty()) {
+        props.local_dest.path = (fs::path(dest_path) / item.name).string();
+    }
+    return props;
+}
+
 std::vector<FileItem> remote_mount_items_for(
     const RemoteBrowseTarget& target,
     const std::vector<core::FileMasterListItem>& remote_items) {
@@ -199,6 +241,64 @@ std::vector<FileItem> remote_mount_items_for(
         item.mime_type = remote_item.mime_type;
         item.type = FileType::REMOTE;
         items.push_back(std::move(item));
+    }
+    return items;
+}
+
+bool is_remote_file_master_item(const FileItem& item) {
+    return item.type == FileType::REMOTE &&
+           !item.sync_remote_name.empty() &&
+           !item.sync_remote_path.empty();
+}
+
+bool is_file_master_item(const FileItem& item) {
+    return item.type == FileType::LOCAL || is_remote_file_master_item(item);
+}
+
+bool selected_items_are_file_master_items(const std::unordered_set<std::string>& selected_ids,
+                                          const FileListing& listing) {
+    if (selected_ids.empty()) {
+        return false;
+    }
+
+    for (const auto& selected_id : selected_ids) {
+        const FileItem* item = find_file_item_by_id(listing, selected_id);
+        if (!item || !is_file_master_item(*item)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool exactly_one_file_master_item_selected(const std::unordered_set<std::string>& selected_ids,
+                                           const FileListing& listing) {
+    return selected_ids.size() == 1 && selected_items_are_file_master_items(selected_ids, listing);
+}
+
+const FileItem* find_file_item_by_id(const FileListing& listing,
+                                     const std::string& id) {
+    const auto it = std::find_if(listing.files.begin(), listing.files.end(), [&](const FileItem& item) {
+        return item.id == id;
+    });
+    return it == listing.files.end() ? nullptr : &*it;
+}
+
+const FileItem* find_file_item_by_path(const std::vector<FileItem>& items,
+                                       const std::string& path) {
+    const auto it = std::find_if(items.begin(), items.end(), [&](const FileItem& item) {
+        return item.path == path;
+    });
+    return it == items.end() ? nullptr : &*it;
+}
+
+std::vector<FileItem> selected_file_items(const std::unordered_set<std::string>& selected_ids,
+                                          const FileListing& listing) {
+    std::vector<FileItem> items;
+    items.reserve(selected_ids.size());
+    for (const auto& selected_id : selected_ids) {
+        if (const FileItem* item = find_file_item_by_id(listing, selected_id)) {
+            items.push_back(*item);
+        }
     }
     return items;
 }

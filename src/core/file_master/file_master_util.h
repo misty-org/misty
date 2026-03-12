@@ -6,6 +6,7 @@
 #include <string>
 
 #include "file_master.h"
+#include "file_master_api.h"
 
 namespace misty::core {
 
@@ -40,19 +41,25 @@ FileMasterProps normalize_remote_props(const FileMasterProps& props);
 
 FileMasterResult validate_remote_props(const FileMasterProps& props);
 
-FileMasterResult rename_remote_path(const FileMasterProps& props);
+FileMasterResult rename_remote_path(const FileMasterProps& props,
+                                    RemoteJobProgressCallback progress_callback = nullptr);
 
-FileMasterResult remove_remote_path(const FileMasterProps& props);
+FileMasterResult remove_remote_path(const FileMasterProps& props,
+                                    RemoteJobProgressCallback progress_callback = nullptr);
 
-FileMasterResult copy_remote_path(const FileMasterProps& props);
+FileMasterResult copy_remote_path(const FileMasterProps& props,
+                                  RemoteJobProgressCallback progress_callback = nullptr);
 
-FileMasterResult cut_remote_path(const FileMasterProps& props);
+FileMasterResult cut_remote_path(const FileMasterProps& props,
+                                 RemoteJobProgressCallback progress_callback = nullptr);
 
 bool load_cached_remote_path(const FileMasterProps& props, std::vector<FileMasterListItem>& items);
 
 std::optional<std::chrono::system_clock::time_point> cached_remote_path_time(const FileMasterProps& props);
 
-FileMasterResult list_remote_path(const FileMasterProps& props, std::vector<FileMasterListItem>& items);
+FileMasterResult list_remote_path(const FileMasterProps& props,
+                                  std::vector<FileMasterListItem>& items,
+                                  RemoteJobProgressCallback progress_callback = nullptr);
 
 
 } // namespace misty::core

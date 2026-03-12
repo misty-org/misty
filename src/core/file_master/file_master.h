@@ -25,9 +25,7 @@ struct FileMasterResult {
 struct FileMasterLocalContext {
     std::string path;
 
-    bool empty() const {
-        return path.empty();
-    }
+    bool empty() const;
 };
 
 struct FileMasterRemoteContext {
@@ -35,12 +33,11 @@ struct FileMasterRemoteContext {
     std::string provider_type;
     std::string remote_path;
 
-    bool empty() const {
-        return remote_name.empty() && provider_type.empty() && remote_path.empty();
-    }
+    bool empty() const;
 };
 
 struct FileMasterProps {
+    uint64_t job_id = 0;
     std::string file_name;
     FileMasterLocalContext local_source;
     FileMasterLocalContext local_dest;

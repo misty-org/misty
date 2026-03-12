@@ -45,18 +45,18 @@ const std::array<ThemeManager::ThemePreset, 4>& ThemeManager::builtins() {
             "misty-dark",
             "Misty Dark",
             {
-                token("window_bg", ImVec4(0.067f, 0.067f, 0.075f, 1.0f)),
-                token("panel_bg", ImVec4(0.094f, 0.094f, 0.106f, 1.0f)),
-                token("panel_alt_bg", ImVec4(0.153f, 0.153f, 0.165f, 1.0f)),
-                token("border", ImVec4(0.153f, 0.153f, 0.165f, 1.0f)),
-                token("text", ImVec4(0.831f, 0.831f, 0.847f, 1.0f)),
-                token("text_muted", ImVec4(0.443f, 0.443f, 0.478f, 1.0f)),
-                token("accent", ImVec4(0.231f, 0.510f, 0.965f, 1.0f)),
-                token("accent_hover", ImVec4(0.145f, 0.388f, 0.922f, 1.0f)),
-                token("selection", ImVec4(0.231f, 0.510f, 0.965f, 0.35f)),
-                token("success", ImVec4(0.161f, 0.733f, 0.533f, 1.0f)),
-                token("warning", ImVec4(0.969f, 0.631f, 0.204f, 1.0f)),
-                token("error", ImVec4(0.937f, 0.267f, 0.267f, 1.0f)),
+                token("window_bg", ImVec4(0.027f, 0.035f, 0.043f, 1.0f)),    // #07090b
+                token("panel_bg", ImVec4(0.043f, 0.051f, 0.059f, 1.0f)),     // #0b0d0f
+                token("panel_alt_bg", ImVec4(0.094f, 0.094f, 0.106f, 1.0f)), // #18181b
+                token("border", ImVec4(0.153f, 0.153f, 0.165f, 1.0f)),       // #27272a
+                token("text", ImVec4(0.945f, 0.933f, 0.910f, 1.0f)),         // #f1eee8
+                token("text_muted", ImVec4(0.788f, 0.769f, 0.737f, 1.0f)),   // #c9c4bc
+                token("accent", ImVec4(0.941f, 0.922f, 0.894f, 1.0f)),       // #f0ebe4
+                token("accent_hover", ImVec4(0.831f, 0.808f, 0.776f, 1.0f)), // #d4cec6
+                token("selection", ImVec4(0.945f, 0.933f, 0.910f, 0.18f)),
+                token("success", ImVec4(0.475f, 0.729f, 0.561f, 1.0f)),
+                token("warning", ImVec4(0.925f, 0.729f, 0.455f, 1.0f)),
+                token("error", ImVec4(0.894f, 0.373f, 0.373f, 1.0f)),
             },
         },
         ThemePreset{
