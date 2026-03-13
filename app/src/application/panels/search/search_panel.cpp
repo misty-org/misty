@@ -1,9 +1,9 @@
 #include "panels/search/search_panel.h"
 #include "panels/search/fuzzy_match.h"
 #include "panels/file_explorer/file_explorer_state.h"
-#include "core/http_client.h"
-#include "core/env_manager.h"
-#include "core/asset_manager.h"
+#include "core/net/http_client.h"
+#include "core/manager/env_manager.h"
+#include "core/manager/asset_manager.h"
 
 #include <imgui.h>
 #include <nlohmann/json.hpp>
@@ -144,9 +144,13 @@ void SearchPanel::submit_search(const std::string& query) {
 
     state.last_submitted_query = query;
 
-    // Search from the user's home directory so results span the whole machine.
-    const char* home_env = std::getenv("HOME");
-    std::string local_root = home_env ? std::string(home_env) : std::string();
+    // Read current_path on the main thread — never touch fe_state.mu from a worker.
+    std::string local_root;
+    {
+        auto& fe_state = ui_registry_.get_state<FileExplorerState>("Files");
+        std::lock_guard<std::mutex> lk(fe_state.mu);
+        local_root = std::string(fe_state.current_path);
+    }
 
     // Cache scan runs on a worker thread; results arrive quickly.
     worker_pool_.add(
@@ -589,17 +593,33 @@ void SearchPanel::launch_api_searches(SearchState& state, const std::string& que
 }
 
 // ---------------------------------------------------------------------------
-// navigate_to_result — sets pending_navigation_path on the file explorer state
+// navigate_to_result — navigates the file explorer to the item's location.
+//
+// POLICY: search results NEVER open or execute files. We only reveal the
+// containing directory so the user can decide what to do next. This prevents
+// accidentally launching malicious scripts or binaries that match a search.
+//
+// • Local file  → parent directory (never the file path itself)
+// • Local dir   → the directory
+// • Cloud item  → virtual_path is always the provider folder, never a file
 // ---------------------------------------------------------------------------
 
 void SearchPanel::navigate_to_result(const SearchResult& result) {
     auto& fe_state = ui_registry_.get_state<FileExplorerState>("Files");
     std::lock_guard<std::mutex> lock(fe_state.mu);
-    if (result.source == FileSource::LOCAL && !result.is_dir) {
-        fe_state.pending_navigation_path = fs::path(result.virtual_path).parent_path().string();
+
+    std::string dest;
+    if (!result.is_dir) {
+        // For any non-directory result: always navigate to the parent folder.
+        // For cloud files, virtual_path is already a folder path by construction,
+        // but we guard uniformly here so this policy cannot silently regress.
+        fs::path vp(result.virtual_path);
+        dest = vp.has_parent_path() ? vp.parent_path().string() : result.virtual_path;
     } else {
-        fe_state.pending_navigation_path = result.virtual_path;
+        dest = result.virtual_path;
     }
+
+    fe_state.pending_navigation_path = dest;
 }
 
 // ---------------------------------------------------------------------------
@@ -682,7 +702,7 @@ void SearchPanel::render_results(SearchState& state) {
         if (icon.id != 0) {
             ImVec2 p = ImGui::GetCursorScreenPos();
             ImU32 col = r.is_dir ? IM_COL32(230, 191, 76, 255)
-                                 : IM_COL32(192, 192, 192, 255);
+                                 : IM_COL32(100, 170, 230, 255);
             ImGui::GetWindowDrawList()->AddImage(
                 icon.id, p, ImVec2(p.x + 14, p.y + 14),
                 ImVec2(0,0), ImVec2(1,1), col);

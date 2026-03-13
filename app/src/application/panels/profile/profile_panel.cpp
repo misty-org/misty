@@ -1,8 +1,8 @@
 #include "panels/profile/profile_panel.h"
 #include "panels/profile/profile_state.h"
 #include "panels/settings/settings_state.h"
-#include "core/asset_manager.h"
-#include "core/session_manager.h"
+#include "core/manager/asset_manager.h"
+#include "core/manager/session_manager.h"
 #include "views/app_view.h"
 #include "imgui.h"
 

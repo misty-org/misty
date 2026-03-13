@@ -3,7 +3,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 #include "mac_app.h"
-#include "core/asset_manager.h"
+#include "core/manager/asset_manager.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 #include <cstdio>
@@ -34,11 +34,12 @@ namespace misty {
     }
 
     void MacApp::init_window() {
-        window_ = glfwCreateWindow(1280, 720, "Misty Client", NULL, NULL);
+        window_ = glfwCreateWindow(1280, 720, "Misty", NULL, NULL);
         if (!window_) throw std::runtime_error("Failed to create GLFW window");
         glfwMakeContextCurrent(window_); //VERY IMPORTANT
         glfwSetWindowUserPointer(window_, this);
         glfwSetWindowSizeCallback(window_, glfw_window_size_callback);
+        glfwSetWindowFocusCallback(window_, glfw_window_focus_callback);
     }
 
     void MacApp::init_opengl() {
@@ -133,6 +134,7 @@ namespace misty {
         style.Colors[ImGuiCol_Tab]                  = ImVec4(0.094f, 0.094f, 0.106f, 1.0f);
         style.Colors[ImGuiCol_TabHovered]           = ImVec4(0.153f, 0.153f, 0.165f, 1.0f);
         style.Colors[ImGuiCol_TabSelected]          = ImVec4(0.153f, 0.153f, 0.165f, 1.0f);
+        style.Colors[ImGuiCol_NavHighlight]         = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
 	}
 
     void MacApp::prepare_frame() {
@@ -180,6 +182,11 @@ namespace misty {
 
     void MacApp::glfw_window_size_callback(GLFWwindow* window, int width, int height) {
 
+    }
+
+    void MacApp::glfw_window_focus_callback(GLFWwindow* window, int focused) {
+        if (!focused)
+            static_cast<Application*>(glfwGetWindowUserPointer(window))->on_focus_lost();
     }
 }
 #endif

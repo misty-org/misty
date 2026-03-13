@@ -6,8 +6,8 @@
 #include "panels/services/services_state.h"
 #include "panels/activity/upload_state.h"
 #include "panels/panel_ui.h"
-#include "core/asset_manager.h"
-#include "core/file_picker.h"
+#include "core/manager/asset_manager.h"
+#include "core/file_picker/file_picker.h"
 #include <nlohmann/json.hpp>
 #include <filesystem>
 #include <vector>
@@ -81,6 +81,8 @@ namespace misty::panel {
             ImGui::PushStyleColor(ImGuiCol_Separator, ImVec4(0.30f, 0.30f, 0.32f, 1.0f));
             ImGui::Separator();
             show_local_section(width, padding);
+            ImGui::Separator();
+            show_devices_section(width, padding);
             ImGui::Separator();
             show_services_section(services_state, width, padding);
             ImGui::Separator();
@@ -352,6 +354,123 @@ namespace misty::panel {
         }
         ImGui::PopStyleVar(4);
     }
+
+    // ─── Devices section ──────────────────────────────────────────────────────
+
+    static std::string format_bytes(uint64_t bytes) {
+        if (bytes == 0) return "";
+        if (bytes < 1024ULL * 1024)
+            return std::to_string(bytes / 1024) + " KB";
+        double gb = static_cast<double>(bytes) / (1024.0 * 1024.0 * 1024.0);
+        if (gb >= 1.0) {
+            char buf[32];
+            std::snprintf(buf, sizeof(buf), "%.1f GB", gb);
+            return buf;
+        }
+        char buf[32];
+        std::snprintf(buf, sizeof(buf), "%.0f MB", static_cast<double>(bytes) / (1024.0 * 1024.0));
+        return buf;
+    }
+
+    void FileSidebarPanel::show_devices_section(float width, float padding) {
+        // Rescan only when the OS fires a mount/unmount event (kqueue/inotify/FCN),
+        // or on first render, or when the user clicks the refresh button.
+        bool do_rescan = cached_devices_.empty() || device_watcher_.has_changed();
+
+        float content_width = width - (padding * 2.0f);
+        ImGui::SetCursorPosX(padding);
+        ImGui::BeginGroup();
+
+        // Header row: "Devices" label + small refresh button on the right
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.7f, 0.7f, 0.7f, 1.0f));
+        ImGui::Text("Devices");
+        ImGui::PopStyleColor();
+        ImGui::SameLine(content_width - 4.0f);
+        ImGui::PushStyleColor(ImGuiCol_Button,        ImVec4(0,0,0,0));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1,1,1,0.12f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(1,1,1,0.06f));
+        ImGui::PushStyleColor(ImGuiCol_Text,          ImVec4(0.5f,0.5f,0.5f,1.0f));
+        if (ImGui::SmallButton("↻")) do_rescan = true;
+        ImGui::PopStyleColor(4);
+
+        if (do_rescan) cached_devices_ = scan_mounted_devices();
+
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 2.0f));
+
+        if (cached_devices_.empty()) {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+            ImGui::SetCursorPosX(padding + 8.0f);
+            ImGui::TextUnformatted("No drives found");
+            ImGui::PopStyleColor();
+        }
+
+        for (const auto& dev : cached_devices_) {
+            // Each device item is 42px tall: name on top, info line below.
+            const float item_h = 42.0f;
+            ImVec2 cursor = ImGui::GetCursorScreenPos();
+
+            ImGui::PushID(dev.mount_path.c_str());
+            bool pressed = ImGui::InvisibleButton("##dev", ImVec2(content_width, item_h));
+            bool hovered = ImGui::IsItemHovered();
+            bool active  = ImGui::IsItemActive();
+
+            if (hovered || active) {
+                ImDrawList* dl = ImGui::GetWindowDrawList();
+                ImU32 col_l = active ? IM_COL32(255,255,255,30) : IM_COL32(255,255,255,20);
+                dl->AddRectFilledMultiColor(
+                    cursor, ImVec2(cursor.x + content_width, cursor.y + item_h),
+                    col_l, IM_COL32(255,255,255,0), IM_COL32(255,255,255,0), col_l);
+            }
+
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+
+            // Device name
+            dl->AddText(ImVec2(cursor.x + 8.0f, cursor.y + 5.0f),
+                        IM_COL32(220, 220, 220, 255), dev.name.c_str());
+
+            // Info line: FS type + free space
+            std::string info = dev.fs_type;
+            if (dev.total_bytes > 0) {
+                info += "  ·  " + format_bytes(dev.free_bytes) + " free";
+            }
+            dl->AddText(ImGui::GetFont(), ImGui::GetFontSize() * 0.85f,
+                        ImVec2(cursor.x + 8.0f, cursor.y + 22.0f),
+                        IM_COL32(130, 130, 130, 255), info.c_str());
+
+            // Disk usage bar (3px tall, sits at the bottom of the item)
+            if (dev.total_bytes > 0) {
+                float fill  = 1.0f - static_cast<float>(dev.free_bytes) /
+                                     static_cast<float>(dev.total_bytes);
+                float bar_x = cursor.x + 8.0f;
+                float bar_y = cursor.y + item_h - 7.0f;
+                float bar_w = content_width - 16.0f;
+
+                // Background track
+                dl->AddRectFilled(ImVec2(bar_x, bar_y),
+                                  ImVec2(bar_x + bar_w, bar_y + 3.0f),
+                                  IM_COL32(60, 60, 60, 255), 1.5f);
+                // Fill — red when almost full (>90%)
+                ImU32 fill_col = (fill > 0.9f) ? IM_COL32(210, 70, 70, 255)
+                                               : IM_COL32(100, 170, 230, 255);
+                dl->AddRectFilled(ImVec2(bar_x, bar_y),
+                                  ImVec2(bar_x + bar_w * fill, bar_y + 3.0f),
+                                  fill_col, 1.5f);
+            }
+
+            ImGui::PopID();
+
+            if (pressed) {
+                auto& fe_state = registry_.get_state<FileExplorerState>("Files");
+                fe_state.pending_navigation_path = dev.mount_path;
+            }
+        }
+
+        ImGui::PopStyleVar();
+        ImGui::EndGroup();
+        ImGui::Spacing();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
 
     void FileSidebarPanel::show_quick_access(float width, float padding) {
         float content_width = width - (padding * 2);

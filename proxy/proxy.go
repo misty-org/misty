@@ -69,9 +69,9 @@ func (proxy *Proxy) MountHandlers() {
 
 	// Public routes (no auth required)
 	proxy.APIRouter.Post("/register", api.RegisterUser(proxy.Database))
-	proxy.APIRouter.Post("/login", api.LoginUser(proxy.Database))
+	proxy.APIRouter.Post("/login", api.LoginUser(proxy.Database, proxy.LicenseManager))
 	proxy.APIRouter.Post("/logout", api.LogoutUser(proxy.Database))
-	proxy.APIRouter.Post("/refresh", api.RefreshToken(proxy.Database))
+	proxy.APIRouter.Post("/refresh", api.RefreshToken(proxy.Database, proxy.LicenseManager))
 
 	// OAuth callbacks must remain public
 	proxy.APIRouter.Get("/ms/auth", ms.GetOAuthLogin())

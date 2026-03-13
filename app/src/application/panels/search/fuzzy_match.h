@@ -6,85 +6,100 @@
 
 namespace misty::search {
 
-// Fuzzy match score using Smith-Waterman-inspired greedy subsequence scoring.
-// Returns -1 if query is not a subsequence of target (case-insensitive).
-// Higher score = better match.
+// Fuzzy match score using a forward + backward pass to find the tightest
+// (most consecutive) valid subsequence match.
 //
-// Scoring bonuses per matched character:
-//   +10  base score per matched char
-//   +15  consecutive run (compounding per extra consecutive char)
-//   +20  word-boundary start (after / . _ - space, or camelCase transition)
-//   +10  prefix bonus (matched position equals query index)
-//   -2x  gap penalty per skipped character in target
+// Forward pass: verify query is a subsequence of target; record leftmost positions.
+// Backward pass: from the last matched position, scan backward to pull all
+//   positions as close together as possible (maximises consecutive bonuses).
+//
+// Scoring per matched character:
+//   +10  base per matched char
+//   +15*run  consecutive run bonus (compounding: +15 for run-1, +30 for run-2, …)
+//   +20  word-boundary start (pos 0, after / . _ - \ space, or camelCase transition)
+//   +20  prefix bonus (first query char matches position 0 of target)
+//   -2×gap  penalty per skipped character between consecutive matches
+//
+// Returns -1 if not a subsequence match or if score < kMinScore.
 inline int fuzzy_score(std::string_view query, std::string_view target) {
     if (query.empty()) return 0;
     if (target.empty()) return -1;
 
-    // Forward pass: greedily find leftmost subsequence match (case-insensitive).
-    std::vector<int> match_pos;
-    match_pos.reserve(query.size());
+    const int n = static_cast<int>(query.size());
+    const int m = static_cast<int>(target.size());
 
-    size_t ti = 0;
-    for (size_t qi = 0; qi < query.size(); ++qi) {
-        char qc = static_cast<char>(std::tolower(static_cast<unsigned char>(query[qi])));
-        bool found = false;
-        while (ti < target.size()) {
-            char tc = static_cast<char>(std::tolower(static_cast<unsigned char>(target[ti])));
-            ++ti;
-            if (tc == qc) {
-                match_pos.push_back(static_cast<int>(ti) - 1);
-                found = true;
-                break;
-            }
+    auto lc = [](char c) {
+        return static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    };
+
+    // --- Forward pass: check subsequence, record leftmost match positions ---
+    std::vector<int> fwd(n);
+    {
+        int ti = 0;
+        for (int qi = 0; qi < n; ++qi) {
+            char qc = lc(query[qi]);
+            while (ti < m && lc(target[ti]) != qc) ++ti;
+            if (ti >= m) return -1;   // not a subsequence
+            fwd[qi] = ti++;
         }
-        if (!found) return -1;
     }
 
-    // Score the match positions.
+    // --- Backward pass: tighten positions toward the last match ---
+    // Starting from fwd[n-1], scan backward so each query character lands
+    // as far right as possible without violating order — this maximises
+    // consecutive runs between adjacent matched characters.
+    std::vector<int> pos(n);
+    {
+        int ti = fwd[n - 1];
+        for (int qi = n - 1; qi >= 0; --qi) {
+            char qc = lc(query[qi]);
+            while (lc(target[ti]) != qc) --ti;  // always terminates: fwd proved validity
+            pos[qi] = ti--;
+        }
+    }
+
+    // --- Score the (tightened) positions ---
     int score = 0;
-    int prev = -1;
-    int consecutive = 0;
+    int prev  = -1;
+    int run   = 0;
 
-    for (size_t i = 0; i < match_pos.size(); ++i) {
-        int pos = match_pos[i];
+    for (int i = 0; i < n; ++i) {
+        int p = pos[i];
 
-        // Base score
-        score += 10;
+        score += 10;  // base per matched char
 
-        // Consecutive bonus (compounding)
-        if (prev != -1 && pos == prev + 1) {
-            ++consecutive;
-            score += 15 * consecutive;
+        // Consecutive run bonus (compounding)
+        if (prev >= 0 && p == prev + 1) {
+            ++run;
+            score += 15 * run;
         } else {
-            consecutive = 0;
-            // Gap penalty
-            if (prev != -1) {
-                score -= 2 * (pos - prev - 1);
-            }
+            run = 0;
+            if (prev >= 0) score -= 2 * (p - prev - 1);  // gap penalty
         }
 
         // Word-boundary bonus
-        bool at_boundary = (pos == 0);
-        if (!at_boundary && pos > 0) {
-            char p = target[pos - 1];
-            at_boundary = (p == '/' || p == '.' || p == '_' ||
-                           p == '-' || p == ' ' || p == '\\');
-            // camelCase: current is uppercase, previous is lowercase
+        bool at_boundary = (p == 0);
+        if (!at_boundary) {
+            char pc = target[p - 1];
+            at_boundary = (pc == '/' || pc == '.' || pc == '_' ||
+                           pc == '-' || pc == ' ' || pc == '\\');
             if (!at_boundary &&
-                std::isupper(static_cast<unsigned char>(target[pos])) &&
-                std::islower(static_cast<unsigned char>(p))) {
+                std::isupper(static_cast<unsigned char>(target[p])) &&
+                std::islower(static_cast<unsigned char>(pc))) {
                 at_boundary = true;
             }
         }
         if (at_boundary) score += 20;
 
-        // Prefix bonus: matched position lines up with query index
-        if (pos == static_cast<int>(i)) score += 10;
+        // Extra prefix bonus: first query char hits position 0 of the filename
+        if (i == 0 && p == 0) score += 20;
 
-        prev = pos;
+        prev = p;
     }
 
-    return std::max(0, score);
+    // Suppress weak / accidental subsequence matches
+    constexpr int kMinScore = 20;
+    return score >= kMinScore ? score : -1;
 }
 
 } // namespace misty::search

@@ -2,9 +2,10 @@
 
 #include <memory>
 
-#include "core/ui_registry.h"
+#include "core/ui/ui_registry.h"
+#include "dfs/client/misty_client.h"
 #include "panels/panel.h"
-#include "core/worker_pool.h"
+#include "core/threading/worker_pool.h"
 #include "panels/file_explorer/file_explorer_state.h"
 #include "panels/workspace/workspace_state.h"
 #include "panels/activity/upload_state.h"
@@ -52,6 +53,10 @@ namespace misty::panel {
         void perform_delete_selected(panel::FileExplorerState& state);
         void perform_delete(panel::FileExplorerState& state, const std::string& path);
         void initiate_rename(panel::FileExplorerState& state);
+
+        // Async local filesystem navigation — dispatches I/O to worker pool
+        // so the UI thread is never blocked by slow drives or USB spin-up.
+        void navigate_to_local_path_async(const std::string& path, bool update_history);
 
         // Sync account mappings from services state
         void sync_account_mappings();

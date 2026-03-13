@@ -5,9 +5,11 @@
 #include <stack>
 #include <unordered_set>
 #include <mutex>
+#include <atomic>
 #include <filesystem>
 #include <cstring>
-#include "core/ui_registry.h"
+#include "core/ui/ui_registry.h"
+#include "core/threading/worker_pool.h"
 #include "panels/workspace/workspace_state.h"  // For AccountMapping and mount_utils
 
 namespace fs = std::filesystem;
@@ -342,7 +344,19 @@ namespace misty::panel {
 
         // State persistence
         void load_state();
-        void save_state();
+        void save_state();   // synchronous — use only at shutdown or for explicit user actions
+
+        // Non-blocking write-behind save. Snapshots state under mu, then
+        // dispatches the file write to a worker thread. Safe to call every frame —
+        // returns immediately if nothing has changed or a write is already in flight.
+        void save_async(core::WorkerPool& pool);
+
+        // Set whenever in-memory state diverges from what is on disk.
+        std::atomic<bool> dirty_{false};
+
+    private:
+        // Prevents queuing more than one concurrent background write.
+        std::atomic<bool> save_in_flight_{false};
     };
 
     // Navigate to local filesystem path

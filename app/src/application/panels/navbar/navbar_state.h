@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/ui_registry.h"
+#include "core/ui/ui_registry.h"
 #include "views/app_view.h"
 
 using namespace misty::core;

@@ -11,7 +11,7 @@
 #include "panels/file_sidebar/file_sidebar_state.h"
 #include "panels/search/search_state.h"
 #include "panels/search/search_panel.h"
-#include "core/asset_manager.h"
+#include "core/manager/asset_manager.h"
 #include <nlohmann/json.hpp>
 #include <algorithm>
 #include <chrono>
@@ -229,9 +229,101 @@ namespace misty::panel {
                     search_state.is_open = false;
                 }
             }
+
+            // Periodic write-behind save — runs every 60s, dispatches to worker
+            // thread only when something actually changed (dirty flag).
+            static double last_save_check = 0.0;
+            double now = ImGui::GetTime();
+            if (now - last_save_check >= 60.0) {
+                last_save_check = now;
+                state.save_async(worker_pool_);
+            }
         }
         ImGui::End();
         ImGui::PopStyleColor();
+    }
+
+    void FileExplorerPanel::navigate_to_local_path_async(const std::string& path, bool update_history) {
+        auto& state = registry_.get_state<FileExplorerState>("Files");
+
+        // Immediately signal loading — UI stays responsive while worker scans
+        state.is_loading = true;
+        state.error_msg  = "";
+
+        // Snapshot volatile UI state before leaving the UI thread
+        const bool show_hidden = state.show_hidden;
+
+        // History update is fast (no I/O) — do it synchronously now so
+        // back/forward buttons are correct even before the scan completes.
+        if (update_history) {
+            std::string cur(state.current_path);
+            if (!cur.empty() && cur != path) {
+                state.back_history.push(cur);
+            }
+            while (!state.forward_history.empty()) state.forward_history.pop();
+        }
+
+        worker_pool_.add(
+            [&state, path, show_hidden]() {
+                std::vector<UnifiedFileItem> new_files;
+                std::string new_path;
+
+                try {
+                    new_path = fs::canonical(fs::path(path)).generic_string();
+                } catch (...) {
+                    new_path = path;
+                }
+
+                try {
+                    for (const auto& entry : fs::directory_iterator(path)) {
+                        std::string fname = entry.path().filename().generic_string();
+                        if (!show_hidden && !fname.empty() && fname[0] == '.') continue;
+
+                        UnifiedFileItem item;
+                        item.path   = entry.path().generic_string();
+                        item.name   = fname;
+                        item.is_dir = entry.is_directory();
+                        item.source = FileSource::LOCAL;
+                        item.status = SyncStatus::LOCAL;
+
+                        if (!item.is_dir) {
+                            try { item.size = fs::file_size(entry.path()); } catch (...) {}
+                        }
+                        try {
+                            auto ftime = fs::last_write_time(entry.path());
+                            auto sctp  = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
+                                ftime - fs::file_time_type::clock::now() + std::chrono::system_clock::now());
+                            auto t = std::chrono::system_clock::to_time_t(sctp);
+                            char buf[32];
+                            std::strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M", std::localtime(&t));
+                            item.last_modified = buf;
+                        } catch (...) {}
+
+                        new_files.push_back(std::move(item));
+                    }
+                } catch (const std::exception& e) {
+                    std::lock_guard<std::mutex> lk(state.mu);
+                    state.error_msg  = e.what();
+                    state.is_loading = false;
+                    return;
+                }
+
+                // Apply results under lock
+                std::lock_guard<std::mutex> lk(state.mu);
+                state.files = std::move(new_files);
+                strncpy(state.current_path, new_path.c_str(), sizeof(state.current_path) - 1);
+                state.current_path[sizeof(state.current_path) - 1] = '\0';
+                strncpy(state.search_path, new_path.c_str(), sizeof(state.search_path) - 1);
+                state.selected_files.clear();
+                state.last_selected_index = -1;
+                state.is_loading = false;
+            },
+            []() {},
+            [&state](const std::string& err) {
+                state.error_msg  = err;
+                state.is_loading = false;
+            }
+        );
     }
 
     void FileExplorerPanel::navigate_to_path(const std::string& path, bool update_history, bool create_if_missing) {
@@ -371,11 +463,10 @@ namespace misty::panel {
                 icloud_state.current_folder_path.clear();
             }
             state.last_disconnected_notification_folder.clear();
-            navigate_to_local_path(state, path, update_history);
+            navigate_to_local_path_async(path, update_history);
         }
         
-        // Persist state after successful navigation
-        state.save_state();
+        state.dirty_ = true; // mark for next async save cycle
     }
 
     void FileExplorerPanel::sync_account_mappings() {
@@ -1496,7 +1587,7 @@ namespace misty::panel {
         ImVec2 icon_p = ImVec2(p.x + 4.0f, p.y + content_padding_y);
         ImGui::SetCursorScreenPos(icon_p);
         if (icon.id != 0) {
-            ImU32 icon_col = file.is_dir ? IM_COL32(230, 191, 76, 255) : IM_COL32(255, 255, 255, 255);
+            ImU32 icon_col = file.is_dir ? IM_COL32(230, 191, 76, 255) : IM_COL32(100, 170, 230, 255);
             ImGui::GetWindowDrawList()->AddImage(
                 icon.id, icon_p, ImVec2(icon_p.x + 16, icon_p.y + 16),
                 ImVec2(0, 0), ImVec2(1, 1), icon_col);
@@ -1609,7 +1700,7 @@ namespace misty::panel {
         float icon_x = cell_pos.x + (cell_w - icon_size) * 0.5f;
         float icon_y = cell_pos.y + 10.0f;
         if (icon.id != 0) {
-            ImU32 icon_col = file.is_dir ? IM_COL32(230, 191, 76, 255) : IM_COL32(255, 255, 255, 255);
+            ImU32 icon_col = file.is_dir ? IM_COL32(230, 191, 76, 255) : IM_COL32(100, 170, 230, 255);
             dl->AddImage(icon.id, ImVec2(icon_x, icon_y), ImVec2(icon_x + icon_size, icon_y + icon_size),
                 ImVec2(0, 0), ImVec2(1, 1), icon_col);
         }
