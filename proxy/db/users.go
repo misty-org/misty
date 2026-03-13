@@ -1,51 +1,44 @@
 package db
 
 import (
+	"database/sql"
+	"errors"
 	"log"
-
-	"github.com/google/uuid"
-	"golang.org/x/crypto/bcrypt"
 )
 
-func (db *Database) InsertUser(name, email, password string) error {
-    id := uuid.New().String()
-
-    hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-
-    _, err := db.Conn.Exec(`
-        INSERT INTO users (id, name, email, password)
-        VALUES (?, ?, ?, ?)`,
-        id, name, email, hashedPassword,
-    )
-    if err != nil {
-        log.Println("Failed to create user:", err)
-    }
-    return err
-}
-
 type UserInfo struct {
-    ID    string
-    Name  string
-    Email string
+	ID    string
+	Name  string
+	Email string
 }
 
-func (db *Database) GetUser(email, password string) (*UserInfo, error) {
-    var user UserInfo
-    var storedHashedPassword string
-    err := db.Conn.QueryRow(`
-        SELECT id, name, email, password FROM users WHERE email = ?`,
-        email,
-    ).Scan(&user.ID, &user.Name, &user.Email, &storedHashedPassword)
-    if err != nil {
-        log.Println("Failed to get user:", err)
-        return nil, err
-    }
+// InsertOrIgnoreUser stores a user record locally (id + name + email, no password).
+// Silently ignores conflicts — the server is the source of truth for credentials.
+func (db *Database) InsertOrIgnoreUser(id, name, email string) error {
+	_, err := db.Conn.Exec(`
+		INSERT OR IGNORE INTO users (id, name, email)
+		VALUES (?, ?, ?)`,
+		id, name, email,
+	)
+	if err != nil {
+		log.Println("Failed to insert user:", err)
+	}
+	return err
+}
 
-    err = bcrypt.CompareHashAndPassword([]byte(storedHashedPassword), []byte(password))
-    if err != nil {
-        log.Println("Invalid password:", err)
-        return nil, err
-    }
-
-    return &user, nil
+// GetUserByEmail returns the locally cached user record for the given email, or nil if not found.
+func (db *Database) GetUserByEmail(email string) (*UserInfo, error) {
+	var user UserInfo
+	err := db.Conn.QueryRow(`
+		SELECT id, name, email FROM users WHERE email = ?`,
+		email,
+	).Scan(&user.ID, &user.Name, &user.Email)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		log.Println("Failed to get user by email:", err)
+		return nil, err
+	}
+	return &user, nil
 }

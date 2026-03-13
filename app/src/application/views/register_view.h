@@ -4,7 +4,7 @@
 
 #include "views/app_view.h"
 #include "panels/auth/auth_register_panel.h"
-#include "core/ui_registry.h"
+#include "core/ui/ui_registry.h"
 
 using namespace misty::core;
 using namespace misty::panel;

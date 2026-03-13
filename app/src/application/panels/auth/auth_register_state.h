@@ -3,11 +3,11 @@
 #include <mutex>
 #include <cstring>
 #include <map>
-#include "core/ui_registry.h"
+#include "core/ui/ui_registry.h"
 #include "views/app_view.h"
-#include "core/http_client.h"
-#include "core/env_manager.h"
-#include "core/util.h"
+#include "core/net/http_client.h"
+#include "core/manager/env_manager.h"
+#include "core/system/util.h"
 
 namespace misty::panel {
 

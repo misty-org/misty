@@ -8,9 +8,9 @@
 #include <filesystem>
 #include <functional>
 #include <nlohmann/json.hpp>
-#include "core/ui_registry.h"
-#include "core/http_client.h"
-#include "core/worker_pool.h"
+#include "core/ui/ui_registry.h"
+#include "core/net/http_client.h"
+#include "core/threading/worker_pool.h"
 
 namespace misty::panel {
 

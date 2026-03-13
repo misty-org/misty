@@ -2,8 +2,8 @@
 
 #include "panels/search/search_state.h"
 #include "panels/workspace/workspace_state.h"
-#include "core/ui_registry.h"
-#include "core/worker_pool.h"
+#include "core/ui/ui_registry.h"
+#include "core/threading/worker_pool.h"
 
 namespace misty::panel {
 

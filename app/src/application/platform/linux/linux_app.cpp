@@ -4,7 +4,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 
 #include "linux_app.h"
-#include "core/asset_manager.h"
+#include "core/manager/asset_manager.h"
 #include "stb_image.h"
 
 #include "imgui_impl_glfw.h"
@@ -48,13 +48,14 @@ void LinuxApp::init_glfw() {
 }
 
 void LinuxApp::init_window() {
-    window_ = glfwCreateWindow(1280, 720, "Misty Client", nullptr, nullptr);
+    window_ = glfwCreateWindow(1280, 720, "Misty", nullptr, nullptr);
     if (!window_)
         throw std::runtime_error("Failed to create GLFW window");
 
     glfwMakeContextCurrent(window_);
     glfwSetWindowUserPointer(window_, this);
     glfwSetWindowSizeCallback(window_, glfw_window_size_callback);
+    glfwSetWindowFocusCallback(window_, glfw_window_focus_callback);
 
     glfwSwapInterval(1);
 }
@@ -164,6 +165,7 @@ void LinuxApp::configure_imgui_style() {
     style.Colors[ImGuiCol_Tab]                  = ImVec4(0.094f, 0.094f, 0.106f, 1.0f);
     style.Colors[ImGuiCol_TabHovered]           = ImVec4(0.153f, 0.153f, 0.165f, 1.0f);
     style.Colors[ImGuiCol_TabSelected]          = ImVec4(0.153f, 0.153f, 0.165f, 1.0f);
+    style.Colors[ImGuiCol_NavHighlight]         = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
 }
 
 void LinuxApp::prepare_frame() {
@@ -213,6 +215,11 @@ void LinuxApp::glfw_error_callback(int error, const char* description) {
 
 void LinuxApp::glfw_window_size_callback(GLFWwindow*, int, int) {
     // intentionally empty
+}
+
+void LinuxApp::glfw_window_focus_callback(GLFWwindow* window, int focused) {
+    if (!focused)
+        static_cast<Application*>(glfwGetWindowUserPointer(window))->on_focus_lost();
 }
 
 } // namespace misty

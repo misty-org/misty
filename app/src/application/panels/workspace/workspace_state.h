@@ -6,10 +6,10 @@
 #include <mutex>
 #include <atomic>
 #include <filesystem>
-#include "core/ui_registry.h"
-#include "core/http_client.h"
-#include "core/env_manager.h"
-#include "core/worker_pool.h"
+#include "core/ui/ui_registry.h"
+#include "core/net/http_client.h"
+#include "core/manager/env_manager.h"
+#include "core/threading/worker_pool.h"
 #include <nlohmann/json.hpp>
 
 namespace fs = std::filesystem;

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/ui_registry.h"
+#include "core/ui/ui_registry.h"
 #include "panels/settings/settings_state.h"
 
 namespace misty::panel {

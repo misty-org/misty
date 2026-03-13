@@ -4,7 +4,6 @@
 #define GLFW_EXPOSE_NATIVE_WIN32
 
 #include <windows.h>
-#include "misty.h"
 #include <GLFW/glfw3native.h>
 #include <dwmapi.h>
 #include <windowsx.h>
@@ -43,6 +42,7 @@ namespace misty {
     private:
         static void glfw_error_callback(int error, const char* description);
         static void glfw_window_size_callback(GLFWwindow* window, int width, int height);
+        static void glfw_window_focus_callback(GLFWwindow* window, int focused);
         static LRESULT CALLBACK win32_window_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
     
     private:

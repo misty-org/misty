@@ -1,7 +1,7 @@
 #include "services_state.h"
-#include "core/env_manager.h"
-#include "core/http_client.h"
-#include "core/util.h"
+#include "core/manager/env_manager.h"
+#include "core/net/http_client.h"
+#include "core/system/util.h"
 #include <nlohmann/json.hpp>
 #include <iostream>
 #include <set>

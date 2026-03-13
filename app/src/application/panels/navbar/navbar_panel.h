@@ -1,9 +1,9 @@
 #pragma once
-#include "core/ui_registry.h"
+#include "core/ui/ui_registry.h"
 #include "navbar_state.h"
 #include "panels/panel.h"
 #include "panels/profile/profile_panel.h"
-#include "core/svg_loader.h"
+#include "core/ui/svg_loader.h"
 
 
 namespace misty::panel {

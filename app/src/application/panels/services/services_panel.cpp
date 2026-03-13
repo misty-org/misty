@@ -1,6 +1,6 @@
 #include "services_panel.h"
 #include "imgui.h"
-#include "core/imgui_utils.h"
+#include "core/ui/imgui_utils.h"
 #include <nlohmann/json.hpp>
 #include <cstring>
 

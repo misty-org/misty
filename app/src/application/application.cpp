@@ -1,5 +1,5 @@
 #include "application.h"
-#include "core/session_manager.h"
+#include "core/manager/session_manager.h"
 #include "views/main_view.h"
 #include "views/register_view.h"
 #include "views/login_view.h"
@@ -7,6 +7,7 @@
 #include "views/activity_view.h"
 #include "views/settings_view.h"
 #include "views/edit_profile_view.h"
+#include "panels/file_explorer/file_explorer_state.h"
 
 
 
@@ -38,7 +39,21 @@ namespace misty {
         if (file_sync_service_) {
             file_sync_service_->stop();
         }
+
+        // Flush any unsaved state on clean exit.
+        // worker_pool_ threads are still alive here so any in-flight async write
+        // can finish; we also do one final synchronous save to catch anything dirty.
+        auto& explorer = ui_registry_.get_state<panel::FileExplorerState>("Files");
+        if (explorer.dirty_.load()) {
+            explorer.save_state();
+        }
+
         cleanup();
+    }
+
+    void Application::on_focus_lost() {
+        auto& explorer = ui_registry_.get_state<panel::FileExplorerState>("Files");
+        explorer.save_async(worker_pool_);
     }
 
     void Application::init_client() {

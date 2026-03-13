@@ -1,7 +1,9 @@
 #pragma once
 #include <string>
 #include <unordered_map>
-#include "core/svg_loader.h"
+#include <glad/glad.h>
+#include "imgui.h"
+#include "core/ui/svg_loader.h"
 
 
 

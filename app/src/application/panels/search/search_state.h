@@ -7,7 +7,7 @@
 #include <atomic>
 #include <cstring>
 
-#include "core/ui_registry.h"
+#include "core/ui/ui_registry.h"
 #include "panels/file_explorer/file_explorer_state.h"
 
 namespace misty::panel {

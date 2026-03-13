@@ -1,4 +1,5 @@
 #include <cctype>
+#include <fstream>
 #ifdef _WIN32
 #include <windows.h>
 #include <shellapi.h>
@@ -12,7 +13,7 @@
 #endif
 
 #include "env_manager.h"
-#include "util.h"
+#include "core/system/util.h"
 
 
 namespace misty::core {

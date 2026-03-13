@@ -1,7 +1,7 @@
 #include "ts_panel.h"
 #include "imgui.h"
-#include "core/util.h"
-#include "core/imgui_utils.h"
+#include "core/system/util.h"
+#include "core/ui/imgui_utils.h"
 #include <cstring>
 #include <mutex>
 
