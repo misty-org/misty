@@ -38,6 +38,7 @@ struct FileMasterRemoteContext {
 
 struct FileMasterProps {
     uint64_t job_id = 0;
+    uint64_t transfer_id = 0;
     std::string file_name;
     FileMasterLocalContext local_source;
     FileMasterLocalContext local_dest;

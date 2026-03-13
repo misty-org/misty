@@ -16,6 +16,10 @@ std::string sibling_path_for_name(const std::string& path, const std::string& na
     return (std::filesystem::path(path).parent_path() / name).generic_string();
 }
 
+std::string target_name_for(const FileItem& item, const std::string& override_name) {
+    return override_name.empty() ? item.name : override_name;
+}
+
 std::string normalized_local_path(const std::filesystem::path& path) {
     std::error_code ec;
     const std::filesystem::path canonical = std::filesystem::weakly_canonical(path, ec);
@@ -114,7 +118,9 @@ bool dispatch_file_master_clipboard_operation(core::WorkerPool& worker_pool,
                                               const std::string& dest_dir,
                                               ClipboardOp op,
                                               uint64_t job_id,
-                                              core::FileMasterCompletion callback) {
+                                              core::FileMasterCompletion callback,
+                                              uint64_t transfer_id,
+                                              const std::string& target_name_override) {
     (void)worker_pool;
     if (dest_dir.empty() || op == ClipboardOp::NONE) {
         return false;
@@ -129,7 +135,7 @@ bool dispatch_file_master_clipboard_operation(core::WorkerPool& worker_pool,
 
     const bool dest_is_remote = remote_browse_target_for(dest_dir).has_value();
     if (item.type == FileType::LOCAL && !dest_is_remote) {
-        std::filesystem::path resolved_dest = std::filesystem::path(dest_dir) / item.name;
+        std::filesystem::path resolved_dest = std::filesystem::path(dest_dir) / target_name_for(item, target_name_override);
         std::error_code ec;
         if (std::filesystem::equivalent(std::filesystem::path(item.path), resolved_dest, ec) && !ec) {
             return false;
@@ -137,6 +143,10 @@ bool dispatch_file_master_clipboard_operation(core::WorkerPool& worker_pool,
 
         auto props = local_file_master_props_for(item, resolved_dest.string());
         props.job_id = job_id;
+        props.transfer_id = transfer_id;
+        if (!target_name_override.empty()) {
+            props.file_name = target_name_override;
+        }
         core::FileMasterLocal file_master(file_transfer_worker_pool(), &transfers);
         if (op == ClipboardOp::CUT) {
             file_master.cut(props, std::move(callback));
@@ -149,8 +159,13 @@ bool dispatch_file_master_clipboard_operation(core::WorkerPool& worker_pool,
         return false;
     }
 
-    auto props = remote_file_master_props_for(item, dest_dir);
+    FileItem effective_item = item;
+    if (!target_name_override.empty()) {
+        effective_item.name = target_name_override;
+    }
+    auto props = remote_file_master_props_for(effective_item, dest_dir);
     props.job_id = job_id;
+    props.transfer_id = transfer_id;
     if (same_remote_destination(props)) {
         return false;
     }
@@ -173,18 +188,21 @@ bool remove_file_master_item(core::WorkerPool& worker_pool,
                              core::FileTransfer& transfers,
                              const FileItem& item,
                              uint64_t job_id,
-                             core::FileMasterCompletion callback) {
+                             core::FileMasterCompletion callback,
+                             uint64_t transfer_id) {
     (void)worker_pool;
     if (item.type == FileType::LOCAL) {
         core::FileMasterLocal local_master(file_transfer_worker_pool(), &transfers);
         auto props = local_file_master_props_for(item);
         props.job_id = job_id;
+        props.transfer_id = transfer_id;
         local_master.remove(props, std::move(callback));
         return true;
     } else if (is_remote_file_master_item(item)) {
         core::FileMasterRemote remote_master(file_transfer_worker_pool(), &transfers);
         auto props = remote_file_master_props_for(item);
         props.job_id = job_id;
+        props.transfer_id = transfer_id;
         remote_master.remove(props, std::move(callback));
         return true;
     }
@@ -196,17 +214,20 @@ bool rename_file_master_item(core::WorkerPool& worker_pool,
                              const FileItem& item,
                              const std::string& new_name,
                              uint64_t job_id,
-                             core::FileMasterCompletion callback) {
+                             core::FileMasterCompletion callback,
+                             uint64_t transfer_id) {
     (void)worker_pool;
     if (item.type == FileType::LOCAL) {
         core::FileMasterLocal file_master(file_transfer_worker_pool(), &transfers);
         auto props = local_file_master_props_for(item, sibling_path_for_name(item.path, new_name));
         props.job_id = job_id;
+        props.transfer_id = transfer_id;
         file_master.rename(props, std::move(callback));
         return true;
     } else if (is_remote_file_master_item(item)) {
         core::FileMasterProps props = remote_file_master_props_for(item);
         props.job_id = job_id;
+        props.transfer_id = transfer_id;
         props.remote_dest = props.remote_source;
         props.remote_dest.remote_path = sibling_path_for_name(item.sync_remote_path, new_name);
         core::FileMasterRemote file_master(file_transfer_worker_pool(), &transfers);
@@ -220,7 +241,9 @@ bool download_remote_file_master_item(core::WorkerPool& worker_pool,
                                       core::FileTransfer& transfers,
                                       const FileItem& item,
                                       uint64_t job_id,
-                                      core::FileMasterCompletion callback) {
+                                      core::FileMasterCompletion callback,
+                                      uint64_t transfer_id,
+                                      const std::string& target_name_override) {
     (void)worker_pool;
     if (!is_remote_file_master_item(item) || item.is_dir) {
         return false;
@@ -229,7 +252,10 @@ bool download_remote_file_master_item(core::WorkerPool& worker_pool,
     core::FileMasterRemote file_master(file_transfer_worker_pool(), &transfers);
     auto props = remote_file_master_props_for(item, std::filesystem::path(item.path).parent_path().string());
     props.job_id = job_id;
-    props.local_dest.path = item.path;
+    props.transfer_id = transfer_id;
+    props.local_dest.path = target_name_override.empty()
+        ? item.path
+        : (std::filesystem::path(item.path).parent_path() / target_name_override).string();
     props.remote_dest = {};
     file_master.copy(props, std::move(callback));
     return true;

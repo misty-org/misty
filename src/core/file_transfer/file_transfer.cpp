@@ -2,130 +2,389 @@
 
 #include <algorithm>
 
+#include "core/file_transfer/file_transfer_store.h"
+
 namespace misty::core {
+namespace {
+
+int64_t now_epoch_ms() {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(
+               std::chrono::system_clock::now().time_since_epoch())
+        .count();
+}
+
+}  // namespace
 
 bool FileTransferRecord::is_alive() const {
     if (!error_message.empty() ||
         status == FileTransferStatus::Failed ||
-        status == FileTransferStatus::Completed) {
+        status == FileTransferStatus::Completed ||
+        status == FileTransferStatus::Canceled ||
+        status == FileTransferStatus::Skipped ||
+        status == FileTransferStatus::Interrupted) {
         return false;
     }
-    return status == FileTransferStatus::Pending || status == FileTransferStatus::InProgress;
+    return status == FileTransferStatus::Queued ||
+           status == FileTransferStatus::Pending ||
+           status == FileTransferStatus::InProgress ||
+           status == FileTransferStatus::WaitingForResolution;
+}
+
+bool FileTransfer::initialize_persistence(std::string* error) {
+    auto& store = FileTransferStore::get();
+    if (!store.initialize(error)) {
+        return false;
+    }
+
+    std::string local_error;
+    std::string* effective_error = error != nullptr ? error : &local_error;
+    effective_error->clear();
+    std::vector<FileTransferRecord> rows = store.load_recent(kMaxHistory, effective_error);
+    if (!effective_error->empty()) {
+        return false;
+    }
+    const uint64_t next_id = store.next_transfer_id(effective_error);
+    if (!effective_error->empty()) {
+        return false;
+    }
+    hydrate_persisted_rows(std::move(rows), next_id);
+    return true;
+}
+
+uint64_t FileTransfer::create_transfer(FileTransferRecord snapshot) {
+    FileTransferRecord notify_record;
+    {
+        std::lock_guard<std::mutex> lock(mu_);
+
+        snapshot.id = next_id_.fetch_add(1);
+        if (snapshot.queued_at_ms <= 0) {
+            snapshot.queued_at_ms = now_epoch_ms();
+        }
+
+        const uint64_t id = snapshot.id;
+        transfer_order_.push_back(id);
+        auto [it, _] = transfers_.emplace(id, std::move(snapshot));
+        notify_record = it->second;
+        trim_history();
+    }
+    persist_record_if_enabled(notify_record);
+    notify_listeners(notify_record);
+    return notify_record.id;
+}
+
+uint64_t FileTransfer::add_listener(Listener listener) {
+    if (!listener) {
+        return 0;
+    }
+    std::lock_guard<std::mutex> lock(mu_);
+    const uint64_t listener_id = next_listener_id_.fetch_add(1);
+    listeners_.emplace(listener_id, std::move(listener));
+    return listener_id;
+}
+
+void FileTransfer::remove_listener(uint64_t listener_id) {
+    if (listener_id == 0) {
+        return;
+    }
+    std::lock_guard<std::mutex> lock(mu_);
+    listeners_.erase(listener_id);
 }
 
 void FileTransfer::set_local_context(uint64_t id, const std::string& local_path) {
-    std::lock_guard<std::mutex> lock(mu_);
+    FileTransferRecord notify_record;
+    {
+        std::lock_guard<std::mutex> lock(mu_);
 
-    auto it = transfers_.find(id);
-    if (it == transfers_.end()) {
-        return;
-    }
+        auto it = transfers_.find(id);
+        if (it == transfers_.end()) {
+            return;
+        }
 
-    if (it->second.local_source_path.empty()) {
-        it->second.local_source_path = local_path;
-    } else {
-        it->second.local_dest_path = local_path;
+        if (it->second.local_source_path.empty()) {
+            it->second.local_source_path = local_path;
+        } else {
+            it->second.local_dest_path = local_path;
+        }
+        notify_record = it->second;
     }
+    notify_listeners(notify_record);
 }
 
 void FileTransfer::set_remote_context(uint64_t id, const std::string& remote_name, const std::string& remote_path) {
-    std::lock_guard<std::mutex> lock(mu_);
+    FileTransferRecord notify_record;
+    {
+        std::lock_guard<std::mutex> lock(mu_);
 
-    auto it = transfers_.find(id);
-    if (it == transfers_.end()) {
-        return;
-    }
+        auto it = transfers_.find(id);
+        if (it == transfers_.end()) {
+            return;
+        }
 
-    if (it->second.remote_source_name.empty() && it->second.remote_source_path.empty()) {
-        it->second.remote_source_name = remote_name;
-        it->second.remote_source_path = remote_path;
-    } else {
-        it->second.remote_dest_name = remote_name;
-        it->second.remote_dest_path = remote_path;
+        if (it->second.remote_source_name.empty() && it->second.remote_source_path.empty()) {
+            it->second.remote_source_name = remote_name;
+            it->second.remote_source_path = remote_path;
+        } else {
+            it->second.remote_dest_name = remote_name;
+            it->second.remote_dest_path = remote_path;
+        }
+        notify_record = it->second;
     }
+    notify_listeners(notify_record);
 }
 
 void FileTransfer::update_progress(uint64_t id, int64_t transferred_bytes, int64_t total_bytes) {
-    std::lock_guard<std::mutex> lock(mu_);
+    FileTransferRecord notify_record;
+    bool should_persist = false;
+    {
+        std::lock_guard<std::mutex> lock(mu_);
 
-    auto it = transfers_.find(id);
-    if (it == transfers_.end()) {
-        return;
-    }
+        auto it = transfers_.find(id);
+        if (it == transfers_.end()) {
+            return;
+        }
 
-    it->second.transferred_bytes = transferred_bytes;
-    if (total_bytes >= 0) {
-        it->second.total_bytes = total_bytes;
+        it->second.transferred_bytes = transferred_bytes;
+        if (total_bytes >= 0) {
+            it->second.total_bytes = total_bytes;
+        }
+        if (it->second.status == FileTransferStatus::Queued ||
+            it->second.status == FileTransferStatus::Pending ||
+            it->second.status == FileTransferStatus::WaitingForResolution) {
+            it->second.status = FileTransferStatus::InProgress;
+        }
+        if (it->second.started_at_ms <= 0) {
+            it->second.started_at_ms = now_epoch_ms();
+        }
+        notify_record = it->second;
+        should_persist = should_persist_progress_locked(notify_record, now_epoch_ms());
     }
-    if (it->second.status == FileTransferStatus::Pending) {
+    if (should_persist) {
+        persist_record_if_enabled(notify_record);
+    }
+    notify_listeners(notify_record);
+}
+
+void FileTransfer::update_detail(uint64_t id, const std::string& detail_message) {
+    FileTransferRecord notify_record;
+    {
+        std::lock_guard<std::mutex> lock(mu_);
+
+        auto it = transfers_.find(id);
+        if (it == transfers_.end()) {
+            return;
+        }
+        it->second.detail_message = detail_message;
+        notify_record = it->second;
+    }
+    persist_record_if_enabled(notify_record);
+    notify_listeners(notify_record);
+}
+
+void FileTransfer::update_action_flags(uint64_t id,
+                                       bool cancelable,
+                                       bool retryable,
+                                       bool undoable,
+                                       uint64_t undo_token_id) {
+    FileTransferRecord notify_record;
+    {
+        std::lock_guard<std::mutex> lock(mu_);
+
+        auto it = transfers_.find(id);
+        if (it == transfers_.end()) {
+            return;
+        }
+        it->second.cancelable = cancelable;
+        it->second.retryable = retryable;
+        it->second.undoable = undoable;
+        it->second.undo_token_id = undo_token_id;
+        notify_record = it->second;
+    }
+    persist_record_if_enabled(notify_record);
+    notify_listeners(notify_record);
+}
+
+void FileTransfer::update_conflict_policy(uint64_t id, FileTransferConflictPolicy conflict_policy) {
+    FileTransferRecord notify_record;
+    {
+        std::lock_guard<std::mutex> lock(mu_);
+
+        auto it = transfers_.find(id);
+        if (it == transfers_.end()) {
+            return;
+        }
+        it->second.conflict_policy = conflict_policy;
+        notify_record = it->second;
+    }
+    persist_record_if_enabled(notify_record);
+    notify_listeners(notify_record);
+}
+
+void FileTransfer::mark_waiting_for_resolution(uint64_t id, const std::string& detail_message) {
+    FileTransferRecord notify_record;
+    {
+        std::lock_guard<std::mutex> lock(mu_);
+
+        auto it = transfers_.find(id);
+        if (it == transfers_.end()) {
+            return;
+        }
+        it->second.status = FileTransferStatus::WaitingForResolution;
+        it->second.detail_message = detail_message;
+        notify_record = it->second;
+    }
+    persist_record_if_enabled(notify_record);
+    notify_listeners(notify_record);
+}
+
+void FileTransfer::mark_started(uint64_t id) {
+    FileTransferRecord notify_record;
+    {
+        std::lock_guard<std::mutex> lock(mu_);
+
+        auto it = transfers_.find(id);
+        if (it == transfers_.end()) {
+            return;
+        }
         it->second.status = FileTransferStatus::InProgress;
+        if (it->second.started_at_ms <= 0) {
+            it->second.started_at_ms = now_epoch_ms();
+        }
+        it->second.cancelable = false;
+        notify_record = it->second;
     }
+    persist_record_if_enabled(notify_record);
+    notify_listeners(notify_record);
+}
+
+void FileTransfer::cancel_transfer(uint64_t id, const std::string& detail_message) {
+    FileTransferRecord notify_record;
+    {
+        std::lock_guard<std::mutex> lock(mu_);
+
+        auto it = transfers_.find(id);
+        if (it == transfers_.end()) {
+            return;
+        }
+
+        it->second.status = FileTransferStatus::Canceled;
+        it->second.detail_message = detail_message;
+        it->second.completed_at_ms = now_epoch_ms();
+        it->second.cancelable = false;
+        notify_record = it->second;
+        trim_history();
+    }
+    persist_record_if_enabled(notify_record);
+    notify_listeners(notify_record);
 }
 
 uint64_t FileTransfer::start_transfer(FileTransferRecord snapshot) {
-    std::lock_guard<std::mutex> lock(mu_);
-
-    snapshot.id = next_id_.fetch_add(1);
-    if (snapshot.status == FileTransferStatus::Pending) {
-        snapshot.status = FileTransferStatus::InProgress;
+    if (snapshot.status == FileTransferStatus::Queued) {
+        return create_transfer(std::move(snapshot));
     }
-    if (snapshot.started_at == std::chrono::steady_clock::time_point{}) {
-        snapshot.started_at = std::chrono::steady_clock::now();
-    }
-
-    const uint64_t id = snapshot.id;
-    transfer_order_.push_back(id);
-    transfers_.emplace(id, std::move(snapshot));
-    trim_history();
+    const uint64_t id = create_transfer(std::move(snapshot));
+    mark_started(id);
     return id;
 }
 
 void FileTransfer::complete_transfer(uint64_t id) {
-    std::lock_guard<std::mutex> lock(mu_);
+    FileTransferRecord notify_record;
+    {
+        std::lock_guard<std::mutex> lock(mu_);
 
-    auto it = transfers_.find(id);
-    if (it == transfers_.end()) {
-        return;
-    }
+        auto it = transfers_.find(id);
+        if (it == transfers_.end()) {
+            return;
+        }
 
-    it->second.status = FileTransferStatus::Completed;
-    it->second.completed_at = std::chrono::steady_clock::now();
-    if (it->second.total_bytes > 0 && it->second.transferred_bytes < it->second.total_bytes) {
-        it->second.transferred_bytes = it->second.total_bytes;
+        it->second.status = FileTransferStatus::Completed;
+        it->second.completed_at_ms = now_epoch_ms();
+        it->second.cancelable = false;
+        it->second.retryable = false;
+        if (it->second.total_bytes > 0 && it->second.transferred_bytes < it->second.total_bytes) {
+            it->second.transferred_bytes = it->second.total_bytes;
+        }
+        notify_record = it->second;
+        trim_history();
     }
-    trim_history();
+    persist_record_if_enabled(notify_record);
+    notify_listeners(notify_record);
 }
 
 void FileTransfer::fail_transfer(uint64_t id, const std::string& error_message) {
-    std::lock_guard<std::mutex> lock(mu_);
+    FileTransferRecord notify_record;
+    {
+        std::lock_guard<std::mutex> lock(mu_);
 
-    auto it = transfers_.find(id);
-    if (it == transfers_.end()) {
-        return;
+        auto it = transfers_.find(id);
+        if (it == transfers_.end()) {
+            return;
+        }
+
+        it->second.status = FileTransferStatus::Failed;
+        it->second.error_message = error_message;
+        it->second.completed_at_ms = now_epoch_ms();
+        it->second.cancelable = false;
+        it->second.retryable = true;
+        notify_record = it->second;
+        trim_history();
     }
-
-    it->second.status = FileTransferStatus::Failed;
-    it->second.error_message = error_message;
-    it->second.completed_at = std::chrono::steady_clock::now();
-    trim_history();
+    persist_record_if_enabled(notify_record);
+    notify_listeners(notify_record);
 }
 
 void FileTransfer::clear_completed() {
-    std::lock_guard<std::mutex> lock(mu_);
+    bool should_delete_persisted = false;
+    {
+        std::lock_guard<std::mutex> lock(mu_);
 
-    transfer_order_.erase(
-        std::remove_if(transfer_order_.begin(), transfer_order_.end(), [this](uint64_t id) {
-            auto it = transfers_.find(id);
-            if (it == transfers_.end()) {
+        transfer_order_.erase(
+            std::remove_if(transfer_order_.begin(), transfer_order_.end(), [this](uint64_t id) {
+                auto it = transfers_.find(id);
+                if (it == transfers_.end()) {
+                    return true;
+                }
+                if (it->second.status != FileTransferStatus::Completed) {
+                    return false;
+                }
+                last_persisted_progress_at_ms_.erase(id);
+                transfers_.erase(it);
                 return true;
-            }
-            if (it->second.status != FileTransferStatus::Completed) {
-                return false;
-            }
-            transfers_.erase(it);
-            return true;
-        }),
-        transfer_order_.end());
+            }),
+            transfer_order_.end());
+        should_delete_persisted = persistence_enabled_;
+    }
+    if (should_delete_persisted) {
+        FileTransferStore::get().delete_completed(nullptr);
+    }
+}
+
+void FileTransfer::clear_failed() {
+    bool should_delete_persisted = false;
+    {
+        std::lock_guard<std::mutex> lock(mu_);
+
+        transfer_order_.erase(
+            std::remove_if(transfer_order_.begin(), transfer_order_.end(), [this](uint64_t id) {
+                auto it = transfers_.find(id);
+                if (it == transfers_.end()) {
+                    return true;
+                }
+                if (it->second.status != FileTransferStatus::Failed &&
+                    it->second.status != FileTransferStatus::Canceled &&
+                    it->second.status != FileTransferStatus::Skipped &&
+                    it->second.status != FileTransferStatus::Interrupted) {
+                    return false;
+                }
+                last_persisted_progress_at_ms_.erase(id);
+                transfers_.erase(it);
+                return true;
+            }),
+            transfer_order_.end());
+        should_delete_persisted = persistence_enabled_;
+    }
+    if (should_delete_persisted) {
+        FileTransferStore::get().delete_failed_like(nullptr);
+    }
 }
 
 std::vector<FileTransferRecord> FileTransfer::get_all_transfers() const {
@@ -141,6 +400,67 @@ std::vector<FileTransferRecord> FileTransfer::get_all_transfers() const {
     return result;
 }
 
+bool FileTransfer::get_transfer(uint64_t id, FileTransferRecord& out) const {
+    std::lock_guard<std::mutex> lock(mu_);
+    const auto it = transfers_.find(id);
+    if (it == transfers_.end()) {
+        return false;
+    }
+    out = it->second;
+    return true;
+}
+
+void FileTransfer::notify_listeners(const FileTransferRecord& record) const {
+    std::vector<Listener> listeners;
+    {
+        std::lock_guard<std::mutex> lock(mu_);
+        listeners.reserve(listeners_.size());
+        for (const auto& [_, listener] : listeners_) {
+            listeners.push_back(listener);
+        }
+    }
+    for (const auto& listener : listeners) {
+        if (listener) {
+            listener(record);
+        }
+    }
+}
+
+bool FileTransfer::should_persist_progress_locked(const FileTransferRecord& record, int64_t now_ms) {
+    const auto it = last_persisted_progress_at_ms_.find(record.id);
+    if (it == last_persisted_progress_at_ms_.end()) {
+        last_persisted_progress_at_ms_[record.id] = now_ms;
+        return true;
+    }
+    if (now_ms - it->second >= 500) {
+        it->second = now_ms;
+        return true;
+    }
+    return false;
+}
+
+void FileTransfer::persist_record_if_enabled(const FileTransferRecord& record) {
+    if (!persistence_enabled_) {
+        return;
+    }
+    FileTransferStore::get().upsert(record, nullptr);
+}
+
+void FileTransfer::hydrate_persisted_rows(std::vector<FileTransferRecord> rows, uint64_t next_id) {
+    std::lock_guard<std::mutex> lock(mu_);
+    transfers_.clear();
+    transfer_order_.clear();
+    last_persisted_progress_at_ms_.clear();
+
+    for (auto& row : rows) {
+        transfer_order_.push_back(row.id);
+        transfers_[row.id] = std::move(row);
+    }
+
+    next_id_.store(std::max<uint64_t>(next_id, 1), std::memory_order_relaxed);
+    persistence_enabled_ = true;
+}
+
 void FileTransfer::trim_history() {
     if (transfers_.size() <= kMaxHistory) {
         return;
@@ -152,7 +472,7 @@ void FileTransfer::trim_history() {
         if (it == transfers_.end()) {
             continue;
         }
-        if (!it->second.is_alive() && it->second.status != FileTransferStatus::Failed) {
+        if (!it->second.is_alive()) {
             ++removable_count;
         }
     }
@@ -172,10 +492,11 @@ void FileTransfer::trim_history() {
             if (it == transfers_.end()) {
                 return true;
             }
-            if (it->second.is_alive() || it->second.status == FileTransferStatus::Failed) {
+            if (it->second.is_alive()) {
                 return false;
             }
             transfers_.erase(it);
+            last_persisted_progress_at_ms_.erase(id);
             --remove_count;
             return true;
         }),

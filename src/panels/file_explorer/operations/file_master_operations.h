@@ -16,26 +16,32 @@ bool dispatch_file_master_clipboard_operation(core::WorkerPool& worker_pool,
                                               const std::string& dest_dir,
                                               ClipboardOp op,
                                               uint64_t job_id,
-                                              core::FileMasterCompletion callback);
+                                              core::FileMasterCompletion callback,
+                                              uint64_t transfer_id = 0,
+                                              const std::string& target_name_override = {});
 
 bool remove_file_master_item(core::WorkerPool& worker_pool,
                              core::FileTransfer& transfers,
                              const FileItem& item,
                              uint64_t job_id,
-                             core::FileMasterCompletion callback);
+                             core::FileMasterCompletion callback,
+                             uint64_t transfer_id = 0);
 
 bool rename_file_master_item(core::WorkerPool& worker_pool,
                              core::FileTransfer& transfers,
                              const FileItem& item,
                              const std::string& new_name,
                              uint64_t job_id,
-                             core::FileMasterCompletion callback);
+                             core::FileMasterCompletion callback,
+                             uint64_t transfer_id = 0);
 
 bool download_remote_file_master_item(core::WorkerPool& worker_pool,
                                       core::FileTransfer& transfers,
                                       const FileItem& item,
                                       uint64_t job_id,
-                                      core::FileMasterCompletion callback);
+                                      core::FileMasterCompletion callback,
+                                      uint64_t transfer_id = 0,
+                                      const std::string& target_name_override = {});
 
 void shutdown_file_transfer_worker_pool();
 

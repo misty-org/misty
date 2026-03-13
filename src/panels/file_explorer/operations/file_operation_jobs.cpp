@@ -8,16 +8,20 @@ namespace {
 
 constexpr float kJobToastDurationSeconds = 3.0f;
 
-std::string start_message(uint64_t job_id) {
-    return "Starting job " + std::to_string(job_id);
+std::string job_label(uint64_t job_id) {
+    return "J-" + std::to_string(job_id);
+}
+
+std::string start_message(uint64_t /*job_id*/) {
+    return "Starting transfer...";
 }
 
 std::string success_message(uint64_t job_id) {
-    return "Job " + std::to_string(job_id) + " completed";
+    return "Transfer job " + job_label(job_id) + " completed";
 }
 
 std::string failure_message(uint64_t job_id, const std::string& reason) {
-    std::string message = "Job " + std::to_string(job_id) + " failed";
+    std::string message = "Transfer job " + job_label(job_id) + " failed";
     if (!reason.empty()) {
         message += ": " + reason;
     }

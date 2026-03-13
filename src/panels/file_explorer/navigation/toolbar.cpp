@@ -253,10 +253,11 @@ void FileExplorerPanel::show_file_action_toolbar(FileExplorerState& state) {
     const ImVec2 button_size(kActionButtonWidth, kToolbarButtonSize);
     const ImVec4 disabled_action_tint(0.86f, 0.88f, 0.92f, 0.40f);
     const auto& listing = active_listing();
+    const bool rename_active = rename_mode_active();
     const bool has_file_master_selection = selected_items_are_file_master_items(ui_.selected_files, listing);
     const bool has_single_file_master_selection = exactly_one_file_master_item_selected(ui_.selected_files, listing);
     const bool has_clipboard = registry_.get_state<ClipboardState>("Clipboard").has_content();
-    const bool can_create = !std::string(state.current_path).empty();
+    const bool can_create = !rename_active && !std::string(state.current_path).empty();
 
     if (toolbar_text_icon_button("new_entry",
                                  "assets/icons/plus-24.svg",
@@ -283,7 +284,7 @@ void FileExplorerPanel::show_file_action_toolbar(FileExplorerState& state) {
     if (toolbar_icon_button("cut_selection",
                             "assets/icons/cut-24.svg",
                             "Cut",
-                            has_file_master_selection,
+                            has_file_master_selection && !rename_active,
                             button_size,
                             kToolbarIconSize,
                             ImVec4(0.88f, 0.88f, 0.88f, 1.0f),
@@ -295,7 +296,7 @@ void FileExplorerPanel::show_file_action_toolbar(FileExplorerState& state) {
     if (toolbar_icon_button("copy_selection",
                             "assets/icons/copy-24.svg",
                             "Copy",
-                            has_file_master_selection,
+                            has_file_master_selection && !rename_active,
                             button_size,
                             kToolbarIconSize,
                             ImVec4(0.88f, 0.88f, 0.88f, 1.0f),
@@ -307,7 +308,7 @@ void FileExplorerPanel::show_file_action_toolbar(FileExplorerState& state) {
     if (toolbar_icon_button("paste_selection",
                             "assets/icons/paste-24.svg",
                             "Paste",
-                            has_clipboard,
+                            has_clipboard && !rename_active,
                             button_size,
                             kToolbarIconSize,
                             ImVec4(0.88f, 0.88f, 0.88f, 1.0f),
@@ -319,7 +320,7 @@ void FileExplorerPanel::show_file_action_toolbar(FileExplorerState& state) {
     if (toolbar_icon_button("rename_selection",
                             "assets/icons/rename-24.svg",
                             "Rename",
-                            has_single_file_master_selection,
+                            has_file_master_selection,
                             button_size,
                             kToolbarIconSize,
                             ImVec4(0.88f, 0.88f, 0.88f, 1.0f),
@@ -331,12 +332,24 @@ void FileExplorerPanel::show_file_action_toolbar(FileExplorerState& state) {
     if (toolbar_icon_button("delete_selection",
                             "assets/icons/trash-24.svg",
                             "Delete",
-                            has_file_master_selection,
+                            has_file_master_selection && !rename_active,
                             button_size,
                             kToolbarIconSize,
                             ImVec4(0.88f, 0.88f, 0.88f, 1.0f),
                             disabled_action_tint)) {
         perform_delete_selected(state);
+    }
+
+    bool show_rename_status = false;
+    {
+        auto& session = rename_session_state();
+        std::lock_guard<std::mutex> lock(session.mu);
+        show_rename_status = session.active || session.job_banner_active;
+    }
+    if (show_rename_status) {
+        ImGui::SameLine(0.0f, kActionToolbarGap);
+        const float status_width = std::max(260.0f, ImGui::GetWindowContentRegionMax().x - ImGui::GetCursorPosX() - 140.0f);
+        render_rename_status_banner(status_width);
     }
 
     const float right_controls_width = kViewToggleWidth + kActionToolbarGap + kToolbarButtonSize;
