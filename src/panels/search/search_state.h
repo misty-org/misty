@@ -19,6 +19,7 @@ struct SearchState : public core::StateEntry {
     std::string context_path;
     bool is_open = false;
     bool focus_query = false;
+    bool just_opened = false;
     int selected_index = 0;
     bool search_pending = false;
     bool search_in_flight = false;
@@ -26,6 +27,13 @@ struct SearchState : public core::StateEntry {
     std::chrono::steady_clock::time_point last_input_change_at{};
     std::string last_submitted_query;
     std::string last_err;
+    bool results_cached = false;
+    bool refresh_in_progress = false;
+    bool results_updated = false;
+    std::string updated_at;
+    std::string request_id;
+    std::vector<SearchRemoteStatus> remote_statuses;
+    SearchSource last_query_source = SearchSource::LOCAL;
     std::mutex mu;
 };
 
