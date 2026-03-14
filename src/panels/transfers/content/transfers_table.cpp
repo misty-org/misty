@@ -71,17 +71,17 @@ void render_row_actions(core::StateRegistry& registry,
     ImGui::PushID(static_cast<int>(row.id));
     if (row.cancelable) {
         if (ImGui::SmallButton("Cancel")) {
-            cancel_queued_operation(registry, row.id);
+            cancel_queued_operation_async(registry, worker_pool, row.id);
         }
     } else if (row.retryable &&
                (row.status == core::FileTransferStatus::Failed ||
                 row.status == core::FileTransferStatus::Interrupted)) {
         if (ImGui::SmallButton("Retry")) {
-            retry_operation(registry, worker_pool, row.id);
+            retry_operation_async(registry, worker_pool, row.id);
         }
     } else if (row.undoable && row.undo_token_id != 0) {
         if (ImGui::SmallButton("Undo")) {
-            undo_operation(registry, worker_pool, row.undo_token_id);
+            undo_operation_async(registry, worker_pool, row.undo_token_id);
         }
     } else {
         ImGui::TextDisabled("--");
@@ -127,11 +127,6 @@ void render_row(core::StateRegistry& registry,
                           row.status == core::FileTransferStatus::Completed ? kGreen :
                           row.status == core::FileTransferStatus::Canceled ? kMuted : kText);
     ImGui::TextUnformatted(transfers_content::status_label(row));
-    if (!row.detail_message.empty()) {
-        ImGui::PushStyleColor(ImGuiCol_Text, kMuted);
-        ImGui::TextWrapped("%s", row.detail_message.c_str());
-        ImGui::PopStyleColor();
-    }
     ImGui::PopStyleColor();
 
     ImGui::TableSetColumnIndex(6);

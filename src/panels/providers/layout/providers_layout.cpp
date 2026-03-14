@@ -2,6 +2,7 @@
 
 #include "core/manager/asset_manager.h"
 #include "panels/providers/cards/provider_cards_util.h"
+#include "panels/providers/content/providers_tables.h"
 #include "panels/providers/layout/providers_layout_util.h"
 #include "imgui.h"
 
@@ -21,8 +22,6 @@ namespace misty::panel {
         constexpr ImVec4 kBorder = ImVec4(0.24f, 0.27f, 0.30f, 1.0f);
         constexpr ImVec4 kReadyBg = ImVec4(0.14f, 0.17f, 0.19f, 1.0f);
         constexpr ImVec4 kReadyText = ImVec4(0.42f, 0.86f, 0.55f, 1.0f);
-        constexpr float kSectionChromeHeight = 88.0f;
-
         std::string lowercase_copy(std::string value) {
             std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
                 return static_cast<char>(std::tolower(c));
@@ -90,12 +89,11 @@ namespace misty::panel {
             show_top_bar(state, content_width);
             ImGui::Dummy(ImVec2(0.0f, 8.0f));
             show_status_messages(state);
-            show_health_card(state.health_card_snapshot());
 
             const float remaining_height = ImGui::GetContentRegionAvail().y;
-            const float list_height_budget = std::max(0.0f, remaining_height - kSectionChromeHeight);
+            const float list_height_budget = std::max(0.0f, remaining_height);
 
-            show_connected_accounts(state, list_height_budget);
+            render_connected_accounts_table(state, list_height_budget);
             show_provider_dialogs(state);
         }
 

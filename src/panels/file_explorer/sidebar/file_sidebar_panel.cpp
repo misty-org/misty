@@ -298,6 +298,10 @@ namespace misty::panel {
 
     FileSidebarPanel::FileSidebarPanel(core::StateRegistry& registry, core::WorkerPool& worker_pool)
         : registry_(registry), worker_pool_(worker_pool) {
+        registry_.get_state<ProvidersState>("Providers").set_provider_added_callback([this]() {
+            auto& sidebar_state = registry_.get_state<FileSidebarState>("FileSidebar");
+            refresh_provider_entries(sidebar_state);
+        });
     }
 
     void FileSidebarPanel::render() {

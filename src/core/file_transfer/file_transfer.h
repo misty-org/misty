@@ -6,6 +6,7 @@
 #include <functional>
 #include <mutex>
 #include <string>
+#include <thread>
 #include <unordered_map>
 #include <vector>
 
@@ -87,7 +88,11 @@ public:
     static constexpr size_t kMaxHistory = 500;
     using Listener = std::function<void(const FileTransferRecord&)>;
 
+    ~FileTransfer();
     bool initialize_persistence(std::string* error = nullptr);
+    bool initialize_persistence_metadata(std::string* error = nullptr);
+    bool start_background_hydration(std::string* error = nullptr);
+    bool poll_background_hydration(std::string* error = nullptr);
     uint64_t create_transfer(FileTransferRecord snapshot);
     uint64_t add_listener(Listener listener);
     void remove_listener(uint64_t listener_id);
@@ -118,6 +123,8 @@ private:
     bool should_persist_progress_locked(const FileTransferRecord& record, int64_t now_ms);
     void persist_record_if_enabled(const FileTransferRecord& record);
     void hydrate_persisted_rows(std::vector<FileTransferRecord> rows, uint64_t next_id);
+    void merge_persisted_rows(std::vector<FileTransferRecord> rows, uint64_t next_id);
+    void stop_background_hydration();
     void trim_history();
     void notify_listeners(const FileTransferRecord& record) const;
 
@@ -129,6 +136,15 @@ private:
     std::atomic<uint64_t> next_id_{1};
     std::atomic<uint64_t> next_listener_id_{1};
     bool persistence_enabled_ = false;
+    mutable std::mutex hydration_mu_;
+    std::thread hydration_thread_;
+    bool hydration_in_flight_ = false;
+    bool hydration_ready_ = false;
+    bool hydration_failed_ = false;
+    bool hydration_started_ = false;
+    std::string hydration_error_;
+    std::vector<FileTransferRecord> pending_hydrated_rows_;
+    uint64_t pending_hydrated_next_id_ = 1;
 };
 
 }  // namespace misty::core

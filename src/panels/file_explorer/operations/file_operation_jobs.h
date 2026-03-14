@@ -7,6 +7,7 @@
 #include <string>
 #include <unordered_map>
 
+#include "core/file_transfer/file_transfer.h"
 #include "core/ui/state_registry.h"
 #include "panels/notification/notification_state.h"
 
@@ -27,6 +28,7 @@ struct FileOperationJobRecord {
 
 class FileOperationJobs : public core::StateEntry {
 public:
+    void seed_next_job_id(uint64_t next_job_id);
     uint64_t begin_job(NotificationState& notifications, const std::string& operation_label);
     void add_operation(uint64_t job_id);
     void cancel_operation(NotificationState& notifications, uint64_t job_id);
@@ -46,6 +48,7 @@ private:
 
 uint64_t begin_file_operation_job(core::StateRegistry& registry,
                                   const std::string& operation_label);
+void seed_file_operation_job_ids(core::StateRegistry& registry);
 void add_file_operation_to_job(core::StateRegistry& registry, uint64_t job_id);
 void cancel_file_operation_in_job(core::StateRegistry& registry, uint64_t job_id);
 void close_file_operation_job(core::StateRegistry& registry, uint64_t job_id);

@@ -31,13 +31,9 @@ void RenameSessionState::clear() {
     active = false;
     review_modal_open = false;
     focus_requested = false;
-    job_banner_active = false;
     shared_cursor_pos = 0;
     shared_cursor_anim = 0.0f;
-    job_banner_item_count = 0;
-    job_banner_job_id = 0;
     focus_key.clear();
-    job_banner_text.clear();
     participants.clear();
     participant_order.clear();
 }

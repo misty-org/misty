@@ -22,6 +22,8 @@
 #include "core/file_transfer/file_transfer.h"
 #include "core/manager/env_manager.h"
 #include "core/threading/worker_pool.h"
+#include "core/ui/state_registry.h"
+#include "panels/file_explorer/operations/operation_queue_state.h"
 
 namespace fs = std::filesystem;
 
@@ -76,6 +78,20 @@ bool wait_for(const std::function<bool()>& predicate,
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     return predicate();
+}
+
+misty::panel::FileItem make_remote_item(const std::string& remote_name,
+                                        const std::string& remote_path,
+                                        bool is_dir = false) {
+    misty::panel::FileItem item;
+    item.name = fs::path(remote_path).filename().string();
+    item.path = (fs::path("/tmp/misty-remote") / remote_name / fs::path(remote_path).relative_path()).string();
+    item.id = item.path;
+    item.type = misty::panel::FileType::REMOTE;
+    item.sync_remote_name = remote_name;
+    item.sync_remote_path = remote_path;
+    item.is_dir = is_dir;
+    return item;
 }
 
 template <typename RequestT, typename Predicate>
@@ -731,6 +747,36 @@ TEST_F(FileMasterRemoteTest, RenameSendsExpectedProxyRequestAndSucceeds) {
     EXPECT_NE(request->body.find("\"new_path\":\"/Archive/report.txt\""), std::string::npos);
 }
 
+TEST_F(FileMasterRemoteTest, RenameDirectoryUsesMoveEndpointPayload) {
+    FakeRemoteProxy proxy;
+    proxy.start();
+    proxy.configure_env(home_.path());
+
+    std::optional<misty::core::FileMasterResult> result;
+    misty::core::FileMasterProps props;
+    props.remote_source.remote_name = "drive-work";
+    props.remote_source.remote_path = "/Documents/bruh";
+    props.remote_dest.remote_name = "drive-work";
+    props.remote_dest.remote_path = "/Documents/baby";
+    props.source_is_dir = true;
+
+    file_master_.rename(props, [&](misty::core::FileMasterResult value) {
+        result = std::move(value);
+    });
+
+    ASSERT_TRUE(wait_for([&]() { return result.has_value(); }));
+    ASSERT_TRUE(result->success) << result->error_message;
+    const auto requests = proxy.requests();
+    const auto* request = find_request(requests, [](const auto& item) {
+        return item.method == "POST" && item.target == "/api/remote/file/move";
+    });
+    ASSERT_NE(request, nullptr);
+    EXPECT_NE(request->body.find("\"source_remote\":\"drive-work\""), std::string::npos);
+    EXPECT_NE(request->body.find("\"source_path\":\"/Documents/bruh\""), std::string::npos);
+    EXPECT_NE(request->body.find("\"dest_remote\":\"drive-work\""), std::string::npos);
+    EXPECT_NE(request->body.find("\"dest_path\":\"/Documents/baby\""), std::string::npos);
+}
+
 TEST_F(FileMasterRemoteTest, RemoteToRemoteCopyCallsProxyTransferEndpoint) {
     FakeRemoteProxy proxy;
     proxy.start();
@@ -919,6 +965,74 @@ TEST_F(FileMasterRemoteTest, TrackedRemoteToRemoteCopyCreatesCompletedTransfer) 
     EXPECT_EQ(rows[0].remote_dest_name, "archive");
     EXPECT_EQ(rows[0].remote_dest_path, "/Reports/report.txt");
     EXPECT_EQ(rows[0].status, misty::core::FileTransferStatus::Completed);
+}
+
+TEST_F(FileMasterRemoteTest, OperationQueueRemoteRenameProducesUndoAndCanUndo) {
+    FakeRemoteProxy proxy;
+    proxy.start();
+    proxy.configure_env(home_.path());
+
+    misty::core::StateRegistry registry;
+    misty::core::WorkerPool queue_pool(2);
+
+    misty::panel::RenameExecutionRequest request;
+    request.owner_state_key = "Files";
+    request.directory_path = "/tmp/misty-remote/drive-work/Documents";
+    request.item = make_remote_item("drive-work", "/Documents/temp", false);
+    request.new_name = "sexy";
+
+    ASSERT_NE(misty::panel::enqueue_rename_operation_batch(registry, queue_pool, {request}), 0u);
+    ASSERT_TRUE(wait_for([&]() {
+        const auto rows = registry.get_state<misty::core::FileTransfer>("FileMasterTransfers").get_all_transfers();
+        return std::any_of(rows.begin(), rows.end(), [](const misty::core::FileTransferRecord& row) {
+            return row.status == misty::core::FileTransferStatus::Completed &&
+                   row.undoable &&
+                   row.undo_token_id != 0 &&
+                   row.remote_source_path == "/Documents/temp" &&
+                   row.remote_dest_path == "/Documents/sexy";
+        });
+    }));
+
+    const auto first_rows = registry.get_state<misty::core::FileTransfer>("FileMasterTransfers").get_all_transfers();
+    const auto first_undo = std::find_if(first_rows.begin(), first_rows.end(), [](const misty::core::FileTransferRecord& row) {
+        return row.status == misty::core::FileTransferStatus::Completed &&
+               row.undoable &&
+               row.undo_token_id != 0 &&
+               row.remote_source_path == "/Documents/temp" &&
+               row.remote_dest_path == "/Documents/sexy";
+    });
+    ASSERT_NE(first_undo, first_rows.end());
+
+    EXPECT_TRUE(misty::panel::undo_operation(registry, queue_pool, first_undo->undo_token_id));
+    ASSERT_TRUE(wait_for([&]() {
+        const auto rows = registry.get_state<misty::core::FileTransfer>("FileMasterTransfers").get_all_transfers();
+        return std::any_of(rows.begin(), rows.end(), [](const misty::core::FileTransferRecord& row) {
+            return row.status == misty::core::FileTransferStatus::Completed &&
+                   row.undoable &&
+                   row.undo_token_id != 0 &&
+                   row.remote_source_path == "/Documents/sexy" &&
+                   row.remote_dest_path == "/Documents/temp";
+        });
+    }));
+
+    const auto requests = proxy.requests();
+    const auto forward_request = find_request(requests, [](const auto& item) {
+        return item.method == "POST" &&
+               item.target == "/api/remote/file/rename" &&
+               item.body.find("\"old_path\":\"/Documents/temp\"") != std::string::npos &&
+               item.body.find("\"new_path\":\"/Documents/sexy\"") != std::string::npos;
+    });
+    ASSERT_NE(forward_request, nullptr);
+
+    const auto reverse_request = find_request(requests, [](const auto& item) {
+        return item.method == "POST" &&
+               item.target == "/api/remote/file/rename" &&
+               item.body.find("\"old_path\":\"/Documents/sexy\"") != std::string::npos &&
+               item.body.find("\"new_path\":\"/Documents/temp\"") != std::string::npos;
+    });
+    ASSERT_NE(reverse_request, nullptr);
+
+    queue_pool.shutdown();
 }
 
 TEST_F(FileMasterRemoteTest, TrackedRemoteToLocalCutFailureCreatesFailedTransfer) {
