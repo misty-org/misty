@@ -37,6 +37,16 @@ std::vector<MountedDevice> scan_mounted_devices() {
         if (mountpoint.rfind("/private", 0) == 0) continue;
         if (mountpoint.rfind("/dev",     0) == 0) continue;
 
+        // Skip UUID-named simulator/developer volumes (e.g. SimRuntimeBundle-XXXXXXXX-…).
+        // A UUID tail is 36 chars with dashes at positions 8, 13, 18, 23.
+        {
+            std::string vol_name = fs::path(mountpoint).filename().string();
+            if (vol_name.size() >= 36) {
+                const char* p = vol_name.c_str() + vol_name.size() - 36;
+                if (p[8] == '-' && p[13] == '-' && p[18] == '-' && p[23] == '-') continue;
+            }
+        }
+
         MountedDevice dev;
         dev.fs_type    = fstype;
         dev.mount_path = mountpoint;

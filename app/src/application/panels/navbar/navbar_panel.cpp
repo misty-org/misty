@@ -18,7 +18,7 @@ namespace misty::panel {
             ImGuiWindowFlags_NoResize |
             ImGuiWindowFlags_NoScrollbar;
 
-        ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.067f, 0.067f, 0.075f, 1.0f)); // #111113 surface
+        ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.10f, 0.10f, 0.12f, 1.0f)); // dark charcoal
         ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
 
         if (ImGui::Begin("Navbar", nullptr, navbar_flags)) {
@@ -53,13 +53,13 @@ namespace misty::panel {
     }
 
     void NavbarPanel::show_logo_icon() {
-        const char* path = "assets/icons/misty_full.png";
+        const char* path = "assets/icons/misty.png";
         const char* label = "mist_v1";
-        
+
         auto& logo_image = core::AssetManager::get().get_image_texture(path);
 
-        float logo_size = 48.0f;
-        ImVec2 padding(4.0f, 4.0f);
+        float logo_size = 62.0f;
+        ImVec2 padding(2.0f, 2.0f);
         float button_size = logo_size + padding.x * 2.0f;
 
         float current_width = ImGui::GetWindowWidth();

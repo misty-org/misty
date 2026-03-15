@@ -163,6 +163,9 @@ namespace misty::panel {
         // Must be called before any async methods. Idempotent.
         void init(core::WorkerPool& pool);
 
+        // Clear all connections and re-fetch from all providers.
+        void refresh_connections();
+
         bool has_ms_connections();
         void check_connections();
         bool get_onedrive_card_state(const std::string& ms_user_id, OneDriveCardState& out);
@@ -265,6 +268,8 @@ namespace misty::panel {
         std::mutex mu;
         std::string error_msg = "";
         std::string success_msg = "";
+        bool is_refreshing = false;
+        bool initial_load_done = false;
         std::set<MSConnection> ms_connections;
         bool show_ms_login_modal = false;
         std::string ms_auth_error;
@@ -285,5 +290,6 @@ namespace misty::panel {
 
     private:
         core::WorkerPool* worker_pool_ = nullptr;
+        int pending_tasks_ = 0; // guarded by mu
     };
 }

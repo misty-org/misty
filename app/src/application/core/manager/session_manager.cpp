@@ -59,22 +59,40 @@ namespace misty::core {
     void SessionManager::load_tokens() {
         token_         = read_file_token(get_misty_dir() / "token");
         refresh_token_ = read_file_token(get_misty_dir() / "refresh_token");
+        license_token_ = read_file_token(get_misty_dir() / "license_token");
+        user_id_       = read_file_token(get_misty_dir() / "user_id");
         if (!token_.empty())
             std::cerr << "[SessionManager] loaded access token (" << token_.size() << " bytes)" << std::endl;
         if (!refresh_token_.empty())
             std::cerr << "[SessionManager] loaded refresh token (" << refresh_token_.size() << " bytes)" << std::endl;
+        if (!license_token_.empty())
+            std::cerr << "[SessionManager] loaded license token (" << license_token_.size() << " bytes)" << std::endl;
     }
 
     void SessionManager::save_tokens() const {
         write_file_token(get_misty_dir() / "token",         token_);
         write_file_token(get_misty_dir() / "refresh_token", refresh_token_);
-        std::cerr << "[SessionManager] persisted both tokens" << std::endl;
+        write_file_token(get_misty_dir() / "license_token", license_token_);
+        std::cerr << "[SessionManager] persisted tokens" << std::endl;
     }
 
     void SessionManager::delete_tokens() const {
         remove_file_token(get_misty_dir() / "token");
         remove_file_token(get_misty_dir() / "refresh_token");
+        remove_file_token(get_misty_dir() / "license_token");
+        remove_file_token(get_misty_dir() / "user_id");
         std::cerr << "[SessionManager] removed all tokens" << std::endl;
+    }
+
+    void SessionManager::set_user_id(const std::string& user_id) {
+        std::lock_guard<std::mutex> lock(mu_);
+        user_id_ = user_id;
+        write_file_token(get_misty_dir() / "user_id", user_id_);
+    }
+
+    std::string SessionManager::get_user_id() const {
+        std::lock_guard<std::mutex> lock(mu_);
+        return user_id_;
     }
 
     void SessionManager::set_tokens(const std::string& access_token, const std::string& refresh_token) {
@@ -108,6 +126,17 @@ namespace misty::core {
         return refresh_token_;
     }
 
+    void SessionManager::set_license_token(const std::string& license_token) {
+        std::lock_guard<std::mutex> lock(mu_);
+        license_token_ = license_token;
+        write_file_token(get_misty_dir() / "license_token", license_token_);
+    }
+
+    std::string SessionManager::get_license_token() const {
+        std::lock_guard<std::mutex> lock(mu_);
+        return license_token_;
+    }
+
     bool SessionManager::is_authenticated() const {
         std::lock_guard<std::mutex> lock(mu_);
         return !token_.empty();
@@ -134,6 +163,9 @@ namespace misty::core {
         std::map<std::string, std::string> headers;
         if (!token_.empty()) {
             headers["Authorization"] = "Bearer " + token_;
+        }
+        if (!license_token_.empty()) {
+            headers["X-License-Token"] = license_token_;
         }
         return headers;
     }
