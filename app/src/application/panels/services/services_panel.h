@@ -53,6 +53,8 @@ namespace misty::panel {
         void show_icloud_card_profile(const ICloudCardState& card, const std::string& email);
         void show_icloud_card_actions(ServicesState& state, const std::string& email, bool is_connected);
 
+        void show_loading_overlay();
+
     private:
         static constexpr float kCardWidth = 300.0f;
         static constexpr float kCardSpacing = 12.0f;

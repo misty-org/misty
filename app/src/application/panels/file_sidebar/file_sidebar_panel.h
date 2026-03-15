@@ -7,6 +7,8 @@
 #include "dfs/client/misty_client.h"
 #include <functional>
 #include <vector>
+#include <unordered_map>
+#include <unordered_set>
 
 #include "file_sidebar_state.h"
 
@@ -40,6 +42,8 @@ namespace misty::panel {
         void show_upload_progress_modal(FileSidebarState& state);
         void start_next_upload(FileSidebarState& state);
         void show_quick_access(float width, float padding);
+        void show_add_device_modal();
+        void show_device_rename_modal();
 
     private:
         core::UIRegistry& registry_;
@@ -50,6 +54,23 @@ namespace misty::panel {
         // Mounted device cache — refreshed on OS mount/unmount events or manual refresh
         std::vector<MountedDevice> cached_devices_;
         DeviceWatcher device_watcher_;
+
+        // Sidebar section collapse state
+        bool local_collapsed_        = false;
+        bool services_collapsed_     = false;
+        bool devices_collapsed_      = false;
+        bool quick_access_collapsed_ = false;
+
+        // Device customization
+        std::unordered_map<std::string, std::string> device_name_overrides_;
+        std::unordered_set<std::string>              hidden_device_paths_;
+        std::vector<std::string>                     custom_mount_paths_;
+
+        // Device modal state
+        bool        show_add_device_modal_ = false;
+        std::string device_renaming_path_;
+        char        add_device_path_buf_[512] = {};
+        char        device_rename_buf_[256]   = {};
     };
 
 }

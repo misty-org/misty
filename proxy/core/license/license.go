@@ -76,36 +76,50 @@ func (m *Manager) RenewIfCached() {
 
 // RefreshIfNeeded fetches a fresh license token from the server if the
 // cached one is missing, expired, or within refreshThreshold of expiry.
-func (m *Manager) RefreshIfNeeded(email, password string) error {
+// Returns the license token string (cached or freshly fetched).
+func (m *Manager) RefreshIfNeeded(email, password string) (string, error) {
 	cached, err := m.database.GetLicense()
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	if cached != nil && time.Until(cached.ExpiresAt) > refreshThreshold {
-		return nil // still fresh
+		return cached.Token, nil // still fresh
 	}
 
 	return m.fetchAndStore(email, password)
 }
 
-func (m *Manager) fetchAndStore(email, password string) error {
+// GetCachedToken returns the cached license token string, or empty string if
+// none is cached or it has expired.
+func (m *Manager) GetCachedToken() string {
+	cached, err := m.database.GetLicense()
+	if err != nil || cached == nil {
+		return ""
+	}
+	if time.Now().After(cached.ExpiresAt) {
+		return ""
+	}
+	return cached.Token
+}
+
+func (m *Manager) fetchAndStore(email, password string) (string, error) {
 	if m.serverURL == "" {
-		return errors.New("MISTY_SERVER_URL not configured")
+		return "", errors.New("MISTY_SERVER_URL not configured")
 	}
 
 	body, _ := json.Marshal(map[string]string{"email": email, "password": password})
 	resp, err := http.Post(m.serverURL+"/license/validate", "application/json", bytes.NewReader(body))
 	if err != nil {
-		return fmt.Errorf("license server unreachable: %w", err)
+		return "", fmt.Errorf("license server unreachable: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusForbidden {
-		return errors.New("subscription inactive")
+		return "", errors.New("subscription inactive")
 	}
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("license server returned %d", resp.StatusCode)
+		return "", fmt.Errorf("license server returned %d", resp.StatusCode)
 	}
 
 	var result struct {
@@ -113,20 +127,20 @@ func (m *Manager) fetchAndStore(email, password string) error {
 		Tier         string `json:"tier"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return err
+		return "", err
 	}
 
 	claims, err := m.validateToken(result.LicenseToken)
 	if err != nil {
-		return fmt.Errorf("server returned invalid token: %w", err)
+		return "", fmt.Errorf("server returned invalid token: %w", err)
 	}
 
 	if err := m.database.StoreLicense(result.LicenseToken, result.Tier, claims.ExpiresAt.Time); err != nil {
-		return err
+		return "", err
 	}
 
 	log.Printf("License refreshed: tier=%s expires=%s", result.Tier, claims.ExpiresAt.Time.Format(time.RFC3339))
-	return nil
+	return result.LicenseToken, nil
 }
 
 func (m *Manager) validateToken(tokenStr string) (*Claims, error) {

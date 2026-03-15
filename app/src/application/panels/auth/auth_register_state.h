@@ -70,15 +70,15 @@ namespace misty::panel {
             std::map<std::string, std::string> headers;
             headers["Content-Type"] = "application/json";
             
-            // Make HTTP POST request
-            std::string proxy_url = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
-            if (proxy_url.empty()) {
-                error_msg = "PROXY_SERVICE_URL is not set";
+            // Register directly with the server (no proxy hop needed)
+            std::string server_url = core::EnvManager::get().get("MISTY_SERVER_URL", "");
+            if (server_url.empty()) {
+                error_msg = "MISTY_SERVER_URL is not set";
                 is_submitting = false;
                 return;
             }
             auto response = core::HTTPClient::get().post(
-                proxy_url + "/api/register",
+                server_url + "/register",
                 json_body,
                 headers
             );
@@ -96,7 +96,7 @@ namespace misty::panel {
             } else if (response.status_code == 500) {
                 error_msg = "Server error: Failed to create user";
             } else if (response.status_code == 0) {
-                error_msg = "Failed to connect to server. Is the proxy running?";
+                error_msg = "Failed to connect to server. Is MISTY_SERVER_URL reachable?";
             } else {
                 error_msg = "Registration failed (Status: " + std::to_string(response.status_code) + "): " + response.body;
             }
