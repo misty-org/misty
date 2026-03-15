@@ -74,7 +74,7 @@ namespace misty::panel {
             
             // Handle response
             if (response.status_code == 200 || response.status_code == 201) {
-                // Parse token from response and store it
+                // Parse tokens from response and store them
                 try {
                     auto json_resp = nlohmann::json::parse(response.body);
                     if (json_resp.contains("token") && json_resp.contains("refresh_token")) {
@@ -84,6 +84,12 @@ namespace misty::panel {
                         );
                     } else if (json_resp.contains("token")) {
                         core::SessionManager::get().set_tokens(json_resp["token"].get<std::string>(), "");
+                    }
+                    if (json_resp.contains("license_token") && !json_resp["license_token"].get<std::string>().empty()) {
+                        core::SessionManager::get().set_license_token(json_resp["license_token"].get<std::string>());
+                    }
+                    if (json_resp.contains("id") && !json_resp["id"].get<std::string>().empty()) {
+                        core::SessionManager::get().set_user_id(json_resp["id"].get<std::string>());
                     }
                 } catch (...) {
                     // Token storage failed, but login succeeded

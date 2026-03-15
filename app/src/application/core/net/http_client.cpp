@@ -177,6 +177,12 @@ namespace misty::core {
                 std::string new_token = json_resp["token"].get<std::string>();
                 std::string new_refresh = json_resp["refresh_token"].get<std::string>();
                 SessionManager::get().update_tokens(new_token, new_refresh);
+                if (json_resp.contains("license_token")) {
+                    auto lic = json_resp["license_token"].get<std::string>();
+                    if (!lic.empty()) {
+                        SessionManager::get().set_license_token(lic);
+                    }
+                }
                 std::cerr << "[HTTPClient] Token refresh succeeded" << std::endl;
                 return true;
             } catch (...) {

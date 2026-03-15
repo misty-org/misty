@@ -25,6 +25,14 @@ namespace misty::core {
         // Get the stored refresh token (empty string if none)
         std::string get_refresh_token() const;
 
+        // License token issued by the server — sent as X-License-Token on proxy requests
+        void set_license_token(const std::string& license_token);
+        std::string get_license_token() const;
+
+        // User ID from the proxy — used to scope cloud provider API calls
+        void set_user_id(const std::string& user_id);
+        std::string get_user_id() const;
+
         // Check if user has a stored token
         bool is_authenticated() const;
 
@@ -49,6 +57,8 @@ namespace misty::core {
         mutable std::mutex mu_;
         std::string token_;
         std::string refresh_token_;
+        std::string license_token_;
+        std::string user_id_;
         bool session_expired_ = false;
     };
 
