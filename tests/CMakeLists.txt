@@ -29,6 +29,7 @@ if(BUILD_TESTING)
             "${CMAKE_SOURCE_DIR}/src/core/file_sync/file_sync_watcher.cpp"
             "${CMAKE_SOURCE_DIR}/src/core/file_sync/file_sync_watcher.h"
             "${CMAKE_SOURCE_DIR}/src/core/clipboard/clipboard_service.cpp"
+            "${CMAKE_SOURCE_DIR}/src/core/clipboard/clipboard_cache.cpp"
             "${CMAKE_SOURCE_DIR}/src/core/clipboard/clipboard_types.cpp"
             "${CMAKE_SOURCE_DIR}/src/core/clipboard/proxy_clipboard_client.cpp"
             "${CMAKE_SOURCE_DIR}/src/core/threading/worker_pool.cpp"
