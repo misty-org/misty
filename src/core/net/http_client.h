@@ -38,6 +38,8 @@ namespace misty::core {
     struct HttpRequestOptions {
         std::map<std::string, std::string> headers;
         HttpTimeoutOptions timeouts;
+        std::atomic<bool>* cancel_flag = nullptr;
+        std::string debug_label;
     };
 
     HttpResponse execute_raw_http_request(const std::string& method,

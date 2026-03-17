@@ -164,25 +164,34 @@ namespace misty {
                 append_startup_log("startup: transfer persistence hydration started");
             }
         }
-        persist_file_explorer_state();
+        append_startup_log("shutdown: persist file explorer state");
+        persist_file_explorer_state(true);
 
+        append_startup_log("shutdown: plugin manager");
         core::PluginManager::get().shutdown();
+        append_startup_log("shutdown: clipboard service");
         if (clipboard_service_) {
             clipboard_service_->stop();
         }
+        append_startup_log("shutdown: proxy clipboard client");
         if (proxy_clipboard_client_) {
             proxy_clipboard_client_->stop();
         }
+        append_startup_log("shutdown: file transfer worker pool");
         panel::shutdown_file_transfer_worker_pool();
-        worker_pool_.shutdown();
+        append_startup_log("shutdown: views");
         view::clear_views();
+        append_startup_log("shutdown: worker pool");
+        worker_pool_.shutdown();
+        append_startup_log("shutdown: platform cleanup");
         cleanup();
+        append_startup_log("shutdown: complete");
     }
 
     void Application::on_focus_lost() {
     }
 
-    void Application::persist_file_explorer_state() {
+    void Application::persist_file_explorer_state(bool best_effort) {
         std::string explorer_state_key = "Files";
         if (auto* current_view = view::ViewRegistry::get().get_current_view()) {
             explorer_state_key = current_view->active_explorer_state_key();
@@ -195,16 +204,33 @@ namespace misty {
         auto& explorer = state_registry_.get_state<panel::FileExplorerState>(explorer_state_key);
         auto& library = state_registry_.get_state<panel::LibraryState>(panel::kLibraryStateKey);
         {
-            std::lock_guard<std::recursive_mutex> explorer_lock(explorer.mu);
-            std::lock_guard<std::mutex> library_lock(library.mu);
-            if (explorer.current_path[0] != '\0') {
+            std::unique_lock<std::recursive_mutex> explorer_lock(explorer.mu, std::defer_lock);
+            std::unique_lock<std::mutex> library_lock(library.mu, std::defer_lock);
+            if (best_effort) {
+                if (!explorer_lock.try_lock()) {
+                    append_startup_log("shutdown: skipped explorer state persist; explorer state busy");
+                    return;
+                }
+                if (!library_lock.try_lock()) {
+                    append_startup_log("shutdown: skipped explorer state persist; library state busy");
+                    return;
+                }
+            } else {
+                explorer_lock.lock();
+                library_lock.lock();
+            }
+            if (explorer.current_path[0] != '\0' && library.last_opened_path != explorer.current_path) {
                 library.last_opened_path = explorer.current_path;
                 library.dirty = true;
             }
         }
 
         if (library.dirty.load(std::memory_order_relaxed)) {
-            library.save();
+            if (best_effort) {
+                library.save_best_effort();
+            } else {
+                library.save();
+            }
         }
     }
 

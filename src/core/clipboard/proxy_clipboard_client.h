@@ -31,6 +31,7 @@ private:
     std::string device_id_;
     std::string device_name_;
     std::atomic<bool> running_{false};
+    std::atomic<bool> stream_cancel_requested_{false};
     std::thread stream_thread_;
 };
 

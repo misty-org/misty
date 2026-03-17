@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include <mutex>
+#include <unordered_set>
 
 namespace misty::panel {
 
@@ -48,10 +49,36 @@ namespace misty::panel {
         std::string providers_error;
         std::vector<SidebarProviderEntry> provider_entries;
         std::mutex providers_mutex;
+
+        // Lightweight quick access customization.
+        std::vector<std::string> pinned_quick_access_paths;
+        std::unordered_set<std::string> pinned_quick_access_seen;
+        bool preferences_loaded = false;
     };
 
     /**
      * @brief Creates an empty file at the requested path.
      */
     void create_file(const std::string& file_path);
+
+    /**
+     * @brief Returns a stable normalized key for pinned quick access paths.
+     */
+    std::string normalize_quick_access_pin_path(const std::string& path);
+    /**
+     * @brief Loads persisted quick access pins once.
+     */
+    void load_sidebar_preferences(FileSidebarState& state);
+    /**
+     * @brief Saves persisted quick access pins.
+     */
+    void save_sidebar_preferences(const FileSidebarState& state);
+    /**
+     * @brief Pins a directory into Quick access.
+     */
+    bool pin_quick_access_path(FileSidebarState& state, const std::string& path);
+    /**
+     * @brief Removes a directory from Quick access pins.
+     */
+    bool unpin_quick_access_path(FileSidebarState& state, const std::string& path);
 }

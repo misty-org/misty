@@ -22,12 +22,20 @@ public:
 
     bool initialize(std::string* error = nullptr);
     std::vector<FileTransferRecord> load_recent(std::size_t limit, std::string* error = nullptr);
+    FileTransferPage load_page(std::size_t limit,
+                               std::size_t offset,
+                               const std::string& search_query = {},
+                               std::string* error = nullptr);
     bool upsert(const FileTransferRecord& record, std::string* error = nullptr);
+    bool delete_by_id(uint64_t id, std::string* error = nullptr);
+    bool delete_all(std::string* error = nullptr);
     bool delete_completed(std::string* error = nullptr);
     bool delete_failed_like(std::string* error = nullptr);
     bool prune_history(std::size_t limit, std::string* error = nullptr);
     uint64_t next_transfer_id(std::string* error = nullptr);
     void schedule_upsert(const FileTransferRecord& record);
+    void schedule_delete_by_id(uint64_t id);
+    void schedule_delete_all();
     void schedule_delete_completed();
     void schedule_delete_failed_like();
     void flush();
@@ -39,6 +47,8 @@ private:
 
     enum class PendingWriteKind {
         Upsert,
+        DeleteById,
+        DeleteAll,
         DeleteCompleted,
         DeleteFailedLike,
     };
@@ -46,9 +56,12 @@ private:
     struct PendingWrite {
         PendingWriteKind kind = PendingWriteKind::Upsert;
         FileTransferRecord record;
+        uint64_t id = 0;
     };
 
     bool upsert_sync(const FileTransferRecord& record, std::string* error = nullptr);
+    bool delete_by_id_sync(uint64_t id, std::string* error = nullptr);
+    bool delete_all_sync(std::string* error = nullptr);
     bool delete_completed_sync(std::string* error = nullptr);
     bool delete_failed_like_sync(std::string* error = nullptr);
     bool prune_history_sync(std::size_t limit, std::string* error = nullptr);

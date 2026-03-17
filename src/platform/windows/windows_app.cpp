@@ -293,8 +293,8 @@ namespace misty {
         core::FramePacer::request_immediate_frame();
     }
 
-    void WindowsApp::glfw_window_close_callback(GLFWwindow* window) {
-        static_cast<Application*>(glfwGetWindowUserPointer(window))->persist_file_explorer_state();
+    void WindowsApp::glfw_window_close_callback(GLFWwindow*) {
+        core::FramePacer::request_immediate_frame();
     }
 
     void WindowsApp::glfw_window_refresh_callback(GLFWwindow*) {
