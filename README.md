@@ -19,3 +19,4 @@ API access and Tailscale-aware networking.
 - `scripts/` - vendor/bootstrap helpers
 - `vendor/` - third-party dependencies
 
+planned release 3/23/25
