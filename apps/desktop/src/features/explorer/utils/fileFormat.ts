@@ -23,6 +23,9 @@ export function formatDate(timestamp: number | null): string {
 }
 
 export function breadcrumbSegments(path: string): Array<{ label: string; path: string }> {
+  if (path === "misty://recent") return [{ label: "Recent", path }];
+  if (path === "misty://starred") return [{ label: "Starred", path }];
+  if (path === "misty://trash") return [{ label: "Trash", path }];
   const parts = path.split("/").filter(Boolean);
   const segments = [{ label: "/", path: "/" }];
   let current = "";

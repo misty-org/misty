@@ -101,8 +101,33 @@ impl AppEnvironmentService {
         self.inner.commands_path.clone()
     }
 
+    pub fn plugins_public_dir(&self) -> PathBuf {
+        self.inner.plugins_public_dir.clone()
+    }
+
+    pub fn plugins_private_dir(&self) -> PathBuf {
+        self.inner.plugins_private_dir.clone()
+    }
+
     pub fn home_dir(&self) -> PathBuf {
         self.inner.home_dir.clone()
+    }
+
+    pub fn mount_root(&self) -> PathBuf {
+        let configured = PathBuf::from(&self.inner.mount_path);
+        if configured.is_absolute() {
+            configured
+        } else {
+            self.inner.home_dir.join(configured)
+        }
+    }
+
+    pub fn cache_dir(&self) -> PathBuf {
+        self.inner.cache_dir.clone()
+    }
+
+    pub fn workspaces_path(&self) -> PathBuf {
+        self.inner.workspaces_path.clone()
     }
 }
 

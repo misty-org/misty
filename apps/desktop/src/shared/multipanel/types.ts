@@ -6,6 +6,16 @@ export interface MultiPanelPane {
   path: string;
 }
 
+export type MultiPanelPaneRestoreMode = "same_lane" | "new_lane";
+
+export interface MultiPanelClosedPane {
+  pane: MultiPanelPane;
+  tabId: string;
+  restoreMode: MultiPanelPaneRestoreMode;
+  laneIndex: number;
+  rowIndex: number;
+}
+
 export interface MultiPanelTab {
   id: string;
   title: string;
@@ -13,9 +23,13 @@ export interface MultiPanelTab {
   panes: MultiPanelPane[];
   activePaneId: string;
   layout: MultiPanelLayout;
+  mode?: "browse" | "compare";
 }
 
 export interface MultiPanelLayout {
   orientation: SplitOrientation;
   paneIds: string[];
+  lanes?: string[][];
+  gridSplitRatio?: number;
+  laneSplitRatios?: [number, number];
 }

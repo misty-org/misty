@@ -1,10 +1,13 @@
 import { BrowserRouter } from "react-router-dom";
 import { AppShell } from "./app/AppShell";
+import { RenderErrorBoundary } from "./shared/components/RenderErrorBoundary";
 
 export function App() {
   return (
     <BrowserRouter>
-      <AppShell />
+      <RenderErrorBoundary>
+        <AppShell />
+      </RenderErrorBoundary>
     </BrowserRouter>
   );
 }
