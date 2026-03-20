@@ -12,6 +12,7 @@ import type {
   ExplorerPreviewPayload,
   ExplorerLibraryItem,
   ExplorerLibrarySnapshot,
+  FileEntry,
   FileSyncApplyRequest,
   FileSyncApplyResult,
   FileSyncCompareRequest,
@@ -30,6 +31,7 @@ import type {
   PrepareOpenItemRequest,
   PreparedOpenItem,
   ProviderRemote,
+  ProviderWorkflow,
   ProviderConfigRequest,
   ProviderConfigStep,
   ProvidersSnapshot,
@@ -53,9 +55,251 @@ function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> 
     __TAURI_INTERNALS__?: { invoke?: unknown };
   }).__TAURI_INTERNALS__;
   if (typeof internals?.invoke !== "function") {
+    const fallback = browserSmokeFallback<T>(command, args);
+    if (fallback) return fallback;
     return Promise.reject(new Error(`Native command "${command}" is only available in the Tauri app.`));
   }
   return tauriInvoke<T>(command, args);
+}
+
+function browserSmokeFallback<T>(command: string, args?: Record<string, unknown>): Promise<T> | null {
+  switch (command) {
+    case "app_snapshot":
+      return Promise.resolve(browserAppSnapshot() as T);
+    case "app_environment_snapshot":
+      return Promise.resolve(browserAppSnapshot().environment as T);
+    case "proxy_snapshot":
+      return Promise.resolve({ proxyUrl: null, ready: false, statusCode: null, error: "Browser smoke mode" } as T);
+    case "clipboard_snapshot":
+      return Promise.resolve({ local: emptyClipboardPayload(), shared: emptyClipboardPayload() } as T);
+    case "workspaces_snapshot":
+      return Promise.resolve(browserWorkspaceDocument() as T);
+    case "workspaces_save":
+      return Promise.resolve((args?.document ?? browserWorkspaceDocument()) as T);
+    case "explorer_list_directory":
+      return Promise.resolve(browserDirectoryListing((args?.request as ListDirectoryRequest | undefined) ?? {}) as T);
+    case "devices_snapshot":
+      return Promise.resolve({ devices: [] } as T);
+    case "providers_snapshot":
+    case "providers_refresh":
+      return Promise.resolve(browserProvidersSnapshot() as T);
+    case "transfers_snapshot":
+      return Promise.resolve({ rows: [], totalCount: 0, dbPath: "" } as T);
+    case "operation_queue_snapshot":
+      return Promise.resolve(browserOperationQueueSnapshot() as T);
+    case "explorer_library_snapshot":
+      return Promise.resolve({ recent: [], starred: [], trash: [], lastOpenedPath: null } as T);
+    case "plugin_commands_snapshot":
+      return Promise.resolve({ roots: [], commands: [] } as T);
+    case "shortcuts_snapshot":
+      return Promise.resolve({ path: "", bindings: [] } as T);
+    default:
+      return null;
+  }
+}
+
+const browserSmokeHome = "/Users/misty";
+
+function browserAppSnapshot(): AppSnapshot {
+  const mistyDir = `${browserSmokeHome}/.misty`;
+  return {
+    appName: "Misty",
+    migrationStage: "Browser smoke mode",
+    proxyUrl: null,
+    environment: {
+      homeDir: browserSmokeHome,
+      mistyDir,
+      configDir: `${mistyDir}/config`,
+      dbDir: `${mistyDir}/db`,
+      cacheDir: `${mistyDir}/cache`,
+      tmpDir: `${mistyDir}/tmp`,
+      assetsDir: `${mistyDir}/assets`,
+      pluginsPublicDir: `${mistyDir}/plugins/public`,
+      pluginsPrivateDir: `${mistyDir}/plugins/private`,
+      settingsPath: `${mistyDir}/config/settings.json`,
+      mistyConfigPath: `${mistyDir}/config/misty.json`,
+      workspacesPath: `${mistyDir}/config/workspaces.json`,
+      commandsPath: `${mistyDir}/config/commands.msy`,
+      proxyUrl: null,
+      serverUrl: null,
+      grpcAddress: "",
+      mountPath: ".misty/mnt",
+      configExists: false,
+      derivedEnv: {},
+    },
+  };
+}
+
+function emptyClipboardPayload(): ClipboardPayload {
+  return {
+    kind: "empty",
+    origin: "local_misty",
+    payload_id: "",
+    source_device_id: "",
+    source_device_name: "",
+    revision: 0,
+    created_unix_ms: 0,
+    text: "",
+    html: "",
+    file_refs: [],
+    images: [],
+  };
+}
+
+function browserWorkspaceDocument() {
+  return {
+    schema_version: 1,
+    active_workspace_id: "workspace_0",
+    next_workspace_idx: 1,
+    workspaces: [],
+  };
+}
+
+function browserProvidersSnapshot(): ProvidersSnapshot {
+  return {
+    health: {
+      ready: false,
+      port: null,
+      version: null,
+      uptimeSeconds: 0,
+      connectedProviders: 0,
+      availableProviders: 0,
+      error: "Browser smoke mode",
+    },
+    remotes: [],
+    workflows: defaultProviderWorkflows(),
+    loading: false,
+    error: null,
+  };
+}
+
+function defaultProviderWorkflows(): ProviderWorkflow[] {
+  return [
+    {
+      type: "drive",
+      name: "Google Drive",
+      description: "Connect a Google Drive remote with browser sign-in.",
+      options: [
+        {
+          name: "scope",
+          label: "Scope",
+          help: "Access scope requested from Google Drive.",
+          defaultValue: "drive",
+          required: true,
+          password: false,
+          choices: [{ value: "drive", help: "Full Google Drive access" }],
+        },
+      ],
+    },
+    {
+      type: "dropbox",
+      name: "Dropbox",
+      description: "Connect a Dropbox remote with browser sign-in.",
+      options: [],
+    },
+    {
+      type: "onedrive",
+      name: "OneDrive",
+      description: "Connect a Microsoft OneDrive remote with browser sign-in.",
+      options: [],
+    },
+  ];
+}
+
+function browserOperationQueueSnapshot(): OperationQueueSnapshot {
+  return {
+    operations: [],
+    batches: [],
+    conflictDialog: {
+      open: false,
+      operationId: 0,
+      batchId: 0,
+      applyToBatch: false,
+      supportsReplace: true,
+      supportsKeepBoth: true,
+      selectedPolicy: "ask",
+      title: "",
+      sourceLabel: "",
+      targetLabel: "",
+    },
+    activeCount: 0,
+    maxConcurrent: 4,
+  };
+}
+
+function browserDirectoryListing(request: ListDirectoryRequest): DirectoryListing {
+  const requestedPath = normalizeBrowserPath(request.path || browserSmokeHome);
+  const entries = browserEntriesForPath(requestedPath);
+  return {
+    path: requestedPath,
+    parentPath: requestedPath === "/" ? null : parentBrowserPath(requestedPath),
+    location: { kind: "local", providerType: null, remoteName: null, remotePath: null },
+    entries,
+    totalCount: entries.length,
+    hiddenCount: entries.filter((entry) => entry.hidden).length,
+  };
+}
+
+function browserEntriesForPath(path: string) {
+  const now = Date.now();
+  const folder = (name: string, offset: number) => browserFileEntry(path, name, "folder", null, now - offset);
+  const file = (name: string, sizeBytes: number, offset: number) => browserFileEntry(path, name, "file", sizeBytes, now - offset);
+  if (path === "/" || path === "/Users") {
+    return [folder("misty", 86_400_000)];
+  }
+  if (path === browserSmokeHome) {
+    return [
+      folder("Desktop", 3_600_000),
+      folder("Documents", 7_200_000),
+      folder("Downloads", 10_800_000),
+      folder("Projects", 14_400_000),
+      file("migration-notes.md", 3_224, 18_000_000),
+      file("screenshot.png", 248_120, 22_000_000),
+    ];
+  }
+  return [
+    file("example.txt", 1_024, 3_600_000),
+    folder("Nested Folder", 7_200_000),
+  ];
+}
+
+function browserFileEntry(
+  parentPath: string,
+  name: string,
+  kind: "folder" | "file",
+  sizeBytes: number | null,
+  modifiedMs: number,
+): FileEntry {
+  const path = `${parentPath.replace(/\/+$/, "")}/${name}`.replace(/^$/, "/");
+  const extension = kind === "file" && name.includes(".") ? name.split(".").pop() || "" : "";
+  return {
+    id: path,
+    name,
+    path,
+    extension,
+    mimeType: extension === "png" ? "image/png" : extension === "md" ? "text/markdown" : null,
+    remoteModified: null,
+    kind,
+    sizeBytes,
+    modifiedMs,
+    createdMs: modifiedMs,
+    readonly: false,
+    hidden: name.startsWith("."),
+    isDeleted: false,
+    location: { kind: "local", providerType: null, remoteName: null, remotePath: null },
+  };
+}
+
+function normalizeBrowserPath(path: string): string {
+  const trimmed = path.trim() || browserSmokeHome;
+  return trimmed.startsWith("/") ? trimmed.replace(/\/+$/, "") || "/" : `${browserSmokeHome}/${trimmed}`;
+}
+
+function parentBrowserPath(path: string): string | null {
+  const normalized = normalizeBrowserPath(path);
+  if (normalized === "/") return null;
+  const index = normalized.lastIndexOf("/");
+  return index <= 0 ? "/" : normalized.slice(0, index);
 }
 
 export function appSnapshot(): Promise<AppSnapshot> {

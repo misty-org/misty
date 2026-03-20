@@ -7,6 +7,19 @@ import { DiagnosticsWorkspace } from "../features/diagnostics/DiagnosticsWorkspa
 import { ExplorerWorkspace } from "../features/explorer/ExplorerWorkspace";
 import { useExplorerStore } from "../features/explorer/state/useExplorerStore";
 import type { ExplorerNotification } from "../features/explorer/state/useExplorerStore";
+import { HubWorkspace } from "../features/hub/HubWorkspace";
+import HubAccountPage from "../features/hub/pages/Account";
+import HubDashboardPage from "../features/hub/pages/Dashboard";
+import HubHomePage from "../features/hub/pages/Home";
+import HubPluginsPage from "../features/hub/pages/Plugins";
+import HubRegisterPage from "../features/hub/pages/Register";
+import HubSignInPage from "../features/hub/pages/SignIn";
+import {
+  isRememberableHubRoute,
+  useHubRouteMemoryStore,
+} from "../features/hub/store/useHubRouteMemoryStore";
+import HubChangelogPage from "../features/hub/website/pages/Changelog";
+import HubDocsPage from "../features/hub/website/pages/Docs";
 import { ProvidersWorkspace } from "../features/providers/ProvidersWorkspace";
 import { useProvidersStore } from "../features/providers/useProvidersStore";
 import { SettingsWorkspace } from "../features/settings/SettingsWorkspace";
@@ -14,13 +27,14 @@ import { useSettingsStore } from "../features/settings/useSettingsStore";
 import { TransfersWorkspace } from "../features/transfers/TransfersWorkspace";
 import { useTransfersStore } from "../features/transfers/useTransfersStore";
 import { useAppStore } from "./useAppStore";
+import { useAppThemeStore } from "./useAppThemeStore";
 import type { AppTab } from "./types";
 
 const primaryNavItems = [
   { id: "files", label: "Files", path: "/files", icon: Folder },
   { id: "transfers", label: "Transfers", path: "/transfers", icon: ArrowRightLeft },
   { id: "providers", label: "Providers", path: "/providers", icon: PanelsTopLeft },
-  { id: "plugins", label: "Plugins", path: "/plugins", icon: Blocks },
+  { id: "hub", label: "Hub", path: "/hub", icon: Blocks },
 ] satisfies Array<{ id: AppTab; label: string; path: string; icon: typeof Folder }>;
 
 const bottomNavItems = [
@@ -38,9 +52,19 @@ export function AppShell() {
   const transferLoad = useTransfersStore((state) => state.load);
   const settingsLoad = useSettingsStore((state) => state.load);
   const unreadActivityCount = useExplorerStore((state) => state.notificationHistory.filter((notification) => !notification.read).length);
+  const { resolvedTheme, setSystemTheme, themeMode } = useAppThemeStore(useShallow((state) => ({
+    resolvedTheme: state.resolvedTheme,
+    setSystemTheme: state.setSystemTheme,
+    themeMode: state.themeMode,
+  })));
+  const lastHubRoute = useHubRouteMemoryStore((state) => state.lastHubRoute);
+  const rememberHubRoute = useHubRouteMemoryStore((state) => state.rememberHubRoute);
   const routeId = routeIdFromPath(location.pathname);
   const appLoadStarted = useRef(false);
   const loadedRoutes = useRef(new Set<AppTab>());
+  const navItems = primaryNavItems.map((item) =>
+    item.id === "hub" ? { ...item, path: lastHubRoute } : item,
+  );
 
   useEffect(() => {
     if (appLoadStarted.current) return;
@@ -58,6 +82,27 @@ export function AppShell() {
     if (routeId === "settings") void settingsLoad();
   }, [providerLoad, routeId, settingsLoad, transferLoad]);
 
+  useEffect(() => {
+    if (isRememberableHubRoute(location.pathname)) {
+      rememberHubRoute(location.pathname);
+    }
+  }, [location.pathname, rememberHubRoute]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.dataset.theme = resolvedTheme;
+    root.dataset.themeMode = themeMode;
+    root.style.colorScheme = resolvedTheme;
+  }, [resolvedTheme, themeMode]);
+
+  useEffect(() => {
+    const query = window.matchMedia("(prefers-color-scheme: light)");
+    const syncSystemTheme = () => setSystemTheme(query.matches ? "light" : "dark");
+    syncSystemTheme();
+    query.addEventListener("change", syncSystemTheme);
+    return () => query.removeEventListener("change", syncSystemTheme);
+  }, [setSystemTheme]);
+
   return (
     <main className="app-frame">
       <nav className="app-navbar" aria-label="Primary">
@@ -65,10 +110,10 @@ export function AppShell() {
           <img src={mistyLogo} alt="Misty" />
         </div>
         <div className="navbar-links">
-          <NavGroup items={primaryNavItems} />
+          <NavGroup currentPath={location.pathname} items={navItems} />
         </div>
         <div className="navbar-bottom">
-          <NavGroup items={bottomNavItems} badges={{ activity: unreadActivityCount }} />
+          <NavGroup currentPath={location.pathname} items={bottomNavItems} badges={{ activity: unreadActivityCount }} />
         </div>
       </nav>
 
@@ -80,7 +125,18 @@ export function AppShell() {
           <Route path="/files" element={<ExplorerWorkspace />} />
           <Route path="/providers" element={<ProvidersWorkspace />} />
           <Route path="/transfers" element={<TransfersWorkspace />} />
-          <Route path="/plugins" element={<PlaceholderPage title="Plugins" subtitle="Plugin workspace route is registered for the Tauri shell." />} />
+          <Route path="/hub" element={<HubWorkspace />}>
+            <Route index element={<HubHomePage />} />
+            <Route path="dashboard" element={<HubDashboardPage />} />
+            <Route path="docs/*" element={<HubDocsPage basePath="/hub/docs" />} />
+            <Route path="plugins" element={<HubPluginsPage />} />
+            <Route path="resources/changelog" element={<HubChangelogPage />} />
+            <Route path="account" element={<HubAccountPage />} />
+            <Route path="settings" element={<HubAccountPage />} />
+            <Route path="signin" element={<HubSignInPage />} />
+            <Route path="register" element={<HubRegisterPage />} />
+            <Route path="*" element={<Navigate to="/hub" replace />} />
+          </Route>
           <Route path="/activity" element={<ActivityWorkspace />} />
           <Route path="/settings" element={<SettingsWorkspace />} />
           <Route path="/diagnostics" element={<DiagnosticsRoute />} />
@@ -129,13 +185,19 @@ function DiagnosticsRoute() {
 function NavGroup(props: {
   items: Array<{ id: AppTab; label: string; path: string; icon: typeof Folder }>;
   badges?: Partial<Record<AppTab, number>>;
+  currentPath: string;
 }) {
   return (
     <>
       {props.items.map((item) => {
         const Icon = item.icon;
+        const isHubActive = item.id === "hub" && props.currentPath.startsWith("/hub");
         return (
-          <NavLink key={item.id} to={item.path}>
+          <NavLink
+            className={({ isActive }) => (isHubActive || isActive ? "active" : undefined)}
+            key={item.id}
+            to={item.path}
+          >
             <span className="navbar-icon-tile">
               <Icon size={22} strokeWidth={1.85} />
               {props.badges?.[item.id] ? (
@@ -230,7 +292,7 @@ function PlaceholderPage(props: { title: string; subtitle: string }) {
 function routeIdFromPath(pathname: string): AppTab {
   if (pathname.startsWith("/transfers")) return "transfers";
   if (pathname.startsWith("/providers")) return "providers";
-  if (pathname.startsWith("/plugins")) return "plugins";
+  if (pathname.startsWith("/hub")) return "hub";
   if (pathname.startsWith("/activity")) return "activity";
   if (pathname.startsWith("/settings")) return "settings";
   if (pathname.startsWith("/diagnostics")) return "diagnostics";

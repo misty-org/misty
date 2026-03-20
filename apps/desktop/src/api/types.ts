@@ -133,6 +133,7 @@ export interface ExplorerPreviewPayload {
 export interface ListDirectoryRequest {
   path?: string | null;
   showHidden?: boolean;
+  forceRemoteRefresh?: boolean;
 }
 
 export type CreateItemKind = "file" | "folder";
@@ -537,6 +538,7 @@ export interface ConflictDialogState {
   operationId: number;
   batchId: number;
   applyToBatch: boolean;
+  supportsReplace: boolean;
   supportsKeepBoth: boolean;
   selectedPolicy: OperationConflictPolicy;
   title: string;

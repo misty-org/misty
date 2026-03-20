@@ -1,6 +1,6 @@
 import { File, Folder, MoreHorizontal, Tag } from "lucide-react";
 import { useEffect, useState } from "react";
-import { explorerPreviewItem } from "../../../api/misty";
+import { explorerPrepareOpenItem, explorerPreviewItem } from "../../../api/misty";
 import type { DirectoryListing, FileEntry } from "../../../api/types";
 import { errorText } from "../../../shared/format";
 import { formatBytes, formatDate } from "../utils/fileFormat";
@@ -111,13 +111,14 @@ function useFilePreview(entry: FileEntry | null): {
     let objectUrl: string | null = null;
     setPreview(null);
     setPreviewError(null);
-    if (!entry || entry.location.kind !== "local" || !previewSupported(entry)) {
+    if (!entry || !previewSupported(entry)) {
       setPreviewLoading(false);
       return () => undefined;
     }
 
     setPreviewLoading(true);
-    void explorerPreviewItem(entry.path)
+    void previewPathForEntry(entry)
+      .then((path) => explorerPreviewItem(path))
       .then((payload) => {
         if (!active) return;
         objectUrl = URL.createObjectURL(new Blob([new Uint8Array(payload.bytes)], { type: payload.mimeType }));
@@ -139,9 +140,19 @@ function useFilePreview(entry: FileEntry | null): {
   return { preview, previewError, previewLoading };
 }
 
+async function previewPathForEntry(entry: FileEntry): Promise<string> {
+  if (entry.location.kind !== "remote") return entry.path;
+  const prepared = await explorerPrepareOpenItem({
+    path: entry.path,
+    sizeBytes: entry.sizeBytes,
+    remoteModified: entry.remoteModified,
+  });
+  return prepared.localPath;
+}
+
 function previewSupported(entry: FileEntry): boolean {
   const extension = entry.extension.toLowerCase().replace(/^\./, "");
-  return ["png", "jpg", "jpeg", "gif", "bmp", "webp", "pdf"].includes(extension);
+  return ["png", "jpg", "jpeg", "gif", "bmp", "webp", "pdf", "tga", "hdr", "pbm", "pgm", "pnm", "ppm"].includes(extension);
 }
 
 function kindLabel(entry: FileEntry | null): string {
