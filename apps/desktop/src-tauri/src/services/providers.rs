@@ -269,11 +269,11 @@ impl ProviderService {
         let config_status = config_response.status();
         let config_body = config_response.text().await.unwrap_or_default();
         if !config_status.is_success() {
-            return Err(ApiError::Message(if config_body.is_empty() {
-                format!("Failed to load remote config ({})", config_status.as_u16())
-            } else {
-                config_body
-            }));
+            return Err(provider_operation_error(
+                config_status.as_u16(),
+                &config_body,
+                "Failed to load remote config",
+            ));
         }
         let mut config = parse_config_map(&config_body)?;
         config
@@ -355,11 +355,12 @@ impl ProviderService {
             .send()
             .await?;
         if !response.status().is_success() {
-            return Err(ApiError::Message(
-                response
-                    .text()
-                    .await
-                    .unwrap_or_else(|_| "Failed to save remote config".to_string()),
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(provider_operation_error(
+                status.as_u16(),
+                &body,
+                "Failed to save remote config",
             ));
         }
 
@@ -386,11 +387,11 @@ impl ProviderService {
                 checked_unix: now_unix(),
             })
         } else {
-            Err(ApiError::Message(if body.is_empty() {
-                format!("Connection failed ({})", status.as_u16())
-            } else {
-                body
-            }))
+            Err(provider_operation_error(
+                status.as_u16(),
+                &body,
+                "Connection failed",
+            ))
         }
     }
 
@@ -406,11 +407,11 @@ impl ProviderService {
         let status = response.status();
         let body = response.text().await.unwrap_or_default();
         if !status.is_success() {
-            return Err(ApiError::Message(if body.is_empty() {
-                format!("Failed to load rclone config paths ({})", status.as_u16())
-            } else {
-                body
-            }));
+            return Err(provider_operation_error(
+                status.as_u16(),
+                &body,
+                "Failed to load rclone config paths",
+            ));
         }
         let parsed = serde_json::from_str::<serde_json::Value>(&body).unwrap_or_default();
         Ok(RcloneConfigPaths {
@@ -440,7 +441,7 @@ impl ProviderService {
         let status = response.status();
         let body = response.text().await.unwrap_or_default();
         if !status.is_success() {
-            return Err(proxy_response_error(
+            return Err(provider_operation_error(
                 status.as_u16(),
                 &body,
                 "Provider configuration failed",
@@ -448,11 +449,13 @@ impl ProviderService {
         }
         let mut step = parse_provider_config_step(&body)?;
         if !step.error.is_empty() || step.kind == "error" {
-            return Err(ApiError::Message(if step.error.is_empty() {
-                "Provider configuration failed.".to_string()
-            } else {
-                std::mem::take(&mut step.error)
-            }));
+            return Err(normalize_provider_config_error(ApiError::Message(
+                if step.error.is_empty() {
+                    "Provider configuration failed.".to_string()
+                } else {
+                    std::mem::take(&mut step.error)
+                },
+            )));
         }
         if step.done || step.kind == "done" {
             let _ = self.refresh().await;
@@ -733,6 +736,14 @@ fn parse_provider_config_step(body: &str) -> ApiResult<ProviderConfigStep> {
                         .and_then(|options| options.as_array()?.first())
                 })
                 .cloned()
+                .or_else(|| {
+                    let has_inline_prompt_shape = object.contains_key("name")
+                        && (object.contains_key("choices")
+                            || object.contains_key("default")
+                            || object.contains_key("defaultValue")
+                            || object.contains_key("required"));
+                    has_inline_prompt_shape.then(|| serde_json::Value::Object(object.clone()))
+                })
         });
         object.remove("field");
         object.remove("prompt");
@@ -762,6 +773,29 @@ fn proxy_response_error(status: u16, body: &str, fallback: &str) -> ApiError {
         .or_else(|| (!body.trim().is_empty()).then(|| body.trim().to_string()))
         .unwrap_or_else(|| format!("{fallback} (HTTP {status})"));
     ApiError::Message(message)
+}
+
+fn provider_operation_error(status: u16, body: &str, fallback: &str) -> ApiError {
+    normalize_provider_config_error(proxy_response_error(status, body, fallback))
+}
+
+fn normalize_provider_config_error(error: ApiError) -> ApiError {
+    match error {
+        ApiError::Message(message) if recoverable_provider_auth_error(&message) => ApiError::Message(
+            "Provider authorization is still pending. Complete the browser sign-in, then return to Misty and try again.".to_string(),
+        ),
+        other => other,
+    }
+}
+
+fn recoverable_provider_auth_error(message: &str) -> bool {
+    let lower = message.to_ascii_lowercase();
+    lower.contains("authorization")
+        || lower.contains("auth header")
+        || lower.contains("unauthorized")
+        || lower.contains("oauth")
+        || lower.contains("token")
+        || lower.contains("forbidden")
 }
 
 const fn default_poll_after_ms() -> u64 {
@@ -814,6 +848,25 @@ mod tests {
     }
 
     #[test]
+    fn provider_step_accepts_inline_prompt_shape() {
+        let step = parse_provider_config_step(
+            r#"{
+                "kind":"post_auth_config",
+                "name":"scope",
+                "default":"drive",
+                "required":true,
+                "choices":[{"value":"drive","help":"Full Google Drive access"}]
+            }"#,
+        )
+        .unwrap();
+        let option = step.option.unwrap();
+        assert_eq!(option.name, "scope");
+        assert_eq!(option.default_value, "drive");
+        assert!(option.required);
+        assert_eq!(option.choices[0].value, "drive");
+    }
+
+    #[test]
     fn provider_config_start_body_omits_continuation_fields() {
         let request = ProviderConfigRequest {
             name: "drive-misty".into(),
@@ -859,6 +912,29 @@ mod tests {
     }
 
     #[test]
+    fn provider_config_onedrive_repair_bootstrap_can_continue_existing() {
+        let request = ProviderConfigRequest {
+            name: "onedrive-misty".into(),
+            provider_type: "onedrive".into(),
+            parameters: BTreeMap::from([("config_type".to_string(), "onedrive".to_string())]),
+            state: String::new(),
+            result: String::new(),
+            mode: ProviderConfigMode::Repair,
+            continuing: true,
+            continue_existing: true,
+        };
+
+        let body = provider_config_request_body(&request);
+
+        assert_eq!(body["name"], "onedrive-misty");
+        assert_eq!(body["type"], "onedrive");
+        assert_eq!(body["parameters"]["config_type"], "onedrive");
+        assert_eq!(body["state"], "");
+        assert_eq!(body["result"], "");
+        assert_eq!(body["continue_existing"], true);
+    }
+
+    #[test]
     fn default_provider_workflows_include_supported_clouds() {
         let workflows = default_provider_workflows();
 
@@ -878,6 +954,64 @@ mod tests {
             .unwrap();
         assert_eq!(drive.options[0].name, "scope");
         assert_eq!(drive.options[0].default_value, "drive");
+    }
+
+    #[test]
+    fn provider_config_auth_header_errors_are_recoverable_messages() {
+        let error = normalize_provider_config_error(ApiError::Message(
+            "Missing or invalid Authorization header".to_string(),
+        ));
+        let ApiError::Message(message) = error else {
+            panic!("expected message error");
+        };
+        assert!(message.contains("authorization is still pending"));
+        assert!(!message.contains("Authorization header"));
+    }
+
+    #[test]
+    fn provider_runtime_auth_errors_are_normalized_from_json_bodies() {
+        let error = provider_operation_error(
+            401,
+            r#"{"error":"oauth token expired: missing Authorization header"}"#,
+            "Connection failed",
+        );
+        let ApiError::Message(message) = error else {
+            panic!("expected message error");
+        };
+
+        assert!(message.contains("authorization is still pending"));
+        assert!(!message.contains("Authorization header"));
+        assert!(!message.contains("oauth token expired"));
+    }
+
+    #[test]
+    fn provider_runtime_forbidden_auth_errors_are_recoverable_messages() {
+        let error = provider_operation_error(
+            403,
+            r#"{"message":"forbidden: OAuth authorization has not completed"}"#,
+            "Connection failed",
+        );
+        let ApiError::Message(message) = error else {
+            panic!("expected message error");
+        };
+
+        assert!(message.contains("authorization is still pending"));
+        assert!(!message.contains("forbidden"));
+        assert!(!message.contains("OAuth authorization has not completed"));
+    }
+
+    #[test]
+    fn provider_runtime_non_auth_errors_keep_proxy_message() {
+        let error = provider_operation_error(
+            500,
+            r#"{"message":"rclone config update failed"}"#,
+            "Provider operation failed",
+        );
+        let ApiError::Message(message) = error else {
+            panic!("expected message error");
+        };
+
+        assert_eq!(message, "rclone config update failed");
     }
 
     #[test]

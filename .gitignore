@@ -27,7 +27,9 @@ releases/**/*.AppImage
 **/dist/
 **/node_modules/
 **/target/
-**/src-tauri/gen/
+**/src-tauri/gen/*
+!**/src-tauri/gen/apple/
+!**/src-tauri/gen/apple/**
 **/libs/
 **/.vs/
 **.log

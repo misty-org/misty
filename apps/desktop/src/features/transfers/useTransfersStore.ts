@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { transfersDeleteAll, transfersDeleteSelected, transfersSnapshot } from "../../api/misty";
 import type { TransferPage, TransferStatus, TransferType } from "../../api/types";
 import { errorText } from "../../shared/format";
+import { selectGeneralPreferences, useSettingsStore } from "../settings/useSettingsStore";
 
 let silentTransferLoadInFlight = false;
 
@@ -206,7 +207,9 @@ export const useTransfersStore = create<TransfersStore>((set, get) => ({
   deleteSelected: async (workspaceId) => {
     const ids = [...(get().workspaces[workspaceId]?.selectedIds ?? new Set<number>())];
     if (ids.length === 0) return;
+    const shouldConfirm = selectGeneralPreferences(useSettingsStore.getState().settings?.document).confirmDestructiveActions;
     if (
+      shouldConfirm &&
       !window.confirm(
         `Delete ${ids.length} selected transfer history ${ids.length === 1 ? "row" : "rows"}? Active file operations are not canceled.`,
       )
@@ -232,7 +235,11 @@ export const useTransfersStore = create<TransfersStore>((set, get) => ({
   },
 
   deleteAll: async () => {
-    if (!window.confirm("Delete all transfer history? This ignores current filters and does not cancel active file operations.")) {
+    const shouldConfirm = selectGeneralPreferences(useSettingsStore.getState().settings?.document).confirmDestructiveActions;
+    if (
+      shouldConfirm &&
+      !window.confirm("Delete all transfer history? This ignores current filters and does not cancel active file operations.")
+    ) {
       return;
     }
     set({ working: true, error: null, message: null });

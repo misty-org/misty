@@ -8,6 +8,7 @@ import type {
   PluginEntry,
   PluginRootKind,
 } from "../types/plugins";
+import { publishPluginCatalogChanged } from "../../plugins/pluginEvents";
 
 const DEFAULT_CATALOG_BASE_URL =
   "https://raw.githubusercontent.com/misty-org/misty-plugins/main/catalog";
@@ -468,6 +469,7 @@ export const usePluginsStore = create<PluginsStore>((set, get) => ({
       await rebuildCatalogState(set, get, {
         localPlugins: await scanLocalPlugins(),
       });
+      publishPluginCatalogChanged();
     } catch (error) {
       set({ actionPluginId: "", error: String(error) });
     }
@@ -485,6 +487,7 @@ export const usePluginsStore = create<PluginsStore>((set, get) => ({
       await rebuildCatalogState(set, get, {
         localPlugins: await scanLocalPlugins(),
       });
+      publishPluginCatalogChanged();
     } catch (error) {
       set({ actionPluginId: "", error: String(error) });
     }
@@ -503,6 +506,7 @@ export const usePluginsStore = create<PluginsStore>((set, get) => ({
       await rebuildCatalogState(set, get, {
         localPlugins: await scanLocalPlugins(),
       });
+      publishPluginCatalogChanged();
     } catch (error) {
       set({ actionPluginId: "", error: String(error) });
     }

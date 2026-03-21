@@ -1,7 +1,7 @@
-import { openUrl } from "@tauri-apps/plugin-opener";
 import type { ProviderWorkflow, ProviderWorkflowOption } from "../../../api/types";
 import { iconAssets, providerIconForType } from "../../../shared/assets/icons";
 import { AssetIcon } from "../../../shared/components/AssetIcon";
+import { providerOptionsForConnection } from "../providerUtils";
 import type { ProviderConnectionSession } from "../useProvidersStore";
 
 interface ProviderConnectionDialogProps {
@@ -12,7 +12,8 @@ interface ProviderConnectionDialogProps {
   onName: (name: string) => void;
   onParameter: (key: string, value: string) => void;
   onAdvance: () => void;
-  onSubmit: () => void;
+  onSubmit: (polling?: boolean) => void;
+  onOpenAuthorize: () => void;
 }
 
 export function ProviderConnectionDialog(props: ProviderConnectionDialogProps) {
@@ -68,9 +69,14 @@ export function ProviderConnectionDialog(props: ProviderConnectionDialogProps) {
               </div>
               <h3>Finish signing in with your provider</h3>
               <p>{session.step?.instructions || "Misty opened the authorization page in your browser and is waiting for it to finish."}</p>
+              <small>
+                {session.polling
+                  ? `Checking authorization${session.authPollAttempts > 0 ? ` (${session.authPollAttempts})` : ""}...`
+                  : "Return here after the browser sign-in completes."}
+              </small>
               {session.step?.authorizeUrl ? (
-                <button className="provider-auth-link" type="button" onClick={() => void openUrl(session.step!.authorizeUrl)}>
-                  <AssetIcon src={iconAssets.rclone24} size={15} /> Open authorization page
+                <button className="provider-auth-link" type="button" onClick={props.onOpenAuthorize}>
+                  <AssetIcon src={iconAssets.rclone24} size={15} /> {session.openedAuthorizeUrl ? "Reopen authorization page" : "Open authorization page"}
                 </button>
               ) : null}
             </div>
@@ -97,9 +103,15 @@ export function ProviderConnectionDialog(props: ProviderConnectionDialogProps) {
             </button>
           ) : null}
           {session.stage === "configure" ? (
-            <button className="primary" type="button" onClick={props.onSubmit} disabled={session.inFlight}>
+            <button className="primary" type="button" onClick={() => props.onSubmit(false)} disabled={session.inFlight}>
               <AssetIcon className={session.inFlight ? "spin" : ""} src={session.inFlight ? iconAssets.sync16 : iconAssets.shieldLock24} size={16} />
               {submitLabel(session)}
+            </button>
+          ) : null}
+          {session.stage === "authorize" ? (
+            <button className="primary" type="button" onClick={() => props.onSubmit(true)} disabled={session.inFlight}>
+              <AssetIcon className={session.inFlight ? "spin" : ""} src={session.inFlight ? iconAssets.sync16 : iconAssets.shieldLock24} size={16} />
+              {session.inFlight ? "Checking..." : "Check Again"}
             </button>
           ) : null}
         </footer>
@@ -160,8 +172,7 @@ function ProviderConfiguration(props: {
   onName: (name: string) => void;
   onParameter: (key: string, value: string) => void;
 }) {
-  const stepOption = props.session.step?.option;
-  const options = stepOption ? [stepOption] : props.workflow?.options ?? [];
+  const options = providerOptionsForConnection(props.session, props.workflow);
   return (
     <div className="provider-connect-form">
       <label>

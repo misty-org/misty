@@ -44,6 +44,7 @@ export const ProvidersWorkspace = memo(function ProvidersWorkspace() {
     closeConnection,
     confirmDisconnect,
     discardWorkspaces,
+    reopenConnectionAuthorization,
     setConnectionName,
     setConnectionParameter,
     submitConnection,
@@ -60,6 +61,7 @@ export const ProvidersWorkspace = memo(function ProvidersWorkspace() {
     closeConnection: state.closeConnection,
     confirmDisconnect: state.confirmDisconnect,
     discardWorkspaces: state.discardWorkspaces,
+    reopenConnectionAuthorization: state.reopenConnectionAuthorization,
     setConnectionName: state.setConnectionName,
     setConnectionParameter: state.setConnectionParameter,
     submitConnection: state.submitConnection,
@@ -134,7 +136,8 @@ export const ProvidersWorkspace = memo(function ProvidersWorkspace() {
           onName={setConnectionName}
           onParameter={setConnectionParameter}
           onAdvance={advanceConnection}
-          onSubmit={() => void submitConnection()}
+          onSubmit={(polling) => void submitConnection(polling)}
+          onOpenAuthorize={() => void reopenConnectionAuthorization()}
         />
       ) : null}
 

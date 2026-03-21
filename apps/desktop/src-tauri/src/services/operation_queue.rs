@@ -15,6 +15,7 @@ use crate::core::{
         PasteItemsRequest, RenameItemRequest, RenameItemsRequest,
     },
     file_master::RemoteBrowseTarget,
+    file_transfer::FileTransferRecord,
     file_transfer::{FileTransferItemType, FileTransferStatus, FileTransferType},
     operation_queue::{
         ConflictPolicy, OperationDescriptor, OperationEndpoint, OperationKind, OperationQueue,
@@ -31,6 +32,7 @@ pub struct OperationQueueService {
     transfers: TransferService,
     payloads: Arc<Mutex<HashMap<u64, QueuedExplorerOperation>>>,
     cancellations: Arc<Mutex<HashMap<u64, Arc<AtomicBool>>>>,
+    redo_stack: Arc<Mutex<Vec<FileTransferRecord>>>,
     pumping: Arc<AtomicBool>,
 }
 
@@ -45,6 +47,7 @@ enum QueuedExplorerOperation {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ExecutionOutcome {
     Completed,
+    Skipped,
     WaitingForConflict,
 }
 
@@ -56,6 +59,7 @@ impl OperationQueueService {
             transfers,
             payloads: Arc::new(Mutex::new(HashMap::new())),
             cancellations: Arc::new(Mutex::new(HashMap::new())),
+            redo_stack: Arc::new(Mutex::new(Vec::new())),
             pumping: Arc::new(AtomicBool::new(false)),
         }
     }
@@ -65,7 +69,17 @@ impl OperationQueueService {
         request: PasteItemsRequest,
     ) -> ApiResult<OperationQueueSnapshot> {
         if request.sources.is_empty() {
-            return Ok(self.queue.snapshot().await);
+            return Ok(self.snapshot_with_redo_state().await);
+        }
+        self.enqueue_paste_items_inner(request).await
+    }
+
+    async fn enqueue_paste_items_inner(
+        &self,
+        request: PasteItemsRequest,
+    ) -> ApiResult<OperationQueueSnapshot> {
+        if request.sources.is_empty() {
+            return Ok(self.snapshot_with_redo_state().await);
         }
 
         let mut descriptors = Vec::with_capacity(request.sources.len());
@@ -89,23 +103,15 @@ impl OperationQueueService {
                 .to_string();
             let source_endpoint = self.endpoint_for_path(source.path.clone());
             let target_endpoint = self.endpoint_for_path(target_path);
+            let operation_kind =
+                operation_kind_for_paste(request.operation, &source_endpoint, &target_endpoint);
             descriptors.push(OperationDescriptor {
-                kind: match request.operation {
-                    ClipboardOperation::Copy => OperationKind::Copy,
-                    ClipboardOperation::Move => OperationKind::Move,
-                },
+                kind: operation_kind,
                 source: source_endpoint,
                 target: target_endpoint,
                 supports_replace: true,
                 supports_keep_both: true,
-                title: format!(
-                    "{} {}",
-                    match request.operation {
-                        ClipboardOperation::Copy => "Copy",
-                        ClipboardOperation::Move => "Move",
-                    },
-                    file_name
-                ),
+                title: format!("{} {}", operation_action_label(operation_kind), file_name),
                 ..OperationDescriptor::default()
             });
             payloads.push(QueuedExplorerOperation::Paste(PasteItemsRequest {
@@ -124,6 +130,7 @@ impl OperationQueueService {
             ClipboardOperation::Copy => "Copy items",
             ClipboardOperation::Move => "Move items",
         };
+        self.clear_redo_stack().await;
         let (_, operation_ids) = self
             .queue
             .enqueue_batch_with_ids(label, false, descriptors)
@@ -135,7 +142,7 @@ impl OperationQueueService {
             }
         }
         self.schedule_pump();
-        Ok(self.queue.snapshot().await)
+        Ok(self.snapshot_with_redo_state().await)
     }
 
     pub async fn enqueue_create_item(
@@ -170,6 +177,13 @@ impl OperationQueueService {
         &self,
         request: RenameItemRequest,
     ) -> ApiResult<OperationQueueSnapshot> {
+        self.enqueue_rename_item_inner(request).await
+    }
+
+    async fn enqueue_rename_item_inner(
+        &self,
+        request: RenameItemRequest,
+    ) -> ApiResult<OperationQueueSnapshot> {
         let target_path = Path::new(&request.path)
             .parent()
             .unwrap_or_else(|| Path::new(""))
@@ -198,7 +212,7 @@ impl OperationQueueService {
         request: RenameItemsRequest,
     ) -> ApiResult<OperationQueueSnapshot> {
         if request.items.is_empty() {
-            return Ok(self.queue.snapshot().await);
+            return Ok(self.snapshot_with_redo_state().await);
         }
         let mut descriptors = Vec::with_capacity(request.items.len());
         let mut payloads = Vec::with_capacity(request.items.len());
@@ -229,7 +243,7 @@ impl OperationQueueService {
         request: DeleteItemsRequest,
     ) -> ApiResult<OperationQueueSnapshot> {
         if request.paths.is_empty() {
-            return Ok(self.queue.snapshot().await);
+            return Ok(self.snapshot_with_redo_state().await);
         }
         let mut descriptors = Vec::with_capacity(request.paths.len());
         let mut payloads = Vec::with_capacity(request.paths.len());
@@ -278,6 +292,10 @@ impl OperationQueueService {
                 "Operation descriptors and payloads are out of sync.".to_string(),
             ));
         }
+        if descriptors.is_empty() {
+            return Ok((self.snapshot_with_redo_state().await, Vec::new()));
+        }
+        self.clear_redo_stack().await;
         let (_, operation_ids) = self
             .queue
             .enqueue_batch_with_ids(label, preserve_order, descriptors)
@@ -289,7 +307,7 @@ impl OperationQueueService {
             }
         }
         self.schedule_pump();
-        Ok((self.queue.snapshot().await, operation_ids))
+        Ok((self.snapshot_with_redo_state().await, operation_ids))
     }
 
     fn endpoint_for_path(&self, path: String) -> OperationEndpoint {
@@ -304,7 +322,7 @@ impl OperationQueueService {
         delete_paths: Vec<String>,
     ) -> ApiResult<(OperationQueueSnapshot, Vec<u64>)> {
         if copy_requests.is_empty() && delete_paths.is_empty() {
-            return Ok((self.queue.snapshot().await, Vec::new()));
+            return Ok((self.snapshot_with_redo_state().await, Vec::new()));
         }
         let mut descriptors = Vec::new();
         let mut payloads = Vec::new();
@@ -329,23 +347,15 @@ impl OperationQueueService {
                     .to_string();
                 let source_endpoint = self.endpoint_for_path(source.path.clone());
                 let target_endpoint = self.endpoint_for_path(target_path);
+                let operation_kind =
+                    operation_kind_for_paste(request.operation, &source_endpoint, &target_endpoint);
                 descriptors.push(OperationDescriptor {
-                    kind: match request.operation {
-                        ClipboardOperation::Copy => OperationKind::Copy,
-                        ClipboardOperation::Move => OperationKind::Move,
-                    },
+                    kind: operation_kind,
                     source: source_endpoint,
                     target: target_endpoint,
                     supports_replace: true,
                     supports_keep_both: true,
-                    title: format!(
-                        "{} {}",
-                        match request.operation {
-                            ClipboardOperation::Copy => "Copy",
-                            ClipboardOperation::Move => "Move",
-                        },
-                        file_name
-                    ),
+                    title: format!("{} {}", operation_action_label(operation_kind), file_name),
                     ..OperationDescriptor::default()
                 });
                 payloads.push(QueuedExplorerOperation::Paste(PasteItemsRequest {
@@ -383,7 +393,7 @@ impl OperationQueueService {
     }
 
     pub async fn snapshot(&self) -> OperationQueueSnapshot {
-        self.queue.snapshot().await
+        self.snapshot_with_redo_state().await
     }
 
     pub async fn cancel(&self, operation_id: u64) -> ApiResult<OperationQueueSnapshot> {
@@ -397,7 +407,26 @@ impl OperationQueueService {
         }
         self.prune_non_retryable_payloads().await;
         self.schedule_pump();
-        Ok(self.queue.snapshot().await)
+        Ok(self.snapshot_with_redo_state().await)
+    }
+
+    pub async fn cancel_batch(&self, batch_id: u64) -> ApiResult<OperationQueueSnapshot> {
+        let canceled = self.queue.cancel_batch(batch_id).await;
+        if canceled.is_empty() {
+            return Err(ApiError::Message(format!(
+                "Batch {batch_id} has no cancelable operations."
+            )));
+        }
+        let mut cancellations = self.cancellations.lock().await;
+        for operation_id in canceled {
+            if let Some(token) = cancellations.remove(&operation_id) {
+                token.store(true, Ordering::SeqCst);
+            }
+        }
+        drop(cancellations);
+        self.prune_non_retryable_payloads().await;
+        self.schedule_pump();
+        Ok(self.snapshot_with_redo_state().await)
     }
 
     pub async fn retry(&self, operation_id: u64) -> ApiResult<OperationQueueSnapshot> {
@@ -407,7 +436,7 @@ impl OperationQueueService {
             )));
         }
         self.schedule_pump();
-        Ok(self.queue.snapshot().await)
+        Ok(self.snapshot_with_redo_state().await)
     }
 
     pub async fn undo(&self, undo_token_id: u64) -> ApiResult<OperationQueueSnapshot> {
@@ -430,7 +459,23 @@ impl OperationQueueService {
             }
         };
         self.transfers.clear_undo(row.id).await?;
+        self.redo_stack.lock().await.push(row);
+        let mut snapshot = snapshot;
+        snapshot.redo_available = true;
         Ok(snapshot)
+    }
+
+    pub async fn redo(&self) -> ApiResult<OperationQueueSnapshot> {
+        let row = self.redo_stack.lock().await.pop().ok_or_else(|| {
+            ApiError::Message("No undone rename or move is available to redo.".to_string())
+        })?;
+        match self.enqueue_original_transfer(&row).await {
+            Ok(snapshot) => Ok(snapshot),
+            Err(error) => {
+                self.redo_stack.lock().await.push(row);
+                Err(error)
+            }
+        }
     }
 
     pub async fn resolve_conflict(
@@ -450,13 +495,19 @@ impl OperationQueueService {
         }
         self.prune_non_retryable_payloads().await;
         self.schedule_pump();
-        Ok(self.queue.snapshot().await)
+        Ok(self.snapshot_with_redo_state().await)
     }
 
     pub async fn clear_terminal(&self) -> OperationQueueSnapshot {
         self.queue.clear_terminal().await;
         self.prune_missing_payloads().await;
-        self.queue.snapshot().await
+        self.snapshot_with_redo_state().await
+    }
+
+    async fn snapshot_with_redo_state(&self) -> OperationQueueSnapshot {
+        let mut snapshot = self.queue.snapshot().await;
+        snapshot.redo_available = !self.redo_stack.lock().await.is_empty();
+        snapshot
     }
 
     async fn enqueue_undo_rename(
@@ -484,7 +535,7 @@ impl OperationQueueService {
                 .await?
                 .unwrap_or(false);
             return self
-                .enqueue_rename_item(RenameItemRequest {
+                .enqueue_rename_item_inner(RenameItemRequest {
                     path: current_path,
                     new_name: original_name,
                     source_is_directory: Some(source_is_directory),
@@ -503,7 +554,7 @@ impl OperationQueueService {
             .item_is_directory(&row.local_dest_path)
             .await?
             .unwrap_or(false);
-        self.enqueue_rename_item(RenameItemRequest {
+        self.enqueue_rename_item_inner(RenameItemRequest {
             path: row.local_dest_path.clone(),
             new_name: original_name,
             source_is_directory: Some(source_is_directory),
@@ -541,7 +592,7 @@ impl OperationQueueService {
                 .await?
                 .unwrap_or(false);
             return self
-                .enqueue_paste_items(PasteItemsRequest {
+                .enqueue_paste_items_inner(PasteItemsRequest {
                     sources: vec![PasteItem {
                         path: current_path,
                         is_directory,
@@ -569,7 +620,7 @@ impl OperationQueueService {
             .item_is_directory(&row.local_dest_path)
             .await?
             .unwrap_or(false);
-        self.enqueue_paste_items(PasteItemsRequest {
+        self.enqueue_paste_items_inner(PasteItemsRequest {
             sources: vec![PasteItem {
                 path: row.local_dest_path.clone(),
                 is_directory,
@@ -579,6 +630,145 @@ impl OperationQueueService {
             target_name: Some(original_name),
         })
         .await
+    }
+
+    async fn enqueue_original_transfer(
+        &self,
+        row: &FileTransferRecord,
+    ) -> ApiResult<OperationQueueSnapshot> {
+        match row.transfer_type {
+            FileTransferType::Rename => self.enqueue_redo_rename(row).await,
+            FileTransferType::Move => self.enqueue_redo_move(row).await,
+            _ => Err(ApiError::Message(format!(
+                "Transfer {} does not support redo.",
+                row.id
+            ))),
+        }
+    }
+
+    async fn enqueue_redo_rename(
+        &self,
+        row: &FileTransferRecord,
+    ) -> ApiResult<OperationQueueSnapshot> {
+        if row.item_type == FileTransferItemType::Remote {
+            if row.remote_source_name.is_empty()
+                || row.remote_source_path.is_empty()
+                || row.remote_dest_path.is_empty()
+            {
+                return Err(ApiError::Message(
+                    "Remote rename redo is missing source or destination metadata.".to_string(),
+                ));
+            }
+            let current_path = self
+                .explorer
+                .remote_virtual_path(&row.remote_source_name, &row.remote_source_path)
+                .await?;
+            let redone_name = file_name_for_path(&row.remote_dest_path)?;
+            let source_is_directory = self
+                .explorer
+                .item_is_directory(&current_path)
+                .await?
+                .unwrap_or(false);
+            return self
+                .enqueue_rename_item_inner(RenameItemRequest {
+                    path: current_path,
+                    new_name: redone_name,
+                    source_is_directory: Some(source_is_directory),
+                })
+                .await;
+        }
+
+        if row.local_source_path.is_empty() || row.local_dest_path.is_empty() {
+            return Err(ApiError::Message(
+                "Local rename redo is missing source or destination metadata.".to_string(),
+            ));
+        }
+        let redone_name = file_name_for_path(&row.local_dest_path)?;
+        let source_is_directory = self
+            .explorer
+            .item_is_directory(&row.local_source_path)
+            .await?
+            .unwrap_or(false);
+        self.enqueue_rename_item_inner(RenameItemRequest {
+            path: row.local_source_path.clone(),
+            new_name: redone_name,
+            source_is_directory: Some(source_is_directory),
+        })
+        .await
+    }
+
+    async fn enqueue_redo_move(
+        &self,
+        row: &FileTransferRecord,
+    ) -> ApiResult<OperationQueueSnapshot> {
+        if row.item_type == FileTransferItemType::Remote {
+            if row.remote_source_name.is_empty()
+                || row.remote_source_path.is_empty()
+                || row.remote_dest_name.is_empty()
+                || row.remote_dest_path.is_empty()
+            {
+                return Err(ApiError::Message(
+                    "Remote move redo is missing source or destination metadata.".to_string(),
+                ));
+            }
+            let current_path = self
+                .explorer
+                .remote_virtual_path(&row.remote_source_name, &row.remote_source_path)
+                .await?;
+            let redone_parent_path = remote_parent_for_path(&row.remote_dest_path)?;
+            let redone_parent = self
+                .explorer
+                .remote_virtual_path(&row.remote_dest_name, &redone_parent_path)
+                .await?;
+            let redone_name = file_name_for_path(&row.remote_dest_path)?;
+            let is_directory = self
+                .explorer
+                .item_is_directory(&current_path)
+                .await?
+                .unwrap_or(false);
+            return self
+                .enqueue_paste_items_inner(PasteItemsRequest {
+                    sources: vec![PasteItem {
+                        path: current_path,
+                        is_directory,
+                    }],
+                    destination_directory: redone_parent,
+                    operation: ClipboardOperation::Move,
+                    target_name: Some(redone_name),
+                })
+                .await;
+        }
+
+        if row.local_source_path.is_empty() || row.local_dest_path.is_empty() {
+            return Err(ApiError::Message(
+                "Local move redo is missing source or destination metadata.".to_string(),
+            ));
+        }
+        let redone_name = file_name_for_path(&row.local_dest_path)?;
+        let redone_parent = Path::new(&row.local_dest_path)
+            .parent()
+            .unwrap_or_else(|| Path::new(""))
+            .to_string_lossy()
+            .to_string();
+        let is_directory = self
+            .explorer
+            .item_is_directory(&row.local_source_path)
+            .await?
+            .unwrap_or(false);
+        self.enqueue_paste_items_inner(PasteItemsRequest {
+            sources: vec![PasteItem {
+                path: row.local_source_path.clone(),
+                is_directory,
+            }],
+            destination_directory: redone_parent,
+            operation: ClipboardOperation::Move,
+            target_name: Some(redone_name),
+        })
+        .await
+    }
+
+    async fn clear_redo_stack(&self) {
+        self.redo_stack.lock().await.clear();
     }
 
     fn schedule_pump(&self) {
@@ -603,19 +793,10 @@ impl OperationQueueService {
                             .lock()
                             .await
                             .insert(operation_id, cancellation.clone());
-                        match worker.execute(operation, cancellation.clone()).await {
-                            Ok(ExecutionOutcome::Completed) => {
-                                worker.queue.complete(operation_id, None).await;
-                                worker.payloads.lock().await.remove(&operation_id);
-                            }
-                            Ok(ExecutionOutcome::WaitingForConflict) => {}
-                            Err(error) => {
-                                worker
-                                    .queue
-                                    .complete(operation_id, Some(error.to_string()))
-                                    .await;
-                            }
-                        }
+                        let result = worker.execute(operation, cancellation.clone()).await;
+                        worker
+                            .finish_execution_result(operation_id, result, cancellation.as_ref())
+                            .await;
                         if !matches!(
                             worker
                                 .queue
@@ -634,6 +815,36 @@ impl OperationQueueService {
                 }
             }
         });
+    }
+
+    async fn finish_execution_result(
+        &self,
+        operation_id: u64,
+        result: ApiResult<ExecutionOutcome>,
+        cancellation: &AtomicBool,
+    ) {
+        match result {
+            Ok(ExecutionOutcome::Completed) => {
+                self.queue.complete(operation_id, None).await;
+                self.payloads.lock().await.remove(&operation_id);
+            }
+            Ok(ExecutionOutcome::Skipped) => {
+                self.queue.skip(operation_id).await;
+                self.payloads.lock().await.remove(&operation_id);
+            }
+            Ok(ExecutionOutcome::WaitingForConflict) => {}
+            Err(error)
+                if cancellation.load(Ordering::SeqCst) || is_operation_canceled_error(&error) =>
+            {
+                self.queue.cancel(operation_id).await;
+                self.payloads.lock().await.remove(&operation_id);
+            }
+            Err(error) => {
+                self.queue
+                    .complete(operation_id, Some(error.to_string()))
+                    .await;
+            }
+        }
     }
 
     async fn execute(
@@ -750,12 +961,16 @@ impl OperationQueueService {
                                     .await?;
                             }
                             ConflictPolicy::Skip => {
-                                return Ok(ExecutionOutcome::Completed);
+                                return Ok(ExecutionOutcome::Skipped);
                             }
                             ConflictPolicy::KeepBoth => {
                                 ensure_not_canceled(&cancellation)?;
-                                let keep_both_destination =
-                                    self.available_keep_both_destination(&destination).await?;
+                                let keep_both_destination = self
+                                    .available_keep_both_destination(
+                                        &destination,
+                                        Some(cancellation.as_ref()),
+                                    )
+                                    .await?;
                                 let target_name = keep_both_destination
                                     .file_name()
                                     .and_then(|value| value.to_str())
@@ -818,14 +1033,19 @@ impl OperationQueueService {
                     .await?;
                 Ok(None)
             }
-            ConflictPolicy::Skip => Ok(Some(ExecutionOutcome::Completed)),
+            ConflictPolicy::Skip => Ok(Some(ExecutionOutcome::Skipped)),
             ConflictPolicy::KeepBoth => Err(ApiError::Message(
                 "Keep Both is not available for create or rename operations.".to_string(),
             )),
         }
     }
 
-    async fn available_keep_both_destination(&self, path: &Path) -> ApiResult<PathBuf> {
+    async fn available_keep_both_destination(
+        &self,
+        path: &Path,
+        cancellation: Option<&AtomicBool>,
+    ) -> ApiResult<PathBuf> {
+        ensure_not_canceled_if(cancellation)?;
         if self
             .explorer
             .item_is_directory(&path.to_string_lossy())
@@ -835,6 +1055,7 @@ impl OperationQueueService {
             return Ok(path.to_path_buf());
         }
         for index in 1..10_000 {
+            ensure_not_canceled_if(cancellation)?;
             let candidate = keep_both_candidate(path, index)?;
             if self
                 .explorer
@@ -894,6 +1115,19 @@ fn ensure_not_canceled(cancellation: &AtomicBool) -> ApiResult<()> {
     Ok(())
 }
 
+fn ensure_not_canceled_if(cancellation: Option<&AtomicBool>) -> ApiResult<()> {
+    if let Some(cancellation) = cancellation {
+        ensure_not_canceled(cancellation)?;
+    }
+    Ok(())
+}
+
+fn is_operation_canceled_error(error: &ApiError) -> bool {
+    error
+        .to_string()
+        .eq_ignore_ascii_case("Operation canceled.")
+}
+
 fn local_endpoint(path: String) -> OperationEndpoint {
     OperationEndpoint {
         local_path: path,
@@ -910,6 +1144,31 @@ fn endpoint_for_path(path: String, remote: Option<RemoteBrowseTarget>) -> Operat
         }
     } else {
         local_endpoint(path)
+    }
+}
+
+fn operation_kind_for_paste(
+    operation: ClipboardOperation,
+    source: &OperationEndpoint,
+    target: &OperationEndpoint,
+) -> OperationKind {
+    match operation {
+        ClipboardOperation::Move => OperationKind::Move,
+        ClipboardOperation::Copy if source.is_remote() && !target.is_remote() => {
+            OperationKind::Download
+        }
+        ClipboardOperation::Copy => OperationKind::Copy,
+    }
+}
+
+fn operation_action_label(kind: OperationKind) -> &'static str {
+    match kind {
+        OperationKind::Download => "Download",
+        OperationKind::Move => "Move",
+        OperationKind::Create => "Create",
+        OperationKind::Rename => "Rename",
+        OperationKind::Delete => "Delete",
+        OperationKind::Copy => "Copy",
     }
 }
 
@@ -1024,6 +1283,18 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn keep_both_destination_stops_when_canceled() {
+        let service = test_operation_queue_service();
+        let cancellation = AtomicBool::new(true);
+
+        let result = service
+            .available_keep_both_destination(Path::new("/tmp/report.txt"), Some(&cancellation))
+            .await;
+
+        assert!(result.as_ref().is_err_and(is_operation_canceled_error));
+    }
+
     #[test]
     fn paste_destination_uses_explicit_target_name() {
         let destination = paste_destination(&PasteItemsRequest {
@@ -1087,6 +1358,48 @@ mod tests {
         assert_eq!(endpoint.local_path, "/tmp/report.pdf");
         assert!(endpoint.remote_name.is_empty());
         assert!(endpoint.remote_path.is_empty());
+    }
+
+    #[test]
+    fn remote_to_local_copy_is_described_as_download() {
+        let source = endpoint_for_path(
+            "/Users/misty/.misty/mnt/drive/work/report.pdf".to_string(),
+            Some(RemoteBrowseTarget {
+                provider_type: "drive".to_string(),
+                remote_name: "drive-work".to_string(),
+                remote_path: "/work/report.pdf".to_string(),
+            }),
+        );
+        let target = local_endpoint("/Users/misty/Downloads/report.pdf".to_string());
+
+        assert_eq!(
+            operation_kind_for_paste(ClipboardOperation::Copy, &source, &target),
+            OperationKind::Download
+        );
+        assert_eq!(operation_action_label(OperationKind::Download), "Download");
+    }
+
+    #[test]
+    fn local_copy_and_remote_move_keep_their_operation_kinds() {
+        let local_source = local_endpoint("/tmp/report.pdf".to_string());
+        let local_target = local_endpoint("/tmp/archive/report.pdf".to_string());
+        let remote_source = endpoint_for_path(
+            "/Users/misty/.misty/mnt/drive/report.pdf".to_string(),
+            Some(RemoteBrowseTarget {
+                provider_type: "drive".to_string(),
+                remote_name: "drive-work".to_string(),
+                remote_path: "/report.pdf".to_string(),
+            }),
+        );
+
+        assert_eq!(
+            operation_kind_for_paste(ClipboardOperation::Copy, &local_source, &local_target),
+            OperationKind::Copy
+        );
+        assert_eq!(
+            operation_kind_for_paste(ClipboardOperation::Move, &remote_source, &local_target),
+            OperationKind::Move
+        );
     }
 
     #[test]
@@ -1175,6 +1488,62 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn cancellation_error_finishes_service_operation_as_canceled_not_failed() {
+        let service = test_operation_queue_service();
+        let root = unique_test_dir("finish-cancel");
+        let target = root.join("never-created.txt");
+        let request = CreateItemRequest {
+            directory: root.to_string_lossy().to_string(),
+            name: "never-created.txt".to_string(),
+            kind: CreateItemKind::File,
+        };
+        let (_, operation_ids) = service
+            .queue
+            .enqueue_batch_with_ids(
+                "Create file",
+                false,
+                vec![OperationDescriptor {
+                    kind: OperationKind::Create,
+                    target: local_endpoint(target.to_string_lossy().to_string()),
+                    title: "Create never-created.txt".to_string(),
+                    ..OperationDescriptor::default()
+                }],
+            )
+            .await;
+        let operation_id = operation_ids[0];
+        service
+            .payloads
+            .lock()
+            .await
+            .insert(operation_id, QueuedExplorerOperation::Create(request));
+        assert_eq!(
+            service.queue.take_ready().await.remove(0).operation_id,
+            operation_id
+        );
+        let cancellation = AtomicBool::new(false);
+
+        service
+            .finish_execution_result(
+                operation_id,
+                Err(ApiError::Message("Operation canceled.".to_string())),
+                &cancellation,
+            )
+            .await;
+
+        let snapshot = service.snapshot().await;
+        let operation = snapshot
+            .operations
+            .iter()
+            .find(|operation| operation.operation_id == operation_id)
+            .unwrap();
+        assert_eq!(operation.status, OperationStatus::Canceled);
+        assert!(operation.error_message.is_empty());
+        assert!(!service.payloads.lock().await.contains_key(&operation_id));
+
+        let _ = tokio::fs::remove_dir_all(&root).await;
+    }
+
+    #[tokio::test]
     async fn canceling_conflict_paused_operation_removes_payload_and_cancellation_token() {
         let service = test_operation_queue_service();
         let root = unique_test_dir("cancel-conflict");
@@ -1224,8 +1593,316 @@ mod tests {
         let _ = tokio::fs::remove_dir_all(&root).await;
     }
 
+    #[tokio::test]
+    async fn resolving_conflict_with_skip_marks_service_operation_skipped() {
+        let service = test_operation_queue_service();
+        let root = unique_test_dir("skip-conflict");
+        let target = root.join("existing.txt");
+        tokio::fs::create_dir_all(&root).await.unwrap();
+        tokio::fs::write(&target, b"already here").await.unwrap();
+
+        let snapshot = service
+            .enqueue_create_item(CreateItemRequest {
+                directory: root.to_string_lossy().to_string(),
+                name: "existing.txt".to_string(),
+                kind: CreateItemKind::File,
+            })
+            .await
+            .unwrap();
+        let operation_id = snapshot.operations[0].operation_id;
+
+        wait_for_operation_status(
+            &service,
+            operation_id,
+            OperationStatus::WaitingForResolution,
+        )
+        .await;
+
+        service
+            .resolve_conflict(operation_id, ConflictPolicy::Skip, false)
+            .await
+            .unwrap();
+
+        wait_for_operation_status(&service, operation_id, OperationStatus::Skipped).await;
+        assert!(!service.payloads.lock().await.contains_key(&operation_id));
+        assert_eq!(tokio::fs::read(&target).await.unwrap(), b"already here");
+
+        let _ = tokio::fs::remove_dir_all(&root).await;
+    }
+
+    #[tokio::test]
+    async fn inherited_skip_policy_marks_executed_service_operation_skipped() {
+        let service = test_operation_queue_service();
+        let root = unique_test_dir("inherited-skip-conflict");
+        let target = root.join("existing.txt");
+        tokio::fs::create_dir_all(&root).await.unwrap();
+        tokio::fs::write(&target, b"already here").await.unwrap();
+        let request = CreateItemRequest {
+            directory: root.to_string_lossy().to_string(),
+            name: "existing.txt".to_string(),
+            kind: CreateItemKind::File,
+        };
+        let (_, operation_ids) = service
+            .queue
+            .enqueue_batch_with_ids(
+                "Create file",
+                false,
+                vec![OperationDescriptor {
+                    kind: OperationKind::Create,
+                    target: local_endpoint(target.to_string_lossy().to_string()),
+                    conflict_policy: ConflictPolicy::Skip,
+                    title: "Create existing.txt".to_string(),
+                    ..OperationDescriptor::default()
+                }],
+            )
+            .await;
+        let operation_id = operation_ids[0];
+        service
+            .payloads
+            .lock()
+            .await
+            .insert(operation_id, QueuedExplorerOperation::Create(request));
+
+        service.schedule_pump();
+
+        wait_for_operation_status(&service, operation_id, OperationStatus::Skipped).await;
+        assert!(!service.payloads.lock().await.contains_key(&operation_id));
+        assert_eq!(tokio::fs::read(&target).await.unwrap(), b"already here");
+
+        let _ = tokio::fs::remove_dir_all(&root).await;
+    }
+
+    #[tokio::test]
+    async fn undo_then_redo_local_rename_uses_backend_redo_stack() {
+        let service = test_operation_queue_service();
+        let root = unique_test_dir("redo-rename");
+        tokio::fs::create_dir_all(&root).await.unwrap();
+        let original = root.join("draft.txt");
+        let renamed = root.join("final.txt");
+        tokio::fs::write(&original, b"notes").await.unwrap();
+        tokio::fs::rename(&original, &renamed).await.unwrap();
+
+        let mut transfer = FileTransferRecord::new(
+            FileTransferType::Rename,
+            FileTransferItemType::Local,
+            "final.txt".to_string(),
+        );
+        transfer.local_source_path = original.to_string_lossy().to_string();
+        transfer.local_dest_path = renamed.to_string_lossy().to_string();
+        let transfer_id = service.transfers.start_transfer(transfer).await.unwrap();
+        service
+            .transfers
+            .complete_transfer(transfer_id)
+            .await
+            .unwrap();
+
+        assert!(!original.exists());
+        assert!(renamed.is_file());
+        assert!(!service.snapshot().await.redo_available);
+
+        let undo_snapshot = service.undo(transfer_id).await.unwrap();
+        assert!(undo_snapshot.redo_available);
+        let undo_operation_id = newest_operation_id(&undo_snapshot);
+        wait_for_operation_status(&service, undo_operation_id, OperationStatus::Completed).await;
+        assert!(original.is_file());
+        assert!(!renamed.exists());
+
+        let redo_snapshot = service.redo().await.unwrap();
+        assert!(!redo_snapshot.redo_available);
+        let redo_operation_id = newest_operation_id(&redo_snapshot);
+        wait_for_operation_status(&service, redo_operation_id, OperationStatus::Completed).await;
+        assert!(!original.exists());
+        assert!(renamed.is_file());
+
+        assert!(service.redo().await.is_err());
+
+        let _ = tokio::fs::remove_dir_all(&root).await;
+    }
+
+    #[tokio::test]
+    async fn undo_then_redo_local_move_uses_backend_redo_stack() {
+        let service = test_operation_queue_service();
+        let root = unique_test_dir("redo-move");
+        let source_dir = root.join("source");
+        let dest_dir = root.join("dest");
+        tokio::fs::create_dir_all(&source_dir).await.unwrap();
+        tokio::fs::create_dir_all(&dest_dir).await.unwrap();
+        let original = source_dir.join("draft.txt");
+        let moved = dest_dir.join("draft.txt");
+        tokio::fs::write(&original, b"notes").await.unwrap();
+        tokio::fs::rename(&original, &moved).await.unwrap();
+
+        let mut transfer = FileTransferRecord::new(
+            FileTransferType::Move,
+            FileTransferItemType::Local,
+            "draft.txt".to_string(),
+        );
+        transfer.local_source_path = original.to_string_lossy().to_string();
+        transfer.local_dest_path = moved.to_string_lossy().to_string();
+        let transfer_id = service.transfers.start_transfer(transfer).await.unwrap();
+        service
+            .transfers
+            .complete_transfer(transfer_id)
+            .await
+            .unwrap();
+
+        assert!(!original.exists());
+        assert!(moved.is_file());
+        assert!(!service.snapshot().await.redo_available);
+
+        let undo_snapshot = service.undo(transfer_id).await.unwrap();
+        assert!(undo_snapshot.redo_available);
+        let undo_operation_id = newest_operation_id(&undo_snapshot);
+        wait_for_operation_status(&service, undo_operation_id, OperationStatus::Completed).await;
+        assert!(original.is_file());
+        assert!(!moved.exists());
+
+        let redo_snapshot = service.redo().await.unwrap();
+        assert!(!redo_snapshot.redo_available);
+        let redo_operation_id = newest_operation_id(&redo_snapshot);
+        wait_for_operation_status(&service, redo_operation_id, OperationStatus::Completed).await;
+        assert!(!original.exists());
+        assert!(moved.is_file());
+
+        assert!(service.redo().await.is_err());
+
+        let _ = tokio::fs::remove_dir_all(&root).await;
+    }
+
+    #[tokio::test]
+    async fn file_sync_apply_invalidates_redo_stack_after_undo() {
+        let service = test_operation_queue_service();
+        let root = unique_test_dir("redo-file-sync-apply");
+        let source_dir = root.join("source");
+        let dest_dir = root.join("dest");
+        let sync_source_dir = root.join("sync-source");
+        let sync_dest_dir = root.join("sync-dest");
+        tokio::fs::create_dir_all(&source_dir).await.unwrap();
+        tokio::fs::create_dir_all(&dest_dir).await.unwrap();
+        tokio::fs::create_dir_all(&sync_source_dir).await.unwrap();
+        tokio::fs::create_dir_all(&sync_dest_dir).await.unwrap();
+
+        let original = source_dir.join("draft.txt");
+        let moved = dest_dir.join("draft.txt");
+        tokio::fs::write(&original, b"notes").await.unwrap();
+        tokio::fs::rename(&original, &moved).await.unwrap();
+
+        let mut transfer = FileTransferRecord::new(
+            FileTransferType::Move,
+            FileTransferItemType::Local,
+            "draft.txt".to_string(),
+        );
+        transfer.local_source_path = original.to_string_lossy().to_string();
+        transfer.local_dest_path = moved.to_string_lossy().to_string();
+        let transfer_id = service.transfers.start_transfer(transfer).await.unwrap();
+        service
+            .transfers
+            .complete_transfer(transfer_id)
+            .await
+            .unwrap();
+
+        let undo_snapshot = service.undo(transfer_id).await.unwrap();
+        assert!(undo_snapshot.redo_available);
+        let undo_operation_id = newest_operation_id(&undo_snapshot);
+        wait_for_operation_status(&service, undo_operation_id, OperationStatus::Completed).await;
+
+        let sync_source = sync_source_dir.join("sync.txt");
+        tokio::fs::write(&sync_source, b"sync").await.unwrap();
+        let (sync_snapshot, operation_ids) = service
+            .enqueue_file_sync_apply(
+                "Apply sync",
+                vec![PasteItemsRequest {
+                    sources: vec![PasteItem {
+                        path: sync_source.to_string_lossy().to_string(),
+                        is_directory: false,
+                    }],
+                    destination_directory: sync_dest_dir.to_string_lossy().to_string(),
+                    operation: ClipboardOperation::Copy,
+                    target_name: None,
+                }],
+                Vec::new(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(operation_ids.len(), 1);
+        assert!(!sync_snapshot.redo_available);
+        assert!(service.redo().await.is_err());
+
+        let _ = tokio::fs::remove_dir_all(&root).await;
+    }
+
+    #[tokio::test]
+    async fn empty_operation_requests_do_not_invalidate_redo_stack() {
+        let service = test_operation_queue_service();
+        service
+            .redo_stack
+            .lock()
+            .await
+            .push(FileTransferRecord::new(
+                FileTransferType::Rename,
+                FileTransferItemType::Local,
+                "draft.txt".to_string(),
+            ));
+
+        let paste_snapshot = service
+            .enqueue_paste_items(PasteItemsRequest {
+                sources: Vec::new(),
+                destination_directory: "/tmp".to_string(),
+                operation: ClipboardOperation::Copy,
+                target_name: None,
+            })
+            .await
+            .unwrap();
+        assert!(paste_snapshot.redo_available);
+
+        let rename_snapshot = service
+            .enqueue_rename_items(RenameItemsRequest { items: Vec::new() })
+            .await
+            .unwrap();
+        assert!(rename_snapshot.redo_available);
+
+        let delete_snapshot = service
+            .enqueue_delete_items(DeleteItemsRequest { paths: Vec::new() })
+            .await
+            .unwrap();
+        assert!(delete_snapshot.redo_available);
+        assert_eq!(service.redo_stack.lock().await.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn failed_enqueue_validation_does_not_invalidate_redo_stack() {
+        let service = test_operation_queue_service();
+        service
+            .redo_stack
+            .lock()
+            .await
+            .push(FileTransferRecord::new(
+                FileTransferType::Rename,
+                FileTransferItemType::Local,
+                "draft.txt".to_string(),
+            ));
+
+        let result = service
+            .enqueue_operations_with_ids(
+                "Broken enqueue",
+                false,
+                vec![OperationDescriptor {
+                    kind: OperationKind::Rename,
+                    title: "Rename draft".to_string(),
+                    ..OperationDescriptor::default()
+                }],
+                Vec::new(),
+            )
+            .await;
+
+        assert!(result.is_err());
+        assert!(service.snapshot().await.redo_available);
+        assert_eq!(service.redo_stack.lock().await.len(), 1);
+    }
+
     fn test_operation_queue_service() -> OperationQueueService {
-        let environment = AppEnvironmentService::new();
+        let environment = AppEnvironmentService::for_test_home(unique_test_dir("service-home"));
         let proxy = ProxyService::new(environment.clone());
         let providers = ProviderService::new(proxy.clone());
         let transfers = TransferService::new(environment.clone());
@@ -1268,6 +1945,15 @@ mod tests {
             tokio::time::sleep(std::time::Duration::from_millis(20)).await;
         }
         panic!("operation {operation_id} did not reach {expected:?}");
+    }
+
+    fn newest_operation_id(snapshot: &OperationQueueSnapshot) -> u64 {
+        snapshot
+            .operations
+            .iter()
+            .map(|operation| operation.operation_id)
+            .max()
+            .expect("operation id")
     }
 }
 

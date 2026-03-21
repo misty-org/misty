@@ -7,6 +7,8 @@ use std::{
 
 use serde_json::{json, Map, Value};
 
+use crate::services::paths;
+
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ClipboardRemoteFileCacheKey {
     pub remote_name: String,
@@ -40,11 +42,8 @@ impl ClipboardCache {
     }
 
     pub fn default_root() -> PathBuf {
-        std::env::var_os("HOME")
-            .filter(|home| !home.is_empty())
-            .map(PathBuf::from)
+        paths::misty_home_dir()
             .unwrap_or_else(std::env::temp_dir)
-            .join(".misty")
             .join("tmp")
             .join("clipboard-cache")
             .join("v1")

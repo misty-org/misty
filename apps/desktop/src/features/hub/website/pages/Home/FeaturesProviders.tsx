@@ -6,6 +6,7 @@ import {
 } from "react-icons/si";
 import { FaAws } from "react-icons/fa";
 import { GrOnedrive } from "react-icons/gr";
+import { handleExternalLinkClick } from "../../../../../shared/openExternalLink";
 
 const providers = [
   { Icon: SiGoogledrive, label: "Google Drive", iconClassName: "text-[#0F9D58]" },
@@ -41,6 +42,7 @@ export default function FeaturesProviders() {
               target="_blank"
               rel="noopener noreferrer"
               className="text-text underline underline-offset-4 transition-colors hover:text-white"
+              onClick={handleExternalLinkClick("https://rclone.org/#supported-providers")}
             >
               See the full compatibility list
             </a>
@@ -53,6 +55,7 @@ export default function FeaturesProviders() {
               target="_blank"
               rel="noopener noreferrer"
               className="text-text-muted transition-colors hover:text-white"
+              onClick={handleExternalLinkClick("https://rclone.org")}
             >
               rclone
             </a>

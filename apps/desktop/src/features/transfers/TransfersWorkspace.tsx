@@ -1,4 +1,4 @@
-import { Filter, RefreshCcw, RotateCcw, Search, Trash2, XCircle } from "lucide-react";
+import { Filter, RefreshCcw, Redo2, RotateCcw, Search, Trash2, XCircle } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
@@ -199,6 +199,7 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
   const cancelOperation = useOperationQueueStore((state) => state.cancel);
   const retryOperation = useOperationQueueStore((state) => state.retry);
   const undoOperation = useOperationQueueStore((state) => state.undo);
+  const redoOperation = useOperationQueueStore((state) => state.redo);
 
   useEffect(() => {
     ensureWorkspace(props.workspaceId);
@@ -314,8 +315,30 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
     });
   }, []);
   const handleUndo = useCallback((undoTokenId: number) => {
-    void undoOperation(undoTokenId).then(() => load(undefined, { silent: true }));
+    void undoOperation(undoTokenId).then(() => {
+      void load(undefined, { silent: true });
+      void useOperationQueueStore.getState().load({ silent: true });
+    });
   }, [load, undoOperation]);
+  const handleRedo = useCallback(() => {
+    void redoOperation().then(() => {
+      void load(undefined, { silent: true });
+      void useOperationQueueStore.getState().load({ silent: true });
+    });
+  }, [load, redoOperation]);
+  const refreshAfterQueueMutation = useCallback(async (action: Promise<void>) => {
+    await action;
+    void load(undefined, { silent: true });
+    void useOperationQueueStore.getState().load({ silent: true });
+  }, [load]);
+  const handleCancelOperation = useCallback(
+    (operationId: number) => refreshAfterQueueMutation(cancelOperation(operationId)),
+    [cancelOperation, refreshAfterQueueMutation],
+  );
+  const handleRetryOperation = useCallback(
+    (operationId: number) => refreshAfterQueueMutation(retryOperation(operationId)),
+    [refreshAfterQueueMutation, retryOperation],
+  );
   const beginColumnResize = useCallback((column: TransferTableColumn, event: ReactPointerEvent) => {
     event.preventDefault();
     event.stopPropagation();
@@ -374,6 +397,10 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
             <RefreshCcw size={16} />
             Refresh
           </button>
+          <button onClick={handleRedo} disabled={queueWorking || !queueSnapshot?.redoAvailable}>
+            <Redo2 size={16} />
+            Redo
+          </button>
           <button onClick={() => void deleteSelected(props.workspaceId)} disabled={working || selectedIds.size === 0}>
             <Trash2 size={16} />
             Delete Selected
@@ -409,7 +436,7 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
           </aside>
 
           <main className="transfer-list-panel">
-          <OperationQueueStrip />
+          <OperationQueueStrip onQueueChanged={() => void load(undefined, { silent: true })} />
           <div ref={tableScrollRef} className="transfer-table-wrap" onScroll={handleTableScroll}>
             <table className="transfer-table" style={{ width: tableWidth, minWidth: "100%" }}>
               <colgroup>
@@ -463,8 +490,8 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
                       queueWorking={queueWorking}
                       onSelect={(id, checked) => toggleTransfer(props.workspaceId, id, checked)}
                       onFocus={(id) => setFocusedTransfer(props.workspaceId, id)}
-                      onCancel={cancelOperation}
-                      onRetry={retryOperation}
+                      onCancel={handleCancelOperation}
+                      onRetry={handleRetryOperation}
                       onUndo={handleUndo}
                     />
                   );
@@ -508,8 +535,8 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
               transfer={focusedTransfer}
               operation={focusedTransfer ? queueOperationsByTransfer.get(focusedTransfer.id) : undefined}
               working={queueWorking}
-              onCancel={cancelOperation}
-              onRetry={retryOperation}
+              onCancel={handleCancelOperation}
+              onRetry={handleRetryOperation}
               onUndo={handleUndo}
             />
           </aside>
@@ -1066,14 +1093,16 @@ function saveTransferColumnOrder(order: TransferTableColumn[]): void {
   window.localStorage.setItem(TRANSFER_COLUMN_ORDER_STORAGE_KEY, JSON.stringify(order));
 }
 
-function OperationQueueStrip() {
-  const { snapshot, working, error, load, cancel, retry, resolveConflict, clearTerminal } = useOperationQueueStore(useShallow((state) => ({
+function OperationQueueStrip(props: { onQueueChanged: () => void }) {
+  const { snapshot, working, error, load, cancel, cancelBatch, retry, redo, resolveConflict, clearTerminal } = useOperationQueueStore(useShallow((state) => ({
     snapshot: state.snapshot,
     working: state.working,
     error: state.error,
     load: state.load,
     cancel: state.cancel,
+    cancelBatch: state.cancelBatch,
     retry: state.retry,
+    redo: state.redo,
     resolveConflict: state.resolveConflict,
     clearTerminal: state.clearTerminal,
   })));
@@ -1083,6 +1112,14 @@ function OperationQueueStrip() {
   const conflict = snapshot?.conflictDialog;
   const conflictBatch = conflict?.open ? snapshot?.batches.find((batch) => batch.batchId === conflict.batchId) : null;
   const canApplyConflictToBatch = Boolean(conflictBatch && conflictBatch.operationIds.length > 1);
+  const canCancelConflictBatch = Boolean(
+    conflictBatch
+      && conflictBatch.operationIds.length > 1
+      && operations.some((operation) => (
+        operation.batchId === conflictBatch.batchId
+        && operation.cancelable
+      )),
+  );
   const [applyConflictToBatch, setApplyConflictToBatch] = useState(conflict?.applyToBatch ?? true);
 
   useEffect(() => {
@@ -1090,6 +1127,10 @@ function OperationQueueStrip() {
       setApplyConflictToBatch(conflict.applyToBatch);
     }
   }, [conflict?.operationId, conflict?.applyToBatch, conflict?.open]);
+  const runQueueMutation = useCallback(async (action: Promise<void>) => {
+    await action;
+    props.onQueueChanged();
+  }, [props]);
 
   return (
     <section className="operation-queue-strip">
@@ -1105,7 +1146,11 @@ function OperationQueueStrip() {
           <RefreshCcw size={14} />
           Refresh
         </button>
-        <button type="button" onClick={() => void clearTerminal()} disabled={working || terminal === 0}>
+        <button type="button" onClick={() => void runQueueMutation(redo())} disabled={working || !snapshot?.redoAvailable}>
+          <RotateCcw size={14} />
+          Redo
+        </button>
+        <button type="button" onClick={() => void runQueueMutation(clearTerminal())} disabled={working || terminal === 0}>
           <Trash2 size={14} />
           Clear Finished
         </button>
@@ -1125,19 +1170,32 @@ function OperationQueueStrip() {
             />
             <span>Apply to batch</span>
           </label>
-          <button type="button" disabled={working} onClick={() => void cancel(conflict.operationId)}>
+          <button
+            type="button"
+            disabled={working}
+            onClick={() => void runQueueMutation(cancel(conflict.operationId))}
+          >
             Cancel
           </button>
+          {conflictBatch ? (
+            <button
+              type="button"
+              disabled={working || !canCancelConflictBatch}
+              onClick={() => void runQueueMutation(cancelBatch(conflictBatch.batchId))}
+            >
+              Cancel Batch
+            </button>
+          ) : null}
           {conflict.supportsReplace ? (
-            <button type="button" disabled={working} onClick={() => void resolveConflict(conflict.operationId, "replace", canApplyConflictToBatch && applyConflictToBatch)}>
+            <button type="button" disabled={working} onClick={() => void runQueueMutation(resolveConflict(conflict.operationId, "replace", canApplyConflictToBatch && applyConflictToBatch))}>
               Replace
             </button>
           ) : null}
-          <button type="button" disabled={working} onClick={() => void resolveConflict(conflict.operationId, "skip", canApplyConflictToBatch && applyConflictToBatch)}>
+          <button type="button" disabled={working} onClick={() => void runQueueMutation(resolveConflict(conflict.operationId, "skip", canApplyConflictToBatch && applyConflictToBatch))}>
             Skip
           </button>
           {conflict.supportsKeepBoth ? (
-            <button type="button" disabled={working} onClick={() => void resolveConflict(conflict.operationId, "keep_both", canApplyConflictToBatch && applyConflictToBatch)}>
+            <button type="button" disabled={working} onClick={() => void runQueueMutation(resolveConflict(conflict.operationId, "keep_both", canApplyConflictToBatch && applyConflictToBatch))}>
               Keep Both
             </button>
           ) : null}
@@ -1151,11 +1209,11 @@ function OperationQueueStrip() {
               <span className={`status-badge ${operation.status}`}>{prettyLabel(operation.status)}</span>
               <span>{operation.source.localPath || `${operation.source.remoteName}:${operation.source.remotePath}`}</span>
               <span>{operation.target.localPath || `${operation.target.remoteName}:${operation.target.remotePath}`}</span>
-              <button type="button" disabled={!operation.cancelable || working} onClick={() => void cancel(operation.operationId)}>
+              <button type="button" disabled={!operation.cancelable || working} onClick={() => void runQueueMutation(cancel(operation.operationId))}>
                 <XCircle size={14} />
                 Cancel
               </button>
-              <button type="button" disabled={!operation.retryable || operation.status !== "failed" || working} onClick={() => void retry(operation.operationId)}>
+              <button type="button" disabled={!operation.retryable || operation.status !== "failed" || working} onClick={() => void runQueueMutation(retry(operation.operationId))}>
                 <RotateCcw size={14} />
                 Retry
               </button>

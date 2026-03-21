@@ -1,3 +1,5 @@
+pub mod autostart;
+pub mod claude;
 pub mod commands;
 pub mod devices;
 pub mod environment;
@@ -7,10 +9,12 @@ pub mod file_sync;
 pub mod hub;
 pub mod native_clipboard;
 pub mod operation_queue;
+pub mod paths;
 pub mod plugin_commands;
 pub mod providers;
 pub mod proxy;
 pub mod proxy_clipboard;
+pub mod proxy_runtime;
 pub mod settings;
 pub mod transfers;
 pub mod workspaces;

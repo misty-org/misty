@@ -1,5 +1,6 @@
 import { FaDiscord, FaGithub } from "react-icons/fa";
 import { MdOutlineEmail } from "react-icons/md"
+import { handleExternalLinkClick } from "../../../../../shared/openExternalLink";
 
 export default function MoreSocials() {
   return (
@@ -19,13 +20,32 @@ export default function MoreSocials() {
         <span className="text-sm text-text-muted">Join our community</span>
         <div className="w-px h-4 bg-white/10" />
         <div className="flex items-center gap-3">
-          <a href="https://discord.gg/your-invite" target="_blank" rel="noopener noreferrer" className="text-text-muted hover:text-zinc-200 transition-colors" aria-label="Discord">
+          <a
+            href="https://discord.gg/your-invite"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-text-muted hover:text-zinc-200 transition-colors"
+            aria-label="Discord"
+            onClick={handleExternalLinkClick("https://discord.gg/your-invite")}
+          >
             <FaDiscord className="text-3xl" />
           </a>
-          <a href="https://github.com/your-repo/misty-web/discussions" target="_blank" rel="noopener noreferrer" className="text-text-muted hover:text-zinc-200 transition-colors" aria-label="GitHub Discussions">
+          <a
+            href="https://github.com/your-repo/misty-web/discussions"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-text-muted hover:text-zinc-200 transition-colors"
+            aria-label="GitHub Discussions"
+            onClick={handleExternalLinkClick("https://github.com/your-repo/misty-web/discussions")}
+          >
             <FaGithub className="text-2xl" />
           </a>
-          <a href="mailto:hello@misty.app" className="text-text-muted hover:text-zinc-200 transition-colors" aria-label="Email">
+          <a
+            href="mailto:hello@misty.app"
+            className="text-text-muted hover:text-zinc-200 transition-colors"
+            aria-label="Email"
+            onClick={handleExternalLinkClick("mailto:hello@misty.app")}
+          >
             <MdOutlineEmail className="text-3xl" />
           </a>
         </div>
