@@ -8,6 +8,7 @@
 #include <atomic>
 #include <filesystem>
 #include <cstring>
+#include "core/system/util.h"
 #include "core/ui/ui_registry.h"
 #include "core/threading/worker_pool.h"
 #include "panels/workspace/workspace_state.h"  // For AccountMapping and mount_utils
@@ -439,22 +440,7 @@ namespace misty::panel {
     inline bool can_go_back(FileExplorerState& state) { return !state.back_history.empty(); }
     inline bool can_go_forward(FileExplorerState& state) { return !state.forward_history.empty(); }
 
-#ifdef _WIN32
-#include <windows.h>
-#include <shellapi.h>
-
     inline void open_file(const std::string& path) {
-        ShellExecuteA(NULL, "open", path.c_str(), NULL, NULL, SW_SHOWNORMAL);
+        core::open_path_default(path);
     }
-#elif __APPLE__
-    inline void open_file(const std::string& path) {
-        std::string cmd = "open \"" + path + "\"";
-        system(cmd.c_str());
-    }
-#elif __linux__
-    inline void open_file(const std::string& path) {
-        std::string cmd = "xdg-open \"" + path + "\"";
-        system(cmd.c_str());
-    }
-#endif
 }

@@ -12,8 +12,16 @@ namespace misty::panel {
         core::UploadProgressCallback progress_cb,
         DBXUploadCallback callback
     ) {
-        // Get upload context (thread-safe copy)
         UploadContext ctx = get_upload_context();
+        upload_file(local_path, ctx, progress_cb, callback);
+    }
+
+    void DropboxState::upload_file(
+        const std::string& local_path,
+        const UploadContext& ctx,
+        core::UploadProgressCallback progress_cb,
+        DBXUploadCallback callback
+    ) {
 
         if (ctx.dbx_user_id.empty()) {
             callback(false, "No Dropbox folder context. Navigate to a Dropbox folder first.");

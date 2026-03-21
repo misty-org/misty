@@ -169,11 +169,11 @@ func LoginUser(db *db.Database, lm *license.Manager) http.HandlerFunc {
 			return
 		}
 
-		// Fetch license synchronously so the token is available in the response.
-		// Login still succeeds if the license server is unreachable.
+		// Entitlement verification is one-time for perpetual pro access.
+		// Login still succeeds if the licensing server is unreachable.
 		licenseToken, err := lm.RefreshIfNeeded(req.Email, req.Password)
 		if err != nil {
-			log.Printf("License refresh failed: %v", err)
+			log.Printf("Entitlement verification failed: %v", err)
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -243,15 +243,13 @@ func RefreshToken(db *db.Database, lm *license.Manager) http.HandlerFunc {
 			return
 		}
 
-		// Renew cached license token if it's close to expiry — no password available
-		// here so this is a no-op if the cache is empty; only extends existing entries.
-		go lm.RenewIfCached()
+		licenseToken := lm.GetCachedTokenForIdentity(userID, email)
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(RefreshResponse{
 			Token:        newAccessToken,
 			RefreshToken: newRefreshToken,
-			LicenseToken: lm.GetCachedToken(),
+			LicenseToken: licenseToken,
 		})
 	}
 }
