@@ -1,5 +1,9 @@
 #include "activity_panel.h"
+#include "panels/services/onedrive/onedrive_state.h"
+#include "panels/services/gdrive/gdrive_state.h"
+#include "panels/services/dropbox/dropbox_state.h"
 #include "imgui.h"
+#include <filesystem>
 #include <sstream>
 #include <iomanip>
 #include <algorithm>
@@ -49,6 +53,8 @@ namespace misty::panel {
         ImGui::PopStyleColor();
     }
 
+    /* Header */
+
     void ActivityPanel::render_header() {
         auto& download_state = registry_.get_state<DownloadState>("Downloads");
         auto& upload_state = registry_.get_state<UploadState>("Uploads");
@@ -56,18 +62,6 @@ namespace misty::panel {
         ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[0]);
         ImGui::Text("Activity");
         ImGui::PopFont();
-
-        ImGui::SameLine();
-
-        size_t active_downloads = download_state.active_count();
-        size_t active_uploads = upload_state.active_count();
-        size_t total_active = active_downloads + active_uploads;
-
-        if (total_active > 0) {
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.7f, 1.0f, 1.0f));
-            ImGui::Text("(%zu active)", total_active);
-            ImGui::PopStyleColor();
-        }
     }
 
     void ActivityPanel::render_category_tabs() {
@@ -75,9 +69,9 @@ namespace misty::panel {
         auto& download_state = registry_.get_state<DownloadState>("Downloads");
         auto& upload_state = registry_.get_state<UploadState>("Uploads");
 
-        size_t notif_count = notification_state.history_count();
-        size_t download_count = download_state.total_count();
-        size_t upload_count = upload_state.total_count();
+        size_t notifications = notification_state.history_count();
+        size_t downloads = download_state.total_count();
+        size_t uploads = upload_state.total_count();
 
         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(14.0f, 8.0f));
@@ -101,17 +95,15 @@ namespace misty::panel {
             ImGui::SameLine();
         };
 
-        render_category("Notifications", notif_count, ActivityCategory::NOTIFICATIONS);
-        render_category("Downloads", download_count, ActivityCategory::DOWNLOADS);
-        render_category("Uploads", upload_count, ActivityCategory::UPLOADS);
+        render_category("Notifications", notifications, ActivityCategory::NOTIFICATIONS);
+        render_category("Downloads", downloads, ActivityCategory::DOWNLOADS);
+        render_category("Uploads", uploads, ActivityCategory::UPLOADS);
 
         ImGui::PopStyleVar(2);
         ImGui::NewLine();
     }
 
-    // =========================================================================
-    // Notifications
-    // =========================================================================
+    /* Notifications */
 
     void ActivityPanel::render_notification_list() {
         auto& notification_state = registry_.get_state<NotificationState>("Notifications");
@@ -122,7 +114,6 @@ namespace misty::panel {
             return;
         }
 
-        // Clear history button
         ImGui::SameLine(ImGui::GetWindowWidth() - 140);
         if (ImGui::Button("Clear History")) {
             notification_state.clear_history();
@@ -131,7 +122,6 @@ namespace misty::panel {
 
         ImGui::BeginChild("NotificationList", ImVec2(0, 0), false);
 
-        // Show newest first
         for (int i = static_cast<int>(history.size()) - 1; i >= 0; --i) {
             render_notification_item(history[i]);
             ImGui::Spacing();
@@ -143,9 +133,7 @@ namespace misty::panel {
     void ActivityPanel::render_notification_item(const Notification& notif) {
         ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 8.0f);
 
-        // Background color based on notification type
         ImVec4 bg_color = get_notification_type_color(notif.type);
-        // Darken for the card background
         bg_color.x *= 0.5f;
         bg_color.y *= 0.5f;
         bg_color.z *= 0.5f;
@@ -154,7 +142,6 @@ namespace misty::panel {
 
         std::string child_id = "notif_" + std::to_string(notif.id);
         if (ImGui::BeginChild(child_id.c_str(), ImVec2(0, 60), true)) {
-            // Type badge and title
             const char* type_label = get_notification_type_label(notif.type);
             ImVec4 type_color = get_notification_type_color(notif.type);
 
@@ -165,13 +152,11 @@ namespace misty::panel {
             ImGui::SameLine();
             ImGui::Text("%s", notif.title.c_str());
 
-            // Time ago
             ImGui::SameLine(ImGui::GetWindowWidth() - 100);
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
             ImGui::Text("%s", format_time_ago(notif.created_at).c_str());
             ImGui::PopStyleColor();
 
-            // Message
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.7f, 0.7f, 0.7f, 1.0f));
             ImGui::TextWrapped("%s", notif.message.c_str());
             ImGui::PopStyleColor();
@@ -196,9 +181,7 @@ namespace misty::panel {
         ImGui::PopStyleColor();
     }
 
-    // =========================================================================
-    // Downloads
-    // =========================================================================
+    /* Downloads */
 
     void ActivityPanel::render_download_filter_tabs() {
         auto& download_state = registry_.get_state<DownloadState>("Downloads");
@@ -386,9 +369,7 @@ namespace misty::panel {
         ImGui::PopStyleColor();
     }
 
-    // =========================================================================
-    // Uploads
-    // =========================================================================
+    /* Uploads */
 
     void ActivityPanel::render_upload_filter_tabs() {
         auto& upload_state = registry_.get_state<UploadState>("Uploads");
@@ -490,11 +471,15 @@ namespace misty::panel {
     }
 
     void ActivityPanel::render_upload_item(const UploadItem& item) {
+        const bool show_retry = item.can_retry();
+        const bool show_error = item.status == UploadStatus::FAILED && !item.error_message.empty();
+        const float child_height = (show_retry || show_error) ? 112.0f : 80.0f;
+
         ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 8.0f);
         ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.18f, 0.18f, 0.18f, 1.0f));
 
         std::string child_id = "upload_" + std::to_string(item.id);
-        if (ImGui::BeginChild(child_id.c_str(), ImVec2(0, 80), true)) {
+        if (ImGui::BeginChild(child_id.c_str(), ImVec2(0, child_height), true)) {
             ImVec4 status_color;
             const char* status_text;
             switch (item.status) {
@@ -555,6 +540,12 @@ namespace misty::panel {
                 ImGui::TextWrapped("%s", item.error_message.c_str());
                 ImGui::PopStyleColor();
             }
+
+            if (show_retry) {
+                if (ImGui::Button(("Retry##upload_" + std::to_string(item.id)).c_str(), ImVec2(84.0f, 0.0f))) {
+                    retry_upload(item);
+                }
+            }
         }
         ImGui::EndChild();
 
@@ -576,9 +567,121 @@ namespace misty::panel {
         ImGui::PopStyleColor();
     }
 
-    // =========================================================================
-    // Helpers
-    // =========================================================================
+    void ActivityPanel::retry_upload(const UploadItem& item) {
+        namespace fs = std::filesystem;
+
+        auto& uploads = registry_.get_state<UploadState>("Uploads");
+        auto& notifications = registry_.get_state<NotificationState>("Notifications");
+
+        std::error_code ec;
+        if (item.local_path.empty() || !fs::exists(item.local_path, ec)) {
+            notifications.add_notification(
+                "Retry Failed",
+                "File not found: " + item.local_path,
+                NotificationType::ERROR,
+                5.0f
+            );
+            return;
+        }
+
+        const std::string file_name = fs::path(item.local_path).filename().string();
+        const int64_t file_size = item.file_size > 0 ? item.file_size : static_cast<int64_t>(fs::file_size(item.local_path, ec));
+        if (ec) {
+            notifications.add_notification(
+                "Retry Failed",
+                "Failed to inspect local file: " + ec.message(),
+                NotificationType::ERROR,
+                5.0f
+            );
+            return;
+        }
+
+        uint64_t upload_id = uploads.start_upload(file_name, item.local_path, item.destination, file_size);
+
+        if (item.provider == UploadProvider::ONEDRIVE) {
+            uploads.set_onedrive_retry_context(upload_id, item.od_ms_user_id, item.od_drive_id, item.od_folder_id);
+            auto& od_state = registry_.get_state<OneDriveState>("OneDrive");
+            od_state.upload_file(
+                item.local_path,
+                OneDriveState::UploadContext{item.od_drive_id, item.od_folder_id, item.od_ms_user_id},
+                [this, upload_id](size_t bytes_uploaded, size_t) -> bool {
+                    auto& upload_state = registry_.get_state<UploadState>("Uploads");
+                    upload_state.update_progress(upload_id, static_cast<int64_t>(bytes_uploaded));
+                    return true;
+                },
+                [this, file_name, upload_id](bool success, const std::string& error_msg) {
+                    auto& upload_state = registry_.get_state<UploadState>("Uploads");
+                    auto& notif_state = registry_.get_state<NotificationState>("Notifications");
+                    if (success) {
+                        upload_state.complete_upload(upload_id);
+                        notif_state.add_notification("Upload Complete", file_name, NotificationType::SUCCESS, 5.0f);
+                    } else {
+                        upload_state.fail_upload(upload_id, error_msg);
+                        notif_state.add_notification("Upload Failed", file_name + ": " + error_msg, NotificationType::ERROR, 5.0f);
+                    }
+                }
+            );
+        } else if (item.provider == UploadProvider::GDRIVE) {
+            uploads.set_gdrive_retry_context(upload_id, item.gd_user_id, item.gd_folder_id);
+            auto& gd_state = registry_.get_state<GDriveState>("GDrive");
+            gd_state.upload_file(
+                item.local_path,
+                GDriveState::UploadContext{item.gd_folder_id, item.gd_user_id},
+                [this, upload_id](size_t bytes_uploaded, size_t) -> bool {
+                    auto& upload_state = registry_.get_state<UploadState>("Uploads");
+                    upload_state.update_progress(upload_id, static_cast<int64_t>(bytes_uploaded));
+                    return true;
+                },
+                [this, file_name, upload_id](bool success, const std::string& error_msg) {
+                    auto& upload_state = registry_.get_state<UploadState>("Uploads");
+                    auto& notif_state = registry_.get_state<NotificationState>("Notifications");
+                    if (success) {
+                        upload_state.complete_upload(upload_id);
+                        notif_state.add_notification("Upload Complete", file_name, NotificationType::SUCCESS, 5.0f);
+                    } else {
+                        upload_state.fail_upload(upload_id, error_msg);
+                        notif_state.add_notification("Upload Failed", file_name + ": " + error_msg, NotificationType::ERROR, 5.0f);
+                    }
+                }
+            );
+        } else if (item.provider == UploadProvider::DROPBOX) {
+            uploads.set_dropbox_retry_context(upload_id, item.dbx_user_id, item.dbx_folder_path);
+            auto& dbx_state = registry_.get_state<DropboxState>("Dropbox");
+            dbx_state.upload_file(
+                item.local_path,
+                DropboxState::UploadContext{item.dbx_folder_path, item.dbx_user_id},
+                [this, upload_id](size_t bytes_uploaded, size_t) -> bool {
+                    auto& upload_state = registry_.get_state<UploadState>("Uploads");
+                    upload_state.update_progress(upload_id, static_cast<int64_t>(bytes_uploaded));
+                    return true;
+                },
+                [this, file_name, upload_id](bool success, const std::string& error_msg) {
+                    auto& upload_state = registry_.get_state<UploadState>("Uploads");
+                    auto& notif_state = registry_.get_state<NotificationState>("Notifications");
+                    if (success) {
+                        upload_state.complete_upload(upload_id);
+                        notif_state.add_notification("Upload Complete", file_name, NotificationType::SUCCESS, 5.0f);
+                    } else {
+                        upload_state.fail_upload(upload_id, error_msg);
+                        notif_state.add_notification("Upload Failed", file_name + ": " + error_msg, NotificationType::ERROR, 5.0f);
+                    }
+                }
+            );
+        } else {
+            uploads.fail_upload(upload_id, "Retry is not supported for this provider.");
+            notifications.add_notification(
+                "Retry Failed",
+                "Retry is not supported for this provider.",
+                NotificationType::ERROR,
+                5.0f
+            );
+            return;
+        }
+
+        notifications.add_notification("Uploading", file_name, NotificationType::DOWNLOAD, 15.0f);
+    }
+
+    /* Helpers */
 
     ImVec4 ActivityPanel::get_notification_type_color(NotificationType type) {
         switch (type) {

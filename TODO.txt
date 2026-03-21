@@ -3,10 +3,11 @@ MISTY — PRE-RELEASE TODO
 
 CRITICAL
 --------
-[ ] Session expiry UX
-    - Silent 401s give users no feedback. Show a clear "session expired, please log in again" prompt.
+[x] Session expiry UX
+    - Modal appears over the main view when token refresh fails. Shows lock icon + message,
+      "Log In Again" button clears tokens and switches to Login. Non-dismissable.
 
-[ ] Error recovery on upload
+[x] Error recovery on upload
     - Failed uploads show an error string but there's no retry button.
 
 [ ] iCloud upload support
@@ -16,30 +17,32 @@ CRITICAL
     - Worker pool tasks still running when the window closes can access freed state. Need to
       drain/cancel in-flight tasks before teardown.
 
-UX
---
+UX  (priority order)
+--------------------
 [x] Onboarding flow
     - Multi-step slideshow: welcome → overview+agreements → sign up → connect cloud →
       app tour → pro upgrade. Persisted via ~/misty/.cache/onboarding_complete flag.
       Screenshot slots in tour are placeholders to be swapped in later.
 
-[ ] Confirmation before disconnect
-    - "Disconnect" disconnects immediately with no undo. A simple "Are you sure?" modal.
+[x] Empty states
+    - Empty folder shows centered open-folder icon + "This folder is empty" label in both
+      grid and list views.
 
-[ ] Empty states
-    - File explorer shows nothing when a folder is empty. Add a placeholder illustration + label.
+[x] Confirmation before disconnect
+    - All Disconnect/Remove buttons now open a modal: "Disconnect account?" with Cancel +
+      red Disconnect button. Provider + account ID tracked in ServicesPanel member state.
 
-[ ] Download progress feedback
+[x] Download progress feedback
     - Uploads show a progress modal. Downloads have no equivalent UI feedback.
 
-[ ] Keyboard shortcuts
+[x] Keyboard shortcuts
     - No keyboard navigation at all. Minimum: Escape closes modals, Enter confirms.
 
 [ ] iCloud 2FA flow hardening
     - The 2FA path exists but needs stress-testing and better error messaging.
 
-STABILITY
----------
+STABILITY  (priority order)
+---------------------------
 [ ] Offline / proxy-down state
     - If the proxy is unreachable, users see raw error strings. Need a clean "offline" state
       with a retry button.
@@ -49,6 +52,8 @@ STABILITY
 
 DONE
 ----
+[x] Empty states (folder icon + label in grid and list views)
+[x] Confirmation before disconnect (modal with Cancel / Disconnect for all 4 providers)
 [x] Auto-refresh after OAuth (Done button calls check_*_connections)
 [x] Reconnect bypasses modal, goes directly to browser
 [x] Loading overlay with sprite animation
@@ -58,3 +63,6 @@ DONE
 [x] Services panel refresh button + startup fetch fix
 [x] Navbar dark charcoal color
 [x] PNG mipmap fix (GL_LINEAR_MIPMAP_LINEAR, generate after upload)
+
+
+

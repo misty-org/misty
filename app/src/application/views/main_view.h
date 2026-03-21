@@ -22,6 +22,7 @@ namespace misty::view {
 
     private:
         void init_panels();
+        void show_session_expired_modal();
     private:
         UIRegistry& ui_registry_;
         WorkerPool& worker_pool_;

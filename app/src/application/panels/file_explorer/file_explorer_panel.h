@@ -29,6 +29,17 @@ namespace misty::panel {
         void navigate_to_path(const std::string& path, bool update_history = true, bool create_if_missing = true);
 
     private:
+        void apply_workspace_mount_if_ready(panel::FileExplorerState& state, panel::WorkspaceState& workspace_state);
+        void handle_pending_navigation(panel::FileExplorerState& state);
+        void render_search_overlay(panel::SearchState& search_state, const ImVec2& list_start, float list_height);
+        void process_deferred_search_actions(panel::SearchState& search_state);
+        void update_periodic_save(panel::FileExplorerState& state);
+
+        void update_navigation_history(panel::FileExplorerState& state, const std::string& target_path, bool update_history);
+        void set_active_path(panel::FileExplorerState& state, const std::string& path);
+        void reset_selection(panel::FileExplorerState& state);
+        void clear_cloud_upload_contexts();
+
         void show_nav_history(panel::FileExplorerState& state, float button_width, float spacing);
         void show_search_bar(panel::FileExplorerState& state);
         void show_inline_search(panel::FileExplorerState& state, SearchState& search_state);

@@ -26,7 +26,7 @@ namespace misty::panel {
 
             ImGui::Dummy(ImVec2(0, 20));
 
-            show_nav_item("file-24", "Files", 24, ViewID::Files, state);
+            show_nav_item("file-directory-24", "Files", 24, ViewID::Files, state);
             show_nav_item("devices-24", "Services", 24, view::ViewID::Services, state);
             show_nav_item("bell-24", "Activity", 24, ViewID::Activity, state);
 

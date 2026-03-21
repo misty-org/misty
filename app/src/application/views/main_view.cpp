@@ -1,4 +1,8 @@
 #include "views/main_view.h"
+#include "core/commands/command_manager.h"
+#include "core/manager/session_manager.h"
+#include "core/manager/asset_manager.h"
+#include "core/ui/imgui_utils.h"
 #include <algorithm>
 
 
@@ -62,9 +66,12 @@ namespace misty::view {
 
         ImGuiIO& io = ImGui::GetIO();
 
-        // Cmd+K (macOS) or Ctrl+K (Linux/Windows) toggles the search panel
-        bool cmd_k = (io.KeySuper || io.KeyCtrl) && ImGui::IsKeyPressed(ImGuiKey_K, false);
-        if (cmd_k) search_panel_->toggle();
+        if (core::CommandManager::get().matches("search.toggle")) {
+            search_panel_->toggle();
+        }
+        if (core::CommandManager::get().matches("app.open_settings")) {
+            view::switch_view(view::ViewID::Settings);
+        }
 
         bool hovered = io.MousePos.x >= handle_x0 && io.MousePos.x <= handle_x1
                     && io.MousePos.y >= handle_y0 && io.MousePos.y <= handle_y1;
@@ -122,8 +129,92 @@ namespace misty::view {
 
         // Search modal renders last so it sits above everything
         search_panel_->render();
+
+        // Session expiry modal — must be outermost so it blocks all interaction
+        show_session_expired_modal();
     }
 
-    
+    void MainView::show_session_expired_modal() {
+        if (!core::SessionManager::get().is_session_expired()) return;
+
+        // Transparent full-screen host window — gives the popup a valid parent context
+        ImGuiViewport* vp = ImGui::GetMainViewport();
+        ImGui::SetNextWindowPos(vp->WorkPos);
+        ImGui::SetNextWindowSize(vp->WorkSize);
+        ImGui::SetNextWindowBgAlpha(0.0f);
+
+        ImGuiWindowFlags host_flags =
+            ImGuiWindowFlags_NoTitleBar      | ImGuiWindowFlags_NoResize    |
+            ImGuiWindowFlags_NoMove          | ImGuiWindowFlags_NoScrollbar |
+            ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDecoration|
+            ImGuiWindowFlags_NoNav;
+
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+        if (ImGui::Begin("##session_host", nullptr, host_flags)) {
+            ImGui::OpenPopup("##session_expired");
+
+            ImGui::SetNextWindowPos(vp->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+            ImGui::SetNextWindowSize(ImVec2(360.0f, 0.0f), ImGuiCond_Always);
+
+            ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.10f, 0.10f, 0.11f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Border,  ImVec4(0.22f, 0.22f, 0.24f, 1.0f));
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 10.0f);
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,  ImVec2(28.0f, 28.0f));
+            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,    ImVec2(0.0f,  12.0f));
+
+            if (ImGui::BeginPopupModal("##session_expired", nullptr,
+                    ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                    ImGuiWindowFlags_NoMove     | ImGuiWindowFlags_AlwaysAutoResize)) {
+
+                float w = ImGui::GetContentRegionAvail().x;
+
+                // Lock icon
+                auto& lock_icon = core::AssetManager::get().get_svg_texture("lock-24", 32);
+                if (lock_icon.id) {
+                    ImGui::SetCursorPosX((w - 32.0f) * 0.5f);
+                    ImGui::Image(lock_icon.id, ImVec2(32.0f, 32.0f));
+                    ImGui::Spacing();
+                }
+
+                // Title
+                ImGui::PushFont(core::AssetManager::get().get_font(core::FontID::ROBOTO_LARGE));
+                const char* title = "Session Expired";
+                ImGui::SetCursorPosX((w - ImGui::CalcTextSize(title).x) * 0.5f);
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.90f, 0.90f, 0.90f, 1.0f));
+                ImGui::TextUnformatted(title);
+                ImGui::PopStyleColor();
+                ImGui::PopFont();
+
+                ImGui::Spacing();
+
+                // Message
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.58f, 0.58f, 0.58f, 1.0f));
+                ImGui::TextWrapped(
+                    "Your session has expired and could not be renewed. "
+                    "Please log in again to continue.");
+                ImGui::PopStyleColor();
+
+                ImGui::Spacing();
+                ImGui::Separator();
+                ImGui::Spacing();
+
+                // Can't be dismissed any other way — no close button, no Esc
+                if (core::StyledButton("Log In Again", ImVec2(w, 42.0f),
+                                       core::ButtonTheme::Primary())) {
+                    core::SessionManager::get().clear_token();
+                    core::SessionManager::get().clear_session_expired();
+                    ImGui::CloseCurrentPopup();
+                    view::switch_view(view::ViewID::Login);
+                }
+
+                ImGui::EndPopup();
+            }
+
+            ImGui::PopStyleVar(3);
+            ImGui::PopStyleColor(2);
+        }
+        ImGui::End();
+        ImGui::PopStyleVar(); // host window padding
+    }
 
 }

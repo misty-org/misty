@@ -13,12 +13,19 @@ namespace misty::core {
     };
 
     using UploadProgressCallback = std::function<bool(size_t bytes_uploaded, size_t total_bytes)>;
+    using DownloadProgressCallback = std::function<bool(size_t bytes_downloaded, size_t total_bytes)>;
 
     struct UploadResult {
         bool success = false;
         int final_status_code = 0;
         std::string error_message;
         std::string response_body;  // Final response from server (contains file metadata on success)
+    };
+
+    struct DownloadResult {
+        bool success = false;
+        int final_status_code = 0;
+        std::string error_message;
     };
 
   
@@ -39,6 +46,13 @@ namespace misty::core {
             size_t chunk_alignment = 0,             // 0 = no alignment (e.g. 320*1024 for OneDrive, 256*1024 for GDrive)
             UploadProgressCallback progress_cb = nullptr,
             std::atomic<bool>* cancel_flag = nullptr
+        );
+
+        DownloadResult download_to_file(
+            const std::string& url,
+            const std::string& local_path,
+            const std::map<std::string, std::string>& headers = {},
+            DownloadProgressCallback progress_cb = nullptr
         );
 
     private:

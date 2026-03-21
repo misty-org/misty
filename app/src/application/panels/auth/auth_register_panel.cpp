@@ -1,5 +1,6 @@
 #include "auth_register_panel.h"
 #include "imgui.h"
+#include "core/commands/command_manager.h"
 #include "core/system/util.h"
 #include "core/manager/asset_manager.h"
 #include "core/ui/imgui_utils.h"
@@ -142,7 +143,8 @@ namespace misty::panel {
     void AuthRegisterPanel::show_register_button(AuthRegisterState& state) {
         float width = ImGui::GetContentRegionAvail().x;
 
-        if (core::StyledButton("Create account", ImVec2(width, 40), core::ButtonTheme::Primary())) {
+        if (core::StyledButton("Create account", ImVec2(width, 40), core::ButtonTheme::Primary()) ||
+            core::CommandManager::get().matches("auth.submit")) {
             state.handle_create_account();
         }
     }

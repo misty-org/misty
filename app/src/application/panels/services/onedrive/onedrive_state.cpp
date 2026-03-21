@@ -12,8 +12,16 @@ namespace misty::panel {
         core::UploadProgressCallback progress_cb,
         UploadCallback callback
     ) {
-        // Get upload context (thread-safe copy)
         UploadContext ctx = get_upload_context();
+        upload_file(local_path, ctx, progress_cb, callback);
+    }
+
+    void OneDriveState::upload_file(
+        const std::string& local_path,
+        const UploadContext& ctx,
+        core::UploadProgressCallback progress_cb,
+        UploadCallback callback
+    ) {
 
         if (ctx.drive_id.empty() || ctx.folder_id.empty() || ctx.ms_user_id.empty()) {
             callback(false, "No OneDrive folder context. Navigate to a OneDrive folder first.");
