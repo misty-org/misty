@@ -1,5 +1,6 @@
 #include "auth_login_panel.h"
 #include "imgui.h"
+#include "core/commands/command_manager.h"
 #include "core/net/http_client.h"
 #include "core/manager/asset_manager.h"
 #include "core/ui/imgui_utils.h"
@@ -96,7 +97,7 @@ namespace misty::panel {
     void AuthLoginPanel::show_login_button(AuthLoginState& state) {
         float width = ImGui::GetContentRegionAvail().x;
 
-        bool enter_pressed = ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter);
+        bool enter_pressed = core::CommandManager::get().matches("auth.submit");
         if (core::StyledButton("Log in", ImVec2(width, 40), core::ButtonTheme::Primary()) || enter_pressed) {
             state.handle_login();
         }

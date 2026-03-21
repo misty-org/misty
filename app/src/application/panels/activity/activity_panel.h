@@ -29,25 +29,27 @@ namespace misty::panel {
         void render() override;
 
     private:
+        // Header
         void render_header();
         void render_category_tabs();
 
-        // Notifications tab
+        // Notifications
         void render_notification_list();
         void render_notification_item(const Notification& notif);
         void render_notification_empty();
 
-        // Downloads tab
+        // Downloads
         void render_download_filter_tabs();
         void render_download_list();
         void render_download_item(const DownloadItem& item);
         void render_download_empty();
 
-        // Uploads tab
+        // Uploads
         void render_upload_filter_tabs();
         void render_upload_list();
         void render_upload_item(const UploadItem& item);
         void render_upload_empty();
+        void retry_upload(const UploadItem& item);
 
         // Helpers
         std::string format_file_size(int64_t bytes);

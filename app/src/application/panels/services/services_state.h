@@ -5,6 +5,7 @@
 #include <set>
 #include <functional>
 #include "core/ui/ui_registry.h"
+#include "core/net/http_client.h"
 #include "core/threading/worker_pool.h"
 
 namespace misty::panel {
@@ -42,6 +43,7 @@ namespace misty::panel {
     using DownloadCallback = std::function<void(bool success,
                                                  const std::string& local_path,
                                                  const std::string& error)>;
+    using DownloadProgressCallback = core::DownloadProgressCallback;
 
     // Snapshot of a single OneDrive connection for UI rendering
     struct OneDriveCardState {
@@ -184,6 +186,7 @@ namespace misty::panel {
                           const std::string& drive_id,
                           const std::string& file_id,
                           const std::string& local_path,
+                          DownloadProgressCallback progress_cb,
                           DownloadCallback callback);
         void create_onedrive_folder(const std::string& ms_user_id,
                                     const std::string& drive_id,
@@ -210,6 +213,7 @@ namespace misty::panel {
         void download_gd_file(const std::string& gd_user_id,
                               const std::string& file_id,
                               const std::string& local_path,
+                              DownloadProgressCallback progress_cb,
                               GDDownloadCallback callback);
         void create_gdrive_folder(const std::string& gd_user_id,
                                   const std::string& parent_id,
@@ -234,6 +238,7 @@ namespace misty::panel {
         void download_dbx_file(const std::string& dbx_user_id,
                                const std::string& file_path,
                                const std::string& local_path,
+                               DownloadProgressCallback progress_cb,
                                DBXDownloadCallback callback);
         void create_dbx_folder(const std::string& dbx_user_id,
                                const std::string& folder_path,
@@ -261,6 +266,7 @@ namespace misty::panel {
                                const std::string& filename,
                                const std::string& folder_path,
                                const std::string& local_path,
+                               DownloadProgressCallback progress_cb,
                                ICLDownloadCallback callback);
 
         std::set<ICLConnection>::iterator find_by_icl_email(const std::string& email);

@@ -42,6 +42,7 @@ namespace misty {
         static void glfw_error_callback(int error, const char* description);
         static void glfw_window_size_callback(GLFWwindow* window, int width, int height);
         static void glfw_window_focus_callback(GLFWwindow* window, int focused);
+        static void glfw_scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 
     private:
         GLFWwindow* window_ = nullptr;
@@ -50,4 +51,3 @@ namespace misty {
     };
 }
 #endif
-

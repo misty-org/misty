@@ -216,6 +216,13 @@ namespace misty::panel {
             UploadCallback callback
         );
 
+        void upload_file(
+            const std::string& local_path,
+            const UploadContext& ctx,
+            core::UploadProgressCallback progress_cb,
+            UploadCallback callback
+        );
+
         core::WorkerPool* worker_pool_ = nullptr;
     };
 }

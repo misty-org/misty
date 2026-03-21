@@ -12,8 +12,16 @@ namespace misty::panel {
         core::UploadProgressCallback progress_cb,
         GDUploadCallback callback
     ) {
-        // Get upload context (thread-safe copy)
         UploadContext ctx = get_upload_context();
+        upload_file(local_path, ctx, progress_cb, callback);
+    }
+
+    void GDriveState::upload_file(
+        const std::string& local_path,
+        const UploadContext& ctx,
+        core::UploadProgressCallback progress_cb,
+        GDUploadCallback callback
+    ) {
 
         if (ctx.folder_id.empty() || ctx.gd_user_id.empty()) {
             callback(false, "No Google Drive folder context. Navigate to a Google Drive folder first.");

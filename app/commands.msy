@@ -1,0 +1,21 @@
+# Misty keyboard commands
+# Format: command.id = Shortcut
+# Modifiers: Primary, Ctrl, Cmd, Shift, Alt
+
+search.toggle = Primary+K
+search.cancel = Escape
+search.confirm = Enter
+search.prev = Up
+search.next = Down
+
+explorer.copy = Primary+C
+explorer.cut = Primary+X
+explorer.paste = Primary+V
+explorer.delete = Delete
+explorer.rename = F2
+explorer.refresh = Primary+R
+
+app.open_settings = Primary+Comma
+auth.submit = Enter
+modal.confirm = Enter
+modal.cancel = Escape
