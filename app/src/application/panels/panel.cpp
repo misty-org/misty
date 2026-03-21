@@ -1,4 +1,5 @@
 #include "panel.h"
+#include "core/commands/command_manager.h"
 #include "imgui.h"
 
 namespace misty::panel {
@@ -19,7 +20,9 @@ namespace misty::panel {
             float button_x = (window_width - button_width) * 0.5f;
             ImGui::SetCursorPosX(button_x);
 
-            if (ImGui::Button("OK", ImVec2(button_width, 0))) {
+            if (ImGui::Button("OK", ImVec2(button_width, 0)) ||
+                core::CommandManager::get().matches("modal.confirm") ||
+                core::CommandManager::get().matches("modal.cancel")) {
                 error_msg = "";
                 ImGui::CloseCurrentPopup();
             }

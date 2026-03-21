@@ -71,7 +71,6 @@ namespace misty::panel {
                 center, avatar_size * 0.5f,
                 IM_COL32(60, 60, 75, 255), 48);
 
-            // Person icon inside circle
             auto& icon = core::AssetManager::get().get_svg_texture("person-24", 48);
             float icon_sz = 28.0f;
             ImVec2 icon_pos(center.x - icon_sz * 0.5f, center.y - icon_sz * 0.5f);

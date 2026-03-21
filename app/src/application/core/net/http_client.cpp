@@ -5,10 +5,12 @@
 #include <fstream>
 #include <vector>
 #include <cstring>
+#include <filesystem>
 
 #include "core/net/http_client.h"
 #include "core/manager/session_manager.h"
 #include "core/manager/env_manager.h"
+#include "core/manager/proxy_manager.h"
 #include "core/system/util.h"
 
 namespace misty::core {
@@ -16,6 +18,12 @@ namespace misty::core {
     struct CurlData {
         std::string response_body;
         std::map<std::string, std::string> response_headers;
+    };
+
+    struct DownloadFileData {
+        std::ofstream file;
+        DownloadProgressCallback progress_cb;
+        std::string error_message;
     };
 
     static size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
@@ -54,9 +62,48 @@ namespace misty::core {
         return total_size;
     }
 
+    static size_t FileWriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
+        size_t total_size = size * nmemb;
+        DownloadFileData* data = static_cast<DownloadFileData*>(userp);
+        data->file.write(static_cast<const char*>(contents), static_cast<std::streamsize>(total_size));
+        if (!data->file.good()) {
+            data->error_message = "Failed to write downloaded data to disk";
+            return 0;
+        }
+        return total_size;
+    }
+
+    static int DownloadProgressFunc(void* clientp,
+                                    curl_off_t dltotal,
+                                    curl_off_t dlnow,
+                                    curl_off_t /*ultotal*/,
+                                    curl_off_t /*ulnow*/) {
+        DownloadFileData* data = static_cast<DownloadFileData*>(clientp);
+        if (!data || !data->progress_cb) return 0;
+
+        size_t total = dltotal > 0 ? static_cast<size_t>(dltotal) : 0;
+        size_t now = dlnow > 0 ? static_cast<size_t>(dlnow) : 0;
+        return data->progress_cb(now, total) ? 0 : 1;
+    }
+
     HTTPClient& HTTPClient::get() {
         static HTTPClient instance;
         return instance;
+    }
+
+    bool HTTPClient::is_proxy_url(const std::string& url) const {
+        std::string proxy_url = EnvManager::get().get("PROXY_SERVICE_URL", "");
+        return !proxy_url.empty() && url.rfind(proxy_url, 0) == 0;
+    }
+
+    void HTTPClient::update_proxy_status(const std::string& url, int status_code) {
+        if (!is_proxy_url(url)) return;
+
+        if (status_code == 0) {
+            SessionManager::get().mark_proxy_unavailable();
+        } else {
+            SessionManager::get().mark_proxy_available();
+        }
     }
 
     HttpResponse HTTPClient::get(const std::string& url, const std::map<std::string, std::string>& headers) {
@@ -151,15 +198,115 @@ namespace misty::core {
         return response;
     }
 
-    bool HTTPClient::attempt_token_refresh() {
+    static DownloadResult execute_curl_download(const std::string& url,
+                                                const std::string& local_path,
+                                                const std::map<std::string, std::string>& headers,
+                                                DownloadProgressCallback progress_cb) {
+        namespace fs = std::filesystem;
+
+        DownloadResult result;
+        result.final_status_code = 0;
+
+        fs::path final_path(local_path);
+        fs::path temp_path = final_path;
+        temp_path += ".part";
+
+        std::error_code ec;
+        fs::create_directories(final_path.parent_path(), ec);
+
+        DownloadFileData data;
+        data.file.open(temp_path, std::ios::binary | std::ios::trunc);
+        if (!data.file.is_open()) {
+            result.error_message = "Failed to create local file: " + local_path;
+            return result;
+        }
+        data.progress_cb = std::move(progress_cb);
+
+        CURL* curl = curl_easy_init();
+        if (!curl) {
+            data.file.close();
+            fs::remove(temp_path, ec);
+            result.error_message = "Failed to initialize CURL";
+            return result;
+        }
+
+        CurlData header_data;
+
+        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, FileWriteCallback);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &data);
+        curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, HeaderCallback);
+        curl_easy_setopt(curl, CURLOPT_HEADERDATA, &header_data);
+        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+        curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 10L);
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 0L);
+
+        if (data.progress_cb) {
+            curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
+            curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, DownloadProgressFunc);
+            curl_easy_setopt(curl, CURLOPT_XFERINFODATA, &data);
+        }
+
+        struct curl_slist* header_list = nullptr;
+        for (const auto& [key, value] : headers) {
+            std::string header = key + ": " + value;
+            header_list = curl_slist_append(header_list, header.c_str());
+        }
+        if (header_list) {
+            curl_easy_setopt(curl, CURLOPT_HTTPHEADER, header_list);
+        }
+
+        CURLcode res = curl_easy_perform(curl);
+
+        long response_code = 0;
+        curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response_code);
+        result.final_status_code = static_cast<int>(response_code);
+
+        if (header_list) {
+            curl_slist_free_all(header_list);
+        }
+        curl_easy_cleanup(curl);
+        data.file.close();
+
+        if (res != CURLE_OK) {
+            fs::remove(temp_path, ec);
+            if (!data.error_message.empty()) {
+                result.error_message = data.error_message;
+            } else if (res == CURLE_ABORTED_BY_CALLBACK) {
+                result.error_message = "Download cancelled";
+            } else {
+                result.error_message = "CURL error: " + std::string(curl_easy_strerror(res));
+            }
+            return result;
+        }
+
+        if (response_code < 200 || response_code >= 300) {
+            fs::remove(temp_path, ec);
+            result.error_message = "Download failed: HTTP " + std::to_string(response_code);
+            return result;
+        }
+
+        fs::remove(final_path, ec);
+        fs::rename(temp_path, final_path, ec);
+        if (ec) {
+            fs::remove(temp_path, ec);
+            result.error_message = "Failed to finalize downloaded file: " + ec.message();
+            return result;
+        }
+
+        result.success = true;
+        return result;
+    }
+
+    HTTPClient::RefreshResult HTTPClient::attempt_token_refresh() {
         std::string refresh_token = SessionManager::get().get_refresh_token();
         if (refresh_token.empty()) {
-            return false;
+            return RefreshResult::Failed;
         }
 
         std::string proxy_url = EnvManager::get().get("PROXY_SERVICE_URL", "");
         if (proxy_url.empty()) {
-            return false;
+            return RefreshResult::Failed;
         }
 
         std::map<std::string, std::string> json_fields;
@@ -170,6 +317,10 @@ namespace misty::core {
         headers["Content-Type"] = "application/json";
 
         auto response = execute_curl_request("POST", proxy_url + "/api/refresh", json_body, headers);
+        if (response.status_code == 0 && ProxyManager::get().ensure_running()) {
+            response = execute_curl_request("POST", proxy_url + "/api/refresh", json_body, headers);
+        }
+        update_proxy_status(proxy_url + "/api/refresh", response.status_code);
 
         if (response.status_code == 200) {
             try {
@@ -184,15 +335,18 @@ namespace misty::core {
                     }
                 }
                 std::cerr << "[HTTPClient] Token refresh succeeded" << std::endl;
-                return true;
+                return RefreshResult::Success;
             } catch (...) {
                 std::cerr << "[HTTPClient] Failed to parse refresh response" << std::endl;
             }
+        } else if (response.status_code == 0) {
+            std::cerr << "[HTTPClient] Token refresh failed because proxy is unavailable" << std::endl;
+            return RefreshResult::Unavailable;
         } else {
             std::cerr << "[HTTPClient] Token refresh failed with status " << response.status_code << std::endl;
         }
 
-        return false;
+        return RefreshResult::Failed;
     }
 
     HttpResponse HTTPClient::perform_request(const std::string& method, const std::string& url, const std::string& body, const std::map<std::string, std::string>& headers) {
@@ -203,20 +357,26 @@ namespace misty::core {
         }
 
         HttpResponse response = execute_curl_request(method, url, body, merged_headers);
+        if (response.status_code == 0 && is_proxy_url(url) && ProxyManager::get().ensure_running()) {
+            response = execute_curl_request(method, url, body, merged_headers);
+        }
+        update_proxy_status(url, response.status_code);
 
         // Auto-refresh on 401 if we're not already in a refresh call
         // Guard: skip if session already expired or another thread is refreshing
         if (response.status_code == 401 &&
             !SessionManager::get().is_session_expired() &&
             !is_refreshing_.exchange(true)) {
-            if (attempt_token_refresh()) {
+            RefreshResult refresh_result = attempt_token_refresh();
+            if (refresh_result == RefreshResult::Success) {
                 // Retry with new auth headers
                 auto retry_headers = SessionManager::get().get_auth_headers();
                 for (const auto& [key, value] : headers) {
                     retry_headers[key] = value;
                 }
                 response = execute_curl_request(method, url, body, retry_headers);
-            } else {
+                update_proxy_status(url, response.status_code);
+            } else if (refresh_result == RefreshResult::Failed) {
                 // Refresh failed — mark session as expired so UI can prompt reconnect
                 // Tokens are preserved so the user can re-authenticate without re-entering credentials
                 SessionManager::get().mark_session_expired();
@@ -372,6 +532,55 @@ namespace misty::core {
         }
 
         return result;
+    }
+
+    DownloadResult HTTPClient::download_to_file(
+        const std::string& url,
+        const std::string& local_path,
+        const std::map<std::string, std::string>& headers,
+        DownloadProgressCallback progress_cb
+    ) {
+        auto merged_headers = SessionManager::get().get_auth_headers();
+        for (const auto& [key, value] : headers) {
+            merged_headers[key] = value;
+        }
+
+        DownloadResult result = execute_curl_download(url, local_path, merged_headers, progress_cb);
+        if (result.final_status_code == 0 && is_proxy_url(url) && ProxyManager::get().ensure_running()) {
+            result = execute_curl_download(url, local_path, merged_headers, progress_cb);
+        }
+        update_proxy_status(url, result.final_status_code);
+
+        if (result.final_status_code == 401 &&
+            !SessionManager::get().is_session_expired() &&
+            !is_refreshing_.exchange(true)) {
+            RefreshResult refresh_result = attempt_token_refresh();
+            if (refresh_result == RefreshResult::Success) {
+                auto retry_headers = SessionManager::get().get_auth_headers();
+                for (const auto& [key, value] : headers) {
+                    retry_headers[key] = value;
+                }
+                result = execute_curl_download(url, local_path, retry_headers, progress_cb);
+                update_proxy_status(url, result.final_status_code);
+            } else if (refresh_result == RefreshResult::Failed) {
+                SessionManager::get().mark_session_expired();
+            }
+            is_refreshing_.store(false);
+        }
+
+        return result;
+    }
+
+    bool HTTPClient::probe_proxy() {
+        std::string proxy_url = EnvManager::get().get("PROXY_SERVICE_URL", "");
+        if (proxy_url.empty()) {
+            SessionManager::get().mark_proxy_unavailable("PROXY_SERVICE_URL is not configured.");
+            return false;
+        }
+
+        HttpResponse response = execute_curl_request("GET", proxy_url + "/api/hello", "", {});
+        update_proxy_status(proxy_url + "/api/hello", response.status_code);
+        return response.status_code != 0;
     }
 
     std::string build_json_object(const std::map<std::string, std::string>& fields) {

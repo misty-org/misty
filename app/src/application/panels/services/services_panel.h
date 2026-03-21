@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string>
 #include "panels/panel.h"
 #include "core/ui/ui_registry.h"
 #include "services_state.h"
@@ -54,6 +55,7 @@ namespace misty::panel {
         void show_icloud_card_actions(ServicesState& state, const std::string& email, bool is_connected);
 
         void show_loading_overlay();
+        void show_disconnect_confirm_modal(ServicesState& state);
 
     private:
         static constexpr float kCardWidth = 300.0f;
@@ -64,5 +66,9 @@ namespace misty::panel {
         char icl_email_buf_[256] = {};
         char icl_password_buf_[256] = {};
         char icl_2fa_buf_[16] = {};
+
+        // Pending disconnect confirmation
+        std::string pending_disconnect_provider_;
+        std::string pending_disconnect_id_;
     };
 }

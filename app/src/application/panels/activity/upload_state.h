@@ -9,6 +9,14 @@
 
 namespace misty::panel {
 
+    enum class UploadProvider {
+        UNKNOWN,
+        ONEDRIVE,
+        GDRIVE,
+        DROPBOX,
+        ICLOUD
+    };
+
     enum class UploadStatus {
         PENDING,
         UPLOADING,
@@ -27,6 +35,17 @@ namespace misty::panel {
         std::string error_message;
         std::chrono::steady_clock::time_point started_at;
         std::chrono::steady_clock::time_point completed_at;
+        UploadProvider provider = UploadProvider::UNKNOWN;
+
+        std::string od_ms_user_id;
+        std::string od_drive_id;
+        std::string od_folder_id;
+
+        std::string gd_user_id;
+        std::string gd_folder_id;
+
+        std::string dbx_user_id;
+        std::string dbx_folder_path;
 
         float get_progress() const {
             if (file_size <= 0) return 0.0f;
@@ -35,6 +54,23 @@ namespace misty::panel {
 
         bool is_active() const {
             return status == UploadStatus::PENDING || status == UploadStatus::UPLOADING;
+        }
+
+        bool can_retry() const {
+            if (status != UploadStatus::FAILED || local_path.empty()) return false;
+
+            switch (provider) {
+                case UploadProvider::ONEDRIVE:
+                    return !od_ms_user_id.empty() && !od_drive_id.empty() && !od_folder_id.empty();
+                case UploadProvider::GDRIVE:
+                    return !gd_user_id.empty() && !gd_folder_id.empty();
+                case UploadProvider::DROPBOX:
+                    return !dbx_user_id.empty();
+                case UploadProvider::ICLOUD:
+                case UploadProvider::UNKNOWN:
+                default:
+                    return false;
+            }
         }
     };
 
@@ -45,111 +81,28 @@ namespace misty::panel {
         uint64_t start_upload(const std::string& file_name,
                                const std::string& local_path,
                                const std::string& destination,
-                               int64_t file_size = 0) {
-            std::lock_guard<std::mutex> lock(mu);
+                               int64_t file_size = 0);
 
-            uint64_t id = next_id_++;
-            UploadItem item;
-            item.id = id;
-            item.file_name = file_name;
-            item.local_path = local_path;
-            item.destination = destination;
-            item.file_size = file_size;
-            item.status = UploadStatus::UPLOADING;
-            item.started_at = std::chrono::steady_clock::now();
-
-            uploads_.push_back(item);
-            return id;
-        }
-
-        void update_progress(uint64_t id, int64_t uploaded_bytes) {
-            std::lock_guard<std::mutex> lock(mu);
-            for (auto& item : uploads_) {
-                if (item.id == id) {
-                    item.uploaded_bytes = uploaded_bytes;
-                    break;
-                }
-            }
-        }
-
-        void complete_upload(uint64_t id) {
-            std::lock_guard<std::mutex> lock(mu);
-            for (auto& item : uploads_) {
-                if (item.id == id) {
-                    item.status = UploadStatus::COMPLETED;
-                    item.completed_at = std::chrono::steady_clock::now();
-                    item.uploaded_bytes = item.file_size;
-                    break;
-                }
-            }
-            cleanup_old_history();
-        }
-
-        void fail_upload(uint64_t id, const std::string& error) {
-            std::lock_guard<std::mutex> lock(mu);
-            for (auto& item : uploads_) {
-                if (item.id == id) {
-                    item.status = UploadStatus::FAILED;
-                    item.error_message = error;
-                    item.completed_at = std::chrono::steady_clock::now();
-                    break;
-                }
-            }
-            cleanup_old_history();
-        }
-
-        void clear_completed() {
-            std::lock_guard<std::mutex> lock(mu);
-            uploads_.erase(
-                std::remove_if(uploads_.begin(), uploads_.end(),
-                    [](const UploadItem& item) {
-                        return item.status == UploadStatus::COMPLETED ||
-                               item.status == UploadStatus::FAILED;
-                    }),
-                uploads_.end()
-            );
-        }
-
-        std::vector<UploadItem> get_all_uploads() {
-            std::lock_guard<std::mutex> lock(mu);
-            return uploads_;
-        }
-
-        size_t active_count() {
-            std::lock_guard<std::mutex> lock(mu);
-            size_t count = 0;
-            for (const auto& item : uploads_) {
-                if (item.is_active()) count++;
-            }
-            return count;
-        }
-
-        size_t total_count() {
-            std::lock_guard<std::mutex> lock(mu);
-            return uploads_.size();
-        }
+        void update_progress(uint64_t id, int64_t uploaded_bytes);
+        void complete_upload(uint64_t id);
+        void fail_upload(uint64_t id, const std::string& error);
+        void set_onedrive_retry_context(uint64_t id,
+                                        const std::string& ms_user_id,
+                                        const std::string& drive_id,
+                                        const std::string& folder_id);
+        void set_gdrive_retry_context(uint64_t id,
+                                      const std::string& gd_user_id,
+                                      const std::string& folder_id);
+        void set_dropbox_retry_context(uint64_t id,
+                                       const std::string& dbx_user_id,
+                                       const std::string& folder_path);
+        void clear_completed();
+        std::vector<UploadItem> get_all_uploads();
+        size_t active_count();
+        size_t total_count();
 
     private:
-        void cleanup_old_history() {
-            size_t completed_count = 0;
-            for (auto it = uploads_.rbegin(); it != uploads_.rend(); ++it) {
-                if (!it->is_active()) {
-                    completed_count++;
-                }
-            }
-
-            if (completed_count > MAX_HISTORY) {
-                size_t to_remove = completed_count - MAX_HISTORY;
-                for (auto it = uploads_.begin(); it != uploads_.end() && to_remove > 0;) {
-                    if (!it->is_active()) {
-                        it = uploads_.erase(it);
-                        to_remove--;
-                    } else {
-                        ++it;
-                    }
-                }
-            }
-        }
+        void cleanup_old_history();
 
         std::mutex mu;
         std::vector<UploadItem> uploads_;

@@ -204,6 +204,13 @@ namespace misty::panel {
             DBXUploadCallback callback
         );
 
+        void upload_file(
+            const std::string& local_path,
+            const UploadContext& ctx,
+            core::UploadProgressCallback progress_cb,
+            DBXUploadCallback callback
+        );
+
         core::WorkerPool* worker_pool_ = nullptr;
     };
 }

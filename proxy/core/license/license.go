@@ -8,13 +8,12 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/kannachi323/misty/proxy/db"
 )
-
-const refreshThreshold = 24 * time.Hour // refresh if token expires within 1 day
 
 type Claims struct {
 	UserID string `json:"user_id"`
@@ -37,67 +36,66 @@ func NewManager(database *db.Database) *Manager {
 	}
 }
 
-// GetTier returns the current subscription tier from the local cache.
-// Returns "free" if no valid license is cached.
-func (m *Manager) GetTier() string {
+func (m *Manager) cachedClaims() (*Claims, error) {
 	cached, err := m.database.GetLicense()
 	if err != nil || cached == nil {
-		return "free"
+		return nil, err
 	}
-	if time.Now().After(cached.ExpiresAt) {
-		return "free"
+	if !cached.ExpiresAt.IsZero() && time.Now().After(cached.ExpiresAt) {
+		return nil, errors.New("cached entitlement expired")
 	}
-	if _, err := m.validateToken(cached.Token); err != nil {
-		return "free"
-	}
-	return cached.Tier
+	return m.validateToken(cached.Token)
 }
 
-// RenewIfCached re-validates the cached license token if it's close to expiry.
-// Safe to call without credentials — does nothing if cache is empty or still fresh.
-func (m *Manager) RenewIfCached() {
-	cached, err := m.database.GetLicense()
-	if err != nil || cached == nil {
-		return
+func identityMatches(claims *Claims, userID, email string) bool {
+	if claims == nil {
+		return false
 	}
-	if time.Until(cached.ExpiresAt) > refreshThreshold {
-		return
+	if userID != "" && claims.UserID == userID {
+		return true
 	}
-	// Re-validate the existing token — if the server still considers it valid,
-	// parse claims and extend the local cache without needing credentials.
-	claims, err := m.validateToken(cached.Token)
-	if err != nil {
-		return
+	if email != "" && strings.EqualFold(claims.Email, email) {
+		return true
 	}
-	// Token is structurally valid but close to expiry; keep it in cache
-	// without extension (server-side expiry is authoritative).
-	_ = m.database.StoreLicense(cached.Token, cached.Tier, claims.ExpiresAt.Time)
+	return false
 }
 
-// RefreshIfNeeded fetches a fresh license token from the server if the
-// cached one is missing, expired, or within refreshThreshold of expiry.
-// Returns the license token string (cached or freshly fetched).
+// GetTierForIdentity returns the local cached entitlement tier for the
+// authenticated user. Returns "free" if no matching entitlement is cached.
+func (m *Manager) GetTierForIdentity(userID, email string) string {
+	claims, err := m.cachedClaims()
+	if err != nil || !identityMatches(claims, userID, email) {
+		return "free"
+	}
+	return claims.Tier
+}
+
+// RenewIfCached is intentionally a no-op for perpetual entitlements.
+func (m *Manager) RenewIfCached() {}
+
+// RefreshIfNeeded returns a previously verified local entitlement for this
+// user if one exists; otherwise it performs the one-time server verification.
 func (m *Manager) RefreshIfNeeded(email, password string) (string, error) {
-	cached, err := m.database.GetLicense()
-	if err != nil {
-		return "", err
-	}
-
-	if cached != nil && time.Until(cached.ExpiresAt) > refreshThreshold {
-		return cached.Token, nil // still fresh
+	claims, err := m.cachedClaims()
+	if err == nil && identityMatches(claims, "", email) {
+		return m.GetCachedTokenForIdentity(claims.UserID, email), nil
 	}
 
 	return m.fetchAndStore(email, password)
 }
 
-// GetCachedToken returns the cached license token string, or empty string if
-// none is cached or it has expired.
-func (m *Manager) GetCachedToken() string {
+// GetCachedTokenForIdentity returns the cached entitlement token for the
+// authenticated user, or empty string if none matches.
+func (m *Manager) GetCachedTokenForIdentity(userID, email string) string {
 	cached, err := m.database.GetLicense()
 	if err != nil || cached == nil {
 		return ""
 	}
-	if time.Now().After(cached.ExpiresAt) {
+	if !cached.ExpiresAt.IsZero() && time.Now().After(cached.ExpiresAt) {
+		return ""
+	}
+	claims, err := m.validateToken(cached.Token)
+	if err != nil || !identityMatches(claims, userID, email) {
 		return ""
 	}
 	return cached.Token
@@ -134,12 +132,24 @@ func (m *Manager) fetchAndStore(email, password string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("server returned invalid token: %w", err)
 	}
+	if !identityMatches(claims, "", email) {
+		return "", errors.New("server returned entitlement for a different user")
+	}
 
-	if err := m.database.StoreLicense(result.LicenseToken, result.Tier, claims.ExpiresAt.Time); err != nil {
+	expiresAt := time.Time{}
+	if claims.ExpiresAt != nil {
+		expiresAt = claims.ExpiresAt.Time
+	}
+
+	if err := m.database.StoreLicense(result.LicenseToken, result.Tier, expiresAt); err != nil {
 		return "", err
 	}
 
-	log.Printf("License refreshed: tier=%s expires=%s", result.Tier, claims.ExpiresAt.Time.Format(time.RFC3339))
+	expiry := "never"
+	if !expiresAt.IsZero() {
+		expiry = expiresAt.Format(time.RFC3339)
+	}
+	log.Printf("Entitlement cached: tier=%s expires=%s", result.Tier, expiry)
 	return result.LicenseToken, nil
 }
 
