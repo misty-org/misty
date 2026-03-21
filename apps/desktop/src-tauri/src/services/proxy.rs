@@ -2,7 +2,7 @@ use std::{
     path::Path,
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc,
+        Arc, RwLock as StdRwLock,
     },
 };
 
@@ -14,7 +14,7 @@ use tokio::sync::RwLock;
 use tokio::time::{sleep, Duration};
 
 use crate::error::{ApiError, ApiResult};
-use crate::services::environment::AppEnvironmentService;
+use crate::services::{environment::AppEnvironmentService, proxy_runtime::ProxyRuntimeService};
 
 #[derive(Clone)]
 pub struct ProxyService {
@@ -23,7 +23,8 @@ pub struct ProxyService {
 
 struct ProxyInner {
     client: reqwest::Client,
-    proxy_url: Option<String>,
+    proxy_url: StdRwLock<Option<String>>,
+    proxy_runtime: Option<ProxyRuntimeService>,
     database_path: std::path::PathBuf,
     snapshot: RwLock<ProxySnapshot>,
 }
@@ -46,7 +47,16 @@ impl ProxyService {
         environment: AppEnvironmentService,
         proxy_url: Option<String>,
     ) -> Self {
+        Self::new_with_proxy_runtime(environment, None, proxy_url)
+    }
+
+    pub fn new_with_proxy_runtime(
+        environment: AppEnvironmentService,
+        proxy_runtime: Option<ProxyRuntimeService>,
+        proxy_url: Option<String>,
+    ) -> Self {
         let database_path = environment.proxy_token_db_path();
+        let proxy_url = normalize_proxy_url(proxy_url);
         let snapshot = ProxySnapshot {
             proxy_url: proxy_url.clone(),
             ready: false,
@@ -56,7 +66,8 @@ impl ProxyService {
         Self {
             inner: Arc::new(ProxyInner {
                 client: reqwest::Client::new(),
-                proxy_url,
+                proxy_url: StdRwLock::new(proxy_url),
+                proxy_runtime,
                 database_path,
                 snapshot: RwLock::new(snapshot),
             }),
@@ -64,15 +75,17 @@ impl ProxyService {
     }
 
     pub fn proxy_url(&self) -> Option<String> {
-        self.inner.proxy_url.clone()
+        self.resolve_proxy_url()
     }
 
     pub async fn snapshot(&self) -> ProxySnapshot {
-        self.inner.snapshot.read().await.clone()
+        let mut snapshot = self.inner.snapshot.read().await.clone();
+        snapshot.proxy_url = self.proxy_url();
+        snapshot
     }
 
     pub async fn probe_remote_health(&self) -> ApiResult<serde_json::Value> {
-        let url = self.url("/api/remote/health")?;
+        let url = self.request_url("/api/remote/health").await?;
         let response = self.inner.client.get(url).send().await?;
         let status = response.status();
         let body = response.text().await.unwrap_or_default();
@@ -100,11 +113,61 @@ impl ProxyService {
     }
 
     pub fn url(&self, path: &str) -> ApiResult<String> {
-        let base =
-            self.inner.proxy_url.as_ref().ok_or_else(|| {
-                ApiError::Unavailable("PROXY_SERVICE_URL not configured".to_string())
-            })?;
+        let base = self
+            .resolve_proxy_url()
+            .ok_or_else(|| ApiError::Unavailable("Misty proxy is not ready.".to_string()))?;
         Ok(format!("{base}{path}"))
+    }
+
+    async fn request_url(&self, path: &str) -> ApiResult<String> {
+        self.request_url_with_cancellation(path, None).await
+    }
+
+    async fn request_url_with_cancellation(
+        &self,
+        path: &str,
+        cancellation: Option<&AtomicBool>,
+    ) -> ApiResult<String> {
+        for attempt in 0..50 {
+            ensure_not_canceled_if(cancellation)?;
+            if let Some(base) = self.resolve_proxy_url() {
+                return Ok(format!("{base}{path}"));
+            }
+            if attempt < 49 {
+                sleep(Duration::from_millis(100)).await;
+            }
+        }
+        Err(ApiError::Unavailable(
+            "Misty proxy is not ready.".to_string(),
+        ))
+    }
+
+    fn resolve_proxy_url(&self) -> Option<String> {
+        if let Some(proxy_url) = self
+            .inner
+            .proxy_runtime
+            .as_ref()
+            .and_then(ProxyRuntimeService::proxy_url)
+            .and_then(|value| normalize_proxy_url(Some(value)))
+        {
+            self.store_proxy_url(proxy_url.clone());
+            return Some(proxy_url);
+        }
+
+        self.inner
+            .proxy_url
+            .read()
+            .ok()
+            .and_then(|value| value.clone())
+    }
+
+    fn store_proxy_url(&self, proxy_url: String) {
+        let Ok(mut current) = self.inner.proxy_url.write() else {
+            return;
+        };
+        if current.as_deref() != Some(proxy_url.as_str()) {
+            *current = Some(proxy_url);
+        }
     }
 
     pub fn rclone_rc_url_from_health(&self, health: &serde_json::Value) -> String {
@@ -120,13 +183,13 @@ impl ProxyService {
     where
         Q: Serialize + ?Sized,
     {
-        let url = self.url(path)?;
+        let url = self.request_url(path).await?;
         self.send_authenticated(Method::GET, &url, |request| request.query(query))
             .await
     }
 
     pub async fn get(&self, path: &str) -> ApiResult<reqwest::Response> {
-        let url = self.url(path)?;
+        let url = self.request_url(path).await?;
         self.send_authenticated(Method::GET, &url, |request| request)
             .await
     }
@@ -136,7 +199,7 @@ impl ProxyService {
         path: &str,
         body: &serde_json::Value,
     ) -> ApiResult<reqwest::Response> {
-        let url = self.url(path)?;
+        let url = self.request_url(path).await?;
         self.send_authenticated(Method::POST, &url, |request| request.json(body))
             .await
     }
@@ -145,13 +208,13 @@ impl ProxyService {
     where
         Q: Serialize + ?Sized,
     {
-        let url = self.url(path)?;
+        let url = self.request_url(path).await?;
         self.send_authenticated(Method::DELETE, &url, |request| request.query(query))
             .await
     }
 
     pub async fn delete(&self, path: &str) -> ApiResult<reqwest::Response> {
-        let url = self.url(path)?;
+        let url = self.request_url(path).await?;
         self.send_authenticated(Method::DELETE, &url, |request| request)
             .await
     }
@@ -165,7 +228,9 @@ impl ProxyService {
         cancellation: Option<&AtomicBool>,
     ) -> ApiResult<reqwest::Response> {
         ensure_not_canceled_if(cancellation)?;
-        let url = self.url("/api/remote/file/upload")?;
+        let url = self
+            .request_url_with_cancellation("/api/remote/file/upload", cancellation)
+            .await?;
         let token = self.current_or_refresh_access_token().await;
         let response = self
             .upload_file_request(
@@ -273,7 +338,7 @@ impl ProxyService {
     }
 
     async fn refresh_access_token(&self) -> bool {
-        let Ok(url) = self.url("/api/session/refresh") else {
+        let Ok(url) = self.request_url("/api/session/refresh").await else {
             return false;
         };
         self.inner
@@ -335,6 +400,12 @@ impl ProxyService {
         })?;
         Ok(())
     }
+}
+
+fn normalize_proxy_url(proxy_url: Option<String>) -> Option<String> {
+    proxy_url
+        .map(|value| value.trim().trim_end_matches('/').to_owned())
+        .filter(|value| !value.is_empty())
 }
 
 trait CancellableRequestBuilder {

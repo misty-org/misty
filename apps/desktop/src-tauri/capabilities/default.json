@@ -11,6 +11,8 @@
     "clipboard-manager:allow-read-image",
     "clipboard-manager:allow-write-html",
     "clipboard-manager:allow-write-image",
+    "core:event:default",
+    "deep-link:default",
     "dialog:default",
     "keystore:default",
     "os:default",
