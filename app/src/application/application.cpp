@@ -1,5 +1,6 @@
 #include "application.h"
 #include "core/commands/command_manager.h"
+#include "core/manager/proxy_manager.h"
 #include "core/manager/session_manager.h"
 #include "views/main_view.h"
 #include "views/register_view.h"
@@ -20,6 +21,7 @@ namespace misty {
             init_platform();
             init_client();
             core::CommandManager::get().load();
+            core::ProxyManager::get().ensure_running();
             //init_file_sync();
             
             // Initialize and start background file status sync

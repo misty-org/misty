@@ -5,11 +5,9 @@
 #include "download_state.h"
 #include "upload_state.h"
 #include "panels/notification/notification_state.h"
-
 namespace misty::panel {
 
     enum class ActivityCategory {
-        NOTIFICATIONS,
         DOWNLOADS,
         UPLOADS
     };
@@ -33,11 +31,6 @@ namespace misty::panel {
         void render_header();
         void render_category_tabs();
 
-        // Notifications
-        void render_notification_list();
-        void render_notification_item(const Notification& notif);
-        void render_notification_empty();
-
         // Downloads
         void render_download_filter_tabs();
         void render_download_list();
@@ -54,11 +47,9 @@ namespace misty::panel {
         // Helpers
         std::string format_file_size(int64_t bytes);
         std::string format_time_ago(std::chrono::steady_clock::time_point time);
-        ImVec4 get_notification_type_color(NotificationType type);
-        const char* get_notification_type_label(NotificationType type);
 
         core::UIRegistry& registry_;
-        ActivityCategory current_category_ = ActivityCategory::NOTIFICATIONS;
+        ActivityCategory current_category_ = ActivityCategory::DOWNLOADS;
         ActivityFilter download_filter_ = ActivityFilter::ALL;
         ActivityFilter upload_filter_ = ActivityFilter::ALL;
     };

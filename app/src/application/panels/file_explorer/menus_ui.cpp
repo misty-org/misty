@@ -3,6 +3,9 @@
 #include <cstdio>
 
 #include "core/commands/command_manager.h"
+#include "core/file_picker/application_picker.h"
+#include "core/manager/open_with_manager.h"
+#include "core/system/util.h"
 #include "panels/notification/notification_state.h"
 #include "panels/search/search_state.h"
 #include "panels/services/dropbox/dropbox_state.h"
@@ -15,6 +18,44 @@ namespace fs = std::filesystem;
 using namespace misty::core;
 
 namespace misty::panel {
+const UnifiedFileItem* FileExplorerPanel::find_context_menu_target(const FileExplorerState& state) const {
+    for (const auto& file : state.files) {
+        if (file.path == state.context_menu_target_path) {
+            return &file;
+        }
+    }
+    return nullptr;
+}
+
+bool FileExplorerPanel::open_context_menu_target(FileExplorerState& state) {
+    const UnifiedFileItem* file = find_context_menu_target(state);
+    if (!file || file->is_dir || !fs::exists(file->path)) {
+        return false;
+    }
+
+    auto associated_app = OpenWithManager::get().association_for_path(file->path);
+    if (associated_app.has_value()) {
+        return core::open_path_with_application(*associated_app, file->path);
+    }
+
+    return core::open_path_default(file->path);
+}
+
+bool FileExplorerPanel::open_context_menu_target_with_dialog(FileExplorerState& state) {
+    const UnifiedFileItem* file = find_context_menu_target(state);
+    if (!file || file->is_dir || !fs::exists(file->path)) {
+        return false;
+    }
+
+    auto app = core::ApplicationPicker::pick();
+    if (!app.has_value()) {
+        return false;
+    }
+
+    OpenWithManager::get().set_association_for_path(file->path, *app);
+    return core::open_path_with_application(*app, file->path);
+}
+
 void FileExplorerPanel::show_context_menu(FileExplorerState& state) {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 8.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(10.0f, 6.0f));
@@ -33,6 +74,8 @@ void FileExplorerPanel::show_context_menu(FileExplorerState& state) {
 
         if (show_menu) {
             bool is_trash_view = (std::string(state.current_path) == FileExplorerState::VIRTUAL_PATH_TRASH);
+            const UnifiedFileItem* target_file = find_context_menu_target(state);
+            const bool can_open_directly = target_file && !target_file->is_dir && fs::exists(target_file->path);
             bool all_local_available = !state.selected_files.empty();
             for (const auto& f : state.files) {
                 if (state.selected_files.count(f.path) == 0) continue;
@@ -41,6 +84,24 @@ void FileExplorerPanel::show_context_menu(FileExplorerState& state) {
                     all_local_available = false;
                     break;
                 }
+            }
+
+            if (ImGui::MenuItem("Open", nullptr, false, can_open_directly)) {
+                if (!open_context_menu_target(state)) {
+                    auto& notif = registry_.get_state<NotificationState>("Notifications");
+                    notif.add_notification("Open Failed", "Could not open file.", NotificationType::ERROR);
+                }
+            }
+
+            if (ImGui::MenuItem("Open With...", nullptr, false, can_open_directly)) {
+                if (!open_context_menu_target_with_dialog(state)) {
+                    auto& notif = registry_.get_state<NotificationState>("Notifications");
+                    notif.add_notification("Open With Failed", "Could not open file with the selected application.", NotificationType::ERROR);
+                }
+            }
+
+            if (can_open_directly) {
+                ImGui::Separator();
             }
 
             if (all_local_available) {

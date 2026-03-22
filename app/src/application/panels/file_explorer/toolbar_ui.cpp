@@ -119,10 +119,20 @@ void FileExplorerPanel::show_search_bar(FileExplorerState& state) {
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 8));
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
 
+    const float icon_size = 16.0f;
     const float btn_size = 32.0f;
     const float spacing = 8.0f;
+    const bool is_local = !path_utils::is_onedrive_path(state.current_path)
+                       && !path_utils::is_gdrive_path(state.current_path)
+                       && !path_utils::is_dropbox_path(state.current_path)
+                       && !path_utils::is_icloud_path(state.current_path);
+    const int icon_button_count = is_local ? 4 : 3;
+    const float icon_button_width = icon_size + ImGui::GetStyle().FramePadding.x * 2.0f;
     const float total_available = ImGui::GetContentRegionAvail().x;
-    const float path_width = std::max(100.0f, total_available - (btn_size + spacing) * 2);
+    const float path_width = std::max(
+        100.0f,
+        total_available - icon_button_width * icon_button_count - spacing * icon_button_count
+    );
 
     ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.21f, 0.21f, 0.21f, 1.0f));
     ImGui::SetNextItemWidth(path_width);
@@ -139,7 +149,7 @@ void FileExplorerPanel::show_search_bar(FileExplorerState& state) {
     ImGui::SameLine(0, spacing);
     auto& search_tex = AssetManager::get().get_svg_texture("search-16", 16);
     if (search_tex.id != 0) {
-        if (ImGui::ImageButton("##opensearch", search_tex.id, ImVec2(16, 16), ImVec2(0, 0), ImVec2(1, 1),
+        if (ImGui::ImageButton("##opensearch", search_tex.id, ImVec2(icon_size, icon_size), ImVec2(0, 0), ImVec2(1, 1),
                 ImVec4(0, 0, 0, 0), ImVec4(0.7f, 0.7f, 0.7f, 1.0f))) {
             registry_.get_state<SearchState>("Search").is_open = true;
         }
@@ -151,42 +161,63 @@ void FileExplorerPanel::show_search_bar(FileExplorerState& state) {
     }
 
     ImGui::SameLine(0, spacing);
-    if (ImGui::Button("···", ImVec2(btn_size, 0))) {
-        ImGui::OpenPopup("ViewOptionsPopup");
+    ImVec4 icon_tint = state.grid_view
+        ? ImVec4(0.95f, 0.95f, 0.95f, 1.0f)
+        : ImVec4(0.7f, 0.7f, 0.7f, 1.0f);
+    auto& grid_tex = AssetManager::get().get_svg_texture("apps-16", 16);
+    if (grid_tex.id != 0) {
+        if (ImGui::ImageButton("##gridview", grid_tex.id, ImVec2(icon_size, icon_size), ImVec2(0, 0), ImVec2(1, 1),
+                ImVec4(0, 0, 0, 0), icon_tint)) {
+            state.grid_view = true;
+        }
+    } else if (ImGui::Button("G", ImVec2(btn_size, 0))) {
+        state.grid_view = true;
     }
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("View Options");
+        ImGui::SetTooltip("Grid View");
     }
 
-    ImGui::PopStyleColor(3);
+    ImGui::SameLine(0, spacing);
+    icon_tint = !state.grid_view
+        ? ImVec4(0.95f, 0.95f, 0.95f, 1.0f)
+        : ImVec4(0.7f, 0.7f, 0.7f, 1.0f);
+    auto& list_tex = AssetManager::get().get_svg_texture("rows-16", 16);
+    if (list_tex.id != 0) {
+        if (ImGui::ImageButton("##listview", list_tex.id, ImVec2(icon_size, icon_size), ImVec2(0, 0), ImVec2(1, 1),
+                ImVec4(0, 0, 0, 0), icon_tint)) {
+            state.grid_view = false;
+        }
+    } else if (ImGui::Button("L", ImVec2(btn_size, 0))) {
+        state.grid_view = false;
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("List View");
+    }
 
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 8.0f));
-    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(10.0f, 6.0f));
-    ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.15f, 0.15f, 0.15f, 0.95f));
-    ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.3f, 0.3f, 0.3f, 0.6f));
-
-    if (ImGui::BeginPopup("ViewOptionsPopup")) {
-        if (ImGui::MenuItem("List View", nullptr, !state.grid_view)) state.grid_view = false;
-        if (ImGui::MenuItem("Grid View", nullptr, state.grid_view)) state.grid_view = true;
-
-        bool is_local = !path_utils::is_onedrive_path(state.current_path)
-                     && !path_utils::is_gdrive_path(state.current_path)
-                     && !path_utils::is_dropbox_path(state.current_path)
-                     && !path_utils::is_icloud_path(state.current_path);
-        if (is_local) {
-            ImGui::Separator();
-            if (ImGui::MenuItem("Show Hidden Files", nullptr, state.show_hidden)) {
+    if (is_local) {
+        ImGui::SameLine(0, spacing);
+        icon_tint = state.show_hidden
+            ? ImVec4(0.95f, 0.95f, 0.95f, 1.0f)
+            : ImVec4(0.7f, 0.7f, 0.7f, 1.0f);
+        auto& hidden_tex = AssetManager::get().get_svg_texture(state.show_hidden ? "eye-16" : "eye-closed-16", 16);
+        if (hidden_tex.id != 0) {
+            if (ImGui::ImageButton("##togglehidden", hidden_tex.id, ImVec2(icon_size, icon_size), ImVec2(0, 0), ImVec2(1, 1),
+                    ImVec4(0, 0, 0, 0), icon_tint)) {
                 state.show_hidden = !state.show_hidden;
                 std::string current(state.current_path);
                 if (!current.empty()) navigate_to_path(current, false);
             }
+        } else if (ImGui::Button("H", ImVec2(btn_size, 0))) {
+            state.show_hidden = !state.show_hidden;
+            std::string current(state.current_path);
+            if (!current.empty()) navigate_to_path(current, false);
         }
-
-        ImGui::EndPopup();
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip(state.show_hidden ? "Hide Hidden Files" : "Show Hidden Files");
+        }
     }
 
-    ImGui::PopStyleColor(2);
-    ImGui::PopStyleVar(2);
+    ImGui::PopStyleColor(3);
     ImGui::PopStyleVar(2);
 }
 

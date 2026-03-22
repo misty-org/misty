@@ -2,6 +2,8 @@
 #include "core/commands/command_manager.h"
 #include "core/manager/session_manager.h"
 #include "core/manager/asset_manager.h"
+#include "core/manager/proxy_manager.h"
+#include "core/net/http_client.h"
 #include "core/ui/imgui_utils.h"
 #include <algorithm>
 
@@ -12,6 +14,7 @@ namespace misty::view {
         ui_registry_(ui_registry), worker_pool_(worker_pool), client_(client) {
 
         init_panels();
+        schedule_proxy_probe();
     }
   
     void MainView::init_panels() {
@@ -37,6 +40,12 @@ namespace misty::view {
         // 1. Define Layout Constraints
         // ---------------------------------------------------------
         float navbar_width = 77.0f;
+        float content_x = viewport->WorkPos.x + navbar_width;
+        float content_width = viewport->WorkSize.x - navbar_width;
+        float proxy_banner_height = render_proxy_status_banner(
+            ImVec2(content_x, viewport->WorkPos.y),
+            content_width
+        );
 
         // ---------------------------------------------------------
         // 2. Calculate Geometry (Left-to-Right Flow)
@@ -48,21 +57,22 @@ namespace misty::view {
 
         // --- Sidebar Geometry (Middle Column) ---
         float sidebar_w = sidebar_width_;
-        float sidebar_h = viewport->WorkSize.y;
-        ImVec2 sidebar_pos = ImVec2(viewport->WorkPos.x + navbar_width, viewport->WorkPos.y);
+        float sidebar_h = viewport->WorkSize.y - proxy_banner_height;
+        ImVec2 sidebar_pos = ImVec2(content_x, viewport->WorkPos.y + proxy_banner_height);
 
         // --- Explorer Geometry (Right Column) ---
         float explorer_w = viewport->WorkSize.x - navbar_width - sidebar_w;
-        float explorer_h = viewport->WorkSize.y;
+        float explorer_h = viewport->WorkSize.y - proxy_banner_height;
         ImVec2 explorer_pos = ImVec2(sidebar_pos.x + sidebar_w, viewport->WorkPos.y);
+        explorer_pos.y += proxy_banner_height;
 
         // ---------------------------------------------------------
         // 3. Resize Handle (between sidebar and explorer)
         // ---------------------------------------------------------
         float handle_x0 = explorer_pos.x - kResizeHandleWidth * 0.5f;
         float handle_x1 = handle_x0 + kResizeHandleWidth;
-        float handle_y0 = viewport->WorkPos.y;
-        float handle_y1 = handle_y0 + viewport->WorkSize.y;
+        float handle_y0 = sidebar_pos.y;
+        float handle_y1 = viewport->WorkPos.y + viewport->WorkSize.y;
 
         ImGuiIO& io = ImGui::GetIO();
 
@@ -103,7 +113,7 @@ namespace misty::view {
             ImDrawList* fg = ImGui::GetForegroundDrawList();
             float line_x = sidebar_pos.x + sidebar_w;
             fg->AddLine(
-                ImVec2(line_x, viewport->WorkPos.y),
+                ImVec2(line_x, sidebar_pos.y),
                 ImVec2(line_x, viewport->WorkPos.y + viewport->WorkSize.y),
                 IM_COL32(100, 100, 100, 180), 2.0f);
         }
@@ -132,6 +142,76 @@ namespace misty::view {
 
         // Session expiry modal — must be outermost so it blocks all interaction
         show_session_expired_modal();
+    }
+
+    void MainView::schedule_proxy_probe() {
+        bool expected = false;
+        if (!proxy_probe_in_flight_.compare_exchange_strong(expected, true)) {
+            return;
+        }
+
+        worker_pool_.add(
+            []() {
+                core::ProxyManager::get().ensure_running();
+            },
+            [this]() {
+                proxy_probe_in_flight_.store(false);
+            },
+            [this](const std::string&) {
+                core::SessionManager::get().mark_proxy_unavailable();
+                proxy_probe_in_flight_.store(false);
+            }
+        );
+    }
+
+    float MainView::render_proxy_status_banner(const ImVec2& pos, float width) {
+        if (core::SessionManager::get().is_proxy_available()) {
+            return 0.0f;
+        }
+
+        constexpr float kBannerHeight = 62.0f;
+        constexpr float kButtonWidth = 112.0f;
+
+        ImGui::SetNextWindowPos(pos);
+        ImGui::SetNextWindowSize(ImVec2(width, kBannerHeight));
+        ImGuiWindowFlags flags =
+            ImGuiWindowFlags_NoTitleBar |
+            ImGuiWindowFlags_NoResize |
+            ImGuiWindowFlags_NoMove |
+            ImGuiWindowFlags_NoScrollbar |
+            ImGuiWindowFlags_NoSavedSettings;
+
+        ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.20f, 0.13f, 0.09f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.48f, 0.31f, 0.15f, 1.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16.0f, 12.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
+
+        if (ImGui::Begin("##proxy_status_banner", nullptr, flags)) {
+            ImGui::PushFont(core::AssetManager::get().get_font(core::FontID::DEFAULT));
+            ImGui::TextUnformatted("Background Service Offline");
+            ImGui::PopFont();
+
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.90f, 0.84f, 0.76f, 1.0f));
+            ImGui::TextWrapped("%s", core::SessionManager::get().get_proxy_status_message().c_str());
+            ImGui::PopStyleColor();
+
+            ImGui::SetCursorPos(ImVec2(
+                ImGui::GetWindowWidth() - kButtonWidth - 16.0f,
+                (kBannerHeight - 32.0f) * 0.5f
+            ));
+            if (proxy_probe_in_flight_.load()) {
+                ImGui::BeginDisabled();
+                ImGui::Button("Checking...", ImVec2(kButtonWidth, 32.0f));
+                ImGui::EndDisabled();
+            } else if (ImGui::Button("Retry", ImVec2(kButtonWidth, 32.0f))) {
+                schedule_proxy_probe();
+            }
+        }
+        ImGui::End();
+
+        ImGui::PopStyleVar(2);
+        ImGui::PopStyleColor(2);
+        return kBannerHeight;
     }
 
     void MainView::show_session_expired_modal() {

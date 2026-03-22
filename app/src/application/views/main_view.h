@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <atomic>
 
 #include "views/app_view.h"
 #include "panels/file_explorer/file_explorer_panel.h"
@@ -22,6 +23,8 @@ namespace misty::view {
 
     private:
         void init_panels();
+        void schedule_proxy_probe();
+        float render_proxy_status_banner(const ImVec2& pos, float width);
         void show_session_expired_modal();
     private:
         UIRegistry& ui_registry_;
@@ -37,6 +40,7 @@ namespace misty::view {
         // Resizable sidebar
         float sidebar_width_ = 260.0f;
         bool is_resizing_sidebar_ = false;
+        std::atomic<bool> proxy_probe_in_flight_{false};
 
         static constexpr float kSidebarMinWidth = 180.0f;
         static constexpr float kSidebarMaxWidth = 400.0f;

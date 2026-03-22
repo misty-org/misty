@@ -114,7 +114,7 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state) {
         if (state.files.empty()) {
             render_empty_state(48.0f);
         } else {
-            ImGui::BeginChild("##grid_scroll", ImVec2(0, 0), false, ImGuiWindowFlags_NoScrollbar);
+            ImGui::BeginChild("##grid_scroll", ImVec2(0, 0), false);
             for (int i = 0; i < static_cast<int>(state.files.size()); ++i) {
                 if (i % cols != 0) ImGui::SameLine();
                 show_grid_item(state, i, cell_w, cell_h);

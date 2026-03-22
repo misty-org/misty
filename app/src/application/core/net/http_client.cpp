@@ -10,6 +10,7 @@
 #include "core/net/http_client.h"
 #include "core/manager/session_manager.h"
 #include "core/manager/env_manager.h"
+#include "core/manager/proxy_manager.h"
 #include "core/system/util.h"
 
 namespace misty::core {
@@ -88,6 +89,21 @@ namespace misty::core {
     HTTPClient& HTTPClient::get() {
         static HTTPClient instance;
         return instance;
+    }
+
+    bool HTTPClient::is_proxy_url(const std::string& url) const {
+        std::string proxy_url = EnvManager::get().get("PROXY_SERVICE_URL", "");
+        return !proxy_url.empty() && url.rfind(proxy_url, 0) == 0;
+    }
+
+    void HTTPClient::update_proxy_status(const std::string& url, int status_code) {
+        if (!is_proxy_url(url)) return;
+
+        if (status_code == 0) {
+            SessionManager::get().mark_proxy_unavailable();
+        } else {
+            SessionManager::get().mark_proxy_available();
+        }
     }
 
     HttpResponse HTTPClient::get(const std::string& url, const std::map<std::string, std::string>& headers) {
@@ -282,15 +298,15 @@ namespace misty::core {
         return result;
     }
 
-    bool HTTPClient::attempt_token_refresh() {
+    HTTPClient::RefreshResult HTTPClient::attempt_token_refresh() {
         std::string refresh_token = SessionManager::get().get_refresh_token();
         if (refresh_token.empty()) {
-            return false;
+            return RefreshResult::Failed;
         }
 
         std::string proxy_url = EnvManager::get().get("PROXY_SERVICE_URL", "");
         if (proxy_url.empty()) {
-            return false;
+            return RefreshResult::Failed;
         }
 
         std::map<std::string, std::string> json_fields;
@@ -301,6 +317,10 @@ namespace misty::core {
         headers["Content-Type"] = "application/json";
 
         auto response = execute_curl_request("POST", proxy_url + "/api/refresh", json_body, headers);
+        if (response.status_code == 0 && ProxyManager::get().ensure_running()) {
+            response = execute_curl_request("POST", proxy_url + "/api/refresh", json_body, headers);
+        }
+        update_proxy_status(proxy_url + "/api/refresh", response.status_code);
 
         if (response.status_code == 200) {
             try {
@@ -315,15 +335,18 @@ namespace misty::core {
                     }
                 }
                 std::cerr << "[HTTPClient] Token refresh succeeded" << std::endl;
-                return true;
+                return RefreshResult::Success;
             } catch (...) {
                 std::cerr << "[HTTPClient] Failed to parse refresh response" << std::endl;
             }
+        } else if (response.status_code == 0) {
+            std::cerr << "[HTTPClient] Token refresh failed because proxy is unavailable" << std::endl;
+            return RefreshResult::Unavailable;
         } else {
             std::cerr << "[HTTPClient] Token refresh failed with status " << response.status_code << std::endl;
         }
 
-        return false;
+        return RefreshResult::Failed;
     }
 
     HttpResponse HTTPClient::perform_request(const std::string& method, const std::string& url, const std::string& body, const std::map<std::string, std::string>& headers) {
@@ -334,20 +357,26 @@ namespace misty::core {
         }
 
         HttpResponse response = execute_curl_request(method, url, body, merged_headers);
+        if (response.status_code == 0 && is_proxy_url(url) && ProxyManager::get().ensure_running()) {
+            response = execute_curl_request(method, url, body, merged_headers);
+        }
+        update_proxy_status(url, response.status_code);
 
         // Auto-refresh on 401 if we're not already in a refresh call
         // Guard: skip if session already expired or another thread is refreshing
         if (response.status_code == 401 &&
             !SessionManager::get().is_session_expired() &&
             !is_refreshing_.exchange(true)) {
-            if (attempt_token_refresh()) {
+            RefreshResult refresh_result = attempt_token_refresh();
+            if (refresh_result == RefreshResult::Success) {
                 // Retry with new auth headers
                 auto retry_headers = SessionManager::get().get_auth_headers();
                 for (const auto& [key, value] : headers) {
                     retry_headers[key] = value;
                 }
                 response = execute_curl_request(method, url, body, retry_headers);
-            } else {
+                update_proxy_status(url, response.status_code);
+            } else if (refresh_result == RefreshResult::Failed) {
                 // Refresh failed — mark session as expired so UI can prompt reconnect
                 // Tokens are preserved so the user can re-authenticate without re-entering credentials
                 SessionManager::get().mark_session_expired();
@@ -517,23 +546,41 @@ namespace misty::core {
         }
 
         DownloadResult result = execute_curl_download(url, local_path, merged_headers, progress_cb);
+        if (result.final_status_code == 0 && is_proxy_url(url) && ProxyManager::get().ensure_running()) {
+            result = execute_curl_download(url, local_path, merged_headers, progress_cb);
+        }
+        update_proxy_status(url, result.final_status_code);
 
         if (result.final_status_code == 401 &&
             !SessionManager::get().is_session_expired() &&
             !is_refreshing_.exchange(true)) {
-            if (attempt_token_refresh()) {
+            RefreshResult refresh_result = attempt_token_refresh();
+            if (refresh_result == RefreshResult::Success) {
                 auto retry_headers = SessionManager::get().get_auth_headers();
                 for (const auto& [key, value] : headers) {
                     retry_headers[key] = value;
                 }
                 result = execute_curl_download(url, local_path, retry_headers, progress_cb);
-            } else {
+                update_proxy_status(url, result.final_status_code);
+            } else if (refresh_result == RefreshResult::Failed) {
                 SessionManager::get().mark_session_expired();
             }
             is_refreshing_.store(false);
         }
 
         return result;
+    }
+
+    bool HTTPClient::probe_proxy() {
+        std::string proxy_url = EnvManager::get().get("PROXY_SERVICE_URL", "");
+        if (proxy_url.empty()) {
+            SessionManager::get().mark_proxy_unavailable("PROXY_SERVICE_URL is not configured.");
+            return false;
+        }
+
+        HttpResponse response = execute_curl_request("GET", proxy_url + "/api/hello", "", {});
+        update_proxy_status(proxy_url + "/api/hello", response.status_code);
+        return response.status_code != 0;
     }
 
     std::string build_json_object(const std::map<std::string, std::string>& fields) {
