@@ -32,9 +32,6 @@ namespace misty::panel {
             ImGui::Spacing();
 
             switch (current_category_) {
-                case ActivityCategory::NOTIFICATIONS:
-                    render_notification_list();
-                    break;
                 case ActivityCategory::DOWNLOADS:
                     render_download_filter_tabs();
                     ImGui::Spacing();
@@ -65,11 +62,9 @@ namespace misty::panel {
     }
 
     void ActivityPanel::render_category_tabs() {
-        auto& notification_state = registry_.get_state<NotificationState>("Notifications");
         auto& download_state = registry_.get_state<DownloadState>("Downloads");
         auto& upload_state = registry_.get_state<UploadState>("Uploads");
 
-        size_t notifications = notification_state.history_count();
         size_t downloads = download_state.total_count();
         size_t uploads = upload_state.total_count();
 
@@ -95,90 +90,11 @@ namespace misty::panel {
             ImGui::SameLine();
         };
 
-        render_category("Notifications", notifications, ActivityCategory::NOTIFICATIONS);
         render_category("Downloads", downloads, ActivityCategory::DOWNLOADS);
         render_category("Uploads", uploads, ActivityCategory::UPLOADS);
 
         ImGui::PopStyleVar(2);
         ImGui::NewLine();
-    }
-
-    /* Notifications */
-
-    void ActivityPanel::render_notification_list() {
-        auto& notification_state = registry_.get_state<NotificationState>("Notifications");
-        auto history = notification_state.get_history();
-
-        if (history.empty()) {
-            render_notification_empty();
-            return;
-        }
-
-        ImGui::SameLine(ImGui::GetWindowWidth() - 140);
-        if (ImGui::Button("Clear History")) {
-            notification_state.clear_history();
-            return;
-        }
-
-        ImGui::BeginChild("NotificationList", ImVec2(0, 0), false);
-
-        for (int i = static_cast<int>(history.size()) - 1; i >= 0; --i) {
-            render_notification_item(history[i]);
-            ImGui::Spacing();
-        }
-
-        ImGui::EndChild();
-    }
-
-    void ActivityPanel::render_notification_item(const Notification& notif) {
-        ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 8.0f);
-
-        ImVec4 bg_color = get_notification_type_color(notif.type);
-        bg_color.x *= 0.5f;
-        bg_color.y *= 0.5f;
-        bg_color.z *= 0.5f;
-        bg_color.w = 1.0f;
-        ImGui::PushStyleColor(ImGuiCol_ChildBg, bg_color);
-
-        std::string child_id = "notif_" + std::to_string(notif.id);
-        if (ImGui::BeginChild(child_id.c_str(), ImVec2(0, 60), true)) {
-            const char* type_label = get_notification_type_label(notif.type);
-            ImVec4 type_color = get_notification_type_color(notif.type);
-
-            ImGui::PushStyleColor(ImGuiCol_Text, type_color);
-            ImGui::Text("[%s]", type_label);
-            ImGui::PopStyleColor();
-
-            ImGui::SameLine();
-            ImGui::Text("%s", notif.title.c_str());
-
-            ImGui::SameLine(ImGui::GetWindowWidth() - 100);
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
-            ImGui::Text("%s", format_time_ago(notif.created_at).c_str());
-            ImGui::PopStyleColor();
-
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.7f, 0.7f, 0.7f, 1.0f));
-            ImGui::TextWrapped("%s", notif.message.c_str());
-            ImGui::PopStyleColor();
-        }
-        ImGui::EndChild();
-
-        ImGui::PopStyleColor();
-        ImGui::PopStyleVar();
-    }
-
-    void ActivityPanel::render_notification_empty() {
-        ImVec2 available = ImGui::GetContentRegionAvail();
-        ImVec2 text_size = ImGui::CalcTextSize("No notifications");
-
-        ImGui::SetCursorPos(ImVec2(
-            (available.x - text_size.x) * 0.5f,
-            available.y * 0.4f
-        ));
-
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
-        ImGui::Text("No notifications");
-        ImGui::PopStyleColor();
     }
 
     /* Downloads */
@@ -682,34 +598,6 @@ namespace misty::panel {
     }
 
     /* Helpers */
-
-    ImVec4 ActivityPanel::get_notification_type_color(NotificationType type) {
-        switch (type) {
-            case NotificationType::SUCCESS:
-                return ImVec4(0.4f, 0.8f, 0.4f, 1.0f);
-            case NotificationType::ERROR:
-                return ImVec4(0.9f, 0.4f, 0.4f, 1.0f);
-            case NotificationType::DOWNLOAD:
-                return ImVec4(0.4f, 0.7f, 1.0f, 1.0f);
-            case NotificationType::INFO:
-            default:
-                return ImVec4(0.7f, 0.7f, 0.7f, 1.0f);
-        }
-    }
-
-    const char* ActivityPanel::get_notification_type_label(NotificationType type) {
-        switch (type) {
-            case NotificationType::SUCCESS:
-                return "OK";
-            case NotificationType::ERROR:
-                return "ERR";
-            case NotificationType::DOWNLOAD:
-                return "DL";
-            case NotificationType::INFO:
-            default:
-                return "INFO";
-        }
-    }
 
     std::string ActivityPanel::format_file_size(int64_t bytes) {
         std::ostringstream ss;

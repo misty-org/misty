@@ -42,7 +42,6 @@ namespace misty::panel {
     class NotificationState : public core::UIState {
     public:
         static constexpr size_t MAX_VISIBLE = 5;
-        static constexpr size_t MAX_HISTORY = 100;
         static constexpr float DEFAULT_DURATION = 5.0f;
 
         uint64_t add_notification(const std::string& title,
@@ -61,12 +60,6 @@ namespace misty::panel {
             notif.duration_seconds = duration;
 
             notifications_.push_back(notif);
-
-            // Also add to history
-            history_.push_back(notif);
-            while (history_.size() > MAX_HISTORY) {
-                history_.erase(history_.begin());
-            }
 
             // Remove oldest visible if we exceed max
             while (notifications_.size() > MAX_VISIBLE) {
@@ -101,31 +94,14 @@ namespace misty::panel {
             return notifications_;
         }
 
-        // Get full notification history for the activity view
-        std::vector<Notification> get_history() {
-            std::lock_guard<std::mutex> lock(mu);
-            return history_;
-        }
-
-        void clear_history() {
-            std::lock_guard<std::mutex> lock(mu);
-            history_.clear();
-        }
-
         size_t count() {
             std::lock_guard<std::mutex> lock(mu);
             return notifications_.size();
         }
 
-        size_t history_count() {
-            std::lock_guard<std::mutex> lock(mu);
-            return history_.size();
-        }
-
     private:
         std::mutex mu;
         std::vector<Notification> notifications_;  // Active toast notifications
-        std::vector<Notification> history_;         // Full history for activity view
         std::atomic<uint64_t> next_id_{1};
     };
 

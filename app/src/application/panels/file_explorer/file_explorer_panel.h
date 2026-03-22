@@ -64,6 +64,9 @@ namespace misty::panel {
         void perform_delete_selected(panel::FileExplorerState& state);
         void perform_delete(panel::FileExplorerState& state, const std::string& path);
         void initiate_rename(panel::FileExplorerState& state);
+        bool open_context_menu_target(panel::FileExplorerState& state);
+        bool open_context_menu_target_with_dialog(panel::FileExplorerState& state);
+        const UnifiedFileItem* find_context_menu_target(const panel::FileExplorerState& state) const;
 
         // Async local filesystem navigation — dispatches I/O to worker pool
         // so the UI thread is never blocked by slow drives or USB spin-up.

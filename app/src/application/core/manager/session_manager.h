@@ -41,6 +41,11 @@ namespace misty::core {
         bool is_session_expired() const;
         void clear_session_expired();
 
+        void mark_proxy_available();
+        void mark_proxy_unavailable(const std::string& message = "");
+        bool is_proxy_available() const;
+        std::string get_proxy_status_message() const;
+
         // Returns {"Authorization": "Bearer <token>"} if authenticated, empty map otherwise
         std::map<std::string, std::string> get_auth_headers() const;
 
@@ -60,6 +65,8 @@ namespace misty::core {
         std::string license_token_;
         std::string user_id_;
         bool session_expired_ = false;
+        bool proxy_available_ = true;
+        std::string proxy_status_message_;
     };
 
 }

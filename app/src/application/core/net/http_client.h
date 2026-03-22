@@ -55,14 +55,24 @@ namespace misty::core {
             DownloadProgressCallback progress_cb = nullptr
         );
 
+        bool probe_proxy();
+
     private:
+        enum class RefreshResult {
+            Success,
+            Unavailable,
+            Failed
+        };
+
         HTTPClient() = default;
         ~HTTPClient() = default;
         HTTPClient(const HTTPClient&) = delete;
         HTTPClient& operator=(const HTTPClient&) = delete;
 
         HttpResponse perform_request(const std::string& method, const std::string& url, const std::string& body = "", const std::map<std::string, std::string>& headers = {});
-        bool attempt_token_refresh();
+        RefreshResult attempt_token_refresh();
+        bool is_proxy_url(const std::string& url) const;
+        void update_proxy_status(const std::string& url, int status_code);
 
         std::atomic<bool> is_refreshing_{false};
     };
