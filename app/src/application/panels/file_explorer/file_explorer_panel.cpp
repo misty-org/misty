@@ -391,6 +391,18 @@ namespace misty::panel {
             state.files.clear();
             
             if (path == FileExplorerState::VIRTUAL_PATH_RECENT) {
+                // Filter out deleted entries and local files that no longer exist on disk
+                // (covers external deletions and stale entries from previous sessions).
+                auto it = std::remove_if(state.recent_files.begin(), state.recent_files.end(),
+                    [](const UnifiedFileItem& f) {
+                        if (f.status == SyncStatus::DELETED) return true;
+                        if (f.source == FileSource::LOCAL && !fs::exists(f.path)) return true;
+                        return false;
+                    });
+                if (it != state.recent_files.end()) {
+                    state.recent_files.erase(it, state.recent_files.end());
+                    state.dirty_ = true;
+                }
                 printf("Explorer: Loading Recent Files (count: %zu)\n", state.recent_files.size());
                 state.files.assign(state.recent_files.begin(), state.recent_files.end());
             } else if (path == FileExplorerState::VIRTUAL_PATH_STARRED) {
