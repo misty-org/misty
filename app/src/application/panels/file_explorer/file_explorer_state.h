@@ -319,6 +319,7 @@ namespace misty::panel {
         bool new_entry_is_dir = false;
         char new_entry_name_buffer[256] = {};
 
+
         // Virtual Folders Data
         static constexpr const char* VIRTUAL_PATH_RECENT = "misty://recent";
         static constexpr const char* VIRTUAL_PATH_STARRED = "misty://starred";

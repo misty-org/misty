@@ -169,21 +169,23 @@ namespace panel {
     }
 
     void FileExplorerState::track_move(const std::string& old_path, const UnifiedFileItem& new_item) {
-        // Update Recent Files
-        for (auto& f : recent_files) {
-            if (f.path == old_path) {
-                f = new_item; // Update metadata (path, name, status)
-                // If soft deleted, status is already set in new_item
+        if (new_item.status == SyncStatus::DELETED) {
+            // File moved to trash — pull it out of recent entirely
+            auto it = std::remove_if(recent_files.begin(), recent_files.end(),
+                [&](const UnifiedFileItem& f) { return f.path == old_path; });
+            recent_files.erase(it, recent_files.end());
+        } else {
+            // File renamed / moved — update its entry in recent
+            for (auto& f : recent_files) {
+                if (f.path == old_path) f = new_item;
             }
         }
-        
-        // Update Starred Files
+
+        // Always update starred (renames / moves should follow the file)
         for (auto& f : starred_files) {
-            if (f.path == old_path) {
-                f = new_item;
-            }
+            if (f.path == old_path) f = new_item;
         }
-        
+
         dirty_ = true;
     }
 
