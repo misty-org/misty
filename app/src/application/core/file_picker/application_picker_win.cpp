@@ -6,27 +6,30 @@
 #include <commdlg.h>
 
 #include <array>
+#include <thread>
 
 namespace misty::core {
 
-std::optional<std::string> ApplicationPicker::pick() {
-    std::array<char, MAX_PATH> buffer{};
+void ApplicationPicker::pick(std::function<void(std::optional<std::string>)> callback) {
+    std::thread([callback = std::move(callback)]() {
+        std::array<char, MAX_PATH> buffer{};
 
-    OPENFILENAMEA ofn{};
-    ofn.lStructSize = sizeof(ofn);
-    ofn.hwndOwner = nullptr;
-    ofn.lpstrFile = buffer.data();
-    ofn.nMaxFile = static_cast<DWORD>(buffer.size());
-    ofn.lpstrFilter = "Applications (*.exe)\0*.exe\0All Files (*.*)\0*.*\0";
-    ofn.nFilterIndex = 1;
-    ofn.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST;
-    ofn.lpstrTitle = "Choose Application";
+        OPENFILENAMEA ofn{};
+        ofn.lStructSize = sizeof(ofn);
+        ofn.hwndOwner = nullptr;
+        ofn.lpstrFile = buffer.data();
+        ofn.nMaxFile = static_cast<DWORD>(buffer.size());
+        ofn.lpstrFilter = "Applications (*.exe)\0*.exe\0All Files (*.*)\0*.*\0";
+        ofn.nFilterIndex = 1;
+        ofn.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST;
+        ofn.lpstrTitle = "Choose Application";
 
-    if (!GetOpenFileNameA(&ofn)) {
-        return std::nullopt;
-    }
-
-    return std::string(buffer.data());
+        if (!GetOpenFileNameA(&ofn)) {
+            callback(std::nullopt);
+            return;
+        }
+        callback(std::string(buffer.data()));
+    }).detach();
 }
 
 } // namespace misty::core
