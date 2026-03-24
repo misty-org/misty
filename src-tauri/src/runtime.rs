@@ -3,8 +3,7 @@ use std::sync::Arc;
 use crate::core::clipboard::{ClipboardService, SharedClipboardClient};
 use crate::core::file_sync::FileSyncPairStore;
 use crate::services::{
-    ai::AiService,
-    claude::ClaudeService, commands::CommandService, devices::DeviceService,
+    ai::AiService, claude::ClaudeService, commands::CommandService, devices::DeviceService,
     directory_size::DirectorySizeService, environment::AppEnvironmentService,
     explorer::ExplorerService, explorer_library::ExplorerLibraryService,
     file_sync::FileSyncService, operation_queue::OperationQueueService,

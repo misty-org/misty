@@ -17,7 +17,7 @@ async function apiFetch(path: string, init?: RequestInit) {
   const res = await fetch(`${hubApiBase()}${path}`, {
     credentials: "include",
     ...init,
-    headers: hubApiHeaders(init?.headers),
+    headers: await hubApiHeaders(init?.headers),
   });
   if (!res.ok) {
     const text = await res.text();
@@ -52,9 +52,9 @@ export async function logoutRequest(): Promise<void> {
     await fetch(`${hubApiBase()}/logout`, {
       method: "POST",
       credentials: "include",
-      headers: hubApiHeaders(),
+      headers: await hubApiHeaders(),
     });
   } finally {
-    clearHubAuthToken();
+    await clearHubAuthToken();
   }
 }

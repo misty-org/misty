@@ -232,6 +232,58 @@ fn normalize_settings_document(document: &mut Value) -> bool {
     );
     changed |= ensure_section_defaults(
         root,
+        "transfer_profiles",
+        &[
+            ("default_profile_id", json!("balanced")),
+            (
+                "profiles",
+                json!([
+                    {
+                        "id": "balanced",
+                        "name": "Balanced",
+                        "transfers": 4,
+                        "checkers": 8,
+                        "bandwidth_limit": "",
+                        "retries": 3,
+                        "low_level_retries": 10,
+                        "checksum": false
+                    },
+                    {
+                        "id": "low-bandwidth",
+                        "name": "Low Bandwidth",
+                        "transfers": 2,
+                        "checkers": 4,
+                        "bandwidth_limit": "2Mi",
+                        "retries": 3,
+                        "low_level_retries": 10,
+                        "checksum": false
+                    },
+                    {
+                        "id": "many-small-files",
+                        "name": "Many Small Files",
+                        "transfers": 8,
+                        "checkers": 16,
+                        "bandwidth_limit": "",
+                        "retries": 3,
+                        "low_level_retries": 10,
+                        "checksum": false
+                    },
+                    {
+                        "id": "careful-verify",
+                        "name": "Careful Verify",
+                        "transfers": 2,
+                        "checkers": 4,
+                        "bandwidth_limit": "",
+                        "retries": 5,
+                        "low_level_retries": 10,
+                        "checksum": true
+                    }
+                ]),
+            ),
+        ],
+    );
+    changed |= ensure_section_defaults(
+        root,
         "notifications",
         &[
             ("desktop_notifications_enabled", json!(true)),

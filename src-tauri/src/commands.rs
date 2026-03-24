@@ -17,8 +17,8 @@ use crate::core::operation_queue::{ConflictPolicy, OperationQueueSnapshot};
 use crate::core::workspace::WorkspaceDocument;
 use crate::error::{ApiError, ApiResult};
 use crate::runtime::MistyRuntime;
-use crate::services::autostart::LaunchOnLoginSnapshot;
 use crate::services::ai::{AiSendRequest, AiStatus, AiStreamEvent};
+use crate::services::autostart::LaunchOnLoginSnapshot;
 use crate::services::claude::{ClaudeSendRequest, ClaudeStatus, ClaudeStreamEvent};
 use crate::services::commands::{SaveShortcutsRequest, ShortcutsSnapshot};
 use crate::services::devices::DeviceSnapshot;
@@ -35,8 +35,10 @@ use crate::services::plugin_commands::{
     RenderPluginPanelRequest, RunPluginCommandRequest,
 };
 use crate::services::providers::{
-    ProviderConfigRequest, ProviderConfigStep, ProvidersSnapshot, RcloneConfigPaths,
-    RemoteEditDraft, RemoteTestResult, SaveRemoteRequest,
+    BackendAction, BackendActionResult, BackendRunRequest, ConfigSecurityStatus, LinkPathRequest,
+    ProviderConfigRequest, ProviderConfigStep, ProviderJobStart, ProviderJobStatus,
+    ProvidersSnapshot, PublicLinkActionResult, PublicLinkListResult, RcloneConfigPaths,
+    RemoteEditDraft, RemoteTestResult, SaveRemoteRequest, VerifyResult, VerifyStartRequest,
 };
 use crate::services::proxy::ProxySnapshot;
 use crate::services::proxy_runtime::ProxyRuntimeSnapshot;
@@ -646,6 +648,100 @@ pub async fn providers_configure_remote(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<ProviderConfigStep> {
     state.providers.configure_remote(request).await
+}
+
+#[tauri::command]
+pub async fn providers_verify_start(
+    request: VerifyStartRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<ProviderJobStart> {
+    state.providers.start_verify(request).await
+}
+
+#[tauri::command]
+pub async fn providers_job_status(
+    job_id: String,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<ProviderJobStatus> {
+    state.providers.job_status(job_id).await
+}
+
+#[tauri::command]
+pub async fn providers_job_cancel(
+    job_id: String,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<serde_json::Value> {
+    state.providers.cancel_job(job_id).await
+}
+
+#[tauri::command]
+pub async fn providers_verify_result(
+    job_id: String,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<VerifyResult> {
+    state.providers.verify_result(job_id).await
+}
+
+#[tauri::command]
+pub async fn providers_public_links(
+    request: LinkPathRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<PublicLinkListResult> {
+    state.providers.public_links(request).await
+}
+
+#[tauri::command]
+pub async fn providers_create_public_link(
+    request: LinkPathRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<PublicLinkActionResult> {
+    state.providers.create_public_link(request).await
+}
+
+#[tauri::command]
+pub async fn providers_revoke_public_link(
+    request: LinkPathRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<PublicLinkActionResult> {
+    state.providers.revoke_public_link(request).await
+}
+
+#[tauri::command]
+pub async fn providers_backend_actions(
+    remote: String,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<Vec<BackendAction>> {
+    state.providers.backend_actions(remote).await
+}
+
+#[tauri::command]
+pub async fn providers_run_backend_action(
+    request: BackendRunRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<BackendActionResult> {
+    state.providers.run_backend_action(request).await
+}
+
+#[tauri::command]
+pub async fn providers_config_security(
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<ConfigSecurityStatus> {
+    state.providers.config_security().await
+}
+
+#[tauri::command]
+pub async fn providers_harden_config(
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<ConfigSecurityStatus> {
+    state.providers.harden_config().await
+}
+
+#[tauri::command]
+pub async fn providers_repair_config_security(
+    password: String,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<ConfigSecurityStatus> {
+    state.providers.repair_config_security(password).await
 }
 
 #[tauri::command]

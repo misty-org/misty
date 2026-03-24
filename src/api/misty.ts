@@ -38,16 +38,25 @@ import type {
   PasteTextRequest,
   PrepareDragItemsRequest,
   PreparedDragItemsResult,
+  BackendAction,
+  BackendActionResult,
+  BackendRunRequest,
+  ConfigSecurityStatus,
+  LinkPathRequest,
   PluginPanelRenderResult,
   PluginCommandRunResult,
   PluginCommandsSnapshot,
   PrepareOpenItemRequest,
   PreparedOpenItem,
+  ProviderJobStart,
+  ProviderJobStatus,
   ProviderRemote,
   ProviderWorkflow,
   ProviderConfigRequest,
   ProviderConfigStep,
   ProvidersSnapshot,
+  PublicLinkActionResult,
+  PublicLinkListResult,
   ProxySnapshot,
   RcloneConfigPaths,
   RemoteEditDraft,
@@ -67,6 +76,8 @@ import type {
   ShortcutsSnapshot,
   TransferFilter,
   TransferPage,
+  VerifyResult,
+  VerifyStartRequest,
 } from "./types";
 import { hasTauriInternals } from "../shared/tauri";
 
@@ -111,8 +122,8 @@ function browserSmokeFallback<T>(command: string, args?: Record<string, unknown>
     case "ai_status":
       return Promise.resolve({
         configured: false,
-        provider: "openai",
-        model: "gpt-5.5",
+        provider: "mock",
+        model: "mock",
         running: false,
         sessionId: null,
         error: "Browser smoke mode",
@@ -758,6 +769,54 @@ export function providersConfigPaths(): Promise<RcloneConfigPaths> {
 
 export function providersConfigureRemote(request: ProviderConfigRequest): Promise<ProviderConfigStep> {
   return invoke("providers_configure_remote", { request });
+}
+
+export function providersVerifyStart(request: VerifyStartRequest): Promise<ProviderJobStart> {
+  return invoke("providers_verify_start", { request });
+}
+
+export function providersJobStatus(jobId: string): Promise<ProviderJobStatus> {
+  return invoke("providers_job_status", { jobId });
+}
+
+export function providersJobCancel(jobId: string): Promise<unknown> {
+  return invoke("providers_job_cancel", { jobId });
+}
+
+export function providersVerifyResult(jobId: string): Promise<VerifyResult> {
+  return invoke("providers_verify_result", { jobId });
+}
+
+export function providersPublicLinks(request: LinkPathRequest): Promise<PublicLinkListResult> {
+  return invoke("providers_public_links", { request });
+}
+
+export function providersCreatePublicLink(request: LinkPathRequest): Promise<PublicLinkActionResult> {
+  return invoke("providers_create_public_link", { request });
+}
+
+export function providersRevokePublicLink(request: LinkPathRequest): Promise<PublicLinkActionResult> {
+  return invoke("providers_revoke_public_link", { request });
+}
+
+export function providersBackendActions(remote: string): Promise<BackendAction[]> {
+  return invoke("providers_backend_actions", { remote });
+}
+
+export function providersRunBackendAction(request: BackendRunRequest): Promise<BackendActionResult> {
+  return invoke("providers_run_backend_action", { request });
+}
+
+export function providersConfigSecurity(): Promise<ConfigSecurityStatus> {
+  return invoke("providers_config_security");
+}
+
+export function providersHardenConfig(): Promise<ConfigSecurityStatus> {
+  return invoke("providers_harden_config");
+}
+
+export function providersRepairConfigSecurity(password: string): Promise<ConfigSecurityStatus> {
+  return invoke("providers_repair_config_security", { password });
 }
 
 export function providersDisconnectRemote(name: string): Promise<ProvidersSnapshot> {
