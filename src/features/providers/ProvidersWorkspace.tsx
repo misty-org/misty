@@ -36,39 +36,8 @@ interface ProvidersMultiPanelSnapshot {
 }
 
 export const ProvidersWorkspace = memo(function ProvidersWorkspace() {
-  const {
-    connection,
-    disconnectTarget,
-    providers,
-    working,
-    advanceConnection,
-    cancelDisconnect,
-    chooseConnectionProvider,
-    closeConnection,
-    confirmDisconnect,
-    discardWorkspaces,
-    reopenConnectionAuthorization,
-    setConnectionName,
-    setConnectionParameter,
-    submitConnection,
-  } = useProvidersStore(useShallow((state) => ({
-    connection: state.connection,
-    disconnectTarget: state.disconnectTarget,
-    providers: state.providers,
-    working: state.working,
-    advanceConnection: state.advanceConnection,
-    cancelDisconnect: state.cancelDisconnect,
-    chooseConnectionProvider: state.chooseConnectionProvider,
-    closeConnection: state.closeConnection,
-    confirmDisconnect: state.confirmDisconnect,
-    discardWorkspaces: state.discardWorkspaces,
-    reopenConnectionAuthorization: state.reopenConnectionAuthorization,
-    setConnectionName: state.setConnectionName,
-    setConnectionParameter: state.setConnectionParameter,
-    submitConnection: state.submitConnection,
-  })));
+  const discardWorkspaces = useProvidersStore((state) => state.discardWorkspaces);
   const loadProviders = useProvidersStore((state) => state.load);
-  const providerWorkflows = providers?.workflows ?? EMPTY_PROVIDER_WORKFLOWS;
 
   useEffect(() => {
     const multi = useProvidersMultiPanelStore.getState();
@@ -126,6 +95,60 @@ export const ProvidersWorkspace = memo(function ProvidersWorkspace() {
         renderPane={(paneId) => <ProvidersPane workspaceId={paneId} />}
       />
 
+      <ProvidersDialogs />
+    </>
+  );
+});
+
+export const ProvidersWorkspacePanel = memo(function ProvidersWorkspacePanel(props: { workspaceId: string }) {
+  const loadProviders = useProvidersStore((state) => state.load);
+
+  useEffect(() => {
+    void loadProviders();
+  }, [loadProviders]);
+
+  return (
+    <>
+      <ProvidersPane workspaceId={props.workspaceId} />
+      <ProvidersDialogs />
+    </>
+  );
+});
+
+const ProvidersDialogs = memo(function ProvidersDialogs() {
+  const {
+    connection,
+    disconnectTarget,
+    providers,
+    working,
+    advanceConnection,
+    cancelDisconnect,
+    chooseConnectionProvider,
+    closeConnection,
+    confirmDisconnect,
+    reopenConnectionAuthorization,
+    setConnectionName,
+    setConnectionParameter,
+    submitConnection,
+  } = useProvidersStore(useShallow((state) => ({
+    connection: state.connection,
+    disconnectTarget: state.disconnectTarget,
+    providers: state.providers,
+    working: state.working,
+    advanceConnection: state.advanceConnection,
+    cancelDisconnect: state.cancelDisconnect,
+    chooseConnectionProvider: state.chooseConnectionProvider,
+    closeConnection: state.closeConnection,
+    confirmDisconnect: state.confirmDisconnect,
+    reopenConnectionAuthorization: state.reopenConnectionAuthorization,
+    setConnectionName: state.setConnectionName,
+    setConnectionParameter: state.setConnectionParameter,
+    submitConnection: state.submitConnection,
+  })));
+  const providerWorkflows = providers?.workflows ?? EMPTY_PROVIDER_WORKFLOWS;
+
+  return (
+    <>
       {connection ? (
         <ProviderConnectionDialog
           session={connection}

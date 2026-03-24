@@ -16,6 +16,7 @@ import {
   mobileRouteIdFromPath,
   safeMobileRoute,
 } from "./mobileRoutes";
+import { hasTauriInternals } from "../shared/tauri";
 
 const mobileRouteElements = Object.fromEntries(
   mobileNavRoutes.map((route) => [route.id, route.element]),
@@ -88,6 +89,7 @@ export function MobileAppShell() {
       ? unreadActivityCount
       : undefined;
     try {
+      if (!hasTauriInternals()) return;
       void getCurrentWindow().setBadgeCount(badgeCount).catch(() => {});
     } catch {
       // Browser smoke mode and some platforms do not expose app badges.

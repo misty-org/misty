@@ -37,8 +37,8 @@ export function DiagnosticsWorkspace(props: {
     ["Cache", environment.cacheDir],
     ["Temporary files", environment.tmpDir],
     ["Assets", environment.assetsDir],
-    ["Public plugins", environment.pluginsPublicDir],
-    ["Private plugins", environment.pluginsPrivateDir],
+    ["Public extensions", environment.pluginsPublicDir],
+    ["Private extensions", environment.pluginsPrivateDir],
   ];
 
   return (

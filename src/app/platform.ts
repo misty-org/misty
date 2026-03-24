@@ -1,4 +1,5 @@
 import { platform } from "@tauri-apps/plugin-os";
+import { hasTauriInternals } from "../shared/tauri";
 
 export type AppFormFactor = "desktop" | "mobile";
 
@@ -7,7 +8,7 @@ const mobilePreviewQuery = "(max-width: 720px)";
 
 export function detectAppFormFactor(): AppFormFactor {
   try {
-    if (mobilePlatforms.has(platform())) return "mobile";
+    if (hasTauriInternals() && mobilePlatforms.has(platform())) return "mobile";
   } catch {
     // Browser smoke mode runs without Tauri plugin internals.
   }

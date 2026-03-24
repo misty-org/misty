@@ -245,6 +245,7 @@ impl OperationQueueService {
         if request.paths.is_empty() {
             return Ok(self.snapshot_with_redo_state().await);
         }
+        let permanent = request.permanent;
         let mut descriptors = Vec::with_capacity(request.paths.len());
         let mut payloads = Vec::with_capacity(request.paths.len());
         for path in request.paths {
@@ -256,15 +257,29 @@ impl OperationQueueService {
             descriptors.push(OperationDescriptor {
                 kind: OperationKind::Delete,
                 source: self.endpoint_for_path(path.clone()),
-                title: format!("Delete {name}"),
+                title: if permanent {
+                    format!("Delete Permanently {name}")
+                } else {
+                    format!("Trash {name}")
+                },
                 ..OperationDescriptor::default()
             });
             payloads.push(QueuedExplorerOperation::Delete(DeleteItemsRequest {
                 paths: vec![path],
+                permanent,
             }));
         }
-        self.enqueue_operations("Delete items", false, descriptors, payloads)
-            .await
+        self.enqueue_operations(
+            if permanent {
+                "Delete items"
+            } else {
+                "Move items to Trash"
+            },
+            false,
+            descriptors,
+            payloads,
+        )
+        .await
     }
 
     async fn enqueue_operations(
@@ -385,6 +400,7 @@ impl OperationQueueService {
             });
             payloads.push(QueuedExplorerOperation::Delete(DeleteItemsRequest {
                 paths: vec![path],
+                permanent: true,
             }));
         }
 
@@ -955,6 +971,7 @@ impl OperationQueueService {
                                     .delete_items_with_cancellation(
                                         DeleteItemsRequest {
                                             paths: vec![destination_path],
+                                            permanent: true,
                                         },
                                         cancellation.clone(),
                                     )
@@ -1027,6 +1044,7 @@ impl OperationQueueService {
                     .delete_items_with_cancellation(
                         DeleteItemsRequest {
                             paths: vec![destination_path],
+                            permanent: true,
                         },
                         cancellation,
                     )
@@ -1338,7 +1356,7 @@ mod tests {
     #[test]
     fn endpoint_for_path_preserves_remote_metadata() {
         let endpoint = endpoint_for_path(
-            "/Users/misty/.misty/mnt/drive/work/report.pdf".to_string(),
+            "/Users/misty/.misty/mnt/drive-work/report.pdf".to_string(),
             Some(RemoteBrowseTarget {
                 provider_type: "drive".to_string(),
                 remote_name: "drive-work".to_string(),
@@ -1363,7 +1381,7 @@ mod tests {
     #[test]
     fn remote_to_local_copy_is_described_as_download() {
         let source = endpoint_for_path(
-            "/Users/misty/.misty/mnt/drive/work/report.pdf".to_string(),
+            "/Users/misty/.misty/mnt/drive-work/work/report.pdf".to_string(),
             Some(RemoteBrowseTarget {
                 provider_type: "drive".to_string(),
                 remote_name: "drive-work".to_string(),
@@ -1384,7 +1402,7 @@ mod tests {
         let local_source = local_endpoint("/tmp/report.pdf".to_string());
         let local_target = local_endpoint("/tmp/archive/report.pdf".to_string());
         let remote_source = endpoint_for_path(
-            "/Users/misty/.misty/mnt/drive/report.pdf".to_string(),
+            "/Users/misty/.misty/mnt/drive-work/report.pdf".to_string(),
             Some(RemoteBrowseTarget {
                 provider_type: "drive".to_string(),
                 remote_name: "drive-work".to_string(),
@@ -1863,7 +1881,10 @@ mod tests {
         assert!(rename_snapshot.redo_available);
 
         let delete_snapshot = service
-            .enqueue_delete_items(DeleteItemsRequest { paths: Vec::new() })
+            .enqueue_delete_items(DeleteItemsRequest {
+                paths: Vec::new(),
+                permanent: true,
+            })
             .await
             .unwrap();
         assert!(delete_snapshot.redo_available);

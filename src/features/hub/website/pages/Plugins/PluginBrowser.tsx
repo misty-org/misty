@@ -82,6 +82,10 @@ function actionLabel(plugin: PluginBrowserEntry) {
   return plugin.enabled ? "Disable" : "Enable";
 }
 
+function extensionViewLabels(views: string[]): string[] {
+  return views.map((view) => view.trim().toLowerCase() === "plugins" ? "Extensions" : view);
+}
+
 function PluginLogo({
   plugin,
   sizeClass,
@@ -347,7 +351,7 @@ function PrimaryAction({
 }
 
 export function PluginBrowser({
-  title = "Plugins",
+  title = "Extensions",
   marketplacePlugins,
   installedPlugins = [],
   loading = false,
@@ -402,7 +406,7 @@ export function PluginBrowser({
                   className="w-full bg-transparent text-[15px] text-white outline-none placeholder:text-zinc-500 disabled:cursor-progress"
                   disabled={showSkeleton}
                   onChange={(event) => onQueryChange(event.target.value)}
-                  placeholder="Search plugins..."
+                  placeholder="Search extensions..."
                   value={query}
                 />
               </label>
@@ -451,7 +455,7 @@ export function PluginBrowser({
                 ))}
                 {visiblePlugins.length === 0 ? (
                   <div className="rounded-2xl border border-dashed border-white/10 px-5 py-10 text-center text-sm text-zinc-500">
-                    No plugins match the current filter.
+                    No extensions match the current filter.
                   </div>
                 ) : null}
               </div>
@@ -602,7 +606,7 @@ export function PluginBrowser({
                         ))
                       ) : (
                         <p className="text-sm text-zinc-500">
-                          No changelog has been published for this plugin yet.
+                          No changelog has been published for this extension yet.
                         </p>
                       )}
                     </div>
@@ -614,7 +618,7 @@ export function PluginBrowser({
                     <DetailSection title="Metadata">
                       <div className="grid gap-3 text-sm text-zinc-300">
                         <div className="flex items-center justify-between gap-4">
-                          <span className="text-zinc-500">Plugin ID</span>
+                          <span className="text-zinc-500">Extension ID</span>
                           <span className="font-mono text-xs">
                             {selectedPlugin.id}
                           </span>
@@ -630,7 +634,7 @@ export function PluginBrowser({
                         <div className="flex items-center justify-between gap-4">
                           <span className="text-zinc-500">Launcher</span>
                           <span>
-                            {selectedPlugin.launcher.views.join(", ") || "none"}
+                            {extensionViewLabels(selectedPlugin.launcher.views).join(", ") || "none"}
                           </span>
                         </div>
                         <div className="flex items-center justify-between gap-4">
@@ -667,7 +671,7 @@ export function PluginBrowser({
             </div>
           ) : (
             <div className="flex h-full items-center justify-center text-sm text-zinc-500">
-              No plugins match the current filter.
+              No extensions match the current filter.
             </div>
           )}
         </section>

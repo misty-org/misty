@@ -101,7 +101,7 @@ export function RemoteEditPanel(props: RemoteEditPanelProps) {
 }
 
 function RemoteEditSkeleton() {
-  const skeletonBlockClass = "rounded-[7px] bg-[var(--misty-surface-2)] animate-pulse";
+  const skeletonBlockClass = "misty-skeleton rounded-[7px]";
   return (
     <div className="grid max-w-[760px] gap-3.5 p-[18px]" aria-busy="true" aria-label="Loading remote configuration">
       <div className="inline-flex items-center gap-2 text-[13px] text-[var(--misty-text-muted)]">

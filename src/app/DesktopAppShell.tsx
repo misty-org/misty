@@ -1,10 +1,18 @@
 import { forwardRef, memo, useCallback, useEffect, useRef, useState } from "react";
-import type { CSSProperties, RefObject } from "react";
+import type {
+  CSSProperties,
+  MouseEvent as ReactMouseEvent,
+  PointerEvent as ReactPointerEvent,
+  RefObject,
+} from "react";
 import { createPortal } from "react-dom";
-import { convertFileSrc } from "@tauri-apps/api/core";
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { invoke } from "@tauri-apps/api/core";
+import { PhysicalPosition, PhysicalSize } from "@tauri-apps/api/dpi";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { currentMonitor, getCurrentWindow, primaryMonitor } from "@tauri-apps/api/window";
 import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from "react-router-dom";
-import { ArrowRightLeft, Bell, Blocks, Folder, LogOut, PanelsTopLeft, Repeat2, Settings as SettingsIcon, UserCircle } from "lucide-react";
+import { Bell, Blocks, Folder, Inbox, LogOut, Repeat2, Settings as SettingsIcon, UserCircle } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import mistyLogo from "../assets/misty.png";
 import { DiagnosticsWorkspace } from "../features/diagnostics/desktop/DiagnosticsWorkspace";
@@ -16,9 +24,11 @@ import { HubWorkspace } from "../features/hub/desktop/HubWorkspace";
 import HubAccountPage from "../features/hub/pages/Account";
 import HubDashboardPage from "../features/hub/pages/Dashboard";
 import HubHomePage from "../features/hub/pages/Home";
+import HubExtensionsPage from "../features/hub/pages/Plugins";
 import HubRegisterPage from "../features/hub/pages/Register";
 import HubSignInPage from "../features/hub/pages/SignIn";
 import { useAuth } from "../features/hub/AuthContext";
+import { usePluginsStore } from "../features/hub/store/usePluginsStore";
 import {
   isRememberableHubRoute,
   useHubRouteMemoryStore,
@@ -43,31 +53,39 @@ import {
   isRememberableAppRoute,
   useAppRouteMemoryStore,
 } from "./useAppRouteMemoryStore";
+import { hasTauriInternals, safeTauriAssetUrl } from "../shared/tauri";
 import { useAppStore } from "./useAppStore";
 import { useAppThemeStore } from "./useAppThemeStore";
 import type { AppTab } from "./types";
+import type { TransferRecord } from "../api/types";
 
 const primaryNavItems = [
   { id: "files", label: "Files", path: "/files", icon: Folder },
-  { id: "transfers", label: "Transfers", path: "/transfers", icon: ArrowRightLeft },
-  { id: "providers", label: "Remotes", path: "/providers", icon: PanelsTopLeft },
   { id: "hub", label: "Hub", path: "/hub", icon: Blocks },
-] satisfies Array<{ id: AppTab; label: string; path: string; icon: typeof Folder }>;
-
-const bottomNavItems = [
-  { id: "settings", label: "Settings", path: "/settings", icon: SettingsIcon },
 ] satisfies Array<{ id: AppTab; label: string; path: string; icon: typeof Folder }>;
 
 const DEFAULT_FONT_STACK = `Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
 
+type WindowBounds = {
+  position: PhysicalPosition;
+  size: PhysicalSize;
+};
+
+type WindowRect = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
 const desktopFrameClass =
-  "grid h-screen min-h-0 grid-cols-[72px_minmax(0,1fr)] overflow-hidden bg-[var(--misty-bg)]";
+  "grid h-full min-h-0 grid-cols-[72px_minmax(0,1fr)] grid-rows-[28px_minmax(0,1fr)] overflow-hidden bg-[var(--misty-bg)]";
 
 const desktopNavbarClass =
-  "relative col-start-1 row-start-1 flex min-h-0 flex-col items-center overflow-hidden border-r border-[var(--misty-border-soft)] bg-[var(--misty-bg)] px-1 pb-2.5 pt-2";
+  "relative col-start-1 row-start-2 flex min-h-0 flex-col items-center overflow-hidden border-r border-[var(--misty-border-soft)] bg-[var(--misty-bg)] px-1 pb-2.5 pt-2";
 
 const desktopRouteShellClass =
-  "col-start-2 h-screen min-h-0 overflow-hidden";
+  "relative col-start-2 row-start-2 min-h-0 overflow-hidden";
 
 const navbarGroupClass =
   "flex w-full flex-col items-center gap-2.5";
@@ -99,6 +117,15 @@ const profileMenuItemClass =
 const globalBannerBaseClass =
   "mx-[18px] mb-0 mt-3 rounded-xl border px-3.5 py-2.5 text-sm shadow-[0_14px_36px_rgba(0,0,0,0.28)]";
 
+const globalNoticeLayerClass =
+  "pointer-events-none absolute inset-x-0 top-0 z-[2147482800]";
+
+const workStatusPopupClass =
+  "pointer-events-none fixed right-4 top-4 z-[2147482850] grid max-w-[min(360px,calc(100vw-96px))] grid-cols-[10px_minmax(0,1fr)] items-center gap-3 rounded-lg border border-[var(--misty-border-soft)] bg-[color-mix(in_srgb,var(--misty-surface)_94%,transparent)] px-3.5 py-2.5 text-sm text-[var(--misty-text)] shadow-[0_18px_48px_var(--misty-shadow)] backdrop-blur-xl";
+
+const workStatusPulseClass =
+  "size-2.5 rounded-full bg-[var(--misty-success)] shadow-[0_0_18px_color-mix(in_srgb,var(--misty-success)_72%,transparent)]";
+
 const activityPanelClass =
   "grid h-[min(560px,calc(100vh-24px))] w-[420px] min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-lg border border-[#27272a] bg-[#0b0d0f] shadow-[0_24px_64px_rgba(0,0,0,0.42)]";
 
@@ -108,11 +135,32 @@ const activityPopoverClass =
 const activityButtonClass =
   "min-h-7 rounded-md border border-[#303640] bg-[#121820] px-2.5 py-1 text-[13px] text-[#d8dde6] disabled:opacity-50";
 
+const desktopTitlebarClass =
+  "group/titlebar relative col-span-full row-start-1 h-7 select-none border-b border-[var(--misty-border-soft)] bg-[var(--misty-bg)]";
+
+const desktopTitlebarTitleClass =
+  "pointer-events-none absolute inset-x-[112px] top-0 flex h-full min-w-0 items-center justify-center truncate text-[13px] font-semibold leading-none text-[var(--misty-text-muted)]";
+
+const desktopTitlebarDoubleClickLayerClass =
+  "absolute inset-0 cursor-default";
+
+const desktopTitlebarActionsClass =
+  "absolute right-2 top-0 z-[2] flex h-full min-w-0 items-center justify-end gap-1";
+
+const titlebarActivityButtonClass =
+  "relative grid h-7 w-7 place-items-center rounded-md border-0 bg-transparent p-0 text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-2)] hover:text-[var(--misty-text)]";
+
 const activityEntryBaseClass =
   "relative grid grid-cols-[18px_minmax(0,1fr)_auto] items-start gap-2 rounded-md px-1.5 py-[7px]";
 
 const frameOverlayBaseClass =
   "pointer-events-none fixed right-3 top-2.5 z-[90] grid min-w-36 grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-[3px] rounded-[7px] border bg-[color-mix(in_srgb,var(--misty-bg)_88%,transparent)] px-2.5 py-2 text-[11px] leading-[1.2] text-[var(--misty-text)] shadow-[0_12px_34px_var(--misty-shadow)] backdrop-blur-xl";
+
+const settingsOverlayLayerClass =
+  "fixed inset-0 z-[2147482600] grid place-items-center bg-[rgba(0,0,0,0.66)] p-8 backdrop-blur-[10px]";
+
+const settingsOverlayPanelClass =
+  "h-[min(760px,calc(100vh-64px))] w-[min(980px,calc(100vw-64px))] min-w-0 overflow-hidden rounded-2xl border border-[#242529] bg-[#07090b] shadow-[0_28px_90px_rgba(0,0,0,0.62)]";
 
 const frameOverlayLevelClass: Record<FramePacingState["level"], string> = {
   idle: "border-[color-mix(in_srgb,var(--misty-success)_45%,var(--misty-border-soft))]",
@@ -122,6 +170,7 @@ const frameOverlayLevelClass: Record<FramePacingState["level"], string> = {
 
 export function DesktopAppShell() {
   const location = useLocation();
+  const navigate = useNavigate();
   const { app, loadApp } = useAppStore(useShallow((state) => ({
     app: state.app,
     loadApp: state.loadApp,
@@ -153,16 +202,29 @@ export function DesktopAppShell() {
   const lastHubRoute = useHubRouteMemoryStore((state) => state.lastHubRoute);
   const rememberHubRoute = useHubRouteMemoryStore((state) => state.rememberHubRoute);
   const rememberAppRoute = useAppRouteMemoryStore((state) => state.rememberAppRoute);
+  const lastAppRoute = useAppRouteMemoryStore((state) => state.lastAppRoute);
   const routeId = routeIdFromPath(location.pathname);
   const appLoadStarted = useRef(false);
   const loadedRoutes = useRef(new Set<AppTab>());
-  const activityAnchorRef = useRef<HTMLButtonElement | null>(null);
+  const titlebarActivityAnchorRef = useRef<HTMLButtonElement | null>(null);
   const profileAnchorRef = useRef<HTMLButtonElement | null>(null);
+  const lastNonSettingsRouteRef = useRef(settingsFallbackRoute("/files", lastAppRoute));
+  const customZoomRestoreBoundsRef = useRef<WindowBounds | null>(null);
+  const customZoomedRef = useRef(false);
+  const customZoomAnimatingRef = useRef(false);
   const [activityOpen, setActivityOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const navItems = primaryNavItems.map((item) =>
     item.id === "hub" ? { ...item, path: lastHubRoute } : item,
   );
+  const openSettingsOverlay = useCallback(() => {
+    setSettingsOpen(true);
+    void settingsLoad();
+  }, [settingsLoad]);
+  const closeSettingsOverlay = useCallback(() => {
+    setSettingsOpen(false);
+  }, []);
 
   useEffect(() => {
     if (appLoadStarted.current) return;
@@ -195,6 +257,17 @@ export function DesktopAppShell() {
   }, [location.pathname, location.search, rememberAppRoute]);
 
   useEffect(() => {
+    if (location.pathname.startsWith("/settings")) return;
+    lastNonSettingsRouteRef.current = `${location.pathname}${location.search}`;
+  }, [location.pathname, location.search]);
+
+  useEffect(() => {
+    if (!location.pathname.startsWith("/settings")) return;
+    openSettingsOverlay();
+    navigate(settingsFallbackRoute(lastNonSettingsRouteRef.current, lastAppRoute), { replace: true });
+  }, [lastAppRoute, location.pathname, navigate, openSettingsOverlay]);
+
+  useEffect(() => {
     const root = document.documentElement;
     root.dataset.theme = resolvedTheme;
     root.dataset.themeMode = themeMode;
@@ -211,6 +284,7 @@ export function DesktopAppShell() {
       ? unreadActivityCount
       : undefined;
     try {
+      if (!hasTauriInternals()) return;
       void getCurrentWindow().setBadgeCount(badgeCount).catch(() => {
         // Some platforms or browser test contexts do not support app badge counts.
       });
@@ -233,7 +307,7 @@ export function DesktopAppShell() {
     const rules = customFonts
       .map((font, index) => {
         const family = customFontFamilyName(index);
-        return `@font-face{font-family:${cssString(family)};src:url(${cssUrl(convertFileSrc(font.path))});font-display:swap;}`;
+        return `@font-face{font-family:${cssString(family)};src:url(${cssUrl(safeTauriAssetUrl(font.path))});font-display:swap;}`;
       })
       .join("\n");
     const style = document.createElement("style");
@@ -257,8 +331,154 @@ export function DesktopAppShell() {
     return () => query.removeEventListener("change", syncSystemTheme);
   }, [setSystemTheme]);
 
+  useEffect(() => {
+    if (!hasTauriInternals()) return;
+    void getCurrentWebview().setAutoResize(true).catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    if (!hasTauriInternals()) return;
+    void invoke("enable_modern_window_style", {
+      window: getCurrentWebviewWindow(),
+      offsetX: -6,
+      offsetY: 0,
+    }).catch(() => undefined);
+  }, []);
+
+  const startTitlebarDrag = useCallback((event: ReactPointerEvent<HTMLElement>) => {
+    if (event.button !== 0 || event.detail > 1) {
+      return;
+    }
+
+    const target = event.target as HTMLElement | null;
+    if (target?.closest("button,a,input,textarea,select,[role='button']")) {
+      return;
+    }
+
+    event.preventDefault();
+    if (!hasTauriInternals()) return;
+    void getCurrentWindow().startDragging().catch(() => undefined);
+  }, []);
+
+  const animateWindowRect = useCallback((from: WindowRect, to: WindowRect, durationMs = 500) => {
+    if (!hasTauriInternals()) {
+      return Promise.resolve();
+    }
+    if (customZoomAnimatingRef.current) {
+      return Promise.resolve();
+    }
+
+    customZoomAnimatingRef.current = true;
+    const window = getCurrentWindow();
+    const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+
+    return new Promise<void>((resolve) => {
+      const start = performance.now();
+
+      const step = (now: number) => {
+        const progress = Math.min(1, (now - start) / durationMs);
+        const eased = easeOutCubic(progress);
+        const x = Math.round(from.x + (to.x - from.x) * eased);
+        const y = Math.round(from.y + (to.y - from.y) * eased);
+        const width = Math.round(from.width + (to.width - from.width) * eased);
+        const height = Math.round(from.height + (to.height - from.height) * eased);
+
+        void window.setPosition(new PhysicalPosition(x, y));
+        void window.setSize(new PhysicalSize(width, height));
+
+        if (progress < 1) {
+          requestAnimationFrame(step);
+          return;
+        }
+
+        customZoomAnimatingRef.current = false;
+        resolve();
+      };
+
+      requestAnimationFrame(step);
+    });
+  }, []);
+
+  const togglePseudoMaximize = useCallback(async () => {
+    if (!hasTauriInternals()) return;
+    const window = getCurrentWindow();
+    if (await window.isFullscreen()) {
+      return;
+    }
+
+    const [position, size, monitor] = await Promise.all([
+      window.outerPosition(),
+      window.outerSize(),
+      currentMonitor().then((current) => current ?? primaryMonitor()),
+    ]);
+
+    const currentRect = { x: position.x, y: position.y, width: size.width, height: size.height };
+
+    if (!customZoomedRef.current) {
+      if (!monitor) {
+        return;
+      }
+
+      customZoomRestoreBoundsRef.current = { position, size };
+      await animateWindowRect(
+        currentRect,
+        {
+          x: monitor.workArea.position.x,
+          y: monitor.workArea.position.y,
+          width: monitor.workArea.size.width,
+          height: monitor.workArea.size.height,
+        },
+      );
+      customZoomedRef.current = true;
+      return;
+    }
+
+    const restoreBounds = customZoomRestoreBoundsRef.current;
+    if (!restoreBounds) {
+      customZoomedRef.current = false;
+      return;
+    }
+
+    await animateWindowRect(
+      currentRect,
+      {
+        x: restoreBounds.position.x,
+        y: restoreBounds.position.y,
+        width: restoreBounds.size.width,
+        height: restoreBounds.size.height,
+      },
+    );
+    customZoomedRef.current = false;
+  }, [animateWindowRect]);
+
+  const expandTitlebarWindow = useCallback((event: ReactMouseEvent<HTMLElement>) => {
+    event.stopPropagation();
+    event.preventDefault();
+    void togglePseudoMaximize().catch(() => undefined);
+  }, [togglePseudoMaximize]);
+
   return (
     <main className={desktopFrameClass}>
+      <header
+        className={desktopTitlebarClass}
+        data-tauri-drag-region
+        onPointerDown={startTitlebarDrag}
+      >
+        <div
+          className={desktopTitlebarDoubleClickLayerClass}
+          onDoubleClick={expandTitlebarWindow}
+        />
+        <span className={desktopTitlebarTitleClass}>Misty</span>
+        <div className={desktopTitlebarActionsClass}>
+          <TitlebarActivityButton
+            ref={titlebarActivityAnchorRef}
+            open={activityOpen}
+            badge={notificationPreferences.badgeCountEnabled ? unreadActivityCount : 0}
+            onClick={() => setActivityOpen((open) => !open)}
+          />
+        </div>
+      </header>
+
       <nav className={desktopNavbarClass} aria-label="Primary">
         <div className="mb-3 grid h-[62px] w-[62px] place-items-center" title={app?.migrationStage ?? "Misty"}>
           <img className="h-[58px] w-[58px] object-contain" src={mistyLogo} alt="Misty" />
@@ -268,14 +488,13 @@ export function DesktopAppShell() {
         </div>
         <div className={navbarBottomClass}>
           <ActivityNavButton
-            ref={activityAnchorRef}
             open={activityOpen}
             badge={notificationPreferences.badgeCountEnabled ? unreadActivityCount : 0}
             onClick={() => setActivityOpen((open) => !open)}
           />
-          <NavGroup
-            currentPath={location.pathname}
-            items={bottomNavItems}
+          <SettingsNavButton
+            open={settingsOpen || location.pathname.startsWith("/settings")}
+            onClick={openSettingsOverlay}
           />
           <ProfileNavButton
             ref={profileAnchorRef}
@@ -301,21 +520,23 @@ export function DesktopAppShell() {
           <Route path="/hub" element={<HubWorkspace />}>
             <Route index element={<HubHomePage />} />
             <Route path="dashboard" element={<HubDashboardPage />} />
-            <Route path="plugins" element={<Navigate to="/hub" replace />} />
+            <Route path="extensions" element={<HubExtensionsPage />} />
+            <Route path="plugins" element={<HubExtensionsPage />} />
             <Route path="resources/changelog" element={<HubChangelogPage />} />
             <Route path="signin" element={<HubSignInPage />} />
             <Route path="register" element={<HubRegisterPage />} />
             <Route path="*" element={<Navigate to="/hub" replace />} />
           </Route>
           <Route path="/activity" element={<Navigate to="/files" replace />} />
-          <Route path="/settings" element={<SettingsWorkspace />} />
+          <Route path="/settings" element={<SettingsRoutePlaceholder />} />
           <Route path="/diagnostics" element={<DiagnosticsRoute />} />
         </Routes>
       </section>
 
+      <WorkStatusPopup />
       <FramePacingOverlay enabled={framePacingOverlayEnabled} />
       <ActivityPopover
-        anchorRef={activityAnchorRef}
+        anchorRef={titlebarActivityAnchorRef}
         open={activityOpen}
         onClose={() => setActivityOpen(false)}
       />
@@ -324,7 +545,9 @@ export function DesktopAppShell() {
         currentPath={location.pathname}
         open={profileOpen}
         onClose={() => setProfileOpen(false)}
+        onOpenSettings={openSettingsOverlay}
       />
+      <SettingsOverlay open={settingsOpen} onClose={closeSettingsOverlay} />
     </main>
   );
 }
@@ -377,8 +600,10 @@ const RouteNotice = memo(function RouteNotice(props: { routeId: AppTab }) {
   const showMessage = notificationPreferences.inAppNotificationsEnabled
     && !notificationPreferences.quietHoursEnabled;
 
+  if (!notice.error && !(showMessage && notice.message)) return null;
+
   return (
-    <>
+    <div className={globalNoticeLayerClass}>
       {notice.error ? (
         <div className={`${globalBannerBaseClass} border-[color-mix(in_srgb,var(--misty-danger)_42%,var(--misty-border-soft))] bg-[color-mix(in_srgb,var(--misty-danger)_10%,var(--misty-surface))] text-[var(--misty-danger)]`}>
           {notice.error}
@@ -389,7 +614,7 @@ const RouteNotice = memo(function RouteNotice(props: { routeId: AppTab }) {
           {notice.message}
         </div>
       ) : null}
-    </>
+    </div>
   );
 });
 
@@ -453,6 +678,42 @@ const AppNoticePublisher = memo(function AppNoticePublisher() {
   return null;
 });
 
+const activeWorkStatuses = new Set<TransferRecord["status"]>(["queued", "pending", "in_progress"]);
+const emptyTransferRows: TransferRecord[] = [];
+
+const WorkStatusPopup = memo(function WorkStatusPopup() {
+  const rows = useTransfersStore((state) => state.transfers?.rows ?? emptyTransferRows);
+  const loadTransfers = useTransfersStore((state) => state.load);
+  const setupInstalling = useSetupStore((state) => state.installState === "installing" || state.busy);
+  const pluginInstalling = usePluginsStore((state) => Boolean(state.actionPluginId));
+
+  useEffect(() => {
+    let disposed = false;
+    const refresh = () => {
+      if (!disposed) void loadTransfers(undefined, { silent: true });
+    };
+    refresh();
+    const interval = window.setInterval(refresh, 2000);
+    return () => {
+      disposed = true;
+      window.clearInterval(interval);
+    };
+  }, [loadTransfers]);
+
+  const summary = workStatusSummary(rows, setupInstalling || pluginInstalling);
+  if (!summary) return null;
+
+  return (
+    <aside className={workStatusPopupClass} role="status" aria-live="polite">
+      <span className={workStatusPulseClass} />
+      <span className="min-w-0">
+        <strong className="block truncate text-[13px] font-semibold leading-tight">{summary.title}</strong>
+        <span className="block truncate text-xs leading-tight text-[var(--misty-text-muted)]">{summary.detail}</span>
+      </span>
+    </aside>
+  );
+});
+
 function DiagnosticsRoute() {
   const environment = useAppStore((state) => state.app?.environment ?? null);
   const providerStatus = useProvidersStore((state) => {
@@ -463,6 +724,10 @@ function DiagnosticsRoute() {
       : providers.health.error || providers.error || "Remote service unavailable";
   });
   return <DiagnosticsWorkspace environment={environment} proxyStatus={providerStatus} />;
+}
+
+function SettingsRoutePlaceholder() {
+  return null;
 }
 
 function StartupRedirect() {
@@ -557,6 +822,53 @@ const ActivityNavButton = memo(forwardRef<HTMLButtonElement, {
   );
 }));
 
+const TitlebarActivityButton = memo(forwardRef<HTMLButtonElement, {
+  badge: number;
+  open: boolean;
+  onClick: () => void;
+}>(function TitlebarActivityButton(props, ref) {
+  return (
+    <button
+      ref={ref}
+      className={`${titlebarActivityButtonClass} ${props.open ? "bg-[var(--misty-surface-2)] text-[var(--misty-text)]" : ""}`}
+      type="button"
+      aria-haspopup="dialog"
+      aria-expanded={props.open}
+      aria-label="Inbox"
+      title="Inbox"
+      onClick={props.onClick}
+    >
+      <Inbox size={16} strokeWidth={1.9} />
+      {props.badge ? (
+        <span className="absolute right-0 top-0 grid h-[14px] min-w-[14px] place-items-center rounded-full bg-[#d83e3e] px-[3px] text-[9px] font-bold leading-none text-white shadow-[0_0_0_2px_var(--misty-bg)]">
+          {formatBadgeCount(props.badge)}
+        </span>
+      ) : null}
+    </button>
+  );
+}));
+
+function SettingsNavButton(props: {
+  open: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      className={`group ${navLinkBaseClass} ${props.open ? navLinkActiveClass : ""}`}
+      type="button"
+      aria-haspopup="dialog"
+      aria-expanded={props.open}
+      aria-label="Settings"
+      onClick={props.onClick}
+    >
+      <span className={`${navIconTileBaseClass} ${props.open ? navIconTileActiveClass : ""}`}>
+        <SettingsIcon size={22} strokeWidth={1.85} />
+      </span>
+      <span>Settings</span>
+    </button>
+  );
+}
+
 const ProfileNavButton = memo(forwardRef<HTMLButtonElement, {
   open: boolean;
   onClick: () => void;
@@ -598,6 +910,7 @@ function ProfilePopover(props: {
   currentPath: string;
   open: boolean;
   onClose: () => void;
+  onOpenSettings: () => void;
 }) {
   const navigate = useNavigate();
   const currentUser = useSetupStore((state) => state.status?.current_user ?? null);
@@ -621,7 +934,11 @@ function ProfilePopover(props: {
     const width = 286;
     const left = Math.min(Math.max(8, rect.right + 10), window.innerWidth - width - 8);
     const top = Math.min(Math.max(8, rect.bottom - 220), window.innerHeight - 236);
-    setMenuStyle({ left, top, width });
+    setMenuStyle((current) => (
+      current.left === left && current.top === top && current.width === width
+        ? current
+        : { left, top, width }
+    ));
   }, [props.anchorRef]);
 
   useEffect(() => {
@@ -644,7 +961,7 @@ function ProfilePopover(props: {
       window.removeEventListener("keydown", closeOnEscape);
       window.removeEventListener("resize", updatePosition);
     };
-  }, [props, updatePosition]);
+  }, [props.anchorRef, props.onClose, props.open, updatePosition]);
 
   if (!props.open) return null;
 
@@ -704,7 +1021,7 @@ function ProfilePopover(props: {
             onClick={() => {
               setActiveSettingsSection("general");
               props.onClose();
-              navigate("/settings");
+              props.onOpenSettings();
             }}
           >
             <SettingsIcon size={17} />
@@ -757,13 +1074,16 @@ function ActivityPopover(props: {
       if (!rect) return;
       const panelWidth = 420;
       const panelHeight = Math.min(560, window.innerHeight - 24);
-      setPosition({
-        left: Math.min(window.innerWidth - panelWidth - 12, rect.right + 10),
-        top: Math.min(
+      const left = Math.min(window.innerWidth - panelWidth - 12, rect.right + 10);
+      const top = Math.min(
           Math.max(12, rect.top + rect.height / 2 - panelHeight / 2),
           window.innerHeight - panelHeight - 12,
-        ),
-      });
+        );
+      setPosition((current) => (
+        current.left === left && current.top === top
+          ? current
+          : { left, top }
+      ));
     };
     syncPosition();
     window.addEventListener("resize", syncPosition);
@@ -790,7 +1110,7 @@ function ActivityPopover(props: {
       window.removeEventListener("pointerdown", onPointerDown);
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [props]);
+  }, [props.anchorRef, props.onClose, props.open]);
   const clearActivityHistory = () => {
     if (
       confirmDestructiveActions
@@ -853,6 +1173,39 @@ function ActivityEntry(props: { entry: ExplorerNotification }) {
       <p className="m-0 min-w-0 [overflow-wrap:anywhere] leading-[1.35] text-[#f1eee8]">{props.entry.message}</p>
       <time className="whitespace-nowrap pt-px text-xs text-[#9e9890]">{formatActivityTime(props.entry.createdAtMs)}</time>
     </article>
+  );
+}
+
+function SettingsOverlay(props: {
+  open: boolean;
+  onClose: () => void;
+}) {
+  const panelRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!props.open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") props.onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [props.onClose, props.open]);
+
+  if (!props.open) return null;
+
+  return createPortal(
+    <div
+      className={settingsOverlayLayerClass}
+      role="presentation"
+      onPointerDown={(event) => {
+        if (event.target === event.currentTarget) props.onClose();
+      }}
+    >
+      <div ref={panelRef} className={settingsOverlayPanelClass} role="dialog" aria-modal="true" aria-label="Settings">
+        <SettingsWorkspace presentation="overlay" onClose={props.onClose} />
+      </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -977,11 +1330,20 @@ function routeIdFromPath(pathname: string): AppTab {
   return "files";
 }
 
+function settingsFallbackRoute(previousRoute: string, rememberedRoute: string): string {
+  const candidates = [previousRoute, rememberedRoute, "/files"];
+  return candidates.find((route) => {
+    if (!route || route.startsWith("/settings")) return false;
+    return isRememberableAppRoute(route);
+  }) ?? "/files";
+}
+
 function startupRouteForIndex(index: number): string {
   if (index === 1) return "/providers";
   if (index === 2) return "/transfers";
-  if (index === 3) return "/hub";
-  if (index === 4 || index === 5) return "/settings";
+  if (index === 3) return "/hub/extensions";
+  if (index === 4) return "/hub";
+  if (index === 5) return "/settings";
   return "/files";
 }
 
@@ -1011,4 +1373,39 @@ function appNoticeSourceLabel(source: AppNoticeSource): string {
 
 function appNoticeType(kind: AppNoticeKind): ExplorerNotificationType {
   return kind === "error" ? "error" : "success";
+}
+
+function workStatusSummary(
+  rows: TransferRecord[],
+  installing: boolean,
+): { title: string; detail: string } | null {
+  const active = rows.filter((row) => activeWorkStatuses.has(row.status));
+  const downloads = active.filter((row) => row.transferType === "download").length;
+  const uploads = active.filter((row) => row.transferType === "upload").length;
+
+  if (downloads > 0 && uploads > 0) {
+    return {
+      title: "Transferring...",
+      detail: `${downloads} ${downloads === 1 ? "download" : "downloads"}, ${uploads} ${uploads === 1 ? "upload" : "uploads"}`,
+    };
+  }
+  if (downloads > 0) {
+    return {
+      title: "Downloading...",
+      detail: `${downloads} active ${downloads === 1 ? "download" : "downloads"}`,
+    };
+  }
+  if (uploads > 0) {
+    return {
+      title: "Uploading...",
+      detail: `${uploads} active ${uploads === 1 ? "upload" : "uploads"}`,
+    };
+  }
+  if (installing) {
+    return {
+      title: "Installing...",
+      detail: "Setting up Misty components",
+    };
+  }
+  return null;
 }

@@ -46,6 +46,34 @@ export interface ProxyRuntimeSnapshot {
   error: string | null;
 }
 
+export interface AiStatus {
+  configured: boolean;
+  provider: string;
+  model: string;
+  running: boolean;
+  sessionId: string | null;
+  error: string | null;
+}
+
+export interface AiSendRequest {
+  prompt: string;
+  cwd?: string | null;
+  resumeSession?: boolean;
+}
+
+export type AiEventKind = "system" | "text" | "tool_use" | "tool_result" | "result" | "error";
+
+export interface AiStreamEvent {
+  kind: AiEventKind;
+  sessionId: string | null;
+  text: string;
+  toolName: string;
+  toolInput: string;
+  toolUseId: string;
+  toolResult: string;
+  costUsd: number;
+}
+
 export interface ClaudeStatus {
   installed: boolean;
   running: boolean;
@@ -153,6 +181,73 @@ export interface FileEntry {
   location: ExplorerLocation;
 }
 
+export type DirectorySizeStatus = "unknown" | "calculating" | "ready" | "failed";
+
+export interface DirectorySizeRecord {
+  path: string;
+  sizeBytes: number | null;
+  status: DirectorySizeStatus;
+  calculatedAtMs: number | null;
+  error?: string | null;
+}
+
+export interface DirectorySizeRequest {
+  paths: string[];
+  force?: boolean;
+}
+
+export type SearchSourceKind = "local" | "remote";
+export type SearchScanPhase = "idle" | "scanning" | "canceling" | "committing";
+export type SearchScanOutcome = "completed" | "canceled" | "failed";
+export type SearchQueryScope = "current" | "local" | "remotes" | "everything";
+
+export interface SearchScanError {
+  source: string;
+  message: string;
+}
+
+export interface SearchStatus {
+  scanInProgress: boolean;
+  scanPhase: SearchScanPhase;
+  lastScanTimeMs: number | null;
+  lastScanOutcome: SearchScanOutcome | null;
+  lastScanError: string | null;
+  indexedItemCount: number;
+  scanIndexedItemCount: number;
+  indexSizeBytes: number;
+  currentSource: string | null;
+  currentPath: string | null;
+  scanErrors: SearchScanError[];
+  indexedLocalRoots: string[];
+  indexedRemoteNames: string[];
+}
+
+export interface SearchScanRequest {
+  roots?: string[];
+  includeLocal?: boolean;
+  includeRemotes?: boolean;
+  remoteNames?: string[];
+  maxDepth?: number | null;
+  ignoredPaths?: string[];
+}
+
+export interface SearchQueryRequest {
+  query: string;
+  currentPath?: string | null;
+  scope?: SearchQueryScope;
+  includeFiles?: boolean;
+  includeDirectories?: boolean;
+  includeHidden?: boolean;
+  limit?: number | null;
+}
+
+export interface SearchResult {
+  entry: FileEntry;
+  score: number;
+  sourceKind: SearchSourceKind;
+  indexedAtMs: number;
+}
+
 export interface DirectoryListing {
   path: string;
   parentPath: string | null;
@@ -193,6 +288,7 @@ export interface RenameItemsRequest {
 
 export interface DeleteItemsRequest {
   paths: string[];
+  permanent?: boolean;
 }
 
 export type ClipboardOperation = "copy" | "move";
@@ -246,6 +342,9 @@ export interface PrepareDragItemRequest {
 export interface PreparedOpenItem {
   localPath: string;
   cached: boolean;
+  sourcePath?: string | null;
+  cachePath?: string | null;
+  cacheHit?: boolean;
 }
 
 export interface PreparedDragItemsResult {
@@ -332,6 +431,8 @@ export interface NativeWorkspaceExplorerSnapshot {
 export interface NativeWorkspaceFileTabSnapshot {
   idx: number;
   title: string;
+  sidebar_visible: boolean;
+  inspector_visible: boolean;
   explorer: NativeWorkspaceExplorerSnapshot;
 }
 

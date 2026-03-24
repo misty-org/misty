@@ -1,9 +1,12 @@
 import { create } from "zustand";
 import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { open } from "@tauri-apps/plugin-dialog";
+import { hasTauriInternals } from "../../../shared/tauri";
 import { useAppStore } from "../../../app/useAppStore";
 import {
   clipboardNativeFileRefs,
+  explorerCalculateDirectorySizes,
+  explorerDirectorySizeSnapshot,
   clipboardSetLocal,
   clipboardSnapshot,
   clipboardWriteFileRefs,
@@ -35,6 +38,7 @@ import type {
   ClipboardOperation,
   ClipboardPayload,
   CreateItemKind,
+  DirectorySizeRecord,
   DirectoryListing,
   ExplorerLibraryItem,
   ExplorerLibrarySnapshot,
@@ -60,6 +64,7 @@ export type ExplorerViewMode = "list" | "grid";
 export type ExplorerSortColumn = "name" | "modified" | "size" | "type";
 export type ExplorerSortDirection = "asc" | "desc";
 export type ExplorerUploadSourceKind = "files" | "folders";
+export type ExplorerDeleteMode = "trash" | "permanent";
 
 export interface ExplorerWorkspaceEntry {
   id: string;
@@ -139,12 +144,13 @@ export interface ExplorerBatchRenameItem {
 }
 
 export type ExplorerDialogState =
-  | { kind: "delete"; paneId: string; paths: string[] }
+  | { kind: "delete"; paneId: string; paths: string[]; permanent: boolean }
   | { kind: "batchRename"; paneId: string; items: ExplorerBatchRenameItem[] }
   | null;
 
 interface ExplorerStore {
   panes: Record<string, PaneExplorerState>;
+  directorySizes: Record<string, DirectorySizeRecord>;
   viewMode: ExplorerViewMode;
   paneViewModes: Record<string, ExplorerViewMode>;
   sort: ExplorerSortState;
@@ -186,6 +192,10 @@ interface ExplorerStore {
   navigateForward: (paneId: string) => Promise<void>;
   navigateParent: (paneId: string) => Promise<void>;
   refreshPane: (paneId: string) => Promise<void>;
+  loadDirectorySizeSnapshot: (paths: string[], options?: { calculateMissing?: boolean }) => Promise<void>;
+  calculateDirectorySizes: (paths: string[], options?: { force?: boolean; notify?: boolean }) => Promise<void>;
+  calculatePaneDirectorySizes: (paneId: string, options?: { force?: boolean; notify?: boolean }) => Promise<void>;
+  runScheduledDirectorySizeRefresh: () => Promise<void>;
   setViewMode: (mode: ExplorerViewMode, paneId?: string) => void;
   setSort: (column: ExplorerSortColumn, paneId?: string) => void;
   setCommandQuery: (paneId: string, query: string) => void;
@@ -197,7 +207,7 @@ interface ExplorerStore {
   canCreateItem: (paneId: string, kind: CreateItemKind) => boolean;
   createItem: (paneId: string, kind: CreateItemKind, name?: string) => Promise<void>;
   renameSelected: (paneId: string, name?: string) => Promise<void>;
-  deleteSelected: (paneId: string) => Promise<void>;
+  deleteSelected: (paneId: string, mode?: ExplorerDeleteMode) => Promise<void>;
   downloadSelected: (paneId: string) => Promise<void>;
   copySelected: (paneId: string) => void;
   cutSelected: (paneId: string) => void;
@@ -238,8 +248,10 @@ let transferRefreshObserverReady = false;
 let transferRefreshWatermarkMs = 0;
 let transferRefreshStatuses: Record<number, string> = {};
 let nextExplorerNotificationId = 1;
+let directorySizeSchedulerTimer: number | null = null;
 const pendingPaneRefreshes = new Map<string, { firstTimer: number | null; followupTimer: number | null }>();
 const paneLoadRequestsInFlight = new Map<string, Promise<void>>();
+const directorySizeRefreshIntervalMs = 30 * 60 * 1000;
 
 function emptyPaneState(): PaneExplorerState {
   return {
@@ -258,6 +270,7 @@ function emptyPaneState(): PaneExplorerState {
 
 export const useExplorerStore = create<ExplorerStore>((set, get) => ({
   panes: {},
+  directorySizes: {},
   viewMode: "list",
   paneViewModes: {},
   showHidden: false,
@@ -325,6 +338,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     if (initializationInFlight) return;
     if (!shouldResetWorkspace && (multi.tabs.length > 0 || get().initialized)) return;
     initializationInFlight = true;
+    ensureDirectorySizeScheduler();
     void get().loadLibrary();
     try {
       const [workspaceDocument, processClipboard] = await Promise.all([
@@ -527,6 +541,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
           forceRemoteRefresh: options?.forceRemoteRefresh,
         }),
         sortForPane(get(), paneId),
+        get().directorySizes,
       );
       if (mode !== "replace") void get().recordLastOpenedPath(listing.path);
       const multi = useMultiPanelStore.getState();
@@ -555,6 +570,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
           },
         };
       });
+      void get().loadDirectorySizeSnapshot(folderPathsForListing(listing), { calculateMissing: true });
     } catch (error) {
       set((state) => ({
         panes: {
@@ -604,6 +620,77 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     }
   },
 
+  loadDirectorySizeSnapshot: async (paths, options) => {
+    const uniquePaths = uniqueDirectorySizePaths(paths);
+    if (uniquePaths.length === 0) return;
+    try {
+      const records = await explorerDirectorySizeSnapshot(uniquePaths);
+      mergeDirectorySizeRecords(set, records);
+      if (options?.calculateMissing) {
+        const missing = records
+          .filter((record) => record.status === "unknown")
+          .map((record) => record.path);
+        if (missing.length > 0) {
+          void get().calculateDirectorySizes(missing, { force: false, notify: false });
+        }
+      }
+    } catch {
+      // Directory sizes are progressive metadata and should not block listing work.
+    }
+  },
+
+  calculateDirectorySizes: async (paths, options) => {
+    const uniquePaths = uniqueDirectorySizePaths(paths);
+    if (uniquePaths.length === 0) return;
+    markDirectorySizesCalculating(set, uniquePaths);
+    try {
+      const records = await explorerCalculateDirectorySizes({
+        paths: uniquePaths,
+        force: options?.force ?? false,
+      });
+      mergeDirectorySizeRecords(set, records);
+      if (options?.notify) {
+        const failed = records.filter((record) => record.status === "failed");
+        if (failed.length > 0) {
+          get().pushNotification(`Folder size failed: ${failed[0].error ?? "Unable to calculate folder size."}`, "error", 5000);
+        } else {
+          get().pushNotification(records.length === 1 ? "Folder size updated" : "Folder sizes updated", "success", 2500);
+        }
+      }
+    } catch (error) {
+      markDirectorySizesFailed(set, uniquePaths, errorText(error));
+      if (options?.notify) {
+        get().pushNotification(`Folder size failed: ${errorText(error)}`, "error", 5000);
+      }
+    }
+  },
+
+  calculatePaneDirectorySizes: async (paneId, options) => {
+    const pane = get().panes[paneId];
+    await get().calculateDirectorySizes(folderPathsForListing(pane?.listing ?? null), {
+      force: options?.force ?? true,
+      notify: options?.notify ?? true,
+    });
+  },
+
+  runScheduledDirectorySizeRefresh: async () => {
+    const paths = openPaneDirectorySizePaths(get());
+    if (paths.length === 0) return;
+    let records: DirectorySizeRecord[];
+    try {
+      records = await explorerDirectorySizeSnapshot(paths);
+      mergeDirectorySizeRecords(set, records);
+    } catch {
+      return;
+    }
+    const missing = records
+      .filter((record) => record.status === "unknown")
+      .map((record) => record.path);
+    if (missing.length > 0) {
+      await get().calculateDirectorySizes(missing, { force: false, notify: false });
+    }
+  },
+
   setViewMode: (viewMode, paneId) => set((state) => {
     const targetPaneId = paneId ?? useMultiPanelStore.getState().activePaneId;
     if (!targetPaneId) return state.viewMode === viewMode ? state : { viewMode };
@@ -628,7 +715,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         panes: pane?.listing
           ? {
               ...state.panes,
-              [targetPaneId]: { ...pane, listing: sortListing(pane.listing, sort) },
+              [targetPaneId]: { ...pane, listing: sortListing(pane.listing, sort, state.directorySizes) },
             }
           : state.panes,
       };
@@ -760,8 +847,10 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     const defaultFileAction = selectGeneralPreferences(
       useSettingsStore.getState().settings?.document,
     ).defaultFileActionIndex;
-    if (defaultFileAction === 1 || defaultFileAction === 2) {
-      set({ previewVisible: true, operationError: null });
+    const isRemoteFile = entry.location.kind !== "local";
+    if (!isRemoteFile && (defaultFileAction === 1 || defaultFileAction === 2)) {
+      setPreviewVisibleForPane(paneId);
+      set({ operationError: null });
       if (defaultFileAction === 1) {
         get().pushNotification("Preview opened", "info", 1800, false);
       }
@@ -769,12 +858,18 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     }
     try {
       set({ operationError: null });
+      if (isRemoteFile) {
+        get().pushNotification(`Downloading ${entry.name}...`, "info", 2500, false);
+      }
       const localPath = await localPathForEntry(entry);
       const applicationPath = await associationForPath(entry.path);
       if (applicationPath) {
         await explorerOpenWith(applicationPath, localPath);
       } else {
         await explorerOpenPath(localPath);
+      }
+      if (isRemoteFile) {
+        get().pushNotification(`Downloaded ${entry.name}`, "success", 2200, false);
       }
       void get().recordLibraryRecent(entry);
     } catch (error) {
@@ -785,6 +880,10 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
   openWithSelected: async (paneId) => {
     const entry = selectedEntryForPane(get().panes[paneId]);
     if (!entry || entry.kind === "folder" || entry.kind === "symlink") return;
+    if (!hasTauriInternals()) {
+      set({ operationError: "Choosing a local application is only available in the Tauri app." });
+      return;
+    }
     try {
       const selection = await open({
         title: "Choose Application",
@@ -879,16 +978,21 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     }
   },
 
-  deleteSelected: async (paneId) => {
+  deleteSelected: async (paneId, mode) => {
     const pane = get().panes[paneId];
-    const paths = selectedPathsForPane(pane);
+    const permanent = deleteModeForPaneSelection(pane, mode) === "permanent";
+    const paths = selectedDeletePathsForPane(pane, permanent);
     if (paths.length === 0) return;
-    if (!selectGeneralPreferences(useSettingsStore.getState().settings?.document).confirmDestructiveActions) {
+    const isTrashPane = pane?.listing?.path === "misty://trash";
+    const shouldConfirm = permanent
+      && !isTrashPane
+      && selectGeneralPreferences(useSettingsStore.getState().settings?.document).confirmDestructiveActions;
+    if (!shouldConfirm) {
       try {
         set({ operationError: null });
         const directory = pane?.listing?.path;
-        await explorerQueueDeleteItems({ paths });
-        get().pushNotification(`Queued delete for ${itemCountLabel(paths.length)}`, "success");
+        await explorerQueueDeleteItems({ paths, permanent });
+        get().pushNotification(deleteQueuedMessage(paths.length, permanent), "success");
         get().clearSelection(paneId);
         if (directory) queuePaneRefresh(paneId, directory);
       } catch (error) {
@@ -896,7 +1000,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       }
       return;
     }
-    set({ dialog: { kind: "delete", paneId, paths } });
+    set({ dialog: { kind: "delete", paneId, paths, permanent } });
   },
 
   downloadSelected: async (paneId) => {
@@ -929,8 +1033,8 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       try {
         set({ operationError: null });
         const directory = get().panes[dialog.paneId]?.listing?.path;
-        await explorerQueueDeleteItems({ paths: dialog.paths });
-        get().pushNotification(`Queued delete for ${itemCountLabel(dialog.paths.length)}`, "success");
+        await explorerQueueDeleteItems({ paths: dialog.paths, permanent: dialog.permanent });
+        get().pushNotification(deleteQueuedMessage(dialog.paths.length, dialog.permanent), "success");
         get().clearSelection(dialog.paneId);
         if (directory) queuePaneRefresh(dialog.paneId, directory);
       } catch (error) {
@@ -1095,6 +1199,10 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
   uploadIntoPane: async (paneId, sourceKind = "files") => {
     const directory = get().panes[paneId]?.listing?.path;
     if (!directory) return;
+    if (!hasTauriInternals()) {
+      set({ operationError: "Uploading local files is only available in the Tauri app." });
+      return;
+    }
     try {
       const selection = await open({ multiple: true, directory: sourceKind === "folders" });
       const paths = selection == null ? [] : Array.isArray(selection) ? selection : [selection];
@@ -1186,11 +1294,11 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
   },
 
   togglePinnedPath: (path) => {
-    const normalized = path.replace(/\/+$/, "");
-    const current = get().pinnedPaths;
+    const normalized = normalizedPath(path);
+    const current = normalizePinnedPaths(get().pinnedPaths);
     const pinnedPaths = current.some((candidate) => samePath(candidate, normalized))
       ? current.filter((candidate) => !samePath(candidate, normalized))
-      : [...current, normalized];
+      : normalizePinnedPaths([...current, normalized]);
     if (arraysEqual(current, pinnedPaths)) return;
     window.localStorage.setItem("misty.explorer.pinnedPaths", JSON.stringify(pinnedPaths));
     set({ pinnedPaths });
@@ -1344,6 +1452,9 @@ async function downloadDestinationDirectory(): Promise<string | null> {
     useSettingsStore.getState().settings?.document,
   ).defaultTransferBehaviorIndex;
   if (transferBehaviorIndex === 1) {
+    return defaultDirectory;
+  }
+  if (!hasTauriInternals()) {
     return defaultDirectory;
   }
   const selection = await open({
@@ -1589,6 +1700,19 @@ export function selectedPathsForPane(pane: PaneExplorerState | undefined): strin
     .map((entry) => entry.path);
 }
 
+export function selectedDeletePathsForPane(pane: PaneExplorerState | undefined, permanent: boolean): string[] {
+  if (!pane?.listing) return [];
+  const selected = new Set(pane.selectedIds);
+  const inTrash = pane.listing.path === "misty://trash";
+  return pane.listing.entries
+    .filter((entry) => {
+      if (!selected.has(entry.id)) return false;
+      if (inTrash) return permanent && entry.isDeleted;
+      return permanent ? !entry.isDeleted : !entry.isDeleted && entry.location.kind === "local";
+    })
+    .map((entry) => entry.path);
+}
+
 export function selectedPasteItemsForPane(pane: PaneExplorerState | undefined): PasteItem[] {
   if (!pane?.listing) return [];
   if (pane.listing.path === "misty://trash") return [];
@@ -1600,6 +1724,23 @@ export function selectedPasteItemsForPane(pane: PaneExplorerState | undefined): 
 
 function isFileMasterEntry(entry: FileEntry): boolean {
   return !entry.isDeleted;
+}
+
+function deleteModeForPaneSelection(
+  pane: PaneExplorerState | undefined,
+  requestedMode: ExplorerDeleteMode | undefined,
+): ExplorerDeleteMode {
+  if (requestedMode) return requestedMode;
+  if (pane?.listing?.path === "misty://trash") return "permanent";
+  const selected = new Set(pane?.selectedIds ?? []);
+  const hasRemoteSelection = Boolean(pane?.listing?.entries.some((entry) =>
+    selected.has(entry.id) && !entry.isDeleted && entry.location.kind === "remote"
+  ));
+  return hasRemoteSelection ? "permanent" : "trash";
+}
+
+function deleteQueuedMessage(count: number, permanent: boolean): string {
+  return `Queued ${permanent ? "permanent delete" : "trash"} for ${itemCountLabel(count)}`;
 }
 
 async function localPathForEntry(entry: FileEntry): Promise<string> {
@@ -1911,11 +2052,11 @@ function pasteItemFromClipboardRef(fileRef: ClipboardPayload["file_refs"][number
 
 function remoteClipboardVirtualPath(
   mountPath: string,
-  providerType: string,
+  _providerType: string,
   remoteName: string,
   remotePath: string,
 ): string {
-  const base = [mountPath, providerType, remoteName]
+  const base = [mountPath, remoteName]
     .map((part, index) => index === 0 ? part.replace(/\/+$/, "") : part.replace(/^\/+|\/+$/g, ""))
     .filter(Boolean)
     .join("/");
@@ -2080,10 +2221,24 @@ function libraryItemFromEntry(entry: FileEntry): ExplorerLibraryItem {
 function loadPinnedPaths(): string[] {
   try {
     const parsed = JSON.parse(window.localStorage.getItem("misty.explorer.pinnedPaths") ?? "[]");
-    return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === "string") : [];
+    const pinnedPaths = Array.isArray(parsed)
+      ? normalizePinnedPaths(parsed.filter((value): value is string => typeof value === "string"))
+      : [];
+    window.localStorage.setItem("misty.explorer.pinnedPaths", JSON.stringify(pinnedPaths));
+    return pinnedPaths;
   } catch {
     return [];
   }
+}
+
+function normalizePinnedPaths(paths: string[]): string[] {
+  const normalized: string[] = [];
+  for (const path of paths) {
+    const candidate = normalizedPath(path.trim());
+    if (!candidate || normalized.some((existing) => samePath(existing, candidate))) continue;
+    normalized.push(candidate);
+  }
+  return normalized;
 }
 
 export function scheduleExplorerWorkspaceSave(): void {
@@ -2166,10 +2321,10 @@ function remoteBrowseTargetForPath(path: string, mountRoot: string): { remoteNam
   const cleanMount = normalizedPath(mountRoot);
   if (cleanPath !== cleanMount && !cleanPath.startsWith(`${cleanMount}/`)) return null;
   const parts = cleanPath.slice(cleanMount.length).split("/").filter(Boolean);
-  if (parts.length < 2) return null;
+  if (parts.length < 1) return null;
   return {
-    remoteName: parts[1],
-    remotePath: parts.length > 2 ? `/${parts.slice(2).join("/")}` : "/",
+    remoteName: parts[0],
+    remotePath: parts.length > 1 ? `/${parts.slice(1).join("/")}` : "/",
   };
 }
 
@@ -2183,6 +2338,12 @@ function parentDirectory(path: string): string {
 function remoteParentDirectory(path: string): string {
   const parent = parentDirectory(path);
   return parent === "/" ? "" : parent;
+}
+
+function setPreviewVisibleForPane(paneId: string): void {
+  const multi = useMultiPanelStore.getState();
+  const tab = multi.tabs.find((candidate) => candidate.panes.some((pane) => pane.id === paneId));
+  if (tab) multi.setTabPanelVisibility(tab.id, { previewVisible: true });
 }
 
 export function explorerWorkspaceNeedsSave(
@@ -2228,6 +2389,8 @@ async function persistExplorerWorkspace(): Promise<void> {
   const tabs = multi.tabs.map((tab, index) => ({
     idx: tabIndex(tab.id, index),
     title: tab.title,
+    sidebar_visible: tab.sidebarVisible ?? true,
+    inspector_visible: tab.previewVisible ?? true,
     explorer: nativeExplorerSnapshot(tab, explorer.panes, multi.closedPanes, multi.nextPaneIndex),
   }));
   const activeTab = multi.tabs.find((tab) => tab.id === multi.activeTabId) ?? multi.tabs[0];
@@ -2235,9 +2398,9 @@ async function persistExplorerWorkspace(): Promise<void> {
     id: workspaceId,
     title: existing?.title || "Workspace 1",
     sidebar_width: explorer.sidebarWidth,
-    sidebar_visible: explorer.sidebarVisible,
+    sidebar_visible: activeTab?.sidebarVisible ?? explorer.sidebarVisible,
     inspector_width: explorer.previewWidth,
-    inspector_visible: explorer.previewVisible,
+    inspector_visible: activeTab?.previewVisible ?? explorer.previewVisible,
     active_tab_idx: tabIndex(activeTab.id, 0),
     next_tab_idx: multi.nextTabIndex,
     tabs,
@@ -2426,6 +2589,8 @@ function defaultNativeWorkspace(
     tabs: [{
       idx: 0,
       title: titleFromPath(homePath),
+      sidebar_visible: explorer.sidebarVisible,
+      inspector_visible: explorer.previewVisible,
       explorer: explorerSnapshot,
     }],
     explorer: explorerSnapshot,
@@ -2455,7 +2620,13 @@ function restoreNativeWorkspace(document: NativeWorkspaceDocument, homePath: str
   if (!workspace) return null;
   const nativeTabs = workspace.tabs.length > 0
     ? workspace.tabs
-    : [{ idx: 0, title: workspace.title || "Home", explorer: workspace.explorer }];
+    : [{
+        idx: 0,
+        title: workspace.title || "Home",
+        sidebar_visible: workspace.sidebar_visible,
+        inspector_visible: workspace.inspector_visible,
+        explorer: workspace.explorer,
+      }];
   const panes: Record<string, PaneExplorerState> = {};
   const paneSorts: Record<string, ExplorerSortState> = {};
   const paneShowHidden: Record<string, boolean> = {};
@@ -2501,6 +2672,8 @@ function restoreNativeWorkspace(document: NativeWorkspaceDocument, homePath: str
       path: activePane.path,
       panes: restoredPanes,
       activePaneId,
+      sidebarVisible: nativeTab.sidebar_visible ?? workspace.sidebar_visible,
+      previewVisible: nativeTab.inspector_visible ?? workspace.inspector_visible,
       layout: {
         orientation: lanes.length > 1 ? "vertical" : "horizontal",
         lanes,
@@ -2783,24 +2956,169 @@ function titleFromPath(path: string): string {
   return clean.split("/").filter(Boolean).pop() || clean || "Home";
 }
 
-function sortListing(listing: DirectoryListing, sort: ExplorerSortState): DirectoryListing {
+type ExplorerStoreSetter = (
+  partial: Partial<ExplorerStore> | ExplorerStore | ((state: ExplorerStore) => Partial<ExplorerStore> | ExplorerStore),
+) => void;
+
+function ensureDirectorySizeScheduler(): void {
+  if (typeof window === "undefined" || directorySizeSchedulerTimer !== null) return;
+  directorySizeSchedulerTimer = window.setInterval(() => {
+    void useExplorerStore.getState().runScheduledDirectorySizeRefresh();
+  }, directorySizeRefreshIntervalMs);
+}
+
+function uniqueDirectorySizePaths(paths: string[]): string[] {
+  const unique: string[] = [];
+  for (const path of paths) {
+    const normalized = normalizedPath(path.trim());
+    if (!normalized || unique.some((candidate) => samePath(candidate, normalized))) continue;
+    unique.push(normalized);
+  }
+  return unique;
+}
+
+function folderPathsForListing(listing: DirectoryListing | null): string[] {
+  if (!listing || !directorySizeEligibleListing(listing)) return [];
+  return listing.entries
+    .filter((entry) => !entry.isDeleted && entry.kind === "folder")
+    .map((entry) => entry.path);
+}
+
+function directorySizeEligibleListing(listing: DirectoryListing): boolean {
+  return !listing.path.includes("://") && (listing.location.kind === "local" || listing.location.kind === "remote");
+}
+
+function openPaneDirectorySizePaths(state: ExplorerStore): string[] {
+  return uniqueDirectorySizePaths(
+    Object.values(state.panes).flatMap((pane) => folderPathsForListing(pane.listing)),
+  );
+}
+
+function mergeDirectorySizeRecords(setState: ExplorerStoreSetter, records: DirectorySizeRecord[]): void {
+  if (records.length === 0) return;
+  setState((state) => {
+    let changed = false;
+    const directorySizes = { ...state.directorySizes };
+    for (const record of records) {
+      const key = normalizedPath(record.path);
+      const previous = directorySizes[key];
+      if (directorySizeRecordsEqual(previous, record)) continue;
+      directorySizes[key] = { ...record, path: key };
+      changed = true;
+    }
+    if (!changed) return state;
+    return {
+      directorySizes,
+      panes: resortSizeSortedPanes(state, directorySizes),
+    };
+  });
+}
+
+function markDirectorySizesCalculating(setState: ExplorerStoreSetter, paths: string[]): void {
+  setState((state) => {
+    const directorySizes = { ...state.directorySizes };
+    let changed = false;
+    for (const path of paths) {
+      const key = normalizedPath(path);
+      const previous = directorySizes[key];
+      if (previous?.status === "calculating") continue;
+      directorySizes[key] = {
+        path: key,
+        sizeBytes: previous?.sizeBytes ?? null,
+        status: "calculating",
+        calculatedAtMs: previous?.calculatedAtMs ?? null,
+        error: null,
+      };
+      changed = true;
+    }
+    return changed ? { directorySizes } : state;
+  });
+}
+
+function markDirectorySizesFailed(setState: ExplorerStoreSetter, paths: string[], message: string): void {
+  setState((state) => {
+    const directorySizes = { ...state.directorySizes };
+    for (const path of paths) {
+      const key = normalizedPath(path);
+      directorySizes[key] = {
+        path: key,
+        sizeBytes: null,
+        status: "failed",
+        calculatedAtMs: Date.now(),
+        error: message,
+      };
+    }
+    return { directorySizes };
+  });
+}
+
+function resortSizeSortedPanes(
+  state: ExplorerStore,
+  directorySizes: Record<string, DirectorySizeRecord>,
+): Record<string, PaneExplorerState> {
+  let panes = state.panes;
+  for (const [paneId, pane] of Object.entries(state.panes)) {
+    const sort = state.paneSorts[paneId] ?? state.sort;
+    if (!pane.listing || sort.column !== "size") continue;
+    if (panes === state.panes) panes = { ...state.panes };
+    panes[paneId] = { ...pane, listing: sortListing(pane.listing, sort, directorySizes) };
+  }
+  return panes;
+}
+
+function directorySizeRecordsEqual(left: DirectorySizeRecord | undefined, right: DirectorySizeRecord): boolean {
+  return Boolean(left)
+    && left!.path === normalizedPath(right.path)
+    && left!.sizeBytes === right.sizeBytes
+    && left!.status === right.status
+    && left!.calculatedAtMs === right.calculatedAtMs
+    && (left!.error ?? null) === (right.error ?? null);
+}
+
+export function directorySizeRecordForPath(
+  directorySizes: Record<string, DirectorySizeRecord>,
+  path: string,
+): DirectorySizeRecord | undefined {
+  return directorySizes[normalizedPath(path)];
+}
+
+export function entrySizeBytes(
+  entry: FileEntry,
+  directorySizes: Record<string, DirectorySizeRecord>,
+): number | null {
+  if (entry.kind !== "folder") return entry.sizeBytes;
+  const record = directorySizeRecordForPath(directorySizes, entry.path);
+  return record?.status === "ready" ? record.sizeBytes : null;
+}
+
+function sortListing(
+  listing: DirectoryListing,
+  sort: ExplorerSortState,
+  directorySizes: Record<string, DirectorySizeRecord> = {},
+): DirectoryListing {
   const entries = [...listing.entries].sort((left, right) => {
     const folderBias = Number(right.kind === "folder") - Number(left.kind === "folder");
     if (folderBias !== 0) return folderBias;
     const direction = sort.direction === "asc" ? 1 : -1;
-    return compareEntries(left, right, sort.column) * direction;
+    return compareEntries(left, right, sort.column, directorySizes) * direction;
   });
   return { ...listing, entries };
 }
 
-function compareEntries(left: FileEntry, right: FileEntry, column: ExplorerSortColumn): number {
+function compareEntries(
+  left: FileEntry,
+  right: FileEntry,
+  column: ExplorerSortColumn,
+  directorySizes: Record<string, DirectorySizeRecord>,
+): number {
   if (column === "modified") {
     return compareNullableNumber(left.modifiedMs, right.modifiedMs)
       || compareText(left.remoteModified, right.remoteModified)
       || compareText(left.name, right.name);
   }
   if (column === "size") {
-    return compareNullableNumber(left.sizeBytes, right.sizeBytes) || compareText(left.name, right.name);
+    return compareNullableNumber(entrySizeBytes(left, directorySizes), entrySizeBytes(right, directorySizes))
+      || compareText(left.name, right.name);
   }
   if (column === "type") {
     return compareText(typeLabel(left), typeLabel(right)) || compareText(left.name, right.name);

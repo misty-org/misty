@@ -3,48 +3,61 @@ import {
   ChevronDown,
   ChevronRight,
   Clock3,
-  Cloud,
   Download,
+  ExternalLink,
   FileText,
   Folder,
   HardDrive,
   Home,
+  Check,
   Monitor,
   MoreHorizontal,
+  Pencil,
+  PinOff,
   Plus,
   RefreshCcw,
+  SlidersHorizontal,
   Star,
   Trash2,
   X,
 } from "lucide-react";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import type { ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
 import type { MountedDevice, ProviderRemote } from "../../../api/types";
+import { providerIconForType } from "../../../shared/assets/icons";
+import { AssetIcon } from "../../../shared/components/AssetIcon";
 import { formatBytes } from "../utils/fileFormat";
 import type { ExplorerWorkspaceEntry } from "../state/useExplorerStore";
 
 const DEVICE_CUSTOMIZATION_STORAGE_KEY = "misty.explorer.sidebar.devices";
 const SIDEBAR_COLLAPSE_STORAGE_KEY = "misty.explorer.sidebar.collapsed";
+const QUICK_ACCESS_HIDDEN_STORAGE_KEY = "misty.explorer.sidebar.quickAccessHidden";
 
 const sidebarStyles = {
   root:
     "h-full min-h-0 min-w-0 overflow-auto border-r border-[#292929] bg-[#141414] px-3.5 py-4 max-[980px]:hidden",
   section: "[&+&]:mt-4",
-  sectionHeading: "mb-2.5 text-[15px] font-medium text-[#d5d5d5]",
-  sectionTitle: "mb-2.5 flex items-center justify-between gap-2",
+  sectionTitle: "mb-2.5 flex min-w-0 items-center gap-2",
   sectionToggle:
-    "flex min-w-0 flex-1 items-center justify-between gap-2 rounded-md border-0 bg-transparent py-[3px] pl-0 pr-1 text-left text-[#d5d5d5] hover:text-[#eeeeee]",
+    "inline-flex min-w-0 items-center gap-1.5 rounded-md border-0 bg-transparent py-[3px] pl-0 pr-1 text-left text-[#d5d5d5] hover:text-[#eeeeee]",
   sectionToggleLabel:
     "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[15px] font-medium",
-  sectionChevron: "text-[#949494]",
-  sectionActions: "flex flex-none items-center gap-[3px]",
+  sectionChevron: "flex-none text-[#949494]",
+  sectionActions: "ml-auto flex flex-none items-center gap-[3px]",
   sectionActionButton:
     "grid size-6 place-items-center rounded-md border-0 bg-transparent p-0 text-[#949494] hover:bg-[#1f1f1f] hover:text-[#dddddd]",
   spinning: "[&>svg]:animate-spin",
   itemButton:
     "flex w-full items-center gap-2.5 rounded-lg border border-transparent bg-transparent px-[11px] py-2.5 text-left text-[#d5d5d5] hover:bg-[#2b2b2b] hover:text-[#bdbdbd]",
   itemSelected: "bg-[#2b2b2b] text-[#bdbdbd]",
+  remoteIcon: "grid size-[18px] flex-none place-items-center",
+  pinnedRow:
+    "group/pin flex min-w-0 items-center rounded-lg border border-transparent bg-transparent text-[#d5d5d5] hover:bg-[#2b2b2b] hover:text-[#bdbdbd]",
+  pinnedButton:
+    "flex min-w-0 flex-1 items-center gap-2.5 border-0 bg-transparent px-[11px] py-2.5 text-left text-inherit",
+  pinnedUnpinButton:
+    "mr-1 grid size-7 flex-none place-items-center rounded-lg border border-transparent bg-transparent p-0 text-[#8f8f8f] opacity-0 hover:bg-[#3a3a3a] hover:text-[#eeeeee] group-hover/pin:opacity-100 group-focus-within/pin:opacity-100",
   workspaceSelect:
     "flex w-full items-center gap-2.5 rounded-lg border border-[#373737] bg-[#1c1c1c] px-[11px] py-2.5 text-left text-[#d5d5d5]",
   workspaceSelectLabel:
@@ -66,14 +79,24 @@ const sidebarStyles = {
   deviceMenuButton:
     "flex w-7 min-w-7 justify-center rounded-lg border border-transparent bg-transparent p-0 text-[#d5d5d5] opacity-0 hover:bg-[#2b2b2b] hover:text-[#bdbdbd] group-hover/device:opacity-100 group-focus-within/device:opacity-100",
   menu:
-    "fixed z-[2147483000] grid w-44 gap-0.5 rounded-[11px] border border-[#323232] bg-[rgba(17, 17, 17, 0.98)] p-1.5 shadow-[0_18px_40px_rgba(0,0,0,0.45)]",
+    "fixed z-[2147483000] grid w-44 gap-0.5 rounded-[11px] border border-[#323232] bg-[rgba(17,17,17,0.98)] p-1.5 shadow-[0_18px_40px_rgba(0,0,0,0.45)]",
   workspaceMenu: "w-60",
   menuButton:
-    "h-[34px] rounded-lg border-0 bg-transparent px-2.5 text-left text-[#dddddd] hover:bg-[#222222] hover:text-[#eeeeee] disabled:cursor-default disabled:opacity-40",
+    "flex h-[34px] items-center gap-2 rounded-lg border-0 bg-transparent px-2.5 text-left text-[#dddddd] hover:bg-[#222222] hover:text-[#eeeeee] disabled:cursor-default disabled:opacity-40",
   menuButtonSelected: "bg-[#292929] text-[#eeeeee]",
+  workspaceMenuRow:
+    "group/workspace flex h-[34px] min-w-0 items-center gap-1 rounded-lg border-0 bg-transparent text-[#dddddd] hover:bg-[#222222] hover:text-[#eeeeee]",
+  workspaceMenuSelect:
+    "flex h-full min-w-0 flex-1 items-center gap-2 border-0 bg-transparent px-2.5 text-left text-inherit",
+  workspaceMenuActions:
+    "mr-1 flex flex-none items-center gap-px opacity-0 group-hover/workspace:opacity-100 group-focus-within/workspace:opacity-100",
+  workspaceMenuIconButton:
+    "grid size-7 place-items-center rounded-md border-0 bg-transparent p-0 text-[#a9a9a9] hover:bg-[#303030] hover:text-[#eeeeee] disabled:cursor-default disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-[#a9a9a9]",
+  menuButtonIcon: "grid size-[17px] flex-none place-items-center text-[#bdbdbd]",
   menuButtonTruncate: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap",
+  menuButtonCheck: "w-[17px] flex-none text-[#d8d8d8]",
   menuSeparator: "mx-1 my-[5px] h-px bg-[#292929]",
-  dialogBackdrop: "fixed inset-0 z-[2147483200] grid place-items-center bg-[rgba(6, 6, 6, 0.58)] p-6 backdrop-blur-[3px]",
+  dialogBackdrop: "fixed inset-0 z-[2147483200] grid place-items-center bg-[rgba(6,6,6,0.58)] p-6 backdrop-blur-[3px]",
   dialog: "grid w-[min(380px,100%)] gap-4 rounded-[10px] border border-[#353535] bg-[#141414] p-[18px] shadow-[0_24px_64px_rgba(0,0,0,0.55)]",
   dialogHeader: "flex items-center justify-between gap-3",
   dialogTitle: "m-0 text-[17px] font-semibold",
@@ -105,6 +128,10 @@ interface ExplorerSidebarProps {
   onCreateWorkspace: (title: string) => void;
   onRenameWorkspace: (workspaceId: string, title: string) => void;
   onDeleteWorkspace: (workspaceId: string) => void;
+  onOpenInNewTab: (path: string, title?: string) => void;
+  onManageRemotes: () => void;
+  onAddRemote: () => void;
+  onUnpinPinnedPath: (path: string) => void;
 }
 
 export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSidebarProps) {
@@ -116,20 +143,31 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
   const [renameDevice, setRenameDevice] = useState<SidebarDeviceEntry | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [workspaceMenu, setWorkspaceMenu] = useState<WorkspaceMenuState | null>(null);
+  const [quickAccessMenu, setQuickAccessMenu] = useState<QuickAccessMenuState | null>(null);
   const [workspaceDialog, setWorkspaceDialog] = useState<WorkspaceDialogState>(null);
   const [workspaceDraft, setWorkspaceDraft] = useState("");
+  const [hiddenQuickAccessPaths, setHiddenQuickAccessPaths] = useState<string[]>(loadHiddenQuickAccessPaths);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const workspaceButtonRef = useRef<HTMLButtonElement | null>(null);
   const workspaceMenuRef = useRef<HTMLDivElement | null>(null);
-  const quickAccess = [
+  const quickAccessMenuRef = useRef<HTMLDivElement | null>(null);
+  const quickAccess = useMemo(() => [
     { label: "Home", icon: Home, path: props.homePath },
     { label: "Desktop", icon: Monitor, path: `${props.homePath}/Desktop` },
     { label: "Documents", icon: FileText, path: `${props.homePath}/Documents` },
     { label: "Downloads", icon: Download, path: `${props.homePath}/Downloads` },
-    { label: "Projects", icon: Folder, path: `${props.homePath}/Projects` },
     { label: "Recent", icon: Clock3, path: "misty://recent" },
     { label: "Starred", icon: Star, path: "misty://starred" },
     { label: "Trash", icon: Trash2, path: "misty://trash" },
-  ];
+  ], [props.homePath]);
+  const visiblePinnedPaths = useMemo(
+    () => dedupePinnedPathsForQuickAccess(props.pinnedPaths, quickAccess.filter((item) => !quickAccessPathHidden(item.path, hiddenQuickAccessPaths)).map((item) => item.path)),
+    [hiddenQuickAccessPaths, props.pinnedPaths, quickAccess],
+  );
+  const visibleQuickAccess = useMemo(
+    () => quickAccess.filter((item) => !quickAccessPathHidden(item.path, hiddenQuickAccessPaths)),
+    [hiddenQuickAccessPaths, quickAccess],
+  );
   const deviceEntries = useMemo(
     () => buildDeviceEntries(props.devices, deviceCustomization),
     [deviceCustomization, props.devices],
@@ -144,18 +182,26 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
   }, [collapsedSections]);
 
   useEffect(() => {
-    if (!deviceMenu && !workspaceMenu) return;
+    saveHiddenQuickAccessPaths(hiddenQuickAccessPaths);
+  }, [hiddenQuickAccessPaths]);
+
+  useEffect(() => {
+    if (!deviceMenu && !workspaceMenu && !quickAccessMenu) return;
     const closeOnOutside = (event: PointerEvent) => {
       const target = event.target as Node | null;
       if (target && menuRef.current?.contains(target)) return;
+      if (target && workspaceButtonRef.current?.contains(target)) return;
       if (target && workspaceMenuRef.current?.contains(target)) return;
+      if (target && quickAccessMenuRef.current?.contains(target)) return;
       setDeviceMenu(null);
       setWorkspaceMenu(null);
+      setQuickAccessMenu(null);
     };
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setDeviceMenu(null);
         setWorkspaceMenu(null);
+        setQuickAccessMenu(null);
       }
     };
     window.addEventListener("pointerdown", closeOnOutside);
@@ -164,7 +210,7 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
       window.removeEventListener("pointerdown", closeOnOutside);
       window.removeEventListener("keydown", closeOnEscape);
     };
-  }, [deviceMenu, workspaceMenu]);
+  }, [deviceMenu, quickAccessMenu, workspaceMenu]);
 
   const startRename = (device: SidebarDeviceEntry) => {
     setRenameDevice(device);
@@ -205,8 +251,45 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
   const toggleSection = (section: keyof SidebarCollapsedState) => {
     setCollapsedSections((current) => ({ ...current, [section]: !current[section] }));
   };
-  const openWorkspaceDialog = (kind: "create" | "rename" | "delete") => {
-    const active = props.workspaceEntries.find((workspace) => workspace.id === props.activeWorkspaceId)
+  const openQuickAccessMenu = (
+    event: MouseEvent,
+    item: QuickAccessMenuItem | null,
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const width = item ? 224 : 236;
+    setDeviceMenu(null);
+    setWorkspaceMenu(null);
+    setQuickAccessMenu({
+      item,
+      mode: item ? "item" : "checklist",
+      left: Math.max(8, Math.min(event.clientX, window.innerWidth - width - 8)),
+      top: Math.max(8, Math.min(event.clientY, window.innerHeight - 150)),
+      width,
+    });
+  };
+  const removeQuickAccessItem = (item: QuickAccessMenuItem) => {
+    if (item.kind === "builtIn") {
+      setHiddenQuickAccessPaths((paths) => addHiddenQuickAccessPath(paths, item.path));
+    } else {
+      props.onUnpinPinnedPath(item.path);
+    }
+    setQuickAccessMenu(null);
+  };
+  const resetQuickAccessDefaults = () => {
+    setHiddenQuickAccessPaths([]);
+    setQuickAccessMenu(null);
+  };
+  const toggleQuickAccessDefault = (path: string) => {
+    setHiddenQuickAccessPaths((paths) =>
+      quickAccessPathHidden(path, paths)
+        ? paths.filter((candidate) => normalizeSidebarPath(candidate) !== normalizeSidebarPath(path))
+        : addHiddenQuickAccessPath(paths, path)
+    );
+  };
+  const openWorkspaceDialog = (kind: "create" | "rename" | "delete", target?: ExplorerWorkspaceEntry) => {
+    const active = target
+      ?? props.workspaceEntries.find((workspace) => workspace.id === props.activeWorkspaceId)
       ?? (props.activeWorkspaceId ? { id: props.activeWorkspaceId, title: props.activeWorkspaceTitle } : null);
     setWorkspaceMenu(null);
     setWorkspaceDialog(kind === "rename" && active
@@ -232,17 +315,22 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
   return (
     <aside className={sidebarStyles.root}>
       <section className={sidebarStyles.section}>
-        <h2 className={sidebarStyles.sectionHeading}>Workspace</h2>
         <button
           type="button"
+          ref={workspaceButtonRef}
           className={sidebarStyles.workspaceSelect}
           aria-haspopup="menu"
           aria-expanded={Boolean(workspaceMenu)}
           onClick={(event) => {
             const rect = event.currentTarget.getBoundingClientRect();
-            setWorkspaceMenu({
-              left: Math.max(8, Math.min(rect.left, window.innerWidth - 248)),
-              top: Math.max(8, Math.min(rect.bottom + 6, window.innerHeight - 260)),
+            const width = Math.max(220, rect.width);
+            setWorkspaceMenu((current) => {
+              if (current) return null;
+              return {
+                left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)),
+                top: Math.max(8, Math.min(rect.bottom + 6, window.innerHeight - 260)),
+                width,
+              };
             });
           }}
         >
@@ -257,32 +345,70 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
           title="Quick access"
           collapsed={collapsedSections.quickAccess}
           onToggle={() => toggleSection("quickAccess")}
+          onContextMenu={(event) => openQuickAccessMenu(event, null)}
         />
         {!collapsedSections.quickAccess ? (
           <div className={sidebarStyles.list}>
-            {quickAccess.map((item) => {
+            {visibleQuickAccess.map((item) => {
               const Icon = item.icon;
               return (
-                <button
-                  key={item.label}
-                  className={`${sidebarStyles.itemButton} ${props.activePath === item.path ? sidebarStyles.itemSelected : ""}`}
-                  onClick={() => props.onNavigate(item.path)}
+                <div
+                  className={`${sidebarStyles.pinnedRow} ${props.activePath === item.path ? sidebarStyles.itemSelected : ""}`}
+                  key={`quick:${item.path}`}
+                  onContextMenu={(event) => openQuickAccessMenu(event, {
+                    kind: "builtIn",
+                    label: item.label,
+                    path: item.path,
+                  })}
                 >
-                  <Icon size={18} />
-                  {item.label}
-                </button>
+                  <button
+                    className={sidebarStyles.pinnedButton}
+                    onClick={() => props.onNavigate(item.path)}
+                    title={item.path}
+                  >
+                    <Icon size={18} />
+                    <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{item.label}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={sidebarStyles.pinnedUnpinButton}
+                    title={`Unpin ${item.label}`}
+                    aria-label={`Unpin ${item.label} from Quick access`}
+                    onClick={() => setHiddenQuickAccessPaths((paths) => addHiddenQuickAccessPath(paths, item.path))}
+                  >
+                    <PinOff size={15} />
+                  </button>
+                </div>
               );
             })}
-            {props.pinnedPaths.map((path) => (
-              <button
+            {visiblePinnedPaths.map((path) => (
+              <div
+                className={`${sidebarStyles.pinnedRow} ${props.activePath === path ? sidebarStyles.itemSelected : ""}`}
                 key={`pin:${path}`}
-                className={`${sidebarStyles.itemButton} ${props.activePath === path ? sidebarStyles.itemSelected : ""}`}
-                onClick={() => props.onNavigate(path)}
-                title={path}
+                onContextMenu={(event) => openQuickAccessMenu(event, {
+                  kind: "pinned",
+                  label: pinnedPathLabel(path),
+                  path,
+                })}
               >
-                <Folder size={18} />
-                <span>{path.split("/").filter(Boolean).pop() || path}</span>
-              </button>
+                <button
+                  className={sidebarStyles.pinnedButton}
+                  onClick={() => props.onNavigate(path)}
+                  title={path}
+                >
+                  <Folder size={18} />
+                  <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{pinnedPathLabel(path)}</span>
+                </button>
+                <button
+                  type="button"
+                  className={sidebarStyles.pinnedUnpinButton}
+                  title={`Unpin ${path}`}
+                  aria-label={`Unpin ${path} from Quick access`}
+                  onClick={() => props.onUnpinPinnedPath(path)}
+                >
+                  <PinOff size={15} />
+                </button>
+              </div>
             ))}
           </div>
         ) : null}
@@ -293,6 +419,34 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
           title="Remote"
           collapsed={collapsedSections.remote}
           onToggle={() => toggleSection("remote")}
+          actions={(
+            <>
+              <button
+                type="button"
+                title="Manage remotes"
+                aria-label="Manage remotes"
+                className={sidebarStyles.sectionActionButton}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  props.onManageRemotes();
+                }}
+              >
+                <SlidersHorizontal size={15} />
+              </button>
+              <button
+                type="button"
+                title="Add remote"
+                aria-label="Add remote"
+                className={sidebarStyles.sectionActionButton}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  props.onAddRemote();
+                }}
+              >
+                <Plus size={15} />
+              </button>
+            </>
+          )}
         />
         {!collapsedSections.remote ? (
           props.remoteLoading && props.remotes.length === 0 ? (
@@ -302,7 +456,8 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
           ) : (
             <div className={sidebarStyles.list}>
               {props.remotes.map((remote) => {
-                const path = joinPath(props.mountRoot, remote.type, remote.name);
+                const path = joinPath(props.mountRoot, remote.name);
+                const providerIcon = providerIconForType(remote.type);
                 return (
                   <button
                     key={`${remote.type}:${remote.name}`}
@@ -310,7 +465,9 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
                     onClick={() => props.onNavigate(path)}
                     title={`${remote.type}: ${remote.name}`}
                   >
-                    <Cloud size={18} />
+                    <span className={sidebarStyles.remoteIcon}>
+                      <AssetIcon src={providerIcon.src} color={providerIcon.color} size={18} />
+                    </span>
                     <span>{remote.name}</span>
                   </button>
                 );
@@ -404,35 +561,130 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
             <div
               ref={workspaceMenuRef}
               className={`${sidebarStyles.menu} ${sidebarStyles.workspaceMenu}`}
-              style={{ left: workspaceMenu.left, top: workspaceMenu.top }}
+              style={{ left: workspaceMenu.left, top: workspaceMenu.top, width: workspaceMenu.width }}
               role="menu"
             >
               {(props.workspaceEntries.length > 0 ? props.workspaceEntries : [{ id: props.activeWorkspaceId || "workspace_0", title: props.activeWorkspaceTitle }]).map((workspace) => (
-                <button
+                <div
                   key={workspace.id}
-                  type="button"
-                  role="menuitemradio"
-                  aria-checked={workspace.id === props.activeWorkspaceId}
-                  className={`${sidebarStyles.menuButton} ${sidebarStyles.menuButtonTruncate} ${workspace.id === props.activeWorkspaceId ? sidebarStyles.menuButtonSelected : ""}`}
-                  onClick={() => {
-                    setWorkspaceMenu(null);
-                    props.onSelectWorkspace(workspace.id);
-                  }}
+                  className={`${sidebarStyles.workspaceMenuRow} ${workspace.id === props.activeWorkspaceId ? sidebarStyles.menuButtonSelected : ""}`}
                 >
-                  {workspace.title}
-                </button>
+                  <button
+                    className={sidebarStyles.workspaceMenuSelect}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={workspace.id === props.activeWorkspaceId}
+                    onClick={() => {
+                      setWorkspaceMenu(null);
+                      props.onSelectWorkspace(workspace.id);
+                    }}
+                  >
+                    <span className={sidebarStyles.menuButtonCheck}>
+                      {workspace.id === props.activeWorkspaceId ? <Check size={15} /> : null}
+                    </span>
+                    <span className={sidebarStyles.menuButtonTruncate}>{workspace.title}</span>
+                  </button>
+                  <span className={sidebarStyles.workspaceMenuActions}>
+                    <button
+                      className={sidebarStyles.workspaceMenuIconButton}
+                      type="button"
+                      title={`Rename ${workspace.title}`}
+                      aria-label={`Rename ${workspace.title}`}
+                      onClick={() => openWorkspaceDialog("rename", workspace)}
+                    >
+                      <Pencil size={14} />
+                    </button>
+                    <button
+                      className={sidebarStyles.workspaceMenuIconButton}
+                      type="button"
+                      title={`Delete ${workspace.title}`}
+                      aria-label={`Delete ${workspace.title}`}
+                      onClick={() => openWorkspaceDialog("delete", workspace)}
+                      disabled={props.workspaceEntries.length <= 1}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </span>
+                </div>
               ))}
               <div className={sidebarStyles.menuSeparator} />
-              <button className={sidebarStyles.menuButton} type="button" role="menuitem" onClick={() => openWorkspaceDialog("create")}>New Workspace</button>
-              <button className={sidebarStyles.menuButton} type="button" role="menuitem" onClick={() => openWorkspaceDialog("rename")} disabled={!props.activeWorkspaceId}>Rename Workspace</button>
+              <button className={sidebarStyles.menuButton} type="button" role="menuitem" onClick={() => openWorkspaceDialog("create")}>
+                <span className={sidebarStyles.menuButtonIcon}><Plus size={15} /></span>
+                <span>New</span>
+              </button>
+            </div>,
+            document.body,
+          )
+        : null}
+      {quickAccessMenu
+        ? createPortal(
+            <div
+              ref={quickAccessMenuRef}
+              className={sidebarStyles.menu}
+              style={{ left: quickAccessMenu.left, top: quickAccessMenu.top, width: quickAccessMenu.width }}
+              role="menu"
+              aria-label="Quick access actions"
+            >
+              {quickAccessMenu.mode === "item" ? (
+                <>
+                  <button
+                    className={sidebarStyles.menuButton}
+                    type="button"
+                    role="menuitem"
+                    disabled={!quickAccessMenu.item}
+                    onClick={() => {
+                      if (!quickAccessMenu.item) return;
+                      props.onOpenInNewTab(quickAccessMenu.item.path, quickAccessMenu.item.label);
+                      setQuickAccessMenu(null);
+                    }}
+                  >
+                    <ExternalLink size={15} />
+                    <span>Open in New Tab</span>
+                  </button>
+                  <button
+                    className={sidebarStyles.menuButton}
+                    type="button"
+                    role="menuitem"
+                    disabled={!quickAccessMenu.item}
+                    onClick={() => {
+                      if (quickAccessMenu.item) removeQuickAccessItem(quickAccessMenu.item);
+                    }}
+                  >
+                    <X size={15} />
+                    <span>Remove from Sidebar</span>
+                  </button>
+                  <div className={sidebarStyles.menuSeparator} />
+                </>
+              ) : null}
+              {quickAccessMenu.mode === "checklist" ? (
+                <>
+                  {quickAccess.map((item) => {
+                    const checked = !quickAccessPathHidden(item.path, hiddenQuickAccessPaths);
+                    return (
+                      <button
+                        key={`quick-menu:${item.path}`}
+                        className={sidebarStyles.menuButton}
+                        type="button"
+                        role="menuitemcheckbox"
+                        aria-checked={checked}
+                        onClick={() => toggleQuickAccessDefault(item.path)}
+                      >
+                        <span className={sidebarStyles.menuButtonCheck}>{checked ? <Check size={15} /> : null}</span>
+                        <span>{item.label}</span>
+                      </button>
+                    );
+                  })}
+                  <div className={sidebarStyles.menuSeparator} />
+                </>
+              ) : null}
               <button
                 className={sidebarStyles.menuButton}
                 type="button"
                 role="menuitem"
-                onClick={() => openWorkspaceDialog("delete")}
-                disabled={!props.activeWorkspaceId || props.workspaceEntries.length <= 1}
+                onClick={resetQuickAccessDefaults}
               >
-                Delete Workspace
+                <RefreshCcw size={15} />
+                <span>Reset Defaults</span>
               </button>
             </div>,
             document.body,
@@ -565,10 +817,11 @@ function SidebarSectionHeader(props: {
   collapsed: boolean;
   actions?: ReactNode;
   onToggle: () => void;
+  onContextMenu?: (event: MouseEvent<HTMLDivElement>) => void;
 }) {
   const Chevron = props.collapsed ? ChevronRight : ChevronDown;
   return (
-    <div className={sidebarStyles.sectionTitle}>
+    <div className={sidebarStyles.sectionTitle} onContextMenu={props.onContextMenu}>
       <button type="button" className={sidebarStyles.sectionToggle} onClick={props.onToggle} aria-expanded={!props.collapsed}>
         <span className={sidebarStyles.sectionToggleLabel}>{props.title}</span>
         <Chevron className={sidebarStyles.sectionChevron} size={14} />
@@ -649,12 +902,27 @@ type WorkspaceDialogState =
 interface WorkspaceMenuState {
   left: number;
   top: number;
+  width: number;
 }
 
 interface DeviceMenuState {
   device: SidebarDeviceEntry;
   left: number;
   top: number;
+}
+
+type QuickAccessMenuItem = {
+  kind: "builtIn" | "pinned";
+  label: string;
+  path: string;
+};
+
+interface QuickAccessMenuState {
+  item: QuickAccessMenuItem | null;
+  mode: "item" | "checklist";
+  left: number;
+  top: number;
+  width: number;
 }
 
 function buildDeviceEntries(devices: MountedDevice[], customization: DeviceCustomizationState): SidebarDeviceEntry[] {
@@ -696,6 +964,63 @@ function pathIsInside(path: string, root: string): boolean {
   if (path === normalizedRoot) return true;
   if (normalizedRoot === "/") return false;
   return path.startsWith(`${normalizedRoot}/`);
+}
+
+function dedupePinnedPathsForQuickAccess(paths: string[], builtInPaths: string[]): string[] {
+  const seen = new Set(builtInPaths.map(normalizeSidebarPath));
+  const pinnedPaths: string[] = [];
+  for (const path of paths) {
+    const normalized = normalizeSidebarPath(path);
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    pinnedPaths.push(normalized);
+  }
+  return pinnedPaths;
+}
+
+function normalizeSidebarPath(path: string): string {
+  const trimmed = path.trim();
+  const normalized = trimmed.replace(/\/+$/, "");
+  return normalized || (trimmed === "/" ? "/" : "");
+}
+
+function pinnedPathLabel(path: string): string {
+  if (path === "misty://recent") return "Recent";
+  if (path === "misty://starred") return "Starred";
+  if (path === "misty://trash") return "Trash";
+  return path.split("/").filter(Boolean).pop() || path;
+}
+
+function quickAccessPathHidden(path: string, hiddenPaths: string[]): boolean {
+  const normalized = normalizeSidebarPath(path);
+  return hiddenPaths.some((candidate) => normalizeSidebarPath(candidate) === normalized);
+}
+
+function addHiddenQuickAccessPath(paths: string[], path: string): string[] {
+  const normalized = normalizeSidebarPath(path);
+  if (!normalized || quickAccessPathHidden(normalized, paths)) return paths;
+  return [...paths, normalized];
+}
+
+function loadHiddenQuickAccessPaths(): string[] {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(QUICK_ACCESS_HIDDEN_STORAGE_KEY) ?? "[]");
+    if (!Array.isArray(parsed)) return [];
+    const hiddenPaths: string[] = [];
+    for (const value of parsed) {
+      if (typeof value !== "string") continue;
+      const normalized = normalizeSidebarPath(value);
+      if (!normalized || quickAccessPathHidden(normalized, hiddenPaths)) continue;
+      hiddenPaths.push(normalized);
+    }
+    return hiddenPaths;
+  } catch {
+    return [];
+  }
+}
+
+function saveHiddenQuickAccessPaths(paths: string[]): void {
+  window.localStorage.setItem(QUICK_ACCESS_HIDDEN_STORAGE_KEY, JSON.stringify(paths));
 }
 
 function loadDeviceCustomization(): DeviceCustomizationState {

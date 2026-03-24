@@ -10,6 +10,7 @@ import {
   TerminalSquare,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { hasTauriInternals } from "../../../../shared/tauri";
 
 type LogKey = "misty-hub" | "misty" | "misty-proxy" | "misty-rclone";
 
@@ -136,6 +137,11 @@ export default function DashboardPage() {
 
   async function loadLog(name: LogKey) {
     try {
+      if (!hasTauriInternals()) {
+        setSnapshots((current) => ({ ...current, [name]: browserFallback(name) }));
+        setError("");
+        return;
+      }
       const snapshot = await invoke<LogFileSnapshot>("read_misty_log", {
         name,
         maxBytes: 512 * 1024,
@@ -158,20 +164,28 @@ export default function DashboardPage() {
     try {
       await Promise.all([
         ...logs.map((log) => loadLog(log.key)),
-        invoke<ClipboardProxySnapshot>("get_clipboard_proxy_snapshot")
-          .then((snapshot) => setClipboard(snapshot))
-          .catch((requestError) => {
-            const message = String(requestError);
-            setClipboard({
-              proxy_running: false,
-              proxy_url: null,
-              devices: [],
-              latest: null,
-              error: message.toLowerCase().includes("invoke")
-                ? "Clipboard relay state is available in the Misty Hub desktop app."
-                : message,
-            });
-          }),
+        hasTauriInternals()
+          ? invoke<ClipboardProxySnapshot>("get_clipboard_proxy_snapshot")
+            .then((snapshot) => setClipboard(snapshot))
+            .catch((requestError) => {
+              const message = String(requestError);
+              setClipboard({
+                proxy_running: false,
+                proxy_url: null,
+                devices: [],
+                latest: null,
+                error: message.toLowerCase().includes("invoke")
+                  ? "Clipboard relay state is available in the Misty Hub desktop app."
+                  : message,
+              });
+            })
+          : Promise.resolve(setClipboard({
+            proxy_running: false,
+            proxy_url: null,
+            devices: [],
+            latest: null,
+            error: "Clipboard relay state is available in the Misty Hub desktop app.",
+          })),
       ]);
     } finally {
       setLoading(false);
