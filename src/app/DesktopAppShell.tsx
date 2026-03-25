@@ -249,10 +249,11 @@ export function DesktopAppShell() {
       state.notificationHistory.filter((notification) => !notification.read)
         .length,
   );
-  const { resolvedTheme, setSystemTheme, themeMode } = useAppThemeStore(
+  const { resolvedTheme, setSystemTheme, themeId, themeMode } = useAppThemeStore(
     useShallow((state) => ({
       resolvedTheme: state.resolvedTheme,
       setSystemTheme: state.setSystemTheme,
+      themeId: state.themeId,
       themeMode: state.themeMode,
     })),
   );
@@ -388,6 +389,7 @@ export function DesktopAppShell() {
   useEffect(() => {
     const root = document.documentElement;
     root.dataset.theme = resolvedTheme;
+    root.dataset.mistyTheme = themeId;
     root.dataset.themeMode = themeMode;
     root.dataset.compactMode = String(appearancePreferences.compactModeEnabled);
     root.dataset.fontSize = appearancePreferences.fontSize;
@@ -399,7 +401,7 @@ export function DesktopAppShell() {
     );
     root.dataset.uiScale = appearancePreferences.uiScale;
     root.style.colorScheme = resolvedTheme;
-  }, [appearancePreferences, resolvedTheme, themeMode]);
+  }, [appearancePreferences, resolvedTheme, themeId, themeMode]);
 
   useEffect(() => {
     const badgeCount =

@@ -30,8 +30,9 @@ import { createPortal } from "react-dom";
 import type { CSSProperties, ReactNode } from "react";
 import { searchQuery } from "../../../api/misty";
 import type { PluginCommandEntry, SearchResult } from "../../../api/types";
-import type { ExplorerSortColumn, ExplorerSortState, ExplorerViewMode } from "../state/useExplorerStore";
+import { useExplorerStore, type ExplorerSortColumn, type ExplorerSortState, type ExplorerViewMode } from "../state/useExplorerStore";
 import { breadcrumbSegments } from "../utils/fileFormat";
+import { mergeLibrarySearchResults } from "../utils/librarySearch";
 import { searchResultNavigationTarget } from "../utils/searchNavigation";
 import type { ExplorerSearchNavigationTarget } from "../utils/searchNavigation";
 
@@ -58,6 +59,10 @@ export type ExplorerCommandId =
   | "explorer.split_horizontal"
   | "explorer.refresh"
   | "explorer.rename"
+  | "explorer.batch_rename"
+  | "explorer.duplicate_finder"
+  | "explorer.compare_with"
+  | "explorer.automation_rules"
   | "explorer.delete"
   | "explorer.download"
   | "explorer.open_with"
@@ -104,6 +109,10 @@ const explorerCommands: ExplorerCommandPaletteEntry[] = [
   { id: "explorer.split_horizontal", label: "Split Horizontally", hint: "Add a stacked pane for the active folder" },
   { id: "explorer.refresh", label: "Refresh", hint: "Reload the active folder" },
   { id: "explorer.rename", label: "Rename", hint: "Rename the selected item" },
+  { id: "explorer.batch_rename", label: "Batch Rename", hint: "Preview and queue renames for selected items" },
+  { id: "explorer.duplicate_finder", label: "Find Duplicates", hint: "Scan folders and queue reviewed cleanup" },
+  { id: "explorer.compare_with", label: "Compare With", hint: "Compare the selected file or folder against another path" },
+  { id: "explorer.automation_rules", label: "Automation Rules", hint: "Create rules and preview matched files" },
   { id: "explorer.delete", label: "Delete", hint: "Delete the selected items" },
   { id: "explorer.download", label: "Download", hint: "Download selected remote items to Downloads" },
   { id: "explorer.open_with", label: "Open With", hint: "Choose an app for the selected file" },
@@ -347,14 +356,25 @@ export const ExplorerToolbar = memo(function ExplorerToolbar(props: ExplorerTool
       })
         .then((results) => {
           if (canceled) return;
-          setIndexedResults(results);
+          setIndexedResults(mergeLibrarySearchResults(
+            results,
+            useExplorerStore.getState().library,
+            query,
+            { scope: "everything", currentPath: props.path, limit: 8 },
+          ));
           setIndexedSearching(false);
         })
         .catch((error: unknown) => {
           if (canceled) return;
-          setIndexedResults([]);
+          const results = mergeLibrarySearchResults(
+            [],
+            useExplorerStore.getState().library,
+            query,
+            { scope: "everything", currentPath: props.path, limit: 8 },
+          );
+          setIndexedResults(results);
           setIndexedSearching(false);
-          setIndexedError(error instanceof Error ? error.message : String(error));
+          setIndexedError(results.length > 0 ? null : error instanceof Error ? error.message : String(error));
         });
     }, 160);
     return () => {

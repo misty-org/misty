@@ -625,6 +625,7 @@ fn transfer_type_from_text(value: &str) -> TransferType {
         "move" => TransferType::Move,
         "rename" => TransferType::Rename,
         "delete" => TransferType::Delete,
+        "archive" => TransferType::Archive,
         _ => TransferType::Copy,
     }
 }
@@ -638,6 +639,7 @@ fn transfer_type_text(value: TransferType) -> &'static str {
         TransferType::Move => "move",
         TransferType::Rename => "rename",
         TransferType::Delete => "delete",
+        TransferType::Archive => "archive",
     }
 }
 

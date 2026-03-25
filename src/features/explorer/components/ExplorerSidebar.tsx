@@ -16,19 +16,24 @@ import {
   PinOff,
   Plus,
   RefreshCcw,
+  Search,
   SlidersHorizontal,
   Star,
+  Tag,
   Trash2,
   X,
 } from "lucide-react";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { MouseEvent, ReactNode } from "react";
-import type { MountedDevice, ProviderRemote } from "../../../api/types";
+import { savedSearchesDelete, savedSearchesSave, savedSearchesSnapshot } from "../../../api/misty";
+import type { ExplorerLibrarySnapshot, MountedDevice, ProviderRemote, SavedSearch, SavedSearchRule } from "../../../api/types";
 import { providerIconForType } from "../../../shared/assets/icons";
 import { AssetIcon } from "../../../shared/components/AssetIcon";
+import { errorText } from "../../../shared/format";
 import { formatBytes } from "../utils/fileFormat";
 import type { ExplorerWorkspaceEntry } from "../state/useExplorerStore";
+import { useSearchStore } from "../state/useSearchStore";
 
 const DEVICE_CUSTOMIZATION_STORAGE_KEY = "misty.explorer.sidebar.devices";
 const SIDEBAR_COLLAPSE_STORAGE_KEY = "misty.explorer.sidebar.collapsed";
@@ -105,6 +110,14 @@ const sidebarStyles = {
   dialogLabel: "grid gap-2 text-[#b2b2b2]",
   dialogText: "m-0 leading-normal text-[#b2b2b2]",
   dialogInput: "h-[38px] w-full rounded-[7px] border border-[#3f3f3f] bg-[#0e0e0e] px-[11px] text-[#f0f0f0] outline-none focus:border-[#787878] focus:shadow-[0_0_0_2px_rgba(120,120,120,0.18)]",
+  dialogSelect: "h-[38px] w-full rounded-[7px] border border-[#3f3f3f] bg-[#0e0e0e] px-[9px] text-[#f0f0f0] outline-none focus:border-[#787878]",
+  dialogWide: "w-[min(620px,100%)]",
+  dialogGrid: "grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3 max-[640px]:grid-cols-1",
+  ruleList: "grid gap-2 rounded-lg border border-[#2d2d2d] bg-[#101010] p-2.5",
+  ruleRow: "grid grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,1.2fr)_30px] gap-2 max-[640px]:grid-cols-1",
+  iconButton: "grid size-[30px] place-items-center rounded-lg border border-transparent bg-transparent p-0 text-[#a9a9a9] hover:bg-[#252525] hover:text-[#eeeeee]",
+  errorText: "m-0 text-sm text-[#ffb7b7]",
+  smartMeta: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs text-[#969696]",
   dialogActions: "flex justify-end gap-2",
   dialogActionButton: "h-[34px] min-w-[82px] rounded-[7px]",
   dialogDanger: "border-[#484848] bg-[#313131] text-[#f4f4f4]",
@@ -116,6 +129,7 @@ interface ExplorerSidebarProps {
   mountRoot: string;
   remotes: ProviderRemote[];
   remoteLoading: boolean;
+  library: ExplorerLibrarySnapshot | null;
   devices: MountedDevice[];
   devicesLoading: boolean;
   pinnedPaths: string[];
@@ -146,6 +160,10 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
   const [quickAccessMenu, setQuickAccessMenu] = useState<QuickAccessMenuState | null>(null);
   const [workspaceDialog, setWorkspaceDialog] = useState<WorkspaceDialogState>(null);
   const [workspaceDraft, setWorkspaceDraft] = useState("");
+  const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
+  const [smartFolderDialog, setSmartFolderDialog] = useState<SmartFolderDialogState>(null);
+  const [smartFolderError, setSmartFolderError] = useState<string | null>(null);
+  const [smartFoldersLoading, setSmartFoldersLoading] = useState(false);
   const [hiddenQuickAccessPaths, setHiddenQuickAccessPaths] = useState<string[]>(loadHiddenQuickAccessPaths);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const workspaceButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -168,6 +186,10 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
     () => quickAccess.filter((item) => !quickAccessPathHidden(item.path, hiddenQuickAccessPaths)),
     [hiddenQuickAccessPaths, quickAccess],
   );
+  const visibleTagViews = useMemo(
+    () => buildLibraryTagViews(props.library),
+    [props.library],
+  );
   const deviceEntries = useMemo(
     () => buildDeviceEntries(props.devices, deviceCustomization),
     [deviceCustomization, props.devices],
@@ -184,6 +206,27 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
   useEffect(() => {
     saveHiddenQuickAccessPaths(hiddenQuickAccessPaths);
   }, [hiddenQuickAccessPaths]);
+
+  useEffect(() => {
+    let disposed = false;
+    setSmartFoldersLoading(true);
+    void savedSearchesSnapshot()
+      .then((snapshot) => {
+        if (!disposed) {
+          setSavedSearches(sortSavedSearches(snapshot.searches));
+          setSmartFolderError(null);
+        }
+      })
+      .catch((error) => {
+        if (!disposed) setSmartFolderError(errorText(error));
+      })
+      .finally(() => {
+        if (!disposed) setSmartFoldersLoading(false);
+      });
+    return () => {
+      disposed = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!deviceMenu && !workspaceMenu && !quickAccessMenu) return;
@@ -311,6 +354,53 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
     setWorkspaceDialog(null);
     setWorkspaceDraft("");
   };
+  const openSmartFolderDialog = (search?: SavedSearch) => {
+    setSmartFolderError(null);
+    setSmartFolderDialog(createSmartFolderDialogState(search));
+  };
+  const saveSmartFolder = async (draft: SmartFolderDraft) => {
+    const name = draft.name.trim();
+    if (!name) return;
+    const search: SavedSearch = {
+      id: draft.id || smartFolderId(),
+      name,
+      query: draft.query.trim() || smartFolderQueryFromRules(draft.rules, draft.matchMode),
+      rules: smartFolderRulesWithMode(draft.rules, draft.matchMode),
+      updatedAtMs: Date.now(),
+    };
+    try {
+      const snapshot = await savedSearchesSave(search);
+      setSavedSearches(sortSavedSearches(snapshot.searches));
+      setSmartFolderDialog(null);
+      setSmartFolderError(null);
+    } catch (error) {
+      setSmartFolderError(errorText(error));
+    }
+  };
+  const deleteSmartFolder = async (id: string) => {
+    try {
+      const snapshot = await savedSearchesDelete(id);
+      setSavedSearches(sortSavedSearches(snapshot.searches));
+      setSmartFolderDialog(null);
+      setSmartFolderError(null);
+    } catch (error) {
+      setSmartFolderError(errorText(error));
+    }
+  };
+  const runSmartFolder = async (search: SavedSearch) => {
+    const query = search.query.trim() || smartFolderQueryFromRules(search.rules, smartFolderMatchMode(search.rules));
+    if (!query) return;
+    const searchStore = useSearchStore.getState();
+    await searchStore.openSearch(props.activePath || props.homePath);
+    searchStore.setScope("everything");
+    searchStore.setQuery(query);
+  };
+  const openTagView = async (tag: string) => {
+    const searchStore = useSearchStore.getState();
+    await searchStore.openSearch(props.activePath || props.homePath);
+    searchStore.setScope("everything");
+    searchStore.setQuery(`tag:${quoteTagQueryValue(tag)}`);
+  };
 
   return (
     <aside className={sidebarStyles.root}>
@@ -409,6 +499,89 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
                   <PinOff size={15} />
                 </button>
               </div>
+            ))}
+          </div>
+        ) : null}
+      </section>
+
+      <section className={sidebarStyles.section}>
+        <SidebarSectionHeader
+          title="Smart Folders"
+          collapsed={collapsedSections.smartFolders}
+          onToggle={() => toggleSection("smartFolders")}
+          actions={(
+            <button
+              type="button"
+              title="New smart folder"
+              aria-label="New smart folder"
+              className={sidebarStyles.sectionActionButton}
+              onClick={(event) => {
+                event.stopPropagation();
+                openSmartFolderDialog();
+              }}
+            >
+              <Plus size={15} />
+            </button>
+          )}
+        />
+        {!collapsedSections.smartFolders ? (
+          <div className={sidebarStyles.list}>
+            {smartFolderError ? <p className={sidebarStyles.errorText}>{smartFolderError}</p> : null}
+            {smartFoldersLoading && savedSearches.length === 0 ? <div className={sidebarStyles.muted}>Loading smart folders...</div> : null}
+            {!smartFoldersLoading && savedSearches.length === 0 ? <div className={sidebarStyles.muted}>No smart folders yet</div> : null}
+            {savedSearches.map((search) => {
+              const query = search.query.trim() || smartFolderQueryFromRules(search.rules, smartFolderMatchMode(search.rules));
+              return (
+                <div className={`${sidebarStyles.pinnedRow} group/pin`} key={search.id}>
+                  <button
+                    className={sidebarStyles.pinnedButton}
+                    onClick={() => void runSmartFolder(search)}
+                    title={query || search.name}
+                  >
+                    <Search size={20} />
+                    <span className="grid min-w-0 gap-[2px]">
+                      <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{search.name}</span>
+                      <small className={sidebarStyles.smartMeta}>{query || `${visibleSmartFolderRules(search.rules).length} rules`}</small>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className={sidebarStyles.pinnedUnpinButton}
+                    title={`Edit ${search.name}`}
+                    aria-label={`Edit ${search.name}`}
+                    onClick={() => openSmartFolderDialog(search)}
+                  >
+                    <Pencil size={15} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        ) : null}
+      </section>
+
+      <section className={sidebarStyles.section}>
+        <SidebarSectionHeader
+          title="Tags"
+          collapsed={collapsedSections.tags}
+          onToggle={() => toggleSection("tags")}
+        />
+        {!collapsedSections.tags ? (
+          <div className={sidebarStyles.list}>
+            {visibleTagViews.length === 0 ? <div className={sidebarStyles.muted}>No tags yet</div> : null}
+            {visibleTagViews.map((tagView) => (
+              <button
+                key={tagView.key}
+                className={sidebarStyles.itemButton}
+                onClick={() => void openTagView(tagView.name)}
+                title={`tag:${tagView.name}`}
+              >
+                <Tag size={20} />
+                <span className="grid min-w-0 gap-[2px]">
+                  <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{tagView.name}</span>
+                  <small className={sidebarStyles.smartMeta}>{tagView.count} {tagView.count === 1 ? "item" : "items"}</small>
+                </span>
+              </button>
             ))}
           </div>
         ) : null}
@@ -719,6 +892,21 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
             document.body,
           )
         : null}
+      {smartFolderDialog
+        ? createPortal(
+            <SmartFolderDialog
+              state={smartFolderDialog}
+              error={smartFolderError}
+              onSave={saveSmartFolder}
+              onDelete={deleteSmartFolder}
+              onCancel={() => {
+                setSmartFolderDialog(null);
+                setSmartFolderError(null);
+              }}
+            />,
+            document.body,
+          )
+        : null}
       {addDeviceOpen
         ? createPortal(
             <DeviceDialog
@@ -812,6 +1000,138 @@ function WorkspaceDialog(props: {
   );
 }
 
+function SmartFolderDialog(props: {
+  state: NonNullable<SmartFolderDialogState>;
+  error: string | null;
+  onSave: (draft: SmartFolderDraft) => void | Promise<void>;
+  onDelete: (id: string) => void | Promise<void>;
+  onCancel: () => void;
+}) {
+  const [draft, setDraft] = useState<SmartFolderDraft>(props.state.draft);
+  const editing = Boolean(draft.id);
+  const updateRule = (index: number, patch: Partial<SavedSearchRule>) => {
+    setDraft((current) => ({
+      ...current,
+      rules: current.rules.map((rule, ruleIndex) => ruleIndex === index ? { ...rule, ...patch } : rule),
+    }));
+  };
+  const addRule = () => {
+    setDraft((current) => ({ ...current, rules: [...current.rules, defaultSmartFolderRule()] }));
+  };
+  const removeRule = (index: number) => {
+    setDraft((current) => ({
+      ...current,
+      rules: current.rules.length <= 1 ? [defaultSmartFolderRule()] : current.rules.filter((_rule, ruleIndex) => ruleIndex !== index),
+    }));
+  };
+  return (
+    <div className={sidebarStyles.dialogBackdrop} role="presentation" onPointerDown={props.onCancel}>
+      <form
+        className={`${sidebarStyles.dialog} ${sidebarStyles.dialogWide}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label={editing ? "Edit Smart Folder" : "New Smart Folder"}
+        onPointerDown={(event) => event.stopPropagation()}
+        onSubmit={(event) => {
+          event.preventDefault();
+          void props.onSave(draft);
+        }}
+      >
+        <header className={sidebarStyles.dialogHeader}>
+          <h2 className={sidebarStyles.dialogTitle}>{editing ? "Edit Smart Folder" : "New Smart Folder"}</h2>
+          <button className={sidebarStyles.dialogClose} type="button" aria-label="Close" onClick={props.onCancel}><X size={16} /></button>
+        </header>
+        <div className={sidebarStyles.dialogGrid}>
+          <label className={sidebarStyles.dialogLabel}>
+            <span>Name</span>
+            <input
+              className={sidebarStyles.dialogInput}
+              autoFocus
+              value={draft.name}
+              onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
+            />
+          </label>
+          <label className={sidebarStyles.dialogLabel}>
+            <span>Match</span>
+            <select
+              className={sidebarStyles.dialogSelect}
+              value={draft.matchMode}
+              onChange={(event) => setDraft((current) => ({ ...current, matchMode: event.target.value === "any" ? "any" : "all" }))}
+            >
+              <option value="all">All rules</option>
+              <option value="any">Any rule</option>
+            </select>
+          </label>
+        </div>
+        <label className={sidebarStyles.dialogLabel}>
+          <span>Query string</span>
+          <input
+            className={sidebarStyles.dialogInput}
+            value={draft.query}
+            placeholder={smartFolderQueryFromRules(draft.rules, draft.matchMode) || "invoice pdf tag:work"}
+            onChange={(event) => setDraft((current) => ({ ...current, query: event.target.value }))}
+          />
+        </label>
+        <div className={sidebarStyles.ruleList}>
+          {draft.rules.map((rule, index) => (
+            <div className={sidebarStyles.ruleRow} key={`rule:${index}`}>
+              <select
+                className={sidebarStyles.dialogSelect}
+                value={rule.field}
+                onChange={(event) => updateRule(index, { field: event.target.value })}
+                aria-label={`Rule ${index + 1} field`}
+              >
+                {smartFolderFields.map((field) => <option key={field.value} value={field.value}>{field.label}</option>)}
+              </select>
+              <select
+                className={sidebarStyles.dialogSelect}
+                value={rule.operator}
+                onChange={(event) => updateRule(index, { operator: event.target.value })}
+                aria-label={`Rule ${index + 1} operator`}
+              >
+                {smartFolderOperators.map((operator) => <option key={operator.value} value={operator.value}>{operator.label}</option>)}
+              </select>
+              <input
+                className={sidebarStyles.dialogInput}
+                value={rule.value}
+                placeholder={smartFolderValuePlaceholder(rule.field)}
+                onChange={(event) => updateRule(index, { value: event.target.value })}
+                aria-label={`Rule ${index + 1} value`}
+              />
+              <button
+                className={sidebarStyles.iconButton}
+                type="button"
+                aria-label={`Remove rule ${index + 1}`}
+                onClick={() => removeRule(index)}
+              >
+                <X size={15} />
+              </button>
+            </div>
+          ))}
+          <button className={sidebarStyles.menuButton} type="button" onClick={addRule}>
+            <Plus size={15} />
+            <span>Add Rule</span>
+          </button>
+        </div>
+        {props.error ? <p className={sidebarStyles.errorText}>{props.error}</p> : null}
+        <div className={sidebarStyles.dialogActions}>
+          {editing ? (
+            <button
+              className={`${sidebarStyles.dialogActionButton} ${sidebarStyles.dialogDanger}`}
+              type="button"
+              onClick={() => void props.onDelete(draft.id)}
+            >
+              Delete
+            </button>
+          ) : null}
+          <button className={sidebarStyles.dialogActionButton} type="button" onClick={props.onCancel}>Cancel</button>
+          <button className={sidebarStyles.dialogActionButton} type="submit" disabled={!draft.name.trim()}>Save</button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 function SidebarSectionHeader(props: {
   title: string;
   collapsed: boolean;
@@ -885,8 +1205,16 @@ interface DeviceCustomizationState {
 
 interface SidebarCollapsedState {
   quickAccess: boolean;
+  smartFolders: boolean;
+  tags: boolean;
   remote: boolean;
   devices: boolean;
+}
+
+interface LibraryTagView {
+  key: string;
+  name: string;
+  count: number;
 }
 
 interface SidebarDeviceEntry extends MountedDevice {
@@ -898,6 +1226,18 @@ type WorkspaceDialogState =
   | { kind: "rename"; workspaceId: string; title: string }
   | { kind: "delete"; workspaceId: string; title: string }
   | null;
+
+type SmartFolderMatchMode = "all" | "any";
+
+interface SmartFolderDraft {
+  id: string;
+  name: string;
+  query: string;
+  matchMode: SmartFolderMatchMode;
+  rules: SavedSearchRule[];
+}
+
+type SmartFolderDialogState = { draft: SmartFolderDraft } | null;
 
 interface WorkspaceMenuState {
   left: number;
@@ -923,6 +1263,143 @@ interface QuickAccessMenuState {
   left: number;
   top: number;
   width: number;
+}
+
+const smartFolderModeField = "__match";
+
+const smartFolderFields = [
+  { value: "text", label: "Text query" },
+  { value: "path", label: "Path / source" },
+  { value: "kind", label: "File or folder" },
+  { value: "extension", label: "Extension" },
+  { value: "size", label: "Size" },
+  { value: "modified", label: "Modified date" },
+  { value: "hidden", label: "Hidden" },
+  { value: "tag", label: "Misty tag" },
+] as const;
+
+const smartFolderOperators = [
+  { value: "contains", label: "contains" },
+  { value: "is", label: "is" },
+  { value: "is_not", label: "is not" },
+  { value: "starts_with", label: "starts with" },
+  { value: "ends_with", label: "ends with" },
+  { value: "gt", label: "greater than" },
+  { value: "lt", label: "less than" },
+  { value: "after", label: "after" },
+  { value: "before", label: "before" },
+] as const;
+
+function defaultSmartFolderRule(): SavedSearchRule {
+  return { field: "text", operator: "contains", value: "" };
+}
+
+function createSmartFolderDialogState(search?: SavedSearch): SmartFolderDialogState {
+  return {
+    draft: {
+      id: search?.id ?? "",
+      name: search?.name ?? "New Smart Folder",
+      query: search?.query ?? "",
+      matchMode: search ? smartFolderMatchMode(search.rules) : "all",
+      rules: search ? visibleSmartFolderRules(search.rules) : [defaultSmartFolderRule()],
+    },
+  };
+}
+
+function smartFolderMatchMode(rules: SavedSearchRule[]): SmartFolderMatchMode {
+  return rules.find((rule) => rule.field === smartFolderModeField)?.value === "any" ? "any" : "all";
+}
+
+function visibleSmartFolderRules(rules: SavedSearchRule[]): SavedSearchRule[] {
+  const visible = rules.filter((rule) => rule.field !== smartFolderModeField);
+  return visible.length > 0 ? visible : [defaultSmartFolderRule()];
+}
+
+function smartFolderRulesWithMode(rules: SavedSearchRule[], matchMode: SmartFolderMatchMode): SavedSearchRule[] {
+  const cleaned = visibleSmartFolderRules(rules)
+    .map((rule) => ({
+      field: rule.field.trim(),
+      operator: rule.operator.trim() || "contains",
+      value: rule.value.trim(),
+    }))
+    .filter((rule) => rule.field && rule.value);
+  return [
+    { field: smartFolderModeField, operator: "mode", value: matchMode },
+    ...cleaned,
+  ];
+}
+
+function smartFolderQueryFromRules(rules: SavedSearchRule[], matchMode: SmartFolderMatchMode): string {
+  const parts = visibleSmartFolderRules(rules)
+    .filter((rule) => rule.value.trim())
+    .map(smartFolderRuleQuery)
+    .filter(Boolean);
+  return matchMode === "any" && parts.length > 1 ? parts.join(" OR ") : parts.join(" ");
+}
+
+function smartFolderRuleQuery(rule: SavedSearchRule): string {
+  const value = quoteSearchToken(rule.value.trim());
+  if (!value) return "";
+  switch (rule.field) {
+    case "path":
+      return `path:${value}`;
+    case "kind":
+      return `kind:${value}`;
+    case "extension":
+      return `ext:${value.replace(/^\./, "")}`;
+    case "size":
+      return `size${operatorSymbol(rule.operator)}${value}`;
+    case "modified":
+      return `modified${operatorSymbol(rule.operator)}${value}`;
+    case "hidden":
+      return `hidden:${value}`;
+    case "tag":
+      return `tag:${value}`;
+    case "text":
+    default:
+      return rule.operator === "is_not" ? `-${value}` : value;
+  }
+}
+
+function operatorSymbol(operator: string): string {
+  if (operator === "gt" || operator === "after") return ":>";
+  if (operator === "lt" || operator === "before") return ":<";
+  if (operator === "is_not") return ":!";
+  return ":";
+}
+
+function quoteSearchToken(value: string): string {
+  if (!value) return "";
+  return /\s/.test(value) ? `"${value.replace(/"/g, "\\\"")}"` : value;
+}
+
+function smartFolderValuePlaceholder(field: string): string {
+  switch (field) {
+    case "path":
+      return "/Users/name/Documents or remote:";
+    case "kind":
+      return "file or folder";
+    case "extension":
+      return "pdf";
+    case "size":
+      return "10MB";
+    case "modified":
+      return "2026-06-01";
+    case "hidden":
+      return "true or false";
+    case "tag":
+      return "work";
+    default:
+      return "invoice";
+  }
+}
+
+function sortSavedSearches(searches: SavedSearch[]): SavedSearch[] {
+  return [...searches].sort((left, right) => right.updatedAtMs - left.updatedAtMs || left.name.localeCompare(right.name));
+}
+
+function smartFolderId(): string {
+  return `smart_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
 function buildDeviceEntries(devices: MountedDevice[], customization: DeviceCustomizationState): SidebarDeviceEntry[] {
@@ -1049,11 +1526,13 @@ function loadSidebarCollapsedState(): SidebarCollapsedState {
     const parsed = JSON.parse(window.localStorage.getItem(SIDEBAR_COLLAPSE_STORAGE_KEY) ?? "{}") as Partial<SidebarCollapsedState>;
     return {
       quickAccess: parsed.quickAccess === true,
+      smartFolders: parsed.smartFolders === true,
+      tags: parsed.tags === true,
       remote: parsed.remote === true,
       devices: parsed.devices === true,
     };
   } catch {
-    return { quickAccess: false, remote: false, devices: false };
+    return { quickAccess: false, smartFolders: false, tags: false, remote: false, devices: false };
   }
 }
 
@@ -1069,6 +1548,36 @@ function normalizeDevicePath(path: string): string {
 
 function uniqueStrings(values: string[]): string[] {
   return [...new Set(values)];
+}
+
+function buildLibraryTagViews(library: ExplorerLibrarySnapshot | null): LibraryTagView[] {
+  if (!library) return [];
+  const tags = new Map<string, LibraryTagView>();
+  const seenByPath = new Map<string, Set<string>>();
+  for (const item of [...library.recentFiles, ...library.starredFiles]) {
+    const pathKey = normalizeSidebarPath(item.path);
+    if (!pathKey) continue;
+    const pathTags = seenByPath.get(pathKey) ?? new Set<string>();
+    for (const rawTag of item.tags ?? []) {
+      const name = rawTag.trim();
+      const key = name.toLowerCase();
+      if (!name || pathTags.has(key)) continue;
+      pathTags.add(key);
+      const current = tags.get(key);
+      tags.set(key, {
+        key,
+        name: current?.name ?? name,
+        count: (current?.count ?? 0) + 1,
+      });
+    }
+    seenByPath.set(pathKey, pathTags);
+  }
+  return [...tags.values()].sort((left, right) => right.count - left.count || left.name.localeCompare(right.name));
+}
+
+function quoteTagQueryValue(value: string): string {
+  const trimmed = value.replace(/"/g, "").trim();
+  return /\s/.test(trimmed) ? `"${trimmed}"` : trimmed;
 }
 
 function joinPath(...parts: string[]): string {

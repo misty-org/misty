@@ -8,7 +8,7 @@ let silentTransferLoadInFlight = false;
 
 export type TransferLocationScope = "all" | "local" | "remote";
 export type TransferStatusFilter = "all" | "active" | "completed" | "failed";
-export type TransferSortKey = "time" | "name" | "operation" | "status";
+export type TransferSortKey = "none" | "time" | "name" | "operation" | "status";
 export type TransferSortDirection = "asc" | "desc";
 export const TRANSFERS_PAGE_SIZE = 25;
 
@@ -164,9 +164,21 @@ export const useTransfersStore = create<TransfersStore>((set, get) => ({
   setSort: (workspaceId, sortKey, direction) => {
     set((state) => {
       const workspace = state.workspaces[workspaceId] ?? createTransferWorkspaceState();
-      const sortDirection = direction ?? (workspace.sortKey === sortKey && workspace.sortDirection === "asc" ? "desc" : "asc");
-      if (workspace.sortKey === sortKey && workspace.sortDirection === sortDirection) return state;
-      return withWorkspace(state, workspaceId, { ...workspace, sortKey, sortDirection, pageIndex: 0 });
+      let nextSortKey = sortKey;
+      let sortDirection: TransferSortDirection = direction ?? "asc";
+      if (!direction) {
+        if (workspace.sortKey !== sortKey) {
+          sortDirection = "asc";
+        } else if (workspace.sortDirection === "asc") {
+          sortDirection = "desc";
+        } else {
+          nextSortKey = "none";
+          sortDirection = "asc";
+        }
+      }
+      if (nextSortKey === "none") sortDirection = "asc";
+      if (workspace.sortKey === nextSortKey && workspace.sortDirection === sortDirection) return state;
+      return withWorkspace(state, workspaceId, { ...workspace, sortKey: nextSortKey, sortDirection, pageIndex: 0 });
     });
   },
 
@@ -271,7 +283,7 @@ export const useTransfersStore = create<TransfersStore>((set, get) => ({
   },
 }));
 
-export const transferTypes: TransferType[] = ["upload", "download", "create", "copy", "move", "rename", "delete"];
+export const transferTypes: TransferType[] = ["upload", "download", "archive", "create", "copy", "move", "rename", "delete"];
 
 export function activeTransferFilterCount(state: Pick<
   TransferWorkspaceState,

@@ -15,7 +15,9 @@ pub enum OperationKind {
     Create,
     Rename,
     Delete,
+    Upload,
     Download,
+    Archive,
 }
 
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -39,6 +41,15 @@ pub enum OperationStatus {
     Failed,
     Canceled,
     Skipped,
+}
+
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum OperationPriority {
+    Low,
+    #[default]
+    Normal,
+    High,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -83,6 +94,8 @@ pub struct OperationDescriptor {
     pub title: String,
     pub error_message: String,
     pub attempt: u32,
+    pub paused: bool,
+    pub priority: OperationPriority,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -120,6 +133,10 @@ pub struct OperationQueueSnapshot {
     pub active_count: usize,
     pub max_concurrent: usize,
     pub redo_available: bool,
+    pub paused: bool,
+    pub bandwidth_limit: String,
+    pub transfer_profile_id: String,
+    pub transfer_profile_name: String,
 }
 
 #[derive(Default)]
@@ -130,6 +147,10 @@ struct OperationQueueInner {
     conflict_dialog: ConflictDialogState,
     active_count: usize,
     max_concurrent: usize,
+    paused: bool,
+    bandwidth_limit: String,
+    transfer_profile_id: String,
+    transfer_profile_name: String,
     next_operation_id: u64,
     next_batch_id: u64,
 }
@@ -143,6 +164,8 @@ impl OperationQueue {
     pub fn new(max_concurrent: usize) -> Self {
         let inner = OperationQueueInner {
             max_concurrent: max_concurrent.max(1),
+            transfer_profile_id: "balanced".to_owned(),
+            transfer_profile_name: "Balanced".to_owned(),
             ..OperationQueueInner::default()
         };
         Self {
@@ -198,6 +221,9 @@ impl OperationQueue {
 
     pub async fn take_ready(&self) -> Vec<OperationDescriptor> {
         let mut inner = self.inner.lock().await;
+        if inner.paused {
+            return Vec::new();
+        }
         let available = inner.max_concurrent.saturating_sub(inner.active_count);
         let mut ready = Vec::with_capacity(available);
         while ready.len() < available {
@@ -207,16 +233,17 @@ impl OperationQueue {
             let Some(candidate) = inner.operations.get(&id) else {
                 continue;
             };
-            let blocked = inner.batches.get(&candidate.batch_id).is_some_and(|batch| {
-                batch.paused
-                    || (batch.preserve_order
-                        && batch.operation_ids.iter().any(|prior| {
-                            *prior != id
-                                && inner.operations.get(prior).is_some_and(|operation| {
-                                    operation.operation_id < id && !terminal(operation.status)
-                                })
-                        }))
-            });
+            let blocked = candidate.paused
+                || inner.batches.get(&candidate.batch_id).is_some_and(|batch| {
+                    batch.paused
+                        || (batch.preserve_order
+                            && batch.operation_ids.iter().any(|prior| {
+                                *prior != id
+                                    && inner.operations.get(prior).is_some_and(|operation| {
+                                        operation.operation_id < id && !terminal(operation.status)
+                                    })
+                            }))
+                });
             if blocked {
                 inner.pending.push_back(id);
                 if inner.pending.iter().all(|queued| {
@@ -471,6 +498,100 @@ impl OperationQueue {
         true
     }
 
+    pub async fn pause_operation(&self, operation_id: u64) -> bool {
+        let mut inner = self.inner.lock().await;
+        let Some(operation) = inner.operations.get_mut(&operation_id) else {
+            return false;
+        };
+        if !matches!(
+            operation.status,
+            OperationStatus::Queued | OperationStatus::WaitingForResolution
+        ) {
+            return false;
+        }
+        operation.paused = true;
+        true
+    }
+
+    pub async fn resume_operation(&self, operation_id: u64) -> bool {
+        let mut inner = self.inner.lock().await;
+        let Some(operation) = inner.operations.get_mut(&operation_id) else {
+            return false;
+        };
+        operation.paused = false;
+        if operation.status == OperationStatus::Queued && !inner.pending.contains(&operation_id) {
+            inner.pending.push_front(operation_id);
+        }
+        true
+    }
+
+    pub async fn pause_batch(&self, batch_id: u64) -> bool {
+        let mut inner = self.inner.lock().await;
+        let Some(batch) = inner.batches.get_mut(&batch_id) else {
+            return false;
+        };
+        batch.paused = true;
+        true
+    }
+
+    pub async fn resume_batch(&self, batch_id: u64) -> bool {
+        let mut inner = self.inner.lock().await;
+        let Some(batch) = inner.batches.get_mut(&batch_id) else {
+            return false;
+        };
+        batch.paused = false;
+        batch.paused_operation_id = 0;
+        true
+    }
+
+    pub async fn pause_all(&self) {
+        self.inner.lock().await.paused = true;
+    }
+
+    pub async fn resume_all(&self) {
+        self.inner.lock().await.paused = false;
+    }
+
+    pub async fn set_priority(&self, operation_id: u64, priority: OperationPriority) -> bool {
+        let mut inner = self.inner.lock().await;
+        let Some(operation) = inner.operations.get_mut(&operation_id) else {
+            return false;
+        };
+        operation.priority = priority;
+        let priorities = inner
+            .operations
+            .iter()
+            .map(|(id, operation)| (*id, operation.priority))
+            .collect::<HashMap<_, _>>();
+        let mut pending = inner.pending.drain(..).collect::<Vec<_>>();
+        pending.sort_by(|left, right| {
+            priorities
+                .get(right)
+                .unwrap_or(&OperationPriority::Normal)
+                .cmp(priorities.get(left).unwrap_or(&OperationPriority::Normal))
+        });
+        inner.pending = pending.into();
+        true
+    }
+
+    pub async fn set_bandwidth_limit(&self, limit: String) {
+        self.inner.lock().await.bandwidth_limit = limit;
+    }
+
+    pub async fn set_transfer_profile(
+        &self,
+        profile_id: String,
+        profile_name: String,
+        max_concurrent: usize,
+        bandwidth_limit: String,
+    ) {
+        let mut inner = self.inner.lock().await;
+        inner.transfer_profile_id = profile_id;
+        inner.transfer_profile_name = profile_name;
+        inner.max_concurrent = max_concurrent.max(1);
+        inner.bandwidth_limit = bandwidth_limit;
+    }
+
     pub async fn snapshot(&self) -> OperationQueueSnapshot {
         let inner = self.inner.lock().await;
         let mut operations: Vec<_> = inner.operations.values().cloned().collect();
@@ -484,6 +605,10 @@ impl OperationQueue {
             active_count: inner.active_count,
             max_concurrent: inner.max_concurrent,
             redo_available: false,
+            paused: inner.paused,
+            bandwidth_limit: inner.bandwidth_limit.clone(),
+            transfer_profile_id: inner.transfer_profile_id.clone(),
+            transfer_profile_name: inner.transfer_profile_name.clone(),
         }
     }
 
@@ -613,6 +738,64 @@ mod tests {
             .unwrap();
         assert!(queue.cancel(second.operation_id).await);
         assert!(!queue.retry(second.operation_id).await);
+    }
+
+    #[tokio::test]
+    async fn pause_resume_and_bandwidth_state_are_reported() {
+        let queue = OperationQueue::new(1);
+        queue
+            .enqueue_batch("copy", false, vec![descriptor("one")])
+            .await;
+        let operation_id = queue.snapshot().await.operations[0].operation_id;
+
+        assert!(queue.pause_operation(operation_id).await);
+        assert!(queue.take_ready().await.is_empty());
+        queue.pause_all().await;
+        queue.set_bandwidth_limit("10M".to_owned()).await;
+
+        let snapshot = queue.snapshot().await;
+        assert!(snapshot.paused);
+        assert_eq!(snapshot.bandwidth_limit, "10M");
+        assert!(snapshot.operations[0].paused);
+
+        assert!(queue.resume_operation(operation_id).await);
+        queue.resume_all().await;
+        assert_eq!(queue.take_ready().await.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn transfer_profile_updates_queue_capacity_and_bandwidth() {
+        let queue = OperationQueue::new(1);
+        queue
+            .set_transfer_profile(
+                "many-small-files".to_owned(),
+                "Many Small Files".to_owned(),
+                8,
+                "5Mi".to_owned(),
+            )
+            .await;
+
+        let snapshot = queue.snapshot().await;
+        assert_eq!(snapshot.transfer_profile_id, "many-small-files");
+        assert_eq!(snapshot.transfer_profile_name, "Many Small Files");
+        assert_eq!(snapshot.max_concurrent, 8);
+        assert_eq!(snapshot.bandwidth_limit, "5Mi");
+    }
+
+    #[tokio::test]
+    async fn priority_reorders_queued_operations() {
+        let queue = OperationQueue::new(1);
+        queue
+            .enqueue_batch("copy", false, vec![descriptor("one"), descriptor("two")])
+            .await;
+        let snapshot = queue.snapshot().await;
+        let first_id = snapshot.operations[0].operation_id;
+        let second_id = snapshot.operations[1].operation_id;
+
+        assert!(queue.set_priority(second_id, OperationPriority::High).await);
+        let ready = queue.take_ready().await;
+        assert_eq!(ready[0].operation_id, second_id);
+        assert_ne!(ready[0].operation_id, first_id);
     }
 
     #[tokio::test]

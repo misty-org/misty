@@ -3,8 +3,17 @@ import type {
   AiSendRequest,
   AiStatus,
   AiStreamEvent,
+  ArchiveActionResult,
+  ArchiveCreateRequest,
+  ArchiveExtractRequest,
+  ArchiveListRequest,
+  ArchiveListResult,
   AppSnapshot,
   AppEnvironmentSnapshot,
+  AutomationRule,
+  AutomationRulesSnapshot,
+  AutomationRunResult,
+  AutomationWatchSnapshot,
   ClaudeSendRequest,
   ClaudeStatus,
   ClaudeStreamEvent,
@@ -21,6 +30,15 @@ import type {
   ExplorerLibraryItem,
   ExplorerLibrarySnapshot,
   FileEntry,
+  FileMetadataSnapshot,
+  FileToolsActionResult,
+  FileToolsChecksumRequest,
+  FileToolsChecksumResult,
+  FileToolsChmodRequest,
+  FileToolsReadonlyRequest,
+  FileToolsSymlinkRequest,
+  FileToolsSymlinkTargetRequest,
+  FileToolsSymlinkTargetResult,
   FileSyncApplyRequest,
   FileSyncApplyResult,
   FileSyncCompareRequest,
@@ -32,6 +50,7 @@ import type {
   OpenWithAssociation,
   OperationConflictPolicy,
   OperationQueueSnapshot,
+  OperationPriority,
   PasteBlobRequest,
   PasteItem,
   PasteItemsRequest,
@@ -46,6 +65,7 @@ import type {
   PluginPanelRenderResult,
   PluginCommandRunResult,
   PluginCommandsSnapshot,
+  PluginDiagnosticsSnapshot,
   PrepareOpenItemRequest,
   PreparedOpenItem,
   ProviderJobStart,
@@ -66,6 +86,8 @@ import type {
   RenderPluginPanelRequest,
   RunPluginCommandRequest,
   SaveSettingsRequest,
+  SavedSearch,
+  SavedSearchesSnapshot,
   SaveRemoteRequest,
   SaveShortcutsRequest,
   SearchQueryRequest,
@@ -78,6 +100,12 @@ import type {
   TransferPage,
   VerifyResult,
   VerifyStartRequest,
+  CompareFilesRequest,
+  CompareFilesResult,
+  CompareFoldersRequest,
+  CompareFoldersResult,
+  DuplicateScanRequest,
+  DuplicateScanResult,
 } from "./types";
 import { hasTauriInternals } from "../shared/tauri";
 
@@ -176,23 +204,45 @@ function browserSmokeFallback<T>(command: string, args?: Record<string, unknown>
       return Promise.resolve({ rows: [], totalCount: 0, dbPath: "" } as T);
     case "operation_queue_snapshot":
     case "operation_queue_redo":
+    case "operation_queue_pause":
+    case "operation_queue_resume":
+    case "operation_queue_pause_batch":
+    case "operation_queue_resume_batch":
+    case "operation_queue_pause_all":
+    case "operation_queue_resume_all":
+    case "operation_queue_set_priority":
+    case "operation_queue_set_bandwidth_limit":
+    case "operation_queue_set_transfer_profile":
       return Promise.resolve(browserOperationQueueSnapshot() as T);
-    case "explorer_library_snapshot":
-      return Promise.resolve({ recent: [], starred: [], trash: [], lastOpenedPath: null } as T);
-    case "plugin_commands_snapshot":
-      return Promise.resolve({ roots: [], commands: [], panels: [] } as T);
-    case "plugin_command_run":
+    case "file_metadata_snapshot":
       return Promise.resolve({
-        commandId: (args?.request as RunPluginCommandRequest | undefined)?.commandId ?? "",
-        pluginId: "",
-        pluginName: "",
-        label: "",
-        handled: false,
-        targetRoute: "/hub/extensions",
-        message: "Extension command execution is only available in the Tauri app.",
-        notifications: [],
-        runtimeStatus: "unavailable",
+        path: String(args?.path ?? ""),
+        kind: "file",
+        sizeBytes: null,
+        readonly: false,
+        hidden: false,
+        createdMs: null,
+        modifiedMs: null,
+        accessedMs: null,
+        osTags: [],
+        fields: [],
+        extracted: [],
       } as T);
+    case "explorer_library_snapshot":
+      return Promise.resolve({
+        path: "",
+        recentFiles: [],
+        starredFiles: [],
+        lastOpenedPath: browserSmokeHome,
+      } as T);
+    case "plugin_commands_snapshot":
+      return Promise.resolve(browserPluginCommandsSnapshot() as T);
+    case "plugin_diagnostics_snapshot":
+      return Promise.resolve(browserPluginDiagnosticsSnapshot() as T);
+    case "plugin_command_run":
+      return Promise.resolve(browserPluginCommandRun(args?.request as RunPluginCommandRequest | undefined) as T);
+    case "plugin_panel_render":
+      return Promise.resolve(browserPluginPanelRender(args?.request as RenderPluginPanelRequest | undefined) as T);
     case "settings_snapshot":
       return Promise.resolve(browserSettingsSnapshot() as T);
     case "settings_save":
@@ -219,6 +269,46 @@ function browserSmokeFallback<T>(command: string, args?: Record<string, unknown>
       return Promise.resolve({ path: "", bindings: [] } as T);
     case "shortcuts_save":
       return Promise.resolve({ path: "", bindings: (args?.request as SaveShortcutsRequest | undefined)?.bindings ?? [] } as T);
+    case "archive_list":
+      return Promise.resolve({ archivePath: "", format: "zip", entries: [], message: "Archive tools are only available in the Tauri app." } as T);
+    case "archive_create":
+    case "archive_extract":
+      return Promise.resolve({ archivePath: "", destinationPath: "", affectedPaths: [], message: "Archive tools are only available in the Tauri app." } as T);
+    case "duplicates_scan":
+      return Promise.resolve({
+        scanId: "browser",
+        groups: [],
+        scannedCount: 0,
+        hashedCount: 0,
+        remoteCandidateCount: 0,
+        remoteHashingApproved: false,
+        canceled: false,
+        message: "Duplicate scanning is only available in the Tauri app.",
+      } as T);
+    case "duplicates_cancel":
+      return Promise.resolve(false as T);
+    case "saved_searches_snapshot":
+    case "saved_searches_save":
+    case "saved_searches_delete":
+      return Promise.resolve({ searches: [] } as T);
+    case "automation_rules_snapshot":
+    case "automation_rules_save":
+    case "automation_rules_delete":
+      return Promise.resolve({ rules: [], activity: [] } as T);
+    case "automation_watch_snapshot":
+    case "automation_watch_start":
+    case "automation_watch_stop":
+      return Promise.resolve(browserAutomationWatchSnapshot(args?.pollIntervalMs as number | undefined) as T);
+    case "automation_rules_run_now":
+      return Promise.resolve({
+        ruleId: String(args?.id ?? ""),
+        activityId: "browser",
+        dryRun: args?.dryRun !== false,
+        matchedPaths: [],
+        queuedCount: 0,
+        actionResults: [],
+        message: "Automation runs are only available in the Tauri app.",
+      } as T);
     default:
       return null;
   }
@@ -226,6 +316,244 @@ function browserSmokeFallback<T>(command: string, args?: Record<string, unknown>
 
 const browserSmokeHome = "/Users/misty";
 const browserSettingsStorageKey = "misty.browser-smoke.settings";
+
+const browserPluginDefinitions = [
+  {
+    id: "quick_convert",
+    name: "Quick Convert",
+    title: "Quick Convert",
+    views: ["Files"],
+    commands: [
+      ["plugin.quick_convert.builtin.convert_mp4", "Quick Convert: Convert selected to MP4", "convert_mp4", true],
+      ["plugin.quick_convert.builtin.convert_mp3", "Quick Convert: Convert selected to MP3", "convert_mp3", true],
+      ["plugin.quick_convert.builtin.convert_png", "Quick Convert: Convert selected to PNG", "convert_png", true],
+    ],
+  },
+  {
+    id: "themes",
+    name: "Themes",
+    title: "Themes",
+    views: ["Settings", "Extensions", "Dock"],
+    commands: [
+      ["plugin.themes.builtin.apply_dark", "Themes: Apply Dark preset", "apply_dark", false],
+      ["plugin.themes.builtin.apply_light", "Themes: Apply Light preset", "apply_light", false],
+      ["plugin.themes.builtin.apply_graphite", "Themes: Apply Graphite preset", "apply_graphite", false],
+      ["plugin.themes.builtin.apply_aurora", "Themes: Apply Aurora preset", "apply_aurora", false],
+      ["plugin.themes.builtin.apply_copper", "Themes: Apply Copper preset", "apply_copper", false],
+    ],
+  },
+  {
+    id: "vault",
+    name: "Vault",
+    title: "Vault",
+    views: ["Dock"],
+    commands: [
+      ["plugin.vault.builtin.setup_backup", "Vault: Create backup job scaffold", "setup_backup", false],
+      ["plugin.vault.builtin.backup_status", "Vault: Review backup status", "backup_status", false],
+      ["plugin.vault.builtin.restore_plan", "Vault: Prepare restore plan", "restore_plan", false],
+    ],
+  },
+  {
+    id: "ytdlp",
+    name: "yt-dlp",
+    title: "yt-dlp",
+    views: ["Files", "Dock", "Extensions"],
+    commands: [
+      ["plugin.ytdlp.builtin.download_video", "yt-dlp: Download video from URL file", "download_video", true],
+      ["plugin.ytdlp.builtin.download_audio", "yt-dlp: Download audio from URL file", "download_audio", true],
+    ],
+  },
+] as const;
+
+function browserPluginCommandsSnapshot(): PluginCommandsSnapshot {
+  return {
+    roots: [`${browserSmokeHome}/.misty/plugins/private`],
+    commands: browserPluginDefinitions.flatMap((plugin) => [
+      ...plugin.commands.map(([id, label, actionKind, requiresSelectedFile]) => ({
+        id,
+        label,
+        hint: "Browser smoke extension command.",
+        pluginId: plugin.id,
+        pluginName: plugin.name,
+        defaultShortcut: "",
+        source: "builtin",
+        actionKind,
+        launcherOpenMode: "tab",
+        requiresSelectedFile,
+        pluginDir: `${browserSmokeHome}/.misty/plugins/private/${plugin.id}`,
+        manifestPath: `${browserSmokeHome}/.misty/plugins/private/${plugin.id}/manifest.json`,
+        libraryPath: "",
+      })),
+      {
+        id: `plugin.${plugin.id}.open`,
+        label: `Open ${plugin.name}`,
+        hint: "Open extension from the launcher.",
+        pluginId: plugin.id,
+        pluginName: plugin.name,
+        defaultShortcut: "",
+        source: "launcher",
+        actionKind: "open",
+        launcherOpenMode: "tab",
+        requiresSelectedFile: false,
+        pluginDir: `${browserSmokeHome}/.misty/plugins/private/${plugin.id}`,
+        manifestPath: `${browserSmokeHome}/.misty/plugins/private/${plugin.id}/manifest.json`,
+        libraryPath: "",
+      },
+    ]),
+    panels: browserPluginDefinitions.map((plugin) => ({
+      id: `${plugin.id}.panel`,
+      title: plugin.title,
+      pluginId: plugin.id,
+      pluginName: plugin.name,
+      windowType: "panel",
+      defaultWidth: 420,
+      defaultHeight: 520,
+      pluginDir: `${browserSmokeHome}/.misty/plugins/private/${plugin.id}`,
+      manifestPath: `${browserSmokeHome}/.misty/plugins/private/${plugin.id}/manifest.json`,
+      libraryPath: "",
+      launcherViews: [...plugin.views],
+    })),
+  };
+}
+
+function browserPluginCommandRun(request?: RunPluginCommandRequest): PluginCommandRunResult {
+  const snapshot = browserPluginCommandsSnapshot();
+  const command = snapshot.commands.find((candidate) => candidate.id === request?.commandId);
+  if (!command) {
+    return {
+      commandId: request?.commandId ?? "",
+      pluginId: "",
+      pluginName: "",
+      label: "",
+      handled: false,
+      targetRoute: "/hub/extensions",
+      message: "Extension command was not found in browser smoke mode.",
+      notifications: [],
+      runtimeStatus: "not_found",
+    };
+  }
+  if (command.source === "launcher" || command.actionKind === "open") {
+    return {
+      commandId: command.id,
+      pluginId: command.pluginId,
+      pluginName: command.pluginName,
+      label: command.label,
+      handled: true,
+      targetRoute: `/dock?plugin=${encodeURIComponent(command.pluginId)}`,
+      message: `Opened ${command.pluginName}.`,
+      notifications: [],
+      runtimeStatus: "opened",
+    };
+  }
+  return {
+    commandId: command.id,
+    pluginId: command.pluginId,
+    pluginName: command.pluginName,
+    label: command.label,
+    handled: true,
+    targetRoute: "",
+    message: `${command.label} is ready in the Tauri app; browser smoke mode does not run system tools.`,
+    notifications: [{
+      level: "success",
+      title: "Extension action",
+      message: "Browser smoke mode verified the command route.",
+    }],
+    runtimeStatus: "browser_mock",
+  };
+}
+
+function browserPluginPanelRender(request?: RenderPluginPanelRequest): PluginPanelRenderResult {
+  const snapshot = browserPluginCommandsSnapshot();
+  const panel = snapshot.panels.find((candidate) =>
+    candidate.id === request?.panelId && (!request?.pluginId || candidate.pluginId === request.pluginId)
+  ) ?? snapshot.panels.find((candidate) => candidate.pluginId === request?.pluginId) ?? snapshot.panels[0];
+  const elements = browserPluginPanelElements(panel?.pluginId ?? "", request);
+  return {
+    panelId: panel?.id ?? request?.panelId ?? "",
+    pluginId: panel?.pluginId ?? request?.pluginId ?? "",
+    pluginName: panel?.pluginName ?? "",
+    title: panel?.title ?? "Extension",
+    elements,
+    notifications: request?.clickedButton ? [{
+      level: "success",
+      title: panel?.title ?? "Extension",
+      message: `${request.clickedButton} is wired; browser smoke mode does not run system tools.`,
+    }] : [],
+    message: "Rendered browser smoke extension panel.",
+    runtimeStatus: "native_rendered",
+  };
+}
+
+function browserPluginPanelElements(pluginId: string, request?: RenderPluginPanelRequest): PluginPanelRenderResult["elements"] {
+  const input = (id: string, text: string) => ({ kind: "inputText", id, text, width: 320, height: 0, border: false });
+  const button = (id: string, text: string) => ({ kind: "button", id, text, width: 0, height: 0, border: false });
+  const text = (value: string) => ({ kind: "textWrapped", id: "", text: value, width: 0, height: 0, border: false });
+  const separator = () => ({ kind: "separator", id: "", text: "", width: 0, height: 0, border: false });
+  switch (pluginId) {
+    case "quick_convert":
+      return [
+        text("Quick Convert"),
+        text("Convert selected media through system FFmpeg in the Tauri app."),
+        separator(),
+        button("convert_mp4", "Convert to MP4"),
+        button("convert_mp3", "Convert to MP3"),
+        button("convert_png", "Convert to PNG"),
+      ];
+    case "themes":
+      return [
+        text("Themes"),
+        text("Apply presets or persist an edited accent token."),
+        separator(),
+        button("apply_dark", "Apply Dark"),
+        button("apply_light", "Apply Light"),
+        button("apply_graphite", "Graphite"),
+        button("apply_aurora", "Aurora"),
+        button("apply_copper", "Copper"),
+        input("accent", request?.inputs?.accent ?? "#7da2b4"),
+        button("save_accent", "Save Accent"),
+      ];
+    case "vault":
+      return [
+        text("Vault"),
+        text("Create backup job scaffolds, review status, and prepare restore plans."),
+        separator(),
+        button("setup_backup", "Create Backup Job"),
+        button("backup_status", "Backup Status"),
+        button("restore_plan", "Prepare Restore Plan"),
+      ];
+    case "ytdlp":
+      return [
+        text("yt-dlp"),
+        text("Paste a URL and download media through yt-dlp in the Tauri app."),
+        input("url", request?.inputs?.url ?? "https://"),
+        separator(),
+        button("download_video", "Download Video"),
+        button("download_audio", "Download Audio"),
+      ];
+    default:
+      return [text("Extension panel")];
+  }
+}
+
+function browserPluginDiagnosticsSnapshot(): PluginDiagnosticsSnapshot {
+  const snapshot = browserPluginCommandsSnapshot();
+  return {
+    roots: snapshot.roots,
+    removedIds: ["git", "preview-panel", "preview_panel"],
+    plugins: browserPluginDefinitions.map((plugin) => ({
+      pluginId: plugin.id,
+      pluginName: plugin.name,
+      pluginDir: `${browserSmokeHome}/.misty/plugins/private/${plugin.id}`,
+      installed: true,
+      enabled: true,
+      runtimeStatus: "browser_mock",
+      commands: snapshot.commands.filter((command) => command.pluginId === plugin.id),
+      panels: snapshot.panels.filter((panel) => panel.pluginId === plugin.id),
+      missingDependencies: [],
+      errors: [],
+    })),
+  };
+}
 
 function browserAppSnapshot(): AppSnapshot {
   const mistyDir = `${browserSmokeHome}/.misty`;
@@ -341,36 +669,101 @@ function browserProvidersSnapshot(): ProvidersSnapshot {
 }
 
 function defaultProviderWorkflows(): ProviderWorkflow[] {
+  const driveScope = [{
+    name: "scope",
+    label: "Scope",
+    help: "Access scope requested from Google Drive.",
+    defaultValue: "drive",
+    required: true,
+    password: false,
+    choices: [{ value: "drive", help: "Full Google Drive access" }],
+  }];
   return [
-    {
-      type: "drive",
-      name: "Google Drive",
-      description: "Connect a Google Drive remote with browser sign-in.",
-      options: [
-        {
-          name: "scope",
-          label: "Scope",
-          help: "Access scope requested from Google Drive.",
-          defaultValue: "drive",
-          required: true,
-          password: false,
-          choices: [{ value: "drive", help: "Full Google Drive access" }],
-        },
-      ],
-    },
-    {
-      type: "dropbox",
-      name: "Dropbox",
-      description: "Connect a Dropbox remote with browser sign-in.",
-      options: [],
-    },
-    {
-      type: "onedrive",
-      name: "OneDrive",
-      description: "Connect a Microsoft OneDrive remote with browser sign-in.",
-      options: [],
-    },
-  ];
+    providerWorkflow("drive", "Google Drive", "Google Drive with browser sign-in.", driveScope),
+    providerWorkflow("dropbox", "Dropbox", "Dropbox storage with browser sign-in."),
+    providerWorkflow("onedrive", "OneDrive", "Microsoft OneDrive."),
+    providerWorkflow("box", "Box", "Box storage."),
+    providerWorkflow("s3", "S3", "Amazon S3-compatible object storage."),
+    providerWorkflow("sftp", "SFTP", "SSH/SFTP remote."),
+    providerWorkflow("webdav", "WebDAV", "WebDAV-compatible storage."),
+    providerWorkflow("alias", "Alias", "Alias for an existing remote."),
+    providerWorkflow("azureblob", "Azure Blob", "Microsoft Azure Blob Storage."),
+    providerWorkflow("azurefiles", "Azure Files", "Microsoft Azure Files."),
+    providerWorkflow("b2", "Backblaze B2", "Backblaze B2 storage."),
+    providerWorkflow("cache", "Cache", "Cache another remote."),
+    providerWorkflow("chunker", "Chunker", "Transparently chunk or split large files."),
+    providerWorkflow("cloudinary", "Cloudinary", "Cloudinary media storage."),
+    providerWorkflow("combine", "Combine", "Combine several remotes into one."),
+    providerWorkflow("compress", "Compress", "Compress another remote."),
+    providerWorkflow("crypt", "Crypt", "Encrypt or decrypt another remote."),
+    providerWorkflow("doi", "DOI datasets", "DOI dataset storage."),
+    providerWorkflow("drime", "Drime", "Drime storage."),
+    providerWorkflow("fichier", "1Fichier", "1Fichier cloud storage."),
+    providerWorkflow("filefabric", "Enterprise File Fabric", "Enterprise File Fabric."),
+    providerWorkflow("filen", "Filen", "Filen cloud storage."),
+    providerWorkflow("filelu", "FileLu", "FileLu cloud storage."),
+    providerWorkflow("filescom", "Files.com", "Files.com storage."),
+    providerWorkflow("ftp", "FTP", "FTP server."),
+    providerWorkflow("gcs", "Google Cloud Storage", "Google Cloud Storage."),
+    providerWorkflow("gofile", "Gofile", "Gofile storage."),
+    providerWorkflow("gphotos", "Google Photos", "Google Photos storage."),
+    providerWorkflow("hasher", "Hasher", "Better checksums for other remotes."),
+    providerWorkflow("hdfs", "HDFS", "Hadoop distributed file system."),
+    providerWorkflow("hidrive", "HiDrive", "HiDrive storage."),
+    providerWorkflow("http", "HTTP", "HTTP remote."),
+    providerWorkflow("huaweidrive", "Huawei Drive", "Huawei Drive storage."),
+    providerWorkflow("iclouddrive", "iCloud Drive", "iCloud Drive and Photos."),
+    providerWorkflow("imagekit", "ImageKit.io", "ImageKit.io storage."),
+    providerWorkflow("internxt", "Internxt Drive", "Internxt Drive storage."),
+    providerWorkflow("internetarchive", "Internet Archive", "Internet Archive storage."),
+    providerWorkflow("jottacloud", "Jottacloud", "Jottacloud storage."),
+    providerWorkflow("koofr", "Koofr", "Koofr-compatible storage."),
+    providerWorkflow("linkbox", "Linkbox", "Linkbox storage."),
+    providerWorkflow("local", "Local Disk", "Local disk backend."),
+    providerWorkflow("mailru", "Mail.ru Cloud", "Mail.ru Cloud storage."),
+    providerWorkflow("memory", "Memory", "In-memory object storage."),
+    providerWorkflow("mega", "Mega", "Mega cloud storage."),
+    providerWorkflow("netstorage", "Akamai NetStorage", "Akamai NetStorage."),
+    providerWorkflow("oos", "Oracle Object Storage", "Oracle Cloud Infrastructure Object Storage."),
+    providerWorkflow("opendrive", "OpenDrive", "OpenDrive storage."),
+    providerWorkflow("pcloud", "pCloud", "pCloud storage."),
+    providerWorkflow("pikpak", "PikPak", "PikPak storage."),
+    providerWorkflow("pixeldrain", "Pixeldrain", "Pixeldrain filesystem."),
+    providerWorkflow("premiumizeme", "premiumize.me", "premiumize.me storage."),
+    providerWorkflow("protondrive", "Proton Drive", "Proton Drive storage."),
+    providerWorkflow("putio", "Put.io", "Put.io storage."),
+    providerWorkflow("qingstor", "QingStor", "QingCloud Object Storage."),
+    providerWorkflow("quatrix", "Quatrix", "Quatrix by Maytech."),
+    providerWorkflow("seafile", "Seafile", "Seafile storage."),
+    providerWorkflow("shade", "Shade FS", "Shade filesystem."),
+    providerWorkflow("sharefile", "Citrix ShareFile", "Citrix ShareFile storage."),
+    providerWorkflow("sia", "Sia", "Sia decentralized cloud storage."),
+    providerWorkflow("smb", "SMB / CIFS", "SMB / CIFS share."),
+    providerWorkflow("storj", "Storj", "Storj decentralized cloud storage."),
+    providerWorkflow("sugarsync", "SugarSync", "SugarSync storage."),
+    providerWorkflow("swift", "OpenStack Swift", "OpenStack Swift and compatible cloud files."),
+    providerWorkflow("tardigrade", "Tardigrade", "Storj decentralized cloud storage."),
+    providerWorkflow("ulozto", "Uloz.to", "Uloz.to storage."),
+    providerWorkflow("union", "Union", "Union merges several upstream filesystems."),
+    providerWorkflow("yandex", "Yandex Disk", "Yandex Disk storage."),
+    providerWorkflow("zoho", "Zoho", "Zoho storage."),
+    providerWorkflow("archive", "Archive", "Read archive files as remotes."),
+  ].sort((left, right) => providerWorkflowRank(left.type) - providerWorkflowRank(right.type) || left.name.localeCompare(right.name));
+}
+
+function providerWorkflow(
+  type: string,
+  name: string,
+  description: string,
+  options: ProviderWorkflow["options"] = [],
+): ProviderWorkflow {
+  return { type, name, description, options };
+}
+
+function providerWorkflowRank(type: string): number {
+  if (["drive", "dropbox", "onedrive", "box", "s3", "sftp", "webdav"].includes(type)) return 0;
+  if (["alias", "crypt", "chunker", "combine", "compress", "hasher", "union"].includes(type)) return 2;
+  return 1;
 }
 
 function browserOperationQueueSnapshot(): OperationQueueSnapshot {
@@ -392,6 +785,23 @@ function browserOperationQueueSnapshot(): OperationQueueSnapshot {
     activeCount: 0,
     maxConcurrent: 4,
     redoAvailable: false,
+    paused: false,
+    bandwidthLimit: "",
+    transferProfileId: "balanced",
+    transferProfileName: "Balanced",
+  };
+}
+
+function browserAutomationWatchSnapshot(pollIntervalMs?: number): AutomationWatchSnapshot {
+  return {
+    active: false,
+    pollIntervalMs: Math.max(1000, pollIntervalMs ?? 5000),
+    watchedRuleCount: 0,
+    watchedRoots: [],
+    remoteRootCount: 0,
+    lastScanMs: 0,
+    lastRunMs: 0,
+    lastMessage: "Automation watching is only available in the Tauri app.",
   };
 }
 
@@ -615,6 +1025,10 @@ export function explorerPreviewItem(path: string): Promise<ExplorerPreviewPayloa
   return invoke("explorer_preview_item", { path });
 }
 
+export function fileMetadataSnapshot(path: string): Promise<FileMetadataSnapshot> {
+  return invoke("file_metadata_snapshot", { path });
+}
+
 export function explorerPathIsDirectory(path: string): Promise<boolean> {
   return invoke("explorer_path_is_directory", { path });
 }
@@ -637,6 +1051,10 @@ export function explorerLibraryRecordLastOpened(path: string): Promise<ExplorerL
 
 export function explorerLibrarySetTags(item: ExplorerLibraryItem, tags: string[]): Promise<ExplorerLibrarySnapshot> {
   return invoke("explorer_library_set_tags", { request: { item, tags } });
+}
+
+export function explorerLibrarySetMetadata(item: ExplorerLibraryItem, tags: string[], comments: string): Promise<ExplorerLibrarySnapshot> {
+  return invoke("explorer_library_set_tags", { request: { item, tags, comments } });
 }
 
 export function explorerOpenWith(applicationPath: string, filePath: string): Promise<void> {
@@ -737,6 +1155,10 @@ export function pluginCommandRun(request: RunPluginCommandRequest): Promise<Plug
 
 export function pluginPanelRender(request: RenderPluginPanelRequest): Promise<PluginPanelRenderResult> {
   return invoke("plugin_panel_render", { request });
+}
+
+export function pluginDiagnosticsSnapshot(): Promise<PluginDiagnosticsSnapshot> {
+  return invoke("plugin_diagnostics_snapshot");
 }
 
 export function openExternalUrl(url: string): Promise<void> {
@@ -851,12 +1273,154 @@ export function operationQueueRetry(operationId: number): Promise<OperationQueue
   return invoke("operation_queue_retry", { operationId });
 }
 
+export function operationQueuePause(operationId: number): Promise<OperationQueueSnapshot> {
+  return invoke("operation_queue_pause", { operationId });
+}
+
+export function operationQueueResume(operationId: number): Promise<OperationQueueSnapshot> {
+  return invoke("operation_queue_resume", { operationId });
+}
+
+export function operationQueuePauseBatch(batchId: number): Promise<OperationQueueSnapshot> {
+  return invoke("operation_queue_pause_batch", { batchId });
+}
+
+export function operationQueueResumeBatch(batchId: number): Promise<OperationQueueSnapshot> {
+  return invoke("operation_queue_resume_batch", { batchId });
+}
+
+export function operationQueuePauseAll(): Promise<OperationQueueSnapshot> {
+  return invoke("operation_queue_pause_all");
+}
+
+export function operationQueueResumeAll(): Promise<OperationQueueSnapshot> {
+  return invoke("operation_queue_resume_all");
+}
+
+export function operationQueueSetPriority(operationId: number, priority: OperationPriority): Promise<OperationQueueSnapshot> {
+  return invoke("operation_queue_set_priority", { operationId, priority });
+}
+
+export function operationQueueSetBandwidthLimit(limit: string): Promise<OperationQueueSnapshot> {
+  return invoke("operation_queue_set_bandwidth_limit", { limit });
+}
+
+export function operationQueueSetTransferProfile(
+  profileId: string,
+  profileName: string,
+  maxConcurrent: number,
+  bandwidthLimit: string,
+): Promise<OperationQueueSnapshot> {
+  return invoke("operation_queue_set_transfer_profile", {
+    profileId,
+    profileName,
+    maxConcurrent,
+    bandwidthLimit,
+  });
+}
+
 export function operationQueueUndo(undoTokenId: number): Promise<OperationQueueSnapshot> {
   return invoke("operation_queue_undo", { undoTokenId });
 }
 
 export function operationQueueRedo(): Promise<OperationQueueSnapshot> {
   return invoke("operation_queue_redo");
+}
+
+export function archiveList(request: ArchiveListRequest): Promise<ArchiveListResult> {
+  return invoke("archive_list", { request });
+}
+
+export function archiveCreate(request: ArchiveCreateRequest): Promise<ArchiveActionResult> {
+  return invoke("archive_create", { request });
+}
+
+export function archiveExtract(request: ArchiveExtractRequest): Promise<ArchiveActionResult> {
+  return invoke("archive_extract", { request });
+}
+
+export function duplicatesScan(request: DuplicateScanRequest): Promise<DuplicateScanResult> {
+  return invoke("duplicates_scan", { request });
+}
+
+export function duplicatesCancel(scanId: string): Promise<boolean> {
+  return invoke("duplicates_cancel", { scanId });
+}
+
+export function duplicatesHashRemoteCandidates(scanId: string): Promise<DuplicateScanResult> {
+  return invoke("duplicates_hash_remote_candidates", { scanId });
+}
+
+export function savedSearchesSnapshot(): Promise<SavedSearchesSnapshot> {
+  return invoke("saved_searches_snapshot");
+}
+
+export function savedSearchesSave(search: SavedSearch): Promise<SavedSearchesSnapshot> {
+  return invoke("saved_searches_save", { search });
+}
+
+export function savedSearchesDelete(id: string): Promise<SavedSearchesSnapshot> {
+  return invoke("saved_searches_delete", { id });
+}
+
+export function compareFiles(request: CompareFilesRequest): Promise<CompareFilesResult> {
+  return invoke("compare_files", { request });
+}
+
+export function compareFolders(request: CompareFoldersRequest): Promise<CompareFoldersResult> {
+  return invoke("compare_folders", { request });
+}
+
+export function compareApplyTextMerge(mergedText: string, targetPath: string): Promise<FileToolsActionResult> {
+  return invoke("compare_apply_text_merge", { mergedText, targetPath });
+}
+
+export function fileToolsChecksum(request: FileToolsChecksumRequest): Promise<FileToolsChecksumResult> {
+  return invoke("file_tools_checksum", { request });
+}
+
+export function fileToolsSetReadonly(request: FileToolsReadonlyRequest): Promise<FileToolsActionResult> {
+  return invoke("file_tools_set_readonly", { request });
+}
+
+export function fileToolsChmod(request: FileToolsChmodRequest): Promise<FileToolsActionResult> {
+  return invoke("file_tools_chmod", { request });
+}
+
+export function fileToolsCreateSymlink(request: FileToolsSymlinkRequest): Promise<FileToolsActionResult> {
+  return invoke("file_tools_create_symlink", { request });
+}
+
+export function fileToolsReadSymlink(request: FileToolsSymlinkTargetRequest): Promise<FileToolsSymlinkTargetResult> {
+  return invoke("file_tools_read_symlink", { request });
+}
+
+export function automationRulesSnapshot(): Promise<AutomationRulesSnapshot> {
+  return invoke("automation_rules_snapshot");
+}
+
+export function automationRulesSave(rule: AutomationRule): Promise<AutomationRulesSnapshot> {
+  return invoke("automation_rules_save", { rule });
+}
+
+export function automationRulesDelete(id: string): Promise<AutomationRulesSnapshot> {
+  return invoke("automation_rules_delete", { id });
+}
+
+export function automationRulesRunNow(id: string, dryRun = true): Promise<AutomationRunResult> {
+  return invoke("automation_rules_run_now", { id, dryRun });
+}
+
+export function automationWatchSnapshot(): Promise<AutomationWatchSnapshot> {
+  return invoke("automation_watch_snapshot");
+}
+
+export function automationWatchStart(pollIntervalMs?: number): Promise<AutomationWatchSnapshot> {
+  return invoke("automation_watch_start", { pollIntervalMs });
+}
+
+export function automationWatchStop(): Promise<AutomationWatchSnapshot> {
+  return invoke("automation_watch_stop");
 }
 
 export function operationQueueResolveConflict(

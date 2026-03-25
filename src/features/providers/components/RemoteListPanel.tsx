@@ -112,14 +112,22 @@ function RemoteRow(props: {
   const { remote, selected, onSelect } = props;
   const [menuOpen, setMenuOpen] = useState(false);
   const providerIcon = providerIconForType(remote.type);
+  const externalConfig = remote.configSource === "user";
   return (
     <div className={`${remoteRowClass} ${selected ? remoteRowSelectedClass : ""}`}>
-      <button className={remoteRowSelectClass} type="button" onClick={onSelect}>
+      <button
+        className={remoteRowSelectClass}
+        type="button"
+        title={remote.error ?? undefined}
+        onClick={externalConfig ? props.onRepair : onSelect}
+      >
         <span className={`${remoteProviderIconClass} ${remote.needsReconnect ? remoteProviderIconWarningClass : ""}`}>
           <AssetIcon src={providerIcon.src} color={providerIcon.color} size={17} />
         </span>
         <span className="overflow-hidden text-ellipsis whitespace-nowrap font-[580]">{remoteDisplayName(remote)}</span>
-        <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[var(--misty-text-muted)]">{remote.type}</span>
+        <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[var(--misty-text-muted)]">
+          {remote.type}{externalConfig ? " · user config" : ""}
+        </span>
         <span className={`inline-flex items-center gap-[5px] overflow-hidden text-ellipsis whitespace-nowrap ${remote.needsReconnect ? "text-[var(--misty-warning)]" : "text-[var(--misty-success)]"}`}>
           <AssetIcon src={remote.needsReconnect ? iconAssets.xCircleFill16 : iconAssets.verified24} size={14} />
           {remote.statusLabel}
@@ -137,9 +145,15 @@ function RemoteRow(props: {
         </button>
         {menuOpen ? (
           <div className={remoteMenuClass} role="menu">
-            {remote.needsReconnect ? <button className={remoteMenuButtonClass} type="button" role="menuitem" onClick={() => { setMenuOpen(false); props.onReconnect(); }}><AssetIcon src={iconAssets.sync16} size={15} /> Reconnect</button> : null}
-            <button className={remoteMenuButtonClass} type="button" role="menuitem" onClick={() => { setMenuOpen(false); props.onRepair(); }}><AssetIcon src={iconAssets.gear24} size={15} /> Configure</button>
-            <button className={`${remoteMenuButtonClass} text-[var(--misty-danger)]`} type="button" role="menuitem" onClick={() => { setMenuOpen(false); props.onDisconnect(); }}><AssetIcon src={iconAssets.trash24} size={15} /> Disconnect</button>
+            {externalConfig ? (
+              <button className={remoteMenuButtonClass} type="button" role="menuitem" onClick={() => { setMenuOpen(false); props.onRepair(); }}><AssetIcon src={iconAssets.plus16} size={15} /> Import</button>
+            ) : (
+              <>
+                {remote.needsReconnect ? <button className={remoteMenuButtonClass} type="button" role="menuitem" onClick={() => { setMenuOpen(false); props.onReconnect(); }}><AssetIcon src={iconAssets.sync16} size={15} /> Reconnect</button> : null}
+                <button className={remoteMenuButtonClass} type="button" role="menuitem" onClick={() => { setMenuOpen(false); props.onRepair(); }}><AssetIcon src={iconAssets.gear24} size={15} /> Configure</button>
+                <button className={`${remoteMenuButtonClass} text-[var(--misty-danger)]`} type="button" role="menuitem" onClick={() => { setMenuOpen(false); props.onDisconnect(); }}><AssetIcon src={iconAssets.trash24} size={15} /> Disconnect</button>
+              </>
+            )}
           </div>
         ) : null}
       </div>
