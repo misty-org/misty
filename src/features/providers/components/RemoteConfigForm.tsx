@@ -14,7 +14,7 @@ interface RemoteConfigFormProps {
 }
 
 const remoteConfigFormClass =
-  "min-h-0 overflow-auto";
+  "min-h-0";
 
 const formGridClass =
   "grid max-w-[760px] grid-cols-2 gap-x-4 gap-y-3.5 p-[18px] max-[980px]:grid-cols-1";

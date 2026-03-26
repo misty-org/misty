@@ -128,8 +128,7 @@ function RemoteRow(props: {
         <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[var(--misty-text-muted)]">
           {remote.type}{externalConfig ? " · user config" : ""}
         </span>
-        <span className={`inline-flex items-center gap-[5px] overflow-hidden text-ellipsis whitespace-nowrap ${remote.needsReconnect ? "text-[var(--misty-warning)]" : "text-[var(--misty-success)]"}`}>
-          <AssetIcon src={remote.needsReconnect ? iconAssets.xCircleFill16 : iconAssets.verified24} size={14} />
+        <span className={`overflow-hidden text-ellipsis whitespace-nowrap ${remote.needsReconnect ? "text-[var(--misty-warning)]" : "text-[var(--misty-success)]"}`}>
           {remote.statusLabel}
         </span>
       </button>
