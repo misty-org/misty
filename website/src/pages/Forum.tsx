@@ -438,7 +438,7 @@ function ThreadDetail({ thread, onBack }: { thread: Thread; onBack: () => void }
           className="w-full bg-transparent px-5 py-4 text-sm text-text placeholder-text-muted resize-none focus:outline-none min-h-[100px]"
         />
         <div className="px-5 py-3 border-t border-border/50 flex justify-end">
-          <button className="px-4 py-2 bg-primary hover:bg-primary-hover text-white text-sm font-medium rounded-lg transition-colors cursor-pointer">
+          <button className="px-4 py-2 bg-primary hover:bg-primary-hover text-bg text-sm font-medium rounded-lg transition-colors cursor-pointer">
             Reply
           </button>
         </div>
@@ -469,7 +469,7 @@ export default function Forum() {
   const totalReplies = threads.reduce((sum, t) => sum + t.replies.length, 0);
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-20">
+    <div className="max-w-280 mx-auto px-4 sm:px-6 lg:px-8 py-20">
       {/* Header */}
       <div className="mb-10">
         <h1 className="text-3xl md:text-5xl font-bold text-text mb-4">Forum</h1>
@@ -563,7 +563,7 @@ export default function Forum() {
 
           {/* New thread CTA */}
           <div className="mt-6 flex justify-center">
-            <button className="px-5 py-2.5 bg-primary hover:bg-primary-hover text-white text-sm font-medium rounded-lg transition-colors cursor-pointer">
+            <button className="px-5 py-2.5 bg-primary hover:bg-primary-hover text-bg text-sm font-medium rounded-lg transition-colors cursor-pointer">
               Start a Thread
             </button>
           </div>

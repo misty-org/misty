@@ -32,7 +32,7 @@ export function GlowCard({ children, className = "" }: GlowCardProps) {
         <div
           className="pointer-events-none absolute -inset-px transition-opacity duration-300"
           style={{
-            background: `radial-gradient(400px circle at ${glowPosition.x}px ${glowPosition.y}px, rgba(59, 130, 246, 0.08), transparent 60%)`,
+            background: `radial-gradient(400px circle at ${glowPosition.x}px ${glowPosition.y}px, rgba(228, 228, 231, 0.06), transparent 60%)`,
           }}
         />
       )}

@@ -11,8 +11,8 @@ export default function App() {
 
   useEffect(() => {
     const match = [...matches].reverse().find((m) => (m.handle as Handle)?.title);
-    console.log(match?.handle)
-    document.title = (match?.handle as any)?.title
+    document.title = (match?.handle as any)?.title;
+    window.getSelection()?.removeAllRanges();
   }, [matches]);
 
   return (

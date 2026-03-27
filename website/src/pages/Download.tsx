@@ -120,7 +120,7 @@ function ReleaseItem({
 
 export default function Download() {
   return (
-    <div className="max-w-6xl mx-auto px-6 py-20">
+    <div className="max-w-280 mx-auto px-4 sm:px-6 lg:px-8 py-20">
       {/* Header */}
       <div className="text-center mb-16">
         
@@ -134,7 +134,7 @@ export default function Download() {
       </div>
 
       {/* Platform cards */}
-      <div className="grid md:grid-cols-3 gap-5 max-w-3xl mx-auto mb-20">
+      <div className="grid md:grid-cols-3 gap-5 mb-20">
         {platforms.map((platform) => (
           <GlowCard key={platform.name} className="h-full">
             <div className="p-7 text-center flex flex-col items-center">
@@ -154,7 +154,7 @@ export default function Download() {
       </div>
 
       {/* Releases */}
-      <div className="max-w-2xl mx-auto mb-20">
+      <div className="mb-20">
         <h2 className="text-lg font-semibold text-text mb-6">Releases</h2>
         <div>
           {releases.map((release) => (
@@ -169,7 +169,7 @@ export default function Download() {
       </div>
 
       {/* System requirements */}
-      <div className="max-w-2xl mx-auto">
+      <div>
         <h2 className="text-xl font-semibold text-text mb-6 text-center">
           System Requirements
         </h2>
