@@ -71,7 +71,7 @@ export default function Navbar() {
               to={to}
               end={to === "/"}
               className={({ isActive }) => `relative px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                isActive ? "text-text" : "text-text-muted hover:text-text"
+                isActive ? "text-white" : "text-text hover:text-white"
               }`}
             >
               {({ isActive }) => (
@@ -92,7 +92,7 @@ export default function Navbar() {
               to="/docs"
               onClick={() => setDocsOpen(false)}
               className={`relative px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 block ${
-                location.pathname.startsWith("/docs") ? "text-text" : "text-text-muted hover:text-text"
+                location.pathname.startsWith("/docs") ? "text-white" : "text-text hover:text-white"
               }`}
             >
               Docs
@@ -106,7 +106,7 @@ export default function Navbar() {
                     to={to}
                     end
                     className={({ isActive }) => `block px-4 py-2.5 text-sm transition-colors ${
-                      isActive ? "text-primary bg-primary/10" : "text-text-muted hover:text-text hover:bg-elevated"
+                      isActive ? "text-white bg-primary/10" : "text-text hover:text-white hover:bg-elevated"
                     }`}
                   >
                     {label}
@@ -123,13 +123,13 @@ export default function Navbar() {
           >
             <NavLink
               to="/changelog"
-              onClick={() => setDocsOpen(false)}
+              onClick={() => setResourcesOpen(false)}
               className={`relative px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 block ${
-                location.pathname.startsWith("/changelog") ? "text-text" : "text-text-muted hover:text-text"
+                resourcesLinks.some(({ to }) => location.pathname.startsWith(to)) ? "text-white" : "text-text hover:text-white"
               }`}
             >
               Resources
-              {location.pathname.startsWith("/docs") && <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-primary rounded-full" />}
+              {resourcesLinks.some(({ to }) => location.pathname.startsWith(to)) && <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-primary rounded-full" />}
             </NavLink>
             <div className={`absolute left-1/2 -translate-x-1/2 top-full pt-1 w-44 transition-all duration-200 ${resourcesOpen ? "opacity-100 visible" : "opacity-0 invisible"}`}>
               <div className="bg-surface border border-border rounded-xl overflow-hidden shadow-xl shadow-bg/50">
@@ -139,7 +139,7 @@ export default function Navbar() {
                     to={to}
                     end
                     className={({ isActive }) => `block px-4 py-2.5 text-sm transition-colors ${
-                      isActive ? "text-primary bg-primary/10" : "text-text-muted hover:text-text hover:bg-elevated"
+                      isActive ? "text-white bg-primary/10" : "text-text hover:text-white hover:bg-elevated"
                     }`}
                   >
                     {label}

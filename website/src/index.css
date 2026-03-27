@@ -7,12 +7,12 @@
   --color-border: #27272A;
   --color-border-subtle: #1E1E21;
   --color-text: #D4D4D8;
-  --color-text-muted: #71717A;
+  --color-text-muted: #A1A1AA;
   --color-text-secondary: #A1A1AA;
-  --color-primary: #3B82F6;
-  --color-primary-hover: #60A5FA;
-  --color-primary-active: #2563EB;
-  --color-primary-glow: #3B82F633;
+  --color-primary: #E4E4E7;
+  --color-primary-hover: #F4F4F5;
+  --color-primary-active: #D4D4D8;
+  --color-primary-glow: #E4E4E733;
   --color-success: #22C55E;
   --color-success-hover: #4ADE80;
   --color-danger: #EF4444;
@@ -34,8 +34,8 @@ body {
 }
 
 ::selection {
-  background-color: var(--color-primary);
-  color: white;
+  background-color: rgba(244, 244, 245, 0.15);
+  color: #FAFAFA;
 }
 
 /* Animations */
@@ -99,7 +99,7 @@ body {
 
 /* Gradient text */
 .gradient-text {
-  background: linear-gradient(135deg, #D4D4D8 0%, #3B82F6 50%, #60A5FA 100%);
+  background: linear-gradient(135deg, #F0C040 0%, #F5D870 50%, #E8B020 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -108,24 +108,33 @@ body {
 /* Grid background pattern */
 .grid-bg {
   background-image: 
-    linear-gradient(rgba(59, 130, 246, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(59, 130, 246, 0.03) 1px, transparent 1px);
+    linear-gradient(rgba(228, 228, 231, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(228, 228, 231, 0.03) 1px, transparent 1px);
   background-size: 60px 60px;
 }
 
 /* Radial glow */
 .radial-glow {
-  background: radial-gradient(ellipse 300px 200px at 50% 0%, rgba(59, 130, 246, 0.12), transparent);
+  background: radial-gradient(ellipse 300px 200px at 50% 0%, rgba(228, 228, 231, 0.08), transparent);
 }
 @media (min-width: 640px) {
   .radial-glow {
-    background: radial-gradient(ellipse 600px 400px at 50% 0%, rgba(59, 130, 246, 0.12), transparent);
+    background: radial-gradient(ellipse 600px 400px at 50% 0%, rgba(228, 228, 231, 0.08), transparent);
   }
 }
 
 /* Disable Inter contextual alternates in inputs (fixes @ jiggle) */
 input, textarea {
   font-variant-ligatures: no-contextual;
+}
+
+/* Hide scrollbar but keep scrollable */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }
 
 /* Scrollbar styling */

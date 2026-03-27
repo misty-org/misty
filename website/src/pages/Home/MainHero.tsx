@@ -24,7 +24,7 @@ export default function MainHero() {
               </span>
             </NavLink>
             <NavLink to="/waitlist">
-              <span className="inline-flex items-center justify-center px-8 py-3.5 bg-[#3b82f6] text-black font-bold rounded-full transition-all duration-300 shadow-lg hover:bg-gray-200 hover:shadow-zinc-100/20 hover:-translate-y-0.5">
+              <span className="inline-flex items-center justify-center px-8 py-3.5 bg-zinc-700 text-zinc-100 font-bold rounded-full transition-all duration-300 shadow-lg hover:bg-zinc-600 hover:shadow-zinc-100/20 hover:-translate-y-0.5">
                 Join Waitlist
               </span>
             </NavLink>

@@ -1,11 +1,10 @@
 import type { Section, Category } from "./data";
 
-/* ─── guide sections for API docs ─── */
 export const apiSections: Section[] = [
   {
     id: "self-hosting",
     label: "Self-Hosting",
-    category: "api",
+    category: "overview",
     title: "Self-Hosting",
     prose: [
       "When you self-host Misty, you run the proxy service on your own infrastructure — a home server, a VPS, or inside your private network. In this setup, the Misty desktop app isn't managing the proxy for you, so you interact with the API directly.",
@@ -17,25 +16,6 @@ export const apiSections: Section[] = [
       { kind: "note", text: "The proxy requires network access to reach cloud provider APIs (Google, Microsoft, Dropbox). It does not need to be publicly accessible." },
     ],
   },
-  {
-    id: "extensions",
-    label: "Building Extensions",
-    category: "getting-started",
-    title: "Building Extensions",
-    prose: [
-      "Misty's local API gives you a single, unified interface to Google Drive, OneDrive, and Dropbox. Instead of wrangling three different SDKs and auth flows, you hit one localhost endpoint and Misty handles the rest. This makes it a powerful foundation for building your own tools.",
-      "Automation — Write scripts that back up cloud files on a schedule, sync folders across providers, or trigger actions when files change. A simple cron job and curl is all you need.",
-      "Developer tools — Build CLI clients, editor plugins (VS Code, Neovim), or TUI file browsers that let you work with cloud files without leaving your workflow.",
-      "App integrations — Connect Misty to note-taking apps, media servers, CI/CD pipelines, or any tool that can make HTTP requests. Upload build artifacts, index cloud-stored photos, or sync notes across providers.",
-      "Custom dashboards — Use the device, workspace, and Tailscale APIs to build monitoring dashboards, storage usage trackers, or network status panels.",
-    ],
-    notes: [
-      { kind: "tip", text: "The API is the same one the Misty desktop app uses. If you can do it in the app, you can automate it with the API." },
-      { kind: "note", text: "Extensions run locally against your proxy. There's no app store or review process — just build and use." },
-    ],
-  },
-
-  /* ─── API endpoint sections ─── */
   {
     id: "authentication",
     label: "Authentication",
@@ -398,6 +378,6 @@ export const apiSections: Section[] = [
 ];
 
 export const apiCategories: Category[] = [
-  { key: "getting-started", label: "Overview", ids: ["self-hosting", "extensions"] },
+  { key: "overview", label: "Overview", ids: ["self-hosting"] },
   { key: "api", label: "Endpoints", ids: ["authentication", "devices", "workspaces", "tailscale", "onedrive", "google-drive", "dropbox"] },
 ];

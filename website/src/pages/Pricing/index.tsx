@@ -1,14 +1,14 @@
 import PricingHeader from "./PricingHeader";
 import PricingCard from "./PricingCard";
 import PricingFooter from "./PricingFooter";
-import { liteFeatures, proFeatures } from "./data";
+import { liteFeatures, proFeatures, maxFeatures } from "./data";
 
 export default function Pricing() {
   return (
-    <div className="mx-auto px-6 py-20">
+    <div className="max-w-280 mx-auto px-4 sm:px-6 lg:px-8 py-20">
       <PricingHeader />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-3xl mx-auto mb-20">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-20">
         <PricingCard
           name="Lite"
           price="Free"
@@ -19,11 +19,21 @@ export default function Pricing() {
         <PricingCard
           name="Pro"
           price="$30"
-          period="one-time"
+          period="/ year"
           features={proFeatures}
           ctaTo="/download"
           ctaLabel="Get Pro"
           inherits="Lite"
+          popular
+        />
+        <PricingCard
+          name="Max"
+          price="$150"
+          period="lifetime"
+          features={maxFeatures}
+          ctaTo="/download"
+          ctaLabel="Get Max"
+          inherits="Pro"
         />
       </div>
 
