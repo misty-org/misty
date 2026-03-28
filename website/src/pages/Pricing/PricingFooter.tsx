@@ -3,11 +3,11 @@ import { useState } from "react";
 const faqs = [
   {
     q: "What is the right plan for me?",
-    a: "Lite is free forever and covers everything you need to manage files across multiple cloud providers. Pro is a one-time purchase that unlocks unlimited accounts, the Misty clipboard, and priority support — ideal if you work with many cloud accounts or move large amounts of data regularly.",
+    a: "Lite is free forever and covers everything you need to manage files across multiple cloud providers. Pro is a yearly plan that unlocks unlimited accounts, the Misty clipboard, and priority support. Max is a one-time purchase that gives you everything in Pro permanently, plus lifetime updates and unlimited clipboard transfers.",
   },
   {
-    q: "What does 'one-time' mean for Pro?",
-    a: "You pay once and own it. No subscriptions, no renewal fees. You get all Pro features and any future updates included in the Pro tier at no extra cost.",
+    q: "What's the difference between Pro and Max?",
+    a: "Pro is billed yearly and includes all premium features. Max is a one-time payment that gives you everything in Pro forever — no renewals, no expiration. Max also includes unlimited clipboard transfer data and priority feature requests.",
   },
   {
     q: "What payment options are available?",
@@ -58,7 +58,7 @@ function FAQItem({ q, a }: { q: string; a: string }) {
 
 export default function PricingFooter() {
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="">
       <h2 className="text-lg font-semibold text-text mb-6">Questions & Answers</h2>
       <div>
         {faqs.map((faq) => (

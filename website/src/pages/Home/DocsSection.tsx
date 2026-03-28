@@ -41,11 +41,11 @@ const docs = [
   },
 ];
 
-export default function Documentation() {
+export default function Docs() {
   return (
     <div>
       <h2 className="text-3xl md:text-4xl font-bold text-text tracking-tight mb-2">
-        Documentation
+        Docs
       </h2>
       <p className="text-sm text-text-muted mb-5">
         Everything you need to set up Misty.
