@@ -774,33 +774,6 @@ export interface PublicLinkActionResult {
   message?: string | null;
 }
 
-export interface BackendAction {
-  id: string;
-  label: string;
-  description: string;
-  provider: string;
-  destructive: boolean;
-}
-
-export interface BackendRunRequest {
-  remote: string;
-  actionId: string;
-}
-
-export interface BackendActionResult {
-  actionId: string;
-  label: string;
-  result: unknown;
-}
-
-export interface ConfigSecurityStatus {
-  configPath?: string | null;
-  encrypted: boolean;
-  unlocked: boolean;
-  passwordPresent: boolean;
-  message?: string | null;
-}
-
 export type ProviderConfigMode = "add" | "reconnect" | "repair";
 
 export interface ProviderConfigRequest {
@@ -1126,62 +1099,6 @@ export interface FileToolsSymlinkTargetResult {
 
 export interface FileToolsActionResult {
   path: string;
-  message: string;
-}
-
-export interface AutomationRule {
-  id: string;
-  name: string;
-  enabled: boolean;
-  roots: string[];
-  conditions: SavedSearchRule[];
-  actions: string[];
-  updatedAtMs: number;
-}
-
-export interface AutomationRulesSnapshot {
-  rules: AutomationRule[];
-  activity: AutomationActivityEntry[];
-}
-
-export interface AutomationWatchSnapshot {
-  active: boolean;
-  pollIntervalMs: number;
-  watchedRuleCount: number;
-  watchedRoots: string[];
-  remoteRootCount: number;
-  lastScanMs: number;
-  lastRunMs: number;
-  lastMessage: string;
-}
-
-export interface AutomationActionResult {
-  action: string;
-  status: string;
-  message: string;
-  affectedPaths: string[];
-  queuedCount: number;
-}
-
-export interface AutomationActivityEntry {
-  id: string;
-  ruleId: string;
-  ruleName: string;
-  startedAtMs: number;
-  dryRun: boolean;
-  matchedCount: number;
-  queuedCount: number;
-  message: string;
-  actionResults: AutomationActionResult[];
-}
-
-export interface AutomationRunResult {
-  ruleId: string;
-  activityId: string;
-  dryRun: boolean;
-  matchedPaths: string[];
-  queuedCount: number;
-  actionResults: AutomationActionResult[];
   message: string;
 }
 
