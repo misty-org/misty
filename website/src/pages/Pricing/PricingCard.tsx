@@ -81,7 +81,7 @@ export default function PricingCard({
         {ctaTo ? (
           <NavLink
             to={ctaTo}
-            className="w-full text-center px-6 py-2.5 bg-zinc-100 hover:bg-gray-200 text-black font-medium rounded-xl transition-all duration-300 shadow-lg hover:-translate-y-0.5"
+            className="w-full text-center px-6 py-2.5 bg-white hover:bg-zinc-200 text-black font-medium rounded-xl transition-colors duration-300 shadow-lg"
           >
             {ctaLabel}
           </NavLink>

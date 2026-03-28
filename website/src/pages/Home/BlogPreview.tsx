@@ -1,9 +1,11 @@
+import { NavLink } from "react-router";
+
 const posts = [
   {
     title: "Introducing Misty — One App for All Your Cloud Files",
     date: "December 2025",
     summary:
-      "We built Misty because managing files across Google Drive, OneDrive, and iCloud shouldn't require three different apps. Here's the story behind it.",
+      "We built Misty because managing files across Google Drive, OneDrive, and iCloud shouldn't require three different apps.",
     tag: "Announcement",
   },
   {
@@ -24,26 +26,34 @@ const posts = [
 
 const tagColors: Record<string, string> = {
   Announcement: "bg-primary/10 text-primary border-primary/20",
-  Engineering: "bg-success/10 text-success border-success/20",
+  Engineering: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
 };
 
-export default function Blog() {
+export default function BlogPreview() {
   return (
-    <div className="max-w-280 mx-auto px-4 sm:px-6 lg:px-8 pt-32 pb-20">
-      <div className="mb-12">
-        <h1 className="text-3xl md:text-5xl font-bold text-text mb-4">Blog</h1>
-        <p className="text-text-muted leading-relaxed">
-          Updates, deep dives, and behind-the-scenes from the Misty team.
-        </p>
+    <div>
+      <div className="flex items-center justify-between mb-8">
+        <h2 className="text-3xl md:text-4xl font-bold text-text tracking-tight">
+          Blog
+        </h2>
+        <NavLink
+          to="/blog"
+          className="text-sm text-text-muted hover:text-text transition-colors flex items-center gap-1.5 group"
+        >
+          View all posts
+          <span className="group-hover:translate-x-1 transition-transform duration-300">
+            &rarr;
+          </span>
+        </NavLink>
       </div>
 
-      <div className="flex flex-col gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {posts.map((post) => (
           <article
             key={post.title}
-            className="group rounded-xl border border-border p-6 hover:border-border hover:bg-elevated/30 transition-colors"
+            className="glass-card rounded-2xl p-8 flex flex-col"
           >
-            <div className="flex items-center gap-3 mb-3">
+            <div className="flex items-center gap-3 mb-4">
               <span
                 className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${tagColors[post.tag] ?? "bg-elevated text-text-muted border-border"}`}
               >
@@ -51,9 +61,9 @@ export default function Blog() {
               </span>
               <span className="text-xs text-text-muted">{post.date}</span>
             </div>
-            <h2 className="text-lg font-semibold text-text mb-2 group-hover:text-primary transition-colors">
+            <h3 className="text-lg font-semibold text-text mb-3">
               {post.title}
-            </h2>
+            </h3>
             <p className="text-sm text-text-muted leading-relaxed">
               {post.summary}
             </p>

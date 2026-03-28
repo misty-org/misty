@@ -7,8 +7,8 @@ export default function MainHero() {
         <div className="radial-glow absolute inset-0 pointer-events-none" />
         <div className="absolute inset-0 grid-bg pointer-events-none" />
 
-        <div className="pt-12 pb-16 md:mt-20 text-center relative">
-          <h1 className="text-5xl md:text-7xl lg:text-6xl font-bold text-neutral-300 tracking-tight mb-6 text-balance flex flex-col gap-2">
+        <div className="pt-12 md:mt-20 text-center relative">
+          <h1 className="text-5xl md:text-7xl lg:text-6xl font-bold text-white tracking-tight mb-6 text-balance flex flex-col gap-2">
               <span>A <span className="gradient-text">file manager</span> for all your <span className="gradient-text">clouds</span></span>
           </h1>
 
@@ -19,12 +19,12 @@ export default function MainHero() {
 
           <div className="flex gap-5 justify-center flex-wrap">
             <NavLink to="/register">
-              <span className="inline-flex items-center justify-center px-8 py-3.5 bg-zinc-100 text-black font-bold rounded-full transition-all duration-300 shadow-lg hover:bg-gray-200 hover:shadow-zinc-100/20 hover:-translate-y-0.5">
+              <span className="inline-flex items-center justify-center px-8 py-3.5 bg-white text-black font-bold rounded-full transition-colors duration-300 shadow-lg hover:bg-zinc-200">
                 Get Started
               </span>
             </NavLink>
             <NavLink to="/waitlist">
-              <span className="inline-flex items-center justify-center px-8 py-3.5 bg-zinc-700 text-zinc-100 font-bold rounded-full transition-all duration-300 shadow-lg hover:bg-zinc-600 hover:shadow-zinc-100/20 hover:-translate-y-0.5">
+              <span className="inline-flex items-center justify-center px-8 py-3.5 bg-zinc-700 text-zinc-100 font-bold rounded-full transition-colors duration-300 shadow-lg hover:bg-zinc-600">
                 Join Waitlist
               </span>
             </NavLink>

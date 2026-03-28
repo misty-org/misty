@@ -5,7 +5,7 @@ import { liteFeatures, proFeatures, maxFeatures } from "./data";
 
 export default function Pricing() {
   return (
-    <div className="max-w-280 mx-auto px-4 sm:px-6 lg:px-8 py-20">
+    <div className="max-w-280 mx-auto px-4 sm:px-6 lg:px-8 pt-32 pb-20">
       <PricingHeader />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-20">
