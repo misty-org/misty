@@ -20,6 +20,7 @@ interface PricingCardProps {
   features: string[];
   inherits?: string;
   comingSoon?: boolean;
+  popular?: boolean;
   ctaTo?: string;
   ctaLabel?: string;
 }
@@ -31,22 +32,27 @@ export default function PricingCard({
   features,
   inherits,
   comingSoon = false,
+  popular = false,
   ctaTo,
   ctaLabel,
 }: PricingCardProps) {
   return (
     <GlowCard className="h-full">
       <div className="p-5 pb-4 flex flex-col h-full relative">
-        {comingSoon && (
+        {(comingSoon || popular) && (
           <div className="absolute top-3 right-3">
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20">
-              Coming Soon
+            <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium border ${
+              popular
+                ? "bg-primary text-bg border-primary"
+                : "bg-primary/10 text-primary border-primary/20"
+            }`}>
+              {popular ? "Most Popular" : "Coming Soon"}
             </span>
           </div>
         )}
 
         <div className="mb-4">
-          <h3 className="text-xl font-semibold text-text mb-0.5">{name}</h3>
+          <h3 className="text-2xl font-bold text-text mb-0.5">{name}</h3>
           <div className="flex items-baseline gap-1">
             <span className="text-lg font-bold text-text/60">{price ?? "Free"}</span>
             {period && <span className="text-text-muted text-sm">{period}</span>}
@@ -75,7 +81,7 @@ export default function PricingCard({
         {ctaTo ? (
           <NavLink
             to={ctaTo}
-            className="w-full text-center px-6 py-2.5 bg-zinc-100 hover:bg-gray-200 text-black font-medium rounded-xl transition-all duration-300 shadow-lg hover:-translate-y-0.5"
+            className="w-full text-center px-6 py-2.5 bg-white hover:bg-zinc-200 text-black font-medium rounded-xl transition-colors duration-300 shadow-lg"
           >
             {ctaLabel}
           </NavLink>

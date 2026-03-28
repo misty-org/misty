@@ -13,14 +13,12 @@ export default function FeatureDemo() {
   const [isDemoPlaying, setIsDemoPlaying] = useState(false);
 
   return (
-    <div>
+    <>
 
       {/* Feature Toggle & Demo Controls */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-6 mb-8 relative z-20">
+      <div className="flex flex-row md:flex-row items-center justify-center gap-6 mb-8 relative z-20">
 
-        <div className="hidden md:block w-35"></div>
-
-        <div className="flex bg-neutral-900/80 backdrop-blur-md p-1.5 rounded-full border border-white/10 shadow-lg shrink-0">
+        <div className="flex gap-2 bg-neutral-900/80 backdrop-blur-md p-1.5 rounded-full border border-white/10 shadow-lg shrink-0">
           {tabs.map((tab) => (
             <button
               key={tab.key}
@@ -28,29 +26,12 @@ export default function FeatureDemo() {
               className={`px-5 py-2 text-sm font-medium rounded-full transition-all duration-300 ${
                 !isDemoPlaying && activeView === tab.key
                   ? "bg-zinc-100 text-black shadow-sm"
-                  : "text-text-muted hover:text-zinc-200"
+                  : "text-text-muted hover:text-zinc-200 hover:bg-zinc-500/30"
               }`}
             >
               {tab.label}
             </button>
           ))}
-        </div>
-
-        <div className="flex justify-end w-full md:w-35">
-          <button
-            onClick={() => setIsDemoPlaying(true)}
-            className={`flex items-center gap-2.5 px-2 py-1.5 pr-4 backdrop-blur-md border border-white/10 rounded-full text-sm font-medium transition-all duration-300 shadow-xl group ml-auto md:ml-0 ${
-              isDemoPlaying
-                ? "bg-zinc-100 text-black"
-                : "bg-neutral-900/80 text-zinc-200 hover:bg-zinc-100 hover:text-black hover:scale-105"
-            }`}
-          >
-            {!isDemoPlaying && (
-              <div className="absolute inset-0 rounded-full bg-white/50 opacity-20 group-hover:hidden" />
-            )}  
-            <FaPlay className="w-2.5 h-2.5 ml-0.5" />
-            <span className="whitespace-nowrap">Watch Demo</span>
-          </button>
         </div>
       </div>
 
@@ -124,6 +105,6 @@ export default function FeatureDemo() {
           )}
         </div>
       </div>
-    </div>
+    </>
   );
 }

@@ -36,7 +36,7 @@ export interface Category {
 /* ─── constants ─── */
 export const methodColor: Record<string, string> = {
   GET: "text-green-400",
-  POST: "text-blue-400",
+  POST: "text-zinc-400",
   PUT: "text-amber-400",
   DELETE: "text-red-400",
 };

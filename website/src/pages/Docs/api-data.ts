@@ -1,11 +1,26 @@
 import type { Section, Category } from "./data";
 
-/* ─── guide sections for API docs ─── */
 export const apiSections: Section[] = [
+  {
+    id: "api-overview",
+    label: "API Reference",
+    category: "overview",
+    title: "API Reference",
+    prose: [
+      "Welcome to the Misty API Reference. This documents the REST API exposed by the Misty local proxy service. The API is the same interface the desktop app uses internally — anything you can do in the app, you can automate through these endpoints.",
+      "Base URL: http://localhost:3000 — The proxy runs on your machine. All requests are made to localhost unless you're connecting to a self-hosted instance on another machine.",
+      "Authentication: Most endpoints require a valid JWT access token passed in the Authorization header as a Bearer token. Use the /api/login or /api/register endpoints to obtain tokens.",
+      "Current version: v0.3.0 — This API is versioned alongside the Misty desktop app. Breaking changes are documented in the changelog.",
+    ],
+    notes: [
+      { kind: "note", text: "This API is not publicly hosted. It runs locally on your machine or on your self-hosted proxy instance." },
+      { kind: "tip", text: "Use the Guide section for installation, architecture overview, and getting started. This page is for endpoint-level documentation." },
+    ],
+  },
   {
     id: "self-hosting",
     label: "Self-Hosting",
-    category: "api",
+    category: "overview",
     title: "Self-Hosting",
     prose: [
       "When you self-host Misty, you run the proxy service on your own infrastructure — a home server, a VPS, or inside your private network. In this setup, the Misty desktop app isn't managing the proxy for you, so you interact with the API directly.",
@@ -17,25 +32,6 @@ export const apiSections: Section[] = [
       { kind: "note", text: "The proxy requires network access to reach cloud provider APIs (Google, Microsoft, Dropbox). It does not need to be publicly accessible." },
     ],
   },
-  {
-    id: "extensions",
-    label: "Building Extensions",
-    category: "getting-started",
-    title: "Building Extensions",
-    prose: [
-      "Misty's local API gives you a single, unified interface to Google Drive, OneDrive, and Dropbox. Instead of wrangling three different SDKs and auth flows, you hit one localhost endpoint and Misty handles the rest. This makes it a powerful foundation for building your own tools.",
-      "Automation — Write scripts that back up cloud files on a schedule, sync folders across providers, or trigger actions when files change. A simple cron job and curl is all you need.",
-      "Developer tools — Build CLI clients, editor plugins (VS Code, Neovim), or TUI file browsers that let you work with cloud files without leaving your workflow.",
-      "App integrations — Connect Misty to note-taking apps, media servers, CI/CD pipelines, or any tool that can make HTTP requests. Upload build artifacts, index cloud-stored photos, or sync notes across providers.",
-      "Custom dashboards — Use the device, workspace, and Tailscale APIs to build monitoring dashboards, storage usage trackers, or network status panels.",
-    ],
-    notes: [
-      { kind: "tip", text: "The API is the same one the Misty desktop app uses. If you can do it in the app, you can automate it with the API." },
-      { kind: "note", text: "Extensions run locally against your proxy. There's no app store or review process — just build and use." },
-    ],
-  },
-
-  /* ─── API endpoint sections ─── */
   {
     id: "authentication",
     label: "Authentication",
@@ -88,7 +84,7 @@ export const apiSections: Section[] = [
     label: "Devices",
     category: "api",
     title: "Devices",
-    badge: "Auth required",
+    badge: "Auth",
     description: "Create, read, update, and delete registered devices.",
     endpoints: [
       {
@@ -145,7 +141,7 @@ export const apiSections: Section[] = [
     label: "Workspaces",
     category: "api",
     title: "Workspaces",
-    badge: "Auth required",
+    badge: "Auth",
     description: "Manage workspaces for organizing files and folders across providers.",
     endpoints: [
       {
@@ -203,7 +199,7 @@ export const apiSections: Section[] = [
     label: "Tailscale",
     category: "api",
     title: "Tailscale",
-    badge: "Auth required",
+    badge: "Auth",
     description: "Query your Tailscale network status, list peers, and ping nodes.",
     endpoints: [
       {
@@ -398,6 +394,7 @@ export const apiSections: Section[] = [
 ];
 
 export const apiCategories: Category[] = [
-  { key: "getting-started", label: "Overview", ids: ["self-hosting", "extensions"] },
-  { key: "api", label: "Endpoints", ids: ["authentication", "devices", "workspaces", "tailscale", "onedrive", "google-drive", "dropbox"] },
+  { key: "overview", label: "Overview", ids: ["api-overview", "self-hosting"] },
+  { key: "core", label: "Core", ids: ["authentication", "devices", "workspaces", "tailscale"] },
+  { key: "services", label: "Services", ids: ["onedrive", "google-drive", "dropbox"] },
 ];
