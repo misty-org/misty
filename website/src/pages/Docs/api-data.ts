@@ -2,6 +2,22 @@ import type { Section, Category } from "./data";
 
 export const apiSections: Section[] = [
   {
+    id: "api-overview",
+    label: "API Reference",
+    category: "overview",
+    title: "API Reference",
+    prose: [
+      "Welcome to the Misty API Reference. This documents the REST API exposed by the Misty local proxy service. The API is the same interface the desktop app uses internally — anything you can do in the app, you can automate through these endpoints.",
+      "Base URL: http://localhost:3000 — The proxy runs on your machine. All requests are made to localhost unless you're connecting to a self-hosted instance on another machine.",
+      "Authentication: Most endpoints require a valid JWT access token passed in the Authorization header as a Bearer token. Use the /api/login or /api/register endpoints to obtain tokens.",
+      "Current version: v0.3.0 — This API is versioned alongside the Misty desktop app. Breaking changes are documented in the changelog.",
+    ],
+    notes: [
+      { kind: "note", text: "This API is not publicly hosted. It runs locally on your machine or on your self-hosted proxy instance." },
+      { kind: "tip", text: "Use the Guide section for installation, architecture overview, and getting started. This page is for endpoint-level documentation." },
+    ],
+  },
+  {
     id: "self-hosting",
     label: "Self-Hosting",
     category: "overview",
@@ -68,7 +84,7 @@ export const apiSections: Section[] = [
     label: "Devices",
     category: "api",
     title: "Devices",
-    badge: "Auth required",
+    badge: "Auth",
     description: "Create, read, update, and delete registered devices.",
     endpoints: [
       {
@@ -125,7 +141,7 @@ export const apiSections: Section[] = [
     label: "Workspaces",
     category: "api",
     title: "Workspaces",
-    badge: "Auth required",
+    badge: "Auth",
     description: "Manage workspaces for organizing files and folders across providers.",
     endpoints: [
       {
@@ -183,7 +199,7 @@ export const apiSections: Section[] = [
     label: "Tailscale",
     category: "api",
     title: "Tailscale",
-    badge: "Auth required",
+    badge: "Auth",
     description: "Query your Tailscale network status, list peers, and ping nodes.",
     endpoints: [
       {
@@ -378,6 +394,7 @@ export const apiSections: Section[] = [
 ];
 
 export const apiCategories: Category[] = [
-  { key: "overview", label: "Overview", ids: ["self-hosting"] },
-  { key: "api", label: "Endpoints", ids: ["authentication", "devices", "workspaces", "tailscale", "onedrive", "google-drive", "dropbox"] },
+  { key: "overview", label: "Overview", ids: ["api-overview", "self-hosting"] },
+  { key: "core", label: "Core", ids: ["authentication", "devices", "workspaces", "tailscale"] },
+  { key: "services", label: "Services", ids: ["onedrive", "google-drive", "dropbox"] },
 ];

@@ -6,9 +6,9 @@
   --color-elevated: #18181B;
   --color-border: #27272A;
   --color-border-subtle: #1E1E21;
-  --color-text: #D4D4D8;
-  --color-text-muted: #A1A1AA;
-  --color-text-secondary: #A1A1AA;
+  --color-text: #FFFFFF;
+  --color-text-muted: #D4D4D8;
+  --color-text-secondary: #D4D4D8;
   --color-primary: #E4E4E7;
   --color-primary-hover: #F4F4F5;
   --color-primary-active: #D4D4D8;
@@ -178,3 +178,40 @@ input, textarea {
 .animate-fade-up-2 { animation: fade-up 0.6s 0.15s ease both; }
 .animate-fade-up-3 { animation: fade-up 0.6s 0.25s ease both; }
 .animate-spin-slow { animation: spin 0.6s linear infinite; }
+
+/* Streak animation for "Fast" section */
+@keyframes streak {
+  0% { transform: translateX(-100%); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translateX(300%); opacity: 0; }
+}
+.animate-streak {
+  animation: streak 2.5s ease-in-out infinite;
+}
+.animate-streak-2 {
+  animation: streak 2.5s 0.6s ease-in-out infinite;
+}
+.animate-streak-3 {
+  animation: streak 2.5s 1.2s ease-in-out infinite;
+}
+
+/* Progress bar fill animations */
+@keyframes fill-1 {
+  0% { width: 20%; }
+  50% { width: 75%; }
+  100% { width: 20%; }
+}
+@keyframes fill-2 {
+  0% { width: 60%; }
+  40% { width: 100%; }
+  60% { width: 100%; }
+  100% { width: 60%; }
+}
+@keyframes fill-3 {
+  0% { width: 5%; }
+  100% { width: 65%; }
+}
+.animate-fill-1 { animation: fill-1 4s ease-in-out infinite; }
+.animate-fill-2 { animation: fill-2 5s ease-in-out infinite; }
+.animate-fill-3 { animation: fill-3 6s ease-in-out infinite alternate; }

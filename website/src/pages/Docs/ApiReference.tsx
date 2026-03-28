@@ -5,7 +5,7 @@ import CenterPanel from "./CenterPanel";
 import RightPanel from "./RightPanel";
 
 export default function ApiReference() {
-  const [activeId, setActiveId] = useState("self-hosting");
+  const [activeId, setActiveId] = useState("api-overview");
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const section = apiSections.find((s) => s.id === activeId)!;

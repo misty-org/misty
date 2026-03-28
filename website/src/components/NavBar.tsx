@@ -8,8 +8,8 @@ const navItems = [
 ];
 
 const docsLinks = [
-  { to: "/docs", label: "Getting Started" },
-  { to: "/docs/api", label: "API Reference" },
+  { to: "/docs", label: "Guide" },
+  { to: "/docs/api", label: "API" },
 ];
 
 const resourcesLinks = [
@@ -59,7 +59,7 @@ export default function Navbar() {
     }`}>
       <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
         <NavLink to="/" className="group flex items-center gap-1">
-          <img src="/misty_full.png" alt="Misty logo" className="w-12 h-12 transition-transform duration-300 group-hover:scale-110" />
+          <img src="/misty_full.png" alt="Misty logo" className="w-12 h-12" />
           <span className="text-lg font-semibold text-text tracking-tight">Misty</span>
         </NavLink>
 
@@ -172,7 +172,7 @@ export default function Navbar() {
             ) : (
               <button
                 onClick={() => navigate("/signin", { state: { from: location.pathname } })}
-                className="px-4 py-1.5 bg-text hover:bg-text-secondary text-bg text-sm font-medium rounded-lg transition-all duration-200"
+                className="px-4 py-1.5 bg-white hover:bg-zinc-200 text-bg text-sm font-medium rounded-lg transition-colors duration-200"
               >
                 Sign In
               </button>
@@ -225,7 +225,7 @@ export default function Navbar() {
                 </div>
               </div>
             ) : (
-              <button onClick={() => navigate("/signin")} className="mt-2 px-4 py-2.5 bg-text text-bg text-sm font-medium rounded-lg">Sign In</button>
+              <button onClick={() => navigate("/signin")} className="mt-2 px-4 py-2.5 bg-white text-bg text-sm font-medium rounded-lg">Sign In</button>
             )}
           </div>
         </div>
