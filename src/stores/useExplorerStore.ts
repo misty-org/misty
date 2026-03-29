@@ -50,7 +50,7 @@ import type {
   PasteItem,
   TransferRecord,
 } from "../api/types";
-import { errorText } from "../shared/format";
+import { errorText, userFacingErrorText } from "../shared/format";
 import { useMultiPanelStore } from "../shared/multipanel/useMultiPanelStore";
 import type { MultiPanelClosedPane, MultiPanelPane, MultiPanelTab } from "../shared/multipanel/types";
 import {
@@ -93,6 +93,7 @@ export interface ExplorerSortState {
 
 interface PaneExplorerState {
   listing: DirectoryListing | null;
+  hasFolderEntries: boolean;
   commandQuery: string;
   commandQueryMode: ExplorerCommandQueryMode;
   selectedIds: string[];
@@ -265,6 +266,7 @@ const directorySizeRefreshIntervalMs = 30 * 60 * 1000;
 function emptyPaneState(): PaneExplorerState {
   return {
     listing: null,
+    hasFolderEntries: false,
     commandQuery: "",
     commandQueryMode: "search",
     selectedIds: [],
@@ -406,7 +408,9 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
           await Promise.all(
             (activeTab?.panes ?? []).map((pane) => {
               const restoredPane = restored.panes[pane.id];
-              return restoredPane?.listing ? get().loadPane(pane.id, restoredPane.listing.path, "replace") : Promise.resolve();
+              return restoredPane?.listing && !isExplorerInternalTabPath(restoredPane.listing.path)
+                ? get().loadPane(pane.id, restoredPane.listing.path, "replace")
+                : Promise.resolve();
             }),
           );
           initializationInFlight = false;
@@ -464,8 +468,12 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     try {
       await persistExplorerWorkspace();
       const document = workspaceDocumentCache ?? await workspacesSnapshot();
+      const nextTitle = uniqueWorkspaceTitle(
+        trimmed,
+        document.workspaces.filter((workspace) => workspace.id !== workspaceId),
+      );
       const workspaces = document.workspaces.map((workspace) =>
-        workspace.id === workspaceId ? { ...workspace, title: trimmed } : workspace,
+        workspace.id === workspaceId ? { ...workspace, title: nextTitle } : workspace,
       );
       const nextDocument = await saveWorkspaceDocument({ ...document, workspaces });
       set(workspaceMetadata(nextDocument));
@@ -502,6 +510,15 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
   },
 
   loadPane: (paneId, path, mode = "push", options) => {
+    if (isExplorerInternalTabPath(path)) {
+      set((state) => ({
+        panes: {
+          ...state.panes,
+          [paneId]: { ...(state.panes[paneId] ?? emptyPaneState()), loading: false, needsLoad: false, error: null },
+        },
+      }));
+      return Promise.resolve();
+    }
     const loadKey = [
       paneId,
       path,
@@ -593,7 +610,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       set((state) => ({
         panes: {
           ...state.panes,
-          [paneId]: { ...(state.panes[paneId] ?? emptyPaneState()), loading: false, needsLoad: false, error: errorText(error) },
+          [paneId]: { ...(state.panes[paneId] ?? emptyPaneState()), loading: false, needsLoad: false, error: userFacingErrorText(error) },
         },
       }));
     }
@@ -775,14 +792,16 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
   selectEntry: (paneId, entryId, options = {}) => {
     set((state) => {
       const pane = state.panes[paneId] ?? emptyPaneState();
+      const entries = pane.listing?.entries ?? [];
       const path = pane.listing?.path ?? "";
-      const entryIndex = pane.listing?.entries.findIndex((entry) => entry.id === entryId) ?? -1;
-      const visibleEntryIds = options.visibleEntryIds?.filter((id) => pane.listing?.entries.some((entry) => entry.id === id)) ?? [];
+      const entryIndex = entries.findIndex((entry) => entry.id === entryId);
       let selectedIds: string[];
-      if (options.range && pane.listing && entryIndex >= 0 && visibleEntryIds.length > 0) {
+      if (options.range && pane.listing && entryIndex >= 0 && options.visibleEntryIds?.length) {
+        const entryIds = new Set(entries.map((entry) => entry.id));
+        const visibleEntryIds = options.visibleEntryIds.filter((id) => entryIds.has(id));
         const targetVisibleIndex = visibleEntryIds.indexOf(entryId);
         const previousAnchor = pane.lastSelectedIndexByPath[path];
-        const anchorEntryId = previousAnchor === undefined ? entryId : pane.listing.entries[previousAnchor]?.id;
+        const anchorEntryId = previousAnchor === undefined ? entryId : entries[previousAnchor]?.id;
         const anchorVisibleIndex = anchorEntryId ? visibleEntryIds.indexOf(anchorEntryId) : -1;
         const anchor = anchorVisibleIndex >= 0 ? anchorVisibleIndex : targetVisibleIndex;
         const target = targetVisibleIndex >= 0 ? targetVisibleIndex : anchor;
@@ -793,7 +812,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         const anchor = pane.lastSelectedIndexByPath[path] ?? entryIndex;
         const start = Math.min(anchor, entryIndex);
         const end = Math.max(anchor, entryIndex);
-        selectedIds = pane.listing.entries.slice(start, end + 1).map((entry) => entry.id);
+        selectedIds = entries.slice(start, end + 1).map((entry) => entry.id);
       } else if (options.toggle) {
         selectedIds = pane.selectedIds.includes(entryId)
           ? pane.selectedIds.filter((id) => id !== entryId)
@@ -867,7 +886,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
           return;
         }
       } catch (error) {
-        set({ operationError: `Unable to inspect link: ${errorText(error)}` });
+        set({ operationError: `Unable to inspect link: ${userFacingErrorText(error)}` });
         return;
       }
     }
@@ -901,7 +920,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       }
       void get().recordLibraryRecent(entry);
     } catch (error) {
-      set({ operationError: `Unable to open file: ${errorText(error)}` });
+      set({ operationError: `Unable to open file: ${userFacingErrorText(error)}` });
     }
   },
 
@@ -924,7 +943,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       await setAssociationForPath(entry.path, applicationPath);
       await explorerOpenWith(applicationPath, await localPathForEntry(entry));
     } catch (error) {
-      set({ operationError: `Open With failed: ${errorText(error)}` });
+      set({ operationError: `Open With failed: ${userFacingErrorText(error)}` });
     }
   },
 
@@ -934,9 +953,9 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     const pane = get().panes[paneId];
     const directory = pane?.listing?.path;
     if (!directory) return;
-    if (!canCreateItemInPane(pane, kind, get().inlineEdit)) return;
     const defaultName = kind === "folder" ? "Untitled Folder" : "Untitled File";
     if (name == null) {
+      if (!canCreateItemInPane(pane, kind, get().inlineEdit)) return;
       const inlineEdit: ExplorerInlineEditState = {
         paneId,
         kind: "create",
@@ -950,6 +969,11 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       set({ inlineEdit: withInlineEditValidation(inlineEdit, pane) });
       return;
     }
+    const inlineEdit = get().inlineEdit;
+    const submittingCurrentCreate = inlineEdit?.kind === "create"
+      && inlineEdit.paneId === paneId
+      && inlineEdit.itemKind === kind;
+    if (!canCreateItemInPane(pane, kind, submittingCurrentCreate ? null : inlineEdit)) return;
     const requestedName = name;
     if (!requestedName) return;
     try {
@@ -959,7 +983,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       get().pushNotification(`Queued ${kind === "folder" ? "folder" : "file"} creation`, "success");
       queuePaneRefresh(paneId, directory);
     } catch (error) {
-      set({ operationError: errorText(error) });
+      set({ operationError: userFacingErrorText(error) });
     }
   },
 
@@ -1004,7 +1028,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       get().clearSelection(paneId);
       queuePaneRefresh(paneId, pane?.listing?.path ?? entry.path);
     } catch (error) {
-      set({ operationError: errorText(error) });
+      set({ operationError: userFacingErrorText(error) });
     }
   },
 
@@ -1040,7 +1064,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         get().clearSelection(paneId);
         if (directory) queuePaneRefresh(paneId, directory);
       } catch (error) {
-        set({ operationError: errorText(error) });
+        set({ operationError: userFacingErrorText(error) });
       }
       return;
     }
@@ -1066,7 +1090,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         queuePaneRefresh(paneId, downloadsDirectory);
       }
     } catch (error) {
-      set({ operationError: `Download failed: ${errorText(error)}` });
+      set({ operationError: `Download failed: ${userFacingErrorText(error)}` });
     }
   },
 
@@ -1084,7 +1108,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         get().clearSelection(dialog.paneId);
         if (directory) queuePaneRefresh(dialog.paneId, directory);
       } catch (error) {
-        set({ operationError: errorText(error) });
+        set({ operationError: userFacingErrorText(error) });
       }
       return;
     }
@@ -1115,7 +1139,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       refreshAndClearRenamePanes(validatedItems);
     } catch (error) {
       set({
-        operationError: errorText(error),
+        operationError: userFacingErrorText(error),
         dialog: { ...dialog, items: validatedItems },
       });
     }
@@ -1247,7 +1271,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       get().pushNotification(`Queued copy for ${itemCountLabel(clipboard.items.length)}`, "success");
       queuePaneRefresh(paneId, directory);
     } catch (error) {
-      set({ operationError: errorText(error) });
+      set({ operationError: userFacingErrorText(error) });
     }
   },
 
@@ -1272,7 +1296,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       get().pushNotification(`Queued upload for ${itemCountLabel(paths.length)}`, "success");
       queuePaneRefresh(paneId, directory);
     } catch (error) {
-      set({ operationError: `Upload failed: ${errorText(error)}` });
+      set({ operationError: `Upload failed: ${userFacingErrorText(error)}` });
     }
   },
 
@@ -1290,7 +1314,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       const current = get().panes[paneId]?.listing?.path;
       if (current) queuePaneRefresh(paneId, current);
     } catch (error) {
-      set({ operationError: `Drop failed: ${errorText(error)}` });
+      set({ operationError: `Drop failed: ${userFacingErrorText(error)}` });
     }
   },
 
@@ -1313,7 +1337,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       const current = get().panes[paneId]?.listing?.path;
       if (current) queuePaneRefresh(paneId, current);
     } catch (error) {
-      set({ operationError: `Drop failed: ${errorText(error)}` });
+      set({ operationError: `Drop failed: ${userFacingErrorText(error)}` });
     }
   },
 
@@ -1465,6 +1489,7 @@ export function selectedEntryForPane(pane: PaneExplorerState | undefined): FileE
 function paneExplorerStatesEqual(left: PaneExplorerState, right: PaneExplorerState): boolean {
   return left === right || (
     left.listing === right.listing
+    && left.hasFolderEntries === right.hasFolderEntries
     && left.commandQuery === right.commandQuery
     && left.commandQueryMode === right.commandQueryMode
     && arraysEqual(left.selectedIds, right.selectedIds)
@@ -1478,8 +1503,12 @@ function paneExplorerStatesEqual(left: PaneExplorerState, right: PaneExplorerSta
   );
 }
 
-function selectedEntriesForPane(pane: PaneExplorerState | undefined): FileEntry[] {
+export function selectedEntriesForPane(pane: PaneExplorerState | undefined): FileEntry[] {
   if (!pane?.listing || pane.selectedIds.length === 0) return [];
+  if (pane.selectedIds.length === 1) {
+    const entry = selectedEntryForPane(pane);
+    return entry ? [entry] : [];
+  }
   const selected = new Set(pane.selectedIds);
   return pane.listing.entries.filter((entry) => selected.has(entry.id));
 }
@@ -1759,6 +1788,10 @@ function canCreateItemInPane(
 export function selectedPathsForPane(pane: PaneExplorerState | undefined): string[] {
   if (!pane?.listing) return [];
   if (pane.listing.path === "misty://trash") return [];
+  if (pane.selectedIds.length === 1) {
+    const entry = selectedEntryForPane(pane);
+    return entry && isFileMasterEntry(entry) ? [entry.path] : [];
+  }
   const selected = new Set(pane.selectedIds);
   return pane.listing.entries
     .filter((entry) => selected.has(entry.id) && isFileMasterEntry(entry))
@@ -1798,10 +1831,12 @@ function deleteModeForPaneSelection(
   if (requestedMode) return requestedMode;
   if (pane?.listing?.path === "misty://trash") return "permanent";
   const selected = new Set(pane?.selectedIds ?? []);
-  const hasRemoteSelection = Boolean(pane?.listing?.entries.some((entry) =>
+  const selectedEntries = pane?.listing?.entries.filter((entry) => selected.has(entry.id) && !entry.isDeleted) ?? [];
+  const hasRemoteSelection = selectedEntries.some((entry) =>
     selected.has(entry.id) && !entry.isDeleted && entry.location.kind === "remote"
-  ));
-  return hasRemoteSelection ? "permanent" : "trash";
+  );
+  const hasLocalSelection = selectedEntries.some((entry) => entry.location.kind === "local");
+  return hasRemoteSelection && !hasLocalSelection ? "permanent" : "trash";
 }
 
 function deleteQueuedMessage(count: number, permanent: boolean): string {
@@ -2215,6 +2250,7 @@ function applyNavigationResult(
   return {
     ...pane,
     listing,
+    hasFolderEntries: listing.entries.some((entry) => !entry.isDeleted && entry.kind === "folder"),
     selectedIds,
     selectedIdsByPath,
     backHistory,
@@ -2323,6 +2359,7 @@ export function scheduleExplorerWorkspaceSave(): void {
 }
 
 function queuePaneRefresh(paneId: string, path: string, options: { immediate?: boolean } = {}): void {
+  if (isExplorerInternalTabPath(path)) return;
   const key = `${paneId}\n${normalizedPath(path)}`;
   const pending = pendingPaneRefreshes.get(key) ?? { firstTimer: null, followupTimer: null };
   pendingPaneRefreshes.set(key, pending);
@@ -2544,9 +2581,17 @@ async function applyWorkspaceDocument(document: NativeWorkspaceDocument, homePat
   await Promise.all(
     (activeTab?.panes ?? []).map((pane) => {
       const restoredPane = restored.panes[pane.id];
-      return restoredPane?.listing ? useExplorerStore.getState().loadPane(pane.id, restoredPane.listing.path, "replace") : Promise.resolve();
+      return restoredPane?.listing && !isExplorerInternalTabPath(restoredPane.listing.path)
+        ? useExplorerStore.getState().loadPane(pane.id, restoredPane.listing.path, "replace")
+        : Promise.resolve();
     }),
   );
+}
+
+function isExplorerInternalTabPath(path: string): boolean {
+  return path.startsWith("misty-transfers://")
+    || path.startsWith("misty-remotes://")
+    || path.startsWith("misty-plugin://");
 }
 
 async function saveWorkspaceDocument(document: NativeWorkspaceDocument): Promise<NativeWorkspaceDocument> {

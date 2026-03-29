@@ -4,6 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 import path from "node:path";
 
 const tauriDevHost = process.env.TAURI_DEV_HOST;
+const desktopDevPort = Number(process.env.MISTY_DESKTOP_DEV_PORT ?? 5173);
 
 export default defineConfig({
   resolve: {
@@ -18,7 +19,7 @@ export default defineConfig({
   },
   server: {
     host: tauriDevHost ?? "127.0.0.1",
-    port: 5173,
+    port: desktopDevPort,
     strictPort: true,
     watch: {
       ignored: ["**/dist/**", "**/dist-web/**", "**/src-tauri/target/**"],
@@ -27,7 +28,7 @@ export default defineConfig({
       ? {
           protocol: "ws",
           host: tauriDevHost,
-          port: 5173,
+          port: desktopDevPort,
         }
       : undefined,
   },

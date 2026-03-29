@@ -34,10 +34,7 @@ import {
   useAppRouteMemoryStore,
 } from "./stores/useAppRouteMemoryStore";
 import { useSetupStore } from "./stores/useSetupStore";
-import {
-  selectGeneralPreferences,
-  useSettingsStore,
-} from "./stores/useSettingsStore";
+import { useSettingsStore } from "./stores/useSettingsStore";
 import "./App.css";
 
 const routes = {
@@ -288,7 +285,6 @@ function StartupRedirect() {
 
 function DesktopStartupRedirect() {
   const loaded = useSettingsStore((state) => state.loaded);
-  const settings = useSettingsStore((state) => state.settings);
   const lastAppRoute = useAppRouteMemoryStore((state) => state.lastAppRoute);
 
   if (!loaded) {
@@ -304,11 +300,7 @@ function DesktopStartupRedirect() {
     );
   }
 
-  const generalPreferences = selectGeneralPreferences(settings?.document);
-  const target =
-    generalPreferences.reopenLastSession && isRememberableAppRoute(lastAppRoute)
-      ? lastAppRoute
-      : startupRouteForIndex(generalPreferences.startupViewIndex);
+  const target = isRememberableAppRoute(lastAppRoute) ? lastAppRoute : routes.home;
 
   return <Navigate to={target} replace />;
 }
@@ -385,15 +377,6 @@ function mobileTitleForPath(pathname: string): string {
     return "Desktop only";
   }
   return "Files";
-}
-
-function startupRouteForIndex(index: number): string {
-  if (index === 1) return routes.providers;
-  if (index === 2) return routes.transfers;
-  if (index === 3) return routes.extensions;
-  if (index === 4) return routes.home;
-  if (index === 5) return routes.settings;
-  return routes.files;
 }
 
 function isDeepLinkRouteAllowed(route: string, formFactor: AppFormFactor): boolean {

@@ -6,7 +6,7 @@ import type { ExplorerLocationResult } from "../components/ExplorerToolbar";
 import { FileInspector } from "../components/FileInspector";
 import type { ExplorerLibrarySnapshot, FileEntry, PluginCommandEntry } from "../../../api/types";
 import { maxMultiPanelPanes, useMultiPanelStore } from "../../../shared/multipanel/useMultiPanelStore";
-import { selectedEntryForPane, useExplorerStore } from "../../../stores/useExplorerStore";
+import { selectedEntriesForPane, selectedEntryForPane, useExplorerStore } from "../../../stores/useExplorerStore";
 import type { ExplorerSortColumn } from "../../../stores/useExplorerStore";
 import { useOperationQueueStore } from "../../../stores/useOperationQueueStore";
 import { useTransfersStore } from "../../../stores/useTransfersStore";
@@ -24,8 +24,7 @@ export const ConnectedExplorerToolbar = memo(function ConnectedExplorerToolbar(p
 }) {
   const state = useExplorerStore(useShallow((explorer) => {
     const pane = explorer.panes[props.paneId];
-    const selectedIds = new Set(pane?.selectedIds ?? []);
-    const selectedEntries = pane?.listing?.entries.filter((entry) => selectedIds.has(entry.id) && !entry.isDeleted) ?? [];
+    const selectedEntries = selectedEntriesForPane(pane).filter((entry) => !entry.isDeleted);
     const selectedEntry = selectedEntries.length === 1 ? selectedEntries[0] : null;
     return {
       path: pane?.listing?.path ?? props.fallbackPath,
@@ -38,7 +37,7 @@ export const ConnectedExplorerToolbar = memo(function ConnectedExplorerToolbar(p
       selectedEntryPath: selectedEntry?.path ?? null,
       hasRemoteSelection: selectedEntries.some((entry) => entry.location.kind === "remote"),
       canOpenWithSelected: Boolean(selectedEntry && selectedEntry.kind !== "folder" && selectedEntry.kind !== "symlink"),
-      canCalculateDirectorySizes: Boolean(pane?.listing?.entries.some((entry) => !entry.isDeleted && entry.kind === "folder")),
+      canCalculateDirectorySizes: Boolean(pane?.hasFolderEntries),
       canGoBack: Boolean(pane?.backHistory.length),
       canGoForward: Boolean(pane?.forwardHistory.length),
       canCreateFile: explorer.canCreateItem(props.paneId, "file"),
@@ -212,8 +211,7 @@ export const ExplorerPaneHeaderActions = memo(function ExplorerPaneHeaderActions
 const ConnectedExplorerPaneToolbarActions = memo(function ConnectedExplorerPaneToolbarActions(props: { paneId: string }) {
   const state = useExplorerStore(useShallow((explorer) => {
     const pane = explorer.panes[props.paneId];
-    const selectedIds = new Set(pane?.selectedIds ?? []);
-    const selectedEntries = pane?.listing?.entries.filter((entry) => selectedIds.has(entry.id) && !entry.isDeleted) ?? [];
+    const selectedEntries = selectedEntriesForPane(pane).filter((entry) => !entry.isDeleted);
     const selectedEntry = selectedEntries.length === 1 ? selectedEntries[0] : null;
     return {
       path: pane?.listing?.path ?? "",
@@ -224,7 +222,7 @@ const ConnectedExplorerPaneToolbarActions = memo(function ConnectedExplorerPaneT
       selectedEntryPath: selectedEntry?.path ?? null,
       hasRemoteSelection: selectedEntries.some((entry) => entry.location.kind === "remote"),
       canOpenWithSelected: Boolean(selectedEntry && selectedEntry.kind !== "folder" && selectedEntry.kind !== "symlink"),
-      canCalculateDirectorySizes: Boolean(pane?.listing?.entries.some((entry) => !entry.isDeleted && entry.kind === "folder")),
+      canCalculateDirectorySizes: Boolean(pane?.hasFolderEntries),
     };
   }));
   const onViewMode = useCallback((mode: "grid" | "list") => {
@@ -331,6 +329,10 @@ export const ConnectedFileInspector = memo(function ConnectedFileInspector() {
   const onCalculateSize = useCallback((path: string) => {
     void useExplorerStore.getState().calculateDirectorySizes([path], { force: false, notify: false });
   }, []);
+  const onOpenEntry = useCallback((entry: FileEntry) => {
+    if (!activePaneId) return;
+    void useExplorerStore.getState().openEntry(activePaneId, entry);
+  }, [activePaneId]);
   const onSaveMetadata = useCallback((entry: FileEntry, tags: string[], comments: string) => {
     void useExplorerStore.getState().setLibraryMetadata(entry, tags, comments);
   }, []);
@@ -343,6 +345,7 @@ export const ConnectedFileInspector = memo(function ConnectedFileInspector() {
       selectedEntry={selectedEntry}
       selectedCount={selectedCount}
       onCalculateSize={onCalculateSize}
+      onOpenEntry={onOpenEntry}
       onSaveMetadata={onSaveMetadata}
     />
   );

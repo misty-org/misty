@@ -70,20 +70,13 @@ async function requestJson<T>(method: "GET" | "POST", path: string, body?: unkno
 }
 
 async function parseResponse<T>(response: Response, method: string, path: string, url: string): Promise<T> {
-  const contentType = response.headers.get("Content-Type") ?? "";
-  const payload = contentType.includes("application/json")
-    ? await response.json()
-    : await response.text();
+  const payload = await parsePayload(response, method, path);
 
   if (!response.ok) {
     const message =
       typeof payload === "string"
         ? payload.trim()
-        : typeof payload?.message === "string"
-          ? payload.message
-          : typeof payload?.error === "string"
-            ? payload.error
-            : "";
+        : responseMessage(payload) || responseError(payload);
     const requestUrl = response.url || url;
     const fallback = `${method} ${requestUrl} failed: ${response.status} ${response.statusText || "HTTP error"}`;
     const errorMessage = message || fallback;
@@ -97,6 +90,69 @@ async function parseResponse<T>(response: Response, method: string, path: string
   }
 
   return payload as T;
+}
+
+async function parsePayload(response: Response, method: string, path: string): Promise<unknown> {
+  const text = await response.text();
+  const contentType = response.headers.get("Content-Type") ?? "";
+  if (!contentType.includes("application/json")) return text;
+  if (!text.trim()) return null;
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    const firstJsonValue = firstJsonValueText(text);
+    if (firstJsonValue) return JSON.parse(firstJsonValue);
+    throw new AccountApiError(`Misty server returned malformed JSON for ${method} ${path}: ${textPreview(text)}${error instanceof Error ? ` (${error.message})` : ""}`, response.status);
+  }
+}
+
+function textPreview(value: string): string {
+  return value.replace(/\s+/g, " ").trim().slice(0, 160) || "empty response";
+}
+
+function firstJsonValueText(value: string): string | null {
+  const start = value.search(/[\[{]/);
+  if (start < 0) return null;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let index = start; index < value.length; index += 1) {
+    const char = value[index];
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (char === "\"") {
+        inString = false;
+      }
+      continue;
+    }
+    if (char === "\"") {
+      inString = true;
+      continue;
+    }
+    if (char === "{" || char === "[") {
+      depth += 1;
+    } else if (char === "}" || char === "]") {
+      depth -= 1;
+      if (depth === 0) return value.slice(start, index + 1);
+      if (depth < 0) return null;
+    }
+  }
+  return null;
+}
+
+function responseMessage(payload: unknown): string {
+  if (!payload || typeof payload !== "object") return "";
+  const message = (payload as { message?: unknown }).message;
+  return typeof message === "string" ? message : "";
+}
+
+function responseError(payload: unknown): string {
+  if (!payload || typeof payload !== "object") return "";
+  const error = (payload as { error?: unknown }).error;
+  return typeof error === "string" ? error : "";
 }
 
 export async function accountSignIn(email: string, password: string): Promise<AccountAuthUser> {

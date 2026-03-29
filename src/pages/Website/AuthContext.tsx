@@ -28,8 +28,7 @@ interface AuthProviderProps {
 
 export function AuthProvider({ children, onLogout }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(() => {
-    const stored = localStorage.getItem("misty_user");
-    return stored ? JSON.parse(stored) : null;
+    return loadStoredUser();
   });
 
   useEffect(() => {
@@ -59,4 +58,14 @@ export function AuthProvider({ children, onLogout }: AuthProviderProps) {
 
 export function useAuth() {
   return useContext(AuthContext);
+}
+
+function loadStoredUser(): User | null {
+  try {
+    const stored = localStorage.getItem("misty_user");
+    return stored ? JSON.parse(stored) : null;
+  } catch {
+    localStorage.removeItem("misty_user");
+    return null;
+  }
 }

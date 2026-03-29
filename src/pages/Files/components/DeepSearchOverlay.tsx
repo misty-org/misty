@@ -17,36 +17,36 @@ const scopeOptions: Array<{ value: SearchQueryScope; label: string }> = [
 const overlayStyles = {
   scrim: "fixed inset-0 z-[1000] grid place-items-start justify-center bg-black/45 px-4 pt-[9vh] backdrop-blur-[2px]",
   panel:
-    "grid w-[min(760px,calc(100vw-28px))] max-h-[78vh] grid-rows-[auto_auto_minmax(0,1fr)_auto] overflow-hidden rounded-xl border border-[#363636] bg-[#101010] shadow-[0_26px_70px_rgba(0,0,0,0.54)]",
-  header: "grid grid-cols-[1fr_auto] items-center gap-3 border-b border-[#292929] px-3 py-2",
+    "grid w-[min(760px,calc(100vw-28px))] max-h-[78vh] grid-rows-[auto_auto_minmax(0,1fr)_auto] overflow-hidden rounded-xl border border-white/10 bg-[#050607] shadow-[0_26px_70px_rgba(0,0,0,0.54)]",
+  header: "grid grid-cols-[1fr_auto] items-center gap-3 border-b border-white/[0.08] px-3 py-2",
   searchBox:
-    "grid h-10 min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-2 rounded-lg border border-[#333333] bg-[#181818] px-3 text-[#a8a8a8]",
+    "grid h-10 min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-2 rounded-lg border border-white/10 bg-[#07090b] px-3 text-[#a1a1aa]",
   input:
     "h-full min-w-0 border-0 bg-transparent p-0 text-[15px] text-[#eeeeee] outline-none placeholder:text-[#777777]",
   iconButton:
-    "grid size-8 place-items-center rounded-md border border-transparent bg-transparent text-[#a5a5a5] hover:border-[#3a3a3a] hover:bg-[#1e1e1e] hover:text-[#eeeeee]",
+    "grid size-8 place-items-center rounded-md border border-transparent bg-transparent text-[#a1a1aa] hover:border-white/10 hover:bg-white/[0.06] hover:text-[#f4f4f5]",
   controls:
-    "flex min-w-0 flex-wrap items-center justify-between gap-2 border-b border-[#292929] px-3 py-2",
-  scopes: "flex min-w-0 items-center gap-1 rounded-lg bg-[#181818] p-1",
+    "flex min-w-0 flex-wrap items-center justify-between gap-2 border-b border-white/[0.08] px-3 py-2",
+  scopes: "flex min-w-0 items-center gap-1 rounded-lg bg-[#07090b] p-1",
   scope:
-    "h-7 rounded-md border-0 bg-transparent px-2.5 text-sm text-[#a7a7a7] hover:bg-[#252525] hover:text-[#eeeeee]",
-  scopeActive: "bg-[#303030] text-[#f0f0f0]",
+    "h-7 rounded-md border-0 bg-transparent px-2.5 text-sm text-[#a1a1aa] hover:bg-white/[0.06] hover:text-[#f4f4f5]",
+  scopeActive: "bg-white/[0.08] text-[#f4f4f5]",
   scanActions: "flex min-w-0 items-center gap-2",
   scanButton:
-    "inline-flex h-8 items-center gap-2 rounded-lg border border-[#383838] bg-[#1a1a1a] px-3 text-sm text-[#dedede] hover:bg-[#232323] disabled:opacity-55",
-  status: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap px-3 py-1.5 text-xs text-[#969696]",
+    "inline-flex h-8 items-center gap-2 rounded-lg border border-white/10 bg-[#07090b] px-3 text-sm text-[#e4e4e7] hover:bg-white/[0.055] disabled:opacity-55",
+  status: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap px-3 py-1.5 text-xs text-[#8f8f8f]",
   results: "min-h-0 overflow-auto py-1",
   result:
-    "grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-0 bg-transparent px-3 py-2 text-left text-[#dfdfdf] hover:bg-[#1d1d1d]",
+    "grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-0 bg-transparent px-3 py-2 text-left text-[#e4e4e7] hover:bg-white/[0.045]",
   resultIcon:
-    "grid size-8 place-items-center rounded-md border border-[#303030] bg-[#171717] text-xs font-semibold text-[#a9c8ff]",
+    "grid size-8 place-items-center rounded-md border border-white/10 bg-[#07090b] text-xs font-semibold text-[#d4d4d8]",
   resultText: "grid min-w-0 gap-0.5",
   resultName: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-semibold",
   resultPath: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs text-[#929292]",
   resultMeta: "text-right text-xs text-[#8f8f8f]",
   empty: "px-4 py-9 text-center text-sm text-[#9a9a9a]",
   footer:
-    "flex min-h-9 items-center justify-between gap-3 border-t border-[#292929] px-3 text-xs text-[#898989]",
+    "flex min-h-9 items-center justify-between gap-3 border-t border-white/[0.08] px-3 text-xs text-[#8f8f8f]",
   error: "text-[#d6a0a0]",
 } as const;
 
