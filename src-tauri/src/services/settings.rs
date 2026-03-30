@@ -196,6 +196,10 @@ fn normalize_settings_document(document: &mut Value) -> bool {
             ("thumbnail_previews_enabled", json!(true)),
             ("ui_scale_index", json!(1)),
             ("font_size_index", json!(1)),
+            ("wallpaper_path", json!("")),
+            ("panel_opacity", json!(0.82)),
+            ("home_wallpaper_path", json!("")),
+            ("home_panel_opacity", json!(0.82)),
             ("custom_fonts", json!([])),
         ],
     );

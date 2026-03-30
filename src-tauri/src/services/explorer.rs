@@ -1,16 +1,25 @@
 use std::{
     collections::BTreeSet,
     ffi::OsStr,
-    io::Cursor,
+    fs::File,
+    io::{BufReader, BufWriter, Cursor},
     path::{Path, PathBuf},
     process::{Command, Stdio},
     sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
+        atomic::{AtomicBool, AtomicU64, Ordering},
+        Arc, LazyLock, Mutex as StdMutex,
     },
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
+use image::{
+    codecs::{
+        gif::GifDecoder,
+        png::{CompressionType, FilterType as PngFilterType, PngEncoder},
+    },
+    imageops::FilterType,
+    ImageDecoder, ImageReader, Limits,
+};
 use sha2::{Digest, Sha256};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::Mutex;
@@ -19,10 +28,10 @@ use crate::core::clipboard::{ClipboardCache, ClipboardRemoteFileCacheKey};
 use crate::core::explorer::{
     list_directory, paste_items, CreateItemRequest, DeleteItemsRequest, DirectoryListing,
     ExplorerLocation, ExplorerLocationKind, ExplorerOperationResult, ExplorerPreviewPayload,
-    FileEntry, FileKind, ListDirectoryRequest, PasteBlobRequest, PasteItem, PasteItemsRequest,
-    PasteTextRequest, PrepareDragItemRequest, PrepareDragItemsRequest, PrepareOpenItemRequest,
-    PreparedDragItem, PreparedDragItemsResult, PreparedDragSkippedItem, PreparedOpenItem,
-    RenameItemRequest,
+    FileEntry, FileKind, GeneratedImageThumbnail, ListDirectoryRequest, PasteBlobRequest,
+    PasteItem, PasteItemsRequest, PasteTextRequest, PrepareDragItemRequest,
+    PrepareDragItemsRequest, PrepareOpenItemRequest, PreparedDragItem, PreparedDragItemsResult,
+    PreparedDragSkippedItem, PreparedOpenItem, RenameItemRequest,
 };
 use crate::core::file_master::{
     join_remote_path, normalize_remote_path, virtual_path_parts, RemoteBrowseTarget,
@@ -44,10 +53,25 @@ const VIRTUAL_PATH_RECENT: &str = "misty://recent";
 const VIRTUAL_PATH_STARRED: &str = "misty://starred";
 const VIRTUAL_PATH_TRASH: &str = "misty://trash";
 const MAX_PREVIEW_BYTES: u64 = 32 * 1024 * 1024;
+const MAX_IMAGE_PREVIEW_DIMENSION: u32 = 1600;
+const DEFAULT_IMAGE_THUMBNAIL_DIMENSION: u32 = 384;
+const MAX_GENERATED_IMAGE_THUMBNAIL_DIMENSION: u32 = 384;
+const MAX_THUMBNAIL_SOURCE_FILE_SIZE_BYTES: u64 = 128 * 1024 * 1024;
+const MAX_THUMBNAIL_SOURCE_DIMENSION: u32 = 32_768;
+const MAX_THUMBNAIL_SOURCE_PIXELS: u64 = 50_000_000;
+const MAX_THUMBNAIL_DECODE_ALLOCATION_BYTES: u64 = 192 * 1024 * 1024;
+const MAX_ORIGINAL_IMAGE_THUMBNAIL_SOURCE_SIZE_BYTES: u64 = 512 * 1024;
+const IMAGE_THUMBNAIL_RESIZE_FILTER: FilterType = FilterType::Triangle;
+const IMAGE_THUMBNAIL_PNG_COMPRESSION: CompressionType = CompressionType::Fast;
+const IMAGE_THUMBNAIL_PNG_FILTER: PngFilterType = PngFilterType::Adaptive;
 const REMOTE_INVENTORY_WAIT_ATTEMPTS: usize = 30;
 const REMOTE_INVENTORY_WAIT_INTERVAL: Duration = Duration::from_millis(100);
 const REMOTE_JOB_STALE_TIMEOUT: Duration = Duration::from_secs(30 * 60);
 const REMOTE_JOB_MAX_WAIT: Duration = Duration::from_secs(24 * 60 * 60);
+
+static IMAGE_THUMBNAIL_CACHE_FILE_LOCK: LazyLock<StdMutex<()>> =
+    LazyLock::new(|| StdMutex::new(()));
+static TEMPORARY_THUMBNAIL_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug, Clone, Copy)]
 struct TransferProgress {
@@ -69,6 +93,7 @@ pub struct ExplorerService {
     clipboard_text_cache_dir: PathBuf,
     clipboard_blob_cache_dir: PathBuf,
     trash_dir: PathBuf,
+    image_thumbnail_cache_dir: PathBuf,
     #[cfg(test)]
     remote_job_cancellation_log: Option<Arc<Mutex<Vec<String>>>>,
 }
@@ -102,6 +127,7 @@ impl ExplorerService {
             clipboard_text_cache_dir: cache_dir.join("clipboard-paste").join("text"),
             clipboard_blob_cache_dir: cache_dir.join("clipboard-paste").join("blob"),
             trash_dir: cache_dir.join("trash"),
+            image_thumbnail_cache_dir: cache_dir.join("thumbnails").join("images").join("v1"),
             #[cfg(test)]
             remote_job_cancellation_log: None,
         }
@@ -348,6 +374,135 @@ impl ExplorerService {
         self.preview_local_item(Path::new(path)).await
     }
 
+    pub async fn generate_image_thumbnail(
+        &self,
+        path: &str,
+        max_dimension: u32,
+        modified_ms: Option<u64>,
+        remote_modified: Option<&str>,
+        size_bytes: Option<u64>,
+    ) -> ApiResult<GeneratedImageThumbnail> {
+        if let Some(source) = self.remote_target(path) {
+            let (size_bytes, remote_modified) = if let Some(size_bytes) = size_bytes {
+                (size_bytes, remote_modified.map(str::to_string))
+            } else {
+                let parent = RemoteBrowseTarget {
+                    provider_type: source.provider_type.clone(),
+                    remote_name: source.remote_name.clone(),
+                    remote_path: remote_parent_path(&source.remote_path),
+                };
+                let items = self.fetch_remote_items(&parent).await?;
+                let Some((size_bytes, remote_modified)) =
+                    remote_preview_metadata_from_items(&parent, &source.remote_path, &items)?
+                else {
+                    return Err(ApiError::Message(format!(
+                        "Remote file {} was not found.",
+                        source.remote_path
+                    )));
+                };
+                (size_bytes, Some(remote_modified))
+            };
+            let remote_modified = if remote_modified
+                .as_deref()
+                .unwrap_or_default()
+                .trim()
+                .is_empty()
+            {
+                None
+            } else {
+                remote_modified
+            };
+            let prepared = self
+                .prepare_remote_file_for_local_use(
+                    &source,
+                    Some(size_bytes),
+                    remote_modified.as_deref(),
+                    "Preparing remote file thumbnail",
+                )
+                .await?;
+            let identity = ImageThumbnailIdentity {
+                path: path.to_string(),
+                size_bytes,
+                modified_fingerprint: remote_modified,
+            };
+            return self
+                .generate_local_image_thumbnail(
+                    Path::new(&prepared.local_path),
+                    max_dimension,
+                    Some(identity),
+                )
+                .await;
+        }
+        self.reject_virtual_mount_container(path, "thumbnail")?;
+        let identity = size_bytes.map(|size_bytes| ImageThumbnailIdentity {
+            path: path.to_string(),
+            size_bytes,
+            modified_fingerprint: modified_ms.map(|value| value.to_string()),
+        });
+        self.generate_local_image_thumbnail(Path::new(path), max_dimension, identity)
+            .await
+    }
+
+    async fn generate_local_image_thumbnail(
+        &self,
+        path: &Path,
+        max_dimension: u32,
+        identity: Option<ImageThumbnailIdentity>,
+    ) -> ApiResult<GeneratedImageThumbnail> {
+        let format = image_thumbnail_format(path).ok_or_else(|| {
+            ApiError::Message("This file type does not support image thumbnails.".to_string())
+        })?;
+        let metadata = tokio::fs::metadata(path).await.map_err(|error| {
+            ApiError::Message(format!(
+                "Failed to inspect image thumbnail file {}: {error}",
+                path.display()
+            ))
+        })?;
+        if !metadata.is_file() {
+            return Err(ApiError::Message(
+                "Only files can be thumbnailed.".to_string(),
+            ));
+        }
+        let max_dimension = normalize_image_thumbnail_dimension(max_dimension);
+        let identity = identity.unwrap_or_else(|| ImageThumbnailIdentity::from_metadata(path, &metadata));
+        let thumbnail_path = image_thumbnail_cache_path(
+            &self.image_thumbnail_cache_dir,
+            &identity,
+            max_dimension,
+        );
+        if tokio::fs::metadata(&thumbnail_path)
+            .await
+            .is_ok_and(|metadata| metadata.is_file() && metadata.len() > 0)
+        {
+            return Ok(GeneratedImageThumbnail {
+                path: display_path(&thumbnail_path),
+                mime_type: "image/png".to_string(),
+            });
+        }
+        if let Some(parent) = thumbnail_path.parent() {
+            tokio::fs::create_dir_all(parent).await.map_err(|error| {
+                ApiError::Message(format!(
+                    "Failed to create image thumbnail cache {}: {error}",
+                    parent.display()
+                ))
+            })?;
+        }
+        let source_path = path.to_path_buf();
+        let output_path = thumbnail_path.clone();
+        let rendered = tokio::task::spawn_blocking(move || {
+            render_image_thumbnail_file_blocking(
+                &source_path,
+                &output_path,
+                format,
+                identity.size_bytes,
+                max_dimension,
+            )
+        })
+        .await
+        .map_err(|error| ApiError::Message(format!("Image thumbnail worker failed: {error}")))??;
+        Ok(rendered)
+    }
+
     async fn preview_local_item(&self, path: &Path) -> ApiResult<ExplorerPreviewPayload> {
         let format = preview_format(path).ok_or_else(|| {
             ApiError::Message("This file type does not support preview.".to_string())
@@ -383,6 +538,20 @@ impl ExplorerService {
                     bytes,
                 })
             }
+            PreviewFormat::Image(image_format) => {
+                let path = path.to_path_buf();
+                let bytes = tokio::task::spawn_blocking(move || {
+                    render_image_preview_png_blocking(&path, image_format)
+                })
+                .await
+                .map_err(|error| {
+                    ApiError::Message(format!("Image preview worker failed: {error}"))
+                })??;
+                Ok(ExplorerPreviewPayload {
+                    mime_type: "image/png".to_string(),
+                    bytes,
+                })
+            }
             PreviewFormat::Direct(mime_type) => {
                 let bytes = read_preview_file(path).await?;
                 Ok(ExplorerPreviewPayload {
@@ -391,26 +560,17 @@ impl ExplorerService {
                 })
             }
             PreviewFormat::TranscodeImage(image_format) => {
-                let bytes = read_preview_file(path).await?;
-                let image =
-                    image::load_from_memory_with_format(&bytes, image_format).map_err(|error| {
-                        ApiError::Message(format!(
-                            "Failed to decode preview image {}: {error}",
-                            path.display()
-                        ))
-                    })?;
-                let mut encoded = Cursor::new(Vec::new());
-                image
-                    .write_to(&mut encoded, image::ImageFormat::Png)
-                    .map_err(|error| {
-                        ApiError::Message(format!(
-                            "Failed to encode preview image {}: {error}",
-                            path.display()
-                        ))
-                    })?;
+                let path = path.to_path_buf();
+                let bytes = tokio::task::spawn_blocking(move || {
+                    render_image_preview_png_blocking(&path, image_format)
+                })
+                .await
+                .map_err(|error| {
+                    ApiError::Message(format!("Image preview worker failed: {error}"))
+                })??;
                 Ok(ExplorerPreviewPayload {
                     mime_type: "image/png".to_string(),
-                    bytes: encoded.into_inner(),
+                    bytes,
                 })
             }
             PreviewFormat::Psd => {
@@ -3196,20 +3356,42 @@ fn virtual_folder_rank(kind: &FileKind) -> u8 {
     }
 }
 
+#[derive(Clone, Copy)]
 enum PreviewFormat {
+    Image(image::ImageFormat),
     Direct(&'static str),
     TranscodeImage(image::ImageFormat),
     Pdf,
     Psd,
 }
 
+struct ImageThumbnailIdentity {
+    path: String,
+    size_bytes: u64,
+    modified_fingerprint: Option<String>,
+}
+
+impl ImageThumbnailIdentity {
+    fn from_metadata(path: &Path, metadata: &std::fs::Metadata) -> Self {
+        Self {
+            path: display_path(path),
+            size_bytes: metadata.len(),
+            modified_fingerprint: metadata
+                .modified()
+                .ok()
+                .and_then(|modified| modified.duration_since(UNIX_EPOCH).ok())
+                .map(|duration| duration.as_millis().to_string()),
+        }
+    }
+}
+
 fn preview_format(path: &Path) -> Option<PreviewFormat> {
     match path.extension()?.to_str()?.to_ascii_lowercase().as_str() {
-        "png" => Some(PreviewFormat::Direct("image/png")),
-        "jpg" | "jpeg" => Some(PreviewFormat::Direct("image/jpeg")),
-        "gif" => Some(PreviewFormat::Direct("image/gif")),
-        "bmp" => Some(PreviewFormat::Direct("image/bmp")),
-        "webp" => Some(PreviewFormat::Direct("image/webp")),
+        "png" => Some(PreviewFormat::Image(image::ImageFormat::Png)),
+        "jpg" | "jpeg" => Some(PreviewFormat::Image(image::ImageFormat::Jpeg)),
+        "gif" => Some(PreviewFormat::Image(image::ImageFormat::Gif)),
+        "bmp" => Some(PreviewFormat::Image(image::ImageFormat::Bmp)),
+        "webp" => Some(PreviewFormat::Image(image::ImageFormat::WebP)),
         "svg" => Some(PreviewFormat::Direct("image/svg+xml")),
         "pdf" => Some(PreviewFormat::Pdf),
         "psd" => Some(PreviewFormat::Psd),
@@ -3229,6 +3411,381 @@ fn preview_format(path: &Path) -> Option<PreviewFormat> {
     }
 }
 
+fn image_thumbnail_format(path: &Path) -> Option<PreviewFormat> {
+    match preview_format(path)? {
+        PreviewFormat::Image(format) => Some(PreviewFormat::Image(format)),
+        PreviewFormat::TranscodeImage(format) => Some(PreviewFormat::TranscodeImage(format)),
+        PreviewFormat::Psd => Some(PreviewFormat::Psd),
+        PreviewFormat::Direct(_) | PreviewFormat::Pdf => None,
+    }
+}
+
+fn normalize_image_thumbnail_dimension(max_dimension: u32) -> u32 {
+    let dimension = if max_dimension == 0 {
+        DEFAULT_IMAGE_THUMBNAIL_DIMENSION
+    } else {
+        max_dimension
+    };
+    dimension.clamp(1, MAX_GENERATED_IMAGE_THUMBNAIL_DIMENSION)
+}
+
+fn normalize_image_preview_dimension(max_dimension: u32) -> u32 {
+    let dimension = if max_dimension == 0 {
+        MAX_IMAGE_PREVIEW_DIMENSION
+    } else {
+        max_dimension
+    };
+    dimension.clamp(1, MAX_IMAGE_PREVIEW_DIMENSION)
+}
+
+fn image_thumbnail_cache_path(
+    cache_dir: &Path,
+    identity: &ImageThumbnailIdentity,
+    max_dimension: u32,
+) -> PathBuf {
+    let mut hasher = Sha256::new();
+    hasher.update(identity.path.as_bytes());
+    hasher.update([0]);
+    hasher.update(identity.size_bytes.to_le_bytes());
+    hasher.update([0]);
+    if let Some(modified_fingerprint) = &identity.modified_fingerprint {
+        hasher.update(modified_fingerprint.as_bytes());
+    }
+    hasher.update([0]);
+    hasher.update(max_dimension.to_le_bytes());
+    let digest = hasher.finalize();
+    cache_dir.join(format!(
+        "misty-image-thumb-{}-{}.png",
+        max_dimension,
+        hex::encode(&digest[..16])
+    ))
+}
+
+fn thumbnail_decode_limits() -> Limits {
+    let mut limits = Limits::default();
+    limits.max_image_width = Some(MAX_THUMBNAIL_SOURCE_DIMENSION);
+    limits.max_image_height = Some(MAX_THUMBNAIL_SOURCE_DIMENSION);
+    limits.max_alloc = Some(MAX_THUMBNAIL_DECODE_ALLOCATION_BYTES);
+    limits
+}
+
+fn validate_image_thumbnail_source(source_size: u64, width: u32, height: u32) -> ApiResult<()> {
+    if source_size > MAX_THUMBNAIL_SOURCE_FILE_SIZE_BYTES {
+        return Err(ApiError::Message(
+            "Image is too large to thumbnail.".to_string(),
+        ));
+    }
+
+    let pixel_count = u64::from(width).saturating_mul(u64::from(height));
+    if width == 0 || height == 0 || pixel_count > MAX_THUMBNAIL_SOURCE_PIXELS {
+        return Err(ApiError::Message(
+            "Image dimensions are too large to thumbnail.".to_string(),
+        ));
+    }
+
+    Ok(())
+}
+
+fn image_dimensions(path: &Path) -> ApiResult<(u32, u32)> {
+    let mut reader = ImageReader::open(path)
+        .map_err(|error| {
+            ApiError::Message(format!(
+                "Failed to open image thumbnail source {}: {error}",
+                path.display()
+            ))
+        })?
+        .with_guessed_format()
+        .map_err(|error| {
+            ApiError::Message(format!(
+                "Failed to detect image thumbnail format {}: {error}",
+                path.display()
+            ))
+        })?;
+    reader.limits(thumbnail_decode_limits());
+    reader.into_dimensions().map_err(|error| {
+        ApiError::Message(format!(
+            "Failed to read image thumbnail dimensions {}: {error}",
+            path.display()
+        ))
+    })
+}
+
+fn is_gif_path(path: &Path) -> bool {
+    path.extension()
+        .and_then(|extension| extension.to_str())
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("gif"))
+}
+
+fn is_browser_renderable_image_path(path: &Path) -> bool {
+    let Some(extension) = path.extension().and_then(|extension| extension.to_str()) else {
+        return false;
+    };
+    matches!(
+        extension.to_ascii_lowercase().as_str(),
+        "bmp" | "gif" | "ico" | "jpeg" | "jpg" | "png" | "webp"
+    )
+}
+
+fn should_use_original_image_thumbnail(
+    path: &Path,
+    source_size: u64,
+    width: u32,
+    height: u32,
+    max_dimension: u32,
+) -> bool {
+    if is_gif_path(path) {
+        return false;
+    }
+    source_size <= MAX_ORIGINAL_IMAGE_THUMBNAIL_SOURCE_SIZE_BYTES
+        && width <= max_dimension
+        && height <= max_dimension
+        && is_browser_renderable_image_path(path)
+}
+
+fn image_thumbnail_mime_type(format: PreviewFormat) -> &'static str {
+    match format {
+        PreviewFormat::Image(image::ImageFormat::Png) => "image/png",
+        PreviewFormat::Image(image::ImageFormat::Jpeg) => "image/jpeg",
+        PreviewFormat::Image(image::ImageFormat::Gif) => "image/gif",
+        PreviewFormat::Image(image::ImageFormat::Bmp) => "image/bmp",
+        PreviewFormat::Image(image::ImageFormat::WebP) => "image/webp",
+        PreviewFormat::Image(_) => "image/*",
+        PreviewFormat::TranscodeImage(_) | PreviewFormat::Psd => "image/png",
+        PreviewFormat::Direct(mime_type) => mime_type,
+        PreviewFormat::Pdf => "application/pdf",
+    }
+}
+
+fn decode_gif_first_frame(path: &Path) -> ApiResult<image::DynamicImage> {
+    let file = File::open(path).map_err(|error| {
+        ApiError::Message(format!(
+            "Failed to open GIF thumbnail source {}: {error}",
+            path.display()
+        ))
+    })?;
+    let mut decoder = GifDecoder::new(BufReader::new(file)).map_err(|error| {
+        ApiError::Message(format!(
+            "Failed to read GIF thumbnail source {}: {error}",
+            path.display()
+        ))
+    })?;
+    decoder
+        .set_limits(thumbnail_decode_limits())
+        .map_err(|error| {
+            ApiError::Message(format!(
+                "Failed to set GIF thumbnail limits {}: {error}",
+                path.display()
+            ))
+        })?;
+
+    let (screen_width, screen_height) = decoder.dimensions();
+    if screen_width == 0 || screen_height == 0 {
+        return Err(ApiError::Message("GIF dimensions are invalid.".to_string()));
+    }
+
+    let mut buffer = vec![0u8; decoder.total_bytes() as usize];
+    decoder.read_image(&mut buffer).map_err(|error| {
+        ApiError::Message(format!(
+            "Failed to decode GIF thumbnail frame {}: {error}",
+            path.display()
+        ))
+    })?;
+    let rgba_image = image::RgbaImage::from_raw(screen_width, screen_height, buffer)
+        .ok_or_else(|| ApiError::Message("GIF frame canvas size is invalid.".to_string()))?;
+    Ok(image::DynamicImage::ImageRgba8(rgba_image))
+}
+
+fn decode_image_thumbnail_source(path: &Path) -> ApiResult<image::DynamicImage> {
+    if is_gif_path(path) {
+        return decode_gif_first_frame(path);
+    }
+
+    let mut reader = ImageReader::open(path)
+        .map_err(|error| {
+            ApiError::Message(format!(
+                "Failed to open image thumbnail source {}: {error}",
+                path.display()
+            ))
+        })?
+        .with_guessed_format()
+        .map_err(|error| {
+            ApiError::Message(format!(
+                "Failed to detect image thumbnail format {}: {error}",
+                path.display()
+            ))
+        })?;
+    reader.limits(thumbnail_decode_limits());
+    reader.decode().map_err(|error| {
+        ApiError::Message(format!(
+            "Failed to decode image thumbnail source {}: {error}",
+            path.display()
+        ))
+    })
+}
+
+fn temporary_image_thumbnail_path(output_path: &Path) -> PathBuf {
+    let temporary_id = TEMPORARY_THUMBNAIL_COUNTER.fetch_add(1, Ordering::Relaxed);
+    output_path.with_extension(format!("tmp-{temporary_id}"))
+}
+
+fn write_image_thumbnail_png(
+    thumbnail: &image::DynamicImage,
+    thumbnail_path: &Path,
+) -> ApiResult<()> {
+    let file = File::create(thumbnail_path).map_err(|error| {
+        ApiError::Message(format!(
+            "Failed to create image thumbnail {}: {error}",
+            thumbnail_path.display()
+        ))
+    })?;
+    let writer = BufWriter::new(file);
+    let encoder = PngEncoder::new_with_quality(
+        writer,
+        IMAGE_THUMBNAIL_PNG_COMPRESSION,
+        IMAGE_THUMBNAIL_PNG_FILTER,
+    );
+    thumbnail.write_with_encoder(encoder).map_err(|error| {
+        ApiError::Message(format!(
+            "Failed to write image thumbnail {}: {error}",
+            thumbnail_path.display()
+        ))
+    })
+}
+
+fn render_image_thumbnail_file_blocking(
+    path: &Path,
+    output_path: &Path,
+    format: PreviewFormat,
+    source_size: u64,
+    max_dimension: u32,
+) -> ApiResult<GeneratedImageThumbnail> {
+    {
+        let _cache_file_lock = IMAGE_THUMBNAIL_CACHE_FILE_LOCK.lock().map_err(|error| {
+            ApiError::Message(format!("Failed to lock thumbnail cache: {error}"))
+        })?;
+        if output_path.exists() {
+            return Ok(GeneratedImageThumbnail {
+                path: display_path(output_path),
+                mime_type: "image/png".to_string(),
+            });
+        }
+    }
+
+    let temp_path = temporary_image_thumbnail_path(output_path);
+    match format {
+        PreviewFormat::Image(_) | PreviewFormat::TranscodeImage(_) => {
+            let (width, height) = image_dimensions(path)?;
+            validate_image_thumbnail_source(source_size, width, height)?;
+            if should_use_original_image_thumbnail(path, source_size, width, height, max_dimension)
+            {
+                return Ok(GeneratedImageThumbnail {
+                    path: display_path(path),
+                    mime_type: image_thumbnail_mime_type(format).to_string(),
+                });
+            }
+            let image = decode_image_thumbnail_source(path)?;
+            let max_dimension = normalize_image_thumbnail_dimension(max_dimension);
+            let thumbnail =
+                image.resize(max_dimension, max_dimension, IMAGE_THUMBNAIL_RESIZE_FILTER);
+            if let Err(error) = write_image_thumbnail_png(&thumbnail, &temp_path) {
+                let _ = std::fs::remove_file(&temp_path);
+                return Err(error);
+            }
+        }
+        PreviewFormat::Psd => {
+            let bytes = std::fs::read(path).map_err(|error| {
+                ApiError::Message(format!(
+                    "Failed to read PSD thumbnail {}: {error}",
+                    path.display()
+                ))
+            })?;
+            let bytes = transcode_psd_preview_png_with_dimension(&bytes, path, max_dimension)?;
+            if let Err(error) = std::fs::write(&temp_path, bytes) {
+                let _ = std::fs::remove_file(&temp_path);
+                return Err(ApiError::Message(format!(
+                    "Failed to write image thumbnail {}: {error}",
+                    temp_path.display()
+                )));
+            }
+        }
+        PreviewFormat::Direct(_) | PreviewFormat::Pdf => {
+            return Err(ApiError::Message(
+                "This file type does not support image thumbnails.".to_string(),
+            ));
+        }
+    };
+
+    {
+        let _cache_file_lock = IMAGE_THUMBNAIL_CACHE_FILE_LOCK.lock().map_err(|error| {
+            ApiError::Message(format!("Failed to lock thumbnail cache: {error}"))
+        })?;
+        if output_path.exists() {
+            let _ = std::fs::remove_file(&temp_path);
+            return Ok(GeneratedImageThumbnail {
+                path: display_path(output_path),
+                mime_type: "image/png".to_string(),
+            });
+        }
+        std::fs::rename(&temp_path, output_path).map_err(|error| {
+            let _ = std::fs::remove_file(&temp_path);
+            ApiError::Message(format!(
+                "Failed to commit image thumbnail {}: {error}",
+                output_path.display()
+            ))
+        })?;
+    }
+    Ok(GeneratedImageThumbnail {
+        path: display_path(output_path),
+        mime_type: "image/png".to_string(),
+    })
+}
+
+fn render_image_preview_png_blocking(
+    path: &Path,
+    image_format: image::ImageFormat,
+) -> ApiResult<Vec<u8>> {
+    render_image_preview_png_with_dimension_blocking(
+        path,
+        image_format,
+        MAX_IMAGE_PREVIEW_DIMENSION,
+    )
+}
+
+fn render_image_preview_png_with_dimension_blocking(
+    path: &Path,
+    _image_format: image::ImageFormat,
+    max_dimension: u32,
+) -> ApiResult<Vec<u8>> {
+    let image = decode_image_thumbnail_source(path)?;
+    encode_preview_image_png_with_dimension(image, path, max_dimension)
+}
+
+fn encode_preview_image_png(image: image::DynamicImage, path: &Path) -> ApiResult<Vec<u8>> {
+    encode_preview_image_png_with_dimension(image, path, MAX_IMAGE_PREVIEW_DIMENSION)
+}
+
+fn encode_preview_image_png_with_dimension(
+    image: image::DynamicImage,
+    path: &Path,
+    max_dimension: u32,
+) -> ApiResult<Vec<u8>> {
+    let max_dimension = normalize_image_preview_dimension(max_dimension);
+    let thumbnail = image.resize(max_dimension, max_dimension, IMAGE_THUMBNAIL_RESIZE_FILTER);
+    let mut encoded = Cursor::new(Vec::new());
+    let encoder = PngEncoder::new_with_quality(
+        &mut encoded,
+        IMAGE_THUMBNAIL_PNG_COMPRESSION,
+        IMAGE_THUMBNAIL_PNG_FILTER,
+    );
+    thumbnail.write_with_encoder(encoder).map_err(|error| {
+        ApiError::Message(format!(
+            "Failed to encode preview image {}: {error}",
+            path.display()
+        ))
+    })?;
+    Ok(encoded.into_inner())
+}
+
 async fn read_preview_file(path: &Path) -> ApiResult<Vec<u8>> {
     tokio::fs::read(path).await.map_err(|error| {
         ApiError::Message(format!(
@@ -3239,6 +3796,14 @@ async fn read_preview_file(path: &Path) -> ApiResult<Vec<u8>> {
 }
 
 fn transcode_psd_preview_png(bytes: &[u8], path: &Path) -> ApiResult<Vec<u8>> {
+    transcode_psd_preview_png_with_dimension(bytes, path, MAX_IMAGE_PREVIEW_DIMENSION)
+}
+
+fn transcode_psd_preview_png_with_dimension(
+    bytes: &[u8],
+    path: &Path,
+    max_dimension: u32,
+) -> ApiResult<Vec<u8>> {
     use zune_psd::zune_core::{bytestream::ZCursor, result::DecodingResult};
 
     let mut decoder = zune_psd::PSDDecoder::new(ZCursor::new(bytes));
@@ -3283,16 +3848,11 @@ fn transcode_psd_preview_png(bytes: &[u8], path: &Path) -> ApiResult<Vec<u8>> {
             path.display()
         ))
     })?;
-    let mut encoded = Cursor::new(Vec::new());
-    image
-        .write_to(&mut encoded, image::ImageFormat::Png)
-        .map_err(|error| {
-            ApiError::Message(format!(
-                "Failed to encode PSD preview {}: {error}",
-                path.display()
-            ))
-        })?;
-    Ok(encoded.into_inner())
+    encode_preview_image_png_with_dimension(
+        image::DynamicImage::ImageRgba8(image),
+        path,
+        max_dimension,
+    )
 }
 
 fn psd_pixels_to_rgba8(
@@ -3658,9 +4218,15 @@ mod tests {
         let text = root.join("notes.txt");
         let unsupported = root.join("payload.bin");
         tokio::fs::create_dir_all(&root).await.unwrap();
-        tokio::fs::write(&image, [0x89, b'P', b'N', b'G'])
-            .await
-            .unwrap();
+        let mut png = Cursor::new(Vec::new());
+        image::DynamicImage::ImageRgba8(image::RgbaImage::from_pixel(
+            1,
+            1,
+            image::Rgba([255, 0, 0, 255]),
+        ))
+        .write_to(&mut png, image::ImageFormat::Png)
+        .unwrap();
+        tokio::fs::write(&image, png.into_inner()).await.unwrap();
         tokio::fs::write(&svg, br#"<svg xmlns="http://www.w3.org/2000/svg"/>"#)
             .await
             .unwrap();
@@ -3674,7 +4240,7 @@ mod tests {
         let service = test_explorer_service();
         let preview = service.preview_item(&display_path(&image)).await.unwrap();
         assert_eq!(preview.mime_type, "image/png");
-        assert_eq!(preview.bytes, vec![0x89, b'P', b'N', b'G']);
+        assert!(preview.bytes.starts_with(&[0x89, b'P', b'N', b'G']));
         let svg_preview = service.preview_item(&display_path(&svg)).await.unwrap();
         assert_eq!(svg_preview.mime_type, "image/svg+xml");
         assert_eq!(
@@ -3698,11 +4264,48 @@ mod tests {
         let _ = tokio::fs::remove_dir_all(&root).await;
     }
 
+    #[tokio::test]
+    async fn generated_image_thumbnail_is_cached_and_dimensioned() {
+        let root = unique_test_dir("image-thumbnail-cache");
+        let image = root.join("wide.png");
+        tokio::fs::create_dir_all(&root).await.unwrap();
+        let mut png = Cursor::new(Vec::new());
+        image::DynamicImage::ImageRgba8(image::RgbaImage::from_pixel(
+            1000,
+            500,
+            image::Rgba([0, 128, 255, 255]),
+        ))
+        .write_to(&mut png, image::ImageFormat::Png)
+        .unwrap();
+        tokio::fs::write(&image, png.into_inner()).await.unwrap();
+
+        let service = test_explorer_service();
+        let first = service
+            .generate_image_thumbnail(&display_path(&image), 384, None, None, None)
+            .await
+            .unwrap();
+        let second = service
+            .generate_image_thumbnail(&display_path(&image), 384, None, None, None)
+            .await
+            .unwrap();
+        assert_eq!(first.mime_type, "image/png");
+        assert_eq!(first.path, second.path);
+        let thumbnail = image::open(&first.path).unwrap();
+        assert!(thumbnail.width() <= 384);
+        assert!(thumbnail.height() <= 384);
+
+        let _ = tokio::fs::remove_dir_all(&root).await;
+    }
+
     #[test]
     fn preview_format_matches_imgui_radiance_pic_support() {
         assert!(matches!(
             preview_format(Path::new("studio-lighting.pic")),
             Some(PreviewFormat::TranscodeImage(image::ImageFormat::Hdr))
+        ));
+        assert!(matches!(
+            preview_format(Path::new("photo.jpg")),
+            Some(PreviewFormat::Image(image::ImageFormat::Jpeg))
         ));
         assert!(matches!(
             preview_format(Path::new("thumbnail.psd")),

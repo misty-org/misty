@@ -23,6 +23,7 @@ import type {
   DirectoryListing,
   ExplorerOperationResult,
   ExplorerPreviewPayload,
+  GeneratedImageThumbnail,
   ExplorerLibraryItem,
   ExplorerLibrarySnapshot,
   FileEntry,
@@ -1214,6 +1215,24 @@ export function explorerPrepareDragItems(request: PrepareDragItemsRequest): Prom
 
 export function explorerPreviewItem(path: string): Promise<ExplorerPreviewPayload> {
   return invoke("explorer_preview_item", { path });
+}
+
+export function explorerGenerateImageThumbnail(
+  path: string,
+  maxDimension: number,
+  options: {
+    modifiedMs?: number | null;
+    remoteModified?: string | null;
+    sizeBytes?: number | null;
+  } = {},
+): Promise<GeneratedImageThumbnail> {
+  return invoke("explorer_generate_image_thumbnail", {
+    path,
+    maxDimension,
+    modifiedMs: options.modifiedMs ?? null,
+    remoteModified: options.remoteModified ?? null,
+    sizeBytes: options.sizeBytes ?? null,
+  });
 }
 
 export function fileMetadataSnapshot(path: string): Promise<FileMetadataSnapshot> {

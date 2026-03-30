@@ -157,6 +157,13 @@ pub struct ExplorerPreviewPayload {
     pub bytes: Vec<u8>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GeneratedImageThumbnail {
+    pub path: String,
+    pub mime_type: String,
+}
+
 #[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ClipboardOperation {

@@ -22,6 +22,20 @@ interface ChromeTabStripProps {
   onSelectTab: (tabId: string) => void;
 }
 
+const chromeTabShellClass = [
+  "misty-chrome-tabs-shell",
+  "flex h-[46px] min-w-0 overflow-hidden border-b border-transparent",
+  "!bg-transparent",
+  "[&_.chrome-tab_.chrome-tab-background>svg_.chrome-tab-geometry]:!fill-[rgb(9_11_14_/_var(--misty-app-tab-opacity,0.14))]",
+  "[&_.chrome-tab[active]_.chrome-tab-background>svg_.chrome-tab-geometry]:!fill-[rgb(20_23_28_/_var(--misty-app-tab-active-opacity,0.28))]",
+].join(" ");
+
+const chromeTabTrayClass = [
+  "misty-chrome-tabs-tray",
+  "flex h-8 flex-none items-center justify-end gap-0.5 rounded-[11px] border border-transparent p-0.5",
+  "!bg-transparent",
+].join(" ");
+
 export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStripProps) {
   const shellRef = useRef<HTMLDivElement | null>(null);
   const packageTabs = useMemo<TabProperties[]>(
@@ -49,7 +63,7 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
   }, []);
 
   return (
-    <div ref={shellRef} className="misty-chrome-tabs-shell">
+    <div ref={shellRef} className={chromeTabShellClass}>
       <Tabs
         tabs={packageTabs}
         className="misty-chrome-tabs"
@@ -69,7 +83,7 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
         }}
         onTabReorder={props.onReorderTab}
       />
-      {props.actions ? <div className="misty-chrome-tabs-tray">{props.actions}</div> : null}
+      {props.actions ? <div className={chromeTabTrayClass}>{props.actions}</div> : null}
     </div>
   );
 });

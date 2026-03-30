@@ -12,7 +12,7 @@ const paneStyles = {
   shellInactive:
     "[&_button]:!text-[#5b5b5b] [&_button:hover]:!text-[#666666] [&_footer]:!text-[#555555] [&_img]:opacity-45 [&_span]:!text-[#5b5b5b] [&_svg]:!text-[#5b5b5b] [&_td]:!text-[#5b5b5b] [&_th]:!text-[#606060]",
   path:
-    "grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 overflow-hidden border-b border-[var(--misty-border-soft)] bg-[var(--misty-surface)] py-0 pl-3 pr-3 text-xs text-[var(--misty-text-subtle)] max-[720px]:min-h-8 max-[720px]:pl-2.5 max-[720px]:pr-2.5 max-[720px]:text-[11px] max-[720px]:text-[var(--misty-text-subtle)]",
+    "grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 overflow-hidden border-b border-transparent bg-transparent py-0 pl-3 pr-3 text-xs text-[var(--misty-text-subtle)] max-[720px]:min-h-8 max-[720px]:pl-2.5 max-[720px]:pr-2.5 max-[720px]:text-[11px] max-[720px]:text-[var(--misty-text-subtle)]",
   pathText:
     "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap",
   pathActions:

@@ -32,7 +32,7 @@ interface MultiPanelWorkspaceProps {
 
 const multiPanelStyles = {
   workspace:
-    "grid h-full min-h-0 w-full min-w-0 overflow-hidden bg-[var(--misty-bg)]",
+    "grid h-full min-h-0 w-full min-w-0 overflow-hidden bg-transparent",
   workspaceRows:
     "grid-rows-[46px_minmax(0,1fr)] max-[720px]:grid-rows-[38px_minmax(0,1fr)]",
   workspaceRowsWithBottom:
@@ -54,8 +54,8 @@ const multiPanelStyles = {
   lane:
     "relative grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)] overflow-hidden",
   splitter:
-    "absolute z-[6] bg-transparent after:absolute after:bg-transparent after:content-[''] hover:after:bg-[var(--misty-border-strong)]",
-  splitterActive: "after:bg-[var(--misty-border-strong)]",
+    "absolute z-[6] bg-transparent after:absolute after:bg-transparent after:content-[''] hover:after:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))]",
+  splitterActive: "after:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))]",
   splitterVertical:
     "bottom-0 top-0 w-[11px] -translate-x-[5px] cursor-col-resize after:bottom-0 after:left-[5px] after:top-0 after:w-px",
   splitterHorizontal:
@@ -63,19 +63,19 @@ const multiPanelStyles = {
   aside:
     "min-h-0 min-w-0 overflow-hidden max-[980px]:hidden",
   asideResizer:
-    "relative min-h-0 min-w-0 cursor-col-resize bg-transparent after:absolute after:bottom-0 after:left-1/2 after:top-0 after:w-px after:-translate-x-1/2 after:bg-[var(--misty-border-soft)] after:content-[''] hover:after:bg-[var(--misty-border-strong)] max-[980px]:hidden",
+    "relative min-h-0 min-w-0 cursor-col-resize bg-transparent after:absolute after:bottom-0 after:left-1/2 after:top-0 after:w-px after:-translate-x-1/2 after:bg-transparent after:content-[''] hover:after:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] max-[980px]:hidden",
   navigationAside:
     "min-h-0 min-w-0 overflow-hidden max-[980px]:hidden",
   navigationAsideResizer:
-    "relative min-h-0 min-w-0 cursor-col-resize bg-transparent after:absolute after:bottom-0 after:left-1/2 after:top-0 after:w-px after:-translate-x-1/2 after:bg-[var(--misty-border-soft)] after:content-[''] hover:after:bg-[var(--misty-border-strong)] max-[980px]:hidden",
+    "relative min-h-0 min-w-0 cursor-col-resize bg-transparent after:absolute after:bottom-0 after:left-1/2 after:top-0 after:w-px after:-translate-x-1/2 after:bg-transparent after:content-[''] hover:after:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] max-[980px]:hidden",
   pane:
-    "grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)] overflow-hidden bg-[var(--misty-surface)] [container-type:inline-size]",
+    "grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)] overflow-hidden bg-transparent [container-type:inline-size]",
   paneActive: "",
   paneContent: "min-h-0 min-w-0 overflow-hidden",
   paneActions:
     "flex flex-none items-center gap-1 overflow-hidden px-2 py-1 max-[720px]:gap-0.5 max-[720px]:px-1.5",
   paneActionButton:
-    "grid h-[26px] w-7 place-items-center rounded-md border-0 bg-transparent text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-hover)] hover:text-[var(--misty-text)] max-[720px]:h-7 max-[720px]:w-[30px]",
+    "grid h-[26px] w-7 place-items-center rounded-md border-0 bg-transparent text-[var(--misty-text-muted)] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] hover:text-[var(--misty-text)] max-[720px]:h-7 max-[720px]:w-[30px]",
 } as const;
 
 export const MultiPanelWorkspace = memo(function MultiPanelWorkspace(props: MultiPanelWorkspaceProps) {

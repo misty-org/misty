@@ -16,8 +16,8 @@ const explorerCompareWithEvent = "misty:explorer-compare-with";
 const emptyPinnedPaths: string[] = [];
 
 const contextMenuStyles = {
-  menu: "fixed z-[1000] w-[250px] overflow-auto rounded-[11px] border border-white/10 bg-[rgba(5,6,7,0.98)] p-1.5 shadow-[0_18px_40px_rgba(0,0,0,0.45)] backdrop-blur-xl",
-  submenu: "fixed z-[1001] w-[246px] overflow-auto rounded-[11px] border border-white/10 bg-[rgba(5,6,7,0.98)] p-1.5 shadow-[0_18px_40px_rgba(0,0,0,0.48)] backdrop-blur-xl",
+  menu: "fixed z-[1000] w-[250px] overflow-auto rounded-[11px] border border-white/10 bg-[rgba(5,6,7,0.98)] p-1.5 shadow-[0_18px_40px_rgba(0,0,0,0.45)]",
+  submenu: "fixed z-[1001] w-[246px] overflow-auto rounded-[11px] border border-white/10 bg-[rgba(5,6,7,0.98)] p-1.5 shadow-[0_18px_40px_rgba(0,0,0,0.48)]",
   item:
     "grid h-9 w-full grid-cols-[19px_minmax(0,1fr)_auto] items-center gap-2.5 rounded-lg border-0 bg-transparent px-2.5 text-left text-[#e4e4e7] hover:not-disabled:bg-white/[0.06] hover:not-disabled:text-[#f4f4f5] disabled:opacity-45 [&:hover:not(:disabled)_.context-menu-icon]:text-[#d4d4d8] [&:hover:not(:disabled)_.context-menu-shortcut]:text-[#d4d4d8]",
   itemActive:

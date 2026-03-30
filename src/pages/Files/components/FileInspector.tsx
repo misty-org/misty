@@ -1,8 +1,8 @@
-import { convertFileSrc } from "@tauri-apps/api/core";
 import { useEffect, useState, type ReactNode } from "react";
-import { explorerListDirectory, explorerPrepareOpenItem, explorerPreviewItem, fileMetadataSnapshot } from "../../../api/misty";
+import { explorerGenerateImageThumbnail, explorerListDirectory, explorerPrepareOpenItem, explorerPreviewItem, fileMetadataSnapshot } from "../../../api/misty";
 import type { DirectoryListing, DirectorySizeRecord, FileEntry, FileMetadataSnapshot, PreparedOpenItem } from "../../../api/types";
 import { errorText } from "../../../shared/format";
+import { safeTauriAssetUrl } from "../../../shared/tauri";
 import { selectAppearancePreferences, useSettingsStore } from "../../../stores/useSettingsStore";
 import { directorySizeRecordForPath } from "../../../stores/useExplorerStore";
 import { formatBytes, formatDate } from "../utils/fileFormat";
@@ -15,7 +15,6 @@ interface FileInspectorProps {
   mistyTags: string[];
   mistyComments: string;
   directorySizes: Record<string, DirectorySizeRecord>;
-  onCalculateSize: (path: string) => void;
   onOpenEntry: (entry: FileEntry) => void;
   onSaveMetadata: (entry: FileEntry, tags: string[], comments: string) => void;
 }
@@ -32,9 +31,10 @@ interface PreparedPreviewPath {
 }
 
 const MAX_PREVIEW_BYTES = 32 * 1024 * 1024;
-const IMAGE_PREVIEW_LOAD_ATTEMPTS = 5;
-const IMAGE_PREVIEW_RETRY_DELAY_MS = 80;
+const FOLDER_PREVIEW_LIMIT = 80;
 const FILE_METADATA_LOAD_DELAY_MS = 180;
+const FILE_PREVIEW_LOAD_DELAY_MS = 120;
+const INSPECTOR_IMAGE_PREVIEW_MAX_DIMENSION = 384;
 
 const browserImageMimeTypes: Record<string, string> = {
   png: "image/png",
@@ -50,6 +50,23 @@ const browserImageMimeTypes: Record<string, string> = {
   heif: "image/heif",
 };
 
+const nativeImageThumbnailExtensions = new Set([
+  "png",
+  "jpg",
+  "jpeg",
+  "gif",
+  "bmp",
+  "webp",
+  "tga",
+  "hdr",
+  "pic",
+  "pbm",
+  "pgm",
+  "pnm",
+  "ppm",
+  "psd",
+]);
+
 const textPreviewExtensions = new Set([
   "txt", "text", "log", "md", "markdown", "toml", "yaml", "yml", "ini", "conf", "cfg",
   "csv", "tsv", "rs", "go", "js", "jsx", "ts", "tsx", "css", "html", "xml", "sh",
@@ -58,9 +75,9 @@ const textPreviewExtensions = new Set([
 ]);
 
 const inspectorStyles = {
-  root: "h-full min-w-0 overflow-auto bg-[var(--misty-surface)] px-3 py-3 text-[var(--misty-text-muted)] [scrollbar-color:#3f3f46_transparent] [scrollbar-width:thin]",
+  root: "h-full min-w-0 overflow-auto bg-[var(--misty-app-pane-bg,var(--misty-surface))] px-3 py-3 text-[var(--misty-text-muted)] [scrollbar-color:#3f3f46_transparent] [scrollbar-width:thin]",
   previewCard:
-    "grid h-[238px] place-items-center overflow-hidden rounded-[7px] border border-[var(--misty-border)] bg-[var(--misty-surface-2)] text-[var(--misty-text-subtle)] shadow-[0_14px_34px_rgba(0,0,0,0.2)]",
+    "grid h-[238px] place-items-center overflow-hidden rounded-[7px] border border-transparent bg-transparent text-[var(--misty-text-subtle)] shadow-[0_14px_34px_rgba(0,0,0,0.2)]",
   previewMedia: "h-full w-full border-0 object-contain",
   previewText:
     "m-0 h-full w-full overflow-auto whitespace-pre-wrap break-words p-3 text-left font-mono text-[11px] leading-[1.45] text-[var(--misty-text-muted)]",
@@ -68,7 +85,7 @@ const inspectorStyles = {
   folderPreview: "h-full w-full overflow-y-auto overflow-x-hidden p-3 [scrollbar-color:#3f3f46_transparent] [scrollbar-width:thin]",
   folderPreviewList: "grid min-w-0 content-start",
   folderPreviewItem:
-    "grid min-h-9 min-w-0 cursor-pointer select-none grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-2 rounded-md border border-transparent bg-transparent px-2 py-1.5 text-left text-[var(--misty-text-muted)] outline-none hover:border-[var(--misty-border-soft)] hover:bg-[var(--misty-surface-hover)] focus-visible:border-[var(--misty-border-strong)] focus-visible:bg-[var(--misty-surface-hover)] focus-visible:shadow-[0_0_0_2px_rgba(241,243,244,0.08)]",
+    "grid min-h-9 min-w-0 cursor-pointer select-none grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-2 rounded-md border border-transparent bg-transparent px-2 py-1.5 text-left text-[var(--misty-text-muted)] outline-none hover:border-[var(--misty-neutral-border,var(--misty-border-soft))] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] focus-visible:border-[var(--misty-border-strong)] focus-visible:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] focus-visible:shadow-[0_0_0_2px_rgba(241,243,244,0.08)]",
   folderPreviewThumb:
     "grid size-7 place-items-center overflow-hidden",
   folderPreviewName:
@@ -79,12 +96,12 @@ const inspectorStyles = {
   detailRow: "grid gap-2 px-5 py-3.5",
   detailLabel: "text-[12px] font-[720] uppercase leading-none tracking-normal text-[var(--misty-text-subtle)]",
   detailValue: "min-w-0 [overflow-wrap:anywhere] text-[17px] font-[650] leading-[1.25] text-[var(--misty-text)]",
-  editorCard: "grid gap-3 border-b border-[var(--misty-border-soft)] px-5 py-4",
+  editorCard: "grid gap-3 border-b border-transparent px-5 py-4",
   editorLabel: "grid gap-1.5 text-[12px] font-[720] uppercase leading-none tracking-normal text-[var(--misty-text-subtle)]",
-  editorInput: "min-h-9 w-full rounded-[7px] border border-[var(--misty-border)] bg-[var(--misty-surface-2)] px-2.5 py-2 text-sm font-medium normal-case leading-normal text-[var(--misty-text)] outline-none focus:border-[var(--misty-border-strong)] focus:shadow-[0_0_0_2px_rgba(241,243,244,0.08)]",
+  editorInput: "min-h-9 w-full rounded-[7px] border border-[var(--misty-border)] bg-[var(--misty-neutral-control-bg,var(--misty-surface-2))] px-2.5 py-2 text-sm font-medium normal-case leading-normal text-[var(--misty-text)] outline-none focus:border-[var(--misty-border-strong)] focus:shadow-[0_0_0_2px_rgba(241,243,244,0.08)]",
   editorTextarea: "min-h-[74px] resize-y",
   editorActions: "flex justify-end",
-  editorButton: "h-8 rounded-[7px] border border-[var(--misty-border)] bg-[var(--misty-surface-selected)] px-3 text-sm font-semibold text-[var(--misty-text)] hover:bg-[var(--misty-surface-3)] hover:border-[var(--misty-border-strong)] disabled:cursor-default disabled:opacity-45",
+  editorButton: "h-8 rounded-[7px] border border-[var(--misty-border)] bg-[var(--misty-neutral-selected-bg,var(--misty-surface-selected))] px-3 text-sm font-semibold text-[var(--misty-text)] hover:bg-[var(--misty-neutral-strong-bg,var(--misty-surface-3))] hover:border-[var(--misty-border-strong)] disabled:cursor-default disabled:opacity-45",
   dots: "inline-flex h-5 items-center gap-1",
   dot: "size-1.5 rounded-full bg-[var(--misty-text-muted)] motion-safe:animate-bounce",
 } as const;
@@ -109,18 +126,6 @@ export function FileInspector(props: FileInspectorProps) {
   const [tagsDraft, setTagsDraft] = useState(props.mistyTags.join(", "));
   const [commentsDraft, setCommentsDraft] = useState(props.mistyComments);
   const metadataDirty = tagsDraft !== props.mistyTags.join(", ") || commentsDraft !== props.mistyComments;
-  const shouldCalculateDirectorySize = Boolean(
-    displayEntry
-      && !multiple
-      && canCalculateFolderSize(displayEntry)
-      && (!displayDirectorySize || displayDirectorySize.status === "unknown"),
-  );
-
-  useEffect(() => {
-    if (!shouldCalculateDirectorySize || !displayEntry) return;
-    props.onCalculateSize(displayEntry.path);
-  }, [displayEntry?.path, props.onCalculateSize, shouldCalculateDirectorySize]);
-
   useEffect(() => {
     setTagsDraft(props.mistyTags.join(", "));
     setCommentsDraft(props.mistyComments);
@@ -270,14 +275,14 @@ function useFolderPreview(entry: FileEntry | null, listing: DirectoryListing | n
       return () => undefined;
     }
     if (listing?.path === entry.path) {
-      setEntries(listing.entries.filter((candidate) => !candidate.isDeleted));
+      setEntries(folderPreviewEntries(listing.entries));
       setLoading(false);
       return () => undefined;
     }
     setLoading(true);
     void explorerListDirectory({ path: entry.path, showHidden: false })
       .then((next) => {
-        if (active) setEntries(next.entries.filter((candidate) => !candidate.isDeleted));
+        if (active) setEntries(folderPreviewEntries(next.entries));
       })
       .catch((previewError) => {
         if (active) setError(errorText(previewError));
@@ -291,6 +296,10 @@ function useFolderPreview(entry: FileEntry | null, listing: DirectoryListing | n
   }, [entry?.id, entry?.modifiedMs, entry?.path, entry?.remoteModified, listing?.path, listing?.entries]);
 
   return { entries, loading, error };
+}
+
+function folderPreviewEntries(entries: FileEntry[]): FileEntry[] {
+  return entries.filter((candidate) => !candidate.isDeleted).slice(0, FOLDER_PREVIEW_LIMIT);
 }
 
 function useFilePreview(entry: FileEntry | null, enabled = true): {
@@ -320,20 +329,36 @@ function useFilePreview(entry: FileEntry | null, enabled = true): {
 
     const imageMimeType = previewImageMimeType(entry);
     setPreviewLoading(true);
-    if (imageMimeType) {
+    const timer = window.setTimeout(() => {
+      if (!active) return;
+      if (imageMimeType && nativeImageThumbnailSupported(entry)) {
+        void loadNativeImagePreview(entry)
+          .then((loadedPreview) => {
+            if (active) setPreview(loadedPreview);
+          })
+          .catch((error) => {
+            if (active) setPreviewError(errorText(error));
+          })
+          .finally(() => {
+            if (active) setPreviewLoading(false);
+          });
+        return;
+      }
       void previewPathForEntry(entry)
-        .then(async (preparedPath) => {
-          try {
-            return await loadImagePreview(preparedPath, imageMimeType);
-          } catch (directLoadError) {
-            const loadedPreview = await loadNativeImagePreview(preparedPath);
-            objectUrl = loadedPreview.url;
-            if (!loadedPreview.url) throw directLoadError;
-            return loadedPreview;
+        .then((preparedPath) => explorerPreviewItem(preparedPath.path))
+        .then((payload) => {
+          if (!active) return;
+          const bytes = new Uint8Array(payload.bytes);
+          if (previewPayloadIsText(payload.mimeType)) {
+            setPreview({
+              text: new TextDecoder("utf-8", { fatal: false }).decode(bytes),
+              url: "",
+              mimeType: payload.mimeType,
+            });
+            return;
           }
-        })
-        .then((loadedPreview) => {
-          if (active) setPreview(loadedPreview);
+          objectUrl = URL.createObjectURL(new Blob([bytes], { type: payload.mimeType }));
+          setPreview({ text: null, url: objectUrl, mimeType: payload.mimeType });
         })
         .catch((error) => {
           if (active) setPreviewError(errorText(error));
@@ -341,38 +366,11 @@ function useFilePreview(entry: FileEntry | null, enabled = true): {
         .finally(() => {
           if (active) setPreviewLoading(false);
         });
-
-      return () => {
-        active = false;
-        if (objectUrl) URL.revokeObjectURL(objectUrl);
-      };
-    }
-
-    void previewPathForEntry(entry)
-      .then((preparedPath) => explorerPreviewItem(preparedPath.path))
-      .then((payload) => {
-        if (!active) return;
-        const bytes = new Uint8Array(payload.bytes);
-        if (previewPayloadIsText(payload.mimeType)) {
-          setPreview({
-            text: new TextDecoder("utf-8", { fatal: false }).decode(bytes),
-            url: "",
-            mimeType: payload.mimeType,
-          });
-          return;
-        }
-        objectUrl = URL.createObjectURL(new Blob([bytes], { type: payload.mimeType }));
-        setPreview({ text: null, url: objectUrl, mimeType: payload.mimeType });
-      })
-      .catch((error) => {
-        if (active) setPreviewError(errorText(error));
-      })
-      .finally(() => {
-        if (active) setPreviewLoading(false);
-      });
+    }, FILE_PREVIEW_LOAD_DELAY_MS);
 
     return () => {
       active = false;
+      window.clearTimeout(timer);
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [enabled, entry?.id, entry?.modifiedMs, entry?.path, entry?.remoteModified, entry?.sizeBytes]);
@@ -401,62 +399,29 @@ function previewImageMimeType(entry: FileEntry): string | null {
   return browserImageMimeTypes[extension] ?? null;
 }
 
-async function loadImagePreview(preparedPath: PreparedPreviewPath, mimeType: string): Promise<LoadedPreview> {
-  const baseUrl = convertFileSrc(preparedPath.path);
-  let lastError: unknown = null;
-  for (let attempt = 0; attempt < IMAGE_PREVIEW_LOAD_ATTEMPTS; attempt += 1) {
-    const url = attempt === 0 ? baseUrl : cacheBustedUrl(baseUrl, attempt);
-    try {
-      await waitForImage(url);
-      return { text: null, url, mimeType };
-    } catch (error) {
-      lastError = error;
-      if (attempt + 1 < IMAGE_PREVIEW_LOAD_ATTEMPTS) {
-        await sleep(IMAGE_PREVIEW_RETRY_DELAY_MS * (attempt + 1));
-      }
-    }
-  }
-  const baseMessage = lastError instanceof Error ? lastError.message : "Unable to load image preview.";
-  throw new Error(`${baseMessage}${previewDiagnosticSuffix(preparedPath)}`);
-}
-
-async function loadNativeImagePreview(preparedPath: PreparedPreviewPath): Promise<LoadedPreview> {
-  const payload = await explorerPreviewItem(preparedPath.path);
-  const bytes = new Uint8Array(payload.bytes);
-  const url = URL.createObjectURL(new Blob([bytes], { type: payload.mimeType }));
+async function loadNativeImagePreview(entry: FileEntry): Promise<LoadedPreview> {
+  const payload = await explorerGenerateImageThumbnail(entry.path, INSPECTOR_IMAGE_PREVIEW_MAX_DIMENSION, {
+    modifiedMs: entry.modifiedMs,
+    remoteModified: entry.remoteModified,
+    sizeBytes: entry.sizeBytes,
+  });
+  const url = safeTauriAssetUrl(payload.path);
   return { text: null, url, mimeType: payload.mimeType };
 }
 
-function previewDiagnosticSuffix(preparedPath: PreparedPreviewPath): string {
-  const prepared = preparedPath.prepared;
-  if (!prepared) return "";
-  return ` Cache hit: ${prepared.cacheHit ?? prepared.cached}. Local: ${preparedPath.path}. Source: ${prepared.sourcePath ?? "unknown"}. Cache: ${prepared.cachePath ?? "unknown"}.`;
-}
-
-function waitForImage(url: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const image = new Image();
-    image.decoding = "async";
-    image.onload = () => resolve();
-    image.onerror = () => reject(new Error("Unable to load image preview."));
-    image.src = url;
-  });
-}
-
-function cacheBustedUrl(url: string, attempt: number): string {
-  const separator = url.includes("?") ? "&" : "?";
-  return `${url}${separator}mistyPreviewAttempt=${attempt}-${Date.now()}`;
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => window.setTimeout(resolve, ms));
-}
-
 function previewSizeLimitError(entry: FileEntry): string | null {
+  if (previewImageMimeType(entry) && nativeImageThumbnailSupported(entry)) {
+    return null;
+  }
   if (entry.kind === "folder" || entry.sizeBytes == null || entry.sizeBytes <= MAX_PREVIEW_BYTES) {
     return null;
   }
   return `Preview is limited to ${MAX_PREVIEW_BYTES / (1024 * 1024)} MB.`;
+}
+
+function nativeImageThumbnailSupported(entry: FileEntry): boolean {
+  const extension = entry.extension.toLowerCase().replace(/^\./, "");
+  return nativeImageThumbnailExtensions.has(extension);
 }
 
 function previewPayloadIsText(mimeType: string): boolean {
@@ -516,7 +481,7 @@ function sizeDetailValue(
   if (directorySize?.status === "calculating") return <DirectorySizeDots />;
   if (!canCalculateFolderSize(entry)) return "-";
   if (directorySize?.status === "failed") return "-";
-  return <DirectorySizeDots />;
+  return "-";
 }
 
 function DirectorySizeDots() {

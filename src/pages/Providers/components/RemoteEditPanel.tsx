@@ -18,7 +18,7 @@ const staleWarningButtonClass =
   "shrink-0 rounded-[7px] border border-[color-mix(in_srgb,var(--misty-danger)_44%,var(--misty-border))] bg-[color-mix(in_srgb,var(--misty-danger)_10%,var(--misty-surface))] px-2.5 py-1.5 text-[var(--misty-danger)] disabled:opacity-55";
 
 const remoteEditPanelClass =
-  "grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden !rounded-none !border-0 !bg-[var(--misty-surface)] !shadow-none [border-radius:0]";
+  "grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden !rounded-none !border-0 !bg-transparent !shadow-none [border-radius:0]";
 
 const remoteEditBodyClass =
   "min-h-0 overflow-auto";
