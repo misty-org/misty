@@ -8,9 +8,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
 	"github.com/kannachi323/misty/proxy/api"
-	"github.com/kannachi323/misty/proxy/api/dbx"
-	"github.com/kannachi323/misty/proxy/api/gd"
-	"github.com/kannachi323/misty/proxy/api/ms"
+	"github.com/kannachi323/misty/proxy/api/remote"
 	"github.com/kannachi323/misty/proxy/core/auth"
 	"github.com/kannachi323/misty/proxy/core/license"
 	"github.com/kannachi323/misty/proxy/core/tsbase"
@@ -73,14 +71,6 @@ func (proxy *Proxy) MountHandlers() {
 	proxy.APIRouter.Post("/logout", api.LogoutUser(proxy.Database))
 	proxy.APIRouter.Post("/refresh", api.RefreshToken(proxy.Database, proxy.LicenseManager))
 
-	// OAuth callbacks must remain public
-	proxy.APIRouter.Get("/ms/auth", ms.GetOAuthLogin())
-	proxy.APIRouter.Get("/ms/callback", ms.OAuthCallback(proxy.Database))
-	proxy.APIRouter.Get("/gd/auth", gd.GetOAuthLogin())
-	proxy.APIRouter.Get("/gd/callback", gd.OAuthCallback(proxy.Database))
-	proxy.APIRouter.Get("/dbx/auth", dbx.GetOAuthLogin())
-	proxy.APIRouter.Get("/dbx/callback", dbx.OAuthCallback(proxy.Database))
-
 	// Protected routes (JWT required)
 	proxy.APIRouter.Group(func(r chi.Router) {
 		r.Use(auth.JWTMiddleware)
@@ -104,41 +94,19 @@ func (proxy *Proxy) MountHandlers() {
 		r.Group(func(r chi.Router) {
 			r.Use(proxy.LicenseManager.RequirePro)
 
-			// Microsoft endpoints
-			r.Get("/ms/users", ms.GetMSUsers(proxy.Database))
-			r.Delete("/ms/users", ms.DeleteMSToken(proxy.Database))
-			r.Post("/ms/file/upload", ms.GetUploadSession(proxy.Database))
-			r.Get("/ms/drive", ms.GetDrive(proxy.Database))
-			r.Get("/ms/drive/root", ms.GetDriveRoot(proxy.Database))
-			r.Get("/ms/files", ms.GetFiles(proxy.Database))
-			r.Get("/ms/file", ms.GetFile(proxy.Database))
-			r.Get("/ms/file/download", ms.DownloadFile(proxy.Database))
-			r.Post("/ms/folder/create", ms.CreateFolder(proxy.Database))
-			r.Get("/ms/search", ms.SearchFiles(proxy.Database))
+			// ---- rclone unified endpoints ----
+			r.Get("/remotes", remote.ListRemotes())
+			r.Post("/remotes", remote.CreateRemote())
+			r.Delete("/remotes", remote.DeleteRemote())
+			r.Get("/remotes/types", remote.ListTypes())
+			r.Get("/files", remote.ListFiles())
+			r.Get("/file/download", remote.DownloadFile())
+			r.Post("/file/upload", remote.UploadFile())
+			r.Post("/mkdir", remote.MkDir())
+			r.Delete("/file", remote.DeleteFile())
+			r.Get("/search", remote.Search())
+			r.Get("/about", remote.AboutRemote())
 
-			// Google Drive endpoints
-			r.Get("/gd/users", gd.GetGDUsers(proxy.Database))
-			r.Delete("/gd/users", gd.DeleteGDToken(proxy.Database))
-			r.Get("/gd/drive", gd.GetAbout(proxy.Database))
-			r.Get("/gd/drive/root", gd.GetDriveRoot(proxy.Database))
-			r.Get("/gd/files", gd.GetFiles(proxy.Database))
-			r.Get("/gd/file", gd.GetFile(proxy.Database))
-			r.Get("/gd/file/download", gd.DownloadFile(proxy.Database))
-			r.Post("/gd/file/upload", gd.GetUploadSession(proxy.Database))
-			r.Post("/gd/folder/create", gd.CreateFolder(proxy.Database))
-			r.Get("/gd/search", gd.SearchFiles(proxy.Database))
-
-			// Dropbox endpoints
-			r.Get("/dbx/users", dbx.GetDBXUsers(proxy.Database))
-			r.Delete("/dbx/users", dbx.DeleteDBXToken(proxy.Database))
-			r.Get("/dbx/drive", dbx.GetSpaceUsage(proxy.Database))
-			r.Get("/dbx/drive/root", dbx.GetDriveRoot(proxy.Database))
-			r.Get("/dbx/files", dbx.GetFiles(proxy.Database))
-			r.Get("/dbx/file", dbx.GetFile(proxy.Database))
-			r.Get("/dbx/file/download", dbx.DownloadFile(proxy.Database))
-			r.Post("/dbx/file/upload", dbx.GetUploadSession(proxy.Database))
-			r.Post("/dbx/folder/create", dbx.CreateFolder(proxy.Database))
-			r.Get("/dbx/search", dbx.SearchFiles(proxy.Database))
 		})
 	})
 }

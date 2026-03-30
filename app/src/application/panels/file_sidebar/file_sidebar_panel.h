@@ -12,11 +12,8 @@
 
 #include "file_sidebar_state.h"
 
-#include "panels/services/onedrive/onedrive_state.h"
-#include "panels/services/gdrive/gdrive_state.h"
-#include "panels/services/dropbox/dropbox_state.h"
-#include "panels/services/icloud/icloud_state.h"
 #include "panels/services/services_state.h"
+#include "panels/services/remote/remote_state.h"
 #include "panels/devices/device_state.h"
 #include "panels/devices/device_watcher.h"
 

@@ -206,24 +206,23 @@ namespace misty::panel {
         if (!services_collapsed_) {
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 2.0f));
 
-            if (HoverListItem("OneDrive", content_width)) {
-                auto& file_explorer_state = registry_.get_state<FileExplorerState>("Files");
-                file_explorer_state.pending_navigation_path = mount_utils::get_onedrive_root();
+            auto& services = registry_.get_state<ServicesState>("Services");
+            std::vector<RemoteConnection> remotes;
+            {
+                std::lock_guard<std::mutex> lock(services.mu);
+                remotes.assign(services.connections.begin(), services.connections.end());
             }
 
-            if (HoverListItem("Google Drive", content_width)) {
-                auto& file_explorer_state = registry_.get_state<FileExplorerState>("Files");
-                file_explorer_state.pending_navigation_path = mount_utils::get_gdrive_root();
-            }
-
-            if (HoverListItem("Dropbox", content_width)) {
-                auto& file_explorer_state = registry_.get_state<FileExplorerState>("Files");
-                file_explorer_state.pending_navigation_path = mount_utils::get_dropbox_root();
-            }
-
-            if (HoverListItem("iCloud", content_width)) {
-                auto& file_explorer_state = registry_.get_state<FileExplorerState>("Files");
-                file_explorer_state.pending_navigation_path = mount_utils::get_icloud_root();
+            if (remotes.empty()) {
+                ImGui::TextDisabled("  No services connected");
+            } else {
+                for (auto& remote : remotes) {
+                    std::string label = remote.display_name.empty() ? remote.name : remote.display_name;
+                    if (HoverListItem(label.c_str(), content_width)) {
+                        auto& file_explorer_state = registry_.get_state<FileExplorerState>("Files");
+                        file_explorer_state.pending_navigation_path = mount_utils::get_mount_root() + "/" + remote.name;
+                    }
+                }
             }
 
             ImGui::PopStyleVar();

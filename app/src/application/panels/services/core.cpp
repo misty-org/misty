@@ -7,6 +7,18 @@
 #include <cmath>
 
 namespace misty::panel {
+
+    const std::vector<ServicesPanel::ProviderInfo>& ServicesPanel::supported_providers() {
+        static const std::vector<ProviderInfo> providers = {
+            {"onedrive", "OneDrive"},
+            {"drive",    "Google Drive"},
+            {"dropbox",  "Dropbox"},
+            {"s3",       "Amazon S3"},
+            {"sftp",     "SFTP"},
+        };
+        return providers;
+    }
+
     ServicesPanel::ServicesPanel(UIRegistry& registry)
         : registry_(registry) {
     }
@@ -48,6 +60,7 @@ namespace misty::panel {
                 show_loading_overlay();
             }
             show_disconnect_confirm_modal(state);
+            show_login_modal(state);
         }
         ImGui::End();
         });
@@ -63,252 +76,252 @@ namespace misty::panel {
     }
 
     void ServicesPanel::show_cloud_section(ServicesState& state) {
-        show_tab_bar();
+        ImGui::Spacing();
+
+        // Show connected remotes as cards
+        show_remote_cards(state);
 
         ImGui::Spacing();
         ImGui::Spacing();
 
-        if (active_tab_ == 0) {
-            show_onedrive_tab(state);
-        } else if (active_tab_ == 1) {
-            show_gdrive_tab(state);
-        } else if (active_tab_ == 2) {
-            show_dropbox_tab(state);
-        } else {
-            show_icloud_tab(state);
-        }
+        // "Add Account" buttons for each provider type
+        show_add_account_section(state);
 
-        show_ms_login_modal(state);
-        show_gd_login_modal(state);
-        show_dbx_login_modal(state);
-        show_icl_login_modal(state);
-        show_error_modal(state.error_msg, "ServicesError");
-    }
-
-    void ServicesPanel::show_tab_bar() {
-        ImVec4 active_text   = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
-        ImVec4 inactive_text = ImVec4(0.5f, 0.5f, 0.5f, 1.0f);
-        ImVec4 transparent   = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
-        ImU32  underline_col = IM_COL32(255, 255, 255, 210);
-
-        float tab_width  = 140.0f;
-        float tab_height = 32.0f;
-
-        const char* tab_labels[] = { "OneDrive", "Google Drive", "Dropbox", "iCloud" };
-
-        for (int i = 0; i < 4; i++) {
-            if (i > 0) ImGui::SameLine(0.0f, 4.0f);
-
-            ImGui::PushID(i);
-            ImGui::PushStyleColor(ImGuiCol_Button,        transparent);
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.25f, 0.25f, 0.25f, 0.5f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive,  transparent);
-            ImGui::PushStyleColor(ImGuiCol_Text, active_tab_ == i ? active_text : inactive_text);
-            if (ImGui::Button(tab_labels[i], ImVec2(tab_width, tab_height)))
-                active_tab_ = i;
-            ImGui::PopStyleColor(4);
-
-            if (active_tab_ == i) {
-                ImVec2 p_min = ImGui::GetItemRectMin();
-                ImVec2 p_max = ImGui::GetItemRectMax();
-                ImGui::GetWindowDrawList()->AddLine(
-                    ImVec2(p_min.x, p_max.y),
-                    ImVec2(p_max.x, p_max.y),
-                    underline_col, 2.0f);
+        // Error display
+        {
+            std::lock_guard<std::mutex> lock(state.mu);
+            if (!state.error_msg.empty()) {
+                ImGui::Spacing();
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.4f, 0.4f, 1.0f));
+                ImGui::TextWrapped("%s", state.error_msg.c_str());
+                ImGui::PopStyleColor();
             }
-            ImGui::PopID();
         }
-
-        // Separator under tab bar
-        ImGui::Spacing();
-        ImGui::PushStyleColor(ImGuiCol_Separator, ImVec4(0.3f, 0.3f, 0.3f, 0.5f));
-        ImGui::Separator();
-        ImGui::PopStyleColor();
     }
 
-    void ServicesPanel::try_same_line_or_wrap(int cards_drawn) {
-        if (cards_drawn > 0) {
-            float cursor_x = ImGui::GetCursorPosX();
-            float avail = ImGui::GetContentRegionAvail().x;
-            if (cursor_x + kCardWidth + kCardSpacing <= avail + ImGui::GetCursorPosX()) {
-                // Check if another card fits on this line
+    void ServicesPanel::show_remote_cards(ServicesState& state) {
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f, 8.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(kCardSpacing, kCardSpacing));
+
+        std::vector<RemoteConnection> conns;
+        {
+            std::lock_guard<std::mutex> lock(state.mu);
+            conns.assign(state.connections.begin(), state.connections.end());
+        }
+
+        if (conns.empty()) {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+            ImGui::Text("No cloud accounts connected. Add one below.");
+            ImGui::PopStyleColor();
+        }
+
+        int cards_drawn = 0;
+        for (const auto& conn : conns) {
+            if (cards_drawn > 0) {
                 float next_end = ImGui::GetItemRectMax().x - ImGui::GetWindowPos().x + kCardSpacing + kCardWidth;
                 float window_width = ImGui::GetContentRegionAvail().x + ImGui::GetCursorPosX();
                 if (next_end <= window_width) {
                     ImGui::SameLine(0.0f, kCardSpacing);
                 }
             }
-        }
-    }
-
-    void ServicesPanel::show_onedrive_tab(ServicesState& state) {
-        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f, 8.0f));
-        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, kCardSpacing));
-
-        std::vector<std::string> connection_ids;
-        {
-            std::lock_guard<std::mutex> lock(state.mu);
-            for (const auto& conn : state.ms_connections) {
-                if (!conn.profile.id.empty()) {
-                    connection_ids.push_back(conn.profile.id);
-                }
-            }
-        }
-
-        int cards_drawn = 0;
-        for (const auto& ms_user_id : connection_ids) {
-            try_same_line_or_wrap(cards_drawn);
-            show_onedrive_profile_card(state, ms_user_id);
+            show_remote_card(state, conn);
             cards_drawn++;
-        }
-
-        // "Add Account" card
-        try_same_line_or_wrap(cards_drawn);
-        show_add_account_card("Add Account", state.show_ms_login_modal);
-
-        // Error display
-        {
-            std::lock_guard<std::mutex> lock(state.mu);
-            if (!state.error_msg.empty()) {
-                ImGui::Spacing();
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.4f, 0.4f, 1.0f));
-                ImGui::TextWrapped("%s", state.error_msg.c_str());
-                ImGui::PopStyleColor();
-            }
         }
 
         ImGui::PopStyleVar(2);
     }
 
-    void ServicesPanel::show_gdrive_tab(ServicesState& state) {
-        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f, 8.0f));
-        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, kCardSpacing));
-
-        std::vector<std::string> gd_connection_ids;
-        {
-            std::lock_guard<std::mutex> lock(state.mu);
-            for (const auto& conn : state.gd_connections) {
-                if (!conn.profile.id.empty()) {
-                    gd_connection_ids.push_back(conn.profile.id);
-                }
-            }
-        }
-
-        int cards_drawn = 0;
-        for (const auto& gd_user_id : gd_connection_ids) {
-            try_same_line_or_wrap(cards_drawn);
-            show_gdrive_profile_card(state, gd_user_id);
-            cards_drawn++;
-        }
-
-        // "Add Account" card
-        try_same_line_or_wrap(cards_drawn);
-        show_add_account_card("Add Account", state.show_gd_login_modal);
-
-        // Error display
-        {
-            std::lock_guard<std::mutex> lock(state.mu);
-            if (!state.error_msg.empty()) {
-                ImGui::Spacing();
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.4f, 0.4f, 1.0f));
-                ImGui::TextWrapped("%s", state.error_msg.c_str());
-                ImGui::PopStyleColor();
-            }
-        }
-
-        ImGui::PopStyleVar(2);
-    }
-
-    void ServicesPanel::show_add_account_card(const char* label, bool& show_modal) {
-        ImGui::PushID(label);
+    void ServicesPanel::show_remote_card(ServicesState& state, const RemoteConnection& conn) {
+        ImGui::PushID(conn.name.c_str());
         ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 8.0f);
-        ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.16f, 0.16f, 0.16f, 0.5f));
-        ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 0.0f, 0.0f, 0.0f)); // hide default border
-        ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 0.0f);
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.14f, 0.14f, 0.15f, 1.0f));
 
-        float card_height = 160.0f;
-        if (ImGui::BeginChild("AddCard", ImVec2(kCardWidth, card_height), ImGuiChildFlags_None)) {
-            // Draw dashed border manually
-            ImDrawList* draw_list = ImGui::GetWindowDrawList();
-            ImVec2 p_min = ImGui::GetWindowPos();
-            ImVec2 p_max = ImVec2(p_min.x + kCardWidth, p_min.y + card_height);
-            ImU32 border_col = IM_COL32(120, 120, 120, 150);
+        float card_height = 140.0f;
+        if (ImGui::BeginChild("Card", ImVec2(kCardWidth, card_height), true)) {
+            // Provider type label
+            std::string type_label = conn.type;
+            if (type_label == "drive") type_label = "Google Drive";
+            else if (type_label == "onedrive") type_label = "OneDrive";
+            else if (type_label == "dropbox") type_label = "Dropbox";
+            else if (type_label == "s3") type_label = "Amazon S3";
+            else if (type_label == "sftp") type_label = "SFTP";
 
-            // Draw dashed rectangle using line segments
-            float dash_len = 8.0f;
-            float gap_len = 5.0f;
-            float rounding = 8.0f;
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+            ImGui::Text("%s", type_label.c_str());
+            ImGui::PopStyleColor();
 
-            // Use a dotted rect approximation by drawing many small segments
-            auto draw_dashed_line = [&](ImVec2 a, ImVec2 b) {
-                float dx = b.x - a.x;
-                float dy = b.y - a.y;
-                float len = sqrtf(dx * dx + dy * dy);
-                if (len < 1.0f) return;
-                float nx = dx / len;
-                float ny = dy / len;
-                float pos = 0.0f;
-                bool drawing = true;
-                while (pos < len) {
-                    float seg = drawing ? dash_len : gap_len;
-                    float end_pos = (pos + seg > len) ? len : pos + seg;
-                    if (drawing) {
-                        draw_list->AddLine(
-                            ImVec2(a.x + nx * pos, a.y + ny * pos),
-                            ImVec2(a.x + nx * end_pos, a.y + ny * end_pos),
-                            border_col, 1.5f);
-                    }
-                    pos = end_pos;
-                    drawing = !drawing;
-                }
-            };
+            ImGui::Spacing();
 
-            float inset = 0.5f;
-            ImVec2 tl(p_min.x + inset, p_min.y + inset);
-            ImVec2 tr(p_max.x - inset, p_min.y + inset);
-            ImVec2 br(p_max.x - inset, p_max.y - inset);
-            ImVec2 bl(p_min.x + inset, p_max.y - inset);
-
-            draw_dashed_line(ImVec2(tl.x + rounding, tl.y), ImVec2(tr.x - rounding, tr.y)); // top
-            draw_dashed_line(ImVec2(tr.x, tr.y + rounding), ImVec2(br.x, br.y - rounding)); // right
-            draw_dashed_line(ImVec2(br.x - rounding, br.y), ImVec2(bl.x + rounding, bl.y)); // bottom
-            draw_dashed_line(ImVec2(bl.x, bl.y - rounding), ImVec2(tl.x, tl.y + rounding)); // left
-
-            // Center the "+" and label
-            float total_content_height = ImGui::GetFontSize() * 2.5f + 8.0f;
-            float start_y = (card_height - total_content_height) * 0.5f;
-
-            ImGui::SetCursorPosY(start_y);
-
-            // "+" symbol
-            core::WithFontScale(2.0f, [&]() {
-                float plus_width = ImGui::CalcTextSize("+").x;
-                ImGui::SetCursorPosX((kCardWidth - plus_width) * 0.5f);
-                core::ColoredText(ImVec4(0.5f, 0.5f, 0.5f, 0.8f), "+");
+            // Remote name
+            core::WithFontScale(1.2f, [&]() {
+                core::ColoredText(ImVec4(1.0f, 1.0f, 1.0f, 1.0f), "%s", conn.name.c_str());
             });
 
             ImGui::Spacing();
 
-            // Label
-            float label_width = ImGui::CalcTextSize(label).x;
-            ImGui::SetCursorPosX((kCardWidth - label_width) * 0.5f);
-            core::ColoredText(ImVec4(0.5f, 0.5f, 0.5f, 0.8f), "%s", label);
+            // Status indicator
+            ImVec4 status_color = conn.connected
+                ? ImVec4(0.3f, 0.8f, 0.3f, 1.0f)
+                : ImVec4(0.8f, 0.3f, 0.3f, 1.0f);
+            ImGui::PushStyleColor(ImGuiCol_Text, status_color);
+            ImGui::Text("%s", conn.connected ? "Connected" : "Disconnected");
+            ImGui::PopStyleColor();
+
+            ImGui::Spacing();
+            ImGui::Spacing();
+
+            // Disconnect button
+            ImGui::PushStyleColor(ImGuiCol_Button,        ImVec4(0.55f, 0.18f, 0.18f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered,  ImVec4(0.65f, 0.28f, 0.28f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive,   ImVec4(0.45f, 0.12f, 0.12f, 1.0f));
+            ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
+            if (ImGui::Button("Disconnect", ImVec2(100.0f, 26.0f))) {
+                pending_disconnect_remote_ = conn.name;
+                ImGui::OpenPopup("##confirm_disconnect");
+            }
+            ImGui::PopStyleVar();
+            ImGui::PopStyleColor(3);
         }
         ImGui::EndChild();
 
-        // Make the card clickable
-        if (ImGui::IsItemClicked()) {
-            show_modal = true;
-        }
+        ImGui::PopStyleColor();
+        ImGui::PopStyleVar();
+        ImGui::PopID();
+    }
 
-        // Hover effect
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+    void ServicesPanel::show_add_account_section(ServicesState& state) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.7f, 0.7f, 0.7f, 1.0f));
+        ImGui::Text("Add Cloud Account:");
+        ImGui::PopStyleColor();
+
+        ImGui::Spacing();
+
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(16.0f, 8.0f));
+
+        for (const auto& provider : supported_providers()) {
+            ImGui::PushStyleColor(ImGuiCol_Button,        ImVec4(0.22f, 0.22f, 0.25f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered,  ImVec4(0.30f, 0.30f, 0.33f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive,   ImVec4(0.18f, 0.18f, 0.20f, 1.0f));
+
+            std::string label = "+ " + provider.display_name;
+            if (ImGui::Button(label.c_str(), ImVec2(0, 34.0f))) {
+                state.login_provider_type = provider.type;
+                state.show_login_modal = true;
+            }
+            ImGui::PopStyleColor(3);
+            ImGui::SameLine(0.0f, 8.0f);
+        }
+        ImGui::NewLine();
+
+        ImGui::PopStyleVar(2);
+    }
+
+    void ServicesPanel::show_login_modal(ServicesState& state) {
+        if (!state.show_login_modal) return;
+
+        ImGuiViewport* vp = ImGui::GetMainViewport();
+        ImGui::SetNextWindowPos(vp->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+        ImGui::SetNextWindowSize(ImVec2(400.0f, 0.0f), ImGuiCond_Always);
+
+        ImGui::PushStyleColor(ImGuiCol_PopupBg,  ImVec4(0.10f, 0.10f, 0.11f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_Border,   ImVec4(0.22f, 0.22f, 0.24f, 1.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 10.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,  ImVec2(24.0f, 24.0f));
+
+        ImGui::OpenPopup("##add_remote");
+
+        if (ImGui::BeginPopupModal("##add_remote", nullptr,
+                ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                ImGuiWindowFlags_NoMove     | ImGuiWindowFlags_AlwaysAutoResize)) {
+
+            float w = ImGui::GetContentRegionAvail().x;
+
+            // Title
+            std::string type_display = state.login_provider_type;
+            for (const auto& p : supported_providers()) {
+                if (p.type == state.login_provider_type) {
+                    type_display = p.display_name;
+                    break;
+                }
+            }
+
+            core::WithFontScale(1.3f, [&]() {
+                std::string title = "Add " + type_display;
+                float title_w = ImGui::CalcTextSize(title.c_str()).x;
+                ImGui::SetCursorPosX((w - title_w) * 0.5f);
+                core::ColoredText(ImVec4(0.9f, 0.9f, 0.9f, 1.0f), "%s", title.c_str());
+            });
+
+            ImGui::Spacing();
+            ImGui::Spacing();
+
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.6f, 0.6f, 0.6f, 1.0f));
+            ImGui::TextWrapped(
+                "A remote name will be generated automatically. "
+                "Click Connect to start the authentication flow in your browser.");
+            ImGui::PopStyleColor();
+
+            // Error display
+            if (!state.auth_error.empty()) {
+                ImGui::Spacing();
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.4f, 0.4f, 1.0f));
+                ImGui::TextWrapped("%s", state.auth_error.c_str());
+                ImGui::PopStyleColor();
+            }
+
+            // Success display
+            if (!state.success_msg.empty()) {
+                ImGui::Spacing();
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.8f, 0.4f, 1.0f));
+                ImGui::TextWrapped("%s", state.success_msg.c_str());
+                ImGui::PopStyleColor();
+            }
+
+            ImGui::Spacing();
+            ImGui::Separator();
+            ImGui::Spacing();
+
+            float half_w = (w - 8.0f) * 0.5f;
+            bool cancel_shortcut = core::CommandManager::get().matches("modal.cancel");
+
+            // Cancel
+            ImGui::PushStyleColor(ImGuiCol_Button,        ImVec4(0.22f, 0.22f, 0.25f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.30f, 0.30f, 0.33f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.18f, 0.18f, 0.20f, 1.0f));
+            ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);
+            if (ImGui::Button("Cancel", ImVec2(half_w, 36.0f)) || cancel_shortcut) {
+                state.show_login_modal = false;
+                state.auth_error.clear();
+                state.success_msg.clear();
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::PopStyleVar();
+            ImGui::PopStyleColor(3);
+
+            ImGui::SameLine(0, 8.0f);
+
+            // Connect
+            ImGui::PushStyleColor(ImGuiCol_Button,        ImVec4(0.20f, 0.40f, 0.65f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.25f, 0.50f, 0.75f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.15f, 0.35f, 0.55f, 1.0f));
+            ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);
+            if (ImGui::Button("Connect", ImVec2(half_w, 36.0f))) {
+                // Generate a remote name: type-timestamp
+                auto now = std::chrono::system_clock::now();
+                auto epoch = std::chrono::duration_cast<std::chrono::seconds>(
+                    now.time_since_epoch()).count();
+                std::string remote_name = state.login_provider_type + "-" + std::to_string(epoch);
+                state.initiate_login(state.login_provider_type, remote_name);
+            }
+            ImGui::PopStyleVar();
+            ImGui::PopStyleColor(3);
+
+            ImGui::EndPopup();
         }
 
         ImGui::PopStyleVar(2);
         ImGui::PopStyleColor(2);
-        ImGui::PopID();
     }
 
     void ServicesPanel::show_loading_overlay() {
@@ -316,8 +329,8 @@ namespace misty::panel {
         static constexpr int   COLS        = 10;
         static constexpr int   ROWS        = 5;
         static constexpr int   TOTAL       = COLS * ROWS;
-        static constexpr float FRAME_RATE  = 20.0f; // fps
-        static constexpr float SPRITE_SIZE = 128.0f; // display size in pixels
+        static constexpr float FRAME_RATE  = 20.0f;
+        static constexpr float SPRITE_SIZE = 128.0f;
 
         auto& sprite = core::AssetManager::get().get_image_texture("assets/misty_sprite.png");
 
@@ -325,10 +338,8 @@ namespace misty::panel {
         ImVec2 p  = ImGui::GetWindowPos();
         ImVec2 sz = ImGui::GetWindowSize();
 
-        // Semi-transparent dark background
         dl->AddRectFilled(p, ImVec2(p.x + sz.x, p.y + sz.y), IM_COL32(15, 15, 18, 160));
 
-        // Current frame based on elapsed time
         int frame = static_cast<int>(ImGui::GetTime() * FRAME_RATE) % TOTAL;
         int col   = frame % COLS;
         int row   = frame / COLS;
@@ -338,9 +349,8 @@ namespace misty::panel {
         ImVec2 uv0(col * uv_w,        row * uv_h);
         ImVec2 uv1((col + 1) * uv_w,  (row + 1) * uv_h);
 
-        // Gentle vertical bob — runs every render frame so it's smooth at any Hz
         float t    = static_cast<float>(ImGui::GetTime());
-        float bob  = std::sin(t * 3.0f) * 6.0f; // ±6px, ~0.5 Hz cycle
+        float bob  = std::sin(t * 3.0f) * 6.0f;
 
         float cx   = p.x + sz.x * 0.5f;
         float cy   = p.y + sz.y * 0.5f + bob;
@@ -355,7 +365,7 @@ namespace misty::panel {
     }
 
     void ServicesPanel::show_disconnect_confirm_modal(ServicesState& state) {
-        if (pending_disconnect_provider_.empty()) return;
+        if (pending_disconnect_remote_.empty()) return;
 
         ImGuiViewport* vp = ImGui::GetMainViewport();
         ImGui::SetNextWindowPos(vp->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
@@ -385,8 +395,9 @@ namespace misty::panel {
 
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.58f, 0.58f, 0.58f, 1.0f));
             ImGui::TextWrapped(
-                "This will remove the account from Misty. "
-                "Your files in the cloud will not be affected.");
+                "This will remove \"%s\" from Misty. "
+                "Your files in the cloud will not be affected.",
+                pending_disconnect_remote_.c_str());
             ImGui::PopStyleColor();
 
             ImGui::Spacing();
@@ -403,8 +414,7 @@ namespace misty::panel {
             ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.18f, 0.18f, 0.20f, 1.0f));
             ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);
             if (ImGui::Button("Cancel", ImVec2(half_w, 36.0f)) || cancel_shortcut) {
-                pending_disconnect_provider_.clear();
-                pending_disconnect_id_.clear();
+                pending_disconnect_remote_.clear();
                 ImGui::CloseCurrentPopup();
             }
             ImGui::PopStyleVar();
@@ -418,16 +428,8 @@ namespace misty::panel {
             ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.45f, 0.12f, 0.12f, 1.0f));
             ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);
             if (ImGui::Button("Disconnect", ImVec2(half_w, 36.0f)) || confirm_shortcut) {
-                if (pending_disconnect_provider_ == "onedrive")
-                    state.disconnect_onedrive(pending_disconnect_id_);
-                else if (pending_disconnect_provider_ == "gdrive")
-                    state.disconnect_gdrive(pending_disconnect_id_);
-                else if (pending_disconnect_provider_ == "dropbox")
-                    state.disconnect_dropbox(pending_disconnect_id_);
-                else if (pending_disconnect_provider_ == "icloud")
-                    state.disconnect_icloud(pending_disconnect_id_);
-                pending_disconnect_provider_.clear();
-                pending_disconnect_id_.clear();
+                state.disconnect_remote(pending_disconnect_remote_);
+                pending_disconnect_remote_.clear();
                 ImGui::CloseCurrentPopup();
             }
             ImGui::PopStyleVar();
