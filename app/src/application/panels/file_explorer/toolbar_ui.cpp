@@ -122,10 +122,7 @@ void FileExplorerPanel::show_search_bar(FileExplorerState& state) {
     const float icon_size = 16.0f;
     const float btn_size = 32.0f;
     const float spacing = 8.0f;
-    const bool is_local = !path_utils::is_onedrive_path(state.current_path)
-                       && !path_utils::is_gdrive_path(state.current_path)
-                       && !path_utils::is_dropbox_path(state.current_path)
-                       && !path_utils::is_icloud_path(state.current_path);
+    const bool is_local = !path_utils::is_remote_path(state.current_path);
     const int icon_button_count = is_local ? 4 : 3;
     const float icon_button_width = icon_size + ImGui::GetStyle().FramePadding.x * 2.0f;
     const float total_available = ImGui::GetContentRegionAvail().x;

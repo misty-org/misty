@@ -19,7 +19,7 @@ public:
     void render_results(SearchState& state);
 
 private:
-    void scan_caches(SearchState& state, const std::string& query, uint64_t generation, const std::string& local_root);
+    void scan_local(SearchState& state, const std::string& query, uint64_t generation, const std::string& local_root);
     void launch_api_searches(SearchState& state, const std::string& query, uint64_t generation);
 
     core::UIRegistry& ui_registry_;

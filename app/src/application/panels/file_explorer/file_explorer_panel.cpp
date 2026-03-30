@@ -1,10 +1,7 @@
 #include "panels/file_explorer/file_explorer_panel.h"
 #include "panels/workspace/workspace_state.h"
-#include "panels/services/onedrive/onedrive_state.h"
-#include "panels/services/gdrive/gdrive_state.h"
-#include "panels/services/dropbox/dropbox_state.h"
-#include "panels/services/icloud/icloud_state.h"
 #include "panels/services/services_state.h"
+#include "panels/services/remote/remote_state.h"
 #include "panels/activity/download_state.h"
 #include "panels/activity/upload_state.h"
 #include "panels/notification/notification_state.h"
@@ -41,11 +38,8 @@ namespace misty::panel {
         auto& services_state = registry_.get_state<ServicesState>("Services");
         services_state.init(worker_pool_);
 
-        // Sync account mappings to create account directories
+        // Sync remote account mappings
         sync_account_mappings();
-        sync_gd_account_mappings();
-        sync_dbx_account_mappings();
-        sync_icl_account_mappings();
 
         // Fetch workspaces if not already done
         if (!workspace_state.has_fetched) {
@@ -69,8 +63,8 @@ namespace misty::panel {
             // Check if it's a virtual path
             if (saved_path.rfind("misty://", 0) == 0) {
                  // Always valid
-            } else if (path_utils::is_onedrive_path(saved_path) || path_utils::is_gdrive_path(saved_path) || path_utils::is_dropbox_path(saved_path) || path_utils::is_icloud_path(saved_path)) {
-                 // Assume valid for cloud paths (will show error or reconnect if not)
+            } else if (path_utils::is_remote_path(saved_path)) {
+                 // Assume valid for remote paths (will show error or reconnect if not)
             } else {
                  // Check local existence
                  if (!fs::exists(saved_path) || !fs::is_directory(saved_path)) {
@@ -228,33 +222,8 @@ namespace misty::panel {
         state.last_selected_index = -1;
     }
 
-    void FileExplorerPanel::clear_cloud_upload_contexts() {
-        {
-            auto& onedrive_state = registry_.get_state<OneDriveState>("OneDrive");
-            std::lock_guard<std::mutex> od_lock(onedrive_state.mu);
-            onedrive_state.current_ms_user_id.clear();
-            onedrive_state.current_drive_id.clear();
-            onedrive_state.current_folder_id.clear();
-        }
-        {
-            auto& gdrive_state = registry_.get_state<GDriveState>("GDrive");
-            std::lock_guard<std::mutex> gd_lock(gdrive_state.mu);
-            gdrive_state.current_gd_user_id.clear();
-            gdrive_state.current_folder_id.clear();
-        }
-        {
-            auto& dropbox_state = registry_.get_state<DropboxState>("Dropbox");
-            std::lock_guard<std::mutex> dbx_lock(dropbox_state.mu);
-            dropbox_state.current_dbx_user_id.clear();
-            dropbox_state.current_folder_path.clear();
-        }
-        {
-            auto& icloud_state = registry_.get_state<ICloudState>("iCloud");
-            std::lock_guard<std::mutex> icl_lock(icloud_state.mu);
-            icloud_state.current_email.clear();
-            icloud_state.current_folder_path.clear();
-        }
-    }
+    // No-op placeholder - RemoteState upload context is managed in navigate_to_remote
+    // and automatically cleared when navigating to local paths
 
     void FileExplorerPanel::render() {
         auto& state = registry_.get_state<FileExplorerState>("Files");
@@ -452,47 +421,24 @@ namespace misty::panel {
             return;
         }
 
-        if (path_utils::is_onedrive_path(path)) {
-            // OneDrive path - parse and route
-            auto [folder_name, relative_path] = path_utils::parse_onedrive_path(path);
+        if (path_utils::is_remote_path(path)) {
+            // Remote path - parse remote name and relative path
+            auto [remote_name, relative_path] = path_utils::parse_remote_path(path);
 
-            if (folder_name.empty()) {
-                // At OneDrive mount root - show accounts
-                navigate_to_onedrive_mount_root(update_history);
+            if (remote_name.empty()) {
+                // At mount root - show all remote accounts
+                navigate_to_remote_mount_root(update_history);
             } else {
-                // Navigate into specific account
-                navigate_to_onedrive_account(folder_name, relative_path, update_history, create_if_missing);
+                // Navigate into specific remote
+                navigate_to_remote(remote_name, relative_path, update_history, create_if_missing);
             }
-        } else if (path_utils::is_gdrive_path(path)) {
-            // Google Drive path - parse and route
-            auto [folder_name, relative_path] = path_utils::parse_gdrive_path(path);
-
-            if (folder_name.empty()) {
-                navigate_to_gdrive_mount_root(update_history);
-            } else {
-                navigate_to_gdrive_account(folder_name, relative_path, update_history, create_if_missing);
-            }
-        } else if (path_utils::is_dropbox_path(path)) {
-            // Dropbox path - parse and route
-            auto [folder_name, relative_path] = path_utils::parse_dropbox_path(path);
-
-            if (folder_name.empty()) {
-                navigate_to_dropbox_mount_root(update_history);
-            } else {
-                navigate_to_dropbox_account(folder_name, relative_path, update_history, create_if_missing);
-            }
-        } else if (path_utils::is_icloud_path(path)) {
-            // iCloud path - parse and route
-            auto [folder_name, relative_path] = path_utils::parse_icloud_path(path);
-
-            if (folder_name.empty()) {
-                navigate_to_icloud_mount_root(update_history);
-            } else {
-                navigate_to_icloud_account(folder_name, relative_path, update_history, create_if_missing);
-            }
+        } else if (path == path_utils::get_mount_root() || path == path_utils::get_mount_root() + "/") {
+            // At mount root itself
+            navigate_to_remote_mount_root(update_history);
         } else {
-            // Local path - clear cloud upload contexts and notification tracking
-            clear_cloud_upload_contexts();
+            // Local path - clear remote upload context and notification tracking
+            auto& remote_state = registry_.get_state<RemoteState>("Remote");
+            remote_state.clear_upload_context();
             state.last_disconnected_notification_folder.clear();
             navigate_to_local_path_async(path, update_history);
         }
@@ -508,24 +454,19 @@ namespace misty::panel {
 
         std::lock_guard<std::mutex> svc_lock(services.mu);
 
-        workspace.account_mappings.clear();
-        for (const auto& conn : services.ms_connections) {
-            if (!conn.is_authenticated) continue;
+        workspace.remote_mappings.clear();
+        for (const auto& conn : services.connections) {
+            if (!conn.connected) continue;
 
-            AccountMapping mapping;
-            mapping.ms_user_id = conn.profile.id;
-            mapping.display_name = conn.profile.display_name;
-            mapping.email = conn.profile.email;
-            mapping.folder_name = mount_utils::derive_folder_name(conn.profile.email);
+            RemoteAccountMapping mapping;
+            mapping.folder_name = conn.name;     // remote name IS the folder name
+            mapping.remote_name = conn.name;
+            mapping.remote_type = conn.type;
+            mapping.display_name = conn.display_name;
 
-            mount_utils::ensure_account_directory(conn.profile.email);
+            mount_utils::ensure_remote_directory(conn.name);
 
-            std::string cached_drive_id, cached_display, cached_email;
-            if (load_drive_info_from_cache(conn.profile.id, cached_drive_id, cached_display, cached_email)) {
-                mapping.drive_id = cached_drive_id;
-            }
-
-            workspace.account_mappings.push_back(mapping);
+            workspace.remote_mappings.push_back(mapping);
         }
     }
 
