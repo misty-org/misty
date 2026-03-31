@@ -1145,6 +1145,10 @@ fn archive_format(path: &Path) -> String {
         || name.ends_with(".tar.gz")
         || name.ends_with(".tgz")
         || name.ends_with(".tar.bz2")
+        || name.ends_with(".tbz")
+        || name.ends_with(".tbz2")
+        || name.ends_with(".tar.xz")
+        || name.ends_with(".txz")
     {
         "tar"
     } else if name.ends_with(".7z") {

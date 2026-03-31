@@ -1,5 +1,5 @@
-import { recordClientDebugEvent } from "../../../shared/debug/clientDebug";
 import { appSnapshot } from "../../../api/misty";
+import { isNativeMobileBuild } from "../../../platform/buildTarget";
 import {
   clearAccountAuthToken,
   readAccountAuthToken,
@@ -41,7 +41,7 @@ async function getJson<T>(path: string): Promise<T> {
   return requestJson<T>("GET", path);
 }
 
-async function requestJson<T>(method: "GET" | "POST", path: string, body?: unknown): Promise<T> {
+async function requestJson<T>(method: "GET" | "POST" | "PUT", path: string, body?: unknown): Promise<T> {
   const apiBase = await resolveAccountApiBase();
   const url = `${apiBase}${path}`;
   try {
@@ -59,7 +59,7 @@ async function requestJson<T>(method: "GET" | "POST", path: string, body?: unkno
     const message = apiBase
       ? `Could not reach Misty server at ${apiBase}. ${errorMessage(error)}`
       : `Missing VITE_API_BASE for ${method} ${path}.`;
-    recordClientDebugEvent({
+    recordAccountApiDebugEvent({
       level: "error",
       scope: "account-api",
       message,
@@ -80,7 +80,7 @@ async function parseResponse<T>(response: Response, method: string, path: string
     const requestUrl = response.url || url;
     const fallback = `${method} ${requestUrl} failed: ${response.status} ${response.statusText || "HTTP error"}`;
     const errorMessage = message || fallback;
-    recordClientDebugEvent({
+    recordAccountApiDebugEvent({
       level: "error",
       scope: "account-api",
       message: errorMessage,
@@ -90,6 +90,23 @@ async function parseResponse<T>(response: Response, method: string, path: string
   }
 
   return payload as T;
+}
+
+function recordAccountApiDebugEvent(event: {
+  level: "info" | "warn" | "error";
+  scope: string;
+  message: string;
+  detail?: string;
+}): void {
+  if (!accountDebugEnabled()) return;
+  void import("../../../shared/debug/clientDebug").then(({ recordClientDebugEvent }) => {
+    recordClientDebugEvent(event);
+  });
+}
+
+function accountDebugEnabled(): boolean {
+  return !isNativeMobileBuild &&
+    (import.meta.env.DEV || import.meta.env.VITE_MISTY_DEBUG === "1");
 }
 
 async function parsePayload(response: Response, method: string, path: string): Promise<unknown> {
@@ -189,6 +206,14 @@ export async function accountRegister(name: string, email: string, password: str
 
 export function accountFetchMe(): Promise<AccountMeResponse> {
   return getJson("/me");
+}
+
+export async function accountUpdateProfile(name: string): Promise<void> {
+  await requestJson("PUT", "/me/profile", { name });
+}
+
+export async function accountUpdateDevice(device: string): Promise<void> {
+  await requestJson("PUT", "/me/device", { device });
 }
 
 export async function accountLogout(): Promise<void> {

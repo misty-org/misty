@@ -1,0 +1,21 @@
+[package]
+name = "tauri-plugin-document-tree"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.77.2"
+build = "build.rs"
+links = "tauri-plugin-document-tree"
+description = "Android Storage Access Framework document-tree bridge for Misty."
+license = "Apache-2.0"
+
+[lib]
+name = "tauri_plugin_document_tree"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+tauri = "2"
+thiserror = "1"
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }

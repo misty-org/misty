@@ -1,8 +1,8 @@
 name: misty-desktop
 options:
-  bundleIdPrefix: com.misty.desktop
+  bundleIdPrefix: com.misty.mobile
   deploymentTarget:
-    iOS: 14.0
+    iOS: 15.0
 fileGroups: [../../src]
 configs:
   debug: debug
@@ -11,7 +11,7 @@ settingGroups:
   app:
     base:
       PRODUCT_NAME: Misty
-      PRODUCT_BUNDLE_IDENTIFIER: com.misty.desktop
+      PRODUCT_BUNDLE_IDENTIFIER: com.misty.mobile
 targetTemplates:
   app:
     type: application
@@ -31,6 +31,7 @@ targets:
       - path: Sources
       - path: Assets.xcassets
       - path: Externals
+        buildPhase: none
       - path: misty-desktop_iOS
       - path: assets
         buildPhase: resources
@@ -44,15 +45,16 @@ targets:
         UIRequiredDeviceCapabilities: [arm64, metal]
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
-          - UIInterfaceOrientationLandscapeLeft
-          - UIInterfaceOrientationLandscapeRight
-        UISupportedInterfaceOrientations~ipad:
-          - UIInterfaceOrientationPortrait
-          - UIInterfaceOrientationPortraitUpsideDown
-          - UIInterfaceOrientationLandscapeLeft
-          - UIInterfaceOrientationLandscapeRight
         CFBundleShortVersionString: 0.1.0
-        CFBundleVersion: "0.1.0"
+        CFBundleVersion: "1"
+        ITSAppUsesNonExemptEncryption: false
+        CFBundleURLTypes:
+          - CFBundleURLName: misty
+            CFBundleURLSchemes:
+              - misty
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        NSLocalNetworkUsageDescription: Misty uses local secure runtime services on this device to browse and transfer files.
     entitlements:
       path: misty-desktop_iOS/misty-desktop_iOS.entitlements
     scheme:
@@ -62,6 +64,7 @@ targets:
     settings:
       base:
         ENABLE_BITCODE: false
+        TARGETED_DEVICE_FAMILY: 1
         ARCHS: [arm64]
         VALID_ARCHS: arm64 
         LIBRARY_SEARCH_PATHS[arch=x86_64]: $(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)

@@ -49,22 +49,26 @@ import {
 
 const EMPTY_REMOTES: ProviderRemote[] = [];
 const EMPTY_WORKFLOWS: ProviderWorkflow[] = [];
+const mobileProviderAuthDebugEnabled = import.meta.env.DEV;
 const mobileProviderWorkspaceId = "mobile-providers";
-const sheetBackdropClass = "fixed inset-0 z-[1000] flex items-end bg-black/50";
-const sheetClass = "w-full max-h-[min(calc(100dvh-var(--misty-safe-top)-18px),680px)] overflow-auto rounded-t-3xl border border-white/10 bg-[#0a0f15] px-[max(var(--misty-mobile-edge),var(--misty-safe-left))] pb-[calc(18px+var(--misty-safe-bottom))] pr-[max(var(--misty-mobile-edge),var(--misty-safe-right))] pt-[18px] shadow-[0_-20px_55px_rgba(0,0,0,0.5)]";
+type MobileDiscardAction = "close" | "reload";
+const sheetBackdropClass = "fixed inset-0 z-[1000] flex items-end bg-black/60";
+const sheetClass = "w-full max-h-[min(calc(100dvh-var(--misty-safe-top)-18px),680px)] overflow-auto rounded-t-[18px] border border-[var(--misty-border-soft)] bg-[var(--misty-surface)] px-[max(var(--misty-mobile-edge),var(--misty-safe-left))] pb-[calc(18px+var(--misty-safe-bottom))] pr-[max(var(--misty-mobile-edge),var(--misty-safe-right))] pt-[18px] shadow-[0_-24px_70px_rgba(0,0,0,0.52)]";
 const sheetHeaderClass = "mb-3.5 flex items-center justify-between gap-3";
-const sheetKickerClass = "text-[11px] font-bold uppercase tracking-normal text-[#8792a0]";
-const sheetTitleClass = "m-0 text-xl font-black leading-[1.15] text-[#f4f0e8]";
+const sheetKickerClass = "text-[11px] font-bold uppercase tracking-normal text-[var(--misty-text-subtle)]";
+const sheetTitleClass = "m-0 text-xl font-black leading-[1.15] text-[var(--misty-text)]";
 const actionStackClass = "mt-3 grid gap-2.5";
-const primaryActionClass = "inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[14px] border-0 bg-[#eef3fb] px-4 font-bold text-[#05070a] disabled:opacity-50";
-const secondaryActionClass = "inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[14px] border border-white/10 bg-[#101720] px-4 font-bold text-[#eef3fb] disabled:opacity-50";
+const primaryActionClass = "inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[var(--misty-radius-sm)] border border-[var(--misty-primary)] bg-[var(--misty-primary)] px-4 font-bold text-[var(--misty-primary-contrast)] disabled:opacity-50";
+const secondaryActionClass = "inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[var(--misty-radius-sm)] border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] px-4 font-bold text-[var(--misty-text)] disabled:opacity-50";
 const dangerActionClass = `${secondaryActionClass} text-[#ffb8bf]`;
 const inputGroupClass = "grid min-w-0 gap-1.5";
-const inputLabelClass = "text-xs font-bold text-[#a3adba]";
-const inputControlClass = "h-[46px] w-full min-w-0 rounded-[14px] border border-white/10 bg-[#0b1118] px-[13px] text-base text-[#f4f0e8] outline-none focus:border-[#86b7ff6b] focus:shadow-[0_0_0_3px_rgba(134,183,255,0.12)] disabled:opacity-50 read-only:text-[#a3adba]";
-const iconButtonClass = "relative grid h-[38px] w-[38px] flex-none place-items-center rounded-xl border border-white/10 bg-[#101720] text-[#eef3fb] disabled:opacity-45";
+const inputLabelClass = "text-xs font-bold text-[var(--misty-text-muted)]";
+const inputControlClass = "h-[46px] w-full min-w-0 rounded-[14px] border border-[var(--misty-border-soft)] bg-[var(--misty-surface)] px-[13px] text-base text-[var(--misty-text)] outline-none focus:border-[var(--misty-border-strong)] focus:shadow-[0_0_0_3px_var(--misty-focus-ring)] disabled:opacity-50 read-only:text-[var(--misty-text-muted)]";
+const iconButtonClass = "relative grid h-11 w-11 flex-none place-items-center rounded-xl border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] text-[var(--misty-text)] disabled:opacity-45";
 const compactEmptyClass = "grid place-items-center gap-2.5 text-center";
-const noteClass = "m-0 text-[13px] leading-[1.4] text-[#a3adba]";
+const noteClass = "m-0 text-[13px] leading-[1.4] text-[var(--misty-text-muted)]";
+const remoteActionClass = "inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] px-2.5 text-xs font-bold text-[var(--misty-text)] disabled:opacity-50";
+const remoteDangerActionClass = "inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-[#ffb8bf38] bg-[#ffb8bf14] px-2.5 text-xs font-bold text-[#ffb8bf] disabled:opacity-50";
 
 export function MobileProvidersPage() {
   const {
@@ -83,7 +87,6 @@ export function MobileProvidersPage() {
     load,
     ensureWorkspace,
     openAddRemote,
-    openReconnectRemote,
     openRepairRemote,
     closeConnection,
     chooseConnectionProvider,
@@ -120,7 +123,6 @@ export function MobileProvidersPage() {
     load: state.load,
     ensureWorkspace: state.ensureWorkspace,
     openAddRemote: state.openAddRemote,
-    openReconnectRemote: state.openReconnectRemote,
     openRepairRemote: state.openRepairRemote,
     closeConnection: state.closeConnection,
     chooseConnectionProvider: state.chooseConnectionProvider,
@@ -144,6 +146,7 @@ export function MobileProvidersPage() {
   })));
   const [refreshSpinning, startRefreshSpin] = useMinimumSpin(loading);
   const [managedRemoteName, setManagedRemoteName] = useState<string | null>(null);
+  const [discardAction, setDiscardAction] = useState<MobileDiscardAction | null>(null);
 
   useEffect(() => {
     ensureWorkspace(mobileProviderWorkspaceId);
@@ -164,8 +167,31 @@ export function MobileProvidersPage() {
     : null;
 
   const closeManageSheet = () => {
-    if (workspaceDerived.dirty && !window.confirm("Discard unsaved remote edits?")) return;
+    if (workspaceDerived.dirty) {
+      setDiscardAction("close");
+      return;
+    }
     setManagedRemoteName(null);
+  };
+
+  const reloadManagedRemote = () => {
+    if (workspaceDerived.dirty) {
+      setDiscardAction("reload");
+      return;
+    }
+    void reloadWorkspaceRemote(mobileProviderWorkspaceId);
+  };
+
+  const discardRemoteEdits = () => {
+    const action = discardAction;
+    setDiscardAction(null);
+    if (action === "close") {
+      setManagedRemoteName(null);
+      return;
+    }
+    if (action === "reload") {
+      void reloadWorkspaceRemote(mobileProviderWorkspaceId);
+    }
   };
 
   const openManageSheet = (remote: ProviderRemote) => {
@@ -179,30 +205,29 @@ export function MobileProvidersPage() {
 
   return (
     <section className={mobilePageClass}>
-      <div className="mb-3.5 grid min-w-0 grid-cols-[52px_minmax(0,1fr)] items-center gap-3">
-        <div className="grid h-[52px] w-[52px] place-items-center rounded-2xl bg-[#86b7ff24] text-[#cfe2ff]">
-          <Cloud size={31} strokeWidth={1.75} />
+      <div className="mb-3 grid min-w-0 grid-cols-[48px_minmax(0,1fr)] items-center gap-3">
+        <div className="grid h-12 w-12 place-items-center rounded-[15px] bg-[#86b7ff24] text-[#cfe2ff]">
+          <Cloud size={27} strokeWidth={1.75} />
         </div>
         <div className="min-w-0">
-          <span className="text-[11px] font-bold uppercase tracking-normal text-[#8792a0]">Cloud access</span>
-          <h2 className="m-0 mb-1 truncate text-2xl font-black leading-[1.1] text-[#f4f0e8]">
+          <span className={mobileSectionEyebrowClass}>Cloud access</span>
+          <h2 className="m-0 mb-1 truncate text-[22px] font-black leading-[1.1] text-[var(--misty-text)]">
             {connectedCount > 0 ? `${connectedCount} connected` : "Connect remotes"}
           </h2>
-          <p className="m-0 text-[13px] leading-[1.35] text-[#a3adba]">{status}</p>
+          <p className="m-0 text-[13px] leading-[1.35] text-[var(--misty-text-muted)]">{status}</p>
         </div>
       </div>
 
       {error ? <div className={mobileErrorClass}>{error}</div> : null}
       {message ? <div className={mobileSuccessClass}>{message}</div> : null}
 
-      <div className="mb-4 grid grid-cols-2 gap-3.5">
+      <div className="mb-3 grid grid-cols-[1.25fr_0.85fr_0.85fr] gap-2.5">
         <SummaryTile label="Service" value={health?.ready ? "Ready" : "Unavailable"} tone={health?.ready ? "good" : "warn"} />
         <SummaryTile label="Connected" value={`${connectedCount}`} tone={connectedCount > 0 ? "good" : undefined} />
         <SummaryTile label="Available" value={`${providerCount}`} />
-        <SummaryTile label="Version" value={health?.version || "Unknown"} />
       </div>
 
-      <div className={actionStackClass}>
+      <div className={`${actionStackClass} mt-2`}>
         <button
           type="button"
           className={primaryActionClass}
@@ -224,7 +249,7 @@ export function MobileProvidersPage() {
         </button>
       </div>
 
-      <section className="mt-[18px]">
+      <section className="mt-[18px] min-w-0 overflow-hidden">
         <div className={mobileSectionHeaderClass}>
           <div>
             <span className={mobileSectionEyebrowClass}>Remotes</span>
@@ -244,7 +269,6 @@ export function MobileProvidersPage() {
                 key={remote.name}
                 remote={remote}
                 disabled={working || Boolean(connection)}
-                onReconnect={() => void openReconnectRemote(remote)}
                 onRepair={() => void openRepairRemote(remote)}
                 onManage={() => openManageSheet(remote)}
                 onDisconnect={() => requestDisconnect(remote.name)}
@@ -252,7 +276,7 @@ export function MobileProvidersPage() {
             ))}
           </div>
         ) : (
-          <div className={mobileEmptyStateClass}>
+          <div className="relative z-10 grid min-h-[260px] place-items-center gap-2 rounded-[14px] border border-[var(--misty-border-soft)] bg-[var(--misty-bg)] px-4 py-8 text-center text-[#a3adba]">
             <div className={mobileEmptyIconClass}>
               <PlugZap size={31} strokeWidth={1.7} />
             </div>
@@ -297,16 +321,22 @@ export function MobileProvidersPage() {
           onConfigField={(key, value) => setWorkspaceConfigField(mobileProviderWorkspaceId, key, value)}
           onTokenField={(key, value) => setWorkspaceTokenField(mobileProviderWorkspaceId, key, value)}
           onTokenVisible={(visible) => setWorkspaceTokenVisible(mobileProviderWorkspaceId, visible)}
-          onReconnect={(remote) => void openReconnectRemote(remote)}
           onRepair={(remote) => void openRepairRemote(remote)}
           onDisconnect={(name) => requestDisconnect(name)}
           onTest={() => void testWorkspaceConnection(mobileProviderWorkspaceId)}
           onReveal={() => void revealWorkspaceConfig(mobileProviderWorkspaceId)}
           onSave={() => void saveWorkspaceRemote(mobileProviderWorkspaceId)}
           onReload={() => {
-            if (workspaceDerived.dirty && !window.confirm("Reload this remote and discard unsaved edits?")) return;
-            void reloadWorkspaceRemote(mobileProviderWorkspaceId);
+            reloadManagedRemote();
           }}
+        />
+      ) : null}
+
+      {discardAction ? (
+        <MobileProviderDiscardSheet
+          action={discardAction}
+          onClose={() => setDiscardAction(null)}
+          onConfirm={discardRemoteEdits}
         />
       ) : null}
 
@@ -325,7 +355,6 @@ export function MobileProvidersPage() {
 function MobileRemoteCard(props: {
   remote: ProviderRemote;
   disabled: boolean;
-  onReconnect: () => void;
   onRepair: () => void;
   onManage: () => void;
   onDisconnect: () => void;
@@ -335,42 +364,37 @@ function MobileRemoteCard(props: {
   const healthy = !props.remote.needsReconnect && !props.remote.error;
   const issueMessage = providerIssueMessage(props.remote);
   return (
-    <article className={`grid min-w-0 gap-2.5 border-0 border-b border-[var(--misty-border-soft)] bg-transparent py-3 text-[#eef3fb] ${healthy ? "" : "border-[#e9c77538]"}`}>
+    <article className={`grid min-w-0 gap-2.5 border-0 border-b border-[var(--misty-border-soft)] bg-transparent py-3 text-[var(--misty-text)] ${healthy ? "" : "border-[#e9c77538]"}`}>
       <div className="flex min-w-0 items-center gap-2.5">
-        <span className="grid h-[42px] w-[42px] flex-none place-items-center rounded-[13px] bg-[#86b7ff24] text-[#cfe2ff]">
+        <span className="grid h-[42px] w-[42px] flex-none place-items-center rounded-[13px] bg-[color-mix(in_srgb,var(--misty-primary)_16%,transparent)] text-[var(--misty-primary)]">
           <AssetIcon src={providerIcon.src} color={providerIcon.color} size={22} />
         </span>
         <div className="min-w-0">
-          <strong className="block truncate text-[15px] font-bold text-[#f4f0e8]">{props.remote.name}</strong>
-          <small className="block text-xs leading-[1.35] text-[#8792a0]">{props.remote.type}{externalConfig ? " · user config" : ""}</small>
+          <strong className="block truncate text-[15px] font-bold text-[var(--misty-text)]">{props.remote.name}</strong>
+          <small className="block text-xs leading-[1.35] text-[var(--misty-text-subtle)]">{props.remote.type}{externalConfig ? " · user config" : ""}</small>
         </div>
       </div>
       <div className={`text-xs font-bold ${healthy ? "text-[#9ee6b2]" : "text-[#e9c775]"}`}>
         <span>{props.remote.statusLabel}</span>
       </div>
-      {issueMessage ? <p className="m-0 text-[13px] leading-[1.35] text-[#a3adba]">{issueMessage}</p> : null}
+      {issueMessage ? <p className="m-0 text-[13px] leading-[1.35] text-[var(--misty-text-muted)]">{issueMessage}</p> : null}
       <div className="flex flex-wrap gap-1.5">
         {externalConfig ? (
-          <button type="button" className="inline-flex min-h-[34px] items-center gap-1.5 rounded-lg border border-white/10 bg-[#101720] px-2.5 text-xs font-bold text-[#eef3fb] disabled:opacity-50" disabled={props.disabled} onClick={props.onRepair}>
+          <button type="button" className={remoteActionClass} disabled={props.disabled} onClick={props.onRepair}>
             <FolderPlus size={15} /> Import
           </button>
         ) : (
-          <button type="button" className="inline-flex min-h-[34px] items-center gap-1.5 rounded-lg border border-white/10 bg-[#101720] px-2.5 text-xs font-bold text-[#eef3fb] disabled:opacity-50" disabled={props.disabled} onClick={props.onManage}>
+          <button type="button" className={remoteActionClass} disabled={props.disabled} onClick={props.onManage}>
             <Wrench size={15} /> Manage
           </button>
         )}
-        {!externalConfig && props.remote.needsReconnect ? (
-          <button type="button" className="inline-flex min-h-[34px] items-center gap-1.5 rounded-lg border border-white/10 bg-[#101720] px-2.5 text-xs font-bold text-[#eef3fb] disabled:opacity-50" disabled={props.disabled} onClick={props.onReconnect}>
-            <RefreshCcw size={15} /> Reconnect
-          </button>
-        ) : null}
         {!externalConfig ? (
-          <button type="button" className="inline-flex min-h-[34px] items-center gap-1.5 rounded-lg border border-white/10 bg-[#101720] px-2.5 text-xs font-bold text-[#eef3fb] disabled:opacity-50" disabled={props.disabled} onClick={props.onRepair}>
+          <button type="button" className={remoteActionClass} disabled={props.disabled} onClick={props.onRepair}>
             <Wrench size={15} /> Configure
           </button>
         ) : null}
-        <button type="button" className="inline-flex min-h-[34px] items-center gap-1.5 rounded-lg border border-[#ffb8bf38] bg-[#ffb8bf14] px-2.5 text-xs font-bold text-[#ffb8bf] disabled:opacity-50" disabled={props.disabled} onClick={props.onDisconnect}>
-          <Trash2 size={15} /> Delete
+        <button type="button" className={remoteDangerActionClass} disabled={props.disabled} onClick={props.onDisconnect}>
+              <Trash2 size={15} /> Remove
         </button>
       </div>
     </article>
@@ -391,7 +415,6 @@ function MobileRemoteManageSheet(props: {
   onConfigField: (key: string, value: string) => void;
   onTokenField: (key: string, value: string) => void;
   onTokenVisible: (visible: boolean) => void;
-  onReconnect: (remote: ProviderRemote) => void;
   onRepair: (remote: ProviderRemote) => void;
   onDisconnect: (name: string) => void;
   onTest: () => void;
@@ -451,15 +474,15 @@ function MobileRemoteManageSheet(props: {
             />
 
             <div className="grid grid-cols-2 gap-2">
-              <button type="button" className="inline-flex min-h-[42px] min-w-0 items-center justify-center gap-1.5 rounded-[13px] border border-white/10 bg-[#101720] px-2.5 text-xs font-bold text-[#eef3fb] disabled:opacity-50" disabled={props.working} onClick={props.onTest}>
+              <button type="button" className="inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-[13px] border border-white/10 bg-[#101720] px-2.5 text-xs font-bold text-[#eef3fb] disabled:opacity-50" disabled={props.working} onClick={props.onTest}>
                 <Cloud size={16} /> Test
               </button>
-              <button type="button" className="inline-flex min-h-[42px] min-w-0 items-center justify-center gap-1.5 rounded-[13px] border border-white/10 bg-[#101720] px-2.5 text-xs font-bold text-[#eef3fb] disabled:opacity-50" disabled={props.working} onClick={props.onReveal}>
+              <button type="button" className="inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-[13px] border border-white/10 bg-[#101720] px-2.5 text-xs font-bold text-[#eef3fb] disabled:opacity-50" disabled={props.working} onClick={props.onReveal}>
                 <FileText size={16} /> Config
               </button>
               <button
                 type="button"
-                className="inline-flex min-h-[42px] min-w-0 items-center justify-center gap-1.5 rounded-[13px] border border-white/10 bg-[#101720] px-2.5 text-xs font-bold text-[#eef3fb] disabled:opacity-50"
+                className="inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-[13px] border border-white/10 bg-[#101720] px-2.5 text-xs font-bold text-[#eef3fb] disabled:opacity-50"
                 disabled={props.working || props.stale || !props.dirty || !props.validRemoteName}
                 onClick={props.onSave}
               >
@@ -467,7 +490,7 @@ function MobileRemoteManageSheet(props: {
               </button>
               <button
                 type="button"
-                className="inline-flex min-h-[42px] min-w-0 items-center justify-center gap-1.5 rounded-[13px] border border-white/10 bg-[#101720] px-2.5 text-xs font-bold text-[#eef3fb] disabled:opacity-50"
+                className="inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-[13px] border border-white/10 bg-[#101720] px-2.5 text-xs font-bold text-[#eef3fb] disabled:opacity-50"
                 disabled={props.working}
                 onClick={() => {
                   startReloadSpin();
@@ -478,15 +501,12 @@ function MobileRemoteManageSheet(props: {
               </button>
               {remote ? (
                 <>
-                  <button type="button" className="inline-flex min-h-[42px] min-w-0 items-center justify-center gap-1.5 rounded-[13px] border border-white/10 bg-[#101720] px-2.5 text-xs font-bold text-[#eef3fb] disabled:opacity-50" disabled={props.working} onClick={() => props.onRepair(remote)}>
-                    <Wrench size={16} /> Repair
-                  </button>
-                  <button type="button" className="inline-flex min-h-[42px] min-w-0 items-center justify-center gap-1.5 rounded-[13px] border border-white/10 bg-[#101720] px-2.5 text-xs font-bold text-[#eef3fb] disabled:opacity-50" disabled={props.working} onClick={() => props.onReconnect(remote)}>
-                    <RefreshCcw size={16} /> Reconnect
+                  <button type="button" className="inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-[13px] border border-white/10 bg-[#101720] px-2.5 text-xs font-bold text-[#eef3fb] disabled:opacity-50" disabled={props.working} onClick={() => props.onRepair(remote)}>
+                    <Wrench size={16} /> Configure
                   </button>
                 </>
               ) : null}
-              <button type="button" className="inline-flex min-h-[42px] min-w-0 items-center justify-center gap-1.5 rounded-[13px] border border-[#ffb8bf38] bg-[#ffb8bf14] px-2.5 text-xs font-bold text-[#ffb8bf] disabled:opacity-50" disabled={props.working} onClick={() => props.onDisconnect(draft.originalName)}>
+              <button type="button" className="inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-[13px] border border-[#ffb8bf38] bg-[#ffb8bf14] px-2.5 text-xs font-bold text-[#ffb8bf] disabled:opacity-50" disabled={props.working} onClick={() => props.onDisconnect(draft.originalName)}>
                 <Trash2 size={16} /> Delete
               </button>
             </div>
@@ -565,7 +585,7 @@ function MobileRemoteConfigField(props: {
         <fieldset className="m-0 grid min-w-0 gap-2.5 rounded-2xl border border-white/10 bg-[#0b1016] p-3">
           <legend className="flex w-full items-center justify-between gap-2.5 p-0 text-[11px] font-extrabold uppercase tracking-normal text-[#8792a0]">
             <span>Authentication</span>
-            <button type="button" className="inline-flex min-h-[30px] items-center gap-1.5 rounded-full border border-white/10 bg-[#101720] px-2.5 text-xs font-bold normal-case text-[#eef3fb]" onClick={() => props.onTokenVisible(!props.tokenVisible)}>
+            <button type="button" className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-white/10 bg-[#101720] px-2.5 text-xs font-bold normal-case text-[#eef3fb]" onClick={() => props.onTokenVisible(!props.tokenVisible)}>
               {props.tokenVisible ? <EyeOff size={15} /> : <Eye size={15} />}
               {props.tokenVisible ? "Hide" : "Show"}
             </button>
@@ -659,6 +679,48 @@ function MobileProviderDisconnectSheet(props: {
   );
 }
 
+function MobileProviderDiscardSheet(props: {
+  action: MobileDiscardAction;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  const reload = props.action === "reload";
+  return (
+    <div className="fixed inset-0 z-[1100] flex items-end bg-black/60" role="presentation" onClick={props.onClose}>
+      <section
+        className={`${sheetClass} grid gap-3`}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Discard unsaved remote edits"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <header className={sheetHeaderClass}>
+          <div>
+            <span className={sheetKickerClass}>Unsaved changes</span>
+            <h2 className={sheetTitleClass}>{reload ? "Reload remote?" : "Discard changes?"}</h2>
+          </div>
+          <button type="button" className={iconButtonClass} aria-label="Keep editing" onClick={props.onClose}>
+            <X size={20} />
+          </button>
+        </header>
+        <p className={noteClass}>
+          {reload
+            ? "Reloading replaces the edits you have not saved."
+            : "Closing this remote discards the edits you have not saved."}
+          </p>
+        <div className={actionStackClass}>
+          <button type="button" className={dangerActionClass} onClick={props.onConfirm}>
+            {reload ? <RefreshCcw size={17} /> : <X size={17} />} {reload ? "Discard and reload" : "Discard changes"}
+          </button>
+          <button type="button" className={secondaryActionClass} onClick={props.onClose}>
+            Keep editing
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function MobileProviderConnectionSheet(props: {
   session: ProviderConnectionSession;
   workflows: ProviderWorkflow[];
@@ -703,7 +765,6 @@ function MobileProviderConnectionSheet(props: {
             type="button"
             className={iconButtonClass}
             aria-label="Close provider setup"
-            disabled={props.session.inFlight}
             onClick={props.onClose}
           >
             <X size={18} strokeWidth={1.9} />
@@ -774,7 +835,6 @@ function MobileProviderConnectionSheet(props: {
             <button
               type="button"
               className={secondaryActionClass}
-              disabled={props.session.inFlight}
               onClick={props.onClose}
             >
               Cancel
@@ -810,17 +870,17 @@ function ProviderPicker(props: {
           <button
             key={workflow.type}
             type="button"
-            className="flex min-w-0 w-full items-center gap-[11px] rounded-2xl border border-white/10 bg-[#0b1016] p-3.5 text-left text-[#eef3fb] hover:bg-[#101720] focus-visible:bg-[#101720]"
+          className="flex min-w-0 w-full items-center gap-[11px] rounded-[14px] border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] p-3.5 text-left text-[var(--misty-text)] hover:bg-[var(--misty-surface-hover)] focus-visible:bg-[var(--misty-surface-hover)]"
             onClick={() => props.onChooseProvider(workflow.type)}
           >
-            <span className="grid h-[42px] w-[42px] flex-none place-items-center rounded-[13px] bg-[#86b7ff24] text-[#cfe2ff]">
+            <span className="grid h-[42px] w-[42px] flex-none place-items-center rounded-[13px] bg-[color-mix(in_srgb,var(--misty-primary)_16%,transparent)] text-[var(--misty-primary)]">
               <AssetIcon src={providerIcon.src} color={providerIcon.color} size={22} />
             </span>
             <span className="min-w-0">
-              <strong className="block truncate text-[15px] font-bold text-[#f4f0e8]">{workflow.name || workflow.type}</strong>
-              <small className="block text-xs leading-[1.35] text-[#8792a0]">{workflow.description || workflow.type}</small>
+              <strong className="block truncate text-[15px] font-bold text-[var(--misty-text)]">{workflow.name || workflow.type}</strong>
+              <small className="block text-xs leading-[1.35] text-[var(--misty-text-muted)]">{workflow.description || workflow.type}</small>
             </span>
-            <ChevronRight className="ml-auto flex-none text-[#8792a0]" size={18} strokeWidth={1.8} />
+            <ChevronRight className="ml-auto flex-none text-[var(--misty-text-subtle)]" size={18} strokeWidth={1.8} />
           </button>
         );
       })}
@@ -839,7 +899,7 @@ function ProviderConfiguration(props: {
   return (
     <div className="grid gap-2.5">
       {props.onBack ? (
-        <button type="button" className="inline-flex min-h-[34px] w-fit items-center gap-1.5 rounded-[11px] border border-white/10 bg-[#101720] px-2.5 text-xs font-bold text-[#eef3fb]" onClick={props.onBack}>
+        <button type="button" className="inline-flex min-h-11 w-fit items-center gap-1.5 rounded-[11px] border border-white/10 bg-[#101720] px-2.5 text-xs font-bold text-[#eef3fb]" onClick={props.onBack}>
           <ArrowLeft size={16} /> Remotes
         </button>
       ) : null}
@@ -852,9 +912,9 @@ function ProviderConfiguration(props: {
           onChange={(event) => props.onName(event.target.value)}
         />
       </label>
-      <div className="grid gap-1 rounded-[14px] border border-white/10 bg-[#0b1016] p-3">
+      <div className="grid gap-1 rounded-[14px] border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] p-3">
         <span className={sheetKickerClass}>Provider</span>
-        <strong className="truncate text-[15px] font-bold text-[#f4f0e8]">{props.workflow?.name || props.session.providerType}</strong>
+        <strong className="truncate text-[15px] font-bold text-[var(--misty-text)]">{props.workflow?.name || props.session.providerType}</strong>
       </div>
       {options.map((option) => (
         <ProviderOptionField
@@ -888,7 +948,7 @@ function ProviderOptionField(props: {
         <input
           className={inputControlClass}
           value={props.value}
-          type={option.password ? "password" : "text"}
+          type={option.password || isSecretKey(option.name) ? "password" : "text"}
           onChange={(event) => props.onChange(event.target.value)}
         />
       )}
@@ -940,30 +1000,32 @@ function ProviderAuthorizeState(props: {
           <ExternalLink size={16} /> {props.session.openedAuthorizeUrl ? "Reopen sign in" : "Open sign in"}
         </button>
       ) : null}
-      <div className="mt-1.5 w-full min-w-0 text-left">
-        <div className="grid gap-[5px] rounded-xl border border-white/10 border-l-[#86b7ff] bg-[#080d13] p-2.5">
-          <strong className="text-xs text-[#f4f0e8]">Provider auth debug</strong>
-          <p className="m-0 text-[11px] leading-[1.35] text-[#a3adba]">Attempts: {props.session.authorizeOpenAttempts}</p>
-          <p className="m-0 text-[11px] leading-[1.35] text-[#a3adba]">URL: {authorizeUrl ? "present" : "missing"}</p>
-          {props.session.authorizeOpenResult ? (
-            <>
-              <p className="m-0 text-[11px] leading-[1.35] text-[#a3adba]">Platform: {props.session.authorizeOpenResult.platform}</p>
-              <p className="m-0 text-[11px] leading-[1.35] text-[#a3adba]">Opened with: {props.session.authorizeOpenResult.strategy}</p>
-              <time className="m-0 text-[11px] leading-[1.35] text-[#a3adba]">{formatDebugTime(props.session.authorizeOpenResult.attemptedAt)}</time>
-              {props.session.authorizeOpenResult.fallbackReason ? (
-                <code className="max-h-[108px] overflow-auto break-words rounded-lg bg-[#030609] p-2 text-[10px] leading-[1.4] text-[#d7e1ec] [white-space:pre-wrap]">{props.session.authorizeOpenResult.fallbackReason}</code>
-              ) : null}
-            </>
-          ) : null}
-          {props.session.authorizeOpenError ? <code className="max-h-[108px] overflow-auto break-words rounded-lg bg-[#030609] p-2 text-[10px] leading-[1.4] text-[#d7e1ec] [white-space:pre-wrap]">{props.session.authorizeOpenError}</code> : null}
-          {authorizeUrl ? <code className="max-h-[108px] overflow-auto break-words rounded-lg bg-[#030609] p-2 text-[10px] leading-[1.4] text-[#d7e1ec] [white-space:pre-wrap]">{authorizeUrl}</code> : null}
-          {authorizeUrl ? (
-            <button type="button" className="inline-flex min-h-[34px] items-center justify-center gap-1.5 rounded-[10px] border border-white/10 bg-[#101720] px-2.5 text-xs font-bold text-[#eef3fb]" onClick={() => void copyAuthorizeUrl()}>
-              <Copy size={14} /> {copyStatus ?? "Copy URL"}
-            </button>
-          ) : null}
+      {mobileProviderAuthDebugEnabled ? (
+        <div className="mt-1.5 w-full min-w-0 text-left">
+          <div className="grid gap-[5px] rounded-xl border border-white/10 border-l-[#86b7ff] bg-[#080d13] p-2.5">
+            <strong className="text-xs text-[#f4f0e8]">Provider auth debug</strong>
+            <p className="m-0 text-[11px] leading-[1.35] text-[#a3adba]">Attempts: {props.session.authorizeOpenAttempts}</p>
+            <p className="m-0 text-[11px] leading-[1.35] text-[#a3adba]">URL: {authorizeUrl ? "present" : "missing"}</p>
+            {props.session.authorizeOpenResult ? (
+              <>
+                <p className="m-0 text-[11px] leading-[1.35] text-[#a3adba]">Platform: {props.session.authorizeOpenResult.platform}</p>
+                <p className="m-0 text-[11px] leading-[1.35] text-[#a3adba]">Opened with: {props.session.authorizeOpenResult.strategy}</p>
+                <time className="m-0 text-[11px] leading-[1.35] text-[#a3adba]">{formatDebugTime(props.session.authorizeOpenResult.attemptedAt)}</time>
+                {props.session.authorizeOpenResult.fallbackReason ? (
+                  <code className="max-h-[108px] overflow-auto break-words rounded-lg bg-[#030609] p-2 text-[10px] leading-[1.4] text-[#d7e1ec] [white-space:pre-wrap]">{props.session.authorizeOpenResult.fallbackReason}</code>
+                ) : null}
+              </>
+            ) : null}
+            {props.session.authorizeOpenError ? <code className="max-h-[108px] overflow-auto break-words rounded-lg bg-[#030609] p-2 text-[10px] leading-[1.4] text-[#d7e1ec] [white-space:pre-wrap]">{props.session.authorizeOpenError}</code> : null}
+            {authorizeUrl ? <code className="max-h-[108px] overflow-auto break-words rounded-lg bg-[#030609] p-2 text-[10px] leading-[1.4] text-[#d7e1ec] [white-space:pre-wrap]">{authorizeUrl}</code> : null}
+            {authorizeUrl ? (
+              <button type="button" className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] border border-white/10 bg-[#101720] px-2.5 text-xs font-bold text-[#eef3fb]" onClick={() => void copyAuthorizeUrl()}>
+                <Copy size={14} /> {copyStatus ?? "Copy URL"}
+              </button>
+            ) : null}
+          </div>
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }
@@ -1004,9 +1066,9 @@ function MobileProviderProgress(props: { session: ProviderConnectionSession }) {
 
 function SummaryTile(props: { label: string; value: string; tone?: "good" | "warn" }) {
   return (
-    <div className="grid min-w-0 gap-[3px] border-0 bg-transparent p-0">
+    <div className="grid min-w-0 gap-[3px] rounded-[14px] border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] px-2.5 py-2.5">
       <span className="truncate text-[11px] font-bold uppercase tracking-normal text-[var(--misty-text-subtle)]">{props.label}</span>
-      <strong className={`truncate text-2xl font-bold leading-none ${props.tone === "good" ? "text-[#86efac]" : props.tone === "warn" ? "text-[#fde68a]" : "text-[var(--misty-text)]"}`}>
+      <strong className={`truncate text-[18px] font-bold leading-tight ${props.tone === "good" ? "text-[#86efac]" : props.tone === "warn" ? "text-[#fde68a]" : "text-[var(--misty-text)]"}`}>
         {props.value}
       </strong>
     </div>
@@ -1028,7 +1090,6 @@ function workflowForType(workflows: ProviderWorkflow[], type: string): ProviderW
 }
 
 function sheetTitle(session: ProviderConnectionSession): string {
-  if (session.mode === "reconnect") return "Reconnect";
   if (session.mode === "repair") return "Configure";
   if (session.stage === "complete") return "Connected";
   return "Connect provider";
@@ -1044,7 +1105,6 @@ function sheetStepLabel(session: ProviderConnectionSession): string {
 function submitLabel(session: ProviderConnectionSession): string {
   if (session.inFlight) return session.step ? "Continuing..." : "Starting...";
   if (session.step) return "Continue";
-  if (session.mode === "reconnect") return "Reconnect";
   if (session.mode === "repair") return "Configure";
   return "Connect";
 }

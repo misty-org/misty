@@ -1,9 +1,7 @@
 import {
   BadgeCheck,
   Bell,
-  Bug,
   ChevronRight,
-  CircleHelp,
   Lock,
   LogIn,
   LogOut,
@@ -11,7 +9,6 @@ import {
   MonitorSmartphone,
   Settings,
   Shield,
-  Trash2,
   User,
   UserCircle,
   UserPlus,
@@ -29,19 +26,12 @@ import {
 } from "../shared/api";
 import { useSetupStore } from "../../../stores/useSetupStore";
 import type { CurrentLicense, CurrentUser } from "../../../models/setup";
-import { useAppStore } from "../../../stores/useAppStore";
 import { mobileErrorClass, mobilePageClass, mobileSuccessClass } from "../../../shared/mobileStyles";
-import {
-  clearClientDebugEvents,
-  clientDebugPanelEnabled,
-  readClientDebugEvents,
-  type ClientDebugEvent,
-} from "../../../shared/debug/clientDebug";
 
 type AccountMode = "overview" | "signin" | "register";
 
-const mobileAccountPrimaryActionClass = "inline-flex min-h-[42px] items-center justify-center gap-2 rounded-[var(--misty-radius-sm)] border border-[var(--misty-primary)] bg-[var(--misty-primary)] px-3 text-sm font-bold text-[var(--misty-primary-contrast)] transition-colors hover:bg-[var(--misty-primary-hover)] disabled:opacity-55";
-const mobileAccountSecondaryActionClass = "inline-flex min-h-[42px] items-center justify-center gap-2 rounded-[var(--misty-radius-sm)] border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] px-3 text-sm font-bold text-[var(--misty-text)] transition-colors hover:bg-[var(--misty-surface-hover)] disabled:opacity-55";
+const mobileAccountPrimaryActionClass = "inline-flex min-h-11 w-full max-w-full min-w-0 items-center justify-center gap-2 rounded-[var(--misty-radius-sm)] border border-[var(--misty-primary)] bg-[var(--misty-primary)] px-3 text-sm font-bold text-[var(--misty-primary-contrast)] transition-colors hover:bg-[var(--misty-primary-hover)] disabled:opacity-55";
+const mobileAccountSecondaryActionClass = "inline-flex min-h-11 w-full max-w-full min-w-0 items-center justify-center gap-2 rounded-[var(--misty-radius-sm)] border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] px-3 text-sm font-bold text-[var(--misty-text)] transition-colors hover:bg-[var(--misty-surface-hover)] disabled:opacity-55";
 
 export function MobileAccountPage() {
   const location = useLocation();
@@ -74,6 +64,15 @@ export function MobileAccountPage() {
   }, [location.pathname]);
 
   useEffect(() => {
+    const activeElement = document.activeElement;
+    if (activeElement instanceof HTMLElement) activeElement.blur();
+  }, [location.pathname]);
+
+  useEffect(() => {
+    setPassword("");
+  }, [mode]);
+
+  useEffect(() => {
     void loadSystem();
   }, [loadSystem]);
 
@@ -95,7 +94,8 @@ export function MobileAccountPage() {
       const authUser = await accountSignIn(email, password);
       const license = await fetchLicenseAfterAuth();
       await saveAuthenticatedUser(authUser, license);
-      setMessage(license ? "Signed in to Misty." : "Signed in to Misty. License status will refresh later.");
+      setPassword("");
+      setMessage(license ? "Signed in to Misty." : "Signed in to Misty. Account status will refresh later.");
       navigate("/account", { replace: true });
     } catch (signInError) {
       setError(signInError instanceof Error ? signInError.message : "Could not sign in.");
@@ -113,7 +113,8 @@ export function MobileAccountPage() {
       const authUser = await accountRegister(name, email, password);
       const license = await fetchLicenseAfterAuth();
       await saveAuthenticatedUser(authUser, license);
-      setMessage(license ? "Your Misty account is ready." : "Your Misty account is ready. License status will refresh later.");
+      setPassword("");
+      setMessage(license ? "Your Misty account is ready." : "Your Misty account is ready. Account status will refresh later.");
       navigate("/account", { replace: true });
     } catch (registerError) {
       setError(registerError instanceof Error ? registerError.message : "Could not create account.");
@@ -133,6 +134,7 @@ export function MobileAccountPage() {
     }
     try {
       await signOut();
+      setPassword("");
       setMessage("Signed out of Misty.");
     } finally {
       setWorking(false);
@@ -161,7 +163,7 @@ export function MobileAccountPage() {
       {message ? <div className={mobileSuccessClass}>{message}</div> : null}
 
       {mode === "signin" ? (
-        <form className="grid gap-3" onSubmit={handleSignIn}>
+        <form className="grid min-w-0 gap-3" onSubmit={handleSignIn}>
           <MobileInput
             label="Email"
             type="email"
@@ -181,14 +183,14 @@ export function MobileAccountPage() {
           <button type="submit" className={mobileAccountPrimaryActionClass} disabled={disabled}>
             <LogIn size={17} /> {working ? "Signing in..." : "Sign in"}
           </button>
-          <button type="button" className="min-h-[42px] border-0 bg-transparent font-bold text-[var(--misty-text)]" onClick={() => navigate("/account/register")}>
+          <button type="button" className="min-h-11 border-0 bg-transparent font-bold text-[var(--misty-text)]" onClick={() => navigate("/account/register")}>
             Create a Misty account
           </button>
         </form>
       ) : null}
 
       {mode === "register" ? (
-        <form className="grid gap-3" onSubmit={handleRegister}>
+        <form className="grid min-w-0 gap-3" onSubmit={handleRegister}>
           <MobileInput
             label="Name"
             value={name}
@@ -215,7 +217,7 @@ export function MobileAccountPage() {
           <button type="submit" className={mobileAccountPrimaryActionClass} disabled={disabled}>
             <UserPlus size={17} /> {working ? "Creating..." : "Create account"}
           </button>
-          <button type="button" className="min-h-[42px] border-0 bg-transparent font-bold text-[var(--misty-text)]" onClick={() => navigate("/account/signin")}>
+          <button type="button" className="min-h-11 border-0 bg-transparent font-bold text-[var(--misty-text)]" onClick={() => navigate("/account/signin")}>
             Already have an account
           </button>
         </form>
@@ -239,7 +241,7 @@ export function MobileAccountPage() {
                   <h3 className="m-0 text-[22px] font-black leading-tight text-[var(--misty-text)]">Sign in to Misty</h3>
                 </header>
                 <p className="m-0 text-sm leading-relaxed text-[var(--misty-text-muted)]">
-                  Use your Misty account to unlock license status and account-backed features on this device.
+                  Use your Misty account to connect this device and manage account state.
                 </p>
                 <div className="mt-2.5 grid gap-2">
                   <button type="button" className={mobileAccountPrimaryActionClass} onClick={() => navigate("/account/signin")}>
@@ -257,8 +259,6 @@ export function MobileAccountPage() {
           )}
         </>
       ) : null}
-
-      {clientDebugPanelEnabled() ? <MobileClientDebugPanel /> : null}
     </section>
   );
 }
@@ -284,24 +284,20 @@ function MobileAccountOverview(props: {
       </section>
 
       <AccountSection title="Personal">
-        <AccountRow icon={User} label="Profile" />
-        <AccountRow icon={Mail} label="Email" />
-        <AccountRow icon={Shield} label="Security" />
+        <AccountRow icon={User} label="Profile" detail={displayName} />
+        <AccountRow icon={Mail} label="Email" detail={props.user.email} />
+        <AccountRow icon={Shield} label="Security" detail="Stored securely on this device" />
       </AccountSection>
 
-      <AccountSection title="Membership">
-        <AccountRow icon={BadgeCheck} label="License" detail={licenseRowDetail(props.license)} />
-        <AccountRow icon={MonitorSmartphone} label="Devices" />
+      <AccountSection title="Account access">
+        <AccountRow icon={BadgeCheck} label="Status" detail={accountAccessRowDetail(props.license)} />
+        <AccountRow icon={MonitorSmartphone} label="Devices" detail="This device" />
       </AccountSection>
 
       <AccountSection title="Preferences">
         <AccountRow icon={Settings} label="Settings" onClick={props.onSettings} />
-        <AccountRow icon={Bell} label="Notifications" />
-        <AccountRow icon={Lock} label="Privacy" />
-      </AccountSection>
-
-      <AccountSection title="Support">
-        <AccountRow icon={CircleHelp} label="Help" />
+        <AccountRow icon={Bell} label="Notifications" detail="Managed in Settings" onClick={props.onSettings} />
+        <AccountRow icon={Lock} label="Privacy" detail="Managed in Settings" onClick={props.onSettings} />
       </AccountSection>
 
       <button
@@ -333,12 +329,10 @@ function AccountRow(props: {
   onClick?: () => void;
 }) {
   const Icon = props.icon;
-  return (
-    <button
-      type="button"
-      className="grid min-h-[58px] w-full min-w-0 grid-cols-[38px_minmax(0,1fr)_18px] items-center gap-2.5 border-0 border-b border-[var(--misty-border-soft)] bg-transparent px-0 py-2 text-left text-white last:border-b-0"
-      onClick={props.onClick}
-    >
+  const interactive = typeof props.onClick === "function";
+  const rowClass = "grid min-h-[58px] w-full min-w-0 grid-cols-[38px_minmax(0,1fr)_18px] items-center gap-2.5 border-0 border-b border-[var(--misty-border-soft)] bg-transparent px-0 py-2 text-left text-white last:border-b-0";
+  const content = (
+    <>
       <span className="grid h-[34px] w-[34px] place-items-center rounded-lg bg-transparent text-white/90">
         <Icon size={22} strokeWidth={1.85} />
       </span>
@@ -346,98 +340,19 @@ function AccountRow(props: {
         <strong className="overflow-hidden text-[17px] font-medium leading-[1.15] text-white text-ellipsis whitespace-nowrap">{props.label}</strong>
         {props.detail ? <small className="overflow-hidden text-[13px] leading-tight text-[#8f8f95] text-ellipsis whitespace-nowrap">{props.detail}</small> : null}
       </span>
-      <ChevronRight className="text-white/40" size={22} strokeWidth={1.8} />
+      {interactive ? <ChevronRight className="text-white/40" size={22} strokeWidth={1.8} /> : <span aria-hidden="true" />}
+    </>
+  );
+
+  return interactive ? (
+    <button type="button" className={rowClass} onClick={props.onClick}>
+      {content}
     </button>
-  );
-}
-
-function MobileClientDebugPanel() {
-  const app = useAppStore((state) => state.app);
-  const [events, setEvents] = useState<ClientDebugEvent[]>(() => readClientDebugEvents());
-  const serverAccountBase = accountDebugBase(
-    import.meta.env.VITE_MISTY_SERVER_URL
-      || import.meta.env.VITE_API_BASE
-      || app?.environment.serverUrl
-      || null,
-  );
-  useEffect(() => {
-    function refresh() {
-      setEvents(readClientDebugEvents());
-    }
-    window.addEventListener("misty-client-debug", refresh);
-    window.addEventListener("storage", refresh);
-    return () => {
-      window.removeEventListener("misty-client-debug", refresh);
-      window.removeEventListener("storage", refresh);
-    };
-  }, []);
-
-  return (
-    <section className="mb-[18px] grid min-w-0 gap-2">
-      <header className="mb-2.5 flex items-center justify-start gap-3">
-        <Bug size={20} strokeWidth={1.8} />
-        <h3 className="m-0 text-[22px] font-black leading-tight text-[var(--misty-text)]">Debug</h3>
-      </header>
-      <dl className="m-0 mb-4 grid gap-1">
-        <MobileDebugDetail label="Misty server API" value={serverAccountBase || "Not set"} />
-        <MobileDebugDetail label="Server env" value={import.meta.env.VITE_MISTY_SERVER_URL || import.meta.env.VITE_API_BASE || "Not set"} />
-        <MobileDebugDetail label="Build target" value={import.meta.env.VITE_MISTY_TARGET || "unknown"} />
-        <MobileDebugDetail label="Remote runtime" value={app?.proxyRuntime.mode ?? "unknown"} />
-        <MobileDebugDetail label="Remote transport" value="Embedded invoke" />
-        {app?.proxyRuntime.error ? (
-          <MobileDebugDetail label="Runtime error" value={app.proxyRuntime.error} danger />
-        ) : null}
-      </dl>
-      {events.length > 0 ? (
-        <div className="grid gap-2">
-          {events.slice(0, 6).map((event) => (
-            <article
-              key={event.id}
-              className={`grid gap-1 border-0 bg-transparent py-2 ${event.level === "error" ? "text-[#fca5a5]" : event.level === "warn" ? "text-[#fde68a]" : "text-[var(--misty-text)]"}`}
-            >
-              <strong className="text-sm font-black text-inherit">{event.scope}</strong>
-              <p className="m-0 text-xs leading-relaxed text-[var(--misty-text-muted)]">{event.message}</p>
-              {event.detail ? (
-                <code className="block whitespace-pre-wrap rounded-lg bg-white/[0.04] p-2 text-[10px] leading-[1.4] text-[#d7e1ec] [overflow-wrap:anywhere]">
-                  {event.detail}
-                </code>
-              ) : null}
-              <time className="text-xs text-[var(--misty-text-muted)]">{new Date(event.createdAt).toLocaleTimeString()}</time>
-            </article>
-          ))}
-        </div>
-      ) : (
-        <p className="m-0 text-sm leading-relaxed text-[var(--misty-text-muted)]">No client errors recorded yet.</p>
-      )}
-      <button
-        type="button"
-        className={mobileAccountSecondaryActionClass}
-        onClick={() => {
-          clearClientDebugEvents();
-          setEvents([]);
-        }}
-      >
-        <Trash2 size={17} /> Clear debug events
-      </button>
-    </section>
-  );
-}
-
-function MobileDebugDetail(props: { label: string; value: string; danger?: boolean }) {
-  return (
-    <div className="grid min-w-0 grid-cols-[minmax(0,0.42fr)_minmax(0,0.58fr)] gap-2 border-b border-[var(--misty-border-soft)] py-2">
-      <dt className="text-[11px] font-bold uppercase tracking-normal text-[var(--misty-text-subtle)]">{props.label}</dt>
-      <dd className={`m-0 min-w-0 text-right text-xs font-bold [overflow-wrap:anywhere] ${props.danger ? "text-[#ffb8bf]" : "text-[var(--misty-text)]"}`}>
-        {props.value}
-      </dd>
+  ) : (
+    <div className={rowClass}>
+      {content}
     </div>
   );
-}
-
-function accountDebugBase(base: string | null | undefined) {
-  const normalized = base?.trim().replace(/\/+$/, "");
-  if (!normalized) return "";
-  return /\/api$/i.test(normalized) ? normalized : `${normalized}/api`;
 }
 
 function MobileInput(props: {
@@ -475,19 +390,12 @@ function modeFromPath(pathname: string): AccountMode {
 function accountSubtitle(mode: AccountMode, email?: string): string {
   if (mode === "register") return "Create your Misty login on this device.";
   if (mode === "signin") return "Connect this device to your Misty account.";
-  return email || "Manage sign in, license, and local account state.";
+  return email || "Manage sign in, devices, and local account state.";
 }
 
-function licenseSummary(license: CurrentLicense | null): string {
-  if (!license) return "No license is saved on this device yet.";
-  if (license.allows_use) return `${license.tier} plan is ${license.status}.`;
-  return `Your ${license.tier} plan needs attention.`;
-}
-
-function licenseRowDetail(license: CurrentLicense | null): string {
-  if (!license) return "No plan active";
-  const plan = `${license.tier.charAt(0).toUpperCase()}${license.tier.slice(1)} plan`;
-  return license.allows_use ? `${plan} active` : `${plan} ${license.status}`;
+function accountAccessRowDetail(license: CurrentLicense | null): string {
+  if (!license) return "Status pending";
+  return license.allows_use ? "Access active" : `Access ${license.status}`;
 }
 
 function licenseFromMe(me: AccountMeResponse): CurrentLicense {

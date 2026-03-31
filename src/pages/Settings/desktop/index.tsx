@@ -37,6 +37,7 @@ import { useSearchStore } from "../../../stores/useSearchStore";
 import { formatBytes, formatDate } from "../../Files/utils/fileFormat";
 import { userFacingErrorText } from "../../../shared/format";
 import { hasTauriInternals } from "../../../shared/tauri";
+import { isAndroidBuild } from "../../../platform/buildTarget";
 import {
   defaultTransferProfileId,
   transferProfileRecords,
@@ -462,30 +463,34 @@ function AppearanceSettings(props: SettingsContentProps) {
             onChange={(value) => props.onSettingChange("appearance", "compact_mode_enabled", value)}
           />
         </SettingsRow>
-        <SettingsRow label="App wallpaper" description="Choose an image, GIF, or video to show behind Misty pages.">
-          <WallpaperControl
-            value={stringSetting(
-              props.document,
-              "appearance",
-              "wallpaper_path",
-              stringSetting(props.document, "appearance", "home_wallpaper_path", ""),
-            )}
-            disabled={props.working}
-            onChange={(value) => props.onSettingChange("appearance", "wallpaper_path", value)}
-          />
-        </SettingsRow>
-        <SettingsRow label="Panel opacity" description="Lower values make app surfaces more transparent, revealing more wallpaper." last>
-          <OpacityControl
-            value={numberSetting(
-              props.document,
-              "appearance",
-              "panel_opacity",
-              numberSetting(props.document, "appearance", "home_panel_opacity", 0.82),
-            )}
-            disabled={props.working}
-            onCommit={(value) => props.onSettingChange("appearance", "panel_opacity", value)}
-          />
-        </SettingsRow>
+        {!isAndroidBuild ? (
+          <>
+            <SettingsRow label="App wallpaper" description="Choose an image, GIF, or video to show behind Misty pages.">
+              <WallpaperControl
+                value={stringSetting(
+                  props.document,
+                  "appearance",
+                  "wallpaper_path",
+                  stringSetting(props.document, "appearance", "home_wallpaper_path", ""),
+                )}
+                disabled={props.working}
+                onChange={(value) => props.onSettingChange("appearance", "wallpaper_path", value)}
+              />
+            </SettingsRow>
+            <SettingsRow label="Panel opacity" description="Lower values make app surfaces more transparent, revealing more wallpaper." last>
+              <OpacityControl
+                value={numberSetting(
+                  props.document,
+                  "appearance",
+                  "panel_opacity",
+                  numberSetting(props.document, "appearance", "home_panel_opacity", 0.82),
+                )}
+                disabled={props.working}
+                onCommit={(value) => props.onSettingChange("appearance", "panel_opacity", value)}
+              />
+            </SettingsRow>
+          </>
+        ) : null}
       </SettingsSectionBlock>
 
       <SettingsSectionBlock title="Typography">

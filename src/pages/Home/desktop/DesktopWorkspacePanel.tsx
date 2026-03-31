@@ -12,7 +12,7 @@ type DesktopWorkspacePanelProps = {
 };
 
 const panelClass =
-  "flex min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-white/10 bg-[rgb(10_13_16_/_var(--misty-app-panel-opacity-strong,0.94))] p-4 shadow-2xl shadow-black/25 xl:col-span-4 xl:col-start-1 xl:row-span-3 xl:row-start-1";
+  "flex min-h-fit min-w-0 flex-col overflow-hidden rounded-2xl border border-white/10 bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] p-4 shadow-2xl shadow-black/25";
 
 const workspaceRowClass =
   "group/workspace grid w-full min-w-0 grid-cols-[minmax(0,1fr)_64px] items-stretch gap-1 rounded-xl border border-transparent text-left transition hover:border-white/[0.08] hover:bg-white/[0.045]";

@@ -5,7 +5,8 @@ import { spawnSync } from "node:child_process";
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const deviceName = process.env.TAURI_IOS_SIMULATOR_DEVICE ?? "iPhone 17";
-const bundleId = process.env.TAURI_IOS_BUNDLE_ID ?? "com.misty.desktop";
+const bundleId = process.env.TAURI_IOS_BUNDLE_ID ?? "com.misty.mobile";
+const buildNumber = process.env.MISTY_IOS_BUILD_NUMBER ?? "1";
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
@@ -33,7 +34,7 @@ function output(command, args) {
   return result.stdout.trim();
 }
 
-function simulatorUdid(name) {
+function simulatorDevice(name) {
   const json = output("xcrun", ["simctl", "list", "devices", "available", "--json"]);
   const payload = JSON.parse(json);
   const candidates = Object.values(payload.devices ?? {})
@@ -45,7 +46,7 @@ function simulatorUdid(name) {
     console.error(`Could not find an available iOS simulator named "${name}".`);
     process.exit(1);
   }
-  return selected.udid;
+  return selected;
 }
 
 function simulatorAppPath() {
@@ -82,14 +83,29 @@ run("npm", [
     MISTY_PROXY_RUNTIME: "embedded",
     MISTY_PROXY_GO_LIB_DIR: "src-tauri/target/misty-proxy/ios-simulator-arm64",
     MISTY_PROXY_GO_LIB_NAME: "misty_proxy",
+    VITE_MISTY_IOS_BUILD_NUMBER: buildNumber,
   },
 });
 
-const udid = simulatorUdid(deviceName);
-const appPath = simulatorAppPath();
+run("/usr/libexec/PlistBuddy", [
+  "-c",
+  `Set :CFBundleVersion ${buildNumber}`,
+  "src-tauri/gen/apple/misty-desktop_iOS/Info.plist",
+]);
 
-run("xcrun", ["simctl", "boot", udid]);
+const device = simulatorDevice(deviceName);
+const udid = device.udid;
+const appPath = simulatorAppPath();
+const appInfoPlist = resolve(appPath, "Info.plist");
+
+if (existsSync(appInfoPlist)) {
+  run("/usr/libexec/PlistBuddy", ["-c", `Set :CFBundleVersion ${buildNumber}`, appInfoPlist]);
+}
+
+if (device.state !== "Booted") {
+  run("xcrun", ["simctl", "boot", udid]);
+  run("xcrun", ["simctl", "bootstatus", udid, "-b"]);
+}
 run("open", ["-a", "Simulator"]);
 run("xcrun", ["simctl", "install", udid, appPath]);
 run("xcrun", ["simctl", "launch", udid, bundleId]);
-

@@ -54,20 +54,26 @@ const providerWorkflowMarkClass =
 const providerFormClass =
   "mx-auto grid max-w-[560px] gap-3.5";
 
+const providerFieldClass =
+  "grid gap-2 text-[13px] font-semibold text-[#aab3bd]";
+
 const providerFormHelpClass =
-  "text-[11px] normal-case text-[#78838f]";
+  "text-[11px] font-medium normal-case text-[#78838f]";
 
 const providerSelectClass =
-  "w-full rounded-[7px] border border-[#303a44] bg-[#080d11] px-2.5 py-[9px] text-[#f0eee9]";
+  "min-h-11 w-full rounded-[7px] border border-[#34414d] bg-[#090f14] px-3 text-[#f0eee9] outline-none focus:border-[#5d99d8] focus:shadow-[0_0_0_2px_rgba(78,144,229,0.16)]";
 
 const providerInputWrapClass =
-  "grid grid-cols-[minmax(0,1fr)_34px] items-center overflow-hidden rounded-[7px] border border-[#303a44] bg-[#080d11] focus-within:border-[#4779ae]";
+  "grid min-h-11 grid-cols-[minmax(0,1fr)] items-center overflow-hidden rounded-[7px] border border-[#34414d] bg-[#090f14] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.018)] focus-within:border-[#5d99d8] focus-within:shadow-[0_0_0_2px_rgba(78,144,229,0.16)]";
+
+const providerSecretInputWrapClass =
+  `${providerInputWrapClass} grid-cols-[minmax(0,1fr)_42px]`;
 
 const providerTextInputClass =
-  "min-h-9 border-0 bg-transparent px-2.5 py-[9px] text-[#f0eee9] outline-none";
+  "h-full min-h-11 w-full border-0 bg-transparent px-3 text-[#f0eee9] outline-none placeholder:text-[#66717d]";
 
 const providerSecretToggleClass =
-  "grid h-[34px] w-[34px] place-items-center border-0 bg-transparent text-[#8f98a4] hover:text-[#e8eaed]";
+  "grid h-11 w-[42px] place-items-center border-0 border-l border-[#27323c] bg-transparent text-[#8f98a4] hover:text-[#e8eaed]";
 
 const providerSummaryClass =
   "flex items-center justify-between rounded-[7px] border border-[#25313a] bg-[#0a1117] px-3 py-2.5 text-[#8f98a4]";
@@ -107,9 +113,7 @@ export function ProviderConnectionDialog(props: ProviderConnectionDialogProps) {
   const workflow = workflowForType(props.workflows, session.providerType);
   const title = session.mode === "add"
     ? "Add Remote"
-    : session.mode === "reconnect"
-      ? "Reconnect Remote"
-      : "Configure Remote";
+    : "Configure Remote";
 
   useEffect(() => {
     if (session.stage !== "authorize" || session.inFlight) return;
@@ -133,7 +137,7 @@ export function ProviderConnectionDialog(props: ProviderConnectionDialogProps) {
             <h2 className="text-xl" id="provider-connect-title">{title}</h2>
             <p className="text-[13px]">{dialogSubtitle(session)}</p>
           </div>
-          <button className={providerCloseButtonClass} type="button" onClick={props.onClose} disabled={session.inFlight} aria-label="Close">
+          <button className={providerCloseButtonClass} type="button" onClick={props.onClose} aria-label="Close">
             <AssetIcon src={iconAssets.x24} size={18} />
           </button>
         </header>
@@ -194,7 +198,7 @@ export function ProviderConnectionDialog(props: ProviderConnectionDialogProps) {
         </div>
 
         <footer className={providerFooterClass}>
-          <button className={providerFooterButtonClass} type="button" onClick={props.onClose} disabled={session.inFlight}>
+          <button className={providerFooterButtonClass} type="button" onClick={props.onClose}>
             {session.stage === "complete" ? "Close" : "Cancel"}
           </button>
           {session.stage === "provider" ? (
@@ -311,13 +315,12 @@ function ProviderConfiguration(props: {
   const [sensitiveVisible, setSensitiveVisible] = useState(false);
   return (
     <div className={providerFormClass}>
-      <label>
+      <label className={providerFieldClass}>
         Remote name
         <input
           className={providerSelectClass}
           value={props.session.remoteName}
           onChange={(event) => props.onName(event.target.value)}
-          readOnly={props.session.mode === "reconnect"}
           autoFocus={props.session.mode === "add"}
         />
         <small className={providerFormHelpClass}>Used in Explorer and rclone paths.</small>
@@ -351,7 +354,7 @@ function ProviderOptionField(props: {
   const { option } = props;
   const secret = option.password || isSensitiveOptionName(option.name);
   return (
-    <label>
+    <label className={providerFieldClass}>
       {option.label || option.name}{option.required ? " *" : ""}
       {option.choices.length > 0 ? (
         <select className={providerSelectClass} value={props.value} onChange={(event) => props.onChange(event.target.value)}>
@@ -360,9 +363,9 @@ function ProviderOptionField(props: {
           ))}
         </select>
       ) : (
-        <span className={secret ? providerInputWrapClass : "block"}>
+        <span className={secret ? providerSecretInputWrapClass : providerInputWrapClass}>
           <input
-            className={secret ? providerTextInputClass : providerSelectClass}
+            className={providerTextInputClass}
             value={props.value}
             type={secret && !props.sensitiveVisible ? "password" : "text"}
             onChange={(event) => props.onChange(event.target.value)}
@@ -413,7 +416,6 @@ function workflowForType(workflows: ProviderWorkflow[], type: string): ProviderW
 }
 
 function dialogSubtitle(session: ProviderConnectionSession): string {
-  if (session.mode === "reconnect") return "Refresh the saved authorization for this remote.";
   if (session.mode === "repair") return "Run provider setup again without replacing the remote.";
   return "Choose a provider and complete its secure sign-in flow.";
 }
@@ -421,7 +423,6 @@ function dialogSubtitle(session: ProviderConnectionSession): string {
 function submitLabel(session: ProviderConnectionSession): string {
   if (session.inFlight) return session.step ? "Continuing…" : "Starting…";
   if (session.step) return "Continue";
-  if (session.mode === "reconnect") return "Reconnect";
   if (session.mode === "repair") return "Configure";
   return "Connect Remote";
 }

@@ -8,6 +8,7 @@
   --misty-surface: #111418;
   --misty-surface-2: #14171c;
   --misty-surface-3: #1a1f26;
+  --misty-dropdown-bg: #111418;
   --misty-surface-hover: #171a20;
   --misty-surface-selected: #1d222a;
   --misty-sidebar-selected: #1a2028;
@@ -75,7 +76,9 @@
   --misty-font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-family: var(--misty-font-family);
   width: 100%;
-  height: 100%;
+  height: 100dvh;
+  min-width: 0;
+  min-height: 0;
   overflow: hidden;
   background: var(--misty-bg);
   color: var(--misty-text);
@@ -88,6 +91,7 @@
   --misty-surface: #fffaf2;
   --misty-surface-2: #f8f3eb;
   --misty-surface-3: #ebe4d9;
+  --misty-dropdown-bg: #fffaf2;
   --misty-border: #d8cec0;
   --misty-border-soft: rgba(49, 42, 34, 0.13);
   --misty-text: #1b1a18;
@@ -113,6 +117,7 @@
   --misty-surface: #111315;
   --misty-surface-2: #181b1d;
   --misty-surface-3: #222629;
+  --misty-dropdown-bg: #111315;
   --misty-surface-hover: #2b3034;
   --misty-border: #34383d;
   --misty-border-strong: rgba(238, 242, 246, 0.16);
@@ -151,6 +156,7 @@
   --misty-surface: #0d1b1d;
   --misty-surface-2: #122426;
   --misty-surface-3: #193033;
+  --misty-dropdown-bg: #0d1b1d;
   --misty-surface-hover: #213d41;
   --misty-border: #28484d;
   --misty-border-strong: rgba(211, 255, 247, 0.17);
@@ -189,6 +195,7 @@
   --misty-surface: #1d1713;
   --misty-surface-2: #261e19;
   --misty-surface-3: #332820;
+  --misty-dropdown-bg: #1d1713;
   --misty-surface-hover: #403229;
   --misty-border: #4a3a30;
   --misty-border-strong: rgba(255, 231, 210, 0.17);
@@ -330,9 +337,9 @@ pre {
 body {
   margin: 0;
   width: 100%;
-  min-width: 900px;
-  min-height: 600px;
-  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  height: 100dvh;
   overflow: hidden;
   background: var(--misty-bg);
   color: var(--misty-text);
@@ -350,6 +357,14 @@ body {
 button,
 input {
   font: inherit;
+}
+
+:where([role="menu"], [role="listbox"]) {
+  background-color: var(--misty-dropdown-bg) !important;
+}
+
+:where(select, option, optgroup) {
+  background-color: var(--misty-dropdown-bg) !important;
 }
 
 button {
@@ -506,7 +521,7 @@ input {
   --misty-accent: #b7b7b7;
 }
 
-/* Misty website design-system application layer.
+/* Misty design-system application layer.
    Keep new app/mobile surfaces on these tokens unless a feature needs a domain-specific accent. */
 :root[data-form-factor="mobile"],
 :root[data-form-factor="mobile"] body,

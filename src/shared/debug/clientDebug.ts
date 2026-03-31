@@ -35,6 +35,7 @@ export function installClientDebugging(): void {
 }
 
 export function recordClientDebugEvent(event: Omit<ClientDebugEvent, "id" | "createdAt">): void {
+  if (!clientDebugPanelEnabled()) return;
   if (typeof window === "undefined") return;
   const entry: ClientDebugEvent = {
     ...event,

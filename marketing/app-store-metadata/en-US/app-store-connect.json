@@ -1,0 +1,38 @@
+{
+  "locale": "en-US",
+  "platform": "IOS",
+  "bundleId": "com.misty.mobile",
+  "versionString": "0.1.0",
+  "buildNumber": "1",
+  "appInfo": {
+    "name": "Misty",
+    "subtitle": "Files and cloud storage",
+    "primaryCategory": "PRODUCTIVITY",
+    "secondaryCategory": "UTILITIES",
+    "privacyPolicyUrl": null
+  },
+  "versionInfo": {
+    "promotionalText": "Browse files, connect storage providers, and track transfers from Misty on iPhone.",
+    "description": "Misty brings the core Misty file experience to iPhone. Browse files, connect supported storage providers, review transfer activity, and manage account and privacy settings from a focused mobile interface.\n\nMisty for iOS is designed as a companion/client for Misty accounts and supported storage connections. It keeps file browsing, provider setup, transfer status, and account controls close at hand without desktop extension functionality.\n\nKey features:\n\n- Browse files and connected storage locations.\n- Configure supported providers.\n- Track upload, download, and sync activity.\n- Manage account, privacy, notifications, and device settings.\n- Use a mobile interface built for Misty's existing file workflows.",
+    "keywords": "files,cloud storage,transfer,sync,documents,remote storage,productivity",
+    "supportUrl": null,
+    "marketingUrl": null
+  },
+  "reviewInfo": {
+    "contactFirstName": null,
+    "contactLastName": null,
+    "contactPhone": null,
+    "contactEmail": null,
+    "demoAccountName": null,
+    "demoAccountPassword": null,
+    "notes": "Misty is a file browsing and storage companion/client for iPhone. Reviewers should use the supplied demo account to inspect account state, provider setup, file browsing, transfer history, and settings.\n\nThe iOS app does not include in-app purchases, external purchase prompts, pricing, subscription calls to action, or extension/plugin functionality.\n\nLocal network access is used for Misty's local secure runtime services on the device to browse and transfer files. Provider authorization may open the system browser and return through the misty URL scheme.\n\nReviewer path: launch Misty, sign in with the reviewer demo account, open Files, open Remotes, open Transfers, then open Account and Settings to verify sign-out, account state, privacy controls, and device settings."
+  },
+  "submissionBlockers": [
+    "Add production supportUrl.",
+    "Add production privacyPolicyUrl.",
+    "Add App Review contact fields.",
+    "Add reviewer demo account credentials.",
+    "Approve the mobile UI, then regenerate final no-watermark App Store screenshots.",
+    "Upload a signed archive after App Store Connect credentials and provisioning are repaired."
+  ]
+}
