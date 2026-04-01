@@ -7,15 +7,12 @@ mod plugins;
 mod runtime;
 mod services;
 
-#[cfg(target_os = "android")]
-use commands::{
-    android_all_files_access_status, android_grant_local_folder,
-    android_open_all_files_access_settings,
-};
 use commands::{
     ai_abort, ai_drain_events, ai_send_message, ai_status, app_environment_snapshot, app_snapshot,
-    archive_create, archive_extract, archive_list, claude_abort, claude_drain_events,
-    claude_send_message, claude_status, clipboard_apply_shared, clipboard_native_file_refs,
+    archive_create, archive_extract, archive_list, automations_delete_workflow,
+    automations_resolve_approval, automations_run, automations_save_workflow, automations_snapshot,
+    automations_validate_workflow, claude_abort, claude_drain_events, claude_send_message,
+    claude_status, clipboard_apply_shared, clipboard_native_file_refs,
     clipboard_publish_image_bytes, clipboard_publish_shared, clipboard_set_local,
     clipboard_shared_image_bytes, clipboard_snapshot, clipboard_write_file_refs,
     compare_apply_text_merge, compare_files, compare_folders, devices_snapshot, duplicates_cancel,
@@ -38,7 +35,7 @@ use commands::{
     operation_queue_resume, operation_queue_resume_all, operation_queue_resume_batch,
     operation_queue_retry, operation_queue_retry_transfer, operation_queue_set_bandwidth_limit,
     operation_queue_set_transfer_profile, operation_queue_snapshot, operation_queue_undo,
-    plugin_command_run, plugin_commands_snapshot, plugin_diagnostics_snapshot, plugin_panel_render,
+    extension_command_run, plugin_command_run, plugin_commands_snapshot, plugin_diagnostics_snapshot, plugin_panel_render,
     providers_backend_actions, providers_config_paths, providers_config_security,
     providers_configure_remote, providers_create_public_link, providers_disconnect_remote,
     providers_harden_config, providers_job_cancel, providers_job_status, providers_public_links,
@@ -51,6 +48,11 @@ use commands::{
     settings_open_with_associations, settings_remove_open_with_association, settings_save,
     settings_snapshot, shortcuts_save, shortcuts_snapshot, transfers_delete_all,
     transfers_delete_selected, transfers_snapshot, workspaces_save, workspaces_snapshot,
+};
+#[cfg(target_os = "android")]
+use commands::{
+    android_all_files_access_status, android_grant_local_folder,
+    android_open_all_files_access_settings,
 };
 use plugins::mac_rounded_corners;
 use runtime::MistyRuntime;
@@ -138,6 +140,12 @@ pub fn run() {
             mac_rounded_corners::reposition_traffic_lights,
             app_snapshot,
             app_environment_snapshot,
+            automations_snapshot,
+            automations_save_workflow,
+            automations_delete_workflow,
+            automations_validate_workflow,
+            automations_run,
+            automations_resolve_approval,
             ai_status,
             ai_send_message,
             ai_drain_events,
@@ -241,6 +249,7 @@ pub fn run() {
             plugin_command_run,
             #[cfg(desktop)]
             plugin_panel_render,
+            extension_command_run,
             #[cfg(desktop)]
             plugin_diagnostics_snapshot,
             providers_snapshot,

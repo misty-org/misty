@@ -8,6 +8,8 @@ import {
 } from "../api/misty";
 import { errorText } from "../shared/format";
 import { isNativeMobileBuild } from "../platform/buildTarget";
+import { assistantDailyMessageLimit, useAssistantUsageStore } from "./useAssistantUsageStore";
+import { selectAssistantPreferences, useSettingsStore } from "./useSettingsStore";
 import {
   cancelAgentSession,
   createAgentSession,
@@ -47,6 +49,7 @@ export interface AiPlanReview {
   applying: boolean;
   appliedSummary: string | null;
   blockedReasons: string[];
+  scope: AssistantScope | null;
 }
 
 export interface AiToolApproval {
@@ -55,7 +58,11 @@ export interface AiToolApproval {
   running: boolean;
   completed: boolean;
   error: string | null;
+  scope: AssistantScope | null;
 }
+
+export type AssistantScope = "files" | "cleanup" | "search";
+type AssistantRequestScope = AssistantScope | "ambiguous" | null;
 
 interface SendAiPromptRequest {
   displayPrompt: string;
@@ -86,19 +93,89 @@ let nextPlanId = 1;
 let activeSessionId: string | null = null;
 let lastEventSequence = 0;
 let activeRoot: string | null = null;
+let activeRequestScope: AssistantScope | null = null;
 let drainInFlight: Promise<void> | null = null;
 const processedEventSequences = new Set<number>();
 const processedToolRequestIds = new Set<string>();
 const aiToolTimeoutMs = 15000;
 
-const toolManifest: ToolManifest = {
-  tools: [
-    { name: "list_directory", risk: "read" },
-    { name: "search_files", risk: "read" },
-    { name: "validate_file_plan", risk: "read" },
-    { name: "apply_file_plan", risk: "write" },
-  ],
-};
+const toolDefinitions = {
+  list_directory: { name: "list_directory", risk: "read" },
+  search_files: { name: "search_files", risk: "read" },
+  validate_file_plan: { name: "validate_file_plan", risk: "read" },
+  apply_file_plan: { name: "apply_file_plan", risk: "write" },
+} as const;
+
+function toolManifestForScope(scope: AssistantScope | null): ToolManifest {
+  if (scope === "files") {
+    return { tools: [toolDefinitions.list_directory, toolDefinitions.validate_file_plan, toolDefinitions.apply_file_plan] };
+  }
+  if (scope === "cleanup") {
+    return { tools: [toolDefinitions.list_directory, toolDefinitions.search_files, toolDefinitions.validate_file_plan] };
+  }
+  if (scope === "search") {
+    return { tools: [toolDefinitions.list_directory, toolDefinitions.search_files] };
+  }
+  return { tools: [] };
+}
+
+function toolAllowedForScope(toolName: string, scope: AssistantScope): boolean {
+  return toolManifestForScope(scope).tools.some((tool) => tool.name === toolName);
+}
+
+function classifyAssistantRequest(prompt: string): AssistantRequestScope {
+  const normalized = prompt.toLowerCase();
+  const matches: AssistantScope[] = [];
+  if (/\b(clean(?:up)?|tidy|declutter|organize|duplicate|unused|large files?|old files?)\b/.test(normalized)) matches.push("cleanup");
+  if (/\b(search|find|locate|look for|where (?:is|are)|smart folder|query|tagged|tags?)\b/.test(normalized)) matches.push("search");
+  if (/\b(open|reveal|show in finder|copy|move|rename|create|make (?:a )?(?:file|folder)|transfer|download|upload)\b/.test(normalized)) matches.push("files");
+  const distinct = [...new Set(matches)];
+  if (distinct.length > 1) return "ambiguous";
+  return distinct[0] ?? null;
+}
+
+function assistantScopeAllowed(
+  preferences: ReturnType<typeof selectAssistantPreferences>,
+  scope: AssistantScope,
+): boolean {
+  if (!preferences.enabled) return false;
+  if (scope === "files") return preferences.scopes.filesAllowed;
+  if (scope === "cleanup") return preferences.scopes.cleanupAllowed;
+  return preferences.scopes.searchAllowed;
+}
+
+function scopedAssistantPrompt(prompt: string, scope: AssistantScope | null): string {
+  if (scope === "cleanup") {
+    return `${prompt}\n\nPermission boundary: Cleanup is enabled for scanning and planning only. Do not apply, move, rename, create, trash, delete, or otherwise modify files.`;
+  }
+  if (scope === "search") {
+    return `${prompt}\n\nPermission boundary: Search is read-only. Search files, library metadata, tags, and paths, or suggest queries. Do not modify files or perform cleanup actions.`;
+  }
+  if (scope === "files") {
+    return `${prompt}\n\nPermission boundary: Files actions are enabled. Stay within normal file operations and do not perform cleanup or search-only workflows.`;
+  }
+  return `${prompt}\n\nPermission boundary: No capability scope is active. Respond conversationally without using tools or modifying data.`;
+}
+
+function assistantScopeLabel(scope: AssistantScope): string {
+  return scope[0].toUpperCase() + scope.slice(1);
+}
+
+function appendBlockedRequest(
+  set: (partial: Partial<AiSessionStore> | ((state: AiSessionStore) => Partial<AiSessionStore>)) => void,
+  prompt: string,
+  response: string,
+): void {
+  set((state) => ({
+    error: null,
+    status: serverStatus(false),
+    messages: [
+      ...state.messages,
+      { id: aiMessageId("user"), role: "user", text: prompt },
+      { id: aiMessageId("assistant"), role: "assistant", text: response },
+    ],
+  }));
+}
 
 export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
   status: serverStatus(false),
@@ -126,7 +203,26 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
   sendPrompt: async ({ displayPrompt, prompt, cwd, selectedPaths }) => {
     const trimmed = displayPrompt.trim();
     if (!trimmed || get().status?.running) return;
+    const preferences = selectAssistantPreferences(useSettingsStore.getState().settings?.document);
+    if (!preferences.enabled) {
+      appendBlockedRequest(set, trimmed, "Mika is disabled. Enable Mika in Settings > Assistant to continue.");
+      return;
+    }
+    if (!useAssistantUsageStore.getState().consumeMessage()) {
+      appendBlockedRequest(set, trimmed, `You have used all ${assistantDailyMessageLimit} Mika messages for today. Your local limit resets tomorrow.`);
+      return;
+    }
+    const requestScope = classifyAssistantRequest(trimmed);
+    if (requestScope === "ambiguous") {
+      appendBlockedRequest(set, trimmed, "That request crosses more than one permission scope. Please split it into separate Files, Cleanup, or Search steps.");
+      return;
+    }
+    if (requestScope && !assistantScopeAllowed(preferences, requestScope)) {
+      appendBlockedRequest(set, trimmed, `The ${assistantScopeLabel(requestScope)} scope is disabled. Allow it in Settings > Assistant to continue.`);
+      return;
+    }
     activeRoot = cwd || null;
+    activeRequestScope = requestScope;
     set((state) => ({
       messages: [...state.messages, { id: aiMessageId("user"), role: "user", text: trimmed }],
       error: null,
@@ -136,10 +232,10 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
     try {
       await sendAgentMessageWithSessionRetry({
         mode: get().mode,
-        user_message: prompt,
+        user_message: scopedAssistantPrompt(prompt, requestScope),
         active_root: cwd || undefined,
         selected_paths: selectedPaths,
-        capabilities: toolManifest,
+        capabilities: toolManifestForScope(requestScope),
       });
       ensureAiPolling(set, get);
       await drainAiEvents(set, get);
@@ -164,7 +260,7 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
       toolApprovals: state.toolApprovals.map((candidate) => candidate.id === requestId ? { ...candidate, running: true, error: null } : candidate),
     }));
     try {
-      const result = await runToolRequest(approval.request);
+      const result = await runToolRequest(approval.request, approval.scope);
       await submitToolResults(sessionId, [result]);
       set((state) => ({
         toolApprovals: state.toolApprovals.map((candidate) => candidate.id === requestId ? {
@@ -191,7 +287,9 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
   approvePlan: async (planId) => {
     const plan = get().plans.find((candidate) => candidate.id === planId);
     if (!plan || plan.applied || plan.applying) return;
-    const blockedReasons = validateClientPlan(plan.plan);
+    const blockedReasons = plan.scope !== "files"
+      ? [plan.scope === "cleanup" ? "Cleanup plans are review-only in V1." : "The Files scope is required to apply this plan."]
+      : validateClientPlan(plan.plan);
     if (blockedReasons.length > 0) {
       set((state) => ({
         plans: state.plans.map((candidate) => candidate.id === planId ? { ...candidate, blockedReasons } : candidate),
@@ -237,6 +335,7 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
     drainInFlight = null;
     processedEventSequences.clear();
     processedToolRequestIds.clear();
+    activeRequestScope = null;
     set({ messages: [], plans: [], toolApprovals: [], error: null, status: serverStatus(false) });
   },
 }));
@@ -315,15 +414,19 @@ async function drainAiEventsOnce(
         });
         if (!request.approval_required || get().mode === "full") {
           recordAiDebug("info", "Running Mika tool request.", `${request.name} ${request.id}`);
-          toolResults.push(await runToolRequestWithTimeout(request));
+          toolResults.push(await runToolRequestWithTimeout(request, activeRequestScope));
         } else {
-          nextToolApprovals.push({ id: request.id, request, running: false, completed: false, error: null });
+          nextToolApprovals.push({ id: request.id, request, running: false, completed: false, error: null, scope: activeRequestScope });
         }
       }
     } else if (event.type === "file_plan" && event.file_plan) {
       const planId = `plan-${Date.now()}-${nextPlanId++}`;
-      const blockedReasons = validateClientPlan(event.file_plan);
-      nextPlans.push({ id: planId, plan: event.file_plan, applied: false, applying: false, appliedSummary: null, blockedReasons });
+      const blockedReasons = activeRequestScope === "cleanup"
+        ? ["Cleanup plans are review-only in V1."]
+        : activeRequestScope === "files"
+          ? validateClientPlan(event.file_plan)
+          : ["The Files scope is required to apply this plan."];
+      nextPlans.push({ id: planId, plan: event.file_plan, applied: false, applying: false, appliedSummary: null, blockedReasons, scope: activeRequestScope });
       nextMessages.push({ id: aiMessageId("plan"), role: "plan", planId, text: planSummary(event.file_plan, blockedReasons) });
     }
   }
@@ -393,14 +496,24 @@ function resetActiveSession(): void {
   drainInFlight = null;
   processedEventSequences.clear();
   processedToolRequestIds.clear();
+  activeRequestScope = null;
 }
 
 function isSessionNotFoundError(error: unknown): boolean {
   return errorText(error).toLowerCase().includes("session not found");
 }
 
-async function runToolRequest(request: ToolRequest): Promise<ToolResult> {
+async function runToolRequest(request: ToolRequest, scope: AssistantScope | null): Promise<ToolResult> {
   try {
+    const preferences = selectAssistantPreferences(useSettingsStore.getState().settings?.document);
+    if (!scope || !assistantScopeAllowed(preferences, scope)) {
+      return toolError(request, scope
+        ? `The ${assistantScopeLabel(scope)} scope is disabled.`
+        : "This request has no allowed capability scope.");
+    }
+    if (!toolAllowedForScope(request.name, scope)) {
+      return toolError(request, `${request.name} is not allowed by the ${assistantScopeLabel(scope)} scope.`);
+    }
     const args = toolArgs(request);
     switch (request.name) {
       case "list_directory": {
@@ -448,11 +561,11 @@ async function runToolRequest(request: ToolRequest): Promise<ToolResult> {
   }
 }
 
-async function runToolRequestWithTimeout(request: ToolRequest): Promise<ToolResult> {
+async function runToolRequestWithTimeout(request: ToolRequest, scope: AssistantScope | null): Promise<ToolResult> {
   let timeoutId: number | null = null;
   try {
     return await Promise.race([
-      runToolRequest(request),
+      runToolRequest(request, scope),
       new Promise<ToolResult>((resolve) => {
         timeoutId = window.setTimeout(() => {
           resolve(toolError(request, `${request.name} timed out after ${Math.round(aiToolTimeoutMs / 1000)} seconds.`));

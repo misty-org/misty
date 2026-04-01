@@ -569,7 +569,14 @@ export interface PluginPanelEntry {
   pluginDir: string;
   manifestPath: string;
   libraryPath: string;
+  webEntry: string;
   launcherViews: string[];
+}
+
+export interface ExtensionCommandRequest {
+  pluginId: string;
+  command: string;
+  payload?: Record<string, unknown>;
 }
 
 export interface PluginCommandsSnapshot {
@@ -1231,4 +1238,107 @@ export interface FileSyncApplyRequest extends FileSyncCompareRequest {
 export interface FileSyncApplyResult {
   appliedCount: number;
   affectedPaths: string[];
+}
+
+export type AutomationNodeKind =
+  | "manual_trigger"
+  | "schedule_trigger"
+  | "webhook_trigger"
+  | "select_path"
+  | "list_folder"
+  | "filter"
+  | "read_text"
+  | "read_metadata"
+  | "structured_prompt"
+  | "http_request"
+  | "write_text"
+  | "copy_path"
+  | "move_path"
+  | "rename_path"
+  | "notify";
+
+export interface AutomationPosition {
+  x: number;
+  y: number;
+}
+
+export interface AutomationNode {
+  id: string;
+  kind: AutomationNodeKind;
+  label: string;
+  position: AutomationPosition;
+  config: Record<string, unknown>;
+}
+
+export interface AutomationEdge {
+  id: string;
+  source: string;
+  target: string;
+}
+
+export interface AutomationWorkflow {
+  id: string;
+  name: string;
+  description: string;
+  enabled: boolean;
+  intervalMinutes?: number;
+  lastScheduledAt?: string;
+  nodes: AutomationNode[];
+  edges: AutomationEdge[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AutomationNodeRun {
+  nodeId: string;
+  label: string;
+  status: "completed" | "failed" | "waiting_approval";
+  startedAt: string;
+  finishedAt: string;
+  output: unknown;
+  error?: string;
+}
+
+export interface AutomationRun {
+  id: string;
+  workflowId: string;
+  workflowName: string;
+  trigger: string;
+  status: "running" | "completed" | "failed" | "waiting_approval" | "rejected";
+  startedAt: string;
+  finishedAt?: string;
+  nodeRuns: AutomationNodeRun[];
+  error?: string;
+}
+
+export interface AutomationApproval {
+  id: string;
+  runId: string;
+  workflowId: string;
+  nodeId: string;
+  title: string;
+  summary: string;
+  status: "pending" | "approved" | "rejected";
+  action: Record<string, unknown>;
+  createdAt: string;
+  resolvedAt?: string;
+}
+
+export interface AutomationSnapshot {
+  version: number;
+  webhookUrl: string;
+  workflows: AutomationWorkflow[];
+  runs: AutomationRun[];
+  approvals: AutomationApproval[];
+}
+
+export interface AutomationValidation {
+  valid: boolean;
+  errors: string[];
+}
+
+export interface AutomationRunRequest {
+  workflowId: string;
+  trigger: "manual" | "schedule" | "webhook";
+  input?: unknown;
 }

@@ -1,4 +1,4 @@
-import { ArrowUp, Copy, File, FlaskConical, Folder, Info, MessageSquare, Sparkles, X } from "lucide-react";
+import { ArrowUp, Copy, File, Folder, Info, MessageSquare, Sparkles, X } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
@@ -143,17 +143,13 @@ export const assistantPanelStyles = {
   secondaryButton: "bg-transparent text-[#b3b3b3]",
 } as const;
 
-const mikaComingSoon = true;
-
 function assistantStatusText(status: AiStatus | null): string {
-  if (mikaComingSoon) return "Coming soon...";
   if (!status) return "Checking Mika...";
   if (status.configured) return `Ready (${status.provider}/${status.model})`;
-  return "Coming soon...";
+  return "Backend unavailable";
 }
 
 function assistantPlaceholder(configured: boolean, fallback: string): string {
-  if (mikaComingSoon) return "Mika is coming soon...";
   return configured ? fallback : "Configure Mika backend to continue";
 }
 
@@ -191,10 +187,9 @@ export const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
   const logRef = useRef<HTMLDivElement | null>(null);
   const workingDirectory = listing?.path ?? "";
   const running = status?.running ?? false;
-  const configured = !mikaComingSoon && (status?.configured ?? false);
+  const configured = status?.configured ?? false;
 
   useEffect(() => {
-    if (mikaComingSoon) return;
     void refreshStatus();
   }, [refreshStatus]);
 
@@ -204,7 +199,7 @@ export const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
 
   const submitPrompt = useCallback(() => {
     const trimmed = prompt.trim();
-    if (mikaComingSoon || !trimmed || running) return;
+    if (!trimmed || running) return;
     setPrompt("");
     void sendPrompt({
       displayPrompt: trimmed,
@@ -241,10 +236,6 @@ export const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
       </header>
       <div className={assistantPanelStyles.chatBody}>
         <div className={cx(assistantPanelStyles.status, assistantPanelStyles.chatStatus)}>
-          <p className={assistantPanelStyles.betaNotice}>
-            <FlaskConical className={assistantPanelStyles.betaIcon} size={22} />
-            <span>Mika AI is coming soon. We are polishing assistant workflows before turning it on.</span>
-          </p>
           <dl className={assistantPanelStyles.chatDetails}>
             <dt className={assistantPanelStyles.detailLabel}>Status</dt>
             <dd className={assistantPanelStyles.chatDetailValue}>{assistantStatusText(status)}</dd>
@@ -253,11 +244,11 @@ export const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
             <dt className={assistantPanelStyles.detailLabel}>Selection</dt>
             <dd className={assistantPanelStyles.chatDetailValue}>{mikaSelectionSummary(selectedPaths)}</dd>
           </dl>
-          {!mikaComingSoon && error ? <p className={assistantPanelStyles.errorText}>{error}</p> : null}
+          {error ? <p className={assistantPanelStyles.errorText}>{error}</p> : null}
         </div>
         <div ref={logRef} className={cx(assistantPanelStyles.log, assistantPanelStyles.chatLog)} aria-live="polite">
           {messages.length === 0 ? (
-            <p className={assistantPanelStyles.emptyLog}>Mika AI is coming soon...</p>
+            <p className={assistantPanelStyles.emptyLog}>Ask Mika about the current folder or selection.</p>
           ) : messages.map((message) => (
             <article key={message.id} className={assistantMessageClass(message.role, "chat")}>
               <strong className={assistantPanelStyles.messageTitle}>{message.role === "user" ? "You" : message.role === "tool" ? "Tool" : message.role === "error" ? "Error" : "Mika"}</strong>
@@ -289,7 +280,7 @@ export const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
             }}
           />
           <div className={assistantPanelStyles.composerActions}>
-            <select className={assistantPanelStyles.modeSelect} value={mode} aria-label="Mika mode" disabled={mikaComingSoon} onChange={(event) => setMode(event.target.value as Parameters<typeof setMode>[0])}>
+            <select className={assistantPanelStyles.modeSelect} value={mode} aria-label="Mika mode" onChange={(event) => setMode(event.target.value as Parameters<typeof setMode>[0])}>
               <option value="ask">Ask</option>
               <option value="auto">Auto</option>
             </select>
@@ -331,10 +322,9 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel() {
   const contextRef = useRef<HTMLDivElement | null>(null);
   const workingDirectory = listing?.path ?? "";
   const running = status?.running ?? false;
-  const configured = !mikaComingSoon && (status?.configured ?? false);
+  const configured = status?.configured ?? false;
 
   useEffect(() => {
-    if (mikaComingSoon) return;
     void refreshStatus();
   }, [refreshStatus]);
 
@@ -362,7 +352,7 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel() {
 
   const submitPrompt = useCallback(() => {
     const trimmed = prompt.trim();
-    if (mikaComingSoon || !trimmed || running) return;
+    if (!trimmed || running) return;
     const requestPrompt = buildMikaPrompt(trimmed, workingDirectory, selectedPaths);
     setPrompt("");
     void sendPrompt({
@@ -374,7 +364,7 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel() {
   }, [prompt, running, selectedPaths, sendPrompt, workingDirectory]);
 
   return (
-    <aside className={assistantPanelStyles.mikaPanel} aria-label="Mika AI coming soon" title="Mika AI coming soon">
+    <aside className={assistantPanelStyles.mikaPanel} aria-label="Mika Assistant">
       <header className={cx(assistantPanelStyles.header, assistantPanelStyles.mikaHeader, assistantPanelStyles.mikaPanelHeader)}>
         <span className={cx(assistantPanelStyles.headerTitle, assistantPanelStyles.mikaHeaderTitle)}>
           <MessageSquare size={24} strokeWidth={1.9} />
@@ -404,13 +394,11 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel() {
         </div>
       </header>
       <div className={assistantPanelStyles.mikaBody}>
-        <div className={cx(assistantPanelStyles.status, assistantPanelStyles.mikaStatus)}>
-          <p className={assistantPanelStyles.betaNotice}>
-            <FlaskConical className={assistantPanelStyles.betaIcon} size={22} />
-            <span>Mika AI is coming soon. We are polishing assistant workflows before turning it on.</span>
-          </p>
-          {!mikaComingSoon && error ? <p className={assistantPanelStyles.errorText}>{error}</p> : null}
-        </div>
+        {error ? (
+          <div className={cx(assistantPanelStyles.status, assistantPanelStyles.mikaStatus)}>
+            <p className={assistantPanelStyles.errorText}>{error}</p>
+          </div>
+        ) : null}
         <div ref={logRef} className={cx(assistantPanelStyles.log, assistantPanelStyles.mikaLog)} aria-live="polite">
           {messages.length === 0 ? (
             <MikaEmptyState />
@@ -445,7 +433,7 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel() {
             }}
           />
           <div className={cx(assistantPanelStyles.composerActions, assistantPanelStyles.mikaComposerActions)}>
-            <select className={assistantPanelStyles.modeSelect} value={mode} aria-label="Mika mode" disabled={mikaComingSoon} onChange={(event) => setMode(event.target.value as Parameters<typeof setMode>[0])}>
+            <select className={assistantPanelStyles.modeSelect} value={mode} aria-label="Mika mode" onChange={(event) => setMode(event.target.value as Parameters<typeof setMode>[0])}>
               <option value="ask">Ask</option>
               <option value="auto">Auto</option>
             </select>
@@ -461,7 +449,7 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel() {
         </form>
         <footer className={assistantPanelStyles.mikaFooter}>
           <Sparkles size={15} />
-          Coming soon...
+          Mika can make mistakes. Review file plans before applying them.
         </footer>
       </div>
     </aside>
@@ -727,8 +715,8 @@ function MikaEmptyState() {
           <MessageSquare size={42} strokeWidth={1.5} />
           <Sparkles className={assistantPanelStyles.mikaEmptySpark} size={18} />
         </span>
-        <h3 className={assistantPanelStyles.mikaEmptyTitle}>Coming soon...</h3>
-        <p className={assistantPanelStyles.mikaEmptyText}>Mika AI is not available yet.</p>
+        <h3 className={assistantPanelStyles.mikaEmptyTitle}>Ask Mika</h3>
+        <p className={assistantPanelStyles.mikaEmptyText}>Start with the current folder or selected files.</p>
       </div>
     </div>
   );

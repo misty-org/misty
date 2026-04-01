@@ -62,7 +62,7 @@ import {
   selectCustomFontPreferences,
   selectGeneralPreferences,
   selectNotificationPreferences,
-  selectPetPreferences,
+  selectAssistantPreferences,
   settingsBoolean,
   useSettingsStore,
 } from "../stores/useSettingsStore";
@@ -78,11 +78,12 @@ import type { AppTab } from "../routing/types";
 import type { TransferRecord, TransferStatus } from "../api/types";
 import { isAndroidBuild } from "../platform/buildTarget";
 import {
-  closeCloudFolderPetWindow,
-  cloudFolderPetDismissEvent,
-  cloudFolderPetReturnToAppEvent,
-  openCloudFolderPetWindow,
-} from "../pets/cloudFolderPet";
+  closeCloudFolderBotWindow,
+  cloudFolderBotDismissEvent,
+  cloudFolderBotOpenAssistantEvent,
+  cloudFolderBotReturnToAppEvent,
+  openCloudFolderBotWindow,
+} from "../bots/cloudFolderBot";
 
 export type DesktopNavItem = {
   id: string;
@@ -240,8 +241,9 @@ export function DesktopLayout(props: {
       state.notificationHistory.filter((notification) => !notification.read)
         .length,
   );
-  const { resolvedTheme, setSystemTheme, themeId, themeMode } = useAppThemeStore(
+  const { customTokens, resolvedTheme, setSystemTheme, themeId, themeMode } = useAppThemeStore(
     useShallow((state) => ({
+      customTokens: state.customTokens,
       resolvedTheme: state.resolvedTheme,
       setSystemTheme: state.setSystemTheme,
       themeId: state.themeId,
@@ -351,8 +353,8 @@ export function DesktopLayout(props: {
       selectNotificationPreferences(state.settings?.document),
     ),
   );
-  const cloudFolderPetEnabled = useSettingsStore(
-    (state) => selectPetPreferences(state.settings?.document).cloudFolderEnabled,
+  const cloudFolderBotEnabled = useSettingsStore(
+    (state) => selectAssistantPreferences(state.settings?.document).enabled,
   );
   const updateSetting = useSettingsStore((state) => state.updateSetting);
   const framePacingOverlayEnabled = useSettingsStore((state) =>
@@ -431,15 +433,15 @@ export function DesktopLayout(props: {
 
   useEffect(() => {
     if (!hasTauriInternals()) return;
-    if (cloudFolderPetEnabled) void openCloudFolderPetWindow(app?.environment.assetsDir);
-    else void closeCloudFolderPetWindow();
-  }, [app?.environment.assetsDir, cloudFolderPetEnabled]);
+    if (cloudFolderBotEnabled) void openCloudFolderBotWindow(app?.environment.assetsDir);
+    else void closeCloudFolderBotWindow();
+  }, [app?.environment.assetsDir, cloudFolderBotEnabled]);
 
   useEffect(() => {
     if (!hasTauriInternals()) return;
     let unlisten: UnlistenFn | null = null;
-    void listen(cloudFolderPetDismissEvent, () => {
-      updateSetting("pets", "cloud_folder_enabled", false);
+    void listen(cloudFolderBotDismissEvent, () => {
+      updateSetting("assistant", "enabled", false);
     }).then((listener) => {
       unlisten = listener;
     });
@@ -452,7 +454,7 @@ export function DesktopLayout(props: {
   useEffect(() => {
     if (!hasTauriInternals()) return;
     let unlisten: UnlistenFn | null = null;
-    void listen(cloudFolderPetReturnToAppEvent, () => {
+    void listen(cloudFolderBotReturnToAppEvent, () => {
       const mainWindow = getCurrentWindow();
       void mainWindow.show().catch(() => undefined);
       void mainWindow.unminimize().catch(() => undefined);
@@ -465,6 +467,26 @@ export function DesktopLayout(props: {
       if (unlisten) void unlisten();
     };
   }, []);
+
+  useEffect(() => {
+    if (!hasTauriInternals()) return;
+    let unlisten: UnlistenFn | null = null;
+    void listen(cloudFolderBotOpenAssistantEvent, () => {
+      setSettingsOpen(false);
+      useExplorerStore.getState().setMikaPanelOpen(true);
+      navigate("/files");
+      const mainWindow = getCurrentWindow();
+      void mainWindow.show().catch(() => undefined);
+      void mainWindow.unminimize().catch(() => undefined);
+      void mainWindow.setFocus().catch(() => undefined);
+    }).then((listener) => {
+      unlisten = listener;
+    });
+
+    return () => {
+      if (unlisten) void unlisten();
+    };
+  }, [navigate]);
 
   useEffect(() => {
     if (loadedRoutes.current.has(routeId)) return;
@@ -533,6 +555,24 @@ export function DesktopLayout(props: {
       delete root.dataset.mistyWallpaperActive;
     };
   }, [appWallpaperSrc, desktopFrameStyle]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const names: Record<string, string> = {
+      background: "--misty-bg", surface: "--misty-surface", foreground: "--misty-text",
+      muted: "--misty-text-muted", accent: "--misty-accent", selection: "--misty-selection",
+      success: "--misty-success", warning: "--misty-warning", danger: "--misty-danger",
+    };
+    for (const [token, property] of Object.entries(names)) {
+      const value = customTokens?.[token as keyof typeof customTokens];
+      if (value) root.style.setProperty(property, value);
+      else {
+        const frameValue = (desktopFrameStyle as Record<string, string>)[property];
+        if (frameValue) root.style.setProperty(property, frameValue);
+        else root.style.removeProperty(property);
+      }
+    }
+  }, [customTokens, desktopFrameStyle]);
 
   useEffect(() => {
     const badgeCount =

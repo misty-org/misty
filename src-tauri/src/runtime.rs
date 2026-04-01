@@ -4,11 +4,14 @@ use crate::core::clipboard::{ClipboardService, SharedClipboardClient};
 use crate::core::file_sync::FileSyncPairStore;
 #[cfg(desktop)]
 use crate::services::plugin_commands::PluginCommandService;
+#[cfg(desktop)]
+use crate::services::extension_runtime::ExtensionRuntimeService;
 use crate::services::{
-    ai::AiService, claude::ClaudeService, commands::CommandService, devices::DeviceService,
-    directory_size::DirectorySizeService, environment::AppEnvironmentService,
-    explorer::ExplorerService, explorer_library::ExplorerLibraryService,
-    file_sync::FileSyncService, metadata::MetadataService, operation_queue::OperationQueueService,
+    ai::AiService, automations::AutomationService, claude::ClaudeService, commands::CommandService,
+    devices::DeviceService, directory_size::DirectorySizeService,
+    environment::AppEnvironmentService, explorer::ExplorerService,
+    explorer_library::ExplorerLibraryService, file_sync::FileSyncService,
+    metadata::MetadataService, operation_queue::OperationQueueService,
     power_pack::PowerPackService, providers::ProviderService, proxy::ProxyService,
     proxy_clipboard::ProxyClipboardClient, proxy_runtime::ProxyRuntimeService,
     search::SearchService, settings::SettingsService, transfers::TransferService,
@@ -32,6 +35,8 @@ pub struct MistyRuntime {
     pub metadata: MetadataService,
     #[cfg(desktop)]
     pub plugin_commands: PluginCommandService,
+    #[cfg(desktop)]
+    pub extension_runtime: ExtensionRuntimeService,
     pub power_pack: PowerPackService,
     pub search: SearchService,
     pub explorer: ExplorerService,
@@ -39,6 +44,7 @@ pub struct MistyRuntime {
     pub workspaces: WorkspaceService,
     pub operation_queue: OperationQueueService,
     pub ai: AiService,
+    pub automations: AutomationService,
     pub claude: ClaudeService,
 }
 
@@ -75,6 +81,8 @@ impl MistyRuntime {
         let metadata = MetadataService::new();
         #[cfg(desktop)]
         let plugin_commands = PluginCommandService::new(environment.clone());
+        #[cfg(desktop)]
+        let extension_runtime = ExtensionRuntimeService::new(environment.clone());
         let explorer_library = ExplorerLibraryService::new(environment.clone());
         let search = SearchService::new(environment.clone(), providers.clone(), proxy.clone());
         let explorer = ExplorerService::new(
@@ -91,6 +99,7 @@ impl MistyRuntime {
             operation_queue.clone(),
         );
         let ai = AiService::new();
+        let automations = AutomationService::new(environment.clone(), ai.clone());
         let claude = ClaudeService::new();
         let file_sync = FileSyncService::new(
             environment.clone(),
@@ -117,6 +126,8 @@ impl MistyRuntime {
             metadata,
             #[cfg(desktop)]
             plugin_commands,
+            #[cfg(desktop)]
+            extension_runtime,
             power_pack,
             search,
             explorer,
@@ -124,6 +135,7 @@ impl MistyRuntime {
             workspaces,
             operation_queue,
             ai,
+            automations,
             claude,
         }
     }
