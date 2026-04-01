@@ -23,7 +23,6 @@ use crate::core::operation_queue::{ConflictPolicy, OperationQueueSnapshot};
 use crate::core::workspace::WorkspaceDocument;
 use crate::error::{ApiError, ApiResult};
 use crate::runtime::MistyRuntime;
-use crate::services::ai::{AiSendRequest, AiStatus, AiStreamEvent};
 use crate::services::automations::{
     AutomationRunRequest, AutomationSnapshot, AutomationValidation, AutomationWorkflow,
 };
@@ -59,8 +58,8 @@ use crate::services::providers::{
     ProvidersSnapshot, PublicLinkActionResult, PublicLinkListResult, RcloneConfigPaths,
     RemoteEditDraft, RemoteTestResult, SaveRemoteRequest, VerifyResult, VerifyStartRequest,
 };
-use crate::services::proxy::ProxySnapshot;
-use crate::services::proxy_runtime::ProxyRuntimeSnapshot;
+use crate::services::storage::StorageSnapshot;
+use crate::services::storage_runtime::StorageRuntimeSnapshot;
 use crate::services::search::{SearchQueryRequest, SearchResult, SearchScanRequest, SearchStatus};
 use crate::services::settings::{OpenWithAssociation, SaveSettingsRequest, SettingsSnapshot};
 use crate::services::transfers::{TransferFilter, TransferPage};
@@ -71,8 +70,7 @@ pub struct AppSnapshot {
     app_name: &'static str,
     version: &'static str,
     migration_stage: &'static str,
-    proxy_url: Option<String>,
-    proxy_runtime: ProxyRuntimeSnapshot,
+    storage_runtime: StorageRuntimeSnapshot,
     environment: AppEnvironmentSnapshot,
 }
 
@@ -88,8 +86,7 @@ pub async fn app_snapshot(state: State<'_, MistyRuntime>) -> ApiResult<AppSnapsh
         app_name: "Misty",
         version: env!("CARGO_PKG_VERSION"),
         migration_stage: "Tauri migration shell",
-        proxy_url: state.proxy.proxy_url(),
-        proxy_runtime: state.proxy_runtime.snapshot(),
+        storage_runtime: state.storage_runtime.snapshot(),
         environment: state.environment.snapshot(),
     })
 }
@@ -104,6 +101,15 @@ pub async fn app_environment_snapshot(
 #[tauri::command]
 pub async fn automations_snapshot(state: State<'_, MistyRuntime>) -> ApiResult<AutomationSnapshot> {
     state.automations.snapshot().await
+}
+
+#[tauri::command]
+pub async fn automations_set_managed_ai_auth(
+    token: String,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<()> {
+    state.automations.set_managed_ai_auth(token).await;
+    Ok(())
 }
 
 #[tauri::command]
@@ -151,29 +157,6 @@ pub async fn automations_resolve_approval(
 }
 
 #[tauri::command]
-pub fn ai_status(state: State<'_, MistyRuntime>) -> AiStatus {
-    state.ai.status()
-}
-
-#[tauri::command]
-pub fn ai_send_message(
-    request: AiSendRequest,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<AiStatus> {
-    state.ai.send_message(request)
-}
-
-#[tauri::command]
-pub fn ai_drain_events(state: State<'_, MistyRuntime>) -> Vec<AiStreamEvent> {
-    state.ai.drain_events()
-}
-
-#[tauri::command]
-pub fn ai_abort(state: State<'_, MistyRuntime>) -> ApiResult<AiStatus> {
-    state.ai.abort()
-}
-
-#[tauri::command]
 pub fn claude_status(state: State<'_, MistyRuntime>) -> ClaudeStatus {
     state.claude.status()
 }
@@ -197,8 +180,8 @@ pub fn claude_abort(state: State<'_, MistyRuntime>) -> ApiResult<ClaudeStatus> {
 }
 
 #[tauri::command]
-pub async fn proxy_snapshot(state: State<'_, MistyRuntime>) -> ApiResult<ProxySnapshot> {
-    Ok(state.proxy.snapshot().await)
+pub async fn storage_snapshot(state: State<'_, MistyRuntime>) -> ApiResult<StorageSnapshot> {
+    Ok(state.storage.snapshot().await)
 }
 
 #[tauri::command]
@@ -288,15 +271,10 @@ pub fn clipboard_shared_image_bytes(
             "Shared clipboard image is missing a blob id.".to_owned(),
         ));
     }
-    let mut payload = state.clipboard.latest_shared();
+    let payload = state.clipboard.latest_shared();
     if payload.kind != ClipboardPayloadKind::Image || payload.images.is_empty() {
         return Err(ApiError::Message(
             "No shared clipboard image is available.".to_owned(),
-        ));
-    }
-    if !state.proxy_clipboard.hydrate_payload(&mut payload) {
-        return Err(ApiError::Message(
-            "Failed to download the shared clipboard image.".to_owned(),
         ));
     }
     payload

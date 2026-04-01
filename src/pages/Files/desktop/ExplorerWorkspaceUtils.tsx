@@ -1,4 +1,4 @@
-import { PanelLeft, PanelRight, Puzzle } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "lucide-react";
 import type { ExplorerLibrarySnapshot, MountedDevice, PluginCommandEntry, PluginPanelEntry, ProviderRemote } from "../../../api/types";
 import type { MultiPanelTab } from "../../../shared/multipanel/types";
 import { useMultiPanelStore } from "../../../shared/multipanel/useMultiPanelStore";
@@ -9,12 +9,11 @@ import { explorerShellStyles } from "./ExplorerShellStyles";
 export function ExplorerBottomBar(props: {
   sidebarVisible: boolean;
   previewVisible: boolean;
-  extensionsVisible: boolean;
-  extensionsEnabled?: boolean;
   onToggleSidebar: () => void;
   onTogglePreview: () => void;
-  onToggleExtensions: () => void;
 }) {
+  const SidebarIcon = props.sidebarVisible ? PanelLeftClose : PanelLeftOpen;
+  const PreviewIcon = props.previewVisible ? PanelRightClose : PanelRightOpen;
   return (
     <footer className={explorerShellStyles.bottomBar}>
       <button
@@ -23,7 +22,7 @@ export function ExplorerBottomBar(props: {
         title={props.sidebarVisible ? "Hide sidebar" : "Show sidebar"}
         onClick={props.onToggleSidebar}
       >
-        <PanelLeft size={15} />
+        <SidebarIcon size={15} />
       </button>
       <div className={explorerShellStyles.bottomBarGroup}>
         <button
@@ -32,18 +31,8 @@ export function ExplorerBottomBar(props: {
           title={props.previewVisible ? "Hide preview" : "Show preview"}
           onClick={props.onTogglePreview}
         >
-          <PanelRight size={15} />
+          <PreviewIcon size={15} />
         </button>
-        {props.extensionsEnabled !== false ? (
-          <button
-            type="button"
-            className={cx(explorerShellStyles.bottomButton, props.extensionsVisible && explorerShellStyles.bottomButtonSelected)}
-            title={props.extensionsVisible ? "Hide extensions" : "Show extensions"}
-            onClick={props.onToggleExtensions}
-          >
-            <Puzzle size={15} />
-          </button>
-        ) : null}
       </div>
     </footer>
   );

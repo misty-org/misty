@@ -290,6 +290,7 @@ function MobileAccountOverview(props: {
       </AccountSection>
 
       <AccountSection title="Account access">
+        <AccountRow icon={BadgeCheck} label="Plan" detail={licensePlanLabel(props.license)} />
         <AccountRow icon={BadgeCheck} label="Status" detail={accountAccessRowDetail(props.license)} />
         <AccountRow icon={MonitorSmartphone} label="Devices" detail="This device" />
       </AccountSection>
@@ -396,6 +397,11 @@ function accountSubtitle(mode: AccountMode, email?: string): string {
 function accountAccessRowDetail(license: CurrentLicense | null): string {
   if (!license) return "Status pending";
   return license.allows_use ? "Access active" : `Access ${license.status}`;
+}
+
+function licensePlanLabel(license: CurrentLicense | null): string {
+  if (!license) return "Basic";
+  return license.tier === "max" ? "Max" : license.tier === "pro" ? "Pro" : "Basic";
 }
 
 function licenseFromMe(me: AccountMeResponse): CurrentLicense {

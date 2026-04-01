@@ -34,9 +34,8 @@ if (preflightOnly) {
 }
 
 for (const target of buildTargets) {
-  run("npm", ["run", "proxy:archive"], {
-    MISTY_PROXY_GO_TARGET: target,
-    MISTY_PROXY_GO_LIB_NAME: "misty_proxy",
+  run("npm", ["run", "service:archive"], {
+    MISTY_SERVICE_GO_TARGET: target,
   });
 }
 
@@ -47,12 +46,9 @@ if (debug) tauriArgs.push("--debug");
 if (apk) tauriArgs.push("--apk");
 if (aab) tauriArgs.push("--aab");
 if (selectedTarget) tauriArgs.push("--target", androidCargoTarget(selectedTarget));
-tauriArgs.push("--features=embedded-proxy-go", "--ci");
+tauriArgs.push("--features=embedded-storage-go", "--ci");
 
 run("npm", tauriArgs, {
-  MISTY_PROXY_RUNTIME: "embedded",
-  MISTY_RCLONE_BACKEND: "misty-rclone",
-  MISTY_PROXY_GO_LIB_NAME: "misty_proxy",
 });
 
 function preflightAndroidEnvironment() {

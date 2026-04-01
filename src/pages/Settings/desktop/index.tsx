@@ -1,11 +1,18 @@
-import { memo, useEffect, useState, type ChangeEvent, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
+import {
+  memo,
+  useEffect,
+  useState,
+  type ChangeEvent,
+  type KeyboardEvent,
+  type PointerEvent,
+  type ReactNode,
+} from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useShallow } from "zustand/react/shallow";
 import {
   AppWindow,
   ArrowLeftRight,
   Bell,
-  Bot,
   ChevronDown,
   Copy,
   Eye,
@@ -27,10 +34,13 @@ import {
   themeModeToSettingsIndex,
   useAppThemeStore,
 } from "../../../stores/useAppThemeStore";
-import type { LaunchOnLoginSnapshot, OpenWithAssociation, ShortcutBinding } from "../../../api/types";
+import type {
+  LaunchOnLoginSnapshot,
+  OpenWithAssociation,
+  ShortcutBinding,
+} from "../../../api/types";
 import {
   fontLabelFromPath,
-  selectAssistantPreferences,
   selectCustomFontPreferences,
   useSettingsStore,
   type CustomFontPreference,
@@ -47,8 +57,19 @@ import {
   type TransferProfileRecord,
 } from "../transferProfiles";
 
-type SettingsSection = "general" | "app" | "assistant" | "appearance" | "privacy" | "sync" | "transfers" | "search" | "notifications" | "shortcuts" | "advanced";
-type SettingValue = string | number | boolean | Record<string, unknown> | Array<Record<string, unknown>>;
+type SettingsSection =
+  | "general"
+  | "app"
+  | "assistant"
+  | "appearance"
+  | "privacy"
+  | "sync"
+  | "transfers"
+  | "search"
+  | "notifications"
+  | "shortcuts"
+  | "advanced";
+type SettingValue = string | number | boolean | Array<Record<string, unknown>>;
 
 interface NavItem {
   id: SettingsSection;
@@ -59,7 +80,6 @@ interface NavItem {
 const appNavItems: NavItem[] = [
   { id: "general", label: "General", icon: Rows3 },
   { id: "app", label: "App", icon: AppWindow },
-  { id: "assistant", label: "Assistant", icon: Bot },
   { id: "appearance", label: "Appearance", icon: Eye },
   { id: "privacy", label: "Privacy", icon: Lock },
   { id: "sync", label: "Sync", icon: RefreshCcw },
@@ -70,9 +90,7 @@ const appNavItems: NavItem[] = [
   { id: "advanced", label: "Advanced", icon: Settings2 },
 ];
 
-const navGroups = [
-  { label: "Misty App Settings", items: appNavItems },
-];
+const navGroups = [{ label: "Misty App Settings", items: appNavItems }];
 
 const navItems = appNavItems;
 
@@ -110,11 +128,9 @@ const settingsOverlayHeaderClass =
 const settingsOverlayContentClass =
   "misty-scrollbar min-h-0 min-w-0 overflow-auto bg-[var(--misty-app-shell-bg,#050607)] px-7 py-5";
 
-const settingsScrollSurfaceClass =
-  "w-[min(100%,934px)] min-w-[720px]";
+const settingsScrollSurfaceClass = "w-[min(100%,934px)] min-w-[720px]";
 
-const settingsOverlayScrollSurfaceClass =
-  "w-[min(100%,720px)] min-w-[560px]";
+const settingsOverlayScrollSurfaceClass = "w-[min(100%,720px)] min-w-[560px]";
 
 const settingsOverlayCloseClass =
   "grid size-8 place-items-center rounded-md border border-transparent bg-transparent p-0 text-[#a1a1aa] transition hover:border-white/10 hover:bg-white/[0.045] hover:text-[#f4f4f5]";
@@ -122,23 +138,19 @@ const settingsOverlayCloseClass =
 const settingsControlButtonClass =
   "inline-flex h-8 w-[220px] items-center justify-center gap-1.5 rounded-md border border-white/10 bg-white/[0.055] text-[15px] font-semibold text-[#f4f4f5] transition hover:border-white/20 hover:bg-white/[0.09] disabled:opacity-55";
 
-const settingsControlButtonCompactClass =
-  `${settingsControlButtonClass} w-[100px]`;
+const settingsControlButtonCompactClass = `${settingsControlButtonClass} w-[100px]`;
 
 const settingsPrimaryButtonClass =
   "inline-flex h-[34px] w-[140px] items-center justify-center rounded-md border border-[#f4f4f5] bg-[#f4f4f5] text-[15px] font-bold text-[#07090b] transition hover:bg-white disabled:opacity-55";
 
-const settingsReferenceListClass =
-  "grid min-w-0";
+const settingsReferenceListClass = "grid min-w-0";
 
 const settingsReferenceRowClass =
   "grid min-h-[54px] grid-cols-[minmax(0,0.52fr)_minmax(220px,0.48fr)] items-center gap-[18px] border-b border-white/[0.08] px-7 py-[7px] text-sm text-[#f4f4f5]";
 
-const settingsReferenceHeaderClass =
-  "min-h-[42px] text-[15px]";
+const settingsReferenceHeaderClass = "min-h-[42px] text-[15px]";
 
-const settingsReferenceSpanClass =
-  "min-w-0 [overflow-wrap:anywhere]";
+const settingsReferenceSpanClass = "min-w-0 [overflow-wrap:anywhere]";
 
 const settingsReferenceInputClass =
   "h-9 w-full rounded-md border border-white/10 bg-[#07090b] px-2.5 text-[#f4f4f5] outline-none focus:border-white/30";
@@ -146,11 +158,9 @@ const settingsReferenceInputClass =
 const settingsIconDangerClass =
   "grid h-[30px] w-[30px] place-items-center rounded-md border border-white/10 bg-white/[0.045] text-[#f4f4f5] transition hover:border-[#fca5a5]/40 hover:text-[#fca5a5] disabled:opacity-55";
 
-const settingsInlineActionsClass =
-  "flex items-center gap-3 px-7 py-4";
+const settingsInlineActionsClass = "flex items-center gap-3 px-7 py-4";
 
-const settingsEmptyClass =
-  "px-7 py-4 text-sm text-[#8f8f8f]";
+const settingsEmptyClass = "px-7 py-4 text-sm text-[#8f8f8f]";
 
 const settingsFontRowClass =
   "grid min-h-[54px] grid-cols-[minmax(110px,0.24fr)_minmax(0,1fr)_32px] items-center gap-[18px] border-b border-white/[0.08] px-7 py-[7px] text-sm text-[#f4f4f5]";
@@ -175,24 +185,28 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: {
     removeOpenWithAssociation,
     setShortcut,
     saveShortcuts,
-  } = useSettingsStore(useShallow((state) => ({
-    activeSection: state.activeSection,
-    settings: state.settings,
-    launchOnLogin: state.launchOnLogin,
-    openWithAssociations: state.openWithAssociations,
-    shortcuts: state.shortcuts,
-    working: state.working,
-    setActiveSection: state.setActiveSection,
-    updateSetting: state.updateSetting,
-    load: state.load,
-    removeOpenWithAssociation: state.removeOpenWithAssociation,
-    setShortcut: state.setShortcut,
-    saveShortcuts: state.saveShortcuts,
-  })));
+  } = useSettingsStore(
+    useShallow((state) => ({
+      activeSection: state.activeSection,
+      settings: state.settings,
+      launchOnLogin: state.launchOnLogin,
+      openWithAssociations: state.openWithAssociations,
+      shortcuts: state.shortcuts,
+      working: state.working,
+      setActiveSection: state.setActiveSection,
+      updateSetting: state.updateSetting,
+      load: state.load,
+      removeOpenWithAssociation: state.removeOpenWithAssociation,
+      setShortcut: state.setShortcut,
+      saveShortcuts: state.saveShortcuts,
+    })),
+  );
   const app = useAppStore((state) => state.app);
   const document = settings?.document ?? {};
-  const title = navItems.find((item) => item.id === activeSection)?.label ?? "General";
-  const activeIcon = navItems.find((item) => item.id === activeSection)?.icon ?? Settings2;
+  const title =
+    navItems.find((item) => item.id === activeSection)?.label ?? "General";
+  const activeIcon =
+    navItems.find((item) => item.id === activeSection)?.icon ?? Settings2;
   const ActiveIcon = activeIcon;
   const overlay = props.presentation === "overlay";
 
@@ -211,7 +225,10 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: {
   };
 
   return (
-    <section className={overlay ? settingsOverlayGridClass : settingsGridClass} aria-label="Settings">
+    <section
+      className={overlay ? settingsOverlayGridClass : settingsGridClass}
+      aria-label="Settings"
+    >
       <aside className={settingsSidebarClass} aria-label="Settings sections">
         {navGroups.map((group) => (
           <div className="grid gap-[5px]" key={group.label}>
@@ -228,7 +245,9 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: {
                   onClick={() => setActiveSection(item.id)}
                 >
                   <Icon size={18} strokeWidth={1.8} />
-                  <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{item.label}</span>
+                  <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+                    {item.label}
+                  </span>
                 </button>
               );
             })}
@@ -240,8 +259,14 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: {
         <main className={settingsOverlayContentShellClass}>
           <header className={settingsOverlayHeaderClass}>
             <div className="flex min-w-0 items-center gap-3">
-              <ActiveIcon size={17} strokeWidth={1.8} className="shrink-0 text-[#8d8d8d]" />
-              <h1 className="m-0 min-w-0 truncate text-[15px] font-[740] leading-tight tracking-normal text-[#f4f4f5]">{title}</h1>
+              <ActiveIcon
+                size={17}
+                strokeWidth={1.8}
+                className="shrink-0 text-[#8d8d8d]"
+              />
+              <h1 className="m-0 min-w-0 truncate text-[15px] font-[740] leading-tight tracking-normal text-[#f4f4f5]">
+                {title}
+              </h1>
             </div>
             <button
               type="button"
@@ -285,19 +310,40 @@ function SettingsContent(props: {
     <main className={props.className}>
       <div className={props.surfaceClassName}>
         {props.title ? (
-          <h1 className="mb-[18px] mt-1 text-[28px] font-[760] leading-[1.15] tracking-normal text-[#f4f4f5]">{props.title}</h1>
+          <h1 className="mb-[18px] mt-1 text-[28px] font-[760] leading-[1.15] tracking-normal text-[#f4f4f5]">
+            {props.title}
+          </h1>
         ) : null}
-        {props.activeSection === "general" ? <GeneralSettings {...props.controlProps} /> : null}
-        {props.activeSection === "app" ? <AppSettings {...props.controlProps} /> : null}
-        {props.activeSection === "assistant" ? <AssistantSettings {...props.controlProps} /> : null}
-        {props.activeSection === "appearance" ? <AppearanceSettings {...props.controlProps} /> : null}
-        {props.activeSection === "privacy" ? <PrivacySettings {...props.controlProps} /> : null}
-        {props.activeSection === "sync" ? <SyncSettings {...props.controlProps} /> : null}
-        {props.activeSection === "transfers" ? <TransfersSettings {...props.controlProps} /> : null}
-        {props.activeSection === "search" ? <SearchSettings {...props.controlProps} /> : null}
-        {props.activeSection === "notifications" ? <NotificationsSettings {...props.controlProps} /> : null}
-        {props.activeSection === "shortcuts" ? <ShortcutsSettings {...props.controlProps} /> : null}
-        {props.activeSection === "advanced" ? <AdvancedSettings {...props.controlProps} /> : null}
+        {props.activeSection === "general" ? (
+          <GeneralSettings {...props.controlProps} />
+        ) : null}
+        {props.activeSection === "app" ? (
+          <AppSettings {...props.controlProps} />
+        ) : null}
+        {props.activeSection === "appearance" ? (
+          <AppearanceSettings {...props.controlProps} />
+        ) : null}
+        {props.activeSection === "privacy" ? (
+          <PrivacySettings {...props.controlProps} />
+        ) : null}
+        {props.activeSection === "sync" ? (
+          <SyncSettings {...props.controlProps} />
+        ) : null}
+        {props.activeSection === "transfers" ? (
+          <TransfersSettings {...props.controlProps} />
+        ) : null}
+        {props.activeSection === "search" ? (
+          <SearchSettings {...props.controlProps} />
+        ) : null}
+        {props.activeSection === "notifications" ? (
+          <NotificationsSettings {...props.controlProps} />
+        ) : null}
+        {props.activeSection === "shortcuts" ? (
+          <ShortcutsSettings {...props.controlProps} />
+        ) : null}
+        {props.activeSection === "advanced" ? (
+          <AdvancedSettings {...props.controlProps} />
+        ) : null}
       </div>
     </main>
   );
@@ -322,56 +368,114 @@ function GeneralSettings(props: SettingsContentProps) {
   const launchOnLoginEnabled = props.launchOnLogin
     ? props.launchOnLogin.enabled
     : booleanSetting(props.document, "general", "launch_on_login", false);
-  const workspaceRoot = stringSetting(props.document, "general", "preferred_workspace_root", "");
+  const workspaceRoot = stringSetting(
+    props.document,
+    "general",
+    "preferred_workspace_root",
+    "",
+  );
   return (
     <>
       <SettingsSectionBlock title="Startup">
         <SettingsRow
           label="Launch on login"
-          description={launchOnLoginUnsupported
-            ? "Unavailable on this platform."
-            : "Start Misty automatically when you sign in to this device."}
+          description={
+            launchOnLoginUnsupported
+              ? "Unavailable on this platform."
+              : "Start Misty automatically when you sign in to this device."
+          }
           last
         >
           <SwitchControl
             checked={launchOnLoginEnabled}
             disabled={props.working || launchOnLoginUnsupported}
-            onChange={(value) => props.onSettingChange("general", "launch_on_login", value)}
+            onChange={(value) =>
+              props.onSettingChange("general", "launch_on_login", value)
+            }
           />
         </SettingsRow>
       </SettingsSectionBlock>
 
       <SettingsSectionBlock title="Behavior">
-        <SettingsRow label="Confirm destructive actions" description="Ask before delete, empty trash, and other irreversible actions.">
+        <SettingsRow
+          label="Confirm destructive actions"
+          description="Ask before delete, empty trash, and other irreversible actions."
+        >
           <SwitchControl
-            checked={booleanSetting(props.document, "general", "confirm_destructive_actions", true)}
+            checked={booleanSetting(
+              props.document,
+              "general",
+              "confirm_destructive_actions",
+              true,
+            )}
             disabled={props.working}
-            onChange={(value) => props.onSettingChange("general", "confirm_destructive_actions", value)}
+            onChange={(value) =>
+              props.onSettingChange(
+                "general",
+                "confirm_destructive_actions",
+                value,
+              )
+            }
           />
         </SettingsRow>
-        <SettingsRow label="Default file action" description="Choose what a primary file interaction should do.">
+        <SettingsRow
+          label="Default file action"
+          description="Choose what a primary file interaction should do."
+        >
           <SelectControl
-            value={numberSetting(props.document, "general", "default_file_action_index", 0)}
+            value={numberSetting(
+              props.document,
+              "general",
+              "default_file_action_index",
+              0,
+            )}
             options={defaultFileActionOptions}
             disabled={props.working}
-            onChange={(value) => props.onSettingChange("general", "default_file_action_index", value)}
+            onChange={(value) =>
+              props.onSettingChange(
+                "general",
+                "default_file_action_index",
+                value,
+              )
+            }
           />
         </SettingsRow>
-        <SettingsRow label="Open links externally" description="Send external links to the system browser instead of handling them in-app." last>
+        <SettingsRow
+          label="Open links externally"
+          description="Send external links to the system browser instead of handling them in-app."
+          last
+        >
           <SwitchControl
-            checked={booleanSetting(props.document, "general", "open_links_externally", true)}
+            checked={booleanSetting(
+              props.document,
+              "general",
+              "open_links_externally",
+              true,
+            )}
             disabled={props.working}
-            onChange={(value) => props.onSettingChange("general", "open_links_externally", value)}
+            onChange={(value) =>
+              props.onSettingChange("general", "open_links_externally", value)
+            }
           />
         </SettingsRow>
       </SettingsSectionBlock>
 
       <SettingsSectionBlock title="Defaults">
-        <SettingsRow label="Preferred workspace root" description="Choose the default starting location for file browsing." last>
+        <SettingsRow
+          label="Preferred workspace root"
+          description="Choose the default starting location for file browsing."
+          last
+        >
           <WorkspaceRootControl
             value={workspaceRoot}
             disabled={props.working}
-            onChange={(value) => props.onSettingChange("general", "preferred_workspace_root", value)}
+            onChange={(value) =>
+              props.onSettingChange(
+                "general",
+                "preferred_workspace_root",
+                value,
+              )
+            }
           />
         </SettingsRow>
       </SettingsSectionBlock>
@@ -389,69 +493,47 @@ function AppSettings(props: SettingsContentProps) {
       </SettingsSectionBlock>
 
       <SettingsSectionBlock title="Support Info">
-        <SettingsRow label="Remote runtime" description="Provider requests run through the embedded Misty runtime.">
-          <ValueText value={props.app?.proxyRuntime.mode ?? "Loading"} muted={!props.app?.proxyRuntime.mode} />
+        <SettingsRow
+          label="Remote runtime"
+          description="Provider requests run through the embedded Misty runtime."
+        >
+          <ValueText
+            value={props.app?.storageRuntime.ready ? `Ready (${props.app.storageRuntime.version})` : props.app?.storageRuntime.error ?? "Loading"}
+            muted={!props.app?.storageRuntime.ready}
+          />
         </SettingsRow>
-        <SettingsRow label="App version" description="The installed Misty build version.">
-          <ValueText value={props.app?.version ?? "Loading"} muted={!props.app?.version} />
+        <SettingsRow
+          label="App version"
+          description="The installed Misty build version."
+        >
+          <ValueText
+            value={props.app?.version ?? "Loading"}
+            muted={!props.app?.version}
+          />
         </SettingsRow>
-        <SettingsRow label="Build info" description="Helpful runtime details for troubleshooting and support.">
+        <SettingsRow
+          label="Build info"
+          description="Helpful runtime details for troubleshooting and support."
+        >
           <ValueText value="Tauri desktop shell" muted />
         </SettingsRow>
-        <SettingsRow label="Config path" description="Where Misty stores local configuration files on this device.">
-          <CopyableValueText value={props.app?.environment.configDir ?? "Loading"} disabled={!props.app?.environment.configDir} />
-        </SettingsRow>
-        <SettingsRow label="Data path" description="Where Misty stores local app data on this device." last>
-          <CopyableValueText value={props.app?.environment.mistyDir ?? "Loading"} disabled={!props.app?.environment.mistyDir} />
-        </SettingsRow>
-      </SettingsSectionBlock>
-    </>
-  );
-}
-
-function AssistantSettings(props: SettingsContentProps) {
-  const preferences = selectAssistantPreferences(props.document);
-  const updateScope = (key: "files_allowed" | "cleanup_allowed" | "search_allowed", value: boolean) => {
-    props.onSettingChange("assistant", "scopes", {
-      files_allowed: preferences.scopes.filesAllowed,
-      cleanup_allowed: preferences.scopes.cleanupAllowed,
-      search_allowed: preferences.scopes.searchAllowed,
-      [key]: value,
-    });
-  };
-
-  return (
-    <>
-      <SettingsSectionBlock title="Mika">
-        <SettingsRow label="Enable Mika" description="Allow the unified assistant and its desktop overlay." last>
-          <SwitchControl
-            checked={preferences.enabled}
-            disabled={props.working}
-            onChange={(value) => props.onSettingChange("assistant", "enabled", value)}
+        <SettingsRow
+          label="Config path"
+          description="Where Misty stores local configuration files on this device."
+        >
+          <CopyableValueText
+            value={props.app?.environment.configDir ?? "Loading"}
+            disabled={!props.app?.environment.configDir}
           />
         </SettingsRow>
-      </SettingsSectionBlock>
-
-      <SettingsSectionBlock title="Permission scopes">
-        <SettingsRow label="Files" description="Open, reveal, copy, move, rename, create, and monitor file transfers.">
-          <SwitchControl
-            checked={preferences.scopes.filesAllowed}
-            disabled={props.working || !preferences.enabled}
-            onChange={(value) => updateScope("files_allowed", value)}
-          />
-        </SettingsRow>
-        <SettingsRow label="Cleanup" description="Scan files and propose cleanup plans. Mika cannot apply cleanup changes in V1.">
-          <SwitchControl
-            checked={preferences.scopes.cleanupAllowed}
-            disabled={props.working || !preferences.enabled}
-            onChange={(value) => updateScope("cleanup_allowed", value)}
-          />
-        </SettingsRow>
-        <SettingsRow label="Search" description="Search files, libraries, tags, and paths, and suggest smart-folder queries." last>
-          <SwitchControl
-            checked={preferences.scopes.searchAllowed}
-            disabled={props.working || !preferences.enabled}
-            onChange={(value) => updateScope("search_allowed", value)}
+        <SettingsRow
+          label="Data path"
+          description="Where Misty stores local app data on this device."
+          last
+        >
+          <CopyableValueText
+            value={props.app?.environment.mistyDir ?? "Loading"}
+            disabled={!props.app?.environment.mistyDir}
           />
         </SettingsRow>
       </SettingsSectionBlock>
@@ -465,7 +547,11 @@ function AppearanceSettings(props: SettingsContentProps) {
   const themeIndex = themeModeToSettingsIndex(themeMode);
   const customFonts = selectCustomFontPreferences(props.document);
   const updateCustomFonts = (fonts: CustomFontPreference[]) => {
-    props.onSettingChange("appearance", "custom_fonts", fonts.map((font) => ({ label: font.label, path: font.path })));
+    props.onSettingChange(
+      "appearance",
+      "custom_fonts",
+      fonts.map((font) => ({ label: font.label, path: font.path })),
+    );
   };
   const addCustomFont = async () => {
     if (!hasTauriInternals()) return;
@@ -479,16 +565,24 @@ function AppearanceSettings(props: SettingsContentProps) {
     if (!path) return;
     const existing = new Set(customFonts.map((font) => font.path));
     if (existing.has(path)) return;
-    updateCustomFonts([...customFonts, { label: fontLabelFromPath(path), path }]);
+    updateCustomFonts([
+      ...customFonts,
+      { label: fontLabelFromPath(path), path },
+    ]);
   };
   const removeCustomFont = (index: number) => {
-    updateCustomFonts(customFonts.filter((_, fontIndex) => fontIndex !== index));
+    updateCustomFonts(
+      customFonts.filter((_, fontIndex) => fontIndex !== index),
+    );
   };
 
   return (
     <>
       <SettingsSectionBlock title="Theme">
-        <SettingsRow label="Theme mode" description="Choose whether Misty follows the system appearance or uses a fixed theme.">
+        <SettingsRow
+          label="Theme mode"
+          description="Choose whether Misty follows the system appearance or uses a fixed theme."
+        >
           <SelectControl
             value={themeIndex}
             options={themeOptions}
@@ -499,48 +593,90 @@ function AppearanceSettings(props: SettingsContentProps) {
             }}
           />
         </SettingsRow>
-        <SettingsRow label="UI scale" description="Adjust overall interface scale and density." last>
+        <SettingsRow
+          label="UI scale"
+          description="Adjust overall interface scale and density."
+          last
+        >
           <SelectControl
-            value={numberSetting(props.document, "appearance", "ui_scale_index", 1)}
+            value={numberSetting(
+              props.document,
+              "appearance",
+              "ui_scale_index",
+              1,
+            )}
             options={scaleOptions}
             disabled={props.working}
-            onChange={(value) => props.onSettingChange("appearance", "ui_scale_index", value)}
+            onChange={(value) =>
+              props.onSettingChange("appearance", "ui_scale_index", value)
+            }
           />
         </SettingsRow>
       </SettingsSectionBlock>
 
       <SettingsSectionBlock title="Layout">
-        <SettingsRow label="Compact mode" description="Reduce padding and spacing in file-heavy views.">
+        <SettingsRow
+          label="Compact mode"
+          description="Reduce padding and spacing in file-heavy views."
+        >
           <SwitchControl
-            checked={booleanSetting(props.document, "appearance", "compact_mode_enabled", false)}
+            checked={booleanSetting(
+              props.document,
+              "appearance",
+              "compact_mode_enabled",
+              false,
+            )}
             disabled={props.working}
-            onChange={(value) => props.onSettingChange("appearance", "compact_mode_enabled", value)}
+            onChange={(value) =>
+              props.onSettingChange("appearance", "compact_mode_enabled", value)
+            }
           />
         </SettingsRow>
         {!isAndroidBuild ? (
           <>
-            <SettingsRow label="App wallpaper" description="Choose an image, GIF, or video to show behind Misty pages.">
+            <SettingsRow
+              label="App wallpaper"
+              description="Choose an image, GIF, or video to show behind Misty pages."
+            >
               <WallpaperControl
                 value={stringSetting(
                   props.document,
                   "appearance",
                   "wallpaper_path",
-                  stringSetting(props.document, "appearance", "home_wallpaper_path", ""),
+                  stringSetting(
+                    props.document,
+                    "appearance",
+                    "home_wallpaper_path",
+                    "",
+                  ),
                 )}
                 disabled={props.working}
-                onChange={(value) => props.onSettingChange("appearance", "wallpaper_path", value)}
+                onChange={(value) =>
+                  props.onSettingChange("appearance", "wallpaper_path", value)
+                }
               />
             </SettingsRow>
-            <SettingsRow label="Panel opacity" description="Lower values make app surfaces more transparent, revealing more wallpaper." last>
+            <SettingsRow
+              label="Panel opacity"
+              description="Lower values make app surfaces more transparent, revealing more wallpaper."
+              last
+            >
               <OpacityControl
                 value={numberSetting(
                   props.document,
                   "appearance",
                   "panel_opacity",
-                  numberSetting(props.document, "appearance", "home_panel_opacity", 0.82),
+                  numberSetting(
+                    props.document,
+                    "appearance",
+                    "home_panel_opacity",
+                    0.82,
+                  ),
                 )}
                 disabled={props.working}
-                onCommit={(value) => props.onSettingChange("appearance", "panel_opacity", value)}
+                onCommit={(value) =>
+                  props.onSettingChange("appearance", "panel_opacity", value)
+                }
               />
             </SettingsRow>
           </>
@@ -548,28 +684,51 @@ function AppearanceSettings(props: SettingsContentProps) {
       </SettingsSectionBlock>
 
       <SettingsSectionBlock title="Typography">
-        <SettingsRow label="Font size" description="Choose the baseline text size Misty should use." last>
+        <SettingsRow
+          label="Font size"
+          description="Choose the baseline text size Misty should use."
+          last
+        >
           <SelectControl
-            value={numberSetting(props.document, "appearance", "font_size_index", 1)}
+            value={numberSetting(
+              props.document,
+              "appearance",
+              "font_size_index",
+              1,
+            )}
             options={scaleOptions}
             disabled={props.working}
-            onChange={(value) => props.onSettingChange("appearance", "font_size_index", value)}
+            onChange={(value) =>
+              props.onSettingChange("appearance", "font_size_index", value)
+            }
           />
         </SettingsRow>
       </SettingsSectionBlock>
 
       <SettingsSectionBlock title="Fonts">
-        <SettingsNote>Add custom fallback fonts to support filenames and text in additional languages.</SettingsNote>
+        <SettingsNote>
+          Add custom fallback fonts to support filenames and text in additional
+          languages.
+        </SettingsNote>
         <div className={settingsReferenceListClass}>
-          <div className={`${settingsFontRowClass} ${settingsReferenceHeaderClass}`}>
+          <div
+            className={`${settingsFontRowClass} ${settingsReferenceHeaderClass}`}
+          >
             <span>Label</span>
             <span>Path</span>
             <span />
           </div>
           {customFonts.map((font, index) => (
             <div className={settingsFontRowClass} key={`${font.path}:${index}`}>
-              <span className={settingsReferenceSpanClass}>{font.label || fontLabelFromPath(font.path)}</span>
-              <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap" title={font.path}>{font.path}</span>
+              <span className={settingsReferenceSpanClass}>
+                {font.label || fontLabelFromPath(font.path)}
+              </span>
+              <span
+                className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
+                title={font.path}
+              >
+                {font.path}
+              </span>
               <button
                 type="button"
                 className={settingsIconDangerClass}
@@ -581,28 +740,64 @@ function AppearanceSettings(props: SettingsContentProps) {
               </button>
             </div>
           ))}
-          {customFonts.length === 0 ? <p className={settingsEmptyClass}>No custom fonts added yet.</p> : null}
+          {customFonts.length === 0 ? (
+            <p className={settingsEmptyClass}>No custom fonts added yet.</p>
+          ) : null}
         </div>
         <div className={settingsInlineActionsClass}>
-          <button type="button" className={settingsControlButtonCompactClass} disabled={props.working} onClick={() => void addCustomFont()}>
+          <button
+            type="button"
+            className={settingsControlButtonCompactClass}
+            disabled={props.working}
+            onClick={() => void addCustomFont()}
+          >
             Add Font
           </button>
         </div>
       </SettingsSectionBlock>
 
       <SettingsSectionBlock title="Media">
-        <SettingsRow label="Thumbnail previews" description="Show preview-rich file rows where supported.">
+        <SettingsRow
+          label="Thumbnail previews"
+          description="Show preview-rich file rows where supported."
+        >
           <SwitchControl
-            checked={booleanSetting(props.document, "appearance", "thumbnail_previews_enabled", true)}
+            checked={booleanSetting(
+              props.document,
+              "appearance",
+              "thumbnail_previews_enabled",
+              true,
+            )}
             disabled={props.working}
-            onChange={(value) => props.onSettingChange("appearance", "thumbnail_previews_enabled", value)}
+            onChange={(value) =>
+              props.onSettingChange(
+                "appearance",
+                "thumbnail_previews_enabled",
+                value,
+              )
+            }
           />
         </SettingsRow>
-        <SettingsRow label="Reduced motion" description="Tone down motion and animated transitions." last>
+        <SettingsRow
+          label="Reduced motion"
+          description="Tone down motion and animated transitions."
+          last
+        >
           <SwitchControl
-            checked={booleanSetting(props.document, "appearance", "reduced_motion_enabled", false)}
+            checked={booleanSetting(
+              props.document,
+              "appearance",
+              "reduced_motion_enabled",
+              false,
+            )}
             disabled={props.working}
-            onChange={(value) => props.onSettingChange("appearance", "reduced_motion_enabled", value)}
+            onChange={(value) =>
+              props.onSettingChange(
+                "appearance",
+                "reduced_motion_enabled",
+                value,
+              )
+            }
           />
         </SettingsRow>
       </SettingsSectionBlock>
@@ -614,37 +809,100 @@ function PrivacySettings(props: SettingsContentProps) {
   return (
     <>
       <SettingsSectionBlock title="Data handling">
-        <SettingsRow label="Process data locally" description="Keep file handling and provider orchestration local whenever possible.">
+        <SettingsRow
+          label="Share anonymous usage analytics"
+          description="Share first-open, onboarding, and application-session events. No filenames, paths, or content."
+        >
           <SwitchControl
-            checked={booleanSetting(props.document, "privacy", "local_processing_only", true)}
+            checked={booleanSetting(props.document, "privacy", "anonymous_usage_analytics_enabled", false)}
             disabled={props.working}
-            onChange={(value) => props.onSettingChange("privacy", "local_processing_only", value)}
+            onChange={(value) => props.onSettingChange("privacy", "anonymous_usage_analytics_enabled", value)}
           />
         </SettingsRow>
-        <SettingsRow label="Share diagnostics" description="Allow Misty to include low-level runtime details when exporting diagnostics." last>
+        <SettingsRow
+          label="Send anonymous crash reports"
+          description="Share sanitized unexpected React and Rust errors without file or account data."
+        >
           <SwitchControl
-            checked={booleanSetting(props.document, "privacy", "diagnostics_sharing_enabled", false)}
+            checked={booleanSetting(props.document, "privacy", "anonymous_error_reporting_enabled", false)}
             disabled={props.working}
-            onChange={(value) => props.onSettingChange("privacy", "diagnostics_sharing_enabled", value)}
+            onChange={(value) => props.onSettingChange("privacy", "anonymous_error_reporting_enabled", value)}
+          />
+        </SettingsRow>
+        <SettingsRow
+          label="Process data locally"
+          description="Keep file handling and provider orchestration local whenever possible."
+        >
+          <SwitchControl
+            checked={booleanSetting(
+              props.document,
+              "privacy",
+              "local_processing_only",
+              true,
+            )}
+            disabled={props.working}
+            onChange={(value) =>
+              props.onSettingChange("privacy", "local_processing_only", value)
+            }
+          />
+        </SettingsRow>
+        <SettingsRow
+          label="Share diagnostics"
+          description="Allow Misty to include low-level runtime details when exporting diagnostics."
+          last
+        >
+          <SwitchControl
+            checked={booleanSetting(
+              props.document,
+              "privacy",
+              "diagnostics_sharing_enabled",
+              false,
+            )}
+            disabled={props.working}
+            onChange={(value) =>
+              props.onSettingChange(
+                "privacy",
+                "diagnostics_sharing_enabled",
+                value,
+              )
+            }
           />
         </SettingsRow>
       </SettingsSectionBlock>
 
       <SettingsSectionBlock title="Exports & deletion">
-        <SettingsRow label="Allow data export" description="Keep account export actions available in privacy and support workflows." last>
+        <SettingsRow
+          label="Allow data export"
+          description="Keep account export actions available in privacy and support workflows."
+          last
+        >
           <SwitchControl
-            checked={booleanSetting(props.document, "privacy", "export_data_enabled", true)}
+            checked={booleanSetting(
+              props.document,
+              "privacy",
+              "export_data_enabled",
+              true,
+            )}
             disabled={props.working}
-            onChange={(value) => props.onSettingChange("privacy", "export_data_enabled", value)}
+            onChange={(value) =>
+              props.onSettingChange("privacy", "export_data_enabled", value)
+            }
           />
         </SettingsRow>
       </SettingsSectionBlock>
 
       <SettingsSectionBlock title="Legal">
-        <SettingsRow label="Privacy Policy" description="Review how Misty handles account and runtime data.">
+        <SettingsRow
+          label="Privacy Policy"
+          description="Review how Misty handles account and runtime data."
+        >
           <ValueText value="Available soon" muted />
         </SettingsRow>
-        <SettingsRow label="Terms of Service" description="Review product terms before release packaging." last>
+        <SettingsRow
+          label="Terms of Service"
+          description="Review product terms before release packaging."
+          last
+        >
           <ValueText value="Available soon" muted />
         </SettingsRow>
       </SettingsSectionBlock>
@@ -655,16 +913,29 @@ function PrivacySettings(props: SettingsContentProps) {
 function SyncSettings(props: SettingsContentProps) {
   const transferProfiles = transferProfileRecords(props.document);
   const defaultProfileId = defaultTransferProfileId(props.document);
-  const defaultProfileIndex = Math.max(0, transferProfiles.findIndex((profile) => profile.id === defaultProfileId));
+  const defaultProfileIndex = Math.max(
+    0,
+    transferProfiles.findIndex((profile) => profile.id === defaultProfileId),
+  );
   const saveProfiles = (profiles: TransferProfileRecord[]) => {
-    props.onSettingChange("transfer_profiles", "profiles", profiles.map(transferProfileSettingsPayload));
+    props.onSettingChange(
+      "transfer_profiles",
+      "profiles",
+      profiles.map(transferProfileSettingsPayload),
+    );
   };
   const updateProfile = (id: string, patch: Partial<TransferProfileRecord>) => {
-    saveProfiles(transferProfiles.map((profile) => profile.id === id ? { ...profile, ...patch } : profile));
+    saveProfiles(
+      transferProfiles.map((profile) =>
+        profile.id === id ? { ...profile, ...patch } : profile,
+      ),
+    );
   };
   const addProfile = () => {
     const id = `profile-${Date.now().toString(36)}`;
-    const base = transferProfiles.find((profile) => profile.id === defaultProfileId) ?? transferProfiles[0];
+    const base =
+      transferProfiles.find((profile) => profile.id === defaultProfileId) ??
+      transferProfiles[0];
     saveProfiles([
       ...transferProfiles,
       {
@@ -685,74 +956,152 @@ function SyncSettings(props: SettingsContentProps) {
     const next = transferProfiles.filter((profile) => profile.id !== id);
     saveProfiles(next);
     if (defaultProfileId === id) {
-      props.onSettingChange("transfer_profiles", "default_profile_id", next[0]?.id ?? "balanced");
+      props.onSettingChange(
+        "transfer_profiles",
+        "default_profile_id",
+        next[0]?.id ?? "balanced",
+      );
     }
   };
   return (
     <>
       <SettingsSectionBlock title="Status">
-        <SettingsRow label="Auto-sync" description="Keep Misty in sync without requiring manual refreshes.">
+        <SettingsRow
+          label="Auto-sync"
+          description="Keep Misty in sync without requiring manual refreshes."
+        >
           <SwitchControl
-            checked={booleanSetting(props.document, "sync", "auto_sync_enabled", true)}
+            checked={booleanSetting(
+              props.document,
+              "sync",
+              "auto_sync_enabled",
+              true,
+            )}
             disabled={props.working}
-            onChange={(value) => props.onSettingChange("sync", "auto_sync_enabled", value)}
+            onChange={(value) =>
+              props.onSettingChange("sync", "auto_sync_enabled", value)
+            }
           />
         </SettingsRow>
-        <SettingsRow label="Version history" description="Keep enough state around to recover from accidental overwrites." last>
+        <SettingsRow
+          label="Version history"
+          description="Keep enough state around to recover from accidental overwrites."
+          last
+        >
           <SwitchControl
-            checked={booleanSetting(props.document, "sync", "version_history_enabled", true)}
+            checked={booleanSetting(
+              props.document,
+              "sync",
+              "version_history_enabled",
+              true,
+            )}
             disabled={props.working}
-            onChange={(value) => props.onSettingChange("sync", "version_history_enabled", value)}
+            onChange={(value) =>
+              props.onSettingChange("sync", "version_history_enabled", value)
+            }
           />
         </SettingsRow>
       </SettingsSectionBlock>
 
       <SettingsSectionBlock title="Rules">
-        <SettingsRow label="Sync on launch" description="Check for sync activity automatically when Misty starts.">
+        <SettingsRow
+          label="Sync on launch"
+          description="Check for sync activity automatically when Misty starts."
+        >
           <SwitchControl
-            checked={booleanSetting(props.document, "sync", "sync_on_launch_enabled", true)}
+            checked={booleanSetting(
+              props.document,
+              "sync",
+              "sync_on_launch_enabled",
+              true,
+            )}
             disabled={props.working}
-            onChange={(value) => props.onSettingChange("sync", "sync_on_launch_enabled", value)}
+            onChange={(value) =>
+              props.onSettingChange("sync", "sync_on_launch_enabled", value)
+            }
           />
         </SettingsRow>
-        <SettingsRow label="Sync on quit" description="Attempt a final sync pass before Misty closes.">
+        <SettingsRow
+          label="Sync on quit"
+          description="Attempt a final sync pass before Misty closes."
+        >
           <SwitchControl
-            checked={booleanSetting(props.document, "sync", "sync_on_quit_enabled", false)}
+            checked={booleanSetting(
+              props.document,
+              "sync",
+              "sync_on_quit_enabled",
+              false,
+            )}
             disabled={props.working}
-            onChange={(value) => props.onSettingChange("sync", "sync_on_quit_enabled", value)}
+            onChange={(value) =>
+              props.onSettingChange("sync", "sync_on_quit_enabled", value)
+            }
           />
         </SettingsRow>
-        <SettingsRow label="Allow metered sync" description="Continue syncing when the network may have bandwidth limits." last>
+        <SettingsRow
+          label="Allow metered sync"
+          description="Continue syncing when the network may have bandwidth limits."
+          last
+        >
           <SwitchControl
-            checked={booleanSetting(props.document, "sync", "allow_metered_sync", false)}
+            checked={booleanSetting(
+              props.document,
+              "sync",
+              "allow_metered_sync",
+              false,
+            )}
             disabled={props.working}
-            onChange={(value) => props.onSettingChange("sync", "allow_metered_sync", value)}
+            onChange={(value) =>
+              props.onSettingChange("sync", "allow_metered_sync", value)
+            }
           />
         </SettingsRow>
       </SettingsSectionBlock>
 
       <SettingsSectionBlock title="Conflict resolution">
-        <SettingsRow label="Default strategy" description="Choose how Misty should behave when the same file changes in two places." last>
+        <SettingsRow
+          label="Default strategy"
+          description="Choose how Misty should behave when the same file changes in two places."
+          last
+        >
           <SelectControl
-            value={numberSetting(props.document, "sync", "conflict_resolution_index", 0)}
+            value={numberSetting(
+              props.document,
+              "sync",
+              "conflict_resolution_index",
+              0,
+            )}
             options={conflictOptions}
             disabled={props.working}
-            onChange={(value) => props.onSettingChange("sync", "conflict_resolution_index", value)}
+            onChange={(value) =>
+              props.onSettingChange("sync", "conflict_resolution_index", value)
+            }
           />
         </SettingsRow>
       </SettingsSectionBlock>
 
       <SettingsSectionBlock title="Transfer profiles">
-        <SettingsRow label="Default profile" description="Choose the saved transfer behavior Misty should preselect.">
+        <SettingsRow
+          label="Default profile"
+          description="Choose the saved transfer behavior Misty should preselect."
+        >
           <SelectControl
             value={defaultProfileIndex}
             options={transferProfiles.map((profile) => profile.name)}
             disabled={props.working}
-            onChange={(value) => props.onSettingChange("transfer_profiles", "default_profile_id", transferProfiles[value]?.id ?? "balanced")}
+            onChange={(value) =>
+              props.onSettingChange(
+                "transfer_profiles",
+                "default_profile_id",
+                transferProfiles[value]?.id ?? "balanced",
+              )
+            }
           />
         </SettingsRow>
         <div className={settingsReferenceListClass}>
-          <div className={`${settingsReferenceRowClass} ${settingsReferenceHeaderClass}`}>
+          <div
+            className={`${settingsReferenceRowClass} ${settingsReferenceHeaderClass}`}
+          >
             <span>Name</span>
             <span>Behavior</span>
           </div>
@@ -765,24 +1114,65 @@ function SyncSettings(props: SettingsContentProps) {
                   <TextControl
                     value={profile.name}
                     disabled={props.working}
-                    onCommit={(value) => updateProfile(profile.id, { name: value.trim() || "Custom Profile" })}
+                    onCommit={(value) =>
+                      updateProfile(profile.id, {
+                        name: value.trim() || "Custom Profile",
+                      })
+                    }
                   />
                 )}
               </span>
               <span className="grid justify-items-end gap-2 text-right text-[#a1a1aa]">
                 <span>
-                  {profile.transfers} transfers / {profile.checkers} checks{profile.bandwidthLimit ? ` · ${profile.bandwidthLimit}` : ""}
+                  {profile.transfers} transfers / {profile.checkers} checks
+                  {profile.bandwidthLimit ? ` · ${profile.bandwidthLimit}` : ""}
                   {profile.checksum ? " · checksum" : ""}
                 </span>
                 {!profile.builtIn ? (
                   <span className="flex flex-wrap justify-end gap-2">
-                    <ProfileNumberInput label="Transfers" value={profile.transfers} disabled={props.working} onCommit={(value) => updateProfile(profile.id, { transfers: value })} />
-                    <ProfileNumberInput label="Checkers" value={profile.checkers} disabled={props.working} onCommit={(value) => updateProfile(profile.id, { checkers: value })} />
-                    <ProfileTextInput label="Limit" value={profile.bandwidthLimit} disabled={props.working} onCommit={(value) => updateProfile(profile.id, { bandwidthLimit: value })} />
-                    <button className={settingsControlButtonCompactClass} type="button" disabled={props.working} onClick={() => updateProfile(profile.id, { checksum: !profile.checksum })}>
+                    <ProfileNumberInput
+                      label="Transfers"
+                      value={profile.transfers}
+                      disabled={props.working}
+                      onCommit={(value) =>
+                        updateProfile(profile.id, { transfers: value })
+                      }
+                    />
+                    <ProfileNumberInput
+                      label="Checkers"
+                      value={profile.checkers}
+                      disabled={props.working}
+                      onCommit={(value) =>
+                        updateProfile(profile.id, { checkers: value })
+                      }
+                    />
+                    <ProfileTextInput
+                      label="Limit"
+                      value={profile.bandwidthLimit}
+                      disabled={props.working}
+                      onCommit={(value) =>
+                        updateProfile(profile.id, { bandwidthLimit: value })
+                      }
+                    />
+                    <button
+                      className={settingsControlButtonCompactClass}
+                      type="button"
+                      disabled={props.working}
+                      onClick={() =>
+                        updateProfile(profile.id, {
+                          checksum: !profile.checksum,
+                        })
+                      }
+                    >
                       {profile.checksum ? "Checksum" : "Fast"}
                     </button>
-                    <button className={settingsIconDangerClass} type="button" disabled={props.working} aria-label={`Remove ${profile.name}`} onClick={() => removeProfile(profile.id)}>
+                    <button
+                      className={settingsIconDangerClass}
+                      type="button"
+                      disabled={props.working}
+                      aria-label={`Remove ${profile.name}`}
+                      onClick={() => removeProfile(profile.id)}
+                    >
                       <Trash2 size={15} strokeWidth={1.8} />
                     </button>
                   </span>
@@ -792,7 +1182,12 @@ function SyncSettings(props: SettingsContentProps) {
           ))}
         </div>
         <div className={settingsInlineActionsClass}>
-          <button className={settingsPrimaryButtonClass} type="button" disabled={props.working} onClick={addProfile}>
+          <button
+            className={settingsPrimaryButtonClass}
+            type="button"
+            disabled={props.working}
+            onClick={addProfile}
+          >
             Add Profile
           </button>
         </div>
@@ -804,12 +1199,27 @@ function SyncSettings(props: SettingsContentProps) {
 function TransfersSettings(props: SettingsContentProps) {
   return (
     <SettingsSectionBlock title="Defaults">
-      <SettingsRow label="Default transfer behavior" description="Choose how copy and download flows should behave by default." last>
+      <SettingsRow
+        label="Default transfer behavior"
+        description="Choose how copy and download flows should behave by default."
+        last
+      >
         <SelectControl
-          value={numberSetting(props.document, "general", "default_transfer_behavior_index", 0)}
+          value={numberSetting(
+            props.document,
+            "general",
+            "default_transfer_behavior_index",
+            0,
+          )}
           options={transferBehaviorOptions}
           disabled={props.working}
-          onChange={(value) => props.onSettingChange("general", "default_transfer_behavior_index", value)}
+          onChange={(value) =>
+            props.onSettingChange(
+              "general",
+              "default_transfer_behavior_index",
+              value,
+            )
+          }
         />
       </SettingsRow>
     </SettingsSectionBlock>
@@ -817,20 +1227,26 @@ function TransfersSettings(props: SettingsContentProps) {
 }
 
 function SearchSettings(_props: SettingsContentProps) {
-  const { status, error, initialize, refreshStatus, startScan, cancelScan } = useSearchStore(useShallow((state) => ({
-    status: state.status,
-    error: state.error,
-    initialize: state.initialize,
-    refreshStatus: state.refreshStatus,
-    startScan: state.startScan,
-    cancelScan: state.cancelScan,
-  })));
+  const { status, error, initialize, refreshStatus, startScan, cancelScan } =
+    useSearchStore(
+      useShallow((state) => ({
+        status: state.status,
+        error: state.error,
+        initialize: state.initialize,
+        refreshStatus: state.refreshStatus,
+        startScan: state.startScan,
+        cancelScan: state.cancelScan,
+      })),
+    );
 
   useEffect(() => {
     void initialize();
-    const timer = window.setInterval(() => {
-      void refreshStatus();
-    }, status?.scanInProgress ? 700 : 5000);
+    const timer = window.setInterval(
+      () => {
+        void refreshStatus();
+      },
+      status?.scanInProgress ? 700 : 5000,
+    );
     return () => window.clearInterval(timer);
   }, [initialize, refreshStatus, status?.scanInProgress]);
 
@@ -841,48 +1257,94 @@ function SearchSettings(_props: SettingsContentProps) {
   const indexedLocalRoots = status?.indexedLocalRoots ?? [];
   const indexedRemoteNames = status?.indexedRemoteNames ?? [];
   const scanProgress = status?.scanIndexedItemCount ?? 0;
-  const lastIndexed = status?.lastScanTimeMs ? formatDate(status.lastScanTimeMs) : "Never";
-  const phase = status?.scanPhase ? status.scanPhase.replace(/_/g, " ") : "idle";
+  const lastIndexed = status?.lastScanTimeMs
+    ? formatDate(status.lastScanTimeMs)
+    : "Never";
+  const phase = status?.scanPhase
+    ? status.scanPhase.replace(/_/g, " ")
+    : "idle";
   const outcome = searchOutcomeLabel(status?.lastScanOutcome);
-  const indexHasErrors = Boolean(error || status?.lastScanError || status?.scanErrors.length);
+  const indexHasErrors = Boolean(
+    error || status?.lastScanError || status?.scanErrors.length,
+  );
 
   return (
     <>
       <SettingsSectionBlock title="Indexing">
-        <SettingsNote>Misty searches file and folder names from a local metadata index. Remote scans refresh provider listings through the existing Misty remote runtime.</SettingsNote>
+        <SettingsNote>
+          Misty searches file and folder names from a local metadata index.
+          Remote scans refresh provider listings through the existing Misty
+          remote runtime.
+        </SettingsNote>
         <div className="mt-3 grid grid-cols-4 gap-3">
-          <SearchStatCard label="Indexed items" value={indexedItems.toLocaleString()} />
-          <SearchStatCard label="Local items" value={indexedLocalItems.toLocaleString()} />
-          <SearchStatCard label="Remote items" value={indexedRemoteItems.toLocaleString()} />
-          <SearchStatCard label="Index size" value={formatBytes(status?.indexSizeBytes ?? 0)} />
+          <SearchStatCard
+            label="Indexed items"
+            value={indexedItems.toLocaleString()}
+          />
+          <SearchStatCard
+            label="Local items"
+            value={indexedLocalItems.toLocaleString()}
+          />
+          <SearchStatCard
+            label="Remote items"
+            value={indexedRemoteItems.toLocaleString()}
+          />
+          <SearchStatCard
+            label="Index size"
+            value={formatBytes(status?.indexSizeBytes ?? 0)}
+          />
         </div>
         <div className="mt-3 grid grid-cols-2 gap-3">
-          <SearchStatCard label="Local roots" value={indexedLocalRoots.length.toLocaleString()} compact />
-          <SearchStatCard label="Remotes" value={indexedRemoteNames.length.toLocaleString()} compact />
+          <SearchStatCard
+            label="Local roots"
+            value={indexedLocalRoots.length.toLocaleString()}
+            compact
+          />
+          <SearchStatCard
+            label="Remotes"
+            value={indexedRemoteNames.length.toLocaleString()}
+            compact
+          />
         </div>
         <div className="mt-3 grid min-h-[46px] grid-cols-[minmax(0,1fr)_auto] items-center gap-4 border-y border-white/[0.08] py-3">
           <div className="grid min-w-0 gap-1">
-            <strong className="text-[15px] font-[620] text-[#f4f4f5]">Search index</strong>
+            <strong className="text-[15px] font-[620] text-[#f4f4f5]">
+              Search index
+            </strong>
             <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm text-[#a1a1aa]">
               {scanActive
                 ? `${phase} · ${scanProgress.toLocaleString()} items scanned${status?.currentPath ? ` · ${status.currentPath}` : ""}`
                 : `${outcome} · Last indexed ${lastIndexed}`}
             </span>
             {error || status?.lastScanError ? (
-              <span className="text-sm text-[#d6a0a0]">{userFacingErrorText(error || status?.lastScanError)}</span>
+              <span className="text-sm text-[#d6a0a0]">
+                {userFacingErrorText(error || status?.lastScanError)}
+              </span>
             ) : null}
           </div>
           <div className="flex items-center gap-2">
             {scanActive ? (
-              <button type="button" className={settingsControlButtonCompactClass} onClick={() => void cancelScan()}>
+              <button
+                type="button"
+                className={settingsControlButtonCompactClass}
+                onClick={() => void cancelScan()}
+              >
                 Cancel
               </button>
             ) : (
-              <button type="button" className={settingsPrimaryButtonClass} onClick={() => void startScan("")}>
+              <button
+                type="button"
+                className={settingsPrimaryButtonClass}
+                onClick={() => void startScan("")}
+              >
                 {indexHasErrors ? "Reindex Now" : "Reindex All"}
               </button>
             )}
-            <button type="button" className={settingsControlButtonCompactClass} onClick={() => void refreshStatus()}>
+            <button
+              type="button"
+              className={settingsControlButtonCompactClass}
+              onClick={() => void refreshStatus()}
+            >
               Refresh
             </button>
           </div>
@@ -890,13 +1352,37 @@ function SearchSettings(_props: SettingsContentProps) {
       </SettingsSectionBlock>
 
       <SettingsSectionBlock title="Indexed sources">
-        <SettingsRow label="Local roots" description="Local drives or folders included in the most recent completed index.">
-          <ValueText value={indexedLocalRoots.length ? indexedLocalRoots.join(", ") : "None indexed"} muted={!indexedLocalRoots.length} />
+        <SettingsRow
+          label="Local roots"
+          description="Local drives or folders included in the most recent completed index."
+        >
+          <ValueText
+            value={
+              indexedLocalRoots.length
+                ? indexedLocalRoots.join(", ")
+                : "None indexed"
+            }
+            muted={!indexedLocalRoots.length}
+          />
         </SettingsRow>
-        <SettingsRow label="Remotes" description="Connected remotes included in the most recent completed index.">
-          <ValueText value={indexedRemoteNames.length ? indexedRemoteNames.join(", ") : "None indexed"} muted={!indexedRemoteNames.length} />
+        <SettingsRow
+          label="Remotes"
+          description="Connected remotes included in the most recent completed index."
+        >
+          <ValueText
+            value={
+              indexedRemoteNames.length
+                ? indexedRemoteNames.join(", ")
+                : "None indexed"
+            }
+            muted={!indexedRemoteNames.length}
+          />
         </SettingsRow>
-        <SettingsRow label="Last outcome" description="Result of the most recent indexing run." last>
+        <SettingsRow
+          label="Last outcome"
+          description="Result of the most recent indexing run."
+          last
+        >
           <ValueText value={outcome} muted={!status?.lastScanOutcome} />
         </SettingsRow>
       </SettingsSectionBlock>
@@ -904,14 +1390,23 @@ function SearchSettings(_props: SettingsContentProps) {
       {status?.scanErrors.length ? (
         <SettingsSectionBlock title="Indexing errors">
           <div className={settingsReferenceListClass}>
-            <div className={`${settingsReferenceRowClass} ${settingsReferenceHeaderClass}`}>
+            <div
+              className={`${settingsReferenceRowClass} ${settingsReferenceHeaderClass}`}
+            >
               <span>Source</span>
               <span>Error</span>
             </div>
             {status.scanErrors.map((scanError) => (
-              <div className={settingsReferenceRowClass} key={`${scanError.source}:${scanError.message}`}>
-                <span className={settingsReferenceSpanClass}>{scanError.source}</span>
-                <span className="min-w-0 [overflow-wrap:anywhere] text-[#d6a0a0]">{userFacingErrorText(scanError.message)}</span>
+              <div
+                className={settingsReferenceRowClass}
+                key={`${scanError.source}:${scanError.message}`}
+              >
+                <span className={settingsReferenceSpanClass}>
+                  {scanError.source}
+                </span>
+                <span className="min-w-0 [overflow-wrap:anywhere] text-[#d6a0a0]">
+                  {userFacingErrorText(scanError.message)}
+                </span>
               </div>
             ))}
           </div>
@@ -921,10 +1416,20 @@ function SearchSettings(_props: SettingsContentProps) {
   );
 }
 
-function SearchStatCard(props: { label: string; value: string; compact?: boolean }) {
+function SearchStatCard(props: {
+  label: string;
+  value: string;
+  compact?: boolean;
+}) {
   return (
-    <div className={`${props.compact ? "min-h-[54px]" : "min-h-[76px]"} grid content-center gap-1 rounded-md border border-white/10 bg-[#07090b] px-3`}>
-      <strong className={`min-w-0 overflow-hidden text-ellipsis whitespace-nowrap ${props.compact ? "text-[17px]" : "text-[21px]"} font-[720] text-[#f4f4f5]`}>{props.value}</strong>
+    <div
+      className={`${props.compact ? "min-h-[54px]" : "min-h-[76px]"} grid content-center gap-1 rounded-md border border-white/10 bg-[#07090b] px-3`}
+    >
+      <strong
+        className={`min-w-0 overflow-hidden text-ellipsis whitespace-nowrap ${props.compact ? "text-[17px]" : "text-[21px]"} font-[720] text-[#f4f4f5]`}
+      >
+        {props.value}
+      </strong>
       <span className="text-xs text-[#8f8f8f]">{props.label}</span>
     </div>
   );
@@ -941,52 +1446,139 @@ function NotificationsSettings(props: SettingsContentProps) {
   return (
     <>
       <SettingsSectionBlock title="Activity alerts">
-        <SettingsRow label="Desktop notifications" description="Show system-level notifications for important events.">
+        <SettingsRow
+          label="Desktop notifications"
+          description="Show system-level notifications for important events."
+        >
           <SwitchControl
-            checked={booleanSetting(props.document, "notifications", "desktop_notifications_enabled", true)}
+            checked={booleanSetting(
+              props.document,
+              "notifications",
+              "desktop_notifications_enabled",
+              true,
+            )}
             disabled={props.working}
-            onChange={(value) => props.onSettingChange("notifications", "desktop_notifications_enabled", value)}
+            onChange={(value) =>
+              props.onSettingChange(
+                "notifications",
+                "desktop_notifications_enabled",
+                value,
+              )
+            }
           />
         </SettingsRow>
-        <SettingsRow label="In-app toasts" description="Show transient notifications inside Misty.">
+        <SettingsRow
+          label="In-app toasts"
+          description="Show transient notifications inside Misty."
+        >
           <SwitchControl
-            checked={booleanSetting(props.document, "notifications", "in_app_notifications_enabled", true)}
+            checked={booleanSetting(
+              props.document,
+              "notifications",
+              "in_app_notifications_enabled",
+              true,
+            )}
             disabled={props.working}
-            onChange={(value) => props.onSettingChange("notifications", "in_app_notifications_enabled", value)}
+            onChange={(value) =>
+              props.onSettingChange(
+                "notifications",
+                "in_app_notifications_enabled",
+                value,
+              )
+            }
           />
         </SettingsRow>
-        <SettingsRow label="Play sounds" description="Use sound for completion and error alerts." last>
+        <SettingsRow
+          label="Play sounds"
+          description="Use sound for completion and error alerts."
+          last
+        >
           <SwitchControl
-            checked={booleanSetting(props.document, "notifications", "sound_notifications_enabled", false)}
+            checked={booleanSetting(
+              props.document,
+              "notifications",
+              "sound_notifications_enabled",
+              false,
+            )}
             disabled={props.working}
-            onChange={(value) => props.onSettingChange("notifications", "sound_notifications_enabled", value)}
+            onChange={(value) =>
+              props.onSettingChange(
+                "notifications",
+                "sound_notifications_enabled",
+                value,
+              )
+            }
           />
         </SettingsRow>
       </SettingsSectionBlock>
 
       <SettingsSectionBlock title="System notifications">
-        <SettingsRow label="Badge count" description="Show pending activity counts where the platform supports it." last>
+        <SettingsRow
+          label="Badge count"
+          description="Show pending activity counts where the platform supports it."
+          last
+        >
           <SwitchControl
-            checked={booleanSetting(props.document, "notifications", "badge_count_enabled", true)}
+            checked={booleanSetting(
+              props.document,
+              "notifications",
+              "badge_count_enabled",
+              true,
+            )}
             disabled={props.working}
-            onChange={(value) => props.onSettingChange("notifications", "badge_count_enabled", value)}
+            onChange={(value) =>
+              props.onSettingChange(
+                "notifications",
+                "badge_count_enabled",
+                value,
+              )
+            }
           />
         </SettingsRow>
       </SettingsSectionBlock>
 
       <SettingsSectionBlock title="Digest & quiet hours">
-        <SettingsRow label="Quiet hours" description="Suppress non-critical notifications during focus time.">
+        <SettingsRow
+          label="Quiet hours"
+          description="Suppress non-critical notifications during focus time."
+        >
           <SwitchControl
-            checked={booleanSetting(props.document, "notifications", "quiet_hours_enabled", false)}
+            checked={booleanSetting(
+              props.document,
+              "notifications",
+              "quiet_hours_enabled",
+              false,
+            )}
             disabled={props.working}
-            onChange={(value) => props.onSettingChange("notifications", "quiet_hours_enabled", value)}
+            onChange={(value) =>
+              props.onSettingChange(
+                "notifications",
+                "quiet_hours_enabled",
+                value,
+              )
+            }
           />
         </SettingsRow>
-        <SettingsRow label="Notification digest" description="Bundle lower-priority updates into a lighter summary." last>
+        <SettingsRow
+          label="Notification digest"
+          description="Bundle lower-priority updates into a lighter summary."
+          last
+        >
           <SwitchControl
-            checked={booleanSetting(props.document, "notifications", "digest_notifications_enabled", false)}
+            checked={booleanSetting(
+              props.document,
+              "notifications",
+              "digest_notifications_enabled",
+              false,
+            )}
             disabled={props.working}
-            onChange={(value) => props.onSettingChange("notifications", "digest_notifications_enabled", value)}
+            onChange={(value) =>
+              props.onSettingChange(
+                "notifications",
+                "digest_notifications_enabled",
+                value,
+              )
+            }
           />
         </SettingsRow>
       </SettingsSectionBlock>
@@ -998,57 +1590,116 @@ function ShortcutsSettings(props: SettingsContentProps) {
   return (
     <>
       <SettingsSectionBlock title="Navigation">
-        <SettingsRow label="Show shortcut hints" description="Display shortcut hints in tooltips and menus where helpful." last>
+        <SettingsRow
+          label="Show shortcut hints"
+          description="Display shortcut hints in tooltips and menus where helpful."
+          last
+        >
           <SwitchControl
-            checked={booleanSetting(props.document, "shortcuts", "shortcut_hints_enabled", true)}
+            checked={booleanSetting(
+              props.document,
+              "shortcuts",
+              "shortcut_hints_enabled",
+              true,
+            )}
             disabled={props.working}
-            onChange={(value) => props.onSettingChange("shortcuts", "shortcut_hints_enabled", value)}
+            onChange={(value) =>
+              props.onSettingChange(
+                "shortcuts",
+                "shortcut_hints_enabled",
+                value,
+              )
+            }
           />
         </SettingsRow>
       </SettingsSectionBlock>
 
       <SettingsSectionBlock title="Customization">
-        <SettingsRow label="Keymap preset" description="Choose the shortcut style that feels most natural on this device.">
+        <SettingsRow
+          label="Keymap preset"
+          description="Choose the shortcut style that feels most natural on this device."
+        >
           <SelectControl
-            value={numberSetting(props.document, "shortcuts", "keymap_index", 0)}
+            value={numberSetting(
+              props.document,
+              "shortcuts",
+              "keymap_index",
+              0,
+            )}
             options={keymapOptions}
             disabled={props.working}
-            onChange={(value) => props.onSettingChange("shortcuts", "keymap_index", value)}
+            onChange={(value) =>
+              props.onSettingChange("shortcuts", "keymap_index", value)
+            }
           />
         </SettingsRow>
-        <SettingsRow label="Enable custom shortcuts" description="Use saved per-command shortcut overrides instead of only Misty's built-in defaults." last>
+        <SettingsRow
+          label="Enable custom shortcuts"
+          description="Use saved per-command shortcut overrides instead of only Misty's built-in defaults."
+          last
+        >
           <SwitchControl
-            checked={booleanSetting(props.document, "shortcuts", "custom_shortcuts_enabled", false)}
+            checked={booleanSetting(
+              props.document,
+              "shortcuts",
+              "custom_shortcuts_enabled",
+              false,
+            )}
             disabled={props.working}
-            onChange={(value) => props.onSettingChange("shortcuts", "custom_shortcuts_enabled", value)}
+            onChange={(value) =>
+              props.onSettingChange(
+                "shortcuts",
+                "custom_shortcuts_enabled",
+                value,
+              )
+            }
           />
         </SettingsRow>
       </SettingsSectionBlock>
 
       <SettingsSectionBlock title="Reference">
-        <SettingsNote>Review the active bindings Misty has loaded so shortcut behavior is easy to test.</SettingsNote>
+        <SettingsNote>
+          Review the active bindings Misty has loaded so shortcut behavior is
+          easy to test.
+        </SettingsNote>
         <div className={settingsReferenceListClass}>
-          <div className={`${settingsReferenceRowClass} ${settingsReferenceHeaderClass}`}>
+          <div
+            className={`${settingsReferenceRowClass} ${settingsReferenceHeaderClass}`}
+          >
             <span>Command</span>
             <span>Shortcut</span>
           </div>
           {props.shortcuts.map((binding) => (
             <div className={settingsReferenceRowClass} key={binding.commandId}>
-              <span className={settingsReferenceSpanClass}>{binding.commandId}</span>
+              <span className={settingsReferenceSpanClass}>
+                {binding.commandId}
+              </span>
               <input
                 className={settingsReferenceInputClass}
                 value={binding.shortcut}
                 disabled={props.working}
-                onChange={(event) => props.onShortcutChange(binding.commandId, event.target.value)}
+                onChange={(event) =>
+                  props.onShortcutChange(binding.commandId, event.target.value)
+                }
               />
             </div>
           ))}
         </div>
         <div className={settingsInlineActionsClass}>
-          <button type="button" className={settingsPrimaryButtonClass} disabled={props.working} onClick={() => void props.onSaveShortcuts()}>
+          <button
+            type="button"
+            className={settingsPrimaryButtonClass}
+            disabled={props.working}
+            onClick={() => void props.onSaveShortcuts()}
+          >
             Save Changes
           </button>
-          <button type="button" className={settingsControlButtonCompactClass} disabled={props.working} onClick={() => void props.onLoad()}>
+          <button
+            type="button"
+            className={settingsControlButtonCompactClass}
+            disabled={props.working}
+            onClick={() => void props.onLoad()}
+          >
             Reset
           </button>
         </div>
@@ -1061,103 +1712,224 @@ function AdvancedSettings(props: SettingsContentProps) {
   return (
     <>
       <SettingsSectionBlock title="Diagnostics">
-        <SettingsRow label="Loaded views" description="Top-level views currently instantiated in memory.">
+        <SettingsRow
+          label="Loaded views"
+          description="Top-level views currently instantiated in memory."
+        >
           <ValueText value="Tauri route shell" muted />
         </SettingsRow>
-        <SettingsRow label="Debug logging" description="Keep more verbose runtime details available while polishing the release.">
+        <SettingsRow
+          label="Debug logging"
+          description="Keep more verbose runtime details available while polishing the release."
+        >
           <SwitchControl
-            checked={booleanSetting(props.document, "advanced", "debug_logging_enabled", false)}
+            checked={booleanSetting(
+              props.document,
+              "advanced",
+              "debug_logging_enabled",
+              false,
+            )}
             disabled={props.working}
-            onChange={(value) => props.onSettingChange("advanced", "debug_logging_enabled", value)}
+            onChange={(value) =>
+              props.onSettingChange("advanced", "debug_logging_enabled", value)
+            }
           />
         </SettingsRow>
-        <SettingsRow label="Experimental features" description="Allow in-progress features to surface before they are fully settled.">
+        <SettingsRow
+          label="Experimental features"
+          description="Allow in-progress features to surface before they are fully settled."
+        >
           <SwitchControl
-            checked={booleanSetting(props.document, "advanced", "experimental_features_enabled", false)}
+            checked={booleanSetting(
+              props.document,
+              "advanced",
+              "experimental_features_enabled",
+              false,
+            )}
             disabled={props.working}
-            onChange={(value) => props.onSettingChange("advanced", "experimental_features_enabled", value)}
+            onChange={(value) =>
+              props.onSettingChange(
+                "advanced",
+                "experimental_features_enabled",
+                value,
+              )
+            }
           />
         </SettingsRow>
-        <SettingsRow label="Frame pacing overlay" description="Show the live idle, light, and heavy pacing state in the top-right corner." last>
+        <SettingsRow
+          label="Frame pacing overlay"
+          description="Show the live idle, light, and heavy pacing state in the top-right corner."
+          last
+        >
           <SwitchControl
-            checked={booleanSetting(props.document, "advanced", "frame_pacing_overlay_enabled", false)}
+            checked={booleanSetting(
+              props.document,
+              "advanced",
+              "frame_pacing_overlay_enabled",
+              false,
+            )}
             disabled={props.working}
-            onChange={(value) => props.onSettingChange("advanced", "frame_pacing_overlay_enabled", value)}
+            onChange={(value) =>
+              props.onSettingChange(
+                "advanced",
+                "frame_pacing_overlay_enabled",
+                value,
+              )
+            }
           />
         </SettingsRow>
       </SettingsSectionBlock>
 
       <SettingsSectionBlock title="Connection">
-        <SettingsRow label="Server address" description="The gRPC address Misty uses for local file operations.">
+        <SettingsRow
+          label="Server address"
+          description="The gRPC address Misty uses for local file operations."
+        >
           <TextControl
-            value={stringSetting(props.document, "advanced", "server_address", "localhost:50051")}
+            value={stringSetting(
+              props.document,
+              "advanced",
+              "server_address",
+              "localhost:50051",
+            )}
             disabled={props.working}
-            onCommit={(value) => props.onSettingChange("advanced", "server_address", value)}
+            onCommit={(value) =>
+              props.onSettingChange("advanced", "server_address", value)
+            }
           />
         </SettingsRow>
-        <SettingsRow label="Mount path" description="The root path Misty should treat as its default mount target." last>
+        <SettingsRow
+          label="Mount path"
+          description="The root path Misty should treat as its default mount target."
+          last
+        >
           <TextControl
-            value={stringSetting(props.document, "advanced", "mount_path", ".misty/mnt")}
+            value={stringSetting(
+              props.document,
+              "advanced",
+              "mount_path",
+              ".misty/mnt",
+            )}
             disabled={props.working}
-            onCommit={(value) => props.onSettingChange("advanced", "mount_path", value)}
+            onCommit={(value) =>
+              props.onSettingChange("advanced", "mount_path", value)
+            }
           />
         </SettingsRow>
       </SettingsSectionBlock>
 
       <SettingsSectionBlock title="Open with associations">
-        <SettingsNote>Review remembered apps used by File Explorer.</SettingsNote>
+        <SettingsNote>
+          Review remembered apps used by File Explorer.
+        </SettingsNote>
         <div className={settingsReferenceListClass}>
-          <div className={`${settingsAssociationRowClass} ${settingsReferenceHeaderClass}`}>
+          <div
+            className={`${settingsAssociationRowClass} ${settingsReferenceHeaderClass}`}
+          >
             <span>File</span>
             <span>Application</span>
             <span />
           </div>
           {props.openWithAssociations.map((association) => (
             <div className={settingsAssociationRowClass} key={association.key}>
-              <span className={settingsReferenceSpanClass}>{association.key}</span>
-              <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap" title={association.applicationPath}>{association.applicationPath}</span>
+              <span className={settingsReferenceSpanClass}>
+                {association.key}
+              </span>
+              <span
+                className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
+                title={association.applicationPath}
+              >
+                {association.applicationPath}
+              </span>
               <button
                 type="button"
                 className={settingsIconDangerClass}
                 aria-label={`Remove ${association.key}`}
                 disabled={props.working}
-                onClick={() => void props.onRemoveOpenWithAssociation(association.key)}
+                onClick={() =>
+                  void props.onRemoveOpenWithAssociation(association.key)
+                }
               >
                 <Trash2 size={15} />
               </button>
             </div>
           ))}
-          {props.openWithAssociations.length === 0 ? <p className={settingsEmptyClass}>No Open With associations saved.</p> : null}
+          {props.openWithAssociations.length === 0 ? (
+            <p className={settingsEmptyClass}>
+              No Open With associations saved.
+            </p>
+          ) : null}
         </div>
       </SettingsSectionBlock>
 
       <SettingsSectionBlock title="Safeguards">
-        <SettingsRow label="Confirm clear recent" description="Ask before clearing the recent-items list.">
+        <SettingsRow
+          label="Confirm clear recent"
+          description="Ask before clearing the recent-items list."
+        >
           <SwitchControl
-            checked={booleanSetting(props.document, "advanced", "confirm_clear_recent", false)}
+            checked={booleanSetting(
+              props.document,
+              "advanced",
+              "confirm_clear_recent",
+              false,
+            )}
             disabled={props.working}
-            onChange={(value) => props.onSettingChange("advanced", "confirm_clear_recent", value)}
+            onChange={(value) =>
+              props.onSettingChange("advanced", "confirm_clear_recent", value)
+            }
           />
         </SettingsRow>
-        <SettingsRow label="Confirm clear starred" description="Ask before clearing starred items in bulk.">
+        <SettingsRow
+          label="Confirm clear starred"
+          description="Ask before clearing starred items in bulk."
+        >
           <SwitchControl
-            checked={booleanSetting(props.document, "advanced", "confirm_clear_starred", false)}
+            checked={booleanSetting(
+              props.document,
+              "advanced",
+              "confirm_clear_starred",
+              false,
+            )}
             disabled={props.working}
-            onChange={(value) => props.onSettingChange("advanced", "confirm_clear_starred", value)}
+            onChange={(value) =>
+              props.onSettingChange("advanced", "confirm_clear_starred", value)
+            }
           />
         </SettingsRow>
-        <SettingsRow label="Confirm empty trash" description="Require confirmation before emptying trash.">
+        <SettingsRow
+          label="Confirm empty trash"
+          description="Require confirmation before emptying trash."
+        >
           <SwitchControl
-            checked={booleanSetting(props.document, "advanced", "confirm_empty_trash", false)}
+            checked={booleanSetting(
+              props.document,
+              "advanced",
+              "confirm_empty_trash",
+              false,
+            )}
             disabled={props.working}
-            onChange={(value) => props.onSettingChange("advanced", "confirm_empty_trash", value)}
+            onChange={(value) =>
+              props.onSettingChange("advanced", "confirm_empty_trash", value)
+            }
           />
         </SettingsRow>
-        <SettingsRow label="Confirm clear cache" description="Ask before clearing runtime caches and temporary data." last>
+        <SettingsRow
+          label="Confirm clear cache"
+          description="Ask before clearing runtime caches and temporary data."
+          last
+        >
           <SwitchControl
-            checked={booleanSetting(props.document, "advanced", "confirm_clear_cache", false)}
+            checked={booleanSetting(
+              props.document,
+              "advanced",
+              "confirm_clear_cache",
+              false,
+            )}
             disabled={props.working}
-            onChange={(value) => props.onSettingChange("advanced", "confirm_clear_cache", value)}
+            onChange={(value) =>
+              props.onSettingChange("advanced", "confirm_clear_cache", value)
+            }
           />
         </SettingsRow>
       </SettingsSectionBlock>
@@ -1168,26 +1940,45 @@ function AdvancedSettings(props: SettingsContentProps) {
 function SettingsSectionBlock(props: { title: string; children: ReactNode }) {
   return (
     <section className="mb-3.5 overflow-hidden rounded-lg border border-white/10 bg-[var(--misty-app-surface-bg,#090b0d)] shadow-[0_1px_0_rgba(255,255,255,0.035)_inset]">
-      <h2 className="border-b border-white/[0.08] bg-[rgba(12,14,16,var(--misty-app-panel-opacity,1))] px-7 py-4 text-[11px] font-[760] leading-none tracking-normal text-[#a1a1aa]">{props.title}</h2>
+      <h2 className="border-b border-white/[0.08] bg-[rgba(12,14,16,var(--misty-app-panel-opacity,1))] px-7 py-4 text-[11px] font-[760] leading-none tracking-normal text-[#a1a1aa]">
+        {props.title}
+      </h2>
       {props.children}
     </section>
   );
 }
 
-function SettingsRow(props: { label: string; description: string; children: ReactNode; last?: boolean }) {
+function SettingsRow(props: {
+  label: string;
+  description: string;
+  children: ReactNode;
+  last?: boolean;
+}) {
   return (
-    <div className={`grid min-h-[68px] grid-cols-[minmax(0,0.52fr)_minmax(260px,0.48fr)] items-center gap-[18px] border-b border-white/[0.08] bg-[var(--misty-app-surface-bg,#090b0d)] px-7 py-3 ${props.last ? "border-b-0" : ""}`}>
+    <div
+      className={`grid min-h-[68px] grid-cols-[minmax(0,0.52fr)_minmax(260px,0.48fr)] items-center gap-[18px] border-b border-white/[0.08] bg-[var(--misty-app-surface-bg,#090b0d)] px-7 py-3 ${props.last ? "border-b-0" : ""}`}
+    >
       <div className="grid min-w-0 gap-1">
-        <strong className="text-[15px] font-[620] leading-[1.1] text-[#f4f4f5]">{props.label}</strong>
-        <span className="text-[14px] leading-[1.25] text-[#8f8f8f]">{props.description}</span>
+        <strong className="text-[15px] font-[620] leading-[1.1] text-[#f4f4f5]">
+          {props.label}
+        </strong>
+        <span className="text-[14px] leading-[1.25] text-[#8f8f8f]">
+          {props.description}
+        </span>
       </div>
-      <div className="flex min-w-0 items-center justify-end overflow-hidden">{props.children}</div>
+      <div className="flex min-w-0 items-center justify-end overflow-hidden">
+        {props.children}
+      </div>
     </div>
   );
 }
 
 function SettingsNote(props: { children: ReactNode }) {
-  return <p className="m-0 max-w-[620px] px-7 py-4 text-[14px] leading-[1.35] text-[#8f8f8f]">{props.children}</p>;
+  return (
+    <p className="m-0 max-w-[620px] px-7 py-4 text-[14px] leading-[1.35] text-[#8f8f8f]">
+      {props.children}
+    </p>
+  );
 }
 
 function WorkspaceRootControl(props: {
@@ -1220,7 +2011,11 @@ function WorkspaceRootControl(props: {
           type="button"
           className={settingsControlButtonCompactClass}
           disabled={props.disabled || !pickerAvailable}
-          title={pickerAvailable ? "Choose workspace root" : "Folder picker unavailable on this platform"}
+          title={
+            pickerAvailable
+              ? "Choose workspace root"
+              : "Folder picker unavailable on this platform"
+          }
           onClick={() => void chooseFolder()}
         >
           Choose
@@ -1250,10 +2045,27 @@ function WallpaperControl(props: {
       title: "Choose App Wallpaper",
       multiple: false,
       directory: false,
-      filters: [{
-        name: "Images and videos",
-        extensions: ["apng", "avif", "bmp", "gif", "jpg", "jpeg", "png", "svg", "webp", "m4v", "mov", "mp4", "ogv", "webm"],
-      }],
+      filters: [
+        {
+          name: "Images and videos",
+          extensions: [
+            "apng",
+            "avif",
+            "bmp",
+            "gif",
+            "jpg",
+            "jpeg",
+            "png",
+            "svg",
+            "webp",
+            "m4v",
+            "mov",
+            "mp4",
+            "ogv",
+            "webm",
+          ],
+        },
+      ],
     });
     const path = Array.isArray(selection) ? selection[0] : selection;
     if (path) props.onChange(path);
@@ -1272,7 +2084,11 @@ function WallpaperControl(props: {
           type="button"
           className={`${settingsControlButtonClass} w-full`}
           disabled={props.disabled || !pickerAvailable}
-          title={pickerAvailable ? "Choose app wallpaper" : "File picker unavailable on this platform"}
+          title={
+            pickerAvailable
+              ? "Choose app wallpaper"
+              : "File picker unavailable on this platform"
+          }
           onClick={() => void chooseWallpaper()}
         >
           <Image size={15} />
@@ -1323,8 +2139,10 @@ function OpacityControl(props: {
     if (props.disabled) return;
     const step = event.shiftKey ? 0.1 : 0.01;
     let nextValue: number | null = null;
-    if (event.key === "ArrowLeft" || event.key === "ArrowDown") nextValue = draft - step;
-    if (event.key === "ArrowRight" || event.key === "ArrowUp") nextValue = draft + step;
+    if (event.key === "ArrowLeft" || event.key === "ArrowDown")
+      nextValue = draft - step;
+    if (event.key === "ArrowRight" || event.key === "ArrowUp")
+      nextValue = draft + step;
     if (event.key === "Home") nextValue = 0;
     if (event.key === "End") nextValue = 1;
     if (nextValue === null) return;
@@ -1334,7 +2152,9 @@ function OpacityControl(props: {
 
   return (
     <div className="grid w-full min-w-0 max-w-[360px] justify-items-end gap-2">
-      <span className="text-[15px] font-semibold text-[#f4f4f5]">{draftPercent}%</span>
+      <span className="text-[15px] font-semibold text-[#f4f4f5]">
+        {draftPercent}%
+      </span>
       <button
         type="button"
         className="settings-opacity-range-wrap"
@@ -1347,7 +2167,11 @@ function OpacityControl(props: {
         onBlur={commitDraft}
         onKeyDown={handleKeyDown}
         onKeyUp={(event) => {
-          if (event.key.startsWith("Arrow") || event.key === "Home" || event.key === "End") {
+          if (
+            event.key.startsWith("Arrow") ||
+            event.key === "Home" ||
+            event.key === "End"
+          ) {
             commitDraft();
           }
         }}
@@ -1395,12 +2219,19 @@ function SelectControl(props: {
           </option>
         ))}
       </select>
-      <ChevronDown className="pointer-events-none absolute right-2.5 top-2 text-[#f4f4f5]" size={18} />
+      <ChevronDown
+        className="pointer-events-none absolute right-2.5 top-2 text-[#f4f4f5]"
+        size={18}
+      />
     </label>
   );
 }
 
-function SwitchControl(props: { checked: boolean; disabled: boolean; onChange: (value: boolean) => void }) {
+function SwitchControl(props: {
+  checked: boolean;
+  disabled: boolean;
+  onChange: (value: boolean) => void;
+}) {
   return (
     <button
       type="button"
@@ -1461,7 +2292,10 @@ function ProfileNumberInput(props: {
   onCommit: (value: number) => void;
 }) {
   const handleCommit = (event: ChangeEvent<HTMLInputElement>) => {
-    const next = Math.max(1, Math.round(Number(event.currentTarget.value) || props.value));
+    const next = Math.max(
+      1,
+      Math.round(Number(event.currentTarget.value) || props.value),
+    );
     if (next !== props.value) props.onCommit(next);
   };
   return (
@@ -1491,7 +2325,8 @@ function ProfileTextInput(props: {
   onCommit: (value: string) => void;
 }) {
   const handleCommit = (event: ChangeEvent<HTMLInputElement>) => {
-    if (event.currentTarget.value !== props.value) props.onCommit(event.currentTarget.value.trim());
+    if (event.currentTarget.value !== props.value)
+      props.onCommit(event.currentTarget.value.trim());
   };
   return (
     <label className="grid gap-1 text-left text-[11px] text-[#a1a1aa]">
@@ -1512,7 +2347,13 @@ function ProfileTextInput(props: {
 }
 
 function ValueText(props: { value: string; muted?: boolean }) {
-  return <span className={`max-w-[360px] overflow-hidden text-ellipsis whitespace-nowrap text-right text-[15px] ${props.muted ? "text-[#8f8f8f]" : "text-[#f4f4f5]"}`}>{props.value}</span>;
+  return (
+    <span
+      className={`max-w-[360px] overflow-hidden text-ellipsis whitespace-nowrap text-right text-[15px] ${props.muted ? "text-[#8f8f8f]" : "text-[#f4f4f5]"}`}
+    >
+      {props.value}
+    </span>
+  );
 }
 
 function CopyableValueText(props: { value: string; disabled?: boolean }) {
@@ -1543,12 +2384,22 @@ function CopyableValueText(props: { value: string; disabled?: boolean }) {
   );
 }
 
-function sectionRecord(document: Record<string, unknown>, section: string): Record<string, unknown> {
+function sectionRecord(
+  document: Record<string, unknown>,
+  section: string,
+): Record<string, unknown> {
   const value = document[section];
-  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
 }
 
-function numberSetting(document: Record<string, unknown>, section: string, key: string, fallback: number): number {
+function numberSetting(
+  document: Record<string, unknown>,
+  section: string,
+  key: string,
+  fallback: number,
+): number {
   const value = sectionRecord(document, section)[key];
   return typeof value === "number" ? value : fallback;
 }
@@ -1557,12 +2408,22 @@ function clampOpacity(value: number): number {
   return Math.min(1, Math.max(0, Math.round(value * 100) / 100));
 }
 
-function booleanSetting(document: Record<string, unknown>, section: string, key: string, fallback: boolean): boolean {
+function booleanSetting(
+  document: Record<string, unknown>,
+  section: string,
+  key: string,
+  fallback: boolean,
+): boolean {
   const value = sectionRecord(document, section)[key];
   return typeof value === "boolean" ? value : fallback;
 }
 
-function stringSetting(document: Record<string, unknown>, section: string, key: string, fallback: string): string {
+function stringSetting(
+  document: Record<string, unknown>,
+  section: string,
+  key: string,
+  fallback: string,
+): string {
   const value = sectionRecord(document, section)[key];
   return typeof value === "string" ? value : fallback;
 }

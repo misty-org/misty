@@ -2200,7 +2200,7 @@ mod tests {
     use super::*;
     use crate::services::{
         environment::AppEnvironmentService, explorer_library::ExplorerLibraryService,
-        providers::ProviderService, proxy::ProxyService, transfers::TransferFilter,
+        providers::ProviderService, storage::StorageService, transfers::TransferFilter,
     };
 
     #[test]
@@ -3325,7 +3325,7 @@ mod tests {
         let environment =
             AppEnvironmentService::for_test_home(unique_test_dir("folder-upload-home"));
         let mount_root = environment.mount_root();
-        let proxy = ProxyService::new(environment.clone());
+        let proxy = StorageService::new(environment.clone());
         let providers = ProviderService::new(proxy.clone());
         let transfers = TransferService::new(environment.clone());
         let explorer_library = ExplorerLibraryService::new(environment.clone());
@@ -3388,7 +3388,7 @@ mod tests {
         let environment =
             AppEnvironmentService::for_test_home(unique_test_dir("folder-delete-home"));
         let mount_root = environment.mount_root();
-        let proxy = ProxyService::new(environment.clone());
+        let proxy = StorageService::new(environment.clone());
         let providers = ProviderService::new(proxy.clone());
         let transfers = TransferService::new(environment.clone());
         let explorer_library = ExplorerLibraryService::new(environment.clone());
@@ -3427,7 +3427,7 @@ mod tests {
 
     fn test_operation_queue_service() -> OperationQueueService {
         let environment = AppEnvironmentService::for_test_home(unique_test_dir("service-home"));
-        let proxy = ProxyService::new(environment.clone());
+        let proxy = StorageService::new(environment.clone());
         let providers = ProviderService::new(proxy.clone());
         let transfers = TransferService::new(environment.clone());
         let explorer_library = ExplorerLibraryService::new(environment.clone());

@@ -132,32 +132,19 @@ fn build_tray(app: &AppHandle<Wry>) -> Result<MistyTrayState, String> {
 
 fn refresh(app: &AppHandle<Wry>) -> Result<(), String> {
     let tray = app.state::<MistyTrayState>();
-    let runtime = app.state::<MistyRuntime>().proxy_runtime.snapshot();
+    let runtime = app.state::<MistyRuntime>().storage_runtime.snapshot();
     let process = misty::get_misty_process_status();
     let runtime_label = if runtime.ready {
-        runtime
-            .proxy_url
-            .as_deref()
-            .map(|url| format!("Runtime: Running ({url})"))
-            .unwrap_or_else(|| "Runtime: Running".to_owned())
+        format!("Storage: Ready ({})", runtime.version)
     } else {
         runtime
             .error
             .as_deref()
-            .map(|error| format!("Runtime: {error}"))
-            .unwrap_or_else(|| "Runtime: Stopped".to_owned())
+            .map(|error| format!("Storage: {error}"))
+            .unwrap_or_else(|| "Storage: Unavailable".to_owned())
     };
-    let rclone_running = process.misty_rclone_port.is_some() || process.misty_proxy_pid.is_some();
-    let rclone_label = process
-        .misty_rclone_port
-        .map(|port| format!("Remote sync: Running (port {port})"))
-        .unwrap_or_else(|| {
-            if rclone_running {
-                "Remote sync: Running".to_owned()
-            } else {
-                "Remote sync: Stopped".to_owned()
-            }
-        });
+    let rclone_running = runtime.ready;
+    let rclone_label = if rclone_running { "Cloud storage: Ready" } else { "Cloud storage: Unavailable" };
 
     tray.app_status_item
         .set_text(&format!("Misty: Running (pid {})", std::process::id()))
@@ -178,7 +165,7 @@ fn refresh(app: &AppHandle<Wry>) -> Result<(), String> {
         .set_icon(Some(status_icon(rclone_running)?))
         .map_err(|error| format!("Could not update remote sync tray icon: {error}"))?;
     tray.stop_services_item
-        .set_enabled(process.misty_proxy_pid.is_some())
+        .set_enabled(false)
         .map_err(|error| format!("Could not update Stop Services menu item: {error}"))?;
 
     Ok(())

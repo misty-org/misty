@@ -1,10 +1,11 @@
 import { appSnapshot } from "../../../api/misty";
-import { isNativeMobileBuild } from "../../../platform/buildTarget";
+import { isAndroidBuild, isNativeMobileBuild } from "../../../platform/buildTarget";
 import {
   clearAccountAuthToken,
   readAccountAuthToken,
   saveAccountAuthToken,
 } from "./authTokenStore";
+import { analytics } from "../../../analytics/client";
 
 export interface AccountAuthUser {
   id: string;
@@ -17,12 +18,31 @@ export interface AccountMeResponse {
   name: string;
   email: string;
   created_at: string;
-  tier: "basic" | "personal" | "pro";
+	  tier: "basic" | "pro" | "max";
   status: "active" | "trialing" | "cancelled" | "expired";
   allows_use: boolean;
   expires_at: string | null;
   trial_started_at: string | null;
-  license_device: string;
+	  license_device: string;
+	  billing?: {
+	    kind: "free" | "trial" | "lifetime" | "subscription";
+	    interval: "month" | "year" | null;
+	    subscription_status: string | null;
+	    current_period_end: string | null;
+	    cancel_at_period_end: boolean;
+	    customer_portal_available: boolean;
+	  };
+}
+
+export interface BillingUsageResponse {
+	plan: "basic" | "pro" | "max";
+	monthly_allowance: number;
+	monthly_remaining: number;
+	purchased_remaining: number;
+	available_credits: number;
+	reserved_credits: number;
+	next_reset_at: string;
+	usage_by_meter: Array<{ meter: string; credits: number }> | null;
 }
 
 interface LoginResponse {
@@ -208,12 +228,35 @@ export function accountFetchMe(): Promise<AccountMeResponse> {
   return getJson("/me");
 }
 
+export function accountFetchBillingUsage(): Promise<BillingUsageResponse> {
+	return getJson("/billing/usage");
+}
+
+export function accountCreateCheckout(tier: "pro" | "max", interval: "month" | "year"): Promise<{ url: string }> {
+	return postJson("/billing/checkout-session", { tier, interval });
+}
+
+export function accountCreateCreditCheckout(packId: "credits_1500" | "credits_3500"): Promise<{ url: string }> {
+	return postJson("/billing/credit-checkout-session", { pack_id: packId });
+}
+
+export function accountCreatePortalSession(): Promise<{ url: string }> {
+	return postJson("/billing/portal-session");
+}
+
 export async function accountUpdateProfile(name: string): Promise<void> {
   await requestJson("PUT", "/me/profile", { name });
 }
 
 export async function accountUpdateDevice(device: string): Promise<void> {
   await requestJson("PUT", "/me/device", { device });
+}
+
+export async function accountUpdateTelemetryPreferences(analyticsEnabled: boolean, errorReportingEnabled: boolean): Promise<void> {
+  await requestJson("PUT", "/me/telemetry", {
+    analytics_enabled: analyticsEnabled,
+    error_reporting_enabled: errorReportingEnabled,
+  });
 }
 
 export async function accountLogout(): Promise<void> {
@@ -230,6 +273,10 @@ class AccountApiError extends Error {
   constructor(message: string, readonly status?: number) {
     super(message);
   }
+}
+
+export function isAccountUnauthorizedError(error: unknown): boolean {
+  return error instanceof AccountApiError && error.status === 401;
 }
 
 function errorMessage(error: unknown): string {
@@ -278,6 +325,9 @@ function requestHeaders(body: unknown, token: string | null): Headers | undefine
   if (body === undefined && !token) return undefined;
 
   const headers = new Headers();
+  headers.set("X-Misty-Platform", accountClientPlatform());
+  headers.set("X-Misty-Release-Channel", import.meta.env.VITE_RELEASE_CHANNEL?.trim() || (import.meta.env.DEV ? "development" : "production"));
+  headers.set("X-Misty-Analytics-Enabled", String(analytics.isAnalyticsEnabled()));
   if (body !== undefined) {
     headers.set("Content-Type", "application/json");
   }
@@ -285,6 +335,15 @@ function requestHeaders(body: unknown, token: string | null): Headers | undefine
     headers.set("Authorization", `Bearer ${token}`);
   }
   return headers;
+}
+
+function accountClientPlatform(): "windows" | "macos" | "linux" | "android" | "ios" {
+  if (isAndroidBuild) return "android";
+  if (isNativeMobileBuild) return "ios";
+  const platform = navigator.platform.toLowerCase();
+  if (platform.includes("win")) return "windows";
+  if (platform.includes("mac")) return "macos";
+  return "linux";
 }
 
 function shouldAttachAuthToken(path: string): boolean {

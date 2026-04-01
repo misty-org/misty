@@ -1,4 +1,5 @@
-**/.env
+**/.env*
+!**/.env.example
 **/.venv
 scripts/.signing.env
 
@@ -21,6 +22,15 @@ scripts/.signing.env
 !**/src-tauri/gen/apple/**
 !**/src-tauri/gen/android/
 !**/src-tauri/gen/android/**
+
+# Generated mobile build products (the platform project sources above stay tracked)
+**/src-tauri/gen/apple/build/
+**/src-tauri/gen/apple/DerivedData/
+**/src-tauri/gen/apple/Externals/
+**/src-tauri/gen/apple/Pods/
+**/src-tauri/gen/android/.gradle/
+**/src-tauri/gen/android/**/build/
+**/src-tauri/gen/android/local.properties
 
 **/config/
 **/bin/
@@ -48,9 +58,18 @@ proxy/dist/
 *.svg
 *.psd
 *.ai
+*.xcf
 *.sketch
 *.fig
 *.pdf
+*.doc
+*.docx
+*.xls
+*.xlsx
+*.ppt
+*.pptx
+*.odt
+*.ods
 *.mov
 *.mp4
 *.m4v
@@ -83,6 +102,13 @@ proxy/dist/
 *.dylib
 *.so
 *.wasm
+*.a
+*.o
+*.obj
+*.lib
+*.rlib
+*.rmeta
+*.class
 *.ttf
 *.otf
 *.woff
@@ -90,3 +116,29 @@ proxy/dist/
 *.xcarchive
 *.app
 *.asar
+
+# Local databases, caches, memory dumps, and large ML/data artifacts
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.mdb
+*.dump
+*.dmp
+*.core
+*.hprof
+*.onnx
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.parquet
+*.arrow
+
+# Generated and test-only artifacts from the embedded storage service
+service/MANUAL.*
+service/rclone.1
+service/lib/encoder/encoder_cases_test.go
+service/cmd/bisync/testdata/bisync_vscode_debuggers_launch.json
+service/cmd/lsf/testfiles/file[23]
+service/cmd/lsf/testfiles/subdir/file[23]

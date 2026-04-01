@@ -67,7 +67,7 @@ if (preflightOnly) {
 
 const clang = output("xcrun", ["--sdk", "iphoneos", "--find", "clang"]);
 
-run("npm", ["run", "proxy:archive:ios"]);
+run("npm", ["run", "service:archive:ios"]);
 run("npm", [
   "run",
   "tauri",
@@ -77,7 +77,7 @@ run("npm", [
   "--target",
   "aarch64",
   "--features",
-  "embedded-proxy-go",
+  "embedded-storage-go",
   "--build-number",
   buildNumber,
   "--export-method",
@@ -85,9 +85,7 @@ run("npm", [
   "--ci",
 ], {
   SWIFT_RS_CLANG: clang,
-  MISTY_PROXY_RUNTIME: "embedded",
-  MISTY_PROXY_GO_LIB_DIR: "src-tauri/target/misty-proxy/ios-arm64",
-  MISTY_PROXY_GO_LIB_NAME: "misty_proxy",
+  MISTY_SERVICE_GO_LIB_DIR: "src-tauri/target/misty-service/ios-arm64",
   TAURI_IOS_BUNDLE_ID: bundleId,
   APPLE_DEVELOPMENT_TEAM: developmentTeam,
   DEVELOPMENT_TEAM: developmentTeam,

@@ -15,7 +15,7 @@ use walkdir::WalkDir;
 use crate::{
     core::file_master::RemoteBrowseTarget,
     error::{ApiError, ApiResult},
-    services::{environment::AppEnvironmentService, proxy::ProxyService},
+    services::{environment::AppEnvironmentService, storage::StorageService},
 };
 
 const DIRECTORY_SIZE_CACHE_TTL_MS: i64 = 24 * 60 * 60 * 1000;
@@ -29,7 +29,7 @@ struct DirectorySizeInner {
     db_path: PathBuf,
     db_lock: Arc<Mutex<()>>,
     mount_root: PathBuf,
-    proxy: ProxyService,
+    proxy: StorageService,
     calculating: AsyncMutex<HashSet<String>>,
 }
 
@@ -81,7 +81,7 @@ enum DirectorySizeTarget {
 }
 
 impl DirectorySizeService {
-    pub fn new(environment: AppEnvironmentService, proxy: ProxyService) -> Self {
+    pub fn new(environment: AppEnvironmentService, proxy: StorageService) -> Self {
         Self {
             inner: Arc::new(DirectorySizeInner {
                 db_path: environment.misty_db_path(),

@@ -6,29 +6,30 @@ mod error;
 mod plugins;
 mod runtime;
 mod services;
+mod telemetry;
 
 use commands::{
-    ai_abort, ai_drain_events, ai_send_message, ai_status, app_environment_snapshot, app_snapshot,
-    archive_create, archive_extract, archive_list, automations_delete_workflow,
-    automations_resolve_approval, automations_run, automations_save_workflow, automations_snapshot,
-    automations_validate_workflow, claude_abort, claude_drain_events, claude_send_message,
-    claude_status, clipboard_apply_shared, clipboard_native_file_refs,
-    clipboard_publish_image_bytes, clipboard_publish_shared, clipboard_set_local,
-    clipboard_shared_image_bytes, clipboard_snapshot, clipboard_write_file_refs,
-    compare_apply_text_merge, compare_files, compare_folders, devices_snapshot, duplicates_cancel,
-    duplicates_hash_remote_candidates, duplicates_scan, explorer_calculate_directory_sizes,
-    explorer_create_item, explorer_delete_items, explorer_directory_size_snapshot,
-    explorer_generate_image_thumbnail, explorer_library_record_last_opened,
-    explorer_library_record_recent, explorer_library_set_tags, explorer_library_snapshot,
-    explorer_list_directory, explorer_open_association, explorer_open_path, explorer_open_with,
-    explorer_paste_items, explorer_path_exists, explorer_path_is_directory,
-    explorer_prepare_drag_items, explorer_prepare_open_item, explorer_preview_item,
-    explorer_queue_create_item, explorer_queue_delete_items, explorer_queue_paste_blob,
-    explorer_queue_paste_items, explorer_queue_paste_text, explorer_queue_rename_item,
-    explorer_queue_rename_items, explorer_rename_item, explorer_set_open_association,
-    file_metadata_snapshot, file_sync_apply, file_sync_compare, file_sync_pair_remove,
-    file_sync_pair_save, file_sync_pairs_snapshot, file_tools_checksum, file_tools_chmod,
-    file_tools_create_symlink, file_tools_read_symlink, file_tools_set_readonly,
+    app_environment_snapshot, app_snapshot, archive_create, archive_extract, archive_list,
+    automations_delete_workflow,
+    automations_resolve_approval, automations_run, automations_save_workflow,
+    automations_set_managed_ai_auth, automations_snapshot, automations_validate_workflow,
+    claude_abort, claude_drain_events, claude_send_message, claude_status, clipboard_apply_shared,
+    clipboard_native_file_refs, clipboard_publish_image_bytes, clipboard_publish_shared,
+    clipboard_set_local, clipboard_shared_image_bytes, clipboard_snapshot,
+    clipboard_write_file_refs, compare_apply_text_merge, compare_files, compare_folders,
+    devices_snapshot, duplicates_cancel, duplicates_hash_remote_candidates, duplicates_scan,
+    explorer_calculate_directory_sizes, explorer_create_item, explorer_delete_items,
+    explorer_directory_size_snapshot, explorer_generate_image_thumbnail,
+    explorer_library_record_last_opened, explorer_library_record_recent, explorer_library_set_tags,
+    explorer_library_snapshot, explorer_list_directory, explorer_open_association,
+    explorer_open_path, explorer_open_with, explorer_paste_items, explorer_path_exists,
+    explorer_path_is_directory, explorer_prepare_drag_items, explorer_prepare_open_item,
+    explorer_preview_item, explorer_queue_create_item, explorer_queue_delete_items,
+    explorer_queue_paste_blob, explorer_queue_paste_items, explorer_queue_paste_text,
+    explorer_queue_rename_item, explorer_queue_rename_items, explorer_rename_item,
+    explorer_set_open_association, file_metadata_snapshot, file_sync_apply, file_sync_compare,
+    file_sync_pair_remove, file_sync_pair_save, file_sync_pairs_snapshot, file_tools_checksum,
+    file_tools_chmod, file_tools_create_symlink, file_tools_read_symlink, file_tools_set_readonly,
     open_terminal_at_path, operation_queue_cancel, operation_queue_cancel_batch,
     operation_queue_clear_terminal, operation_queue_pause, operation_queue_pause_all,
     operation_queue_pause_batch, operation_queue_redo, operation_queue_resolve_conflict,
@@ -42,7 +43,7 @@ use commands::{
     providers_refresh, providers_repair_config_security, providers_revoke_public_link,
     providers_run_backend_action, providers_save_remote, providers_select_remote,
     providers_snapshot, providers_test_remote, providers_verify_result, providers_verify_start,
-    proxy_snapshot, saved_searches_delete, saved_searches_save, saved_searches_snapshot,
+    storage_snapshot, saved_searches_delete, saved_searches_save, saved_searches_snapshot,
     search_cancel_scan, search_get_status, search_init, search_query, search_start_scan,
     settings_apply_launch_on_login, settings_launch_on_login_snapshot,
     settings_open_with_associations, settings_remove_open_with_association, settings_save,
@@ -68,9 +69,11 @@ use services::misty_template::{
 #[cfg(desktop)]
 use services::tray;
 use tauri::Manager;
+use telemetry::TelemetryReporter;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    telemetry::initialize();
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_deep_link::init())
@@ -96,7 +99,12 @@ pub fn run() {
             let runtime = MistyRuntime::new();
             app.manage(runtime);
             #[cfg(desktop)]
-            tray::setup(app).map_err(std::io::Error::other)?;
+            if let Err(error) = tray::setup(app) {
+                let error = std::io::Error::other(error);
+                telemetry::PostHogTelemetryReporter
+                    .capture_error(&error, telemetry::SafeOperation::ApplicationStartup);
+                return Err(error.into());
+            }
             #[cfg(target_os = "macos")]
             services::devices::start_device_change_listener(app.handle().clone());
             Ok(())
@@ -141,15 +149,12 @@ pub fn run() {
             app_snapshot,
             app_environment_snapshot,
             automations_snapshot,
+            automations_set_managed_ai_auth,
             automations_save_workflow,
             automations_delete_workflow,
             automations_validate_workflow,
             automations_run,
             automations_resolve_approval,
-            ai_status,
-            ai_send_message,
-            ai_drain_events,
-            ai_abort,
             claude_status,
             claude_send_message,
             claude_drain_events,
@@ -178,7 +183,7 @@ pub fn run() {
             uninstall_plugin,
             get_misty_process_status,
             open_external_url,
-            proxy_snapshot,
+            storage_snapshot,
             clipboard_snapshot,
             clipboard_set_local,
             clipboard_publish_shared,
@@ -310,7 +315,13 @@ pub fn run() {
             file_tools_chmod,
             file_tools_create_symlink,
             file_tools_read_symlink,
+            telemetry::telemetry_set_error_reporting_enabled,
         ])
-        .run(tauri::generate_context!())
-        .expect("failed to run Misty Tauri app");
+        .build(tauri::generate_context!())
+        .expect("failed to build Misty Tauri app")
+        .run(|_app, event| {
+            if matches!(event, tauri::RunEvent::Exit) {
+                telemetry::shutdown();
+            }
+        });
 }

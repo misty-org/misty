@@ -4,9 +4,14 @@ export interface AppSnapshot {
   appName: string;
   version: string;
   migrationStage: string;
-  proxyUrl: string | null;
-  proxyRuntime: ProxyRuntimeSnapshot;
+  storageRuntime: StorageRuntimeSnapshot;
   environment: AppEnvironmentSnapshot;
+}
+
+export interface StorageRuntimeSnapshot {
+  ready: boolean;
+  error: string | null;
+  version: string;
 }
 
 export interface AppEnvironmentSnapshot {
@@ -23,7 +28,6 @@ export interface AppEnvironmentSnapshot {
   mistyConfigPath: string;
   workspacesPath: string;
   commandsPath: string;
-  proxyUrl: string | null;
   serverUrl: string | null;
   grpcAddress: string;
   mountPath: string;
@@ -31,19 +35,9 @@ export interface AppEnvironmentSnapshot {
   derivedEnv: Record<string, string>;
 }
 
-export interface ProxySnapshot {
-  proxyUrl: string | null;
+export interface StorageSnapshot {
   ready: boolean;
   statusCode: number | null;
-  error: string | null;
-}
-
-export type ProxyRuntimeMode = "external" | "spawn" | "embedded" | "disabled";
-
-export interface ProxyRuntimeSnapshot {
-  mode: ProxyRuntimeMode;
-  proxyUrl: string | null;
-  ready: boolean;
   error: string | null;
 }
 
@@ -51,34 +45,6 @@ export interface AndroidAllFilesAccessStatus {
   granted: boolean;
   canRequest: boolean;
   storageRoot: string | null;
-}
-
-export interface AiStatus {
-  configured: boolean;
-  provider: string;
-  model: string;
-  running: boolean;
-  sessionId: string | null;
-  error: string | null;
-}
-
-export interface AiSendRequest {
-  prompt: string;
-  cwd?: string | null;
-  resumeSession?: boolean;
-}
-
-export type AiEventKind = "system" | "text" | "tool_use" | "tool_result" | "result" | "error";
-
-export interface AiStreamEvent {
-  kind: AiEventKind;
-  sessionId: string | null;
-  text: string;
-  toolName: string;
-  toolInput: string;
-  toolUseId: string;
-  toolResult: string;
-  costUsd: number;
 }
 
 export interface ClaudeStatus {
@@ -1292,7 +1258,7 @@ export interface AutomationWorkflow {
 export interface AutomationNodeRun {
   nodeId: string;
   label: string;
-  status: "completed" | "failed" | "waiting_approval";
+  status: "completed" | "failed" | "waiting_approval" | "rejected";
   startedAt: string;
   finishedAt: string;
   output: unknown;

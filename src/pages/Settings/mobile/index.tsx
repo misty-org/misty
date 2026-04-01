@@ -92,6 +92,8 @@ export function MobileSettingsPage() {
       </MobileSettingsSection>
 
       <MobileSettingsSection id="privacy" icon={Shield} title="Privacy">
+        <MobileSwitchRow label="Share anonymous usage analytics" checked={booleanSetting(document, "privacy", "anonymous_usage_analytics_enabled", false)} disabled={working} onChange={(value) => onSettingChange("privacy", "anonymous_usage_analytics_enabled", value)} />
+        <MobileSwitchRow label="Send anonymous crash reports" checked={booleanSetting(document, "privacy", "anonymous_error_reporting_enabled", false)} disabled={working} onChange={(value) => onSettingChange("privacy", "anonymous_error_reporting_enabled", value)} />
         <MobileSwitchRow label="Local processing" checked={booleanSetting(document, "privacy", "local_processing_only", true)} disabled={working} onChange={(value) => onSettingChange("privacy", "local_processing_only", value)} />
         <MobileSwitchRow label="Share diagnostics" checked={booleanSetting(document, "privacy", "diagnostics_sharing_enabled", false)} disabled={working} onChange={(value) => onSettingChange("privacy", "diagnostics_sharing_enabled", value)} />
       </MobileSettingsSection>
