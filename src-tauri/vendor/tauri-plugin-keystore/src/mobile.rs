@@ -24,7 +24,9 @@ pub struct Keystore<R: Runtime>(PluginHandle<R>);
 
 impl<R: Runtime> Keystore<R> {
     pub fn store(&self, payload: StoreRequest) -> crate::Result<()> {
-        self.0.run_mobile_plugin("store", payload).map_err(Into::into)
+        self.0
+            .run_mobile_plugin("store", payload)
+            .map_err(Into::into)
     }
 
     pub fn retrieve(&self, payload: RetrieveRequest) -> crate::Result<RetrieveResponse> {
@@ -34,6 +36,8 @@ impl<R: Runtime> Keystore<R> {
     }
 
     pub fn remove(&self, payload: RemoveRequest) -> crate::Result<()> {
-        self.0.run_mobile_plugin("remove", payload).map_err(Into::into)
+        self.0
+            .run_mobile_plugin("remove", payload)
+            .map_err(Into::into)
     }
 }

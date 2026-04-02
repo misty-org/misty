@@ -105,6 +105,7 @@ interface PaneExplorerState {
   backHistory: string[];
   forwardHistory: string[];
   loading: boolean;
+  showLoadingSkeleton: boolean;
   needsLoad: boolean;
   error: string | null;
 }
@@ -278,6 +279,7 @@ function emptyPaneState(): PaneExplorerState {
     backHistory: [],
     forwardHistory: [],
     loading: false,
+    showLoadingSkeleton: false,
     needsLoad: false,
     error: null,
   };
@@ -517,7 +519,13 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       set((state) => ({
         panes: {
           ...state.panes,
-          [paneId]: { ...(state.panes[paneId] ?? emptyPaneState()), loading: false, needsLoad: false, error: null },
+          [paneId]: {
+            ...(state.panes[paneId] ?? emptyPaneState()),
+            loading: false,
+            showLoadingSkeleton: false,
+            needsLoad: false,
+            error: null,
+          },
         },
       }));
       return Promise.resolve();
@@ -554,7 +562,13 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       const quietRefresh = !options?.forceRemoteRefresh && mode === "replace" && pane.listing?.path === path && !pane.needsLoad;
       const nextPane = quietRefresh
         ? (pane.error ? { ...pane, error: null } : pane)
-        : { ...pane, loading: true, needsLoad: false, error: null };
+        : {
+            ...pane,
+            loading: true,
+            showLoadingSkeleton: shouldShowLoadingSkeleton(pane, path),
+            needsLoad: false,
+            error: null,
+          };
       if (
         nextPane === pane
         && state.inlineEdit?.paneId !== paneId
@@ -614,7 +628,13 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       set((state) => ({
         panes: {
           ...state.panes,
-          [paneId]: { ...(state.panes[paneId] ?? emptyPaneState()), loading: false, needsLoad: false, error: userFacingErrorText(error) },
+          [paneId]: {
+            ...(state.panes[paneId] ?? emptyPaneState()),
+            loading: false,
+            showLoadingSkeleton: false,
+            needsLoad: false,
+            error: userFacingErrorText(error),
+          },
         },
       }));
     }
@@ -1505,6 +1525,7 @@ function paneExplorerStatesEqual(left: PaneExplorerState, right: PaneExplorerSta
     && arraysEqual(left.backHistory, right.backHistory)
     && arraysEqual(left.forwardHistory, right.forwardHistory)
     && left.loading === right.loading
+    && left.showLoadingSkeleton === right.showLoadingSkeleton
     && left.needsLoad === right.needsLoad
     && left.error === right.error
   );
@@ -2203,6 +2224,34 @@ function resolveMountRoot(homePath: string, configuredPath: string): string {
   return `${homePath.replace(/\/+$/, "")}/${configuredPath.replace(/^\/+|\/+$/g, "")}`;
 }
 
+function shouldShowLoadingSkeleton(pane: PaneExplorerState, path: string): boolean {
+  const knownLocation = pane.needsLoad
+    ? undefined
+    : samePath(pane.listing?.path ?? "", path)
+      ? pane.listing?.location
+      : pane.listing?.entries.find((entry) => samePath(entry.path, path))?.location;
+  if (knownLocation) return knownLocation.kind !== "local";
+  if (path.startsWith("misty://")) return false;
+
+  const environment = useAppStore.getState().app?.environment;
+  if (!environment) return false;
+  const settings = useSettingsStore.getState().settings?.document;
+  const general = selectGeneralPreferences(settings);
+  const advanced = selectAdvancedPreferences(settings);
+  const preferredRoot = general.preferredWorkspaceRoot.trim();
+  const storageHome = !preferredRoot || preferredRoot === "~"
+    ? environment.homeDir
+    : preferredRoot.startsWith("~/")
+      ? `${environment.homeDir.replace(/\/+$/, "")}/${preferredRoot.slice(2)}`
+      : preferredRoot.startsWith("/")
+        ? preferredRoot
+        : `${environment.homeDir.replace(/\/+$/, "")}/${preferredRoot}`;
+  const mountRoot = resolveMountRoot(storageHome, advanced.mountPath || environment.mountPath || ".misty/mnt");
+  const target = normalizedPath(path);
+  const mount = normalizedPath(mountRoot);
+  return target === mount || target.startsWith(`${mount}/`);
+}
+
 async function publishDesktopNotification(
   notification: ExplorerNotification,
   enabled: boolean,
@@ -2284,6 +2333,7 @@ function applyNavigationResult(
     backHistory,
     forwardHistory,
     loading: false,
+    showLoadingSkeleton: false,
     error: null,
   };
 }

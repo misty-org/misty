@@ -14,13 +14,9 @@ use serde_json::Value;
 
 use crate::error::{ApiError, ApiResult};
 use crate::services::environment::AppEnvironmentService;
+use crate::services::system_dependencies::resolve_executable;
 
-const REMOVED_EXTENSION_IDS: &[&str] = &[
-    "git",
-    "preview-panel",
-    "preview_panel",
-    "vault",
-];
+const REMOVED_EXTENSION_IDS: &[&str] = &["git", "preview-panel", "preview_panel", "vault"];
 
 #[derive(Debug, Clone)]
 pub struct PluginCommandService {
@@ -598,7 +594,7 @@ fn run_result_for_command(
             plugin_name: command.plugin_name.clone(),
             label: command.label,
             handled: true,
-            target_route: dock_plugin_route(&command.plugin_id, selected_path),
+            target_route: plugin_popup_route(&command.plugin_id, selected_path),
             message: format!(
                 "Opened {}{}.",
                 command.plugin_name,
@@ -723,18 +719,7 @@ fn run_native_plugin_command(
         .map(String::as_str)
         .filter(|path| !path.trim().is_empty());
     let target_route = opened_panel
-        .map(|panel| {
-            let mut route = format!(
-                "/dock?plugin={}&panel={}",
-                route_encode(&command.plugin_id),
-                route_encode(panel)
-            );
-            if let Some(selected_path) = selected_path {
-                route.push_str("&selected=");
-                route.push_str(&route_encode(selected_path));
-            }
-            route
-        })
+        .map(|_| plugin_popup_route(&command.plugin_id, selected_path))
         .unwrap_or_default();
     let message = notification_message.unwrap_or_else(|| {
         if let Some(panel) = opened_panel {
@@ -1864,13 +1849,23 @@ fn static_panel_from_json(panel: &Value, plugin: &PluginMetadata) -> Option<Plug
 }
 
 fn web_panel_entry(panel: &Value, plugin: &PluginMetadata) -> String {
-    let Some(raw) = string_field(Some(panel), "entry") else { return String::new(); };
-    let (relative, query) = raw.split_once('?').map(|(path, query)| (path, Some(query))).unwrap_or((raw.as_str(), None));
+    let Some(raw) = string_field(Some(panel), "entry") else {
+        return String::new();
+    };
+    let (relative, query) = raw
+        .split_once('?')
+        .map(|(path, query)| (path, Some(query)))
+        .unwrap_or((raw.as_str(), None));
     let relative = Path::new(relative);
-    if !relative_plugin_library_path_is_safe(relative) { return String::new(); }
+    if !relative_plugin_library_path_is_safe(relative) {
+        return String::new();
+    }
     let path = Path::new(&plugin.plugin_dir).join(relative);
     let mut result = path.display().to_string();
-    if let Some(query) = query.filter(|value| !value.is_empty()) { result.push('?'); result.push_str(query); }
+    if let Some(query) = query.filter(|value| !value.is_empty()) {
+        result.push('?');
+        result.push_str(query);
+    }
     result
 }
 
@@ -2044,8 +2039,8 @@ fn route_encode(value: &str) -> String {
     encoded
 }
 
-fn dock_plugin_route(plugin_id: &str, selected_path: Option<&str>) -> String {
-    let mut route = format!("/dock?plugin={}", route_encode(plugin_id));
+fn plugin_popup_route(plugin_id: &str, selected_path: Option<&str>) -> String {
+    let mut route = format!("/files?extension={}", route_encode(plugin_id));
     if let Some(selected_path) = selected_path.filter(|path| !path.trim().is_empty()) {
         route.push_str("&selected=");
         route.push_str(&route_encode(selected_path));
@@ -2110,10 +2105,7 @@ fn missing_dependencies_for_plugin(plugin_id: &str) -> Vec<String> {
 }
 
 fn command_exists(command: &str) -> bool {
-    std::env::var_os("PATH")
-        .into_iter()
-        .flat_map(|paths| std::env::split_paths(&paths).collect::<Vec<_>>())
-        .any(|path| path.join(command).is_file())
+    resolve_executable(command, None).is_some()
 }
 
 fn string_field(value: Option<&Value>, key: &str) -> Option<String> {
@@ -3164,9 +3156,14 @@ mod tests {
         let plugin = root.join("quick_convert");
         fs::create_dir_all(plugin.join("web")).expect("web dir");
         fs::write(plugin.join("web/index.html"), "<!doctype html>").expect("web entry");
-        fs::write(plugin.join("plugin.json"), serde_json::json!({
-            "id": "quick_convert", "name": "Quick Convert", "status": "installed"
-        }).to_string()).expect("plugin detail");
+        fs::write(
+            plugin.join("plugin.json"),
+            serde_json::json!({
+                "id": "quick_convert", "name": "Quick Convert", "status": "installed"
+            })
+            .to_string(),
+        )
+        .expect("plugin detail");
         fs::write(plugin.join("manifest.json"), serde_json::json!({
             "id": "quick_convert", "enabled": true,
             "launcher": { "show_in_launcher": true },
@@ -3174,11 +3171,26 @@ mod tests {
         }).to_string()).expect("manifest");
 
         let snapshot = snapshot_plugin_commands(vec![root.clone()]).expect("snapshot");
-        let panel = snapshot.panels.iter().find(|panel| panel.plugin_id == "quick_convert").expect("web panel");
-        assert!(panel.web_entry.ends_with("web/index.html?plugin=quick_convert"));
-        assert!(snapshot.panels.iter().all(|panel| panel.id != "quick_convert.builtin"));
-        assert!(snapshot.commands.iter().all(|command| command.source != "builtin"));
-        assert!(snapshot.commands.iter().any(|command| command.source == "launcher"));
+        let panel = snapshot
+            .panels
+            .iter()
+            .find(|panel| panel.plugin_id == "quick_convert")
+            .expect("web panel");
+        assert!(panel
+            .web_entry
+            .ends_with("web/index.html?plugin=quick_convert"));
+        assert!(snapshot
+            .panels
+            .iter()
+            .all(|panel| panel.id != "quick_convert.builtin"));
+        assert!(snapshot
+            .commands
+            .iter()
+            .all(|command| command.source != "builtin"));
+        assert!(snapshot
+            .commands
+            .iter()
+            .any(|command| command.source == "launcher"));
         let _ = fs::remove_dir_all(root);
     }
 
@@ -3289,7 +3301,10 @@ mod tests {
             .plugins
             .iter()
             .any(|plugin| plugin.plugin_id == "themes"));
-        assert!(snapshot.panels.iter().any(|panel| panel.plugin_id == "ytdlp"));
+        assert!(snapshot
+            .panels
+            .iter()
+            .any(|panel| panel.plugin_id == "ytdlp"));
 
         let _ = fs::remove_dir_all(root);
     }
@@ -3315,7 +3330,7 @@ mod tests {
         let result = run_result_for_command(command, Vec::new());
 
         assert!(result.handled);
-        assert_eq!(result.target_route, "/dock?plugin=theme%20tools");
+        assert_eq!(result.target_route, "/files?extension=theme%20tools");
         assert_eq!(result.runtime_status, "opened");
     }
 
@@ -3342,7 +3357,7 @@ mod tests {
         assert!(result.handled);
         assert_eq!(
             result.target_route,
-            "/dock?plugin=theme%20tools&selected=%2Ftmp%2FMy%20File.mov"
+            "/files?extension=theme%20tools&selected=%2Ftmp%2FMy%20File.mov"
         );
         assert_eq!(result.runtime_status, "opened");
     }
@@ -3495,7 +3510,7 @@ mod tests {
         let result = run_result_for_command(command, Vec::new());
 
         assert!(result.handled);
-        assert_eq!(result.target_route, "/dock?plugin=convert");
+        assert_eq!(result.target_route, "/files?extension=convert");
         assert_eq!(result.runtime_status, "opened");
     }
 

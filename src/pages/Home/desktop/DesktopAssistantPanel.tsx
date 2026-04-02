@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Bot } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
-import botHappy from "../../../assets/bots/cloud-folder/happy.png";
-import botIdle from "../../../assets/bots/cloud-folder/idle.png";
-import botSleep from "../../../assets/bots/cloud-folder/sleep.png";
+import mikaAnimation from "../../../assets/bots/cloud-folder/mika.webp";
+import { openCloudFolderBotWindow } from "../../../bots/cloudFolderBot";
+import { useAppStore } from "../../../stores/useAppStore";
 import { assistantDailyMessageLimit, useAssistantUsageStore } from "../../../stores/useAssistantUsageStore";
 import { selectAssistantPreferences, useSettingsStore } from "../../../stores/useSettingsStore";
 
@@ -11,11 +11,9 @@ const panelClass =
   "flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] p-3 shadow-xl shadow-black/20";
 const headerClass =
   "mb-2 flex shrink-0 items-center gap-2 border-b border-white/[0.06] pb-2 text-sm font-semibold text-text";
-const botPreviewCycle = [botIdle, botSleep, botIdle, botHappy];
-const botPreviewCycleMs = 650;
 
 export function DesktopAssistantPanel() {
-  const [previewIndex, setPreviewIndex] = useState(0);
+  const assetsDir = useAppStore((state) => state.app?.environment.assetsDir);
   const { enabled, filesAllowed, cleanupAllowed, searchAllowed } = useSettingsStore(
     useShallow((state) => {
       const preferences = selectAssistantPreferences(state.settings?.document);
@@ -45,13 +43,6 @@ export function DesktopAssistantPanel() {
     return () => window.clearInterval(interval);
   }, [syncForToday]);
 
-  useEffect(() => {
-    const interval = window.setInterval(() => {
-      setPreviewIndex((current) => (current + 1) % botPreviewCycle.length);
-    }, botPreviewCycleMs);
-    return () => window.clearInterval(interval);
-  }, []);
-
   return (
     <section className={panelClass} aria-label="Assistant">
       <div className={headerClass}>
@@ -60,14 +51,21 @@ export function DesktopAssistantPanel() {
       </div>
 
       <div className="grid min-h-0 flex-1 grid-cols-[78px_minmax(0,1fr)] items-center gap-3">
-        <div className={`grid h-[78px] w-[78px] place-items-center rounded-xl border ${enabled ? "border-cyan-300/25 bg-cyan-400/10" : "border-white/[0.08] bg-white/[0.03]"}`}>
+        <button
+          aria-label="Show Mika"
+          className="grid h-[78px] w-[78px] place-items-center rounded-xl border-0 bg-transparent p-0 outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-white/40 disabled:cursor-not-allowed disabled:opacity-45"
+          disabled={!enabled}
+          onClick={() => void openCloudFolderBotWindow(assetsDir)}
+          title={enabled ? "Show Mika" : "Enable Mika in Settings first"}
+          type="button"
+        >
           <img
             alt=""
             className="h-[58px] w-[70px] object-contain"
             draggable={false}
-            src={botPreviewCycle[previewIndex] ?? botIdle}
+            src={mikaAnimation}
           />
-        </div>
+        </button>
 
         <div className="grid min-w-0 gap-2">
           <div className="flex min-w-0 items-center justify-between gap-3 text-xs">

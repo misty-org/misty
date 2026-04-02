@@ -12,6 +12,8 @@ pub mod explorer_library;
 pub mod extension_runtime;
 pub mod file_sync;
 pub mod keychain;
+#[cfg(desktop)]
+pub mod media_search;
 pub mod metadata;
 pub mod misty;
 pub mod misty_template;
@@ -24,8 +26,12 @@ pub mod power_pack;
 pub mod providers;
 pub mod search;
 pub mod settings;
+pub mod smart_library;
+mod smart_library_ingestion;
 pub mod storage;
 pub mod storage_runtime;
+#[cfg(desktop)]
+pub mod system_dependencies;
 pub mod transfers;
 #[cfg(desktop)]
 pub mod tray;

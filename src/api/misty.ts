@@ -105,6 +105,17 @@ import type {
   AutomationSnapshot,
   AutomationValidation,
   AutomationWorkflow,
+  AnalysisResult,
+  FolderLibraryStatus,
+  PreparedSmartLibraryPreview,
+  SmartLibraryAsset,
+  SmartLibraryAssetsPage,
+  SmartLibraryAssetsPageRequest,
+  SmartLibrarySnapshot,
+  ResolvedSmartLibraryAsset,
+  MediaSearchSnapshot,
+  PreparedMediaChunk,
+  ResolvedMediaAsset,
 } from "./types";
 import { hasTauriInternals } from "../shared/tauri";
 
@@ -328,6 +339,48 @@ export function explorerLibrarySetTags(item: ExplorerLibraryItem, tags: string[]
 export function explorerLibrarySetMetadata(item: ExplorerLibraryItem, tags: string[], comments: string): Promise<ExplorerLibrarySnapshot> {
   return invoke("explorer_library_set_tags", { request: { item, tags, comments } });
 }
+
+export function smartLibrarySnapshot(): Promise<SmartLibrarySnapshot> {
+  return invoke("smart_library_snapshot");
+}
+
+export function smartLibraryScan(rootPath: string): Promise<FolderLibraryStatus> {
+  return invoke("smart_library_scan", { request: { rootPath } });
+}
+
+export function smartLibraryPreparePreviews(assetIds: string[], maxDimension = 512): Promise<PreparedSmartLibraryPreview[]> {
+  return invoke("smart_library_prepare_previews", { request: { assetIds, maxDimension } });
+}
+
+export function smartLibraryApplyResults(results: AnalysisResult[]): Promise<SmartLibrarySnapshot> {
+  return invoke("smart_library_apply_results", { request: { results } });
+}
+
+export function smartLibrarySetServerFolderId(serverFolderId: string): Promise<SmartLibrarySnapshot> {
+  return invoke("smart_library_set_server_folder_id", { serverFolderId });
+}
+
+export function smartLibrarySearch(query: string, collection?: string, limit = 100): Promise<SmartLibraryAsset[]> {
+  return invoke("smart_library_search", { request: { query, collection, limit } });
+}
+
+export function smartLibraryDelete(): Promise<SmartLibrarySnapshot> {
+  return invoke("smart_library_delete");
+}
+
+export function smartLibraryResolveAssets(assetIds: string[]): Promise<ResolvedSmartLibraryAsset[]> {
+  return invoke("smart_library_resolve_assets", { request: { assetIds } });
+}
+
+export function smartLibraryAssetsPage(request: SmartLibraryAssetsPageRequest = {}): Promise<SmartLibraryAssetsPage> {
+  return invoke("smart_library_assets_page", { request });
+}
+
+export function mediaSearchScanMovies(): Promise<MediaSearchSnapshot> { return invoke("media_search_scan_movies"); }
+export function mediaSearchSnapshot(): Promise<MediaSearchSnapshot> { return invoke("media_search_snapshot"); }
+export function mediaSearchPrepareChunk(assetId: string, chunkIndex: number): Promise<PreparedMediaChunk> { return invoke("media_search_prepare_chunk", { request: { assetId, chunkIndex } }); }
+export function mediaSearchComplete(assetId: string, fingerprint: string, failureCode?: string | null): Promise<MediaSearchSnapshot> { return invoke("media_search_complete", { request: { assetId, fingerprint, failureCode: failureCode ?? null } }); }
+export function mediaSearchResolveAssets(assetIds: string[]): Promise<ResolvedMediaAsset[]> { return invoke("media_search_resolve_assets", { request: { assetIds } }); }
 
 export function explorerOpenWith(applicationPath: string, filePath: string): Promise<void> {
   return invoke("explorer_open_with", { applicationPath, filePath });

@@ -39,16 +39,13 @@ impl<R: Runtime> DocumentTree<R> {
     }
 
     pub fn persisted_trees(&self) -> Result<Vec<DocumentTreeLocation>> {
-        let response: DocumentTreeLocationsResponse = self.0
-            .run_mobile_plugin("persistedTrees", ())
-            ?;
+        let response: DocumentTreeLocationsResponse =
+            self.0.run_mobile_plugin("persistedTrees", ())?;
         Ok(response.trees)
     }
 
     pub fn list_children(&self, request: ListChildrenRequest) -> Result<Vec<DocumentTreeEntry>> {
-        let response: ListChildrenResponse = self.0
-            .run_mobile_plugin("listChildren", request)
-            ?;
+        let response: ListChildrenResponse = self.0.run_mobile_plugin("listChildren", request)?;
         Ok(response.entries)
     }
 

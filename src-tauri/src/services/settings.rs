@@ -8,6 +8,8 @@ use serde_json::{json, Map, Value};
 
 use crate::error::{ApiError, ApiResult};
 use crate::services::environment::AppEnvironmentService;
+#[cfg(desktop)]
+use crate::services::system_dependencies::detected_login_shell_path;
 
 #[derive(Debug, Clone)]
 pub struct SettingsService {
@@ -167,6 +169,10 @@ fn normalize_settings_document(document: &mut Value) -> bool {
         changed = true;
     }
 
+    #[cfg(desktop)]
+    let default_extension_tools_path = detected_login_shell_path();
+    #[cfg(not(desktop))]
+    let default_extension_tools_path = String::new();
     changed |= ensure_section_defaults(
         root,
         "general",
@@ -234,6 +240,15 @@ fn normalize_settings_document(document: &mut Value) -> bool {
             ("allow_metered_sync", json!(false)),
             ("conflict_resolution_index", json!(0)),
             ("version_history_enabled", json!(true)),
+        ],
+    );
+    changed |= ensure_section_defaults(
+        root,
+        "search",
+        &[
+            ("automatic_file_discovery_enabled", json!(true)),
+            ("automatic_image_discovery_enabled", json!(true)),
+            ("discovery_interval_minutes", json!(15)),
         ],
     );
     changed |= ensure_section_defaults(
@@ -315,6 +330,7 @@ fn normalize_settings_document(document: &mut Value) -> bool {
         &[
             ("server_address", json!("localhost:50051")),
             ("mount_path", json!(".misty/mnt")),
+            ("extension_tools_path", json!(default_extension_tools_path)),
             ("confirm_clear_recent", json!(false)),
             ("confirm_clear_starred", json!(false)),
             ("confirm_empty_trash", json!(false)),
@@ -631,6 +647,22 @@ mod tests {
             .is_some_and(
                 |notifications| notifications.contains_key("desktop_notifications_enabled")
             ));
+        assert_eq!(
+            document
+                .get("search")
+                .and_then(Value::as_object)
+                .and_then(|search| search.get("automatic_file_discovery_enabled"))
+                .and_then(Value::as_bool),
+            Some(true),
+        );
+        assert_eq!(
+            document
+                .get("search")
+                .and_then(Value::as_object)
+                .and_then(|search| search.get("automatic_image_discovery_enabled"))
+                .and_then(Value::as_bool),
+            Some(true),
+        );
 
         let _ = fs::remove_dir_all(
             settings_path

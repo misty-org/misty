@@ -203,6 +203,10 @@ export interface SearchStatus {
   scanErrors: SearchScanError[];
   indexedLocalRoots: string[];
   indexedRemoteNames: string[];
+  lastScanAddedItemCount: number;
+  lastScanUpdatedItemCount: number;
+  lastScanRemovedItemCount: number;
+  lastScanUnchangedItemCount: number;
 }
 
 export interface SearchScanRequest {
@@ -212,6 +216,7 @@ export interface SearchScanRequest {
   remoteNames?: string[];
   maxDepth?: number | null;
   ignoredPaths?: string[];
+  incremental?: boolean;
 }
 
 export interface SearchQueryRequest {
@@ -222,6 +227,8 @@ export interface SearchQueryRequest {
   includeDirectories?: boolean;
   includeHidden?: boolean;
   limit?: number | null;
+  rules?: SavedSearchRule[];
+  matchMode?: "all" | "any";
 }
 
 export interface SearchResult {
@@ -229,7 +236,47 @@ export interface SearchResult {
   score: number;
   sourceKind: SearchSourceKind;
   indexedAtMs: number;
+  match?: SearchResultMatch;
 }
+
+/** Optional ranking evidence for results enriched by the managed semantic catalog. */
+export interface SearchResultMatch {
+  kind: "filename" | "metadata" | "semantic" | "hybrid";
+  semanticScore?: number | null;
+  lexicalScore?: number | null;
+  reasons?: string[];
+  description?: string | null;
+  tags?: string[];
+  collections?: string[];
+  assetKind?: string | null;
+  extractedText?: string | null;
+  mediaSegmentId?: string | null;
+  mediaType?: "audio" | "video" | null;
+  mediaStartMs?: number | null;
+  mediaEndMs?: number | null;
+  mediaMatchKind?: "spoken" | "visual" | null;
+  transcript?: string | null;
+  visualDescription?: string | null;
+}
+
+export interface MediaAsset {
+  assetId: string;
+  path: string;
+  name: string;
+  fingerprint: string;
+  mediaType: "audio" | "video";
+  mimeType: string;
+  durationMs: number;
+  sizeBytes: number;
+  modifiedMs: number;
+  status: "pending" | "processing" | "indexed" | "failed" | "unsupported";
+  indexedFingerprint: string | null;
+  failureCode: string | null;
+}
+export interface MediaSearchSnapshot { rootPath: string; maxDurationMinutes: number; assets: MediaAsset[]; ffmpegAvailable: boolean; }
+export interface PreparedMediaFrame { timestampMs: number; mimeType: "image/jpeg"; base64: string; }
+export interface PreparedMediaChunk { assetId: string; fingerprint: string; mediaType: "audio"|"video"; mimeType: string; durationMs: number; chunkIndex: number; startMs: number; endMs: number; audioMimeType: string|null; audioBase64: string|null; frames: PreparedMediaFrame[]; }
+export interface ResolvedMediaAsset { assetId: string; path: string; name: string; mediaType: "audio"|"video"; durationMs: number; }
 
 export interface DirectoryListing {
   path: string;
@@ -389,6 +436,155 @@ export interface SetExplorerTagsRequest {
   item: ExplorerLibraryItem;
   tags: string[];
   comments?: string;
+}
+
+export type SmartLibrarySourceKind = "local" | "cloud";
+export type SmartLibraryAssetStatus = "pending" | "queued" | "analyzed" | "failed" | "changed" | "unsupported";
+
+export interface PilotAllowance {
+  sampleImages: number;
+  maximumAnalyzedImages: number;
+  sampleIncluded: boolean;
+  remainingImages: number;
+}
+
+export interface AnalysisEstimate {
+  eligibleImages: number;
+  includedImages: number;
+  billableImages: number;
+  creditUnits: number;
+  priceMinor: number | null;
+  currency: string | null;
+}
+
+export interface FolderPreflight {
+  totalImages: number;
+  supportedImages: number;
+  unsupportedImages: number;
+  alreadyAnalyzedImages: number;
+  changedImages: number;
+  newImages: number;
+  duplicateImages: number;
+  eligibleImages: number;
+  pilotCappedImages: number;
+  skippedFullOriginalImages: number;
+  sampleAssetIds: string[];
+  unsupportedReasons: Record<string, number>;
+  allowance: PilotAllowance;
+  estimate: AnalysisEstimate;
+}
+
+export interface SmartLibraryAsset {
+  assetId: string;
+  relativePath: string;
+  name: string;
+  mimeType: string;
+  extension: string;
+  sizeBytes: number;
+  modifiedMs: number;
+  fingerprint: string;
+  sourceKind: SmartLibrarySourceKind;
+  previewSupported: boolean;
+  unsupportedReason: string | null;
+  status: SmartLibraryAssetStatus;
+  description: string | null;
+  tags: string[];
+  collections: string[];
+  confidence: number | null;
+  failure: string | null;
+  assetKind?: string;
+  extractedText?: string | null;
+  generatedMetadata?: SmartLibraryGeneratedMetadata | null;
+  indexVersion?: string | null;
+  indexedFingerprint?: string | null;
+}
+
+export interface SmartLibraryGeneratedMetadata {
+  contentType: string;
+  primarySubject: string;
+  searchTerms: string[];
+  entities: string[];
+  characters: string[];
+  brands: string[];
+  applications: string[];
+  objects: string[];
+  scenes: string[];
+  activities: string[];
+  colors: string[];
+  visibleText: string[];
+  topics: string[];
+}
+
+export interface FolderLibraryStatus {
+  libraryId: string;
+  serverFolderId: string | null;
+  rootPath: string;
+  displayName: string;
+  sourceKind: SmartLibrarySourceKind;
+  createdAtMs: number;
+  lastScannedAtMs: number;
+  preflight: FolderPreflight;
+  assets: SmartLibraryAsset[];
+}
+
+export interface SmartLibrarySnapshot {
+  activeLibrary: FolderLibraryStatus | null;
+}
+
+export interface SmartLibraryAssetsPageRequest {
+  afterAssetId?: string | null;
+  limit?: number;
+  reindexOnly?: boolean;
+  indexVersion?: string | null;
+}
+
+export interface SmartLibraryAssetsPage {
+  assets: SmartLibraryAsset[];
+  nextCursor: string | null;
+}
+
+/** Device-only resolution of opaque managed-catalog IDs. Paths never cross the AI API. */
+export interface ResolvedSmartLibraryAsset {
+  assetId: string;
+  path: string;
+  relativePath: string;
+  name: string;
+  sourceKind: SmartLibrarySourceKind;
+}
+
+export interface PreparedSmartLibraryPreview {
+  assetId: string;
+  fingerprint: string;
+  mimeType: string;
+  assetKind: string;
+  extractedText: string | null;
+  metadata: Record<string, string>;
+  truncated: boolean;
+  bytes: number[];
+  width: number;
+  height: number;
+}
+
+export interface AnalysisResult {
+  assetId: string;
+  status: "analyzed" | "failed";
+  description?: string | null;
+  tags?: string[];
+  suggestedCollections?: string[];
+  confidence?: number | null;
+  failure?: string | null;
+  assetKind?: string | null;
+  mimeType?: string | null;
+  metadata?: Partial<SmartLibraryGeneratedMetadata> | null;
+  indexVersion?: string | null;
+}
+
+export interface AnalysisBatch {
+  batchId: string;
+  assetIds: string[];
+  status: "pending" | "uploading" | "queued" | "processing" | "completed" | "partially_failed" | "failed";
+  completedImages: number;
+  failedImages: number;
 }
 
 export interface FileMetadataField {
