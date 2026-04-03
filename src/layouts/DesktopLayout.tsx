@@ -34,9 +34,13 @@ import {
 } from "react-router-dom";
 import {
   Bell,
+  Check,
+  CheckCheck,
+  ChevronRight,
   Folder,
   LogOut,
   Minus,
+  Plus,
   Repeat2,
   Settings as SettingsIcon,
   Square,
@@ -56,10 +60,10 @@ import { useSetupStore } from "../stores/useSetupStore";
 import { useUserStore } from "../stores/useUserStore";
 import { useProvidersStore } from "../stores/useProvidersStore";
 import SettingsWorkspace from "../pages/Settings/desktop";
+import AccountWorkspace from "../pages/Account/desktop";
 import {
   selectAppearancePreferences,
   selectCustomFontPreferences,
-  selectGeneralPreferences,
   selectNotificationPreferences,
   selectAssistantPreferences,
   selectSearchMaintenancePreferences,
@@ -95,7 +99,15 @@ import { useMultiPanelStore } from "../shared/multipanel/useMultiPanelStore";
 import { DeepSearchOverlay } from "../pages/Files/components/DeepSearchOverlay";
 import { MediaSearchViewer } from "../pages/Files/components/MediaSearchViewer";
 import { useSearchStore } from "../stores/useSearchStore";
-import { useSmartLibraryStore } from "../stores/useSmartLibraryStore";
+import { useMediaSearchStore } from "../stores/useMediaSearchStore";
+import { AgentJobWorker } from "../agents/AgentJobWorker";
+import { SpacesRealtimeBridge } from "../spaces/SpacesRealtimeBridge";
+import { useSpacesStore } from "../stores/useSpacesStore";
+import type { SpaceInboxItem } from "../spaces/types";
+import {
+  advanceTransferCompletionTracker,
+  emptyTransferCompletionTracker,
+} from "./transferCompletionNotifications";
 
 export type DesktopNavItem = {
   id: string;
@@ -121,39 +133,47 @@ type WindowRect = {
 };
 
 const desktopFrameClass =
-  "relative isolate grid h-full min-h-0 grid-cols-[72px_minmax(0,1fr)] grid-rows-[28px_minmax(0,1fr)] overflow-hidden bg-[var(--misty-app-frame-bg,var(--misty-bg))]";
+  "relative isolate grid h-full min-h-0 grid-cols-[80px_minmax(0,1fr)] grid-rows-[28px_minmax(0,1fr)] overflow-hidden bg-[var(--misty-app-frame-bg,var(--misty-bg))]";
 const androidDesktopFrameClass =
-  "relative isolate grid h-full min-h-0 grid-cols-[72px_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] overflow-hidden bg-[var(--misty-app-frame-bg,var(--misty-bg))] pt-[max(var(--misty-safe-top),28px)] pb-[max(var(--misty-safe-bottom),24px)]";
+  "relative isolate grid h-full min-h-0 grid-cols-[80px_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] overflow-hidden bg-[var(--misty-app-frame-bg,var(--misty-bg))] pt-[max(var(--misty-safe-top),28px)] pb-[max(var(--misty-safe-bottom),24px)]";
 
 const desktopNavbarClass =
-  "relative z-10 col-start-1 row-start-2 flex min-h-0 flex-col items-center overflow-hidden border-r border-transparent px-1 pb-2.5 pt-2";
+  "relative z-10 col-start-1 row-start-2 flex min-h-0 flex-col items-center overflow-hidden px-2 py-3";
 const androidDesktopNavbarClass =
-  "relative z-10 col-start-1 row-start-1 flex min-h-0 flex-col items-center overflow-hidden border-r border-transparent px-1 pb-2.5 pt-2";
+  "relative z-10 col-start-1 row-start-1 flex min-h-0 flex-col items-center overflow-hidden px-2 py-3";
 
 const desktopRouteShellClass =
-  "relative z-10 col-start-2 row-start-2 min-h-0 overflow-hidden bg-transparent";
+  "relative z-10 col-start-2 row-start-2 min-h-0 overflow-hidden rounded-tl-xl border-l border-t border-[var(--misty-content-frame-border)] bg-transparent shadow-[0_12px_32px_rgba(0,0,0,0.18)]";
 const androidDesktopRouteShellClass =
-  "relative z-10 col-start-2 row-start-1 min-h-0 overflow-hidden bg-transparent";
+  "relative z-10 col-start-2 row-start-1 min-h-0 overflow-hidden rounded-tl-xl border-l border-t border-[var(--misty-content-frame-border)] bg-transparent shadow-[0_12px_32px_rgba(0,0,0,0.18)]";
 
 const navbarGroupClass = "flex w-full flex-col items-center gap-3";
 
-const navbarBottomClass = `${navbarGroupClass} mt-auto`;
+const navbarBottomClass = "mt-auto flex w-full shrink-0 flex-col items-center gap-4";
 
 const navLinkBaseClass =
-  "grid h-[58px] w-16 place-items-center text-[var(--misty-text-muted)] no-underline";
+  "grid h-[68px] w-16 shrink-0 grid-rows-[48px_18px] place-items-center text-[var(--misty-text-muted)] no-underline";
 
 const navLinkActiveClass = "text-[var(--misty-text)]";
 
 const navIconTileBaseClass =
-  "relative grid h-[52px] w-[52px] place-items-center rounded-[12px] text-[var(--misty-text)] group-hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-2))]";
+  "relative grid h-[48px] w-[52px] place-items-center rounded-[12px] text-[var(--misty-text)] group-hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-2))]";
 
 const navIconTileActiveClass = "bg-[var(--misty-neutral-selected-bg,var(--misty-surface-3))]";
 
+const navItemLabelBaseClass =
+  "block max-w-[64px] truncate text-center text-[11px] font-semibold leading-[1.25] tracking-[-0.01em] text-[var(--misty-text-subtle)] transition-colors group-hover:text-[var(--misty-text-muted)]";
+
+const navItemLabelActiveClass = "text-[var(--misty-text)]";
+
 const profileDockClass =
-  "relative grid h-[48px] w-[48px] place-items-center rounded-full border border-[var(--misty-border-soft)] bg-[var(--misty-neutral-control-bg,var(--misty-surface-2))] p-0 text-base font-bold text-[var(--misty-text)] transition hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-3))]";
+  "relative grid h-[48px] w-[48px] shrink-0 place-items-center rounded-full border border-[var(--misty-border-soft)] bg-[var(--misty-neutral-control-bg,var(--misty-surface-2))] p-0 text-base font-bold text-[var(--misty-text)] transition hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-3))]";
 
 const profilePopoverClass =
-  "fixed z-[2147482900] grid w-[286px] overflow-hidden rounded-xl border border-[var(--misty-border-soft)] bg-[color-mix(in_srgb,var(--misty-surface)_96%,transparent)] p-2 text-[var(--misty-text)] shadow-[0_18px_52px_var(--misty-shadow)]";
+  "fixed z-[2147482900] grid max-h-[calc(100vh-16px)] w-[286px] overflow-y-auto rounded-xl border border-[var(--misty-border-soft)] bg-[color-mix(in_srgb,var(--misty-surface)_96%,transparent)] p-2 text-[var(--misty-text)] shadow-[0_18px_52px_var(--misty-shadow)]";
+
+const accountChooserPopoverClass =
+  "fixed z-[2147482910] grid max-h-[calc(100vh-16px)] w-[320px] overflow-hidden rounded-xl border border-[var(--misty-border-soft)] bg-[color-mix(in_srgb,var(--misty-surface)_96%,transparent)] p-2 text-[var(--misty-text)] shadow-[0_18px_52px_var(--misty-shadow)]";
 
 const profileMenuItemClass =
   "grid min-h-10 w-full grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-2 rounded-lg border-0 bg-transparent px-2.5 py-2 text-left text-sm text-[var(--misty-text-muted)] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-2))] hover:text-[var(--misty-text)]";
@@ -172,12 +192,12 @@ const workStatusPulseClass =
 const workStatusToastDurationMs = 3500;
 
 const activityPanelClass =
-  "grid h-[min(560px,calc(100vh-24px))] w-[420px] min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-lg border border-[#27272a] bg-[#0b0d0f] shadow-[0_24px_64px_rgba(0,0,0,0.42)]";
+  "grid h-[min(460px,calc(100vh-24px))] w-[420px] min-h-0 grid-rows-[auto_auto_minmax(0,1fr)] overflow-hidden rounded-2xl border border-[#27272a] bg-[#0b0d0f] shadow-[0_24px_64px_rgba(0,0,0,0.42)]";
 
 const activityPopoverClass = "fixed z-[2147482900] max-w-[calc(100vw-96px)]";
 
 const activityButtonClass =
-  "min-h-7 rounded-md border border-[#303640] bg-[#121820] px-2.5 py-1 text-[13px] text-[#d8dde6] disabled:opacity-50";
+  "grid size-9 place-items-center rounded-lg border border-[#303640] bg-[#191a20] p-0 text-[#f1eee8] transition hover:bg-[#23252d] disabled:opacity-50";
 
 const desktopTitlebarClass =
   "group/titlebar relative z-10 col-span-full row-start-1 h-7 select-none border-b border-transparent bg-[var(--misty-app-nav-bg,var(--misty-bg))]";
@@ -199,7 +219,7 @@ const windowsTitlebarCloseButtonClass =
 type DesktopPlatform = "macos" | "windows" | "linux" | "browser" | "unknown";
 
 const activityEntryBaseClass =
-  "relative grid grid-cols-[18px_minmax(0,1fr)_auto] items-start gap-2 rounded-md px-1.5 py-[7px]";
+  "relative grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 rounded-md px-2.5 py-[9px]";
 
 const frameOverlayBaseClass =
   "pointer-events-none fixed right-3 top-2.5 z-[90] grid min-w-36 grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-[3px] rounded-[7px] border bg-[color-mix(in_srgb,var(--misty-bg)_88%,transparent)] px-2.5 py-2 text-[11px] leading-[1.2] text-[var(--misty-text)] shadow-[0_12px_34px_var(--misty-shadow)]";
@@ -239,11 +259,15 @@ export function DesktopLayout(props: {
       settingsLoad: state.load,
     })),
   );
-  const unreadActivityCount = useExplorerStore(
+  const localUnreadActivityCount = useExplorerStore(
     (state) =>
       state.notificationHistory.filter((notification) => !notification.read)
         .length,
   );
+  const cloudUnreadActivityCount = useSpacesStore((state) =>
+    [...state.inbox.unreads, ...state.inbox.mentions].filter((item) => !item.seen_at).length,
+  );
+  const unreadActivityCount = localUnreadActivityCount + cloudUnreadActivityCount;
   const activePaneId = useMultiPanelStore((state) => state.activePaneId);
   const activePanePath = useExplorerStore(
     (state) => state.panes[activePaneId]?.listing?.path ?? "",
@@ -396,15 +420,24 @@ export function DesktopLayout(props: {
   const [activityOpen, setActivityOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [desktopPlatform, setDesktopPlatform] =
     useState<DesktopPlatform>("unknown");
   const navItems = props.navItems;
   const openSettingsOverlay = useCallback(() => {
+    setAccountSettingsOpen(false);
     setSettingsOpen(true);
     void settingsLoad();
   }, [settingsLoad]);
   const closeSettingsOverlay = useCallback(() => {
     setSettingsOpen(false);
+  }, []);
+  const openAccountSettingsOverlay = useCallback(() => {
+    setSettingsOpen(false);
+    setAccountSettingsOpen(true);
+  }, []);
+  const closeAccountSettingsOverlay = useCallback(() => {
+    setAccountSettingsOpen(false);
   }, []);
 
   useEffect(() => {
@@ -413,6 +446,13 @@ export function DesktopLayout(props: {
     void loadApp();
     void settingsLoad();
   }, [loadApp, settingsLoad]);
+
+  useEffect(() => {
+    if (!app || !hasTauriInternals()) return;
+    // Loading the durable media queue at app startup resumes explicitly
+    // approved work without requiring the user to revisit the Library page.
+    void useMediaSearchStore.getState().load();
+  }, [app]);
 
   useEffect(() => {
     if (!settings || !hasTauriInternals()) return;
@@ -433,16 +473,6 @@ export function DesktopLayout(props: {
           }
         }
 
-        if (searchMaintenancePreferences.automaticImageDiscoveryEnabled) {
-          await useSmartLibraryStore.getState().load();
-          const smartLibrary = useSmartLibraryStore.getState();
-          const stale = Boolean(
-            smartLibrary.library
-              && Date.now() - smartLibrary.library.lastScannedAtMs >= intervalMs,
-          );
-          const busy = ["scanning", "uploading", "processing", "reindexing"].includes(smartLibrary.phase);
-          if (stale && !busy) await smartLibrary.discoverChanges();
-        }
       } finally {
         searchMaintenanceRunningRef.current = false;
       }
@@ -465,7 +495,6 @@ export function DesktopLayout(props: {
   }, [
     app?.environment.homeDir,
     searchMaintenancePreferences.automaticFileDiscoveryEnabled,
-    searchMaintenancePreferences.automaticImageDiscoveryEnabled,
     searchMaintenancePreferences.discoveryIntervalMinutes,
     settings,
   ]);
@@ -583,13 +612,14 @@ export function DesktopLayout(props: {
 
   useEffect(() => {
     const route = `${location.pathname}${location.search}`;
+    if (location.pathname === "/account") return;
     if (isRememberableAppRoute(route)) {
       rememberAppRoute(route);
     }
   }, [location.pathname, location.search, rememberAppRoute]);
 
   useEffect(() => {
-    if (location.pathname.startsWith("/settings")) return;
+    if (location.pathname.startsWith("/settings") || location.pathname === "/account") return;
     lastNonSettingsRouteRef.current = `${location.pathname}${location.search}`;
   }, [location.pathname, location.search]);
 
@@ -601,6 +631,15 @@ export function DesktopLayout(props: {
       { replace: true },
     );
   }, [lastAppRoute, location.pathname, navigate, openSettingsOverlay]);
+
+  useEffect(() => {
+    if (location.pathname !== "/account") return;
+    openAccountSettingsOverlay();
+    navigate(
+      settingsFallbackRoute(lastNonSettingsRouteRef.current, lastAppRoute),
+      { replace: true },
+    );
+  }, [lastAppRoute, location.pathname, navigate, openAccountSettingsOverlay]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -1038,7 +1077,13 @@ export function DesktopLayout(props: {
         currentPath={location.pathname}
         open={profileOpen}
         onClose={() => setProfileOpen(false)}
+        onOpenAccountSettings={openAccountSettingsOverlay}
         onOpenSettings={openSettingsOverlay}
+      />
+      <AccountSettingsOverlay
+        open={accountSettingsOpen}
+        style={desktopFrameStyle}
+        onClose={closeAccountSettingsOverlay}
       />
       <SettingsOverlay
         open={settingsOpen}
@@ -1050,6 +1095,8 @@ export function DesktopLayout(props: {
         currentPath={activePanePath || app?.environment.homeDir || ""}
       />
       <MediaSearchViewer />
+      <AgentJobWorker />
+      <SpacesRealtimeBridge />
     </main>
   );
 }
@@ -1272,37 +1319,28 @@ const transferNotificationStatuses = new Set<TransferStatus>([
 ]);
 
 const TransferCompletionNotifier = memo(function TransferCompletionNotifier() {
-  const rows = useTransfersStore(
-    (state) => state.transfers?.rows ?? emptyTransferRows,
-  );
-  const readyRef = useRef(false);
-  const statusesRef = useRef<Record<number, TransferStatus>>({});
+  const transferPage = useTransfersStore((state) => state.transfers);
+  const trackerRef = useRef(emptyTransferCompletionTracker());
 
   useEffect(() => {
-    const nextStatuses = Object.fromEntries(
-      rows.map((row) => [row.id, row.status]),
-    ) as Record<number, TransferStatus>;
-
-    if (!readyRef.current) {
-      statusesRef.current = nextStatuses;
-      readyRef.current = true;
-      return;
-    }
-
-    const previousStatuses = statusesRef.current;
+    // A null page means the durable transfer history has not loaded yet. Do
+    // not treat that temporary empty state as the completion baseline.
+    if (!transferPage) return;
+    const advanced = advanceTransferCompletionTracker(
+      trackerRef.current,
+      transferPage.rows,
+      transferNotificationStatuses,
+    );
+    trackerRef.current = advanced.tracker;
     const pushNotification = useExplorerStore.getState().pushNotification;
-    for (const row of rows) {
-      if (!transferNotificationStatuses.has(row.status)) continue;
-      if (previousStatuses[row.id] === row.status) continue;
+    for (const row of advanced.changed) {
       if (row.status === "completed") {
         pushNotification(`Transfer finished: ${transferNotificationTitle(row)}`, "success", 4200);
       } else {
         pushNotification(`Transfer needs attention: ${transferNotificationTitle(row)}`, "error", 5600);
       }
     }
-
-    statusesRef.current = nextStatuses;
-  }, [rows]);
+  }, [transferPage]);
 
   return null;
 });
@@ -1336,6 +1374,11 @@ function NavGroup(props: {
                   {formatBadgeCount(props.badges[item.id] ?? 0)}
                 </span>
               ) : null}
+            </span>
+            <span
+              className={`${navItemLabelBaseClass} ${selected ? navItemLabelActiveClass : ""}`}
+            >
+              {item.label}
             </span>
           </NavLink>
         );
@@ -1380,6 +1423,11 @@ const ActivityNavButton = memo(
             </span>
           ) : null}
         </span>
+        <span
+          className={`${navItemLabelBaseClass} ${props.open ? navItemLabelActiveClass : ""}`}
+        >
+          Activity
+        </span>
       </button>
     );
   }),
@@ -1400,6 +1448,11 @@ function SettingsNavButton(props: { open: boolean; onClick: () => void }) {
         className={`${navIconTileBaseClass} ${props.open ? navIconTileActiveClass : ""}`}
       >
         <SettingsIcon size={29} strokeWidth={1.85} />
+      </span>
+      <span
+        className={`${navItemLabelBaseClass} ${props.open ? navItemLabelActiveClass : ""}`}
+      >
+        Settings
       </span>
     </button>
   );
@@ -1450,13 +1503,14 @@ function ProfilePopover(props: {
   currentPath: string;
   open: boolean;
   onClose: () => void;
+  onOpenAccountSettings: () => void;
   onOpenSettings: () => void;
 }) {
   const navigate = useNavigate();
   const currentUser = useSetupStore(
     (state) => state.status?.current_user ?? null,
   );
-  const { user, logout } = useAuth();
+  const { user, accounts, switchAccount, logout } = useAuth();
   const me = useUserStore(
     useShallow((state) => ({
       email: state.me?.email,
@@ -1467,7 +1521,12 @@ function ProfilePopover(props: {
     (state) => state.setActiveSection,
   );
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const accountChooserRef = useRef<HTMLDivElement | null>(null);
   const [menuStyle, setMenuStyle] = useState<CSSProperties>({});
+  const [accountChooserStyle, setAccountChooserStyle] = useState<CSSProperties>({});
+  const [accountChooserOpen, setAccountChooserOpen] = useState(false);
+  const [switchingAccountId, setSwitchingAccountId] = useState("");
+  const [switchError, setSwitchError] = useState("");
   const account = currentUser ?? user;
   const email = me.email ?? account?.email ?? "";
   const displayName = me.name ?? account?.name ?? emailName(email) ?? "Misty";
@@ -1478,19 +1537,34 @@ function ProfilePopover(props: {
     if (!anchor) return;
     const rect = anchor.getBoundingClientRect();
     const width = 286;
+    const estimatedHeight = 236;
     const left = Math.min(
       Math.max(8, rect.right + 10),
       window.innerWidth - width - 8,
     );
     const top = Math.min(
-      Math.max(8, rect.bottom - 220),
-      window.innerHeight - 236,
+      Math.max(8, rect.bottom - estimatedHeight),
+      window.innerHeight - estimatedHeight - 8,
     );
     setMenuStyle((current) =>
       current.left === left && current.top === top && current.width === width
         ? current
         : { left, top, width },
     );
+    const chooserWidth = 320;
+    const chooserHeight = Math.min(420, window.innerHeight - 16);
+    const chooserLeft = left + width + 8;
+    const chooserTop = Math.min(
+      Math.max(8, rect.bottom - chooserHeight),
+      window.innerHeight - chooserHeight - 8,
+    );
+    setAccountChooserStyle((current) => (
+      current.left === chooserLeft
+      && current.top === chooserTop
+      && current.width === chooserWidth
+        ? current
+        : { left: chooserLeft, top: chooserTop, width: chooserWidth }
+    ));
   }, [props.anchorRef]);
 
   useEffect(() => {
@@ -1501,13 +1575,19 @@ function ProfilePopover(props: {
       if (!target) return;
       if (
         props.anchorRef.current?.contains(target) ||
-        menuRef.current?.contains(target)
+        menuRef.current?.contains(target) ||
+        accountChooserRef.current?.contains(target)
       )
         return;
       props.onClose();
     };
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") props.onClose();
+      if (event.key !== "Escape") return;
+      if (accountChooserOpen) {
+        setAccountChooserOpen(false);
+        return;
+      }
+      props.onClose();
     };
     window.addEventListener("pointerdown", closeOnPointerDown, true);
     window.addEventListener("keydown", closeOnEscape);
@@ -1517,19 +1597,44 @@ function ProfilePopover(props: {
       window.removeEventListener("keydown", closeOnEscape);
       window.removeEventListener("resize", updatePosition);
     };
-  }, [props.anchorRef, props.onClose, props.open, updatePosition]);
+  }, [accountChooserOpen, props.anchorRef, props.onClose, props.open, updatePosition]);
+
+  useEffect(() => {
+    if (props.open) return;
+    setAccountChooserOpen(false);
+    setSwitchingAccountId("");
+    setSwitchError("");
+  }, [props.open]);
 
   if (!props.open) return null;
 
   const openAccountSettings = () => {
     props.onClose();
-    navigate("/account", { state: { from: props.currentPath } });
+    props.onOpenAccountSettings();
   };
 
   const switchAccounts = () => {
+    setSwitchError("");
+    setAccountChooserOpen(true);
+  };
+
+  const chooseAccount = async (accountId: string) => {
+    if (accountId === user?.id || switchingAccountId) return;
+    setSwitchError("");
+    setSwitchingAccountId(accountId);
+    try {
+      await switchAccount(accountId);
+      props.onClose();
+    } catch (error) {
+      setSwitchError(error instanceof Error ? error.message : "That account could not be activated.");
+    } finally {
+      setSwitchingAccountId("");
+    }
+  };
+
+  const addAccount = () => {
     props.onClose();
-    logout();
-    navigate("/signin", { state: { from: "/account" } });
+    navigate("/signin", { state: { from: props.currentPath, addingAccount: true } });
   };
 
   const signOut = () => {
@@ -1538,74 +1643,100 @@ function ProfilePopover(props: {
   };
 
   return createPortal(
-    <div
-      ref={menuRef}
-      className={profilePopoverClass}
-      style={menuStyle}
-      role="menu"
-      aria-label="Profile"
-    >
-      <div className="grid grid-cols-[42px_minmax(0,1fr)] items-center gap-3 border-b border-[var(--misty-border-soft)] px-2 pb-3 pt-1">
-        <span className="relative grid h-10 w-10 place-items-center rounded-full bg-[var(--misty-neutral-selected-bg,var(--misty-surface-3))] text-sm font-bold">
-          {account ? initials : <UserCircle size={24} strokeWidth={1.75} />}
-        </span>
-        <span className="min-w-0">
-          <strong className="block truncate text-sm">{displayName}</strong>
-          <small className="block truncate text-xs text-[var(--misty-text-muted)]">
-            {email || "Not signed in"}
-          </small>
-        </span>
+    <>
+      <div
+        ref={menuRef}
+        className={profilePopoverClass}
+        style={menuStyle}
+        role="menu"
+        aria-label="Profile"
+      >
+        <div className="grid grid-cols-[42px_minmax(0,1fr)] items-center gap-3 border-b border-[var(--misty-border-soft)] px-2 pb-3 pt-1">
+          <span className="relative grid h-10 w-10 place-items-center rounded-full bg-[var(--misty-neutral-selected-bg,var(--misty-surface-3))] text-sm font-bold">
+            {account ? initials : <UserCircle size={24} strokeWidth={1.75} />}
+          </span>
+          <span className="min-w-0">
+            <strong className="block truncate text-sm">{displayName}</strong>
+            <small className="block truncate text-xs text-[var(--misty-text-muted)]">
+              {email || "Not signed in"}
+            </small>
+          </span>
+        </div>
+        <div className="grid gap-1 py-2">
+          <span className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-normal text-[var(--misty-text-subtle)]">
+            User/Profile Settings
+          </span>
+          <button className={profileMenuItemClass} type="button" role="menuitem" onClick={openAccountSettings}>
+            <UserCircle size={17} />
+            <span>Account settings</span>
+          </button>
+          <button
+            className={`${profileMenuItemClass} ${accountChooserOpen ? "bg-[var(--misty-neutral-selected-bg,var(--misty-surface-3))] text-[var(--misty-text)]" : ""}`}
+            type="button"
+            role="menuitem"
+            aria-haspopup="menu"
+            aria-expanded={accountChooserOpen}
+            onClick={() => accountChooserOpen ? setAccountChooserOpen(false) : switchAccounts()}
+          >
+            <Repeat2 size={17} />
+            <span>Switch accounts</span>
+            <ChevronRight size={14} className={accountChooserOpen ? "text-[var(--misty-text)]" : "text-[var(--misty-text-subtle)]"} />
+          </button>
+          <button className={profileMenuItemClass} type="button" role="menuitem" onClick={signOut}>
+            <LogOut size={17} />
+            <span>{account ? "Sign out" : "Clear session"}</span>
+          </button>
+          <div className="my-1 h-px bg-[var(--misty-border-soft)]" />
+          <span className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-normal text-[var(--misty-text-subtle)]">
+            Misty App Settings
+          </span>
+          <button
+            className={profileMenuItemClass}
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setActiveSettingsSection("general");
+              props.onClose();
+              props.onOpenSettings();
+            }}
+          >
+            <SettingsIcon size={17} />
+            <span>Open app settings</span>
+          </button>
+        </div>
       </div>
-      <div className="grid gap-1 py-2">
-        <span className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-normal text-[var(--misty-text-subtle)]">
-          User/Profile Settings
-        </span>
-        <button
-          className={profileMenuItemClass}
-          type="button"
-          role="menuitem"
-          onClick={openAccountSettings}
+      {accountChooserOpen ? (
+        <div
+          ref={accountChooserRef}
+          className={accountChooserPopoverClass}
+          style={accountChooserStyle}
+          role="menu"
+          aria-label="Switch accounts"
         >
-          <UserCircle size={17} />
-          <span>Account settings</span>
-        </button>
-        <button
-          className={profileMenuItemClass}
-          type="button"
-          role="menuitem"
-          onClick={switchAccounts}
-        >
-          <Repeat2 size={17} />
-          <span>Switch accounts</span>
-        </button>
-        <button
-          className={profileMenuItemClass}
-          type="button"
-          role="menuitem"
-          onClick={signOut}
-        >
-          <LogOut size={17} />
-          <span>{account ? "Sign out" : "Clear session"}</span>
-        </button>
-        <div className="my-1 h-px bg-[var(--misty-border-soft)]" />
-        <span className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-normal text-[var(--misty-text-subtle)]">
-          Misty App Settings
-        </span>
-        <button
-          className={profileMenuItemClass}
-          type="button"
-          role="menuitem"
-          onClick={() => {
-            setActiveSettingsSection("general");
-            props.onClose();
-            props.onOpenSettings();
-          }}
-        >
-          <SettingsIcon size={17} />
-          <span>Open app settings</span>
-        </button>
-      </div>
-    </div>,
+          <div className="flex items-center justify-between gap-3 border-b border-[var(--misty-border-soft)] px-2 pb-2 pt-1">
+            <div><strong className="block text-sm">Switch accounts</strong><small className="text-[11px] text-[var(--misty-text-subtle)]">Your saved Misty sessions</small></div>
+            <button className="grid size-8 place-items-center rounded-lg border-0 bg-transparent text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-2)] hover:text-[var(--misty-text)]" type="button" aria-label="Close account chooser" onClick={() => setAccountChooserOpen(false)}><X size={16}/></button>
+          </div>
+          <div className="grid max-h-[268px] gap-1 overflow-auto py-2">
+            {accounts.map((saved) => {
+              const active = saved.id === user?.id;
+              const savedInitials = initialsForProfile(saved.name, saved.email);
+              return (
+                <button className={`${profileMenuItemClass} min-h-[54px] grid-cols-[36px_minmax(0,1fr)_20px]`} type="button" role="menuitem" key={saved.id} disabled={Boolean(switchingAccountId)} onClick={() => void chooseAccount(saved.id)}>
+                  <span className="grid size-9 place-items-center rounded-full bg-[var(--misty-neutral-selected-bg,var(--misty-surface-3))] text-xs font-bold text-[var(--misty-text)]">{savedInitials}</span>
+                  <span className="min-w-0"><strong className="block truncate text-xs text-[var(--misty-text)]">{saved.name}</strong><small className="block truncate text-[10px] text-[var(--misty-text-subtle)]">{switchingAccountId === saved.id ? "Switching…" : saved.email}</small></span>
+                  {active ? <Check size={15} className="text-emerald-300" aria-label="Active account"/> : null}
+                </button>
+              );
+            })}
+            {accounts.length === 0 ? <p className="m-0 px-2 py-3 text-xs text-[var(--misty-text-subtle)]">No saved accounts are available yet.</p> : null}
+          </div>
+          {switchError ? <p className="m-0 mb-2 rounded-lg border border-red-400/20 bg-red-950/20 px-2.5 py-2 text-[11px] leading-relaxed text-red-200" role="alert">{switchError}</p> : null}
+          <button className={profileMenuItemClass} type="button" role="menuitem" disabled={Boolean(switchingAccountId)} onClick={addAccount}><Plus size={17}/><span>Add another account</span></button>
+          <p className="m-0 px-2.5 pb-1 pt-2 text-[10px] leading-relaxed text-[var(--misty-text-subtle)]">Accounts remain signed in securely on this device. Only one account is active in the app at a time.</p>
+        </div>
+      ) : null}
+    </>,
     document.body,
   );
 }
@@ -1633,6 +1764,8 @@ function ActivityPopover(props: {
 }) {
   const panelRef = useRef<HTMLDivElement | null>(null);
   const [position, setPosition] = useState({ left: 84, top: 12 });
+  const [tab, setTab] = useState<"unreads" | "mentions">("unreads");
+  const navigate = useNavigate();
   const { history, clearHistory, markRead } = useExplorerStore(
     useShallow((state) => ({
       history: state.notificationHistory,
@@ -1640,20 +1773,27 @@ function ActivityPopover(props: {
       markRead: state.markNotificationsRead,
     })),
   );
-  const confirmDestructiveActions = useSettingsStore(
-    (state) =>
-      selectGeneralPreferences(state.settings?.document)
-        .confirmDestructiveActions,
-  );
-  const entries = [...history].reverse();
-  const hasEntries = entries.length > 0;
+  const { inbox, loadInbox, markInboxSeen, clearInbox } = useSpacesStore(useShallow((state) => ({
+    inbox: state.inbox,
+    loadInbox: state.loadInbox,
+    markInboxSeen: state.markInboxSeen,
+    clearInbox: state.clearInbox,
+  })));
+  const localEntries = tab === "unreads" ? [...history].reverse() : [];
+  const cloudEntries = inbox[tab];
+  const hasEntries = localEntries.length + cloudEntries.length > 0;
+  useEffect(() => {
+    if (!props.open) return;
+    markRead();
+    void markInboxSeen().then(loadInbox);
+  }, [loadInbox, markInboxSeen, markRead, props.open]);
   useEffect(() => {
     if (!props.open) return;
     const syncPosition = () => {
       const rect = props.anchorRef.current?.getBoundingClientRect();
       if (!rect) return;
       const panelWidth = 420;
-      const panelHeight = Math.min(560, window.innerHeight - 24);
+      const panelHeight = Math.min(460, window.innerHeight - 24);
       const left = Math.min(
         window.innerWidth - panelWidth - 12,
         rect.right + 10,
@@ -1692,16 +1832,6 @@ function ActivityPopover(props: {
       window.removeEventListener("keydown", onKeyDown);
     };
   }, [props.anchorRef, props.onClose, props.open]);
-  const clearActivityHistory = () => {
-    if (
-      confirmDestructiveActions &&
-      !window.confirm("Clear all Activity notifications on this device?")
-    ) {
-      return;
-    }
-    clearHistory();
-  };
-
   if (!props.open) return null;
 
   return createPortal(
@@ -1715,73 +1845,91 @@ function ActivityPopover(props: {
         role="dialog"
         aria-label="Activity"
       >
-        <header className="flex items-start justify-between gap-3.5 border-b border-[#333944] p-4">
-          <div>
-            <h2 className="m-0 text-lg font-semibold leading-tight text-[#f1eee8]">
-              Activity
-            </h2>
-            <p className="mt-1.5 text-[var(--misty-text-muted)]">
-              File work and local action history.
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <button
-              className={activityButtonClass}
-              type="button"
-              onClick={markRead}
-              disabled={!hasEntries}
-            >
-              Mark Read
-            </button>
-            <button
-              className={activityButtonClass}
-              type="button"
-              onClick={clearActivityHistory}
-              disabled={!hasEntries}
-            >
-              Clear
-            </button>
-          </div>
+        <header className="flex items-center justify-between gap-3.5 border-b border-[#333944] p-4">
+          <h2 className="m-0 text-lg font-semibold leading-tight text-[#f1eee8]">
+            Activity
+          </h2>
+          <button
+            className={activityButtonClass}
+            type="button"
+            onClick={() => {
+              if (tab === "unreads") clearHistory();
+              void clearInbox(tab);
+            }}
+            disabled={!hasEntries}
+            aria-label="Clear all activity"
+            title="Clear all activity"
+          >
+            <CheckCheck size={19} strokeWidth={2} />
+          </button>
         </header>
+        <div className="grid grid-cols-2 border-b border-[#333944] px-4">
+          {(["unreads", "mentions"] as const).map((item) => (
+            <button
+              className={`relative h-10 border-0 bg-transparent text-xs font-semibold capitalize ${tab === item ? "text-[#f1eee8] after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:bg-violet-400" : "text-[#9e9890]"}`}
+              type="button"
+              key={item}
+              onClick={() => setTab(item)}
+            >
+              {item}
+              {inbox[item].length > 0 ? <span className="ml-1.5 rounded-full bg-[#252832] px-1.5 py-0.5 text-[9px]">{formatBadgeCount(inbox[item].length)}</span> : null}
+            </button>
+          ))}
+        </div>
         {hasEntries ? (
           <div className="min-h-0 overflow-auto px-4 py-3">
-            {entries.map((entry) => (
+            {cloudEntries.length > 0 ? <p className="mb-1 mt-0 px-2 text-[9px] font-semibold uppercase tracking-[0.12em] text-[#77736d]">Spaces</p> : null}
+            {cloudEntries.map((entry) => (
+              <CloudActivityEntry key={entry.id} entry={entry} onOpen={() => {
+                navigate(`/spaces/${encodeURIComponent(entry.space_id)}/chat${entry.message_id ? `?message=${encodeURIComponent(entry.message_id)}` : ""}`);
+                props.onClose();
+              }} />
+            ))}
+            {localEntries.length > 0 && cloudEntries.length > 0 ? <p className="mb-1 mt-4 px-2 text-[9px] font-semibold uppercase tracking-[0.12em] text-[#77736d]">This device</p> : null}
+            {localEntries.map((entry) => (
               <ActivityEntry key={entry.id} entry={entry} />
             ))}
           </div>
         ) : (
           <div className="grid content-center justify-items-center gap-2 text-center text-[#9e9890]">
             <h3 className="m-0 text-lg font-semibold leading-tight text-[#f1eee8]">
-              No notifications
+              {tab === "mentions" ? "No mentions" : "You’re all caught up"}
             </h3>
             <p className="mt-1.5 text-[#9e9890]">
-              File actions and workspace events will appear here.
+              {tab === "mentions" ? "Direct mentions, Agent replies, and approvals will appear here." : "New Space messages and local file activity will appear here."}
             </p>
           </div>
         )}
-        <footer className="border-t border-[#252b33] px-4 py-[9px] text-xs text-[#9e9890]">
-          Notifications are local to this device.
-        </footer>
       </section>
     </div>,
     document.body,
   );
 }
 
+function CloudActivityEntry(props: { entry: SpaceInboxItem; onOpen: () => void }) {
+  const fallback = props.entry.kind === "mention"
+    ? `You were mentioned in ${props.entry.space_name}`
+    : props.entry.kind === "agent"
+      ? `Agent activity in ${props.entry.space_name}`
+      : props.entry.kind === "workflow"
+        ? `Workflow activity in ${props.entry.space_name}`
+        : `New message in ${props.entry.space_name}`;
+  const sender = typeof props.entry.payload.sender_name === "string" ? props.entry.payload.sender_name : "";
+  const preview = typeof props.entry.payload.preview === "string" ? props.entry.payload.preview : "";
+  const label = preview ? `${sender ? `${sender}: ` : ""}${preview}` : fallback;
+  return (
+    <button className={`${activityEntryBaseClass} grid w-full border-0 bg-transparent text-left [&+&]:mt-1`} type="button" onClick={props.onOpen}>
+      <span className="m-0 min-w-0 [overflow-wrap:anywhere] leading-[1.35] text-[#f1eee8]"><small className="mb-0.5 block text-[10px] font-semibold text-violet-300">{props.entry.space_name}</small>{label}</span>
+      <time className="whitespace-nowrap pt-px text-xs text-[#9e9890]">{formatActivityTime(new Date(props.entry.created_at).getTime())}</time>
+    </button>
+  );
+}
+
 function ActivityEntry(props: { entry: ExplorerNotification }) {
-  const statusColor =
-    props.entry.type === "success"
-      ? "bg-[#6bb878]"
-      : props.entry.type === "error"
-        ? "bg-[#d15757]"
-        : "bg-[#999faa]";
   return (
     <article
       className={`${activityEntryBaseClass} ${props.entry.read ? "" : "bg-[rgba(241,238,232,0.035)]"} [&+&]:mt-1`}
     >
-      <span
-        className={`mx-auto mt-[7px] h-[7px] w-[7px] rounded-full ${statusColor}`}
-      />
       <p className="m-0 min-w-0 [overflow-wrap:anywhere] leading-[1.35] text-[#f1eee8]">
         {props.entry.message}
       </p>
@@ -1823,6 +1971,40 @@ function SettingsOverlay(props: { open: boolean; style: CSSProperties; onClose: 
         aria-label="Settings"
       >
         <SettingsWorkspace presentation="overlay" onClose={props.onClose} />
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+function AccountSettingsOverlay(props: { open: boolean; style: CSSProperties; onClose: () => void }) {
+  useEffect(() => {
+    if (!props.open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") props.onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [props.onClose, props.open]);
+
+  if (!props.open) return null;
+
+  return createPortal(
+    <div
+      className={`app-pages-root ${settingsOverlayLayerClass}`}
+      style={props.style}
+      role="presentation"
+      onPointerDown={(event) => {
+        if (event.target === event.currentTarget) props.onClose();
+      }}
+    >
+      <div
+        className={settingsOverlayPanelClass}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Account settings"
+      >
+        <AccountWorkspace presentation="overlay" onClose={props.onClose} />
       </div>
     </div>,
     document.body,
@@ -1948,7 +2130,7 @@ function settingsFallbackRoute(
   const candidates = [previousRoute, rememberedRoute, "/files"];
   return (
     candidates.find((route) => {
-      if (!route || route.startsWith("/settings")) return false;
+      if (!route || route.startsWith("/settings") || route === "/account") return false;
       return isRememberableAppRoute(route);
     }) ?? "/files"
   );

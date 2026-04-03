@@ -5,7 +5,7 @@ export const fileBrowserStyles = {
   tableSkeleton:
     "min-h-0 min-w-[720px] overflow-hidden",
   tableSkeletonLine:
-    "grid grid-cols-[minmax(240px,1fr)_220px_128px_128px] items-center gap-4 border-b border-[var(--misty-border-soft)] px-3.5",
+    "grid grid-cols-[minmax(240px,1fr)_220px_128px_128px] items-center gap-4 px-3.5",
   tableSkeletonHeader: "h-10 bg-[var(--misty-surface-2)]",
   tableSkeletonRow: "h-9 [[data-compact-mode=true]_&]:h-8",
   skeletonCell:
@@ -15,13 +15,13 @@ export const fileBrowserStyles = {
   gridSkeleton:
     "grid min-h-0 min-w-0 content-start justify-center gap-2 overflow-hidden p-3.5 [grid-template-columns:repeat(auto-fill,minmax(100px,100px))] [[data-compact-mode=true]_&]:gap-1.5 [[data-compact-mode=true]_&]:p-2.5 [[data-compact-mode=true]_&]:[grid-template-columns:repeat(auto-fill,minmax(92px,92px))]",
   gridSkeletonCell:
-    "h-[104px] border border-[var(--misty-border-soft)] [[data-compact-mode=true]_&]:h-[92px]",
+    "h-[104px] [[data-compact-mode=true]_&]:h-[92px]",
   tableWrap:
     "grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden",
   tableHeaderWrap:
-    "min-w-0 overflow-hidden bg-transparent",
+    "min-w-0 overflow-hidden border-b border-[var(--misty-divider-subtle)] bg-transparent",
   tableResetButton:
-    "absolute right-2 top-1.5 z-[4] inline-grid size-7 place-items-center rounded-md border border-transparent bg-[var(--misty-neutral-control-bg,var(--misty-surface-2))] text-[var(--misty-text-muted)] shadow-[0_0_0_1px_var(--misty-border-soft)] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] hover:text-[var(--misty-text)] max-[720px]:hidden",
+    "absolute right-2 top-1.5 z-[4] inline-grid size-7 place-items-center rounded-md border border-transparent bg-[var(--misty-neutral-control-bg,var(--misty-surface-2))] text-[var(--misty-text-muted)] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] hover:text-[var(--misty-text)] focus-visible:border-[var(--misty-interaction-focus)] max-[720px]:hidden",
   tableScroll:
     "min-h-0 min-w-0 overflow-auto [contain:layout_paint] [overscroll-behavior:contain] [scrollbar-gutter:stable] max-[720px]:[scrollbar-gutter:auto]",
   table:
@@ -37,16 +37,23 @@ export const fileBrowserStyles = {
   tableSortIndicator:
     "inline-flex size-[13px] flex-none items-center justify-center text-[var(--misty-text-muted)]",
   tableResizeHandle:
-    "absolute right-0 top-0 z-[2] h-full w-[8px] translate-x-1/2 cursor-col-resize after:absolute after:bottom-[8px] after:left-1/2 after:top-[8px] after:w-px after:-translate-x-1/2 after:bg-transparent after:content-[''] group-hover/header:after:bg-[var(--misty-border-strong)] max-[720px]:hidden",
+    "absolute right-0 top-0 z-[2] h-full w-[8px] translate-x-1/2 cursor-col-resize after:absolute after:bottom-[8px] after:left-1/2 after:top-[8px] after:w-px after:-translate-x-1/2 after:bg-transparent after:content-[''] group-hover/header:after:bg-[var(--misty-divider-hover)] max-[720px]:hidden",
+  tableResizeHandleActive:
+    "after:!bg-[var(--misty-divider-active)]",
   tableRow:
-    "h-11 cursor-default select-none outline outline-0 outline-offset-[-2px] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] [[data-compact-mode=true]_&]:h-9",
-  tableRowSelected: "bg-[var(--misty-neutral-selected-bg,var(--misty-surface-selected))] text-[var(--misty-text)]",
-  tableRowDropTarget: "outline outline-2 outline-[var(--misty-border-strong)]",
-  tableRowDragging: "opacity-55",
-  tableRowDeleted: "text-[var(--misty-text-subtle)]",
+    "h-11 cursor-default select-none outline outline-0 outline-offset-[-2px] hover:bg-[var(--misty-row-hover)] focus-visible:relative focus-visible:z-[2] focus-visible:outline-2 focus-visible:outline-[var(--misty-interaction-focus)] [[data-compact-mode=true]_&]:h-9",
+  tableRowSelected: "bg-[var(--misty-row-selected)] text-[var(--misty-text)] hover:bg-[var(--misty-row-selected-hover)]",
+  tableRowDropTarget: "bg-[var(--misty-row-selected-hover)] outline outline-2 outline-[var(--misty-divider-active)]",
+  tableRowInvalidDropTarget: "bg-[color-mix(in_srgb,var(--misty-danger)_8%,transparent)] outline outline-1 outline-[color-mix(in_srgb,var(--misty-danger)_72%,transparent)]",
+  tableRowDragging: "opacity-50",
+  tableRowCut: "opacity-55",
+  tableRowDeleted: "text-[var(--misty-text-subtle)] opacity-55",
   tableRowInlineEditing: "relative z-[3]",
   tableCell:
     "cursor-default select-none overflow-hidden text-ellipsis whitespace-nowrap px-2.5 py-2 text-left text-sm leading-7 [[data-compact-mode=true]_&]:py-1.5 [[data-compact-mode=true]_&]:leading-6 max-[720px]:px-2 max-[720px]:py-1.5 max-[720px]:text-xs",
+  tableDateCell: "tabular-nums",
+  tableNumericCell: "pr-4 text-right tabular-nums",
+  tableNumericHeader: "[&_button]:justify-end [&_button]:pr-4",
   directorySizeDots:
     "inline-flex h-7 w-8 items-center gap-1 align-middle [[data-compact-mode=true]_&]:h-6",
   directorySizeDot:
@@ -77,10 +84,12 @@ export const fileBrowserStyles = {
   grid:
     "absolute left-3.5 right-3.5 grid content-start justify-center gap-2 [[data-compact-mode=true]_&]:left-2.5 [[data-compact-mode=true]_&]:right-2.5 [[data-compact-mode=true]_&]:gap-1.5",
   gridItem:
-    "relative grid min-h-[104px] min-w-0 cursor-default justify-items-center gap-2 rounded-lg border border-transparent bg-transparent px-2 py-3 text-[var(--misty-text-muted)] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] [[data-compact-mode=true]_&]:min-h-[92px] [[data-compact-mode=true]_&]:gap-1.5 [[data-compact-mode=true]_&]:px-[7px] [[data-compact-mode=true]_&]:py-[9px]",
-  gridItemSelected: "selected border-[var(--misty-border-strong)] bg-[var(--misty-neutral-selected-bg,var(--misty-surface-selected))] text-[var(--misty-text)]",
-  gridItemDropTarget: "border-[var(--misty-border-strong)] bg-[var(--misty-neutral-selected-bg,var(--misty-surface-selected))] shadow-[0_0_0_1px_var(--misty-border-strong)]",
-  gridItemDragging: "opacity-55",
+    "relative grid min-h-[104px] min-w-0 cursor-default justify-items-center gap-2 rounded-lg border border-transparent bg-transparent px-2 py-3 text-[var(--misty-text-muted)] outline-none hover:bg-[var(--misty-row-hover)] focus-visible:border-[var(--misty-interaction-focus)] focus-visible:shadow-[0_0_0_1px_var(--misty-interaction-focus)] [[data-compact-mode=true]_&]:min-h-[92px] [[data-compact-mode=true]_&]:gap-1.5 [[data-compact-mode=true]_&]:px-[7px] [[data-compact-mode=true]_&]:py-[9px]",
+  gridItemSelected: "selected bg-[var(--misty-row-selected)] text-[var(--misty-text)] hover:bg-[var(--misty-row-selected-hover)]",
+  gridItemDropTarget: "bg-[var(--misty-row-selected-hover)] outline outline-2 outline-[var(--misty-divider-active)]",
+  gridItemInvalidDropTarget: "bg-[color-mix(in_srgb,var(--misty-danger)_8%,transparent)] outline outline-1 outline-[color-mix(in_srgb,var(--misty-danger)_72%,transparent)]",
+  gridItemDragging: "opacity-50",
+  gridItemCut: "opacity-55",
   gridItemDeleted: "deleted text-[var(--misty-text-subtle)] [&>span:not(.inline-name-editor)]:opacity-[0.86]",
   gridItemInlineEdit: "relative z-[2]",
   gridThumb:
@@ -92,21 +101,21 @@ export const fileBrowserStyles = {
   inlineEditorGrid: "w-full justify-center",
   inlineEditorInvalid: "gap-[7px]",
   inlineFields:
-    "inline-flex min-w-0 max-w-full items-center overflow-hidden rounded-[5px] border border-[var(--misty-border-strong)] bg-[var(--misty-neutral-control-bg,var(--misty-surface))] shadow-[0_0_0_2px_rgba(241,243,244,0.08)]",
+    "inline-flex min-w-0 max-w-full items-center overflow-hidden rounded-[5px] border border-[var(--misty-interaction-focus)] bg-[var(--misty-neutral-control-bg,var(--misty-surface))] shadow-[0_0_0_2px_var(--misty-focus-ring)]",
   inlineFieldsGrid: "w-full",
   inlineFieldsInvalid:
-    "border-[var(--misty-border-strong)] shadow-[0_0_0_2px_rgba(255,255,255,0.07)]",
+    "border-[var(--misty-danger)] shadow-[0_0_0_2px_color-mix(in_srgb,var(--misty-danger)_18%,transparent)]",
   inlineFieldsInvalidTable: "max-w-[174px]",
   inlineInput:
     "h-7 w-[min(210px,100%)] min-w-16 border-0 bg-transparent px-[7px] text-[var(--misty-text)] outline-0",
   lockedExtension: "flex-none py-0 pl-0 pr-[7px] text-[var(--misty-text-subtle)]",
   inlineError:
-    "absolute left-0 top-[calc(100%+5px)] z-[8] w-max max-w-[260px] whitespace-normal rounded-[5px] border border-[var(--misty-border)] bg-[var(--misty-glass)] px-[7px] py-[5px] text-[11px] leading-[1.3] text-[var(--misty-text-muted)] shadow-[0_8px_20px_var(--misty-shadow)]",
+    "absolute left-0 top-[calc(100%+5px)] z-[8] w-max max-w-[260px] whitespace-normal rounded-[5px] border border-[var(--misty-divider-default)] bg-[var(--misty-glass)] px-[7px] py-[5px] text-[11px] leading-[1.3] text-[var(--misty-text-muted)] shadow-[0_8px_20px_var(--misty-shadow)]",
   inlineErrorTable:
     "static min-w-0 flex-auto overflow-hidden text-ellipsis whitespace-nowrap border-0 bg-transparent p-0 text-[var(--misty-text-subtle)] shadow-none",
   passiveDraft:
-    "inline-flex min-w-0 max-w-full items-center gap-0 overflow-hidden rounded-[5px] border border-[var(--misty-border)] bg-[var(--misty-neutral-control-bg,var(--misty-surface-2))] px-1.5 py-[3px] text-[var(--misty-text)]",
-  passiveDraftInvalid: "border-[var(--misty-border-strong)] text-[var(--misty-text-muted)]",
+    "inline-flex min-w-0 max-w-full items-center gap-0 overflow-hidden rounded-[5px] border border-[var(--misty-divider-subtle)] bg-[var(--misty-neutral-control-bg,var(--misty-surface-2))] px-1.5 py-[3px] text-[var(--misty-text)]",
+  passiveDraftInvalid: "border-[var(--misty-danger)] text-[var(--misty-text-muted)]",
   passiveDraftText: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap",
   passiveDraftExtension: "flex-none text-[inherit] text-[var(--misty-text-subtle)]",
   passiveDraftCaret:
@@ -124,8 +133,8 @@ export const fileBrowserStyles = {
   footerButtonActive:
     "text-[var(--misty-text-muted)]",
   footerSeparator:
-    "h-3 w-px flex-none bg-transparent",
+    "size-1 flex-none rounded-full bg-[var(--misty-divider-default)]",
   empty: "p-6 text-[var(--misty-text-muted)]",
   emptyError: "text-[var(--misty-text-muted)]",
-  dropActive: "outline outline-2 outline-offset-[-2px] outline-[var(--misty-border-strong)]",
+  dropActive: "outline outline-2 outline-offset-[-2px] outline-[var(--misty-divider-active)]",
 } as const;

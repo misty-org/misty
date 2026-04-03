@@ -23,6 +23,14 @@ use crate::core::operation_queue::{ConflictPolicy, OperationQueueSnapshot};
 use crate::core::workspace::WorkspaceDocument;
 use crate::error::{ApiError, ApiResult};
 use crate::runtime::MistyRuntime;
+use crate::services::agents::{
+    AcknowledgeAgentFileEventsRequest, AgentJobLeaseRequest, CancelAgentJobRequest,
+    ClaimAgentJobsRequest, CompleteAgentJobRequest, CreateAgentSummaryArtifactRequest,
+    DeleteAgentDefinitionRequest, ExecuteApprovedAgentActionRequest, FailAgentJobRequest,
+    FindScopeDocumentRequest, OpenAgentCitationRequest, PrepareScopedAgentDocumentRequest,
+    ReconcileAgentScopesRequest, RegisterFolderScopeRequest, ResolveAgentApprovalRequest,
+    SaveAgentDefinitionRequest, StageApprovedAgentActionRequest,
+};
 use crate::services::automations::{
     AutomationRunRequest, AutomationSnapshot, AutomationValidation, AutomationWorkflow,
 };
@@ -31,6 +39,7 @@ use crate::services::claude::{ClaudeSendRequest, ClaudeStatus, ClaudeStreamEvent
 use crate::services::commands::{SaveShortcutsRequest, ShortcutsSnapshot};
 use crate::services::devices::DeviceSnapshot;
 use crate::services::directory_size::{DirectorySizeRecord, DirectorySizeRequest};
+use crate::services::document_intelligence::{PrepareAgentDocumentRequest, PreparedAgentDocument};
 use crate::services::environment::AppEnvironmentSnapshot;
 use crate::services::explorer_library::{
     ExplorerLibrarySnapshot, RecordLastOpenedRequest, RecordRecentRequest, SetTagsRequest,
@@ -40,8 +49,10 @@ use crate::services::file_sync::{
 };
 #[cfg(desktop)]
 use crate::services::media_search::{
-    CompleteMediaAssetRequest, MediaSearchSnapshot, PrepareMediaChunkRequest, PreparedMediaChunk,
-    ResolveMediaAssetsRequest, ResolvedMediaAsset,
+    AcknowledgeRemovedMediaAssetsRequest, ApproveMediaAssetsRequest, CompleteMediaAssetRequest,
+    CompleteMediaLegacyAdoptionRequest, MediaSearchSnapshot, PrepareMediaChunkRequest,
+    PreparedMediaChunk, RecordMediaChunkRequest, ResolveMediaAssetsRequest, ResolvedMediaAsset,
+    SetMediaAssetStateRequest,
 };
 use crate::services::metadata::FileMetadataSnapshot;
 #[cfg(desktop)]
@@ -68,8 +79,9 @@ use crate::services::settings::{OpenWithAssociation, SaveSettingsRequest, Settin
 use crate::services::smart_library::{
     ApplySmartLibraryResultsRequest, FolderLibraryStatus, PrepareSmartLibraryPreviewsRequest,
     PreparedSmartLibraryPreview, ResolveSmartLibraryAssetsRequest, ResolvedSmartLibraryAsset,
-    SmartLibraryAssetsPage, SmartLibraryAssetsPageRequest, SmartLibraryScanRequest,
-    SmartLibrarySearchRequest, SmartLibrarySnapshot,
+    SmartLibraryAssetsPage, SmartLibraryAssetsPageRequest, SmartLibraryImportFilesRequest,
+    SmartLibraryImportResult, SmartLibraryScanRequest, SmartLibrarySearchRequest,
+    SmartLibrarySnapshot,
 };
 use crate::services::storage::StorageSnapshot;
 use crate::services::storage_runtime::StorageRuntimeSnapshot;
@@ -107,6 +119,169 @@ pub async fn app_environment_snapshot(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<AppEnvironmentSnapshot> {
     Ok(state.environment.snapshot())
+}
+
+#[tauri::command]
+pub async fn agents_snapshot(state: State<'_, MistyRuntime>) -> ApiResult<serde_json::Value> {
+    state.agents.snapshot().await
+}
+
+#[tauri::command]
+pub async fn agents_register_folder_scope(
+    request: RegisterFolderScopeRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<serde_json::Value> {
+    state.agents.register_folder_scope(request).await
+}
+
+#[tauri::command]
+pub async fn agents_save_definition(
+    request: SaveAgentDefinitionRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<serde_json::Value> {
+    state.agents.save_definition(request).await
+}
+
+#[tauri::command]
+pub async fn agents_delete_definition(
+    request: DeleteAgentDefinitionRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<()> {
+    state.agents.delete_definition(request).await
+}
+
+#[tauri::command]
+pub async fn agents_claim_jobs(
+    request: ClaimAgentJobsRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<Vec<serde_json::Value>> {
+    state.agents.claim_jobs(request).await
+}
+
+#[tauri::command]
+pub async fn agents_heartbeat_job(
+    request: AgentJobLeaseRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<serde_json::Value> {
+    state.agents.heartbeat_job(request).await
+}
+
+#[tauri::command]
+pub async fn agents_complete_job(
+    request: CompleteAgentJobRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<serde_json::Value> {
+    state.agents.complete_job(request).await
+}
+
+#[tauri::command]
+pub async fn agents_fail_job(
+    request: FailAgentJobRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<serde_json::Value> {
+    state.agents.fail_job(request).await
+}
+
+#[tauri::command]
+pub async fn agents_cancel_job(
+    request: CancelAgentJobRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<serde_json::Value> {
+    state.agents.cancel_job(request).await
+}
+
+#[tauri::command]
+pub async fn agents_resolve_approval(
+    request: ResolveAgentApprovalRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<serde_json::Value> {
+    state.agents.resolve_approval(request).await
+}
+
+#[tauri::command]
+pub async fn agents_open_citation(
+    request: OpenAgentCitationRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<()> {
+    state.agents.open_citation(request).await
+}
+
+#[tauri::command]
+pub async fn agents_prepare_document(
+    request: PrepareAgentDocumentRequest,
+) -> ApiResult<PreparedAgentDocument> {
+    crate::services::document_intelligence::prepare_document(request).await
+}
+
+#[tauri::command]
+pub async fn agents_prepare_scoped_document(
+    request: PrepareScopedAgentDocumentRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<PreparedAgentDocument> {
+    state.agents.prepare_scoped_document(request).await
+}
+
+#[tauri::command]
+pub async fn agents_find_scope_document(
+    request: FindScopeDocumentRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<Option<String>> {
+    state.agents.find_scope_document(request).await
+}
+
+#[tauri::command]
+pub async fn agents_reconcile_scopes(
+    request: ReconcileAgentScopesRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<serde_json::Value> {
+    state.agents.reconcile_scopes(request).await
+}
+
+#[tauri::command]
+pub async fn agents_create_summary_artifact(
+    request: CreateAgentSummaryArtifactRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<serde_json::Value> {
+    state.agents.create_summary_artifact(request).await
+}
+
+#[tauri::command]
+pub async fn agents_stage_approved_action(
+    request: StageApprovedAgentActionRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<serde_json::Value> {
+    state.agents.stage_approved_action(request).await
+}
+
+#[tauri::command]
+pub async fn agents_execute_approved_action(
+    request: ExecuteApprovedAgentActionRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<serde_json::Value> {
+    state.agents.execute_approved_action(request).await
+}
+
+#[tauri::command]
+pub async fn agents_acknowledge_file_events(
+    request: AcknowledgeAgentFileEventsRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<()> {
+    state.agents.acknowledge_file_events(request).await
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn agents_device_identity_load(local_device_id: String) -> ApiResult<Option<String>> {
+    crate::services::agent_device_identity::load(&local_device_id)
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn agents_device_identity_store(
+    local_device_id: String,
+    encoded_identity: String,
+) -> ApiResult<()> {
+    crate::services::agent_device_identity::store(&local_device_id, &encoded_identity)
 }
 
 #[tauri::command]
@@ -153,6 +328,21 @@ pub async fn automations_run(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<AutomationSnapshot> {
     state.automations.run(request).await
+}
+
+#[tauri::command]
+pub async fn workflows_write_mf(
+    document: crate::services::workflow_files::MfWorkflowDocument,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<crate::services::workflow_files::MfWorkflowFile> {
+    crate::services::workflow_files::write_mf(&state.environment, document).await
+}
+
+#[tauri::command]
+pub async fn workflows_read_mf(
+    path: String,
+) -> ApiResult<crate::services::workflow_files::MfWorkflowFile> {
+    crate::services::workflow_files::read_mf(&path).await
 }
 
 #[tauri::command]
@@ -593,6 +783,14 @@ pub async fn smart_library_scan(
 }
 
 #[tauri::command]
+pub async fn smart_library_import_files(
+    request: SmartLibraryImportFilesRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<SmartLibraryImportResult> {
+    state.smart_library.import_files(request).await
+}
+
+#[tauri::command]
 pub async fn smart_library_prepare_previews(
     request: PrepareSmartLibraryPreviewsRequest,
     state: State<'_, MistyRuntime>,
@@ -688,6 +886,59 @@ pub async fn media_search_complete(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<MediaSearchSnapshot> {
     state.media_search.complete(request)
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn media_search_approve_assets(
+    request: ApproveMediaAssetsRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<MediaSearchSnapshot> {
+    state.media_search.approve_assets(request)
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn media_search_acknowledge_removed_assets(
+    request: AcknowledgeRemovedMediaAssetsRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<MediaSearchSnapshot> {
+    state.media_search.acknowledge_removed_assets(request)
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn media_search_record_chunk(
+    request: RecordMediaChunkRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<MediaSearchSnapshot> {
+    state.media_search.record_chunk(request)
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn media_search_set_asset_state(
+    request: SetMediaAssetStateRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<MediaSearchSnapshot> {
+    state.media_search.set_asset_state(request)
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn media_search_reset_device_index(
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<MediaSearchSnapshot> {
+    state.media_search.reset_device_index()
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn media_search_complete_legacy_adoption(
+    request: CompleteMediaLegacyAdoptionRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<MediaSearchSnapshot> {
+    state.media_search.complete_legacy_adoption(request)
 }
 
 #[cfg(desktop)]

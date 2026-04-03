@@ -31,7 +31,9 @@ export default function RegisterPage() {
   const location = useLocation();
   const { setUser } = useAuth();
   const saveAuthenticatedUser = useSetupStore((state) => state.saveAuthenticatedUser);
-  const from = (location.state as { from?: string } | null)?.from || "/home";
+  const routeState = location.state as { from?: string; addingAccount?: boolean } | null;
+  const from = routeState?.from || "/home";
+  const addingAccount = Boolean(routeState?.addingAccount);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -61,11 +63,11 @@ export default function RegisterPage() {
   }
 
   return (
-    <AuthShell title="Create an account" description="Sign up to get started.">
+    <AuthShell title={addingAccount ? "Create another account" : "Create an account"} description={addingAccount ? "Your current account will remain signed in on this device." : "Sign up to get started."} onBack={addingAccount ? () => navigate(from, { replace: true }) : undefined}>
       <AuthCard
         footer={
           <div className="text-center text-sm text-text-muted">
-            <NavLink to="/signin" className="transition hover:text-text">
+            <NavLink to="/signin" state={{ from, addingAccount }} className="transition hover:text-text">
               Already have an account? Sign in
             </NavLink>
           </div>

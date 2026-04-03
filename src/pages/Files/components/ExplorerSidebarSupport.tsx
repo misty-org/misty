@@ -10,7 +10,7 @@ const QUICK_ACCESS_HIDDEN_STORAGE_KEY = "misty.explorer.sidebar.quickAccessHidde
 
 export const sidebarStyles = {
   root:
-    "h-full min-h-0 min-w-0 overflow-x-hidden overflow-y-auto border-r border-transparent !bg-transparent px-3.5 py-4 [overscroll-behavior:contain] [scrollbar-gutter:stable] [scrollbar-width:thin] max-[980px]:hidden",
+    "h-full min-h-0 min-w-0 overflow-x-hidden overflow-y-auto !bg-transparent px-3.5 py-4 [overscroll-behavior:contain] [scrollbar-gutter:stable] [scrollbar-width:thin] max-[980px]:hidden",
   section: "[&+&]:mt-4",
   sectionTitle: "mb-2.5 flex min-w-0 items-center gap-2",
   sectionToggle:
@@ -55,7 +55,7 @@ export const sidebarStyles = {
   deviceMenuButton:
     "flex w-7 min-w-7 justify-center rounded-lg border border-transparent bg-transparent p-0 text-[var(--misty-text-muted)] opacity-0 hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] hover:text-[var(--misty-text)] group-hover/device:opacity-100 group-focus-within/device:opacity-100",
   menu:
-    "fixed z-[2147483000] grid w-44 gap-0.5 rounded-[11px] border border-transparent bg-[var(--misty-glass)] p-1.5 shadow-[0_18px_40px_var(--misty-shadow)]",
+    "fixed z-[2147483000] grid w-44 gap-0.5 rounded-[11px] border border-[var(--misty-divider-default)] bg-[var(--misty-glass)] p-1.5 shadow-[0_18px_40px_var(--misty-shadow)]",
   workspaceMenu: "w-60 !bg-[rgb(7_9_12)]",
   menuButton:
     "flex h-[34px] items-center gap-2 rounded-lg border-0 bg-transparent px-2.5 text-left text-[var(--misty-text)] hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] hover:text-[var(--misty-primary-hover)] disabled:cursor-default disabled:opacity-40",
@@ -71,17 +71,17 @@ export const sidebarStyles = {
   menuButtonIcon: "grid size-[17px] flex-none place-items-center text-[var(--misty-text-muted)]",
   menuButtonTruncate: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap",
   menuButtonCheck: "w-[17px] flex-none text-[var(--misty-text)]",
-  menuSeparator: "mx-1 my-[5px] h-px bg-[var(--misty-border)]",
+  menuSeparator: "mx-1 my-[5px] h-px bg-[var(--misty-divider-subtle)]",
   dialogBackdrop: "fixed inset-0 z-[2147483200] grid place-items-center bg-[rgba(6,6,6,0.58)] p-6 backdrop-blur-[3px]",
-  dialog: "grid w-[min(380px,100%)] gap-4 rounded-[10px] border border-[var(--misty-border)] bg-[var(--misty-surface)] p-[18px] shadow-[0_24px_64px_rgba(0,0,0,0.48)]",
+  dialog: "grid w-[min(380px,100%)] gap-4 rounded-[10px] border border-[var(--misty-divider-default)] bg-[var(--misty-surface)] p-[18px] shadow-[0_24px_64px_rgba(0,0,0,0.48)]",
   dialogHeader: "flex items-center justify-between gap-3",
   dialogTitle: "m-0 text-[17px] font-semibold",
   dialogClose:
     "grid size-[30px] place-items-center rounded-lg border-0 bg-transparent p-0 text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-hover)] hover:text-[var(--misty-text)]",
   dialogLabel: "grid gap-2 text-[var(--misty-text-muted)]",
   dialogText: "m-0 leading-normal text-[var(--misty-text-muted)]",
-  dialogInput: "h-[38px] w-full rounded-[7px] border border-[var(--misty-border)] bg-[var(--misty-surface-2)] px-[11px] text-[var(--misty-text)] outline-none focus:border-[var(--misty-border-strong)] focus:shadow-[0_0_0_2px_rgba(241,243,244,0.08)]",
-  dialogSelect: "h-[38px] w-full rounded-[7px] border border-[var(--misty-border)] bg-[var(--misty-surface-2)] px-[9px] text-[var(--misty-text)] outline-none focus:border-[var(--misty-border-strong)]",
+  dialogInput: "h-[38px] w-full rounded-[7px] border border-[var(--misty-divider-default)] bg-[var(--misty-surface-2)] px-[11px] text-[var(--misty-text)] outline-none focus:border-[var(--misty-interaction-focus)] focus:shadow-[0_0_0_2px_var(--misty-focus-ring)]",
+  dialogSelect: "h-[38px] w-full rounded-[7px] border border-[var(--misty-divider-default)] bg-[var(--misty-surface-2)] px-[9px] text-[var(--misty-text)] outline-none focus:border-[var(--misty-interaction-focus)]",
   dialogWide: "w-[min(620px,100%)]",
   dialogGrid: "grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3 max-[640px]:grid-cols-1",
   ruleList: "grid gap-2 rounded-lg border border-[var(--misty-border)] bg-[var(--misty-surface-2)] p-2.5",

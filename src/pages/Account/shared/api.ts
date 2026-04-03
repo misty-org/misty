@@ -4,6 +4,7 @@ import {
   clearAccountAuthToken,
   readAccountAuthToken,
   saveAccountAuthToken,
+  type SavedAccountSession,
 } from "./authTokenStore";
 import { analytics } from "../../../analytics/client";
 
@@ -198,14 +199,15 @@ export async function accountSignIn(email: string, password: string): Promise<Ac
   if (!id) {
     throw new AccountApiError("Sign-in response did not include a user id.");
   }
-  if (data.token) {
-    await saveAccountAuthToken(data.token);
-  }
-  return {
+  const user = {
     id,
     name: data.name,
     email: data.email,
   };
+  if (data.token) {
+    await saveAccountAuthToken(data.token, user);
+  }
+  return user;
 }
 
 export async function accountRegister(name: string, email: string, password: string): Promise<AccountAuthUser> {
@@ -214,14 +216,15 @@ export async function accountRegister(name: string, email: string, password: str
   if (!id) {
     throw new AccountApiError("Registration response did not include a user id.");
   }
-  if (data.token) {
-    await saveAccountAuthToken(data.token);
-  }
-  return {
+  const user = {
     id,
     name: data.name,
     email: data.email,
   };
+  if (data.token) {
+    await saveAccountAuthToken(data.token, user);
+  }
+  return user;
 }
 
 export function accountFetchMe(): Promise<AccountMeResponse> {
@@ -259,12 +262,13 @@ export async function accountUpdateTelemetryPreferences(analyticsEnabled: boolea
   });
 }
 
-export async function accountLogout(): Promise<void> {
+export async function accountLogout(): Promise<SavedAccountSession | null> {
   try {
     await postJson("/logout");
-  } finally {
-    await clearAccountAuthToken();
+  } catch {
+    // Local sign-out and account switching must still work while offline.
   }
+  return await clearAccountAuthToken();
 }
 
 class AccountApiError extends Error {
