@@ -1,4 +1,5 @@
 import { appSnapshot } from "../../../api/misty";
+import { normalizeApiBaseUrl, withDefaultApiPath } from "../../../api/apiBase";
 import { isAndroidBuild, isNativeMobileBuild } from "../../../platform/buildTarget";
 import {
   clearAccountAuthToken,
@@ -11,12 +12,14 @@ import { analytics } from "../../../analytics/client";
 export interface AccountAuthUser {
   id: string;
   name: string;
+  username: string;
   email: string;
 }
 
 export interface AccountMeResponse {
   id: string;
   name: string;
+  username: string;
   email: string;
   created_at: string;
 	  tier: "basic" | "pro" | "max";
@@ -51,6 +54,7 @@ interface LoginResponse {
   user_id?: string;
   token?: string;
   name: string;
+  username: string;
   email: string;
 }
 
@@ -79,7 +83,7 @@ async function requestJson<T>(method: "GET" | "POST" | "PUT", path: string, body
     if (error instanceof AccountApiError) throw error;
     const message = apiBase
       ? `Could not reach Misty server at ${apiBase}. ${errorMessage(error)}`
-      : `Missing VITE_API_BASE for ${method} ${path}.`;
+      : `Missing Misty API base URL for ${method} ${path}.`;
     recordAccountApiDebugEvent({
       level: "error",
       scope: "account-api",
@@ -202,6 +206,7 @@ export async function accountSignIn(email: string, password: string): Promise<Ac
   const user = {
     id,
     name: data.name,
+    username: data.username,
     email: data.email,
   };
   if (data.token) {
@@ -210,8 +215,8 @@ export async function accountSignIn(email: string, password: string): Promise<Ac
   return user;
 }
 
-export async function accountRegister(name: string, email: string, password: string): Promise<AccountAuthUser> {
-  const data = await postJson<LoginResponse>("/register", { name, email, password });
+export async function accountRegister(name: string, username: string, email: string, password: string): Promise<AccountAuthUser> {
+  const data = await postJson<LoginResponse>("/register", { name, username, email, password });
   const id = data.user_id ?? data.id;
   if (!id) {
     throw new AccountApiError("Registration response did not include a user id.");
@@ -219,6 +224,7 @@ export async function accountRegister(name: string, email: string, password: str
   const user = {
     id,
     name: data.name,
+    username: data.username,
     email: data.email,
   };
   if (data.token) {
@@ -299,11 +305,11 @@ function payloadDetail(payload: unknown): string {
 }
 
 async function resolveAccountApiBase(): Promise<string> {
-  const explicitServerUrl = normalizeBaseUrl(import.meta.env.VITE_MISTY_SERVER_URL);
-  const envApiBase = normalizeBaseUrl(import.meta.env.VITE_API_BASE);
-  const nativeServerUrl = normalizeBaseUrl((await loadAppSnapshotForAccountApi())?.environment.serverUrl);
-  const base = explicitServerUrl ?? envApiBase ?? nativeServerUrl;
-  return withApiPath(base);
+  const publicApiBase = normalizeApiBaseUrl(import.meta.env.VITE_MISTY_PUBLIC_API_URL);
+  const explicitServerUrl = normalizeApiBaseUrl(import.meta.env.VITE_MISTY_SERVER_URL);
+  const envApiBase = normalizeApiBaseUrl(import.meta.env.VITE_API_BASE);
+  const nativeServerUrl = normalizeApiBaseUrl((await loadAppSnapshotForAccountApi())?.environment.serverUrl);
+  return withDefaultApiPath(publicApiBase ?? explicitServerUrl ?? envApiBase ?? nativeServerUrl);
 }
 
 async function loadAppSnapshotForAccountApi() {
@@ -314,16 +320,6 @@ async function loadAppSnapshotForAccountApi() {
   }
 }
 
-function normalizeBaseUrl(value: unknown): string | null {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim().replace(/\/+$/, "");
-  return trimmed ? trimmed : null;
-}
-
-function withApiPath(base: string | null): string {
-  if (!base) return "";
-  return /\/api$/i.test(base) ? base : `${base}/api`;
-}
 
 function requestHeaders(body: unknown, token: string | null): Headers | undefined {
   if (body === undefined && !token) return undefined;

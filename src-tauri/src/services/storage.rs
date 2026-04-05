@@ -266,9 +266,6 @@ impl StorageService {
             "/api/remote/rename" | "/api/remotes/rename" => "remote.rename",
             "/api/remote/verify/start" | "/api/remotes/verify/start" => "remote.verify.start",
             "/api/remote/verify/result" | "/api/remotes/verify/result" => "remote.verify.result",
-            "/api/remote/links/list" | "/api/remotes/links/list" => "remote.links.list",
-            "/api/remote/links/create" | "/api/remotes/links/create" => "remote.links.create",
-            "/api/remote/links/revoke" | "/api/remotes/links/revoke" => "remote.links.revoke",
             "/api/remote/backend/actions" | "/api/remotes/backend/actions" => {
                 "remote.backend.actions"
             }

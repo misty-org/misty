@@ -13,6 +13,7 @@ const legacyUserKey = "misty_user";
 export interface SavedAccountSession {
   id: string;
   name: string;
+  username?: string;
   email: string;
   accountCreatedAt?: string;
   currentPlan?: string;
@@ -67,8 +68,8 @@ export async function saveAccountAuthToken(
 }
 
 export async function readAccountAuthToken(): Promise<string | null> {
-  if (!hasTauriInternals()) return null;
   if (cachedToken !== undefined) return cachedToken;
+  if (!hasTauriInternals()) return null;
 
   try {
     if (isNativeMobileBuild) {
@@ -279,6 +280,7 @@ function readLegacyAccount(): Omit<SavedAccountSession, "lastUsedAt"> | null {
     return {
       id: value.id,
       name: value.name || value.email,
+      username: value.username,
       email: value.email,
       accountCreatedAt: value.accountCreatedAt,
       currentPlan: value.currentPlan,

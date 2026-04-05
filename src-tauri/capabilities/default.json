@@ -34,6 +34,7 @@
     "core:event:default",
     "deep-link:default",
     "dialog:default",
+    "drag:default",
     "keystore:default",
     "os:default",
     "opener:default",

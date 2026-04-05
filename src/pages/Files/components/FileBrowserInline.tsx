@@ -95,16 +95,6 @@ export function InlineNameEditor(props: {
         />
         {props.edit.lockedExtension ? <span className={fileBrowserStyles.lockedExtension}>{props.edit.lockedExtension}</span> : null}
       </span>
-      {props.edit.error ? (
-        <span
-          className={props.variant === "table"
-            ? `${fileBrowserStyles.inlineError} ${fileBrowserStyles.inlineErrorTable}`
-            : fileBrowserStyles.inlineError}
-          title={props.edit.error}
-        >
-          {props.edit.error}
-        </span>
-      ) : null}
     </span>
   );
 }

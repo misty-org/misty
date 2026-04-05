@@ -1,0 +1,41 @@
+{
+  "id": "product-research-hub",
+  "version": 2,
+  "scenarioVersion": "product-research-hub@2",
+  "space": { "name": "Product Research Hub" },
+  "users": {
+    "owner": { "name": "Maya Chen", "username": "maya_research", "email": "maya@demo.misty.local" },
+    "collaborator": { "name": "Jordan Lee", "username": "jordan_research", "email": "jordan@demo.misty.local" }
+  },
+  "assets": [
+    { "key": "brief", "file": "research-brief.pdf", "displayName": "Product Research Brief.pdf", "mimeType": "application/pdf", "contributor": "owner", "caption": "Research goals and success criteria for the shared-context study.", "tags": ["brief", "research", "planning"], "favorite": true },
+    { "key": "synthesis", "file": "interview-synthesis.pdf", "displayName": "Interview Synthesis.pdf", "mimeType": "application/pdf", "contributor": "collaborator", "caption": "Recurring signals across six product and creative teams.", "tags": ["interviews", "insights", "context"], "favorite": true },
+    { "key": "transcript", "file": "customer-transcript.pdf", "displayName": "Customer Transcript 04.pdf", "mimeType": "application/pdf", "contributor": "collaborator", "caption": "A designer describes rebuilding context before creative work can continue.", "tags": ["transcript", "customer-voice", "momentum"], "favorite": false },
+    { "key": "workflow-map", "file": "context-switching-workflow.png", "displayName": "Context Switching Workflow.png", "mimeType": "image/png", "contributor": "owner", "caption": "How files, team chat, and isolated AI sessions fragment the working thread.", "tags": ["workflow", "pain-point", "visual"], "favorite": true },
+    { "key": "research-board", "file": "product-research-board.png", "displayName": "Product Research Board.png", "mimeType": "image/png", "contributor": "collaborator", "caption": "The evidence, opportunity, and momentum loop in one research board.", "tags": ["research-board", "evidence", "opportunity"], "favorite": true },
+    { "key": "session-video", "file": "research-session.mp4", "displayName": "Research Session Synthesis.mp4", "mimeType": "video/mp4", "contributor": "owner", "caption": "A short capture of evidence and Agent synthesis living in the same environment.", "tags": ["session", "video", "agent"], "favorite": false }
+  ],
+  "album": { "name": "Core Evidence", "description": "The strongest source material behind the context and momentum opportunity." },
+  "agent": {
+    "name": "Summarizer",
+    "description": "Turns shared images, reports, and transcripts into concise summaries and useful tags.",
+    "instructions": "Summarize only from evidence available in this Space. State the main signal in plain language, propose three to five useful tags, cite the source items, and never invent details that are not present."
+  },
+  "workflow": {
+    "name": "New Evidence → Summarization Queue",
+    "description": "Demo-safe intake workflow that records a completed handoff to Summarizer. Automatic Library upload triggering and metadata writes are a product follow-up.",
+    "definition": {
+      "nodes": [
+        { "id": "trigger", "kind": "manual_trigger", "config": {} },
+        { "id": "transform", "kind": "transform", "config": { "prefix": "Queued for summary and tags: ", "suffix": " The evidence is ready for Summarizer." } },
+        { "id": "notify", "kind": "notify", "config": { "message": "{{input}}" } }
+      ],
+      "edges": [
+        { "id": "trigger-transform", "source": "trigger", "target": "transform" },
+        { "id": "transform-notify", "source": "transform", "target": "notify" }
+      ]
+    }
+  },
+  "agentMessage": "Summary: Teams already have cloud storage, chat, and powerful AI, but the working context stays fragmented between them. People lose momentum locating files, resending evidence, and rebuilding history before the next person or Agent can continue. Suggested tags: context-fragmentation, collaboration, AI-context, workflow, momentum.",
+  "expected": { "members": 2, "assets": 6, "albums": 1, "agents": 1, "workflows": 1, "completedWorkflowRuns": 1, "everyoneHumanMessages": 4, "everyoneAgentMessages": 1, "privateHumanMessages": 4 }
+}

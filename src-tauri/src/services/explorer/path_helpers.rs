@@ -177,7 +177,7 @@ pub(super) fn remote_item_is_directory(
     items: &[RemoteListItem],
 ) -> ApiResult<Option<bool>> {
     for item in items {
-        if parent.child_remote_path(item)? == target_path {
+        if remote_item_path(parent, item)? == target_path {
             return Ok(Some(item.is_dir));
         }
     }
@@ -198,7 +198,7 @@ pub(super) fn remote_preview_metadata_from_items(
     items: &[RemoteListItem],
 ) -> ApiResult<Option<(i64, String)>> {
     for item in items {
-        if parent.child_remote_path(item)? != target_path {
+        if remote_item_path(parent, item)? != target_path {
             continue;
         }
         if item.is_dir {
@@ -218,12 +218,26 @@ pub(super) fn dedupe_remote_list_items(
     let mut seen_paths = BTreeSet::new();
     let mut deduped = Vec::with_capacity(items.len());
     for item in items {
-        let child_path = parent.child_remote_path(&item)?;
+        if item.name.trim().is_empty() && item.path.trim().is_empty() {
+            continue;
+        }
+        let child_path = remote_item_path(parent, &item)?;
         if seen_paths.insert(child_path) {
             deduped.push(item);
         }
     }
     Ok(deduped)
+}
+
+pub(super) fn remote_item_path(
+    parent: &RemoteBrowseTarget,
+    item: &RemoteListItem,
+) -> ApiResult<String> {
+    let name = item.name.trim();
+    if name.is_empty() {
+        return parent.child_remote_path(item);
+    }
+    normalize_remote_path(&join_remote_path(&parent.remote_path, name))
 }
 
 pub(super) async fn ensure_destination_available(path: &Path) -> ApiResult<()> {

@@ -1,5 +1,5 @@
-import { Archive, FileSearch, FileText, Folder, Maximize2, Minus, Music, Plus, RotateCcw, X } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Archive, FileSearch, FileText, Folder, Maximize2, Music } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
 import { archiveList, explorerGenerateImageThumbnail, explorerListDirectory, explorerPrepareOpenItem, explorerPreviewItem, fileMetadataSnapshot } from "../../../api/misty";
 import type { ArchiveEntry, DirectoryListing, DirectorySizeRecord, FileEntry, FileMetadataSnapshot, PreparedOpenItem } from "../../../api/types";
 import { errorText } from "../../../shared/format";
@@ -7,6 +7,7 @@ import { safeTauriAssetUrl } from "../../../shared/tauri";
 import { directorySizeRecordForPath } from "../../../stores/useExplorerStore";
 import { formatBytes, formatDate } from "../utils/fileFormat";
 import { FileIcon } from "./FileBrowserIcons";
+import { GlobalPreviewDialog } from "./GlobalPreview";
 
 interface FileInspectorProps {
   listing: DirectoryListing | null;
@@ -17,6 +18,7 @@ interface FileInspectorProps {
   directorySizes: Record<string, DirectorySizeRecord>;
   onOpenEntry: (entry: FileEntry) => void;
   onSaveMetadata: (entry: FileEntry, tags: string[], comments: string) => void;
+  onPreviewSaved?: () => void | Promise<void>;
 }
 
 interface LoadedPreview {
@@ -59,7 +61,6 @@ const browserVideoMimeTypes: Record<string, string> = {
   mov: "video/quicktime",
   webm: "video/webm",
   ogv: "video/ogg",
-  ogg: "video/ogg",
 };
 
 const browserAudioMimeTypes: Record<string, string> = {
@@ -147,13 +148,13 @@ const inspectorStyles = {
   folderPreviewSize:
     "pl-2 text-right text-xs font-semibold text-[var(--misty-text-subtle)]",
   archivePreviewSummary:
-    "mb-2 flex min-w-0 items-center justify-between gap-2 px-2 text-xs font-semibold uppercase tracking-normal text-[var(--misty-text-subtle)]",
+    "mb-2 flex min-w-0 items-center justify-between gap-2 px-2 text-xs font-semibold capitalize text-[var(--misty-text-subtle)]",
   detailsCard: "mt-3 grid border-t border-[var(--misty-divider-subtle)] pt-2",
   detailRow: "grid gap-2 px-5 py-3.5",
-  detailLabel: "text-[12px] font-[720] uppercase leading-none tracking-normal text-[var(--misty-text-subtle)]",
+  detailLabel: "text-[12px] font-[720] capitalize leading-none text-[var(--misty-text-subtle)]",
   detailValue: "min-w-0 [overflow-wrap:anywhere] text-[17px] font-[650] leading-[1.25] text-[var(--misty-text)]",
   editorCard: "mt-2 grid gap-3 border-t border-[var(--misty-divider-subtle)] px-5 py-4",
-  editorLabel: "grid gap-1.5 text-[12px] font-[720] uppercase leading-none tracking-normal text-[var(--misty-text-subtle)]",
+  editorLabel: "grid gap-1.5 text-[12px] font-[720] capitalize leading-none text-[var(--misty-text-subtle)]",
   editorInput: "min-h-9 w-full rounded-[7px] border border-[var(--misty-divider-default)] bg-[var(--misty-neutral-control-bg,var(--misty-surface-2))] px-2.5 py-2 text-sm font-medium normal-case leading-normal text-[var(--misty-text)] outline-none focus:border-[var(--misty-interaction-focus)] focus:shadow-[0_0_0_2px_var(--misty-focus-ring)]",
   editorTextarea: "min-h-[74px] resize-y",
   editorActions: "flex justify-end",
@@ -196,7 +197,7 @@ export function FileInspector(props: FileInspectorProps) {
     setCommentsDraft(props.mistyComments);
   }, [displayEntry?.path, props.mistyComments, props.mistyTags]);
   const showPreviewTransition = previewLoading && displayEntry?.kind !== "folder" && !multiple;
-  const canOpenPreview = Boolean(preview && (preview.kind === "image" || preview.kind === "video"));
+  const canOpenPreview = Boolean(displayEntry && displayEntry.kind !== "folder" && displayEntry.kind !== "symlink" && !multiple);
 
   if (!displayEntry && !multiple) {
     return (
@@ -239,7 +240,7 @@ export function FileInspector(props: FileInspectorProps) {
         ) : previewError ? (
           <span className={inspectorStyles.previewStatus}>{previewError}</span>
         ) : !showPreviewTransition && (displayEntry?.kind !== "folder" || multiple) ? (
-          <span className={inspectorStyles.previewStatus}>No preview available</span>
+          <span className={inspectorStyles.previewStatus}>Open the full reader</span>
         ) : null}
         {canOpenPreview ? (
           <button
@@ -253,8 +254,26 @@ export function FileInspector(props: FileInspectorProps) {
         ) : null}
         {showPreviewTransition ? <span className={inspectorStyles.previewLoadingOverlay} aria-hidden="true" /> : null}
       </div>
-      {previewOpen && preview && canOpenPreview ? (
-        <MediaPreviewLightbox preview={preview} title={title} onClose={() => setPreviewOpen(false)} />
+      {previewOpen && displayEntry && canOpenPreview ? (
+        <GlobalPreviewDialog
+          source={{
+            path: displayEntry.path,
+            name: displayEntry.name,
+            extension: displayEntry.extension,
+            mimeType: displayEntry.mimeType,
+            sizeBytes: displayEntry.sizeBytes,
+            modifiedMs: displayEntry.modifiedMs,
+            createdMs: displayEntry.createdMs,
+            description: props.mistyComments,
+            tags: props.mistyTags,
+            originalName: displayEntry.name,
+            readonly: displayEntry.readonly,
+            remote: displayEntry.location.kind === "remote",
+          }}
+          onClose={() => setPreviewOpen(false)}
+          onSaved={() => props.onPreviewSaved?.()}
+          onSaveMetadata={(comments, tags) => props.onSaveMetadata(displayEntry, tags, comments)}
+        />
       ) : null}
 
       <section className={inspectorStyles.detailsCard}>
@@ -340,120 +359,6 @@ function PreviewImage(props: { className: string; src: string; alt: string }) {
       decoding="async"
     />
   );
-}
-
-function MediaPreviewLightbox(props: { preview: LoadedPreview; title: string; onClose: () => void }) {
-  const [scale, setScale] = useState(1);
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const dragRef = useRef<{ pointerId: number; startX: number; startY: number; originX: number; originY: number } | null>(null);
-
-  useEffect(() => {
-    setScale(1);
-    setOffset({ x: 0, y: 0 });
-  }, [props.preview.url]);
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") props.onClose();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [props.onClose]);
-
-  const zoomBy = (delta: number) => {
-    setScale((current) => clampZoom(current + delta));
-  };
-  const resetZoom = () => {
-    setScale(1);
-    setOffset({ x: 0, y: 0 });
-  };
-
-  return (
-    <div className={inspectorStyles.lightboxBackdrop} role="presentation" onPointerDown={props.onClose}>
-      <section
-        className={inspectorStyles.lightbox}
-        role="dialog"
-        aria-modal="true"
-        aria-label={`Preview ${props.title}`}
-        onPointerDown={(event) => event.stopPropagation()}
-      >
-        <header className={inspectorStyles.lightboxHeader}>
-          <span className={inspectorStyles.lightboxTitle}>{props.title}</span>
-          <div className={inspectorStyles.lightboxControls}>
-            {props.preview.kind === "image" ? (
-              <>
-                <button className={inspectorStyles.lightboxButton} type="button" aria-label="Zoom out" onClick={() => zoomBy(-0.25)}>
-                  <Minus size={16} />
-                </button>
-                <button className={inspectorStyles.lightboxButton} type="button" aria-label="Reset zoom" onClick={resetZoom}>
-                  <RotateCcw size={16} />
-                </button>
-                <button className={inspectorStyles.lightboxButton} type="button" aria-label="Zoom in" onClick={() => zoomBy(0.25)}>
-                  <Plus size={16} />
-                </button>
-              </>
-            ) : null}
-            <button className={inspectorStyles.lightboxButton} type="button" aria-label="Close preview" onClick={props.onClose}>
-              <X size={16} />
-            </button>
-          </div>
-        </header>
-        {props.preview.kind === "video" ? (
-          <video className="h-full min-h-0 w-full bg-black object-contain" src={props.preview.url} controls autoPlay muted playsInline />
-        ) : (
-          <div
-            className={inspectorStyles.zoomSurface}
-            onWheel={(event) => {
-              event.preventDefault();
-              zoomBy(event.deltaY > 0 ? -0.15 : 0.15);
-            }}
-            onPointerDown={(event) => {
-              if (scale <= 1) return;
-              event.currentTarget.setPointerCapture(event.pointerId);
-              dragRef.current = {
-                pointerId: event.pointerId,
-                startX: event.clientX,
-                startY: event.clientY,
-                originX: offset.x,
-                originY: offset.y,
-              };
-            }}
-            onPointerMove={(event) => {
-              const drag = dragRef.current;
-              if (!drag || drag.pointerId !== event.pointerId) return;
-              setOffset({
-                x: drag.originX + event.clientX - drag.startX,
-                y: drag.originY + event.clientY - drag.startY,
-              });
-            }}
-            onPointerUp={(event) => {
-              if (dragRef.current?.pointerId === event.pointerId) dragRef.current = null;
-            }}
-            onPointerCancel={(event) => {
-              if (dragRef.current?.pointerId === event.pointerId) dragRef.current = null;
-            }}
-          >
-            <img
-              className={inspectorStyles.zoomImage}
-              src={props.preview.url}
-              alt={`Preview of ${props.title}`}
-              draggable={false}
-              loading="lazy"
-              decoding="async"
-              style={{
-                cursor: scale > 1 ? "grab" : "default",
-                transform: `translate(calc(-50% + ${offset.x}px), calc(-50% + ${offset.y}px)) scale(${scale})`,
-              }}
-            />
-          </div>
-        )}
-      </section>
-    </div>
-  );
-}
-
-function clampZoom(value: number): number {
-  return Math.min(8, Math.max(0.25, Number(value.toFixed(2))));
 }
 
 function useFileMetadata(entry: FileEntry | null): {

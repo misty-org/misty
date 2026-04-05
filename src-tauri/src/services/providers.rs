@@ -294,54 +294,6 @@ pub struct VerifyResult {
     pub combined: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct LinkPathRequest {
-    pub remote: String,
-    pub path: String,
-    #[serde(default)]
-    pub expire: String,
-    #[serde(default)]
-    pub link_id: String,
-    #[serde(default)]
-    pub target_id: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
-pub struct PublicLinkRecord {
-    pub id: String,
-    pub url: String,
-    pub target_id: Option<String>,
-    pub provider: String,
-    pub path: String,
-    pub role: Option<String>,
-    pub scope: Option<String>,
-    pub kind: Option<String>,
-    pub expires_at: Option<String>,
-    pub created_at: Option<String>,
-    pub can_revoke: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
-pub struct PublicLinkListResult {
-    pub supported: bool,
-    pub provider: String,
-    #[serde(default)]
-    pub links: Vec<PublicLinkRecord>,
-    pub message: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
-pub struct PublicLinkActionResult {
-    pub supported: bool,
-    pub provider: String,
-    pub link: Option<PublicLinkRecord>,
-    pub message: Option<String>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
 pub struct BackendAction {
@@ -646,63 +598,6 @@ impl ProviderService {
             &serde_json::json!({ "job_id": job_id }),
         )
         .await
-    }
-
-    pub async fn public_links(&self, request: LinkPathRequest) -> ApiResult<PublicLinkListResult> {
-        let remote = request.remote.trim().to_string();
-        let response = self
-            .inner
-            .proxy
-            .post_json(
-                "/api/remote/links/list",
-                &serde_json::json!({
-                    "remote": &remote,
-                    "path": request.path,
-                }),
-            )
-            .await?;
-        parse_public_link_list_response(response, &remote).await
-    }
-
-    pub async fn create_public_link(
-        &self,
-        request: LinkPathRequest,
-    ) -> ApiResult<PublicLinkActionResult> {
-        let remote = request.remote.trim().to_string();
-        let response = self
-            .inner
-            .proxy
-            .post_json(
-                "/api/remote/links/create",
-                &serde_json::json!({
-                    "remote": &remote,
-                    "path": request.path,
-                    "expire": request.expire,
-                }),
-            )
-            .await?;
-        parse_public_link_action_response(response, &remote).await
-    }
-
-    pub async fn revoke_public_link(
-        &self,
-        request: LinkPathRequest,
-    ) -> ApiResult<PublicLinkActionResult> {
-        let remote = request.remote.trim().to_string();
-        let response = self
-            .inner
-            .proxy
-            .post_json(
-                "/api/remote/links/revoke",
-                &serde_json::json!({
-                    "remote": &remote,
-                    "path": request.path,
-                    "link_id": request.link_id,
-                    "target_id": request.target_id,
-                }),
-            )
-            .await?;
-        parse_public_link_action_response(response, &remote).await
     }
 
     pub async fn backend_actions(&self, remote: String) -> ApiResult<Vec<BackendAction>> {
@@ -1850,62 +1745,6 @@ async fn parse_proxy_response<T: for<'de> Deserialize<'de>>(
         return Err(provider_operation_error(status.as_u16(), &body, fallback));
     }
     serde_json::from_str::<T>(&body).map_err(ApiError::from)
-}
-
-async fn parse_public_link_list_response(
-    response: StorageResponse,
-    remote: &str,
-) -> ApiResult<PublicLinkListResult> {
-    let status = response.status();
-    let body = response.text().await.unwrap_or_default();
-    if !status.is_success() {
-        return Err(provider_operation_error(
-            status.as_u16(),
-            &body,
-            "Failed to load shared links",
-        ));
-    }
-    let result = serde_json::from_str::<PublicLinkListResult>(&body).map_err(ApiError::from)?;
-    if result.supported {
-        Ok(result)
-    } else {
-        Ok(PublicLinkListResult {
-            provider: fallback_public_link_provider(&result.provider, remote),
-            ..result
-        })
-    }
-}
-
-async fn parse_public_link_action_response(
-    response: StorageResponse,
-    remote: &str,
-) -> ApiResult<PublicLinkActionResult> {
-    let status = response.status();
-    let body = response.text().await.unwrap_or_default();
-    if !status.is_success() {
-        return Err(provider_operation_error(
-            status.as_u16(),
-            &body,
-            "Shared link action failed",
-        ));
-    }
-    let result = serde_json::from_str::<PublicLinkActionResult>(&body).map_err(ApiError::from)?;
-    if result.supported {
-        Ok(result)
-    } else {
-        Ok(PublicLinkActionResult {
-            provider: fallback_public_link_provider(&result.provider, remote),
-            ..result
-        })
-    }
-}
-
-fn fallback_public_link_provider(provider: &str, remote: &str) -> String {
-    if provider.trim().is_empty() {
-        remote.to_string()
-    } else {
-        provider.to_string()
-    }
 }
 
 fn endpoint_proxy_body(endpoint: &PowerToolEndpoint) -> serde_json::Value {

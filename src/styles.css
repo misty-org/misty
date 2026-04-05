@@ -1,9 +1,38 @@
 @import "tailwindcss";
 @source "./**/*.{ts,tsx}";
 
+/* The app wallpaper is decorative. WebKit may briefly expose native media
+   chrome when its autoplay session is rebuilt after a window/app resume. */
+.misty-app-wallpaper-video::-webkit-media-controls {
+  display: none !important;
+  -webkit-appearance: none;
+}
+
+.misty-app-wallpaper-video::-webkit-media-controls-enclosure {
+  display: none !important;
+  -webkit-appearance: none;
+}
+
+.misty-app-wallpaper-video::-webkit-media-controls-panel {
+  display: none !important;
+  -webkit-appearance: none;
+}
+
+.misty-app-wallpaper-video::-webkit-media-controls-play-button {
+  display: none !important;
+  -webkit-appearance: none;
+}
+
+.misty-app-wallpaper-video::-webkit-media-controls-start-playback-button {
+  display: none !important;
+  -webkit-appearance: none;
+}
+
 :root {
   color-scheme: dark;
-  --misty-bg: #0b0d10;
+  --misty-page-bg: #181818;
+  --misty-nav-bg: #101010;
+  --misty-bg: #181818;
   --misty-bg-soft: #090b0e;
   --misty-surface: #111418;
   --misty-surface-2: #14171c;
@@ -59,6 +88,22 @@
   --misty-focus-ring: rgba(125, 211, 252, 0.22);
   --misty-glass: rgba(17, 20, 24, 0.94);
   --misty-glass-border: var(--misty-border);
+  /* Stable semantic contract consumed by Misty and hosted extensions. */
+  --misty-semantic-background: var(--misty-bg);
+  --misty-semantic-surface: var(--misty-surface);
+  --misty-semantic-surface-raised: var(--misty-surface-2);
+  --misty-semantic-surface-hover: var(--misty-surface-hover);
+  --misty-semantic-border: var(--misty-border);
+  --misty-semantic-border-strong: var(--misty-border-strong);
+  --misty-semantic-text: var(--misty-text);
+  --misty-semantic-text-muted: var(--misty-text-muted);
+  --misty-semantic-text-subtle: var(--misty-text-subtle);
+  --misty-semantic-accent: var(--misty-accent);
+  --misty-semantic-focus: var(--misty-interaction-focus);
+  --misty-semantic-success: var(--misty-success);
+  --misty-semantic-warning: var(--misty-warning);
+  --misty-semantic-danger: var(--misty-danger);
+  --misty-semantic-info: var(--misty-info);
   --misty-skeleton-base: var(--misty-surface-2);
   --misty-skeleton-highlight: var(--misty-surface-3);
   --misty-radius-xs: 8px;
@@ -76,6 +121,8 @@
   --misty-safe-right: env(safe-area-inset-right, 0px);
   --misty-safe-bottom: env(safe-area-inset-bottom, 0px);
   --misty-safe-left: env(safe-area-inset-left, 0px);
+  --misty-app-zoom: 1;
+  --misty-window-titlebar-inset: 28px;
   --misty-page-x: clamp(16px, 2vw, 20px);
   --misty-mobile-edge: 16px;
   --misty-mobile-page-top: 14px;
@@ -94,6 +141,52 @@
   color: var(--misty-text);
 }
 
+@theme inline {
+  /* Existing utility classes now resolve through the runtime palette. */
+  --color-white: var(--misty-text);
+  --color-black: var(--misty-primary-contrast);
+  --color-zinc-50: var(--misty-text);
+  --color-zinc-100: var(--misty-text);
+  --color-zinc-200: var(--misty-primary);
+  --color-zinc-300: var(--misty-text-muted);
+  --color-zinc-400: var(--misty-text-muted);
+  --color-zinc-500: var(--misty-text-subtle);
+  --color-zinc-600: var(--misty-text-subtle);
+  --color-zinc-700: var(--misty-border-strong);
+  --color-zinc-800: var(--misty-surface-3);
+  --color-zinc-900: var(--misty-surface-2);
+  --color-zinc-950: var(--misty-bg-soft);
+  --color-neutral-50: var(--misty-text);
+  --color-neutral-100: var(--misty-primary);
+  --color-neutral-300: var(--misty-text-muted);
+  --color-neutral-400: var(--misty-text-muted);
+  --color-neutral-500: var(--misty-text-subtle);
+  --color-neutral-700: var(--misty-border-strong);
+  --color-neutral-800: var(--misty-surface-3);
+  --color-neutral-900: var(--misty-surface-2);
+  --color-neutral-950: var(--misty-bg-soft);
+  --color-red-300: var(--misty-danger);
+  --color-red-400: var(--misty-danger);
+  --color-emerald-300: var(--misty-success);
+  --color-emerald-400: var(--misty-success);
+  --color-amber-300: var(--misty-warning);
+  --color-amber-400: var(--misty-warning);
+  --color-misty-background: var(--misty-semantic-background);
+  --color-misty-surface: var(--misty-semantic-surface);
+  --color-misty-surface-raised: var(--misty-semantic-surface-raised);
+  --color-misty-surface-hover: var(--misty-semantic-surface-hover);
+  --color-misty-border: var(--misty-semantic-border);
+  --color-misty-border-strong: var(--misty-semantic-border-strong);
+  --color-misty-text: var(--misty-semantic-text);
+  --color-misty-text-muted: var(--misty-semantic-text-muted);
+  --color-misty-text-subtle: var(--misty-semantic-text-subtle);
+  --color-misty-accent: var(--misty-semantic-accent);
+  --color-misty-success: var(--misty-semantic-success);
+  --color-misty-warning: var(--misty-semantic-warning);
+  --color-misty-danger: var(--misty-semantic-danger);
+  --color-misty-info: var(--misty-semantic-info);
+}
+
 :root[data-theme="light"] {
   color-scheme: light;
   --misty-bg: #f5f2ec;
@@ -102,13 +195,19 @@
   --misty-surface-2: #f8f3eb;
   --misty-surface-3: #ebe4d9;
   --misty-dropdown-bg: #fffaf2;
+  --misty-surface-hover: #eee7dc;
+  --misty-surface-selected: #e3eaf2;
+  --misty-sidebar-selected: #e7edf4;
   --misty-border: #d8cec0;
+  --misty-border-strong: #b9a997;
   --misty-border-soft: rgba(49, 42, 34, 0.13);
   --misty-content-frame-border: #b9a997;
   --misty-text: #1b1a18;
   --misty-text-muted: #5f594f;
   --misty-text-subtle: #847a6c;
   --misty-primary: #1f1e1c;
+  --misty-primary-hover: #0f0e0d;
+  --misty-primary-active: #37332e;
   --misty-primary-contrast: #fffaf2;
   --misty-accent: #246dc5;
   --misty-success: #217447;
@@ -368,6 +467,12 @@ body {
   background: var(--misty-bg);
 }
 
+/* Native desktop chrome does not scale with the webview. The app zoom hook
+   compensates this inset so fullscreen portals always begin below the titlebar. */
+:root[data-form-factor="desktop"] .fixed.inset-0 {
+  top: var(--misty-window-titlebar-inset);
+}
+
 button,
 input {
   font: inherit;
@@ -460,6 +565,78 @@ input {
   padding: 9px 10px;
 }
 
+.misty-library-picker-search-row {
+  display: flex;
+  min-height: 60px;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--misty-divider-subtle);
+  padding: 10px 20px;
+}
+
+.misty-library-picker-search {
+  display: flex;
+  min-width: 0;
+  height: 40px;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--misty-border-soft);
+  border-radius: 10px;
+  background: var(--misty-surface-2);
+  padding: 0 12px;
+  color: var(--misty-text-subtle);
+  transition: border-color 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
+}
+
+.misty-library-picker-search:focus-within {
+  border-color: var(--misty-border-strong);
+  background: var(--misty-neutral-control-bg, var(--misty-surface-2));
+  box-shadow: 0 0 0 2px var(--misty-focus-ring);
+}
+
+.misty-library-picker-search > svg {
+  flex: 0 0 auto;
+}
+
+.misty-library-picker-search > input {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  outline: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--misty-text);
+  font-size: 14px;
+  line-height: 1;
+  text-transform: none;
+}
+
+.misty-library-picker-search > input::placeholder {
+  color: var(--misty-text-subtle);
+  opacity: 1;
+}
+
+.misty-library-picker-search-count {
+  flex: 0 0 auto;
+  color: var(--misty-text-subtle);
+  font-size: 12px;
+  line-height: 1;
+}
+
+@media (max-width: 560px) {
+  .misty-library-picker-search-row {
+    gap: 8px;
+    padding-inline: 12px;
+  }
+
+  .misty-library-picker-search-count {
+    display: none;
+  }
+}
+
 @media (max-width: 980px) {
   body {
     min-width: 0;
@@ -521,6 +698,7 @@ input {
 }
 
 :root[data-form-factor="mobile"] {
+  --misty-window-titlebar-inset: 0px;
   color-scheme: dark;
   --misty-bg: #070707;
   --misty-bg-soft: #0c0c0c;
@@ -540,12 +718,12 @@ input {
 :root[data-form-factor="mobile"],
 :root[data-form-factor="mobile"] body,
 :root[data-form-factor="mobile"] #root {
-  background: var(--misty-bg);
+  background: var(--misty-page-bg);
   color: var(--misty-text);
 }
 
 :root[data-form-factor="mobile"] {
-  --misty-bg: #07090b;
+  --misty-bg: #181818;
   --misty-bg-soft: #090c10;
   --misty-surface: #0b0d0f;
   --misty-surface-2: #111317;
@@ -570,4 +748,81 @@ input {
 :root[data-form-factor="mobile"] {
   --misty-mobile-page-top: 10px;
   --misty-mobile-page-bottom: 12px;
+}
+
+/* Shared image-editor ranges use an explicit track so WebKit's accent fill never
+   paints beyond the thumb at either endpoint. */
+.global-image-editor-range {
+  --editor-range-progress: 0%;
+  appearance: none;
+  -webkit-appearance: none;
+  height: 20px;
+  cursor: pointer;
+  background: transparent;
+}
+
+.global-image-editor-range::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    rgba(245, 247, 250, 0.96) 0 var(--editor-range-progress),
+    rgba(255, 255, 255, 0.16) var(--editor-range-progress) 100%
+  );
+}
+
+.global-image-editor-range::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  margin-top: -7px;
+  border: 1px solid rgba(0, 0, 0, 0.22);
+  border-radius: 999px;
+  background: #f7f8fa;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+.global-image-editor-range::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.global-image-editor-range::-moz-range-progress {
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(245, 247, 250, 0.96);
+}
+
+.global-image-editor-range::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border: 1px solid rgba(0, 0, 0, 0.22);
+  border-radius: 999px;
+  background: #f7f8fa;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+.global-image-editor-range:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.45);
+  outline-offset: 2px;
+  border-radius: 999px;
+}
+
+html[data-explorer-dragging="true"],
+html[data-explorer-dragging="true"] * {
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  -webkit-user-drag: none !important;
+}
+
+[data-explorer-drop-active="true"] {
+  background-image: linear-gradient(120deg, rgba(126, 133, 145, 0.16), rgba(82, 88, 98, 0.08), rgba(126, 133, 145, 0.14)) !important;
+  box-shadow: inset 0 0 0 1px rgba(143, 150, 161, 0.2);
+}
+
+[data-explorer-drop-active="true"] > button {
+  background-image: linear-gradient(120deg, rgba(126, 133, 145, 0.18), rgba(82, 88, 98, 0.1), rgba(126, 133, 145, 0.16)) !important;
+  box-shadow: inset 0 0 0 1px rgba(143, 150, 161, 0.22);
 }

@@ -16,6 +16,15 @@ enum PasswordCache {
 
 static RCLONE_CONFIG_PASSWORD_CACHE: Mutex<PasswordCache> = Mutex::new(PasswordCache::Unchecked);
 
+#[cfg(test)]
+pub(crate) fn prime_rclone_config_password_cache_for_test(password: Option<&str>) {
+    if let Ok(mut cache) = RCLONE_CONFIG_PASSWORD_CACHE.lock() {
+        *cache = password
+            .map(|value| PasswordCache::Present(value.to_owned()))
+            .unwrap_or(PasswordCache::Missing);
+    }
+}
+
 pub fn rclone_config_password() -> Option<String> {
     rclone_config_password_result().ok().flatten()
 }
@@ -78,6 +87,40 @@ pub fn store_rclone_config_password(password: &str) -> ApiResult<()> {
     store_generic_password(RCLONE_CONFIG_SERVICE, RCLONE_CONFIG_ACCOUNT, password)?;
     cache_rclone_config_password(password.to_owned());
     Ok(())
+}
+
+pub fn backup_repository_password(repository_id: &str) -> ApiResult<Option<String>> {
+    let account = format!("repository:{repository_id}");
+    let entry = keyring::Entry::new("misty.backups", &account).map_err(|error| {
+        ApiError::Message(format!("Could not access the credential vault: {error}"))
+    })?;
+    match entry.get_password() {
+        Ok(password) => Ok(Some(password)),
+        Err(keyring::Error::NoEntry) => Ok(None),
+        Err(error) => Err(ApiError::Message(format!(
+            "Could not read the backup credential: {error}"
+        ))),
+    }
+}
+
+pub fn store_backup_repository_password(repository_id: &str, password: &str) -> ApiResult<()> {
+    if repository_id.is_empty() || password.len() < 24 {
+        return Err(ApiError::Message(
+            "Backup credential is invalid.".to_owned(),
+        ));
+    }
+    keyring::Entry::new("misty.backups", &format!("repository:{repository_id}"))
+        .map_err(|error| {
+            ApiError::Message(format!("Could not access the credential vault: {error}"))
+        })?
+        .set_password(password)
+        .map_err(|error| {
+            ApiError::Message(format!("Could not store the backup credential: {error}"))
+        })
+}
+
+pub fn generate_backup_repository_password() -> String {
+    generate_password()
 }
 
 fn generate_password() -> String {

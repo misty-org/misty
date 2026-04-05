@@ -15,6 +15,7 @@ export default defineConfig(({ command, mode }) => {
   const posthogHost = env.POSTHOG_HOST?.trim();
   const posthogProjectId = env.POSTHOG_PROJECT_ID?.trim();
   const sourceMapKey = env.POSTHOG_API_KEY?.trim();
+  const publicApiUrl = (env.MISTY_PUBLIC_API_URL ?? env.VITE_MISTY_PUBLIC_API_URL)?.trim();
   const uploadSourceMaps = Boolean(
     command === "build" &&
       sourceMapKey &&
@@ -51,6 +52,9 @@ export default defineConfig(({ command, mode }) => {
         posthogToken ?? "",
       ),
       "import.meta.env.VITE_POSTHOG_HOST": JSON.stringify(posthogHost ?? ""),
+      // MISTY_PUBLIC_API_URL is the shared server/frontend deployment contract.
+      // Vite's internal alias keeps non-VITE server secrets out of the bundle.
+      "import.meta.env.VITE_MISTY_PUBLIC_API_URL": JSON.stringify(publicApiUrl ?? ""),
     },
     clearScreen: false,
     build: {

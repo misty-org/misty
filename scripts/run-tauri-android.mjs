@@ -62,7 +62,7 @@ run(npmCommand, [...tauriArgs, "--features=embedded-storage-go"], {
   ...(accountApiProxyTarget
     ? {
         MISTY_ACCOUNT_API_PROXY_TARGET: accountApiProxyTarget,
-        VITE_MISTY_SERVER_URL: "/api",
+        MISTY_PUBLIC_API_URL: "/api",
       }
     : {}),
 });

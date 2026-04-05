@@ -567,10 +567,15 @@ export function buildDeviceEntries(devices: MountedDevice[], customization: Devi
     if (!path || hidden.has(path) || seen.has(path)) continue;
     entries.push({
       id: `custom:${path}`,
+      volumeId: `custom:${path}`,
       name: customization.nameOverrides[path] || path.split("/").filter(Boolean).pop() || path,
       mountPath: path,
       fsType: "",
       isRemovable: false,
+      isSystem: false,
+      isExternal: true,
+      isNetwork: false,
+      writable: true,
       totalBytes: 0,
       freeBytes: 0,
       custom: true,

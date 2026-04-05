@@ -5,6 +5,9 @@ interface AuthFieldProps {
   value: string;
   placeholder?: string;
   autoComplete?: string;
+  minLength?: number;
+  maxLength?: number;
+  pattern?: string;
   required?: boolean;
   disabled?: boolean;
   onChange: (value: string) => void;
@@ -17,6 +20,9 @@ export default function AuthField({
   value,
   placeholder,
   autoComplete,
+  minLength,
+  maxLength,
+  pattern,
   required,
   disabled,
   onChange,
@@ -30,6 +36,9 @@ export default function AuthField({
         value={value}
         placeholder={placeholder}
         autoComplete={autoComplete}
+        minLength={minLength}
+        maxLength={maxLength}
+        pattern={pattern}
         required={required}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}

@@ -23,6 +23,8 @@ use crate::{
     },
 };
 
+mod preflight;
+pub use preflight::SmartLibraryImportPreflight;
 pub const PILOT_SAMPLE_SIZE: usize = 25;
 // The original pilot capped the device catalog at 500. Analysis/billing limits belong on the
 // server; the local catalog must be able to represent a selected disk.
@@ -350,30 +352,6 @@ impl SmartLibraryService {
         let db_path = self.db_path.clone();
         tokio::task::spawn_blocking(move || {
             persist_scan(&db_path, &root_path, source_kind, discovered)
-        })
-        .await
-        .map_err(worker_error)?
-    }
-
-    pub async fn import_files(
-        &self,
-        request: SmartLibraryImportFilesRequest,
-    ) -> ApiResult<SmartLibraryImportResult> {
-        if request.paths.is_empty() {
-            return Err(ApiError::Message(
-                "Choose at least one file to add to Library.".to_owned(),
-            ));
-        }
-        if request.paths.len() > MAX_MANUAL_IMPORT_FILES {
-            return Err(ApiError::Message(format!(
-                "Add at most {MAX_MANUAL_IMPORT_FILES} files at once."
-            )));
-        }
-        let db_path = self.db_path.clone();
-        tokio::task::spawn_blocking(move || {
-            let hints = load_scan_hints(&db_path)?;
-            let discovered = discover_selected_local(&request.paths, &hints)?;
-            persist_imported_files(&db_path, discovered)
         })
         .await
         .map_err(worker_error)?
