@@ -1,4 +1,3 @@
-import { ParticleField } from "../../components/ParticleField";
 import Footer from "../../components/Footer";
 import FeatureDemo from "./FeatureDemo";
 import MainHero from "./MainHero";
@@ -8,24 +7,26 @@ import Docs from "./DocsSection";
 import BlogPreview from "./BlogPreview";
 import Changelog from "./Changelog";
 import EndingOutro from "./EndingOutro";
+import StatsSection from "./StatsSection";
 
 export default function Home() {
   return (
-    <div className="max-w-280 mx-auto px-4 sm:px-6 lg:px-8 flex flex-col gap-20">
-      <div className="fixed inset-0 w-full h-full -z-50 pointer-events-none">
-        <ParticleField/>
+    <div className="max-w-4xl mx-auto px-4 pt-24 md:pt-28 flex flex-col gap-20">
+      <div className="flex flex-col gap-6">
+        <section>
+          <MainHero/>
+        </section>
+        <section className="-mx-20">
+          <FeatureDemo/>
+        </section>
       </div>
-     
-      <section>
-        <MainHero/>
-      </section>
-      
-      <section>
-        <FeatureDemo/>
-      </section>
 
       <section>
         <ServiceProviders/>
+      </section>
+
+      <section>
+        <StatsSection/>
       </section>
 
       <section>

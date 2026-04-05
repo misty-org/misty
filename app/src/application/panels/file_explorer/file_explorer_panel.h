@@ -23,9 +23,7 @@ namespace misty::panel {
 
         void set_search_panel(SearchPanel* panel) { search_panel_ = panel; }
 
-        // Unified navigation - routes to local or OneDrive based on path
-        // create_if_missing: if true, creates OneDrive directories locally when navigating
-        //                    set to false when user types path manually (should show error instead)
+        // Unified navigation - routes to local or remote based on path
         void navigate_to_path(const std::string& path, bool update_history = true, bool create_if_missing = true);
 
     private:
@@ -38,7 +36,6 @@ namespace misty::panel {
         void update_navigation_history(panel::FileExplorerState& state, const std::string& target_path, bool update_history);
         void set_active_path(panel::FileExplorerState& state, const std::string& path);
         void reset_selection(panel::FileExplorerState& state);
-        void clear_cloud_upload_contexts();
 
         void show_nav_history(panel::FileExplorerState& state, float button_width, float spacing);
         void show_search_bar(panel::FileExplorerState& state);
@@ -52,7 +49,7 @@ namespace misty::panel {
         void show_background_context_menu(panel::FileExplorerState& state);
         void show_new_entry_modal(panel::FileExplorerState& state);
         void show_rename_modal(panel::FileExplorerState& state);
-        
+
         // File operation helpers
         void perform_copy(panel::FileExplorerState& state);
         void perform_cut(panel::FileExplorerState& state);
@@ -67,68 +64,21 @@ namespace misty::panel {
         bool open_context_menu_target(panel::FileExplorerState& state);
         const UnifiedFileItem* find_context_menu_target(const panel::FileExplorerState& state) const;
 
-        // Async local filesystem navigation — dispatches I/O to worker pool
-        // so the UI thread is never blocked by slow drives or USB spin-up.
+        // Async local filesystem navigation
         void navigate_to_local_path_async(const std::string& path, bool update_history);
 
         // Sync account mappings from services state
         void sync_account_mappings();
 
-        // OneDrive path navigation helpers
-        void navigate_to_onedrive_mount_root(bool update_history);
-        void navigate_to_onedrive_account(const std::string& folder_name, const std::string& relative_path, bool update_history, bool create_if_missing);
-        void fetch_onedrive_folder(const AccountMapping& account, const std::string& folder_id, const std::string& target_path);
-
-        // Resolve relative path to folder ID using cache
-        std::string resolve_folder_id_from_cache(const AccountMapping& account, const std::string& relative_path);
-
-        // Handle async cloud folder fetch response (OneDrive, GDrive, Dropbox)
-        void handle_folder_fetch(const CloudFolderContext& ctx,
-                                 const std::string& target_path,
-                                 bool success,
-                                 const std::string& body,
-                                 const std::string& error);
-
-        // Download OneDrive file and open it when complete
-        void download_and_open_file(const UnifiedFileItem& file);
-
-        // Sync Google Drive account mappings from services state
-        void sync_gd_account_mappings();
-
-        // Google Drive path navigation helpers
-        void navigate_to_gdrive_mount_root(bool update_history);
-        void navigate_to_gdrive_account(const std::string& folder_name, const std::string& relative_path, bool update_history, bool create_if_missing);
-        void fetch_gdrive_folder(const GDAccountMapping& account, const std::string& folder_id, const std::string& target_path);
-
-        // Resolve relative path to folder ID using Google Drive cache
-        std::string resolve_gd_folder_id_from_cache(const GDAccountMapping& account, const std::string& relative_path);
-
-
-
-        // Download Google Drive file and open it when complete
-        void download_and_open_gd_file(const UnifiedFileItem& file);
-
-        // Sync Dropbox account mappings from services state
-        void sync_dbx_account_mappings();
-
-        // Dropbox path navigation helpers
-        void navigate_to_dropbox_mount_root(bool update_history);
-        void navigate_to_dropbox_account(const std::string& folder_name, const std::string& relative_path, bool update_history, bool create_if_missing);
-        void fetch_dropbox_folder(const DBXAccountMapping& account, const std::string& folder_path, const std::string& target_path);
-
-        // Download Dropbox file and open it when complete
-        void download_and_open_dbx_file(const UnifiedFileItem& file);
-
-        // Sync iCloud account mappings from services state
-        void sync_icl_account_mappings();
-
-        // iCloud path navigation helpers
-        void navigate_to_icloud_mount_root(bool update_history);
-        void navigate_to_icloud_account(const std::string& folder_name, const std::string& relative_path, bool update_history, bool create_if_missing);
-        void fetch_icloud_folder(const ICLAccountMapping& account, const std::string& icl_folder_path, const std::string& target_path);
-
-        // Download iCloud file and open it when complete
-        void download_and_open_icl_file(const UnifiedFileItem& file);
+        // Unified remote navigation (replaces per-provider methods)
+        void navigate_to_remote_mount_root(bool update_history);
+        void navigate_to_remote(const std::string& remote_name, const std::string& path,
+                                bool update_history, bool create_if_missing);
+        void fetch_remote_folder(const std::string& remote_name, const std::string& remote_path,
+                                 const std::string& target_path);
+        void handle_remote_folder_fetch(const std::string& remote_name, const std::string& target_path,
+                                        bool success, const std::string& body, const std::string& error);
+        void download_and_open_remote_file(const UnifiedFileItem& file);
 
     private:
         core::UIRegistry& registry_;

@@ -1,7 +1,5 @@
 #include "activity_panel.h"
-#include "panels/services/onedrive/onedrive_state.h"
-#include "panels/services/gdrive/gdrive_state.h"
-#include "panels/services/dropbox/dropbox_state.h"
+#include "panels/services/services_state.h"
 #include "imgui.h"
 #include <filesystem>
 #include <sstream>
@@ -487,6 +485,7 @@ namespace misty::panel {
         namespace fs = std::filesystem;
 
         auto& uploads = registry_.get_state<UploadState>("Uploads");
+        auto& services = registry_.get_state<ServicesState>("Services");
         auto& notifications = registry_.get_state<NotificationState>("Notifications");
 
         std::error_code ec;
@@ -513,86 +512,27 @@ namespace misty::panel {
         }
 
         uint64_t upload_id = uploads.start_upload(file_name, item.local_path, item.destination, file_size);
+        uploads.set_retry_context(upload_id, item.remote_name, item.remote_path);
 
-        if (item.provider == UploadProvider::ONEDRIVE) {
-            uploads.set_onedrive_retry_context(upload_id, item.od_ms_user_id, item.od_drive_id, item.od_folder_id);
-            auto& od_state = registry_.get_state<OneDriveState>("OneDrive");
-            od_state.upload_file(
-                item.local_path,
-                OneDriveState::UploadContext{item.od_drive_id, item.od_folder_id, item.od_ms_user_id},
-                [this, upload_id](size_t bytes_uploaded, size_t) -> bool {
-                    auto& upload_state = registry_.get_state<UploadState>("Uploads");
-                    upload_state.update_progress(upload_id, static_cast<int64_t>(bytes_uploaded));
-                    return true;
-                },
-                [this, file_name, upload_id](bool success, const std::string& error_msg) {
-                    auto& upload_state = registry_.get_state<UploadState>("Uploads");
-                    auto& notif_state = registry_.get_state<NotificationState>("Notifications");
-                    if (success) {
-                        upload_state.complete_upload(upload_id);
-                        notif_state.add_notification("Upload Complete", file_name, NotificationType::SUCCESS, 5.0f);
-                    } else {
-                        upload_state.fail_upload(upload_id, error_msg);
-                        notif_state.add_notification("Upload Failed", file_name + ": " + error_msg, NotificationType::ERROR, 5.0f);
-                    }
+        services.upload_file(
+            item.remote_name, item.remote_path, item.local_path,
+            [this, upload_id](size_t bytes_uploaded, size_t) -> bool {
+                auto& upload_state = registry_.get_state<UploadState>("Uploads");
+                upload_state.update_progress(upload_id, static_cast<int64_t>(bytes_uploaded));
+                return true;
+            },
+            [this, file_name, upload_id](bool success, const std::string& error_msg) {
+                auto& upload_state = registry_.get_state<UploadState>("Uploads");
+                auto& notif_state = registry_.get_state<NotificationState>("Notifications");
+                if (success) {
+                    upload_state.complete_upload(upload_id);
+                    notif_state.add_notification("Upload Complete", file_name, NotificationType::SUCCESS, 5.0f);
+                } else {
+                    upload_state.fail_upload(upload_id, error_msg);
+                    notif_state.add_notification("Upload Failed", file_name + ": " + error_msg, NotificationType::ERROR, 5.0f);
                 }
-            );
-        } else if (item.provider == UploadProvider::GDRIVE) {
-            uploads.set_gdrive_retry_context(upload_id, item.gd_user_id, item.gd_folder_id);
-            auto& gd_state = registry_.get_state<GDriveState>("GDrive");
-            gd_state.upload_file(
-                item.local_path,
-                GDriveState::UploadContext{item.gd_folder_id, item.gd_user_id},
-                [this, upload_id](size_t bytes_uploaded, size_t) -> bool {
-                    auto& upload_state = registry_.get_state<UploadState>("Uploads");
-                    upload_state.update_progress(upload_id, static_cast<int64_t>(bytes_uploaded));
-                    return true;
-                },
-                [this, file_name, upload_id](bool success, const std::string& error_msg) {
-                    auto& upload_state = registry_.get_state<UploadState>("Uploads");
-                    auto& notif_state = registry_.get_state<NotificationState>("Notifications");
-                    if (success) {
-                        upload_state.complete_upload(upload_id);
-                        notif_state.add_notification("Upload Complete", file_name, NotificationType::SUCCESS, 5.0f);
-                    } else {
-                        upload_state.fail_upload(upload_id, error_msg);
-                        notif_state.add_notification("Upload Failed", file_name + ": " + error_msg, NotificationType::ERROR, 5.0f);
-                    }
-                }
-            );
-        } else if (item.provider == UploadProvider::DROPBOX) {
-            uploads.set_dropbox_retry_context(upload_id, item.dbx_user_id, item.dbx_folder_path);
-            auto& dbx_state = registry_.get_state<DropboxState>("Dropbox");
-            dbx_state.upload_file(
-                item.local_path,
-                DropboxState::UploadContext{item.dbx_folder_path, item.dbx_user_id},
-                [this, upload_id](size_t bytes_uploaded, size_t) -> bool {
-                    auto& upload_state = registry_.get_state<UploadState>("Uploads");
-                    upload_state.update_progress(upload_id, static_cast<int64_t>(bytes_uploaded));
-                    return true;
-                },
-                [this, file_name, upload_id](bool success, const std::string& error_msg) {
-                    auto& upload_state = registry_.get_state<UploadState>("Uploads");
-                    auto& notif_state = registry_.get_state<NotificationState>("Notifications");
-                    if (success) {
-                        upload_state.complete_upload(upload_id);
-                        notif_state.add_notification("Upload Complete", file_name, NotificationType::SUCCESS, 5.0f);
-                    } else {
-                        upload_state.fail_upload(upload_id, error_msg);
-                        notif_state.add_notification("Upload Failed", file_name + ": " + error_msg, NotificationType::ERROR, 5.0f);
-                    }
-                }
-            );
-        } else {
-            uploads.fail_upload(upload_id, "Retry is not supported for this provider.");
-            notifications.add_notification(
-                "Retry Failed",
-                "Retry is not supported for this provider.",
-                NotificationType::ERROR,
-                5.0f
-            );
-            return;
-        }
+            }
+        );
 
         notifications.add_notification("Uploading", file_name, NotificationType::DOWNLOAD, 15.0f);
     }

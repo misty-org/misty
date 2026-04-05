@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
+	"github.com/kannachi323/misty/proxy/core/rclone"
 )
 
 func main() {
@@ -33,6 +34,7 @@ func main() {
 		}
 	}()
 
+	rclone.Init()
 	proxy.MountHandlers()
 	proxy.TSBase.StartTSConnection()
 

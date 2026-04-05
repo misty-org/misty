@@ -9,9 +9,6 @@
 #include "core/system/util.h"
 #include "panels/notification/notification_state.h"
 #include "panels/search/search_state.h"
-#include "panels/services/dropbox/dropbox_state.h"
-#include "panels/services/gdrive/gdrive_state.h"
-#include "panels/services/onedrive/onedrive_state.h"
 #include "panels/services/services_state.h"
 
 namespace fs = std::filesystem;
@@ -238,9 +235,7 @@ void FileExplorerPanel::show_background_context_menu(FileExplorerState& state) {
     ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.3f, 0.3f, 0.3f, 0.6f));
 
     if (ImGui::BeginPopup("BackgroundContextMenu")) {
-        bool is_cloud = path_utils::is_onedrive_path(state.current_path) ||
-                        path_utils::is_gdrive_path(state.current_path) ||
-                        path_utils::is_dropbox_path(state.current_path);
+        bool is_cloud = path_utils::is_remote_path(state.current_path);
         bool can_paste = state.clipboard_op != ClipboardOp::NONE && !state.clipboard_items.empty();
         if (ImGui::MenuItem("Paste", CommandManager::get().label("explorer.paste").c_str(), false, can_paste)) perform_paste(state);
 
@@ -314,7 +309,7 @@ void FileExplorerPanel::show_new_entry_modal(FileExplorerState& state) {
         if (ImGui::Button("Create##new_entry", ImVec2(button_width, 32)) || entered || confirm_shortcut) {
             std::string name(state.new_entry_name_buffer);
             std::string current_dir(state.current_path);
-            bool is_cloud_dir = path_utils::is_onedrive_path(current_dir) || path_utils::is_gdrive_path(current_dir) || path_utils::is_dropbox_path(current_dir);
+            bool is_cloud_dir = path_utils::is_remote_path(current_dir);
 
             if (!name.empty()) {
                 fs::path p = fs::path(current_dir) / name;
@@ -323,40 +318,16 @@ void FileExplorerPanel::show_new_entry_modal(FileExplorerState& state) {
                 if (state.new_entry_is_dir) {
                     fs::create_directory(p, ec);
                     if (!ec && is_cloud_dir) {
-                        auto& services = registry_.get_state<ServicesState>("Services");
-                        if (path_utils::is_onedrive_path(current_dir)) {
-                            auto& od_state = registry_.get_state<OneDriveState>("OneDrive");
-                            if (od_state.has_upload_context()) {
-                                auto ctx = od_state.get_upload_context();
-                                services.create_onedrive_folder(ctx.ms_user_id, ctx.drive_id, ctx.folder_id, name,
-                                    [this, name](bool success, const std::string&, const std::string& error) {
-                                        auto& notif = registry_.get_state<NotificationState>("Notifications");
-                                        if (success) notif.add_notification("Created", "Folder " + name + " created on OneDrive", NotificationType::SUCCESS);
-                                        else notif.add_notification("Cloud Error", "Failed to create folder on OneDrive: " + error, NotificationType::ERROR);
-                                    });
-                            }
-                        } else if (path_utils::is_gdrive_path(current_dir)) {
-                            auto& gd_state = registry_.get_state<GDriveState>("GDrive");
-                            if (gd_state.has_upload_context()) {
-                                auto ctx = gd_state.get_upload_context();
-                                services.create_gdrive_folder(ctx.gd_user_id, ctx.folder_id, name,
-                                    [this, name](bool success, const std::string&, const std::string& error) {
-                                        auto& notif = registry_.get_state<NotificationState>("Notifications");
-                                        if (success) notif.add_notification("Created", "Folder " + name + " created on Google Drive", NotificationType::SUCCESS);
-                                        else notif.add_notification("Cloud Error", "Failed to create folder on Google Drive: " + error, NotificationType::ERROR);
-                                    });
-                            }
-                        } else if (path_utils::is_dropbox_path(current_dir)) {
-                            auto& dbx_state = registry_.get_state<DropboxState>("Dropbox");
-                            if (dbx_state.has_upload_context()) {
-                                auto ctx = dbx_state.get_upload_context();
-                                services.create_dbx_folder(ctx.dbx_user_id, ctx.folder_path, name,
-                                    [this, name](bool success, const std::string&, const std::string& error) {
-                                        auto& notif = registry_.get_state<NotificationState>("Notifications");
-                                        if (success) notif.add_notification("Created", "Folder " + name + " created on Dropbox", NotificationType::SUCCESS);
-                                        else notif.add_notification("Cloud Error", "Failed to create folder on Dropbox: " + error, NotificationType::ERROR);
-                                    });
-                            }
+                        auto [remote_name, remote_path] = path_utils::parse_remote_path(current_dir);
+                        if (!remote_name.empty()) {
+                            std::string folder_path = remote_path.empty() ? name : remote_path + "/" + name;
+                            auto& services = registry_.get_state<ServicesState>("Services");
+                            services.create_folder(remote_name, folder_path,
+                                [this, name](bool success, const std::string&, const std::string& error) {
+                                    auto& notif = registry_.get_state<NotificationState>("Notifications");
+                                    if (success) notif.add_notification("Created", "Folder " + name + " created", NotificationType::SUCCESS);
+                                    else notif.add_notification("Cloud Error", "Failed to create folder: " + error, NotificationType::ERROR);
+                                });
                         }
                     }
                 } else {

@@ -22,35 +22,12 @@ namespace misty::panel {
         std::string mount_path;
     };
 
-    // Account mapping for cloud services (OneDrive, etc.)
-    struct AccountMapping {
-        std::string folder_name;    // Derived from email: "matthew"
-        std::string ms_user_id;     // Internal Microsoft user ID
-        std::string drive_id;       // Cached drive ID
+    // Unified account mapping for all cloud remotes (rclone-based)
+    struct RemoteAccountMapping {
+        std::string folder_name;    // mount directory name (= remote_name)
+        std::string remote_name;    // rclone remote name
+        std::string remote_type;    // "onedrive", "drive", "dropbox", etc.
         std::string display_name;
-        std::string email;
-    };
-
-    // Account mapping for Google Drive
-    struct GDAccountMapping {
-        std::string folder_name;    // Derived from email: "matthew"
-        std::string gd_user_id;     // Internal Google user ID
-        std::string display_name;
-        std::string email;
-    };
-
-    // Account mapping for Dropbox
-    struct DBXAccountMapping {
-        std::string folder_name;    // Derived from email: "matthew"
-        std::string dbx_user_id;    // Dropbox account ID
-        std::string display_name;
-        std::string email;
-    };
-
-    // Account mapping for iCloud (email is the only identifier)
-    struct ICLAccountMapping {
-        std::string folder_name;    // Derived from email: "matthew"
-        std::string email;          // Apple ID email (primary identifier)
     };
 
     // Directory management utilities for mount points
@@ -61,76 +38,16 @@ namespace misty::panel {
             return std::string(home) + "/misty/mnt";
         }
 
-        inline std::string get_onedrive_root() {
-            return get_mount_root() + "/OneDrive";
-        }
-
-        inline std::string get_gdrive_root() {
-            return get_mount_root() + "/GoogleDrive";
-        }
-
-        inline std::string get_dropbox_root() {
-            return get_mount_root() + "/Dropbox";
-        }
-
-        inline std::string get_icloud_root() {
-            return get_mount_root() + "/iCloud";
-        }
-
-        // Derive folder name from email: matthew@outlook.com → "matthew"
-        inline std::string derive_folder_name(const std::string& email) {
-            if (email.empty()) return "unknown";
-
-            size_t at_pos = email.find('@');
-            if (at_pos == std::string::npos) return email;
-
-            return email.substr(0, at_pos);
-        }
-
-        // Ensure base mount directories exist
+        // Ensure base mount directory exists
         inline void ensure_mount_directories() {
             std::error_code ec;
             fs::create_directories(get_mount_root(), ec);
-            fs::create_directories(get_onedrive_root(), ec);
-            fs::create_directories(get_gdrive_root(), ec);
-            fs::create_directories(get_dropbox_root(), ec);
-            fs::create_directories(get_icloud_root(), ec);
         }
 
-        // Create account directory and return the path
-        inline std::string ensure_account_directory(const std::string& email) {
-            std::string folder_name = derive_folder_name(email);
-            std::string account_path = get_onedrive_root() + "/" + folder_name;
+        // Ensure a remote's mount directory exists
+        inline void ensure_remote_directory(const std::string& remote_name) {
             std::error_code ec;
-            fs::create_directories(account_path, ec);
-            return account_path;
-        }
-
-        // Create Google Drive account directory and return the path
-        inline std::string ensure_gd_account_directory(const std::string& email) {
-            std::string folder_name = derive_folder_name(email);
-            std::string account_path = get_gdrive_root() + "/" + folder_name;
-            std::error_code ec;
-            fs::create_directories(account_path, ec);
-            return account_path;
-        }
-
-        // Create Dropbox account directory and return the path
-        inline std::string ensure_dbx_account_directory(const std::string& email) {
-            std::string folder_name = derive_folder_name(email);
-            std::string account_path = get_dropbox_root() + "/" + folder_name;
-            std::error_code ec;
-            fs::create_directories(account_path, ec);
-            return account_path;
-        }
-
-        // Create iCloud account directory and return the path
-        inline std::string ensure_icl_account_directory(const std::string& email) {
-            std::string folder_name = derive_folder_name(email);
-            std::string account_path = get_icloud_root() + "/" + folder_name;
-            std::error_code ec;
-            fs::create_directories(account_path, ec);
-            return account_path;
+            fs::create_directories(get_mount_root() + "/" + remote_name, ec);
         }
     }
 
@@ -145,10 +62,7 @@ namespace misty::panel {
         std::string error_msg = "";
 
         // Cloud account mappings (managed by workspace, used by file explorer)
-        std::vector<AccountMapping> account_mappings;
-        std::vector<GDAccountMapping> gd_account_mappings;
-        std::vector<DBXAccountMapping> dbx_account_mappings;
-        std::vector<ICLAccountMapping> icl_account_mappings;
+        std::vector<RemoteAccountMapping> remote_mappings;
 
         // Get currently selected workspace
         WorkspaceInfo* get_current_workspace() {
@@ -266,39 +180,9 @@ namespace misty::panel {
             return false;
         }
 
-        // Find account by folder name
-        AccountMapping* find_account_by_folder(const std::string& folder_name) {
-            for (auto& mapping : account_mappings) {
-                if (mapping.folder_name == folder_name) {
-                    return &mapping;
-                }
-            }
-            return nullptr;
-        }
-
-        // Find Google Drive account by folder name
-        GDAccountMapping* find_gd_account_by_folder(const std::string& folder_name) {
-            for (auto& mapping : gd_account_mappings) {
-                if (mapping.folder_name == folder_name) {
-                    return &mapping;
-                }
-            }
-            return nullptr;
-        }
-
-        // Find Dropbox account by folder name
-        DBXAccountMapping* find_dbx_account_by_folder(const std::string& folder_name) {
-            for (auto& mapping : dbx_account_mappings) {
-                if (mapping.folder_name == folder_name) {
-                    return &mapping;
-                }
-            }
-            return nullptr;
-        }
-
-        // Find iCloud account by folder name
-        ICLAccountMapping* find_icl_account_by_folder(const std::string& folder_name) {
-            for (auto& mapping : icl_account_mappings) {
+        // Find remote account by folder name
+        RemoteAccountMapping* find_remote_by_folder(const std::string& folder_name) {
+            for (auto& mapping : remote_mappings) {
                 if (mapping.folder_name == folder_name) {
                     return &mapping;
                 }

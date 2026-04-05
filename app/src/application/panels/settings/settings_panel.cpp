@@ -423,88 +423,41 @@ namespace misty::panel {
         ImGui::Spacing();
         ImGui::Spacing();
 
-        // --- OneDrive accounts ---
+        // --- Connected Remotes ---
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.85f, 0.85f, 0.85f, 1.0f));
-        ImGui::Text("OneDrive");
+        ImGui::Text("Connected Services");
         ImGui::PopStyleColor();
         ImGui::Spacing();
 
         {
             std::lock_guard<std::mutex> lock(services.mu);
-            if (services.ms_connections.empty()) {
+            if (services.connections.empty()) {
                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.45f, 0.45f, 0.45f, 1.0f));
-                ImGui::Text("No OneDrive accounts connected.");
+                ImGui::Text("No cloud services connected.");
                 ImGui::PopStyleColor();
             } else {
-                for (const auto& conn : services.ms_connections) {
+                for (const auto& conn : services.connections) {
                     ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.16f, 0.16f, 0.16f, 1.0f));
                     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 10.0f));
-                    ImGui::BeginChild(("##od_" + conn.profile.id).c_str(), ImVec2(0, 64), true,
+                    ImGui::BeginChild(("##remote_" + conn.name).c_str(), ImVec2(0, 64), true,
                                       ImGuiWindowFlags_NoScrollbar);
 
+                    std::string label = conn.display_name.empty() ? conn.name : conn.display_name;
                     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
-                    ImGui::Text("%s", conn.profile.display_name.c_str());
+                    ImGui::Text("%s", label.c_str());
                     ImGui::PopStyleColor();
 
                     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
-                    ImGui::Text("%s", conn.profile.email.c_str());
+                    ImGui::Text("%s (%s)", conn.name.c_str(), conn.type.c_str());
                     ImGui::PopStyleColor();
 
                     float btn_w = ImGui::CalcTextSize("Disconnect").x + 32.0f;
                     ImGui::SameLine(ImGui::GetContentRegionMax().x - btn_w);
                     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.5f, 0.15f, 0.15f, 1.0f));
                     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.65f, 0.2f, 0.2f, 1.0f));
-                    if (ImGui::Button(("Disconnect##od_" + conn.profile.id).c_str())) {
-                        services.disconnect_onedrive(conn.profile.id);
-                    }
-                    ImGui::PopStyleColor(2);
-
-                    ImGui::EndChild();
-                    ImGui::PopStyleVar();
-                    ImGui::PopStyleColor();
-                    ImGui::Spacing();
-                }
-            }
-        }
-
-        ImGui::Spacing();
-        ImGui::Separator();
-        ImGui::Spacing();
-        ImGui::Spacing();
-
-        // --- Google Drive accounts ---
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.85f, 0.85f, 0.85f, 1.0f));
-        ImGui::Text("Google Drive");
-        ImGui::PopStyleColor();
-        ImGui::Spacing();
-
-        {
-            std::lock_guard<std::mutex> lock(services.mu);
-            if (services.gd_connections.empty()) {
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.45f, 0.45f, 0.45f, 1.0f));
-                ImGui::Text("No Google Drive accounts connected.");
-                ImGui::PopStyleColor();
-            } else {
-                for (const auto& conn : services.gd_connections) {
-                    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.16f, 0.16f, 0.16f, 1.0f));
-                    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 10.0f));
-                    ImGui::BeginChild(("##gd_" + conn.profile.id).c_str(), ImVec2(0, 64), true,
-                                      ImGuiWindowFlags_NoScrollbar);
-
-                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
-                    ImGui::Text("%s", conn.profile.display_name.c_str());
-                    ImGui::PopStyleColor();
-
-                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
-                    ImGui::Text("%s", conn.profile.email.c_str());
-                    ImGui::PopStyleColor();
-
-                    float btn_w = ImGui::CalcTextSize("Disconnect").x + 32.0f;
-                    ImGui::SameLine(ImGui::GetContentRegionMax().x - btn_w);
-                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.5f, 0.15f, 0.15f, 1.0f));
-                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.65f, 0.2f, 0.2f, 1.0f));
-                    if (ImGui::Button(("Disconnect##gd_" + conn.profile.id).c_str())) {
-                        services.disconnect_gdrive(conn.profile.id);
+                    std::string disconnect_name = conn.name;
+                    if (ImGui::Button(("Disconnect##" + conn.name).c_str())) {
+                        services.disconnect_remote(disconnect_name);
                     }
                     ImGui::PopStyleColor(2);
 

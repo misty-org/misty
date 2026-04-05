@@ -14,29 +14,17 @@ namespace misty::panel {
 
 struct SearchResult {
     std::string name;
-    std::string path_display;   // Human-readable: "OneDrive › matthew › Documents"
+    std::string path_display;   // Human-readable: "onedrive-john › Documents"
     std::string virtual_path;   // Navigable by FileExplorerPanel::navigate_to_path()
     FileSource source = FileSource::LOCAL;
     bool is_dir = false;
     int64_t size = 0;
     int fuzzy_score = 0;
-    std::string dedup_key;      // "od:{id}" / "gd:{id}" / "dbx:{path}" / "icl:{email}/{path}"
+    std::string dedup_key;      // "remote:{remote_name}/{path}"
 
-    // Per-provider navigation metadata (mirrors UnifiedFileItem fields)
-    std::string od_item_id;
-    std::string od_drive_id;
-    std::string od_ms_user_id;
-
-    std::string gd_item_id;
-    std::string gd_user_id;
-    std::string gd_mime_type;
-
-    std::string dbx_item_id;
-    std::string dbx_user_id;
-    std::string dbx_path_display;
-
-    std::string icl_email;
-    std::string icl_path_display;
+    // Remote navigation metadata
+    std::string remote_name;
+    std::string remote_path;
 };
 
 struct SearchState : public core::UIState {

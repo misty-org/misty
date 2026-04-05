@@ -4,6 +4,7 @@
 #include "core/ui/imgui_utils.h"
 #include "views/app_view.h"
 #include "imgui.h"
+#include <chrono>
 #include <cstring>
 
 namespace misty::panel {
@@ -344,18 +345,11 @@ namespace misty::panel {
         // Check if any connection was established (after a refresh)
         if (!state.cloud_connected) {
             std::lock_guard<std::mutex> lock(svc.mu);
-            if (!svc.ms_connections.empty()) {
+            if (!svc.connections.empty()) {
                 state.cloud_connected    = true;
-                state.connected_provider = "OneDrive";
-            } else if (!svc.gd_connections.empty()) {
-                state.cloud_connected    = true;
-                state.connected_provider = "Google Drive";
-            } else if (!svc.dbx_connections.empty()) {
-                state.cloud_connected    = true;
-                state.connected_provider = "Dropbox";
-            } else if (!svc.icl_connections.empty()) {
-                state.cloud_connected    = true;
-                state.connected_provider = "iCloud";
+                state.connected_provider = svc.connections.begin()->display_name.empty()
+                    ? svc.connections.begin()->name
+                    : svc.connections.begin()->display_name;
             }
         }
 
@@ -377,12 +371,11 @@ namespace misty::panel {
         }
 
         // ── Provider buttons ──────────────────────────────────────────────────
-        struct Provider { const char* name; const char* icon; };
+        struct Provider { const char* name; const char* type; const char* icon; };
         static constexpr Provider providers[] = {
-            { "OneDrive",     "cloud-24" },
-            { "Google Drive", "cloud-24" },
-            { "Dropbox",      "cloud-24" },
-            { "iCloud",       "cloud-24" },
+            { "OneDrive",     "onedrive", "cloud-24" },
+            { "Google Drive", "drive",    "cloud-24" },
+            { "Dropbox",      "dropbox",  "cloud-24" },
         };
 
         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
@@ -392,14 +385,14 @@ namespace misty::panel {
         ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.11f, 0.11f, 0.13f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_Text,          ImVec4(0.85f, 0.85f, 0.85f, 1.0f));
 
-        for (int i = 0; i < 4; ++i) {
+        for (int i = 0; i < 3; ++i) {
             ImGui::PushID(i);
             if (ImGui::Button(providers[i].name, ImVec2(w, 42.0f))) {
-                if (i == 0)      svc.initiate_ms_login();
-                else if (i == 1) svc.initiate_gd_login();
-                else if (i == 2) svc.initiate_dbx_login();
-                else             svc.show_icl_login_modal = true;
-
+                auto now = std::chrono::system_clock::now();
+                auto epoch = std::chrono::duration_cast<std::chrono::seconds>(
+                    now.time_since_epoch()).count();
+                std::string remote_name = std::string(providers[i].type) + "-" + std::to_string(epoch);
+                svc.initiate_login(providers[i].type, remote_name);
                 state.awaiting_check = true;
             }
             ImGui::PopID();

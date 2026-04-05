@@ -13,30 +13,15 @@ namespace misty::panel {
     void FileSidebarPanel::show_uploader_modal(FileSidebarState& state) {
         if (!state.show_uploader_modal) return;
 
-        // Detect which cloud service has upload context
-        UploadTarget target_service = UploadTarget::ONEDRIVE;
-        bool has_context = false;
+        auto& remote_state = registry_.get_state<RemoteState>("Remote");
 
-        auto& onedrive_state = registry_.get_state<OneDriveState>("OneDrive");
-        auto& gdrive_state = registry_.get_state<GDriveState>("GDrive");
-        auto& dropbox_state = registry_.get_state<DropboxState>("Dropbox");
-
-        if (onedrive_state.has_upload_context()) {
-            target_service = UploadTarget::ONEDRIVE;
-            has_context = true;
-        } else if (gdrive_state.has_upload_context()) {
-            target_service = UploadTarget::GDRIVE;
-            has_context = true;
-        } else if (dropbox_state.has_upload_context()) {
-            target_service = UploadTarget::DROPBOX;
-            has_context = true;
-        }
-
-        if (!has_context) {
+        if (!remote_state.has_upload_context()) {
             state.show_uploader_modal = false;
             state.status_message = "Navigate to a cloud folder first.";
             return;
         }
+
+        auto ctx = remote_state.get_upload_context();
 
         // Open file picker (this blocks until user selects files or cancels)
         core::FilePickerOptions options;
@@ -57,7 +42,8 @@ namespace misty::panel {
                     FileUploadProgress progress;
                     progress.file_path = path;
                     progress.file_name = fs::path(path).filename().string();
-                    progress.target_service = target_service;
+                    progress.remote_name = ctx.remote_name;
+                    progress.remote_path = ctx.remote_path;
 
                     std::error_code ec;
                     progress.file_size = fs::file_size(path, ec);
@@ -83,7 +69,8 @@ namespace misty::panel {
         std::string file_path;
         std::string file_name;
         int64_t file_size = 0;
-        UploadTarget target_service;
+        std::string remote_name;
+        std::string remote_path;
 
         {
             std::lock_guard<std::mutex> lock(state.upload_mutex);
@@ -95,17 +82,16 @@ namespace misty::panel {
             file_path = state.upload_queue[index].file_path;
             file_name = state.upload_queue[index].file_name;
             file_size = static_cast<int64_t>(state.upload_queue[index].file_size);
-            target_service = state.upload_queue[index].target_service;
+            remote_name = state.upload_queue[index].remote_name;
+            remote_path = state.upload_queue[index].remote_path;
         }
-
-        std::string service_name = (target_service == UploadTarget::ONEDRIVE) ? "OneDrive" :
-                                   (target_service == UploadTarget::GDRIVE) ? "Google Drive" : "Dropbox";
 
         // Register this upload in UploadState for activity tracking
         auto& upload_state = registry_.get_state<UploadState>("Uploads");
-        uint64_t upload_id = upload_state.start_upload(file_name, file_path, service_name, file_size);
+        uint64_t upload_id = upload_state.start_upload(file_name, file_path, remote_name, file_size);
+        upload_state.set_retry_context(upload_id, remote_name, remote_path);
 
-        // Progress callback - updates both the sidebar UI state and the activity UploadState
+        // Progress callback
         auto progress_cb = [&state, &upload_state, index, upload_id](size_t bytes_uploaded, size_t total_bytes) -> bool {
             {
                 std::lock_guard<std::mutex> lock(state.upload_mutex);
@@ -129,14 +115,12 @@ namespace misty::panel {
                 state.current_upload_index++;
             }
 
-            // Update activity UploadState
             if (success) {
                 upload_state.complete_upload(upload_id);
             } else {
                 upload_state.fail_upload(upload_id, error_msg);
             }
 
-            // Start next upload or finish
             if (!state.cancel_upload.load()) {
                 start_next_upload(state);
             } else {
@@ -144,26 +128,9 @@ namespace misty::panel {
             }
         };
 
-        // Dispatch to the appropriate service
-        if (target_service == UploadTarget::ONEDRIVE) {
-            auto& onedrive_state = registry_.get_state<OneDriveState>("OneDrive");
-            onedrive_state.set_worker_pool(worker_pool_);
-            auto ctx = onedrive_state.get_upload_context();
-            upload_state.set_onedrive_retry_context(upload_id, ctx.ms_user_id, ctx.drive_id, ctx.folder_id);
-            onedrive_state.upload_file(file_path, ctx, progress_cb, completion_cb);
-        } else if (target_service == UploadTarget::GDRIVE) {
-            auto& gdrive_state = registry_.get_state<GDriveState>("GDrive");
-            gdrive_state.set_worker_pool(worker_pool_);
-            auto ctx = gdrive_state.get_upload_context();
-            upload_state.set_gdrive_retry_context(upload_id, ctx.gd_user_id, ctx.folder_id);
-            gdrive_state.upload_file(file_path, ctx, progress_cb, completion_cb);
-        } else if (target_service == UploadTarget::DROPBOX) {
-            auto& dropbox_state = registry_.get_state<DropboxState>("Dropbox");
-            dropbox_state.set_worker_pool(worker_pool_);
-            auto ctx = dropbox_state.get_upload_context();
-            upload_state.set_dropbox_retry_context(upload_id, ctx.dbx_user_id, ctx.folder_path);
-            dropbox_state.upload_file(file_path, ctx, progress_cb, completion_cb);
-        }
+        // Upload via unified services
+        auto& services = registry_.get_state<ServicesState>("Services");
+        services.upload_file(remote_name, remote_path, file_path, progress_cb, completion_cb);
     }
 
     void FileSidebarPanel::show_upload_progress_modal(FileSidebarState& state) {
@@ -193,7 +160,6 @@ namespace misty::panel {
             ImGui::Text("Uploading %zu of %zu files", completed + (state.is_uploading ? 1 : 0), total);
             ImGui::Separator();
 
-            // Show current upload progress
             if (state.current_upload_index < state.upload_queue.size()) {
                 const auto& current = state.upload_queue[state.current_upload_index];
                 ImGui::Text("%s", current.file_name.c_str());
@@ -212,7 +178,6 @@ namespace misty::panel {
 
             ImGui::Spacing();
 
-            // Cancel button
             if (state.is_uploading) {
                 if (ImGui::Button("Cancel", ImVec2(-1, 0))) {
                     state.cancel_upload.store(true);
@@ -233,6 +198,5 @@ namespace misty::panel {
             state.is_uploading = false;
         }
     }
-
 
 }

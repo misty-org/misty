@@ -469,7 +469,7 @@ export default function Forum() {
   const totalReplies = threads.reduce((sum, t) => sum + t.replies.length, 0);
 
   return (
-    <div className="max-w-280 mx-auto px-4 sm:px-6 lg:px-8 pt-32 pb-20">
+    <div className="max-w-4xl mx-auto px-4 pt-32 pb-20">
       {/* Header */}
       <div className="mb-10">
         <h1 className="text-3xl md:text-5xl font-bold text-text mb-4">Forum</h1>
