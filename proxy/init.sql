@@ -31,35 +31,6 @@ CREATE TABLE IF NOT EXISTS devices (
     mount_path TEXT
 );
 
-CREATE TABLE IF NOT EXISTS ms_users (
-    user_id TEXT NOT NULL,
-    ms_user_id TEXT NOT NULL,
-    access_token TEXT NOT NULL,
-    refresh_token TEXT,
-    display_name TEXT DEFAULT '',
-    email TEXT DEFAULT '',
-    PRIMARY KEY (user_id, ms_user_id)
-);
-
-CREATE TABLE IF NOT EXISTS gd_users (
-    user_id TEXT NOT NULL,
-    gd_user_id TEXT NOT NULL,
-    access_token TEXT NOT NULL,
-    refresh_token TEXT,
-    display_name TEXT DEFAULT '',
-    email TEXT DEFAULT '',
-    PRIMARY KEY (user_id, gd_user_id)
-);
-
-CREATE TABLE IF NOT EXISTS dbx_users (
-    user_id TEXT NOT NULL,
-    dbx_user_id TEXT NOT NULL,
-    access_token TEXT NOT NULL,
-    refresh_token TEXT,
-    display_name TEXT DEFAULT '',
-    email TEXT DEFAULT '',
-    PRIMARY KEY (user_id, dbx_user_id)
-);
 
 CREATE TABLE IF NOT EXISTS refresh_tokens (
     id TEXT PRIMARY KEY,

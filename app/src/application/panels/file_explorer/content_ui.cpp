@@ -9,10 +9,6 @@
 #include "core/manager/asset_manager.h"
 #include "panels/notification/notification_state.h"
 #include "panels/search/search_state.h"
-#include "panels/services/dropbox/dropbox_state.h"
-#include "panels/services/gdrive/gdrive_state.h"
-#include "panels/services/icloud/icloud_state.h"
-#include "panels/services/onedrive/onedrive_state.h"
 #include "panels/services/services_state.h"
 
 namespace fs = std::filesystem;
@@ -185,11 +181,7 @@ void FileExplorerPanel::show_file_item(FileExplorerState& state, int i) {
     ImGui::TableNextRow(ImGuiTableRowFlags_None, row_height);
     ImGui::TableNextColumn();
 
-    std::string label_id = "##";
-    if (!file.dbx_item_id.empty()) label_id += file.dbx_item_id;
-    else if (!file.gd_item_id.empty()) label_id += file.gd_item_id;
-    else if (!file.od_item_id.empty()) label_id += file.od_item_id;
-    else label_id += file.path;
+    std::string label_id = "##" + file.path;
 
     ImVec2 p = ImGui::GetCursorScreenPos();
     if (ImGui::Selectable(label_id.c_str(), is_selected, ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowDoubleClick, ImVec2(0, row_height))) {
@@ -221,43 +213,13 @@ void FileExplorerPanel::show_file_item(FileExplorerState& state, int i) {
         if (file.source == FileSource::LOCAL) {
             state.add_recent(file);
             open_file(file.path);
-        } else if (file.source == FileSource::ONEDRIVE) {
+        } else if (file.source == FileSource::REMOTE) {
             if (fs::exists(file.path)) {
                 state.add_recent(file);
                 open_file(file.path);
             } else if (!state.is_downloading(file.path)) {
                 state.add_recent(file);
-                download_and_open_file(file);
-            }
-        } else if (file.source == FileSource::GDRIVE) {
-            if (file.gd_mime_type.rfind("application/vnd.google-apps.", 0) == 0 &&
-                file.gd_mime_type != "application/vnd.google-apps.folder") {
-                if (!file.gd_web_url.empty()) {
-                    state.add_recent(file);
-                    open_file(file.gd_web_url);
-                }
-            } else if (fs::exists(file.path)) {
-                state.add_recent(file);
-                open_file(file.path);
-            } else if (!state.is_downloading(file.path)) {
-                state.add_recent(file);
-                download_and_open_gd_file(file);
-            }
-        } else if (file.source == FileSource::DROPBOX) {
-            if (fs::exists(file.path)) {
-                state.add_recent(file);
-                open_file(file.path);
-            } else if (!state.is_downloading(file.path)) {
-                state.add_recent(file);
-                download_and_open_dbx_file(file);
-            }
-        } else if (file.source == FileSource::ICLOUD) {
-            if (fs::exists(file.path)) {
-                state.add_recent(file);
-                open_file(file.path);
-            } else if (!state.is_downloading(file.path)) {
-                state.add_recent(file);
-                download_and_open_icl_file(file);
+                download_and_open_remote_file(file);
             }
         }
     }
@@ -350,43 +312,13 @@ void FileExplorerPanel::show_grid_item(FileExplorerState& state, int i, float ce
         if (file.source == FileSource::LOCAL) {
             state.add_recent(file);
             open_file(file.path);
-        } else if (file.source == FileSource::ONEDRIVE) {
+        } else if (file.source == FileSource::REMOTE) {
             if (fs::exists(file.path)) {
                 state.add_recent(file);
                 open_file(file.path);
             } else if (!state.is_downloading(file.path)) {
                 state.add_recent(file);
-                download_and_open_file(file);
-            }
-        } else if (file.source == FileSource::GDRIVE) {
-            if (file.gd_mime_type.rfind("application/vnd.google-apps.", 0) == 0 &&
-                file.gd_mime_type != "application/vnd.google-apps.folder") {
-                if (!file.gd_web_url.empty()) {
-                    state.add_recent(file);
-                    open_file(file.gd_web_url);
-                }
-            } else if (fs::exists(file.path)) {
-                state.add_recent(file);
-                open_file(file.path);
-            } else if (!state.is_downloading(file.path)) {
-                state.add_recent(file);
-                download_and_open_gd_file(file);
-            }
-        } else if (file.source == FileSource::DROPBOX) {
-            if (fs::exists(file.path)) {
-                state.add_recent(file);
-                open_file(file.path);
-            } else if (!state.is_downloading(file.path)) {
-                state.add_recent(file);
-                download_and_open_dbx_file(file);
-            }
-        } else if (file.source == FileSource::ICLOUD) {
-            if (fs::exists(file.path)) {
-                state.add_recent(file);
-                open_file(file.path);
-            } else if (!state.is_downloading(file.path)) {
-                state.add_recent(file);
-                download_and_open_icl_file(file);
+                download_and_open_remote_file(file);
             }
         }
     }

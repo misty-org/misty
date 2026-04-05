@@ -17,21 +17,16 @@ namespace fs = std::filesystem;
 
 namespace misty::panel {
 
-    // File source type - local filesystem or cloud service
+    // File source type - local filesystem or cloud remote
     enum class FileSource {
         LOCAL,
-        ONEDRIVE,
-        GDRIVE,
-        DROPBOX,
-        ICLOUD
+        REMOTE
     };
 
-    // Context for cloud folder fetch - carries service-specific parameters
+    // Context for cloud folder fetch - carries remote parameters
     struct CloudFolderContext {
-        FileSource service;
-        std::string user_id;     // ms_user_id / gd_user_id / dbx_user_id
-        std::string folder_id;   // folder_id (OD/GD) or folder_path (DBX)
-        std::string drive_id;    // OneDrive only, empty for others
+        std::string remote_name;   // rclone remote name, e.g. "onedrive-john"
+        std::string remote_path;   // path within the remote
     };
 
     // File synchronization status
@@ -43,202 +38,54 @@ namespace misty::panel {
         DELETED     // Soft deleted (Black)
     };
 
-    // Unified file item that works for both local and OneDrive
+    // Unified file item that works for both local and cloud remotes
     struct UnifiedFileItem {
         std::string name;              // Display name
         std::string path;              // Full virtual path
         bool is_dir = false;
         int64_t size = 0;
         std::string last_modified;
+        std::string mime_type;
         FileSource source = FileSource::LOCAL;
         SyncStatus status = SyncStatus::LOCAL;  // Default to local (Gray)
 
-        // OneDrive metadata (empty for local files)
-        std::string od_item_id;
-        std::string od_drive_id;
-        std::string od_ms_user_id;
-        std::string od_web_url;
-
-        // Google Drive metadata (empty for local/OneDrive files)
-        std::string gd_item_id;
-        std::string gd_user_id;
-        std::string gd_mime_type;
-        std::string gd_web_url;
-
-        // Dropbox metadata (empty for non-Dropbox files)
-        std::string dbx_item_id;
-        std::string dbx_user_id;
-        std::string dbx_path_display;
-
-        // iCloud metadata (empty for non-iCloud files)
-        std::string icl_email;         // Apple ID email (account identifier)
-        std::string icl_path_display;  // Full path in iCloud Drive (e.g. "Documents/report.pdf")
+        // Remote metadata (empty for local files)
+        std::string remote_name;       // rclone remote name, e.g. "onedrive-john"
+        std::string remote_path;       // path within the remote, e.g. "/Documents/report.pdf"
     };
 
     // Path utilities for file explorer navigation
-    // Note: Directory management (ensure_*) is in workspace_state.h mount_utils
     namespace path_utils {
-        // Convenience aliases to mount_utils
         inline std::string get_mount_root() {
             return mount_utils::get_mount_root();
         }
 
-        inline std::string get_onedrive_root() {
-            return mount_utils::get_onedrive_root();
+        // Check if path is under the remote mount root (~/misty/mnt/*)
+        inline bool is_remote_path(const std::string& path) {
+            std::string root = get_mount_root();
+            if (path.rfind(root, 0) != 0) return false;
+            // Must have content beyond the mount root itself
+            std::string after = path.substr(root.length());
+            return !after.empty() && after != "/";
         }
 
-        inline std::string get_gdrive_root() {
-            return mount_utils::get_gdrive_root();
-        }
-
-        inline std::string get_dropbox_root() {
-            return mount_utils::get_dropbox_root();
-        }
-
-        inline std::string get_icloud_root() {
-            return mount_utils::get_icloud_root();
-        }
-
-        inline bool is_icloud_path(const std::string& path) {
-            std::string root = get_icloud_root();
-            return path.rfind(root, 0) == 0;
-        }
-
-        // Parse iCloud path into (account_folder_name, relative_path)
-        // e.g., "~/misty/mnt/iCloud/matthew/Documents/report.pdf"
-        //       -> ("matthew", "Documents/report.pdf")
-        inline std::pair<std::string, std::string> parse_icloud_path(const std::string& path) {
-            std::string root = get_icloud_root();
-            if (path.rfind(root, 0) != 0) {
-                return {"", ""};
-            }
+        // Parse remote path: ~/misty/mnt/onedrive-john/Documents → ("onedrive-john", "Documents")
+        inline std::pair<std::string, std::string> parse_remote_path(const std::string& path) {
+            std::string root = get_mount_root();
+            if (path.rfind(root, 0) != 0) return {"", ""};
 
             std::string relative = path.substr(root.length());
-            if (relative.empty() || relative == "/") {
-                return {"", ""};  // At mount root, show accounts
-            }
+            if (relative.empty() || relative == "/") return {"", ""};
 
             if (!relative.empty() && relative[0] == '/') {
                 relative = relative.substr(1);
             }
 
-            size_t slash_pos = relative.find('/');
-            if (slash_pos == std::string::npos) {
-                return {relative, ""};  // Just account name, at account root
+            size_t slash = relative.find('/');
+            if (slash == std::string::npos) {
+                return {relative, ""};  // At remote root
             }
-
-            return {
-                relative.substr(0, slash_pos),
-                relative.substr(slash_pos + 1)
-            };
-        }
-
-        inline bool is_dropbox_path(const std::string& path) {
-            std::string root = get_dropbox_root();
-            return path.rfind(root, 0) == 0;
-        }
-
-        // Parse Dropbox path into (account_folder_name, relative_path)
-        // e.g., "~/misty/mnt/Dropbox/matthew/Documents"
-        //       -> ("matthew", "Documents")
-        inline std::pair<std::string, std::string> parse_dropbox_path(const std::string& path) {
-            std::string root = get_dropbox_root();
-            if (path.rfind(root, 0) != 0) {
-                return {"", ""};
-            }
-
-            std::string relative = path.substr(root.length());
-            if (relative.empty() || relative == "/") {
-                return {"", ""};  // At mount root, show accounts
-            }
-
-            // Remove leading slash
-            if (!relative.empty() && relative[0] == '/') {
-                relative = relative.substr(1);
-            }
-
-            size_t slash_pos = relative.find('/');
-            if (slash_pos == std::string::npos) {
-                // Just account name, at account root
-                return {relative, ""};
-            }
-
-            return {
-                relative.substr(0, slash_pos),
-                relative.substr(slash_pos + 1)
-            };
-        }
-
-        inline bool is_gdrive_path(const std::string& path) {
-            std::string root = get_gdrive_root();
-            return path.rfind(root, 0) == 0;
-        }
-
-        // Parse Google Drive path into (account_folder_name, relative_path)
-        // e.g., "~/misty/mnt/GoogleDrive/matthew/Documents"
-        //       → ("matthew", "Documents")
-        inline std::pair<std::string, std::string> parse_gdrive_path(const std::string& path) {
-            std::string root = get_gdrive_root();
-            if (path.rfind(root, 0) != 0) {
-                return {"", ""};
-            }
-
-            std::string relative = path.substr(root.length());
-            if (relative.empty() || relative == "/") {
-                return {"", ""};  // At mount root, show accounts
-            }
-
-            // Remove leading slash
-            if (!relative.empty() && relative[0] == '/') {
-                relative = relative.substr(1);
-            }
-
-            size_t slash_pos = relative.find('/');
-            if (slash_pos == std::string::npos) {
-                // Just account name, at account root
-                return {relative, ""};
-            }
-
-            return {
-                relative.substr(0, slash_pos),
-                relative.substr(slash_pos + 1)
-            };
-        }
-
-        inline bool is_onedrive_path(const std::string& path) {
-            std::string root = get_onedrive_root();
-            return path.rfind(root, 0) == 0;
-        }
-
-        // Parse OneDrive path into (account_folder_name, relative_path)
-        // e.g., "~/misty/mnt/OneDrive/matthew/Documents"
-        //       → ("matthew", "Documents")
-        inline std::pair<std::string, std::string> parse_onedrive_path(const std::string& path) {
-            std::string root = get_onedrive_root();
-            if (path.rfind(root, 0) != 0) {
-                return {"", ""};
-            }
-
-            std::string relative = path.substr(root.length());
-            if (relative.empty() || relative == "/") {
-                return {"", ""};  // At mount root, show accounts
-            }
-
-            // Remove leading slash
-            if (!relative.empty() && relative[0] == '/') {
-                relative = relative.substr(1);
-            }
-
-            size_t slash_pos = relative.find('/');
-            if (slash_pos == std::string::npos) {
-                // Just account name, at account root
-                return {relative, ""};
-            }
-
-            return {
-                relative.substr(0, slash_pos),
-                relative.substr(slash_pos + 1)
-            };
+            return {relative.substr(0, slash), relative.substr(slash + 1)};
         }
 
         // Split a path into components

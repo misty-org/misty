@@ -10,9 +10,6 @@
 
 namespace misty::panel {
 
-    // Target cloud service for uploads
-    enum class UploadTarget { ONEDRIVE, GDRIVE, DROPBOX };
-
     // State for a single file upload
     struct FileUploadProgress {
         std::string file_path;
@@ -22,7 +19,8 @@ namespace misty::panel {
         bool is_complete = false;
         bool has_error = false;
         std::string error_message;
-        UploadTarget target_service = UploadTarget::ONEDRIVE;
+        std::string remote_name;   // rclone remote name for the upload target
+        std::string remote_path;   // path within the remote
     };
 
     struct FileSidebarState : public core::UIState {

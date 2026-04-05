@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg: #09090B;
+  --color-bg: #07090b;
   --color-surface: #111113;
   --color-elevated: #18181B;
   --color-border: #27272A;
@@ -23,6 +23,7 @@
 
 html {
   scroll-behavior: auto;
+  overflow-y: scroll;
 }
 
 body {
@@ -85,25 +86,16 @@ body {
 
 /* Glassmorphism utility */
 .glass {
-  background: rgba(9, 9, 11, 0.85);
+  background: rgba(19, 18, 24, 0.85);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
 }
 
 .glass-card {
-  background: rgba(17, 17, 19, 0.5);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(39, 39, 42, 0.5);
+  background: #07090b;
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-/* Gradient text */
-.gradient-text {
-  background: linear-gradient(135deg, #F0C040 0%, #F5D870 50%, #E8B020 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
 
 /* Grid background pattern */
 .grid-bg {
