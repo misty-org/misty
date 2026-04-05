@@ -5,6 +5,7 @@ import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useShallow } from "zustand/react/shallow";
 import mikaAnimation from "../../../assets/bots/cloud-folder/mika.webp";
+import { useAppStore } from "../../../stores/useAppStore";
 import { selectedPathsForPane, useExplorerStore } from "../../../stores/useExplorerStore";
 import { useMikaSessionStore } from "../../../stores/useMikaSessionStore";
 import { useSmartLibraryStore } from "../../../stores/useSmartLibraryStore";
@@ -13,6 +14,7 @@ import type { SmartLibraryAsset } from "../../../api/types";
 import { useMultiPanelStore } from "../../../shared/multipanel/useMultiPanelStore";
 import { errorText } from "../../../shared/format";
 import { safeTauriAssetUrl } from "../../../shared/tauri";
+import { restoreBundledAssetOnError, runtimeAssetSource } from "../../../shared/assets/runtimeAsset";
 import { cx } from "./ExplorerDesktopShared";
 import { AgentSources } from "../../../agents/AgentSources";
 import "../../../agents/sources.css";
@@ -319,6 +321,8 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel(props: {
   workingDirectory?: string;
   selectedPaths?: string[];
 }) {
+  const assetsDir = useAppStore((state) => state.app?.environment.assetsDir);
+  const mikaAnimationSource = runtimeAssetSource(assetsDir, "animations/mika.webp", mikaAnimation);
   const activePaneId = useMultiPanelStore((state) => state.activePaneId);
   const panes = useExplorerStore((state) => state.panes);
   const listing = useExplorerStore((state) => state.panes[activePaneId]?.listing ?? null);
@@ -517,7 +521,8 @@ export const ExplorerMikaPanel = memo(function ExplorerMikaPanel(props: {
               aria-hidden="true"
               className={`pointer-events-none absolute -top-12 z-0 h-[72px] w-[88px] select-none object-contain drop-shadow-[0_10px_18px_rgba(18,92,150,0.24)] transition-[opacity,transform] duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] motion-reduce:transition-none ${mikaPeek.popped ? "opacity-100" : "opacity-0"}`}
               draggable={false}
-              src={mikaAnimation}
+              src={mikaAnimationSource}
+              onError={(event) => restoreBundledAssetOnError(event, mikaAnimation)}
               style={{
                 left: `${mikaPeek.leftPercent}%`,
                 transform: mikaPeek.popped

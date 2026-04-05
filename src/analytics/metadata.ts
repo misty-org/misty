@@ -21,7 +21,7 @@ async function loadMetadata(): Promise<CommonClientProperties> {
     ...(architecture ? { architecture } : {}),
     release_channel: releaseChannel(),
     distribution_channel: distributionChannel(),
-    device_class: isNativeMobileBuild ? "phone" : "desktop",
+    device_class: isNativeMobileBuild ? "tablet" : "desktop",
     environment: appEnvironment(),
   };
 }

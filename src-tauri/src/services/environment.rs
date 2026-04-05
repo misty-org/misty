@@ -378,9 +378,13 @@ mod tests {
         )
         .expect("write settings");
 
-        let environment = AppEnvironment::for_home(root);
+        let environment = AppEnvironment::for_home(root.clone());
         let snapshot = environment.snapshot();
 
+        assert_eq!(
+            snapshot.assets_dir,
+            display_path(&root.join(".misty/assets"))
+        );
         assert_eq!(snapshot.grpc_address, "127.0.0.1:60051");
         assert_eq!(snapshot.mount_path, "/Volumes/Misty");
         assert_eq!(

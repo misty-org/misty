@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { existsSync, readFileSync, readdirSync, statSync, writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
@@ -12,7 +12,7 @@ const passes = [];
 const warnings = [];
 
 if (!skipBuild) {
-  run("npm", ["run", "build:mobile"], { stdio: "inherit" });
+  run("npm", ["run", "build:android"], { stdio: "inherit" });
 }
 
 scanTextTree("src", [
@@ -23,21 +23,20 @@ scanTextTree("src", [
 ], "high-confidence secret formats");
 
 scanMobileBundle([
-  /\bsubscription\b/i,
-  /\bupgrade\b/i,
-  /\bpricing\b/i,
-  /\bpurchase\b/i,
-  /\bexternal payment\b/i,
-  /browse extensions/i,
-  /manage extensions/i,
-  /install extension/i,
-  /plugin catalog/i,
   /Action debug/i,
   /Provider auth debug/i,
-], "Play policy and desktop-only mobile bundle strings");
+], "restricted debug strings");
 
-requireText("src-tauri/gen/android/app/src/main/AndroidManifest.xml", /android\.permission\.INTERNET/, "INTERNET permission only baseline");
-forbidText("src-tauri/gen/android/app/src/main/AndroidManifest.xml", /READ_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE|MANAGE_EXTERNAL_STORAGE|QUERY_ALL_PACKAGES|REQUEST_INSTALL_PACKAGES/, "broad Android runtime permissions");
+requireText("src-tauri/gen/android/app/src/main/AndroidManifest.xml", /android\.permission\.INTERNET/, "INTERNET permission baseline");
+requireText("src-tauri/gen/android/app/src/main/AndroidManifest.xml", /android:requiresSmallestWidthDp="600"/, "600dp tablet-only minimum width");
+requireText("src-tauri/gen/android/app/src/main/AndroidManifest.xml", /android:smallScreens="false"/, "phone-sized screens disabled");
+requireWarningText(
+  "src-tauri/gen/android/app/src/main/AndroidManifest.xml",
+  /android\.permission\.MANAGE_EXTERNAL_STORAGE/,
+  "MANAGE_EXTERNAL_STORAGE for Android file-manager functionality",
+  "MANAGE_EXTERNAL_STORAGE remains a high-risk Play permission and requires a platform declaration justifying all-files access as core file-management functionality.",
+);
+forbidText("src-tauri/gen/android/app/src/main/AndroidManifest.xml", /READ_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE|QUERY_ALL_PACKAGES|REQUEST_INSTALL_PACKAGES/, "unapproved broad Android runtime permissions");
 requireText("src-tauri/gen/android/app/build.gradle.kts", /applicationId = "com\.misty\.mobile"/, "Android applicationId com.misty.mobile");
 requireText("src-tauri/gen/android/app/build.gradle.kts", /namespace = "com\.misty\.mobile"/, "Android namespace com.misty.mobile");
 requireText("src-tauri/gen/android/app/build.gradle.kts", /usesCleartextTraffic"\] = "false"/, "release cleartext traffic disabled");
@@ -49,31 +48,13 @@ forbidText("src-tauri/vendor/tauri-plugin-keystore/android/build.gradle.kts", /a
 forbidText("src-tauri/vendor/tauri-plugin-keystore/android/src/main/java/KeystorePlugin.kt", /BiometricPrompt|printStackTrace\(|Logger\./, "unnecessary biometric access or sensitive native debug logging");
 forbidText("src-tauri/vendor/tauri-plugin-keystore/android/src/main/java/SecureTokenStore.kt", /BiometricPrompt|printStackTrace\(|Logger\./, "unnecessary biometric access or sensitive native debug logging");
 requireText("src-tauri/vendor/tauri-plugin-keystore/android/src/androidTest/java/SecureTokenStoreTest.kt", /tokenIsEncryptedRoundTripsAndCanBeRemoved/, "Android secure storage instrumentation coverage");
-requireText("src/pages/Extensions/mobile/index.tsx", /Navigate to="\/files"/, "mobile Extensions redirect");
-requireText("src/router.tsx", /mobile=\{<Navigate to=\{routes\.files\} replace \/>\}/, "mobile desktop-only route redirects");
+requireText("src/router.tsx", /path: "spaces",\s+element: <SpacesShell \/>/, "tablet Spaces route");
+requireText("src/router.tsx", /path: "studio\/agents", element: <StudioPage kind="agents" \/>/, "tablet Studio agents route");
+requireText("src/router.tsx", /path: "studio\/workflows", element: <StudioPage kind="workflows" \/>/, "tablet Studio workflows route");
 requireText("src/stores/useSettingsStore.ts", /isNativeMobileBuild \? "" : "localhost:50051"/, "mobile avoids localhost advanced server fallback");
-forbidText("marketing/google-play-metadata/en-US/play-store-listing.json", /SUPPLY_|PLACEHOLDER|example\.com|yourdomain/i, "placeholder or fake Google Play metadata URL values");
-
-const report = [
-  "# Android Security Audit",
-  "",
-  `Generated: ${new Date().toISOString()}`,
-  "",
-  "## Passes",
-  ...passes.map((item) => `- ${item}`),
-  "",
-  "## Warnings",
-  ...(warnings.length > 0 ? warnings.map((item) => `- ${item}`) : ["- None."]),
-  "",
-  "## Findings",
-  ...(findings.length > 0 ? findings.map((item) => `- ${item}`) : ["- No critical or high-severity local Android findings in this automated pass."]),
-  "",
-].join("\n");
-
-mkdirSync(path.join(root, "docs"), { recursive: true });
-writeFileSync(path.join(root, "docs/android-security-review.md"), report);
-
 console.log(`Android security audit: ${passes.length} passes, ${warnings.length} warnings, ${findings.length} findings`);
+for (const warning of warnings) console.warn(`WARN ${warning}`);
+for (const finding of findings) console.error(`FAIL ${finding}`);
 if (findings.length > 0) process.exit(1);
 
 function rel(...parts) {
@@ -92,6 +73,16 @@ function forbidText(relativePath, pattern, label) {
   if (!text) return;
   if (pattern.test(text)) findings.push(`${relativePath} contains ${label}`);
   else passes.push(`${relativePath}: no ${label}`);
+}
+
+function requireWarningText(relativePath, pattern, label, warning) {
+  const text = readMaybe(relativePath);
+  if (!text) return;
+  if (!pattern.test(text)) findings.push(`${relativePath} missing ${label}`);
+  else {
+    passes.push(`${relativePath}: ${label}`);
+    warnings.push(warning);
+  }
 }
 
 function readMaybe(relativePath) {

@@ -1,15 +1,16 @@
 import { lazy, Suspense } from "react";
-import { detectAppFormFactor } from "../../platform/formFactor";
-import MobileFilesPage from "./mobile";
+import { ExplorerLoadingShell } from "./components/ExplorerLoadingShell";
 
-const DesktopFilesPage = import.meta.env.MODE === "mobile"
-  ? null
-  : lazy(() => import("./desktop"));
+const loadDesktopFilesPage = () => import("./desktop");
+const DesktopFilesPage = lazy(loadDesktopFilesPage);
+
+export function preloadDesktopFilesPage(): Promise<unknown> {
+  return loadDesktopFilesPage();
+}
 
 export default function FilesPage() {
-  if (detectAppFormFactor() === "mobile" || !DesktopFilesPage) return <MobileFilesPage />;
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<ExplorerLoadingShell />}>
       <DesktopFilesPage />
     </Suspense>
   );
