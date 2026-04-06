@@ -11,7 +11,7 @@ import {
   mediaSearchSnapshot,
 } from "../api/misty";
 import type { MediaAsset, MediaSearchSnapshot } from "../api/types";
-import { clearSemanticExplorerSearchCache } from "../pages/Files/utils/globalSearch";
+import { clearSemanticExplorerSearchCache } from "../features/explorer/utils/globalSearch";
 import {
   deleteMediaSearchAsset,
   deleteMediaSearchDevice,
@@ -51,7 +51,8 @@ export const useMediaSearchStore = create<MediaSearchState>((set, get) => {
   let worker: Promise<void> | null = null;
   const pauseRequested = new Set<string>();
 
-  const updateSnapshot = (snapshot: MediaSearchSnapshot) => set({ snapshot, loaded: true, loading: false });
+  const updateSnapshot = (snapshot: MediaSearchSnapshot) =>
+    set({ snapshot, loaded: true, loading: false });
 
   const reconcileRemoved = async (snapshot: MediaSearchSnapshot): Promise<MediaSearchSnapshot> => {
     if (snapshot.removedAssetIds.length === 0) return snapshot;
@@ -88,14 +89,18 @@ export const useMediaSearchStore = create<MediaSearchState>((set, get) => {
       });
       try {
         for (let index = asset.nextChunkIndex; index < totalChunks; index += 1) {
-          if (pauseRequested.has(asset.assetId) || currentAsset(asset.assetId)?.status === "paused") break;
+          if (pauseRequested.has(asset.assetId) || currentAsset(asset.assetId)?.status === "paused")
+            break;
           const chunk = await mediaSearchPrepareChunk(asset.assetId, index);
           await indexChunkWithRetry(chunk);
           const snapshot = await mediaSearchRecordChunk(asset.assetId, asset.fingerprint, index);
           updateSnapshot(snapshot);
           set({ progress: (index + 1) / totalChunks });
         }
-        if (pauseRequested.delete(asset.assetId) || currentAsset(asset.assetId)?.status === "paused") {
+        if (
+          pauseRequested.delete(asset.assetId) ||
+          currentAsset(asset.assetId)?.status === "paused"
+        ) {
           const snapshot = await mediaSearchSetAssetState(asset.assetId, "paused");
           updateSnapshot(snapshot);
           continue;
@@ -109,7 +114,11 @@ export const useMediaSearchStore = create<MediaSearchState>((set, get) => {
         }
       } catch (reason) {
         try {
-          const snapshot = await mediaSearchComplete(asset.assetId, asset.fingerprint, "index_failed");
+          const snapshot = await mediaSearchComplete(
+            asset.assetId,
+            asset.fingerprint,
+            "index_failed",
+          );
           updateSnapshot(snapshot);
         } catch {
           // Preserve the original actionable error.
@@ -119,7 +128,8 @@ export const useMediaSearchStore = create<MediaSearchState>((set, get) => {
     }
   };
 
-  const currentAsset = (assetId: string) => get().snapshot?.assets.find((asset) => asset.assetId === assetId);
+  const currentAsset = (assetId: string) =>
+    get().snapshot?.assets.find((asset) => asset.assetId === assetId);
 
   return {
     loaded: false,
@@ -132,7 +142,9 @@ export const useMediaSearchStore = create<MediaSearchState>((set, get) => {
     load: async () => {
       try {
         set({ loading: true, error: null });
-        const snapshot = await reconcileRemoved(await ensureMediaSearchDeviceReady(await mediaSearchSnapshot()));
+        const snapshot = await reconcileRemoved(
+          await ensureMediaSearchDeviceReady(await mediaSearchSnapshot()),
+        );
         updateSnapshot(snapshot);
         scheduleWorker();
       } catch (reason) {
@@ -142,7 +154,9 @@ export const useMediaSearchStore = create<MediaSearchState>((set, get) => {
     scan: async () => {
       try {
         set({ loading: true, error: null });
-        const snapshot = await reconcileRemoved(await ensureMediaSearchDeviceReady(await mediaSearchScanMovies()));
+        const snapshot = await reconcileRemoved(
+          await ensureMediaSearchDeviceReady(await mediaSearchScanMovies()),
+        );
         updateSnapshot(snapshot);
         scheduleWorker();
       } catch (reason) {
@@ -151,7 +165,9 @@ export const useMediaSearchStore = create<MediaSearchState>((set, get) => {
     },
     requestIndex: (assetIds) => {
       const wanted = new Set(assetIds);
-      const assets = (get().snapshot?.assets ?? []).filter((asset) => wanted.has(asset.assetId) && isEligibleAsset(asset));
+      const assets = (get().snapshot?.assets ?? []).filter(
+        (asset) => wanted.has(asset.assetId) && isEligibleAsset(asset),
+      );
       if (assets.length === 0) return;
       const estimate = estimateAssets(assets);
       set({ pendingApproval: estimate, error: null });
@@ -204,9 +220,11 @@ function isEligibleAsset(asset: MediaAsset): boolean {
 }
 
 function isRunnableAsset(asset: MediaAsset): boolean {
-  return (asset.status === "queued" || asset.status === "processing")
-    && asset.approvedFingerprint === asset.fingerprint
-    && asset.indexedFingerprint !== asset.fingerprint;
+  return (
+    (asset.status === "queued" || asset.status === "processing") &&
+    asset.approvedFingerprint === asset.fingerprint &&
+    asset.indexedFingerprint !== asset.fingerprint
+  );
 }
 
 export function estimateAssets(assets: MediaAsset[]): MediaIndexEstimate {
@@ -216,10 +234,11 @@ export function estimateAssets(assets: MediaAsset[]): MediaIndexEstimate {
     const startChunk = asset.approvedFingerprint === asset.fingerprint ? asset.nextChunkIndex : 0;
     for (let index = startChunk; index < mediaChunkCount(asset.durationMs); index += 1) {
       const start = index * 30_000;
-      const end = index + 1 === mediaChunkCount(asset.durationMs) ? asset.durationMs : start + 30_000;
+      const end =
+        index + 1 === mediaChunkCount(asset.durationMs) ? asset.durationMs : start + 30_000;
       const duration = Math.max(0, end - start);
       remainingDurationMs += duration;
-      estimatedCredits += Math.max(1, Math.ceil(duration * 1000 / 60_000)) / 1000;
+      estimatedCredits += Math.max(1, Math.ceil((duration * 1000) / 60_000)) / 1000;
     }
   }
   return {
@@ -249,7 +268,8 @@ async function indexChunkWithRetry(chunk: Parameters<typeof indexMediaChunk>[0])
       return;
     } catch (reason) {
       if (attempt === maxAttempts || !isRetryableChunkError(reason)) throw reason;
-      const serverDelay = reason instanceof ManagedAiRequestError ? reason.retryAfterSeconds : undefined;
+      const serverDelay =
+        reason instanceof ManagedAiRequestError ? reason.retryAfterSeconds : undefined;
       const delayMs = Math.min(60_000, Math.max(500, (serverDelay ?? 2 ** (attempt - 1)) * 1000));
       await new Promise((resolve) => globalThis.setTimeout(resolve, delayMs));
     }
@@ -258,8 +278,14 @@ async function indexChunkWithRetry(chunk: Parameters<typeof indexMediaChunk>[0])
 
 function isRetryableChunkError(reason: unknown): boolean {
   if (reason instanceof ManagedAiRequestError) {
-    if (reason.code === "media_search_disabled" || reason.code === "insufficient_credits") return false;
-    return reason.status === 409 || reason.status === 429 || reason.status === 502 || reason.status === 504;
+    if (reason.code === "media_search_disabled" || reason.code === "insufficient_credits")
+      return false;
+    return (
+      reason.status === 409 ||
+      reason.status === 429 ||
+      reason.status === 502 ||
+      reason.status === 504
+    );
   }
   return reason instanceof TypeError;
 }

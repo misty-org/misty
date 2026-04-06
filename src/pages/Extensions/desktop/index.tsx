@@ -26,7 +26,11 @@ function toBrowserEntry(plugin: PluginEntry): PluginBrowserEntry {
     changelog: plugin.changelog,
     includedTools: plugin.included_tools,
     links: plugin.links,
-    placement: { views: plugin.launcher.views, openMode: plugin.launcher.open_mode, requiresSelection: plugin.launcher.requires_selected_file },
+    placement: {
+      views: plugin.launcher.views,
+      openMode: plugin.launcher.open_mode,
+      requiresSelection: plugin.launcher.requires_selected_file,
+    },
   };
 }
 
@@ -88,7 +92,9 @@ export default function PluginsPage() {
     [installedPlugins],
   );
   const routePluginAvailable = useMemo(
-    () => Boolean(routePluginId) && [...marketplacePlugins, ...installedPlugins].some((plugin) => plugin.id === routePluginId),
+    () =>
+      Boolean(routePluginId) &&
+      [...marketplacePlugins, ...installedPlugins].some((plugin) => plugin.id === routePluginId),
     [installedPlugins, marketplacePlugins, routePluginId],
   );
 
@@ -106,8 +112,9 @@ export default function PluginsPage() {
       marketplacePlugins={browserMarketplacePlugins}
       notice={notice}
       onInstall={(plugin) => {
-        const match = marketplacePlugins.find((entry) => entry.id === plugin.id)
-          ?? installedPlugins.find((entry) => entry.id === plugin.id);
+        const match =
+          marketplacePlugins.find((entry) => entry.id === plugin.id) ??
+          installedPlugins.find((entry) => entry.id === plugin.id);
         if (match) {
           void installPlugin(match);
         }
@@ -123,15 +130,17 @@ export default function PluginsPage() {
       }}
       onSelect={selectPlugin}
       onToggle={(plugin, enabled) => {
-        const match = marketplacePlugins.find((entry) => entry.id === plugin.id)
-          ?? installedPlugins.find((entry) => entry.id === plugin.id);
+        const match =
+          marketplacePlugins.find((entry) => entry.id === plugin.id) ??
+          installedPlugins.find((entry) => entry.id === plugin.id);
         if (match) {
           void setPluginEnabled(match, enabled);
         }
       }}
       onUninstall={(plugin) => {
-        const match = installedPlugins.find((entry) => entry.id === plugin.id)
-          ?? marketplacePlugins.find((entry) => entry.id === plugin.id);
+        const match =
+          installedPlugins.find((entry) => entry.id === plugin.id) ??
+          marketplacePlugins.find((entry) => entry.id === plugin.id);
         if (match) {
           void uninstallPlugin(match);
         }

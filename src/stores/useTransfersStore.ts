@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { transfersDeleteAll, transfersDeleteSelected, transfersSnapshot } from "../api/misty";
 import type { TransferPage, TransferStatus, TransferType } from "../api/types";
-import { errorText } from "../shared/format";
+import { errorText } from "@/shared/format";
 import { selectGeneralPreferences, useSettingsStore } from "./useSettingsStore";
 
 let silentTransferLoadInFlight = false;
@@ -35,7 +35,11 @@ interface TransfersStore {
   load: (search?: string, options?: { silent?: boolean; force?: boolean }) => Promise<void>;
   ensureWorkspace: (workspaceId: string) => void;
   setSearch: (workspaceId: string, search: string) => void;
-  selectTransfer: (workspaceId: string, id: number, options?: { toggle?: boolean; range?: boolean; visibleTransferIds?: number[] }) => void;
+  selectTransfer: (
+    workspaceId: string,
+    id: number,
+    options?: { toggle?: boolean; range?: boolean; visibleTransferIds?: number[] },
+  ) => void;
   toggleProviderFilter: (workspaceId: string, provider: string) => void;
   toggleTypeFilter: (workspaceId: string, type: TransferType) => void;
   setLocationScope: (workspaceId: string, scope: TransferLocationScope) => void;
@@ -66,10 +70,7 @@ export const useTransfersStore = create<TransfersStore>((set, get) => ({
       set((state) => {
         const transfers = transferPagesEqual(state.transfers, next) ? state.transfers : next;
         const workspaces = pruneWorkspaces(state.workspaces, visibleIds);
-        if (
-          transfers === state.transfers
-          && workspaces === state.workspaces
-        ) {
+        if (transfers === state.transfers && workspaces === state.workspaces) {
           return state;
         }
         return { transfers, workspaces };
@@ -84,14 +85,17 @@ export const useTransfersStore = create<TransfersStore>((set, get) => ({
 
   ensureWorkspace: (workspaceId) => {
     if (!workspaceId) return;
-    set((state) => state.workspaces[workspaceId]
-      ? state
-      : { workspaces: { ...state.workspaces, [workspaceId]: createTransferWorkspaceState() } });
+    set((state) =>
+      state.workspaces[workspaceId]
+        ? state
+        : { workspaces: { ...state.workspaces, [workspaceId]: createTransferWorkspaceState() } },
+    );
   },
 
   setSearch: (workspaceId, search) => {
     updateWorkspace(set, workspaceId, (workspace) =>
-      workspace.search === search ? workspace : { ...workspace, search, pageIndex: 0 });
+      workspace.search === search ? workspace : { ...workspace, search, pageIndex: 0 },
+    );
   },
 
   selectTransfer: (workspaceId, id, options = {}) => {
@@ -160,15 +164,33 @@ export const useTransfersStore = create<TransfersStore>((set, get) => ({
   },
 
   setLocationScope: (workspaceId, locationScope) => {
-    updateWorkspace(set, workspaceId, (workspace) => workspace.locationScope === locationScope
-      ? workspace
-      : { ...workspace, locationScope, selectedIds: new Set(), focusedTransferId: null, lastSelectedId: null, pageIndex: 0 });
+    updateWorkspace(set, workspaceId, (workspace) =>
+      workspace.locationScope === locationScope
+        ? workspace
+        : {
+            ...workspace,
+            locationScope,
+            selectedIds: new Set(),
+            focusedTransferId: null,
+            lastSelectedId: null,
+            pageIndex: 0,
+          },
+    );
   },
 
   setStatusFilter: (workspaceId, statusFilter) => {
-    updateWorkspace(set, workspaceId, (workspace) => workspace.statusFilter === statusFilter
-      ? workspace
-      : { ...workspace, statusFilter, selectedIds: new Set(), focusedTransferId: null, lastSelectedId: null, pageIndex: 0 });
+    updateWorkspace(set, workspaceId, (workspace) =>
+      workspace.statusFilter === statusFilter
+        ? workspace
+        : {
+            ...workspace,
+            statusFilter,
+            selectedIds: new Set(),
+            focusedTransferId: null,
+            lastSelectedId: null,
+            pageIndex: 0,
+          },
+    );
   },
 
   setSort: (workspaceId, sortKey, direction) => {
@@ -187,25 +209,34 @@ export const useTransfersStore = create<TransfersStore>((set, get) => ({
         }
       }
       if (nextSortKey === "none") sortDirection = "asc";
-      if (workspace.sortKey === nextSortKey && workspace.sortDirection === sortDirection) return state;
-      return withWorkspace(state, workspaceId, { ...workspace, sortKey: nextSortKey, sortDirection, pageIndex: 0 });
+      if (workspace.sortKey === nextSortKey && workspace.sortDirection === sortDirection)
+        return state;
+      return withWorkspace(state, workspaceId, {
+        ...workspace,
+        sortKey: nextSortKey,
+        sortDirection,
+        pageIndex: 0,
+      });
     });
   },
 
-  setPageIndex: (workspaceId, pageIndex) => set((state) => {
-    const normalized = Math.max(0, Math.floor(pageIndex));
-    const workspace = state.workspaces[workspaceId] ?? createTransferWorkspaceState();
-    return workspace.pageIndex === normalized ? state : withWorkspace(state, workspaceId, { ...workspace, pageIndex: normalized });
-  }),
+  setPageIndex: (workspaceId, pageIndex) =>
+    set((state) => {
+      const normalized = Math.max(0, Math.floor(pageIndex));
+      const workspace = state.workspaces[workspaceId] ?? createTransferWorkspaceState();
+      return workspace.pageIndex === normalized
+        ? state
+        : withWorkspace(state, workspaceId, { ...workspace, pageIndex: normalized });
+    }),
 
   clearFilters: (workspaceId) => {
     set((state) => {
       const workspace = state.workspaces[workspaceId] ?? createTransferWorkspaceState();
       if (
-        workspace.providerFilters.size === 0
-        && workspace.typeFilters.size === 0
-        && workspace.locationScope === "all"
-        && workspace.statusFilter === "all"
+        workspace.providerFilters.size === 0 &&
+        workspace.typeFilters.size === 0 &&
+        workspace.locationScope === "all" &&
+        workspace.statusFilter === "all"
       ) {
         return state;
       }
@@ -225,13 +256,18 @@ export const useTransfersStore = create<TransfersStore>((set, get) => ({
 
   setFocusedTransfer: (workspaceId, focusedTransferId) => {
     updateWorkspace(set, workspaceId, (workspace) =>
-      workspace.focusedTransferId === focusedTransferId ? workspace : { ...workspace, focusedTransferId });
+      workspace.focusedTransferId === focusedTransferId
+        ? workspace
+        : { ...workspace, focusedTransferId },
+    );
   },
 
   deleteIds: async (workspaceId, idsInput) => {
     const ids = [...new Set(idsInput)].filter((id) => Number.isFinite(id));
     if (ids.length === 0) return;
-    const shouldConfirm = selectGeneralPreferences(useSettingsStore.getState().settings?.document).confirmDestructiveActions;
+    const shouldConfirm = selectGeneralPreferences(
+      useSettingsStore.getState().settings?.document,
+    ).confirmDestructiveActions;
     if (
       shouldConfirm &&
       !window.confirm(
@@ -247,15 +283,20 @@ export const useTransfersStore = create<TransfersStore>((set, get) => ({
       set((state) => ({
         ...withWorkspace(state, workspaceId, {
           ...(state.workspaces[workspaceId] ?? createTransferWorkspaceState()),
-          selectedIds: new Set([...(state.workspaces[workspaceId]?.selectedIds ?? [])].filter((id) => !deletedIds.has(id))),
+          selectedIds: new Set(
+            [...(state.workspaces[workspaceId]?.selectedIds ?? [])].filter(
+              (id) => !deletedIds.has(id),
+            ),
+          ),
           focusedTransferId: deletedIds.has(state.workspaces[workspaceId]?.focusedTransferId ?? -1)
             ? null
-            : state.workspaces[workspaceId]?.focusedTransferId ?? null,
+            : (state.workspaces[workspaceId]?.focusedTransferId ?? null),
           lastSelectedId: deletedIds.has(state.workspaces[workspaceId]?.lastSelectedId ?? -1)
             ? null
-            : state.workspaces[workspaceId]?.lastSelectedId ?? null,
+            : (state.workspaces[workspaceId]?.lastSelectedId ?? null),
         }),
-        message: ids.length === 1 ? "Transfer history row deleted." : "Transfer history rows deleted.",
+        message:
+          ids.length === 1 ? "Transfer history row deleted." : "Transfer history rows deleted.",
       }));
       await get().load();
     } catch (error) {
@@ -271,10 +312,14 @@ export const useTransfersStore = create<TransfersStore>((set, get) => ({
   },
 
   deleteAll: async () => {
-    const shouldConfirm = selectGeneralPreferences(useSettingsStore.getState().settings?.document).confirmDestructiveActions;
+    const shouldConfirm = selectGeneralPreferences(
+      useSettingsStore.getState().settings?.document,
+    ).confirmDestructiveActions;
     if (
       shouldConfirm &&
-      !window.confirm("Delete all transfer history? This ignores current filters and does not cancel active file operations.")
+      !window.confirm(
+        "Delete all transfer history? This ignores current filters and does not cancel active file operations.",
+      )
     ) {
       return;
     }
@@ -282,10 +327,18 @@ export const useTransfersStore = create<TransfersStore>((set, get) => ({
     try {
       await transfersDeleteAll();
       set((state) => ({
-        workspaces: Object.fromEntries(Object.entries(state.workspaces).map(([key, workspace]) => [
-          key,
-          { ...workspace, selectedIds: new Set(), pageIndex: 0, focusedTransferId: null, lastSelectedId: null },
-        ])),
+        workspaces: Object.fromEntries(
+          Object.entries(state.workspaces).map(([key, workspace]) => [
+            key,
+            {
+              ...workspace,
+              selectedIds: new Set(),
+              pageIndex: 0,
+              focusedTransferId: null,
+              lastSelectedId: null,
+            },
+          ]),
+        ),
         message: "All transfer history deleted.",
       }));
       await get().load();
@@ -297,16 +350,29 @@ export const useTransfersStore = create<TransfersStore>((set, get) => ({
   },
 }));
 
-export const transferTypes: TransferType[] = ["upload", "download", "archive", "create", "copy", "move", "rename", "delete"];
+export const transferTypes: TransferType[] = [
+  "upload",
+  "download",
+  "archive",
+  "create",
+  "copy",
+  "move",
+  "rename",
+  "delete",
+];
 
-export function activeTransferFilterCount(state: Pick<
-  TransferWorkspaceState,
-  "providerFilters" | "typeFilters" | "locationScope" | "statusFilter"
->): number {
-  return state.providerFilters.size
-    + state.typeFilters.size
-    + (state.locationScope === "all" ? 0 : 1)
-    + (state.statusFilter === "all" ? 0 : 1);
+export function activeTransferFilterCount(
+  state: Pick<
+    TransferWorkspaceState,
+    "providerFilters" | "typeFilters" | "locationScope" | "statusFilter"
+  >,
+): number {
+  return (
+    state.providerFilters.size +
+    state.typeFilters.size +
+    (state.locationScope === "all" ? 0 : 1) +
+    (state.statusFilter === "all" ? 0 : 1)
+  );
 }
 
 export function createTransferWorkspaceState(): TransferWorkspaceState {
@@ -326,7 +392,12 @@ export function createTransferWorkspaceState(): TransferWorkspaceState {
 }
 
 function updateWorkspace(
-  set: (partial: Partial<TransfersStore> | TransfersStore | ((state: TransfersStore) => Partial<TransfersStore> | TransfersStore)) => void,
+  set: (
+    partial:
+      | Partial<TransfersStore>
+      | TransfersStore
+      | ((state: TransfersStore) => Partial<TransfersStore> | TransfersStore),
+  ) => void,
   workspaceId: string,
   update: (workspace: TransferWorkspaceState) => TransferWorkspaceState,
 ): void {
@@ -352,32 +423,44 @@ function pruneWorkspaces(
   visibleIds: Set<number>,
 ): Record<string, TransferWorkspaceState> {
   let changed = false;
-  const next = Object.fromEntries(Object.entries(workspaces).map(([workspaceId, workspace]) => {
-    const selectedIds = pruneSelectedIds(workspace.selectedIds, visibleIds);
-    const focusedTransferId = workspace.focusedTransferId == null || visibleIds.has(workspace.focusedTransferId)
-      ? workspace.focusedTransferId
-      : null;
-    const lastSelectedId = workspace.lastSelectedId == null || visibleIds.has(workspace.lastSelectedId)
-      ? workspace.lastSelectedId
-      : null;
-    if (
-      selectedIds !== workspace.selectedIds
-      || focusedTransferId !== workspace.focusedTransferId
-      || lastSelectedId !== workspace.lastSelectedId
-    ) {
-      changed = true;
-      return [workspaceId, { ...workspace, selectedIds, focusedTransferId, lastSelectedId }];
-    }
-    return [workspaceId, workspace];
-  }));
+  const next = Object.fromEntries(
+    Object.entries(workspaces).map(([workspaceId, workspace]) => {
+      const selectedIds = pruneSelectedIds(workspace.selectedIds, visibleIds);
+      const focusedTransferId =
+        workspace.focusedTransferId == null || visibleIds.has(workspace.focusedTransferId)
+          ? workspace.focusedTransferId
+          : null;
+      const lastSelectedId =
+        workspace.lastSelectedId == null || visibleIds.has(workspace.lastSelectedId)
+          ? workspace.lastSelectedId
+          : null;
+      if (
+        selectedIds !== workspace.selectedIds ||
+        focusedTransferId !== workspace.focusedTransferId ||
+        lastSelectedId !== workspace.lastSelectedId
+      ) {
+        changed = true;
+        return [workspaceId, { ...workspace, selectedIds, focusedTransferId, lastSelectedId }];
+      }
+      return [workspaceId, workspace];
+    }),
+  );
   return changed ? next : workspaces;
 }
 
-export function transferStatusMatchesFilter(status: TransferStatus, filter: TransferStatusFilter): boolean {
+export function transferStatusMatchesFilter(
+  status: TransferStatus,
+  filter: TransferStatusFilter,
+): boolean {
   if (filter === "all") return true;
   if (filter === "completed") return status === "completed";
   if (filter === "failed") return status === "failed" || status === "interrupted";
-  return status === "queued" || status === "pending" || status === "in_progress" || status === "waiting_for_resolution";
+  return (
+    status === "queued" ||
+    status === "pending" ||
+    status === "in_progress" ||
+    status === "waiting_for_resolution"
+  );
 }
 
 function pruneSelectedIds(selectedIds: Set<number>, visibleIds: Set<number>): Set<number> {
@@ -391,47 +474,56 @@ function pruneSelectedIds(selectedIds: Set<number>, visibleIds: Set<number>): Se
 
 function transferPagesEqual(left: TransferPage | null, right: TransferPage): boolean {
   if (!left) return false;
-  if (left.totalCount !== right.totalCount || left.dbPath !== right.dbPath || left.rows.length !== right.rows.length) {
+  if (
+    left.totalCount !== right.totalCount ||
+    left.dbPath !== right.dbPath ||
+    left.rows.length !== right.rows.length
+  ) {
     return false;
   }
   return left.rows.every((row, index) => transferRowsEqual(row, right.rows[index]));
 }
 
-function transferRowsEqual(left: TransferPage["rows"][number], right: TransferPage["rows"][number]): boolean {
-  return left.id === right.id
-    && left.jobId === right.jobId
-    && left.operationId === right.operationId
-    && left.batchId === right.batchId
-    && left.parentTransferId === right.parentTransferId
-    && left.rootTransferId === right.rootTransferId
-    && left.treeDepth === right.treeDepth
-    && left.transferType === right.transferType
-    && left.itemType === right.itemType
-    && left.status === right.status
-    && left.conflictPolicy === right.conflictPolicy
-    && left.queueTitle === right.queueTitle
-    && left.fileName === right.fileName
-    && left.localSourcePath === right.localSourcePath
-    && left.localDestPath === right.localDestPath
-    && left.remoteSourceName === right.remoteSourceName
-    && left.remoteSourcePath === right.remoteSourcePath
-    && left.remoteDestName === right.remoteDestName
-    && left.remoteDestPath === right.remoteDestPath
-    && left.totalBytes === right.totalBytes
-    && left.transferredBytes === right.transferredBytes
-    && left.bytesPerSecond === right.bytesPerSecond
-    && left.errorMessage === right.errorMessage
-    && left.detailMessage === right.detailMessage
-    && left.queuedAtMs === right.queuedAtMs
-    && left.startedAtMs === right.startedAtMs
-    && left.completedAtMs === right.completedAtMs
-    && left.cancelable === right.cancelable
-    && left.retryable === right.retryable
-    && left.undoable === right.undoable
-    && left.undoTokenId === right.undoTokenId
-    && left.preserveOrder === right.preserveOrder
-    && left.paused === right.paused
-    && left.attempt === right.attempt
-    && left.supportsReplace === right.supportsReplace
-    && left.supportsKeepBoth === right.supportsKeepBoth;
+function transferRowsEqual(
+  left: TransferPage["rows"][number],
+  right: TransferPage["rows"][number],
+): boolean {
+  return (
+    left.id === right.id &&
+    left.jobId === right.jobId &&
+    left.operationId === right.operationId &&
+    left.batchId === right.batchId &&
+    left.parentTransferId === right.parentTransferId &&
+    left.rootTransferId === right.rootTransferId &&
+    left.treeDepth === right.treeDepth &&
+    left.transferType === right.transferType &&
+    left.itemType === right.itemType &&
+    left.status === right.status &&
+    left.conflictPolicy === right.conflictPolicy &&
+    left.queueTitle === right.queueTitle &&
+    left.fileName === right.fileName &&
+    left.localSourcePath === right.localSourcePath &&
+    left.localDestPath === right.localDestPath &&
+    left.remoteSourceName === right.remoteSourceName &&
+    left.remoteSourcePath === right.remoteSourcePath &&
+    left.remoteDestName === right.remoteDestName &&
+    left.remoteDestPath === right.remoteDestPath &&
+    left.totalBytes === right.totalBytes &&
+    left.transferredBytes === right.transferredBytes &&
+    left.bytesPerSecond === right.bytesPerSecond &&
+    left.errorMessage === right.errorMessage &&
+    left.detailMessage === right.detailMessage &&
+    left.queuedAtMs === right.queuedAtMs &&
+    left.startedAtMs === right.startedAtMs &&
+    left.completedAtMs === right.completedAtMs &&
+    left.cancelable === right.cancelable &&
+    left.retryable === right.retryable &&
+    left.undoable === right.undoable &&
+    left.undoTokenId === right.undoTokenId &&
+    left.preserveOrder === right.preserveOrder &&
+    left.paused === right.paused &&
+    left.attempt === right.attempt &&
+    left.supportsReplace === right.supportsReplace &&
+    left.supportsKeepBoth === right.supportsKeepBoth
+  );
 }

@@ -1,10 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
-import { hasTauriInternals } from "../shared/tauri";
-import {
-  accountFetchMe,
-  type AccountMeResponse,
-} from "../pages/Account/shared/api";
+import { hasTauriInternals } from "@/shared/tauri";
+import { accountFetchMe, type AccountMeResponse } from "../pages/Account/shared/api";
 import { buildInstallerStatusFromTemplate } from "../data/installReadiness";
 import { releases } from "../data/releases";
 import type {
@@ -73,11 +70,16 @@ function mergeReleases(fetched: ReleaseVersion[], fallback: ReleaseVersion[]): R
     const version = release.version.trim();
     if (!version || seen.has(version)) return [];
     seen.add(version);
-    return [{
-      ...release,
-      version,
-      changes: release.changes.length > 0 ? release.changes : ["Release files are available for this version."],
-    }];
+    return [
+      {
+        ...release,
+        version,
+        changes:
+          release.changes.length > 0
+            ? release.changes
+            : ["Release files are available for this version."],
+      },
+    ];
   });
 
   return merged.length > 0 ? merged : fallback;
@@ -109,7 +111,9 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
   status: null,
   systemError: "",
   selectedRelease: () =>
-    get().releases.find((release) => release.version === get().selectedVersion) ?? get().releases[0] ?? releases[0],
+    get().releases.find((release) => release.version === get().selectedVersion) ??
+    get().releases[0] ??
+    releases[0],
   addEvent: (event) => set((state) => ({ events: [...state.events, event] })),
   loadReleases: async () => {
     if (!hasTauriInternals()) {
@@ -127,7 +131,7 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
       const available = mergeReleases(fetched, releases);
       const selectedVersion = available.some((release) => release.version === get().selectedVersion)
         ? get().selectedVersion
-        : available[0]?.version ?? releases[0].version;
+        : (available[0]?.version ?? releases[0].version);
       set({
         releases: available,
         releasesError: "",
@@ -176,7 +180,14 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
     if (!hasTauriInternals()) {
       set((state) => ({
         systemError: "Saving account state is only available in the Misty app.",
-        events: [...state.events, { level: "error", source: "installer", message: `Could not save account state for ${user.email}.` }],
+        events: [
+          ...state.events,
+          {
+            level: "error",
+            source: "installer",
+            message: `Could not save account state for ${user.email}.`,
+          },
+        ],
       }));
       return;
     }
@@ -188,7 +199,10 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
     set((state) => ({
       status,
       systemError: "",
-      events: [...state.events, { level: "info", source: "installer", message: `Signed in as ${user.email}.` }],
+      events: [
+        ...state.events,
+        { level: "info", source: "installer", message: `Signed in as ${user.email}.` },
+      ],
     }));
   },
   setSelectedVersion: (selectedVersion) => set({ selectedVersion }),
@@ -227,7 +241,14 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
       if (!hasTauriInternals()) {
         set((state) => ({
           systemError: "Signing out is only available in the Misty app.",
-          events: [...state.events, { level: "error", source: "installer", message: "Could not sign out outside the Misty app." }],
+          events: [
+            ...state.events,
+            {
+              level: "error",
+              source: "installer",
+              message: "Could not sign out outside the Misty app.",
+            },
+          ],
         }));
         return;
       }
@@ -235,7 +256,10 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
       const status = await loadInstallerStatus(native);
       set((state) => ({
         status,
-        events: [...state.events, { level: "info", source: "installer", message: "Signed out of Misty." }],
+        events: [
+          ...state.events,
+          { level: "info", source: "installer", message: "Signed out of Misty." },
+        ],
       }));
     } catch (error) {
       set((state) => ({
@@ -251,7 +275,13 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
     if (!hasTauriInternals()) {
       set({
         installState: "error",
-        events: [{ level: "error", source: "installer", message: "Installing Misty is only available in the Misty app." }],
+        events: [
+          {
+            level: "error",
+            source: "installer",
+            message: "Installing Misty is only available in the Misty app.",
+          },
+        ],
       });
       return;
     }
@@ -259,7 +289,9 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
     if (!installUser) {
       set({
         installState: "error",
-        events: [{ level: "error", source: "installer", message: "Sign in to Misty before installing." }],
+        events: [
+          { level: "error", source: "installer", message: "Sign in to Misty before installing." },
+        ],
       });
       return;
     }
@@ -271,7 +303,9 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
     set({
       busy: true,
       installState: "installing",
-      events: [{ level: "info", source: "installer", message: `Preparing Misty ${release.version}.` }],
+      events: [
+        { level: "info", source: "installer", message: `Preparing Misty ${release.version}.` },
+      ],
     });
 
     try {
@@ -303,7 +337,10 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
         await invoke<string>("restart_misty_app");
       } catch (restartError) {
         set((state) => ({
-          events: [...state.events, { level: "error", source: "installer", message: String(restartError) }],
+          events: [
+            ...state.events,
+            { level: "error", source: "installer", message: String(restartError) },
+          ],
         }));
       }
     } catch (error) {

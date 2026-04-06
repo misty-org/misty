@@ -75,7 +75,7 @@ export interface AgentInstanceRecord {
   update_available: boolean;
   connection_bindings: Record<string, string>;
   capability_grants: Array<Record<string, unknown>>;
-	workflows: InstanceWorkflowConfig[];
+  workflows: InstanceWorkflowConfig[];
   created_at: string;
   updated_at: string;
 }
@@ -97,11 +97,20 @@ export interface SpaceRun {
   initiated_by_user_id: string;
   billing_user_id: string;
   trigger_kind: string;
-  state: "queued" | "running" | "cooldown" | "awaiting_approval" | "completed" | "completed_with_errors" | "failed" | "canceled" | "rejected";
-	agent_instance_id?: string;
-	agent_version_id?: string;
-	attempt?: number;
-	next_retry_at?: string;
+  state:
+    | "queued"
+    | "running"
+    | "cooldown"
+    | "awaiting_approval"
+    | "completed"
+    | "completed_with_errors"
+    | "failed"
+    | "canceled"
+    | "rejected";
+  agent_instance_id?: string;
+  agent_version_id?: string;
+  attempt?: number;
+  next_retry_at?: string;
   input: Record<string, unknown>;
   result: Record<string, unknown>;
   error_code?: string;

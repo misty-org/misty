@@ -10,7 +10,10 @@ export function SpacesRealtimeBridge() {
   const disconnectRealtime = useSpacesStore((state) => state.disconnectRealtime);
 
   useEffect(() => {
-    if (!user) { disconnectRealtime(); return; }
+    if (!user) {
+      disconnectRealtime();
+      return;
+    }
     void connectRealtime(user.id);
     void Promise.all([load(), loadInbox()]);
     return disconnectRealtime;

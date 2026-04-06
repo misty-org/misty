@@ -10,9 +10,14 @@ import {
   smartLibrarySetServerFolderId,
   smartLibrarySnapshot,
 } from "../api/misty";
-import type { AnalysisEstimate, FolderLibraryStatus, SmartLibraryAsset, SmartLibraryImportPreflight } from "../api/types";
-import { errorText } from "../shared/format";
-import { clearSemanticExplorerSearchCache } from "../pages/Files/utils/globalSearch";
+import type {
+  AnalysisEstimate,
+  FolderLibraryStatus,
+  SmartLibraryAsset,
+  SmartLibraryImportPreflight,
+} from "../api/types";
+import { errorText } from "@/shared/format";
+import { clearSemanticExplorerSearchCache } from "../features/explorer/utils/globalSearch";
 import {
   approveSmartLibraryFolder,
   approveSmartLibrarySample,
@@ -33,7 +38,16 @@ import {
   type SemanticReindexPlan,
 } from "./smartLibraryServerApi";
 
-type SmartLibraryPhase = "idle" | "scanning" | "preflight" | "uploading" | "processing" | "reindexing" | "review" | "complete" | "error";
+type SmartLibraryPhase =
+  | "idle"
+  | "scanning"
+  | "preflight"
+  | "uploading"
+  | "processing"
+  | "reindexing"
+  | "review"
+  | "complete"
+  | "error";
 
 interface SmartLibraryStore {
   loaded: boolean;
@@ -80,7 +94,12 @@ export const useSmartLibraryStore = create<SmartLibraryStore>((set, get) => ({
     if (get().loaded) return;
     try {
       const snapshot = await smartLibrarySnapshot();
-      set({ loaded: true, library: snapshot.activeLibrary, phase: snapshot.activeLibrary ? phaseFromLibrary(snapshot.activeLibrary) : "idle", error: null });
+      set({
+        loaded: true,
+        library: snapshot.activeLibrary,
+        phase: snapshot.activeLibrary ? phaseFromLibrary(snapshot.activeLibrary) : "idle",
+        error: null,
+      });
       if (snapshot.activeLibrary?.serverFolderId) void get().refreshProgress();
     } catch (error) {
       set({ loaded: true, phase: "error", error: errorText(error) });
@@ -100,15 +119,27 @@ export const useSmartLibraryStore = create<SmartLibraryStore>((set, get) => ({
 
   addFiles: async (paths) => {
     const selected = [...new Set(paths.map((path) => path.trim()).filter(Boolean))];
-    if (selected.length === 0 || get().phase === "uploading" || get().phase === "processing") return;
+    if (selected.length === 0 || get().phase === "uploading" || get().phase === "processing")
+      return;
     set({ phase: "uploading", error: null });
     try {
       const imported = await smartLibraryImportFiles(selected);
-      set({ loaded: true, library: imported.library, estimate: imported.library.preflight.estimate });
+      set({
+        loaded: true,
+        library: imported.library,
+        estimate: imported.library.preflight.estimate,
+      });
       const selectedAssets = await loadAssetsByIds(new Set(imported.importedAssetIds));
-      const eligible = selectedAssets.filter((asset) => asset.previewSupported && ["pending", "changed", "failed"].includes(asset.status));
+      const eligible = selectedAssets.filter(
+        (asset) =>
+          asset.previewSupported && ["pending", "changed", "failed"].includes(asset.status),
+      );
       if (eligible.length === 0) {
-        set({ phase: phaseFromLibrary(imported.library), error: "The selected files are already analyzed or are not supported for Library analysis." });
+        set({
+          phase: phaseFromLibrary(imported.library),
+          error:
+            "The selected files are already analyzed or are not supported for Library analysis.",
+        });
         return;
       }
 
@@ -119,7 +150,10 @@ export const useSmartLibraryStore = create<SmartLibraryStore>((set, get) => ({
       let serverProgress = await fetchSmartLibraryProgress(folderId);
       let sampleIds = new Set(serverProgress.sampleAssetIds ?? []);
       if (sampleIds.size === 0 && serverProgress.successfulImages === 0) {
-        const sample = await createSmartLibrarySample(folderId, candidatesFromAssets(eligible.slice(0, 25)));
+        const sample = await createSmartLibrarySample(
+          folderId,
+          candidatesFromAssets(eligible.slice(0, 25)),
+        );
         sampleIds = new Set(sample.assetIds);
       }
       const included = eligible
@@ -130,7 +164,11 @@ export const useSmartLibraryStore = create<SmartLibraryStore>((set, get) => ({
         .map((asset) => asset.assetId);
       if (included.length > 0) serverProgress = await analyzeAssets(folderId, included, "sample");
       if (billable.length > 0) serverProgress = await analyzeAssets(folderId, billable, "full");
-      set({ progress: serverProgress, phase: phaseFromProgress(serverProgress), error: serverProgress.message ?? null });
+      set({
+        progress: serverProgress,
+        phase: phaseFromProgress(serverProgress),
+        error: serverProgress.message ?? null,
+      });
       await get().refreshProgress();
     } catch (error) {
       set({ phase: "error", error: errorText(error) });
@@ -157,7 +195,10 @@ export const useSmartLibraryStore = create<SmartLibraryStore>((set, get) => ({
   },
 
   cancelDroppedFiles: () => {
-    set((state) => ({ pendingDrop: null, phase: state.library ? phaseFromLibrary(state.library) : "idle" }));
+    set((state) => ({
+      pendingDrop: null,
+      phase: state.library ? phaseFromLibrary(state.library) : "idle",
+    }));
   },
 
   discoverChanges: async () => {
@@ -170,13 +211,15 @@ export const useSmartLibraryStore = create<SmartLibraryStore>((set, get) => ({
       set({ library, estimate, phase: "preflight", error: null });
       if (library.serverFolderId) {
         try {
-          estimate = (await submitSmartLibraryRescan(library.serverFolderId, library.preflight)).estimate;
+          estimate = (await submitSmartLibraryRescan(library.serverFolderId, library.preflight))
+            .estimate;
         } catch {
           set({
             library,
             estimate,
             phase: "preflight",
-            error: "New files were saved locally. Misty will refresh the account estimate when the server is available.",
+            error:
+              "New files were saved locally. Misty will refresh the account estimate when the server is available.",
           });
           return;
         }
@@ -201,11 +244,22 @@ export const useSmartLibraryStore = create<SmartLibraryStore>((set, get) => ({
         ? serverProgress.sampleAssetIds
         : currentAfterRegistration.preflight.sampleAssetIds;
       const sampleIds = new Set(authoritativeSample.slice(0, 25));
-      const candidates = (await loadAssetsByIds(sampleIds)).filter((asset) => asset.status === "pending" || asset.status === "failed" || asset.status === "changed");
+      const candidates = (await loadAssetsByIds(sampleIds)).filter(
+        (asset) =>
+          asset.status === "pending" || asset.status === "failed" || asset.status === "changed",
+      );
       const sample = await createSmartLibrarySample(folderId, candidatesFromAssets(candidates));
-      const requested = sample.assetIds.length > 0 ? sample.assetIds.slice(0, 25) : current.preflight.sampleAssetIds;
+      const requested =
+        sample.assetIds.length > 0
+          ? sample.assetIds.slice(0, 25)
+          : current.preflight.sampleAssetIds;
       const progress = await analyzeAssets(folderId, requested, "sample");
-      set({ progress, estimate: sample.estimate, phase: phaseFromProgress(progress), error: progress.message ?? null });
+      set({
+        progress,
+        estimate: sample.estimate,
+        phase: phaseFromProgress(progress),
+        error: progress.message ?? null,
+      });
       await get().refreshProgress();
     } catch (error) {
       set({ phase: "error", error: errorText(error) });
@@ -222,13 +276,16 @@ export const useSmartLibraryStore = create<SmartLibraryStore>((set, get) => ({
       const serverProgress = await fetchSmartLibraryProgress(folderId);
       const sampleIds = new Set(serverProgress.sampleAssetIds ?? latest.preflight.sampleAssetIds);
       const eligible = await loadEligibleAssets(500);
-      const includedRetries = eligible.filter((asset) => sampleIds.has(asset.assetId) && asset.status !== "changed").map((asset) => asset.assetId);
+      const includedRetries = eligible
+        .filter((asset) => sampleIds.has(asset.assetId) && asset.status !== "changed")
+        .map((asset) => asset.assetId);
       const billableIds = eligible
         .filter((asset) => !sampleIds.has(asset.assetId) || asset.status === "changed")
         .slice(0, Math.max(0, 500 - serverProgress.successfulImages - includedRetries.length))
         .map((asset) => asset.assetId);
       let progress: SmartLibraryProgress | null = null;
-      if (includedRetries.length > 0) progress = await analyzeAssets(folderId, includedRetries, "sample");
+      if (includedRetries.length > 0)
+        progress = await analyzeAssets(folderId, includedRetries, "sample");
       if (billableIds.length > 0) progress = await analyzeAssets(folderId, billableIds, "full");
       if (!progress) throw new Error("There are no new or changed files to analyze.");
       set({ progress, phase: phaseFromProgress(progress), error: progress.message ?? null });
@@ -251,10 +308,21 @@ export const useSmartLibraryStore = create<SmartLibraryStore>((set, get) => ({
       if (response.results.length > 0) {
         library = (await smartLibraryApplyResults(response.results)).activeLibrary;
       }
-      const phase = progress.phase === "sample_review" ? "review"
-        : progress.phase === "complete" ? "complete"
-          : progress.phase === "failed" ? "error" : "processing";
-      set({ progress, library, estimate: progress.estimate, phase, error: progress.message ?? null });
+      const phase =
+        progress.phase === "sample_review"
+          ? "review"
+          : progress.phase === "complete"
+            ? "complete"
+            : progress.phase === "failed"
+              ? "error"
+              : "processing";
+      set({
+        progress,
+        library,
+        estimate: progress.estimate,
+        phase,
+        error: progress.message ?? null,
+      });
       if (phase === "review" || phase === "complete" || phase === "error") stopPolling();
     } catch (error) {
       stopPolling();
@@ -280,7 +348,7 @@ export const useSmartLibraryStore = create<SmartLibraryStore>((set, get) => ({
     if (!library || !folderId) return;
     set({ phase: "reindexing", error: null, reindexProcessed: 0 });
     try {
-      let plan = get().reindexPlan ?? await planSemanticReindex({ folderId, limit: 100 });
+      let plan = get().reindexPlan ?? (await planSemanticReindex({ folderId, limit: 100 }));
       let processed = 0;
       const seenCursors = new Set<string>();
       while (plan.assets.length > 0) {
@@ -292,9 +360,17 @@ export const useSmartLibraryStore = create<SmartLibraryStore>((set, get) => ({
           set({ reindexProcessed: processed });
         }
         if (!plan.nextCursor) break;
-        if (seenCursors.has(plan.nextCursor)) throw new Error("Index upgrade stopped because the server returned a repeated page cursor.");
+        if (seenCursors.has(plan.nextCursor))
+          throw new Error(
+            "Index upgrade stopped because the server returned a repeated page cursor.",
+          );
         seenCursors.add(plan.nextCursor);
-        plan = await planSemanticReindex({ folderId, cursor: plan.nextCursor, limit: 100, targetVersion: plan.targetVersion });
+        plan = await planSemanticReindex({
+          folderId,
+          cursor: plan.nextCursor,
+          limit: 100,
+          targetVersion: plan.targetVersion,
+        });
       }
       set({ reindexPlan: null, reindexProcessed: processed, phase: "complete" });
       await get().refreshProgress();
@@ -308,7 +384,9 @@ export const useSmartLibraryStore = create<SmartLibraryStore>((set, get) => ({
     const library = get().library;
     const folderId = library?.serverFolderId;
     if (!library || !folderId) return;
-    const normalized = [...new Map(tags.map((tag) => [tag.trim().toLocaleLowerCase(), tag.trim()])).values()]
+    const normalized = [
+      ...new Map(tags.map((tag) => [tag.trim().toLocaleLowerCase(), tag.trim()])).values(),
+    ]
       .filter(Boolean)
       .slice(0, 24);
     try {
@@ -330,7 +408,15 @@ export const useSmartLibraryStore = create<SmartLibraryStore>((set, get) => ({
       const snapshot = await smartLibraryDelete();
       stopPolling();
       resultSequence = 0;
-      set({ library: snapshot.activeLibrary, progress: null, estimate: null, reindexPlan: null, reindexProcessed: 0, phase: "idle", error: null });
+      set({
+        library: snapshot.activeLibrary,
+        progress: null,
+        estimate: null,
+        reindexPlan: null,
+        reindexProcessed: 0,
+        phase: "idle",
+        error: null,
+      });
     } catch (error) {
       set({ phase: "error", error: errorText(error) });
     }
@@ -354,8 +440,17 @@ async function loadEligibleAssets(limit: number): Promise<SmartLibraryAsset[]> {
   const assets: SmartLibraryAsset[] = [];
   let afterAssetId: string | null = null;
   do {
-    const page = await smartLibraryAssetsPage({ afterAssetId, limit: Math.min(500, limit), reindexOnly: true });
-    assets.push(...page.assets.filter((asset) => asset.previewSupported && ["pending", "changed", "failed"].includes(asset.status)));
+    const page = await smartLibraryAssetsPage({
+      afterAssetId,
+      limit: Math.min(500, limit),
+      reindexOnly: true,
+    });
+    assets.push(
+      ...page.assets.filter(
+        (asset) =>
+          asset.previewSupported && ["pending", "changed", "failed"].includes(asset.status),
+      ),
+    );
     afterAssetId = page.nextCursor;
   } while (afterAssetId && assets.length < limit);
   return assets.slice(0, limit);
@@ -378,19 +473,23 @@ async function prepareSemanticReindexInputs(
 ): Promise<SemanticReindexInput[]> {
   const localAssets = new Map(library.assets.map((asset) => [asset.assetId, asset]));
   const preparedIds = planned.map((asset) => asset.assetId);
-  const previews = preparedIds.length > 0 ? await smartLibraryPreparePreviews(preparedIds, 512) : [];
+  const previews =
+    preparedIds.length > 0 ? await smartLibraryPreparePreviews(preparedIds, 512) : [];
   const previewsById = new Map(previews.map((preview) => [preview.assetId, preview]));
   return planned.map((asset) => {
     const local = localAssets.get(asset.assetId);
     const preview = previewsById.get(asset.assetId);
-    if (asset.requiresPreview && !preview) throw new Error(`Could not prepare a private preview for ${local?.name ?? asset.assetId}.`);
+    if (asset.requiresPreview && !preview)
+      throw new Error(`Could not prepare a private preview for ${local?.name ?? asset.assetId}.`);
     return {
       assetId: asset.assetId,
       fingerprint: asset.fingerprint,
       assetKind: asset.assetKind,
-      mimeType: asset.requiresPreview ? preview?.mimeType ?? asset.mimeType : asset.mimeType,
+      mimeType: asset.requiresPreview ? (preview?.mimeType ?? asset.mimeType) : asset.mimeType,
       ...(preview ? { base64: bytesToBase64(preview.bytes) } : {}),
-      ...(preview?.extractedText || local?.extractedText ? { extractedText: preview?.extractedText ?? local?.extractedText ?? undefined } : {}),
+      ...(preview?.extractedText || local?.extractedText
+        ? { extractedText: preview?.extractedText ?? local?.extractedText ?? undefined }
+        : {}),
       metadata: { ...(local ? reindexMetadata(local) : {}), ...(preview?.metadata ?? {}) },
       ...(preview ? { truncated: preview.truncated } : {}),
     };
@@ -411,7 +510,11 @@ function reindexMetadata(asset: SmartLibraryAsset): Record<string, string> {
   return metadata;
 }
 
-async function analyzeAssets(folderId: string, assetIds: string[], kind: "sample" | "full"): Promise<SmartLibraryProgress> {
+async function analyzeAssets(
+  folderId: string,
+  assetIds: string[],
+  kind: "sample" | "full",
+): Promise<SmartLibraryProgress> {
   let progress: SmartLibraryProgress | null = null;
   for (let offset = 0; offset < assetIds.length; offset += 8) {
     const ids = assetIds.slice(offset, offset + 8);
@@ -427,9 +530,10 @@ async function analyzeAssets(folderId: string, assetIds: string[], kind: "sample
       truncated: preview.truncated,
     }));
     const finalBatch = offset + ids.length >= assetIds.length;
-    progress = kind === "sample"
-      ? await approveSmartLibrarySample(folderId, payload, finalBatch)
-      : await approveSmartLibraryFolder(folderId, payload, finalBatch);
+    progress =
+      kind === "sample"
+        ? await approveSmartLibrarySample(folderId, payload, finalBatch)
+        : await approveSmartLibraryFolder(folderId, payload, finalBatch);
     useSmartLibraryStore.setState({ progress, phase: phaseFromProgress(progress) });
   }
   if (!progress) throw new Error("No eligible Library previews were prepared.");

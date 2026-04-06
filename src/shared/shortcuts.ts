@@ -10,7 +10,10 @@ interface ParsedShortcut {
   shift: boolean;
 }
 
-export function shortcutMapFromBindings(bindings: ShortcutBinding[], fallback: ShortcutMap = {}): ShortcutMap {
+export function shortcutMapFromBindings(
+  bindings: ShortcutBinding[],
+  fallback: ShortcutMap = {},
+): ShortcutMap {
   const shortcuts: ShortcutMap = { ...fallback };
   for (const binding of bindings) {
     if (!binding.commandId || !binding.shortcut) continue;
@@ -23,11 +26,13 @@ export function shortcutMatchesEvent(shortcut: string | undefined, event: Keyboa
   if (!shortcut || event.repeat) return false;
   const parsed = parseShortcut(shortcut);
   if (!parsed) return false;
-  return event.altKey === parsed.alt
-    && event.ctrlKey === parsed.ctrl
-    && event.metaKey === parsed.meta
-    && event.shiftKey === parsed.shift
-    && normalizedEventKey(event) === parsed.key;
+  return (
+    event.altKey === parsed.alt &&
+    event.ctrlKey === parsed.ctrl &&
+    event.metaKey === parsed.meta &&
+    event.shiftKey === parsed.shift &&
+    normalizedEventKey(event) === parsed.key
+  );
 }
 
 function parseShortcut(shortcut: string): ParsedShortcut | null {

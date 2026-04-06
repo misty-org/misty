@@ -17,9 +17,9 @@ describe("estimateSmartLibraryTokens", () => {
     expect(estimate.batchCount).toBe(2);
     expect(estimate.estimatedInputTokens).toBe(9 * 340 + 2 * 180);
     expect(estimate.estimatedTotalTokens).toBe(
-      estimate.estimatedInputTokens
-        + estimate.estimatedOutputTokens
-        + estimate.estimatedEmbeddingTokens,
+      estimate.estimatedInputTokens +
+        estimate.estimatedOutputTokens +
+        estimate.estimatedEmbeddingTokens,
     );
   });
 

@@ -1,7 +1,9 @@
 import { ArrowRight, FileText, Newspaper } from "lucide-react";
 import { FaGithub, FaXTwitter } from "react-icons/fa6";
 import { Link } from "react-router-dom";
-import { openExternalLink } from "../../../shared/openExternalLink";
+import { openExternalLink } from "@/shared/openExternalLink";
+import { Button } from "../../../components/ui/button";
+import { Card } from "../../../components/ui/card";
 
 type LatestPost = {
   date: string;
@@ -27,63 +29,72 @@ const socialLinks = [
 ];
 
 const floatingFooterClass =
-  "grid min-w-0 shrink-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-center gap-1 overflow-hidden rounded-xl border border-white/[0.08] bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] p-1.5 shadow-xl shadow-black/20";
+  "grid min-w-0 shrink-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-center gap-1 overflow-hidden py-1.5 max-[760px]:grid-cols-1";
 const dockCellClass =
-  "group grid min-h-14 min-w-0 items-center rounded-lg px-3 py-2 text-left transition hover:bg-white/[0.045]";
+  "group grid min-h-14 min-w-0 items-center rounded-md px-3 py-2 text-left transition-colors hover:bg-muted/60";
 const dockLinkClass =
-  "group grid min-w-0 grid-cols-[18px_minmax(0,1fr)_18px] items-center gap-2 text-left";
+  "group grid h-full w-full min-w-0 grid-cols-[18px_minmax(0,1fr)_18px] items-center gap-2 text-left";
 
 export function HomeFooter({ latestChangelog, latestPost }: HomeFooterProps) {
   return (
-    <footer className={floatingFooterClass}>
-      <section className={dockCellClass}>
-        {latestPost ? (
-          <Link
-            className={dockLinkClass}
-            to="/changelog"
-          >
-            <Newspaper className="h-4 w-4 text-text-muted" />
+    <Card className={floatingFooterClass} size="sm">
+      <footer aria-label="Home resources" className="contents">
+        <section aria-label="Latest news" className={dockCellClass}>
+          {latestPost ? (
+            <Link className={dockLinkClass} to="/changelog">
+              <Newspaper className="h-4 w-4 text-muted-foreground" />
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-medium text-foreground">
+                  {latestPost.title}
+                </span>
+                <span className="block truncate text-[11px] text-muted-foreground">
+                  {latestPost.tag} · {latestPost.date}
+                </span>
+              </span>
+              <ArrowRight className="h-4 w-4 shrink-0 opacity-60 transition group-hover:translate-x-0.5 group-hover:opacity-100" />
+            </Link>
+          ) : (
+            <p className="text-sm text-muted-foreground">No news published yet.</p>
+          )}
+        </section>
+
+        <section aria-label="Latest release" className={dockCellClass}>
+          <Link className={dockLinkClass} to="/changelog">
+            <FileText className="h-4 w-4 text-muted-foreground" />
             <span className="min-w-0">
-              <span className="block truncate text-sm font-semibold text-text">{latestPost.title}</span>
-              <span className="block truncate text-[11px] text-text-muted">{latestPost.tag} · {latestPost.date}</span>
+              <span className="block truncate text-sm font-medium text-foreground">
+                {latestChangelog.version}
+              </span>
+              <span className="block truncate text-[11px] text-muted-foreground">
+                {latestChangelog.date}
+              </span>
             </span>
             <ArrowRight className="h-4 w-4 shrink-0 opacity-60 transition group-hover:translate-x-0.5 group-hover:opacity-100" />
           </Link>
-        ) : (
-          <p className="text-sm text-text-muted">No news published yet.</p>
-        )}
-      </section>
+        </section>
 
-      <section className={dockCellClass}>
-        <Link
-          className={dockLinkClass}
-          to="/changelog"
+        <section
+          aria-label="Misty on social media"
+          className={`${dockCellClass} justify-items-center justify-self-end max-[760px]:justify-self-stretch`}
         >
-          <FileText className="h-4 w-4 text-text-muted" />
-          <span className="min-w-0">
-            <span className="block truncate text-sm font-semibold text-text">{latestChangelog.version}</span>
-            <span className="block truncate text-[11px] text-text-muted">{latestChangelog.date}</span>
-          </span>
-          <ArrowRight className="h-4 w-4 shrink-0 opacity-60 transition group-hover:translate-x-0.5 group-hover:opacity-100" />
-        </Link>
-      </section>
-
-      <section className={`${dockCellClass} justify-items-center justify-self-end`}>
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          {socialLinks.map(({ href, icon: Icon, label }) => (
-            <button
-              aria-label={label}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-transparent p-0 text-text-muted transition hover:border-white/[0.08] hover:bg-white/[0.045] hover:text-text"
-              key={label}
-              onClick={() => void openExternalLink(href)}
-              title={label}
-              type="button"
-            >
-              <Icon className="h-5 w-5" />
-            </button>
-          ))}
-        </div>
-      </section>
-    </footer>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            {socialLinks.map(({ href, icon: Icon, label }) => (
+              <Button
+                aria-label={label}
+                className="size-8 text-muted-foreground"
+                key={label}
+                onClick={() => void openExternalLink(href)}
+                title={label}
+                size="icon"
+                type="button"
+                variant="ghost"
+              >
+                <Icon className="h-5 w-5" />
+              </Button>
+            ))}
+          </div>
+        </section>
+      </footer>
+    </Card>
   );
 }

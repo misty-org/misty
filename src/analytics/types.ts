@@ -1,7 +1,15 @@
 export type Platform = "windows" | "macos" | "linux" | "android" | "ios";
 export type Environment = "development" | "test" | "staging" | "production";
-export type ReleaseChannel = "development" | "internal" | "private_alpha" | "private_beta" | "public_beta" | "production";
-export type DistributionChannel = "direct" | "microsoft_store" | "mac_app_store" | "apple_app_store" | "google_play" | "linux_package" | "unknown";
+export type ReleaseChannel =
+  "development" | "internal" | "private_alpha" | "private_beta" | "public_beta" | "production";
+export type DistributionChannel =
+  | "direct"
+  | "microsoft_store"
+  | "mac_app_store"
+  | "apple_app_store"
+  | "google_play"
+  | "linux_package"
+  | "unknown";
 
 export interface CommonClientProperties {
   platform: Platform;
@@ -32,7 +40,8 @@ export interface AnalyticsEventProperties {
   download_requested: {
     platform: Platform;
     architecture?: "x86_64" | "aarch64" | "universal";
-    package_format?: "exe" | "msi" | "dmg" | "pkg" | "appimage" | "deb" | "rpm" | "app_store" | "play_store";
+    package_format?:
+      "exe" | "msi" | "dmg" | "pkg" | "appimage" | "deb" | "rpm" | "app_store" | "play_store";
     app_version?: string;
     release_channel: ReleaseChannel;
     distribution_channel: DistributionChannel;
@@ -68,7 +77,14 @@ export interface SafeUserProperties {
 }
 
 export interface SafeErrorContext {
-  operation?: "authentication" | "onboarding" | "subscription" | "file_operation" | "application_startup" | "background_task" | "unknown";
+  operation?:
+    | "authentication"
+    | "onboarding"
+    | "subscription"
+    | "file_operation"
+    | "application_startup"
+    | "background_task"
+    | "unknown";
   platform?: Platform;
   app_version?: string;
   release_channel?: ReleaseChannel;

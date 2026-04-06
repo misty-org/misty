@@ -1,10 +1,13 @@
 import { CheckCircle2, ExternalLink, RefreshCcw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import type {
-  PluginBrowserEntry,
-  PluginBrowserTab,
-} from "./types";
+import type { PluginBrowserEntry, PluginBrowserTab } from "./types";
 import { ExtensionCatalogIcon } from "../../../plugins/ExtensionCatalogIcon";
+import { Badge } from "../../../components/ui/badge";
+import { Button } from "../../../components/ui/button";
+import { Card } from "../../../components/ui/card";
+import { Input } from "../../../components/ui/input";
+import { Skeleton } from "../../../components/ui/skeleton";
+import { Tabs, TabsList, TabsTrigger } from "../../../components/ui/tabs";
 
 type PluginBrowserProps = {
   title?: string;
@@ -32,20 +35,11 @@ function pluginStatus(plugin: PluginBrowserEntry) {
   return plugin.enabled ? "installed" : "disabled";
 }
 
-function statusPillClass(plugin: PluginBrowserEntry) {
-  if (!plugin.installed) {
-    return "border-[var(--misty-border)] bg-[var(--misty-surface-2)] text-[var(--misty-text-muted)]";
-  }
-  return plugin.enabled
-    ? "border-[var(--misty-border-strong)] bg-[var(--misty-surface-2)] text-[var(--misty-text)]"
-    : "border-[var(--misty-border)] bg-[var(--misty-surface)] text-[var(--misty-text-subtle)]";
+function statusBadgeVariant(plugin: PluginBrowserEntry) {
+  return plugin.installed && plugin.enabled ? ("secondary" as const) : ("outline" as const);
 }
 
-function filterPlugins(
-  plugins: PluginBrowserEntry[],
-  query: string,
-  tab: PluginBrowserTab,
-) {
+function filterPlugins(plugins: PluginBrowserEntry[], query: string, tab: PluginBrowserTab) {
   const normalized = query.trim().toLowerCase();
   return plugins.filter((plugin) => {
     if (tab === "installed" && !plugin.installed) {
@@ -103,18 +97,12 @@ function PluginLogo({
   );
 }
 
-function DetailSection({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
+function DetailSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-xl border border-[var(--misty-border)] bg-[var(--misty-surface)] p-4">
+    <Card className="rounded-xl p-4">
       <p className="text-sm font-medium text-[var(--misty-text)]">{title}</p>
       <div className="mt-3">{children}</div>
-    </section>
+    </Card>
   );
 }
 
@@ -128,8 +116,9 @@ function SidebarPluginCard({
   onClick: () => void;
 }) {
   return (
-    <button
-      className={`w-full rounded-xl border p-3.5 text-left transition ${
+    <Button
+      variant="ghost"
+      className={`h-auto w-full justify-start rounded-xl border p-3.5 text-left transition ${
         selected
           ? "border-[var(--misty-border-strong)] bg-[var(--misty-surface-2)]"
           : "border-[var(--misty-border)] bg-[var(--misty-surface)] hover:border-[var(--misty-border-strong)] hover:bg-[var(--misty-surface-hover)]"
@@ -149,11 +138,9 @@ function SidebarPluginCard({
             <p className="truncate text-[17px] font-medium text-[var(--misty-text)]">
               {plugin.name}
             </p>
-            <span
-              className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-medium ${statusPillClass(plugin)}`}
-            >
+            <Badge className="shrink-0 text-[10px]" variant={statusBadgeVariant(plugin)}>
               {pluginStatus(plugin)}
-            </span>
+            </Badge>
           </div>
           <p className="mt-2 line-clamp-2 text-sm leading-5 text-[var(--misty-text-muted)]">
             {plugin.overview}
@@ -164,28 +151,28 @@ function SidebarPluginCard({
           </div>
         </div>
       </div>
-    </button>
+    </Button>
   );
 }
-
-const pluginSkeletonBlockClass =
-  "relative overflow-hidden rounded-xl bg-white/[0.055] after:absolute after:inset-0 after:-translate-x-full after:animate-[shimmer_1.35s_ease-in-out_infinite] after:bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.075),transparent)] after:content-['']";
 
 function PluginListSkeleton() {
   return (
     <div className="flex flex-col gap-4" aria-hidden="true">
       {[0, 1, 2, 3].map((index) => (
-        <div key={index} className="rounded-2xl border border-white/8 bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] p-4">
+        <div
+          key={index}
+          className="rounded-2xl border border-white/8 bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] p-4"
+        >
           <div className="flex items-start gap-4">
-            <span className={`${pluginSkeletonBlockClass} h-16 w-16 shrink-0`} />
+            <Skeleton className="h-16 w-16 shrink-0 rounded-xl" />
             <span className="grid min-w-0 flex-1 gap-3">
               <span className="flex items-center justify-between gap-3">
-                <span className={`${pluginSkeletonBlockClass} h-5 w-36`} />
-                <span className={`${pluginSkeletonBlockClass} h-6 w-16 rounded-full`} />
+                <Skeleton className="h-5 w-36" />
+                <Skeleton className="h-6 w-16 rounded-full" />
               </span>
-              <span className={`${pluginSkeletonBlockClass} h-4 w-full`} />
-              <span className={`${pluginSkeletonBlockClass} h-4 w-4/5`} />
-              <span className={`${pluginSkeletonBlockClass} h-3.5 w-28`} />
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-4/5" />
+              <Skeleton className="h-3.5 w-28" />
             </span>
           </div>
         </div>
@@ -201,25 +188,25 @@ function PluginDetailSkeleton() {
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="grid min-w-[320px] gap-3">
             <span className="flex items-center gap-3">
-              <span className={`${pluginSkeletonBlockClass} h-9 w-64`} />
-              <span className={`${pluginSkeletonBlockClass} h-7 w-24 rounded-full`} />
+              <Skeleton className="h-9 w-64" />
+              <Skeleton className="h-7 w-24 rounded-full" />
             </span>
-            <span className={`${pluginSkeletonBlockClass} h-4 w-56`} />
+            <Skeleton className="h-4 w-56" />
           </div>
           <span className="flex items-center gap-2">
-            <span className={`${pluginSkeletonBlockClass} h-10 w-24`} />
-            <span className={`${pluginSkeletonBlockClass} h-10 w-28`} />
+            <Skeleton className="h-10 w-24" />
+            <Skeleton className="h-10 w-28" />
           </span>
         </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
         <section className="rounded-2xl border border-white/8 bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] p-4">
-          <span className={`${pluginSkeletonBlockClass} block h-5 w-24`} />
+          <Skeleton className="h-5 w-24" />
           <div className="mt-4 grid gap-3">
-            <span className={`${pluginSkeletonBlockClass} h-4 w-full`} />
-            <span className={`${pluginSkeletonBlockClass} h-4 w-11/12`} />
-            <span className={`${pluginSkeletonBlockClass} h-4 w-3/5`} />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-11/12" />
+            <Skeleton className="h-4 w-3/5" />
           </div>
         </section>
       </div>
@@ -243,26 +230,31 @@ function PrimaryAction({
   onPrimaryAction?: (plugin: PluginBrowserEntry) => void;
 }) {
   return (
-    <button
-      className="inline-flex h-10 items-center gap-2 rounded-xl bg-[var(--misty-primary)] px-4 text-sm font-medium text-[var(--misty-primary-contrast)] transition hover:bg-[var(--misty-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+    <Button
+      className="h-10 rounded-xl px-4"
       disabled={
         busy ||
-        ((!plugin.installed && !onInstall) ||
-          (plugin.installed && !plugin.enabled && !onToggle) ||
-          (plugin.installed && plugin.enabled && !onPrimaryAction))
+        (!plugin.installed && !onInstall) ||
+        (plugin.installed && !plugin.enabled && !onToggle) ||
+        (plugin.installed && plugin.enabled && !onPrimaryAction)
       }
       onClick={() => {
         if (!plugin.installed) {
           onInstall?.(plugin);
           return;
         }
-        if (!plugin.enabled) { onToggle?.(plugin, true); return; }
+        if (!plugin.enabled) {
+          onToggle?.(plugin, true);
+          return;
+        }
         onPrimaryAction?.(plugin);
       }}
       type="button"
     >
-      {plugin.installed && plugin.enabled && primaryActionLabel ? primaryActionLabel : actionLabel(plugin)}
-    </button>
+      {plugin.installed && plugin.enabled && primaryActionLabel
+        ? primaryActionLabel
+        : actionLabel(plugin)}
+    </Button>
   );
 }
 
@@ -308,11 +300,14 @@ export function PluginBrowser({
     <div className="mx-auto flex h-full w-full max-w-[1440px] flex-col overflow-x-auto overflow-y-hidden px-4 py-4 sm:px-5 lg:px-6">
       <div className="flex items-end justify-between gap-4 border-b border-[var(--misty-border)] pb-3">
         <div>
-          <h1 className="text-[30px] font-semibold tracking-normal text-[var(--misty-text)]">{title}</h1>
+          <h1 className="text-[30px] font-semibold tracking-normal text-[var(--misty-text)]">
+            {title}
+          </h1>
         </div>
         {onRefresh ? (
-          <button
-            className="inline-flex h-10 items-center gap-2 rounded-xl border border-[var(--misty-border)] bg-[var(--misty-surface-2)] px-4 text-sm font-medium text-[var(--misty-text)] transition hover:bg-[var(--misty-surface-hover)] disabled:cursor-progress disabled:opacity-55"
+          <Button
+            className="h-10 rounded-xl px-4"
+            variant="outline"
             disabled={loading}
             onClick={onRefresh}
             title="Reload extensions"
@@ -320,7 +315,7 @@ export function PluginBrowser({
           >
             <RefreshCcw className={loading ? "animate-spin" : undefined} size={16} />
             Refresh
-          </button>
+          </Button>
         ) : null}
       </div>
 
@@ -328,9 +323,9 @@ export function PluginBrowser({
         <aside className="flex min-h-0 flex-col overflow-hidden rounded-[20px] border border-[var(--misty-border)] bg-[var(--misty-surface)]">
           <div className="shrink-0 border-b border-white/[0.07] bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] p-3">
             <div className="flex h-11 min-w-0 items-center rounded-xl border border-white/10 bg-transparent px-3.5 focus-within:border-white/25">
-              <input
+              <Input
                 aria-label="Search extensions"
-                className="w-full bg-transparent text-[15px] text-[var(--misty-text)] outline-none placeholder:text-[var(--misty-text-subtle)] disabled:cursor-progress"
+                className="h-full w-full border-0 bg-transparent px-0 text-[15px] shadow-none focus-visible:ring-0"
                 disabled={showSkeleton}
                 onChange={(event) => onQueryChange(event.target.value)}
                 placeholder="Search extensions..."
@@ -338,27 +333,24 @@ export function PluginBrowser({
               />
             </div>
 
-            <div className="mt-3 grid grid-cols-2 gap-1.5 rounded-xl border border-white/8 bg-[var(--misty-app-panel-bg,var(--misty-app-page-bg,var(--misty-bg)))] p-1">
-              {(
-                [
-                  ["marketplace", "Marketplace"],
-                  ["installed", "Installed"],
-                ] as const
-              ).map(([value, label]) => (
-                <button
-                  key={value}
-                    className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
-                    browserTab === value
-                      ? "bg-[var(--misty-primary)] text-[var(--misty-primary-contrast)]"
-                      : "text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-hover)]"
-                  }`}
-                  onClick={() => setBrowserTab(value)}
-                  type="button"
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+            <Tabs
+              className="mt-3"
+              value={browserTab}
+              onValueChange={(value) => setBrowserTab(value as PluginBrowserTab)}
+            >
+              <TabsList className="grid h-auto w-full grid-cols-2 rounded-xl p-1">
+                {(
+                  [
+                    ["marketplace", "Marketplace"],
+                    ["installed", "Installed"],
+                  ] as const
+                ).map(([value, label]) => (
+                  <TabsTrigger key={value} className="rounded-lg py-2 text-sm" value={value}>
+                    {label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto p-3">
@@ -401,20 +393,16 @@ export function PluginBrowser({
                       <h2 className="truncate text-[24px] font-semibold tracking-normal text-[var(--misty-text)]">
                         {selectedPlugin.name}
                       </h2>
-                      <span
-                        className={`inline-flex rounded-full border px-3 py-1 text-xs font-medium ${statusPillClass(selectedPlugin)}`}
-                      >
+                      <Badge variant={statusBadgeVariant(selectedPlugin)}>
                         {pluginStatus(selectedPlugin)}
-                      </span>
+                      </Badge>
                     </div>
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       <span className="text-sm text-zinc-500">
                         {selectedPlugin.author || "Misty"}
                       </span>
                       <span className="text-sm text-zinc-600">•</span>
-                      <span className="text-sm text-zinc-500">
-                        v{selectedPlugin.version}
-                      </span>
+                      <span className="text-sm text-zinc-500">v{selectedPlugin.version}</span>
                       {selectedPlugin.verified ? (
                         <>
                           <span className="text-sm text-zinc-600">•</span>
@@ -434,26 +422,28 @@ export function PluginBrowser({
                       primaryActionLabel={primaryActionLabel}
                     />
                     {selectedPlugin.installed && selectedPlugin.enabled && onToggle ? (
-                      <button className="inline-flex h-10 items-center gap-2 rounded-xl border border-[var(--misty-border)] bg-[var(--misty-surface-2)] px-4 text-sm text-[var(--misty-text)] transition hover:bg-[var(--misty-surface-hover)]" onClick={() => onToggle(selectedPlugin, false)} type="button">Disable</button>
+                      <Button
+                        className="h-10 rounded-xl px-4"
+                        onClick={() => onToggle(selectedPlugin, false)}
+                        variant="outline"
+                      >
+                        Disable
+                      </Button>
                     ) : null}
                     {selectedPlugin.installed && onUninstall ? (
-                      <button
-                        className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 text-sm text-white transition hover:bg-white/[0.06]"
+                      <Button
+                        className="h-10 rounded-xl px-4"
                         onClick={() => onUninstall(selectedPlugin)}
-                        type="button"
+                        variant="destructive"
                       >
                         Uninstall
-                      </button>
+                      </Button>
                     ) : null}
                   </div>
                 </div>
 
-                {notice ? (
-                  <p className="mt-3 text-sm text-zinc-300">{notice}</p>
-                ) : null}
-                {error ? (
-                  <p className="mt-3 text-sm text-red-300">{error}</p>
-                ) : null}
+                {notice ? <p className="mt-3 text-sm text-zinc-300">{notice}</p> : null}
+                {error ? <p className="mt-3 text-sm text-red-300">{error}</p> : null}
               </div>
 
               <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
@@ -463,14 +453,93 @@ export function PluginBrowser({
                   </p>
                 </DetailSection>
                 <div className="mt-3 grid gap-3 lg:grid-cols-2">
-                  <DetailSection title="Capabilities"><ul className="grid gap-2 text-sm text-[var(--misty-text-muted)]">{selectedPlugin.capabilities.map((item) => <li className="flex gap-2" key={item}><CheckCircle2 className="mt-0.5 shrink-0 text-[var(--misty-success)]" size={15}/><span>{item}</span></li>)}</ul></DetailSection>
-                  <DetailSection title="Permissions"><ul className="grid gap-2 text-sm text-[var(--misty-text-muted)]">{selectedPlugin.permissions.map((item) => <li key={item}>{item}</li>)}</ul></DetailSection>
-                  <DetailSection title="Placement"><dl className="grid grid-cols-[110px_1fr] gap-x-3 gap-y-2 text-sm"><dt className="text-[var(--misty-text-subtle)]">Appears in</dt><dd className="text-[var(--misty-text-muted)]">{selectedPlugin.whereItAppears.join(", ") || selectedPlugin.placement.views.join(", ")}</dd><dt className="text-[var(--misty-text-subtle)]">Opens as</dt><dd className="capitalize text-[var(--misty-text-muted)]">{selectedPlugin.placement.openMode}</dd><dt className="text-[var(--misty-text-subtle)]">Selection</dt><dd className="text-[var(--misty-text-muted)]">{selectedPlugin.placement.requiresSelection ? "Required" : "Not required"}</dd></dl></DetailSection>
-                  <DetailSection title="Included tools">{selectedPlugin.includedTools.length ? <ul className="grid gap-2 text-sm text-[var(--misty-text-muted)]">{selectedPlugin.includedTools.map((tool) => <li className="flex justify-between gap-3" key={`${tool.name}-${tool.version}`}><span>{tool.name}</span><code>{tool.version}</code></li>)}</ul> : <p className="text-sm text-[var(--misty-text-subtle)]">No executable tools included.</p>}</DetailSection>
-                  <DetailSection title="Getting started"><ol className="grid list-decimal gap-2 pl-5 text-sm text-[var(--misty-text-muted)]">{selectedPlugin.gettingStarted.map((item) => <li key={item}>{item}</li>)}</ol></DetailSection>
-                  <DetailSection title="Changelog"><ul className="grid gap-2 text-sm text-[var(--misty-text-muted)]">{selectedPlugin.changelog.map((item) => <li key={item}>{item}</li>)}</ul></DetailSection>
+                  <DetailSection title="Capabilities">
+                    <ul className="grid gap-2 text-sm text-[var(--misty-text-muted)]">
+                      {selectedPlugin.capabilities.map((item) => (
+                        <li className="flex gap-2" key={item}>
+                          <CheckCircle2
+                            className="mt-0.5 shrink-0 text-[var(--misty-success)]"
+                            size={15}
+                          />
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </DetailSection>
+                  <DetailSection title="Permissions">
+                    <ul className="grid gap-2 text-sm text-[var(--misty-text-muted)]">
+                      {selectedPlugin.permissions.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </DetailSection>
+                  <DetailSection title="Placement">
+                    <dl className="grid grid-cols-[110px_1fr] gap-x-3 gap-y-2 text-sm">
+                      <dt className="text-[var(--misty-text-subtle)]">Appears in</dt>
+                      <dd className="text-[var(--misty-text-muted)]">
+                        {selectedPlugin.whereItAppears.join(", ") ||
+                          selectedPlugin.placement.views.join(", ")}
+                      </dd>
+                      <dt className="text-[var(--misty-text-subtle)]">Opens as</dt>
+                      <dd className="capitalize text-[var(--misty-text-muted)]">
+                        {selectedPlugin.placement.openMode}
+                      </dd>
+                      <dt className="text-[var(--misty-text-subtle)]">Selection</dt>
+                      <dd className="text-[var(--misty-text-muted)]">
+                        {selectedPlugin.placement.requiresSelection ? "Required" : "Not required"}
+                      </dd>
+                    </dl>
+                  </DetailSection>
+                  <DetailSection title="Included tools">
+                    {selectedPlugin.includedTools.length ? (
+                      <ul className="grid gap-2 text-sm text-[var(--misty-text-muted)]">
+                        {selectedPlugin.includedTools.map((tool) => (
+                          <li
+                            className="flex justify-between gap-3"
+                            key={`${tool.name}-${tool.version}`}
+                          >
+                            <span>{tool.name}</span>
+                            <code>{tool.version}</code>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-sm text-[var(--misty-text-subtle)]">
+                        No executable tools included.
+                      </p>
+                    )}
+                  </DetailSection>
+                  <DetailSection title="Getting started">
+                    <ol className="grid list-decimal gap-2 pl-5 text-sm text-[var(--misty-text-muted)]">
+                      {selectedPlugin.gettingStarted.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ol>
+                  </DetailSection>
+                  <DetailSection title="Changelog">
+                    <ul className="grid gap-2 text-sm text-[var(--misty-text-muted)]">
+                      {selectedPlugin.changelog.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </DetailSection>
                 </div>
-                {selectedPlugin.links.length ? <div className="mt-3 flex flex-wrap gap-2">{selectedPlugin.links.map((link) => <a className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--misty-border)] px-3 py-2 text-sm text-[var(--misty-link)]" href={link.url} key={link.url} rel="noreferrer" target="_blank">{link.label}<ExternalLink size={13}/></a>)}</div> : null}
+                {selectedPlugin.links.length ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {selectedPlugin.links.map((link) => (
+                      <a
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--misty-border)] px-3 py-2 text-sm text-[var(--misty-link)]"
+                        href={link.url}
+                        key={link.url}
+                        rel="noreferrer"
+                        target="_blank"
+                      >
+                        {link.label}
+                        <ExternalLink size={13} />
+                      </a>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             </div>
           ) : (

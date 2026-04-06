@@ -12,10 +12,10 @@ export function userFacingErrorText(error: unknown): string {
 
   if (!raw) return "Something went wrong.";
   if (
-    normalized.includes("directory not found")
-    || normalized.includes("object not found")
-    || normalized.includes("not found in its parent directory")
-    || normalized.includes("os error 2")
+    normalized.includes("directory not found") ||
+    normalized.includes("object not found") ||
+    normalized.includes("not found in its parent directory") ||
+    normalized.includes("os error 2")
   ) {
     return "That file or folder could not be found. Refresh the folder or reindex search, then try again.";
   }
@@ -28,7 +28,11 @@ export function userFacingErrorText(error: unknown): string {
   if (normalized.includes("permission denied") || normalized.includes("access denied")) {
     return "Misty does not have permission to access that item.";
   }
-  if (normalized.includes("connection refused") || normalized.includes("network") || normalized.includes("transport error")) {
+  if (
+    normalized.includes("connection refused") ||
+    normalized.includes("network") ||
+    normalized.includes("transport error")
+  ) {
     return "Misty could not reach the remote service. Check the connection and try again.";
   }
   if (raw.length > 220) return `${raw.slice(0, 217).trimEnd()}...`;

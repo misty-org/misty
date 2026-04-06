@@ -10,11 +10,13 @@ describe("media indexing estimates", () => {
   });
 
   it("charges only resumable work remaining after persisted chunks", () => {
-    const estimate = estimateAssets([asset({
-      durationMs: 120_186,
-      approvedFingerprint: "a".repeat(64),
-      nextChunkIndex: 3,
-    })]);
+    const estimate = estimateAssets([
+      asset({
+        durationMs: 120_186,
+        approvedFingerprint: "a".repeat(64),
+        nextChunkIndex: 3,
+      }),
+    ]);
     expect(estimate.remainingDurationMs).toBe(30_186);
     expect(estimate.estimatedCredits).toBe(0.504);
   });

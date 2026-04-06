@@ -1,3 +1,5 @@
+import { Button } from "@/components/ui/button";
+
 interface AuthSubmitButtonProps {
   idleLabel: string;
   loadingLabel: string;
@@ -12,12 +14,8 @@ export default function AuthSubmitButton({
   disabled,
 }: AuthSubmitButtonProps) {
   return (
-    <button
-      type="submit"
-      disabled={disabled || loading}
-      className="w-full rounded-xl bg-zinc-100 px-4 py-3 text-sm font-semibold text-black transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
-    >
+    <Button type="submit" disabled={disabled || loading} className="h-11 w-full">
       {loading ? loadingLabel : idleLabel}
-    </button>
+    </Button>
   );
 }

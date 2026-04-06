@@ -45,6 +45,60 @@ final result: passed
 
 ---
 
+# Shadcn Home dashboard and native playground window QA
+
+## Source visual truth
+
+- Reference: `/Users/mtccool668/misty-org/misty/.codex-qa/home-dashboard-shadcn/Screenshot 2026-07-19 at 1.40.04 PM.png`
+- Requested adaptation: preserve the reference's three equal dashboard columns, paired outer cards, tall Quick Access card, shorter Smart Folders card, and full-width resource footer while using Misty's shadcn Vega/Zinc components and larger Inter typography.
+
+## Native implementation evidence
+
+- Home: `/Users/mtccool668/misty-org/misty/.codex-qa/home-dashboard-shadcn/misty-home-dashboard-v3.png`
+- Reference + normalized Home comparison: `/Users/mtccool668/misty-org/misty/.codex-qa/home-dashboard-shadcn/misty-home-dashboard-comparison.png`
+- Playground with native macOS window controls: `/Users/mtccool668/misty-org/misty/.codex-qa/home-dashboard-shadcn/misty-playground-native-controls.png`
+- Viewport: native Misty Tauri window at 1280 × 820 macOS points; captures are Retina screenshots.
+- State: dark theme, live local workspace/device/provider data, one saved smart folder, and no library tags.
+
+## Full-view and focused comparison
+
+- Home matches the reference's six-card information architecture and column proportions. Workspaces/Devices and Remote/Tags use equal stacked cards; Quick Access is taller than Smart Folders; the news/release/social resource card spans the bottom.
+- The implementation intentionally uses the shared shadcn `Card`, `Button`, `Skeleton`, semantic Zinc surfaces, rounded Vega geometry, Inter type, Lucide icons, and real provider assets instead of copying the reference's near-black bespoke panels.
+- The implementation shows current product data rather than copying the screenshot's data: one workspace and remote are available, Tags shows the real empty state, and device capacities reflect the current machine.
+- The focused normalized comparison shows that card boundaries, header dividers, icon/text rows, selected workspace treatment, and footer alignment preserve the reference hierarchy.
+
+## Required fidelity surfaces
+
+- Fonts and typography: Inter Variable is used throughout. Dashboard headings and supporting details are deliberately larger than the prior refactor while retaining clear title/detail hierarchy, truncation, and tabular capacity labels.
+- Spacing and layout rhythm: the native 1280 × 820 view has consistent 16px card gaps, equal outer tracks, a taller middle top track, shared card padding, aligned dividers, and no clipped Quick Access rows after the density correction.
+- Colors and visual tokens: background, card, accent, muted, border, foreground, and destructive states use shared shadcn semantic tokens. The lighter Zinc cards are an intentional requested adaptation, not fidelity drift.
+- Image quality and asset fidelity: no new raster artwork was needed. Google Drive uses the existing sharp provider asset; interface icons use the existing Lucide/react-icons libraries.
+- Copy and content: section labels match the selected reference (`Workspaces`, `Devices`, `Quick access`, `Smart Folders`, `Remote`, `Tags`) while row labels and metadata remain connected to real Misty state.
+
+## Playground window behavior
+
+- `Misty` and `Misty UI Playground` are independent top-level macOS windows owned by the same debug `misty-desktop` process.
+- The playground has standard red/yellow/green native controls and is configured as minimizable, maximizable, and resizable.
+- Native accessibility verification set the playground's `AXMinimized` state to true. The on-screen window registry continued to show `Misty` while omitting `Misty UI Playground`; restoring it returned only the playground window.
+- The playground remains debug-only and uses the shared Vite source, so component edits hot-reload in both windows.
+
+## Comparison history
+
+- Iteration 1: the first six-card implementation matched the target hierarchy, but Quick Access clipped its final rows at 1280 × 820 and the literal AppKit parent relationship caused minimizing the playground to hide Misty.
+- Fixes: increased the Quick Access track, tightened row padding without reducing text size, removed the AppKit parent relationship, and enabled standard native window decorations.
+- Iteration 2: recaptured Home and the playground. All Quick Access rows are visible, the Home layout remains stable, native traffic-light controls render correctly, and independent minimization was verified at the OS level.
+
+## Findings
+
+- P0: none.
+- P1: none.
+- P2: none.
+- P3: the current Tags card is sparse because the live library has no tags; its shadcn empty state is intentional and will be replaced by the same row treatment when tags exist.
+
+final result: passed
+
+---
+
 # Unified Files + Space Library image editor design QA
 
 ## Source visual truth
@@ -87,6 +141,115 @@ final result: passed
 - Iteration 1: implementation and automated verification completed; native capture returned the macOS lock screen. No visual fixes can be responsibly derived until the desktop session is unlocked.
 
 final result: blocked
+
+---
+
+# Home, File Explorer, and Spaces native desktop refactor QA
+
+## Source visual truth
+
+- Horizontal Spaces navigation reference: `/var/folders/hd/3cy894z92v70m7crvhv8rwmr0000gn/T/TemporaryItems/NSIRD_screencaptureui_DgiGxi/Screenshot 2026-07-19 at 11.47.37 AM.png`
+- Requested adaptation: Inter-only typography, shadcn Vega/Zinc interaction styling, a repaired Home dashboard, aligned File Explorer controls, larger Spaces text, and the reference's compact horizontal section layout.
+
+## Native desktop evidence
+
+- Home: `/tmp/misty-home-final.png`
+- File Explorer: `/tmp/misty-files-final.png`
+- Spaces: `/tmp/misty-spaces-final.png`
+- Focused reference comparison: `/tmp/misty-spaces-nav-comparison.png`
+- Viewport: native Misty Tauri window at 1280 × 820 macOS points; captures are Retina screenshots.
+- State: dark theme; Home dashboard loaded; connected remote open in File Explorer list view; Spaces Chat section active.
+
+## Full-view comparison evidence
+
+- Home uses three stable, bounded dashboard regions with balanced vertical space, responsive two- and one-column fallbacks, consistent rows, and a separate compact resource footer.
+- File Explorer uses opaque Zinc surfaces, one icon-button sizing system, aligned breadcrumb/action/view controls, semantic hover and selected states, and consistent sidebar rows.
+- Spaces preserves the contextual two-column shell while replacing the tall labeled destination list with a single compact horizontal icon rail. The active tile, muted icons, spacing, and dark filled container closely follow the supplied reference.
+
+## Focused comparison evidence
+
+- `/tmp/misty-spaces-nav-comparison.png` places the supplied section-control reference and the native implementation in one image at matched height.
+- Both use evenly spaced icon-only destinations, a quiet filled active state, muted warm-neutral icon color, rounded dark container treatment, and generous click targets.
+- The implementation intentionally has six destinations because Settings is a real peer destination; every icon retains an accessible name and native tooltip.
+
+## Required fidelity surfaces
+
+- Fonts and typography: only Inter Variable is imported and used for body and heading text; runtime custom-font injection and its Settings UI were removed. Spaces navigation/context text was raised to readable 13–15px tiers while metadata remains subordinate.
+- Spacing and layout rhythm: Home card tracks, Explorer 32/36px controls, sidebar rows, and the Spaces icon rail align without clipping or uneven empty columns. The Explorer path bar was expanded after the first native pass to remove reserved empty search space.
+- Colors and visual tokens: controls use shadcn semantic `background`, `sidebar`, `muted`, `accent`, `border`, and foreground tokens. Hard-coded inactive-pane gray overrides and yellow folder fills were removed.
+- Image quality and asset fidelity: no raster reference assets needed recreation; the implementation uses the existing Lucide icon system and real provider/Mika assets. The Google Drive and Mika assets remained sharp and correctly sized in native captures.
+- Copy and content: existing product labels, paths, workspace data, devices, remotes, Space destinations, and error states remain intact.
+
+## Interaction and accessibility checks
+
+- Home quick access, workspace, remote, device, collection, and footer controls retain their existing behavior.
+- Explorer navigation, breadcrumb, search, file actions, view toggle, sidebar destinations, and selected rows rendered in the native Tauri app.
+- Spaces section links remain semantic links with `aria-label`, `aria-current`, visible focus styling, and title tooltips despite the icon-only presentation.
+- TypeScript, UI-contract validation, size validation, production desktop build, and all 151 automated tests pass.
+
+## Comparison history
+
+- Iteration 1: native captures showed the redesigned Home, File Explorer, and Spaces layouts. The Explorer toolbar reserved an unnecessary wide third grid track for its icon-only search trigger.
+- Fix: restored the toolbar's third track to intrinsic width so the breadcrumb/path field consumes the available horizontal space.
+- Iteration 2: recaptured Home, File Explorer, and Spaces in the native Tauri app. No actionable P0/P1/P2 findings remain.
+
+## Findings
+
+- P0: none.
+- P1: none.
+- P2: none.
+- P3: the supplied reference shows five abstract destinations, while Misty exposes six functional Space destinations; matching the exact count would hide Settings or add an unnecessary overflow menu.
+
+final result: passed
+
+---
+
+# Unified Agent Center and native Jira-style Tasks design QA
+
+## Source visual truth
+
+- Jira Board reference: `/Users/mtccool668/misty-org/misty/.codex-qa/jira-tasks-native/jira-reference.webp`
+- Source: `https://wac-cdn.atlassian.com/misc-assets/webp-images/jswf/plan-jumpstart-with-expert-templates.webp`
+- Requested adaptation: use Jira's compact sibling-view toolbar, persistent filters, dense status columns, focused task details, and work-management hierarchy while retaining Misty's visual system and three agreed statuses.
+
+## Native desktop evidence
+
+- Board: `/Users/mtccool668/misty-org/misty/.codex-qa/jira-tasks-native/native-tasks.png`
+- List: `/Users/mtccool668/misty-org/misty/.codex-qa/jira-tasks-native/native-list.png`
+- Calendar: `/Users/mtccool668/misty-org/misty/.codex-qa/jira-tasks-native/native-calendar.png`
+- Task drawer: `/Users/mtccool668/misty-org/misty/.codex-qa/jira-tasks-native/native-task-drawer.png`
+- Narrow Board: `/Users/mtccool668/misty-org/misty/.codex-qa/jira-tasks-native/native-board-1100.png`
+- Agent Center: `/Users/mtccool668/misty-org/misty/.codex-qa/jira-tasks-native/native-current.png`
+- Studio Agents: `/Users/mtccool668/misty-org/misty/.codex-qa/jira-tasks-native/native-studio-agents.png`
+- Studio Workflows: `/Users/mtccool668/misty-org/misty/.codex-qa/jira-tasks-native/native-studio-workflows.png`
+- Reference + native comparison: `/Users/mtccool668/misty-org/misty/.codex-qa/jira-tasks-native/jira-vs-misty-native.png`
+
+All implementation captures came from the running `target/debug/misty-desktop` Tauri application, not a standalone browser preview. The primary capture was 1280 × 820 macOS points (2560 × 1640 Retina pixels); narrow behavior was checked at 1100 × 720 points. The connected production Space had no tasks, so the verified native Board and List show their real empty states rather than seeded browser-only data.
+
+## Visible comparison
+
+- Board, List, and Calendar are sibling views in one compact toolbar alongside search, assignee, filters, calendar-source health, refresh, and Create.
+- The Board follows Jira's dense column structure and inline create affordance, using Misty's dark translucent surfaces, typography, icons, and `To do`, `In progress`, and `Done` status model.
+- At the narrow desktop width the Board preserves its minimum column widths and scrolls horizontally instead of crushing or clipping card content.
+- The month Calendar keeps Google events visually read-only and Misty due tasks editable through separate drawers.
+- Agent authoring is visibly contained inside Agent Center's Studio tab. The Space navigation no longer exposes a separate Studio destination.
+- The Studio Agents empty state was tightened to one short sentence and one action; redundant shared-definition helper copy was removed.
+
+## Interaction and functional checks
+
+- Native navigation exercised Board → List → Calendar and opened/canceled the task-create drawer without writing production data.
+- The task drawer exposes title, notes, status, priority, assignee, and due date in the requested focused two-column structure.
+- Native navigation exercised Agent Center → Studio → Agents/Workflows. The workflow canvas rendered draggable categorized nodes, typed connections, canvas controls, minimap, Save/Publish, and run validation inside Agent Center.
+- Standalone Vite preview QA, its screenshots, its disposable database, and its demo containers were removed or stopped. The Vite development server still used by `tauri dev` is the desktop WebView's required asset server, not a separate product surface.
+
+## Findings
+
+- P0: none.
+- P1: none.
+- P2: none.
+- P3: the Jira reference contains four populated custom columns while the agreed Misty launch model has three statuses and the production test Space was empty; the interaction density and proportions were compared, but card-content fidelity remains covered by component tests rather than this production desktop capture.
+
+final result: passed
 
 # Global image editor design QA
 
@@ -171,3 +334,11 @@ final result: passed
 The complete unified Files + Space Library report, source paths, functional evidence, fidelity surfaces, and comparison history are recorded above under “Unified Files + Space Library image editor design QA.” Native capture is still returning the macOS lock screen, so that report cannot pass until the same shared editor is visibly exercised from both desktop entry points.
 
 final result: blocked
+
+---
+
+# Current task final status
+
+The latest verification for this task is the “Shadcn Home dashboard and native playground window QA” report above. Its native Home comparison, playground capture, and independent macOS minimization evidence are current, with all P0/P1/P2 findings cleared.
+
+final result: passed

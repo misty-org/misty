@@ -1,8 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type {
-  MouseEvent as ReactMouseEvent,
-  PointerEvent as ReactPointerEvent,
-} from "react";
+import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { currentMonitor, getCurrentWindow, primaryMonitor } from "@tauri-apps/api/window";
@@ -10,7 +7,6 @@ import { PhysicalPosition } from "@tauri-apps/api/dpi";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import { AppWindow, ArrowUpRight, MessageSquare, X } from "lucide-react";
 import { motion, useMotionValue, useSpring } from "motion/react";
-import mikaAnimation from "../../assets/bots/cloud-folder/mika.webp";
 import {
   cloudFolderBotChatVisibilityEvent,
   cloudFolderBotNotifyEvent,
@@ -20,9 +16,15 @@ import {
   returnToMistyAppFromBot,
   type CloudFolderBotNotification,
   type CloudFolderBotChatVisibility,
-} from "../../bots/cloudFolderBot";
-import { hasTauriInternals, safeTauriAssetUrl } from "../../shared/tauri";
+} from "@/bots/cloudFolderBot";
+import { hasTauriInternals } from "@/shared/tauri";
+import {
+  hideRuntimeAssetOnError,
+  revealRuntimeAssetOnLoad,
+  runtimeAssetSource,
+} from "@/shared/assets/runtimeAsset";
 import { useSettingsStore } from "../../stores/useSettingsStore";
+import { Button } from "../../components/ui/button";
 
 type BotContextMenu = { x: number; y: number };
 type MikaNativeVelocity = { velocityX: number; velocityY: number };
@@ -33,8 +35,7 @@ const contextMenuClass =
 const contextMenuItemClass =
   "grid h-9 w-full grid-cols-[18px_minmax(0,1fr)] items-center gap-2.5 rounded-lg border-0 bg-transparent px-2.5 text-left text-[#e4e4e7] transition hover:bg-white/[0.06] hover:text-[#f4f4f5]";
 export default function CloudFolderBotOverlay() {
-  const [notification, setNotification] =
-    useState<CloudFolderBotNotification | null>(null);
+  const [notification, setNotification] = useState<CloudFolderBotNotification | null>(null);
   const [bubbleVisible, setBubbleVisible] = useState(false);
   const [chatMode, setChatMode] = useState(false);
   const [contextMenu, setContextMenu] = useState<BotContextMenu | null>(null);
@@ -80,9 +81,8 @@ export default function CloudFolderBotOverlay() {
   useEffect(() => {
     if (!hasTauriInternals()) return;
     let unlisten: UnlistenFn | null = null;
-    void listen<CloudFolderBotChatVisibility>(
-      cloudFolderBotChatVisibilityEvent,
-      (event) => setChatMode(event.payload.visible),
+    void listen<CloudFolderBotChatVisibility>(cloudFolderBotChatVisibilityEvent, (event) =>
+      setChatMode(event.payload.visible),
     ).then((listener) => {
       unlisten = listener;
     });
@@ -98,13 +98,10 @@ export default function CloudFolderBotOverlay() {
   useEffect(() => {
     if (!hasTauriInternals()) return;
     let unlisten: UnlistenFn | null = null;
-    void listen<CloudFolderBotNotification>(
-      cloudFolderBotNotifyEvent,
-      (event) => {
-        setNotification(event.payload);
-        setBubbleVisible(true);
-      },
-    ).then((listener) => {
+    void listen<CloudFolderBotNotification>(cloudFolderBotNotifyEvent, (event) => {
+      setNotification(event.payload);
+      setBubbleVisible(true);
+    }).then((listener) => {
       unlisten = listener;
     });
 
@@ -239,12 +236,10 @@ export default function CloudFolderBotOverlay() {
   };
 
   return (
-    <main
-      className="pointer-events-none relative h-screen w-screen select-none overflow-hidden bg-transparent text-[#17202a]"
-    >
+    <main className="pointer-events-none relative h-screen w-screen select-none overflow-hidden bg-transparent text-[#17202a]">
       {!chatMode ? (
         <div className="pointer-events-auto absolute right-0 top-2 z-40 flex w-6 flex-col items-center gap-1">
-          <button
+          <Button
             aria-label="Open Mika chat"
             className="grid size-5 place-items-center border-0 bg-transparent p-0 text-[#f1f3f5] transition hover:scale-110 hover:text-white"
             onClick={openAssistant}
@@ -252,8 +247,8 @@ export default function CloudFolderBotOverlay() {
             type="button"
           >
             <MessageSquare aria-hidden="true" size={15} strokeWidth={2.2} />
-          </button>
-          <button
+          </Button>
+          <Button
             aria-label="Open Misty"
             className="grid size-5 place-items-center border-0 bg-transparent p-0 text-[#f1f3f5] transition hover:scale-110 hover:text-white"
             onClick={returnToApp}
@@ -261,7 +256,7 @@ export default function CloudFolderBotOverlay() {
             type="button"
           >
             <AppWindow aria-hidden="true" size={15} strokeWidth={2.2} />
-          </button>
+          </Button>
         </div>
       ) : null}
 
@@ -271,30 +266,30 @@ export default function CloudFolderBotOverlay() {
         role="log"
         aria-live={bubbleShown ? "polite" : "off"}
       >
-          <button
-            aria-label="Return to Misty"
-            className="absolute right-2 top-2 z-10 grid size-6 place-items-center rounded-full border-0 bg-[#e7f8ee] p-0 text-[#1f6f36] transition hover:bg-[#d2f3df]"
-            onClick={returnToApp}
-            title="Return to Misty"
-            type="button"
+        <Button
+          aria-label="Return to Misty"
+          className="absolute right-2 top-2 z-10 grid size-6 place-items-center rounded-full border-0 bg-[#e7f8ee] p-0 text-[#1f6f36] transition hover:bg-[#d2f3df]"
+          onClick={returnToApp}
+          title="Return to Misty"
+          type="button"
+        >
+          <ArrowUpRight aria-hidden="true" size={14} strokeWidth={2.5} />
+        </Button>
+        {notification ? (
+          <article
+            className={`truncate rounded-[10px] px-2.5 py-1.5 pr-7 text-[11px] font-semibold leading-snug ${
+              notification.type === "error"
+                ? "bg-[#fff1f2] text-[#7f1d1d]"
+                : "bg-[#edf8ff] text-[#17334a]"
+            }`}
           >
-            <ArrowUpRight aria-hidden="true" size={14} strokeWidth={2.5} />
-          </button>
-          {notification ? (
-            <article
-              className={`truncate rounded-[10px] px-2.5 py-1.5 pr-7 text-[11px] font-semibold leading-snug ${
-                notification.type === "error"
-                  ? "bg-[#fff1f2] text-[#7f1d1d]"
-                  : "bg-[#edf8ff] text-[#17334a]"
-              }`}
-            >
-              {notification.message}
-            </article>
-          ) : (
-            <div className="truncate rounded-[10px] bg-[#edf8ff] px-2.5 py-2 pr-7 text-[11px] font-semibold leading-snug text-[#426270]">
-              Nothing going on.
-            </div>
-          )}
+            {notification.message}
+          </article>
+        ) : (
+          <div className="truncate rounded-[10px] bg-[#edf8ff] px-2.5 py-2 pr-7 text-[11px] font-semibold leading-snug text-[#426270]">
+            Nothing going on.
+          </div>
+        )}
       </aside>
 
       <motion.button
@@ -306,19 +301,23 @@ export default function CloudFolderBotOverlay() {
         onContextMenu={openContextMenu}
         type="button"
       >
-        <motion.img
-          alt=""
-          aria-hidden="true"
-          className="pointer-events-none h-full w-full select-none object-contain drop-shadow-[0_10px_18px_rgba(18,92,150,0.2)] [backface-visibility:hidden] will-change-transform"
-          draggable={false}
-          src={botAsset}
-          style={{
-            rotate: spriteRotation,
-            scaleX: spriteScaleX,
-            scaleY: spriteScaleY,
-            y: spriteOffset,
-          }}
-        />
+        {botAsset ? (
+          <motion.img
+            alt=""
+            aria-hidden="true"
+            className="pointer-events-none h-full w-full select-none object-contain drop-shadow-[0_10px_18px_rgba(18,92,150,0.2)] [backface-visibility:hidden] will-change-transform"
+            draggable={false}
+            src={botAsset}
+            onError={hideRuntimeAssetOnError}
+            onLoad={revealRuntimeAssetOnLoad}
+            style={{
+              rotate: spriteRotation,
+              scaleX: spriteScaleX,
+              scaleY: spriteScaleY,
+              y: spriteOffset,
+            }}
+          />
+        ) : null}
       </motion.button>
 
       {contextMenu ? (
@@ -329,7 +328,7 @@ export default function CloudFolderBotOverlay() {
           role="menu"
           style={{ left: contextMenu.x, top: contextMenu.y }}
         >
-          <button
+          <Button
             className={contextMenuItemClass}
             onClick={returnToApp}
             role="menuitem"
@@ -337,8 +336,8 @@ export default function CloudFolderBotOverlay() {
           >
             <AppWindow className="text-[#a1a1aa]" aria-hidden="true" size={16} />
             <span className="truncate">Open Misty</span>
-          </button>
-          <button
+          </Button>
+          <Button
             className={`${contextMenuItemClass} text-[#f87171] hover:bg-[#ef4444]/10 hover:text-[#fca5a5]`}
             onClick={closeBot}
             role="menuitem"
@@ -346,7 +345,7 @@ export default function CloudFolderBotOverlay() {
           >
             <X className="text-current" aria-hidden="true" size={16} />
             <span className="truncate">Close Mika</span>
-          </button>
+          </Button>
         </div>
       ) : null}
     </main>
@@ -354,14 +353,8 @@ export default function CloudFolderBotOverlay() {
 }
 
 function cloudFolderBotAssetSource(): string {
-  const assetsDir = new URLSearchParams(window.location.search)
-    .get("assetsDir")
-    ?.trim();
-  if (!assetsDir) {
-    return mikaAnimation;
-  }
-  const base = assetsDir.replace(/\/+$/, "");
-  return safeTauriAssetUrl(`${base}/animations/mika.webp`);
+  const assetsDir = new URLSearchParams(window.location.search).get("assetsDir")?.trim();
+  return runtimeAssetSource(assetsDir, "animations/mika.webp");
 }
 
 async function clampBotWindowToScreen(): Promise<void> {

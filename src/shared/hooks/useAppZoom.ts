@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { hasTauriInternals } from "../tauri";
-import { isNativeMobileBuild } from "../../platform/buildTarget";
+import { isNativeMobileBuild } from "@/platform/buildTarget";
 
 const APP_ZOOM_STORAGE_KEY = "misty.app.zoom";
 const appZoomMin = 0.5;
@@ -58,9 +58,12 @@ export function useAppZoom() {
     }, 900);
   }, [zoom]);
 
-  useEffect(() => () => {
-    if (hideTimerRef.current !== null) window.clearTimeout(hideTimerRef.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (hideTimerRef.current !== null) window.clearTimeout(hideTimerRef.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -158,11 +161,18 @@ function clampAppZoom(zoom: number): number {
 }
 
 function isZoomInKey(event: KeyboardEvent): boolean {
-  return event.key === "+" || event.key === "=" || event.code === "Equal" || event.code === "NumpadAdd";
+  return (
+    event.key === "+" || event.key === "=" || event.code === "Equal" || event.code === "NumpadAdd"
+  );
 }
 
 function isZoomOutKey(event: KeyboardEvent): boolean {
-  return event.key === "-" || event.key === "_" || event.code === "Minus" || event.code === "NumpadSubtract";
+  return (
+    event.key === "-" ||
+    event.key === "_" ||
+    event.code === "Minus" ||
+    event.code === "NumpadSubtract"
+  );
 }
 
 function isZoomResetKey(event: KeyboardEvent): boolean {

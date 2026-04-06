@@ -1,6 +1,6 @@
 import { appSnapshot } from "../../../api/misty";
 import { normalizeApiBaseUrl, withDefaultApiPath } from "../../../api/apiBase";
-import { isAndroidBuild, isNativeMobileBuild } from "../../../platform/buildTarget";
+import { isAndroidBuild, isNativeMobileBuild } from "@/platform/buildTarget";
 import {
   clearAccountAuthToken,
   readAccountAuthToken,
@@ -22,31 +22,31 @@ export interface AccountMeResponse {
   username: string;
   email: string;
   created_at: string;
-	  tier: "basic" | "pro" | "max";
+  tier: "basic" | "pro" | "max";
   status: "active" | "trialing" | "cancelled" | "expired";
   allows_use: boolean;
   expires_at: string | null;
   trial_started_at: string | null;
-	  license_device: string;
-	  billing?: {
-	    kind: "free" | "trial" | "lifetime" | "subscription";
-	    interval: "month" | "year" | null;
-	    subscription_status: string | null;
-	    current_period_end: string | null;
-	    cancel_at_period_end: boolean;
-	    customer_portal_available: boolean;
-	  };
+  license_device: string;
+  billing?: {
+    kind: "free" | "trial" | "lifetime" | "subscription";
+    interval: "month" | "year" | null;
+    subscription_status: string | null;
+    current_period_end: string | null;
+    cancel_at_period_end: boolean;
+    customer_portal_available: boolean;
+  };
 }
 
 export interface BillingUsageResponse {
-	plan: "basic" | "pro" | "max";
-	monthly_allowance: number;
-	monthly_remaining: number;
-	purchased_remaining: number;
-	available_credits: number;
-	reserved_credits: number;
-	next_reset_at: string;
-	usage_by_meter: Array<{ meter: string; credits: number }> | null;
+  plan: "basic" | "pro" | "max";
+  monthly_allowance: number;
+  monthly_remaining: number;
+  purchased_remaining: number;
+  available_credits: number;
+  reserved_credits: number;
+  next_reset_at: string;
+  usage_by_meter: Array<{ meter: string; credits: number }> | null;
 }
 
 interface LoginResponse {
@@ -66,7 +66,11 @@ async function getJson<T>(path: string): Promise<T> {
   return requestJson<T>("GET", path);
 }
 
-async function requestJson<T>(method: "GET" | "POST" | "PUT", path: string, body?: unknown): Promise<T> {
+async function requestJson<T>(
+  method: "GET" | "POST" | "PUT",
+  path: string,
+  body?: unknown,
+): Promise<T> {
   const apiBase = await resolveAccountApiBase();
   const url = `${apiBase}${path}`;
   try {
@@ -94,7 +98,12 @@ async function requestJson<T>(method: "GET" | "POST" | "PUT", path: string, body
   }
 }
 
-async function parseResponse<T>(response: Response, method: string, path: string, url: string): Promise<T> {
+async function parseResponse<T>(
+  response: Response,
+  method: string,
+  path: string,
+  url: string,
+): Promise<T> {
   const payload = await parsePayload(response, method, path);
 
   if (!response.ok) {
@@ -130,8 +139,7 @@ function recordAccountApiDebugEvent(event: {
 }
 
 function accountDebugEnabled(): boolean {
-  return !isNativeMobileBuild &&
-    (import.meta.env.DEV || import.meta.env.VITE_MISTY_DEBUG === "1");
+  return !isNativeMobileBuild && (import.meta.env.DEV || import.meta.env.VITE_MISTY_DEBUG === "1");
 }
 
 async function parsePayload(response: Response, method: string, path: string): Promise<unknown> {
@@ -144,7 +152,10 @@ async function parsePayload(response: Response, method: string, path: string): P
   } catch (error) {
     const firstJsonValue = firstJsonValueText(text);
     if (firstJsonValue) return JSON.parse(firstJsonValue);
-    throw new AccountApiError(`Misty server returned malformed JSON for ${method} ${path}: ${textPreview(text)}${error instanceof Error ? ` (${error.message})` : ""}`, response.status);
+    throw new AccountApiError(
+      `Misty server returned malformed JSON for ${method} ${path}: ${textPreview(text)}${error instanceof Error ? ` (${error.message})` : ""}`,
+      response.status,
+    );
   }
 }
 
@@ -165,12 +176,12 @@ function firstJsonValueText(value: string): string | null {
         escaped = false;
       } else if (char === "\\") {
         escaped = true;
-      } else if (char === "\"") {
+      } else if (char === '"') {
         inString = false;
       }
       continue;
     }
-    if (char === "\"") {
+    if (char === '"') {
       inString = true;
       continue;
     }
@@ -215,7 +226,12 @@ export async function accountSignIn(email: string, password: string): Promise<Ac
   return user;
 }
 
-export async function accountRegister(name: string, username: string, email: string, password: string): Promise<AccountAuthUser> {
+export async function accountRegister(
+  name: string,
+  username: string,
+  email: string,
+  password: string,
+): Promise<AccountAuthUser> {
   const data = await postJson<LoginResponse>("/register", { name, username, email, password });
   const id = data.user_id ?? data.id;
   if (!id) {
@@ -238,19 +254,24 @@ export function accountFetchMe(): Promise<AccountMeResponse> {
 }
 
 export function accountFetchBillingUsage(): Promise<BillingUsageResponse> {
-	return getJson("/billing/usage");
+  return getJson("/billing/usage");
 }
 
-export function accountCreateCheckout(tier: "pro" | "max", interval: "month" | "year"): Promise<{ url: string }> {
-	return postJson("/billing/checkout-session", { tier, interval });
+export function accountCreateCheckout(
+  tier: "pro" | "max",
+  interval: "month" | "year",
+): Promise<{ url: string }> {
+  return postJson("/billing/checkout-session", { tier, interval });
 }
 
-export function accountCreateCreditCheckout(packId: "credits_1500" | "credits_3500"): Promise<{ url: string }> {
-	return postJson("/billing/credit-checkout-session", { pack_id: packId });
+export function accountCreateCreditCheckout(
+  packId: "credits_1500" | "credits_3500",
+): Promise<{ url: string }> {
+  return postJson("/billing/credit-checkout-session", { pack_id: packId });
 }
 
 export function accountCreatePortalSession(): Promise<{ url: string }> {
-	return postJson("/billing/portal-session");
+  return postJson("/billing/portal-session");
 }
 
 export async function accountUpdateProfile(name: string): Promise<void> {
@@ -261,7 +282,10 @@ export async function accountUpdateDevice(device: string): Promise<void> {
   await requestJson("PUT", "/me/device", { device });
 }
 
-export async function accountUpdateTelemetryPreferences(analyticsEnabled: boolean, errorReportingEnabled: boolean): Promise<void> {
+export async function accountUpdateTelemetryPreferences(
+  analyticsEnabled: boolean,
+  errorReportingEnabled: boolean,
+): Promise<void> {
   await requestJson("PUT", "/me/telemetry", {
     analytics_enabled: analyticsEnabled,
     error_reporting_enabled: errorReportingEnabled,
@@ -280,7 +304,10 @@ export async function accountLogout(): Promise<SavedAccountSession | null> {
 class AccountApiError extends Error {
   name = "AccountApiError";
 
-  constructor(message: string, readonly status?: number) {
+  constructor(
+    message: string,
+    readonly status?: number,
+  ) {
     super(message);
   }
 }
@@ -308,7 +335,9 @@ async function resolveAccountApiBase(): Promise<string> {
   const publicApiBase = normalizeApiBaseUrl(import.meta.env.VITE_MISTY_PUBLIC_API_URL);
   const explicitServerUrl = normalizeApiBaseUrl(import.meta.env.VITE_MISTY_SERVER_URL);
   const envApiBase = normalizeApiBaseUrl(import.meta.env.VITE_API_BASE);
-  const nativeServerUrl = normalizeApiBaseUrl((await loadAppSnapshotForAccountApi())?.environment.serverUrl);
+  const nativeServerUrl = normalizeApiBaseUrl(
+    (await loadAppSnapshotForAccountApi())?.environment.serverUrl,
+  );
   return withDefaultApiPath(publicApiBase ?? explicitServerUrl ?? envApiBase ?? nativeServerUrl);
 }
 
@@ -320,13 +349,16 @@ async function loadAppSnapshotForAccountApi() {
   }
 }
 
-
 function requestHeaders(body: unknown, token: string | null): Headers | undefined {
   if (body === undefined && !token) return undefined;
 
   const headers = new Headers();
   headers.set("X-Misty-Platform", accountClientPlatform());
-  headers.set("X-Misty-Release-Channel", import.meta.env.VITE_RELEASE_CHANNEL?.trim() || (import.meta.env.DEV ? "development" : "production"));
+  headers.set(
+    "X-Misty-Release-Channel",
+    import.meta.env.VITE_RELEASE_CHANNEL?.trim() ||
+      (import.meta.env.DEV ? "development" : "production"),
+  );
   headers.set("X-Misty-Analytics-Enabled", String(analytics.isAnalyticsEnabled()));
   if (body !== undefined) {
     headers.set("Content-Type", "application/json");

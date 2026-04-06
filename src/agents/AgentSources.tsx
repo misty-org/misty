@@ -1,3 +1,4 @@
+import { Button } from "../components/ui/button";
 import { FileText, Presentation, Sheet, TextQuote } from "lucide-react";
 import { agentsOpenCitation } from "./api";
 import type { AgentCitation } from "./types";
@@ -22,16 +23,20 @@ export function AgentSources({ citations, compact = false, onOpen }: AgentSource
       <strong className="agent-sources-title">Sources</strong>
       <div className="agent-sources-list">
         {citations.map((citation, index) => {
-          const Icon = citation.kind === "slide"
-            ? Presentation
-            : citation.kind === "sheet_range"
-              ? Sheet
-              : citation.kind === "section"
-                ? TextQuote
-                : FileText;
+          const Icon =
+            citation.kind === "slide"
+              ? Presentation
+              : citation.kind === "sheet_range"
+                ? Sheet
+                : citation.kind === "section"
+                  ? TextQuote
+                  : FileText;
           return (
-            <button
-              key={citation.id || `${citation.scopeId}:${citation.relativePath || citation.fileName}:${citation.label}:${index}`}
+            <Button
+              key={
+                citation.id ||
+                `${citation.scopeId}:${citation.relativePath || citation.fileName}:${citation.label}:${index}`
+              }
               className="agent-source"
               type="button"
               title={citation.excerpt ?? `${citation.fileName}, ${citation.label}`}
@@ -41,7 +46,7 @@ export function AgentSources({ citations, compact = false, onOpen }: AgentSource
               <Icon size={13} aria-hidden="true" />
               <span className="agent-source-name">{citation.fileName}</span>
               <span className="agent-source-location">{citation.label}</span>
-            </button>
+            </Button>
           );
         })}
       </div>

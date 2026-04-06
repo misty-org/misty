@@ -21,13 +21,18 @@ describe("telemetry redaction", () => {
   });
 
   it("redacts bearer-style secrets", () => {
-    expect(redactText("Bearer abcdefghijklmnopqrstuvwxyz")).not.toContain("abcdefghijklmnopqrstuvwxyz");
+    expect(redactText("Bearer abcdefghijklmnopqrstuvwxyz")).not.toContain(
+      "abcdefghijklmnopqrstuvwxyz",
+    );
   });
 
   it("removes user URLs and filenames while preserving safe bundle frames", () => {
-    expect(redactText("failed report.pdf at https://example.com/customer/alice?q=secret")).not.toMatch(/report|example|alice|secret/);
+    expect(
+      redactText("failed report.pdf at https://example.com/customer/alice?q=secret"),
+    ).not.toMatch(/report|example|alice|secret/);
     const error = new Error("failure");
-    error.stack = "Error: failure\n at run (https://tauri.localhost/assets/App.js?token=secret:1:2)";
+    error.stack =
+      "Error: failure\n at run (https://tauri.localhost/assets/App.js?token=secret:1:2)";
     const safe = redactedError(error);
     expect(safe.stack).toContain("https://tauri.localhost/assets/App.js");
     expect(safe.stack).not.toContain("token=secret");

@@ -48,13 +48,24 @@ describe("Mika Space delegation", () => {
   });
 
   it("explains clarification choices without inventing a selection", () => {
-    expect(mikaDelegationMessage({
-      status: "needs_clarification",
-      routing: {
-        needs_clarification: true,
-        question: "Which Agent should handle this?",
-        options: [{ space_id: "space_one", space_name: "Personal Space", agent_id: "agent_one", agent_name: "Helper", capability_id: "summarize", capability_name: "Summarize" }],
-      },
-    })).toBe("Which Agent should handle this?\n• Helper in Personal Space (Summarize)");
+    expect(
+      mikaDelegationMessage({
+        status: "needs_clarification",
+        routing: {
+          needs_clarification: true,
+          question: "Which Agent should handle this?",
+          options: [
+            {
+              space_id: "space_one",
+              space_name: "Personal Space",
+              agent_id: "agent_one",
+              agent_name: "Helper",
+              capability_id: "summarize",
+              capability_name: "Summarize",
+            },
+          ],
+        },
+      }),
+    ).toBe("Which Agent should handle this?\n• Helper in Personal Space (Summarize)");
   });
 });

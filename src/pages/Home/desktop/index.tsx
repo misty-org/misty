@@ -10,13 +10,13 @@ import type {
   SavedSearchRule,
 } from "../../../api/types";
 import { releases } from "../../../data/releases";
-import { useMultiPanelStore } from "../../../shared/multipanel/useMultiPanelStore";
+import { useMultiPanelStore } from "@/shared/multipanel/useMultiPanelStore";
 import { useAppStore } from "../../../stores/useAppStore";
 import { useExplorerStore } from "../../../stores/useExplorerStore";
 import { useProvidersStore } from "../../../stores/useProvidersStore";
 import { useSearchStore } from "../../../stores/useSearchStore";
-import { explorerRootForBuild } from "../../../platform/androidStorage";
-import { isAndroidBuild } from "../../../platform/buildTarget";
+import { explorerRootForBuild } from "@/platform/androidStorage";
+import { isAndroidBuild } from "@/platform/buildTarget";
 import {
   selectAdvancedPreferences,
   selectGeneralPreferences,
@@ -25,7 +25,6 @@ import {
 import { changelog } from "../../Changelog/desktop/data";
 import { posts } from "../../../data/blog";
 import { DesktopWorkspacePanel } from "./DesktopWorkspacePanel";
-import { DesktopAssistantPanel } from "./DesktopAssistantPanel";
 import { HomeFooter } from "./HomeFooter";
 import {
   buildHomeQuickAccessItems,
@@ -48,15 +47,12 @@ export default function HomePage() {
   const app = useAppStore((state) => state.app);
   const { preferredWorkspaceRoot, settingsMountPath } = useSettingsStore(
     useShallow((state) => ({
-      preferredWorkspaceRoot: selectGeneralPreferences(state.settings?.document).preferredWorkspaceRoot,
+      preferredWorkspaceRoot: selectGeneralPreferences(state.settings?.document)
+        .preferredWorkspaceRoot,
       settingsMountPath: selectAdvancedPreferences(state.settings?.document).mountPath,
     })),
   );
-  const {
-    library,
-    loadLibrary,
-    pinnedPaths,
-  } = useExplorerStore(
+  const { library, loadLibrary, pinnedPaths } = useExplorerStore(
     useShallow((state) => ({
       library: state.library,
       loadLibrary: state.loadLibrary,
@@ -189,8 +185,8 @@ export default function HomePage() {
   };
 
   return (
-    <div className="misty-scrollbar relative box-border h-full min-h-0 min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain p-[clamp(0.5rem,1vw,1.25rem)]">
-      <section className="relative z-10 flex min-h-full w-full min-w-0 flex-col gap-[clamp(0.5rem,0.8vw,1rem)]">
+    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-background text-foreground">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain bg-background p-5 max-[720px]:p-4">
         <HomeSidebarPanels
           devices={devices}
           devicesLoading={devicesLoading}
@@ -202,18 +198,14 @@ export default function HomePage() {
           quickAccessItems={quickAccessItems}
           remotes={remotes}
           remotesLoading={remotesLoading}
-          assistantPanel={<DesktopAssistantPanel />}
           smartFolders={smartFolders}
           smartFoldersLoading={smartFoldersLoading}
           tags={tags}
           tagsLoading={!library}
           workspacePanel={<DesktopWorkspacePanel homePath={homePath} />}
         />
-        <HomeFooter
-          latestChangelog={latestChangelog}
-          latestPost={latestPost}
-        />
-      </section>
+        <HomeFooter latestChangelog={latestChangelog} latestPost={latestPost} />
+      </div>
     </div>
   );
 }
@@ -242,18 +234,21 @@ function buildHomeTagItems(library: ExplorerLibrarySnapshot | null): HomeTagItem
     seenByPath.set(pathKey, pathTags);
   }
 
-  return [...tags.values()].sort((left, right) =>
-    right.count - left.count || left.name.localeCompare(right.name),
+  return [...tags.values()].sort(
+    (left, right) => right.count - left.count || left.name.localeCompare(right.name),
   );
 }
 
 function smartFolderQuery(search: SavedSearch): string {
-  return search.query.trim() || smartFolderQueryFromRules(search.rules, smartFolderMatchMode(search.rules));
+  return (
+    search.query.trim() ||
+    smartFolderQueryFromRules(search.rules, smartFolderMatchMode(search.rules))
+  );
 }
 
 function sortSavedSearches(searches: SavedSearch[]): SavedSearch[] {
-  return [...searches].sort((left, right) =>
-    right.updatedAtMs - left.updatedAtMs || left.name.localeCompare(right.name),
+  return [...searches].sort(
+    (left, right) => right.updatedAtMs - left.updatedAtMs || left.name.localeCompare(right.name),
   );
 }
 
@@ -307,7 +302,7 @@ function operatorSymbol(operator: string): string {
 
 function quoteSearchToken(value: string): string {
   if (!value) return "";
-  return /\s/.test(value) ? `"${value.replace(/"/g, "\\\"")}"` : value;
+  return /\s/.test(value) ? `"${value.replace(/"/g, '\\"')}"` : value;
 }
 
 function quoteTagQueryValue(value: string): string {

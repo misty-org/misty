@@ -9,21 +9,33 @@ import {
   shortcutsSave,
   shortcutsSnapshot,
 } from "../api/misty";
-import type { LaunchOnLoginSnapshot, OpenWithAssociation, ShortcutsSnapshot, SettingsSnapshot } from "../api/types";
-import { errorText } from "../shared/format";
-import { isNativeMobileBuild } from "../platform/buildTarget";
+import type {
+  LaunchOnLoginSnapshot,
+  OpenWithAssociation,
+  ShortcutsSnapshot,
+  SettingsSnapshot,
+} from "../api/types";
+import { errorText } from "@/shared/format";
+import { isNativeMobileBuild } from "@/platform/buildTarget";
 import { settingsIndexToThemeMode, useAppThemeStore } from "./useAppThemeStore";
 import { telemetryPreferencesChanged } from "../analytics/lifecycle";
 
-type SettingsSection = "general" | "app" | "assistant" | "appearance" | "privacy" | "sync" | "transfers" | "search" | "notifications" | "shortcuts" | "advanced";
-type SettingValue = string | number | boolean | Record<string, unknown> | Array<Record<string, unknown>>;
+type SettingsSection =
+  | "general"
+  | "app"
+  | "assistant"
+  | "appearance"
+  | "privacy"
+  | "sync"
+  | "transfers"
+  | "search"
+  | "notifications"
+  | "shortcuts"
+  | "advanced";
+type SettingValue =
+  string | number | boolean | Record<string, unknown> | Array<Record<string, unknown>>;
 
 export type SettingsScaleToken = "small" | "default" | "large";
-
-export interface CustomFontPreference {
-  label: string;
-  path: string;
-}
 
 export interface AppearancePreferences {
   compactModeEnabled: boolean;
@@ -158,9 +170,10 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     const current = get().settings;
     const document = cloneDocument(current?.document ?? {});
     const sectionValue = document[section];
-    const sectionDocument = sectionValue && typeof sectionValue === "object" && !Array.isArray(sectionValue)
-      ? { ...sectionValue as Record<string, unknown> }
-      : {};
+    const sectionDocument =
+      sectionValue && typeof sectionValue === "object" && !Array.isArray(sectionValue)
+        ? { ...(sectionValue as Record<string, unknown>) }
+        : {};
     sectionDocument[key] = value;
     document[section] = sectionDocument;
 
@@ -171,9 +184,10 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       message: null,
     });
 
-    const applyNativeSetting = section === "general" && key === "launch_on_login"
-      ? settingsApplyLaunchOnLogin(Boolean(value))
-      : Promise.resolve<LaunchOnLoginSnapshot | null>(null);
+    const applyNativeSetting =
+      section === "general" && key === "launch_on_login"
+        ? settingsApplyLaunchOnLogin(Boolean(value))
+        : Promise.resolve<LaunchOnLoginSnapshot | null>(null);
 
     void applyNativeSetting
       .then((launchOnLogin) =>
@@ -283,16 +297,19 @@ function settingsWithLaunchOnLoginSnapshot(
 
   const document = cloneDocument(settings.document);
   const sectionValue = document.general;
-  document.general = sectionValue && typeof sectionValue === "object" && !Array.isArray(sectionValue)
-    ? { ...sectionValue as Record<string, unknown>, launch_on_login: launchOnLogin.enabled }
-    : { launch_on_login: launchOnLogin.enabled };
+  document.general =
+    sectionValue && typeof sectionValue === "object" && !Array.isArray(sectionValue)
+      ? { ...(sectionValue as Record<string, unknown>), launch_on_login: launchOnLogin.enabled }
+      : { launch_on_login: launchOnLogin.enabled };
   return { ...settings, document };
 }
 
 function applySettingsSideEffects(document: Record<string, unknown>): void {
   useAppThemeStore
     .getState()
-    .setThemeMode(settingsIndexToThemeMode(settingsNumber(document, "appearance", "theme_index", 0)));
+    .setThemeMode(
+      settingsIndexToThemeMode(settingsNumber(document, "appearance", "theme_index", 0)),
+    );
   telemetryPreferencesChanged(
     settingsBoolean(document, "privacy", "anonymous_usage_analytics_enabled", false),
     settingsBoolean(document, "privacy", "anonymous_error_reporting_enabled", false),
@@ -311,37 +328,30 @@ export function selectAppearancePreferences(
     compactModeEnabled: settingsBoolean(source, "appearance", "compact_mode_enabled", false),
     fontSize: settingsScaleToken(settingsNumber(source, "appearance", "font_size_index", 1)),
     panelOpacity: clampSettingsNumber(
-      settingsNumber(source, "appearance", "panel_opacity", settingsNumber(source, "appearance", "home_panel_opacity", 0.82)),
+      settingsNumber(
+        source,
+        "appearance",
+        "panel_opacity",
+        settingsNumber(source, "appearance", "home_panel_opacity", 0.82),
+      ),
       0,
       1,
     ),
     reducedMotionEnabled: settingsBoolean(source, "appearance", "reduced_motion_enabled", false),
-    thumbnailPreviewsEnabled: settingsBoolean(source, "appearance", "thumbnail_previews_enabled", true),
+    thumbnailPreviewsEnabled: settingsBoolean(
+      source,
+      "appearance",
+      "thumbnail_previews_enabled",
+      true,
+    ),
     uiScale: settingsScaleToken(settingsNumber(source, "appearance", "ui_scale_index", 1)),
-    wallpaperPath: settingsString(source, "appearance", "wallpaper_path", settingsString(source, "appearance", "home_wallpaper_path", "")),
+    wallpaperPath: settingsString(
+      source,
+      "appearance",
+      "wallpaper_path",
+      settingsString(source, "appearance", "home_wallpaper_path", ""),
+    ),
   };
-}
-
-export function selectCustomFontPreferences(
-  document: Record<string, unknown> | null | undefined,
-): CustomFontPreference[] {
-  const value = settingsSectionRecord(document ?? {}, "appearance").custom_fonts;
-  if (!Array.isArray(value)) return [];
-  return value
-    .map((entry) => {
-      if (!entry || typeof entry !== "object" || Array.isArray(entry)) return null;
-      const record = entry as Record<string, unknown>;
-      const path = typeof record.path === "string" ? record.path.trim() : "";
-      const label = typeof record.label === "string" ? record.label.trim() : "";
-      return path ? { label: label || fontLabelFromPath(path), path } : null;
-    })
-    .filter((entry): entry is CustomFontPreference => entry !== null);
-}
-
-export function fontLabelFromPath(path: string): string {
-  const fileName = path.split(/[\\/]/).filter(Boolean).pop() ?? path;
-  const dotIndex = fileName.lastIndexOf(".");
-  return dotIndex > 0 ? fileName.slice(0, dotIndex) : fileName;
 }
 
 export function selectNotificationPreferences(
@@ -358,10 +368,25 @@ export function selectNotificationPreferences(
     badgeCountEnabled: settingsBoolean(source, "notifications", "badge_count_enabled", true),
     deviceNotificationsEnabled,
     desktopNotificationsEnabled: deviceNotificationsEnabled,
-    digestNotificationsEnabled: settingsBoolean(source, "notifications", "digest_notifications_enabled", false),
-    inAppNotificationsEnabled: settingsBoolean(source, "notifications", "in_app_notifications_enabled", true),
+    digestNotificationsEnabled: settingsBoolean(
+      source,
+      "notifications",
+      "digest_notifications_enabled",
+      false,
+    ),
+    inAppNotificationsEnabled: settingsBoolean(
+      source,
+      "notifications",
+      "in_app_notifications_enabled",
+      true,
+    ),
     quietHoursEnabled: settingsBoolean(source, "notifications", "quiet_hours_enabled", false),
-    soundNotificationsEnabled: settingsBoolean(source, "notifications", "sound_notifications_enabled", false),
+    soundNotificationsEnabled: settingsBoolean(
+      source,
+      "notifications",
+      "sound_notifications_enabled",
+      false,
+    ),
   };
 }
 
@@ -370,9 +395,19 @@ export function selectGeneralPreferences(
 ): GeneralPreferences {
   const source = document ?? {};
   return {
-    confirmDestructiveActions: settingsBoolean(source, "general", "confirm_destructive_actions", true),
+    confirmDestructiveActions: settingsBoolean(
+      source,
+      "general",
+      "confirm_destructive_actions",
+      true,
+    ),
     defaultFileActionIndex: settingsNumber(source, "general", "default_file_action_index", 0),
-    defaultTransferBehaviorIndex: settingsNumber(source, "general", "default_transfer_behavior_index", 0),
+    defaultTransferBehaviorIndex: settingsNumber(
+      source,
+      "general",
+      "default_transfer_behavior_index",
+      0,
+    ),
     openLinksExternally: settingsBoolean(source, "general", "open_links_externally", true),
     preferredWorkspaceRoot: settingsString(source, "general", "preferred_workspace_root", ""),
     reopenLastSession: settingsBoolean(source, "general", "reopen_last_session", true),
@@ -386,16 +421,18 @@ export function selectAssistantPreferences(
   const source = document ?? {};
   const assistant = settingsSectionRecord(source, "assistant");
   const scopesValue = assistant.scopes;
-  const scopes = scopesValue && typeof scopesValue === "object" && !Array.isArray(scopesValue)
-    ? scopesValue as Record<string, unknown>
-    : {};
+  const scopes =
+    scopesValue && typeof scopesValue === "object" && !Array.isArray(scopesValue)
+      ? (scopesValue as Record<string, unknown>)
+      : {};
   const legacyBotEnabled = settingsSectionRecord(source, "bots").cloud_folder_enabled;
   return {
-    enabled: typeof assistant.enabled === "boolean"
-      ? assistant.enabled
-      : typeof legacyBotEnabled === "boolean"
-        ? legacyBotEnabled
-        : settingsBoolean(source, "pets", "cloud_folder_enabled", false),
+    enabled:
+      typeof assistant.enabled === "boolean"
+        ? assistant.enabled
+        : typeof legacyBotEnabled === "boolean"
+          ? legacyBotEnabled
+          : settingsBoolean(source, "pets", "cloud_folder_enabled", false),
     scopes: {
       filesAllowed: scopes.files_allowed === true,
       cleanupAllowed: scopes.cleanup_allowed === true,
@@ -433,7 +470,12 @@ export function selectAdvancedPreferences(
   return {
     extensionToolsPath: settingsString(source, "advanced", "extension_tools_path", ""),
     mountPath: settingsString(source, "advanced", "mount_path", ".misty/mnt"),
-    serverAddress: settingsString(source, "advanced", "server_address", defaultAdvancedServerAddress),
+    serverAddress: settingsString(
+      source,
+      "advanced",
+      "server_address",
+      defaultAdvancedServerAddress,
+    ),
   };
 }
 
@@ -502,7 +544,12 @@ function clampSettingsNumber(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-function settingsSectionRecord(document: Record<string, unknown>, section: string): Record<string, unknown> {
+function settingsSectionRecord(
+  document: Record<string, unknown>,
+  section: string,
+): Record<string, unknown> {
   const value = document[section];
-  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
 }

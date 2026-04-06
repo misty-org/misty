@@ -14,7 +14,7 @@ import type {
   FileSyncPlannedAction,
   FileSyncPolicy,
 } from "../api/types";
-import { errorText } from "../shared/format";
+import { errorText } from "@/shared/format";
 
 export interface FileSyncSession {
   activePairId: number | null;
@@ -70,32 +70,36 @@ export const useFileSyncStore = create<FileSyncStore>((set, get) => ({
     }
   },
 
-  ensureSession: (sessionId, left, right) => set((state) => {
-    const existing = state.sessions[sessionId];
-    if (existing && endpointsEqual(existing.left, left) && endpointsEqual(existing.right, right)) return state;
-    return {
-      sessions: {
-        ...state.sessions,
-        [sessionId]: existing
-          ? { ...existing, left, right, rows: [], stale: true, comparedAtMs: 0 }
-          : createSession(left, right),
-      },
-    };
-  }),
+  ensureSession: (sessionId, left, right) =>
+    set((state) => {
+      const existing = state.sessions[sessionId];
+      if (existing && endpointsEqual(existing.left, left) && endpointsEqual(existing.right, right))
+        return state;
+      return {
+        sessions: {
+          ...state.sessions,
+          [sessionId]: existing
+            ? { ...existing, left, right, rows: [], stale: true, comparedAtMs: 0 }
+            : createSession(left, right),
+        },
+      };
+    }),
 
-  removeSession: (sessionId) => set((state) => {
-    const sessions = { ...state.sessions };
-    delete sessions[sessionId];
-    return { sessions };
-  }),
+  removeSession: (sessionId) =>
+    set((state) => {
+      const sessions = { ...state.sessions };
+      delete sessions[sessionId];
+      return { sessions };
+    }),
 
-  swapRoots: (sessionId) => updateSession(set, sessionId, (session) => ({
-    ...session,
-    left: session.right,
-    right: session.left,
-    rows: [],
-    stale: true,
-  })),
+  swapRoots: (sessionId) =>
+    updateSession(set, sessionId, (session) => ({
+      ...session,
+      left: session.right,
+      right: session.left,
+      rows: [],
+      stale: true,
+    })),
 
   selectPair: (sessionId, activePairId) => {
     const pair = get().pairs.find((candidate) => candidate.id === activePairId);
@@ -110,7 +114,8 @@ export const useFileSyncStore = create<FileSyncStore>((set, get) => ({
     }));
   },
 
-  setPairName: (sessionId, pairName) => updateSession(set, sessionId, (session) => ({ ...session, pairName })),
+  setPairName: (sessionId, pairName) =>
+    updateSession(set, sessionId, (session) => ({ ...session, pairName })),
 
   savePair: async (sessionId, preferredPolicy = "bi_directional") => {
     const session = get().sessions[sessionId];
@@ -120,11 +125,16 @@ export const useFileSyncStore = create<FileSyncStore>((set, get) => ({
       const saved = await fileSyncPairSave(pairFromSession(session, preferredPolicy));
       set((state) => ({
         pairs: state.pairs.some((pair) => pair.id === saved.id)
-          ? state.pairs.map((pair) => pair.id === saved.id ? saved : pair)
+          ? state.pairs.map((pair) => (pair.id === saved.id ? saved : pair))
           : [...state.pairs, saved],
         sessions: {
           ...state.sessions,
-          [sessionId]: { ...state.sessions[sessionId], activePairId: saved.id, pairName: saved.name, message: "Sync pair saved." },
+          [sessionId]: {
+            ...state.sessions[sessionId],
+            activePairId: saved.id,
+            pairName: saved.name,
+            message: "Sync pair saved.",
+          },
         },
       }));
     } catch (error) {
@@ -141,7 +151,12 @@ export const useFileSyncStore = create<FileSyncStore>((set, get) => ({
         pairs: state.pairs.filter((pair) => pair.id !== pairId),
         sessions: {
           ...state.sessions,
-          [sessionId]: { ...state.sessions[sessionId], activePairId: null, pairName: "", message: "Sync pair removed." },
+          [sessionId]: {
+            ...state.sessions[sessionId],
+            activePairId: null,
+            pairName: "",
+            message: "Sync pair removed.",
+          },
         },
       }));
     } catch (error) {
@@ -159,7 +174,9 @@ export const useFileSyncStore = create<FileSyncStore>((set, get) => ({
     }
     try {
       const saved = await fileSyncPairSave({ ...pair, watchMode });
-      set((state) => ({ pairs: state.pairs.map((candidate) => candidate.id === saved.id ? saved : candidate) }));
+      set((state) => ({
+        pairs: state.pairs.map((candidate) => (candidate.id === saved.id ? saved : candidate)),
+      }));
     } catch (error) {
       setSessionError(set, sessionId, error);
     }
@@ -168,7 +185,12 @@ export const useFileSyncStore = create<FileSyncStore>((set, get) => ({
   compare: async (sessionId) => {
     const session = get().sessions[sessionId];
     if (!session || session.comparing) return;
-    updateSession(set, sessionId, (value) => ({ ...value, comparing: true, error: null, message: null }));
+    updateSession(set, sessionId, (value) => ({
+      ...value,
+      comparing: true,
+      error: null,
+      message: null,
+    }));
     try {
       const result = await fileSyncCompare({
         left: session.left,
@@ -189,16 +211,24 @@ export const useFileSyncStore = create<FileSyncStore>((set, get) => ({
     }
   },
 
-  setRowAction: (sessionId, relativePath, action) => updateSession(set, sessionId, (session) => ({
-    ...session,
-    rows: session.rows.map((row) => row.relativePath === relativePath ? { ...row, action } : row),
-    stale: true,
-  })),
+  setRowAction: (sessionId, relativePath, action) =>
+    updateSession(set, sessionId, (session) => ({
+      ...session,
+      rows: session.rows.map((row) =>
+        row.relativePath === relativePath ? { ...row, action } : row,
+      ),
+      stale: true,
+    })),
 
   apply: async (sessionId) => {
     const session = get().sessions[sessionId];
     if (!session || session.applying) return null;
-    updateSession(set, sessionId, (value) => ({ ...value, applying: true, error: null, message: null }));
+    updateSession(set, sessionId, (value) => ({
+      ...value,
+      applying: true,
+      error: null,
+      message: null,
+    }));
     try {
       const result = await fileSyncApply({
         left: session.left,
@@ -265,7 +295,9 @@ function createSession(left: FileSyncEndpoint, right: FileSyncEndpoint): FileSyn
 function pairFromSession(session: FileSyncSession, preferredPolicy: FileSyncPolicy): FileSyncPair {
   return {
     id: session.activePairId ?? 0,
-    name: session.pairName.trim() || `Pair: ${endpointTitle(session.left)} <-> ${endpointTitle(session.right)}`,
+    name:
+      session.pairName.trim() ||
+      `Pair: ${endpointTitle(session.left)} <-> ${endpointTitle(session.right)}`,
     left: session.left,
     right: session.right,
     watchMode: session.watchMode,
@@ -277,14 +309,17 @@ function pairFromSession(session: FileSyncSession, preferredPolicy: FileSyncPoli
 }
 
 function endpointTitle(endpoint: FileSyncEndpoint): string {
-  if (endpoint.kind === "local") return endpoint.localPath.split("/").filter(Boolean).pop() || endpoint.localPath;
+  if (endpoint.kind === "local")
+    return endpoint.localPath.split("/").filter(Boolean).pop() || endpoint.localPath;
   return `${endpoint.remoteName}:${endpoint.remotePath || "/"}`;
 }
 
 function endpointsEqual(left: FileSyncEndpoint, right: FileSyncEndpoint): boolean {
-  return left.kind === right.kind
-    && left.localPath === right.localPath
-    && left.remoteName === right.remoteName
-    && left.remotePath === right.remotePath
-    && left.providerType === right.providerType;
+  return (
+    left.kind === right.kind &&
+    left.localPath === right.localPath &&
+    left.remoteName === right.remoteName &&
+    left.remotePath === right.remotePath &&
+    left.providerType === right.providerType
+  );
 }

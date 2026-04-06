@@ -62,7 +62,10 @@ export function parseTokenFields(tokenJson: string): TokenField[] {
         value: typeof value === "string" ? value : JSON.stringify(value),
         sensitive: key !== "token_type" && (key.includes("token") || key.includes("secret")),
       }))
-      .sort((left, right) => tokenPriority(left.key) - tokenPriority(right.key) || left.key.localeCompare(right.key));
+      .sort(
+        (left, right) =>
+          tokenPriority(left.key) - tokenPriority(right.key) || left.key.localeCompare(right.key),
+      );
   } catch {
     return [];
   }

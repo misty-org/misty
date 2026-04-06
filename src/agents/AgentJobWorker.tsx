@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { hasTauriInternals } from "../shared/tauri";
+import { hasTauriInternals } from "@/shared/tauri";
 import { useAuth } from "../auth/AuthContext";
 import { readAccountAuthToken } from "../pages/Account/shared/authTokenStore";
 import { DesktopAgentJobWorker } from "./worker";
