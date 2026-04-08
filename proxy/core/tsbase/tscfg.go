@@ -47,7 +47,7 @@ func (config *TSConfig) GetHashedBaseName() string {
 
 	secret, err := os.ReadFile(secretPath)
 	if err != nil {
-		fmt.Printf("error reading secret file: %w", err)
+		log.Printf("error reading secret file: %v", err)
 		return ""
 	}
 	hash := utils.GenerateShortHash(secret, config.BaseName)
@@ -71,4 +71,3 @@ func LoadConfig(path string) (*TSConfig, error) {
 
 	return &config, nil
 }
-

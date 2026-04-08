@@ -90,15 +90,12 @@ func (proxy *Proxy) MountHandlers() {
 		r.Put("/workspaces", api.UpdateWorkspace(proxy.Database))
 		r.Delete("/workspaces", api.DeleteWorkspace(proxy.Database))
 
-		// Pro-only: cloud provider integrations
-		r.Group(func(r chi.Router) {
-			r.Use(proxy.LicenseManager.RequirePro)
-
 			// ---- rclone unified endpoints ----
 			r.Get("/remotes", remote.ListRemotes())
-			r.Post("/remotes", remote.CreateRemote())
 			r.Delete("/remotes", remote.DeleteRemote())
 			r.Get("/remotes/types", remote.ListTypes())
+			r.Post("/remotes/config/continue", remote.ConfigContinue())
+			r.Delete("/remotes/config", remote.ConfigCancel())
 			r.Get("/files", remote.ListFiles())
 			r.Get("/file/download", remote.DownloadFile())
 			r.Post("/file/upload", remote.UploadFile())
@@ -107,6 +104,10 @@ func (proxy *Proxy) MountHandlers() {
 			r.Get("/search", remote.Search())
 			r.Get("/about", remote.AboutRemote())
 
+			r.Group(func(r chi.Router) {
+				r.Use(proxy.LicenseManager.RequireRemoteQuota(3, nil))
+				r.Post("/remotes", remote.CreateRemote())
+				r.Post("/remotes/config/start", remote.ConfigStart())
+			})
 		})
-	})
-}
+	}

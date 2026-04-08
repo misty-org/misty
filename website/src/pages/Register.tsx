@@ -1,8 +1,6 @@
 import { useState } from "react";
 import { NavLink, useNavigate } from "react-router";
 
-const API_BASE = "http://localhost:3000";
-
 export default function Register() {
   const navigate = useNavigate();
   const [name, setName] = useState("");
@@ -17,7 +15,7 @@ export default function Register() {
     setLoading(true);
 
     try {
-      const res = await fetch(`${API_BASE}/api/register`, {
+      const res = await fetch(`${import.meta.env.API_BASE}/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, email, password }),
