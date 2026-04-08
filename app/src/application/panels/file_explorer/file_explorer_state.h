@@ -69,23 +69,52 @@ namespace misty::panel {
             return !after.empty() && after != "/";
         }
 
-        // Parse remote path: ~/misty/mnt/onedrive-john/Documents → ("onedrive-john", "Documents")
-        inline std::pair<std::string, std::string> parse_remote_path(const std::string& path) {
+        // Structure: ~/misty/mnt/{ProviderFolder}/{remote_name}/{relative_path}
+        //
+        // Returns (provider_folder, remote_name, relative_path).
+        // Examples:
+        //   ~/misty/mnt/OneDrive                     → ("OneDrive", "", "")
+        //   ~/misty/mnt/OneDrive/onedrive-123         → ("OneDrive", "onedrive-123", "")
+        //   ~/misty/mnt/OneDrive/onedrive-123/Docs    → ("OneDrive", "onedrive-123", "Docs")
+        struct RemotePathInfo {
+            std::string provider_folder;  // "OneDrive", "Google Drive", etc.
+            std::string remote_name;      // rclone remote name
+            std::string relative_path;    // path within the remote
+        };
+
+        inline RemotePathInfo parse_remote_path(const std::string& path) {
             std::string root = get_mount_root();
-            if (path.rfind(root, 0) != 0) return {"", ""};
+            if (path.rfind(root, 0) != 0) return {};
 
             std::string relative = path.substr(root.length());
-            if (relative.empty() || relative == "/") return {"", ""};
+            if (relative.empty() || relative == "/") return {};
 
-            if (!relative.empty() && relative[0] == '/') {
+            if (!relative.empty() && relative[0] == '/')
                 relative = relative.substr(1);
+
+            // First component: provider folder
+            size_t slash1 = relative.find('/');
+            if (slash1 == std::string::npos) {
+                return { relative, "", "" };  // Just provider folder
             }
 
-            size_t slash = relative.find('/');
-            if (slash == std::string::npos) {
-                return {relative, ""};  // At remote root
+            std::string provider = relative.substr(0, slash1);
+            std::string rest = relative.substr(slash1 + 1);
+
+            // Second component: remote name
+            size_t slash2 = rest.find('/');
+            if (slash2 == std::string::npos) {
+                return { provider, rest, "" };  // Provider + remote, no subpath
             }
-            return {relative.substr(0, slash), relative.substr(slash + 1)};
+
+            return { provider, rest.substr(0, slash2), rest.substr(slash2 + 1) };
+        }
+
+        // Legacy 2-arg variant for code that just needs (remote_name, relative_path)
+        // and doesn't care about the provider folder.
+        inline std::pair<std::string, std::string> parse_remote_name_and_path(const std::string& path) {
+            auto info = parse_remote_path(path);
+            return { info.remote_name, info.relative_path };
         }
 
         // Split a path into components

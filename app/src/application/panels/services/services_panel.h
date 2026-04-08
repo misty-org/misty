@@ -20,6 +20,7 @@ namespace misty::panel {
         void show_remote_cards(ServicesState& state);
         void show_add_account_section(ServicesState& state);
         void show_login_modal(ServicesState& state);
+        void show_config_flow_modal(ServicesState& state);
         void show_remote_card(ServicesState& state, const RemoteConnection& conn);
         void show_loading_overlay();
         void show_disconnect_confirm_modal(ServicesState& state);

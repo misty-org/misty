@@ -72,13 +72,14 @@ namespace misty::panel {
 
         // Unified remote navigation (replaces per-provider methods)
         void navigate_to_remote_mount_root(bool update_history);
+        void navigate_to_provider_folder(const std::string& provider_folder, bool update_history);
         void navigate_to_remote(const std::string& remote_name, const std::string& path,
                                 bool update_history, bool create_if_missing);
         void fetch_remote_folder(const std::string& remote_name, const std::string& remote_path,
                                  const std::string& target_path);
         void handle_remote_folder_fetch(const std::string& remote_name, const std::string& target_path,
                                         bool success, const std::string& body, const std::string& error);
-        void download_and_open_remote_file(const UnifiedFileItem& file);
+        void download_remote_file(const UnifiedFileItem& file);
 
     private:
         core::UIRegistry& registry_;

@@ -1,14 +1,26 @@
 import PricingHeader from "./PricingHeader";
 import PricingCard from "./PricingCard";
-import PricingFooter from "./PricingFooter";
+import PricingQA from "./PricingFooter";
 import { liteFeatures, proFeatures, maxFeatures } from "./data";
+import { useAuth } from "../../AuthContext";
 
 export default function Pricing() {
+  const { user } = useAuth();
+
+  function buildStripeLink(link?: string) {
+    if (!link || !user?.email) return undefined;
+
+    const url = new URL(link);
+    url.searchParams.set("locked_prefilled_email", user.email);
+    url.searchParams.set("client_reference_id", user.id);
+    return url.toString();
+  }
+
   return (
-    <div className="max-w-4xl mx-auto px-4 pt-32 pb-20">
+    <div className="max-w-6xl mx-auto px-4 pt-32 pb-20">
       <PricingHeader />
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-20">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-20 items-stretch">
         <PricingCard
           name="Lite"
           price="Free"
@@ -18,26 +30,28 @@ export default function Pricing() {
         />
         <PricingCard
           name="Pro"
-          price="$30"
+          price="$20"
           period="/ year"
           features={proFeatures}
-          ctaTo="/download"
+          ctaHref={buildStripeLink(import.meta.env.VITE_STRIPE_LINK_PRO)}
+          ctaTo={user ? undefined : "/signin"}
           ctaLabel="Get Pro"
           inherits="Lite"
           popular
         />
         <PricingCard
           name="Max"
-          price="$150"
+          price="$89"
           period="lifetime"
           features={maxFeatures}
-          ctaTo="/download"
+          ctaHref={buildStripeLink(import.meta.env.VITE_STRIPE_LINK_MAX)}
+          ctaTo={user ? undefined : "/signin"}
           ctaLabel="Get Max"
           inherits="Pro"
         />
       </div>
 
-      <PricingFooter />
+      <PricingQA />
     </div>
   );
 }

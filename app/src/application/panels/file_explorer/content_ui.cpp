@@ -181,7 +181,11 @@ void FileExplorerPanel::show_file_item(FileExplorerState& state, int i) {
     ImGui::TableNextRow(ImGuiTableRowFlags_None, row_height);
     ImGui::TableNextColumn();
 
-    std::string label_id = "##" + file.path;
+    // Cloud providers (Google Drive especially) allow multiple files with the
+    // exact same name in the same folder, so file.path alone is not unique.
+    // Prefix with the row index so ImGui sees distinct IDs even on collisions.
+    // (The "##" hides the suffix from the visible label.)
+    std::string label_id = "##row_" + std::to_string(i) + "_" + file.path;
 
     ImVec2 p = ImGui::GetCursorScreenPos();
     if (ImGui::Selectable(label_id.c_str(), is_selected, ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowDoubleClick, ImVec2(0, row_height))) {
@@ -219,7 +223,7 @@ void FileExplorerPanel::show_file_item(FileExplorerState& state, int i) {
                 open_file(file.path);
             } else if (!state.is_downloading(file.path)) {
                 state.add_recent(file);
-                download_and_open_remote_file(file);
+                download_remote_file(file);
             }
         }
     }
@@ -318,7 +322,7 @@ void FileExplorerPanel::show_grid_item(FileExplorerState& state, int i, float ce
                 open_file(file.path);
             } else if (!state.is_downloading(file.path)) {
                 state.add_recent(file);
-                download_and_open_remote_file(file);
+                download_remote_file(file);
             }
         }
     }
