@@ -4,13 +4,16 @@
 #include "panels/activity/download_state.h"
 #include "panels/notification/notification_state.h"
 #include "panels/workspace/workspace_state.h"
+#include "core/cache/listing_cache.h"
 #include <nlohmann/json.hpp>
 #include <cstdio>
+#include <set>
 
 namespace fs = std::filesystem;
 
 namespace misty::panel {
 
+    // Navigate to ~/misty/mnt/ — show one entry per provider type
     void FileExplorerPanel::navigate_to_remote_mount_root(bool update_history) {
         auto& state = registry_.get_state<FileExplorerState>("Files");
         auto& workspace = registry_.get_state<WorkspaceState>("Workspace");
@@ -20,18 +23,20 @@ namespace misty::panel {
         state.is_loading = true;
         state.files.clear();
 
-        // Sync mappings first
         sync_account_mappings();
 
-        // Create a virtual folder entry for each connected remote
+        // Collect unique provider folders
+        std::set<std::string> seen;
         for (const auto& mapping : workspace.remote_mappings) {
+            if (seen.count(mapping.provider_folder)) continue;
+            seen.insert(mapping.provider_folder);
+
             UnifiedFileItem item;
-            item.name = mapping.folder_name;
-            item.path = mount_root + "/" + mapping.folder_name;
+            item.name = mapping.provider_folder;
+            item.path = mount_root + "/" + mapping.provider_folder;
             item.is_dir = true;
             item.source = FileSource::REMOTE;
             item.status = SyncStatus::SYNCED;
-            item.remote_name = mapping.remote_name;
             state.files.push_back(item);
         }
 
@@ -40,7 +45,52 @@ namespace misty::panel {
         reset_selection(state);
         state.is_loading = false;
 
-        // Clear upload context when at mount root
+        auto& remote_state = registry_.get_state<RemoteState>("Remote");
+        remote_state.clear_upload_context();
+    }
+
+    // Navigate to ~/misty/mnt/OneDrive/ — show remotes of this provider type
+    void FileExplorerPanel::navigate_to_provider_folder(const std::string& provider_folder, bool update_history) {
+        auto& state = registry_.get_state<FileExplorerState>("Files");
+        auto& workspace = registry_.get_state<WorkspaceState>("Workspace");
+
+        std::string mount_root = path_utils::get_mount_root();
+        std::string target_path = mount_root + "/" + provider_folder;
+
+        state.is_loading = true;
+        state.files.clear();
+
+        sync_account_mappings();
+
+        // Collect remotes matching this provider folder
+        std::vector<const RemoteAccountMapping*> matches;
+        for (const auto& mapping : workspace.remote_mappings) {
+            if (mapping.provider_folder == provider_folder) {
+                matches.push_back(&mapping);
+            }
+        }
+
+        // Always show the account listing here, even when there's only one
+        // account connected. Skipping straight into the lone account makes
+        // navigation behavior depend on how many remotes exist, which is
+        // confusing — clicking "Google Drive" should always land on the
+        // account list page regardless of count.
+        for (const auto* mapping : matches) {
+            UnifiedFileItem item;
+            item.name = mapping->folder_name;
+            item.path = target_path + "/" + mapping->folder_name;
+            item.is_dir = true;
+            item.source = FileSource::REMOTE;
+            item.status = SyncStatus::SYNCED;
+            item.remote_name = mapping->remote_name;
+            state.files.push_back(item);
+        }
+
+        update_navigation_history(state, target_path, update_history);
+        set_active_path(state, target_path);
+        reset_selection(state);
+        state.is_loading = false;
+
         auto& remote_state = registry_.get_state<RemoteState>("Remote");
         remote_state.clear_upload_context();
     }
@@ -51,10 +101,10 @@ namespace misty::panel {
                                                  bool create_if_missing) {
         auto& state = registry_.get_state<FileExplorerState>("Files");
         auto& services = registry_.get_state<ServicesState>("Services");
+        auto& workspace = registry_.get_state<WorkspaceState>("Workspace");
 
         // Check if the remote is connected
         if (!services.is_remote_connected(remote_name)) {
-            // Show notification if we haven't already for this folder
             if (state.last_disconnected_notification_folder != remote_name) {
                 state.last_disconnected_notification_folder = remote_name;
                 auto& notifications = registry_.get_state<NotificationState>("Notifications");
@@ -69,15 +119,24 @@ namespace misty::panel {
             return;
         }
 
+        // Find the provider folder for this remote
+        std::string provider_folder;
+        for (const auto& mapping : workspace.remote_mappings) {
+            if (mapping.remote_name == remote_name) {
+                provider_folder = mapping.provider_folder;
+                break;
+            }
+        }
+
         std::string mount_root = path_utils::get_mount_root();
-        std::string target_path = mount_root + "/" + remote_name;
+        std::string target_path = mount_root + "/" + provider_folder + "/" + remote_name;
         if (!path.empty()) {
             target_path += "/" + path;
         }
 
         // Ensure the mount directory exists locally
-        if (create_if_missing) {
-            mount_utils::ensure_remote_directory(remote_name);
+        if (create_if_missing && !provider_folder.empty()) {
+            mount_utils::ensure_remote_directory(provider_folder, remote_name);
         }
 
         // Set upload context
@@ -95,15 +154,63 @@ namespace misty::panel {
                                                   const std::string& remote_path,
                                                   const std::string& target_path) {
         auto& state = registry_.get_state<FileExplorerState>("Files");
-        auto& services = registry_.get_state<ServicesState>("Services");
 
+        printf("fetch_remote_folder: remote=%s path=%s target=%s\n",
+               remote_name.c_str(), remote_path.c_str(), target_path.c_str());
+
+        // Mark loading immediately on the UI thread so the next render shows
+        // a spinner. The cache check below runs on a worker, so we don't yet
+        // know whether we'll get an instant cache hit — being optimistic and
+        // showing the spinner for one frame is fine.
+        //
+        // NOTE: Do NOT take state.mu here. This function is reached from click
+        // handlers inside the panel's render(), which already holds state.mu
+        // for the entire render scope (file_explorer_panel.cpp:257). Acquiring
+        // it again would self-deadlock the UI thread (std::mutex is non-recursive).
+        // The convention used by navigate_to_local_path_async is the same:
+        // UI thread writes is_loading without a lock; worker clears it under
+        // the lock when results land.
         state.is_loading = true;
         state.error_msg.clear();
 
-        services.fetch_files(remote_name, remote_path,
-            [this, remote_name, target_path](bool success, const std::string& body, const std::string& error) {
-                handle_remote_folder_fetch(remote_name, target_path, success, body, error);
-            });
+        // Stale-while-revalidate, fully off the UI thread:
+        //   1. Worker thread loads cache (disk I/O) and, on hit, parses + applies
+        //      the cached body via handle_remote_folder_fetch().
+        //   2. Worker thread then kicks off services.fetch_files(), which itself
+        //      runs on a worker and whose callback is also on a worker thread —
+        //      so the network response, cache save, and final parse all stay
+        //      off the UI thread.
+        worker_pool_.add(
+            [this, remote_name, remote_path, target_path]() {
+                auto& services = registry_.get_state<ServicesState>("Services");
+
+                std::string cached_body;
+                bool had_cache = core::listing_cache::load(remote_name, remote_path, cached_body);
+                if (had_cache) {
+                    handle_remote_folder_fetch(remote_name, target_path, true, cached_body, "");
+                }
+
+                services.fetch_files(remote_name, remote_path,
+                    [this, remote_name, remote_path, target_path, had_cache]
+                    (bool success, const std::string& body, const std::string& error) {
+                        if (success) {
+                            core::listing_cache::save(remote_name, remote_path, body);
+                            handle_remote_folder_fetch(remote_name, target_path, true, body, "");
+                        } else if (!had_cache) {
+                            // No cache to fall back on — surface the error.
+                            handle_remote_folder_fetch(remote_name, target_path, false, "", error);
+                        } else {
+                            // Already showed cached content; revalidation failed silently.
+                            printf("revalidate failed for %s/%s: %s\n",
+                                   remote_name.c_str(), remote_path.c_str(), error.c_str());
+                        }
+                    });
+            },
+            []() {},
+            [this, target_path](const std::string& err) {
+                handle_remote_folder_fetch("", target_path, false, "", err);
+            }
+        );
     }
 
     void FileExplorerPanel::handle_remote_folder_fetch(const std::string& remote_name,
@@ -114,6 +221,7 @@ namespace misty::panel {
         auto& state = registry_.get_state<FileExplorerState>("Files");
 
         if (!success) {
+            printf("handle_remote_folder_fetch FAILED: %s\n", error.c_str());
             std::lock_guard<std::mutex> lock(state.mu);
             state.error_msg = "Failed to list remote: " + error;
             state.is_loading = false;
@@ -125,6 +233,16 @@ namespace misty::panel {
             auto items_json = json.value("items", nlohmann::json::array());
             std::string resp_remote = json.value("remote", remote_name);
             std::string resp_path = json.value("path", std::string(""));
+
+            // Look up provider folder for constructing local paths
+            auto& workspace = registry_.get_state<WorkspaceState>("Workspace");
+            std::string provider_folder;
+            for (const auto& mapping : workspace.remote_mappings) {
+                if (mapping.remote_name == resp_remote) {
+                    provider_folder = mapping.provider_folder;
+                    break;
+                }
+            }
 
             std::vector<UnifiedFileItem> new_files;
             for (const auto& item_json : items_json) {
@@ -140,12 +258,11 @@ namespace misty::panel {
                 // Build item paths
                 std::string item_remote_path = item_json.value("path", std::string(""));
                 item.remote_path = item_remote_path;
-                item.path = path_utils::get_mount_root() + "/" + resp_remote + "/" + item_remote_path;
+                item.path = path_utils::get_mount_root() + "/" + provider_folder + "/" + resp_remote + "/" + item_remote_path;
 
                 // Parse mod_time
                 std::string mod_time = item_json.value("mod_time", std::string(""));
                 if (!mod_time.empty() && mod_time.size() >= 16) {
-                    // ISO format: "2024-01-15T10:30:00Z" -> "2024-01-15 10:30"
                     item.last_modified = mod_time.substr(0, 10) + " " + mod_time.substr(11, 5);
                 }
 
@@ -160,19 +277,22 @@ namespace misty::panel {
                 new_files.push_back(std::move(item));
             }
 
+            printf("handle_remote_folder_fetch: got %zu items for %s\n", new_files.size(), resp_remote.c_str());
+
             std::lock_guard<std::mutex> lock(state.mu);
             state.files = std::move(new_files);
             reset_selection(state);
             state.is_loading = false;
             state.error_msg.clear();
         } catch (const std::exception& e) {
+            printf("handle_remote_folder_fetch PARSE ERROR: %s\n", e.what());
             std::lock_guard<std::mutex> lock(state.mu);
             state.error_msg = std::string("Failed to parse remote response: ") + e.what();
             state.is_loading = false;
         }
     }
 
-    void FileExplorerPanel::download_and_open_remote_file(const UnifiedFileItem& file) {
+    void FileExplorerPanel::download_remote_file(const UnifiedFileItem& file) {
         auto& services = registry_.get_state<ServicesState>("Services");
         auto& downloads = registry_.get_state<DownloadState>("Downloads");
         auto& notifications = registry_.get_state<NotificationState>("Notifications");
@@ -211,9 +331,7 @@ namespace misty::panel {
                 if (success) {
                     downloads.complete_download(download_id);
                     notifications.add_notification("Download Complete", file_name, NotificationType::SUCCESS, 5.0f);
-                    core::open_path_default(local_path);
 
-                    // Update sync status in file list
                     std::lock_guard<std::mutex> lock(state.mu);
                     for (auto& f : state.files) {
                         if (f.path == file_path) {

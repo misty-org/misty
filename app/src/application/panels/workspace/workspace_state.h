@@ -24,10 +24,11 @@ namespace misty::panel {
 
     // Unified account mapping for all cloud remotes (rclone-based)
     struct RemoteAccountMapping {
-        std::string folder_name;    // mount directory name (= remote_name)
-        std::string remote_name;    // rclone remote name
+        std::string folder_name;    // rclone remote name, used as subfolder
+        std::string remote_name;    // rclone remote name (same as folder_name)
         std::string remote_type;    // "onedrive", "drive", "dropbox", etc.
-        std::string display_name;
+        std::string display_name;   // friendly name, e.g. "OneDrive"
+        std::string provider_folder; // provider group folder, e.g. "OneDrive", "Google Drive"
     };
 
     // Directory management utilities for mount points
@@ -44,10 +45,16 @@ namespace misty::panel {
             fs::create_directories(get_mount_root(), ec);
         }
 
-        // Ensure a remote's mount directory exists
-        inline void ensure_remote_directory(const std::string& remote_name) {
+        // Ensure a remote's mount directory exists under its provider folder
+        inline void ensure_remote_directory(const std::string& provider_folder, const std::string& remote_name) {
             std::error_code ec;
-            fs::create_directories(get_mount_root() + "/" + remote_name, ec);
+            fs::create_directories(get_mount_root() + "/" + provider_folder + "/" + remote_name, ec);
+        }
+
+        // Ensure just the provider type folder exists
+        inline void ensure_provider_directory(const std::string& provider_folder) {
+            std::error_code ec;
+            fs::create_directories(get_mount_root() + "/" + provider_folder, ec);
         }
     }
 

@@ -53,6 +53,12 @@ func DownloadFile(ctx context.Context, remote, filePath string, w io.Writer) (in
 	Init()
 
 	dir := path.Dir(filePath)
+	// path.Dir returns "." for a bare filename (file at root). rclone treats
+	// "remote:." as a different filesystem than "remote:" — the former misses
+	// the actual root and NewObject returns "object not found". Normalize.
+	if dir == "." {
+		dir = ""
+	}
 	name := path.Base(filePath)
 
 	f, err := fs.NewFs(ctx, remote+":"+dir)
@@ -106,6 +112,11 @@ func DeletePath(ctx context.Context, remote, filePath string) error {
 	Init()
 
 	dir := path.Dir(filePath)
+	// See note in DownloadFile: rclone treats "remote:." differently from
+	// "remote:". Normalize the bare-filename case so root files are deletable.
+	if dir == "." {
+		dir = ""
+	}
 	name := path.Base(filePath)
 
 	f, err := fs.NewFs(ctx, remote+":"+dir)

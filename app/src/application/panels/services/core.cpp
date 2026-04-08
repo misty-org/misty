@@ -61,6 +61,7 @@ namespace misty::panel {
             }
             show_disconnect_confirm_modal(state);
             show_login_modal(state);
+            show_config_flow_modal(state);
         }
         ImGui::End();
         });
@@ -170,14 +171,18 @@ namespace misty::panel {
             ImGui::Spacing();
             ImGui::Spacing();
 
-            // Disconnect button
+            // Disconnect button. We only set the pending state here — the
+            // modal opens itself from show_disconnect_confirm_modal(), which
+            // runs outside this per-card PushID stack so the popup ID
+            // resolves correctly. Calling OpenPopup from inside PushID
+            // would register the popup under a different ID hash and
+            // BeginPopupModal would never find it.
             ImGui::PushStyleColor(ImGuiCol_Button,        ImVec4(0.55f, 0.18f, 0.18f, 1.0f));
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered,  ImVec4(0.65f, 0.28f, 0.28f, 1.0f));
             ImGui::PushStyleColor(ImGuiCol_ButtonActive,   ImVec4(0.45f, 0.12f, 0.12f, 1.0f));
             ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
             if (ImGui::Button("Disconnect", ImVec2(100.0f, 26.0f))) {
                 pending_disconnect_remote_ = conn.name;
-                ImGui::OpenPopup("##confirm_disconnect");
             }
             ImGui::PopStyleVar();
             ImGui::PopStyleColor(3);
@@ -312,7 +317,11 @@ namespace misty::panel {
                 auto epoch = std::chrono::duration_cast<std::chrono::seconds>(
                     now.time_since_epoch()).count();
                 std::string remote_name = state.login_provider_type + "-" + std::to_string(epoch);
-                state.initiate_login(state.login_provider_type, remote_name);
+                // Close the login picker and hand off to the interactive
+                // step-by-step config flow modal.
+                state.show_login_modal = false;
+                state.start_remote_config(state.login_provider_type, remote_name);
+                ImGui::CloseCurrentPopup();
             }
             ImGui::PopStyleVar();
             ImGui::PopStyleColor(3);
@@ -364,8 +373,208 @@ namespace misty::panel {
         );
     }
 
+    void ServicesPanel::show_config_flow_modal(ServicesState& state) {
+        // Snapshot under lock so the modal renders consistent state even if
+        // a worker callback fires mid-frame.
+        bool open;
+        bool in_flight;
+        ServicesState::ConfigStepKind kind;
+        std::string remote_name;
+        std::string question_help;
+        std::string question_name;
+        std::string error_msg;
+        std::string warning_msg;
+        std::vector<ServicesState::ConfigChoice> choices;
+        std::string default_value;
+        {
+            std::lock_guard<std::mutex> lock(state.mu);
+            open          = state.config_modal_open;
+            in_flight     = state.config_in_flight;
+            kind          = state.config_kind;
+            remote_name   = state.config_remote_name;
+            question_help = state.config_question_help;
+            question_name = state.config_question_name;
+            error_msg     = state.config_error;
+            warning_msg   = state.config_warning;
+            choices       = state.config_choices;
+            default_value = state.config_default;
+        }
+
+        if (!open) return;
+
+        // If the flow finished, refresh connections and dismiss after a tick.
+        if (kind == ServicesState::ConfigStepKind::DONE && !in_flight) {
+            state.refresh_connections();
+            std::lock_guard<std::mutex> lock(state.mu);
+            state.config_modal_open = false;
+            state.config_kind = ServicesState::ConfigStepKind::NONE;
+            return;
+        }
+
+        ImGuiViewport* vp = ImGui::GetMainViewport();
+        ImGui::SetNextWindowPos(vp->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+        ImGui::SetNextWindowSize(ImVec2(480.0f, 0.0f), ImGuiCond_Always);
+
+        ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.10f, 0.10f, 0.11f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_Border,  ImVec4(0.22f, 0.22f, 0.24f, 1.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 10.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,  ImVec2(24.0f, 24.0f));
+
+        ImGui::OpenPopup("##remote_config_flow");
+
+        if (ImGui::BeginPopupModal("##remote_config_flow", nullptr,
+                ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                ImGuiWindowFlags_NoMove     | ImGuiWindowFlags_AlwaysAutoResize)) {
+
+            float w = ImGui::GetContentRegionAvail().x;
+
+            // Title
+            core::WithFontScale(1.3f, [&]() {
+                std::string title = "Configure " + remote_name;
+                float tw = ImGui::CalcTextSize(title.c_str()).x;
+                ImGui::SetCursorPosX((w - tw) * 0.5f);
+                core::ColoredText(ImVec4(0.9f, 0.9f, 0.9f, 1.0f), "%s", title.c_str());
+            });
+            ImGui::Spacing();
+            ImGui::Spacing();
+
+            // Spinner while we're waiting for the proxy
+            if (in_flight) {
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.7f, 0.7f, 0.7f, 1.0f));
+                ImGui::TextWrapped("Working… If a browser opened, complete the sign-in there.");
+                ImGui::PopStyleColor();
+            } else {
+                // Question text
+                if (!question_help.empty()) {
+                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.85f, 0.85f, 0.85f, 1.0f));
+                    ImGui::TextWrapped("%s", question_help.c_str());
+                    ImGui::PopStyleColor();
+                    ImGui::Spacing();
+                }
+
+                // Render based on step kind
+                bool submitted = false;
+                std::string result_value;
+
+                switch (kind) {
+                    case ServicesState::ConfigStepKind::CONFIRM: {
+                        float half = (w - 8.0f) * 0.5f;
+                        if (ImGui::Button("Yes", ImVec2(half, 32.0f))) {
+                            submitted = true; result_value = "true";
+                        }
+                        ImGui::SameLine(0, 8.0f);
+                        if (ImGui::Button("No", ImVec2(half, 32.0f))) {
+                            submitted = true; result_value = "false";
+                        }
+                        break;
+                    }
+                    case ServicesState::ConfigStepKind::CHOOSE:
+                    case ServicesState::ConfigStepKind::SUGGEST: {
+                        // Vertical list of buttons. Default is highlighted.
+                        for (const auto& c : choices) {
+                            ImVec4 bg = (c.value == default_value)
+                                ? ImVec4(0.20f, 0.40f, 0.65f, 1.0f)
+                                : ImVec4(0.22f, 0.22f, 0.25f, 1.0f);
+                            ImGui::PushStyleColor(ImGuiCol_Button,        bg);
+                            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.30f, 0.46f, 0.70f, 1.0f));
+                            ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.18f, 0.36f, 0.56f, 1.0f));
+                            ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);
+                            std::string label = c.value;
+                            if (!c.help.empty()) {
+                                // First non-empty line of help becomes the subtitle
+                                std::string h = c.help;
+                                size_t nl = h.find('\n');
+                                if (nl != std::string::npos) h = h.substr(0, nl);
+                                label += "  —  " + h;
+                            }
+                            if (ImGui::Button(label.c_str(), ImVec2(w, 28.0f))) {
+                                submitted = true; result_value = c.value;
+                            }
+                            ImGui::PopStyleVar();
+                            ImGui::PopStyleColor(3);
+                        }
+                        // For SUGGEST, also allow free text below
+                        if (kind == ServicesState::ConfigStepKind::SUGGEST) {
+                            ImGui::Spacing();
+                            ImGui::PushItemWidth(w);
+                            ImGui::InputText("##config_input", state.config_input_buf,
+                                             sizeof(state.config_input_buf));
+                            ImGui::PopItemWidth();
+                            if (ImGui::Button("Submit custom value", ImVec2(w, 32.0f))) {
+                                submitted = true;
+                                result_value = state.config_input_buf;
+                            }
+                        }
+                        break;
+                    }
+                    case ServicesState::ConfigStepKind::INPUT: {
+                        ImGui::PushItemWidth(w);
+                        ImGui::InputText("##config_input", state.config_input_buf,
+                                         sizeof(state.config_input_buf));
+                        ImGui::PopItemWidth();
+                        ImGui::Spacing();
+                        if (ImGui::Button("Continue", ImVec2(w, 32.0f))) {
+                            submitted = true;
+                            result_value = state.config_input_buf;
+                        }
+                        break;
+                    }
+                    default:
+                        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.7f, 0.7f, 0.7f, 1.0f));
+                        ImGui::Text("Waiting for next step…");
+                        ImGui::PopStyleColor();
+                        break;
+                }
+
+                if (submitted) {
+                    state.continue_remote_config(result_value);
+                }
+            }
+
+            if (!warning_msg.empty()) {
+                ImGui::Spacing();
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.7f, 0.3f, 1.0f));
+                ImGui::TextWrapped("%s", warning_msg.c_str());
+                ImGui::PopStyleColor();
+            }
+            if (!error_msg.empty()) {
+                ImGui::Spacing();
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.4f, 0.4f, 1.0f));
+                ImGui::TextWrapped("%s", error_msg.c_str());
+                ImGui::PopStyleColor();
+            }
+
+            ImGui::Spacing();
+            ImGui::Separator();
+            ImGui::Spacing();
+
+            ImGui::PushStyleColor(ImGuiCol_Button,        ImVec4(0.22f, 0.22f, 0.25f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.30f, 0.30f, 0.33f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.18f, 0.18f, 0.20f, 1.0f));
+            ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);
+            if (ImGui::Button("Cancel", ImVec2(w, 32.0f))) {
+                state.cancel_remote_config();
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::PopStyleVar();
+            ImGui::PopStyleColor(3);
+
+            ImGui::EndPopup();
+        }
+
+        ImGui::PopStyleVar(2);
+        ImGui::PopStyleColor(2);
+    }
+
     void ServicesPanel::show_disconnect_confirm_modal(ServicesState& state) {
         if (pending_disconnect_remote_.empty()) return;
+
+        // Open the popup from here (no PushID block in scope) so the popup
+        // ID stack matches the BeginPopupModal call below. Idempotent — safe
+        // to call every frame; ImGui no-ops if it's already open.
+        if (!ImGui::IsPopupOpen("##confirm_disconnect")) {
+            ImGui::OpenPopup("##confirm_disconnect");
+        }
 
         ImGuiViewport* vp = ImGui::GetMainViewport();
         ImGui::SetNextWindowPos(vp->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
