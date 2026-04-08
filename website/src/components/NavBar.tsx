@@ -53,6 +53,24 @@ export default function Navbar() {
     return () => document.removeEventListener("click", handleClick);
   }, [profileOpen]);
 
+  function openDocs() {
+    setProfileOpen(false);
+    setResourcesOpen(false);
+    setDocsOpen(true);
+  }
+
+  function openResources() {
+    setProfileOpen(false);
+    setDocsOpen(false);
+    setResourcesOpen(true);
+  }
+
+  function openProfile() {
+    setDocsOpen(false);
+    setResourcesOpen(false);
+    setProfileOpen(true);
+  }
+
   return (
     <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
       scrolled ? "glass shadow-lg shadow-bg/50" : "bg-transparent"
@@ -91,7 +109,7 @@ export default function Navbar() {
           {/* Docs dropdown */}
           <div
             className="relative"
-            onMouseEnter={() => setDocsOpen(true)}
+            onMouseEnter={openDocs}
             onMouseLeave={() => setDocsOpen(false)}
           >
             <NavLink
@@ -124,7 +142,7 @@ export default function Navbar() {
           {/* Resources dropdown */}
           <div
             className="relative"
-            onMouseEnter={() => setResourcesOpen(true)}
+            onMouseEnter={openResources}
             onMouseLeave={() => setResourcesOpen(false)}
           >
             <NavLink
@@ -156,10 +174,14 @@ export default function Navbar() {
           </div>
           <div className="ml-4 pl-4 border-l border-border">
             {user ? (
-              <div className="relative">
+              <div
+                className="relative"
+                onMouseEnter={openProfile}
+                onMouseLeave={() => setProfileOpen(false)}
+              >
                 <button
                   onClick={(e) => { e.stopPropagation(); setProfileOpen(!profileOpen); }}
-                  className="w-8 h-8 rounded-full bg-primary hover:bg-primary-hover flex items-center justify-center text-xs font-semibold text-text transition-colors"
+                  className="w-8 h-8 rounded-full bg-white hover:bg-zinc-200 flex items-center justify-center text-xs font-semibold text-black transition-colors"
                 >
                   {initials}
                 </button>
@@ -224,7 +246,7 @@ export default function Navbar() {
             ))}
             {user ? (
               <div className="mt-2 flex items-center gap-3 px-4 py-2.5 border-t border-border/30">
-                <span className="w-7 h-7 rounded-full bg-primary flex items-center justify-center text-xs font-semibold text-text">{initials}</span>
+                <span className="w-7 h-7 rounded-full bg-white flex items-center justify-center text-xs font-semibold text-black">{initials}</span>
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-text truncate">{user.name}</p>
                   <p className="text-xs text-text-muted truncate">{user.email}</p>

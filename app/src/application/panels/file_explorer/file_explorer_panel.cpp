@@ -84,8 +84,12 @@ namespace misty::panel {
 
         initial_start_path_ = start_path;
 
-        // Create directory if it doesn't exist
-        if (!start_path.empty()) {
+        // Create directory if it doesn't exist. Skip remote paths — those
+        // are managed by sync_account_mappings() under the provider folder
+        // layout (~/misty/mnt/<Provider>/<remote_name>/), and a stale
+        // last_opened_path from the pre-migration layout would otherwise
+        // recreate a phantom ~/misty/mnt/<remote_name>/ directory here.
+        if (!start_path.empty() && !path_utils::is_remote_path(start_path)) {
             std::error_code ec;
             fs::create_directories(start_path, ec);
         }
@@ -228,7 +232,16 @@ namespace misty::panel {
     void FileExplorerPanel::render() {
         auto& state = registry_.get_state<FileExplorerState>("Files");
         auto& workspace_state = registry_.get_state<WorkspaceState>("Workspace");
+        auto& services_state = registry_.get_state<ServicesState>("Services");
         apply_workspace_mount_if_ready(state, workspace_state);
+
+        // If services connections changed (new remote added, one disconnected),
+        // resync mappings + materialize provider/remote mount directories now,
+        // so the user doesn't have to navigate before the new layout appears.
+        if (services_state.mappings_dirty.exchange(false)) {
+            sync_account_mappings();
+        }
+
         handle_pending_navigation(state);
 
         ImGuiWindowFlags file_explorer_flags = ImGuiWindowFlags_NoTitleBar |
@@ -422,15 +435,17 @@ namespace misty::panel {
         }
 
         if (path_utils::is_remote_path(path)) {
-            // Remote path - parse remote name and relative path
-            auto [remote_name, relative_path] = path_utils::parse_remote_path(path);
+            auto info = path_utils::parse_remote_path(path);
 
-            if (remote_name.empty()) {
-                // At mount root - show all remote accounts
+            if (info.provider_folder.empty()) {
+                // At mount root - show all provider folders
                 navigate_to_remote_mount_root(update_history);
+            } else if (info.remote_name.empty()) {
+                // At provider folder - show remotes of this type
+                navigate_to_provider_folder(info.provider_folder, update_history);
             } else {
                 // Navigate into specific remote
-                navigate_to_remote(remote_name, relative_path, update_history, create_if_missing);
+                navigate_to_remote(info.remote_name, info.relative_path, update_history, create_if_missing);
             }
         } else if (path == path_utils::get_mount_root() || path == path_utils::get_mount_root() + "/") {
             // At mount root itself
@@ -459,12 +474,14 @@ namespace misty::panel {
             if (!conn.connected) continue;
 
             RemoteAccountMapping mapping;
-            mapping.folder_name = conn.name;     // remote name IS the folder name
+            mapping.folder_name = conn.name;
             mapping.remote_name = conn.name;
             mapping.remote_type = conn.type;
             mapping.display_name = conn.display_name;
+            mapping.provider_folder = conn.display_name;  // "OneDrive", "Google Drive", etc.
 
-            mount_utils::ensure_remote_directory(conn.name);
+            mount_utils::ensure_provider_directory(mapping.provider_folder);
+            mount_utils::ensure_remote_directory(mapping.provider_folder, conn.name);
 
             workspace.remote_mappings.push_back(mapping);
         }

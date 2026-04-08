@@ -56,7 +56,7 @@ function FAQItem({ q, a }: { q: string; a: string }) {
   );
 }
 
-export default function PricingFooter() {
+export default function PricingQA() {
   return (
     <div className="">
       <h2 className="text-lg font-semibold text-text mb-6">Questions & Answers</h2>

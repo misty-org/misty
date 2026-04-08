@@ -247,7 +247,7 @@ void SearchPanel::launch_api_searches(SearchState& state, const std::string& que
                     r.dedup_key    = dedup;
                     r.remote_name  = remote_name;
                     r.remote_path  = item_path;
-                    r.virtual_path = mount_root + "/" + remote_name + (item_path.empty() ? "" : "/" + item_path);
+                    r.virtual_path = mount_root + "/" + display_name + "/" + remote_name + (item_path.empty() ? "" : "/" + item_path);
                     r.path_display = display_name + (item_path.empty() ? "" : " › " + item_path);
 
                     // Trim filename from path_display to show parent

@@ -9,6 +9,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <set>
 
 namespace fs = std::filesystem;
 
@@ -216,11 +217,16 @@ namespace misty::panel {
             if (remotes.empty()) {
                 ImGui::TextDisabled("  No services connected");
             } else {
+                // Show one entry per provider type (e.g. "OneDrive", "Google Drive")
+                std::set<std::string> seen_providers;
                 for (auto& remote : remotes) {
-                    std::string label = remote.display_name.empty() ? remote.name : remote.display_name;
-                    if (HoverListItem(label.c_str(), content_width)) {
+                    std::string provider = remote.display_name.empty() ? remote.name : remote.display_name;
+                    if (seen_providers.count(provider)) continue;
+                    seen_providers.insert(provider);
+
+                    if (HoverListItem(provider.c_str(), content_width)) {
                         auto& file_explorer_state = registry_.get_state<FileExplorerState>("Files");
-                        file_explorer_state.pending_navigation_path = mount_utils::get_mount_root() + "/" + remote.name;
+                        file_explorer_state.pending_navigation_path = mount_utils::get_mount_root() + "/" + provider;
                     }
                 }
             }

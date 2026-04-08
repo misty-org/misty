@@ -2,6 +2,7 @@
 
 #include <string>
 #include <mutex>
+#include <atomic>
 #include <set>
 #include <vector>
 #include <functional>
@@ -107,10 +108,59 @@ namespace misty::panel {
 
         std::set<RemoteConnection> connections;
 
+        // Set to true whenever `connections` changes (e.g. after a successful
+        // refresh or a new remote is added). The file explorer panel polls
+        // this on each render and re-runs sync_account_mappings() to keep
+        // workspace.remote_mappings and on-disk mount directories in sync
+        // without requiring the user to navigate.
+        std::atomic<bool> mappings_dirty{false};
+
         // Login modal state
         bool show_login_modal = false;
         std::string login_provider_type;  // which type to add
         std::string auth_error;
+
+        // ----- Interactive remote-config flow -----
+
+        enum class ConfigStepKind {
+            NONE,     // no flow active
+            DONE,     // flow completed
+            CHOOSE,   // exclusive: must pick from examples
+            SUGGEST,  // examples + free text
+            CONFIRM,  // yes/no
+            INPUT,    // free text
+        };
+
+        struct ConfigChoice {
+            std::string value;
+            std::string help;
+        };
+
+        // Current step from the proxy. Mutated by config_step_loaded() on
+        // worker callbacks; read by the modal on the UI thread under `mu`.
+        bool          config_modal_open    = false;
+        bool          config_in_flight     = false; // POST in progress
+        ConfigStepKind config_kind         = ConfigStepKind::NONE;
+        std::string   config_remote_name;            // rclone name being built
+        std::string   config_provider_type;          // "onedrive", etc.
+        std::string   config_state;                  // opaque round-trip token
+        std::string   config_question_name;          // option.name
+        std::string   config_question_help;          // option.help
+        std::string   config_default;                // option.default
+        char          config_input_buf[512] = {0};   // ImGui::InputText buffer
+        std::vector<ConfigChoice> config_choices;    // for CHOOSE/SUGGEST/CONFIRM
+        std::string   config_error;                  // last server-side error
+        std::string   config_warning;                // non-fatal step warning
+
+        // POST /api/remotes/config/start
+        void start_remote_config(const std::string& provider_type,
+                                 const std::string& remote_name);
+
+        // POST /api/remotes/config/continue with the user's chosen result
+        void continue_remote_config(const std::string& result);
+
+        // DELETE /api/remotes/config?name=… and reset modal state
+        void cancel_remote_config();
 
     private:
         core::WorkerPool* worker_pool_ = nullptr;

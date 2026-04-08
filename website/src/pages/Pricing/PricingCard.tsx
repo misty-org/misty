@@ -22,6 +22,7 @@ interface PricingCardProps {
   comingSoon?: boolean;
   popular?: boolean;
   ctaTo?: string;
+  ctaHref?: string;
   ctaLabel?: string;
 }
 
@@ -34,11 +35,12 @@ export default function PricingCard({
   comingSoon = false,
   popular = false,
   ctaTo,
+  ctaHref,
   ctaLabel,
 }: PricingCardProps) {
   return (
-    <GlowCard className="h-full">
-      <div className="p-5 pb-4 flex flex-col h-full relative">
+    <GlowCard className="h-full min-h-92">
+      <div className="p-6 flex flex-col h-full relative">
         {(comingSoon || popular) && (
           <div className="absolute top-3 right-3">
             <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium border ${
@@ -78,7 +80,16 @@ export default function PricingCard({
           ))}
         </ul>
 
-        {ctaTo ? (
+        {ctaHref ? (
+          <a
+            href={ctaHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full text-center px-6 py-2.5 bg-white hover:bg-zinc-200 text-black font-medium rounded-xl transition-colors duration-300 shadow-lg"
+          >
+            {ctaLabel}
+          </a>
+        ) : ctaTo ? (
           <NavLink
             to={ctaTo}
             className="w-full text-center px-6 py-2.5 bg-white hover:bg-zinc-200 text-black font-medium rounded-xl transition-colors duration-300 shadow-lg"

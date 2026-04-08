@@ -128,7 +128,7 @@ namespace misty::panel {
         }
 
         // Queue into sidebar upload queue
-        auto [remote_name, remote_path] = path_utils::parse_remote_path(dest_dir);
+        auto [remote_name, remote_path] = path_utils::parse_remote_name_and_path(dest_dir);
 
         auto& sidebar_state = registry_.get_state<FileSidebarState>("FileSidebar");
         std::string dest_str = dest.string();
@@ -233,7 +233,7 @@ namespace misty::panel {
         try { file_size = static_cast<int64_t>(fs::file_size(local_path)); } catch (...) {}
 
         if (path_utils::is_remote_path(dest_dir)) {
-            auto [remote_name, remote_path] = path_utils::parse_remote_path(dest_dir);
+            auto [remote_name, remote_path] = path_utils::parse_remote_name_and_path(dest_dir);
 
             if (remote_name.empty()) {
                 notifications.add_notification("Upload Failed", "Cannot upload to mount root. Navigate into a remote folder.", NotificationType::ERROR);
