@@ -26,7 +26,7 @@ describe("SpaceSectionNavigation", () => {
     container.remove();
   });
 
-  it("renders labeled primary navigation with Settings at the bottom", async () => {
+  it("renders the complete Space work surface strip", async () => {
     useSpacesStore.setState({ spaces: [spaceFixture()] });
 
     await act(async () => {
@@ -44,25 +44,20 @@ describe("SpaceSectionNavigation", () => {
     const links = [...container.querySelectorAll("a")];
     expect(links.map((link) => link.textContent?.trim())).toEqual([
       "Chat",
-      "Agents",
       "Tasks",
+      "Notes",
       "Library",
-      "Members",
-      "Settings",
     ]);
-    expect(links[links.length - 1]?.getAttribute("href")).toBe("/spaces/space-1/settings/general");
     expect(container.textContent).toContain("Library context");
     expect(container.querySelector('a[aria-current="page"]')?.textContent).toContain("Library");
   });
 
-  it("hides inaccessible sections but keeps Studio-only Agent access visible", async () => {
+  it("hides inaccessible sections", async () => {
     useSpacesStore.setState({
       spaces: [
         spaceFixture({
           permissions: {
             "messages.read": false,
-            "agents.run": false,
-            "studio.view": true,
             "tasks.view": false,
             "library.view": true,
           },
@@ -79,13 +74,45 @@ describe("SpaceSectionNavigation", () => {
     });
 
     const labels = [...container.querySelectorAll("a")].map((link) => link.textContent?.trim());
-    expect(labels).toEqual(["Agents", "Library", "Members", "Settings"]);
+    expect(labels).toEqual(["Notes", "Library"]);
   });
 
-  it("preserves the active Agent Studio destination when switching Spaces", () => {
-    expect(spaceSectionPath("space-2", "agents", "workflows", "general", true)).toBe(
-      "/spaces/space-2/agents/studio/workflows",
-    );
+  it("keeps Space management out of the primary strip", async () => {
+    useSpacesStore.setState({ spaces: [spaceFixture()] });
+
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={["/spaces/space-1/chat"]}>
+          <SpaceSectionNavigation spaceId="space-1" section="chat" />
+        </MemoryRouter>,
+      );
+    });
+
+    const labels = [...container.querySelectorAll("a")].map((link) => link.textContent?.trim());
+    expect(labels).not.toContain("Members");
+    expect(labels).not.toContain("Settings");
+  });
+
+  it("hides Library when access is denied", async () => {
+    useSpacesStore.setState({
+      spaces: [spaceFixture({ permissions: { "library.view": false } })],
+    });
+
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={["/spaces/space-1/chat"]}>
+          <SpaceSectionNavigation spaceId="space-1" section="chat" />
+        </MemoryRouter>,
+      );
+    });
+
+    const labels = [...container.querySelectorAll("a")].map((link) => link.textContent?.trim());
+    expect(labels).not.toContain("Notes");
+    expect(labels).not.toContain("Library");
+  });
+
+  it("builds the settings destination when switching Spaces", () => {
+    expect(spaceSectionPath("space-2", "settings", "chat")).toBe("/spaces/space-2/settings/chat");
   });
 });
 

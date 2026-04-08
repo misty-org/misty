@@ -79,7 +79,6 @@ const explorerCommands: ExplorerCommandPaletteEntry[] = [
     label: "Compare With",
     hint: "Compare the selected file or folder against another path",
   },
-  { id: "explorer.automation_rules", label: "Automation Rules", hint: "coming soon..." },
   { id: "explorer.delete", label: "Delete", hint: "Delete the selected items" },
   {
     id: "explorer.download",
@@ -107,10 +106,10 @@ const explorerCommands: ExplorerCommandPaletteEntry[] = [
     label: "Toggle Chat",
     hint: "Open or close the explorer chat overlay",
   },
-  { id: "explorer.toggle_mika", label: "Toggle Mika", hint: "Open or close Mika Assistant" },
+  { id: "explorer.toggle_mika", label: "Toggle Agents", hint: "Open or close Agents" },
   {
     id: "explorer.next_workspace",
-    label: "Next Workspace",
+    label: "Next File Layout",
     hint: "Cycle to the next explorer tab",
   },
   ...Array.from({ length: 9 }, (_, index): ExplorerCommandPaletteEntry => ({

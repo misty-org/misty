@@ -9,6 +9,8 @@ import type {
   FileOperationPlan,
   AgentEvent,
   AgentEventsResponse,
+  AgentSessionsResponse,
+  AgentTranscriptResponse,
   CreateSessionResponse,
   AgentStatusResponse,
   ManagedAiErrorPayload,
@@ -28,7 +30,11 @@ export type {
 } from "@/models/interfaces/stores/assistant/useAiServerStore";
 import { appSnapshot } from "@/stores/backend";
 import { normalizeApiBaseUrl, withDefaultApiPath } from "@/stores/backend";
-import { readAccountAuthToken } from "@/stores/account/useAuthTokenStore";
+import {
+  isAccountSessionTransitioning,
+  readAccountSessionGeneration,
+  readAccountAuthToken,
+} from "@/stores/account/useAuthTokenStore";
 import type { AgentCitation } from "@/models/interfaces/features/agents/types";
 
 export class ManagedAiRequestError extends Error {
@@ -47,10 +53,35 @@ export async function fetchAgentStatus(): Promise<AgentStatusResponse> {
   return managedAiRequest<AgentStatusResponse>("/ai/status");
 }
 
-export async function createAgentSession(agentJobId?: string): Promise<CreateSessionResponse> {
+export async function createAgentSession(
+  optionsOrJob: { agentId?: string; spaceId?: string; modelId?: string } | string | undefined = {},
+  legacySpaceId?: string,
+): Promise<CreateSessionResponse> {
+  const options: {
+    agentId?: string;
+    agentJobId?: string;
+    spaceId?: string;
+    modelId?: string;
+  } =
+    legacySpaceId !== undefined
+      ? {
+          agentJobId: typeof optionsOrJob === "string" ? optionsOrJob : undefined,
+          spaceId: legacySpaceId,
+        }
+      : typeof optionsOrJob === "object"
+      ? optionsOrJob
+      : { agentJobId: optionsOrJob, spaceId: legacySpaceId };
   return managedAiRequest<CreateSessionResponse>("/ai/sessions", {
     method: "POST",
-    body: agentJobId ? JSON.stringify({ agent_job_id: agentJobId }) : undefined,
+    body:
+      options.agentId || options.spaceId || options.modelId
+        ? JSON.stringify({
+            agent_id: options.agentId || undefined,
+            agent_job_id: options.agentJobId || undefined,
+            space_id: options.spaceId || undefined,
+            model_id: options.modelId || undefined,
+          })
+        : undefined,
   });
 }
 
@@ -86,24 +117,53 @@ export async function cancelAgentSession(sessionId: string): Promise<void> {
   });
 }
 
+export async function listAgentSessions(): Promise<AgentSessionsResponse> {
+  return managedAiRequest<AgentSessionsResponse>("/ai/sessions");
+}
+
+export async function fetchAgentTranscript(sessionId: string): Promise<AgentTranscriptResponse> {
+  return managedAiRequest<AgentTranscriptResponse>(
+    `/ai/sessions/${encodeURIComponent(sessionId)}/transcript`,
+  );
+}
+
+export async function renameAgentSession(sessionId: string, title: string): Promise<void> {
+  await managedAiRequest(`/ai/sessions/${encodeURIComponent(sessionId)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ title }),
+  });
+}
+
 export async function deleteAgentSession(sessionId: string): Promise<void> {
   await managedAiRequest(`/ai/sessions/${encodeURIComponent(sessionId)}`, { method: "DELETE" });
 }
 
 export async function managedAiRequest<T = unknown>(path: string, init?: RequestInit): Promise<T> {
+  const accountGeneration = readAccountSessionGeneration();
+  assertStableManagedAiAccount(accountGeneration);
   const base = await resolveServerApiBase();
+  assertStableManagedAiAccount(accountGeneration);
   if (!base) throw new Error("Misty server URL is not configured.");
   const token = await readAccountAuthToken();
+  assertStableManagedAiAccount(accountGeneration);
   const headers = new Headers(init?.headers);
   if (init?.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   if (token && !headers.has("Authorization")) headers.set("Authorization", `Bearer ${token}`);
-  const response = await fetch(`${base}${path}`, {
-    credentials: "include",
-    ...init,
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${base}${path}`, {
+      credentials: "include",
+      ...init,
+      headers,
+    });
+  } catch (error) {
+    assertStableManagedAiAccount(accountGeneration);
+    throw error;
+  }
+  assertStableManagedAiAccount(accountGeneration);
   if (!response.ok) {
     const text = await response.text();
+    assertStableManagedAiAccount(accountGeneration);
     let payload: ManagedAiErrorPayload | null = null;
     try {
       payload = JSON.parse(text) as ManagedAiErrorPayload;
@@ -111,23 +171,12 @@ export async function managedAiRequest<T = unknown>(path: string, init?: Request
       // Plain-text errors are handled below.
     }
     if (payload) {
-      if (payload.code === "credits_exhausted") {
+      if (payload.code === "hosted_ai_limit_reached") {
         const reset = payload.reset_at
           ? new Date(payload.reset_at).toLocaleDateString()
-          : "your next reset";
+          : "Monday";
         throw new ManagedAiRequestError(
-          `Misty credits exhausted (${payload.available_credits ?? 0} available). Add credits or wait until ${reset}.`,
-          response.status,
-          payload.code,
-        );
-      }
-      if (payload.code === "insufficient_credits") {
-        const required =
-          typeof payload.requiredCredits === "number"
-            ? ` ${payload.requiredCredits} Mika credits are required.`
-            : "";
-        throw new ManagedAiRequestError(
-          `${payload.message?.trim() || "Not enough Mika credits for this request."}${required}`,
+          `Weekly hosted AI usage is fully used. Try again after the reset on ${reset} or upgrade to Pro.`,
           response.status,
           payload.code,
         );
@@ -138,14 +187,14 @@ export async function managedAiRequest<T = unknown>(path: string, init?: Request
           ? ""
           : " Requests are never retried automatically.";
         throw new ManagedAiRequestError(
-          `Mika request limit reached. Try again in ${retryAfter} seconds.${retryPolicy}`,
+          `Agent request limit reached. Try again in ${retryAfter} seconds.${retryPolicy}`,
           response.status,
           payload.code,
           retryAfter,
         );
       }
       if (payload.code === "request_canceled") {
-        throw new ManagedAiRequestError("Mika request canceled.", response.status, payload.code);
+        throw new ManagedAiRequestError("Agent request canceled.", response.status, payload.code);
       }
       if (payload.message?.trim())
         throw new ManagedAiRequestError(
@@ -156,7 +205,7 @@ export async function managedAiRequest<T = unknown>(path: string, init?: Request
         );
     }
     throw new ManagedAiRequestError(
-      text.trim() || `Mika ${path} failed: ${response.status}`,
+      text.trim() || `Agent ${path} failed: ${response.status}`,
       response.status,
       undefined,
       retryAfterHeader(response),
@@ -164,9 +213,20 @@ export async function managedAiRequest<T = unknown>(path: string, init?: Request
   }
   if (response.status === 204) return undefined as T;
   const contentType = response.headers.get("Content-Type") ?? "";
-  return contentType.includes("application/json")
-    ? ((await response.json()) as T)
-    : (undefined as T);
+  if (!contentType.includes("application/json")) return undefined as T;
+  const result = (await response.json()) as T;
+  assertStableManagedAiAccount(accountGeneration);
+  return result;
+}
+
+function assertStableManagedAiAccount(generation: number): void {
+  if (isAccountSessionTransitioning() || generation !== readAccountSessionGeneration()) {
+    throw new ManagedAiRequestError(
+      "Wait for the account switch to finish.",
+      409,
+      "account_changed",
+    );
+  }
 }
 
 function retryAfterHeader(response: Response): number | undefined {

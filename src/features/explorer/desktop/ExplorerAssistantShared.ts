@@ -1,14 +1,15 @@
+import { useEffect, useState } from "react";
 import { selectedPathsForPane, useExplorerStore } from "@/stores/explorer";
 import type { AiStatus } from "@/models/interfaces/stores/assistant/useMikaSessionStore";
 
 export function assistantStatusText(status: AiStatus | null): string {
-  if (!status) return "Checking Mika...";
+  if (!status) return "Checking Agents...";
   if (status.configured) return `Ready (${status.modelName})`;
   return "Backend unavailable";
 }
 
 export function assistantPlaceholder(configured: boolean, fallback: string): string {
-  return configured ? fallback : "Configure Mika backend to continue";
+  return configured ? fallback : "Configure hosted Agents to continue";
 }
 
 export function selectedPathsAcrossPanes(
@@ -51,7 +52,7 @@ export function buildMikaPrompt(
       : ["Selected items: none"];
   const context = [
     "You are helping inside Misty, a desktop file manager.",
-    "Mika is beta and experimental.",
+    "Agents are beta and experimental.",
     "Your main goal is to help reorganize files. You may chat freely, but tool-assisted work should stay focused on listing, searching, validating, and proposing safe file organization plans.",
     "Do not inspect file contents or ask for preview tools. For changes, propose a file plan with folders, moves, and renames for the user to review.",
     workingDirectory ? `Current folder: ${workingDirectory}` : "Current folder: none",
@@ -70,6 +71,41 @@ export function randomMikaPeek(): { leftPercent: number; tiltDegrees: number; po
 
 export function randomInteger(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+// Drives the little Mika character that peeks up above the composer,
+// popping in and out on a randomized cadence. Shared by every chat-style
+// Mika surface (the Explorer chat window and the full Assistant page) so
+// they stay in sync rather than each re-implementing the same timers.
+export function useMikaPeekAnimation(enabled: boolean) {
+  const [mikaPeek, setMikaPeek] = useState(() => randomMikaPeek());
+  useEffect(() => {
+    if (!enabled) return;
+    let timer = 0;
+    let disposed = false;
+    const scheduleRetreat = () => {
+      timer = window.setTimeout(
+        () => {
+          setMikaPeek((peek) => ({ ...peek, popped: false }));
+          timer = window.setTimeout(
+            () => {
+              if (disposed) return;
+              setMikaPeek(randomMikaPeek());
+              scheduleRetreat();
+            },
+            randomInteger(700, 1_500),
+          );
+        },
+        randomInteger(3_500, 7_500),
+      );
+    };
+    scheduleRetreat();
+    return () => {
+      disposed = true;
+      window.clearTimeout(timer);
+    };
+  }, [enabled]);
+  return mikaPeek;
 }
 
 function titleFromPath(path: string): string {

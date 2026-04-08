@@ -38,7 +38,6 @@ export type SettingsSection =
   | "assistant"
   | "appearance"
   | "privacy"
-  | "sync"
   | "transfers"
   | "search"
   | "notifications"

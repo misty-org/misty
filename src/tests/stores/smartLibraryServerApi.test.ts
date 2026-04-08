@@ -1,10 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/stores/account/useAuthTokenStore", () => ({
+  isAccountSessionTransitioning: vi.fn(() => false),
+  readAccountSessionGeneration: vi.fn(() => 0),
   readAccountAuthToken: vi.fn().mockResolvedValue("smart-library-token"),
 }));
 
-vi.mock("@/stores/backend", () => ({
+vi.mock("@/stores/backend", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/stores/backend")>()),
   appSnapshot: vi.fn().mockRejectedValue(new Error("not running in Tauri")),
 }));
 
@@ -31,7 +34,7 @@ describe("Smart Library managed API", () => {
           allowance: {
             sampleImages: 25,
             maximumAnalyzedImages: 500,
-            sampleIncluded: true,
+            sampleIncluded: false,
             remainingImages: 500,
           },
         }),
@@ -189,7 +192,7 @@ describe("Smart Library managed API", () => {
       new Response(
         JSON.stringify({
           code: "visual_embedding_failed",
-          message: "Mika could not index the scenes. No credits were charged.",
+          message: "The agent could not index the scenes. No hosted AI usage was consumed.",
           detail: "private provider detail that must stay hidden",
         }),
         { status: 502, headers: { "Content-Type": "application/json" } },
@@ -198,6 +201,6 @@ describe("Smart Library managed API", () => {
 
     await expect(
       managedAiRequest("/ai/media-search/chunks", { method: "POST", body: "{}" }),
-    ).rejects.toThrow("Mika could not index the scenes. No credits were charged.");
+    ).rejects.toThrow("The agent could not index the scenes. No hosted AI usage was consumed.");
   });
 });

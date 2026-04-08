@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { AuthProvider } from "@/features/auth/AuthContext";
+import { PointerDragProvider } from "@/features/dnd/PointerDragContext";
 import { RenderErrorBoundary } from "@/layouts/RenderErrorBoundary";
 import { useSetupStore } from "@/stores/app";
 import { installMistyDeepLinkHandler } from "../routing/deepLinks";
@@ -45,7 +46,9 @@ export function RootLayout(props: {
     <>
       <AuthProvider>
         <RenderErrorBoundary>
-          <Outlet />
+          <PointerDragProvider>
+            <Outlet />
+          </PointerDragProvider>
         </RenderErrorBoundary>
       </AuthProvider>
       <AppZoomIndicator visible={appZoom.indicatorVisible} percent={appZoom.zoomPercent} />

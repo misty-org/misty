@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import type { TransferRecord } from "@/models/interfaces/services/misty-api";
 import { EmptyState } from "@/ui";
-import { PrimitiveIconButton as IconButton } from "@/ui";
+import { IconButton } from "@/ui/icon-button";
 import { StatusBadge } from "@/ui";
 import { Button } from "@/ui";
 import { prettyLabel } from "@/lib/format";
@@ -351,11 +351,11 @@ const TransferTableCell = memo(function TransferTableCell(
           {props.row.operationId ? (
             <>
               <QuickAction
-                label={props.row.paused ? "Resume transfer" : "Pause transfer"}
+                label={props.isTransferPaused(props.row) ? "Resume transfer" : "Pause transfer"}
                 disabled={!canPauseResumeTransfer(props.row) || props.queueWorking}
                 onClick={() => void props.onPauseResume(props.row)}
               >
-                {props.row.paused ? <Play /> : <Pause />}
+                {props.isTransferPaused(props.row) ? <Play /> : <Pause />}
               </QuickAction>
               <QuickAction
                 label="Cancel transfer"

@@ -303,7 +303,6 @@ export function selectNotificationPreferences(
   );
   return {
     badgeCountEnabled: settingsBoolean(source, "notifications", "badge_count_enabled", true),
-    deviceNotificationsEnabled,
     desktopNotificationsEnabled: deviceNotificationsEnabled,
     digestNotificationsEnabled: settingsBoolean(
       source,
@@ -347,8 +346,6 @@ export function selectGeneralPreferences(
     ),
     openLinksExternally: settingsBoolean(source, "general", "open_links_externally", true),
     preferredWorkspaceRoot: settingsString(source, "general", "preferred_workspace_root", ""),
-    reopenLastSession: settingsBoolean(source, "general", "reopen_last_session", true),
-    startupViewIndex: settingsNumber(source, "general", "startup_view_index", 0),
   };
 }
 

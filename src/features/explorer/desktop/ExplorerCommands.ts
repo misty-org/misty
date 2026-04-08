@@ -53,7 +53,6 @@ export const executableShortcutCommands = [
   "explorer.batch_rename",
   "explorer.duplicate_finder",
   "explorer.compare_with",
-  "explorer.automation_rules",
   "explorer.refresh",
   "explorer.new_tab",
   "explorer.restore_tab",
@@ -251,9 +250,6 @@ export function runExplorerCommand(
       break;
     case "explorer.compare_with":
       openCompareWith(paneId);
-      break;
-    case "explorer.automation_rules":
-      useExplorerStore.getState().pushNotification("coming soon...", "info", 3000);
       break;
     case "explorer.delete":
       void explorer.deleteSelected(paneId);

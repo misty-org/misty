@@ -5,7 +5,10 @@ import { useTransfersStore } from "@/stores/transfers";
 import type { TransferStatus } from "@/models/types/services/misty-api";
 import type { TransferRecord } from "@/models/interfaces/services/misty-api";
 import { workStatusPopupClass, workStatusPulseClass, workStatusToastDurationMs } from "./styles";
-import { advanceTransferCompletionTracker, emptyTransferCompletionTracker } from "../transferCompletionNotifications";
+import {
+  advanceTransferCompletionTracker,
+  emptyTransferCompletionTracker,
+} from "../transferCompletionNotifications";
 
 const activeWorkStatuses = new Set<TransferRecord["status"]>(["queued", "pending", "in_progress"]);
 const emptyTransferRows: TransferRecord[] = [];

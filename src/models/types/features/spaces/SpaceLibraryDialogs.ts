@@ -15,13 +15,7 @@ import { Textarea } from "@/ui";
 import type { SpaceLibraryItem } from "@/models/interfaces/features/spaces/types";
 
 export type LibraryTextDialogState = {
-  kind:
-    | "create-folder"
-    | "rename-folder"
-    | "create-group"
-    | "rename-memory"
-    | "rename-item"
-    | "edit-tags";
+  kind: "create-folder" | "rename-folder" | "rename-memory" | "rename-item" | "edit-tags";
   title: string;
   primaryLabel: string;
   primaryValue: string;

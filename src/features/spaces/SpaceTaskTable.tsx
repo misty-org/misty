@@ -14,6 +14,7 @@ import {
   taskStatusOptions,
   toLocalInput,
 } from "./SpaceTaskPrimitives";
+import { TaskSyncBadge } from "@/features/spaces/components/TaskSyncBadge";
 
 export function SpaceTaskList({
   tasks,
@@ -69,6 +70,7 @@ export function SpaceTaskList({
                   >
                     {taskBusy ? <LoaderCircle className="size-3.5 animate-spin" /> : null}
                     <span className="truncate">{task.title}</span>
+                    <TaskSyncBadge task={task} />
                   </Button>
                 </TableCell>
                 <TableCell>

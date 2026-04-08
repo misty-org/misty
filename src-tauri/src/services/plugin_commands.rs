@@ -623,10 +623,7 @@ fn run_result_for_command(
         plugin_name: command.plugin_name,
         label: command.label,
         handled: false,
-        target_route: format!(
-            "/hub/extensions?plugin={}",
-            route_encode(&command.plugin_id)
-        ),
+        target_route: String::new(),
         message: "No runtime library was advertised for this platform.".to_owned(),
         notifications: Vec::new(),
         runtime_status: "native_runtime_unavailable".to_owned(),
@@ -758,10 +755,7 @@ fn native_plugin_failure(
         plugin_name: command.plugin_name,
         label: command.label,
         handled: false,
-        target_route: format!(
-            "/hub/extensions?plugin={}",
-            route_encode(&command.plugin_id)
-        ),
+        target_route: String::new(),
         message,
         notifications: Vec::new(),
         runtime_status: runtime_status.to_owned(),
@@ -1374,14 +1368,7 @@ fn builtin_command_result(
         plugin_name: command.plugin_name,
         label: command.label,
         handled,
-        target_route: if handled {
-            String::new()
-        } else {
-            format!(
-                "/hub/extensions?plugin={}",
-                route_encode(&command.plugin_id)
-            )
-        },
+        target_route: String::new(),
         notifications: vec![PluginPanelNotification {
             level: level.to_owned(),
             title: "Extension action".to_owned(),
@@ -3535,7 +3522,7 @@ mod tests {
         let result = run_result_for_command(command, vec!["/tmp/input.mov".to_owned()]);
 
         assert!(!result.handled);
-        assert_eq!(result.target_route, "/hub/extensions?plugin=convert");
+        assert!(result.target_route.is_empty());
         assert_eq!(result.runtime_status, "native_load_failed");
         assert!(result.message.contains("Could not load extension library"));
     }

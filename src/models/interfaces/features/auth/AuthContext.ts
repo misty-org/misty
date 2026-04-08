@@ -36,6 +36,7 @@ export interface AuthUser {
   name: string;
   username?: string;
   email: string;
+  avatarVersion?: number;
   accountCreatedAt?: string;
   currentPlan?: string;
 }
@@ -44,6 +45,9 @@ export interface AuthContextValue {
   user: AuthUser | null;
   setUser: (user: AuthUser | null) => void;
   accounts: SavedAccountSession[];
+  transitioning: boolean;
+  refreshUser: () => Promise<AuthUser | null>;
+  authenticateAccount: (request: () => Promise<AuthUser>) => Promise<AuthUser>;
   switchAccount: (accountId: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }

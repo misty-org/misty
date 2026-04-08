@@ -6,28 +6,12 @@ import AuthMessage from "@/features/auth/components/AuthMessage";
 import AuthShell from "@/features/auth/components/AuthShell";
 import AuthSubmitButton from "@/features/auth/components/AuthSubmitButton";
 import { useAuth } from "@/features/auth/AuthContext";
-import { accountFetchMe, accountRegister } from "@/stores/account/useAccountStore";
-import type { AccountMeResponse } from "@/models/interfaces/stores/account/useAccountStore";
-import type { CurrentLicense } from "@/models/types/features/installer/types";
-import { useSetupStore } from "@/stores/app";
-
-function licenseFromMe(me: AccountMeResponse | null): CurrentLicense | null {
-  if (!me) return null;
-  return {
-    tier: me.tier,
-    status: me.status,
-    allows_use: me.allows_use,
-    expires_at: me.expires_at,
-    trial_started_at: me.trial_started_at,
-    license_device: me.license_device || null,
-  };
-}
+import { accountRegister } from "@/stores/account/useAccountStore";
 
 export default function RegisterPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { setUser } = useAuth();
-  const saveAuthenticatedUser = useSetupStore((state) => state.saveAuthenticatedUser);
+  const { authenticateAccount } = useAuth();
   const routeState = location.state as { from?: string; addingAccount?: boolean } | null;
   const from = routeState?.from || "/files";
   const addingAccount = Boolean(routeState?.addingAccount);
@@ -49,10 +33,7 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      const user = await accountRegister(name, normalizedUsername, email, password);
-      const me = await accountFetchMe().catch(() => null);
-      await saveAuthenticatedUser(user, licenseFromMe(me));
-      setUser({ ...user, accountCreatedAt: me?.created_at, currentPlan: me?.tier });
+      await authenticateAccount(() => accountRegister(name, normalizedUsername, email, password));
       navigate(from, { replace: true });
     } catch (registerError) {
       setError(

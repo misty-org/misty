@@ -17,6 +17,7 @@ export function LibraryDropReviewDialog(props: {
   onConfirm: () => void;
 }) {
   const { preflight } = props;
+  const weeklyPercent = Math.min(100, Math.ceil(preflight.estimate.hostedAIWeeklyRatio * 100));
   return (
     <AlertDialog
       open
@@ -49,8 +50,8 @@ export function LibraryDropReviewDialog(props: {
           </div>
           <div className="p-3">
             <Sparkles className="mb-2 text-muted-foreground" size={17} />
-            <strong>{preflight.estimate.creditUnits}</strong>
-            <span className="ml-1 text-muted-foreground">credit units</span>
+            <strong>{weeklyPercent}%</strong>
+            <span className="ml-1 text-muted-foreground">weekly AI impact</span>
           </div>
         </div>
         {preflight.unsupportedFiles > 0 ? (

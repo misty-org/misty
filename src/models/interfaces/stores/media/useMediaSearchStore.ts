@@ -25,7 +25,7 @@ export interface MediaIndexEstimate {
   fileNames: string[];
   fileCount: number;
   remainingDurationMs: number;
-  estimatedCredits: number;
+  estimatedWeeklyPercent: number;
 }
 
 export interface MediaSearchState {

@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { TransferRecord } from "@/models/interfaces/services/misty-api";
+import type { OperationQueueSnapshot } from "@/models/interfaces/services/misty-api";
 import {
   aggregateTransferProgress,
   buildTransferTreeRows,
   filterAndSortTransfers,
   includeTransferAncestors,
+  transferPaused,
 } from "@/pages/Transfers/desktop/transferModel";
 
 function transfer(id: number, overrides: Partial<TransferRecord> = {}): TransferRecord {
@@ -48,6 +50,45 @@ function transfer(id: number, overrides: Partial<TransferRecord> = {}): Transfer
     ...overrides,
   };
 }
+
+function snapshotWithOperation(operationId: number, paused: boolean): OperationQueueSnapshot {
+  return {
+    operations: [{ operationId, paused } as never],
+    batches: [],
+    conflictDialog: {} as never,
+    activeCount: 0,
+    maxConcurrent: 4,
+    redoAvailable: false,
+    paused: false,
+    bandwidthLimit: "",
+    transferProfileId: "balanced",
+    transferProfileName: "Balanced",
+  };
+}
+
+describe("transfer paused state", () => {
+  it("prefers the queue snapshot over a stale transfer record", () => {
+    // The record still says running, but the queue already accepted the pause.
+    const row = transfer(7, { paused: false });
+    expect(transferPaused(row, snapshotWithOperation(7, true))).toBe(true);
+  });
+
+  it("prefers the queue snapshot when the record is stale in the other direction", () => {
+    const row = transfer(7, { paused: true });
+    expect(transferPaused(row, snapshotWithOperation(7, false))).toBe(false);
+  });
+
+  it("falls back to the record when the queue does not know the operation", () => {
+    const row = transfer(7, { paused: true });
+    expect(transferPaused(row, snapshotWithOperation(99, false))).toBe(true);
+    expect(transferPaused(row, null)).toBe(true);
+  });
+
+  it("falls back to the record for transfers with no operation", () => {
+    const row = transfer(7, { operationId: 0, paused: true });
+    expect(transferPaused(row, snapshotWithOperation(7, false))).toBe(true);
+  });
+});
 
 describe("transfer model", () => {
   it("keeps transfer filters and sorting deterministic", () => {

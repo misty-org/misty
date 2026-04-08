@@ -137,8 +137,6 @@ pub fn run() {
             app.manage(runtime);
             #[cfg(desktop)]
             app.manage(mika_physics::MikaPhysicsState::default());
-            #[cfg(all(desktop, debug_assertions))]
-            setup_ui_playground(app)?;
             #[cfg(desktop)]
             if let Err(error) = tray::setup(app) {
                 let error = std::io::Error::other(error);
@@ -408,24 +406,4 @@ pub fn run() {
                 telemetry::shutdown();
             }
         });
-}
-
-#[cfg(all(desktop, debug_assertions))]
-fn setup_ui_playground(app: &mut tauri::App) -> tauri::Result<()> {
-    tauri::WebviewWindowBuilder::new(
-        app,
-        "playground",
-        tauri::WebviewUrl::App("playground".into()),
-    )
-    .title("Misty UI Playground")
-    .inner_size(1180.0, 780.0)
-    .min_inner_size(900.0, 600.0)
-    .minimizable(true)
-    .maximizable(true)
-    .resizable(true)
-    .decorations(true)
-    .shadow(true)
-    .build()?;
-
-    Ok(())
 }

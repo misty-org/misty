@@ -1,12 +1,14 @@
 import type { ChatComposerSuggestion } from "@/models/types/features/spaces/SpaceChat";
 export type { ChatComposerSuggestion } from "@/models/types/features/spaces/SpaceChat";
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import { Bot, LibraryBig, Paperclip, Send, Sparkles, Users, X } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { Bot, LibraryBig, Paperclip, Plus, Send, Users, X } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 
 import { useAuth } from "@/features/auth/AuthContext";
-import { MistyFilePicker } from "../picker/FilePicker";
+import { useMinimumSpin } from "@/hooks/useMinimumSpin";
+import { MistyPicker } from "../picker/MistyPicker";
+import type { MistyPickerSource } from "@/models/interfaces/features/picker/MistyPicker";
 import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
 import type {
   MessageAttachment,
@@ -17,6 +19,7 @@ import type {
   SpaceStudioResource,
 } from "@/models/interfaces/features/spaces/types";
 import { mergeSpaceMessages } from "@/stores/spaces/useSpaceMessageSpansStore";
+import type { SpacePresenceViewer } from "@/models/types/stores/spaces/useSpacesBackendStore";
 import { buildMessageSpans, useSpacesStore } from "@/stores/spaces/useSpacesStore";
 import { useSetupStore } from "@/stores/app";
 import { Button } from "@/ui";
@@ -30,18 +33,18 @@ import {
 } from "@/ui";
 import { Popover, PopoverAnchor, PopoverContent } from "@/ui";
 import { Textarea } from "@/ui";
-import { MistyLibraryPicker } from "./components/MistyLibraryPicker";
-import { AgentConversationPanel } from "@/pages/Studio/AgentConversation";
 import { useSpaceConversationChat } from "./useSpaceConversationChat";
+import { spansToText, useDiscordPublish } from "./integrations";
 import { DeleteMessageDialog, SpaceChatMessages } from "./components/SpaceChatMessages";
+import { ActiveUsersCapsule } from "./components/ActiveUsersCapsule";
 
 const emptyMessages: SpaceMessage[] = [];
 const emptyMembers: SpaceMember[] = [];
 const emptyNodes: SpaceNode[] = [];
-const emptyStudioResources: SpaceStudioResource[] = [];
+const emptyPresence: SpacePresenceViewer[] = [];
+const emptyAgents: SpaceStudioResource[] = [];
 
 export function SpaceChat({ spaceId }: { spaceId: string }) {
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user: authUser } = useAuth();
   const setupUser = useSetupStore((state) => state.status?.current_user ?? null);
@@ -51,12 +54,9 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
   const canWriteMessages = permissions?.["messages.write"] !== false;
   const canUploadAttachments = canWriteMessages && permissions?.["attachments.upload"] !== false;
   const canBrowseLibrary = canWriteMessages && permissions?.["library.view"] !== false;
-  const canRunAgents = canWriteMessages && permissions?.["agents.run"] !== false;
   const canCopyLibrary = permissions?.["library.download"] !== false;
   const canAddToLibrary = permissions?.["library.add"] !== false;
   const conversationId = searchParams.get("conversation") ?? "";
-  const agentId = searchParams.get("agentId") ?? "";
-  const agentConversationId = searchParams.get("agentConversationId") ?? "";
   const endRef = useRef<HTMLDivElement | null>(null);
   const suggestionsListId = useId();
   const [text, setText] = useState("");
@@ -68,9 +68,10 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [suggestionsError, setSuggestionsError] = useState("");
   const [suggestionQuery, setSuggestionQuery] = useState("");
+  const [selectedAgentIdsByLabel, setSelectedAgentIdsByLabel] = useState<Record<string, string>>({});
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(0);
-  const [libraryBrowserOpen, setLibraryBrowserOpen] = useState(false);
-  const [attachmentPickerOpen, setAttachmentPickerOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerSource, setPickerSource] = useState<MistyPickerSource>("files");
   const [attachmentUploading, setAttachmentUploading] = useState(false);
   const [replyToMessageId, setReplyToMessageId] = useState("");
   const [editingMessageId, setEditingMessageId] = useState("");
@@ -88,9 +89,12 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
   const {
     messagesBySpace,
     membersBySpace,
-    agentsBySpace,
     nodesBySpace,
+    presenceBySpace,
+    agentsBySpace,
+    loading: spacesLoading,
     sending,
+    spacesError,
     sendMessage,
     updateMessage,
     deleteMessage,
@@ -98,13 +102,18 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
     loadMessages,
     loadChatAgents,
     openNode,
+    setViewingSpace,
+    clearSpacesError,
   } = useSpacesStore(
     useShallow((state) => ({
       messagesBySpace: state.messagesBySpace,
       membersBySpace: state.membersBySpace,
-      agentsBySpace: state.agentsBySpace,
       nodesBySpace: state.nodesBySpace,
+      presenceBySpace: state.presenceBySpace,
+      agentsBySpace: state.agentsBySpace,
+      loading: state.loading,
       sending: state.sending,
+      spacesError: state.error,
       sendMessage: state.sendMessage,
       updateMessage: state.updateMessage,
       deleteMessage: state.deleteMessage,
@@ -112,12 +121,14 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
       loadMessages: state.loadMessages,
       loadChatAgents: state.loadChatAgents,
       openNode: state.openNode,
+      setViewingSpace: state.setViewingSpace,
+      clearSpacesError: state.clearError,
     })),
   );
   const defaultMessages = messagesBySpace[spaceId] ?? emptyMessages;
   const allMembers = membersBySpace[spaceId] ?? emptyMembers;
-  const agents = agentsBySpace[spaceId] ?? emptyStudioResources;
-  const directAgent = agents.find((agent) => agent.id === agentId);
+  const activeUserIds = presenceBySpace[spaceId] ?? emptyPresence;
+  const agents = agentsBySpace[spaceId] ?? emptyAgents;
   const activeConversation = groupConversations.find(
     (conversation) => conversation.id === conversationId,
   );
@@ -125,36 +136,43 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
     () => new Set(activeConversation?.members.map((member) => member.user_id) ?? []),
     [activeConversation],
   );
+  const directRecipient = useMemo(() => {
+    if (!activeConversation || activeConversation.members.length > 2) return undefined;
+    const other =
+      activeConversation.members.find((member) => member.user_id !== user?.id) ??
+      activeConversation.members[0];
+    return other ? { userId: other.user_id, name: other.name } : undefined;
+  }, [activeConversation, user?.id]);
   const members = conversationId
     ? allMembers.filter((member) => allowedMemberIds.has(member.user_id))
     : allMembers;
   const messages = conversationId ? groupMessages : defaultMessages;
+  const discord = useDiscordPublish(spaceId, conversationId, (published) =>
+    setGroupMessages((current) => mergeSpaceMessages(current, [published])),
+  );
+  const [messagesLoading] = useMinimumSpin(
+    conversationId ? groupLoading : spacesLoading && defaultMessages.length === 0,
+  );
   const nodes = useMemo(
     () => (nodesBySpace[spaceId] ?? emptyNodes).filter((node) => node.kind === "link"),
     [nodesBySpace, spaceId],
   );
   const suggestions = useMemo<ChatComposerSuggestion[]>(() => {
     const query = suggestionQuery.trim().toLocaleLowerCase();
-    const peopleAndAgents: ChatComposerSuggestion[] = [
-      ...members
-        .filter((member) => member.user_id !== user?.id)
-        .map((member) => ({
-          kind: "member" as const,
-          id: member.user_id,
-          label: member.name,
-          detail: member.email,
-        })),
-      ...(canRunAgents
-        ? agents
-            .filter((agent) => agent.enabled)
-            .map((agent) => ({
-              kind: "agent" as const,
-              id: agent.id,
-              label: agent.name,
-              detail: agent.description || "Shared Agent",
-            }))
-        : []),
-    ];
+    const people: ChatComposerSuggestion[] = members
+      .filter((member) => member.user_id !== user?.id)
+      .map((member) => ({
+        kind: "member" as const,
+        id: member.user_id,
+        label: member.name,
+        detail: member.email,
+      }));
+    const agentSuggestions: ChatComposerSuggestion[] = agents.map((agent) => ({
+      kind: "agent" as const,
+      id: agent.id,
+      label: agent.name,
+      detail: agent.creator_user_id === user?.id ? "Your Agent" : "Shared Agent",
+    }));
     const library =
       canBrowseLibrary && pendingAttachments.length + selectedLibraryIds.length < 5
         ? libraryItems
@@ -167,15 +185,14 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
               item,
             }))
         : [];
-    return [...peopleAndAgents, ...library]
+    return [...agentSuggestions, ...people, ...library]
       .filter(
         (item) => !query || `${item.label} ${item.detail}`.toLocaleLowerCase().includes(query),
       )
       .slice(0, 24);
   }, [
-    agents,
     canBrowseLibrary,
-    canRunAgents,
+    agents,
     libraryItems,
     members,
     pendingAttachments.length,
@@ -190,12 +207,13 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
     setSelectedLibraryIds([]);
     setPendingAttachments([]);
     setSuggestionsOpen(false);
-    setLibraryBrowserOpen(false);
-    setAttachmentPickerOpen(false);
+    setPickerOpen(false);
     setReplyToMessageId("");
     setEditingMessageId("");
     setEditingText("");
-    if (canRunAgents) void loadChatAgents(spaceId);
+    setSelectedAgentIdsByLabel({});
+    clearSpacesError();
+    void loadChatAgents(spaceId);
     if (permissions?.["library.view"] === false) {
       setLibraryItems([]);
       return;
@@ -212,7 +230,12 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
         );
       })
       .finally(() => setSuggestionsLoading(false));
-  }, [canRunAgents, loadChatAgents, permissions, spaceId, user?.id]);
+  }, [clearSpacesError, loadChatAgents, permissions, spaceId, user?.id]);
+
+  useEffect(() => {
+    setViewingSpace(spaceId);
+    return () => setViewingSpace("");
+  }, [setViewingSpace, spaceId]);
 
   useEffect(() => {
     const messageId = searchParams.get("message");
@@ -235,7 +258,7 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
         const response = await spacesApi.sendConversationMessage(
           spaceId,
           conversationId,
-          buildMessageSpans(value, members, agents),
+          buildMessageSpans(value, members, agents, selectedAgentIdsByLabel),
           selectedFileIds,
           pendingAttachments.map((item) => item.id),
           selectedLibraryIds,
@@ -252,6 +275,7 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
           pendingAttachments.map((item) => item.id),
           selectedLibraryIds,
           replyToMessageId,
+          selectedAgentIdsByLabel,
         );
       }
       setText("");
@@ -260,6 +284,7 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
       setPendingAttachments([]);
       setReplyToMessageId("");
       setSuggestionsOpen(false);
+      setSelectedAgentIdsByLabel({});
     } catch (reason) {
       if (conversationId)
         setGroupChatError(
@@ -292,19 +317,24 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
     setSuggestionsOpen(true);
   };
 
+  const openPicker = (source: MistyPickerSource) => {
+    setPickerSource(source);
+    setPickerOpen(true);
+  };
+
   const onComposerChange = (value: string) => {
     if (!canWriteMessages) return;
     if (/(^|\s)@files\s*$/i.test(value)) {
       setText(value.replace(/(^|\s)@files\s*$/i, "$1"));
       setSuggestionsOpen(false);
       if (canUploadAttachments && pendingAttachments.length + selectedLibraryIds.length < 5)
-        setAttachmentPickerOpen(true);
+        openPicker("files");
       return;
     }
     if (/(^|\s)@library\s*$/i.test(value)) {
       setText(value.replace(/(^|\s)@library\s*$/i, "$1"));
       setSuggestionsOpen(false);
-      if (canBrowseLibrary) setLibraryBrowserOpen(true);
+      if (canBrowseLibrary) openPicker("library");
       return;
     }
     setText(value);
@@ -325,6 +355,12 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
       setText((current) => current.replace(/(^|\s)@[^\s@]*$/, "$1"));
     } else {
       setText((current) => current.replace(/(^|\s)@[^\s@]*$/, `$1@${suggestion.label} `));
+      if (suggestion.kind === "agent") {
+        setSelectedAgentIdsByLabel((current) => ({
+          ...current,
+          [suggestion.label.toLocaleLowerCase()]: suggestion.id,
+        }));
+      }
     }
     setSuggestionsOpen(false);
     setSuggestionQuery("");
@@ -361,6 +397,12 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
         await updateMessage(spaceId, message.id, value, message.file_node_ids);
       }
       cancelEditing(message.id);
+    } catch (error) {
+      if (conversationId)
+        setGroupChatError(
+          error instanceof Error ? error.message : "The message could not be saved.",
+        );
+      // Non-conversation failures already land on the shared spaces store error above.
     } finally {
       setEditSaving(false);
     }
@@ -368,43 +410,37 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
 
   const removeMessage = async () => {
     if (!messageToDelete) return;
-    if (conversationId) {
-      await spacesApi.deleteConversationMessage(spaceId, conversationId, messageToDelete.id);
-      setGroupMessages((current) => current.filter((item) => item.id !== messageToDelete.id));
-    } else {
-      await deleteMessage(spaceId, messageToDelete.id);
+    try {
+      if (conversationId) {
+        await spacesApi.deleteConversationMessage(spaceId, conversationId, messageToDelete.id);
+        setGroupMessages((current) => current.filter((item) => item.id !== messageToDelete.id));
+      } else {
+        await deleteMessage(spaceId, messageToDelete.id);
+      }
+      setMessageToDelete(null);
+    } catch (error) {
+      if (conversationId)
+        setGroupChatError(
+          error instanceof Error ? error.message : "The message could not be deleted.",
+        );
+      // The dialog stays open on failure so the error banner and retry are visible.
     }
-    setMessageToDelete(null);
   };
 
-  if (agentId) {
-    return directAgent ? (
-      <AgentConversationPanel
-        agent={directAgent}
-        conversationId={agentConversationId || undefined}
-        embedded
-        onClose={() => navigate(`/spaces/${encodeURIComponent(spaceId)}/chat`)}
-      />
-    ) : (
-      <div className="grid h-full place-items-center p-8 text-center">
-        <div className="max-w-sm">
-          <span className="mx-auto grid size-12 place-items-center rounded-xl bg-muted/60">
-            <Bot />
-          </span>
-          <h2 className="mt-4 text-base font-semibold">Agent chat unavailable</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            This Space Agent is disabled, missing, or unavailable to your role.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto] bg-background text-foreground">
+    <div className="relative grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto] bg-background text-foreground">
+      {activeUserIds.length > 0 ? (
+        <div className="absolute right-4 top-3 z-10">
+          <ActiveUsersCapsule
+            viewers={activeUserIds}
+            members={allMembers}
+            currentUserId={user?.id}
+          />
+        </div>
+      ) : null}
       <SpaceChatMessages
-        error={groupChatError}
-        loading={groupLoading}
+        error={groupChatError || (spacesError ?? "")}
+        loading={messagesLoading}
         messages={messages}
         currentUserId={user?.id}
         isOwner={activeSpace?.role === "owner"}
@@ -417,6 +453,13 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
         canCopyLibrary={canCopyLibrary}
         canAddToLibrary={canAddToLibrary}
         spaceId={spaceId}
+        spaceName={activeConversation?.title || activeSpace?.name}
+        directRecipient={directRecipient}
+        onStarter={(starter) => {
+          if (starter === "files" || starter === "library") return openPicker(starter);
+          setText((current) => `${current}${current && !current.endsWith(" ") ? " " : ""}@`);
+          if (starter === "mention") openSuggestions("");
+        }}
         endRef={endRef}
         onEditingText={setEditingText}
         onCancelEditing={cancelEditing}
@@ -426,15 +469,17 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
         onReply={setReplyToMessageId}
         onBeginEditing={(message) => {
           setEditingMessageId(message.id);
-          setEditingText(
-            message.content
-              .map((span) => (span.type === "text" ? span.text : `@${span.label}`))
-              .join(""),
-          );
+          setEditingText(spansToText(message.content));
         }}
         onDelete={setMessageToDelete}
+        publishingMessageId={discord.publishingMessageId}
+        onPublishToDiscord={(message) => void discord.publish(message)}
         onOpenNode={(nodeId) => {
-          void openNode(spaceId, nodeId);
+          void openNode(spaceId, nodeId).catch((error: unknown) => {
+            setGroupChatError(
+              error instanceof Error ? error.message : "This file could not be opened.",
+            );
+          });
         }}
         onError={setGroupChatError}
         onLibraryItem={(item) =>
@@ -535,7 +580,7 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
                       <CommandItem
                         onSelect={() => {
                           setSuggestionsOpen(false);
-                          setLibraryBrowserOpen(true);
+                          openPicker("library");
                         }}
                       >
                         <LibraryBig />
@@ -551,7 +596,7 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
                       <CommandItem
                         onSelect={() => {
                           setSuggestionsOpen(false);
-                          setAttachmentPickerOpen(true);
+                          openPicker("files");
                         }}
                       >
                         <Paperclip />
@@ -579,7 +624,7 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
                         {suggestion.kind === "member" ? (
                           <Users />
                         ) : suggestion.kind === "agent" ? (
-                          <Sparkles />
+                          <Bot />
                         ) : (
                           <LibraryBig />
                         )}
@@ -593,7 +638,7 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
                     ))}
                   </CommandGroup>
                   {!suggestionsLoading && !suggestionsError && suggestions.length === 0 ? (
-                    <CommandEmpty>No matching people, Agents, or Library items.</CommandEmpty>
+                    <CommandEmpty>No matching Agents, people, or Library items.</CommandEmpty>
                   ) : null}
                   {suggestionsLoading ? (
                     <p className="p-3 text-sm text-muted-foreground">Loading Library…</p>
@@ -644,7 +689,7 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
           ) : null}
           <div className="flex items-center justify-between gap-2 px-1">
             <div className="flex items-center gap-1">
-              {canUploadAttachments ? (
+              {canUploadAttachments || canBrowseLibrary ? (
                 <Button
                   variant="ghost"
                   size="icon"
@@ -654,22 +699,10 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
                     attachmentUploading ||
                     pendingAttachments.length + selectedLibraryIds.length >= 5
                   }
-                  onClick={() => setAttachmentPickerOpen(true)}
-                  aria-label="Attach files"
+                  onClick={() => openPicker(canUploadAttachments ? "files" : "library")}
+                  aria-label="Add files or Library items"
                 >
-                  <Paperclip />
-                </Button>
-              ) : null}
-              {canBrowseLibrary ? (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-8"
-                  type="button"
-                  onClick={() => setLibraryBrowserOpen(true)}
-                  aria-label="Browse Space Library"
-                >
-                  <LibraryBig />
+                  <Plus />
                 </Button>
               ) : null}
               <Button
@@ -689,7 +722,7 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
             </div>
             <Button
               size="icon"
-              className="size-8"
+              className="size-8 rounded-full"
               disabled={
                 sending ||
                 (!text.trim() && pendingAttachments.length === 0 && selectedLibraryIds.length === 0)
@@ -710,32 +743,27 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
         </div>
       )}
 
-      {canBrowseLibrary && libraryBrowserOpen ? (
-        <MistyLibraryPicker
-          spaceId={spaceId}
-          selectedIds={selectedLibraryIds}
-          maximumSelected={Math.max(0, 5 - pendingAttachments.length)}
-          onCancel={() => setLibraryBrowserOpen(false)}
-          onChoose={(itemIds) => {
-            setSelectedLibraryIds(itemIds);
-            setLibraryBrowserOpen(false);
-          }}
-        />
-      ) : null}
-      {canUploadAttachments && attachmentPickerOpen ? (
-        <MistyFilePicker
-          mode="file"
+      {pickerOpen ? (
+        <MistyPicker
+          spaceId={canBrowseLibrary ? spaceId : undefined}
+          initialSource={pickerSource}
           multiple
-          title="Attach files to this chat"
-          onCancel={() => setAttachmentPickerOpen(false)}
-          onSelect={(path) => {
-            setAttachmentPickerOpen(false);
-            void uploadAttachments([path]);
+          title="Add to this chat"
+          librarySelectedIds={selectedLibraryIds}
+          libraryMaximum={Math.max(0, 5 - pendingAttachments.length)}
+          onCancel={() => setPickerOpen(false)}
+          onChooseFiles={(paths) => {
+            setPickerOpen(false);
+            if (canUploadAttachments) void uploadAttachments(paths);
           }}
-          onSelectMany={(paths) => {
-            setAttachmentPickerOpen(false);
-            void uploadAttachments(paths);
-          }}
+          onChooseLibraryItems={
+            canBrowseLibrary
+              ? (itemIds) => {
+                  setSelectedLibraryIds(itemIds);
+                  setPickerOpen(false);
+                }
+              : undefined
+          }
         />
       ) : null}
       <DeleteMessageDialog

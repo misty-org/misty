@@ -8,6 +8,7 @@ import { userFacingErrorText } from "@/lib/format";
 import { useExplorerStore } from "./useExplorerStore";
 import { mergeLibrarySearchResults } from "@/features/explorer/utils/librarySearch";
 import {
+  clearSemanticExplorerSearchCache,
   mergeHybridSearchResults,
   queryIndexedExplorerSearch,
   querySemanticExplorerSearch,
@@ -26,6 +27,7 @@ let querySequence = 0;
 let indexedResults: SearchResult[] = [];
 let semanticResults: SearchResult[] = [];
 let indexedError: string | null = null;
+let accountStateGeneration = 0;
 
 export const useSearchStore = create<SearchStore>((set, get) => ({
   open: false,
@@ -38,16 +40,21 @@ export const useSearchStore = create<SearchStore>((set, get) => ({
   error: null,
   initialized: false,
   initialize: async () => {
+    const generation = accountStateGeneration;
     try {
       const status = get().initialized ? await searchGetStatus() : await searchInit();
+      if (generation !== accountStateGeneration) return;
       set({ initialized: true, status });
     } catch (error) {
+      if (generation !== accountStateGeneration) return;
       set({ initialized: true, error: userFacingErrorText(error) });
     }
   },
   openSearch: async (currentPath) => {
+    const generation = accountStateGeneration;
     set({ open: true, currentPath, error: null });
     await get().initialize();
+    if (generation !== accountStateGeneration) return;
     scheduleStatusPolling();
     scheduleSearch();
   },
@@ -66,14 +73,18 @@ export const useSearchStore = create<SearchStore>((set, get) => ({
     scheduleSearch(0);
   },
   refreshStatus: async () => {
+    const generation = accountStateGeneration;
     try {
       const status = await searchGetStatus();
+      if (generation !== accountStateGeneration) return;
       set({ status, error: null });
     } catch (error) {
+      if (generation !== accountStateGeneration) return;
       set({ error: userFacingErrorText(error) });
     }
   },
   startScan: async (currentPath) => {
+    const generation = accountStateGeneration;
     try {
       const status = await searchStartScan({
         includeLocal: true,
@@ -82,18 +93,23 @@ export const useSearchStore = create<SearchStore>((set, get) => ({
         maxDepth: null,
         incremental: true,
       });
+      if (generation !== accountStateGeneration) return;
       set({ status, currentPath, error: null });
       scheduleStatusPolling();
     } catch (error) {
+      if (generation !== accountStateGeneration) return;
       set({ error: userFacingErrorText(error) });
     }
   },
   cancelScan: async () => {
+    const generation = accountStateGeneration;
     try {
       const status = await searchCancelScan();
+      if (generation !== accountStateGeneration) return;
       set({ status, error: null });
       scheduleStatusPolling();
     } catch (error) {
+      if (generation !== accountStateGeneration) return;
       set({ error: userFacingErrorText(error) });
     }
   },
@@ -152,8 +168,10 @@ async function executeIndexedSearch(sequence: number): Promise<void> {
   const trimmed = query.trim();
   if (!trimmed || sequence !== querySequence) return;
   useSearchStore.setState({ searching: true, error: null });
+  let nextIndexedResults: SearchResult[];
+  let nextIndexedError: string | null = null;
   try {
-    indexedResults =
+    nextIndexedResults =
       !status || status.indexedItemCount === 0
         ? mergeLibrarySearchResults([], useExplorerStore.getState().library, trimmed, {
             scope,
@@ -165,16 +183,22 @@ async function executeIndexedSearch(sequence: number): Promise<void> {
             { scope, currentPath, limit: 100 },
             useExplorerStore.getState().library,
           );
-    indexedError = null;
   } catch (error) {
-    indexedResults = mergeLibrarySearchResults([], useExplorerStore.getState().library, trimmed, {
-      scope,
-      currentPath,
-      limit: 100,
-    });
-    indexedError = userFacingErrorText(error);
+    nextIndexedResults = mergeLibrarySearchResults(
+      [],
+      useExplorerStore.getState().library,
+      trimmed,
+      {
+        scope,
+        currentPath,
+        limit: 100,
+      },
+    );
+    nextIndexedError = userFacingErrorText(error);
   }
   if (sequence !== querySequence) return;
+  indexedResults = nextIndexedResults;
+  indexedError = nextIndexedError;
   const results = mergeHybridSearchResults(indexedResults, semanticResults, 100);
   useSearchStore.setState({
     results,
@@ -189,17 +213,19 @@ async function executeSemanticSearch(sequence: number): Promise<void> {
   const trimmed = query.trim();
   if (!trimmed || sequence !== querySequence) return;
   useSearchStore.setState({ searching: true });
+  let nextSemanticResults: SearchResult[];
   try {
-    semanticResults = await querySemanticExplorerSearch(trimmed, {
+    nextSemanticResults = await querySemanticExplorerSearch(trimmed, {
       scope,
       currentPath,
       limit: 100,
     });
   } catch {
     // Offline/unconfigured semantic search is intentionally a silent local-only fallback.
-    semanticResults = [];
+    nextSemanticResults = [];
   }
   if (sequence !== querySequence) return;
+  semanticResults = nextSemanticResults;
   const results = mergeHybridSearchResults(indexedResults, semanticResults, 100);
   useSearchStore.setState({
     results,
@@ -210,8 +236,10 @@ async function executeSemanticSearch(sequence: number): Promise<void> {
 
 function scheduleStatusPolling(): void {
   stopStatusPolling();
+  const generation = accountStateGeneration;
   const poll = async () => {
     await useSearchStore.getState().refreshStatus();
+    if (generation !== accountStateGeneration) return;
     const status = useSearchStore.getState().status;
     const active = Boolean(status?.scanInProgress);
     if (useSearchStore.getState().open || active) {
@@ -226,4 +254,26 @@ function stopStatusPolling(): void {
     window.clearTimeout(statusPollTimer);
     statusPollTimer = null;
   }
+}
+
+export function resetSearchAccountState(): void {
+  accountStateGeneration += 1;
+  querySequence += 1;
+  clearSearchDebounce();
+  stopStatusPolling();
+  clearSemanticExplorerSearchCache();
+  indexedResults = [];
+  semanticResults = [];
+  indexedError = null;
+  useSearchStore.setState({
+    open: false,
+    query: "",
+    scope: "everything",
+    currentPath: "",
+    results: [],
+    searching: false,
+    status: null,
+    error: null,
+    initialized: false,
+  });
 }

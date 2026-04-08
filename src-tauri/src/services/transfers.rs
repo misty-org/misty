@@ -773,6 +773,13 @@ fn cancel_logical_descendants(db_path: &Path, root_id: u64, detail: String) -> A
 
 fn recover_orphaned_queue_rows(db_path: &Path) -> ApiResult<()> {
     let conn = open_db(db_path)?;
+    // The operation queue and its executable payloads live only in memory and
+    // are never rehydrated on startup, so every in-flight row is orphaned once
+    // this runs (which is during TransferService::new, before any operation
+    // exists this session). A row's `operation_id` refers to that vanished
+    // in-memory operation, so it must NOT gate recovery — otherwise transfers
+    // that were mid-flight when the app closed stay stuck in an in-flight
+    // status ("Pending") forever.
     conn.execute(
         "UPDATE transfers
          SET status = 'failed',
@@ -789,8 +796,7 @@ fn recover_orphaned_queue_rows(db_path: &Path) -> ApiResult<()> {
              retryable = 1,
              paused = 0,
              bytes_per_second = 0
-         WHERE operation_id = 0
-           AND status IN ('queued', 'pending', 'in_progress', 'waiting_for_resolution')",
+         WHERE status IN ('queued', 'pending', 'in_progress', 'waiting_for_resolution')",
         params![now_epoch_ms()],
     )
     .map_err(sql_error)?;
@@ -1305,6 +1311,54 @@ mod tests {
             .rows
             .iter()
             .any(|row| row.status == TransferStatus::Completed));
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[tokio::test]
+    async fn in_flight_rows_with_stale_operation_id_recover_after_restart() {
+        // A transfer that was mid-flight when the app closed keeps the
+        // operation_id it was assigned, but that in-memory operation is gone on
+        // the next launch. Recovery must still convert it to a retryable
+        // failure instead of leaving it stuck "in progress" / Pending.
+        let (service, root) = test_service("orphaned-in-progress");
+        let mut in_flight =
+            TransferRecord::new(TransferType::Move, TransferItemType::Local, "IMG_2333.jpg");
+        in_flight.status = TransferStatus::InProgress;
+        in_flight.operation_id = 42;
+        in_flight.total_bytes = 100;
+        in_flight.transferred_bytes = 40;
+        let in_flight_id = service
+            .create_transfer(in_flight)
+            .await
+            .expect("create in-flight transfer");
+
+        let mut queued =
+            TransferRecord::new(TransferType::Copy, TransferItemType::Local, "clipboard.png");
+        queued.status = TransferStatus::Queued;
+        queued.operation_id = 7;
+        let queued_id = service
+            .create_transfer(queued)
+            .await
+            .expect("create queued transfer");
+
+        service
+            .recover_orphaned_queue_rows()
+            .expect("recover orphaned rows");
+
+        let page = service
+            .snapshot(TransferFilter::default())
+            .await
+            .expect("load transfer page");
+        for id in [in_flight_id, queued_id] {
+            let row = page
+                .rows
+                .iter()
+                .find(|row| row.id == id)
+                .expect("recovered row");
+            assert_eq!(row.status, TransferStatus::Failed);
+            assert!(row.retryable);
+        }
 
         let _ = fs::remove_dir_all(root);
     }

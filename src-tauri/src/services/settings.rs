@@ -223,23 +223,8 @@ fn normalize_settings_document(document: &mut Value) -> bool {
         "privacy",
         &[
             ("data_stays_local", json!(true)),
-            ("local_processing_only", json!(true)),
-            ("export_data_enabled", json!(true)),
-            ("diagnostics_sharing_enabled", json!(false)),
             ("anonymous_usage_analytics_enabled", json!(false)),
             ("anonymous_error_reporting_enabled", json!(false)),
-        ],
-    );
-    changed |= ensure_section_defaults(
-        root,
-        "sync",
-        &[
-            ("auto_sync_enabled", json!(true)),
-            ("sync_on_launch_enabled", json!(true)),
-            ("sync_on_quit_enabled", json!(false)),
-            ("allow_metered_sync", json!(false)),
-            ("conflict_resolution_index", json!(0)),
-            ("version_history_enabled", json!(true)),
         ],
     );
     changed |= ensure_section_defaults(
@@ -331,13 +316,7 @@ fn normalize_settings_document(document: &mut Value) -> bool {
             ("server_address", json!("localhost:50051")),
             ("mount_path", json!(".misty/mnt")),
             ("extension_tools_path", json!(default_extension_tools_path)),
-            ("confirm_clear_recent", json!(false)),
-            ("confirm_clear_starred", json!(false)),
-            ("confirm_empty_trash", json!(false)),
-            ("confirm_clear_cache", json!(false)),
-            ("debug_logging_enabled", json!(false)),
             ("frame_pacing_overlay_enabled", json!(false)),
-            ("experimental_features_enabled", json!(false)),
         ],
     );
     changed |= ensure_section_defaults(

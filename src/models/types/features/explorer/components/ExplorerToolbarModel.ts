@@ -32,7 +32,6 @@ export type ExplorerCommandId =
   | "explorer.batch_rename"
   | "explorer.duplicate_finder"
   | "explorer.compare_with"
-  | "explorer.automation_rules"
   | "explorer.delete"
   | "explorer.download"
   | "explorer.open_with"

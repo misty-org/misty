@@ -3,10 +3,10 @@ import type { MediaAsset } from "@/models/interfaces/services/misty-api";
 import { estimateAssets } from "@/stores/media/useMediaSearchStore";
 
 describe("media indexing estimates", () => {
-  it("matches the server's per-chunk credit rounding", () => {
+  it("estimates weekly hosted AI impact", () => {
     const estimate = estimateAssets([asset({ durationMs: 120_186 })]);
     expect(estimate.remainingDurationMs).toBe(120_186);
-    expect(estimate.estimatedCredits).toBe(2.004);
+    expect(estimate.estimatedWeeklyPercent).toBe(21);
   });
 
   it("charges only resumable work remaining after persisted chunks", () => {
@@ -18,7 +18,7 @@ describe("media indexing estimates", () => {
       }),
     ]);
     expect(estimate.remainingDurationMs).toBe(30_186);
-    expect(estimate.estimatedCredits).toBe(0.504);
+    expect(estimate.estimatedWeeklyPercent).toBe(6);
   });
 });
 

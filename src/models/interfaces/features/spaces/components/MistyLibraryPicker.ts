@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { BookOpenText, Check, File, Image, Music2, Search, Video } from "lucide-react";
 import { Badge } from "@/ui";
 import { Button } from "@/ui";
@@ -22,6 +22,8 @@ import type { LibraryMediaFilter } from "@/models/types/features/spaces/componen
 
 export interface MistyLibraryPickerProps {
   spaceId: string;
+  /** Source switcher rendered in the header when this picker is hosted by MistyPicker. */
+  sourceToggle?: ReactNode;
   selectedIds: string[];
   maximumSelected?: number;
   onCancel: () => void;

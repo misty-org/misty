@@ -32,14 +32,55 @@ describe("app route memory", () => {
     });
   });
 
-  it("updates Spaces subsections and discards non-route fragments", () => {
+  it("updates valid Spaces subsections and discards non-route fragments", () => {
     useAppRouteMemoryStore
       .getState()
-      .rememberAppRoute("/spaces/space-7/settings/agents#permissions");
+      .rememberAppRoute("/spaces/space-7/settings/integrations#permissions");
 
     expect(useAppRouteMemoryStore.getState()).toMatchObject({
-      lastAppRoute: "/spaces/space-7/settings/agents",
-      lastSpacesRoute: "/spaces/space-7/settings/agents",
+      lastAppRoute: "/spaces/space-7/settings/integrations",
+      lastSpacesRoute: "/spaces/space-7/settings/integrations",
+    });
+  });
+
+  it("migrates removed Space surfaces to the Space root and strips stale query data", () => {
+    useAppRouteMemoryStore
+      .getState()
+      .rememberAppRoute(
+        "/spaces/space-7/agents/studio/workflows?workflowId=old&runId=old#activity",
+      );
+
+    expect(useAppRouteMemoryStore.getState()).toMatchObject({
+      lastAppRoute: "/spaces/space-7",
+      lastSpacesRoute: "/spaces/space-7",
+    });
+  });
+
+  it("keeps only query parameters used by the remembered Space surface", () => {
+    useAppRouteMemoryStore
+      .getState()
+      .rememberAppRoute(
+        "/spaces/space-7/chat?conversation=group-4&message=message-2&path=%2Fprivate",
+      );
+
+    expect(useAppRouteMemoryStore.getState()).toMatchObject({
+      lastAppRoute: "/spaces/space-7/chat",
+      lastSpacesRoute: "/spaces/space-7/chat?conversation=group-4&message=message-2",
+    });
+  });
+
+  it("remembers restored Space surfaces including Assistant and Calendar", () => {
+    useAppRouteMemoryStore
+      .getState()
+      .rememberAppRoute("/spaces/space-7/tasks/calendar?priority=high");
+    expect(useAppRouteMemoryStore.getState().lastSpacesRoute).toBe(
+      "/spaces/space-7/tasks/calendar?priority=high",
+    );
+
+    useAppRouteMemoryStore.getState().rememberAppRoute("/spaces/space-7/assistant");
+    expect(useAppRouteMemoryStore.getState()).toMatchObject({
+      lastAppRoute: "/spaces/space-7/assistant",
+      lastSpacesRoute: "/spaces/space-7/assistant",
     });
   });
 });

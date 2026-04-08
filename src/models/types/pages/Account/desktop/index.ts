@@ -22,7 +22,6 @@ import { StatusBadge } from "@/ui";
 import { useAuth } from "@/features/auth/AuthContext";
 import {
   accountCreateCheckout as createCheckout,
-  accountCreateCreditCheckout as createCreditCheckout,
   accountCreatePortalSession as createPortalSession,
   accountFetchBillingUsage as fetchBillingUsage,
   accountFetchMe as fetchMe,
