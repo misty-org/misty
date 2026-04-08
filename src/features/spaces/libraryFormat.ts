@@ -1,4 +1,4 @@
-import type { LibraryItemQuery, SpaceLibraryItem } from "../../spaces/types";
+import type { LibraryItemQuery, SpaceLibraryItem } from "@/models/interfaces/features/spaces/types";
 
 export function compareLibraryItems(
   left: SpaceLibraryItem,

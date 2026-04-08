@@ -1,22 +1,30 @@
+import type { SpaceLibraryItemActions } from "@/models/types/features/spaces/useSpaceLibraryItemActions";
+export type { SpaceLibraryItemActions } from "@/models/types/features/spaces/useSpaceLibraryItemActions";
 import { useEffect, type FormEvent } from "react";
 
-import { confirmAction } from "@/shared/confirmAction";
-import { spacesApi } from "@/spaces/api";
-import { copyBlobFilesToClipboard, copyLibraryItemsToClipboard } from "@/spaces/libraryClipboard";
+import { confirmAction } from "@/lib/confirmAction";
+import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
+import {
+  copyBlobFilesToClipboard,
+  copyLibraryItemsToClipboard,
+} from "@/features/spaces/libraryClipboard";
+import type { BulkLibraryItemAction } from "@/models/types/features/spaces/types";
 import type {
-  BulkLibraryItemAction,
   BulkLibraryItemOptions,
   LibraryAssetStack,
   LibrarySharedReference,
   SpaceLibraryItem,
-} from "@/spaces/types";
+} from "@/models/interfaces/features/spaces/types";
 
 import {
   buildLibraryAssetStack,
   detectUploadedAssetStacks,
   libraryItemMIME,
 } from "./SpaceLibraryPrimitives";
-import type { LibraryUploadJob, SpaceLibraryData } from "./useSpaceLibraryData";
+import type {
+  LibraryUploadJob,
+  SpaceLibraryData,
+} from "@/models/types/features/spaces/useSpaceLibraryData";
 
 export function useSpaceLibraryItemActions(data: SpaceLibraryData) {
   const {
@@ -613,5 +621,3 @@ export function useSpaceLibraryItemActions(data: SpaceLibraryData) {
     submitSensitiveUnlock,
   };
 }
-
-export type SpaceLibraryItemActions = ReturnType<typeof useSpaceLibraryItemActions>;

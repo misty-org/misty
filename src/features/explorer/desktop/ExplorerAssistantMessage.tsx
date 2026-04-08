@@ -1,9 +1,11 @@
+import type { AssistantPlanOperation } from "@/models/types/features/explorer/desktop/ExplorerAssistantMessage";
+export type { AssistantPlanOperation } from "@/models/types/features/explorer/desktop/ExplorerAssistantMessage";
 import { File, Folder } from "lucide-react";
 import { useMemo, useState } from "react";
-import { AgentSources } from "../../../agents/AgentSources";
-import "../../../agents/sources.css";
-import { Badge } from "../../../components/ui/badge";
-import { Button } from "../../../components/ui/button";
+import { AgentSources } from "@/features/agents/AgentSources";
+import "@/features/agents/sources.css";
+import { Badge } from "@/ui";
+import { Button } from "@/ui";
 import {
   Dialog,
   DialogContent,
@@ -11,13 +13,13 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "../../../components/ui/dialog";
-import { safeTauriAssetUrl } from "@/shared/tauri";
+} from "@/ui";
+import { safeTauriAssetUrl } from "@/platform/tauri";
+import type { AiPanelMessage } from "@/models/types/stores/assistant/useMikaSessionStore";
 import type {
-  AiPanelMessage,
   AiPlanReview,
   AiToolApproval,
-} from "../../../stores/useMikaSessionStore";
+} from "@/models/interfaces/stores/assistant/useMikaSessionStore";
 import { MikaDelegatedRunAction } from "./MikaDelegatedRunAction";
 import { cx } from "./ExplorerDesktopShared";
 import { assistantPanelStyles } from "./ExplorerAssistantStyles";
@@ -136,8 +138,6 @@ function AssistantToolActions(props: {
     </div>
   );
 }
-
-type AssistantPlanOperation = AiPlanReview["plan"]["operations"][number];
 
 function AssistantPlanReviewDialog(props: {
   open: boolean;

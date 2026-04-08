@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button";
+import { Button } from "@/ui";
 import {
   Dialog,
   DialogContent,
@@ -6,9 +6,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { iconAssets } from "@/shared/assets/icons";
-import { AssetIcon } from "@/shared/components/AssetIcon";
+} from "@/ui";
+import { iconAssets } from "@/assets/icons";
+import { AssetIcon } from "@/ui";
 
 export function ProviderDisconnectDialog(props: {
   remoteName: string;

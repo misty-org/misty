@@ -19,8 +19,8 @@ import {
 } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/ui";
+import { Checkbox } from "@/ui";
 import {
   Dialog,
   DialogContent,
@@ -28,25 +28,27 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Progress } from "@/components/ui/progress";
-import { Separator } from "@/components/ui/separator";
-import { cn } from "@/lib/utils";
-import { useAuth } from "../../../auth/AuthContext";
-import { agentArchitectureApi } from "../../../spaces/agentArchitectureApi";
-import { spacesApi } from "../../../spaces/api";
+} from "@/ui";
+import { Input } from "@/ui";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui";
+import { Progress } from "@/ui";
+import { Separator } from "@/ui";
+import { cn } from "@/ui";
+import { useAuth } from "@/features/auth/AuthContext";
+import { agentArchitectureApi } from "@/stores/agents/useAgentArchitectureStore";
+import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
 import type {
   AgentConversation,
-  Space,
   SpaceConversation,
+} from "@/models/interfaces/features/spaces/types";
+import type {
+  Space,
   SpaceMember,
   SpaceStorageUsage,
   SpaceStudioResource,
   SpacesSnapshot,
-} from "../../../spaces/types";
-import { useSpacesStore } from "../../../stores/useSpacesStore";
+} from "@/models/interfaces/features/spaces/types";
+import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
 import { SpaceSectionNavigation } from "./SpaceSectionNavigation";
 import { SpaceSidebarSection } from "./SpaceSidebarSection";
 

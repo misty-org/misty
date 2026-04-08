@@ -13,26 +13,20 @@ import {
   X,
 } from "lucide-react";
 
-import { GlobalImageEditor } from "@/components/GlobalImageEditor";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { confirmAction } from "@/shared/confirmAction";
-import { copyLibraryItemsToClipboard } from "@/spaces/libraryClipboard";
-import { spacesApi } from "@/spaces/api";
+import { GlobalImageEditor } from "@/features/editor/GlobalImageEditor";
+import { Button } from "@/ui";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/ui";
+import { Input } from "@/ui";
+import { Textarea } from "@/ui";
+import { confirmAction } from "@/lib/confirmAction";
+import { copyLibraryItemsToClipboard } from "@/features/spaces/libraryClipboard";
+import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
+import type { LibraryEditDefinition } from "@/models/types/features/spaces/types";
 import type {
   LibraryAssetStack,
-  LibraryEditDefinition,
   LibraryEditVersion,
   SpaceLibraryItem,
-} from "@/spaces/types";
+} from "@/models/interfaces/features/spaces/types";
 
 import { EmbeddedUniversalPreview } from "@/features/explorer/components/GlobalPreview";
 import { MistyLibraryPicker } from "./components/MistyLibraryPicker";

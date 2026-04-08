@@ -1,12 +1,23 @@
-import { Button } from "../../../components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "../../../components/ui/table";
+import type {
+  FileTableColumn,
+  FileTableColumnWidths,
+  GridThumbnailSubscriber,
+} from "@/models/types/features/explorer/components/FileBrowser";
+export type {
+  FileTableColumn,
+  FileTableColumnWidths,
+  GridThumbnailSubscriber,
+} from "@/models/types/features/explorer/components/FileBrowser";
+import type {
+  FileBrowserProps,
+  GridThumbnailJob,
+} from "@/models/interfaces/features/explorer/components/FileBrowser";
+export type {
+  FileBrowserProps,
+  GridThumbnailJob,
+} from "@/models/interfaces/features/explorer/components/FileBrowser";
+import { Button } from "@/ui";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/ui";
 import { ChevronDown, ChevronUp, RotateCcw } from "lucide-react";
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type {
@@ -15,24 +26,31 @@ import type {
   PointerEvent as ReactPointerEvent,
   ReactNode,
 } from "react";
-import { explorerGenerateImageThumbnail } from "@/services/misty-api/misty";
-import type { DirectoryListing, DirectorySizeRecord, FileEntry } from "@/services/misty-api/types";
-import { safeTauriAssetUrl } from "@/shared/tauri";
-import { selectAppearancePreferences, useSettingsStore } from "../../../stores/useSettingsStore";
-import { directorySizeRecordForPath, entrySizeBytes } from "../../../stores/useExplorerStore";
+import { explorerGenerateImageThumbnail } from "@/stores/backend";
+import type {
+  DirectoryListing,
+  DirectorySizeRecord,
+  FileEntry,
+} from "@/models/interfaces/services/misty-api";
+import { safeTauriAssetUrl } from "@/platform/tauri";
+import { selectAppearancePreferences, useSettingsStore } from "@/stores/app";
+import { directorySizeRecordForPath, entrySizeBytes } from "@/stores/explorer";
 import type {
   ExplorerCommandQueryMode,
   ExplorerInlineEditState,
   ExplorerSortColumn,
   ExplorerSortState,
   ExplorerViewMode,
-} from "../../../stores/useExplorerStore";
+} from "@/stores/explorer";
 import { formatBytes, formatDate } from "../utils/fileFormat";
 import { dragItemsForEntry, transferDropAcceptance } from "./FileBrowserDrag";
-import type { FileBrowserDragItem } from "./FileBrowserDrag";
+import type { FileBrowserDragItem } from "@/models/types/features/explorer/components/FileBrowserDrag";
 import { storageIdForPath } from "../drag/operations";
 import { useExplorerDragSource, useExplorerDropZone } from "../drag/ExplorerDragContext";
-import type { ExplorerDragModifiers, ExplorerDragPayload } from "../drag/types";
+import type {
+  ExplorerDragModifiers,
+  ExplorerDragPayload,
+} from "@/models/interfaces/features/explorer/drag/types";
 import { compileEntryFilterMatcher, entryMatchesQuery } from "./FileBrowserFilters";
 import { FileIcon, GenericFileIcon } from "./FileBrowserIcons";
 import {
@@ -40,7 +58,7 @@ import {
   InlineNameEditor,
   PassiveRenameDraftView,
 } from "./FileBrowserInline";
-import type { PassiveRenameDraft } from "./FileBrowserInline";
+import type { PassiveRenameDraft } from "@/models/types/features/explorer/components/FileBrowserInline";
 import { FileBrowserSkeleton } from "./FileBrowserSkeleton";
 import { fileBrowserStyles } from "./FileBrowserStyles";
 
@@ -56,9 +74,6 @@ const DEFAULT_ITEM_SCALE = 1;
 const TABLE_COLUMN_STORAGE_KEY = "misty.explorer.fileTable.columnWidths";
 const TABLE_COLUMN_ORDER_STORAGE_KEY = "misty.explorer.fileTable.columnOrder";
 const emptyEntries: FileEntry[] = [];
-
-type FileTableColumn = ExplorerSortColumn;
-type FileTableColumnWidths = Record<FileTableColumn, number>;
 
 const fileTableColumns: FileTableColumn[] = ["name", "modified", "size", "type"];
 const fileTableColumnLabels: Record<FileTableColumn, string> = {
@@ -88,40 +103,6 @@ const maximumColumnWidths: FileTableColumnWidths = {
   size: 220,
   type: 260,
 };
-
-interface FileBrowserProps {
-  paneId: string;
-  selectionOnly?: boolean;
-  listing: DirectoryListing | null;
-  selectedIds: string[];
-  loading: boolean;
-  error: string | null;
-  viewMode: ExplorerViewMode;
-  itemScale?: number;
-  sort: ExplorerSortState;
-  showHidden: boolean;
-  commandQuery: string;
-  commandQueryMode: ExplorerCommandQueryMode;
-  directorySizes: Record<string, DirectorySizeRecord>;
-  cutPaths: ReadonlySet<string>;
-  inlineEdit: ExplorerInlineEditState | null;
-  onSort: (column: ExplorerSortColumn) => void;
-  onToggleHidden: () => void;
-  onSelect: (entryId: string, event: MouseEvent, visibleEntryIds: string[]) => void;
-  onClearSelection: () => void;
-  onOpen: (entry: FileEntry) => void;
-  onContextMenu: (event: MouseEvent, entry: FileEntry) => void;
-  onBackgroundContextMenu: (event: MouseEvent) => void;
-  onDropItems: (
-    payload: ExplorerDragPayload,
-    destination: string,
-    destinationStorageId: string,
-    modifiers: ExplorerDragModifiers,
-  ) => void;
-  onInlineEditChange: (value: string) => void;
-  onInlineEditCommit: () => void;
-  onInlineEditCancel: () => void;
-}
 
 export type { FileBrowserDragItem } from "./FileBrowserDrag";
 
@@ -1158,17 +1139,6 @@ const gridThumbnailQueue: GridThumbnailJob[] = [];
 const gridThumbnailJobs = new Map<string, GridThumbnailJob>();
 let activeGridThumbnailJobs = 0;
 let backgroundGridThumbnailTimer: number | null = null;
-
-type GridThumbnailSubscriber = (url: string | null) => void;
-
-interface GridThumbnailJob {
-  key: string;
-  entry: FileEntry;
-  maxDimension: number;
-  subscribers: Set<GridThumbnailSubscriber>;
-  processing: boolean;
-  background: boolean;
-}
 
 function gridThumbnailSupported(entry: FileEntry): boolean {
   if (entry.kind === "folder" || entry.kind === "symlink" || entry.isDeleted) return false;

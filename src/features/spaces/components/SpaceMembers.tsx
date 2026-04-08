@@ -1,3 +1,5 @@
+import type { MemberAction } from "@/models/types/features/spaces/components/SpaceMembers";
+export type { MemberAction } from "@/models/types/features/spaces/components/SpaceMembers";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Ellipsis, Mail, RotateCcw, ShieldCheck, Trash2, UserPlus, Users } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
@@ -10,12 +12,12 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
+} from "@/ui";
+import { Avatar, AvatarFallback } from "@/ui";
+import { Badge } from "@/ui";
+import { Button } from "@/ui";
+import { Card } from "@/ui";
+import { Checkbox } from "@/ui";
 import {
   Dialog,
   DialogContent,
@@ -23,21 +25,19 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@/ui";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
-import { useAuth } from "../../../auth/AuthContext";
-import { spacesApi } from "../../../spaces/api";
-import type { SpaceMember } from "../../../spaces/types";
-import { useSpacesStore } from "../../../stores/useSpacesStore";
-
-type MemberAction = { kind: "transfer" | "remove"; member: SpaceMember };
+} from "@/ui";
+import { Input } from "@/ui";
+import { useAuth } from "@/features/auth/AuthContext";
+import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
+import type { SpaceMember } from "@/models/interfaces/features/spaces/types";
+import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
 
 export function SpaceMembers({ spaceId }: { spaceId: string }) {
   const { user } = useAuth();

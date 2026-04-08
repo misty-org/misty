@@ -1,17 +1,17 @@
 import { useEffect, useState } from "react";
 import { Bot } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
-import { openCloudFolderBotWindow } from "@/bots/cloudFolderBot";
-import { runtimeAssetSource } from "@/shared/assets/runtimeAsset";
-import { useAppStore } from "../../../stores/useAppStore";
+import { openCloudFolderBotWindow } from "@/features/bots/cloudFolderBot";
+import { runtimeAssetSource } from "@/platform/runtimeAsset";
+import { useAppStore } from "@/stores/app";
 import {
   assistantDailyMessageLimit,
   useAssistantUsageStore,
-} from "../../../stores/useAssistantUsageStore";
-import { selectAssistantPreferences, useSettingsStore } from "../../../stores/useSettingsStore";
-import { Badge } from "../../../components/ui/badge";
-import { Button } from "../../../components/ui/button";
-import { Progress } from "../../../components/ui/progress";
+} from "@/stores/assistant/useAssistantUsageStore";
+import { selectAssistantPreferences, useSettingsStore } from "@/stores/app";
+import { Badge } from "@/ui";
+import { Button } from "@/ui";
+import { Progress } from "@/ui";
 
 const panelClass = "flex min-h-0 min-w-0 flex-col";
 const headerClass = "mb-2 flex shrink-0 items-center gap-2 text-sm font-medium text-foreground";

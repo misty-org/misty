@@ -1,23 +1,20 @@
-import { Input } from "../../../components/ui/input";
-import { Button } from "../../../components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "../../../components/ui/dialog";
+import type { DeepSearchOverlayProps } from "@/models/interfaces/features/explorer/components/DeepSearchOverlay";
+export type { DeepSearchOverlayProps } from "@/models/interfaces/features/explorer/components/DeepSearchOverlay";
+import { Input } from "@/ui";
+import { Button } from "@/ui";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/ui";
 import { CornerDownLeft, ListFilter, Loader2, Search } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
-import type { SearchQueryScope, SearchResult } from "@/services/misty-api/types";
+import type { SearchQueryScope } from "@/models/types/services/misty-api";
+import type { SearchResult } from "@/models/interfaces/services/misty-api";
 import { formatBytes, formatDate } from "../utils/fileFormat";
-import { useSearchStore } from "../../../stores/useSearchStore";
+import { useSearchStore } from "@/stores/explorer";
 import { revealSearchResultInPane, searchResultNavigationTarget } from "../utils/searchNavigation";
 import { searchResultContext, searchResultSummary } from "./ExplorerToolbarSupport";
 import { SearchResultThumbnail } from "./SearchResultThumbnail";
-import { useExplorerStore } from "../../../stores/useExplorerStore";
+import { useExplorerStore } from "@/stores/explorer";
 import { compileEntryFilterMatcher, entryMatchesQuery } from "./FileBrowserFilters";
 
 const scopeOptions: Array<{ value: SearchQueryScope; label: string }> = [
@@ -66,11 +63,6 @@ const overlayStyles = {
     "flex min-h-10 items-center justify-between gap-3 border-t border-border/80 bg-muted/20 px-5 text-[11px] text-muted-foreground",
   error: "text-destructive",
 } as const;
-
-interface DeepSearchOverlayProps {
-  activePaneId: string;
-  currentPath: string;
-}
 
 export const DeepSearchOverlay = memo(function DeepSearchOverlay(props: DeepSearchOverlayProps) {
   const navigate = useNavigate();

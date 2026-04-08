@@ -1,15 +1,8 @@
-import { Button } from "@/components/ui/button";
-import { iconAssets } from "@/shared/assets/icons";
-import { AssetIcon } from "@/shared/components/AssetIcon";
-
-interface RemoteEditActionsProps {
-  working: boolean;
-  dirty: boolean;
-  validRemoteName: boolean;
-  stale: boolean;
-  onSave: () => void;
-  onDelete: () => void;
-}
+import type { RemoteEditActionsProps } from "@/models/interfaces/pages/Providers/components/RemoteEditActions";
+export type { RemoteEditActionsProps } from "@/models/interfaces/pages/Providers/components/RemoteEditActions";
+import { Button } from "@/ui";
+import { iconAssets } from "@/assets/icons";
+import { AssetIcon } from "@/ui";
 
 const editActionsClass =
   "grid max-w-[760px] grid-cols-2 gap-2.5 px-[18px] pb-[18px] max-[980px]:grid-cols-1";

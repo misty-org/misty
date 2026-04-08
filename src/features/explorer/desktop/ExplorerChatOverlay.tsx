@@ -1,18 +1,12 @@
 import { MessageSquare, X } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { Button } from "../../../components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../../../components/ui/select";
-import { Textarea } from "../../../components/ui/textarea";
-import { useExplorerStore } from "../../../stores/useExplorerStore";
-import { useMikaSessionStore } from "../../../stores/useMikaSessionStore";
-import { useMultiPanelStore } from "@/shared/multipanel/useMultiPanelStore";
+import { Button } from "@/ui";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui";
+import { Textarea } from "@/ui";
+import { useExplorerStore } from "@/stores/explorer";
+import { useMikaSessionStore } from "@/stores/assistant/useMikaSessionStore";
+import { useMultiPanelStore } from "@/features/workspace";
 import { AssistantMessage } from "./ExplorerAssistantMessage";
 import {
   assistantPlaceholder,

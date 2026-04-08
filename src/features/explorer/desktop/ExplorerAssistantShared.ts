@@ -1,5 +1,5 @@
-import { selectedPathsForPane, useExplorerStore } from "../../../stores/useExplorerStore";
-import type { AiStatus } from "../../../stores/useMikaSessionStore";
+import { selectedPathsForPane, useExplorerStore } from "@/stores/explorer";
+import type { AiStatus } from "@/models/interfaces/stores/assistant/useMikaSessionStore";
 
 export function assistantStatusText(status: AiStatus | null): string {
   if (!status) return "Checking Mika...";

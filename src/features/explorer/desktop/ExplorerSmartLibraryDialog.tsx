@@ -21,17 +21,11 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "../../../components/ui/alert-dialog";
-import { Badge } from "../../../components/ui/badge";
-import { Button } from "../../../components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "../../../components/ui/dialog";
-import { useSmartLibraryStore } from "../../../stores/useSmartLibraryStore";
+} from "@/ui";
+import { Badge } from "@/ui";
+import { Button } from "@/ui";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/ui";
+import { useSmartLibraryStore } from "@/stores/media/useSmartLibraryStore";
 import {
   formatEstimate,
   SmartLibraryAssetGrid,

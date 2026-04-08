@@ -11,23 +11,22 @@ import {
   operationQueueUndo,
   pluginCommandRun,
   transfersSnapshot,
-} from "@/services/misty-api/misty";
+} from "@/stores/backend";
 import type {
   ClipboardPayload,
   PluginCommandEntry,
   TransferRecord,
-} from "@/services/misty-api/types";
-import { useAppStore } from "../../../stores/useAppStore";
-import { selectedPathsForPane, useExplorerStore } from "../../../stores/useExplorerStore";
-import { useOperationQueueStore } from "../../../stores/useOperationQueueStore";
-import { useSearchStore } from "../../../stores/useSearchStore";
-import { useTransfersStore } from "../../../stores/useTransfersStore";
-import { useMultiPanelStore } from "@/shared/multipanel/useMultiPanelStore";
-import { selectAdvancedPreferences, useSettingsStore } from "../../../stores/useSettingsStore";
-import { shortcutMatchesEvent } from "@/shared/shortcuts";
-import type { ShortcutMap } from "@/shared/shortcuts";
-import { errorText } from "@/shared/format";
-import { publishPluginNotifications } from "../../../plugins/pluginNotifications";
+} from "@/models/interfaces/services/misty-api";
+import { useAppStore } from "@/stores/app";
+import { selectedPathsForPane, useExplorerStore } from "@/stores/explorer";
+import { useOperationQueueStore } from "@/stores/explorer";
+import { useSearchStore } from "@/stores/explorer";
+import { useTransfersStore } from "@/stores/transfers";
+import { useMultiPanelStore } from "@/features/workspace";
+import { selectAdvancedPreferences, useSettingsStore } from "@/stores/app";
+import { shortcutMatchesEvent } from "@/lib/shortcuts";
+import type { ShortcutMap } from "@/models/types/lib/shortcuts";
+import { errorText } from "@/lib/format";
 import { clipboardImagePng } from "../utils/clipboardImage";
 import { openCompareWith } from "./ExplorerContextMenu";
 import { openTransfersTab, toggleActiveTabPanelVisibility } from "./ExplorerDesktopPlugins";
@@ -327,7 +326,9 @@ export async function runPluginCommand(
     const result = await pluginCommandRun({ commandId: command.id, selectedPaths });
     if (result.targetRoute) navigateRoute(result.targetRoute);
     if (result.handled) {
-      publishPluginNotifications(result.notifications, result.message);
+      if (result.message) {
+        useExplorerStore.getState().pushNotification(result.message, "success", 4500);
+      }
       return;
     }
     useExplorerStore.setState({
@@ -350,7 +351,9 @@ async function runPluginCommandById(
     const result = await pluginCommandRun({ commandId, selectedPaths });
     if (result.targetRoute) navigateRoute(result.targetRoute);
     if (result.handled) {
-      publishPluginNotifications(result.notifications, result.message);
+      if (result.message) {
+        useExplorerStore.getState().pushNotification(result.message, "success", 4500);
+      }
       return;
     }
     useExplorerStore.setState({

@@ -1,6 +1,28 @@
+import type {
+  CompareMode,
+  CompareTextDiffKind,
+} from "@/models/types/features/explorer/desktop/ExplorerCompareDialog";
+export type {
+  CompareMode,
+  CompareTextDiffKind,
+} from "@/models/types/features/explorer/desktop/ExplorerCompareDialog";
+import type {
+  CompareDialogSeed,
+  CompareTextDiffRow,
+  CompareTextDiffState,
+  CompareImagePreview,
+  CompareImageState,
+} from "@/models/interfaces/features/explorer/desktop/ExplorerCompareDialog";
+export type {
+  CompareDialogSeed,
+  CompareTextDiffRow,
+  CompareTextDiffState,
+  CompareImagePreview,
+  CompareImageState,
+} from "@/models/interfaces/features/explorer/desktop/ExplorerCompareDialog";
 import { useCallback, useState } from "react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Badge } from "@/ui";
+import { Button } from "@/ui";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -10,7 +32,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from "@/ui";
 import {
   Dialog,
   DialogContent,
@@ -18,8 +40,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
+} from "@/ui";
+import { Input } from "@/ui";
 import {
   compareApplyTextMerge,
   compareFiles,
@@ -27,56 +49,19 @@ import {
   explorerPreviewItem,
   explorerQueueDeleteItems,
   explorerQueuePasteItems,
-} from "@/services/misty-api/misty";
+} from "@/stores/backend";
 import type {
   CompareFilesResult,
   CompareFolderRow,
   CompareFoldersResult,
   PasteItem,
-} from "@/services/misty-api/types";
-import { useOperationQueueStore } from "../../../stores/useOperationQueueStore";
-import { useExplorerStore } from "../../../stores/useExplorerStore";
-import { errorText } from "@/shared/format";
+} from "@/models/interfaces/services/misty-api";
+import { useOperationQueueStore } from "@/stores/explorer";
+import { useExplorerStore } from "@/stores/explorer";
+import { errorText } from "@/lib/format";
 import { formatBytes } from "../utils/fileFormat";
 import { cx } from "./ExplorerDesktopShared";
 import { compareStyles } from "./ExplorerDesktopDialogStyles";
-
-type CompareMode = "file" | "folder";
-
-export interface CompareDialogSeed {
-  paneId: string;
-  leftPath: string;
-  mode: CompareMode;
-}
-
-type CompareTextDiffKind = "same" | "added" | "removed" | "changed";
-
-interface CompareTextDiffRow {
-  id: string;
-  leftLine: number | null;
-  rightLine: number | null;
-  leftText: string;
-  rightText: string;
-  kind: CompareTextDiffKind;
-}
-
-interface CompareTextDiffState {
-  leftText: string;
-  rightText: string;
-  rows: CompareTextDiffRow[];
-  truncated: boolean;
-}
-
-interface CompareImagePreview {
-  src: string;
-  mimeType: string;
-  byteLength: number;
-}
-
-interface CompareImageState {
-  left: CompareImagePreview;
-  right: CompareImagePreview;
-}
 
 export function CompareDialog(props: { seed: CompareDialogSeed; onClose: () => void }) {
   const [mode, setMode] = useState<CompareMode>(props.seed.mode);

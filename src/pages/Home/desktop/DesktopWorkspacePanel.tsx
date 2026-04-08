@@ -1,15 +1,13 @@
+import type { DesktopWorkspacePanelProps } from "@/models/types/pages/Home/desktop/DesktopWorkspacePanel";
+export type { DesktopWorkspacePanelProps } from "@/models/types/pages/Home/desktop/DesktopWorkspacePanel";
 import { useEffect, useState } from "react";
 import { Briefcase, Pencil, Plus, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
-import { useExplorerStore, type ExplorerWorkspaceEntry } from "../../../stores/useExplorerStore";
+import { useExplorerStore, type ExplorerWorkspaceEntry } from "@/stores/explorer";
 import { WorkspaceDialog } from "@/features/explorer/components/ExplorerSidebarSupport";
-import type { WorkspaceDialogState } from "@/features/explorer/components/ExplorerSidebarSupport";
-import { Button } from "../../../components/ui/button";
-
-type DesktopWorkspacePanelProps = {
-  homePath: string;
-};
+import type { WorkspaceDialogState } from "@/models/types/features/explorer/components/ExplorerSidebarSupport";
+import { Button } from "@/ui";
 
 const panelClass = "flex h-full min-h-0 min-w-0 flex-col";
 

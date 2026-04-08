@@ -1,5 +1,5 @@
-import { MistyFilePicker } from "@/components/MistyFilePicker/MistyFilePicker";
-import { spacesApi } from "@/spaces/api";
+import { MistyFilePicker } from "@/features/picker/FilePicker";
+import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
 
 import { LibraryItemContextMenu } from "./LibraryItemContextMenu";
 import { SpaceLibraryDialogs } from "../SpaceLibraryDialogs";

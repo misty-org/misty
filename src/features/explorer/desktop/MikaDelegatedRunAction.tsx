@@ -1,10 +1,10 @@
-import { Button } from "../../../components/ui/button";
+import { Button } from "@/ui";
 import { ExternalLink } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { errorText } from "@/shared/format";
-import { agentArchitectureApi } from "../../../spaces/agentArchitectureApi";
-import type { AiPanelMessage } from "../../../stores/useMikaSessionStore";
+import { errorText } from "@/lib/format";
+import { agentArchitectureApi } from "@/stores/agents/useAgentArchitectureStore";
+import type { AiPanelMessage } from "@/models/types/stores/assistant/useMikaSessionStore";
 
 export function MikaDelegatedRunAction({ message }: { message: AiPanelMessage }) {
   const navigate = useNavigate();

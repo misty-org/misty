@@ -1,8 +1,12 @@
-import type { FileEntry } from "@/services/misty-api/types";
+import type { FileBrowserDragItem } from "@/models/types/features/explorer/components/FileBrowserDrag";
+export type { FileBrowserDragItem } from "@/models/types/features/explorer/components/FileBrowserDrag";
+import type { FileEntry } from "@/models/interfaces/services/misty-api";
 import { invalidTransferReason, storageIdForPath } from "../drag/operations";
-import type { DropAcceptance, ExplorerDragItem, ExplorerDragPayload } from "../drag/types";
-
-export type FileBrowserDragItem = ExplorerDragItem;
+import type {
+  DropAcceptance,
+  ExplorerDragItem,
+  ExplorerDragPayload,
+} from "@/models/interfaces/features/explorer/drag/types";
 
 export function dragItemsForEntry(
   entry: FileEntry,

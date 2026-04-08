@@ -1,5 +1,6 @@
-import type { ClipboardOperation, MountedDevice } from "@/services/misty-api/types";
-import type { ExplorerDragItem } from "./types";
+import type { ClipboardOperation } from "@/models/types/services/misty-api";
+import type { MountedDevice } from "@/models/interfaces/services/misty-api";
+import type { ExplorerDragItem } from "@/models/interfaces/features/explorer/drag/types";
 import { normalizedDragPath, pathContainsPath } from "./geometry";
 
 export function storageIdForPath(

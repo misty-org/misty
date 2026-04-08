@@ -1,3 +1,5 @@
+import type { TransferTableActions } from "@/models/types/pages/Transfers/desktop/TransferTable";
+export type { TransferTableActions } from "@/models/types/pages/Transfers/desktop/TransferTable";
 import { memo, useState } from "react";
 import type {
   MouseEvent as ReactMouseEvent,
@@ -13,19 +15,19 @@ import {
   RotateCcw,
   XCircle,
 } from "lucide-react";
-import type { TransferRecord } from "../../../api/types";
-import { EmptyState } from "@/components/ui/state-view";
-import { IconButton } from "@/components/ui/icon-button";
-import { StatusBadge } from "@/components/ui/status-badge";
-import { Button } from "../../../components/ui/button";
-import { prettyLabel } from "@/shared/format";
-import type { TransferSortDirection, TransferSortKey } from "../../../stores/useTransfersStore";
+import type { TransferRecord } from "@/models/interfaces/services/misty-api";
+import { EmptyState } from "@/ui";
+import { PrimitiveIconButton as IconButton } from "@/ui";
+import { StatusBadge } from "@/ui";
+import { Button } from "@/ui";
+import { prettyLabel } from "@/lib/format";
+import type {
+  TransferSortDirection,
+  TransferSortKey,
+} from "@/models/types/stores/transfers/useTransfersStore";
 import { relativeTime, remoteSummary } from "../transferUtils";
-import {
-  TransferRowActionsMenu,
-  TransferRowContextMenu,
-  type TransferActionHandlers,
-} from "./TransferMenus";
+import { TransferRowActionsMenu, TransferRowContextMenu } from "./TransferMenus";
+import type { TransferActionHandlers } from "@/models/types/pages/Transfers/desktop/TransferMenus";
 import {
   canPauseResumeTransfer,
   isTransferTableColumn,
@@ -37,20 +39,14 @@ import {
   transferStatusLabel,
   transferStatusTone,
   transferTime,
-  type TransferColumnWidths,
-  type TransferSortableKey,
-  type TransferTableColumn,
-  type TransferTreeRow,
 } from "./transferModel";
+import type {
+  TransferColumnWidths,
+  TransferSortableKey,
+  TransferTableColumn,
+  TransferTreeRow,
+} from "@/models/types/pages/Transfers/desktop/transferModel";
 import { transferStyles } from "./transferStyles";
-
-type TransferTableActions = TransferActionHandlers & {
-  selectedCount: number;
-  hasTransfers: boolean;
-  historyWorking: boolean;
-  queueWorking: boolean;
-  isBatchPaused: (row: TransferRecord) => boolean;
-};
 
 export function TransferHistoryTable(
   props: TransferTableActions & {

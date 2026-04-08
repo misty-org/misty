@@ -1,3 +1,7 @@
+import type { ProviderLogoSpec } from "@/models/types/pages/Providers/components/ProviderLogo";
+export type { ProviderLogoSpec } from "@/models/types/pages/Providers/components/ProviderLogo";
+import type { ProviderLogoProps } from "@/models/interfaces/pages/Providers/components/ProviderLogo";
+export type { ProviderLogoProps } from "@/models/interfaces/pages/Providers/components/ProviderLogo";
 import type { IconType } from "react-icons";
 import {
   SiApachehadoop,
@@ -54,20 +58,8 @@ import {
   TableProperties,
   Workflow,
 } from "lucide-react";
-import { iconAssets } from "@/shared/assets/icons";
-import { AssetIcon } from "@/shared/components/AssetIcon";
-
-interface ProviderLogoProps {
-  type: string;
-  size?: number;
-  className?: string;
-  title?: string;
-}
-
-type ProviderLogoSpec =
-  | { kind: "react"; icon: IconType; color?: string }
-  | { kind: "lucide"; icon: typeof Cloud; color?: string }
-  | { kind: "asset"; src: string };
+import { iconAssets } from "@/assets/icons";
+import { AssetIcon } from "@/ui";
 
 const brandLogoMap: Record<string, ProviderLogoSpec> = {
   b2: { kind: "react", icon: SiBackblaze, color: "#E21E29" },

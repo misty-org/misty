@@ -1,0 +1,194 @@
+import type { AiMode, FileOperation } from "@/models/types/stores/assistant/useAiServerStore";
+export type { AiMode, FileOperation } from "@/models/types/stores/assistant/useAiServerStore";
+import type {
+  ToolDefinition,
+  ToolManifest,
+  AgentMessageRequest,
+  ToolRequest,
+  ToolResult,
+  FileOperationPlan,
+  AgentEvent,
+  AgentEventsResponse,
+  CreateSessionResponse,
+  AgentStatusResponse,
+  ManagedAiErrorPayload,
+} from "@/models/interfaces/stores/assistant/useAiServerStore";
+export type {
+  ToolDefinition,
+  ToolManifest,
+  AgentMessageRequest,
+  ToolRequest,
+  ToolResult,
+  FileOperationPlan,
+  AgentEvent,
+  AgentEventsResponse,
+  CreateSessionResponse,
+  AgentStatusResponse,
+  ManagedAiErrorPayload,
+} from "@/models/interfaces/stores/assistant/useAiServerStore";
+import { appSnapshot } from "@/stores/backend";
+import { normalizeApiBaseUrl, withDefaultApiPath } from "@/stores/backend";
+import { readAccountAuthToken } from "@/stores/account/useAuthTokenStore";
+import type { AgentCitation } from "@/models/interfaces/features/agents/types";
+
+export class ManagedAiRequestError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code?: string,
+    readonly retryAfterSeconds?: number,
+  ) {
+    super(message);
+    this.name = "ManagedAiRequestError";
+  }
+}
+
+export async function fetchAgentStatus(): Promise<AgentStatusResponse> {
+  return managedAiRequest<AgentStatusResponse>("/ai/status");
+}
+
+export async function createAgentSession(agentJobId?: string): Promise<CreateSessionResponse> {
+  return managedAiRequest<CreateSessionResponse>("/ai/sessions", {
+    method: "POST",
+    body: agentJobId ? JSON.stringify({ agent_job_id: agentJobId }) : undefined,
+  });
+}
+
+export async function sendAgentMessage(
+  sessionId: string,
+  body: AgentMessageRequest,
+): Promise<void> {
+  await managedAiRequest(`/ai/sessions/${encodeURIComponent(sessionId)}/messages`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function fetchAgentEvents(
+  sessionId: string,
+  after: number,
+): Promise<AgentEventsResponse> {
+  return managedAiRequest<AgentEventsResponse>(
+    `/ai/sessions/${encodeURIComponent(sessionId)}/events?after=${after}`,
+  );
+}
+
+export async function submitToolResults(sessionId: string, results: ToolResult[]): Promise<void> {
+  await managedAiRequest(`/ai/sessions/${encodeURIComponent(sessionId)}/tool-results`, {
+    method: "POST",
+    body: JSON.stringify({ results }),
+  });
+}
+
+export async function cancelAgentSession(sessionId: string): Promise<void> {
+  await managedAiRequest(`/ai/sessions/${encodeURIComponent(sessionId)}/cancel`, {
+    method: "POST",
+  });
+}
+
+export async function deleteAgentSession(sessionId: string): Promise<void> {
+  await managedAiRequest(`/ai/sessions/${encodeURIComponent(sessionId)}`, { method: "DELETE" });
+}
+
+export async function managedAiRequest<T = unknown>(path: string, init?: RequestInit): Promise<T> {
+  const base = await resolveServerApiBase();
+  if (!base) throw new Error("Misty server URL is not configured.");
+  const token = await readAccountAuthToken();
+  const headers = new Headers(init?.headers);
+  if (init?.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+  if (token && !headers.has("Authorization")) headers.set("Authorization", `Bearer ${token}`);
+  const response = await fetch(`${base}${path}`, {
+    credentials: "include",
+    ...init,
+    headers,
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    let payload: ManagedAiErrorPayload | null = null;
+    try {
+      payload = JSON.parse(text) as ManagedAiErrorPayload;
+    } catch {
+      // Plain-text errors are handled below.
+    }
+    if (payload) {
+      if (payload.code === "credits_exhausted") {
+        const reset = payload.reset_at
+          ? new Date(payload.reset_at).toLocaleDateString()
+          : "your next reset";
+        throw new ManagedAiRequestError(
+          `Misty credits exhausted (${payload.available_credits ?? 0} available). Add credits or wait until ${reset}.`,
+          response.status,
+          payload.code,
+        );
+      }
+      if (payload.code === "insufficient_credits") {
+        const required =
+          typeof payload.requiredCredits === "number"
+            ? ` ${payload.requiredCredits} Mika credits are required.`
+            : "";
+        throw new ManagedAiRequestError(
+          `${payload.message?.trim() || "Not enough Mika credits for this request."}${required}`,
+          response.status,
+          payload.code,
+        );
+      }
+      if (payload.code === "rate_limited") {
+        const retryAfter = payload.retry_after_seconds ?? retryAfterHeader(response);
+        const retryPolicy = path.includes("/media-search/")
+          ? ""
+          : " Requests are never retried automatically.";
+        throw new ManagedAiRequestError(
+          `Mika request limit reached. Try again in ${retryAfter} seconds.${retryPolicy}`,
+          response.status,
+          payload.code,
+          retryAfter,
+        );
+      }
+      if (payload.code === "request_canceled") {
+        throw new ManagedAiRequestError("Mika request canceled.", response.status, payload.code);
+      }
+      if (payload.message?.trim())
+        throw new ManagedAiRequestError(
+          payload.message.trim(),
+          response.status,
+          payload.code,
+          payload.retry_after_seconds ?? retryAfterHeader(response),
+        );
+    }
+    throw new ManagedAiRequestError(
+      text.trim() || `Mika ${path} failed: ${response.status}`,
+      response.status,
+      undefined,
+      retryAfterHeader(response),
+    );
+  }
+  if (response.status === 204) return undefined as T;
+  const contentType = response.headers.get("Content-Type") ?? "";
+  return contentType.includes("application/json")
+    ? ((await response.json()) as T)
+    : (undefined as T);
+}
+
+function retryAfterHeader(response: Response): number | undefined {
+  const seconds = Number(response.headers.get("Retry-After"));
+  return Number.isFinite(seconds) && seconds > 0 ? Math.ceil(seconds) : undefined;
+}
+
+async function resolveServerApiBase(): Promise<string> {
+  const publicApiBase = normalizeApiBaseUrl(import.meta.env.VITE_MISTY_PUBLIC_API_URL);
+  const explicitServerUrl = normalizeApiBaseUrl(import.meta.env.VITE_MISTY_SERVER_URL);
+  const envApiBase = normalizeApiBaseUrl(import.meta.env.VITE_API_BASE);
+  const nativeServerUrl = normalizeApiBaseUrl((await loadAppSnapshot())?.environment.serverUrl);
+  const localBetaServerUrl = import.meta.env.DEV ? "http://localhost:8080/api" : null;
+  return withDefaultApiPath(
+    publicApiBase ?? explicitServerUrl ?? envApiBase ?? nativeServerUrl ?? localBetaServerUrl,
+  );
+}
+
+async function loadAppSnapshot() {
+  try {
+    return await appSnapshot();
+  } catch {
+    return null;
+  }
+}

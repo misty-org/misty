@@ -1,40 +1,19 @@
+import type {
+  SpaceLibraryHeaderProps,
+  SpaceLibraryEmptyStateProps,
+} from "@/models/interfaces/features/spaces/components/SpaceLibraryChrome";
+export type {
+  SpaceLibraryHeaderProps,
+  SpaceLibraryEmptyStateProps,
+} from "@/models/interfaces/features/spaces/components/SpaceLibraryChrome";
 import { Grid2X2, Image as ImageIcon, List, Search, Upload, X } from "lucide-react";
-import { EmptyState } from "@/components/ui/state-view";
-import { Toolbar, ToolbarGroup } from "@/components/ui/toolbar";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import type { LibraryItemQuery } from "../../../spaces/types";
-
-interface SpaceLibraryHeaderProps {
-  uploadAvailable: boolean;
-  uploading: boolean;
-  uploadDisabled: boolean;
-  onUpload: () => void;
-  searchInput: string;
-  onSearchInput: (value: string) => void;
-  onSearchFocus: () => void;
-  onSearchBlur: () => void;
-  mediaType: string;
-  onMediaType: (value: string) => void;
-  sort: NonNullable<LibraryItemQuery["sort"]>;
-  direction: NonNullable<LibraryItemQuery["direction"]>;
-  onSort: (
-    sort: NonNullable<LibraryItemQuery["sort"]>,
-    direction: NonNullable<LibraryItemQuery["direction"]>,
-  ) => void;
-  albumOrderAvailable: boolean;
-  viewMode: "grid" | "list";
-  onViewMode: (mode: "grid" | "list") => void;
-  visibleItemCount: number;
-}
+import { EmptyState } from "@/ui";
+import { Toolbar, ToolbarGroup } from "@/ui";
+import { Button } from "@/ui";
+import { Input } from "@/ui";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui";
+import { ToggleGroup, ToggleGroupItem } from "@/ui";
+import type { LibraryItemQuery } from "@/models/interfaces/features/spaces/types";
 
 const mediaTypeOptions = [
   { value: "", label: "All media" },
@@ -178,16 +157,6 @@ export function SpaceLibraryHeader(props: SpaceLibraryHeaderProps) {
       </Toolbar>
     </div>
   );
-}
-
-interface SpaceLibraryEmptyStateProps {
-  collection: string;
-  searching?: boolean;
-  uploadAvailable: boolean;
-  uploading: boolean;
-  uploadDisabled: boolean;
-  onUpload: () => void;
-  onClearSearch?: () => void;
 }
 
 export function SpaceLibraryEmptyState(props: SpaceLibraryEmptyStateProps) {

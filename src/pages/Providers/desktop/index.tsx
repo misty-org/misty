@@ -1,22 +1,22 @@
+import type { ProvidersMultiPanelSnapshot } from "@/models/interfaces/pages/Providers/desktop/index";
+export type { ProvidersMultiPanelSnapshot } from "@/models/interfaces/pages/Providers/desktop/index";
 import { memo, useCallback, useEffect, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
-import type { MultiPanelClosedPane, MultiPanelTab } from "@/shared/multipanel/types";
-import { MultiPanelWorkspace } from "@/shared/multipanel/MultiPanelWorkspace";
-import {
-  createMultiPanelStore,
-  type MultiPanelStore,
-} from "@/shared/multipanel/useMultiPanelStore";
+import type { MultiPanelClosedPane, MultiPanelTab } from "@/models/interfaces/workspace";
+import { MultiPanelWorkspace } from "@/features/workspace";
+import { createMultiPanelStore } from "@/features/workspace";
+import type { MultiPanelStore } from "@/models/interfaces/workspace";
 import { RemoteEditPanel } from "../components/RemoteEditPanel";
 import { RemoteListPanel } from "../components/RemoteListPanel";
 import { ProviderConnectionDialog } from "../components/ProviderConnectionDialog";
 import { ProviderDisconnectDialog } from "../components/ProviderDisconnectDialog";
-import type { ProviderRemote, ProviderWorkflow } from "../../../api/types";
+import type { ProviderRemote, ProviderWorkflow } from "@/models/interfaces/services/misty-api";
 import {
   createProvidersWorkspaceState,
   isProviderWorkspaceStale,
   selectProviderWorkspaceDerived,
   useProvidersStore,
-} from "../../../stores/useProvidersStore";
+} from "@/stores/providers";
 
 const useProvidersMultiPanelStore = createMultiPanelStore({
   idPrefix: "remotes",
@@ -31,15 +31,6 @@ const providersWorkspaceClass = "h-full bg-background";
 
 const providersPaneWorkspaceClass =
   "grid h-full min-h-0 min-w-0 grid-cols-[minmax(280px,0.42fr)_minmax(420px,0.58fr)] overflow-hidden rounded-lg border border-border bg-card max-[860px]:grid-cols-[minmax(0,1fr)]";
-
-interface ProvidersMultiPanelSnapshot {
-  tabs: MultiPanelTab[];
-  activeTabId: string;
-  activePaneId: string;
-  closedPanes: MultiPanelClosedPane[];
-  nextPaneIndex: number;
-  nextTabIndex: number;
-}
 
 export const ProvidersWorkspace = memo(function ProvidersWorkspace() {
   const discardWorkspaces = useProvidersStore((state) => state.discardWorkspaces);

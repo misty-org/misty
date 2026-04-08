@@ -1,12 +1,8 @@
 import { getVersion } from "@tauri-apps/api/app";
 import { arch, platform, version } from "@tauri-apps/plugin-os";
 import { isAndroidBuild, isNativeMobileBuild } from "@/platform/buildTarget";
-import type {
-  CommonClientProperties,
-  DistributionChannel,
-  Platform,
-  ReleaseChannel,
-} from "./types";
+import type { DistributionChannel, Platform, ReleaseChannel } from "@/models/types/analytics/types";
+import type { CommonClientProperties } from "@/models/interfaces/analytics/types";
 
 let cached: Promise<CommonClientProperties> | undefined;
 

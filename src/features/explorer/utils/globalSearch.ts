@@ -1,10 +1,13 @@
+import type { ExplorerSearchOptions } from "@/models/interfaces/features/explorer/utils/globalSearch";
+export type { ExplorerSearchOptions } from "@/models/interfaces/features/explorer/utils/globalSearch";
 import {
   mediaSearchResolveAssets,
   mediaSearchSnapshot,
   searchQuery,
   smartLibraryResolveAssets,
   smartLibrarySnapshot,
-} from "@/services/misty-api/misty";
+} from "@/stores/backend";
+import type { SearchQueryScope, SearchSourceKind } from "@/models/types/services/misty-api";
 import type {
   ExplorerLibrarySnapshot,
   ExplorerLocation,
@@ -12,19 +15,16 @@ import type {
   ResolvedSmartLibraryAsset,
   ResolvedMediaAsset,
   SearchQueryRequest,
-  SearchQueryScope,
   SearchResult,
   SearchResultMatch,
-  SearchSourceKind,
   SmartLibraryAsset,
   SavedSearchRule,
-} from "@/services/misty-api/types";
-import {
-  searchSemanticAssets,
-  type SemanticSearchHit,
-} from "../../../stores/smartLibraryServerApi";
-import { searchMedia, type MediaSearchHit } from "../../../stores/mediaSearchServerApi";
-import { ensureMediaSearchDeviceReady } from "../../../stores/mediaSearchMigration";
+} from "@/models/interfaces/services/misty-api";
+import { searchSemanticAssets } from "@/stores/media/useSmartLibraryServerStore";
+import type { SemanticSearchHit } from "@/models/interfaces/stores/media/useSmartLibraryServerStore";
+import { searchMedia } from "@/stores/media/useMediaSearchServerStore";
+import type { MediaSearchHit } from "@/models/interfaces/stores/media/useMediaSearchServerStore";
+import { ensureMediaSearchDeviceReady } from "@/stores/media/useMediaSearchMigrationStore";
 import { mergeLibrarySearchResults } from "./librarySearch";
 
 export const semanticQueryMinimumCharacters = 3;
@@ -33,17 +33,6 @@ const semanticCacheTtlMs = 2 * 60 * 1000;
 const semanticCacheMaxEntries = 50;
 const semanticCache = new Map<string, { expiresAt: number; results: SearchResult[] }>();
 const semanticInFlight = new Map<string, Promise<SearchResult[]>>();
-
-export interface ExplorerSearchOptions {
-  currentPath?: string | null;
-  scope?: SearchQueryScope;
-  includeFiles?: boolean;
-  includeDirectories?: boolean;
-  includeHidden?: boolean;
-  limit?: number | null;
-  rules?: SavedSearchRule[];
-  matchMode?: "all" | "any";
-}
 
 export async function queryIndexedExplorerSearch(
   query: string,
