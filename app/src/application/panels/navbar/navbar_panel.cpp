@@ -2,6 +2,8 @@
 #include "panels/profile/profile_state.h"
 #include "core/manager/asset_manager.h"
 
+#include <cmath>
+
 using namespace misty::view;
 
 namespace misty::panel {
@@ -28,6 +30,7 @@ namespace misty::panel {
 
             show_nav_item("file-directory-24", "Files", 24, ViewID::Files, state);
             show_nav_item("devices-24", "Services", 24, view::ViewID::Services, state);
+            show_nav_item("shield-lock-24", "Vault", 24, view::ViewID::Vault, state);
             show_nav_item("bell-24", "Activity", 24, ViewID::Activity, state);
 
             // Calculate nav item height: icon size + button padding + text height + spacing

@@ -16,6 +16,7 @@ namespace misty::panel {
         if (!state.is_open) return;
 
         auto& settings = registry_.get_state<SettingsState>("Settings");
+        auto& session = core::SessionManager::get();
 
         ImGuiViewport* viewport = ImGui::GetMainViewport();
         float navbar_width = 77.0f;
@@ -91,9 +92,13 @@ namespace misty::panel {
             ImGui::PopStyleColor();
 
             // Email
+            const std::string email_text = !state.email.empty()
+                ? state.email
+                : (!session.get_email().empty() ? session.get_email() : "No email set");
+
             ImGui::SetCursorScreenPos(ImVec2(text_x, cursor.y + 32.0f));
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
-            ImGui::Text("%s", state.email.empty() ? "No email set" : state.email.c_str());
+            ImGui::Text("%s", email_text.c_str());
             ImGui::PopStyleColor();
 
             // Advance past avatar
@@ -113,10 +118,11 @@ namespace misty::panel {
             // Status section
             // =============================================
             {
-                // Server connection
+                // Background service
                 ImVec2 dot_cursor = ImGui::GetCursorScreenPos();
                 float dot_radius = 4.0f;
-                ImU32 dot_color = settings.server_connected
+                const bool proxy_available = session.is_proxy_available();
+                ImU32 dot_color = proxy_available
                     ? IM_COL32(80, 220, 100, 255)
                     : IM_COL32(220, 100, 80, 255);
 
@@ -126,7 +132,7 @@ namespace misty::panel {
 
                 ImGui::SetCursorPosX(ImGui::GetCursorPosX() + dot_radius * 2.0f + 10.0f);
                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.75f, 0.75f, 0.75f, 1.0f));
-                ImGui::Text("Server: %s", settings.server_connected ? "Connected" : "Disconnected");
+                ImGui::Text("Service: %s", proxy_available ? "Online" : "Offline");
                 ImGui::PopStyleColor();
             }
 
@@ -152,7 +158,7 @@ namespace misty::panel {
 
             ImGui::Spacing();
 
-            bool session_expired = core::SessionManager::get().is_session_expired();
+            bool session_expired = session.is_session_expired();
             {
                 // Session status
                 ImVec2 dot_cursor = ImGui::GetCursorScreenPos();
@@ -205,8 +211,8 @@ namespace misty::panel {
                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
                 if (ImGui::Button("Reconnect", ImVec2(btn_w, 0))) {
                     state.is_open = false;
-                    core::SessionManager::get().clear_token();
-                    core::SessionManager::get().clear_session_expired();
+                    session.clear_token();
+                    session.clear_session_expired();
                     view::switch_view(view::ViewID::Login);
                 }
                 ImGui::PopStyleColor(3);
@@ -217,7 +223,7 @@ namespace misty::panel {
                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.9f, 0.9f, 1.0f));
                 if (ImGui::Button("Sign Out", ImVec2(btn_w, 0))) {
                     state.is_open = false;
-                    core::SessionManager::get().clear_token();
+                    session.clear_token();
                     view::switch_view(view::ViewID::Login);
                 }
                 ImGui::PopStyleColor(3);

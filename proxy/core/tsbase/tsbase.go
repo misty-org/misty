@@ -20,10 +20,17 @@ func CreateTSBase(dataDir string) (*TSBase, error) {
 		return nil, err
 	}
 	hashedBaseName := config.GetHashedBaseName()
+	// tsnet treats Logf=nil as "fall back to log.Printf", which floods
+	// our startup output with NOTICE lines. Set both Logf (internal) and
+	// UserLogf (the user-facing NOTICE channel) to no-ops so the proxy
+	// boot stays quiet. If we ever need tsnet diagnostics again, gate this
+	// behind an env var (e.g. MISTY_TSNET_DEBUG).
+	quiet := func(format string, args ...interface{}) {}
 	server := &tsnet.Server{
 		Hostname: hashedBaseName,
 		Dir:      dataDir,
-		Logf: nil,
+		Logf:     quiet,
+		UserLogf: quiet,
 	}
 	localClient, err := server.LocalClient()
 	if err != nil {
