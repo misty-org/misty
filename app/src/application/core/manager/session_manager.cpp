@@ -61,6 +61,7 @@ namespace misty::core {
         refresh_token_ = read_file_token(get_misty_dir() / "refresh_token");
         license_token_ = read_file_token(get_misty_dir() / "license_token");
         user_id_       = read_file_token(get_misty_dir() / "user_id");
+        email_         = read_file_token(get_misty_dir() / "email");
         if (!token_.empty())
             std::cerr << "[SessionManager] loaded access token (" << token_.size() << " bytes)" << std::endl;
         if (!refresh_token_.empty())
@@ -81,6 +82,7 @@ namespace misty::core {
         remove_file_token(get_misty_dir() / "refresh_token");
         remove_file_token(get_misty_dir() / "license_token");
         remove_file_token(get_misty_dir() / "user_id");
+        remove_file_token(get_misty_dir() / "email");
         std::cerr << "[SessionManager] removed all tokens" << std::endl;
     }
 
@@ -93,6 +95,17 @@ namespace misty::core {
     std::string SessionManager::get_user_id() const {
         std::lock_guard<std::mutex> lock(mu_);
         return user_id_;
+    }
+
+    void SessionManager::set_email(const std::string& email) {
+        std::lock_guard<std::mutex> lock(mu_);
+        email_ = email;
+        write_file_token(get_misty_dir() / "email", email_);
+    }
+
+    std::string SessionManager::get_email() const {
+        std::lock_guard<std::mutex> lock(mu_);
+        return email_;
     }
 
     void SessionManager::set_tokens(const std::string& access_token, const std::string& refresh_token) {
@@ -113,6 +126,9 @@ namespace misty::core {
         std::lock_guard<std::mutex> lock(mu_);
         token_.clear();
         refresh_token_.clear();
+        license_token_.clear();
+        user_id_.clear();
+        email_.clear();
         delete_tokens();
     }
 

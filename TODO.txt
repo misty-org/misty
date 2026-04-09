@@ -50,6 +50,67 @@ STABILITY  (priority order)
 [ ] File search across cloud
     - Search appears local-only. Users will expect to search OneDrive / GDrive / Dropbox files.
 
+MVAULT  (restic-backed backup feature, Pluton-style)
+----------------------------------------------------
+Backend lives in proxy/ (Go, shells out to restic --json), UI in app/ (C++/ImGui).
+Repo URLs use rclone:<remote>:<path> so existing rclone remotes compose for free.
+Passwords go in OS keyring via --password-command, never on argv or in mvault.json.
+
+[x] proxy/core/restic skeleton
+    - config.go, types.go, exec.go, repository.go, restic_test.go all in place.
+      Tests pass against a temp local: repo.
+
+[x] proxy/core/restic backup + progress streaming
+    - operations.go Backup() + progress.go line parser cover status/summary/error.
+      Verified by TestBackupAndSnapshot driving a real restic against a temp dir.
+
+[x] proxy/core/jobs manager
+    - core/jobs/jobs.go: generic in-process Start/Get/Subscribe/Cancel with non-
+      blocking fan-out. Used by every long-running vault op.
+
+[x] proxy/core/restic restore + ls + forget + check + stats + unlock
+    - All landed, each covered by a focused test against the temp repo.
+
+[x] OS keyring password helper
+    - core/restic/password.go: keyring backend (zalando/go-keyring) + 0600 file
+      fallback. cmd/misty-pwd-helper prints passwords by repo name. resticCmd
+      uses RESTIC_PASSWORD_COMMAND when both helper + entry are present, falls
+      back to RESTIC_PASSWORD_FILE otherwise. DeleteRepo cleans up both.
+
+[x] proxy/api/vault HTTP layer
+    - vault.go/repos.go/snapshots.go/backup.go/jobs.go, mounted under the JWT
+      group in proxy.go. RequireVaultQuota gates POST /vault/repos and
+      POST /vault/backup; the rest are open inside the auth group.
+
+[x] C++ MVault view + navbar entry
+    - ViewID::Vault, shield-lock-24 icon, navbar entry, vault_view.{h,cpp}
+      mirroring services_view; registered in application.cpp init_views().
+
+[x] C++ MVault panels
+    - panels/vault/{vault_panel,vault_state}.{h,cpp}: header, repos grid w/ cards,
+      snapshots table, job progress card, create-repo / backup / restore modals,
+      pending-delete confirm flow. (Single panel file rather than the originally
+      sketched per-section split — kept tighter so the worker pool / SSE wiring
+      lives in one place.)
+
+[x] C++ SSE consumer for live job progress
+    - vault_state.cpp spawn_job_stream(): detached thread with libcurl chunked
+      GET, line-by-line SSE parser, fan-in to jobs_/job_order_ under mu. Cap of
+      16 jobs in history. ~Destructor drains via active_streams_ counter.
+
+[x] Bundle / locate restic binary
+    - core/restic/config.go pins MinResticVersion=0.16.0, looks restic up on PATH
+      at startup, version-checks via "restic version". main.go calls Init() at
+      boot and logs the result so misconfigured installs fail loudly.
+    - Note: rclone:<remote>:<path> targets cause restic to spawn the rclone binary
+      too, so both binaries need to be locatable.
+
+DEFERRED (post-MVP)
+[ ] In-app scheduler (cron-style backup plans)
+[ ] Email / webhook notifications on job completion
+[ ] restic copy-based replication between repos
+[ ] Find/search across snapshots (restic find)
+
 DONE
 ----
 [x] Empty states (folder icon + label in grid and list views)

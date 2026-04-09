@@ -1,6 +1,7 @@
 #include "panels/profile/edit_profile_panel.h"
 #include "panels/profile/profile_state.h"
 #include "core/manager/asset_manager.h"
+#include "core/manager/session_manager.h"
 #include "views/app_view.h"
 #include "imgui.h"
 
@@ -133,6 +134,7 @@ namespace misty::panel {
                 // Apply changes to profile state
                 state.display_name = edit_name_;
                 state.email = edit_email_;
+                core::SessionManager::get().set_email(edit_email_);
                 buffers_initialized_ = false;
 
                 // Navigate back to previous view

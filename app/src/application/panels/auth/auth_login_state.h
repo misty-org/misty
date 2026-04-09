@@ -91,6 +91,7 @@ namespace misty::panel {
                     if (json_resp.contains("id") && !json_resp["id"].get<std::string>().empty()) {
                         core::SessionManager::get().set_user_id(json_resp["id"].get<std::string>());
                     }
+                    core::SessionManager::get().set_email(std::string(email));
                 } catch (...) {
                     // Token storage failed, but login succeeded
                 }
