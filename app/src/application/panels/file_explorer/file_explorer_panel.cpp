@@ -12,8 +12,10 @@
 #include "core/manager/asset_manager.h"
 #include <nlohmann/json.hpp>
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <cstdio>
+#include <unordered_set>
 
 
 namespace fs = std::filesystem;
@@ -21,6 +23,41 @@ namespace fs = std::filesystem;
 using namespace misty::core;
 
 namespace misty::panel {
+
+    namespace {
+        std::string trim_copy(std::string value) {
+            auto not_space = [](unsigned char c) { return !std::isspace(c); };
+            value.erase(value.begin(), std::find_if(value.begin(), value.end(), not_space));
+            value.erase(std::find_if(value.rbegin(), value.rend(), not_space).base(), value.end());
+            return value;
+        }
+
+        std::string sanitize_remote_folder_name(const std::string& preferred, const std::string& fallback) {
+            std::string name = trim_copy(preferred);
+            if (name.empty()) name = fallback;
+
+            for (char& c : name) {
+                switch (c) {
+                    case '<':
+                    case '>':
+                    case ':':
+                    case '"':
+                    case '/':
+                    case '\\':
+                    case '|':
+                    case '?':
+                    case '*':
+                        c = '-';
+                        break;
+                    default:
+                        break;
+                }
+            }
+
+            name = trim_copy(name);
+            return name.empty() ? fallback : name;
+        }
+    } // namespace
 
     FileExplorerPanel::FileExplorerPanel(UIRegistry& registry, WorkerPool& worker_pool, std::shared_ptr<MistyClient> client)
         : registry_(registry), worker_pool_(worker_pool), client_(std::move(client)) {
@@ -288,11 +325,14 @@ namespace misty::panel {
         ImGui::PopStyleColor();
     }
 
-    void FileExplorerPanel::navigate_to_local_path_async(const std::string& path, bool update_history) {
+    void FileExplorerPanel::navigate_to_local_path_async(const std::string& path,
+                                                         bool update_history,
+                                                         uint64_t navigation_generation) {
         auto& state = registry_.get_state<FileExplorerState>("Files");
 
         // Immediately signal loading — UI stays responsive while worker scans
         state.is_loading = true;
+        state.show_loading_animation = false;
         state.error_msg  = "";
 
         // Snapshot volatile UI state before leaving the UI thread
@@ -303,7 +343,7 @@ namespace misty::panel {
         update_navigation_history(state, path, update_history);
 
         worker_pool_.add(
-            [this, &state, path, show_hidden]() {
+            [this, &state, path, show_hidden, navigation_generation]() {
                 std::vector<UnifiedFileItem> new_files;
                 std::string new_path;
 
@@ -342,22 +382,34 @@ namespace misty::panel {
                     }
                 } catch (const std::exception& e) {
                     std::lock_guard<std::mutex> lk(state.mu);
+                    if (state.navigation_generation.load(std::memory_order_relaxed) != navigation_generation) {
+                        return;
+                    }
                     state.error_msg  = e.what();
                     state.is_loading = false;
+                    state.show_loading_animation = false;
                     return;
                 }
 
                 // Apply results under lock
                 std::lock_guard<std::mutex> lk(state.mu);
+                if (state.navigation_generation.load(std::memory_order_relaxed) != navigation_generation) {
+                    return;
+                }
                 state.files = std::move(new_files);
                 set_active_path(state, new_path);
                 reset_selection(state);
                 state.is_loading = false;
+                state.show_loading_animation = false;
             },
             []() {},
-            [&state](const std::string& err) {
+            [&state, navigation_generation](const std::string& err) {
+                if (state.navigation_generation.load(std::memory_order_relaxed) != navigation_generation) {
+                    return;
+                }
                 state.error_msg  = err;
                 state.is_loading = false;
+                state.show_loading_animation = false;
             }
         );
     }
@@ -365,11 +417,13 @@ namespace misty::panel {
     void FileExplorerPanel::navigate_to_path(const std::string& path, bool update_history, bool create_if_missing) {
         printf("Explorer: navigate_to_path called with: %s\n", path.c_str());
         auto& state = registry_.get_state<FileExplorerState>("Files");
+        uint64_t navigation_generation = state.navigation_generation.fetch_add(1, std::memory_order_relaxed) + 1;
 
         // Virtual Paths Logic
         if (path.rfind("misty://", 0) == 0) {
             printf("Explorer: Handling virtual path: %s\n", path.c_str());
             state.is_loading = true;
+            state.show_loading_animation = false;
             state.files.clear();
             
             if (path == FileExplorerState::VIRTUAL_PATH_RECENT) {
@@ -430,6 +484,7 @@ namespace misty::panel {
             set_active_path(state, path);
             reset_selection(state);
             state.is_loading = false;
+            state.show_loading_animation = false;
             printf("Explorer: Virtual path loaded. File count: %zu\n", state.files.size());
             return;
         }
@@ -445,7 +500,7 @@ namespace misty::panel {
                 navigate_to_provider_folder(info.provider_folder, update_history);
             } else {
                 // Navigate into specific remote
-                navigate_to_remote(info.remote_name, info.relative_path, update_history, create_if_missing);
+                navigate_to_remote(info.remote_name, info.relative_path, update_history, create_if_missing, navigation_generation);
             }
         } else if (path == path_utils::get_mount_root() || path == path_utils::get_mount_root() + "/") {
             // At mount root itself
@@ -455,7 +510,7 @@ namespace misty::panel {
             auto& remote_state = registry_.get_state<RemoteState>("Remote");
             remote_state.clear_upload_context();
             state.last_disconnected_notification_folder.clear();
-            navigate_to_local_path_async(path, update_history);
+            navigate_to_local_path_async(path, update_history, navigation_generation);
         }
         
         state.dirty_ = true; // mark for next async save cycle
@@ -467,21 +522,44 @@ namespace misty::panel {
 
         workspace.ensure_directories();
 
+        std::unordered_map<std::string, std::string> old_folder_names;
+        for (const auto& mapping : workspace.remote_mappings) {
+            old_folder_names[mapping.remote_name] = mapping.folder_name;
+        }
+
         std::lock_guard<std::mutex> svc_lock(services.mu);
 
         workspace.remote_mappings.clear();
+        std::unordered_set<std::string> used_folder_names;
         for (const auto& conn : services.connections) {
             if (!conn.connected) continue;
 
             RemoteAccountMapping mapping;
-            mapping.folder_name = conn.name;
+            mapping.folder_name = sanitize_remote_folder_name(conn.alias, conn.name);
+            if (!used_folder_names.insert(mapping.folder_name).second) {
+                std::string base = mapping.folder_name;
+                int suffix = 2;
+                while (!used_folder_names.insert(base + " (" + std::to_string(suffix) + ")").second) {
+                    ++suffix;
+                }
+                mapping.folder_name = base + " (" + std::to_string(suffix) + ")";
+            }
             mapping.remote_name = conn.name;
             mapping.remote_type = conn.type;
             mapping.display_name = conn.display_name;
             mapping.provider_folder = conn.display_name;  // "OneDrive", "Google Drive", etc.
 
             mount_utils::ensure_provider_directory(mapping.provider_folder);
-            mount_utils::ensure_remote_directory(mapping.provider_folder, conn.name);
+            auto old_it = old_folder_names.find(mapping.remote_name);
+            if (old_it != old_folder_names.end() && old_it->second != mapping.folder_name) {
+                fs::path old_path = fs::path(mount_utils::get_mount_root()) / mapping.provider_folder / old_it->second;
+                fs::path new_path = fs::path(mount_utils::get_mount_root()) / mapping.provider_folder / mapping.folder_name;
+                std::error_code ec;
+                if (fs::exists(old_path, ec) && !fs::exists(new_path, ec)) {
+                    fs::rename(old_path, new_path, ec);
+                }
+            }
+            mount_utils::ensure_remote_directory(mapping.provider_folder, mapping.folder_name);
 
             workspace.remote_mappings.push_back(mapping);
         }

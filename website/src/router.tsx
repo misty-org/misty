@@ -5,6 +5,8 @@ import Download from "./pages/Download";
 import Pricing from "./pages/Pricing";
 import SignIn from "./pages/SignIn";
 import Register from "./pages/Register";
+import ResetPassword from "./pages/ResetPassword";
+import NotFound from "./pages/NotFound";
 import Waitlist from "./pages/Waitlist";
 import Docs from "./pages/Docs";
 import ApiReference from "./pages/Docs/ApiReference";
@@ -32,6 +34,8 @@ export const router = createBrowserRouter([
       { path: "waitlist", element: <Waitlist />, handle: { title: "Misty - Waitlist" } },
       { path: "signin", element: <SignIn />, handle: { title: "Misty - Sign In" } },
       { path: "register", element: <Register />, handle: { title: "Misty - Register" } },
+      { path: "reset", element: <ResetPassword />, handle: { title: "Misty - Reset Password" } },
+      { path: "*", element: <NotFound />, handle: { title: "Misty - Not Found" } },
     ],
   },
 ]);

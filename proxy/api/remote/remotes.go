@@ -1,19 +1,65 @@
 package remote
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/kannachi323/misty/proxy/core/rclone"
+	"github.com/rclone/rclone/lib/oauthutil"
 )
 
 // in-flight OAuth tracking
 var (
-	oauthMu      sync.Mutex
-	oauthPending = map[string]bool{} // remote name -> in progress
+	oauthMu       sync.Mutex
+	oauthPending  = map[string]bool{}               // remote name -> in progress
+	oauthCancels  = map[string]context.CancelFunc{} // remote name -> cancel active flow
 )
+
+func beginOAuthFlow(name string, cancel context.CancelFunc) bool {
+	oauthMu.Lock()
+	defer oauthMu.Unlock()
+	if len(oauthPending) != 0 {
+		return false
+	}
+	oauthPending[name] = true
+	if cancel != nil {
+		oauthCancels[name] = cancel
+	}
+	return true
+}
+
+func endOAuthFlow(name string) {
+	oauthMu.Lock()
+	defer oauthMu.Unlock()
+	delete(oauthPending, name)
+	delete(oauthCancels, name)
+}
+
+func cancelOAuthFlow(name string) {
+	oauthMu.Lock()
+	cancel := oauthCancels[name]
+	delete(oauthPending, name)
+	delete(oauthCancels, name)
+	oauthMu.Unlock()
+
+	if cancel != nil {
+		cancel()
+	}
+	stopOAuthWebserver()
+}
+
+func stopOAuthWebserver() {
+	client := &http.Client{Timeout: 2 * time.Second}
+	req, err := http.NewRequest(http.MethodGet, oauthutil.RedirectURL+"?error=cancelled", nil)
+	if err != nil {
+		return
+	}
+	_, _ = client.Do(req)
+}
 
 func ListRemotes() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -44,29 +90,23 @@ func CreateRemote() http.HandlerFunc {
 			return
 		}
 
-		oauthMu.Lock()
-		if oauthPending[req.Name] {
-			oauthMu.Unlock()
+		ctx, cancel := context.WithCancel(context.Background())
+		if !beginOAuthFlow(req.Name, cancel) {
+			cancel()
 			http.Error(w, "OAuth already in progress for this remote", http.StatusConflict)
 			return
 		}
-		oauthPending[req.Name] = true
-		oauthMu.Unlock()
 
 		// Run OAuth in a goroutine — it blocks until the user completes the browser flow.
 		// Client should poll GET /api/remotes to detect when the remote appears.
 		go func() {
-			defer func() {
-				oauthMu.Lock()
-				delete(oauthPending, req.Name)
-				oauthMu.Unlock()
-			}()
+			defer endOAuthFlow(req.Name)
 
 			params := req.Params
 			if params == nil {
 				params = map[string]string{}
 			}
-			if err := rclone.CreateRemote(r.Context(), req.Name, req.Type, params); err != nil {
+			if err := rclone.CreateRemote(ctx, req.Name, req.Type, params); err != nil {
 				log.Printf("Failed to create remote %q: %v", req.Name, err)
 			}
 		}()
@@ -121,21 +161,15 @@ func ConfigStart() http.HandlerFunc {
 			return
 		}
 
-		oauthMu.Lock()
-		if oauthPending[req.Name] {
-			oauthMu.Unlock()
+		ctx, cancel := context.WithCancel(r.Context())
+		if !beginOAuthFlow(req.Name, cancel) {
+			cancel()
 			http.Error(w, "config flow already in progress for this remote", http.StatusConflict)
 			return
 		}
-		oauthPending[req.Name] = true
-		oauthMu.Unlock()
-		defer func() {
-			oauthMu.Lock()
-			delete(oauthPending, req.Name)
-			oauthMu.Unlock()
-		}()
+		defer endOAuthFlow(req.Name)
 
-		step, err := rclone.ConfigStart(r.Context(), req.Name, req.Type, req.Params)
+		step, err := rclone.ConfigStart(ctx, req.Name, req.Type, req.Params)
 		if err != nil {
 			log.Printf("ConfigStart %q: %v", req.Name, err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -164,7 +198,15 @@ func ConfigContinue() http.HandlerFunc {
 			return
 		}
 
-		step, err := rclone.ConfigContinue(r.Context(), req.Name, req.State, req.Result)
+		ctx, cancel := context.WithCancel(r.Context())
+		if !beginOAuthFlow(req.Name, cancel) {
+			cancel()
+			http.Error(w, "config flow already in progress for this remote", http.StatusConflict)
+			return
+		}
+		defer endOAuthFlow(req.Name)
+
+		step, err := rclone.ConfigContinue(ctx, req.Name, req.State, req.Result)
 		if err != nil {
 			log.Printf("ConfigContinue %q: %v", req.Name, err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -184,6 +226,7 @@ func ConfigCancel() http.HandlerFunc {
 			http.Error(w, "name query parameter is required", http.StatusBadRequest)
 			return
 		}
+		cancelOAuthFlow(name)
 		rclone.DeleteRemote(name)
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(map[string]string{"status": "cancelled"})

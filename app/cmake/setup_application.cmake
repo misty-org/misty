@@ -103,25 +103,25 @@ target_link_libraries(misty PRIVATE
 )
 
 
-add_custom_command(TARGET misty POST_BUILD
-    # Operation 1: Copy main assets to build folder
+add_custom_target(misty_assets ALL
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+        "$<TARGET_FILE_DIR:misty>/assets"
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_CURRENT_SOURCE_DIR}/assets"
         "$<TARGET_FILE_DIR:misty>/assets"
-    
-    # Operation 2: Copy icons to the build folder's assets/icons directory
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+        "$<TARGET_FILE_DIR:misty>/assets/icons"
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_CURRENT_SOURCE_DIR}/vendor/octicons/icons"
         "$<TARGET_FILE_DIR:misty>/assets/icons"
-
     COMMAND ${CMAKE_COMMAND} -E copy
         "${CMAKE_CURRENT_SOURCE_DIR}/misty.conf"
         "$<TARGET_FILE_DIR:misty>/misty.conf"
-
     COMMAND ${CMAKE_COMMAND} -E copy
         "${CMAKE_CURRENT_SOURCE_DIR}/commands.msy"
         "$<TARGET_FILE_DIR:misty>/commands.msy"
 )
 
+add_dependencies(misty_assets misty)
 
 

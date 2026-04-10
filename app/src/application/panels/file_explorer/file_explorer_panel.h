@@ -49,6 +49,8 @@ namespace misty::panel {
         void show_background_context_menu(panel::FileExplorerState& state);
         void show_new_entry_modal(panel::FileExplorerState& state);
         void show_rename_modal(panel::FileExplorerState& state);
+        void show_permanent_delete_modal(panel::FileExplorerState& state);
+        void show_permission_delete_modal(panel::FileExplorerState& state);
 
         // File operation helpers
         void perform_copy(panel::FileExplorerState& state);
@@ -59,13 +61,15 @@ namespace misty::panel {
         void perform_paste_cloud_to_local(panel::FileExplorerState& state, const panel::UnifiedFileItem& item, const std::string& dest_dir);
         void trigger_upload(const std::string& local_path, const std::string& dest_dir);
         void perform_delete_selected(panel::FileExplorerState& state);
-        void perform_delete(panel::FileExplorerState& state, const std::string& path);
+        bool perform_delete(panel::FileExplorerState& state, const std::string& path, bool* requires_permission = nullptr);
         void initiate_rename(panel::FileExplorerState& state);
+        void confirm_permanent_delete(panel::FileExplorerState& state);
+        void retry_permission_delete(panel::FileExplorerState& state);
         bool open_context_menu_target(panel::FileExplorerState& state);
         const UnifiedFileItem* find_context_menu_target(const panel::FileExplorerState& state) const;
 
         // Async local filesystem navigation
-        void navigate_to_local_path_async(const std::string& path, bool update_history);
+        void navigate_to_local_path_async(const std::string& path, bool update_history, uint64_t navigation_generation);
 
         // Sync account mappings from services state
         void sync_account_mappings();
@@ -74,10 +78,11 @@ namespace misty::panel {
         void navigate_to_remote_mount_root(bool update_history);
         void navigate_to_provider_folder(const std::string& provider_folder, bool update_history);
         void navigate_to_remote(const std::string& remote_name, const std::string& path,
-                                bool update_history, bool create_if_missing);
+                                bool update_history, bool create_if_missing, uint64_t navigation_generation);
         void fetch_remote_folder(const std::string& remote_name, const std::string& remote_path,
-                                 const std::string& target_path);
+                                 const std::string& target_path, uint64_t navigation_generation);
         void handle_remote_folder_fetch(const std::string& remote_name, const std::string& target_path,
+                                        uint64_t navigation_generation,
                                         bool success, const std::string& body, const std::string& error);
         void download_remote_file(const UnifiedFileItem& file);
 

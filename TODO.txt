@@ -105,6 +105,11 @@ Passwords go in OS keyring via --password-command, never on argv or in mvault.js
     - Note: rclone:<remote>:<path> targets cause restic to spawn the rclone binary
       too, so both binaries need to be locatable.
 
+[ ] Bundle restic for Windows/Linux too
+    - macOS can now prefer a bundled restic next to misty-proxy (or in
+      Contents/Resources). Mirror that packaging + lookup flow for Windows and
+      Linux release artifacts instead of relying on PATH there.
+
 DEFERRED (post-MVP)
 [ ] In-app scheduler (cron-style backup plans)
 [ ] Email / webhook notifications on job completion
@@ -124,6 +129,5 @@ DONE
 [x] Services panel refresh button + startup fetch fix
 [x] Navbar dark charcoal color
 [x] PNG mipmap fix (GL_LINEAR_MIPMAP_LINEAR, generate after upload)
-
 
 

@@ -1,4 +1,5 @@
 #include "activity_panel.h"
+#include "core/ui/imgui_utils.h"
 #include "panels/services/services_state.h"
 #include "imgui.h"
 #include <filesystem>
@@ -7,6 +8,14 @@
 #include <algorithm>
 
 namespace misty::panel {
+
+    namespace {
+        void right_align_after_tabs(float item_width) {
+            ImGui::SameLine();
+            ImGui::Dummy(ImVec2(std::max(0.0f, ImGui::GetContentRegionAvail().x - item_width), 0.0f));
+            ImGui::SameLine();
+        }
+    } // namespace
 
     ActivityPanel::ActivityPanel(core::UIRegistry& registry)
         : registry_(registry) {
@@ -146,8 +155,9 @@ namespace misty::panel {
         render_tab("Completed##dl", completed_count, ActivityFilter::COMPLETED);
         render_tab("Failed##dl", failed_count, ActivityFilter::FAILED);
 
-        ImGui::SameLine(ImGui::GetWindowWidth() - 160);
-        if (ImGui::Button("Clear Completed##dl")) {
+        const float clear_button_w = 136.0f;
+        right_align_after_tabs(clear_button_w);
+        if (ImGui::Button("Clear Completed##dl", ImVec2(clear_button_w, 0.0f))) {
             download_state.clear_completed();
         }
 
@@ -251,7 +261,8 @@ namespace misty::panel {
             }
 
             if (!item.is_active()) {
-                ImGui::SameLine(ImGui::GetWindowWidth() - 120);
+                const float timestamp_w = 112.0f;
+                right_align_after_tabs(timestamp_w);
                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
                 ImGui::Text("%s", format_time_ago(item.completed_at).c_str());
                 ImGui::PopStyleColor();
@@ -334,8 +345,9 @@ namespace misty::panel {
         render_tab("Completed##ul", completed_count, ActivityFilter::COMPLETED);
         render_tab("Failed##ul", failed_count, ActivityFilter::FAILED);
 
-        ImGui::SameLine(ImGui::GetWindowWidth() - 160);
-        if (ImGui::Button("Clear Completed##ul")) {
+        const float clear_button_w = 136.0f;
+        right_align_after_tabs(clear_button_w);
+        if (ImGui::Button("Clear Completed##ul", ImVec2(clear_button_w, 0.0f))) {
             upload_state.clear_completed();
         }
 
@@ -443,7 +455,8 @@ namespace misty::panel {
             }
 
             if (!item.is_active()) {
-                ImGui::SameLine(ImGui::GetWindowWidth() - 120);
+                const float timestamp_w = 112.0f;
+                right_align_after_tabs(timestamp_w);
                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
                 ImGui::Text("%s", format_time_ago(item.completed_at).c_str());
                 ImGui::PopStyleColor();

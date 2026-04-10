@@ -43,9 +43,9 @@ func Init() error {
 			return
 		}
 
-		path, err := exec.LookPath("restic")
+		path, err := findResticBinary()
 		if err != nil {
-			binaryError = fmt.Errorf("restic binary not found in PATH: %w", err)
+			binaryError = err
 			return
 		}
 		binaryPath = path
@@ -63,6 +63,24 @@ func Init() error {
 		}
 	})
 	return binaryError
+}
+
+func findResticBinary() (string, error) {
+	if env := os.Getenv("MISTY_RESTIC_PATH"); env != "" {
+		if path, ok := executableCandidate(env); ok {
+			return path, nil
+		}
+		return "", fmt.Errorf("MISTY_RESTIC_PATH does not point to an executable file: %s", env)
+	}
+
+	if path := resolveBundledBinaryPath("restic"); path != "" {
+		return path, nil
+	}
+
+	if path, ok := lookupPathBinary("restic"); ok {
+		return path, nil
+	}
+	return "", fmt.Errorf("restic binary not found (checked MISTY_RESTIC_PATH, proxy/dist, ~/misty/bin, executable-adjacent paths, and PATH)")
 }
 
 // Version returns the parsed restic version string ("0.18.1") if Init has

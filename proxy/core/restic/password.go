@@ -4,8 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"sync"
 
 	"github.com/zalando/go-keyring"
@@ -99,26 +97,25 @@ func DeletePassword(repoName string) {
 //
 //  1. $MISTY_PWD_HELPER (explicit override; useful for tests and packaged
 //     builds where the helper sits outside PATH).
-//  2. ./misty-pwd-helper next to the running executable.
-//  3. PATH.
+//  2. Development bundle paths under proxy/dist.
+//  3. User-install bundle path under ~/misty/bin.
+//  4. Executable-adjacent packaged paths.
+//  5. PATH.
 //
 // Returns "" if not found. Cached after the first call.
 func HelperBinaryPath() string {
 	helperOnce.Do(func() {
 		if env := os.Getenv("MISTY_PWD_HELPER"); env != "" {
-			if _, err := os.Stat(env); err == nil {
-				helperBinPath = env
+			if path, ok := executableCandidate(env); ok {
+				helperBinPath = path
 				return
 			}
 		}
-		if exe, err := os.Executable(); err == nil {
-			candidate := filepath.Join(filepath.Dir(exe), "misty-pwd-helper")
-			if _, err := os.Stat(candidate); err == nil {
-				helperBinPath = candidate
-				return
-			}
+		if path := resolveBundledBinaryPath("misty-pwd-helper"); path != "" {
+			helperBinPath = path
+			return
 		}
-		if p, err := exec.LookPath("misty-pwd-helper"); err == nil {
+		if p, ok := lookupPathBinary("misty-pwd-helper"); ok {
 			helperBinPath = p
 			return
 		}
