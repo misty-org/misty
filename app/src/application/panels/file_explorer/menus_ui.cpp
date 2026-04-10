@@ -362,4 +362,127 @@ void FileExplorerPanel::show_new_entry_modal(FileExplorerState& state) {
     ImGui::PopStyleVar(2);
 }
 
+void FileExplorerPanel::show_permission_delete_modal(FileExplorerState& state) {
+    if (state.show_permission_delete_modal) {
+        ImGui::OpenPopup("Delete With Permission##Modal");
+    }
+
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowSize(ImVec2(420, 0), ImGuiCond_Appearing);
+
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 8.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(20.0f, 16.0f));
+    ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.16f, 0.16f, 0.16f, 1.0f));
+
+    if (ImGui::BeginPopupModal("Delete With Permission##Modal", &state.show_permission_delete_modal,
+                               ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize)) {
+        const size_t count = state.permission_delete_paths.size();
+        const bool permanent = state.permission_delete_permanent;
+        const char* action = permanent ? "permanently delete" : "move to trash";
+
+        ImGui::TextWrapped(
+            "Misty needs your permission to %s %zu %s.",
+            action,
+            count,
+            count == 1 ? "item" : "items");
+        ImGui::Spacing();
+        ImGui::TextWrapped("Continue to approve this deletion?");
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        float width = ImGui::GetContentRegionAvail().x;
+        float button_width = (width - 8.0f) * 0.5f;
+        bool confirm_shortcut = CommandManager::get().matches("modal.confirm");
+        bool cancel_shortcut = CommandManager::get().matches("modal.cancel");
+
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.55f, 0.18f, 0.18f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.65f, 0.28f, 0.28f, 1.0f));
+        if (ImGui::Button("Continue", ImVec2(button_width, 32)) || confirm_shortcut) {
+            retry_permission_delete(state);
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::PopStyleColor(2);
+
+        ImGui::SameLine(0, 8.0f);
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.4f, 0.4f, 0.4f, 1.0f));
+        if (ImGui::Button("Cancel", ImVec2(button_width, 32)) || cancel_shortcut) {
+            state.show_permission_delete_modal = false;
+            state.permission_delete_paths.clear();
+            state.permission_delete_permanent = false;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::PopStyleColor(2);
+        ImGui::PopStyleVar();
+        ImGui::EndPopup();
+    }
+
+    ImGui::PopStyleColor();
+    ImGui::PopStyleVar(2);
+}
+
+void FileExplorerPanel::show_permanent_delete_modal(FileExplorerState& state) {
+    if (state.show_permanent_delete_modal) {
+        ImGui::OpenPopup("Permanent Delete##Modal");
+    }
+
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowSize(ImVec2(440, 0), ImGuiCond_Appearing);
+
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 8.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(20.0f, 16.0f));
+    ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.16f, 0.16f, 0.16f, 1.0f));
+
+    if (ImGui::BeginPopupModal("Permanent Delete##Modal", &state.show_permanent_delete_modal,
+                               ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize)) {
+        const size_t count = state.permanent_delete_paths.size();
+        const bool single = count == 1;
+        const std::string label = single
+            ? fs::path(state.permanent_delete_paths.front()).filename().string()
+            : std::to_string(count) + " items";
+
+        ImGui::TextWrapped(
+            "Are you sure you want to permanently delete %s?",
+            label.c_str());
+        ImGui::Spacing();
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.75f, 0.75f, 0.75f, 1.0f));
+        ImGui::TextWrapped("Items removed from Trash cannot be restored.");
+        ImGui::PopStyleColor();
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        float width = ImGui::GetContentRegionAvail().x;
+        float button_width = (width - 8.0f) * 0.5f;
+        bool confirm_shortcut = CommandManager::get().matches("modal.confirm");
+        bool cancel_shortcut = CommandManager::get().matches("modal.cancel");
+
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.55f, 0.18f, 0.18f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.65f, 0.28f, 0.28f, 1.0f));
+        if (ImGui::Button("Delete Permanently", ImVec2(button_width, 32)) || confirm_shortcut) {
+            confirm_permanent_delete(state);
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::PopStyleColor(2);
+
+        ImGui::SameLine(0, 8.0f);
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.4f, 0.4f, 0.4f, 1.0f));
+        if (ImGui::Button("Cancel", ImVec2(button_width, 32)) || cancel_shortcut) {
+            state.show_permanent_delete_modal = false;
+            state.permanent_delete_paths.clear();
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::PopStyleColor(2);
+        ImGui::PopStyleVar();
+        ImGui::EndPopup();
+    }
+
+    ImGui::PopStyleColor();
+    ImGui::PopStyleVar(2);
+}
+
 } // namespace misty::panel

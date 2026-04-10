@@ -6,7 +6,7 @@
 #include <cstring>
 
 #include "core/commands/command_manager.h"
-#include "core/manager/asset_manager.h"
+#include "core/ui/imgui_utils.h"
 #include "panels/notification/notification_state.h"
 #include "panels/search/search_state.h"
 #include "panels/services/services_state.h"
@@ -78,7 +78,14 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state) {
         ImGuiTableFlags_Hideable | ImGuiTableFlags_ScrollY | ImGuiTableFlags_Resizable;
 
     if (state.is_loading) {
-        ImGui::Text("Loading...");
+        if (state.show_loading_animation) {
+            ImVec2 min = ImGui::GetCursorScreenPos();
+            ImVec2 max(min.x + ImGui::GetContentRegionAvail().x, min.y + ImGui::GetContentRegionAvail().y);
+            if (max.x > min.x && max.y > min.y) {
+                ImGui::InvisibleButton("##file_loading_overlay", ImVec2(max.x - min.x, max.y - min.y));
+                core::DrawMistyLoadingAnimation(min, max);
+            }
+        }
         return;
     }
 
@@ -103,14 +110,14 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state) {
         const float cell_w = 100.0f;
         const float cell_h = 90.0f;
         const float padding = 8.0f;
-        float avail_w = ImGui::GetContentRegionAvail().x;
-        int cols = std::max(1, static_cast<int>(avail_w / (cell_w + padding)));
 
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(padding, padding));
         if (state.files.empty()) {
             render_empty_state(48.0f);
         } else {
             ImGui::BeginChild("##grid_scroll", ImVec2(0, 0), false);
+            float avail_w = ImGui::GetContentRegionAvail().x;
+            int cols = std::max(1, static_cast<int>(avail_w / (cell_w + padding)));
             for (int i = 0; i < static_cast<int>(state.files.size()); ++i) {
                 if (i % cols != 0) ImGui::SameLine();
                 show_grid_item(state, i, cell_w, cell_h);
@@ -168,6 +175,8 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state) {
     ImGui::PopStyleColor(3);
     show_rename_modal(state);
     show_new_entry_modal(state);
+    show_permanent_delete_modal(state);
+    show_permission_delete_modal(state);
 }
 
 void FileExplorerPanel::show_file_item(FileExplorerState& state, int i) {

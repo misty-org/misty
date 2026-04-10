@@ -33,6 +33,11 @@ namespace misty::core {
         void set_user_id(const std::string& user_id);
         std::string get_user_id() const;
 
+        // Email captured at login. Used by the settings Account section to
+        // show the signed-in identity without re-decoding the JWT.
+        void set_email(const std::string& email);
+        std::string get_email() const;
+
         // Check if user has a stored token
         bool is_authenticated() const;
 
@@ -64,6 +69,7 @@ namespace misty::core {
         std::string refresh_token_;
         std::string license_token_;
         std::string user_id_;
+        std::string email_;
         bool session_expired_ = false;
         bool proxy_available_ = true;
         std::string proxy_status_message_;

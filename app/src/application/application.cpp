@@ -7,6 +7,7 @@
 #include "views/login_view.h"
 #include "views/onboarding_view.h"
 #include "views/services_view.h"
+#include "views/vault_view.h"
 #include "views/activity_view.h"
 #include "views/settings_view.h"
 #include "views/edit_profile_view.h"
@@ -86,6 +87,8 @@ namespace misty {
         view::register_view(view::ViewID::Onboarding,
             std::make_unique<view::OnboardingView>(ui_registry_, worker_pool_));
         view::register_view(view::ViewID::Services, std::make_unique<view::ServicesView>(ui_registry_));
+        view::register_view(view::ViewID::Vault,
+            std::make_unique<view::VaultView>(ui_registry_, worker_pool_));
         view::register_view(view::ViewID::Activity, std::make_unique<view::ActivityView>(ui_registry_));
         view::register_view(view::ViewID::Settings, std::make_unique<view::SettingsView>(ui_registry_));
         view::register_view(view::ViewID::EditProfile, std::make_unique<view::EditProfileView>(ui_registry_));

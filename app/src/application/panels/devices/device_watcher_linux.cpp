@@ -2,6 +2,8 @@
 
 #include "panels/devices/device_watcher.h"
 
+#include <climits>
+#include <cstdint>
 #include <sys/inotify.h>
 #include <unistd.h>
 
