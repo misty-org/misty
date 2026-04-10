@@ -15,15 +15,16 @@ namespace misty::panel {
         void render() override;
 
     private:
-        void show_header();
+        void show_header(ServicesState& state);
         void show_cloud_section(ServicesState& state);
         void show_remote_cards(ServicesState& state);
         void show_add_account_section(ServicesState& state);
         void show_login_modal(ServicesState& state);
         void show_config_flow_modal(ServicesState& state);
-        void show_remote_card(ServicesState& state, const RemoteConnection& conn);
+        void show_remote_card(ServicesState& state, const RemoteConnection& conn, float card_width);
         void show_loading_overlay();
         void show_disconnect_confirm_modal(ServicesState& state);
+        void show_rename_remote_modal(ServicesState& state);
 
         // Supported provider types for "Add Account" buttons
         struct ProviderInfo {
@@ -33,11 +34,15 @@ namespace misty::panel {
         static const std::vector<ProviderInfo>& supported_providers();
 
     private:
-        static constexpr float kCardWidth = 300.0f;
-        static constexpr float kCardSpacing = 12.0f;
+        static constexpr float kMinCardWidth = 230.0f;
+        static constexpr float kCardSpacing = 14.0f;
         UIRegistry& registry_;
+        char remote_search_buf_[128] = {0};
+        char provider_search_buf_[128] = {0};
+        char rename_remote_buf_[128] = {0};
 
         // Pending disconnect confirmation
         std::string pending_disconnect_remote_;
+        std::string pending_rename_remote_;
     };
 }

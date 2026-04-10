@@ -5,6 +5,8 @@
 #include "core/net/http_client.h"
 #include "core/system/util.h"
 
+#include <algorithm>
+#include <cctype>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -12,30 +14,213 @@
 #include <nlohmann/json.hpp>
 
 namespace misty::panel {
+    namespace fs = std::filesystem;
+    using json = nlohmann::json;
 
     ServicesState::ServicesState() = default;
     ServicesState::~ServicesState() = default;
 
+    namespace {
+        fs::path remote_metadata_path() {
+            const char* home = std::getenv("HOME");
+            return fs::path(home ? home : "/tmp") / "misty" / "remotes.json";
+        }
+
+        std::string trim_copy(std::string value) {
+            auto not_space = [](unsigned char c) { return !std::isspace(c); };
+            value.erase(value.begin(), std::find_if(value.begin(), value.end(), not_space));
+            value.erase(std::find_if(value.rbegin(), value.rend(), not_space).base(), value.end());
+            return value;
+        }
+
+        // Map rclone provider type to a human-readable display name.
+        std::string display_name_for_type(const std::string& type) {
+            if (type == "onedrive") return "OneDrive";
+            if (type == "drive")    return "Google Drive";
+            if (type == "dropbox")  return "Dropbox";
+            if (type == "s3")       return "Amazon S3";
+            if (type == "sftp")     return "SFTP";
+            if (!type.empty()) {
+                std::string out = type;
+                out[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(out[0])));
+                return out;
+            }
+            return type;
+        }
+
+        std::string lowercase_copy(std::string value) {
+            std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
+                return static_cast<char>(std::tolower(c));
+            });
+            return value;
+        }
+
+        std::string first_line(const std::string& text) {
+            if (text.empty()) return "";
+            std::string line = text.substr(0, text.find('\n'));
+            return trim_copy(line);
+        }
+
+        std::string title_case_words(std::string text) {
+            bool new_word = true;
+            for (char& c : text) {
+                if (std::isspace(static_cast<unsigned char>(c))) {
+                    new_word = true;
+                    continue;
+                }
+                c = static_cast<char>(new_word ? std::toupper(static_cast<unsigned char>(c))
+                                               : std::tolower(static_cast<unsigned char>(c)));
+                new_word = false;
+            }
+            return text;
+        }
+
+        std::string prettify_field_name(std::string raw_name) {
+            if (raw_name.empty()) return "";
+
+            for (char& c : raw_name) {
+                if (c == '_' || c == '-') c = ' ';
+            }
+
+            raw_name = trim_copy(raw_name);
+            if (raw_name == "config type") return "Account Type";
+            if (raw_name == "drive id" || raw_name == "driveid") return "Drive";
+            if (raw_name == "client id") return "Client ID";
+            if (raw_name == "client secret") return "Client Secret";
+            if (raw_name == "access key id") return "Access Key ID";
+            if (raw_name == "secret access key") return "Secret Access Key";
+            if (raw_name == "host") return "Server";
+            if (raw_name == "user") return "Username";
+            if (raw_name == "key file") return "SSH Key File";
+            return title_case_words(raw_name);
+        }
+
+        bool looks_opaque_choice_value(const std::string& value) {
+            if (value.size() < 10) return false;
+            if (value.find('@') != std::string::npos) return false;
+
+            bool has_alpha = false;
+            bool has_digit = false;
+            bool has_sep = false;
+            for (unsigned char c : value) {
+                has_alpha = has_alpha || std::isalpha(c);
+                has_digit = has_digit || std::isdigit(c);
+                has_sep = has_sep || c == '-' || c == '_' || c == ':' || c == '.';
+            }
+            return has_alpha && has_digit && has_sep;
+        }
+
+        std::string normalize_question_help(const std::string& provider_type,
+                                            const std::string& option_name,
+                                            const std::string& raw_help) {
+            const std::string key = lowercase_copy(option_name);
+            if (provider_type == "onedrive" && (key == "driveid" || key == "drive id")) {
+                return "Choose which OneDrive location Misty should use for this connection.";
+            }
+            if (key == "config_type" || key == "config type") {
+                return "Choose the account type that matches the service you are connecting.";
+            }
+            if (key == "scope") {
+                return "Choose how much access Misty should request for this remote.";
+            }
+            return trim_copy(raw_help);
+        }
+
+        ServicesState::ConfigChoice normalize_choice(const std::string& provider_type,
+                                                     const std::string& option_name,
+                                                     const std::string& raw_value,
+                                                     const std::string& raw_help) {
+            ServicesState::ConfigChoice choice;
+            choice.value = raw_value;
+
+            const std::string summary = first_line(raw_help);
+            const std::string summary_lower = lowercase_copy(summary);
+            const std::string option_key = lowercase_copy(option_name);
+
+            if (provider_type == "onedrive" && (option_key == "driveid" || option_key == "drive id")) {
+                if (summary_lower.find("personal") != std::string::npos) {
+                    choice.label = "Personal";
+                } else if (summary_lower.find("business") != std::string::npos) {
+                    choice.label = "Business";
+                } else if (!summary.empty()) {
+                    choice.label = summary;
+                }
+            } else if (!summary.empty() && looks_opaque_choice_value(raw_value)) {
+                choice.label = summary;
+            } else if (raw_value == "true") {
+                choice.label = "Yes";
+            } else if (raw_value == "false") {
+                choice.label = "No";
+            }
+
+            if (choice.label.empty()) {
+                choice.label = raw_value;
+            }
+
+            choice.help = trim_copy(raw_help);
+            if (!summary.empty() && choice.label == summary) {
+                choice.help.clear();
+            }
+            return choice;
+        }
+    }
+
     void ServicesState::init(core::WorkerPool& pool) {
         if (worker_pool_) return;
         worker_pool_ = &pool;
+        {
+            std::lock_guard<std::mutex> lock(mu);
+            load_remote_aliases_locked();
+        }
         refresh_connections();
     }
 
-    // Map rclone provider type to a human-readable display name.
-    static std::string display_name_for_type(const std::string& type) {
-        if (type == "onedrive") return "OneDrive";
-        if (type == "drive")    return "Google Drive";
-        if (type == "dropbox")  return "Dropbox";
-        if (type == "s3")       return "Amazon S3";
-        if (type == "sftp")     return "SFTP";
-        // Fallback: capitalise first letter
-        if (!type.empty()) {
-            std::string out = type;
-            out[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(out[0])));
-            return out;
+    void ServicesState::load_remote_aliases_locked() {
+        remote_aliases_.clear();
+
+        const fs::path path = remote_metadata_path();
+        if (!fs::exists(path)) return;
+
+        try {
+            std::ifstream file(path);
+            if (!file.is_open()) return;
+
+            json j = json::parse(file, nullptr, true, true);
+            const auto& remotes = j.value("remotes", json::object());
+            if (!remotes.is_object()) return;
+
+            for (auto it = remotes.begin(); it != remotes.end(); ++it) {
+                if (!it.value().is_object()) continue;
+                std::string alias = trim_copy(it.value().value("alias", std::string("")));
+                if (!alias.empty()) {
+                    remote_aliases_[it.key()] = alias;
+                }
+            }
+        } catch (const std::exception& ex) {
+            std::cerr << "load_remote_aliases_locked: " << ex.what() << std::endl;
         }
-        return type;
+    }
+
+    void ServicesState::save_remote_aliases_locked() const {
+        const fs::path path = remote_metadata_path();
+
+        try {
+            fs::create_directories(path.parent_path());
+
+            json remotes = json::object();
+            for (const auto& [remote_name, alias] : remote_aliases_) {
+                if (alias.empty()) continue;
+                remotes[remote_name] = {
+                    {"alias", alias},
+                };
+            }
+
+            std::ofstream file(path);
+            if (!file.is_open()) return;
+            file << json{{"remotes", remotes}}.dump(2);
+        } catch (const std::exception& ex) {
+            std::cerr << "save_remote_aliases_locked: " << ex.what() << std::endl;
+        }
     }
 
     void ServicesState::refresh_connections() {
@@ -75,6 +260,10 @@ namespace misty::panel {
                                     conn.name = obj.value("name", std::string(""));
                                     conn.type = obj.value("type", std::string(""));
                                     conn.display_name = display_name_for_type(conn.type);
+                                    auto alias_it = remote_aliases_.find(conn.name);
+                                    if (alias_it != remote_aliases_.end()) {
+                                        conn.alias = alias_it->second;
+                                    }
                                     conn.connected = true;
                                     if (!conn.name.empty()) {
                                         new_connections.insert(conn);
@@ -127,7 +316,39 @@ namespace misty::panel {
         out.name = it->name;
         out.type = it->type;
         out.display_name = it->display_name;
+        out.alias = it->alias;
         out.connected = it->connected;
+        return true;
+    }
+
+    std::string ServicesState::get_remote_alias(const std::string& remote_name) {
+        std::lock_guard<std::mutex> lock(mu);
+        auto it = remote_aliases_.find(remote_name);
+        return it == remote_aliases_.end() ? std::string() : it->second;
+    }
+
+    bool ServicesState::set_remote_alias(const std::string& remote_name, const std::string& alias) {
+        std::lock_guard<std::mutex> lock(mu);
+        if (remote_name.empty()) return false;
+
+        const std::string trimmed = trim_copy(alias);
+        if (trimmed.empty()) {
+            remote_aliases_.erase(remote_name);
+        } else {
+            remote_aliases_[remote_name] = trimmed;
+        }
+        save_remote_aliases_locked();
+
+        RemoteConnection search;
+        search.name = remote_name;
+        auto it = connections.find(search);
+        if (it != connections.end()) {
+            RemoteConnection updated = *it;
+            connections.erase(it);
+            updated.alias = trimmed;
+            connections.insert(std::move(updated));
+        }
+        mappings_dirty = true;
         return true;
     }
 
@@ -186,6 +407,8 @@ namespace misty::panel {
                 connections.erase(it);
                 mappings_dirty = true;
             }
+            remote_aliases_.erase(remote_name);
+            save_remote_aliases_locked();
             error_msg.clear();
             success_msg.clear();
         }
@@ -400,19 +623,45 @@ namespace misty::panel {
             state.config_question_name.clear();
             state.config_question_help.clear();
             state.config_default.clear();
+            state.config_question_password = false;
             std::memset(state.config_input_buf, 0, sizeof(state.config_input_buf));
+
+            // The server may rename the remote on the terminal DONE step —
+            // e.g. "onedrive-1712345678" → "onedrive-alice@contoso.com" once
+            // the email is resolved. Track the latest name so success
+            // messages and any post-DONE refresh show the final form.
+            if (j.contains("name") && j["name"].is_string()) {
+                std::string server_name = j["name"].get<std::string>();
+                if (!server_name.empty()) {
+                    state.config_remote_name = server_name;
+                }
+            }
 
             if (j.contains("option") && j["option"].is_object()) {
                 const auto& opt = j["option"];
-                state.config_question_name = opt.value("name", std::string(""));
-                state.config_question_help = opt.value("help", std::string(""));
+                const std::string raw_name = opt.value("name", std::string(""));
+                const std::string raw_help = opt.value("help", std::string(""));
+                state.config_question_name = prettify_field_name(raw_name);
+                state.config_question_help = normalize_question_help(state.config_provider_type, raw_name, raw_help);
                 state.config_default       = opt.value("default", std::string(""));
+                state.config_question_password = opt.value("password", false);
                 if (opt.contains("examples") && opt["examples"].is_array()) {
                     for (const auto& ex : opt["examples"]) {
-                        ServicesState::ConfigChoice c;
-                        c.value = ex.value("value", std::string(""));
-                        c.help  = ex.value("help",  std::string(""));
+                        ServicesState::ConfigChoice c = normalize_choice(
+                            state.config_provider_type,
+                            raw_name,
+                            ex.value("value", std::string("")),
+                            ex.value("help",  std::string("")));
                         state.config_choices.push_back(std::move(c));
+                    }
+                    if (state.config_provider_type == "onedrive" &&
+                        (lowercase_copy(raw_name) == "driveid" || lowercase_copy(raw_name) == "drive id")) {
+                        std::stable_sort(state.config_choices.begin(), state.config_choices.end(),
+                            [](const ServicesState::ConfigChoice& lhs, const ServicesState::ConfigChoice& rhs) {
+                                const bool lhs_personal = lowercase_copy(lhs.label).find("personal") != std::string::npos;
+                                const bool rhs_personal = lowercase_copy(rhs.label).find("personal") != std::string::npos;
+                                return lhs_personal && !rhs_personal;
+                            });
                     }
                 }
                 // Pre-fill input buffer with default
@@ -472,7 +721,10 @@ namespace misty::panel {
                         auto json = nlohmann::json::parse(response.body);
                         apply_step_locked(*this, json);
                         if (config_kind == ConfigStepKind::DONE) {
-                            success_msg = "Connected " + remote_name;
+                            // apply_step_locked may have updated
+                            // config_remote_name with the server-side
+                            // renamed form — use it instead of the temp.
+                            success_msg = "Connected " + config_remote_name;
                         }
                     } catch (const std::exception& ex) {
                         config_error = std::string("Failed to parse step: ") + ex.what();

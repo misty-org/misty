@@ -20,7 +20,7 @@ export default function Waitlist() {
     )
 }
 
-interface FormData {
+interface WaitlistFormState {
   email: string;
   name: string;
 }
@@ -31,7 +31,7 @@ interface WaitlistFormProps {
 }
 
 function WaitlistForm({ onSuccess, className }: WaitlistFormProps) {
-  const [formData, setFormData] = useState<FormData>({ email: '', name: '' });
+  const [formData, setFormData] = useState<WaitlistFormState>({ email: '', name: '' });
   const [loading, setLoading] = useState<boolean>(false);
   const [success, setSuccess] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +51,7 @@ function WaitlistForm({ onSuccess, className }: WaitlistFormProps) {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams(formData)
+          body: new URLSearchParams(Object.entries(formData))
         }
       );
 

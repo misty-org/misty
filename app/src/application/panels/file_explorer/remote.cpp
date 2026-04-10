@@ -21,6 +21,7 @@ namespace misty::panel {
         std::string mount_root = path_utils::get_mount_root();
 
         state.is_loading = true;
+        state.show_loading_animation = false;
         state.files.clear();
 
         sync_account_mappings();
@@ -44,6 +45,7 @@ namespace misty::panel {
         set_active_path(state, mount_root);
         reset_selection(state);
         state.is_loading = false;
+        state.show_loading_animation = false;
 
         auto& remote_state = registry_.get_state<RemoteState>("Remote");
         remote_state.clear_upload_context();
@@ -58,6 +60,7 @@ namespace misty::panel {
         std::string target_path = mount_root + "/" + provider_folder;
 
         state.is_loading = true;
+        state.show_loading_animation = false;
         state.files.clear();
 
         sync_account_mappings();
@@ -90,6 +93,7 @@ namespace misty::panel {
         set_active_path(state, target_path);
         reset_selection(state);
         state.is_loading = false;
+        state.show_loading_animation = false;
 
         auto& remote_state = registry_.get_state<RemoteState>("Remote");
         remote_state.clear_upload_context();
@@ -98,19 +102,30 @@ namespace misty::panel {
     void FileExplorerPanel::navigate_to_remote(const std::string& remote_name,
                                                  const std::string& path,
                                                  bool update_history,
-                                                 bool create_if_missing) {
+                                                 bool create_if_missing,
+                                                 uint64_t navigation_generation) {
         auto& state = registry_.get_state<FileExplorerState>("Files");
         auto& services = registry_.get_state<ServicesState>("Services");
         auto& workspace = registry_.get_state<WorkspaceState>("Workspace");
 
+        std::string resolved_remote_name = remote_name;
+        std::string folder_name = remote_name;
+        for (const auto& mapping : workspace.remote_mappings) {
+            if (mapping.remote_name == remote_name || mapping.folder_name == remote_name) {
+                resolved_remote_name = mapping.remote_name;
+                folder_name = mapping.folder_name;
+                break;
+            }
+        }
+
         // Check if the remote is connected
-        if (!services.is_remote_connected(remote_name)) {
-            if (state.last_disconnected_notification_folder != remote_name) {
-                state.last_disconnected_notification_folder = remote_name;
+        if (!services.is_remote_connected(resolved_remote_name)) {
+            if (state.last_disconnected_notification_folder != resolved_remote_name) {
+                state.last_disconnected_notification_folder = resolved_remote_name;
                 auto& notifications = registry_.get_state<NotificationState>("Notifications");
                 notifications.add_notification(
                     "Not Connected",
-                    "Remote '" + remote_name + "' is not connected. Go to Services to connect.",
+                    "Remote '" + resolved_remote_name + "' is not connected. Go to Services to connect.",
                     NotificationType::ERROR,
                     5.0f
                 );
@@ -122,29 +137,30 @@ namespace misty::panel {
         // Find the provider folder for this remote
         std::string provider_folder;
         for (const auto& mapping : workspace.remote_mappings) {
-            if (mapping.remote_name == remote_name) {
+            if (mapping.remote_name == resolved_remote_name) {
                 provider_folder = mapping.provider_folder;
+                folder_name = mapping.folder_name;
                 break;
             }
         }
 
         std::string mount_root = path_utils::get_mount_root();
-        std::string target_path = mount_root + "/" + provider_folder + "/" + remote_name;
+        std::string target_path = mount_root + "/" + provider_folder + "/" + folder_name;
         if (!path.empty()) {
             target_path += "/" + path;
         }
 
         // Ensure the mount directory exists locally
         if (create_if_missing && !provider_folder.empty()) {
-            mount_utils::ensure_remote_directory(provider_folder, remote_name);
+            mount_utils::ensure_remote_directory(provider_folder, folder_name);
         }
 
         // Set upload context
         auto& remote_state = registry_.get_state<RemoteState>("Remote");
-        remote_state.set_upload_context(remote_name, path);
+        remote_state.set_upload_context(resolved_remote_name, path);
 
         // Fetch files from remote via proxy
-        fetch_remote_folder(remote_name, path, target_path);
+        fetch_remote_folder(resolved_remote_name, path, target_path, navigation_generation);
 
         update_navigation_history(state, target_path, update_history);
         set_active_path(state, target_path);
@@ -152,16 +168,17 @@ namespace misty::panel {
 
     void FileExplorerPanel::fetch_remote_folder(const std::string& remote_name,
                                                   const std::string& remote_path,
-                                                  const std::string& target_path) {
+                                                  const std::string& target_path,
+                                                  uint64_t navigation_generation) {
         auto& state = registry_.get_state<FileExplorerState>("Files");
 
         printf("fetch_remote_folder: remote=%s path=%s target=%s\n",
                remote_name.c_str(), remote_path.c_str(), target_path.c_str());
 
         // Mark loading immediately on the UI thread so the next render shows
-        // a spinner. The cache check below runs on a worker, so we don't yet
+        // a loading animation. The cache check below runs on a worker, so we don't yet
         // know whether we'll get an instant cache hit — being optimistic and
-        // showing the spinner for one frame is fine.
+        // showing the animation for one frame is fine.
         //
         // NOTE: Do NOT take state.mu here. This function is reached from click
         // handlers inside the panel's render(), which already holds state.mu
@@ -171,6 +188,7 @@ namespace misty::panel {
         // UI thread writes is_loading without a lock; worker clears it under
         // the lock when results land.
         state.is_loading = true;
+        state.show_loading_animation = true;
         state.error_msg.clear();
 
         // Stale-while-revalidate, fully off the UI thread:
@@ -181,24 +199,24 @@ namespace misty::panel {
         //      so the network response, cache save, and final parse all stay
         //      off the UI thread.
         worker_pool_.add(
-            [this, remote_name, remote_path, target_path]() {
+            [this, remote_name, remote_path, target_path, navigation_generation]() {
                 auto& services = registry_.get_state<ServicesState>("Services");
 
                 std::string cached_body;
                 bool had_cache = core::listing_cache::load(remote_name, remote_path, cached_body);
                 if (had_cache) {
-                    handle_remote_folder_fetch(remote_name, target_path, true, cached_body, "");
+                    handle_remote_folder_fetch(remote_name, target_path, navigation_generation, true, cached_body, "");
                 }
 
                 services.fetch_files(remote_name, remote_path,
-                    [this, remote_name, remote_path, target_path, had_cache]
+                    [this, remote_name, remote_path, target_path, had_cache, navigation_generation]
                     (bool success, const std::string& body, const std::string& error) {
                         if (success) {
                             core::listing_cache::save(remote_name, remote_path, body);
-                            handle_remote_folder_fetch(remote_name, target_path, true, body, "");
+                            handle_remote_folder_fetch(remote_name, target_path, navigation_generation, true, body, "");
                         } else if (!had_cache) {
                             // No cache to fall back on — surface the error.
-                            handle_remote_folder_fetch(remote_name, target_path, false, "", error);
+                            handle_remote_folder_fetch(remote_name, target_path, navigation_generation, false, "", error);
                         } else {
                             // Already showed cached content; revalidation failed silently.
                             printf("revalidate failed for %s/%s: %s\n",
@@ -207,14 +225,15 @@ namespace misty::panel {
                     });
             },
             []() {},
-            [this, target_path](const std::string& err) {
-                handle_remote_folder_fetch("", target_path, false, "", err);
+            [this, target_path, navigation_generation](const std::string& err) {
+                handle_remote_folder_fetch("", target_path, navigation_generation, false, "", err);
             }
         );
     }
 
     void FileExplorerPanel::handle_remote_folder_fetch(const std::string& remote_name,
                                                          const std::string& target_path,
+                                                         uint64_t navigation_generation,
                                                          bool success,
                                                          const std::string& body,
                                                          const std::string& error) {
@@ -223,8 +242,13 @@ namespace misty::panel {
         if (!success) {
             printf("handle_remote_folder_fetch FAILED: %s\n", error.c_str());
             std::lock_guard<std::mutex> lock(state.mu);
+            if (state.navigation_generation.load(std::memory_order_relaxed) != navigation_generation ||
+                std::string(state.current_path) != target_path) {
+                return;
+            }
             state.error_msg = "Failed to list remote: " + error;
             state.is_loading = false;
+            state.show_loading_animation = false;
             return;
         }
 
@@ -237,9 +261,11 @@ namespace misty::panel {
             // Look up provider folder for constructing local paths
             auto& workspace = registry_.get_state<WorkspaceState>("Workspace");
             std::string provider_folder;
+            std::string folder_name = resp_remote;
             for (const auto& mapping : workspace.remote_mappings) {
                 if (mapping.remote_name == resp_remote) {
                     provider_folder = mapping.provider_folder;
+                    folder_name = mapping.folder_name;
                     break;
                 }
             }
@@ -258,7 +284,7 @@ namespace misty::panel {
                 // Build item paths
                 std::string item_remote_path = item_json.value("path", std::string(""));
                 item.remote_path = item_remote_path;
-                item.path = path_utils::get_mount_root() + "/" + provider_folder + "/" + resp_remote + "/" + item_remote_path;
+                item.path = path_utils::get_mount_root() + "/" + provider_folder + "/" + folder_name + "/" + item_remote_path;
 
                 // Parse mod_time
                 std::string mod_time = item_json.value("mod_time", std::string(""));
@@ -280,15 +306,25 @@ namespace misty::panel {
             printf("handle_remote_folder_fetch: got %zu items for %s\n", new_files.size(), resp_remote.c_str());
 
             std::lock_guard<std::mutex> lock(state.mu);
+            if (state.navigation_generation.load(std::memory_order_relaxed) != navigation_generation ||
+                std::string(state.current_path) != target_path) {
+                return;
+            }
             state.files = std::move(new_files);
             reset_selection(state);
             state.is_loading = false;
+            state.show_loading_animation = false;
             state.error_msg.clear();
         } catch (const std::exception& e) {
             printf("handle_remote_folder_fetch PARSE ERROR: %s\n", e.what());
             std::lock_guard<std::mutex> lock(state.mu);
+            if (state.navigation_generation.load(std::memory_order_relaxed) != navigation_generation ||
+                std::string(state.current_path) != target_path) {
+                return;
+            }
             state.error_msg = std::string("Failed to parse remote response: ") + e.what();
             state.is_loading = false;
+            state.show_loading_animation = false;
         }
     }
 

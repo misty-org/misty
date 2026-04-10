@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/cors"
 	"github.com/kannachi323/misty/proxy/api"
 	"github.com/kannachi323/misty/proxy/api/remote"
+	"github.com/kannachi323/misty/proxy/api/vault"
 	"github.com/kannachi323/misty/proxy/core/auth"
 	"github.com/kannachi323/misty/proxy/core/license"
 	"github.com/kannachi323/misty/proxy/core/tsbase"
@@ -21,6 +22,7 @@ type Proxy struct {
 	TSBase          *tsbase.TSBase
 	Database        *db.Database
 	LicenseManager  *license.Manager
+	VaultService    *vault.Service
 }
 
 func CreateProxy() (*Proxy, error) {
@@ -46,6 +48,7 @@ func CreateProxy() (*Proxy, error) {
 	proxy.TSBase = base
 	proxy.Database = &db.Database{}
 	proxy.LicenseManager = license.NewManager(proxy.Database)
+	proxy.VaultService = vault.NewService()
 
 	return proxy, nil
 }
@@ -74,6 +77,8 @@ func (proxy *Proxy) MountHandlers() {
 	// Protected routes (JWT required)
 	proxy.APIRouter.Group(func(r chi.Router) {
 		r.Use(auth.JWTMiddleware)
+
+		r.Get("/license", api.GetLicense(proxy.LicenseManager))
 
 		r.Get("/ts-status", api.GetTSStatus(proxy.TSBase))
 		r.Get("/ts-peers", api.GetPeers(proxy.TSBase))
@@ -108,6 +113,33 @@ func (proxy *Proxy) MountHandlers() {
 				r.Use(proxy.LicenseManager.RequireRemoteQuota(3, nil))
 				r.Post("/remotes", remote.CreateRemote())
 				r.Post("/remotes/config/start", remote.ConfigStart())
+			})
+
+			// ---- mvault (restic) endpoints ----
+			v := proxy.VaultService
+
+			r.Get("/vault/health", v.Health())
+			r.Get("/vault/repos", v.ListRepos())
+			r.Delete("/vault/repos", v.DeleteRepo())
+			r.Get("/vault/repos/stats", v.RepoStats())
+			r.Post("/vault/repos/check", v.CheckRepo())
+			r.Post("/vault/repos/unlock", v.UnlockRepo())
+
+			r.Get("/vault/snapshots", v.ListSnapshots())
+			r.Get("/vault/snapshots/files", v.BrowseSnapshot())
+
+			r.Post("/vault/restore", v.StartRestore())
+			r.Post("/vault/forget", v.StartForget())
+
+			r.Get("/vault/jobs", v.ListJobs())
+			r.Get("/vault/jobs/{id}", v.GetJob())
+			r.Get("/vault/jobs/{id}/stream", v.StreamJob())
+			r.Post("/vault/jobs/{id}/cancel", v.CancelJob())
+
+			r.Group(func(r chi.Router) {
+				r.Use(proxy.LicenseManager.RequireVaultQuota(1, nil))
+				r.Post("/vault/repos", v.CreateRepo())
+				r.Post("/vault/backup", v.StartBackup())
 			})
 		})
 	}

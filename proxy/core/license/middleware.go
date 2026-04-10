@@ -5,6 +5,7 @@ import (
 
 	"github.com/kannachi323/misty/proxy/core/auth"
 	"github.com/kannachi323/misty/proxy/core/rclone"
+	"github.com/kannachi323/misty/proxy/core/restic"
 )
 
 func hasPaidTier(tier string) bool {
@@ -56,6 +57,39 @@ func (m *Manager) RequireRemoteQuota(maxFree int, countRemotes func() int) func(
 
 			if countRemotes() >= maxFree {
 				http.Error(w, "free tier is limited to 3 connected remotes", http.StatusPaymentRequired)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// RequireVaultQuota allows paid users unlimited MVault repositories and caps
+// free users at maxFree configured repos.
+func (m *Manager) RequireVaultQuota(maxFree int, countRepos func() int) func(http.Handler) http.Handler {
+	if countRepos == nil {
+		countRepos = func() int {
+			repos, err := restic.LoadRegistry()
+			if err != nil {
+				return 0
+			}
+			return len(repos)
+		}
+	}
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			userID, _ := r.Context().Value(auth.ContextUserID).(string)
+			email, _ := r.Context().Value(auth.ContextEmail).(string)
+
+			if hasPaidTier(m.tierForRequest(r, userID, email)) {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			if countRepos() >= maxFree {
+				http.Error(w, "free tier is limited to 1 vault repository", http.StatusPaymentRequired)
 				return
 			}
 

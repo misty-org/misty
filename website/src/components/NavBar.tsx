@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { NavLink, useNavigate, useLocation } from "react-router";
 import { useAuth } from "../AuthContext";
 
@@ -28,6 +28,7 @@ export default function Navbar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const profileMenuRef = useRef<HTMLDivElement | null>(null);
 
   const initials = user?.name
     ? user.name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2)
@@ -48,9 +49,14 @@ export default function Navbar() {
 
   useEffect(() => {
     if (!profileOpen) return;
-    const handleClick = () => setProfileOpen(false);
-    document.addEventListener("click", handleClick);
-    return () => document.removeEventListener("click", handleClick);
+    const handlePointerDown = (event: MouseEvent) => {
+      if (profileMenuRef.current?.contains(event.target as Node)) {
+        return;
+      }
+      setProfileOpen(false);
+    };
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
   }, [profileOpen]);
 
   function openDocs() {
@@ -172,9 +178,10 @@ export default function Navbar() {
               </div>
             </div>
           </div>
-          <div className="ml-4 pl-4 border-l border-border">
+          <div className="pl-4 border-l border-border">
             {user ? (
               <div
+                ref={profileMenuRef}
                 className="relative"
                 onMouseEnter={openProfile}
                 onMouseLeave={() => setProfileOpen(false)}
@@ -186,14 +193,16 @@ export default function Navbar() {
                   {initials}
                 </button>
                 {profileOpen && (
-                  <div className="absolute right-0 mt-2 w-48 glass-card rounded-xl overflow-hidden shadow-xl shadow-bg/50">
-                    <div className="px-4 py-3 border-b border-border/50">
-                      <p className="text-sm font-medium text-text truncate">{user.name}</p>
-                      <p className="text-xs text-text-muted truncate">{user.email}</p>
+                  <div className="absolute right-0 top-full pt-2">
+                    <div className="w-48 glass-card rounded-xl overflow-hidden shadow-xl shadow-bg/50">
+                      <div className="px-4 py-3 border-b border-border/50">
+                        <p className="text-sm font-medium text-text truncate">{user.name}</p>
+                        <p className="text-xs text-text-muted truncate">{user.email}</p>
+                      </div>
+                      <button onClick={logout} className="w-full px-4 py-2.5 text-left text-sm text-text-muted hover:text-text hover:bg-elevated transition-colors">
+                        Sign Out
+                      </button>
                     </div>
-                    <button onClick={logout} className="w-full px-4 py-2.5 text-left text-sm text-text-muted hover:text-text hover:bg-elevated transition-colors">
-                      Sign Out
-                    </button>
                   </div>
                 )}
               </div>
