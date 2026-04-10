@@ -107,6 +107,74 @@ func TestDeleteRemote(t *testing.T) {
 	}
 }
 
+func TestRenameRemote(t *testing.T) {
+	oldName, _, cleanup := setupTest(t)
+	_ = cleanup
+
+	// Stash a couple of extra keys on the temp remote so we can verify
+	// RenameRemote actually moves the whole section, not just `type`.
+	if err := config.SetValueAndSave(oldName, "custom_key", "custom_value"); err != nil {
+		t.Fatal("SetValueAndSave:", err)
+	}
+
+	newName := "local-alice@example.com"
+	if err := RenameRemote(oldName, newName); err != nil {
+		t.Fatal("RenameRemote:", err)
+	}
+
+	if RemoteExists(oldName) {
+		t.Errorf("RenameRemote: old name %q still exists", oldName)
+	}
+	if !RemoteExists(newName) {
+		t.Errorf("RenameRemote: new name %q missing", newName)
+	}
+	if got := GetRemoteType(newName); got != "local" {
+		t.Errorf("RenameRemote: type under new name = %q, want %q", got, "local")
+	}
+	if v, ok := config.FileGetValue(newName, "custom_key"); !ok || v != "custom_value" {
+		t.Errorf("RenameRemote: custom_key under new name = (%q, %v), want (%q, true)", v, ok, "custom_value")
+	}
+
+	// Cleanup
+	DeleteRemote(newName)
+}
+
+func TestRenameRemoteCollision(t *testing.T) {
+	oldName, _, cleanup := setupTest(t)
+	defer cleanup()
+
+	// Create a second remote that we'll try to rename `oldName` on top of.
+	other := "local-taken"
+	if err := CreateRemote(context.Background(), other, "local", nil); err != nil {
+		t.Fatal("CreateRemote (other):", err)
+	}
+	defer DeleteRemote(other)
+
+	if err := RenameRemote(oldName, other); err == nil {
+		t.Error("RenameRemote: expected error when target exists, got nil")
+	}
+	// oldName must still be present — a failed rename shouldn't leave
+	// the config in a half-migrated state.
+	if !RemoteExists(oldName) {
+		t.Errorf("RenameRemote: failed rename ate the source remote %q", oldName)
+	}
+}
+
+func TestFinalizeRemoteNameNoToken(t *testing.T) {
+	// `local` has no OAuth token, so Finalize should be a no-op and return
+	// the same name it was given.
+	oldName, _, cleanup := setupTest(t)
+	defer cleanup()
+
+	got := FinalizeRemoteName(context.Background(), oldName)
+	if got != oldName {
+		t.Errorf("FinalizeRemoteName(local): got %q, want %q (no-op expected)", got, oldName)
+	}
+	if !RemoteExists(oldName) {
+		t.Error("FinalizeRemoteName(local): remote went missing")
+	}
+}
+
 func TestGetRemoteType(t *testing.T) {
 	remote, _, cleanup := setupTest(t)
 	defer cleanup()

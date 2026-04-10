@@ -152,6 +152,7 @@ void SettingsPanel::render_sidebar(SettingsState& state, float width) {
 
 void SettingsPanel::render_section_button(const char* label, SettingsSection section,
                                           SettingsState& state, float width) {
+    (void) width;
     const bool selected = state.active_section == section;
     ImGui::SetCursorPosX(10.0f);
 
@@ -168,7 +169,7 @@ void SettingsPanel::render_section_button(const char* label, SettingsSection sec
     }
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.18f, 0.18f, 0.20f, 1.0f));
 
-    if (ImGui::Button(label, ImVec2(width, 0.0f))) {
+    if (ImGui::Button(label, ImVec2(core::FillWidth(), 0.0f))) {
         state.active_section = section;
     }
 

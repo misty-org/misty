@@ -4,6 +4,7 @@
 #include <mutex>
 #include <atomic>
 #include <set>
+#include <unordered_map>
 #include <vector>
 #include <functional>
 #include "core/ui/ui_registry.h"
@@ -17,6 +18,7 @@ namespace misty::panel {
         std::string name;           // rclone remote name, e.g. "onedrive-john"
         std::string type;           // provider type: "onedrive", "drive", "dropbox", etc.
         std::string display_name;   // friendly display name
+        std::string alias;          // user-defined local label shown in UI and paths
         bool connected = true;
 
         bool operator<(const RemoteConnection& other) const {
@@ -29,6 +31,7 @@ namespace misty::panel {
         std::string name;
         std::string type;
         std::string display_name;
+        std::string alias;
         bool connected = false;
     };
 
@@ -73,6 +76,8 @@ namespace misty::panel {
 
         // Get a card state for rendering
         bool get_remote_card_state(const std::string& remote_name, RemoteCardState& out);
+        std::string get_remote_alias(const std::string& remote_name);
+        bool set_remote_alias(const std::string& remote_name, const std::string& alias);
 
         // File operations — all use unified rclone proxy endpoints
         void fetch_files(const std::string& remote,
@@ -133,6 +138,7 @@ namespace misty::panel {
 
         struct ConfigChoice {
             std::string value;
+            std::string label;
             std::string help;
         };
 
@@ -147,6 +153,7 @@ namespace misty::panel {
         std::string   config_question_name;          // option.name
         std::string   config_question_help;          // option.help
         std::string   config_default;                // option.default
+        bool          config_question_password = false;
         char          config_input_buf[512] = {0};   // ImGui::InputText buffer
         std::vector<ConfigChoice> config_choices;    // for CHOOSE/SUGGEST/CONFIRM
         std::string   config_error;                  // last server-side error
@@ -163,6 +170,10 @@ namespace misty::panel {
         void cancel_remote_config();
 
     private:
+        void load_remote_aliases_locked();
+        void save_remote_aliases_locked() const;
+
         core::WorkerPool* worker_pool_ = nullptr;
+        std::unordered_map<std::string, std::string> remote_aliases_;
     };
 }

@@ -202,7 +202,7 @@ namespace misty::panel {
 
         ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.10f, 0.10f, 0.11f, 1.0f));
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 10.0f));
-        if (ImGui::BeginChild("##tos", ImVec2(w, 150.0f), true)) {
+        if (ImGui::BeginChild("##tos", ImVec2(0.0f, 150.0f), true)) {
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.60f, 0.60f, 0.60f, 1.0f));
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 6.0f));
 

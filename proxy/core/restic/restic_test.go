@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"testing"
 )
@@ -90,6 +91,52 @@ func TestSnapshotsWithoutPasswordFile(t *testing.T) {
 	_, err := Snapshots(context.Background(), repo)
 	if err == nil {
 		t.Error("expected error when password file is missing")
+	}
+}
+
+func TestFindResticBinaryEnvOverride(t *testing.T) {
+	resetInit()
+	t.Setenv("HOME", t.TempDir())
+
+	fake := filepath.Join(t.TempDir(), "restic")
+	if err := os.WriteFile(fake, []byte("#!/bin/sh\necho restic 0.18.0\n"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("MISTY_RESTIC_PATH", fake)
+
+	got, err := findResticBinary()
+	if err != nil {
+		t.Fatalf("findResticBinary: %v", err)
+	}
+	want, err := filepath.EvalSymlinks(fake)
+	if err != nil {
+		want = fake
+	}
+	if got != want {
+		t.Fatalf("findResticBinary: got %q, want %q", got, want)
+	}
+}
+
+func TestBundledBinaryCandidatesOrder(t *testing.T) {
+	exe := "/Applications/Misty.app/Contents/MacOS/misty-proxy"
+	workingDir := "/Users/test/projects/misty"
+	home := "/Users/test"
+
+	got := bundledBinaryCandidates("restic", exe, workingDir, home)
+	if len(got) < 4 {
+		t.Fatalf("bundledBinaryCandidates: got %d candidates, want at least 4", len(got))
+	}
+	if got[0] != "/Users/test/projects/misty/proxy/dist/restic" {
+		t.Fatalf("first candidate: got %q", got[0])
+	}
+	if got[1] != "/Users/test/misty/bin/restic" {
+		t.Fatalf("second candidate: got %q", got[1])
+	}
+	if got[2] != "/Applications/Misty.app/Contents/MacOS/restic" {
+		t.Fatalf("third candidate: got %q", got[2])
+	}
+	if runtime.GOOS == "darwin" && got[3] != "/Applications/Misty.app/Contents/Resources/restic" {
+		t.Fatalf("fourth candidate: got %q", got[3])
 	}
 }
 

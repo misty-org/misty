@@ -74,7 +74,11 @@ func TestHelperBinaryPathEnv(t *testing.T) {
 	}
 	t.Setenv("MISTY_PWD_HELPER", fake)
 
-	if got := HelperBinaryPath(); got != fake {
-		t.Errorf("HelperBinaryPath: got %q, want %q", got, fake)
+	want, err := filepath.EvalSymlinks(fake)
+	if err != nil {
+		want = fake
+	}
+	if got := HelperBinaryPath(); got != want {
+		t.Errorf("HelperBinaryPath: got %q, want %q", got, want)
 	}
 }

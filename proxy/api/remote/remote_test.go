@@ -373,5 +373,68 @@ func TestAboutMissingRemote(t *testing.T) {
 	}
 }
 
+func TestConfigCancelStopsInFlightFlow(t *testing.T) {
+	const name = "cancel-test-remote"
+
+	oauthMu.Lock()
+	previousPending := oauthPending
+	previousCancels := oauthCancels
+	oauthPending = map[string]bool{}
+	oauthCancels = map[string]context.CancelFunc{}
+	oauthMu.Unlock()
+
+	t.Cleanup(func() {
+		oauthMu.Lock()
+		oauthPending = previousPending
+		oauthCancels = previousCancels
+		oauthMu.Unlock()
+	})
+
+	cancelled := false
+	if !beginOAuthFlow(name, func() { cancelled = true }) {
+		t.Fatal("expected flow registration to succeed")
+	}
+
+	rr := doRequest(ConfigCancel(), "DELETE", "/api/remotes/config?name="+name, nil)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("ConfigCancel: expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if !cancelled {
+		t.Fatal("expected ConfigCancel to invoke the active cancel func")
+	}
+
+	oauthMu.Lock()
+	defer oauthMu.Unlock()
+	if oauthPending[name] {
+		t.Fatal("expected pending flow entry to be cleared")
+	}
+	if _, ok := oauthCancels[name]; ok {
+		t.Fatal("expected cancel func entry to be cleared")
+	}
+}
+
+func TestBeginOAuthFlowAllowsOnlyOneActiveFlow(t *testing.T) {
+	oauthMu.Lock()
+	previousPending := oauthPending
+	previousCancels := oauthCancels
+	oauthPending = map[string]bool{}
+	oauthCancels = map[string]context.CancelFunc{}
+	oauthMu.Unlock()
+
+	t.Cleanup(func() {
+		oauthMu.Lock()
+		oauthPending = previousPending
+		oauthCancels = previousCancels
+		oauthMu.Unlock()
+	})
+
+	if !beginOAuthFlow("remote-a", func() {}) {
+		t.Fatal("expected first flow registration to succeed")
+	}
+	if beginOAuthFlow("remote-b", func() {}) {
+		t.Fatal("expected second concurrent flow registration to be rejected")
+	}
+}
+
 // Ensure unused import doesn't cause issues
 var _ = sync.Once{}
