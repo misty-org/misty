@@ -42,8 +42,6 @@ export type ExplorerCommandId =
   | "explorer.redo"
   | "explorer.preview.toggle"
   | "explorer.sidebar.toggle"
-  | "explorer.toggle_chat"
-  | "explorer.toggle_mika"
   | "explorer.next_workspace"
   | "explorer.tab_1"
   | "explorer.tab_2"

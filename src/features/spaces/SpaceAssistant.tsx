@@ -4,14 +4,8 @@ import { useShallow } from "zustand/react/shallow";
 
 import { AssistantComposerActions } from "@/features/explorer/desktop/ExplorerAssistantComposer";
 import { AssistantMessage } from "@/features/explorer/desktop/ExplorerAssistantMessage";
-import { useMikaPeekAnimation } from "@/features/explorer/desktop/ExplorerAssistantShared";
 import { assistantPanelStyles } from "@/features/explorer/desktop/ExplorerAssistantStyles";
-import {
-  hideRuntimeAssetOnError,
-  revealRuntimeAssetOnLoad,
-  runtimeAssetSource,
-} from "@/platform/runtimeAsset";
-import { selectAssistantPreferences, useAppStore, useSettingsStore } from "@/stores/app";
+import { selectAssistantPreferences, useSettingsStore } from "@/stores/app";
 import { spaceMikaScopeKey, useMikaSessionStore } from "@/stores/assistant/useMikaSessionStore";
 import { Badge, Textarea } from "@/ui";
 import { buildSpaceMikaContext, spaceAssistantPrompt } from "./mika/spaceMikaContext";
@@ -65,7 +59,6 @@ export function SpaceAssistant({
   const mikaEnabled = useSettingsStore(
     (state) => selectAssistantPreferences(state.settings?.document).enabled,
   );
-  const assetsDir = useAppStore((state) => state.app?.environment.assetsDir);
   const [prompt, setPrompt] = useState("");
   const [preparing, setPreparing] = useState(false);
   const [contextNotice, setContextNotice] = useState("");
@@ -77,9 +70,6 @@ export function SpaceAssistant({
   const configured = status?.configured ?? false;
   const supportsPrivateSpaceSessions = status?.spaceScopedSessions ?? false;
   const available = configured && mikaEnabled && supportsPrivateSpaceSessions;
-  const mikaAnimationSource = runtimeAssetSource(assetsDir, "animations/mika.webp");
-  const mikaPeek = useMikaPeekAnimation(true);
-
   useEffect(() => {
     requestGeneration.current += 1;
     setPrompt("");
@@ -222,28 +212,6 @@ export function SpaceAssistant({
           void submitPrompt();
         }}
       >
-        {mikaAnimationSource ? (
-          <img
-            alt=""
-            aria-hidden="true"
-            className={[
-              "pointer-events-none absolute -top-14 z-0 h-20 w-24 select-none object-contain",
-              "drop-shadow-md transition-[opacity,transform] duration-500 ease-out",
-              "motion-reduce:transition-none",
-              mikaPeek.popped ? "opacity-100" : "opacity-0",
-            ].join(" ")}
-            draggable={false}
-            src={mikaAnimationSource}
-            onError={hideRuntimeAssetOnError}
-            onLoad={revealRuntimeAssetOnLoad}
-            style={{
-              left: `${mikaPeek.leftPercent}%`,
-              transform: mikaPeek.popped
-                ? `translateX(-50%) translateY(0) scale(1) rotate(${mikaPeek.tiltDegrees}deg)`
-                : `translateX(-50%) translateY(48px) scale(0.82) rotate(${mikaPeek.tiltDegrees}deg)`,
-            }}
-          />
-        ) : null}
         <div className="relative z-10 min-w-0 rounded-xl bg-muted/60">
           <Textarea
             ref={promptRef}

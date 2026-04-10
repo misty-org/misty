@@ -10,17 +10,14 @@ import {
   type ReactNode,
 } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  accountFetchMe,
-  accountLogout,
-  accountRevokeCurrentSession,
-  isAccountUnauthorizedError,
-} from "@/stores/account/useAccountStore";
+import { accountFetchMe, isAccountUnauthorizedError } from "@/stores/account/useAccountStore";
 import type { AccountMeResponse } from "@/models/interfaces/stores/account/useAccountStore";
 import {
   activateAccountSession,
   clearAccountAuthToken,
+  deactivateActiveAccount,
   listSavedAccountSessions,
+  readActiveSavedAccountSession,
   readAccountSessionGeneration,
   removeSavedAccountSession,
   setAccountSessionTransitioning,
@@ -47,6 +44,8 @@ const AuthContext = createContext<AuthContextValue>({
   refreshUser: async () => null,
   authenticateAccount: async (request) => request(),
   switchAccount: async () => {},
+  resumeAccount: async () => {},
+  removeAccount: async () => {},
   logout: async () => {},
 });
 
@@ -58,9 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const saveAuthenticatedUser = useSetupStore((state) => state.saveAuthenticatedUser);
   const nativeUser = useSetupStore((state) => state.status?.current_user ?? null);
   const navigate = useNavigate();
-  const [user, setUserState] = useState<AuthUser | null>(() =>
-    shouldPersistAuthUser ? readStoredUser() : null,
-  );
+  const [user, setUserState] = useState<AuthUser | null>(() => readInitialUser());
   const [accounts, setAccounts] = useState<SavedAccountSession[]>(() => listSavedAccountSessions());
   const [transitioning, setTransitioning] = useState(false);
   const [telemetryIdentity] = useState(() => new TelemetryIdentityManager(analytics));
@@ -83,29 +80,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setTransitioning(false);
   }, []);
 
-  const findValidatedFallback = useCallback(async (excludedAccountId: string) => {
-    const candidates = listSavedAccountSessions().filter(
-      (account) => account.id !== excludedAccountId,
-    );
-    for (const candidate of candidates) {
-      try {
-        const fallback = await activateAccountSession(candidate.id);
-        const me = await accountFetchMe();
-        assertAccountIdentity(me, fallback.id);
-        const nextUser = authUserFromMe(me, fallback);
-        return { me, user: nextUser };
-      } catch (error) {
-        if (isInvalidAccountSessionError(error)) {
-          await clearAccountAuthToken();
-          continue;
-        }
-        await restoreSavedSession(excludedAccountId);
-        throw error;
-      }
-    }
-    await restoreSavedSession(excludedAccountId);
-    return null;
-  }, []);
+  // Signs out the active account and returns to the sign-in chooser without
+  // silently jumping to another saved account. Every account stays listed.
+  const deactivateToChooser = useCallback(async () => {
+    await deactivateActiveAccount();
+    await signOut();
+    useUserStore.getState().clear();
+    setUserState(null);
+    setAccounts(listSavedAccountSessions());
+    navigate("/signin", { replace: true });
+  }, [navigate, signOut]);
 
   const setUser = useCallback(
     (nextUser: AuthUser | null) => {
@@ -291,35 +275,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        let accountReady = false;
         beginAccountOperation();
         resetAccountScopedState();
         try {
-          const validated = await findValidatedFallback(activeUser.id);
-          if (validated) {
-            await updateSavedAccountSession(validated.user);
-            await saveAuthenticatedUser(validated.user, licenseFromMe(validated.me));
-            await removeSavedAccountSession(activeUser.id);
-            useUserStore.getState().setMe(validated.me);
-            setUserState(validated.user);
-            setAccounts(listSavedAccountSessions());
-            accountReady = true;
-            return;
-          }
-          useUserStore.getState().clear();
-          await signOut();
-          await clearAccountAuthToken();
-          setUserState(null);
-          setAccounts(listSavedAccountSessions());
+          // The restored account's token is no longer valid. Rather than silently
+          // switching to a different saved account, send the user to the chooser
+          // where they can pick another account or re-sign-in to this one.
+          await deactivateToChooser();
         } catch {
-          // A transient fallback or persistence failure must not delete saved
-          // sessions or cross the native identity with another account token.
+          // A transient persistence failure must not strand the user; keep the
+          // account active so the next launch can retry validation.
           await restoreSavedSession(activeUser.id);
           setUserState(activeUser);
           setAccounts(listSavedAccountSessions());
         } finally {
           finishAccountOperation();
-          if (accountReady) refreshAuthenticatedAccountState();
         }
       }
     })();
@@ -328,60 +298,72 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
     // Validate only the first restored identity. Sign-in and account switching
     // already fetch /me before setting the user.
-  }, [activeUser, beginAccountOperation, finishAccountOperation, signOut, findValidatedFallback]);
+  }, [activeUser, beginAccountOperation, finishAccountOperation, deactivateToChooser]);
 
+  // Signing out no longer hops to another saved account. It deactivates the
+  // current one — leaving it (and every other account) listed on the sign-in
+  // chooser — and never revokes tokens, so the chooser can resume any account
+  // whose token is still valid, or prompt a re-login when it isn't.
   const logout = useCallback(async () => {
     if (accountOperationActive.current) return;
-    await (async () => {
-      const previousUser = activeUser;
-      const previousMe = useUserStore.getState().me;
-      let accountReady = false;
+    const previousUser = activeUser;
+    const previousMe = useUserStore.getState().me;
+    beginAccountOperation();
+    resetAccountScopedState();
+    try {
+      await deactivateToChooser();
+    } catch (error) {
+      if (previousUser) {
+        await restoreSavedSession(previousUser.id);
+        if (previousMe?.id === previousUser.id) useUserStore.getState().setMe(previousMe);
+        setUserState(previousUser);
+        refreshAuthenticatedAccountState();
+      }
+      setAccounts(listSavedAccountSessions());
+      throw error;
+    } finally {
+      finishAccountOperation();
+    }
+  }, [activeUser, beginAccountOperation, finishAccountOperation, deactivateToChooser]);
+
+  // Resume a saved account chosen from the sign-in screen. Its token is validated
+  // against /me; on failure the account stays listed and the error propagates so
+  // the chooser can send the person to re-sign-in.
+  const resumeAccount = useCallback(
+    async (accountId: string) => {
+      if (accountOperationActive.current) return;
       beginAccountOperation();
       resetAccountScopedState();
+      let accountReady = false;
       try {
-        const validated = previousUser ? await findValidatedFallback(previousUser.id) : null;
-        if (validated) {
-          await updateSavedAccountSession(validated.user);
-          await restoreSavedSession(previousUser?.id ?? "");
-          await accountRevokeCurrentSession();
-          await activateAccountSession(validated.user.id);
-          await saveAuthenticatedUser(validated.user, licenseFromMe(validated.me));
-          await removeSavedAccountSession(previousUser?.id ?? "");
-          useUserStore.getState().setMe(validated.me);
-          setUserState(validated.user);
-          setAccounts(listSavedAccountSessions());
-          accountReady = true;
-          return;
-        }
-        await restoreSavedSession(previousUser?.id ?? "");
-        await signOut();
-        await accountLogout();
-        useUserStore.getState().clear();
-        setUserState(null);
+        const saved = await activateAccountSession(accountId);
+        const me = await accountFetchMe();
+        assertAccountIdentity(me, saved.id);
+        const nextUser = authUserFromMe(me, saved);
+        await updateSavedAccountSession(nextUser);
+        await saveAuthenticatedUser(nextUser, licenseFromMe(me));
+        useUserStore.getState().setMe(me);
+        setUserState(nextUser);
         setAccounts(listSavedAccountSessions());
-        navigate("/signin", { replace: true });
+        accountReady = true;
       } catch (error) {
-        if (previousUser) {
-          await restoreSavedSession(previousUser.id);
-          if (previousMe?.id === previousUser.id) useUserStore.getState().setMe(previousMe);
-          setUserState(previousUser);
-          accountReady = true;
-        }
+        // Leave the account listed; its token is stale, so the caller re-signs-in.
+        await deactivateActiveAccount().catch(() => undefined);
         setAccounts(listSavedAccountSessions());
         throw error;
       } finally {
         finishAccountOperation();
         if (accountReady) refreshAuthenticatedAccountState();
       }
-    })();
-  }, [
-    activeUser,
-    beginAccountOperation,
-    finishAccountOperation,
-    navigate,
-    signOut,
-    findValidatedFallback,
-  ]);
+    },
+    [beginAccountOperation, finishAccountOperation, saveAuthenticatedUser],
+  );
+
+  // Forget a saved account from this device (from the chooser's remove control).
+  const removeAccount = useCallback(async (accountId: string) => {
+    await removeSavedAccountSession(accountId);
+    setAccounts(listSavedAccountSessions());
+  }, []);
 
   return (
     <AuthContext.Provider
@@ -393,6 +375,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         refreshUser,
         authenticateAccount,
         switchAccount,
+        resumeAccount,
+        removeAccount,
         logout,
       }}
     >
@@ -473,6 +457,17 @@ function readStoredUser(): AuthUser | null {
   } catch {
     return null;
   }
+}
+
+function readInitialUser(): AuthUser | null {
+  if (!shouldPersistAuthUser) return null;
+  const activeSession = readActiveSavedAccountSession();
+  const storedUser = readStoredUser();
+  if (!activeSession) return storedUser;
+  if (storedUser?.id === activeSession.id) {
+    return { ...activeSession, ...storedUser, id: activeSession.id };
+  }
+  return activeSession;
 }
 
 function writeStoredUser(user: AuthUser | null): void {

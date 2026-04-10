@@ -17,7 +17,6 @@ import type {
   AdvancedPreferences,
   SearchMaintenancePreferences,
   SettingsStore,
-  BotPreferences,
 } from "@/models/interfaces/stores/app/useSettingsStore";
 export type {
   AppearancePreferences,
@@ -28,7 +27,6 @@ export type {
   AdvancedPreferences,
   SearchMaintenancePreferences,
   SettingsStore,
-  BotPreferences,
 } from "@/models/interfaces/stores/app/useSettingsStore";
 import { create } from "zustand";
 import {
@@ -359,27 +357,14 @@ export function selectAssistantPreferences(
     scopesValue && typeof scopesValue === "object" && !Array.isArray(scopesValue)
       ? (scopesValue as Record<string, unknown>)
       : {};
-  const legacyBotEnabled = settingsSectionRecord(source, "bots").cloud_folder_enabled;
   return {
-    enabled:
-      typeof assistant.enabled === "boolean"
-        ? assistant.enabled
-        : typeof legacyBotEnabled === "boolean"
-          ? legacyBotEnabled
-          : settingsBoolean(source, "pets", "cloud_folder_enabled", false),
+    enabled: assistant.enabled === true,
     scopes: {
       filesAllowed: scopes.files_allowed === true,
       cleanupAllowed: scopes.cleanup_allowed === true,
       searchAllowed: scopes.search_allowed === true,
     },
   };
-}
-
-/** @deprecated Use selectAssistantPreferences. */
-export function selectBotPreferences(
-  document: Record<string, unknown> | null | undefined,
-): BotPreferences {
-  return { cloudFolderEnabled: selectAssistantPreferences(document).enabled };
 }
 
 export function selectShortcutPreferences(

@@ -379,7 +379,9 @@ describe("Spaces realtime account lifecycle", () => {
       .mockResolvedValueOnce({ ticket: "retry-ticket", expires_in: 60 });
 
     await useSpacesStore.getState().connectRealtime("active-account");
+    useSpacesStore.setState({ error: "The operation is insecure." });
     FakeWebSocket.instances[0].open();
+    expect(useSpacesStore.getState().error).toBeNull();
     FakeWebSocket.instances[0].close();
     await vi.advanceTimersByTimeAsync(3_000);
 

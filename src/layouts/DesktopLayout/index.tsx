@@ -26,7 +26,6 @@ import { Minus, Square, X } from "lucide-react";
 import { hideRuntimeAssetOnError, revealRuntimeAssetOnLoad } from "@/platform/runtimeAsset";
 import type { AppTab } from "@/models/types/routing/types";
 import {
-  selectAssistantPreferences,
   selectNotificationPreferences,
   settingsBoolean,
   useAppRouteMemoryStore,
@@ -58,7 +57,6 @@ import { settingsFallbackRoute } from "./helpers";
 import { useDesktopWindowChrome } from "./useDesktopWindowChrome";
 import { useDesktopFrameStyle } from "./useDesktopFrameStyle";
 import { useDesktopBootstrap } from "./useDesktopBootstrap";
-import { useCloudFolderBotBridge } from "./useCloudFolderBotBridge";
 import { useUnreadBadgeSync } from "./useUnreadBadgeSync";
 import { ActivityNavButton, NavGroup, ProfileNavButton, SettingsNavButton } from "./NavRail";
 import { ProfilePopover } from "./ProfilePopover";
@@ -118,9 +116,6 @@ export function DesktopLayout(props: {
   const notificationPreferences = useSettingsStore(
     useShallow((state) => selectNotificationPreferences(state.settings?.document)),
   );
-  const cloudFolderBotEnabled = useSettingsStore(
-    (state) => selectAssistantPreferences(state.settings?.document).enabled,
-  );
   const framePacingOverlayEnabled = useSettingsStore((state) =>
     settingsBoolean(
       state.settings?.document ?? {},
@@ -131,10 +126,6 @@ export function DesktopLayout(props: {
   );
   const lastSpacesRoute = useAppRouteMemoryStore((state) => state.lastSpacesRoute);
 
-  useCloudFolderBotBridge({
-    cloudFolderBotEnabled,
-    assetsDir: app?.environment.assetsDir,
-  });
   useUnreadBadgeSync({
     badgeCountEnabled: notificationPreferences.badgeCountEnabled,
     unreadActivityCount,
@@ -284,10 +275,10 @@ export function DesktopLayout(props: {
         aria-label="Primary"
         onPointerDown={usesNativeWindowChrome ? startTitlebarDrag : undefined}
       >
-        <div className="mb-3 grid h-[62px] w-[62px] place-items-center">
+        <div className="mb-3 grid h-[50px] w-[54px] place-items-center">
           {mistyLogoSource ? (
             <img
-              className="h-[58px] w-[58px] object-contain"
+              className="h-[34px] w-[34px] object-contain"
               src={mistyLogoSource}
               onError={hideRuntimeAssetOnError}
               onLoad={revealRuntimeAssetOnLoad}
@@ -344,7 +335,6 @@ export function DesktopLayout(props: {
         open={profileOpen}
         onClose={() => setProfileOpen(false)}
         onOpenAccountSettings={openAccountSettingsOverlay}
-        onOpenSettings={openSettingsOverlay}
       />
       <AccountSettingsOverlay
         open={accountSettingsOpen}

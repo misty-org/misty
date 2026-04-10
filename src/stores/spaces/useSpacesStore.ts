@@ -494,7 +494,7 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
         }
         clearRealtimeOpenTimer();
         reconnectAttempt = 0;
-        set({ realtimeConnected: true });
+        set({ realtimeConnected: true, error: null });
         if (currentViewingSpaceId) sendViewingMessage(currentViewingSpaceId, currentViewingActive);
       };
       socket.onmessage = (message) => {

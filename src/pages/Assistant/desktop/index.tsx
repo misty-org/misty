@@ -15,13 +15,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/ui";
-import {
-  hideRuntimeAssetOnError,
-  revealRuntimeAssetOnLoad,
-  runtimeAssetSource,
-} from "@/platform/runtimeAsset";
 import { useMultiPanelStore } from "@/features/workspace";
-import { useAppStore } from "@/stores/app";
 import { useExplorerStore } from "@/stores/explorer";
 import { MistyPicker } from "@/features/picker/MistyPicker";
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
@@ -30,13 +24,14 @@ import { usePersonalAgentsStore } from "@/stores/agents/usePersonalAgentsStore";
 import { useAuth } from "@/features/auth/AuthContext";
 import { AssistantMessage } from "@/features/explorer/desktop/ExplorerAssistantMessage";
 import { AssistantComposerActions } from "@/features/explorer/desktop/ExplorerAssistantComposer";
-import {
-  assistantPlaceholder,
-  useMikaPeekAnimation,
-} from "@/features/explorer/desktop/ExplorerAssistantShared";
+import { assistantPlaceholder } from "@/features/explorer/desktop/ExplorerAssistantShared";
 import { assistantPanelStyles } from "@/features/explorer/desktop/ExplorerAssistantStyles";
 import { PersonalAgentsSidebar } from "./PersonalAgentsSidebar";
-import { initialAgentModelName, selectedAgentModelName } from "@/features/agents/modelSelection";
+import {
+  initialAgentModelName,
+  modelSupportsReasoning,
+  selectedAgentModelName,
+} from "@/features/agents/modelSelection";
 
 function defaultWorkingDirectory(pathParam: string | null): string {
   if (pathParam) return pathParam;
@@ -81,10 +76,12 @@ export default function DesktopAgentsPage() {
     toolApprovals,
     error,
     activeModelId,
+    activeReasoningEffort,
     refreshStatus,
     hydrateConversations,
     setMode,
     setConversationModel,
+    setConversationReasoning,
     sendPrompt,
     abortPrompt,
     approvePlan,
@@ -100,10 +97,12 @@ export default function DesktopAgentsPage() {
       toolApprovals: state.toolApprovals,
       error: state.error,
       activeModelId: state.activeModelId,
+      activeReasoningEffort: state.activeReasoningEffort,
       refreshStatus: state.refreshStatus,
       hydrateConversations: state.hydrateConversations,
       setMode: state.setMode,
       setConversationModel: state.setConversationModel,
+      setConversationReasoning: state.setConversationReasoning,
       sendPrompt: state.sendPrompt,
       abortPrompt: state.abortPrompt,
       approvePlan: state.approvePlan,
@@ -130,6 +129,12 @@ export default function DesktopAgentsPage() {
   const agentChatModelName = selectedAgent
     ? modelNameFor(agentChatModelId)
     : (status?.modelName ?? initialAgentModelName);
+  // Reasoning effort for this chat: its per-chat override, else the agent's default.
+  const agentChatSupportsReasoning = modelSupportsReasoning(
+    models.find((model) => model.id === agentChatModelId)?.capabilities,
+  );
+  const agentChatReasoningEffort =
+    activeReasoningEffort || selectedAgent?.reasoning_effort || "medium";
   const requestModelChange = useCallback(
     (modelId: string) => {
       if (!modelId || modelId === agentChatModelId) return;
@@ -151,10 +156,6 @@ export default function DesktopAgentsPage() {
     typeof hostedAiUsage?.hostedAiUsedRatio === "number"
       ? Math.round(Math.min(1, Math.max(0, hostedAiUsage.hostedAiUsedRatio)) * 100)
       : null;
-  const assetsDir = useAppStore((state) => state.app?.environment.assetsDir);
-  const mikaAnimationSource = runtimeAssetSource(assetsDir, "animations/mika.webp");
-  const mikaPeek = useMikaPeekAnimation(true);
-
   useEffect(() => {
     void refreshStatus();
   }, [refreshStatus]);
@@ -265,7 +266,7 @@ export default function DesktopAgentsPage() {
 
           {error ? <p className={assistantPanelStyles.errorText}>{error}</p> : null}
 
-          <div ref={logRef} className={`${assistantPanelStyles.log} gap-2.5`} aria-live="polite">
+          <div ref={logRef} className={assistantPanelStyles.log} aria-live="polite">
             {messages.length === 0
               ? null
               : messages.map((message) => (
@@ -277,6 +278,7 @@ export default function DesktopAgentsPage() {
                     toolApprovals={toolApprovals}
                     onApplyPlan={approvePlan}
                     onApproveTool={approveToolRequest}
+                    spacious
                   />
                 ))}
           </div>
@@ -288,28 +290,6 @@ export default function DesktopAgentsPage() {
               submitPrompt();
             }}
           >
-            {mikaAnimationSource ? (
-              <img
-                alt=""
-                aria-hidden="true"
-                className={[
-                  "pointer-events-none absolute -top-14 z-0 h-20 w-24 select-none object-contain",
-                  "drop-shadow-md transition-[opacity,transform] duration-500 ease-out",
-                  "motion-reduce:transition-none",
-                  mikaPeek.popped ? "opacity-100" : "opacity-0",
-                ].join(" ")}
-                draggable={false}
-                src={mikaAnimationSource}
-                onError={hideRuntimeAssetOnError}
-                onLoad={revealRuntimeAssetOnLoad}
-                style={{
-                  left: `${mikaPeek.leftPercent}%`,
-                  transform: mikaPeek.popped
-                    ? `translateX(-50%) translateY(0) scale(1) rotate(${mikaPeek.tiltDegrees}deg)`
-                    : `translateX(-50%) translateY(48px) scale(0.82) rotate(${mikaPeek.tiltDegrees}deg)`,
-                }}
-              />
-            ) : null}
             <div className="relative z-10 min-w-0 rounded-xl bg-muted/60">
               <Textarea
                 className={[
@@ -339,6 +319,9 @@ export default function DesktopAgentsPage() {
                 onAddContext={() => setContextPickerOpen(true)}
                 modelOptions={models}
                 selectedModelId={agentChatModelId}
+                reasoningEffort={agentChatReasoningEffort}
+                reasoningSupported={agentChatSupportsReasoning}
+                onSelectReasoning={(effort) => void setConversationReasoning(effort)}
                 onSelectModel={
                   selectedAgent
                     ? requestModelChange
@@ -377,10 +360,10 @@ export default function DesktopAgentsPage() {
                   Switch this chat to {pendingModelSwitch ? modelNameFor(pendingModelSwitch) : ""}?
                 </AlertDialogTitle>
                 <AlertDialogDescription>
-                  This changes the model for this chat only — {selectedAgent?.name}&rsquo;s configured
-                  model stays the same. To keep the conversation going, the entire chat is resent to
-                  the new model on your next message, which costs extra tokens. Or reset to start this
-                  chat fresh on the new model.
+                  This changes the model for this chat only — {selectedAgent?.name}&rsquo;s
+                  configured model stays the same. To keep the conversation going, the entire chat
+                  is resent to the new model on your next message, which costs extra tokens. Or
+                  reset to start this chat fresh on the new model.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>

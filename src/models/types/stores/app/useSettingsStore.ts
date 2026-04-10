@@ -29,7 +29,6 @@ import type {
   AdvancedPreferences,
   SearchMaintenancePreferences,
   SettingsStore,
-  BotPreferences,
 } from "@/models/interfaces/stores/app/useSettingsStore";
 
 export type SettingsSection =

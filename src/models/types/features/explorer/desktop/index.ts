@@ -148,15 +148,10 @@ import { shortcutMapFromBindings, shortcutMatchesEvent } from "@/lib/shortcuts";
 import type { ShortcutMap } from "@/models/types/lib/shortcuts";
 import {
   selectAdvancedPreferences,
-  selectAssistantPreferences,
   selectGeneralPreferences,
   selectShortcutPreferences,
   useSettingsStore,
 } from "@/stores/app";
-import {
-  openCloudFolderBotChatWindow,
-  openCloudFolderBotWindow,
-} from "@/features/bots/cloudFolderBot";
 import { errorText } from "@/lib/format";
 import { clipboardImagePng } from "@/features/explorer/utils/clipboardImage";
 import { formatBytes, formatDate } from "@/features/explorer/utils/fileFormat";

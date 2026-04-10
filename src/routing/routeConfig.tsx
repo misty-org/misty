@@ -1,9 +1,8 @@
 import { createBrowserRouter, Navigate } from "react-router";
 import { RootLayout } from "../layouts/RootLayout";
 import AccountPage from "../pages/Account";
-import CloudFolderBotChatOverlay from "../pages/BotOverlay/CloudFolderBotChatOverlay";
-import CloudFolderBotOverlay from "../pages/BotOverlay/CloudFolderBotOverlay";
 import FilesPage from "../pages/Files";
+import HomePage from "../pages/Home";
 import RegisterPage from "../pages/Register";
 import SettingsPage from "../pages/Settings";
 import SignInPage from "../pages/SignIn";
@@ -27,13 +26,10 @@ export const router = createBrowserRouter([
       />
     ),
     children: [
-      { path: "bot/cloud-folder", element: <CloudFolderBotOverlay /> },
-      { path: "bot/cloud-folder-chat", element: <CloudFolderBotChatOverlay /> },
-      { path: "pet/cloud-folder", element: <Navigate to={routes.cloudFolderBot} replace /> },
       {
         element: <AppFrameLayout />,
         children: [
-          { index: true, element: <Navigate to={routes.files} replace /> },
+          { index: true, element: <Navigate to={routes.home} replace /> },
           { path: "files", element: <FilesPage /> },
           { path: "library", element: <Navigate to={routes.spacePersonal} replace /> },
           { path: "providers", element: null },
@@ -59,7 +55,7 @@ export const router = createBrowserRouter([
               { path: "studio", element: <Navigate to={routes.spacePersonal} replace /> },
               { path: "studio/agents", element: <Navigate to={routes.agents} replace /> },
               { path: "studio/workflows", element: <Navigate to={routes.spacePersonal} replace /> },
-              { path: "home", element: <Navigate to={routes.files} replace /> },
+              { path: "home", element: <HomePage /> },
               { path: "extensions", element: <ExtensionsPage /> },
               { path: "changelog", element: <Navigate to={routes.files} replace /> },
               { path: "signin", element: <SignInPage /> },

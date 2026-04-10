@@ -47,7 +47,9 @@ export function AgentModelPicker({
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    // The picker is portaled outside any parent dialog. Making it modal while
+    // open prevents the dialog's scroll lock from swallowing list wheel events.
+    <Popover modal open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           variant="ghost"

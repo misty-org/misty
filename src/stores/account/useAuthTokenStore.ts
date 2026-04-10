@@ -123,6 +123,12 @@ export function listSavedAccountSessions(): SavedAccountSession[] {
   }
 }
 
+export function readActiveSavedAccountSession(): SavedAccountSession | null {
+  const activeAccountId = readActiveAccountId();
+  if (!activeAccountId) return null;
+  return listSavedAccountSessions().find((account) => account.id === activeAccountId) ?? null;
+}
+
 export async function updateSavedAccountSession(
   account: Omit<SavedAccountSession, "lastUsedAt">,
 ): Promise<void> {
@@ -183,6 +189,40 @@ export async function clearAccountAuthToken(): Promise<SavedAccountSession | nul
   } catch (error) {
     recordRemoveError(error);
     return null;
+  }
+}
+
+/**
+ * Signs out the active account without forgetting any saved session. The active
+ * pointer and in-memory token are cleared so the app is logged out, but every
+ * account stays listed so the sign-in chooser can offer them again (each is
+ * re-validated, and re-login is required, only when it is next selected).
+ */
+export async function deactivateActiveAccount(): Promise<void> {
+  accountSessionGeneration += 1;
+  cachedToken = null;
+  if (!hasTauriInternals()) return;
+  await syncManagedAiToken("");
+
+  if (isNativeMobileBuild) {
+    // Mobile keeps a single raw token and no multi-account chooser, so signing
+    // out clears it outright.
+    writeTokenStoredMarker(false);
+    try {
+      await remove(desktopTokenService, desktopTokenUser);
+    } catch (error) {
+      recordRemoveError(error);
+    }
+    return;
+  }
+
+  try {
+    const vault = await loadSecureVault();
+    if (vault.sessions.length === 0) return;
+    vault.activeAccountId = "";
+    await persistSecureVault(vault);
+  } catch (error) {
+    recordRemoveError(error);
   }
 }
 
