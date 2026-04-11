@@ -1,149 +1,85 @@
-import { useLayoutEffect, useRef } from "react";
-
-const playbackRetryDelaysMs = [0, 100, 500, 1_000, 2_000] as const;
-const playbackWatchdogIntervalMs = 1_000;
-const stalledPlaybackChecksBeforeRestart = 2;
+import { useEffect, useRef } from "react";
 
 export function AppWallpaperVideo(props: { src: string }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
 
-    let disposed = false;
-    let playbackConfirmed = false;
-    let lastCurrentTime = video.currentTime;
-    let retryIndex = 0;
-    let retryTimer: number | undefined;
-    let stalledPlaybackChecks = 0;
+    // React does not reliably set the muted *property* from the JSX attribute,
+    // and browsers/webviews only allow autoplay for genuinely muted video — so
+    // enforce it here, otherwise autoplay is blocked and the wallpaper never
+    // starts.
+    video.muted = true;
+    video.defaultMuted = true;
+    video.playsInline = true;
 
-    const cancelRetry = () => {
-      if (retryTimer === undefined) return;
-      window.clearTimeout(retryTimer);
-      retryTimer = undefined;
-    };
-
-    const prepareForPlayback = () => {
-      video.defaultMuted = true;
-      video.muted = true;
-      video.volume = 0;
-      video.controls = false;
-      video.setAttribute("muted", "");
-      video.setAttribute("webkit-playsinline", "");
-    };
-
-    const playbackStarted = () => {
-      playbackConfirmed = true;
-      retryIndex = 0;
-      stalledPlaybackChecks = 0;
-      cancelRetry();
-    };
-
-    const schedulePlayback = (restartRetries = false) => {
-      if (disposed) return;
-      if (playbackConfirmed && !video.paused) return;
-
-      if (restartRetries) {
-        playbackConfirmed = false;
-        retryIndex = 0;
-        cancelRetry();
-      }
-      if (retryTimer !== undefined) return;
-
-      // WKWebView can reject play() for longer than the initial page load while
-      // it restores a media session after a reload. Keep retrying at the capped
-      // delay instead of permanently giving up before that restoration ends.
-      const delay = playbackRetryDelaysMs[Math.min(retryIndex, playbackRetryDelaysMs.length - 1)];
-      retryIndex += 1;
-      retryTimer = window.setTimeout(() => {
-        retryTimer = undefined;
-        playImmediately();
-      }, delay);
-    };
-
-    const playImmediately = () => {
-      if (disposed || (playbackConfirmed && !video.paused)) return;
-      prepareForPlayback();
-      try {
-        void video.play().then(
-          () => {
-            if (disposed) return;
-            // A resolved play() promise is not enough on WKWebView startup.
-            // Wait for `playing` or timeline progress before stopping retries.
-            if (!playbackConfirmed) schedulePlayback();
-          },
-          () => schedulePlayback(),
-        );
-      } catch {
-        schedulePlayback();
+    let canceled = false;
+    const play = () => {
+      if (canceled) return;
+      const started = video.play();
+      if (started && typeof started.catch === "function") {
+        // Autoplay can reject transiently (e.g. before data is ready); the
+        // event listeners below retry, so a rejection here is safe to ignore.
+        started.catch(() => undefined);
       }
     };
 
-    const resumePlayback = () => {
-      schedulePlayback(true);
+    play();
+
+    // A wallpaper must always be playing. Resume it whenever it stalls: if it
+    // pauses for any reason, ends (loop backstop), becomes playable, or the tab
+    // regains visibility.
+    const resume = () => play();
+    const onEnded = () => {
+      video.currentTime = 0;
+      play();
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") play();
     };
 
-    const checkPlaybackProgress = () => {
-      if (disposed) return;
-      const currentTime = video.currentTime;
-      const progressed = Math.abs(currentTime - lastCurrentTime) > 0.01;
-      lastCurrentTime = currentTime;
-
-      if (progressed && !video.paused) {
-        playbackStarted();
-        return;
+    // Fallback for environments whose autoplay policy still requires a user
+    // gesture (e.g. a webview built before autoplay was enabled): the very first
+    // interaction anywhere starts playback, then these listeners remove
+    // themselves so they never interfere again.
+    const gestureEvents = ["pointerdown", "keydown", "touchstart"] as const;
+    const onFirstGesture = () => {
+      play();
+      for (const type of gestureEvents) {
+        document.removeEventListener(type, onFirstGesture, true);
       }
-      if (video.paused) {
-        stalledPlaybackChecks = 0;
-        schedulePlayback();
-        return;
-      }
-
-      stalledPlaybackChecks += 1;
-      if (stalledPlaybackChecks < stalledPlaybackChecksBeforeRestart) {
-        if (!playbackConfirmed) schedulePlayback();
-        return;
-      }
-
-      // WKWebView can claim the element is playing while its media pipeline is
-      // suspended at time zero. Cycling pause/play gives it a fresh attempt
-      // without requiring a pointer or keyboard event from the user.
-      playbackConfirmed = false;
-      stalledPlaybackChecks = 0;
-      video.pause();
-      schedulePlayback(true);
     };
 
-    prepareForPlayback();
-    video.addEventListener("loadeddata", resumePlayback);
-    video.addEventListener("canplay", resumePlayback);
-    video.addEventListener("pause", resumePlayback);
-    video.addEventListener("playing", playbackStarted);
-    video.addEventListener("timeupdate", playbackStarted);
-    document.addEventListener("visibilitychange", resumePlayback);
-    window.addEventListener("focus", resumePlayback);
-    window.addEventListener("pageshow", resumePlayback);
-    const watchdogTimer = window.setInterval(checkPlaybackProgress, playbackWatchdogIntervalMs);
-    resumePlayback();
+    video.addEventListener("pause", resume);
+    video.addEventListener("ended", onEnded);
+    video.addEventListener("stalled", resume);
+    video.addEventListener("loadeddata", resume);
+    video.addEventListener("canplay", resume);
+    document.addEventListener("visibilitychange", onVisibility);
+    for (const type of gestureEvents) {
+      document.addEventListener(type, onFirstGesture, true);
+    }
 
     return () => {
-      disposed = true;
-      cancelRetry();
-      window.clearInterval(watchdogTimer);
-      video.removeEventListener("loadeddata", resumePlayback);
-      video.removeEventListener("canplay", resumePlayback);
-      video.removeEventListener("pause", resumePlayback);
-      video.removeEventListener("playing", playbackStarted);
-      video.removeEventListener("timeupdate", playbackStarted);
-      document.removeEventListener("visibilitychange", resumePlayback);
-      window.removeEventListener("focus", resumePlayback);
-      window.removeEventListener("pageshow", resumePlayback);
+      canceled = true;
+      video.removeEventListener("pause", resume);
+      video.removeEventListener("ended", onEnded);
+      video.removeEventListener("stalled", resume);
+      video.removeEventListener("loadeddata", resume);
+      video.removeEventListener("canplay", resume);
+      document.removeEventListener("visibilitychange", onVisibility);
+      for (const type of gestureEvents) {
+        document.removeEventListener(type, onFirstGesture, true);
+      }
     };
   }, [props.src]);
 
   return (
     <video
+      ref={videoRef}
+      key={props.src}
       aria-hidden="true"
       autoPlay
       className="misty-app-wallpaper-video h-full w-full object-cover"
@@ -155,7 +91,6 @@ export function AppWallpaperVideo(props: { src: string }) {
       muted
       playsInline
       preload="auto"
-      ref={videoRef}
       src={props.src}
       tabIndex={-1}
     />

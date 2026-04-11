@@ -12,6 +12,12 @@ import { useMultiPanelStore } from "@/features/workspace";
 import type { ExplorerLocationResult } from "../components/ExplorerToolbar";
 import { cx } from "./ExplorerDesktopShared";
 import { explorerShellStyles } from "./ExplorerShellStyles";
+import {
+  explorerPathKey,
+  explorerPathName,
+  joinExplorerPath,
+  normalizeExplorerPath,
+} from "../utils/pathNormalization";
 
 export function ExplorerBottomBar(props: {
   sidebarVisible: boolean;
@@ -64,14 +70,15 @@ export function buildExplorerLocationResults(
   const seen = new Set<string>();
   const add = (label: string, path: string, badge: string) => {
     if (!path) return;
-    const key = normalizedPath(path) || "/";
+    const normalized = normalizedPath(path) || "/";
+    const key = explorerPathKey(normalized);
     if (seen.has(key)) return;
     seen.add(key);
     results.push({
       id: `${badge}:${key}`,
       label,
-      path,
-      subtitle: path,
+      path: normalized,
+      subtitle: normalized,
       badge,
     });
   };
@@ -213,8 +220,7 @@ function isAbsolutePath(path: string): boolean {
 }
 
 function normalizedPath(path: string): string {
-  if (path.startsWith("misty://")) return path.replace(/\/+$/, "");
-  return path.replace(/\/+$/, "");
+  return normalizeExplorerPath(path);
 }
 
 function titleFromPath(path: string): string {
@@ -222,15 +228,12 @@ function titleFromPath(path: string): string {
   if (path === "misty://recent") return "Recent";
   if (path === "misty://starred") return "Starred";
   if (path === "misty://trash") return "Trash";
-  const clean = normalizedPath(path);
-  return clean.split("/").filter(Boolean).pop() || clean || "Home";
+  return explorerPathName(path) || "Home";
 }
 
 function joinPath(...parts: string[]): string {
   const [first, ...rest] = parts;
-  return [first.replace(/\/+$/, ""), ...rest.map((part) => part.replace(/^\/+|\/+$/g, ""))].join(
-    "/",
-  );
+  return joinExplorerPath(first, ...rest);
 }
 
 export function multiPanelWorkspaceNeedsSave(

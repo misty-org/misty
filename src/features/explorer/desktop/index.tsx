@@ -171,7 +171,9 @@ import {
 } from "./ExplorerWorkspaceUtils";
 import { ExplorerNotifications, ExplorerRenameStatus } from "./ExplorerDesktopStatus";
 import {
+  canCloseExplorerTab,
   canOpenTerminalPath,
+  ensureFilesBrowseTab,
   ExplorerPluginTabContent,
   ExplorerPluginTabHeader,
   ExplorerTray,
@@ -379,6 +381,10 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
   const activeTabSupportsSidePanels = !isChromeTabPath(activeTabPath);
   const sidebarVisible = activeTabSupportsSidePanels && activeTabSidebarVisible;
   const previewVisible = activeTabSupportsSidePanels && activeTabPreviewVisible;
+
+  useEffect(() => {
+    ensureFilesBrowseTab(homePath);
+  }, [homePath, workspacePathSignature]);
 
   useEffect(() => {
     activePaneIdRef.current = activePaneId;
@@ -902,6 +908,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
         <main ref={mainRef} className={explorerShellStyles.main}>
           <MultiPanelWorkspace
             className="explorer-multipanel"
+            canCloseTab={(tab) => canCloseExplorerTab(tab, useMultiPanelStore.getState().tabs)}
             renderBottomBar={renderBottomBar}
             renderTabActions={renderTabActions}
             renderToolbar={renderToolbar}

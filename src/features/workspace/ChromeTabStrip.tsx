@@ -1,13 +1,9 @@
 import type { ChromeTabStripTab, ChromeTabStripProps } from "@/models/interfaces/workspace";
 export type { ChromeTabStripTab, ChromeTabStripProps } from "@/models/interfaces/workspace";
 import { Button } from "@/ui";
-import { Tabs } from "@sinm/react-chrome-tabs";
-import type { TabProperties } from "@sinm/react-chrome-tabs/dist/chrome-tabs";
-import { Plus } from "lucide-react";
-import "@sinm/react-chrome-tabs/css/chrome-tabs.css";
-import "@sinm/react-chrome-tabs/css/chrome-tabs-dark-theme.css";
+import { Plus, X } from "lucide-react";
 import "./chromeTabs.css";
-import { memo, useEffect, useMemo, useRef, type ReactNode } from "react";
+import { memo, useCallback, useEffect, useRef, type DragEvent, type WheelEvent } from "react";
 import { useExplorerDropRegistry } from "@/features/explorer/drag/ExplorerDragContext";
 import { createExplorerDropTargetSpec } from "@/features/explorer/drag/ExplorerDropTarget";
 
@@ -15,8 +11,6 @@ const chromeTabShellClass = [
   "misty-chrome-tabs-shell",
   "flex h-[46px] min-w-0 overflow-hidden",
   "!bg-[var(--misty-files-panel-bg,transparent)]",
-  "[&_.chrome-tab_.chrome-tab-background>svg_.chrome-tab-geometry]:!fill-[var(--misty-app-tab-bg,var(--misty-bg-soft))]",
-  "[&_.chrome-tab[active]_.chrome-tab-background>svg_.chrome-tab-geometry]:!fill-[var(--misty-app-tab-active-bg,var(--misty-surface-2))]",
 ].join(" ");
 
 const chromeTabTrayClass = [
@@ -26,31 +20,9 @@ const chromeTabTrayClass = [
 
 export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStripProps) {
   const shellRef = useRef<HTMLDivElement | null>(null);
+  const tabsRef = useRef<HTMLDivElement | null>(null);
+  const draggedTabIdRef = useRef<string | null>(null);
   const registerDropZone = useExplorerDropRegistry();
-  const packageTabs = useMemo<TabProperties[]>(
-    () =>
-      props.tabs.map((tab) => ({
-        id: tab.id,
-        title: tab.title,
-        active: tab.id === props.activeTabId,
-        isCloseIconVisible: props.canCloseTab ? props.canCloseTab(tab) : true,
-      })),
-    [props.activeTabId, props.canCloseTab, props.tabs],
-  );
-  const tabById = useMemo(() => new Map(props.tabs.map((tab) => [tab.id, tab])), [props.tabs]);
-
-  useEffect(() => {
-    const shell = shellRef.current;
-    if (!shell) return;
-    const preventNativeTabScroll = (event: WheelEvent) => {
-      const target = event.target as Element | null;
-      if (target?.closest(".chrome-tabs-content")) {
-        event.preventDefault();
-      }
-    };
-    shell.addEventListener("wheel", preventNativeTabScroll, { capture: true, passive: false });
-    return () => shell.removeEventListener("wheel", preventNativeTabScroll, { capture: true });
-  }, []);
 
   useEffect(() => {
     if (!registerDropZone) return;
@@ -80,32 +52,102 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
     };
   }, [props.activeTabId, props.onSelectTab, props.tabs, registerDropZone]);
 
+  const handleWheel = useCallback((event: WheelEvent<HTMLDivElement>) => {
+    const tabs = tabsRef.current;
+    if (!tabs || Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+    tabs.scrollLeft += event.deltaY;
+    event.preventDefault();
+  }, []);
+
+  const handleDragStart = useCallback((event: DragEvent<HTMLDivElement>, tabId: string) => {
+    draggedTabIdRef.current = tabId;
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", tabId);
+  }, []);
+
+  const handleDrop = useCallback(
+    (event: DragEvent<HTMLDivElement>, destinationTabId: string) => {
+      event.preventDefault();
+      const sourceTabId =
+        draggedTabIdRef.current || event.dataTransfer.getData("text/plain").trim();
+      draggedTabIdRef.current = null;
+      if (!sourceTabId || sourceTabId === destinationTabId || !props.onReorderTab) return;
+      const fromIndex = props.tabs.findIndex((tab) => tab.id === sourceTabId);
+      const toIndex = props.tabs.findIndex((tab) => tab.id === destinationTabId);
+      if (fromIndex < 0 || toIndex < 0) return;
+      props.onReorderTab(sourceTabId, fromIndex, toIndex);
+    },
+    [props.onReorderTab, props.tabs],
+  );
+
   return (
     <div ref={shellRef} className={chromeTabShellClass}>
-      <Tabs
-        tabs={packageTabs}
+      <div
+        ref={tabsRef}
         className="misty-chrome-tabs"
-        darkMode
-        draggable
-        pinnedRight={
-          <div className="misty-chrome-tabs-toolbar">
-            <Button
-              type="button"
-              className="misty-chrome-tabs-add"
-              title="New tab"
-              onClick={props.onAddTab}
+        role="tablist"
+        aria-label="Open locations"
+        onWheel={handleWheel}
+      >
+        {props.tabs.map((tab) => {
+          const active = tab.id === props.activeTabId;
+          const canClose = props.canCloseTab ? props.canCloseTab(tab) : true;
+          return (
+            <div
+              key={tab.id}
+              className="chrome-tab"
+              data-tab-id={tab.id}
+              data-active={active ? "true" : "false"}
+              draggable={Boolean(props.onReorderTab)}
+              onDragEnd={() => {
+                draggedTabIdRef.current = null;
+              }}
+              onDragOver={(event) => {
+                if (!props.onReorderTab) return;
+                event.preventDefault();
+                event.dataTransfer.dropEffect = "move";
+              }}
+              onDragStart={(event) => handleDragStart(event, tab.id)}
+              onDrop={(event) => handleDrop(event, tab.id)}
             >
-              <Plus size={17} strokeWidth={2.4} />
-            </Button>
-          </div>
-        }
-        onTabActive={props.onSelectTab}
-        onTabClose={(tabId) => {
-          const tab = tabById.get(tabId);
-          if (tab) props.onCloseTab(tab);
-        }}
-        onTabReorder={props.onReorderTab}
-      />
+              <button
+                type="button"
+                className="chrome-tab-select"
+                role="tab"
+                aria-selected={active}
+                title={tab.path}
+                onClick={() => props.onSelectTab(tab.id)}
+              >
+                <span className="chrome-tab-title">{tab.title}</span>
+              </button>
+              {canClose ? (
+                <button
+                  type="button"
+                  className="chrome-tab-close"
+                  aria-label={`Close ${tab.title}`}
+                  title={`Close ${tab.title}`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    props.onCloseTab(tab);
+                  }}
+                >
+                  <X size={13} strokeWidth={2} />
+                </button>
+              ) : null}
+            </div>
+          );
+        })}
+        <div className="misty-chrome-tabs-toolbar">
+          <Button
+            type="button"
+            className="misty-chrome-tabs-add"
+            title="New tab"
+            onClick={props.onAddTab}
+          >
+            <Plus size={17} strokeWidth={2.4} />
+          </Button>
+        </div>
+      </div>
       {props.actions ? <div className={chromeTabTrayClass}>{props.actions}</div> : null}
     </div>
   );
