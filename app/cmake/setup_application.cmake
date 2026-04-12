@@ -11,17 +11,31 @@ set(IMGUI_SRCS
 )
 
 
-file(GLOB_RECURSE APP_SRCS
-    "src/application/*.cpp"
-    "src/application/*.mm"
-    "src/application/*.h"
+set(APP_SRCS
+    "src/application.cpp"
+    "src/application.h"
+    "src/main.cpp"
     "vendor/glad/src/glad.cpp"
     ${IMGUI_SRCS}
 )
 
+file(GLOB_RECURSE APP_COMMON_SRCS CONFIGURE_DEPENDS
+    "src/core/*.cpp"
+    "src/core/*.mm"
+    "src/core/*.h"
+    "src/panels/*.cpp"
+    "src/panels/*.mm"
+    "src/panels/*.h"
+    "src/views/*.cpp"
+    "src/views/*.mm"
+    "src/views/*.h"
+)
+
+list(APPEND APP_SRCS ${APP_COMMON_SRCS})
+
 add_executable(misty)
 if(WIN32)
-    file(GLOB WIN32_SRCS "src/application/platform/windows/*.cpp" "src/application/platform/windows/*.h")
+    file(GLOB WIN32_SRCS "src/platform/windows/*.cpp" "src/platform/windows/*.h")
     list(APPEND APP_SRCS ${WIN32_SRCS})
     target_sources(misty PRIVATE ${APP_SRCS})
     if(CMAKE_BUILD_TYPE STREQUAL "Release")
@@ -50,7 +64,7 @@ if(WIN32)
         set_target_properties(misty PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "$<TARGET_FILE_DIR:misty>")
     endif()
 elseif(APPLE)
-    file(GLOB MAC_SRCS "application/platform/mac/*.cpp" "application/platform/mac/*.h")
+    file(GLOB MAC_SRCS "src/platform/mac/*.cpp" "src/platform/mac/*.h" "src/platform/mac/*.mm")
     list(APPEND APP_SRCS ${MAC_SRCS})
     target_sources(misty PRIVATE ${APP_SRCS})
     target_link_libraries(misty PRIVATE
@@ -61,8 +75,8 @@ elseif(APPLE)
     )
 elseif(UNIX AND NOT APPLE)
     file(GLOB LINUX_SRCS
-        "src/application/platform/linux/*.cpp"
-        "src/application/platform/linux/*.h"
+        "src/platform/linux/*.cpp"
+        "src/platform/linux/*.h"
     )
     list(APPEND APP_SRCS ${LINUX_SRCS})
     target_sources(misty PRIVATE ${APP_SRCS})
@@ -89,7 +103,7 @@ target_include_directories(misty PRIVATE
     ${IMGUI_DIR}/backends
     ${CMAKE_SOURCE_DIR}/src/proto_src
     ${CMAKE_SOURCE_DIR}/src/dfs
-    ${CMAKE_SOURCE_DIR}/src/application
+    ${CMAKE_SOURCE_DIR}/src
 )
 
 target_link_libraries(misty PRIVATE 
@@ -117,11 +131,6 @@ add_custom_target(misty_assets ALL
     COMMAND ${CMAKE_COMMAND} -E copy
         "${CMAKE_CURRENT_SOURCE_DIR}/misty.conf"
         "$<TARGET_FILE_DIR:misty>/misty.conf"
-    COMMAND ${CMAKE_COMMAND} -E copy
-        "${CMAKE_CURRENT_SOURCE_DIR}/commands.msy"
-        "$<TARGET_FILE_DIR:misty>/commands.msy"
 )
 
 add_dependencies(misty_assets misty)
-
-

@@ -117,10 +117,16 @@ func main() {
 	proxy.MountHandlers()
 	proxy.TSBase.StartTSConnection()
 
+	if proxy.AIService == nil || !proxy.AIService.Ready() {
+		log.Println("ai: Gemini disabled; set GEMINI_API_KEY to enable file-context chat")
+	} else {
+		log.Println("ai: Gemini ready with model", proxy.AIService.Model())
+	}
+
 	if err := http.ListenAndServe(":3000", proxy.Router); err != nil {
-    	panic(err)
+		panic(err)
 	}
 
 	proxy.Database.Stop()
-	
+
 }
