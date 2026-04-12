@@ -1,6 +1,6 @@
 export type NoteSource = "misty" | "notion";
 
-export type NoteBodyFormat = "markdown" | "html" | "notion-blocks";
+export type NoteBodyFormat = "markdown" | "blocknote-json" | "html" | "notion-blocks";
 
 export type NoteSyncStatus = "synced" | "syncing" | "error" | "conflict" | "local-only";
 
@@ -18,6 +18,8 @@ export type UnifiedNote = {
   title: string;
   body: string;
   bodyFormat: NoteBodyFormat;
+  /** Plain markdown projection for search, previews, publishing, and legacy readers. */
+  bodyMarkdown?: string;
   preview: string;
   spaceId?: string;
   spaceName?: string;

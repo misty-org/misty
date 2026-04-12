@@ -44,6 +44,8 @@ import type {
   LaunchOnLoginSnapshot,
   ListDirectoryRequest,
   NativeWorkspaceDocument,
+  NoteAssetStoreRequest,
+  NoteAssetStoreResult,
   OpenWithAssociation,
   OperationDescriptor,
   OperationQueueSnapshot,
@@ -205,6 +207,12 @@ export function clipboardWriteFileBytes(
   items: Array<{ name: string; bytes: number[] }>,
 ): Promise<boolean> {
   return invoke("clipboard_write_file_bytes", { items });
+}
+
+export function notesStoreAsset(
+  request: NoteAssetStoreRequest,
+): Promise<NoteAssetStoreResult> {
+  return invoke("notes_store_asset", { request });
 }
 
 export function devicesSnapshot(): Promise<DeviceSnapshot> {

@@ -2,14 +2,14 @@ import type {
   AiPanelMessage,
   AssistantScope,
   AssistantRequestScope,
-  MikaContextSource,
-} from "@/models/types/stores/assistant/useMikaSessionStore";
+  AgentContextSource,
+} from "@/models/types/stores/assistant/useAgentSessionStore";
 export type {
   AiPanelMessage,
   AssistantScope,
   AssistantRequestScope,
-  MikaContextSource,
-} from "@/models/types/stores/assistant/useMikaSessionStore";
+  AgentContextSource,
+} from "@/models/types/stores/assistant/useAgentSessionStore";
 import type {
   AiStatus,
   AiPlanReview,
@@ -17,7 +17,7 @@ import type {
   SendAiPromptRequest,
   AiConversationSummary,
   AiSessionStore,
-} from "@/models/interfaces/stores/assistant/useMikaSessionStore";
+} from "@/models/interfaces/stores/assistant/useAgentSessionStore";
 export type {
   AiStatus,
   AiPlanReview,
@@ -25,7 +25,7 @@ export type {
   SendAiPromptRequest,
   AiConversationSummary,
   AiSessionStore,
-} from "@/models/interfaces/stores/assistant/useMikaSessionStore";
+} from "@/models/interfaces/stores/assistant/useAgentSessionStore";
 import { create } from "zustand";
 import {
   explorerCreateItem,
@@ -38,7 +38,7 @@ import { errorText } from "@/lib/format";
 import {
   hydrateServerSessions,
   loadConversationTranscript,
-} from "@/stores/assistant/mikaSessionSync";
+} from "@/stores/assistant/agentSessionSync";
 import { isNativeMobileBuild } from "@/platform/buildTarget";
 import { selectAssistantPreferences, useSettingsStore } from "@/stores/app";
 import {
@@ -66,10 +66,10 @@ import type { AgentCitation } from "@/models/interfaces/features/agents/types";
 import {
   deviceRelativePath,
   isSafeRelativePath,
-  mikaServerContext,
+  agentServerContext,
 } from "@/features/agents/pathPrivacy";
 import { mistyDocumentsEnabled } from "@/features/agents/flags";
-import { publicMikaDisplayName, publicMikaModel } from "./useMikaDelegationStore";
+import { publicAgentDisplayName, publicAgentModel } from "./useAgentDelegationStore";
 import { initialAgentModelId, initialAgentModelName } from "@/features/agents/modelSelection";
 
 let pollTimer: number | null = null;
@@ -81,7 +81,7 @@ let activeRoot: string | null = null;
 let activeScopeId: string | null = null;
 let activeSelectedPaths: string[] = [];
 let activeRequestScope: AssistantScope | null = null;
-let activeContextSources: MikaContextSource[] = [];
+let activeContextSources: AgentContextSource[] = [];
 // The active chat's per-chat model, overriding the agent's configured model.
 // Null means the chat follows the agent's model (or the base default).
 let activeAgentModelOverride: string | null = null;
@@ -91,27 +91,27 @@ let activeAgentReasoningOverride: string | null = null;
 const pendingReseedConversationIds = new Set<string>();
 let drainInFlight: Promise<void> | null = null;
 let abortRequested = false;
-let mikaRuntimeGeneration = 0;
+let agentRuntimeGeneration = 0;
 const processedEventSequences = new Set<number>();
 const processedToolRequestIds = new Set<string>();
 const aiToolTimeoutMs = 15000;
 
-class MikaRuntimeChangedError extends Error {
+class AgentRuntimeChangedError extends Error {
   constructor() {
     super("Agent conversation changed while the request was running.");
-    this.name = "MikaRuntimeChangedError";
+    this.name = "AgentRuntimeChangedError";
   }
 }
 
-function mikaRuntimeIsCurrent(generation: number, sessionId?: string | null): boolean {
+function agentRuntimeIsCurrent(generation: number, sessionId?: string | null): boolean {
   return (
-    generation === mikaRuntimeGeneration &&
+    generation === agentRuntimeGeneration &&
     (sessionId === undefined || sessionId === activeSessionId)
   );
 }
 
-function assertMikaRuntime(generation: number, sessionId?: string | null): void {
-  if (!mikaRuntimeIsCurrent(generation, sessionId)) throw new MikaRuntimeChangedError();
+function assertAgentRuntime(generation: number, sessionId?: string | null): void {
+  if (!agentRuntimeIsCurrent(generation, sessionId)) throw new AgentRuntimeChangedError();
 }
 
 interface ConversationRuntimeSnapshot {
@@ -121,7 +121,7 @@ interface ConversationRuntimeSnapshot {
   activeScopeId: string | null;
   activeSelectedPaths: string[];
   requestScope: AssistantScope | null;
-  contextSources: MikaContextSource[];
+  contextSources: AgentContextSource[];
 }
 interface StoredConversation {
   id: string;
@@ -146,16 +146,16 @@ interface StoredConversation {
 
 const conversationSnapshots = new Map<string, StoredConversation>();
 let nextConversationSeq = 1;
-export const filesMikaScopeKey = "files";
-let activeConversationScopeKey = filesMikaScopeKey;
+export const filesAgentScopeKey = "files";
+let activeConversationScopeKey = filesAgentScopeKey;
 let scopeActivationGeneration = 0;
 const initialConversationId = newConversationId();
 
-export function spaceMikaScopeKey(accountId: string, spaceId: string): string {
+export function spaceAgentScopeKey(accountId: string, spaceId: string): string {
   return `account:${encodeURIComponent(accountId)}:space:${encodeURIComponent(spaceId)}`;
 }
 
-export function agentMikaScopeKey(
+export function agentScopeKey(
   accountId: string,
   agentId = "",
   spaceId = "",
@@ -169,7 +169,7 @@ export function agentMikaScopeKey(
 }
 
 function newConversationId(): string {
-  return `mika-local-${Date.now()}-${nextConversationSeq++}`;
+  return `agent-local-${Date.now()}-${nextConversationSeq++}`;
 }
 
 function emptyStoredConversation(
@@ -341,7 +341,7 @@ function snapshotActiveConversation(
   });
 }
 
-function mikaSyncDeps(scopeKey = activeConversationScopeKey) {
+function agentSyncDeps(scopeKey = activeConversationScopeKey) {
   return {
     snapshots: conversationSnapshots,
     createSnapshot: (id: string, updatedAt: number) =>
@@ -352,7 +352,7 @@ function mikaSyncDeps(scopeKey = activeConversationScopeKey) {
 }
 
 function applyConversationRuntime(snapshot: StoredConversation): void {
-  mikaRuntimeGeneration += 1;
+  agentRuntimeGeneration += 1;
   activeAgentModelOverride = snapshot.modelId ?? null;
   activeAgentReasoningOverride = snapshot.reasoningEffort ?? null;
   activeSessionId = snapshot.runtime.sessionId;
@@ -517,7 +517,7 @@ function appendBlockedRequest(
   }));
 }
 
-export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
+export const useAgentSessionStore = create<AiSessionStore>((set, get) => ({
   status: serverStatus(false),
   mode: "auto",
   messages: [],
@@ -528,20 +528,20 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
     { id: initialConversationId, title: "New chat", updatedAt: Date.now(), createdAt: Date.now() },
   ],
   activeConversationId: initialConversationId,
-  conversationScopeKey: filesMikaScopeKey,
+  conversationScopeKey: filesAgentScopeKey,
   activeModelId: "",
   activeReasoningEffort: "",
 
   refreshStatus: async () => {
-    const generation = mikaRuntimeGeneration;
+    const generation = agentRuntimeGeneration;
     try {
       const status = await fetchAgentStatus();
-      if (!mikaRuntimeIsCurrent(generation)) return;
+      if (!agentRuntimeIsCurrent(generation)) return;
       set({ status: serverStatusFromResponse(status), error: status.error });
     } catch (error) {
-      if (!mikaRuntimeIsCurrent(generation)) return;
+      if (!agentRuntimeIsCurrent(generation)) return;
       const message = errorText(error);
-      recordAiDebug("error", "Mika status check failed.", message);
+      recordAiDebug("error", "Agent status check failed.", message);
       set({ status: serverStatus(false, message, false), error: message });
     }
   },
@@ -640,7 +640,7 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
   sendPrompt: async ({ displayPrompt, prompt, cwd, selectedPaths, contextSources }) => {
     const trimmed = displayPrompt.trim();
     if (!trimmed || get().status?.running) return;
-    const generation = mikaRuntimeGeneration;
+    const generation = agentRuntimeGeneration;
     const conversationId = get().activeConversationId;
     // When this chat's model was just switched with history kept, replay the
     // prior transcript to the new model on this first turn so it has full context.
@@ -649,7 +649,7 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
       : "";
     const settingsStore = useSettingsStore.getState();
     if (!settingsStore.loaded) await settingsStore.load();
-    if (!mikaRuntimeIsCurrent(generation) || conversationId !== get().activeConversationId) return;
+    if (!agentRuntimeIsCurrent(generation) || conversationId !== get().activeConversationId) return;
     const preferences = selectAssistantPreferences(useSettingsStore.getState().settings?.document);
     if (!preferences.enabled) {
       appendBlockedRequest(
@@ -659,7 +659,7 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
       );
       return;
     }
-    const inSpace = activeConversationScopeKey !== filesMikaScopeKey;
+    const inSpace = activeConversationScopeKey !== filesAgentScopeKey;
     if (inSpace && !get().status?.spaceScopedSessions) {
       appendBlockedRequest(
         set,
@@ -724,13 +724,13 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
     }));
     try {
       await ensureSession(generation);
-      assertMikaRuntime(generation);
+      assertAgentRuntime(generation);
       const registeredScope = cwd
         ? await agentsRegisterFolderScope({ path: cwd }).catch(() => null)
         : null;
-      assertMikaRuntime(generation);
+      assertAgentRuntime(generation);
       activeScopeId = registeredScope?.id ?? null;
-      const serverContext = mikaServerContext(
+      const serverContext = agentServerContext(
         cwd,
         selectedPaths ?? [],
         registeredScope?.id ?? null,
@@ -748,11 +748,11 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
         generation,
       );
       if (reseedTranscript) pendingReseedConversationIds.delete(conversationId);
-      assertMikaRuntime(generation);
+      assertAgentRuntime(generation);
       ensureAiPolling(set, get);
       await drainAiEvents(set, get);
     } catch (error) {
-      if (error instanceof MikaRuntimeChangedError || !mikaRuntimeIsCurrent(generation)) return;
+      if (error instanceof AgentRuntimeChangedError || !agentRuntimeIsCurrent(generation)) return;
       stopAiPolling();
       const message = errorText(error);
       if (abortRequested && message.toLowerCase().includes("canceled")) {
@@ -760,7 +760,7 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
         set((state) => ({ error: null, status: statusWithRunning(state.status, false) }));
         return;
       }
-      recordAiDebug("error", "Mika send failed.", message);
+      recordAiDebug("error", "Agent send failed.", message);
       set((state) => ({
         error: message,
         status: statusWithRunning(state.status, false, message),
@@ -771,7 +771,7 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
 
   approveToolRequest: async (requestId) => {
     const sessionId = activeSessionId;
-    const generation = mikaRuntimeGeneration;
+    const generation = agentRuntimeGeneration;
     const approval = get().toolApprovals.find((candidate) => candidate.id === requestId);
     if (!sessionId || !approval || approval.running || approval.completed) return;
     set((state) => ({
@@ -782,9 +782,9 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
     }));
     try {
       const result = await runToolRequest(approval.request, approval.scope);
-      assertMikaRuntime(generation, sessionId);
+      assertAgentRuntime(generation, sessionId);
       await submitToolResults(sessionId, [result]);
-      assertMikaRuntime(generation, sessionId);
+      assertAgentRuntime(generation, sessionId);
       set((state) => ({
         toolApprovals: state.toolApprovals.map((candidate) =>
           candidate.id === requestId
@@ -800,10 +800,10 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
       ensureAiPolling(set, get);
       await drainAiEvents(set, get);
     } catch (error) {
-      if (error instanceof MikaRuntimeChangedError || !mikaRuntimeIsCurrent(generation, sessionId))
+      if (error instanceof AgentRuntimeChangedError || !agentRuntimeIsCurrent(generation, sessionId))
         return;
       const message = errorText(error);
-      recordAiDebug("error", "Mika approved tool failed.", message);
+      recordAiDebug("error", "Agent approved tool failed.", message);
       set((state) => ({
         error: message,
         status: statusWithRunning(state.status, false, message),
@@ -816,7 +816,7 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
   },
 
   approvePlan: async (planId) => {
-    const generation = mikaRuntimeGeneration;
+    const generation = agentRuntimeGeneration;
     const plan = get().plans.find((candidate) => candidate.id === planId);
     if (!plan || plan.applied || plan.applying) return;
     const blockedReasons =
@@ -850,7 +850,7 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
     }));
     try {
       await applyFilePlan(plan.plan);
-      assertMikaRuntime(generation);
+      assertAgentRuntime(generation);
       const appliedSummary = queuedSummaryForPlan(plan.plan);
       set((state) => ({
         plans: state.plans.map((candidate) =>
@@ -864,7 +864,7 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
         ],
       }));
     } catch (error) {
-      if (error instanceof MikaRuntimeChangedError || !mikaRuntimeIsCurrent(generation)) return;
+      if (error instanceof AgentRuntimeChangedError || !agentRuntimeIsCurrent(generation)) return;
       const message = errorText(error);
       set((state) => ({
         error: message,
@@ -879,15 +879,15 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
   },
 
   abortPrompt: async () => {
-    const generation = mikaRuntimeGeneration;
+    const generation = agentRuntimeGeneration;
     const sessionId = activeSessionId;
     abortRequested = true;
     try {
       if (sessionId) await cancelAgentSession(sessionId);
     } catch (error) {
-      if (mikaRuntimeIsCurrent(generation, sessionId)) set({ error: errorText(error) });
+      if (agentRuntimeIsCurrent(generation, sessionId)) set({ error: errorText(error) });
     } finally {
-      if (!mikaRuntimeIsCurrent(generation, sessionId)) return;
+      if (!agentRuntimeIsCurrent(generation, sessionId)) return;
       stopAiPolling();
       drainInFlight = null;
       resetActiveSession();
@@ -899,7 +899,7 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
     const sessionId = activeSessionId;
     if (sessionId)
       void deleteAgentSession(sessionId).catch((error) => {
-        recordAiDebug("warn", "Mika conversation deletion failed.", errorText(error));
+        recordAiDebug("warn", "Agent conversation deletion failed.", errorText(error));
       });
     stopAiPolling();
     activeSessionId = null;
@@ -916,7 +916,7 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
   },
 
   activateConversationScope: async (scopeKey) => {
-    const nextScopeKey = scopeKey.trim() || filesMikaScopeKey;
+    const nextScopeKey = scopeKey.trim() || filesAgentScopeKey;
     const generation = ++scopeActivationGeneration;
     if (nextScopeKey === activeConversationScopeKey) return;
     await suspendActiveConversation(set, get);
@@ -928,7 +928,7 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
     const agentScope = parseAgentScopeKey(nextScopeKey);
     if (agentScope?.agentId) {
       await hydrateServerSessions(
-        mikaSyncDeps(nextScopeKey),
+        agentSyncDeps(nextScopeKey),
         (session) =>
           session.agent_id === agentScope.agentId &&
           (session.space_id ?? "") === (agentScope.spaceId ?? ""),
@@ -1015,7 +1015,7 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
       await loadConversationTranscript(
         id,
         target.runtime.sessionId,
-        mikaSyncDeps(),
+        agentSyncDeps(),
         (messages) => set({ messages }),
         () => get().activeConversationId,
       );
@@ -1041,7 +1041,7 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
       (id === get().activeConversationId ? activeSessionId : null);
     if (sessionId) {
       await renameAgentSession(sessionId, next).catch((error: unknown) =>
-        recordAiDebug("warn", "Mika chat rename could not be saved.", errorText(error)),
+        recordAiDebug("warn", "Agent chat rename could not be saved.", errorText(error)),
       );
     }
   },
@@ -1050,13 +1050,13 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
     // The current server session schema has no Space scope metadata. Hydrating
     // an unlabelled server session into a Space could expose another Space's
     // private conversation, so only the Files scope may import legacy rows.
-    if (activeConversationScopeKey !== filesMikaScopeKey) return;
-    const generation = mikaRuntimeGeneration;
+    if (activeConversationScopeKey !== filesAgentScopeKey) return;
+    const generation = agentRuntimeGeneration;
     const added = await hydrateServerSessions(
-      mikaSyncDeps(),
+      agentSyncDeps(),
       (session) => !session.agent_id && !session.space_id,
     );
-    if (!mikaRuntimeIsCurrent(generation) || activeConversationScopeKey !== filesMikaScopeKey)
+    if (!agentRuntimeIsCurrent(generation) || activeConversationScopeKey !== filesAgentScopeKey)
       return;
     if (added.length === 0) return;
     set((state) => ({
@@ -1101,21 +1101,19 @@ export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
   },
 }));
 
-export const useAiSessionStore = useMikaSessionStore;
-
-export function resetMikaAccountState(): void {
+export function resetAgentAccountState(): void {
   stopAiPolling();
   resetActiveSession();
   activeRoot = null;
   conversationSnapshots.clear();
   scopeActivationGeneration += 1;
-  activeConversationScopeKey = filesMikaScopeKey;
+  activeConversationScopeKey = filesAgentScopeKey;
   activeContextSources = [];
   activeAgentModelOverride = null;
   activeAgentReasoningOverride = null;
   pendingReseedConversationIds.clear();
   const freshId = newConversationId();
-  useMikaSessionStore.setState({
+  useAgentSessionStore.setState({
     status: serverStatus(false),
     mode: "auto",
     messages: [],
@@ -1126,7 +1124,7 @@ export function resetMikaAccountState(): void {
       { id: freshId, title: "New chat", updatedAt: Date.now(), createdAt: Date.now() },
     ],
     activeConversationId: freshId,
-    conversationScopeKey: filesMikaScopeKey,
+    conversationScopeKey: filesAgentScopeKey,
     activeModelId: "",
     activeReasoningEffort: "",
   });
@@ -1140,11 +1138,11 @@ function ensureAiPolling(
 ): void {
   if (pollTimer !== null || typeof window === "undefined") return;
   pollTimer = window.setInterval(() => {
-    const generation = mikaRuntimeGeneration;
+    const generation = agentRuntimeGeneration;
     void drainAiEvents(set, get).catch((error) => {
-      if (error instanceof MikaRuntimeChangedError || !mikaRuntimeIsCurrent(generation)) return;
+      if (error instanceof AgentRuntimeChangedError || !agentRuntimeIsCurrent(generation)) return;
       const message = errorText(error);
-      recordAiDebug("error", "Mika polling failed.", message);
+      recordAiDebug("error", "Agent polling failed.", message);
       stopAiPolling();
       set((state) => ({
         error: message,
@@ -1162,7 +1160,7 @@ async function drainAiEvents(
   get: () => AiSessionStore,
 ): Promise<void> {
   if (drainInFlight) return drainInFlight;
-  const generation = mikaRuntimeGeneration;
+  const generation = agentRuntimeGeneration;
   const sessionId = activeSessionId;
   if (!sessionId) return;
   const task = drainAiEventsOnce(set, get, generation, sessionId);
@@ -1182,10 +1180,10 @@ async function drainAiEventsOnce(
   generation: number,
   sessionId: string,
 ): Promise<void> {
-  if (!mikaRuntimeIsCurrent(generation, sessionId)) return;
+  if (!agentRuntimeIsCurrent(generation, sessionId)) return;
   const afterSequence = lastEventSequence;
   const { events } = await fetchAgentEvents(sessionId, afterSequence);
-  if (!mikaRuntimeIsCurrent(generation, sessionId)) return;
+  if (!agentRuntimeIsCurrent(generation, sessionId)) return;
   const nextEvents = events.filter((event) => {
     if (event.sequence <= lastEventSequence) return false;
     if (processedEventSequences.has(event.sequence)) return false;
@@ -1194,7 +1192,7 @@ async function drainAiEventsOnce(
   });
   recordAiDebug(
     "info",
-    "Fetched Mika events.",
+    "Fetched agent events.",
     `session=${sessionId} count=${events.length} new=${nextEvents.length} after=${afterSequence}`,
   );
   if (nextEvents.length === 0) {
@@ -1234,9 +1232,9 @@ async function drainAiEventsOnce(
             : `Running ${request.name}`,
         });
         if (!request.approval_required || get().mode === "full") {
-          recordAiDebug("info", "Running Mika tool request.", `${request.name} ${request.id}`);
+          recordAiDebug("info", "Running agent tool request.", `${request.name} ${request.id}`);
           toolResults.push(await runToolRequestWithTimeout(request, activeRequestScope));
-          if (!mikaRuntimeIsCurrent(generation, sessionId)) return;
+          if (!agentRuntimeIsCurrent(generation, sessionId)) return;
         } else {
           nextToolApprovals.push({
             id: request.id,
@@ -1273,7 +1271,7 @@ async function drainAiEventsOnce(
       });
     }
   }
-  if (!mikaRuntimeIsCurrent(generation, sessionId)) return;
+  if (!agentRuntimeIsCurrent(generation, sessionId)) return;
   set((state) => ({
     messages: [...state.messages, ...nextMessages],
     plans: [...state.plans, ...nextPlans],
@@ -1282,7 +1280,7 @@ async function drainAiEventsOnce(
   }));
   if (toolResults.length > 0) {
     await submitToolResults(sessionId, toolResults);
-    if (!mikaRuntimeIsCurrent(generation, sessionId)) return;
+    if (!agentRuntimeIsCurrent(generation, sessionId)) return;
     await drainAiEventsOnce(set, get, generation, sessionId);
     return;
   }
@@ -1296,18 +1294,18 @@ async function settleEmptyEventPoll(
   generation: number,
   sessionId: string,
 ): Promise<void> {
-  if (!mikaRuntimeIsCurrent(generation, sessionId)) return;
+  if (!agentRuntimeIsCurrent(generation, sessionId)) return;
   try {
     const status = await fetchAgentStatus();
-    if (!mikaRuntimeIsCurrent(generation, sessionId)) return;
+    if (!agentRuntimeIsCurrent(generation, sessionId)) return;
     if (status.running) {
       set({ status: serverStatusFromResponse(status) });
-      ensureAiPolling(set, useMikaSessionStore.getState);
+      ensureAiPolling(set, useAgentSessionStore.getState);
       return;
     }
     set({ status: serverStatusFromResponse(status) });
   } catch {
-    if (!mikaRuntimeIsCurrent(generation, sessionId)) return;
+    if (!agentRuntimeIsCurrent(generation, sessionId)) return;
     set({ status: serverStatus(false) });
   }
   stopAiPolling();
@@ -1319,13 +1317,13 @@ function stopAiPolling(): void {
   pollTimer = null;
 }
 
-async function ensureSession(generation = mikaRuntimeGeneration): Promise<string> {
-  assertMikaRuntime(generation);
+async function ensureSession(generation = agentRuntimeGeneration): Promise<string> {
+  assertAgentRuntime(generation);
   if (activeSessionId) return activeSessionId;
   const scopeKey = activeConversationScopeKey;
   const agentScope = parseAgentScopeKey(scopeKey);
   const sessionInput = agentScope ?? {
-    spaceId: scopeKey === filesMikaScopeKey ? undefined : activeSpaceIdFromScopeKey(scopeKey),
+    spaceId: scopeKey === filesAgentScopeKey ? undefined : activeSpaceIdFromScopeKey(scopeKey),
   };
   // A per-chat model override wins over the agent's configured model. The server
   // treats a supplied model_id as this session's model without touching the agent.
@@ -1334,11 +1332,11 @@ async function ensureSession(generation = mikaRuntimeGeneration): Promise<string
   // A per-chat effort override wins over the agent's configured effort for this session.
   if (activeAgentReasoningOverride) sessionInput.reasoningEffort = activeAgentReasoningOverride;
   const session = await createAgentSession(sessionInput);
-  assertMikaRuntime(generation);
-  if (scopeKey !== activeConversationScopeKey) throw new MikaRuntimeChangedError();
+  assertAgentRuntime(generation);
+  if (scopeKey !== activeConversationScopeKey) throw new AgentRuntimeChangedError();
   activeSessionId = session.session_id;
   lastEventSequence = 0;
-  recordAiDebug("info", "Created Mika session.", activeSessionId);
+  recordAiDebug("info", "Created agent session.", activeSessionId);
   return activeSessionId;
 }
 
@@ -1358,20 +1356,20 @@ function parseAgentScopeKey(
 
 async function sendAgentMessageOnce(
   body: Parameters<typeof sendAgentMessage>[1],
-  generation = mikaRuntimeGeneration,
+  generation = agentRuntimeGeneration,
 ): Promise<void> {
   const sessionId = await ensureSession(generation);
-  assertMikaRuntime(generation, sessionId);
+  assertAgentRuntime(generation, sessionId);
   recordAiDebug(
     "info",
-    "Sending message to Mika server.",
+    "Sending message to the agent server.",
     `session=${sessionId} cwd=${activeRoot ?? ""}`,
   );
   try {
     await sendAgentMessage(sessionId, body);
-    assertMikaRuntime(generation, sessionId);
+    assertAgentRuntime(generation, sessionId);
   } catch (error) {
-    assertMikaRuntime(generation, sessionId);
+    assertAgentRuntime(generation, sessionId);
     if (isSessionNotFoundError(error)) {
       resetActiveSession(false);
       throw new Error(
@@ -1383,7 +1381,7 @@ async function sendAgentMessageOnce(
 }
 
 function resetActiveSession(invalidateRuntime = true): void {
-  if (invalidateRuntime) mikaRuntimeGeneration += 1;
+  if (invalidateRuntime) agentRuntimeGeneration += 1;
   activeSessionId = null;
   lastEventSequence = 0;
   drainInFlight = null;
@@ -1700,8 +1698,8 @@ function serverStatusFromResponse(response: AgentStatusResponse): AiStatus {
     spaceScopedSessions: Boolean(
       response.space_scoped_sessions ?? response.capabilities?.space_scoped_sessions,
     ),
-    model: publicMikaModel(response.model),
-    modelName: publicMikaDisplayName(response.model, response.model_name),
+    model: publicAgentModel(response.model),
+    modelName: publicAgentDisplayName(response.model, response.model_name),
     running: response.running,
     sessionId: response.session_id ?? activeSessionId,
     error: response.error,
@@ -1787,7 +1785,7 @@ function basename(path: string): string {
 function recordAiDebug(level: "info" | "warn" | "error", message: string, detail?: string): void {
   if (!aiDebugEnabled()) return;
   void import("@/platform/clientDebug").then(({ recordClientDebugEvent }) => {
-    recordClientDebugEvent({ level, scope: "mika", message, detail });
+    recordClientDebugEvent({ level, scope: "agent", message, detail });
   });
 }
 

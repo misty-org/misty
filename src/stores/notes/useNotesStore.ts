@@ -161,13 +161,17 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
   },
 
   async updateNoteBody(noteId: string, body: string) {
+    await get().updateNoteContent(noteId, { body, bodyFormat: "markdown" });
+  },
+
+  async updateNoteContent(noteId: string, content) {
     const note = findNote(get().notes, noteId);
     if (!note) return;
     const generation = notesLoadGeneration;
     const activeRegistry = registry;
     const connector = activeRegistry.forSource(note.source);
     try {
-      const updated = await connector?.updateNote?.(note.sourceId, { body });
+      const updated = await connector?.updateNote?.(note.sourceId, content);
       if (!updated || !notesActionIsCurrent(generation, activeRegistry)) return;
       replaceNote(set, noteId, updated);
     } catch (reason) {
@@ -203,7 +207,10 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
     if (!note || !connector?.publishNote) return;
     set({ publishingNoteId: noteId, publishError: "" });
     try {
-      const result = await connector.publishNote({ title: note.title, body: note.body });
+      const result = await connector.publishNote({
+        title: note.title,
+        body: note.bodyMarkdown ?? note.body,
+      });
       if (!notesActionIsCurrent(generation, activeRegistry)) return;
       const skipped = result.skippedProperties.length
         ? `Published. ${result.skippedProperties.length} field could not be mapped.`

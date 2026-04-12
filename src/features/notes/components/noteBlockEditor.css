@@ -62,6 +62,18 @@
   background: var(--misty-code-bg);
 }
 
+.misty-note-block-editor .bn-editor [data-content-type="codeBlock"] pre {
+  overflow-x: auto;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.misty-note-block-editor .bn-editor [data-content-type="image"] img,
+.misty-note-block-editor .bn-editor [data-content-type="video"] video,
+.misty-note-block-editor .bn-editor [data-content-type="audio"] audio {
+  max-width: 100%;
+}
+
 .misty-note-block-editor .bn-editor a {
   color: var(--primary);
   text-underline-offset: 2px;

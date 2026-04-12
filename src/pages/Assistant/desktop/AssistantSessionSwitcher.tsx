@@ -5,7 +5,7 @@ import { Button } from "@/ui";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui";
 import { Separator } from "@/ui";
 import { cn } from "@/ui";
-import { useMikaSessionStore } from "@/stores/assistant/useMikaSessionStore";
+import { useAgentSessionStore } from "@/stores/assistant/useAgentSessionStore";
 
 export function AssistantSessionSwitcher() {
   const [open, setOpen] = useState(false);
@@ -15,7 +15,7 @@ export function AssistantSessionSwitcher() {
     startNewConversation,
     switchConversation,
     deleteConversationSession,
-  } = useMikaSessionStore(
+  } = useAgentSessionStore(
     useShallow((state) => ({
       conversations: state.conversations,
       activeConversationId: state.activeConversationId,

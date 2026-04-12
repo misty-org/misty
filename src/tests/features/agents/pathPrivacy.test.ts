@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { deviceRelativePath, mikaServerContext } from "@/features/agents/pathPrivacy";
+import { deviceRelativePath, agentServerContext } from "@/features/agents/pathPrivacy";
 
-describe("Mika path privacy", () => {
+describe("Agent path privacy", () => {
   it("sends an opaque scope and relative selected paths", () => {
-    const context = mikaServerContext(
+    const context = agentServerContext(
       "/Users/alice/Private Reports",
       ["/Users/alice/Private Reports/2026/Q2.pdf", "/Users/alice/elsewhere.txt"],
       "scope_opaque",

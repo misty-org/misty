@@ -12,11 +12,11 @@ import {
   DialogTitle,
 } from "@/ui";
 import { safeTauriAssetUrl } from "@/platform/tauri";
-import type { AiPanelMessage } from "@/models/types/stores/assistant/useMikaSessionStore";
+import type { AiPanelMessage } from "@/models/types/stores/assistant/useAgentSessionStore";
 import type {
   AiPlanReview,
   AiToolApproval,
-} from "@/models/interfaces/stores/assistant/useMikaSessionStore";
+} from "@/models/interfaces/stores/assistant/useAgentSessionStore";
 import { cx } from "@/features/explorer/desktop/ExplorerDesktopShared";
 import { assistantPanelStyles } from "@/features/explorer/desktop/ExplorerAssistantStyles";
 

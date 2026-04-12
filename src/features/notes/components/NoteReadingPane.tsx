@@ -1,4 +1,7 @@
-import type { NoteReadingPaneProps } from "@/models/interfaces/features/notes/components/NoteReadingPane";
+import type {
+  NoteContentDraft,
+  NoteReadingPaneProps,
+} from "@/models/interfaces/features/notes/components/NoteReadingPane";
 export type { NoteReadingPaneProps } from "@/models/interfaces/features/notes/components/NoteReadingPane";
 import { Suspense, lazy, useEffect, useState } from "react";
 import { Check, FileText, PenLine, Plus, Star, X } from "lucide-react";
@@ -16,12 +19,16 @@ const noteBodyClass = "mx-auto w-full max-w-[760px] px-5 py-6";
 
 export function NoteReadingPane(props: NoteReadingPaneProps) {
   const { note } = props;
-  const [draft, setDraft] = useState("");
+  const [draft, setDraft] = useState<NoteContentDraft>({
+    body: "",
+    bodyFormat: "markdown" as const,
+    bodyMarkdown: undefined as string | undefined,
+  });
   const editing = Boolean(note && props.editingNoteId === note.id);
 
   useEffect(() => {
-    if (!editing) setDraft(note?.body ?? "");
-  }, [editing, note?.body, note?.id]);
+    if (!editing) setDraft(noteContent(note));
+  }, [editing, note?.body, note?.bodyFormat, note?.bodyMarkdown, note?.id]);
 
   if (props.loading) return <ReadingPaneSkeleton />;
 
@@ -47,7 +54,7 @@ export function NoteReadingPane(props: NoteReadingPaneProps) {
 
   // Editability is a connector capability, not a per-source special case: the
   // pane offers Edit only when the store handed down a save handler.
-  const editable = Boolean(props.onSaveBody);
+  const editable = Boolean(props.onSaveBody || props.onSaveContent);
 
   return (
     <article className={paneClass} aria-label={note.title}>
@@ -88,7 +95,7 @@ export function NoteReadingPane(props: NoteReadingPaneProps) {
                     size="sm"
                     className="h-8 gap-1.5"
                     onClick={() => {
-                      setDraft(note.body);
+                      setDraft(noteContent(note));
                       props.onEditingNoteChange?.(undefined);
                     }}
                   >
@@ -100,7 +107,11 @@ export function NoteReadingPane(props: NoteReadingPaneProps) {
                     size="sm"
                     className="h-8 gap-1.5"
                     onClick={() => {
-                      props.onSaveBody?.(note.id, draft);
+                      if (props.onSaveContent) {
+                        props.onSaveContent(note.id, draft);
+                      } else {
+                        props.onSaveBody?.(note.id, draft.bodyMarkdown ?? draft.body);
+                      }
                       props.onEditingNoteChange?.(undefined);
                     }}
                   >
@@ -129,19 +140,47 @@ export function NoteReadingPane(props: NoteReadingPaneProps) {
         {editing ? (
           <div className={noteBodyClass}>
             <Suspense fallback={<Skeleton className="h-[420px] w-full" />}>
-              <NoteBlockEditor editable markdown={draft} onMarkdownChange={setDraft} />
+              <NoteBlockEditor
+                key={note.id}
+                editable
+                autoFocus
+                noteId={note.id}
+                accountId={props.accountId}
+                spaceId={note.spaceId}
+                body={draft.body}
+                bodyFormat={draft.bodyFormat}
+                bodyMarkdown={draft.bodyMarkdown}
+                onContentChange={setDraft}
+              />
             </Suspense>
           </div>
         ) : (
           <div className={noteBodyClass}>
             <Suspense fallback={<Skeleton className="h-48 w-full" />}>
-              <NoteBlockEditor editable={false} markdown={note.body} />
+              <NoteBlockEditor
+                key={note.id}
+                editable={false}
+                noteId={note.id}
+                accountId={props.accountId}
+                spaceId={note.spaceId}
+                body={note.body}
+                bodyFormat={note.bodyFormat}
+                bodyMarkdown={note.bodyMarkdown}
+              />
             </Suspense>
           </div>
         )}
       </ScrollArea>
     </article>
   );
+}
+
+function noteContent(note: NoteReadingPaneProps["note"]) {
+  return {
+    body: note?.body ?? "",
+    bodyFormat: note?.bodyFormat ?? "markdown",
+    bodyMarkdown: note?.bodyMarkdown,
+  };
 }
 
 function ReadingPaneSkeleton() {

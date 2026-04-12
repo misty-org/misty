@@ -1,11 +1,11 @@
-import type { MikaServerContext } from "@/models/interfaces/features/agents/pathPrivacy";
-export type { MikaServerContext } from "@/models/interfaces/features/agents/pathPrivacy";
+import type { AgentServerContext } from "@/models/interfaces/features/agents/pathPrivacy";
+export type { AgentServerContext } from "@/models/interfaces/features/agents/pathPrivacy";
 /** Build the only path context that may cross the device/server boundary. */
-export function mikaServerContext(
+export function agentServerContext(
   localRoot: string | null,
   localSelectedPaths: string[],
   opaqueScopeId: string | null,
-): MikaServerContext {
+): AgentServerContext {
   return {
     activeRoot: opaqueScopeId || undefined,
     selectedPaths: localRoot

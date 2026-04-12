@@ -46,9 +46,9 @@ const mocks = vi.hoisted(() => {
   const useSpacesStore = Object.assign(vi.fn(), {
     getState: () => ({ load: spacesLoad }),
   });
-  const mikaRefresh = vi.fn().mockResolvedValue(undefined);
-  const useMikaSessionStore = Object.assign(vi.fn(), {
-    getState: () => ({ refreshStatus: mikaRefresh }),
+  const agentRefresh = vi.fn().mockResolvedValue(undefined);
+  const useAgentSessionStore = Object.assign(vi.fn(), {
+    getState: () => ({ refreshStatus: agentRefresh }),
   });
   return {
     accountA,
@@ -59,9 +59,9 @@ const mocks = vi.hoisted(() => {
     userStore,
     useUserStore,
     useSpacesStore,
-    useMikaSessionStore,
+    useAgentSessionStore,
     spacesLoad,
-    mikaRefresh,
+    agentRefresh,
     activeAccountId: accountA.id,
     readActiveSavedAccountSession: vi.fn(),
     activateAccountSession: vi.fn(),
@@ -73,7 +73,7 @@ const mocks = vi.hoisted(() => {
     saveAuthenticatedUser: vi.fn().mockResolvedValue(undefined),
     signOut: vi.fn().mockResolvedValue(undefined),
     resetSpacesAccountState: vi.fn(),
-    resetMikaAccountState: vi.fn(),
+    resetAgentAccountState: vi.fn(),
     resetNotesAccountState: vi.fn(),
     resetSearchAccountState: vi.fn(),
     explorerSetState: vi.fn(),
@@ -119,9 +119,9 @@ vi.mock("@/stores/spaces/useSpacesStore", () => ({
   resetSpacesAccountState: mocks.resetSpacesAccountState,
   useSpacesStore: mocks.useSpacesStore,
 }));
-vi.mock("@/stores/assistant/useMikaSessionStore", () => ({
-  resetMikaAccountState: mocks.resetMikaAccountState,
-  useMikaSessionStore: mocks.useMikaSessionStore,
+vi.mock("@/stores/assistant/useAgentSessionStore", () => ({
+  resetAgentAccountState: mocks.resetAgentAccountState,
+  useAgentSessionStore: mocks.useAgentSessionStore,
 }));
 vi.mock("@/stores/notes/useNotesStore", () => ({
   resetNotesAccountState: mocks.resetNotesAccountState,
@@ -184,7 +184,7 @@ describe("AuthProvider account switching", () => {
     mocks.userStore.setMe.mockClear();
     mocks.userStore.clear.mockClear();
     mocks.resetSpacesAccountState.mockClear();
-    mocks.resetMikaAccountState.mockClear();
+    mocks.resetAgentAccountState.mockClear();
     mocks.resetNotesAccountState.mockClear();
     mocks.resetSearchAccountState.mockClear();
     mocks.explorerSetState.mockClear();
@@ -262,7 +262,7 @@ describe("AuthProvider account switching", () => {
     });
     expect(mocks.resetSearchAccountState).toHaveBeenCalled();
     expect(mocks.resetSpacesAccountState).toHaveBeenCalled();
-    expect(mocks.resetMikaAccountState).toHaveBeenCalled();
+    expect(mocks.resetAgentAccountState).toHaveBeenCalled();
     expect(mocks.resetNotesAccountState).toHaveBeenCalled();
   });
 

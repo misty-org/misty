@@ -27,6 +27,7 @@ export function SpaceNotes(props: SpaceNotesProps) {
       connectorErrors: state.connectorErrors,
       selectedNoteId: state.selectedNoteId,
       editingNoteId: state.editingNoteId,
+      accountId: state.accountId,
       query: state.query,
       contextPanelOpen: state.contextPanelOpen,
       registry: state.registry,
@@ -41,6 +42,7 @@ export function SpaceNotes(props: SpaceNotesProps) {
       toggleFavorite: state.toggleFavorite,
       createNote: state.createNote,
       updateNoteBody: state.updateNoteBody,
+      updateNoteContent: state.updateNoteContent,
     })),
   );
 
@@ -69,12 +71,18 @@ export function SpaceNotes(props: SpaceNotesProps) {
       <div className={store.contextPanelOpen ? bodyWithContextClass : bodyClass}>
         <NoteReadingPane
           note={selectedNote}
+          accountId={store.accountId}
           loading={loading}
           editingNoteId={store.editingNoteId}
           onEditingNoteChange={actions.setEditingNoteId}
           onSaveBody={
             selectedConnector?.capabilities.update
               ? (noteId, body) => void actions.updateNoteBody(noteId, body)
+              : undefined
+          }
+          onSaveContent={
+            selectedConnector?.capabilities.update
+              ? (noteId, content) => void actions.updateNoteContent(noteId, content)
               : undefined
           }
           onToggleFavorite={(noteId) => void actions.toggleFavorite(noteId)}
