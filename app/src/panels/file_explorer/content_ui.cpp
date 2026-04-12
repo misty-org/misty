@@ -107,20 +107,14 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state) {
     static ImGuiTableFlags flags = ImGuiTableFlags_Reorderable | ImGuiTableFlags_Sortable |
         ImGuiTableFlags_Hideable | ImGuiTableFlags_ScrollY | ImGuiTableFlags_Resizable;
 
-    if (state.is_loading) {
-        if (state.show_loading_animation) {
-            ImVec2 min = ImGui::GetCursorScreenPos();
-            ImVec2 max(min.x + ImGui::GetContentRegionAvail().x, min.y + ImGui::GetContentRegionAvail().y);
-            if (max.x > min.x && max.y > min.y) {
-                ImGui::InvisibleButton("##file_loading_overlay", ImVec2(max.x - min.x, max.y - min.y));
-                core::DrawMistyLoadingAnimation(min, max);
-            }
-        }
-        return;
-    }
+    const bool loading = state.is_loading;
+    const bool show_loading_animation = loading && state.show_loading_animation;
+    const ImVec2 overlay_min = ImGui::GetCursorScreenPos();
+    const ImVec2 overlay_size = ImGui::GetContentRegionAvail();
+    const ImVec2 overlay_max(overlay_min.x + overlay_size.x, overlay_min.y + overlay_size.y);
 
     ImGuiIO& io = ImGui::GetIO();
-    if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && !io.WantTextInput) {
+    if (!loading && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && !io.WantTextInput) {
         if (CommandManager::get().matches("explorer.copy")) perform_copy(state);
         if (CommandManager::get().matches("explorer.cut")) perform_cut(state);
         if (CommandManager::get().matches("explorer.paste") && state.clipboard_op != ClipboardOp::NONE && !state.clipboard_items.empty()) perform_paste(state);
@@ -145,7 +139,7 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state) {
         if (state.files.empty()) {
             render_empty_state(48.0f);
         } else {
-            ImGui::BeginChild("##grid_scroll", ImVec2(0, 0), false);
+            ImGui::BeginChild("##grid_scroll", ImVec2(0, 0), false, ImGuiWindowFlags_AlwaysVerticalScrollbar);
             float avail_w = ImGui::GetContentRegionAvail().x;
             int cols = std::max(1, static_cast<int>(avail_w / (cell_w + padding)));
             const float base_x = ImGui::GetCursorPosX();
@@ -175,7 +169,8 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state) {
             ImGui::EndChild();
         }
         ImGui::PopStyleVar();
-    } else if (ImGui::BeginTable("FileTable", 5, flags)) {
+    } else if (ImGui::BeginTable("FileTable", 5, flags | ImGuiTableFlags_NoHostExtendY,
+                                 ImVec2(0.0f, ImGui::GetContentRegionAvail().y))) {
         ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch | ImGuiTableColumnFlags_DefaultSort);
         ImGui::TableSetupColumn("Size", ImGuiTableColumnFlags_WidthFixed, 80.0f);
         ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 80.0f);
@@ -215,6 +210,15 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state) {
     }
 
     ImGui::PopStyleColor(3);
+
+    if (loading && overlay_size.x > 0.0f && overlay_size.y > 0.0f) {
+        ImGui::SetCursorScreenPos(overlay_min);
+        ImGui::InvisibleButton("##file_loading_blocker", overlay_size);
+        if (show_loading_animation) {
+            core::DrawMistyLoadingAnimation(overlay_min, overlay_max);
+        }
+    }
+
     show_rename_modal(state);
     show_new_entry_modal(state);
     show_permanent_delete_modal(state);

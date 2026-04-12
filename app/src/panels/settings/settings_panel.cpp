@@ -75,10 +75,9 @@ void SettingsPanel::render() {
 
     constexpr float kPanelPaddingX = 32.0f;
     constexpr float kPanelPaddingY = 24.0f;
-    constexpr float kSidebarPaddingX = 14.0f;
+    constexpr float kSidebarPaddingX = 12.0f;
     constexpr float kSidebarPaddingY = 24.0f;
-    constexpr float kContentPaddingX = 32.0f;
-    constexpr float kContentPaddingY = 24.0f;
+    constexpr float kColumnGap = 24.0f;
 
     ImGuiWindowFlags flags =
         ImGuiWindowFlags_NoTitleBar |
@@ -86,15 +85,15 @@ void SettingsPanel::render() {
         ImGuiWindowFlags_NoMove |
         ImGuiWindowFlags_NoCollapse;
 
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.11f, 0.11f, 0.11f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.18f, 0.18f, 0.18f, 1.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(kPanelPaddingX, kPanelPaddingY));
 
     if (ImGui::Begin("SettingsPanel", nullptr, flags)) {
         const float total_w = ImGui::GetContentRegionAvail().x;
         const float sidebar_w = 228.0f;
-        const float content_w = total_w - sidebar_w;
+        const float content_w = std::max(0.0f, total_w - sidebar_w - kColumnGap);
 
-        ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.13f, 0.13f, 0.13f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.14f, 0.14f, 0.14f, 1.0f));
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(kSidebarPaddingX, kSidebarPaddingY));
         ImGui::BeginChild("##settings_sidebar", ImVec2(sidebar_w, 0.0f), false);
         render_sidebar(state, sidebar_w);
@@ -102,7 +101,7 @@ void SettingsPanel::render() {
         ImGui::PopStyleVar();
         ImGui::PopStyleColor();
 
-        ImGui::SameLine(0.0f, 0.0f);
+        ImGui::SameLine(0.0f, kColumnGap);
 
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
         ImGui::BeginChild("##settings_content_outer", ImVec2(content_w, 0.0f), false);
@@ -110,14 +109,12 @@ void SettingsPanel::render() {
         const float status_h = state.status_timer > 0.0f ? 42.0f : 0.0f;
         const float scroll_h = std::max(0.0f, ImGui::GetContentRegionAvail().y - status_h);
 
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(kContentPaddingX, kContentPaddingY));
-        ImGui::BeginChild("##settings_content_scroll", ImVec2(0.0f, scroll_h), false);
+        ImGui::BeginChild("##settings_content_scroll", ImVec2(0.0f, scroll_h), false,
+                          ImGuiWindowFlags_AlwaysVerticalScrollbar);
         render_content(state);
         ImGui::EndChild();
-        ImGui::PopStyleVar();
 
         if (state.status_timer > 0.0f) {
-            ImGui::SetCursorPosX(32.0f);
             render_status_bar(state);
         }
 
@@ -193,9 +190,8 @@ void SettingsPanel::render_content(SettingsState& state) {
 }
 
 void SettingsPanel::render_section_header(const char* title) {
-    core::WithFontScale(1.45f, [title]() {
-        core::ColoredText(ImVec4(1.0f, 1.0f, 1.0f, 1.0f), "%s", title);
-    });
+    core::CustomFont font(core::AssetManager::get().get_font(core::FontID::ROBOTO_BOLD_LARGE));
+    core::ColoredText(ImVec4(1.0f, 1.0f, 1.0f, 1.0f), "%s", title);
 }
 
 void SettingsPanel::render_section_subtitle(const char* subtitle) {

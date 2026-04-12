@@ -475,9 +475,8 @@ namespace misty::panel {
         // Virtual Paths Logic
         if (path.rfind("misty://", 0) == 0) {
             printf("Explorer: Handling virtual path: %s\n", path.c_str());
-            state.is_loading = true;
-            state.show_loading_animation = false;
-            state.files.clear();
+            std::vector<UnifiedFileItem> new_files;
+            std::vector<UnifiedFileItem> new_trash_files;
             
             if (path == FileExplorerState::VIRTUAL_PATH_RECENT) {
                 // Filter out deleted entries and local files that no longer exist on disk
@@ -493,16 +492,13 @@ namespace misty::panel {
                     state.dirty_ = true;
                 }
                 printf("Explorer: Loading Recent Files (count: %zu)\n", state.recent_files.size());
-                state.files.assign(state.recent_files.begin(), state.recent_files.end());
+                new_files.assign(state.recent_files.begin(), state.recent_files.end());
             } else if (path == FileExplorerState::VIRTUAL_PATH_STARRED) {
                 printf("Explorer: Loading Starred Files (count: %zu)\n", state.starred_files.size());
-                state.files = state.starred_files;
+                new_files = state.starred_files;
             } else if (path == FileExplorerState::VIRTUAL_PATH_TRASH) {
                 printf("Explorer: Loading Trash Files\n");
                 // Read from disk to ensure persistence
-                state.files.clear();
-                state.trash_files.clear(); // Re-sync cache
-                
                 std::string trash_dir = std::string(std::getenv("HOME")) + "/misty/.cache/trash";
                 if (fs::exists(trash_dir)) {
                     printf("Explorer: Reading trash dir: %s\n", trash_dir.c_str());
@@ -527,13 +523,17 @@ namespace misty::panel {
                             item.last_modified = buf;
                         } catch (...) {}
 
-                        state.files.push_back(item);
-                        state.trash_files.push_back(item);
+                        new_files.push_back(item);
+                        new_trash_files.push_back(std::move(item));
                     }
                 }
             }
             
             update_navigation_history(state, path, update_history);
+            state.files = std::move(new_files);
+            if (path == FileExplorerState::VIRTUAL_PATH_TRASH) {
+                state.trash_files = std::move(new_trash_files);
+            }
             set_active_path(state, path);
             reset_selection(state);
             state.is_loading = false;

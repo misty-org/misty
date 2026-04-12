@@ -1,5 +1,7 @@
 import { useState, FormEvent, ChangeEvent } from 'react';
 
+const apiBase = (import.meta.env.VITE_API_BASE ?? "").replace(/\/+$/, "");
+
 
 export default function Waitlist() {
     return (
@@ -46,24 +48,22 @@ function WaitlistForm({ onSuccess, className }: WaitlistFormProps) {
     setError(null);
 
     try {
-      const response = await fetch(
-        `https://waitlister.me/s/${import.meta.env.VITE_WAITLIST_KEY}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams(Object.entries(formData))
-        }
-      );
+      const response = await fetch(`${apiBase}/waitlist`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
 
       if (response.ok) {
         setSuccess(true);
         setFormData({ email: '', name: '' });
         onSuccess?.();
       } else {
-        throw new Error('Submission failed');
+        const text = await response.text();
+        throw new Error(text || 'Submission failed');
       }
     } catch (err) {
-      setError('Failed to join waitlist. Please try again.');
+      setError(err instanceof Error ? err.message : 'Failed to join waitlist. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -73,7 +73,7 @@ function WaitlistForm({ onSuccess, className }: WaitlistFormProps) {
     return (
       <div className="glass-card rounded-2xl p-6 sm:p-8 text-center">
         <h3 className="text-xl font-bold text-text mb-2">You're on the list!</h3>
-        <p className="text-text-muted">We'll notify you when we launch.</p>
+        <p className="text-text-muted">Check your email for confirmation.</p>
       </div>
     );
   }
