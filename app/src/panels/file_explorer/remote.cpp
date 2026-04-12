@@ -20,14 +20,11 @@ namespace misty::panel {
 
         std::string mount_root = path_utils::get_mount_root();
 
-        state.is_loading = true;
-        state.show_loading_animation = false;
-        state.files.clear();
-
         sync_account_mappings();
 
         // Collect unique provider folders
         std::set<std::string> seen;
+        std::vector<UnifiedFileItem> new_files;
         for (const auto& mapping : workspace.remote_mappings) {
             if (seen.count(mapping.provider_folder)) continue;
             seen.insert(mapping.provider_folder);
@@ -38,10 +35,11 @@ namespace misty::panel {
             item.is_dir = true;
             item.source = FileSource::REMOTE;
             item.status = SyncStatus::SYNCED;
-            state.files.push_back(item);
+            new_files.push_back(std::move(item));
         }
 
         update_navigation_history(state, mount_root, update_history);
+        state.files = std::move(new_files);
         set_active_path(state, mount_root);
         reset_selection(state);
         state.is_loading = false;
@@ -60,10 +58,6 @@ namespace misty::panel {
         std::string mount_root = path_utils::get_mount_root();
         std::string target_path = mount_root + "/" + provider_folder;
 
-        state.is_loading = true;
-        state.show_loading_animation = false;
-        state.files.clear();
-
         sync_account_mappings();
 
         // Collect remotes matching this provider folder
@@ -79,6 +73,7 @@ namespace misty::panel {
         // navigation behavior depend on how many remotes exist, which is
         // confusing — clicking "Google Drive" should always land on the
         // account list page regardless of count.
+        std::vector<UnifiedFileItem> new_files;
         for (const auto* mapping : matches) {
             UnifiedFileItem item;
             item.name = mapping->folder_name;
@@ -87,10 +82,11 @@ namespace misty::panel {
             item.source = FileSource::REMOTE;
             item.status = SyncStatus::SYNCED;
             item.remote_name = mapping->remote_name;
-            state.files.push_back(item);
+            new_files.push_back(std::move(item));
         }
 
         update_navigation_history(state, target_path, update_history);
+        state.files = std::move(new_files);
         set_active_path(state, target_path);
         reset_selection(state);
         state.is_loading = false;
