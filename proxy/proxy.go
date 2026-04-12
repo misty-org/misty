@@ -10,6 +10,7 @@ import (
 	"github.com/kannachi323/misty/proxy/api"
 	"github.com/kannachi323/misty/proxy/api/remote"
 	"github.com/kannachi323/misty/proxy/api/vault"
+	"github.com/kannachi323/misty/proxy/core/ai"
 	"github.com/kannachi323/misty/proxy/core/auth"
 	"github.com/kannachi323/misty/proxy/core/license"
 	"github.com/kannachi323/misty/proxy/core/tsbase"
@@ -17,12 +18,13 @@ import (
 )
 
 type Proxy struct {
-	Router          *chi.Mux
-	APIRouter       *chi.Mux
-	TSBase          *tsbase.TSBase
-	Database        *db.Database
-	LicenseManager  *license.Manager
-	VaultService    *vault.Service
+	Router         *chi.Mux
+	APIRouter      *chi.Mux
+	TSBase         *tsbase.TSBase
+	Database       *db.Database
+	LicenseManager *license.Manager
+	VaultService   *vault.Service
+	AIService      *ai.Service
 }
 
 func CreateProxy() (*Proxy, error) {
@@ -49,6 +51,7 @@ func CreateProxy() (*Proxy, error) {
 	proxy.Database = &db.Database{}
 	proxy.LicenseManager = license.NewManager(proxy.Database)
 	proxy.VaultService = vault.NewService()
+	proxy.AIService = ai.NewServiceFromEnv()
 
 	return proxy, nil
 }
@@ -79,6 +82,7 @@ func (proxy *Proxy) MountHandlers() {
 		r.Use(auth.JWTMiddleware)
 
 		r.Get("/license", api.GetLicense(proxy.LicenseManager))
+		r.Post("/ai/file-context", api.AskFileContext(proxy.AIService))
 
 		r.Get("/ts-status", api.GetTSStatus(proxy.TSBase))
 		r.Get("/ts-peers", api.GetPeers(proxy.TSBase))
@@ -95,51 +99,51 @@ func (proxy *Proxy) MountHandlers() {
 		r.Put("/workspaces", api.UpdateWorkspace(proxy.Database))
 		r.Delete("/workspaces", api.DeleteWorkspace(proxy.Database))
 
-			// ---- rclone unified endpoints ----
-			r.Get("/remotes", remote.ListRemotes())
-			r.Delete("/remotes", remote.DeleteRemote())
-			r.Get("/remotes/types", remote.ListTypes())
-			r.Post("/remotes/config/continue", remote.ConfigContinue())
-			r.Delete("/remotes/config", remote.ConfigCancel())
-			r.Get("/files", remote.ListFiles())
-			r.Get("/file/download", remote.DownloadFile())
-			r.Post("/file/upload", remote.UploadFile())
-			r.Post("/mkdir", remote.MkDir())
-			r.Delete("/file", remote.DeleteFile())
-			r.Get("/search", remote.Search())
-			r.Get("/about", remote.AboutRemote())
+		// ---- rclone unified endpoints ----
+		r.Get("/remotes", remote.ListRemotes())
+		r.Delete("/remotes", remote.DeleteRemote())
+		r.Get("/remotes/types", remote.ListTypes())
+		r.Post("/remotes/config/continue", remote.ConfigContinue())
+		r.Delete("/remotes/config", remote.ConfigCancel())
+		r.Get("/files", remote.ListFiles())
+		r.Get("/file/download", remote.DownloadFile())
+		r.Post("/file/upload", remote.UploadFile())
+		r.Post("/mkdir", remote.MkDir())
+		r.Delete("/file", remote.DeleteFile())
+		r.Get("/search", remote.Search())
+		r.Get("/about", remote.AboutRemote())
 
-			r.Group(func(r chi.Router) {
-				r.Use(proxy.LicenseManager.RequireRemoteQuota(3, nil))
-				r.Post("/remotes", remote.CreateRemote())
-				r.Post("/remotes/config/start", remote.ConfigStart())
-			})
-
-			// ---- mvault (restic) endpoints ----
-			v := proxy.VaultService
-
-			r.Get("/vault/health", v.Health())
-			r.Get("/vault/repos", v.ListRepos())
-			r.Delete("/vault/repos", v.DeleteRepo())
-			r.Get("/vault/repos/stats", v.RepoStats())
-			r.Post("/vault/repos/check", v.CheckRepo())
-			r.Post("/vault/repos/unlock", v.UnlockRepo())
-
-			r.Get("/vault/snapshots", v.ListSnapshots())
-			r.Get("/vault/snapshots/files", v.BrowseSnapshot())
-
-			r.Post("/vault/restore", v.StartRestore())
-			r.Post("/vault/forget", v.StartForget())
-
-			r.Get("/vault/jobs", v.ListJobs())
-			r.Get("/vault/jobs/{id}", v.GetJob())
-			r.Get("/vault/jobs/{id}/stream", v.StreamJob())
-			r.Post("/vault/jobs/{id}/cancel", v.CancelJob())
-
-			r.Group(func(r chi.Router) {
-				r.Use(proxy.LicenseManager.RequireVaultQuota(1, nil))
-				r.Post("/vault/repos", v.CreateRepo())
-				r.Post("/vault/backup", v.StartBackup())
-			})
+		r.Group(func(r chi.Router) {
+			r.Use(proxy.LicenseManager.RequireRemoteQuota(3, nil))
+			r.Post("/remotes", remote.CreateRemote())
+			r.Post("/remotes/config/start", remote.ConfigStart())
 		})
-	}
+
+		// ---- mvault (restic) endpoints ----
+		v := proxy.VaultService
+
+		r.Get("/vault/health", v.Health())
+		r.Get("/vault/repos", v.ListRepos())
+		r.Delete("/vault/repos", v.DeleteRepo())
+		r.Get("/vault/repos/stats", v.RepoStats())
+		r.Post("/vault/repos/check", v.CheckRepo())
+		r.Post("/vault/repos/unlock", v.UnlockRepo())
+
+		r.Get("/vault/snapshots", v.ListSnapshots())
+		r.Get("/vault/snapshots/files", v.BrowseSnapshot())
+
+		r.Post("/vault/restore", v.StartRestore())
+		r.Post("/vault/forget", v.StartForget())
+
+		r.Get("/vault/jobs", v.ListJobs())
+		r.Get("/vault/jobs/{id}", v.GetJob())
+		r.Get("/vault/jobs/{id}/stream", v.StreamJob())
+		r.Post("/vault/jobs/{id}/cancel", v.CancelJob())
+
+		r.Group(func(r chi.Router) {
+			r.Use(proxy.LicenseManager.RequireVaultQuota(1, nil))
+			r.Post("/vault/repos", v.CreateRepo())
+			r.Post("/vault/backup", v.StartBackup())
+		})
+	})
+}
