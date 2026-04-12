@@ -750,6 +750,20 @@ export const spacesApi = {
     purpose: "library" | "attachment",
     options?: LibraryUploadOptions,
   ) => uploadLibraryPath(spaceId, path, purpose, options),
+  uploadLibraryBlob: (
+    spaceId: string,
+    blob: Blob,
+    filename: string,
+    purpose: "library" | "attachment" = "library",
+    options?: LibraryUploadOptions,
+  ) => uploadLibraryBlob(spaceId, blob, filename, purpose, options),
+  replaceLibraryItemContent: (
+    spaceId: string,
+    item: SpaceLibraryItem,
+    blob: Blob,
+    filename: string,
+    options?: LibraryUploadOptions,
+  ) => replaceLibraryItemContent(spaceId, item, blob, filename, options),
   promoteAttachment: (spaceId: string, attachmentId: string) =>
     spaceRequest<SpaceLibraryItem>(
       `/spaces/${encodeURIComponent(spaceId)}/attachments/${encodeURIComponent(attachmentId)}/promote`,
@@ -1087,6 +1101,64 @@ async function uploadLibraryPath(
   return uploadLibraryFile(spaceId, file, purpose, accountGeneration, options);
 }
 
+/** Uploads a client-produced Blob as a NEW library item (used for "Save as a copy"). */
+async function uploadLibraryBlob(
+  spaceId: string,
+  blob: Blob,
+  filename: string,
+  purpose: "library" | "attachment" = "library",
+  options?: LibraryUploadOptions,
+): Promise<LibraryUploadResult> {
+  const accountGeneration = readAccountSessionGeneration();
+  assertStableSpaceAccount(accountGeneration);
+  if (blob.size > maxWebviewUploadBytes) throw webviewUploadSizeError();
+  const file = new File([blob], filename, {
+    type: blob.type || "application/octet-stream",
+    lastModified: Date.now(),
+  });
+  return uploadLibraryFile(spaceId, file, purpose, accountGeneration, options);
+}
+
+/**
+ * Replaces an existing library item's content in place with a client-rendered
+ * Blob, keeping the same item id (used for "Save"). Item identity is owned by
+ * the server; if it doesn't honor `replace_item_id` and mints a new id instead,
+ * we trash the stray upload and throw so the caller can fall back to a copy.
+ */
+async function replaceLibraryItemContent(
+  spaceId: string,
+  item: SpaceLibraryItem,
+  blob: Blob,
+  filename: string,
+  options?: LibraryUploadOptions,
+): Promise<LibraryUploadResult> {
+  const accountGeneration = readAccountSessionGeneration();
+  assertStableSpaceAccount(accountGeneration);
+  if (blob.size > maxWebviewUploadBytes) throw webviewUploadSizeError();
+  const file = new File([blob], filename, {
+    type: blob.type || "application/octet-stream",
+    lastModified: Date.now(),
+  });
+  const result = await uploadLibraryFile(spaceId, file, "library", accountGeneration, options, {
+    itemId: item.id,
+    itemVersion: item.version,
+  });
+  if (result.item && result.item.id !== item.id) {
+    try {
+      await spaceRequest(
+        `/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(result.item.id)}/trash`,
+        { method: "POST" },
+      );
+    } catch {
+      // Best-effort cleanup of the stray item; ignore failures.
+    }
+    throw new Error(
+      'Saving over the original isn’t supported by this server yet — use "Save as a copy" instead.',
+    );
+  }
+  return result;
+}
+
 export function fileNameFromPath(path: string): string {
   return (
     path
@@ -1102,6 +1174,7 @@ async function uploadLibraryFile(
   purpose: "library" | "attachment",
   accountGeneration: number,
   options?: LibraryUploadOptions,
+  replace?: { itemId: string; itemVersion: number },
 ): Promise<LibraryUploadResult> {
   assertStableSpaceAccount(accountGeneration);
   options?.onStage?.("hashing");
@@ -1121,6 +1194,12 @@ async function uploadLibraryFile(
       byte_size: file.size,
       sha256,
       purpose,
+      // In-place replace: the server should reuse `replace_item_id` instead of
+      // minting a new item. Older servers ignore these and mint a new id, which
+      // replaceLibraryItemContent() detects and cleans up.
+      ...(replace
+        ? { replace_item_id: replace.itemId, replace_item_version: replace.itemVersion }
+        : {}),
     }),
   });
   options?.onStage?.("uploading");

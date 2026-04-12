@@ -13,7 +13,7 @@ import {
   X,
 } from "lucide-react";
 
-import { GlobalImageEditor } from "@/features/editor/GlobalImageEditor";
+import { PhotoEditor } from "@/features/editor/PhotoEditor";
 import { Button } from "@/ui";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/ui";
 import { Input } from "@/ui";
@@ -418,6 +418,33 @@ export function LibraryItemViewer({
     }
   };
 
+  const editedImageFilename = () => {
+    const extension =
+      mimeType === "image/jpeg" ? "jpg" : mimeType === "image/webp" ? "webp" : "png";
+    const base = (item.display_name || "image").replace(/\.[^./\\]+$/, "");
+    return `${base}.${extension}`;
+  };
+
+  // Client-side edits: filerobot renders the image in the browser and we upload
+  // the result. "Save" replaces the original in place; "Save as a copy" uploads
+  // a new item. No server-side edit rendering is involved. Errors propagate so
+  // the editor surfaces them.
+  const saveEditedImage = async (rendered: Blob) => {
+    const result = await spacesApi.replaceLibraryItemContent(
+      spaceId,
+      item,
+      rendered,
+      editedImageFilename(),
+    );
+    if (result.item) onReplaceItem(result.item);
+    onRenditionReady();
+  };
+
+  const saveEditedImageCopy = async (rendered: Blob) => {
+    await spacesApi.uploadLibraryBlob(spaceId, rendered, editedImageFilename(), "library");
+    onRenditionReady();
+  };
+
   const copyCurrentItem = async (target: SpaceLibraryItem = item) => {
     if (!canCopy) return;
     setEditError("");
@@ -529,13 +556,12 @@ export function LibraryItemViewer({
 
   if (isImage)
     return (
-      <GlobalImageEditor
-        sourceKey={`${item.id}:${activeEdit?.id ?? "original"}`}
+      <PhotoEditor
+        sourceKey={`${item.id}:${item.version}`}
         name={item.display_name}
         url={contentUrl}
         indexLabel={`${index + 1} of ${items.length}`}
         tags={item.tags}
-        initialEdit={editDraft}
         outputMimeType={
           mimeType === "image/jpeg"
             ? "image/jpeg"
@@ -543,20 +569,13 @@ export function LibraryItemViewer({
               ? "image/webp"
               : "image/png"
         }
-        loading={contentLoading || editVersionsLoading}
+        loading={contentLoading}
         error={contentError || undefined}
         readonly={!canEdit}
         onClose={onClose}
         onCancel={onClose}
-        onSave={async (definition) => {
-          await saveEdit(definition);
-        }}
-        onSaveAsCopy={async (definition) => {
-          await saveAsCopy(definition);
-        }}
-        onSaveTags={async (nextTags) => {
-          await onUpdate(item, { tags: nextTags });
-        }}
+        onSave={saveEditedImage}
+        onSaveAsCopy={saveEditedImageCopy}
       />
     );
 

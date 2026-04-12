@@ -1,22 +1,4 @@
 {
-  "src/features/editor/GlobalImageEditor.tsx": [
-    {
-      "length": 461,
-      "hash": "1dc9b59921a52502"
-    },
-    {
-      "length": 238,
-      "hash": "f3c373f48535defa"
-    },
-    {
-      "length": 211,
-      "hash": "e468c345d0065fe7"
-    },
-    {
-      "length": 192,
-      "hash": "2d99f9d2bbeb9e88"
-    }
-  ],
   "src/ui/alert-dialog.tsx": [
     {
       "length": 423,

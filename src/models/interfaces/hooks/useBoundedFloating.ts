@@ -20,7 +20,7 @@ export interface UseBoundedFloatingOptions {
 }
 
 export interface BoundedFloatingResult {
-  floatingRef: RefObject<HTMLDivElement>;
+  floatingRef: RefObject<HTMLDivElement | null>;
   floatingStyle: CSSProperties;
   opensAbove: boolean;
 }

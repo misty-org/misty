@@ -15,6 +15,8 @@ import { delay, matchesQuery, nextId, nowIso, previewFrom } from "@/features/not
 export function createMistyNativeNotesConnector(accountId = ""): NotesConnector {
   const storageKey = accountId ? nativeNotesStorageKey(accountId) : "";
   let notes = storageKey ? readNativeNotes(storageKey) : mistyNoteSeed.map((note) => ({ ...note }));
+  notes = notes.filter(isSpaceAttachedNote);
+  if (storageKey) writeNativeNotes(storageKey, notes);
   let syncedAt = nowIso();
 
   function commit(next: UnifiedNote[]): void {
@@ -68,6 +70,9 @@ export function createMistyNativeNotesConnector(accountId = ""): NotesConnector 
 
     async createNote(input: CreateNoteInput) {
       await delay(120);
+      if (!input.spaceId || !input.spaceName) {
+        throw new Error("Misty notes must belong to a Space.");
+      }
       const sourceId = nextId("note");
       const timestamp = nowIso();
       const created: UnifiedNote = {
@@ -151,4 +156,8 @@ function isStoredNativeNote(value: unknown): value is UnifiedNote {
     Array.isArray(note.tags) &&
     Array.isArray(note.backlinks)
   );
+}
+
+function isSpaceAttachedNote(note: UnifiedNote): boolean {
+  return Boolean(note.spaceId && note.spaceName);
 }

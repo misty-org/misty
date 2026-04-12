@@ -22,6 +22,11 @@ const legacyUserKey = "misty_user";
 
 let cachedToken: string | null | undefined;
 let cachedVault: SecureAccountVault | undefined;
+// The most recent payload written to the OS keystore. Writing to the keychain
+// can prompt the user on macOS, and the app persists the vault on nearly every
+// auth state change (login, /me refresh, effect re-runs), so we skip redundant
+// writes whose serialized content is identical to what is already stored.
+let lastPersistedPayload: string | undefined;
 let accountSessionTransitioning = false;
 let accountSessionGeneration = 0;
 
@@ -262,6 +267,10 @@ async function loadSecureVault(): Promise<SecureAccountVault> {
   cachedVault = parsed.vault;
   if (parsed.migrated && parsed.vault.sessions.length > 0) {
     await persistSecureVault(parsed.vault);
+  } else if (parsed.vault.sessions.length > 0) {
+    // Record what the keystore already holds so an unchanged re-persist on the
+    // common cold-start path is skipped (avoids a needless macOS prompt).
+    lastPersistedPayload = JSON.stringify(parsed.vault);
   }
   return parsed.vault;
 }
@@ -301,11 +310,19 @@ async function persistSecureVault(vault: SecureAccountVault): Promise<void> {
     } catch {
       // Removing a missing item is equivalent to the desired state.
     }
+    lastPersistedPayload = undefined;
     writeAccountIndex([], "");
     writeTokenStoredMarker(false);
     return;
   }
-  await store(JSON.stringify(vault));
+  const payload = JSON.stringify(vault);
+  // Skip the keystore write when nothing changed. Each write can trigger a
+  // macOS Keychain prompt, and callers persist the vault far more often than
+  // its contents actually change.
+  if (payload !== lastPersistedPayload) {
+    await store(payload);
+    lastPersistedPayload = payload;
+  }
   writeAccountIndex(
     vault.sessions.map((item) => item.account),
     vault.activeAccountId,

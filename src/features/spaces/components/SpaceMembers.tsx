@@ -426,7 +426,7 @@ function MemberPermissionControls({
       >
         <ShieldCheck className="size-4" />
       </Button>
-      <DialogContent className="flex max-h-[min(820px,calc(100vh-32px))] max-w-3xl flex-col overflow-hidden p-0">
+      <DialogContent className="flex max-h-[min(820px,calc(100vh-32px))] max-w-xl flex-col overflow-hidden p-0">
         <DialogHeader className="border-b border-border/60 px-5 py-4 text-left sm:px-6 sm:py-5">
           <div className="flex flex-wrap items-center gap-2">
             <DialogTitle>Permissions for {memberName}</DialogTitle>

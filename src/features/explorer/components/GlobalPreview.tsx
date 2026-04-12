@@ -25,9 +25,11 @@ import type { ArchiveEntry } from "@/models/interfaces/services/misty-api";
 import { errorText } from "@/lib/format";
 import { safeTauriAssetUrl } from "@/platform/tauri";
 import { formatBytes, formatDate } from "../utils/fileFormat";
-import { GlobalImageEditor } from "../../editor/GlobalImageEditor";
+import { PhotoEditor } from "../../editor/PhotoEditor";
 
 const ReactMarkdown = lazy(() => import("react-markdown"));
+const PdfViewer = lazy(() => import("./PdfViewer"));
+const VideoAnnotator = lazy(() => import("./VideoAnnotator"));
 const textExtensions = new Set([
   "txt",
   "text",
@@ -227,7 +229,7 @@ export function GlobalPreviewDialog(props: {
 
   if (imageEditorMode)
     return (
-      <GlobalImageEditor
+      <PhotoEditor
         sourceKey={props.source.path}
         name={props.source.name}
         url={resource?.url ?? ""}
@@ -237,13 +239,8 @@ export function GlobalPreviewDialog(props: {
         error={loadError ?? undefined}
         readonly={props.source.readonly || props.source.remote}
         onClose={props.onClose}
-        onSave={async (_edit, blob) => saveImageBlob(blob, false)}
-        onSaveAsCopy={async (_edit, blob) => saveImageBlob(blob, true)}
-        onSaveTags={
-          props.onSaveMetadata
-            ? async (nextTags) => props.onSaveMetadata?.(props.source.description ?? "", nextTags)
-            : undefined
-        }
+        onSave={async (blob) => saveImageBlob(blob, false)}
+        onSaveAsCopy={async (blob) => saveImageBlob(blob, true)}
       />
     );
 
@@ -440,19 +437,15 @@ function PreviewBody(props: {
         />
       </div>
     );
-  if (resource.kind === "video")
+  if (resource.kind === "video" && resource.url)
     return (
-      <div className="grid h-full min-h-[360px] place-items-center p-5">
-        <video
-          className="max-h-full max-w-full"
-          src={resource.url}
-          controls
-          autoPlay
-          muted
-          playsInline
-          preload="metadata"
+      <Suspense fallback={<div className="h-full min-h-[360px] w-full bg-black" />}>
+        <VideoAnnotator
+          url={resource.url}
+          name={props.source.name}
+          persistKey={props.source.path}
         />
-      </div>
+      </Suspense>
     );
   if (resource.kind === "audio")
     return (
@@ -466,14 +459,11 @@ function PreviewBody(props: {
         </div>
       </div>
     );
-  if (resource.kind === "pdf")
+  if (resource.kind === "pdf" && resource.url)
     return (
-      <object
-        className="h-full min-h-[620px] w-full bg-white"
-        data={resource.url}
-        type="application/pdf"
-        aria-label={`PDF reader for ${props.source.name}`}
-      />
+      <Suspense fallback={<div className="h-full min-h-[620px] w-full bg-neutral-800" />}>
+        <PdfViewer url={resource.url} name={props.source.name} />
+      </Suspense>
     );
   if (resource.kind === "archive")
     return (
@@ -532,8 +522,8 @@ export function EmbeddedUniversalPreview(props: {
   url: string;
   loading?: boolean;
   error?: string;
-  imageRef?: React.RefObject<HTMLImageElement>;
-  videoRef?: React.RefObject<HTMLVideoElement>;
+  imageRef?: React.RefObject<HTMLImageElement | null>;
+  videoRef?: React.RefObject<HTMLVideoElement | null>;
   mediaStyle?: React.CSSProperties;
   autoPlay?: boolean;
   loop?: boolean;
@@ -605,12 +595,9 @@ export function EmbeddedUniversalPreview(props: {
     );
   if (isPdf && props.url)
     return (
-      <object
-        className="h-full min-h-[520px] w-full bg-white"
-        data={props.url}
-        type="application/pdf"
-        aria-label={`PDF reader for ${props.name}`}
-      />
+      <Suspense fallback={<div className="h-full min-h-[520px] w-full bg-neutral-800" />}>
+        <PdfViewer url={props.url} name={props.name} />
+      </Suspense>
     );
   if (resource?.kind === "markdown")
     return (

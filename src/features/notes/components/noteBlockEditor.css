@@ -1,0 +1,75 @@
+.misty-note-block-editor {
+  min-height: 0;
+  color: var(--foreground);
+  --bn-font-family: var(--misty-font-family);
+  --bn-border-radius: 8px;
+  --bn-colors-editor-text: var(--foreground);
+  --bn-colors-editor-background: transparent;
+  --bn-colors-menu-text: var(--popover-foreground);
+  --bn-colors-menu-background: var(--popover);
+  --bn-colors-tooltip-text: var(--popover-foreground);
+  --bn-colors-tooltip-background: var(--popover);
+  --bn-colors-hovered-text: var(--foreground);
+  --bn-colors-hovered-background: color-mix(in srgb, var(--muted) 82%, transparent);
+  --bn-colors-selected-text: var(--primary-foreground);
+  --bn-colors-selected-background: var(--primary);
+  --bn-colors-disabled-text: var(--muted-foreground);
+  --bn-colors-disabled-background: color-mix(in srgb, var(--muted) 48%, transparent);
+  --bn-colors-shadow: color-mix(in srgb, black 34%, transparent);
+  --bn-colors-border: var(--border);
+  --bn-colors-side-menu: var(--muted-foreground);
+  --bn-border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  --bn-shadow-medium: 0 14px 40px color-mix(in srgb, black 32%, transparent);
+  --bn-shadow-light: 0 8px 22px color-mix(in srgb, black 18%, transparent);
+}
+
+.misty-note-block-editor .bn-container {
+  margin: 0;
+  background: transparent;
+}
+
+.misty-note-block-editor .bn-editor {
+  min-height: 420px;
+  padding: 0;
+  background: transparent;
+  color: var(--foreground);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.misty-note-block-editor.is-readonly .bn-editor {
+  min-height: 0;
+}
+
+.misty-note-block-editor .bn-editor [data-content-type="heading"] h1 {
+  font-size: 28px;
+  line-height: 1.14;
+}
+
+.misty-note-block-editor .bn-editor [data-content-type="heading"] h2 {
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.misty-note-block-editor .bn-editor [data-content-type="heading"] h3 {
+  font-size: 16px;
+  line-height: 1.3;
+}
+
+.misty-note-block-editor .bn-editor [data-content-type="codeBlock"] pre,
+.misty-note-block-editor .bn-editor code {
+  border-color: var(--misty-code-border);
+  background: var(--misty-code-bg);
+}
+
+.misty-note-block-editor .bn-editor a {
+  color: var(--primary);
+  text-underline-offset: 2px;
+}
+
+.misty-note-block-editor .bn-suggestion-menu,
+.misty-note-block-editor .bn-formatting-toolbar,
+.misty-note-block-editor .bn-file-panel,
+.misty-note-block-editor .bn-link-toolbar {
+  backdrop-filter: blur(20px) saturate(150%);
+}

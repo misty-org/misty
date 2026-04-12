@@ -1,19 +1,7 @@
 import type { NotesTopBarProps } from "@/models/interfaces/features/notes/components/NotesTopBar";
 export type { NotesTopBarProps } from "@/models/interfaces/features/notes/components/NotesTopBar";
-import { PanelRight, Plus, RefreshCw, Search, X } from "lucide-react";
-import type { NoteGroupId } from "@/models/types/features/notes/types";
-import {
-  Button,
-  IconButton,
-  Input,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  cn,
-} from "@/ui";
-import { noteGroups, relativeTime } from "@/features/notes/noteFilters";
+import { PanelRight, Plus, Search, X } from "lucide-react";
+import { Button, IconButton, Input, cn } from "@/ui";
 
 const topBarClass = "flex h-12 shrink-0 items-center gap-2 border-b border-border bg-card/60 px-3";
 
@@ -44,33 +32,7 @@ export function NotesTopBar(props: NotesTopBarProps) {
         ) : null}
       </div>
 
-      <Select
-        value={props.activeGroup}
-        onValueChange={(value) => props.onSelectGroup(value as NoteGroupId)}
-      >
-        <SelectTrigger className="h-8 w-[160px] text-[13px]" aria-label="Filter by source">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {noteGroups.map((group) => (
-            <SelectItem key={group.id} value={group.id}>
-              {group.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
       <div className="ml-auto flex items-center gap-2">
-        <span className="hidden text-[11px] text-muted-foreground sm:inline">
-          {props.syncing
-            ? "Syncing…"
-            : props.lastSyncedAt
-              ? `Synced ${relativeTime(props.lastSyncedAt)}`
-              : "Not synced"}
-        </span>
-        <IconButton title="Sync all sources" disabled={props.syncing} onClick={props.onSync}>
-          <RefreshCw size={14} className={cn(props.syncing && "animate-spin")} />
-        </IconButton>
         <IconButton
           title={props.contextPanelOpen ? "Hide details" : "Show details"}
           onClick={props.onToggleContextPanel}

@@ -18,7 +18,6 @@ export type {
   AppNoticeEntry,
   FramePacingState,
 } from "@/models/types/layouts";
-import { Button } from "@/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Outlet } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
@@ -53,6 +52,7 @@ import {
   windowsTitlebarCloseButtonClass,
   windowsTitlebarControlButtonClass,
   windowsTitlebarControlsClass,
+  windowsTitlebarTitleClass,
 } from "./styles";
 import { settingsFallbackRoute } from "./helpers";
 import { useDesktopWindowChrome } from "./useDesktopWindowChrome";
@@ -71,6 +71,17 @@ import {
 } from "./SettingsOverlays";
 import { FramePacingOverlay } from "./FramePacingOverlay";
 import { useAuth } from "@/features/auth/AuthContext";
+
+// Windows "restore" caption glyph: two offset squares, the front one masked with
+// the titlebar background so the overlap reads cleanly.
+function RestoreGlyph() {
+  return (
+    <span className="relative block size-3" aria-hidden="true">
+      <span className="absolute right-0 top-0 size-2 rounded-[1px] border border-current" />
+      <span className="absolute bottom-0 left-0 size-2 rounded-[1px] border border-current bg-[var(--misty-app-titlebar-bg,var(--misty-bg))]" />
+    </span>
+  );
+}
 
 export function DesktopLayout(props: {
   getRouteId: (pathname: string) => AppTab;
@@ -92,7 +103,9 @@ export function DesktopLayout(props: {
     usesNativeWindowChrome,
     desktopPlatform,
     shouldShowWindowsTitlebarControls,
+    isWindowMaximized,
     startTitlebarDrag,
+    handleWindowsTitlebarPointerDown,
     expandTitlebarWindow,
     togglePseudoMaximize,
     minimizeTitlebarWindow,
@@ -228,43 +241,53 @@ export function DesktopLayout(props: {
       {usesNativeWindowChrome ? (
         <header
           className={desktopTitlebarClass}
-          data-tauri-drag-region
-          onPointerDown={startTitlebarDrag}
+          data-tauri-drag-region={shouldShowWindowsControls ? undefined : ""}
+          onPointerDown={
+            shouldShowWindowsControls ? handleWindowsTitlebarPointerDown : startTitlebarDrag
+          }
         >
+          {/* Windows/Linux handle drag + double-press-to-maximize via the pointer
+              handler above; macOS keeps the native drag region + pseudo-maximize. */}
           <div
             className={desktopTitlebarDoubleClickLayerClass}
-            onDoubleClick={expandTitlebarWindow}
+            onDoubleClick={shouldShowWindowsControls ? undefined : expandTitlebarWindow}
           />
-          <span className={desktopTitlebarTitleClass}>Misty</span>
+          <span
+            className={
+              shouldShowWindowsControls ? windowsTitlebarTitleClass : desktopTitlebarTitleClass
+            }
+          >
+            Misty
+          </span>
           {shouldShowWindowsControls ? (
             <div className={windowsTitlebarControlsClass}>
-              <Button
+              <button
                 type="button"
                 className={windowsTitlebarControlButtonClass}
                 aria-label="Minimize window"
                 title="Minimize"
                 onClick={minimizeTitlebarWindow}
               >
-                <Minus size={15} strokeWidth={1.8} />
-              </Button>
-              <Button
+                <Minus size={16} strokeWidth={1.6} />
+              </button>
+              <button
                 type="button"
                 className={windowsTitlebarControlButtonClass}
-                aria-label="Maximize or restore window"
-                title="Maximize"
+                aria-label={isWindowMaximized ? "Restore window" : "Maximize window"}
+                title={isWindowMaximized ? "Restore" : "Maximize"}
                 onClick={() => void togglePseudoMaximize().catch(() => undefined)}
               >
-                <Square size={13} strokeWidth={1.8} />
-              </Button>
-              <Button
+                {isWindowMaximized ? <RestoreGlyph /> : <Square size={12} strokeWidth={1.6} />}
+              </button>
+              <button
                 type="button"
                 className={windowsTitlebarCloseButtonClass}
                 aria-label="Close window"
                 title="Close"
                 onClick={closeTitlebarWindow}
               >
-                <X size={16} strokeWidth={1.8} />
-              </Button>
+                <X size={17} strokeWidth={1.6} />
+              </button>
             </div>
           ) : null}
         </header>

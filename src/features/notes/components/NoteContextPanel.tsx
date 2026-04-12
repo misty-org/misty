@@ -8,23 +8,11 @@ export type {
 } from "@/models/interfaces/features/notes/components/NoteContextPanel";
 import type { ReactNode } from "react";
 import { Link2 } from "lucide-react";
-import {
-  Badge,
-  ScrollArea,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  StatusBadge,
-} from "@/ui";
+import { Badge, ScrollArea } from "@/ui";
 import { relativeTime } from "@/features/notes/noteFilters";
-import { providerStatusPresentation } from "./NoteSourceBadge";
 
 const panelClass =
   "grid h-full min-h-0 grid-rows-[minmax(0,1fr)] border-l border-border bg-card/40";
-
-const UNLINKED_VALUE = "__unlinked__";
 
 export function NoteContextPanel(props: NoteContextPanelProps) {
   const { note } = props;
@@ -39,60 +27,18 @@ export function NoteContextPanel(props: NoteContextPanelProps) {
     );
   }
 
-  const status = note.providerStatus ?? "connected";
-
   return (
     <aside className={panelClass} aria-label="Note details">
       <ScrollArea className="min-h-0">
         <div className="px-3.5 pb-6">
           <ContextSection title="Space">
-            {props.onAssignSpace ? (
-              <Select
-                value={note.spaceId ?? UNLINKED_VALUE}
-                onValueChange={(value) => {
-                  const space = props.spaces.find((candidate) => candidate.id === value);
-                  props.onAssignSpace?.(note.id, space?.id, space?.name);
-                }}
-              >
-                <SelectTrigger className="h-7 w-full text-[12px]" aria-label="Assign to Space">
-                  <SelectValue placeholder="Unlinked" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={UNLINKED_VALUE}>Unlinked</SelectItem>
-                  {props.spaces.map((space) => (
-                    <SelectItem key={space.id} value={space.id}>
-                      {space.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : (
-              <p className="m-0 text-[12px] text-foreground/90">{note.spaceName ?? "Unlinked"}</p>
-            )}
+            <p className="m-0 text-[12px] text-foreground/90">{note.spaceName}</p>
           </ContextSection>
 
-          <ContextSection title="Source">
+          <ContextSection title="Details">
             <dl className="space-y-1.5 text-[11px]">
-              <Row label="Provider" value={note.source === "notion" ? "Notion" : "Misty Notes"} />
-              <Row
-                label="Status"
-                value={
-                  <StatusBadge status={providerStatusPresentation[status].tone}>
-                    {providerStatusPresentation[status].label}
-                  </StatusBadge>
-                }
-              />
-              <Row label="Last synced" value={relativeTime(note.updatedAt)} />
+              <Row label="Updated" value={relativeTime(note.updatedAt)} />
               <Row label="Created" value={relativeTime(note.createdAt)} />
-              <Row
-                label="Source ID"
-                value={
-                  <span className="truncate font-mono text-[10px]" title={note.sourceId}>
-                    {note.sourceId.slice(0, 14)}
-                    {note.sourceId.length > 14 ? "…" : ""}
-                  </span>
-                }
-              />
             </dl>
           </ContextSection>
 

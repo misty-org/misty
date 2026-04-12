@@ -5,7 +5,6 @@ import type { UnifiedNote } from "@/models/types/features/notes/types";
 import { createDefaultNotesRegistry } from "@/features/notes/connectors/registry";
 import { NOTION_CONNECTOR_ID } from "@/features/notes/mockData";
 import { nowIso } from "@/features/notes/connectorUtils";
-import { setNotionScope } from "@/stores/notes/notionApi";
 
 let registry = createDefaultNotesRegistry();
 let notesLoadGeneration = 0;
@@ -16,6 +15,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
   notes: [],
   connectorErrors: {},
   selectedNoteId: undefined,
+  editingNoteId: undefined,
   accountId: undefined,
   spaceId: undefined,
   spaceName: undefined,
@@ -34,7 +34,6 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
     if (sameScope && state.phase === "ready") return;
 
     const generation = ++notesLoadGeneration;
-    setNotionScope(accountId, spaceId);
     registry = createDefaultNotesRegistry(accountId);
     const activeRegistry = registry;
     set((current) => ({
@@ -45,6 +44,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
       spaceName,
       notes: [],
       selectedNoteId: undefined,
+      editingNoteId: undefined,
       connectorErrors: {},
       syncing: false,
       connectorRevision: current.connectorRevision + 1,
@@ -102,6 +102,10 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
     set({ selectedNoteId });
   },
 
+  setEditingNoteId(editingNoteId) {
+    set({ editingNoteId });
+  },
+
   toggleContextPanel() {
     set((state) => ({ contextPanelOpen: !state.contextPanelOpen }));
   },
@@ -129,23 +133,30 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
 
   async createNote(input: CreateNoteInput) {
     const { spaceId, spaceName } = get();
+    if (!spaceId || !spaceName) {
+      reportConnectorError(set, "notes:misty", new Error("Open a Space before creating a note."));
+      return undefined;
+    }
     const generation = notesLoadGeneration;
     const activeRegistry = registry;
     const connector = activeRegistry.forSource("misty");
     try {
       const created = await connector?.createNote?.({
         ...input,
-        spaceId: input.spaceId ?? spaceId,
-        spaceName: input.spaceName ?? spaceName,
+        spaceId,
+        spaceName,
       });
-      if (!created || !notesActionIsCurrent(generation, activeRegistry)) return;
+      if (!created || !notesActionIsCurrent(generation, activeRegistry)) return undefined;
       set((state) => ({
         notes: [created, ...state.notes],
         selectedNoteId: created.id,
+        editingNoteId: created.id,
         query: "",
       }));
+      return created;
     } catch (reason) {
       reportConnectorError(set, connector?.id ?? "notes:misty", reason);
+      return undefined;
     }
   },
 
@@ -276,13 +287,13 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
 export function resetNotesAccountState(): void {
   notesLoadGeneration += 1;
   registry = createDefaultNotesRegistry();
-  setNotionScope("", "");
   useNotesStore.setState({
     registry,
     phase: "idle",
     notes: [],
     connectorErrors: {},
     selectedNoteId: undefined,
+    editingNoteId: undefined,
     accountId: undefined,
     spaceId: undefined,
     spaceName: undefined,
@@ -312,7 +323,8 @@ function replaceNote(
 }
 
 function scopeNotes(notes: UnifiedNote[], spaceId: string, spaceName: string): UnifiedNote[] {
-  return notes.map((note) => (note.source === "notion" ? { ...note, spaceId, spaceName } : note));
+  void spaceName;
+  return notes.filter((note) => note.spaceId === spaceId);
 }
 
 function notesActionIsCurrent(generation: number, activeRegistry: typeof registry): boolean {

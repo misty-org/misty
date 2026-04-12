@@ -66,7 +66,7 @@ export function SpaceTaskDrawer({
 }) {
   return (
     <Sheet open onOpenChange={(open) => !open && !busy && onClose()}>
-      <SheetContent className="flex w-[min(760px,96vw)] max-w-none flex-col gap-0 bg-background p-0 sm:max-w-none">
+      <SheetContent className="flex w-[min(600px,96vw)] max-w-none flex-col gap-0 bg-background p-0 sm:max-w-none">
         <form className="flex min-h-0 flex-1 flex-col" onSubmit={onSave}>
           <SheetHeader className="border-b border-border/60 px-5 py-4 pr-14 text-left">
             <div className="flex items-center gap-3">
