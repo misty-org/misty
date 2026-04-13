@@ -1,13 +1,13 @@
 import { selectedPathsForPane, useExplorerStore } from "@/stores/explorer";
-import type { AiStatus } from "@/models/interfaces/stores/assistant/useAgentSessionStore";
+import type { AiStatus } from "@/models/interfaces/stores/agent/useAgentSessionStore";
 
-export function assistantStatusText(status: AiStatus | null): string {
+export function agentStatusText(status: AiStatus | null): string {
   if (!status) return "Checking Agents...";
   if (status.configured) return `Ready (${status.modelName})`;
   return "Backend unavailable";
 }
 
-export function assistantPlaceholder(configured: boolean, fallback: string): string {
+export function agentPlaceholder(configured: boolean, fallback: string): string {
   return configured ? fallback : "Configure hosted Agents to continue";
 }
 

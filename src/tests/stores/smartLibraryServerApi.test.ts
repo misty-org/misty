@@ -11,7 +11,7 @@ vi.mock("@/stores/backend", async (importOriginal) => ({
   appSnapshot: vi.fn().mockRejectedValue(new Error("not running in Tauri")),
 }));
 
-import { managedAiRequest } from "@/stores/assistant/useAiServerStore";
+import { managedAiRequest } from "@/stores/agent/useAiServerStore";
 import {
   approveSmartLibrarySample,
   completeSemanticReindex,

@@ -22,7 +22,7 @@ const api = vi.hoisted(() => ({
 }));
 
 vi.mock("@/stores/app", () => ({
-  selectAssistantPreferences: () => ({
+  selectAgentPreferences: () => ({
     enabled: true,
     scopes: { filesAllowed: true, cleanupAllowed: true, searchAllowed: true },
   }),
@@ -31,7 +31,7 @@ vi.mock("@/stores/app", () => ({
   },
 }));
 
-vi.mock("@/stores/assistant/useAiServerStore", () => ({
+vi.mock("@/stores/agent/useAiServerStore", () => ({
   cancelAgentSession: api.cancelAgentSession,
   createAgentSession: api.createAgentSession,
   deleteAgentSession: api.deleteAgentSession,
@@ -44,7 +44,7 @@ vi.mock("@/stores/assistant/useAiServerStore", () => ({
   submitToolResults: api.submitToolResults,
 }));
 
-vi.mock("@/stores/assistant/useAgentDelegationStore", () => ({
+vi.mock("@/stores/agent/useAgentDelegationStore", () => ({
   publicAgentDisplayName: () => "Gemini 2.5 Flash-Lite",
   publicAgentModel: () => "google/gemini-2.5-flash-lite",
   tryAgentSpaceDelegation: api.delegate,
@@ -54,7 +54,7 @@ import {
   resetAgentAccountState,
   spaceAgentScopeKey,
   useAgentSessionStore,
-} from "@/stores/assistant/useAgentSessionStore";
+} from "@/stores/agent/useAgentSessionStore";
 
 describe("useAgentSessionStore runtime isolation", () => {
   beforeEach(() => {

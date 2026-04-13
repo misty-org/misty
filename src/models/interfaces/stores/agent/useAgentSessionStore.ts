@@ -8,7 +8,7 @@ import {
 } from "@/stores/backend";
 import { errorText } from "@/lib/format";
 import { isNativeMobileBuild } from "@/platform/buildTarget";
-import { selectAssistantPreferences, useSettingsStore } from "@/stores/app";
+import { selectAgentPreferences, useSettingsStore } from "@/stores/app";
 import {
   cancelAgentSession,
   createAgentSession,
@@ -17,15 +17,15 @@ import {
   fetchAgentEvents,
   sendAgentMessage,
   submitToolResults,
-} from "@/stores/assistant/useAiServerStore";
-import type { AiMode } from "@/models/types/stores/assistant/useAiServerStore";
+} from "@/stores/agent/useAiServerStore";
+import type { AiMode } from "@/models/types/stores/agent/useAiServerStore";
 import type {
   AgentStatusResponse,
   FileOperationPlan,
   ToolManifest,
   ToolRequest,
   ToolResult,
-} from "@/models/interfaces/stores/assistant/useAiServerStore";
+} from "@/models/interfaces/stores/agent/useAiServerStore";
 import { agentsPrepareDocument, agentsRegisterFolderScope } from "@/stores/agents/useAgentsStore";
 import type { AgentCitation } from "@/models/interfaces/features/agents/types";
 import {
@@ -43,14 +43,14 @@ import {
   resolvePendingAgentDelegation,
   trackPendingAgentDelegation,
   tryAgentSpaceDelegation,
-} from "@/stores/assistant/useAgentDelegationStore";
+} from "@/stores/agent/useAgentDelegationStore";
 
 import type {
   AiPanelMessage,
-  AssistantScope,
-  AssistantRequestScope,
+  AgentScope,
+  AgentRequestScope,
   AgentContextSource,
-} from "@/models/types/stores/assistant/useAgentSessionStore";
+} from "@/models/types/stores/agent/useAgentSessionStore";
 
 export interface AiStatus {
   configured: boolean;
@@ -69,7 +69,7 @@ export interface AiPlanReview {
   applying: boolean;
   appliedSummary: string | null;
   blockedReasons: string[];
-  scope: AssistantScope | null;
+  scope: AgentScope | null;
 }
 
 export interface AiToolApproval {
@@ -78,7 +78,7 @@ export interface AiToolApproval {
   running: boolean;
   completed: boolean;
   error: string | null;
-  scope: AssistantScope | null;
+  scope: AgentScope | null;
 }
 
 export interface SendAiPromptRequest {

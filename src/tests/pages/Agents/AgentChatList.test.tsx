@@ -2,8 +2,8 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { AgentChatList } from "@/pages/Assistant/desktop/AgentChatList";
-import { useAgentSessionStore } from "@/stores/assistant/useAgentSessionStore";
+import { AgentChatList } from "@/pages/Agents/desktop/AgentChatList";
+import { useAgentSessionStore } from "@/stores/agent/useAgentSessionStore";
 
 describe("AgentChatList", () => {
   let container: HTMLDivElement;

@@ -21,6 +21,8 @@ const validSpaceSections = new Set([
   "tasks",
   "notes",
   "library",
+  // Legacy URL segment, kept so saved bookmarks and deep links still resolve.
+  // It renders no surface of its own; it redirects to /agents?spaceId=.
   "assistant",
   "members",
   "settings",

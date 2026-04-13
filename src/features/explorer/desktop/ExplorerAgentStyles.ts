@@ -1,4 +1,4 @@
-export const assistantPanelStyles = {
+export const agentPanelStyles = {
   runningBadge: "text-[11px] font-medium text-muted-foreground",
   errorText: "m-0 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive",
   log: "grid min-h-0 content-start overflow-auto pr-0.5",

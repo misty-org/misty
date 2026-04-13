@@ -1,15 +1,15 @@
 import type {
   AiPanelMessage,
-  AssistantScope,
-  AssistantRequestScope,
+  AgentScope,
+  AgentRequestScope,
   AgentContextSource,
-} from "@/models/types/stores/assistant/useAgentSessionStore";
+} from "@/models/types/stores/agent/useAgentSessionStore";
 export type {
   AiPanelMessage,
-  AssistantScope,
-  AssistantRequestScope,
+  AgentScope,
+  AgentRequestScope,
   AgentContextSource,
-} from "@/models/types/stores/assistant/useAgentSessionStore";
+} from "@/models/types/stores/agent/useAgentSessionStore";
 import type {
   AiStatus,
   AiPlanReview,
@@ -17,7 +17,7 @@ import type {
   SendAiPromptRequest,
   AiConversationSummary,
   AiSessionStore,
-} from "@/models/interfaces/stores/assistant/useAgentSessionStore";
+} from "@/models/interfaces/stores/agent/useAgentSessionStore";
 export type {
   AiStatus,
   AiPlanReview,
@@ -25,7 +25,7 @@ export type {
   SendAiPromptRequest,
   AiConversationSummary,
   AiSessionStore,
-} from "@/models/interfaces/stores/assistant/useAgentSessionStore";
+} from "@/models/interfaces/stores/agent/useAgentSessionStore";
 import { create } from "zustand";
 import {
   explorerCreateItem,
@@ -38,9 +38,9 @@ import { errorText } from "@/lib/format";
 import {
   hydrateServerSessions,
   loadConversationTranscript,
-} from "@/stores/assistant/agentSessionSync";
+} from "@/stores/agent/agentSessionSync";
 import { isNativeMobileBuild } from "@/platform/buildTarget";
-import { selectAssistantPreferences, useSettingsStore } from "@/stores/app";
+import { selectAgentPreferences, useSettingsStore } from "@/stores/app";
 import {
   cancelAgentSession,
   createAgentSession,
@@ -52,15 +52,16 @@ import {
   renameAgentSession,
   sendAgentMessage,
   submitToolResults,
-} from "@/stores/assistant/useAiServerStore";
-import type { AiMode } from "@/models/types/stores/assistant/useAiServerStore";
+} from "@/stores/agent/useAiServerStore";
+import type { AiMode } from "@/models/types/stores/agent/useAiServerStore";
 import type {
+  AgentEvent,
   AgentStatusResponse,
   FileOperationPlan,
   ToolManifest,
   ToolRequest,
   ToolResult,
-} from "@/models/interfaces/stores/assistant/useAiServerStore";
+} from "@/models/interfaces/stores/agent/useAiServerStore";
 import { agentsPrepareDocument, agentsRegisterFolderScope } from "@/stores/agents/useAgentsStore";
 import type { AgentCitation } from "@/models/interfaces/features/agents/types";
 import {
@@ -80,7 +81,7 @@ let lastEventSequence = 0;
 let activeRoot: string | null = null;
 let activeScopeId: string | null = null;
 let activeSelectedPaths: string[] = [];
-let activeRequestScope: AssistantScope | null = null;
+let activeRequestScope: AgentScope | null = null;
 let activeContextSources: AgentContextSource[] = [];
 // The active chat's per-chat model, overriding the agent's configured model.
 // Null means the chat follows the agent's model (or the base default).
@@ -120,7 +121,7 @@ interface ConversationRuntimeSnapshot {
   activeRoot: string | null;
   activeScopeId: string | null;
   activeSelectedPaths: string[];
-  requestScope: AssistantScope | null;
+  requestScope: AgentScope | null;
   contextSources: AgentContextSource[];
 }
 interface StoredConversation {
@@ -208,13 +209,21 @@ function conversationTitleFromText(text: string): string {
   return normalized.length > 48 ? `${normalized.slice(0, 48)}…` : normalized;
 }
 
+// The model-turn event was renamed from "assistant_message" to "agent_message".
+// A server that has not been redeployed yet still emits the old value, and
+// events persisted before the rename replay with it, so both are recognised
+// until that compatibility window closes.
+function isAgentMessageEvent(type: AgentEvent["type"]): boolean {
+  return type === "agent_message" || type === "assistant_message";
+}
+
 // Renders the visible transcript as a plain preamble so a freshly created
 // session on a newly chosen model can pick up where the prior model left off.
-// Only user and assistant turns are replayed; errors and tool chatter are skipped.
+// Only user and agent turns are replayed; errors and tool chatter are skipped.
 function serializeTranscriptForReseed(messages: AiPanelMessage[]): string {
   const turns = messages
-    .filter((message) => message.role === "user" || message.role === "assistant")
-    .map((message) => `${message.role === "user" ? "User" : "Assistant"}: ${message.text}`)
+    .filter((message) => message.role === "user" || message.role === "agent")
+    .map((message) => `${message.role === "user" ? "User" : "Agent"}: ${message.text}`)
     .filter((line) => line.trim().length > 0);
   if (turns.length === 0) return "";
   return [
@@ -265,7 +274,7 @@ async function requestGeneratedChatTitle(userMessage: string): Promise<string | 
       const { events } = await fetchAgentEvents(sessionId, after);
       for (const event of events) {
         after = Math.max(after, event.sequence);
-        if (event.type === "assistant_message" && event.text) return sanitizeChatTitle(event.text);
+        if (isAgentMessageEvent(event.type) && event.text) return sanitizeChatTitle(event.text);
         if (event.type === "error") return null;
       }
       await new Promise((resolve) => setTimeout(resolve, 600));
@@ -401,7 +410,7 @@ const toolDefinitions = {
   apply_file_plan: { name: "apply_file_plan", risk: "write" },
 } as const;
 
-function toolManifestForScope(scope: AssistantScope | null): ToolManifest {
+function toolManifestForScope(scope: AgentScope | null): ToolManifest {
   const previewTools = mistyDocumentsEnabled() ? [toolDefinitions.preview_file] : [];
   if (scope === "files") {
     return {
@@ -430,13 +439,13 @@ function toolManifestForScope(scope: AssistantScope | null): ToolManifest {
   return { tools: [] };
 }
 
-function toolAllowedForScope(toolName: string, scope: AssistantScope): boolean {
+function toolAllowedForScope(toolName: string, scope: AgentScope): boolean {
   return toolManifestForScope(scope).tools.some((tool) => tool.name === toolName);
 }
 
-function classifyAssistantRequest(prompt: string): AssistantRequestScope {
+function classifyAgentRequest(prompt: string): AgentRequestScope {
   const normalized = prompt.toLowerCase();
-  const matches: AssistantScope[] = [];
+  const matches: AgentScope[] = [];
   if (
     /\b(clean(?:up)?|tidy|declutter|organize|duplicate|unused|large files?|old files?)\b/.test(
       normalized,
@@ -466,15 +475,15 @@ function classifyAssistantRequest(prompt: string): AssistantRequestScope {
   return distinct[0] ?? null;
 }
 
-function isDocumentAssistantRequest(prompt: string): boolean {
+function isDocumentAgentRequest(prompt: string): boolean {
   return /\b(summar(?:y|ize)|compare|analy[sz]e|explain|extract|question|read|review|pdf|document|spreadsheet|presentation|slide|contract|report)\b/i.test(
     prompt,
   );
 }
 
-function assistantScopeAllowed(
-  preferences: ReturnType<typeof selectAssistantPreferences>,
-  scope: AssistantScope,
+function agentScopeAllowed(
+  preferences: ReturnType<typeof selectAgentPreferences>,
+  scope: AgentScope,
 ): boolean {
   if (!preferences.enabled) return false;
   if (scope === "files") return preferences.scopes.filesAllowed;
@@ -482,7 +491,7 @@ function assistantScopeAllowed(
   return preferences.scopes.searchAllowed;
 }
 
-function scopedAssistantPrompt(prompt: string, scope: AssistantScope | null): string {
+function scopedAgentPrompt(prompt: string, scope: AgentScope | null): string {
   if (scope === "cleanup") {
     return `${prompt}\n\nPermission boundary: Cleanup is enabled for scanning and planning only. Do not apply, move, rename, create, trash, delete, or otherwise modify files.`;
   }
@@ -495,7 +504,7 @@ function scopedAssistantPrompt(prompt: string, scope: AssistantScope | null): st
   return `${prompt}\n\nPermission boundary: No capability scope is active. Respond conversationally without using tools or modifying data.`;
 }
 
-function assistantScopeLabel(scope: AssistantScope): string {
+function agentScopeLabel(scope: AgentScope): string {
   return scope[0].toUpperCase() + scope.slice(1);
 }
 
@@ -512,7 +521,7 @@ function appendBlockedRequest(
     messages: [
       ...state.messages,
       { id: aiMessageId("user"), role: "user", text: prompt },
-      { id: aiMessageId("assistant"), role: "assistant", text: response },
+      { id: aiMessageId("agent"), role: "agent", text: response },
     ],
   }));
 }
@@ -650,7 +659,7 @@ export const useAgentSessionStore = create<AiSessionStore>((set, get) => ({
     const settingsStore = useSettingsStore.getState();
     if (!settingsStore.loaded) await settingsStore.load();
     if (!agentRuntimeIsCurrent(generation) || conversationId !== get().activeConversationId) return;
-    const preferences = selectAssistantPreferences(useSettingsStore.getState().settings?.document);
+    const preferences = selectAgentPreferences(useSettingsStore.getState().settings?.document);
     if (!preferences.enabled) {
       appendBlockedRequest(
         set,
@@ -668,7 +677,7 @@ export const useAgentSessionStore = create<AiSessionStore>((set, get) => ({
       );
       return;
     }
-    if (!inSpace && isDocumentAssistantRequest(trimmed) && !mistyDocumentsEnabled()) {
+    if (!inSpace && isDocumentAgentRequest(trimmed) && !mistyDocumentsEnabled()) {
       appendBlockedRequest(
         set,
         trimmed,
@@ -676,7 +685,7 @@ export const useAgentSessionStore = create<AiSessionStore>((set, get) => ({
       );
       return;
     }
-    const classifiedScope = inSpace ? null : classifyAssistantRequest(trimmed);
+    const classifiedScope = inSpace ? null : classifyAgentRequest(trimmed);
     if (classifiedScope === "ambiguous") {
       appendBlockedRequest(
         set,
@@ -690,11 +699,11 @@ export const useAgentSessionStore = create<AiSessionStore>((set, get) => ({
     // of dropping to no-tool-access and causing the model to attempt a now-disallowed
     // tool call as it continues its own train of thought from the previous turn.
     const requestScope = classifiedScope ?? activeRequestScope;
-    if (requestScope && !assistantScopeAllowed(preferences, requestScope)) {
+    if (requestScope && !agentScopeAllowed(preferences, requestScope)) {
       appendBlockedRequest(
         set,
         trimmed,
-        `The ${assistantScopeLabel(requestScope)} scope is disabled. Allow it in Settings > Assistant to continue.`,
+        `The ${agentScopeLabel(requestScope)} scope is disabled. Allow it in Settings > Agents to continue.`,
       );
       return;
     }
@@ -739,7 +748,7 @@ export const useAgentSessionStore = create<AiSessionStore>((set, get) => ({
       await sendAgentMessageOnce(
         {
           mode: get().mode,
-          user_message: scopedAssistantPrompt(outboundPrompt, requestScope),
+          user_message: scopedAgentPrompt(outboundPrompt, requestScope),
           active_root: serverContext.activeRoot,
           selected_paths: serverContext.selectedPaths,
           capabilities: toolManifestForScope(requestScope),
@@ -860,7 +869,7 @@ export const useAgentSessionStore = create<AiSessionStore>((set, get) => ({
         ),
         messages: [
           ...state.messages,
-          { id: aiMessageId("assistant"), role: "assistant", text: appliedSummary },
+          { id: aiMessageId("agent"), role: "agent", text: appliedSummary },
         ],
       }));
     } catch (error) {
@@ -1206,10 +1215,10 @@ async function drainAiEventsOnce(
   const nextToolApprovals: AiToolApproval[] = [];
   for (const event of nextEvents) {
     lastEventSequence = Math.max(lastEventSequence, event.sequence);
-    if (event.type === "assistant_message" && event.text) {
+    if (isAgentMessageEvent(event.type) && event.text) {
       nextMessages.push({
-        id: aiMessageId("assistant"),
-        role: "assistant",
+        id: aiMessageId("agent"),
+        role: "agent",
         text: event.text,
         citations: event.citations,
         contextSources: activeContextSources,
@@ -1398,22 +1407,22 @@ function isSessionNotFoundError(error: unknown): boolean {
 
 async function runToolRequest(
   request: ToolRequest,
-  scope: AssistantScope | null,
+  scope: AgentScope | null,
 ): Promise<ToolResult> {
   try {
-    const preferences = selectAssistantPreferences(useSettingsStore.getState().settings?.document);
-    if (!scope || !assistantScopeAllowed(preferences, scope)) {
+    const preferences = selectAgentPreferences(useSettingsStore.getState().settings?.document);
+    if (!scope || !agentScopeAllowed(preferences, scope)) {
       return toolError(
         request,
         scope
-          ? `The ${assistantScopeLabel(scope)} scope is disabled.`
+          ? `The ${agentScopeLabel(scope)} scope is disabled.`
           : "This request has no allowed capability scope.",
       );
     }
     if (!toolAllowedForScope(request.name, scope)) {
       return toolError(
         request,
-        `${request.name} is not allowed by the ${assistantScopeLabel(scope)} scope.`,
+        `${request.name} is not allowed by the ${agentScopeLabel(scope)} scope.`,
       );
     }
     const args = toolArgs(request);
@@ -1523,7 +1532,7 @@ async function runToolRequest(
 
 async function runToolRequestWithTimeout(
   request: ToolRequest,
-  scope: AssistantScope | null,
+  scope: AgentScope | null,
 ): Promise<ToolResult> {
   let timeoutId: number | null = null;
   try {

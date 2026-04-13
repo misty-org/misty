@@ -12,8 +12,8 @@ import { AppFrameLayout } from "../layouts/AppFrameLayout";
 import { AppPagesLayout } from "../layouts/AppPagesLayout";
 import { isDeepLinkRouteAllowed, resolveAuthDeepLinkRoute } from "./navigation";
 import { routes } from "./paths";
-import { LegacyAssistantRedirect } from "./LegacyAssistantRedirect";
-import AgentsPage from "../pages/Assistant";
+import { LegacyAgentRedirect } from "./LegacyAgentRedirect";
+import AgentsPage from "../pages/Agents";
 import ExtensionsPage from "../pages/Extensions";
 
 export const router = createBrowserRouter([
@@ -39,7 +39,7 @@ export const router = createBrowserRouter([
             children: [
               { path: "agents", element: <AgentsPage /> },
               { path: "automations", element: <Navigate to={routes.spacePersonal} replace /> },
-              { path: "assistant", element: <LegacyAssistantRedirect /> },
+              { path: "assistant", element: <LegacyAgentRedirect /> },
               {
                 path: "spaces",
                 element: <SpacesShell />,

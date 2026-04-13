@@ -58,7 +58,7 @@ import { useShallow } from "zustand/react/shallow";
 import {
   clearSelectionsAcrossPanes,
   selectedCountAcrossPanes,
-} from "@/features/explorer/desktop/ExplorerAssistantPanels";
+} from "@/features/explorer/desktop/ExplorerAgentPanels";
 import type { CompareDialogSeed } from "@/models/interfaces/features/explorer/desktop/ExplorerCompareDialog";
 
 export type ContextMenuLeafItem = {
