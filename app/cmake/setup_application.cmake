@@ -131,6 +131,20 @@ add_custom_target(misty_assets ALL
     COMMAND ${CMAKE_COMMAND} -E copy
         "${CMAKE_CURRENT_SOURCE_DIR}/misty.conf"
         "$<TARGET_FILE_DIR:misty>/misty.conf"
+<<<<<<< HEAD
 )
 
 add_dependencies(misty_assets misty)
+=======
+
+    COMMAND ${CMAKE_COMMAND} -E copy
+        "${CMAKE_CURRENT_SOURCE_DIR}/commands.msy"
+        "$<TARGET_FILE_DIR:misty>/commands.msy"
+
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/extensions"
+        "$<TARGET_FILE_DIR:misty>/extensions"
+)
+
+
+>>>>>>> d86c246 (Adding extensions module)
