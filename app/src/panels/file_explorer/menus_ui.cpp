@@ -4,6 +4,7 @@
 #include <cstdio>
 
 #include "core/commands/command_manager.h"
+#include "core/extensions/extension_manager.h"
 #include "core/file_picker/application_picker.h"
 #include "core/manager/open_with_manager.h"
 #include "core/system/util.h"
@@ -16,6 +17,22 @@ namespace fs = std::filesystem;
 using namespace misty::core;
 
 namespace misty::panel {
+namespace {
+
+ExtensionFileContext build_extension_file_context(const UnifiedFileItem& file) {
+    fs::path file_path(file.path);
+    ExtensionFileContext context;
+    context.path = file.path;
+    context.name = file.name;
+    context.parent_path = file_path.parent_path().string();
+    context.extension = file_path.extension().string();
+    context.mime_type = file.mime_type;
+    context.is_dir = file.is_dir;
+    return context;
+}
+
+} // namespace
+
 const UnifiedFileItem* FileExplorerPanel::find_context_menu_target(const FileExplorerState& state) const {
     for (const auto& file : state.files) {
         if (file.path == state.context_menu_target_path) {
@@ -59,6 +76,10 @@ void FileExplorerPanel::show_context_menu(FileExplorerState& state) {
             bool is_trash_view = (std::string(state.current_path) == FileExplorerState::VIRTUAL_PATH_TRASH);
             const UnifiedFileItem* target_file = find_context_menu_target(state);
             const bool can_open_directly = target_file && !target_file->is_dir && fs::exists(target_file->path);
+            const auto extension_context = target_file ? build_extension_file_context(*target_file) : ExtensionFileContext{};
+            const auto extension_actions = can_open_directly
+                ? ExtensionManager::get().matching_file_actions(extension_context)
+                : std::vector<MatchedExtensionAction>{};
             bool all_local_available = !state.selected_files.empty();
             for (const auto& f : state.files) {
                 if (state.selected_files.count(f.path) == 0) continue;
@@ -91,6 +112,31 @@ void FileExplorerPanel::show_context_menu(FileExplorerState& state) {
             }
 
             if (can_open_directly) {
+                ImGui::Separator();
+            }
+
+            if (!extension_actions.empty() && target_file) {
+                if (ImGui::BeginMenu("Extensions")) {
+                    for (const auto& matched : extension_actions) {
+                        const std::string label = matched.action.title + "##" + matched.extension_id + ":" + matched.action.id;
+                        if (ImGui::MenuItem(label.c_str())) {
+                            std::string error;
+                            if (!ExtensionManager::get().invoke_file_action(matched, extension_context, &error)) {
+                                auto& notif = registry_.get_state<NotificationState>("Notifications");
+                                notif.add_notification("Extension Failed",
+                                    error.empty() ? "Could not launch extension." : error,
+                                    NotificationType::ERROR);
+                            }
+                        }
+
+                        if (ImGui::IsItemHovered() && !matched.action.description.empty()) {
+                            ImGui::SetTooltip("%s\n%s", matched.extension_name.c_str(), matched.action.description.c_str());
+                        } else if (ImGui::IsItemHovered()) {
+                            ImGui::SetTooltip("%s", matched.extension_name.c_str());
+                        }
+                    }
+                    ImGui::EndMenu();
+                }
                 ImGui::Separator();
             }
 
