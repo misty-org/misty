@@ -11,6 +11,8 @@ public:
     static CommandManager& get();
 
     void load();
+    void clear_runtime_commands();
+    void register_runtime_command(const std::string& command_id, const std::string& default_shortcut);
     bool matches(const std::string& command_id, bool repeat = false) const;
     std::string label(const std::string& command_id) const;
 
@@ -36,6 +38,9 @@ private:
     static std::string label_for_shortcut(const Shortcut& shortcut);
 
     std::unordered_map<std::string, Shortcut> shortcuts_;
+    std::unordered_map<std::string, std::string> runtime_shortcuts_;
+    std::unordered_map<std::string, std::string> user_shortcut_overrides_;
+    bool loaded_ = false;
 };
 
 } // namespace misty::core

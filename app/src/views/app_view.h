@@ -14,6 +14,7 @@ namespace misty::view {
         Workspace,
         Activity,
         Services,
+        Extensions,
         Vault,
         EditProfile,
         Default

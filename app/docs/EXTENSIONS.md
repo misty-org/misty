@@ -1,472 +1,263 @@
 # Misty Extensions
 
-This document describes:
+Misty now supports two extension models:
 
-- what Misty supports today
-- what "embedded extensions" actually means in practice
-- what direction Misty should take next
-- what kind of extension system is likely to be easiest for third-party developers
+- `file_actions`: manifest-driven external tools launched from the file explorer
+- `plugin`: in-process plugins that register commands and ImGui panels through a versioned C ABI
 
-## Current state
+This document describes the plugin model because that is the new hostable extension surface.
 
-Misty currently supports one extension capability: `file_actions`.
+## Plugin goals
 
-That means:
+The plugin system is intentionally narrow:
 
-- Misty discovers extension folders from disk.
-- Each extension has a `manifest.json`.
-- A file action can match a selected file by extension or MIME type.
-- Matching actions appear in the file explorer context menu under `Extensions`.
-- When the user clicks one, Misty launches the extension executable as a detached process.
+- Misty owns discovery, loading, lifecycle, shortcuts, and panel windows
+- plugins contribute commands and panels
+- plugins do not link against Misty's internal C++ classes
+- plugins talk to Misty only through a versioned C ABI function table
 
-Current discovery roots:
+That gives Misty a more stable boundary than exposing raw C++ interfaces or internal headers.
 
-- Bundled extensions: `build/bin/extensions`
-- User-installed extensions: `~/.misty/extensions`
+## Security and safety model
 
-Current implementation files:
+Plugins are not a hard security boundary.
 
-- runtime types: `src/application/core/extensions/extension_manager.h`
-- discovery/matching/launch: `src/application/core/extensions/extension_manager.cpp`
-- file explorer menu integration: `src/application/panels/file_explorer/menus_ui.cpp`
+- they run in-process
+- they can crash Misty with memory corruption or other undefined behavior
+- marketplace review improves trust, but it does not sandbox native code
 
-## Important clarification
+The host does enforce some guardrails:
 
-Extensions are not currently embedded into Misty's UI.
+- manifest `schema_version` and plugin `abi_version` must match Misty's supported values
+- the plugin library path must stay inside the plugin directory after canonicalization
+- duplicate plugin, command, and panel ids are rejected
+- the host API surface is intentionally small
+- signed plugins must match the expected SDK version, build id, platform, architecture, and library SHA-256
+- signed plugins must verify against a trusted Ed25519 public key before Misty loads them
+- if `MISTY_REQUIRE_SIGNED_PLUGINS=ON`, unsigned plugins are rejected before load
+- if a command or panel callback throws a C++ exception, Misty marks that plugin as faulted and stops invoking it
 
-Today, Misty acts as:
+If you want true isolation, this model is not enough on its own. It is an in-process plugin system with host validation, not a secure sandbox.
 
-- a manifest loader
-- a matcher
-- a launcher
+## Discovery roots
 
-It does not currently:
+Misty looks for plugins in:
 
-- host extension-rendered ImGui UI
-- embed foreign OS windows inside a Misty panel
-- capture stdout/stderr as a rendering surface
-- stream a child process directly into an ImGui dock/tab
+- bundled: `build/bin/plugins`
+- user-installed: `~/.misty/plugins`
 
-So the current model is:
+Each plugin must live in its own folder and contain a `manifest.json`.
 
-- Misty-owned menu
-- extension-owned process
-- separate UI, if any
-
-## Why this still matters
-
-This is still a useful first step because the packaging/runtime contract is already good enough for:
-
-- previews via native helper apps
-- "open in tool X"
-- converters/transcoders
-- send/share/export actions
-- workflow automations
-
-It also gives Misty a clean install format that can later back a marketplace.
-
-## Package layout
-
-Each extension is just a folder:
+Example:
 
 ```text
-my-extension/
-  manifest.json
-  run.sh
-  assets/
+plugins/
+  preview_manager/
+    manifest.json
+    preview_manager.dylib
 ```
 
-## Current manifest shape
+## Manifest format
+
+Plugins use `manifest.json` with a `plugin` section:
 
 ```json
 {
   "schema_version": 1,
-  "id": "misty.native-preview",
-  "name": "Native Preview",
+  "id": "misty.preview-manager",
+  "name": "Preview Manager",
   "version": "0.1.0",
-  "description": "Preview PDFs and images in a native viewer.",
-  "platforms": ["linux", "macos"],
-  "file_actions": [
-    {
-      "id": "preview.open",
-      "title": "Preview",
-      "description": "Launch a preview helper.",
-      "executable": "/usr/bin/env",
-      "args": ["bash", "{extension_dir}/preview.sh", "{file_path}"],
-      "extensions": [".pdf", ".png", ".jpg", ".jpeg"],
-      "mime_types": ["application/pdf", "image/*"]
+  "author": "Misty",
+  "description": "Sample plugin that opens a preview manager panel.",
+  "enabled": true,
+  "platforms": ["macos", "linux", "windows"],
+  "plugin": {
+    "abi_version": 1,
+    "library": "preview_manager.dylib",
+    "sdk_version": "1.0",
+    "build_id": "Darwin-arm64-AppleClang-17.0.0.17000013-sdk1.0",
+    "platform": "macos",
+    "arch": "arm64",
+    "sha256": "<sha256>",
+    "signature": {
+      "algorithm": "ed25519",
+      "signer": "misty-dev",
+      "value": "<base64-signature>"
     }
-  ]
-}
-```
-
-## Supported placeholders
-
-- `{file_path}`
-- `{file_name}`
-- `{file_dir}`
-- `{file_ext}`
-- `{mime_type}`
-- `{extension_id}`
-- `{extension_name}`
-- `{extension_dir}`
-- `{misty_executable_dir}`
-
-## Matching rules
-
-- Extensions are discovered by folder.
-- Each extension must contain `manifest.json`.
-- User-installed extensions override bundled extensions with the same `id`.
-- `file_actions` match non-directory files by extension or MIME type.
-- If an extension or action declares `platforms`, it only loads on those platforms.
-
-## What "embedded inside Misty" actually means
-
-There are three different models people often mix together:
-
-### 1. External action extension
-
-This is what Misty has now.
-
-- Misty shows a menu item.
-- Misty launches an executable.
-- The executable does its work or opens its own window.
-
-This is easy to build and easy to distribute.
-
-### 2. External helper, Misty-owned UI
-
-This is the recommended next step for Misty.
-
-- Misty owns the panel, tab, modal, or window.
-- The extension runs as a separate helper process.
-- The extension does not draw ImGui directly.
-- The extension sends data, assets, or UI content to Misty over IPC.
-- Misty renders or hosts the result.
-
-This gives you "extension views inside Misty" without turning Misty into a native plugin ABI problem.
-
-### 3. True in-process UI plugin
-
-This is the hardest model.
-
-- Misty loads a third-party shared library or script runtime.
-- The plugin draws directly into Misty's ImGui context.
-
-This has major downsides:
-
-- ABI/versioning problems
-- crash isolation is poor
-- security/sandboxing is worse
-- third-party authoring is harder
-- upgrades are more fragile
-
-Misty should avoid starting here.
-
-## DockSpace clarification
-
-Dear ImGui DockSpace helps with layout only.
-
-DockSpace is useful for:
-
-- docked panels
-- tabbed panes
-- movable extension views
-- a persistent "Preview" panel
-
-DockSpace does not by itself allow:
-
-- embedding a foreign executable's window inside a docked ImGui panel
-- letting another process draw directly into Misty's ImGui context
-
-So DockSpace is still valuable, but only as the host layout/container system.
-
-## How VS Code does it, conceptually
-
-VS Code is closer to model 2 than model 3.
-
-At a high level:
-
-- VS Code owns the main UI
-- extensions run in a separate extension-host process
-- richer extension UIs are often shown in webviews
-- communication happens through message passing
-
-The key idea is that the host owns the surface and lifecycle, while the extension provides behavior and content.
-
-That is the right mental model for Misty too.
-
-## Recommended direction for Misty
-
-Misty should keep the current `file_actions` model and add a second capability for hostable views.
-
-Recommended capability families:
-
-- `file_actions`
-  - context-menu commands
-  - shell out and perform work
-- `views`
-  - docked panels
-  - tabs
-  - modal views
-  - separate Misty-owned windows
-- `preview_provider`
-  - specialized view contract for file preview
-
-## Why a webview surface is probably the right move
-
-If the goal is making third-party extensions easy to build, a webview-based surface is likely the best fit.
-
-Reasons:
-
-- extension authors already know HTML/CSS/JS
-- people can port an existing small web app quickly
-- UI iteration is faster than native ImGui code
-- it avoids asking third parties to learn Misty's internal C++ UI code
-- the boundary between host and extension is easier to formalize
-
-This is especially attractive if you want:
-
-- custom preview panels
-- editors
-- media viewers
-- dashboards
-- provider-specific management UI
-
-For third-party authors, "build a small web app and talk to Misty over messages" is dramatically easier than "learn C++, ImGui, build system details, and Misty's internal rendering conventions."
-
-## Recommended host model
-
-Misty should own:
-
-- the dock/tab/window lifecycle
-- focus and docking behavior
-- selection context
-- command dispatch
-- permissions
-- theme/host messaging
-
-Extensions should own:
-
-- their business logic
-- their view content
-- their internal state
-- any file-format-specific processing
-
-This suggests a model like:
-
-- Misty opens an extension tab/panel/window
-- Misty launches or connects to the extension process
-- the extension exposes content through a webview endpoint or structured IPC
-- Misty passes host context and receives commands/events back
-
-## Two realistic paths for embedded views
-
-### Path A: structured-data IPC
-
-The extension returns data and Misty renders it natively in ImGui.
-
-Examples:
-
-- image preview paths
-- PDF page raster outputs
-- metadata tables
-- text content
-- toolbar commands
-
-Benefits:
-
-- fully native look
-- simpler host control
-- predictable rendering
-
-Costs:
-
-- more work for Misty
-- less freedom for extension authors
-
-### Path B: embedded webview
-
-The extension provides HTML/CSS/JS content and Misty hosts it in a webview surface.
-
-Examples:
-
-- preview UI
-- custom inspector/editor
-- extension marketplace panes
-- provider-specific setup or admin interfaces
-
-Benefits:
-
-- easiest for third parties
-- closest to VS Code's extension ergonomics
-- rich UI without teaching authors ImGui
-
-Costs:
-
-- need a webview dependency and lifecycle model
-- host/extension messaging needs to be designed carefully
-- theming and security need to be handled deliberately
-
-For Misty, Path B is likely the better default for third-party extension views.
-
-## Recommended architecture
-
-Short version:
-
-1. Keep `file_actions` as the lightweight executable model.
-2. Add Misty-owned extension views.
-3. Use DockSpace as the layout container.
-4. Use a webview as the default embedded extension surface.
-5. Keep extensions out-of-process.
-
-That gives Misty:
-
-- modularity
-- crash isolation
-- easy marketplace packaging
-- easier third-party adoption
-
-## Proposed extension capability roadmap
-
-### Phase 1: current
-
-- manifest discovery
-- file action matching
-- detached process launch
-
-### Phase 2: hostable extension views
-
-Add support for extension-declared views, for example:
-
-```json
-{
-  "views": [
-    {
-      "id": "preview.main",
-      "title": "Preview",
-      "type": "panel"
-    }
-  ]
-}
-```
-
-Misty would open:
-
-- docked panel
-- tab
-- modal
-- separate window
-
-But the container is still owned by Misty.
-
-### Phase 3: preview provider contract
-
-Add a specialized preview capability, for example:
-
-```json
-{
-  "preview_provider": {
-    "id": "pdf.preview",
-    "extensions": [".pdf"],
-    "mime_types": ["application/pdf"],
-    "view": "panel"
   }
 }
 ```
 
-Then Misty can ask:
+Rules:
 
-- can you preview this file?
-- what kind of surface do you provide?
-- what URL/content/data should be shown?
+- `id` and `name` must be non-empty
+- `schema_version` must be `1`
+- `plugin.abi_version` must match `MISTY_PLUGIN_ABI_VERSION`
+- `plugin.library` must be a relative path inside the plugin directory
+- signed plugins should include `sdk_version`, `build_id`, `platform`, `arch`, `sha256`, and `signature`
+- absolute library paths are rejected
 
-### Phase 4: marketplace
+## ABI contract
 
-Marketplace delivery can reuse the same package format:
+The public plugin ABI lives in:
 
-1. host a signed extension index
-2. download an extension archive
-3. install to `~/.misty/extensions/<id>`
-4. reload extensions
+- `src/core/extensions/plugin_api.h`
 
-## Suggested message model for embedded extensions
+Required exports:
 
-If Misty adopts hostable views, a simple message model is likely enough:
+- `misty_plugin_abi_version()`
+- `misty_plugin_register(const MistyPluginRegistrarApi*)`
 
-Host to extension:
+The registrar lets a plugin contribute:
 
-- `activate`
-- `open_view`
-- `close_view`
-- `selection_changed`
-- `file_opened`
-- `theme_changed`
-- `command_invoked`
+- commands
+- panels
 
-Extension to host:
+The host API currently exposes:
 
-- `set_title`
-- `render_url`
-- `navigate`
-- `show_notification`
-- `request_file`
-- `execute_command`
-- `close_view`
+- `open_panel`
+- `close_panel`
+- `is_panel_open`
+- `copy_current_view_id`
+- `notify`
 
-This can be implemented over:
+The UI API is intentionally small:
 
-- stdio
-- local sockets
-- named pipes
+- `text`
+- `text_wrapped`
+- `button`
+- `same_line`
+- `separator`
+- `spacing`
 
-Stdio is likely the simplest place to start.
+That is deliberate. Plugins render through host-owned ImGui callbacks, but the ABI surface stays narrow and versionable.
 
-## Webview recommendation
+## Runtime model
 
-For third-party authoring, a webview surface is probably key.
+At startup, Misty loads plugins through:
 
-Recommendation:
+- loader and registry: `src/core/extensions/plugin_host.h`
+- implementation: `src/core/extensions/plugin_host.cpp`
 
-- use web technologies for embedded extension views
-- keep Misty as the host shell
-- keep extensions as separate processes
-- let extensions serve or emit their UI
-- use a message bridge between Misty and the extension view
+The host:
 
-This gives extension authors a much lower barrier to entry:
+- discovers plugin folders
+- validates manifests
+- loads the shared library
+- checks the exported ABI version
+- verifies signed plugin metadata before `dlopen`
+- calls the plugin registration entrypoint
+- registers runtime commands with `CommandManager`
+- renders open plugin panels each frame in host-owned ImGui windows
 
-- they can reuse existing frontend code
-- they can ship HTML/JS/CSS instead of native UI code
-- they can think in terms of "small app inside Misty"
+Plugins do not own top-level windows themselves. They contribute content to host-managed windows.
 
-That is likely the best way to make Misty extensions approachable.
+## Commands and panels
 
-## Practical recommendation
+A plugin normally works like this:
 
-Misty should not try to make external executables render directly into ImGui.
+1. Register a command such as `preview-manager.open`
+2. Optionally provide a default shortcut such as `Primary+]`
+3. Register a panel such as `preview-manager.panel`
+4. In the command callback, call `host->open_panel(...)`
+5. Misty opens or focuses that panel and calls the plugin's render callback every frame while it is visible
 
-Instead:
+This is the closest fit to Misty's current ImGui architecture.
 
-- keep executable actions for lightweight integrations
-- add a real Misty-owned extension panel/tab/window system
-- host embedded extension UIs through a webview surface
-- treat DockSpace as the layout manager for those hosted views
+## Sample plugin
 
-That gives you the right separation:
+The bundled sample plugin lives in:
 
-- Misty owns the shell
-- extensions own their content
-- communication happens through a stable protocol
+- source: `plugins/preview_manager/plugin.cpp`
+- manifest template: `plugins/preview_manager/manifest.json.in`
 
-## Notes on the bundled preview sample
+It demonstrates:
 
-There is currently a bundled `native-preview` sample extension in `app/extensions/native-preview/`.
+- exported ABI functions
+- command registration
+- panel registration
+- host notifications
+- reading the current Misty view id
 
-That sample exists only to demonstrate the current action-extension model end to end. It is not intended to define the final preview architecture.
+## Sandbox binary
 
-The likely long-term direction is:
+Misty also builds a lightweight sandbox app:
 
-- remove the sample from the default bundle
-- keep the framework
-- implement a proper embedded preview/view extension system afterward
+- source: `src/tools/plugin_sandbox_main.cpp`
+- binary: `misty-plugin-sandbox`
+
+Purpose:
+
+- load one plugin directory in isolation from the main app flow
+- exercise command registration and panel rendering
+- let extension authors test how their panel behaves without launching full Misty
+
+Important limitation:
+
+- this is a development harness, not a security sandbox
+- it still loads the plugin in-process
+- it helps reproduce crashes and UI issues earlier, but it does not contain malicious native code
+
+You can launch it with:
+
+```sh
+./bin/misty-plugin-sandbox --plugin-dir ./bin/plugins/preview_manager
+```
+
+To sign a plugin manifest for marketplace/official verification:
+
+```sh
+./bin/misty-plugin-sandbox --sign-plugin --plugin-dir ./bin/plugins/preview_manager --private-key ./plugin-private.pem --signer misty-dev
+```
+
+To verify the packaged plugin without opening the GUI:
+
+```sh
+./bin/misty-plugin-sandbox --verify-plugin --plugin-dir ./bin/plugins/preview_manager
+```
+
+For an official Misty build, configure a trusted public key at build time:
+
+```sh
+cmake -S app -B build -DMISTY_PLUGIN_TRUST_PUBKEY=/path/to/plugin-public.pem
+```
+
+To require signatures for every plugin in that build:
+
+```sh
+cmake -S app -B build -DMISTY_PLUGIN_TRUST_PUBKEY=/path/to/plugin-public.pem -DMISTY_REQUIRE_SIGNED_PLUGINS=ON
+```
+
+Or open it from Misty's `Extensions` view with the `Sandbox` button.
+
+## Marketplace guidance
+
+If Misty ships a marketplace for plugins, treat review as a policy layer, not a safety boundary.
+
+Recommended split:
+
+- official plugins: first-party, signed, tested against the current Misty build
+- marketplace plugins: reviewed, signed, ABI-version-gated
+- local plugins: clearly marked as untrusted and unsupported, or rejected entirely when `MISTY_REQUIRE_SIGNED_PLUGINS=ON`
+
+Even with review, plugins should be treated as trusted code with compatibility constraints.
+
+## Current implementation files
+
+- plugin ABI: `src/core/extensions/plugin_api.h`
+- plugin host: `src/core/extensions/plugin_host.h`
+- plugin host implementation: `src/core/extensions/plugin_host.cpp`
+- commands integration: `src/core/commands/command_manager.cpp`
+- extensions UI: `src/panels/extensions/extensions_panel.cpp`
+- sample plugin: `plugins/preview_manager/plugin.cpp`
+- sandbox harness: `src/tools/plugin_sandbox_main.cpp`
+
+## Future directions
+
+If this model grows, the next sensible additions are:
+
+- API version negotiation beyond a single integer
+- explicit plugin unload hooks
+- plugin capability flags and permission prompts
+- optional out-of-process helpers for risky workloads
+- plugin signing and integrity metadata

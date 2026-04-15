@@ -167,9 +167,37 @@ void CommandManager::load() {
     ensure_user_commands_file(user_path);
     sync_missing_user_commands(user_path);
 
+    user_shortcut_overrides_.clear();
     if (!user_path.empty() && std::filesystem::exists(user_path)) {
         load_from_file(user_path.string());
     }
+    loaded_ = true;
+}
+
+void CommandManager::clear_runtime_commands() {
+    if (loaded_) {
+        for (const auto& [command_id, _] : runtime_shortcuts_) {
+            shortcuts_.erase(command_id);
+        }
+    }
+    runtime_shortcuts_.clear();
+}
+
+void CommandManager::register_runtime_command(const std::string& command_id, const std::string& default_shortcut) {
+    if (command_id.empty() || default_shortcut.empty()) {
+        return;
+    }
+
+    runtime_shortcuts_[command_id] = default_shortcut;
+    if (!loaded_) {
+        return;
+    }
+
+    auto user_it = user_shortcut_overrides_.find(command_id);
+    const std::string& shortcut_value = user_it != user_shortcut_overrides_.end()
+        ? user_it->second
+        : default_shortcut;
+    shortcuts_[command_id] = parse_shortcut(shortcut_value);
 }
 
 bool CommandManager::matches(const std::string& command_id, bool repeat) const {
@@ -189,6 +217,9 @@ void CommandManager::load_defaults() {
     for (const auto& entry : default_command_entries()) {
         shortcuts_[entry.id] = parse_shortcut(entry.shortcut);
     }
+    for (const auto& [command_id, shortcut] : runtime_shortcuts_) {
+        shortcuts_[command_id] = parse_shortcut(shortcut);
+    }
 }
 
 void CommandManager::load_from_file(const std::string& path) {
@@ -207,6 +238,7 @@ void CommandManager::load_from_file(const std::string& path) {
         std::string value = trim(trimmed.substr(eq + 1));
         if (key.empty() || value.empty()) continue;
 
+        user_shortcut_overrides_[key] = value;
         shortcuts_[key] = parse_shortcut(value);
     }
 }
@@ -256,6 +288,8 @@ ImGuiKey CommandManager::parse_key_token(const std::string& token) {
     if (token == "RIGHT" || token == "RIGHTARROW") return ImGuiKey_RightArrow;
     if (token == "DELETE" || token == "DEL") return ImGuiKey_Delete;
     if (token == "COMMA" || token == ",") return ImGuiKey_Comma;
+    if (token == "LEFTBRACKET" || token == "[") return ImGuiKey_LeftBracket;
+    if (token == "RIGHTBRACKET" || token == "]") return ImGuiKey_RightBracket;
     if (token == "BACKSLASH" || token == "\\") return ImGuiKey_Backslash;
     if (token == "F2") return ImGuiKey_F2;
     if (token.size() == 1) {
@@ -316,6 +350,8 @@ std::string CommandManager::label_for_shortcut(const Shortcut& shortcut) {
         case ImGuiKey_DownArrow: parts.emplace_back("Down"); break;
         case ImGuiKey_Delete: parts.emplace_back("Delete"); break;
         case ImGuiKey_Comma: parts.emplace_back(","); break;
+        case ImGuiKey_LeftBracket: parts.emplace_back("["); break;
+        case ImGuiKey_RightBracket: parts.emplace_back("]"); break;
         case ImGuiKey_Backslash: parts.emplace_back("\\"); break;
         case ImGuiKey_F2: parts.emplace_back("F2"); break;
         default:
