@@ -491,100 +491,6 @@
       "hash": "e2f6d37a704d6b3b"
     }
   ],
-  "src/layouts/DesktopLayout.tsx": [
-    {
-      "length": 343,
-      "hash": "37c502d67fa01664"
-    },
-    {
-      "length": 337,
-      "hash": "81e4e7babff27f81"
-    },
-    {
-      "length": 302,
-      "hash": "eafab646158f8d5f"
-    },
-    {
-      "length": 280,
-      "hash": "6f73ef82261439d5"
-    },
-    {
-      "length": 271,
-      "hash": "bc3e6433bdd26c94"
-    },
-    {
-      "length": 264,
-      "hash": "3fc32b344ae1f245"
-    },
-    {
-      "length": 264,
-      "hash": "e05faadde041598c"
-    },
-    {
-      "length": 250,
-      "hash": "12a95e2d0d98c2d7"
-    },
-    {
-      "length": 249,
-      "hash": "17791d5c22e19ef2"
-    },
-    {
-      "length": 238,
-      "hash": "accbb8f097f3df6c"
-    },
-    {
-      "length": 222,
-      "hash": "007ea6f887008eb7"
-    },
-    {
-      "length": 218,
-      "hash": "279241e12ca1dcea"
-    },
-    {
-      "length": 209,
-      "hash": "910f07b582f37dbb"
-    },
-    {
-      "length": 198,
-      "hash": "1006ed6f13a67ecf"
-    },
-    {
-      "length": 196,
-      "hash": "7b94a1f9f08840d0"
-    },
-    {
-      "length": 192,
-      "hash": "d3a4ce346df2edfb"
-    },
-    {
-      "length": 187,
-      "hash": "d5d463f131ae1d08"
-    },
-    {
-      "length": 187,
-      "hash": "f79e729d06475351"
-    },
-    {
-      "length": 184,
-      "hash": "f3573f8fdf505031"
-    },
-    {
-      "length": 182,
-      "hash": "3023d5b795713053"
-    },
-    {
-      "length": 168,
-      "hash": "b688dbc90f7e6df8"
-    },
-    {
-      "length": 166,
-      "hash": "890e9eae6bf77a20"
-    },
-    {
-      "length": 163,
-      "hash": "eb0d92e3234c3ff6"
-    }
-  ],
   "src/layouts/RootLayout.tsx": [
     {
       "length": 351,
@@ -613,38 +519,6 @@
     {
       "length": 196,
       "hash": "568f8fe2092850e4"
-    }
-  ],
-  "src/pages/BotOverlay/CloudFolderBotChatOverlay.tsx": [
-    {
-      "length": 356,
-      "hash": "0b6f121491f45498"
-    }
-  ],
-  "src/pages/BotOverlay/CloudFolderBotOverlay.tsx": [
-    {
-      "length": 664,
-      "hash": "d4b1029bc4358084"
-    },
-    {
-      "length": 531,
-      "hash": "775269265f12f8e3"
-    },
-    {
-      "length": 212,
-      "hash": "83818e30413bdc63"
-    },
-    {
-      "length": 193,
-      "hash": "d1e6e974c062b3bc"
-    },
-    {
-      "length": 181,
-      "hash": "33ba0ca579874c76"
-    },
-    {
-      "length": 164,
-      "hash": "6a36505b4ed2878f"
     }
   ],
   "src/pages/Home/desktop/DesktopWorkspacePanel.tsx": [
