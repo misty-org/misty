@@ -30,6 +30,7 @@ namespace misty::panel {
 
             show_nav_item("file-directory-24", "Files", 24, ViewID::Files, state);
             show_nav_item("devices-24", "Services", 24, view::ViewID::Services, state);
+            show_nav_item("apps-16", "Extensions", 24, view::ViewID::Extensions, state);
             show_nav_item("shield-lock-24", "Vault", 24, view::ViewID::Vault, state);
             show_nav_item("bell-24", "Activity", 24, ViewID::Activity, state);
 

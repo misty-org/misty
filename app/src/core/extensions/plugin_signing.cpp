@@ -1,0 +1,480 @@
+#include "core/extensions/plugin_signing.h"
+
+#include <algorithm>
+#include <array>
+#include <cctype>
+#include <cstdlib>
+#include <cstdio>
+#include <fstream>
+#include <sstream>
+
+#include <openssl/evp.h>
+#include <openssl/pem.h>
+
+#include "core/extensions/plugin_api.h"
+#include "core/system/util.h"
+#include "plugin_build_config.h"
+
+namespace fs = std::filesystem;
+
+namespace misty::core {
+namespace {
+
+std::string read_text_file(const fs::path& path) {
+    std::ifstream file(path, std::ios::binary);
+    if (!file) {
+        return {};
+    }
+    std::ostringstream buffer;
+    buffer << file.rdbuf();
+    return buffer.str();
+}
+
+std::string trim_copy(std::string value) {
+    auto not_space = [](unsigned char ch) { return !std::isspace(ch); };
+    value.erase(value.begin(), std::find_if(value.begin(), value.end(), not_space));
+    value.erase(std::find_if(value.rbegin(), value.rend(), not_space).base(), value.end());
+    return value;
+}
+
+std::string base64_encode(const unsigned char* data, std::size_t size) {
+    if (!data || size == 0) {
+        return {};
+    }
+    std::string out;
+    out.resize(4 * ((size + 2) / 3));
+    const int written = EVP_EncodeBlock(reinterpret_cast<unsigned char*>(out.data()),
+                                        data,
+                                        static_cast<int>(size));
+    if (written <= 0) {
+        return {};
+    }
+    out.resize(static_cast<std::size_t>(written));
+    return out;
+}
+
+std::vector<unsigned char> base64_decode(std::string value) {
+    value.erase(std::remove_if(value.begin(), value.end(), [](unsigned char ch) {
+        return std::isspace(ch) != 0;
+    }), value.end());
+    if (value.empty()) {
+        return {};
+    }
+
+    std::vector<unsigned char> out((value.size() * 3) / 4 + 3, 0);
+    const int decoded = EVP_DecodeBlock(out.data(),
+                                        reinterpret_cast<const unsigned char*>(value.data()),
+                                        static_cast<int>(value.size()));
+    if (decoded < 0) {
+        return {};
+    }
+
+    std::size_t out_size = static_cast<std::size_t>(decoded);
+    while (!value.empty() && value.back() == '=') {
+        value.pop_back();
+        if (out_size > 0) {
+            --out_size;
+        }
+    }
+    out.resize(out_size);
+    return out;
+}
+
+std::string manifest_payload(const nlohmann::json& manifest) {
+    nlohmann::json payload = manifest;
+    if (payload.contains("plugin") && payload["plugin"].is_object()) {
+        payload["plugin"].erase("signature");
+    }
+    return payload.dump();
+}
+
+std::string file_sha256(const fs::path& path) {
+    std::ifstream file(path, std::ios::binary);
+    if (!file) {
+        return {};
+    }
+
+    EVP_MD_CTX* ctx = EVP_MD_CTX_new();
+    if (!ctx) {
+        return {};
+    }
+
+    if (EVP_DigestInit_ex(ctx, EVP_sha256(), nullptr) != 1) {
+        EVP_MD_CTX_free(ctx);
+        return {};
+    }
+
+    std::array<char, 32768> buffer{};
+    while (file.read(buffer.data(), static_cast<std::streamsize>(buffer.size())) || file.gcount() > 0) {
+        if (EVP_DigestUpdate(ctx, buffer.data(), static_cast<std::size_t>(file.gcount())) != 1) {
+            EVP_MD_CTX_free(ctx);
+            return {};
+        }
+    }
+
+    unsigned char hash[EVP_MAX_MD_SIZE];
+    unsigned int hash_len = 0;
+    if (EVP_DigestFinal_ex(ctx, hash, &hash_len) != 1) {
+        EVP_MD_CTX_free(ctx);
+        return {};
+    }
+
+    EVP_MD_CTX_free(ctx);
+    std::ostringstream out;
+    out << std::hex;
+    for (unsigned int i = 0; i < hash_len; ++i) {
+        out.width(2);
+        out.fill('0');
+        out << static_cast<int>(hash[i]);
+    }
+    return out.str();
+}
+
+EVP_PKEY* load_private_key(const fs::path& path) {
+    FILE* file = std::fopen(path.string().c_str(), "rb");
+    if (!file) {
+        return nullptr;
+    }
+    EVP_PKEY* key = PEM_read_PrivateKey(file, nullptr, nullptr, nullptr);
+    std::fclose(file);
+    return key;
+}
+
+EVP_PKEY* load_public_key_from_pem(const std::string& pem) {
+    if (pem.empty()) {
+        return nullptr;
+    }
+    BIO* bio = BIO_new_mem_buf(pem.data(), static_cast<int>(pem.size()));
+    if (!bio) {
+        return nullptr;
+    }
+    EVP_PKEY* key = PEM_read_bio_PUBKEY(bio, nullptr, nullptr, nullptr);
+    BIO_free(bio);
+    return key;
+}
+
+bool sign_bytes(EVP_PKEY* private_key,
+                const std::string& payload,
+                std::string* signature_base64) {
+    if (!private_key || !signature_base64) {
+        return false;
+    }
+
+    EVP_MD_CTX* ctx = EVP_MD_CTX_new();
+    if (!ctx) {
+        return false;
+    }
+
+    bool ok = false;
+    size_t signature_len = 0;
+    if (EVP_DigestSignInit(ctx, nullptr, nullptr, nullptr, private_key) == 1 &&
+        EVP_DigestSign(ctx, nullptr, &signature_len,
+                       reinterpret_cast<const unsigned char*>(payload.data()),
+                       payload.size()) == 1) {
+        std::vector<unsigned char> signature(signature_len);
+        if (EVP_DigestSign(ctx, signature.data(), &signature_len,
+                           reinterpret_cast<const unsigned char*>(payload.data()),
+                           payload.size()) == 1) {
+            signature.resize(signature_len);
+            *signature_base64 = base64_encode(signature.data(), signature.size());
+            ok = !signature_base64->empty();
+        }
+    }
+
+    EVP_MD_CTX_free(ctx);
+    return ok;
+}
+
+bool verify_bytes(EVP_PKEY* public_key,
+                  const std::string& payload,
+                  const std::string& signature_base64) {
+    if (!public_key) {
+        return false;
+    }
+
+    const auto signature = base64_decode(signature_base64);
+    if (signature.empty()) {
+        return false;
+    }
+
+    EVP_MD_CTX* ctx = EVP_MD_CTX_new();
+    if (!ctx) {
+        return false;
+    }
+
+    const bool ok = EVP_DigestVerifyInit(ctx, nullptr, nullptr, nullptr, public_key) == 1 &&
+                    EVP_DigestVerify(ctx,
+                                     signature.data(),
+                                     signature.size(),
+                                     reinterpret_cast<const unsigned char*>(payload.data()),
+                                     payload.size()) == 1;
+    EVP_MD_CTX_free(ctx);
+    return ok;
+}
+
+std::vector<std::string> trusted_public_keys() {
+    std::vector<std::string> keys;
+    const std::string embedded = trim_copy(MISTY_PLUGIN_TRUST_PUBKEY_PEM);
+    if (!embedded.empty()) {
+        keys.push_back(embedded);
+    }
+
+    std::vector<fs::path> roots;
+    roots.emplace_back(get_executable_path().parent_path() / "plugin_keys");
+    if (const std::string user_trust_dir = trim_copy(MISTY_PLUGIN_USER_TRUST_DIR); !user_trust_dir.empty()) {
+        roots.emplace_back(user_trust_dir);
+    } else if (const char* home = std::getenv("HOME"); home && *home) {
+        roots.emplace_back(fs::path(home) / ".misty" / "plugin_keys");
+    }
+
+    for (const auto& root : roots) {
+        std::error_code ec;
+        if (!fs::exists(root, ec) || !fs::is_directory(root, ec)) {
+            continue;
+        }
+        for (const auto& entry : fs::directory_iterator(root, ec)) {
+            if (ec || !entry.is_regular_file()) {
+                continue;
+            }
+            const auto ext = entry.path().extension().string();
+            if (ext == ".pem" || ext == ".pub") {
+                const std::string pem = trim_copy(read_text_file(entry.path()));
+                if (!pem.empty()) {
+                    keys.push_back(pem);
+                }
+            }
+        }
+    }
+
+    return keys;
+}
+
+} // namespace
+
+std::string plugin_sdk_version() {
+    return MISTY_PLUGIN_SDK_VERSION;
+}
+
+std::string plugin_build_id() {
+    return MISTY_PLUGIN_BUILD_ID;
+}
+
+std::string plugin_platform() {
+#ifdef _WIN32
+    return "windows";
+#elif __APPLE__
+    return "macos";
+#elif __linux__
+    return "linux";
+#else
+    return "unknown";
+#endif
+}
+
+std::string plugin_arch() {
+#if defined(__aarch64__) || defined(_M_ARM64)
+    return "arm64";
+#elif defined(__x86_64__) || defined(_M_X64)
+    return "x64";
+#elif defined(__arm__) || defined(_M_ARM)
+    return "arm";
+#elif defined(__i386__) || defined(_M_IX86)
+    return "x86";
+#else
+    return "unknown";
+#endif
+}
+
+bool plugin_requires_signature() {
+    return MISTY_REQUIRE_SIGNED_PLUGINS != 0;
+}
+
+std::string sha256_for_file(const fs::path& path) {
+    return file_sha256(path);
+}
+
+PluginVerificationResult verify_plugin_manifest(nlohmann::json& manifest,
+                                                const fs::path&,
+                                                const fs::path& library_path) {
+    PluginVerificationResult result;
+    auto plugin_json = manifest.value("plugin", nlohmann::json::object());
+
+    const std::string sha256 = trim_copy(plugin_json.value("sha256", std::string()));
+    if (!sha256.empty()) {
+        const std::string actual = file_sha256(library_path);
+        if (actual.empty()) {
+            result.diagnostics.push_back("Failed to compute plugin library SHA-256.");
+            return result;
+        }
+        if (actual != sha256) {
+            result.diagnostics.push_back("Plugin library SHA-256 does not match manifest.");
+            return result;
+        }
+        result.hash_verified = true;
+    }
+
+    const std::string sdk_version = trim_copy(plugin_json.value("sdk_version", std::string()));
+    if (!sdk_version.empty() && sdk_version != plugin_sdk_version()) {
+        result.diagnostics.push_back("Plugin SDK version does not match this Misty build.");
+        return result;
+    }
+
+    const std::string build_id = trim_copy(plugin_json.value("build_id", std::string()));
+    if (!build_id.empty() && build_id != plugin_build_id()) {
+        result.diagnostics.push_back("Plugin build id does not match this Misty build.");
+        return result;
+    }
+
+    const std::string platform = trim_copy(plugin_json.value("platform", std::string()));
+    if (!platform.empty() && platform != plugin_platform()) {
+        result.diagnostics.push_back("Plugin platform does not match this Misty runtime.");
+        return result;
+    }
+
+    const std::string arch = trim_copy(plugin_json.value("arch", std::string()));
+    if (!arch.empty() && arch != plugin_arch()) {
+        result.diagnostics.push_back("Plugin architecture does not match this Misty runtime.");
+        return result;
+    }
+
+    const auto signature = plugin_json.value("signature", nlohmann::json::object());
+    if (!signature.is_object() || signature.empty()) {
+        return result;
+    }
+
+    result.has_signature = true;
+    result.signer = trim_copy(signature.value("signer", std::string()));
+    const std::string algorithm = trim_copy(signature.value("algorithm", std::string()));
+    const std::string value = trim_copy(signature.value("value", std::string()));
+
+    if (algorithm != "ed25519") {
+        result.diagnostics.push_back("Unsupported plugin signature algorithm.");
+        return result;
+    }
+    if (!result.hash_verified) {
+        result.diagnostics.push_back("Signed plugins must include a matching SHA-256 hash.");
+        return result;
+    }
+    if (sdk_version.empty() || build_id.empty() || platform.empty() || arch.empty()) {
+        result.diagnostics.push_back("Signed plugins must include sdk_version, build_id, platform, and arch.");
+        return result;
+    }
+    if (value.empty()) {
+        result.diagnostics.push_back("Plugin signature value is empty.");
+        return result;
+    }
+
+    const std::string payload = manifest_payload(manifest);
+    const auto keys = trusted_public_keys();
+    if (keys.empty()) {
+        result.diagnostics.push_back("No trusted plugin public keys are configured.");
+        return result;
+    }
+
+    for (const auto& pem : keys) {
+        EVP_PKEY* key = load_public_key_from_pem(pem);
+        if (!key) {
+            continue;
+        }
+        const bool verified = verify_bytes(key, payload, value);
+        EVP_PKEY_free(key);
+        if (verified) {
+            result.signature_verified = true;
+            return result;
+        }
+    }
+
+    result.diagnostics.push_back("Plugin signature verification failed.");
+    return result;
+}
+
+bool sign_plugin_manifest(const fs::path& plugin_dir,
+                          const fs::path& private_key_path,
+                          const std::string& signer,
+                          const std::string& build_id_override,
+                          const std::string& sdk_version_override,
+                          std::string* error) {
+    const fs::path manifest_path = plugin_dir / "manifest.json";
+    if (!fs::exists(manifest_path)) {
+        if (error) {
+            *error = "manifest.json was not found in the plugin directory.";
+        }
+        return false;
+    }
+
+    nlohmann::json manifest;
+    try {
+        std::ifstream file(manifest_path);
+        file >> manifest;
+    } catch (const std::exception& e) {
+        if (error) {
+            *error = std::string("Failed to parse manifest.json: ") + e.what();
+        }
+        return false;
+    }
+
+    auto plugin_json = manifest.value("plugin", nlohmann::json::object());
+    const std::string library_rel = trim_copy(plugin_json.value("library", std::string()));
+    if (library_rel.empty()) {
+        if (error) {
+            *error = "Manifest is missing plugin.library.";
+        }
+        return false;
+    }
+
+    const fs::path library_path = (plugin_dir / library_rel).lexically_normal();
+    if (!fs::exists(library_path)) {
+        if (error) {
+            *error = "Plugin library was not found.";
+        }
+        return false;
+    }
+
+    EVP_PKEY* private_key = load_private_key(private_key_path);
+    if (!private_key) {
+        if (error) {
+            *error = "Failed to load the private signing key.";
+        }
+        return false;
+    }
+
+    plugin_json["abi_version"] = MISTY_PLUGIN_ABI_VERSION;
+    plugin_json["sdk_version"] = sdk_version_override.empty() ? plugin_sdk_version() : sdk_version_override;
+    plugin_json["build_id"] = build_id_override.empty() ? plugin_build_id() : build_id_override;
+    plugin_json["platform"] = plugin_platform();
+    plugin_json["arch"] = plugin_arch();
+    plugin_json["sha256"] = file_sha256(library_path);
+    plugin_json.erase("signature");
+    manifest["plugin"] = plugin_json;
+
+    const std::string payload = manifest_payload(manifest);
+    std::string signature_base64;
+    const bool signed_ok = sign_bytes(private_key, payload, &signature_base64);
+    EVP_PKEY_free(private_key);
+    if (!signed_ok) {
+        if (error) {
+            *error = "Failed to sign the plugin manifest.";
+        }
+        return false;
+    }
+
+    manifest["plugin"]["signature"] = {
+        {"algorithm", "ed25519"},
+        {"signer", signer.empty() ? "local" : signer},
+        {"value", signature_base64},
+    };
+
+    try {
+        std::ofstream file(manifest_path, std::ios::binary | std::ios::trunc);
+        file << manifest.dump(2) << '\n';
+    } catch (const std::exception& e) {
+        if (error) {
+            *error = std::string("Failed to write manifest.json: ") + e.what();
+        }
+        return false;
+    }
+
+    return true;
+}
+
+} // namespace misty::core

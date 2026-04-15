@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "id": "misty.preview-manager",
+  "name": "Preview Manager",
+  "version": "0.1.0",
+  "author": "Misty",
+  "description": "Sample plugin that registers a command and an ImGui panel through Misty's versioned C ABI.",
+  "enabled": true,
+  "platforms": ["macos", "linux", "windows"],
+  "plugin": {
+    "abi_version": 1,
+    "library": "@MISTY_PREVIEW_MANAGER_LIBRARY_NAME@"
+  }
+}

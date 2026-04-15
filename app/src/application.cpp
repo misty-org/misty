@@ -1,5 +1,6 @@
 #include "application.h"
 #include "core/commands/command_manager.h"
+#include "core/extensions/plugin_host.h"
 #include "core/manager/proxy_manager.h"
 #include "core/manager/session_manager.h"
 #include "views/files_view.h"
@@ -7,6 +8,7 @@
 #include "views/login_view.h"
 #include "views/onboarding_view.h"
 #include "views/services_view.h"
+#include "views/extensions_view.h"
 #include "views/vault_view.h"
 #include "views/activity_view.h"
 #include "views/settings_view.h"
@@ -21,6 +23,8 @@ namespace misty {
         try {
             init_platform();
             init_client();
+            core::PluginHost::get().set_ui_registry(&ui_registry_);
+            core::PluginHost::get().discover_and_load();
             core::CommandManager::get().load();
             core::ProxyManager::get().ensure_running();
             //init_file_sync();
@@ -41,6 +45,8 @@ namespace misty {
             prepare_frame();
             
             view::render_current_view();
+            core::PluginHost::get().process_shortcuts();
+            core::PluginHost::get().render_open_panels();
             render_frame();
         }
         if (file_sync_service_) {
@@ -55,6 +61,7 @@ namespace misty {
             explorer.save_state();
         }
 
+        core::PluginHost::get().shutdown();
         cleanup();
     }
 
@@ -87,6 +94,7 @@ namespace misty {
         view::register_view(view::ViewID::Onboarding,
             std::make_unique<view::OnboardingView>(ui_registry_, worker_pool_));
         view::register_view(view::ViewID::Services, std::make_unique<view::ServicesView>(ui_registry_));
+        view::register_view(view::ViewID::Extensions, std::make_unique<view::ExtensionsView>(ui_registry_));
         view::register_view(view::ViewID::Vault,
             std::make_unique<view::VaultView>(ui_registry_, worker_pool_));
         view::register_view(view::ViewID::Activity, std::make_unique<view::ActivityView>(ui_registry_));

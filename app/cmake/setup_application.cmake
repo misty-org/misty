@@ -1,8 +1,28 @@
 # cmake/setup_gui.cmake
 set(IMGUI_DIR ${CMAKE_SOURCE_DIR}/vendor/imgui)
+set(MISTY_PLUGIN_SDK_VERSION "${PROJECT_VERSION}")
+set(MISTY_PLUGIN_BUILD_ID_DEFAULT "${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}-${CMAKE_CXX_COMPILER_ID}-${CMAKE_CXX_COMPILER_VERSION}-sdk${MISTY_PLUGIN_SDK_VERSION}")
+set(MISTY_PLUGIN_BUILD_ID "${MISTY_PLUGIN_BUILD_ID_DEFAULT}" CACHE STRING "Plugin build id accepted by this Misty build")
+set(MISTY_PLUGIN_TRUST_PUBKEY "" CACHE FILEPATH "Optional PEM public key for trusted plugin signatures")
+set(MISTY_REQUIRE_SIGNED_PLUGINS OFF CACHE BOOL "Reject unsigned plugins before load")
+set(MISTY_PLUGIN_TRUST_DIR "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/plugin_keys")
+set(MISTY_PLUGIN_USER_TRUST_DIR "")
+set(MISTY_PLUGIN_TRUST_PUBKEY_PEM "")
+set(MISTY_REQUIRE_SIGNED_PLUGINS_VALUE 0)
+if(MISTY_REQUIRE_SIGNED_PLUGINS)
+    set(MISTY_REQUIRE_SIGNED_PLUGINS_VALUE 1)
+endif()
+if(MISTY_PLUGIN_TRUST_PUBKEY AND EXISTS "${MISTY_PLUGIN_TRUST_PUBKEY}")
+    file(READ "${MISTY_PLUGIN_TRUST_PUBKEY}" MISTY_PLUGIN_TRUST_PUBKEY_PEM)
+endif()
+file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/generated")
+configure_file(
+    "${CMAKE_SOURCE_DIR}/cmake/plugin_build_config.h.in"
+    "${CMAKE_BINARY_DIR}/generated/plugin_build_config.h"
+    @ONLY
+)
 set(IMGUI_SRCS
     ${IMGUI_DIR}/imgui.cpp
-    ${IMGUI_DIR}/imgui_demo.cpp
     ${IMGUI_DIR}/imgui_draw.cpp
     ${IMGUI_DIR}/imgui_tables.cpp
     ${IMGUI_DIR}/imgui_widgets.cpp
@@ -101,6 +121,7 @@ target_include_directories(misty PRIVATE
     ${CMAKE_SOURCE_DIR}
     ${IMGUI_DIR}
     ${IMGUI_DIR}/backends
+    ${CMAKE_BINARY_DIR}/generated
     ${CMAKE_SOURCE_DIR}/src/proto_src
     ${CMAKE_SOURCE_DIR}/src/dfs
     ${CMAKE_SOURCE_DIR}/src
@@ -114,10 +135,79 @@ target_link_libraries(misty PRIVATE
     lunasvg
     OpenGL::GL
     CURL::libcurl
+    OpenSSL::Crypto
 )
 
+set(MISTY_SANDBOX_SRCS
+    "src/tools/plugin_sandbox_main.cpp"
+    "src/core/extensions/plugin_host.cpp"
+    "src/core/extensions/plugin_signing.cpp"
+    "src/core/commands/command_manager.cpp"
+    "src/core/system/util.cpp"
+    "src/views/app_view.cpp"
+    "vendor/glad/src/glad.cpp"
+    ${IMGUI_SRCS}
+)
 
-add_custom_target(misty_assets ALL
+add_executable(misty_plugin_sandbox ${MISTY_SANDBOX_SRCS})
+set_target_properties(misty_plugin_sandbox PROPERTIES OUTPUT_NAME "misty-plugin-sandbox")
+target_include_directories(misty_plugin_sandbox PRIVATE
+    ${CMAKE_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_BINARY_DIR}/generated
+    ${CMAKE_SOURCE_DIR}/vendor/glad/include
+    ${CMAKE_SOURCE_DIR}/vendor/imgui/backends
+    ${CMAKE_SOURCE_DIR}/vendor/imgui
+    ${CMAKE_SOURCE_DIR}/vendor/json/single_include
+)
+target_link_libraries(misty_plugin_sandbox PRIVATE
+    glfw
+    OpenGL::GL
+    OpenSSL::Crypto
+    ${CMAKE_DL_LIBS}
+)
+if(APPLE)
+    target_link_libraries(misty_plugin_sandbox PRIVATE
+        "-framework CoreGraphics"
+        "-framework CoreServices"
+        "-framework Cocoa"
+        "-framework Security"
+    )
+elseif(WIN32)
+    target_link_libraries(misty_plugin_sandbox PRIVATE ws2_32 dwmapi)
+endif()
+
+set(MISTY_PLUGIN_OUTPUT_DIR "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/plugins/preview_manager")
+set(MISTY_PREVIEW_MANAGER_LIBRARY_NAME "preview_manager${CMAKE_SHARED_LIBRARY_SUFFIX}")
+configure_file(
+    "${CMAKE_SOURCE_DIR}/plugins/preview_manager/manifest.json.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/plugins/preview_manager/manifest.json"
+    @ONLY
+)
+
+add_library(preview_manager MODULE "plugins/preview_manager/plugin.cpp")
+set_target_properties(preview_manager PROPERTIES
+    PREFIX ""
+    OUTPUT_NAME "preview_manager"
+    SUFFIX "${CMAKE_SHARED_LIBRARY_SUFFIX}"
+    LIBRARY_OUTPUT_DIRECTORY "${MISTY_PLUGIN_OUTPUT_DIR}"
+    RUNTIME_OUTPUT_DIRECTORY "${MISTY_PLUGIN_OUTPUT_DIR}"
+)
+target_include_directories(preview_manager PRIVATE
+    ${CMAKE_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/src
+)
+target_compile_definitions(preview_manager PRIVATE MISTY_EXTENSION_BUILD=1)
+
+add_custom_target(preview_manager_manifest ALL
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${MISTY_PLUGIN_OUTPUT_DIR}"
+    COMMAND ${CMAKE_COMMAND} -E copy
+        "${CMAKE_CURRENT_BINARY_DIR}/plugins/preview_manager/manifest.json"
+        "${MISTY_PLUGIN_OUTPUT_DIR}/manifest.json"
+    DEPENDS preview_manager
+)
+
+set(MISTY_ASSET_COMMANDS
     COMMAND ${CMAKE_COMMAND} -E make_directory
         "$<TARGET_FILE_DIR:misty>/assets"
     COMMAND ${CMAKE_COMMAND} -E copy_directory
@@ -131,20 +221,23 @@ add_custom_target(misty_assets ALL
     COMMAND ${CMAKE_COMMAND} -E copy
         "${CMAKE_CURRENT_SOURCE_DIR}/misty.conf"
         "$<TARGET_FILE_DIR:misty>/misty.conf"
-<<<<<<< HEAD
 )
 
-add_dependencies(misty_assets misty)
-=======
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/commands.msy")
+    list(APPEND MISTY_ASSET_COMMANDS
+        COMMAND ${CMAKE_COMMAND} -E copy
+            "${CMAKE_CURRENT_SOURCE_DIR}/commands.msy"
+            "$<TARGET_FILE_DIR:misty>/commands.msy"
+    )
+endif()
 
-    COMMAND ${CMAKE_COMMAND} -E copy
-        "${CMAKE_CURRENT_SOURCE_DIR}/commands.msy"
-        "$<TARGET_FILE_DIR:misty>/commands.msy"
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/extensions")
+    list(APPEND MISTY_ASSET_COMMANDS
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_CURRENT_SOURCE_DIR}/extensions"
+            "$<TARGET_FILE_DIR:misty>/extensions"
+    )
+endif()
 
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${CMAKE_CURRENT_SOURCE_DIR}/extensions"
-        "$<TARGET_FILE_DIR:misty>/extensions"
-)
-
-
->>>>>>> d86c246 (Adding extensions module)
+add_custom_target(misty_assets ALL ${MISTY_ASSET_COMMANDS})
+add_dependencies(misty_assets misty misty_plugin_sandbox preview_manager_manifest)
