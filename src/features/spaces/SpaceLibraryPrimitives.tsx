@@ -319,7 +319,7 @@ export function LibraryCollectionCard({
 }) {
   const canEdit = useContext(LibraryCanEditContext);
   return (
-    <article className="group relative overflow-hidden rounded-xl bg-card shadow-xs ring-1 ring-foreground/10">
+    <article className="group relative overflow-hidden rounded-xl bg-card shadow-xs inset-ring-1 inset-ring-foreground/10">
       <Button
         className="block w-full border-0 bg-transparent p-4 text-left disabled:opacity-40"
         type="button"
@@ -389,7 +389,7 @@ export function LibraryMapView({
       >
         ← Collections
       </Button>
-      <div className="overflow-hidden rounded-xl bg-[linear-gradient(145deg,#10222c,#111922_60%,#18232d)] p-3 shadow-xs ring-1 ring-white/10">
+      <div className="overflow-hidden rounded-xl bg-[linear-gradient(145deg,#10222c,#111922_60%,#18232d)] p-3 shadow-xs inset-ring-1 inset-ring-white/10">
         <svg
           className="block aspect-[2/1] w-full"
           viewBox="0 0 1000 500"
@@ -500,7 +500,7 @@ export function LibraryDiscoveryCard({
 }) {
   const canEdit = useContext(LibraryCanEditContext);
   return (
-    <article className="group relative overflow-hidden rounded-xl bg-card shadow-xs ring-1 ring-foreground/10">
+    <article className="group relative overflow-hidden rounded-xl bg-card shadow-xs inset-ring-1 inset-ring-foreground/10">
       <Button
         className="block w-full border-0 bg-transparent p-0 text-left"
         type="button"

@@ -14,6 +14,32 @@ use cocoa::{
 #[cfg(target_os = "macos")]
 use objc::{msg_send, sel, sel_impl};
 
+#[cfg(target_os = "macos")]
+use std::ffi::c_void;
+
+#[cfg(target_os = "macos")]
+#[link(name = "AVFoundation", kind = "framework")]
+unsafe extern "C" {}
+
+#[cfg(target_os = "macos")]
+#[link(name = "QuartzCore", kind = "framework")]
+unsafe extern "C" {}
+
+#[cfg(target_os = "macos")]
+unsafe extern "C" {
+    fn objc_setAssociatedObject(object: id, key: *const c_void, value: id, policy: usize);
+    fn objc_getAssociatedObject(object: id, key: *const c_void) -> id;
+}
+
+#[cfg(target_os = "macos")]
+static WALLPAPER_LOOPER_ASSOCIATION_KEY: u8 = 0;
+
+#[cfg(target_os = "macos")]
+static WALLPAPER_VIEW_ASSOCIATION_KEY: u8 = 0;
+
+#[cfg(target_os = "macos")]
+const OBJC_ASSOCIATION_RETAIN_NONATOMIC: usize = 1;
+
 /// Configuration for Traffic Lights positioning
 pub struct TrafficLightsConfig {
     /// Offset in pixels from default position (positive = right, negative = left)
@@ -237,6 +263,142 @@ pub fn reposition_traffic_lights<R: Runtime>(
     {
         Ok(())
     }
+}
+
+/// Plays the app wallpaper through AVFoundation on macOS.
+///
+/// WebKit deliberately requires a real user gesture for video while macOS Low
+/// Power Mode is active, even when the video is muted and WKWebView's autoplay
+/// policy allows it. A native AVPlayerLayer is not subject to that WebKit-only
+/// restriction and can live behind Misty's transparent webview.
+#[tauri::command]
+pub fn set_native_wallpaper_video<R: Runtime>(
+    _app: AppHandle<R>,
+    window: WebviewWindow<R>,
+    path: Option<String>,
+) -> Result<bool, String> {
+    #[cfg(target_os = "macos")]
+    {
+        window
+            .with_webview(move |webview| unsafe {
+                let webview_view = webview.inner() as id;
+                let container_view: id = msg_send![webview_view, superview];
+                if container_view.is_null() {
+                    return;
+                }
+
+                remove_native_wallpaper_video(container_view);
+
+                let Some(path) = path.filter(|value| !value.trim().is_empty()) else {
+                    return;
+                };
+                install_native_wallpaper_video(container_view, webview_view, &path);
+            })
+            .map_err(|error| error.to_string())?;
+
+        Ok(true)
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (window, path);
+        Ok(false)
+    }
+}
+
+#[cfg(target_os = "macos")]
+unsafe fn remove_native_wallpaper_video(container_view: id) {
+    let wallpaper_view = objc_getAssociatedObject(
+        container_view,
+        &WALLPAPER_VIEW_ASSOCIATION_KEY as *const u8 as *const c_void,
+    );
+    if wallpaper_view.is_null() {
+        return;
+    }
+
+    let layer: id = msg_send![wallpaper_view, layer];
+    if !layer.is_null() {
+        let player: id = msg_send![layer, player];
+        if !player.is_null() {
+            let _: () = msg_send![player, pause];
+            let _: () = msg_send![player, removeAllItems];
+        }
+    }
+
+    objc_setAssociatedObject(
+        wallpaper_view,
+        &WALLPAPER_LOOPER_ASSOCIATION_KEY as *const u8 as *const c_void,
+        nil,
+        OBJC_ASSOCIATION_RETAIN_NONATOMIC,
+    );
+    let _: () = msg_send![wallpaper_view, removeFromSuperview];
+    objc_setAssociatedObject(
+        container_view,
+        &WALLPAPER_VIEW_ASSOCIATION_KEY as *const u8 as *const c_void,
+        nil,
+        OBJC_ASSOCIATION_RETAIN_NONATOMIC,
+    );
+}
+
+#[cfg(target_os = "macos")]
+unsafe fn install_native_wallpaper_video(container_view: id, webview_view: id, path: &str) {
+    let ns_path = NSString::alloc(nil).init_str(path);
+    let file_url: id = msg_send![objc::class!(NSURL), fileURLWithPath: ns_path];
+    let player_item: id = msg_send![objc::class!(AVPlayerItem), playerItemWithURL: file_url];
+    let items: id = msg_send![objc::class!(NSArray), arrayWithObject: player_item];
+    let player: id = msg_send![objc::class!(AVQueuePlayer), queuePlayerWithItems: items];
+    let looper: id = msg_send![
+        objc::class!(AVPlayerLooper),
+        playerLooperWithPlayer: player
+        templateItem: player_item
+    ];
+    let player_layer: id = msg_send![objc::class!(AVPlayerLayer), playerLayerWithPlayer: player];
+
+    let gravity = NSString::alloc(nil).init_str("AVLayerVideoGravityResizeAspectFill");
+    let _: () = msg_send![player_layer, setVideoGravity: gravity];
+
+    let frame: cocoa::foundation::NSRect = msg_send![webview_view, frame];
+    let wallpaper_view: id = msg_send![objc::class!(NSView), alloc];
+    let wallpaper_view: id = msg_send![wallpaper_view, initWithFrame: frame];
+    let _: () = msg_send![wallpaper_view, setAutoresizingMask: 18usize];
+    let _: () = msg_send![wallpaper_view, setWantsLayer: cocoa::base::YES];
+    let _: () = msg_send![wallpaper_view, setLayer: player_layer];
+
+    let bounds: cocoa::foundation::NSRect = msg_send![wallpaper_view, bounds];
+    let _: () = msg_send![player_layer, setFrame: bounds];
+    let _: () = msg_send![player_layer, setAutoresizingMask: 18u32];
+
+    objc_setAssociatedObject(
+        wallpaper_view,
+        &WALLPAPER_LOOPER_ASSOCIATION_KEY as *const u8 as *const c_void,
+        looper,
+        OBJC_ASSOCIATION_RETAIN_NONATOMIC,
+    );
+
+    // NSWindowBelow is -1. Keeping the native layer below WKWebView preserves
+    // all existing React interaction while allowing transparent surfaces to
+    // reveal the video.
+    let _: () = msg_send![
+        container_view,
+        addSubview: wallpaper_view
+        positioned: -1isize
+        relativeTo: webview_view
+    ];
+    objc_setAssociatedObject(
+        container_view,
+        &WALLPAPER_VIEW_ASSOCIATION_KEY as *const u8 as *const c_void,
+        wallpaper_view,
+        OBJC_ASSOCIATION_RETAIN_NONATOMIC,
+    );
+
+    let _: () = msg_send![player, setMuted: cocoa::base::YES];
+    let _: () = msg_send![player, setVolume: 0.0f32];
+    let _: () = msg_send![player, setAutomaticallyWaitsToMinimizeStalling: cocoa::base::NO];
+    let _: () = msg_send![player, play];
+
+    let _: () = msg_send![ns_path, release];
+    let _: () = msg_send![gravity, release];
+    let _: () = msg_send![wallpaper_view, release];
 }
 
 #[cfg(target_os = "macos")]

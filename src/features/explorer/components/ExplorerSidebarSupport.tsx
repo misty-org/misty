@@ -42,7 +42,7 @@ const SIDEBAR_COLLAPSE_STORAGE_KEY = "misty.explorer.sidebar.collapsed";
 const QUICK_ACCESS_HIDDEN_STORAGE_KEY = "misty.explorer.sidebar.quickAccessHidden";
 
 export const sidebarStyles = {
-  root: "misty-transient-scrollbar h-full min-h-0 min-w-0 overflow-x-hidden overflow-y-auto bg-[var(--misty-files-panel-bg,var(--sidebar))] px-4 py-4 text-sidebar-foreground [overscroll-behavior:contain] max-[980px]:hidden",
+  root: "misty-transient-scrollbar h-full min-h-0 min-w-0 overflow-x-hidden overflow-y-auto bg-[var(--misty-files-panel-bg,transparent)] px-4 py-4 text-sidebar-foreground [overscroll-behavior:contain] max-[980px]:hidden",
   section: "[&+&]:mt-5",
   sectionTitle: "group/section-title mb-2 flex min-w-0 items-center gap-2",
   sectionToggle:

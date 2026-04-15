@@ -138,7 +138,7 @@ export function DesktopWorkspacePanel({ homePath }: DesktopWorkspacePanelProps) 
             const active = workspace.id === activeWorkspaceId;
             return (
               <div
-                className={`${workspaceRowClass} ${active ? "bg-accent ring-1 ring-border" : ""}`}
+                className={`${workspaceRowClass} ${active ? "bg-accent inset-ring-1 inset-ring-border" : ""}`}
                 key={workspace.id}
               >
                 <Button
