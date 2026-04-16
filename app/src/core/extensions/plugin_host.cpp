@@ -15,7 +15,9 @@
 #include "core/commands/command_manager.h"
 #include "core/system/util.h"
 #include "core/extensions/plugin_signing.h"
+#include <glad/glad.h>
 #include "imgui.h"
+#include "panels/file_explorer/file_explorer_state.h"
 #include "panels/notification/notification_state.h"
 #include "views/app_view.h"
 
@@ -78,26 +80,12 @@ bool path_is_within(const fs::path& root, const fs::path& candidate) {
     return true;
 }
 
-std::string current_platform_name() {
-#ifdef _WIN32
-    return "windows";
-#elif __APPLE__
-    return "macos";
-#elif __linux__
-    return "linux";
-#else
-    return "unknown";
-#endif
-}
-
-bool matches_platforms(const std::vector<std::string>& platforms) {
+bool matches_platforms(const std::vector<std::string>& platforms, const std::string& host_os) {
     if (platforms.empty()) {
         return true;
     }
-
-    const std::string current = current_platform_name();
     for (const auto& platform : platforms) {
-        if (to_lower(platform) == current) {
+        if (to_lower(platform) == host_os) {
             return true;
         }
     }
@@ -199,7 +187,7 @@ struct PluginHost::Impl {
         std::string id;
         std::string title;
         std::string default_shortcut;
-        MistyCommandInvokeFn invoke = nullptr;
+        misty::CommandInvokeFn invoke = nullptr;
         void* user_data = nullptr;
         std::size_t plugin_index = 0;
     };
@@ -207,7 +195,7 @@ struct PluginHost::Impl {
     struct PluginPanel {
         std::string id;
         std::string title;
-        MistyPanelRenderFn render = nullptr;
+        misty::PanelRenderFn render = nullptr;
         void* user_data = nullptr;
         bool is_open = false;
         std::size_t plugin_index = 0;
@@ -219,6 +207,244 @@ struct PluginHost::Impl {
         bool active = false;
     };
 
+    class HostImpl : public misty::Host {
+    public:
+        explicit HostImpl(Impl* owner) : owner_(owner) {}
+
+        bool open_panel(const char* id) override {
+            if (!id || !*id) return false;
+            return owner_->open_panel(id);
+        }
+
+        bool close_panel(const char* id) override {
+            if (!id || !*id) return false;
+            return owner_->close_panel(id);
+        }
+
+        bool is_panel_open(const char* id) override {
+            if (!id || !*id) return false;
+            return owner_->is_panel_open(id);
+        }
+
+        bool invoke_command(const char* id) override {
+            if (!id || !*id) return false;
+            if (auto* current_view = view::ViewRegistry::get().get_current_view()) {
+                if (current_view->invoke_command(id)) {
+                    return true;
+                }
+            }
+            const auto it = owner_->command_index_by_id.find(id);
+            if (it == owner_->command_index_by_id.end()) {
+                return false;
+            }
+            const auto& command = owner_->commands[it->second];
+            if (!owner_->is_plugin_active(command.plugin_index)) {
+                return false;
+            }
+            try {
+                command.invoke(owner_->host_impl, command.user_data);
+            } catch (const std::exception& e) {
+                owner_->fault_plugin(command.plugin_index,
+                                     std::string("Command callback threw an exception for ") + command.id + ": " + e.what());
+                return false;
+            } catch (...) {
+                owner_->fault_plugin(command.plugin_index,
+                                     std::string("Command callback threw a non-standard exception for ") + command.id + ".");
+                return false;
+            }
+            return true;
+        }
+
+        bool copy_current_view_id(char* buffer, std::size_t size) override {
+            if (!buffer || size == 0) return false;
+            const std::string name = view_id_to_string(view::get_current_view_id());
+            const std::size_t max_copy = std::min(size - 1, name.size());
+            std::memcpy(buffer, name.data(), max_copy);
+            buffer[max_copy] = '\0';
+            return true;
+        }
+
+        void notify(misty::NotificationLevel level,
+                    const char* title,
+                    const char* message) override {
+            if (!owner_->ui_registry) return;
+            panel::NotificationType type = panel::NotificationType::INFO;
+            switch (level) {
+                case misty::NotificationLevel::Success:
+                    type = panel::NotificationType::SUCCESS; break;
+                case misty::NotificationLevel::Error:
+                    type = panel::NotificationType::ERROR; break;
+                case misty::NotificationLevel::Info:
+                default:
+                    type = panel::NotificationType::INFO; break;
+            }
+            auto& notifications =
+                owner_->ui_registry->get_state<panel::NotificationState>("Notifications");
+            notifications.add_notification(title ? title : "Extension",
+                                           message ? message : "", type);
+        }
+
+        std::uint32_t create_texture(int width, int height,
+                                     const unsigned char* rgba_pixels) override {
+            if (width <= 0 || height <= 0 || !rgba_pixels) return 0;
+            GLuint tex = 0;
+            glGenTextures(1, &tex);
+            if (tex == 0) return 0;
+            glBindTexture(GL_TEXTURE_2D, tex);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0,
+                         GL_RGBA, GL_UNSIGNED_BYTE, rgba_pixels);
+            return static_cast<std::uint32_t>(tex);
+        }
+
+        void destroy_texture(std::uint32_t texture_id) override {
+            if (texture_id != 0) {
+                GLuint tex = static_cast<GLuint>(texture_id);
+                glDeleteTextures(1, &tex);
+            }
+        }
+
+        bool copy_selected_file_path(char* buffer, std::size_t size) override {
+            if (!buffer || size == 0 || !owner_->ui_registry) return false;
+            std::string explorer_state_key = "Files";
+            if (auto* current_view = view::ViewRegistry::get().get_current_view()) {
+                explorer_state_key = current_view->active_explorer_state_key();
+            }
+
+            auto& fe_state =
+                owner_->ui_registry->get_state<panel::FileExplorerState>(explorer_state_key);
+            if (fe_state.selected_files.empty()) return false;
+            const std::string& path = *fe_state.selected_files.begin();
+            const std::size_t max_copy = std::min(size - 1, path.size());
+            std::memcpy(buffer, path.data(), max_copy);
+            buffer[max_copy] = '\0';
+            return true;
+        }
+
+    private:
+        Impl* owner_;
+    };
+
+    class UIImpl : public misty::UI {
+    public:
+        void text(const char* t) override {
+            ImGui::TextUnformatted(t ? t : "");
+        }
+        void text_wrapped(const char* t) override {
+            ImGui::TextWrapped("%s", t ? t : "");
+        }
+        bool button(const char* label, float width, float height) override {
+            return ImGui::Button(label ? label : "", ImVec2(width, height));
+        }
+        void same_line() override { ImGui::SameLine(); }
+        void separator() override { ImGui::Separator(); }
+        void spacing() override { ImGui::Spacing(); }
+        void image(std::uint32_t texture_id, float width, float height) override {
+            if (texture_id != 0) {
+                ImGui::Image(
+                    static_cast<ImTextureID>(static_cast<uintptr_t>(texture_id)),
+                    ImVec2(width, height));
+            }
+        }
+        void get_content_region_avail(float* width, float* height) override {
+            ImVec2 avail = ImGui::GetContentRegionAvail();
+            if (width) *width = avail.x;
+            if (height) *height = avail.y;
+        }
+        bool begin_child(const char* id, float width, float height, bool border) override {
+            return ImGui::BeginChild(id ? id : "", ImVec2(width, height), border);
+        }
+        void end_child() override { ImGui::EndChild(); }
+    };
+
+    class RegistryImpl : public misty::Registry {
+    public:
+        RegistryImpl(Impl* owner, std::size_t plugin_index)
+            : owner_(owner), plugin_index_(plugin_index) {}
+
+        bool register_command(const misty::CommandRegistration& command) override {
+            if (!command.id || !command.title || !command.invoke) {
+                owner_->append_diagnostic(plugin_index_,
+                    "Plugin attempted to register an invalid command.");
+                return false;
+            }
+            const std::string id = trim_copy(command.id);
+            const std::string title = trim_copy(command.title);
+            if (id.empty() || title.empty()) {
+                owner_->append_diagnostic(plugin_index_,
+                    "Plugin attempted to register a command with an empty id or title.");
+                return false;
+            }
+            if (owner_->command_index_by_id.contains(id)) {
+                owner_->append_diagnostic(plugin_index_,
+                    "Plugin attempted to register a duplicate command id: " + id);
+                return false;
+            }
+
+            PluginCommand plugin_command;
+            plugin_command.id = id;
+            plugin_command.title = title;
+            plugin_command.default_shortcut =
+                command.default_shortcut ? command.default_shortcut : "";
+            plugin_command.invoke = command.invoke;
+            plugin_command.user_data = command.user_data;
+            plugin_command.plugin_index = plugin_index_;
+
+            owner_->command_index_by_id[id] = owner_->commands.size();
+            owner_->commands.push_back(plugin_command);
+            owner_->plugins[plugin_index_].info.commands.push_back(
+                PluginCommandInfo{plugin_command.id, plugin_command.title,
+                                  plugin_command.default_shortcut});
+            if (!plugin_command.default_shortcut.empty()) {
+                CommandManager::get().register_runtime_command(
+                    plugin_command.id, plugin_command.default_shortcut);
+            }
+            return true;
+        }
+
+        bool register_panel(const misty::PanelRegistration& panel) override {
+            if (!panel.id || !panel.title || !panel.render) {
+                owner_->append_diagnostic(plugin_index_,
+                    "Plugin attempted to register an invalid panel.");
+                return false;
+            }
+            const std::string id = trim_copy(panel.id);
+            const std::string title = trim_copy(panel.title);
+            if (id.empty() || title.empty()) {
+                owner_->append_diagnostic(plugin_index_,
+                    "Plugin attempted to register a panel with an empty id or title.");
+                return false;
+            }
+            if (owner_->panel_index_by_id.contains(id)) {
+                owner_->append_diagnostic(plugin_index_,
+                    "Plugin attempted to register a duplicate panel id: " + id);
+                return false;
+            }
+
+            PluginPanel plugin_panel;
+            plugin_panel.id = id;
+            plugin_panel.title = title;
+            plugin_panel.render = panel.render;
+            plugin_panel.user_data = panel.user_data;
+            plugin_panel.is_open = panel.default_open;
+            plugin_panel.plugin_index = plugin_index_;
+
+            owner_->panel_index_by_id[id] = owner_->panels.size();
+            owner_->panels.push_back(plugin_panel);
+            owner_->plugins[plugin_index_].info.panels.push_back(
+                PluginPanelInfo{plugin_panel.id, plugin_panel.title,
+                                plugin_panel.is_open});
+            return true;
+        }
+
+    private:
+        Impl* owner_;
+        std::size_t plugin_index_;
+    };
+
     UIRegistry* ui_registry = nullptr;
     std::vector<LoadedPlugin> plugins;
     std::vector<PluginCommand> commands;
@@ -227,118 +453,10 @@ struct PluginHost::Impl {
     std::unordered_map<std::string, std::size_t> command_index_by_id;
     std::unordered_map<std::string, std::size_t> panel_index_by_id;
 
-    MistyHostApi host_api{};
-    MistyUiApi ui_api{};
+    HostImpl host_impl{this};
+    UIImpl ui_impl{};
 
-    Impl() {
-        host_api.struct_size = sizeof(MistyHostApi);
-        host_api.abi_version = MISTY_PLUGIN_ABI_VERSION;
-        host_api.context = this;
-        host_api.open_panel = &Impl::host_open_panel;
-        host_api.close_panel = &Impl::host_close_panel;
-        host_api.is_panel_open = &Impl::host_is_panel_open;
-        host_api.copy_current_view_id = &Impl::host_copy_current_view_id;
-        host_api.notify = &Impl::host_notify;
-
-        ui_api.struct_size = sizeof(MistyUiApi);
-        ui_api.abi_version = MISTY_PLUGIN_ABI_VERSION;
-        ui_api.text = &Impl::ui_text;
-        ui_api.text_wrapped = &Impl::ui_text_wrapped;
-        ui_api.button = &Impl::ui_button;
-        ui_api.same_line = &Impl::ui_same_line;
-        ui_api.separator = &Impl::ui_separator;
-        ui_api.spacing = &Impl::ui_spacing;
-    }
-
-    static int host_open_panel(void* context, const char* panel_id) {
-        if (!context || !panel_id || !*panel_id) {
-            return 0;
-        }
-        return static_cast<Impl*>(context)->open_panel(panel_id) ? 1 : 0;
-    }
-
-    static int host_close_panel(void* context, const char* panel_id) {
-        if (!context || !panel_id || !*panel_id) {
-            return 0;
-        }
-        return static_cast<Impl*>(context)->close_panel(panel_id) ? 1 : 0;
-    }
-
-    static int host_is_panel_open(void* context, const char* panel_id) {
-        if (!context || !panel_id || !*panel_id) {
-            return 0;
-        }
-        return static_cast<Impl*>(context)->is_panel_open(panel_id) ? 1 : 0;
-    }
-
-    static int host_copy_current_view_id(void* context, char* buffer, size_t buffer_size) {
-        if (!context || !buffer || buffer_size == 0) {
-            return 0;
-        }
-        const std::string name = view_id_to_string(view::get_current_view_id());
-        const std::size_t max_copy = std::min(buffer_size - 1, name.size());
-        std::memcpy(buffer, name.data(), max_copy);
-        buffer[max_copy] = '\0';
-        return 1;
-    }
-
-    static int host_notify(void* context,
-                           MistyNotificationLevel level,
-                           const char* title,
-                           const char* message) {
-        if (!context) {
-            return 0;
-        }
-
-        auto* impl = static_cast<Impl*>(context);
-        if (!impl->ui_registry) {
-            return 1;
-        }
-
-        panel::NotificationType notification_type = panel::NotificationType::INFO;
-        switch (level) {
-            case MISTY_NOTIFICATION_SUCCESS:
-                notification_type = panel::NotificationType::SUCCESS;
-                break;
-            case MISTY_NOTIFICATION_ERROR:
-                notification_type = panel::NotificationType::ERROR;
-                break;
-            case MISTY_NOTIFICATION_INFO:
-            default:
-                notification_type = panel::NotificationType::INFO;
-                break;
-        }
-
-        auto& notifications = impl->ui_registry->get_state<panel::NotificationState>("Notifications");
-        notifications.add_notification(title ? title : "Extension",
-                                       message ? message : "",
-                                       notification_type);
-        return 1;
-    }
-
-    static void ui_text(const char* text) {
-        ImGui::TextUnformatted(text ? text : "");
-    }
-
-    static void ui_text_wrapped(const char* text) {
-        ImGui::TextWrapped("%s", text ? text : "");
-    }
-
-    static int ui_button(const char* label, float width, float height) {
-        return ImGui::Button(label ? label : "", ImVec2(width, height)) ? 1 : 0;
-    }
-
-    static void ui_same_line() {
-        ImGui::SameLine();
-    }
-
-    static void ui_separator() {
-        ImGui::Separator();
-    }
-
-    static void ui_spacing() {
-        ImGui::Spacing();
-    }
+    Impl() = default;
 
     void append_diagnostic(std::size_t plugin_index, std::string message) {
         if (plugin_index >= plugins.size() || message.empty()) {
@@ -487,16 +605,18 @@ bool PluginHost::load_plugin_directory(const fs::path& plugin_dir, bool bundled)
     info.description = trim_copy(json.value("description", std::string()));
     info.author = trim_copy(json.value("author", std::string()));
     info.enabled = json.value("enabled", true);
-    const int schema_version = json.value("schema_version", 1);
+    const int schema_version = json.value("schema_version", 0);
     const auto platforms = json_string_array(json.value("platforms", nlohmann::json::array()));
+
+    const HostPlatform host_platform = current_host_platform();
 
     if (info.id.empty() || info.name.empty()) {
         info.diagnostics.push_back("Manifest must include non-empty id and name.");
         impl_->plugins.push_back({std::move(info), {}});
         return false;
     }
-    if (schema_version != 1) {
-        info.diagnostics.push_back("Only manifest schema_version 1 is supported for plugins.");
+    if (schema_version != 2) {
+        info.diagnostics.push_back("This Misty build only supports plugin manifest schema_version 2.");
         impl_->plugins.push_back({std::move(info), {}});
         return false;
     }
@@ -510,49 +630,80 @@ bool PluginHost::load_plugin_directory(const fs::path& plugin_dir, bool bundled)
         impl_->plugins.push_back({std::move(info), {}});
         return false;
     }
-    if (!matches_platforms(platforms)) {
+    if (!matches_platforms(platforms, host_platform.os)) {
         info.diagnostics.push_back("Plugin does not match the current platform.");
         impl_->plugins.push_back({std::move(info), {}});
         return false;
     }
 
     const auto plugin_json = json.value("plugin", nlohmann::json::object());
-    const std::string library_rel = trim_copy(plugin_json.value("library", std::string()));
     const uint32_t manifest_abi = plugin_json.value("abi_version", 0u);
-
-    if (library_rel.empty()) {
-        info.diagnostics.push_back("Manifest is missing plugin.library.");
-        impl_->plugins.push_back({std::move(info), {}});
-        return false;
-    }
     if (manifest_abi != MISTY_PLUGIN_ABI_VERSION) {
         info.diagnostics.push_back("Manifest ABI version does not match Misty's plugin ABI.");
         impl_->plugins.push_back({std::move(info), {}});
         return false;
     }
 
-    fs::path library_candidate(library_rel);
+    const auto variants_json = plugin_json.value("variants", nlohmann::json::array());
+    if (!variants_json.is_array() || variants_json.empty()) {
+        info.diagnostics.push_back("Manifest is missing plugin.variants.");
+        impl_->plugins.push_back({std::move(info), {}});
+        return false;
+    }
+
+    std::vector<ManifestVariant> variants;
+    variants.reserve(variants_json.size());
+    for (const auto& vj : variants_json) {
+        if (!vj.is_object()) continue;
+        ManifestVariant mv;
+        mv.os = trim_copy(vj.value("os", std::string()));
+        mv.arch = trim_copy(vj.value("arch", std::string()));
+        mv.runtime = trim_copy(vj.value("runtime", std::string()));
+        mv.library = trim_copy(vj.value("library", std::string()));
+        mv.sha256 = trim_copy(vj.value("sha256", std::string()));
+        mv.build_id = trim_copy(vj.value("build_id", std::string()));
+        mv.sdk_version = trim_copy(vj.value("sdk_version", std::string()));
+        variants.push_back(std::move(mv));
+    }
+
+    const auto selected_opt = select_variant(variants, host_platform);
+    if (!selected_opt.has_value()) {
+        info.diagnostics.push_back(
+            "No plugin variant matches this host (" + host_platform.os + "-" +
+            host_platform.arch + "/" + host_platform.runtime + ").");
+        impl_->plugins.push_back({std::move(info), {}});
+        return false;
+    }
+    const ManifestVariant& selected = *selected_opt;
+
+    if (selected.library.empty()) {
+        info.diagnostics.push_back("Selected plugin variant is missing its library path.");
+        impl_->plugins.push_back({std::move(info), {}});
+        return false;
+    }
+
+    fs::path library_candidate(selected.library);
     if (library_candidate.is_absolute()) {
-        info.diagnostics.push_back("plugin.library must be a relative path inside the plugin directory.");
+        info.diagnostics.push_back("Variant library must be a relative path inside the plugin directory.");
         impl_->plugins.push_back({std::move(info), {}});
         return false;
     }
 
     const fs::path resolved_library = (plugin_dir / library_candidate).lexically_normal();
     if (!path_is_within(plugin_dir, resolved_library)) {
-        info.diagnostics.push_back("plugin.library resolves outside the plugin directory.");
+        info.diagnostics.push_back("Variant library resolves outside the plugin directory.");
         impl_->plugins.push_back({std::move(info), {}});
         return false;
     }
     if (!fs::exists(resolved_library, ec) || ec || !fs::is_regular_file(resolved_library, ec)) {
-        info.diagnostics.push_back("Plugin library was not found.");
+        info.diagnostics.push_back("Plugin variant library was not found.");
         impl_->plugins.push_back({std::move(info), {}});
         return false;
     }
 
     info.library_path = resolved_library.string();
 
-    PluginVerificationResult verification = verify_plugin_manifest(json, plugin_dir, resolved_library);
+    PluginVerificationResult verification = verify_plugin_manifest(json, plugin_dir, resolved_library, selected);
     info.verified = verification.signature_verified;
     info.signer = verification.signer;
     if (plugin_requires_signature() && !verification.has_signature) {
@@ -575,8 +726,8 @@ bool PluginHost::load_plugin_directory(const fs::path& plugin_dir, bool bundled)
         return false;
     }
 
-    const auto abi_fn = reinterpret_cast<MistyPluginAbiVersionFn>(plugin.library.symbol("misty_plugin_abi_version"));
-    const auto register_fn = reinterpret_cast<MistyPluginRegisterFn>(plugin.library.symbol("misty_plugin_register"));
+    const auto abi_fn = reinterpret_cast<misty::PluginAbiVersionFn>(plugin.library.symbol("misty_plugin_abi_version"));
+    const auto register_fn = reinterpret_cast<misty::PluginRegisterFn>(plugin.library.symbol("misty_plugin_register"));
     if (!abi_fn || !register_fn) {
         plugin.info.diagnostics.push_back("Plugin library is missing required export symbols.");
         impl_->plugins.push_back(std::move(plugin));
@@ -606,98 +757,11 @@ bool PluginHost::load_plugin_directory(const fs::path& plugin_dir, bool bundled)
     impl_->plugins.push_back(std::move(plugin));
     impl_->plugin_index_by_id[impl_->plugins[plugin_index].info.id] = plugin_index;
 
-    struct RegistrarContext {
-        Impl* impl = nullptr;
-        std::size_t plugin_index = 0;
-    } registrar_context{impl_, plugin_index};
-
-    MistyPluginRegistrarApi registrar{};
-    registrar.struct_size = sizeof(MistyPluginRegistrarApi);
-    registrar.abi_version = MISTY_PLUGIN_ABI_VERSION;
-    registrar.context = &registrar_context;
-    registrar.register_command = [](void* context, const MistyCommandRegistration* command) -> int {
-        auto* registrar_ctx = static_cast<RegistrarContext*>(context);
-        if (!registrar_ctx || !command || command->struct_size < sizeof(MistyCommandRegistration) ||
-            !command->id || !command->title || !command->invoke) {
-            if (registrar_ctx) {
-                registrar_ctx->impl->append_diagnostic(registrar_ctx->plugin_index,
-                                                       "Plugin attempted to register an invalid command.");
-            }
-            return 0;
-        }
-
-        const std::string id = trim_copy(command->id);
-        const std::string title = trim_copy(command->title);
-        if (id.empty() || title.empty()) {
-            registrar_ctx->impl->append_diagnostic(registrar_ctx->plugin_index,
-                                                   "Plugin attempted to register a command with an empty id or title.");
-            return 0;
-        }
-        if (registrar_ctx->impl->command_index_by_id.contains(id)) {
-            registrar_ctx->impl->append_diagnostic(registrar_ctx->plugin_index,
-                                                   "Plugin attempted to register a duplicate command id: " + id);
-            return 0;
-        }
-
-        Impl::PluginCommand plugin_command;
-        plugin_command.id = id;
-        plugin_command.title = title;
-        plugin_command.default_shortcut = command->default_shortcut ? command->default_shortcut : "";
-        plugin_command.invoke = command->invoke;
-        plugin_command.user_data = command->user_data;
-        plugin_command.plugin_index = registrar_ctx->plugin_index;
-
-        registrar_ctx->impl->command_index_by_id[id] = registrar_ctx->impl->commands.size();
-        registrar_ctx->impl->commands.push_back(plugin_command);
-        registrar_ctx->impl->plugins[registrar_ctx->plugin_index].info.commands.push_back(
-            PluginCommandInfo{plugin_command.id, plugin_command.title, plugin_command.default_shortcut});
-        if (!plugin_command.default_shortcut.empty()) {
-            CommandManager::get().register_runtime_command(plugin_command.id, plugin_command.default_shortcut);
-        }
-        return 1;
-    };
-    registrar.register_panel = [](void* context, const MistyPanelRegistration* panel) -> int {
-        auto* registrar_ctx = static_cast<RegistrarContext*>(context);
-        if (!registrar_ctx || !panel || panel->struct_size < sizeof(MistyPanelRegistration) ||
-            !panel->id || !panel->title || !panel->render) {
-            if (registrar_ctx) {
-                registrar_ctx->impl->append_diagnostic(registrar_ctx->plugin_index,
-                                                       "Plugin attempted to register an invalid panel.");
-            }
-            return 0;
-        }
-
-        const std::string id = trim_copy(panel->id);
-        const std::string title = trim_copy(panel->title);
-        if (id.empty() || title.empty()) {
-            registrar_ctx->impl->append_diagnostic(registrar_ctx->plugin_index,
-                                                   "Plugin attempted to register a panel with an empty id or title.");
-            return 0;
-        }
-        if (registrar_ctx->impl->panel_index_by_id.contains(id)) {
-            registrar_ctx->impl->append_diagnostic(registrar_ctx->plugin_index,
-                                                   "Plugin attempted to register a duplicate panel id: " + id);
-            return 0;
-        }
-
-        Impl::PluginPanel plugin_panel;
-        plugin_panel.id = id;
-        plugin_panel.title = title;
-        plugin_panel.render = panel->render;
-        plugin_panel.user_data = panel->user_data;
-        plugin_panel.is_open = panel->default_open != 0;
-        plugin_panel.plugin_index = registrar_ctx->plugin_index;
-
-        registrar_ctx->impl->panel_index_by_id[id] = registrar_ctx->impl->panels.size();
-        registrar_ctx->impl->panels.push_back(plugin_panel);
-        registrar_ctx->impl->plugins[registrar_ctx->plugin_index].info.panels.push_back(
-            PluginPanelInfo{plugin_panel.id, plugin_panel.title, plugin_panel.is_open});
-        return 1;
-    };
+    Impl::RegistryImpl registry(impl_, plugin_index);
 
     int register_result = 0;
     try {
-        register_result = register_fn(&registrar);
+        register_result = register_fn(registry);
     } catch (const std::exception& e) {
         impl_->plugins[plugin_index].info.diagnostics.push_back(
             std::string("Plugin registration threw an exception: ") + e.what());
@@ -741,7 +805,7 @@ void PluginHost::process_shortcuts() {
             continue;
         }
         try {
-            command.invoke(&impl_->host_api, command.user_data);
+            command.invoke(impl_->host_impl, command.user_data);
         } catch (const std::exception& e) {
             impl_->fault_plugin(command.plugin_index,
                                 std::string("Command callback threw an exception for ") + command.id + ": " + e.what());
@@ -763,7 +827,7 @@ void PluginHost::render_open_panels() {
         ImGui::SetNextWindowSize(ImVec2(480.0f, 360.0f), ImGuiCond_FirstUseEver);
         if (ImGui::Begin(window_id.c_str(), &keep_open)) {
             try {
-                panel.render(&impl_->host_api, &impl_->ui_api, panel.user_data);
+                panel.render(impl_->host_impl, impl_->ui_impl, panel.user_data);
             } catch (const std::exception& e) {
                 impl_->fault_plugin(panel.plugin_index,
                                     std::string("Panel render callback threw an exception for ") + panel.id + ": " + e.what());
@@ -789,7 +853,7 @@ bool PluginHost::invoke_command(const std::string& command_id) {
         return false;
     }
     try {
-        command.invoke(&impl_->host_api, command.user_data);
+        command.invoke(impl_->host_impl, command.user_data);
     } catch (const std::exception& e) {
         impl_->fault_plugin(command.plugin_index,
                             std::string("Command callback threw an exception for ") + command.id + ": " + e.what());

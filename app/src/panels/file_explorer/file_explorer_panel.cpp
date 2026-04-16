@@ -11,12 +11,15 @@
 #include "core/commands/command_manager.h"
 #include "core/manager/asset_manager.h"
 #include "core/extensions/extension_manager.h"
+#include <glad/glad.h>
 #include <nlohmann/json.hpp>
 #include <algorithm>
 #include <cctype>
 #include <chrono>
 #include <cstdio>
 #include <unordered_set>
+
+#include "stb_image.h"
 
 
 namespace fs = std::filesystem;
@@ -26,11 +29,59 @@ using namespace misty::core;
 namespace misty::panel {
 
     namespace {
+        constexpr const char* kPreviewPaneChildId = "##file_preview_panel";
+        constexpr float kPreviewMinWidth = 280.0f;
+        constexpr float kPreviewFixedWidth = 360.0f;
+        constexpr float kPreviewZoomStep = 0.1f;
+        constexpr float kPreviewZoomMin = 0.1f;
+        constexpr float kPreviewZoomMax = 3.0f;
+        constexpr float kPreviewSplitterWidth = 8.0f;
+
         std::string trim_copy(std::string value) {
             auto not_space = [](unsigned char c) { return !std::isspace(c); };
             value.erase(value.begin(), std::find_if(value.begin(), value.end(), not_space));
             value.erase(std::find_if(value.rbegin(), value.rend(), not_space).base(), value.end());
             return value;
+        }
+
+        bool str_iequal(const char* a, const char* b) {
+            for (; *a && *b; ++a, ++b) {
+                if (std::tolower(static_cast<unsigned char>(*a)) !=
+                    std::tolower(static_cast<unsigned char>(*b))) {
+                    return false;
+                }
+            }
+            return *a == *b;
+        }
+
+        enum class PreviewFormat { Unknown, Image, Pdf };
+
+        PreviewFormat detect_preview_format(const char* path) {
+            const char* dot = std::strrchr(path, '.');
+            if (!dot) return PreviewFormat::Unknown;
+
+            const char* ext = dot + 1;
+            if (str_iequal(ext, "png") || str_iequal(ext, "jpg") ||
+                str_iequal(ext, "jpeg") || str_iequal(ext, "bmp") ||
+                str_iequal(ext, "gif") || str_iequal(ext, "psd") ||
+                str_iequal(ext, "tga") || str_iequal(ext, "hdr") ||
+                str_iequal(ext, "pic") || str_iequal(ext, "pnm") ||
+                str_iequal(ext, "pgm") || str_iequal(ext, "ppm")) {
+                return PreviewFormat::Image;
+            }
+            if (str_iequal(ext, "pdf")) {
+                return PreviewFormat::Pdf;
+            }
+            return PreviewFormat::Unknown;
+        }
+
+        const char* filename_from_path(const char* path) {
+            const char* slash = std::strrchr(path, '/');
+#ifdef _WIN32
+            const char* bslash = std::strrchr(path, '\\');
+            if (bslash && (!slash || bslash > slash)) slash = bslash;
+#endif
+            return slash ? slash + 1 : path;
         }
 
         std::string sanitize_remote_folder_name(const std::string& preferred, const std::string& fallback) {
@@ -58,7 +109,15 @@ namespace misty::panel {
             name = trim_copy(name);
             return name.empty() ? fallback : name;
         }
+
+        float clamp_preview_zoom(float zoom) {
+            return std::clamp(zoom, kPreviewZoomMin, kPreviewZoomMax);
+        }
     } // namespace
+
+    FileExplorerPanel::~FileExplorerPanel() {
+        clear_preview_texture();
+    }
 
     FileExplorerPanel::FileExplorerPanel(UIRegistry& registry,
                                          WorkerPool& worker_pool,
@@ -284,6 +343,157 @@ namespace misty::panel {
         state.last_selected_index = -1;
     }
 
+    std::string FileExplorerPanel::selected_preview_path(FileExplorerState& state) const {
+        if (state.selected_files.size() != 1) {
+            return {};
+        }
+        return *state.selected_files.begin();
+    }
+
+    void FileExplorerPanel::clear_preview_texture() {
+        if (preview_texture_id_ != 0) {
+            GLuint texture = preview_texture_id_;
+            glDeleteTextures(1, &texture);
+            preview_texture_id_ = 0;
+        }
+        preview_texture_width_ = 0;
+        preview_texture_height_ = 0;
+    }
+
+    bool FileExplorerPanel::load_preview_texture(const std::string& path, std::string* error_message) {
+        clear_preview_texture();
+
+        int width = 0;
+        int height = 0;
+        int channels = 0;
+        unsigned char* pixels = stbi_load(path.c_str(), &width, &height, &channels, 4);
+        if (!pixels) {
+            if (error_message) {
+                const char* reason = stbi_failure_reason();
+                *error_message = reason && *reason ? reason : "Failed to decode image.";
+            }
+            return false;
+        }
+
+        GLuint texture = 0;
+        glGenTextures(1, &texture);
+        if (texture == 0) {
+            stbi_image_free(pixels);
+            if (error_message) {
+                *error_message = "Failed to create preview texture.";
+            }
+            return false;
+        }
+
+        glBindTexture(GL_TEXTURE_2D, texture);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0,
+                     GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+
+        stbi_image_free(pixels);
+
+        preview_texture_id_ = texture;
+        preview_texture_width_ = width;
+        preview_texture_height_ = height;
+        preview_source_path_ = path;
+        preview_zoom_ = 1.0f;
+        preview_error_.clear();
+        return true;
+    }
+
+    void FileExplorerPanel::render_preview_pane(const std::string& selected_path, float preview_width) {
+        if (ImGui::BeginChild(kPreviewPaneChildId, ImVec2(preview_width, 0), true,
+                               ImGuiWindowFlags_HorizontalScrollbar)) {
+            ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
+            if (ImGui::Button("Hide Preview")) {
+                preview_pane_open_ = false;
+            }
+            ImGui::PopStyleVar();
+
+            ImGui::SameLine();
+            if (ImGui::Button("-", ImVec2(28.0f, 0))) {
+                zoom_preview_out();
+            }
+            ImGui::SameLine();
+            char zoom_label[32];
+            std::snprintf(zoom_label, sizeof(zoom_label), "%d%%",
+                          static_cast<int>(preview_zoom_ * 100.0f));
+            ImGui::TextUnformatted(zoom_label);
+            ImGui::SameLine();
+            if (ImGui::Button("+", ImVec2(28.0f, 0))) {
+                zoom_preview_in();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("100%", ImVec2(44.0f, 0))) {
+                reset_preview_zoom();
+            }
+
+            ImGui::Separator();
+
+            if (selected_path.empty()) {
+                clear_preview_texture();
+                preview_source_path_.clear();
+                preview_error_ = "Select a single file to preview.";
+            } else if (fs::is_directory(selected_path)) {
+                clear_preview_texture();
+                preview_source_path_.clear();
+                preview_error_ = "Folders do not have a preview.";
+            } else {
+                const PreviewFormat format = detect_preview_format(selected_path.c_str());
+                if (format == PreviewFormat::Image) {
+                    std::string error;
+                    const bool needs_load =
+                        preview_source_path_ != selected_path ||
+                        (preview_texture_id_ == 0 && preview_error_.empty());
+                    if (needs_load) {
+                        preview_source_path_ = selected_path;
+                        if (!load_preview_texture(selected_path, &error)) {
+                            preview_error_ = error.empty() ? "Failed to load preview." : error;
+                        }
+                    }
+                } else if (format == PreviewFormat::Pdf) {
+                    clear_preview_texture();
+                    preview_source_path_.clear();
+                    preview_error_ = "PDF preview is not linked yet.";
+                } else {
+                    clear_preview_texture();
+                    preview_source_path_.clear();
+                    preview_error_ = "Preview supports PNG, JPG, BMP, GIF, PSD, TGA, HDR.";
+                }
+            }
+
+            if (preview_texture_id_ != 0) {
+                preview_error_.clear();
+                const char* name = filename_from_path(preview_source_path_.c_str());
+                ImGui::TextUnformatted(name);
+                ImGui::Separator();
+
+                float avail_w = ImGui::GetContentRegionAvail().x;
+                float avail_h = ImGui::GetContentRegionAvail().y;
+                if (avail_w > 1.0f && avail_h > 1.0f &&
+                    preview_texture_width_ > 0 && preview_texture_height_ > 0) {
+                    float scale = preview_zoom_;
+                    float draw_w = preview_texture_width_ * scale;
+                    float draw_h = preview_texture_height_ * scale;
+
+                    ImGui::Image(
+                        static_cast<ImTextureID>(static_cast<intptr_t>(preview_texture_id_)),
+                        ImVec2(draw_w, draw_h));
+                }
+            } else {
+                if (!preview_error_.empty()) {
+                    ImGui::TextWrapped("%s", preview_error_.c_str());
+                } else {
+                    ImGui::TextDisabled("Select a file to preview.");
+                }
+            }
+        }
+        ImGui::EndChild();
+    }
+
     // No-op placeholder - RemoteState upload context is managed in navigate_to_remote
     // and automatically cleared when navigating to local paths
 
@@ -343,28 +553,95 @@ namespace misty::panel {
             state.chat_overlay_height = chat_h;
 
             if (ImGui::BeginChild("##explorer_content_region", ImVec2(0.0f, available_h), false)) {
-                // Save window-relative position of the list area before rendering it.
-                // We'll reuse this to position the overlay child on top.
-                ImVec2 list_start = ImGui::GetCursorPos();
-                ImVec2 list_screen_min = ImGui::GetCursorScreenPos();
-                ImVec2 list_region_size = ImGui::GetContentRegionAvail();
-                float list_height = ImGui::GetContentRegionAvail().y;
+                ImVec2 content_avail = ImGui::GetContentRegionAvail();
+                const bool show_preview = preview_pane_open_;
+                const float max_preview_width = std::max(0.0f, content_avail.x - kPreviewSplitterWidth);
+                const float min_preview_width = std::min(kPreviewMinWidth, max_preview_width);
+                float preview_width = 0.0f;
+                if (show_preview && max_preview_width > 0.0f) {
+                    preview_width = preview_pane_resizing_
+                        ? std::clamp(preview_pane_drag_start_width_ +
+                                     (preview_pane_drag_start_mouse_x_ - ImGui::GetIO().MousePos.x),
+                                     min_preview_width, max_preview_width)
+                        : std::clamp(preview_pane_width_, min_preview_width, max_preview_width);
+                }
+                const float list_width = show_preview
+                    ? std::max(0.0f, content_avail.x - preview_width - kPreviewSplitterWidth)
+                    : content_avail.x;
 
-                show_directory_contents(state);
-                show_error_modal(state.error_msg, "FileExplorerError");
-                render_search_overlay(search_state, list_start, list_height);
+                std::string preview_path = selected_preview_path(state);
+                if (preview_path != preview_selected_path_) {
+                    preview_selected_path_ = preview_path;
+                }
 
-                if (state.chat_overlay_open && list_region_size.x > 0.0f && list_region_size.y > 0.0f) {
-                    const float overlay_top_y = list_screen_min.y + list_region_size.y - chat_h;
-                    ImGui::SetCursorScreenPos(ImVec2(list_screen_min.x, overlay_top_y));
-                    ImGui::InvisibleButton("##chat_overlay_blocker", ImVec2(list_region_size.x, chat_h));
-                    ImGui::SetCursorScreenPos(ImVec2(list_screen_min.x, overlay_top_y));
-                    render_chat_overlay(state,
-                                        list_region_size.x,
-                                        chat_h,
-                                        min_chat_h,
-                                        max_chat_h,
-                                        list_screen_min.y + list_region_size.y);
+                if (ImGui::BeginChild("##explorer_list", ImVec2(list_width, content_avail.y),
+                                      false, ImGuiWindowFlags_AlwaysVerticalScrollbar)) {
+                    // Save window-relative position of the list area before rendering it.
+                    // We'll reuse this to position the overlay child on top.
+                    ImVec2 list_start = ImGui::GetCursorPos();
+                    ImVec2 list_screen_min = ImGui::GetCursorScreenPos();
+                    ImVec2 list_region_size = ImGui::GetContentRegionAvail();
+                    float list_height = ImGui::GetContentRegionAvail().y;
+
+                    show_directory_contents(state);
+                    show_error_modal(state.error_msg, "FileExplorerError");
+                    render_search_overlay(search_state, list_start, list_height);
+
+                    if (state.chat_overlay_open && list_region_size.x > 0.0f && list_region_size.y > 0.0f) {
+                        const float overlay_top_y = list_screen_min.y + list_region_size.y - chat_h;
+                        ImGui::SetCursorScreenPos(ImVec2(list_screen_min.x, overlay_top_y));
+                        ImGui::InvisibleButton("##chat_overlay_blocker", ImVec2(list_region_size.x, chat_h));
+                        ImGui::SetCursorScreenPos(ImVec2(list_screen_min.x, overlay_top_y));
+                        render_chat_overlay(state,
+                                            list_region_size.x,
+                                            chat_h,
+                                            min_chat_h,
+                                            max_chat_h,
+                                            list_screen_min.y + list_region_size.y);
+                    }
+                }
+                ImGui::EndChild();
+
+                if (show_preview) {
+                    ImGui::SameLine(0.0f, 0.0f);
+
+                    const ImVec2 splitter_pos = ImGui::GetCursorScreenPos();
+                    const ImVec2 splitter_size(kPreviewSplitterWidth, content_avail.y);
+                    ImGui::InvisibleButton("##preview_splitter", splitter_size);
+
+                    const bool splitter_hovered = ImGui::IsItemHovered();
+                    if (splitter_hovered || preview_pane_resizing_) {
+                        ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+                    }
+                    if (splitter_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+                        preview_pane_resizing_ = true;
+                        preview_pane_drag_start_width_ = preview_width;
+                        preview_pane_drag_start_mouse_x_ = ImGui::GetIO().MousePos.x;
+                    }
+                    if (preview_pane_resizing_) {
+                        const ImGuiIO& io = ImGui::GetIO();
+                        const float max_width = std::max(min_preview_width, max_preview_width);
+                        const float live_width = std::clamp(preview_pane_drag_start_width_ +
+                                                            (preview_pane_drag_start_mouse_x_ - io.MousePos.x),
+                                                            min_preview_width, max_width);
+                        if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+                            preview_pane_resizing_ = false;
+                            preview_pane_width_ = live_width;
+                        }
+                    }
+
+                    ImDrawList* splitter_dl = ImGui::GetWindowDrawList();
+                    const ImU32 splitter_color = splitter_hovered || preview_pane_resizing_
+                        ? IM_COL32(180, 180, 180, 180)
+                        : IM_COL32(110, 110, 110, 120);
+                    splitter_dl->AddRectFilled(splitter_pos,
+                                               ImVec2(splitter_pos.x + splitter_size.x, splitter_pos.y + splitter_size.y),
+                                               splitter_color);
+
+                    ImGui::SameLine(0.0f, 0.0f);
+                    lock.unlock();
+                    render_preview_pane(preview_path, preview_width);
+                    lock.lock();
                 }
             }
             ImGui::EndChild();
@@ -590,6 +867,29 @@ namespace misty::panel {
         if (!state.chat_overlay_open) {
             state.chat_error_msg.clear();
         }
+    }
+
+    bool FileExplorerPanel::toggle_preview_pane() {
+        preview_pane_open_ = !preview_pane_open_;
+        if (!preview_pane_open_) {
+            preview_pane_resizing_ = false;
+        }
+        return true;
+    }
+
+    bool FileExplorerPanel::zoom_preview_in() {
+        preview_zoom_ = clamp_preview_zoom(preview_zoom_ + kPreviewZoomStep);
+        return true;
+    }
+
+    bool FileExplorerPanel::zoom_preview_out() {
+        preview_zoom_ = clamp_preview_zoom(preview_zoom_ - kPreviewZoomStep);
+        return true;
+    }
+
+    bool FileExplorerPanel::reset_preview_zoom() {
+        preview_zoom_ = 1.0f;
+        return true;
     }
 
     void FileExplorerPanel::sync_account_mappings() {

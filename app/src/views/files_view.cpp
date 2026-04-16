@@ -1423,6 +1423,26 @@ namespace misty::view {
         return tab ? tab->explorer_state_key : "Files";
     }
 
+    bool FilesView::invoke_command(const std::string& command_id) {
+        if (ExplorerTab* tab = get_active_tab(active_pane_id_)) {
+            if (tab->explorer_panel) {
+                if (command_id == "explorer.preview.toggle") {
+                    return tab->explorer_panel->toggle_preview_pane();
+                }
+                if (command_id == "explorer.preview.zoom_in") {
+                    return tab->explorer_panel->zoom_preview_in();
+                }
+                if (command_id == "explorer.preview.zoom_out") {
+                    return tab->explorer_panel->zoom_preview_out();
+                }
+                if (command_id == "explorer.preview.zoom_reset") {
+                    return tab->explorer_panel->reset_preview_zoom();
+                }
+            }
+        }
+        return false;
+    }
+
     panel::SearchPanel* FilesView::active_search_panel() const {
         const ExplorerTab* tab = get_active_tab(active_pane_id_);
         return tab ? tab->search_panel.get() : nullptr;
