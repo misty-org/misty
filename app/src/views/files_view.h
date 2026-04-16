@@ -24,6 +24,8 @@ namespace misty::view {
 
         void render() override;
         view::ViewID get_view_id() override;
+        std::string active_explorer_state_key() const override;
+        bool invoke_command(const std::string& command_id) override;
 
         enum class SplitOrientation {
             None,
@@ -85,7 +87,6 @@ namespace misty::view {
         void apply_tab_snapshot(const ExplorerTab& tab, const TabSnapshot& snapshot);
         bool pane_has_restorable_tab(int pane_id) const;
         bool has_restorable_pane() const;
-        std::string active_explorer_state_key() const;
         panel::SearchPanel* active_search_panel() const;
         void notify_split_error(const std::string& title, const std::string& message);
         bool restore_layout_state();

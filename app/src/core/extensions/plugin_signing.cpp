@@ -11,7 +11,7 @@
 #include <openssl/evp.h>
 #include <openssl/pem.h>
 
-#include "core/extensions/plugin_api.h"
+#include "core/extensions/misty_plugin_sdk.h"
 #include "core/system/util.h"
 #include "plugin_build_config.h"
 
@@ -259,32 +259,6 @@ std::string plugin_build_id() {
     return MISTY_PLUGIN_BUILD_ID;
 }
 
-std::string plugin_platform() {
-#ifdef _WIN32
-    return "windows";
-#elif __APPLE__
-    return "macos";
-#elif __linux__
-    return "linux";
-#else
-    return "unknown";
-#endif
-}
-
-std::string plugin_arch() {
-#if defined(__aarch64__) || defined(_M_ARM64)
-    return "arm64";
-#elif defined(__x86_64__) || defined(_M_X64)
-    return "x64";
-#elif defined(__arm__) || defined(_M_ARM)
-    return "arm";
-#elif defined(__i386__) || defined(_M_IX86)
-    return "x86";
-#else
-    return "unknown";
-#endif
-}
-
 bool plugin_requires_signature() {
     return MISTY_REQUIRE_SIGNED_PLUGINS != 0;
 }
@@ -293,47 +267,99 @@ std::string sha256_for_file(const fs::path& path) {
     return file_sha256(path);
 }
 
+HostPlatform current_host_platform() {
+    HostPlatform p;
+#ifdef _WIN32
+    p.os = "windows";
+#elif __APPLE__
+    p.os = "macos";
+#elif __linux__
+    p.os = "linux";
+#else
+    p.os = "unknown";
+#endif
+
+#if defined(__aarch64__) || defined(_M_ARM64)
+    p.arch = "arm64";
+#elif defined(__x86_64__) || defined(_M_X64)
+    p.arch = "x86_64";
+#else
+    p.arch = "unknown";
+#endif
+
+#if defined(_MSC_VER)
+    p.runtime = "msvc";
+#elif defined(_LIBCPP_VERSION)
+    p.runtime = "libc++";
+#elif defined(__GLIBCXX__)
+    p.runtime = "libstdc++";
+#else
+    p.runtime = "unknown";
+#endif
+
+    return p;
+}
+
+std::optional<ManifestVariant> select_variant(
+    const std::vector<ManifestVariant>& variants,
+    const HostPlatform& host) {
+    const ManifestVariant* runtime_agnostic = nullptr;
+    for (const auto& variant : variants) {
+        if (variant.os != host.os || variant.arch != host.arch) {
+            continue;
+        }
+        if (variant.runtime.empty()) {
+            if (!runtime_agnostic) {
+                runtime_agnostic = &variant;
+            }
+            continue;
+        }
+        if (variant.runtime == host.runtime) {
+            return variant;
+        }
+    }
+    if (runtime_agnostic) {
+        return *runtime_agnostic;
+    }
+    return std::nullopt;
+}
+
 PluginVerificationResult verify_plugin_manifest(nlohmann::json& manifest,
                                                 const fs::path&,
-                                                const fs::path& library_path) {
+                                                const fs::path& library_path,
+                                                const ManifestVariant& selected) {
     PluginVerificationResult result;
-    auto plugin_json = manifest.value("plugin", nlohmann::json::object());
+    const auto plugin_json = manifest.value("plugin", nlohmann::json::object());
 
-    const std::string sha256 = trim_copy(plugin_json.value("sha256", std::string()));
-    if (!sha256.empty()) {
+    const HostPlatform host = current_host_platform();
+    if (!selected.os.empty() && selected.os != host.os) {
+        result.diagnostics.push_back("Selected plugin variant OS does not match this host.");
+        return result;
+    }
+    if (!selected.arch.empty() && selected.arch != host.arch) {
+        result.diagnostics.push_back("Selected plugin variant architecture does not match this host.");
+        return result;
+    }
+
+    if (!selected.sha256.empty()) {
         const std::string actual = file_sha256(library_path);
         if (actual.empty()) {
             result.diagnostics.push_back("Failed to compute plugin library SHA-256.");
             return result;
         }
-        if (actual != sha256) {
+        if (actual != selected.sha256) {
             result.diagnostics.push_back("Plugin library SHA-256 does not match manifest.");
             return result;
         }
         result.hash_verified = true;
     }
 
-    const std::string sdk_version = trim_copy(plugin_json.value("sdk_version", std::string()));
-    if (!sdk_version.empty() && sdk_version != plugin_sdk_version()) {
+    if (!selected.sdk_version.empty() && selected.sdk_version != plugin_sdk_version()) {
         result.diagnostics.push_back("Plugin SDK version does not match this Misty build.");
         return result;
     }
-
-    const std::string build_id = trim_copy(plugin_json.value("build_id", std::string()));
-    if (!build_id.empty() && build_id != plugin_build_id()) {
+    if (!selected.build_id.empty() && selected.build_id != plugin_build_id()) {
         result.diagnostics.push_back("Plugin build id does not match this Misty build.");
-        return result;
-    }
-
-    const std::string platform = trim_copy(plugin_json.value("platform", std::string()));
-    if (!platform.empty() && platform != plugin_platform()) {
-        result.diagnostics.push_back("Plugin platform does not match this Misty runtime.");
-        return result;
-    }
-
-    const std::string arch = trim_copy(plugin_json.value("arch", std::string()));
-    if (!arch.empty() && arch != plugin_arch()) {
-        result.diagnostics.push_back("Plugin architecture does not match this Misty runtime.");
         return result;
     }
 
@@ -352,11 +378,11 @@ PluginVerificationResult verify_plugin_manifest(nlohmann::json& manifest,
         return result;
     }
     if (!result.hash_verified) {
-        result.diagnostics.push_back("Signed plugins must include a matching SHA-256 hash.");
+        result.diagnostics.push_back("Signed plugins must include a matching SHA-256 for each variant.");
         return result;
     }
-    if (sdk_version.empty() || build_id.empty() || platform.empty() || arch.empty()) {
-        result.diagnostics.push_back("Signed plugins must include sdk_version, build_id, platform, and arch.");
+    if (selected.sdk_version.empty() || selected.build_id.empty()) {
+        result.diagnostics.push_back("Signed plugin variants must include sdk_version and build_id.");
         return result;
     }
     if (value.empty()) {
@@ -391,8 +417,6 @@ PluginVerificationResult verify_plugin_manifest(nlohmann::json& manifest,
 bool sign_plugin_manifest(const fs::path& plugin_dir,
                           const fs::path& private_key_path,
                           const std::string& signer,
-                          const std::string& build_id_override,
-                          const std::string& sdk_version_override,
                           std::string* error) {
     const fs::path manifest_path = plugin_dir / "manifest.json";
     if (!fs::exists(manifest_path)) {
@@ -413,22 +437,43 @@ bool sign_plugin_manifest(const fs::path& plugin_dir,
         return false;
     }
 
-    auto plugin_json = manifest.value("plugin", nlohmann::json::object());
-    const std::string library_rel = trim_copy(plugin_json.value("library", std::string()));
-    if (library_rel.empty()) {
-        if (error) {
-            *error = "Manifest is missing plugin.library.";
-        }
+    if (!manifest.contains("plugin") || !manifest["plugin"].is_object()) {
+        if (error) *error = "Manifest is missing the plugin object.";
+        return false;
+    }
+    auto& plugin_json = manifest["plugin"];
+
+    if (!plugin_json.contains("variants") || !plugin_json["variants"].is_array() ||
+        plugin_json["variants"].empty()) {
+        if (error) *error = "Manifest.plugin.variants must be a non-empty array.";
         return false;
     }
 
-    const fs::path library_path = (plugin_dir / library_rel).lexically_normal();
-    if (!fs::exists(library_path)) {
-        if (error) {
-            *error = "Plugin library was not found.";
+    for (auto& variant : plugin_json["variants"]) {
+        if (!variant.is_object()) {
+            if (error) *error = "Each entry in plugin.variants must be an object.";
+            return false;
         }
-        return false;
+        const std::string library_rel = trim_copy(variant.value("library", std::string()));
+        if (library_rel.empty()) {
+            if (error) *error = "A variant is missing its library path.";
+            return false;
+        }
+        const fs::path library_path = (plugin_dir / library_rel).lexically_normal();
+        if (!fs::exists(library_path)) {
+            if (error) *error = "Variant library was not found: " + library_rel;
+            return false;
+        }
+        const std::string sha = file_sha256(library_path);
+        if (sha.empty()) {
+            if (error) *error = "Failed to compute SHA-256 for variant: " + library_rel;
+            return false;
+        }
+        variant["sha256"] = sha;
     }
+
+    plugin_json["abi_version"] = MISTY_PLUGIN_ABI_VERSION;
+    plugin_json.erase("signature");
 
     EVP_PKEY* private_key = load_private_key(private_key_path);
     if (!private_key) {
@@ -437,15 +482,6 @@ bool sign_plugin_manifest(const fs::path& plugin_dir,
         }
         return false;
     }
-
-    plugin_json["abi_version"] = MISTY_PLUGIN_ABI_VERSION;
-    plugin_json["sdk_version"] = sdk_version_override.empty() ? plugin_sdk_version() : sdk_version_override;
-    plugin_json["build_id"] = build_id_override.empty() ? plugin_build_id() : build_id_override;
-    plugin_json["platform"] = plugin_platform();
-    plugin_json["arch"] = plugin_arch();
-    plugin_json["sha256"] = file_sha256(library_path);
-    plugin_json.erase("signature");
-    manifest["plugin"] = plugin_json;
 
     const std::string payload = manifest_payload(manifest);
     std::string signature_base64;

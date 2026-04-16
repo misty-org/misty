@@ -59,10 +59,8 @@ int main(int argc, char** argv) {
     if (sign_plugin) {
         const std::string private_key = get_arg_value(argc, argv, "--private-key");
         const std::string signer = get_arg_value(argc, argv, "--signer");
-        const std::string build_id = get_arg_value(argc, argv, "--build-id");
-        const std::string sdk_version = get_arg_value(argc, argv, "--sdk-version");
         if (plugin_dir.empty() || private_key.empty()) {
-            std::cerr << "Usage: misty-plugin-sandbox --sign-plugin --plugin-dir <dir> --private-key <pem> [--signer <id>] [--build-id <id>] [--sdk-version <version>]\n";
+            std::cerr << "Usage: misty-plugin-sandbox --sign-plugin --plugin-dir <dir> --private-key <pem> [--signer <id>]\n";
             return 1;
         }
 
@@ -70,8 +68,6 @@ int main(int argc, char** argv) {
         if (!misty::core::sign_plugin_manifest(fs::path(plugin_dir),
                                                fs::path(private_key),
                                                signer,
-                                               build_id,
-                                               sdk_version,
                                                &error)) {
             std::cerr << (error.empty() ? "Failed to sign plugin manifest.\n" : error + "\n");
             return 1;

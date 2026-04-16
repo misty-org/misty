@@ -288,6 +288,8 @@ ImGuiKey CommandManager::parse_key_token(const std::string& token) {
     if (token == "RIGHT" || token == "RIGHTARROW") return ImGuiKey_RightArrow;
     if (token == "DELETE" || token == "DEL") return ImGuiKey_Delete;
     if (token == "COMMA" || token == ",") return ImGuiKey_Comma;
+    if (token == "EQUAL" || token == "PLUS" || token == "=") return ImGuiKey_Equal;
+    if (token == "MINUS" || token == "HYPHEN" || token == "-") return ImGuiKey_Minus;
     if (token == "LEFTBRACKET" || token == "[") return ImGuiKey_LeftBracket;
     if (token == "RIGHTBRACKET" || token == "]") return ImGuiKey_RightBracket;
     if (token == "BACKSLASH" || token == "\\") return ImGuiKey_Backslash;
@@ -350,6 +352,8 @@ std::string CommandManager::label_for_shortcut(const Shortcut& shortcut) {
         case ImGuiKey_DownArrow: parts.emplace_back("Down"); break;
         case ImGuiKey_Delete: parts.emplace_back("Delete"); break;
         case ImGuiKey_Comma: parts.emplace_back(","); break;
+        case ImGuiKey_Equal: parts.emplace_back("="); break;
+        case ImGuiKey_Minus: parts.emplace_back("-"); break;
         case ImGuiKey_LeftBracket: parts.emplace_back("["); break;
         case ImGuiKey_RightBracket: parts.emplace_back("]"); break;
         case ImGuiKey_Backslash: parts.emplace_back("\\"); break;

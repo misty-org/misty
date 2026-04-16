@@ -123,7 +123,7 @@ void FileExplorerPanel::show_search_bar(FileExplorerState& state) {
     const float btn_size = 32.0f;
     const float spacing = 8.0f;
     const bool is_local = !path_utils::is_remote_path(state.current_path);
-    const int icon_button_count = is_local ? 4 : 3;
+    const int icon_button_count = is_local ? 5 : 4;
     const float icon_button_width = icon_size + ImGui::GetStyle().FramePadding.x * 2.0f;
     const float total_available = ImGui::GetContentRegionAvail().x;
     const float path_width = std::max(
@@ -189,6 +189,23 @@ void FileExplorerPanel::show_search_bar(FileExplorerState& state) {
     }
     if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("List View");
+    }
+
+    ImGui::SameLine(0, spacing);
+    ImVec4 preview_tint = preview_pane_open_
+        ? ImVec4(0.95f, 0.95f, 0.95f, 1.0f)
+        : ImVec4(0.7f, 0.7f, 0.7f, 1.0f);
+    auto& preview_tex = AssetManager::get().get_svg_texture("file-media-16", 16);
+    if (preview_tex.id != 0) {
+        if (ImGui::ImageButton("##togglepreview", preview_tex.id, ImVec2(icon_size, icon_size),
+                ImVec2(0, 0), ImVec2(1, 1), ImVec4(0, 0, 0, 0), preview_tint)) {
+            preview_pane_open_ = !preview_pane_open_;
+        }
+    } else if (ImGui::Button("P", ImVec2(btn_size, 0))) {
+        preview_pane_open_ = !preview_pane_open_;
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip(preview_pane_open_ ? "Hide Preview Pane" : "Show Preview Pane");
     }
 
     if (is_local) {

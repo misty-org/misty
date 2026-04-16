@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
 
 #include "core/ui/ui_registry.h"
@@ -25,12 +26,16 @@ namespace misty::panel {
                           std::string panel_id = "primary",
                           bool restore_persistent_state = true,
                           std::string initial_path_override = "");
-        ~FileExplorerPanel() override = default;
+        ~FileExplorerPanel() override;
         void render() override;
 
         void set_search_panel(SearchPanel* panel) { search_panel_ = panel; }
         bool consume_activation_request();
         void toggle_chat_overlay();
+        bool toggle_preview_pane();
+        bool zoom_preview_in();
+        bool zoom_preview_out();
+        bool reset_preview_zoom();
 
         // Unified navigation - routes to local or remote based on path
         void navigate_to_path(const std::string& path, bool update_history = true, bool create_if_missing = true);
@@ -58,6 +63,10 @@ namespace misty::panel {
         void show_search_bar(panel::FileExplorerState& state);
         void show_inline_search(panel::FileExplorerState& state, SearchState& search_state);
         void show_directory_contents(panel::FileExplorerState& state);
+        void render_preview_pane(const std::string& selected_path, float preview_width);
+        bool load_preview_texture(const std::string& path, std::string* error_message);
+        void clear_preview_texture();
+        std::string selected_preview_path(panel::FileExplorerState& state) const;
         void apply_table_sort(panel::FileExplorerState& state, const ImGuiTableSortSpecs& sort_specs);
         void show_file_item(panel::FileExplorerState& state, int i);
         void show_grid_item(panel::FileExplorerState& state, int i, float cell_w, float cell_h);
@@ -116,6 +125,18 @@ namespace misty::panel {
         bool workspace_mount_applied_ = false;
         SearchPanel* search_panel_ = nullptr;
         bool activation_requested_ = false;
+        bool preview_pane_open_ = false;
+        bool preview_pane_resizing_ = false;
+        float preview_pane_width_ = 360.0f;
+        float preview_pane_drag_start_width_ = 360.0f;
+        float preview_pane_drag_start_mouse_x_ = 0.0f;
+        std::uint32_t preview_texture_id_ = 0;
+        int preview_texture_width_ = 0;
+        int preview_texture_height_ = 0;
+        float preview_zoom_ = 1.0f;
+        std::string preview_selected_path_;
+        std::string preview_source_path_;
+        std::string preview_error_;
 
     };
 };

@@ -177,27 +177,57 @@ elseif(WIN32)
     target_link_libraries(misty_plugin_sandbox PRIVATE ws2_32 dwmapi)
 endif()
 
+# ---- Host platform detection for variant layout ----
+if(WIN32)
+    set(MISTY_HOST_OS "windows")
+elseif(APPLE)
+    set(MISTY_HOST_OS "macos")
+else()
+    set(MISTY_HOST_OS "linux")
+endif()
+
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "(aarch64|arm64|ARM64)")
+    set(MISTY_HOST_ARCH "arm64")
+else()
+    set(MISTY_HOST_ARCH "x86_64")
+endif()
+
+if(MSVC)
+    set(MISTY_HOST_RUNTIME "msvc")
+elseif(APPLE)
+    set(MISTY_HOST_RUNTIME "libc++")
+else()
+    set(MISTY_HOST_RUNTIME "libstdc++")
+endif()
+
+set(MISTY_PLUGIN_VARIANT_DIR "variants/${MISTY_HOST_OS}-${MISTY_HOST_ARCH}")
 set(MISTY_PLUGIN_OUTPUT_DIR "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/plugins/preview_manager")
+set(MISTY_PLUGIN_VARIANT_OUTPUT_DIR "${MISTY_PLUGIN_OUTPUT_DIR}/${MISTY_PLUGIN_VARIANT_DIR}")
 set(MISTY_PREVIEW_MANAGER_LIBRARY_NAME "preview_manager${CMAKE_SHARED_LIBRARY_SUFFIX}")
+set(MISTY_PREVIEW_MANAGER_VARIANT_LIBRARY "${MISTY_PLUGIN_VARIANT_DIR}/${MISTY_PREVIEW_MANAGER_LIBRARY_NAME}")
 configure_file(
     "${CMAKE_SOURCE_DIR}/plugins/preview_manager/manifest.json.in"
     "${CMAKE_CURRENT_BINARY_DIR}/plugins/preview_manager/manifest.json"
     @ONLY
 )
 
-add_library(preview_manager MODULE "plugins/preview_manager/plugin.cpp")
+add_library(preview_manager MODULE
+    "plugins/preview_manager/plugin.cpp"
+    "plugins/preview_manager/stb_impl.cpp"
+)
 set_target_properties(preview_manager PROPERTIES
     PREFIX ""
     OUTPUT_NAME "preview_manager"
     SUFFIX "${CMAKE_SHARED_LIBRARY_SUFFIX}"
-    LIBRARY_OUTPUT_DIRECTORY "${MISTY_PLUGIN_OUTPUT_DIR}"
-    RUNTIME_OUTPUT_DIRECTORY "${MISTY_PLUGIN_OUTPUT_DIR}"
+    LIBRARY_OUTPUT_DIRECTORY "${MISTY_PLUGIN_VARIANT_OUTPUT_DIR}"
+    RUNTIME_OUTPUT_DIRECTORY "${MISTY_PLUGIN_VARIANT_OUTPUT_DIR}"
 )
 target_include_directories(preview_manager PRIVATE
     ${CMAKE_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/vendor/stb
 )
-target_compile_definitions(preview_manager PRIVATE MISTY_EXTENSION_BUILD=1)
+target_compile_definitions(preview_manager PRIVATE MISTY_PLUGIN_BUILD=1)
 
 add_custom_target(preview_manager_manifest ALL
     COMMAND ${CMAKE_COMMAND} -E make_directory "${MISTY_PLUGIN_OUTPUT_DIR}"
