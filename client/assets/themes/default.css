@@ -1,0 +1,13 @@
+svg {
+    fill: #e6edf3;
+    stroke: none;
+}
+
+path {
+    fill: inherit;
+    stroke: inherit;
+}
+
+stop {
+    stop-color: #e6edf3;
+}

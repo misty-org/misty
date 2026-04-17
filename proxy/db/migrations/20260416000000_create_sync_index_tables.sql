@@ -1,60 +1,5 @@
-package db
-
-import (
-	"database/sql"
-	"log"
-	"os"
-	"path/filepath"
-
-	_ "github.com/mattn/go-sqlite3"
-)
-
-type Database struct {
-	Conn *sql.DB
-}
-
-func (db *Database) GetDSN() string {
-	path := os.Getenv("DB_PATH")
-	if path == "" {
-		home, _ := os.UserHomeDir()
-		path = filepath.Join(home, "misty", "db", "data.db")
-	}
-	return path
-}
-
-func (db *Database) StartDatabase() error {
-	dsn := db.GetDSN()
-
-	conn, err := sql.Open("sqlite3", dsn+"?_foreign_keys=on")
-	if err != nil {
-		log.Println("Failed to open database: ", err)
-		return err
-	}
-
-	if err := conn.Ping(); err != nil {
-		log.Println("Failed to connect to database: ", err)
-		return err
-	}
-
-	db.Conn = conn
-
-	if err := ensureSyncSchema(conn); err != nil {
-		log.Println("Failed to ensure sync schema: ", err)
-		_ = conn.Close()
-		return err
-	}
-
-	return nil
-}
-
-func (db *Database) Stop() {
-	if db.Conn != nil {
-		db.Conn.Close()
-	}
-}
-
-func ensureSyncSchema(conn *sql.DB) error {
-	const schema = `
+-- +goose Up
+-- +goose StatementBegin
 CREATE TABLE IF NOT EXISTS sync_roots (
     id TEXT PRIMARY KEY,
     remote_name TEXT NOT NULL UNIQUE,
@@ -101,8 +46,13 @@ CREATE INDEX IF NOT EXISTS idx_sync_entries_root_dirty
     ON sync_entries(root_id, is_dirty);
 CREATE INDEX IF NOT EXISTS idx_sync_entries_root_updated
     ON sync_entries(root_id, updated_at);
-`
+-- +goose StatementEnd
 
-	_, err := conn.Exec(schema)
-	return err
-}
+-- +goose Down
+-- +goose StatementBegin
+DROP INDEX IF EXISTS idx_sync_entries_root_updated;
+DROP INDEX IF EXISTS idx_sync_entries_root_dirty;
+DROP INDEX IF EXISTS idx_sync_entries_root_parent_name;
+DROP TABLE IF EXISTS sync_entries;
+DROP TABLE IF EXISTS sync_roots;
+-- +goose StatementEnd
