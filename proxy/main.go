@@ -13,6 +13,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/kannachi323/misty/proxy/core/rclone"
 	"github.com/kannachi323/misty/proxy/core/restic"
+	"github.com/kannachi323/misty/proxy/core/syncindex"
 )
 
 // plainSlogHandler writes log records as plain "YYYY/MM/DD HH:MM:SS message"
@@ -87,6 +88,7 @@ func main() {
 	if err := proxy.Database.StartDatabase(); err != nil {
 		panic(err)
 	}
+	proxy.SyncIndex = syncindex.NewService(proxy.Database)
 
 	// Periodically clean up expired/revoked refresh tokens
 	go func() {
