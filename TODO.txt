@@ -1,6 +1,25 @@
 MISTY — V1.0 SHIP LIST
 ======================
 
+CURRENT IMPLEMENTATION
+----------------------
+[x] Phase 1 sync index rollout
+    - [x] Add proxy-owned SQLite sync tables for roots and per-file entries.
+    - [x] Make proxy startup ensure the sync schema exists in normal app runs.
+    - [x] Add proxy sync service to reconcile remote listings with local mount metadata.
+    - [x] Centralize remote -> mount path mapping on the proxy, including alias/folder-name resolution.
+    - [x] Add `POST /api/sync/refetch` for manual directory refetch.
+    - [x] Add `GET /api/sync/list` for indexed directory reads.
+    - [x] Keep current `/api/files` path available during rollout; do not break existing callers mid-migration.
+    - [x] Add proxy tests for schema setup, reconciliation rules, and sync endpoints.
+    - [x] Switch client remote browsing to refetch + list through the sync APIs.
+    - [x] Extend file explorer item model with `LOC` / `REM` / `MOD` state and sync dirty metadata.
+    - [x] Replace the old list-view status dot with a `State` column and an icon-only `Sync` column.
+    - [x] Add the missing sync-status SVG assets used by the new table column.
+    - [x] Reuse the existing refresh button as the manual "Refetch Items" trigger for remote-backed paths.
+    - [x] Stop using the legacy size-only `FileSyncService` to drive remote row state once indexed sync rows are live.
+    - [x] Verify proxy and client both build after the migration.
+
 SHIP BLOCKERS
 -------------
 [ ] Graceful shutdown
@@ -42,8 +61,6 @@ DEFERRED
 [ ] Customizable UI
 [ ] iCloud upload support
 [ ] iCloud 2FA flow hardening
-<<<<<<< HEAD
-=======
     - The 2FA path exists but needs stress-testing and better error messaging.
 
 STABILITY  (priority order)
@@ -70,7 +87,7 @@ EXTENSIONS / MARKETPLACE
 
 MVAULT  (restic-backed backup feature, Pluton-style)
 ----------------------------------------------------
-Backend lives in proxy/ (Go, shells out to restic --json), UI in app/ (C++/ImGui).
+Backend lives in proxy/ (Go, shells out to restic --json), UI in client/ (C++/ImGui).
 Repo URLs use rclone:<remote>:<path> so existing rclone remotes compose for free.
 Passwords go in OS keyring via --password-command, never on argv or in mvault.json.
 
@@ -124,13 +141,10 @@ Passwords go in OS keyring via --password-command, never on argv or in mvault.js
       too, so both binaries need to be locatable.
 
 DEFERRED (post-MVP)
->>>>>>> d86c246 (Adding extensions module)
 [ ] In-app scheduler (cron-style backup plans)
 [ ] Email / webhook notifications on job completion
 [ ] restic copy-based replication between repos
 [ ] Find/search across snapshots (restic find)
-<<<<<<< HEAD
-=======
 
 DONE
 ----
@@ -145,6 +159,3 @@ DONE
 [x] Services panel refresh button + startup fetch fix
 [x] Navbar dark charcoal color
 [x] PNG mipmap fix (GL_LINEAR_MIPMAP_LINEAR, generate after upload)
-
-
->>>>>>> d86c246 (Adding extensions module)
