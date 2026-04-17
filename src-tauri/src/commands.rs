@@ -79,8 +79,8 @@ use crate::services::smart_library::{
     ApplySmartLibraryResultsRequest, FolderLibraryStatus, PrepareSmartLibraryPreviewsRequest,
     PreparedSmartLibraryPreview, ResolveSmartLibraryAssetsRequest, ResolvedSmartLibraryAsset,
     SmartLibraryAssetsPage, SmartLibraryAssetsPageRequest, SmartLibraryImportFilesRequest,
-    SmartLibraryImportPreflight, SmartLibraryImportResult, SmartLibraryScanRequest, SmartLibrarySearchRequest,
-    SmartLibrarySnapshot,
+    SmartLibraryImportPreflight, SmartLibraryImportResult, SmartLibraryScanRequest,
+    SmartLibrarySearchRequest, SmartLibrarySnapshot,
 };
 use crate::services::storage::StorageSnapshot;
 use crate::services::storage_runtime::StorageRuntimeSnapshot;
@@ -150,7 +150,9 @@ pub async fn app_environment_snapshot(
 }
 
 #[tauri::command]
-pub async fn agents_device_snapshot(state: State<'_, MistyRuntime>) -> ApiResult<serde_json::Value> {
+pub async fn agents_device_snapshot(
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<serde_json::Value> {
     state.agents.device_snapshot().await
 }
 
@@ -342,7 +344,9 @@ pub fn clipboard_write_file_refs(items: Vec<PasteItem>) -> ApiResult<bool> {
 #[tauri::command]
 pub async fn clipboard_write_file_bytes(items: Vec<ClipboardFileBytes>) -> ApiResult<bool> {
     if items.is_empty() {
-        return Err(ApiError::Message("No Library items were selected to copy.".to_owned()));
+        return Err(ApiError::Message(
+            "No Library items were selected to copy.".to_owned(),
+        ));
     }
     let copy_id = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -352,14 +356,18 @@ pub async fn clipboard_write_file_bytes(items: Vec<ClipboardFileBytes>) -> ApiRe
         .join("misty-library-clipboard")
         .join(copy_id.to_string());
     tokio::fs::create_dir_all(&staging).await.map_err(|error| {
-        ApiError::Message(format!("The Library clipboard staging folder could not be created: {error}"))
+        ApiError::Message(format!(
+            "The Library clipboard staging folder could not be created: {error}"
+        ))
     })?;
 
     let mut references = Vec::with_capacity(items.len());
     let mut used_names = HashSet::with_capacity(items.len());
     for (index, item) in items.into_iter().enumerate() {
         if item.bytes.is_empty() {
-            return Err(ApiError::Message("A selected Library item is empty.".to_owned()));
+            return Err(ApiError::Message(
+                "A selected Library item is empty.".to_owned(),
+            ));
         }
         let original_name = Path::new(item.name.trim())
             .file_name()
@@ -385,9 +393,13 @@ pub async fn clipboard_write_file_bytes(items: Vec<ClipboardFileBytes>) -> ApiRe
             suffix += 1;
         }
         let path = staging.join(file_name);
-        tokio::fs::write(&path, &item.bytes).await.map_err(|error| {
-            ApiError::Message(format!("A Library item could not be prepared for the clipboard: {error}"))
-        })?;
+        tokio::fs::write(&path, &item.bytes)
+            .await
+            .map_err(|error| {
+                ApiError::Message(format!(
+                    "A Library item could not be prepared for the clipboard: {error}"
+                ))
+            })?;
         references.push(PasteItem {
             path: path.to_string_lossy().into_owned(),
             is_directory: false,
@@ -404,7 +416,9 @@ pub async fn notes_store_asset(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<NoteAssetStoreResult> {
     if request.bytes.is_empty() {
-        return Err(ApiError::Message("The selected note file is empty.".to_owned()));
+        return Err(ApiError::Message(
+            "The selected note file is empty.".to_owned(),
+        ));
     }
     if request.bytes.len() > NOTE_ASSET_MAX_BYTES {
         return Err(ApiError::Message(
@@ -437,13 +451,19 @@ pub async fn notes_store_asset(
         .join(safe_path_segment(&request.space_id, "space"))
         .join(safe_path_segment(&request.note_id, "note"));
 
-    tokio::fs::create_dir_all(&directory).await.map_err(|error| {
-        ApiError::Message(format!("Misty could not prepare note asset storage: {error}"))
-    })?;
+    tokio::fs::create_dir_all(&directory)
+        .await
+        .map_err(|error| {
+            ApiError::Message(format!(
+                "Misty could not prepare note asset storage: {error}"
+            ))
+        })?;
     let path = directory.join(&file_name);
-    tokio::fs::write(&path, &request.bytes).await.map_err(|error| {
-        ApiError::Message(format!("Misty could not save this note file: {error}"))
-    })?;
+    tokio::fs::write(&path, &request.bytes)
+        .await
+        .map_err(|error| {
+            ApiError::Message(format!("Misty could not save this note file: {error}"))
+        })?;
 
     Ok(NoteAssetStoreResult {
         path: path.to_string_lossy().into_owned(),
@@ -468,9 +488,7 @@ fn safe_path_segment(value: &str, fallback: &str) -> String {
     let sanitized: String = value
         .chars()
         .map(|character| {
-            if character.is_ascii_alphanumeric()
-                || matches!(character, '.' | '-' | '_' | ' ')
-            {
+            if character.is_ascii_alphanumeric() || matches!(character, '.' | '-' | '_' | ' ') {
                 character
             } else {
                 '-'

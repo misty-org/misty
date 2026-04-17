@@ -9,7 +9,7 @@ export const desktopNavItems = [
   {
     id: "spaces",
     label: "Spaces",
-    path: routes.spacePersonal,
+    path: routes.spaces,
     icon: PanelsTopLeft,
     active: (pathname: string) => pathname.startsWith(routes.spaces),
   },
@@ -31,6 +31,7 @@ export const desktopNavItems = [
 
 const deepLinkPrefixes = [
   routes.home,
+  routes.invite,
   routes.transfers,
   routes.files,
   routes.providers,

@@ -37,6 +37,7 @@ import { useSpaceConversationChat } from "./useSpaceConversationChat";
 import { spansToText, useDiscordPublish } from "./integrations";
 import { DeleteMessageDialog, SpaceChatMessages } from "./components/SpaceChatMessages";
 import { ActiveUsersCapsule } from "./components/ActiveUsersCapsule";
+import { SpaceSetupCards } from "./components/SpaceSetupCards";
 
 const emptyMessages: SpaceMessage[] = [];
 const emptyMembers: SpaceMember[] = [];
@@ -68,7 +69,9 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [suggestionsError, setSuggestionsError] = useState("");
   const [suggestionQuery, setSuggestionQuery] = useState("");
-  const [selectedAgentIdsByLabel, setSelectedAgentIdsByLabel] = useState<Record<string, string>>({});
+  const [selectedAgentIdsByLabel, setSelectedAgentIdsByLabel] = useState<Record<string, string>>(
+    {},
+  );
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(0);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerSource, setPickerSource] = useState<MistyPickerSource>("files");
@@ -267,6 +270,12 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
         setGroupMessages((current) =>
           mergeSpaceMessages(current, [response.message, ...response.agent_replies]),
         );
+        if (
+          activeConversation?.origin === "discord" &&
+          discord.canPublish(response.message)
+        ) {
+          void discord.publish(response.message);
+        }
       } else {
         await sendMessage(
           spaceId,
@@ -428,7 +437,7 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
   };
 
   return (
-    <div className="relative grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto] bg-background text-foreground">
+    <div className="relative grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] bg-background text-foreground">
       {activeUserIds.length > 0 ? (
         <div className="absolute right-4 top-3 z-10">
           <ActiveUsersCapsule
@@ -437,6 +446,14 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
             currentUserId={user?.id}
           />
         </div>
+      ) : null}
+      {!conversationId ? (
+        <SpaceSetupCards
+          spaceId={spaceId}
+          isOwner={activeSpace?.role === "owner"}
+          showInvitation={searchParams.get("created") === "1"}
+          dismissible
+        />
       ) : null}
       <SpaceChatMessages
         error={groupChatError || (spacesError ?? "")}

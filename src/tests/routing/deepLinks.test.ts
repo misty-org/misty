@@ -23,4 +23,14 @@ describe("Misty deep links", () => {
       ),
     ).toBe("/spaces/space-one/assistant?source=notification");
   });
+
+  it("opens invitation redemption links inside the desktop app", () => {
+    expect(
+      routeForMistyDeepLink(
+        "misty://open/invite/token-123",
+        isDeepLinkRouteAllowed,
+        resolveAuthDeepLinkRoute,
+      ),
+    ).toBe("/invite/token-123");
+  });
 });

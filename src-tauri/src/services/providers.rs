@@ -1201,13 +1201,10 @@ fn provider_config_parameters(
 }
 
 fn rclone_oauth_callback_template() -> Option<PathBuf> {
-    let Some(misty_home) = paths::misty_home_dir() else {
+    let Some(assets_dir) = paths::misty_assets_dir() else {
         return None;
     };
-    let path = misty_home
-        .join("assets")
-        .join("rclone")
-        .join("oauth-callback.html");
+    let path = assets_dir.join("rclone").join("oauth-callback.html");
     path.is_file().then_some(path)
 }
 

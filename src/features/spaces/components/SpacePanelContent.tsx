@@ -94,9 +94,7 @@ export function SpacePanelContent(props: {
 
   useEffect(() => {
     if (props.loading || activeSpace || props.spaces.length === 0) return;
-    const fallback = props.spaces.find((space) => space.is_personal) ?? props.spaces[0];
-    const fallbackSection = fallback.is_personal && section === "chat" ? "library" : section;
-    navigate(spaceSectionPath(fallback.id, fallbackSection, settingsSection), { replace: true });
+    navigate(spaceSectionPath(props.spaces[0].id, section, settingsSection), { replace: true });
   }, [activeSpace, navigate, props.loading, props.spaces, section, settingsSection]);
 
   useEffect(() => {
@@ -167,9 +165,7 @@ export function SpacePanelContent(props: {
 
   const switchSpace = (spaceId: string) => {
     if (!spaceId || spaceId === activeSpaceId) return;
-    const nextSpace = props.spaces.find((space) => space.id === spaceId);
-    const nextSection = nextSpace?.is_personal && section === "chat" ? "library" : section;
-    navigate(spaceSectionPath(spaceId, nextSection, settingsSection));
+    navigate(spaceSectionPath(spaceId, section, settingsSection));
   };
   const handleConversationSaved = (saved: SpaceConversation) => {
     setGroupConversations((current) => {
@@ -301,7 +297,6 @@ export function SpacePanelContent(props: {
             type="button"
             aria-label={activeSpace?.name ? `Space menu: ${activeSpace.name}` : "Space menu"}
             title={activeSpace?.name ?? "Spaces"}
-            disabled={props.loading || props.spaces.length === 0}
           >
             <span className="grid size-7 shrink-0 place-items-center rounded-md bg-sidebar-accent text-muted-foreground">
               <Briefcase size={15} />

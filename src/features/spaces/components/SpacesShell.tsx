@@ -1,6 +1,15 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type ComponentType, type FormEvent } from "react";
 import { Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { Check, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import {
+  CalendarDays,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  FileText,
+  PanelLeftClose,
+  PanelLeftOpen,
+} from "lucide-react";
+import { SiDiscord } from "react-icons/si";
 import { useShallow } from "zustand/react/shallow";
 import { Button } from "@/ui";
 import {
@@ -15,7 +24,14 @@ import { Input } from "@/ui";
 import { Skeleton } from "@/ui";
 import { useAuth } from "@/features/auth/AuthContext";
 import { useMinimumSpin } from "@/hooks/useMinimumSpin";
+import { openExternalLink } from "@/platform/openExternalLink";
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
+import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
+import type {
+  ProviderConnectionAvailability,
+  SpaceIntegrationProvider,
+  SpaceTemplate,
+} from "@/models/interfaces/features/spaces/types";
 import { SpacePanelContent } from "./SpacePanelContent";
 import { SpacePageFrame } from "./SpacePageLayout";
 
@@ -25,6 +41,14 @@ export default function SpacesShell() {
   const { user } = useAuth();
   const [createOpen, setCreateOpen] = useState(false);
   const [createName, setCreateName] = useState("");
+  const [createStep, setCreateStep] = useState(0);
+  const [templates, setTemplates] = useState<SpaceTemplate[]>([]);
+  const [templateId, setTemplateId] = useState("blank");
+  const [providers, setProviders] = useState<SpaceIntegrationProvider[]>([]);
+  const [providerAvailability, setProviderAvailability] = useState<
+    ProviderConnectionAvailability[]
+  >([]);
+  const [templateError, setTemplateError] = useState("");
   const [creating, setCreating] = useState(false);
   const [panelVisible, setPanelVisible] = useState(() => {
     try {
@@ -73,23 +97,69 @@ export default function SpacesShell() {
       /* storage can be unavailable in private contexts */
     }
   }, [panelVisible]);
+  useEffect(() => {
+    if (!createOpen || templates.length) return;
+    let active = true;
+    spacesApi
+      .templates()
+      .then(({ templates: loaded, providers: available }) => {
+        if (active) {
+          setTemplates(loaded);
+          setProviderAvailability(available ?? []);
+        }
+      })
+      .catch(() => {
+        if (active)
+          setTemplateError("Templates could not be loaded. You can still create a Blank Space.");
+      });
+    return () => {
+      active = false;
+    };
+  }, [createOpen, templates.length]);
 
   const closeCreateDialog = () => {
     if (creating) return;
     clearError();
     setCreateOpen(false);
+    restoreDocumentInteractivityAfterModalClose();
     setCreateName("");
+    setCreateStep(0);
+    setTemplateId("blank");
+    setProviders([]);
+    setProviderAvailability([]);
+    setTemplateError("");
   };
   const onCreate = async (event: FormEvent) => {
     event.preventDefault();
     const name = createName.trim();
-    if (!name || creating) return;
+    if (!name || creating || createStep < 2) return;
     setCreating(true);
     try {
-      const created = await createSpace(name);
+      const firstProvider = providers[0];
+      const created = await createSpace({
+        name,
+        template_id: templateId,
+        integration_providers: providers,
+      });
       setCreateName("");
       setCreateOpen(false);
-      navigate(`/spaces/${encodeURIComponent(created.id)}/library`);
+      restoreDocumentInteractivityAfterModalClose();
+      setCreateStep(0);
+      setTemplateId("blank");
+      setProviders([]);
+      navigate(`/spaces/${encodeURIComponent(created.space.id)}/chat?created=1`);
+      if (firstProvider) {
+        void spacesApi
+          .beginProviderConnection(
+            created.space.id,
+            firstProvider,
+            `/spaces/${created.space.id}/settings/integrations`,
+          )
+          .then((start) => openExternalLink(start.authorization_url))
+          .catch(() => {
+            // The resumable setup card remains available in Chat and Settings.
+          });
+      }
     } catch {
       /* the dialog renders the store error */
     } finally {
@@ -198,27 +268,119 @@ export default function SpacesShell() {
           else closeCreateDialog();
         }}
       >
-        <DialogContent className="max-w-sm">
+        <DialogContent className="max-w-lg">
           <form onSubmit={(event) => void onCreate(event)}>
             <DialogHeader>
               <DialogTitle>Create a Space</DialogTitle>
               <DialogDescription>
-                It starts private. Create as many Spaces as your work needs.
+                Get your team organized in a few seconds. Everything can be changed later.
               </DialogDescription>
             </DialogHeader>
-            <label className="mt-5 grid gap-2 text-xs font-medium text-muted-foreground">
-              Space name
-              <Input
-                autoFocus
-                maxLength={80}
-                placeholder="Design team"
-                value={createName}
-                onChange={(event) => setCreateName(event.target.value)}
-              />
-            </label>
-            <p className="mb-0 mt-3 text-[11px] text-muted-foreground">
-              Spaces and collaborators are unlimited. Hosted files share your account storage pool.
-            </p>
+            <div className="mt-5 flex gap-1.5" aria-label={`Step ${createStep + 1} of 3`}>
+              {[0, 1, 2].map((step) => (
+                <span
+                  key={step}
+                  className={`h-1 flex-1 rounded-full ${step <= createStep ? "bg-primary" : "bg-muted"}`}
+                />
+              ))}
+            </div>
+            {createStep === 0 ? (
+              <label className="mt-5 grid gap-2 text-xs font-medium text-muted-foreground">
+                Space name
+                <Input
+                  autoFocus
+                  maxLength={80}
+                  placeholder="Design team"
+                  value={createName}
+                  onChange={(event) => setCreateName(event.target.value)}
+                />
+              </label>
+            ) : null}
+            {createStep === 1 ? (
+              <section className="mt-5">
+                <p className="m-0 text-sm font-medium">Choose a template</p>
+                <p className="mb-3 mt-1 text-xs text-muted-foreground">
+                  Optional starter content—nothing is locked in.
+                </p>
+                <div className="grid max-h-72 grid-cols-2 gap-2 overflow-y-auto pr-1">
+                  {(templates.length ? templates : blankTemplateFallback).map((template) => (
+                    <button
+                      key={template.id}
+                      className={`rounded-lg border p-3 text-left transition-colors ${
+                        templateId === template.id
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:bg-muted/55"
+                      }`}
+                      type="button"
+                      onClick={() => setTemplateId(template.id)}
+                    >
+                      <span className="block text-sm font-medium">{template.name}</span>
+                      <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
+                        {template.description}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                {templateError ? (
+                  <p className="mb-0 mt-2 text-xs text-muted-foreground">{templateError}</p>
+                ) : null}
+              </section>
+            ) : null}
+            {createStep === 2 ? (
+              <section className="mt-5">
+                <p className="m-0 text-sm font-medium">Connect tools your team already uses</p>
+                <p className="mb-3 mt-1 text-xs text-muted-foreground">
+                  Optional. Setup can be closed and resumed at any time.
+                </p>
+                <div className="grid gap-2">
+                  {integrationChoices.map((choice) => {
+                    const selected = providers.includes(choice.id);
+                    const availability = providerAvailability.find(
+                      (provider) => provider.provider === choice.id,
+                    );
+                    const unavailable = availability?.configured === false;
+                    const Icon = choice.icon;
+                    return (
+                      <button
+                        key={choice.id}
+                        className={`flex items-center gap-3 rounded-lg border p-3 text-left ${
+                          selected
+                            ? "border-primary bg-primary/5"
+                            : "border-border hover:bg-muted/55"
+                        }`}
+                        type="button"
+                        aria-pressed={selected}
+                        disabled={unavailable}
+                        onClick={() =>
+                          setProviders((current) =>
+                            selected
+                              ? current.filter((provider) => provider !== choice.id)
+                              : [...current, choice.id],
+                          )
+                        }
+                      >
+                        <Icon className="size-4 shrink-0" aria-hidden />
+                        <span className="flex-1 text-sm font-medium">
+                          {choice.name}
+                          {unavailable ? (
+                            <span className="ml-2 text-xs font-normal text-muted-foreground">
+                              Unavailable
+                            </span>
+                          ) : null}
+                        </span>
+                        <span
+                          className={`grid size-5 place-items-center rounded-full border ${
+                            selected ? "border-primary bg-primary text-primary-foreground" : ""
+                          }`}
+                        >
+                          {selected ? <Check size={12} /> : null}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+            ) : null}
             {error ? (
               <p
                 className="mb-0 mt-3 rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-xs leading-relaxed text-destructive"
@@ -232,13 +394,31 @@ export default function SpacesShell() {
                 variant="outline"
                 type="button"
                 disabled={creating}
-                onClick={closeCreateDialog}
+                onClick={() =>
+                  createStep === 0 ? closeCreateDialog() : setCreateStep((step) => step - 1)
+                }
               >
-                Cancel
+                {createStep === 0 ? (
+                  "Cancel"
+                ) : (
+                  <>
+                    <ChevronLeft size={14} /> Back
+                  </>
+                )}
               </Button>
-              <Button type="submit" disabled={creating || !createName.trim()}>
-                {creating ? "Creating..." : "Create Space"}
-              </Button>
+              {createStep < 2 ? (
+                <Button
+                  type="button"
+                  disabled={createStep === 0 && !createName.trim()}
+                  onClick={() => setCreateStep((step) => step + 1)}
+                >
+                  Continue <ChevronRight size={14} />
+                </Button>
+              ) : (
+                <Button type="submit" disabled={creating || !createName.trim()}>
+                  {creating ? "Creating..." : "Create Space"}
+                </Button>
+              )}
             </DialogFooter>
           </form>
         </DialogContent>
@@ -247,7 +427,7 @@ export default function SpacesShell() {
   );
 }
 
-export function PersonalSpaceRedirect() {
+export function SpacesIndexRedirect() {
   const { user } = useAuth();
   const { spaces, loading, error, load, clearError } = useSpacesStore(
     useShallow((state) => ({
@@ -258,8 +438,9 @@ export function PersonalSpaceRedirect() {
       clearError: state.clearError,
     })),
   );
-  const personal = spaces.find((space) => space.is_personal);
-  const [skeletonVisible] = useMinimumSpin(!personal);
+  const lastActiveSpaceId = readLastActiveSpaceId(user?.id);
+  const firstSpace = spaces.find((space) => space.id === lastActiveSpaceId) ?? spaces[0];
+  const [skeletonVisible] = useMinimumSpin(!firstSpace);
   const attemptedLoad = useRef(false);
   const attemptedLoadForUserId = useRef(user?.id);
   if (attemptedLoadForUserId.current !== user?.id) {
@@ -267,13 +448,13 @@ export function PersonalSpaceRedirect() {
     attemptedLoad.current = false;
   }
   useEffect(() => {
-    if (!personal && !loading && !attemptedLoad.current) {
+    if (!firstSpace && !loading && !attemptedLoad.current) {
       attemptedLoad.current = true;
       void load();
     }
-  }, [load, loading, personal]);
-  if (personal && !skeletonVisible)
-    return <Navigate to={`/spaces/${encodeURIComponent(personal.id)}/library`} replace />;
+  }, [firstSpace, load, loading]);
+  if (firstSpace && !skeletonVisible)
+    return <Navigate to={`/spaces/${encodeURIComponent(firstSpace.id)}/chat`} replace />;
   if (error && !loading && !skeletonVisible)
     return (
       <div className="grid h-full place-items-center px-6 text-center">
@@ -294,9 +475,20 @@ export function PersonalSpaceRedirect() {
         </div>
       </div>
     );
+  if (!loading && !skeletonVisible && spaces.length === 0)
+    return (
+      <div className="grid h-full place-items-center px-6 text-center">
+        <div className="max-w-sm">
+          <h1 className="m-0 text-xl font-semibold">Create your first Space</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Chat, tasks, notes, and files for your team—ready in under a minute.
+          </p>
+        </div>
+      </div>
+    );
   return (
     <div className="h-full min-h-0 overflow-hidden p-6" aria-busy="true" role="status">
-      <span className="sr-only">Loading your personal Space</span>
+      <span className="sr-only">Loading your Spaces</span>
       <div
         className="grid gap-3.5"
         style={{ gridTemplateColumns: "repeat(auto-fill,minmax(270px,1fr))" }}
@@ -310,4 +502,48 @@ export function PersonalSpaceRedirect() {
       </div>
     </div>
   );
+}
+
+const blankTemplateFallback: SpaceTemplate[] = [
+  {
+    id: "blank",
+    name: "Blank Space",
+    description: "Start with a clean Space.",
+    version: 1,
+    recommended_integrations: [],
+    seed_summary: { task_count: 0, note_count: 0, collection_count: 0 },
+  },
+];
+
+const integrationChoices: Array<{
+  id: SpaceIntegrationProvider;
+  name: string;
+  icon: ComponentType<{ className?: string }>;
+}> = [
+  { id: "google", name: "Google Calendar", icon: CalendarDays },
+  { id: "discord", name: "Discord", icon: SiDiscord },
+  { id: "notion", name: "Notion", icon: FileText },
+];
+
+function readLastActiveSpaceId(userId?: string) {
+  if (!userId) return "";
+  try {
+    return window.localStorage.getItem(`misty:last-active-space:${userId}`) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function restoreDocumentInteractivityAfterModalClose(): void {
+  if (typeof window === "undefined") return;
+  const restore = () => {
+    const modalOpen =
+      document.querySelector("[data-slot='dialog-content'][data-state='open']") ||
+      document.querySelector("[data-slot='alert-dialog-content'][data-state='open']");
+    if (!modalOpen && document.body.style.pointerEvents === "none") {
+      document.body.style.pointerEvents = "";
+    }
+  };
+  window.setTimeout(restore, 0);
+  window.setTimeout(restore, 250);
 }

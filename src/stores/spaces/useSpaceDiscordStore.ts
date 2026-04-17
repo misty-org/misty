@@ -17,10 +17,10 @@ const part = encodeURIComponent;
  * sync, and approve individual outbound messages.
  */
 export const spaceDiscordApi = {
-  /** The Space's current link, or `null` when Discord is not linked yet. */
-  link: (spaceId: string) =>
-    spaceRequest<{ link: SpaceDiscordLink | null }>(
-      `/spaces/${part(spaceId)}/integrations/discord/link`,
+  /** Every Discord channel linked to this Space. */
+  links: (spaceId: string) =>
+    spaceRequest<{ links: SpaceDiscordLink[] }>(
+      `/spaces/${part(spaceId)}/integrations/discord/links`,
     ),
 
   /**
@@ -40,7 +40,7 @@ export const spaceDiscordApi = {
       direction: DiscordLinkDirection;
     },
   ) =>
-    spaceRequest<SpaceDiscordLink>(`/spaces/${part(spaceId)}/integrations/discord/link`, {
+    spaceRequest<SpaceDiscordLink>(`/spaces/${part(spaceId)}/integrations/discord/links`, {
       method: "POST",
       body: JSON.stringify(input),
     }),
@@ -48,13 +48,13 @@ export const spaceDiscordApi = {
   /** Changes the allowed mirror direction without dropping the cursor. */
   updateLink: (spaceId: string, linkId: string, patch: { direction: DiscordLinkDirection }) =>
     spaceRequest<SpaceDiscordLink>(
-      `/spaces/${part(spaceId)}/integrations/discord/link/${part(linkId)}`,
+      `/spaces/${part(spaceId)}/integrations/discord/links/${part(linkId)}`,
       { method: "PATCH", body: JSON.stringify(patch) },
     ),
 
   /** Unlinks the channel. Already-mirrored messages stay in the Space. */
   deleteLink: (spaceId: string, linkId: string) =>
-    spaceRequest<void>(`/spaces/${part(spaceId)}/integrations/discord/link/${part(linkId)}`, {
+    spaceRequest<void>(`/spaces/${part(spaceId)}/integrations/discord/links/${part(linkId)}`, {
       method: "DELETE",
     }),
 
@@ -64,7 +64,7 @@ export const spaceDiscordApi = {
    */
   sync: (spaceId: string, linkId: string) =>
     spaceRequest<DiscordSyncResult>(
-      `/spaces/${part(spaceId)}/integrations/discord/link/${part(linkId)}/sync`,
+      `/spaces/${part(spaceId)}/integrations/discord/links/${part(linkId)}/sync`,
       { method: "POST" },
     ),
 
@@ -74,7 +74,7 @@ export const spaceDiscordApi = {
    */
   publishMessage: (spaceId: string, linkId: string, messageId: string) =>
     spaceRequest<{ message: SpaceMessage }>(
-      `/spaces/${part(spaceId)}/integrations/discord/link/${part(linkId)}/publish`,
+      `/spaces/${part(spaceId)}/integrations/discord/links/${part(linkId)}/publish`,
       { method: "POST", body: JSON.stringify({ message_id: messageId }) },
     ),
 };

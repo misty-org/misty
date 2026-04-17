@@ -11,6 +11,11 @@ export interface SpaceConversation {
   title: string;
   created_by_user_id: string;
   members: SpaceConversationMember[];
+  origin: "misty" | "discord";
+  integration_id?: string;
+  external_resource_id?: string;
+  external_display_name?: string;
+  integration_status?: "active" | "disconnected";
   created_at: string;
   updated_at: string;
 }
