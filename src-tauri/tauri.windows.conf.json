@@ -18,9 +18,6 @@
   },
   "bundle": {
     "targets": ["nsis"],
-    "resources": {
-      "target/misty-service/host/misty_service.dll": "misty_service.dll"
-    },
     "windows": {
       "nsis": {
         "installMode": "currentUser"

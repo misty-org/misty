@@ -2,13 +2,32 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const spaceRequestMock = vi.hoisted(() => vi.fn());
+
 vi.mock("@/features/auth/AuthContext", () => ({
   useAuth: () => ({ user: { id: "account-beta" } }),
 }));
 
+vi.mock("@/stores/spaces/useSpacesBackendStore", () => ({
+  spaceRequest: spaceRequestMock,
+}));
+
 vi.mock("@/features/notes/components/NoteBlockEditor", () => ({
-  default: ({ editable }: { editable: boolean }) => (
-    <div data-testid="block-editor" data-editable={String(editable)} />
+  default: ({
+    collaborative,
+    editable,
+    noteId,
+  }: {
+    collaborative?: boolean;
+    editable: boolean;
+    noteId: string;
+  }) => (
+    <div
+      data-testid="block-editor"
+      data-collaborative={String(Boolean(collaborative))}
+      data-editable={String(editable)}
+      data-note-id={noteId}
+    />
   ),
 }));
 
@@ -63,6 +82,8 @@ describe("SpaceNotes beta simplification", () => {
       globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
     ).IS_REACT_ACT_ENVIRONMENT = true;
     window.localStorage.clear();
+    spaceRequestMock.mockReset();
+    spaceRequestMock.mockResolvedValue({ notes: [] });
     resetNotesAccountState();
     container = document.createElement("div");
     document.body.append(container);
@@ -74,6 +95,7 @@ describe("SpaceNotes beta simplification", () => {
     if (container) container.remove();
     document.body.replaceChildren();
     resetNotesAccountState();
+    vi.useRealTimers();
   });
 
   it("does not render Notion or source-management UI in the beta notes surface", async () => {
@@ -112,7 +134,20 @@ describe("SpaceNotes beta simplification", () => {
     expect(document.body.textContent).not.toContain("Platform note");
   });
 
-  it("creates a title-only Space note and opens it directly in edit mode", async () => {
+  it("creates a title-only collaborative Space note and selects it", async () => {
+    spaceRequestMock.mockResolvedValueOnce({ notes: [] }).mockResolvedValueOnce({
+      id: "note_beta",
+      space_id: "space-product",
+      creator_user_id: "account-beta",
+      title: "Beta note",
+      plain_text: "",
+      lifecycle_state: "active",
+      collaboration_revision: 0,
+      acl_version: 1,
+      role: "creator",
+      created_at: "2026-07-20T12:00:00.000Z",
+      updated_at: "2026-07-20T12:00:00.000Z",
+    });
     await act(async () => {
       root.render(<SpaceNotes spaceId="space-product" spaceName="Product" />);
     });
@@ -144,11 +179,93 @@ describe("SpaceNotes beta simplification", () => {
       body: "",
       spaceId: "space-product",
       spaceName: "Product",
+      syncStatus: "synced",
     });
     expect(useNotesStore.getState().selectedNoteId).toBe(created?.id);
     expect(document.body.textContent).toContain("Beta note");
     expect(
       document.body.querySelector("[data-testid='block-editor']")?.getAttribute("data-editable"),
     ).toBe("true");
+    expect(
+      document.body
+        .querySelector("[data-testid='block-editor']")
+        ?.getAttribute("data-collaborative"),
+    ).toBe("true");
+    expect(
+      document.body.querySelector("[data-testid='block-editor']")?.getAttribute("data-note-id"),
+    ).toBe("note_beta");
+  });
+
+  it("refreshes the mounted Space notes when realtime announces a note change", async () => {
+    spaceRequestMock
+      .mockResolvedValueOnce({
+        notes: [
+          {
+            id: "note_first",
+            space_id: "space-product",
+            creator_user_id: "account-beta",
+            title: "First note",
+            plain_text: "",
+            lifecycle_state: "active",
+            collaboration_revision: 0,
+            acl_version: 1,
+            role: "creator",
+            created_at: "2026-07-20T12:00:00.000Z",
+            updated_at: "2026-07-20T12:00:00.000Z",
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        notes: [
+          {
+            id: "note_second",
+            space_id: "space-product",
+            creator_user_id: "other-user",
+            title: "Second note",
+            plain_text: "",
+            lifecycle_state: "active",
+            collaboration_revision: 0,
+            acl_version: 1,
+            role: "editor",
+            created_at: "2026-07-20T12:02:00.000Z",
+            updated_at: "2026-07-20T12:02:00.000Z",
+          },
+          {
+            id: "note_first",
+            space_id: "space-product",
+            creator_user_id: "account-beta",
+            title: "First note",
+            plain_text: "",
+            lifecycle_state: "active",
+            collaboration_revision: 0,
+            acl_version: 1,
+            role: "creator",
+            created_at: "2026-07-20T12:00:00.000Z",
+            updated_at: "2026-07-20T12:00:00.000Z",
+          },
+        ],
+      });
+
+    await act(async () => {
+      root.render(<SpaceNotes spaceId="space-product" spaceName="Product" />);
+    });
+    await wait(180);
+
+    expect(document.body.textContent).toContain("First note");
+    expect(document.body.textContent).not.toContain("Second note");
+
+    window.dispatchEvent(
+      new CustomEvent("misty:space-note-event", {
+        detail: { space_id: "space-product", type: "note.created" },
+      }),
+    );
+
+    await wait(160);
+
+    expect(useNotesStore.getState().notes.map((note) => note.title)).toEqual([
+      "Second note",
+      "First note",
+    ]);
+    expect(spaceRequestMock).toHaveBeenCalledTimes(2);
   });
 });

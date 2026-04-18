@@ -346,7 +346,7 @@ function ProviderConfiguration(props: {
           onChange={(event) => props.onName(event.target.value)}
           autoFocus={props.session.mode === "add"}
         />
-        <small className={providerFormHelpClass}>Used in Explorer and rclone paths.</small>
+        <small className={providerFormHelpClass}>Used to identify this connection in Files.</small>
       </label>
       <div className={providerSummaryClass}>
         <span>Provider</span>

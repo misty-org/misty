@@ -28,6 +28,7 @@ export interface SpacesStore {
   spaces: Space[];
   invitations: SpaceInvitation[];
   limits: SpacesSnapshot["entitlements"] | null;
+  ownerStorage: SpacesSnapshot["owner_storage"] | null;
   membersBySpace: Record<string, SpaceMember[]>;
   messagesBySpace: Record<string, SpaceMessage[]>;
   nodesBySpace: Record<string, SpaceNode[]>;
@@ -72,6 +73,12 @@ export interface SpacesStore {
     fileNodeIds?: string[],
   ) => Promise<void>;
   deleteMessage: (spaceId: string, messageId: string) => Promise<void>;
+  toggleMessageReaction: (
+    spaceId: string,
+    messageId: string,
+    emoji: string,
+    reacted: boolean,
+  ) => Promise<void>;
   markRead: (spaceId: string, seq: number) => Promise<void>;
   openNode: (spaceId: string, nodeId: string, disposition?: "open" | "download") => Promise<void>;
   saveStudio: (

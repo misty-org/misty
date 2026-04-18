@@ -6,7 +6,6 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const serviceLibDir = resolve(appDir, "src-tauri/target/misty-service/host");
 const signedMacosRunner = resolve(appDir, "scripts/run-signed-macos-binary.sh");
 
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
@@ -54,13 +53,11 @@ if (desktopProfile) {
   console.warn(`Starting Misty desktop profile "${desktopProfile}" at ${profileSessionRoot}.`);
 }
 
-run(npmCommand, ["run", "service:archive"]);
 run(
   npmCommand,
-  ["run", "tauri", "--", "dev", "--features=embedded-storage-go", "--config", tauriDevConfigPath],
+  ["run", "tauri", "--", "dev", "--config", tauriDevConfigPath],
   {
     MISTY_DESKTOP_DEV_PORT: String(devPort),
-    MISTY_SERVICE_GO_LIB_DIR: serviceLibDir,
     ...(desktopProfile
       ? {
           MISTY_PROFILE: desktopProfile,

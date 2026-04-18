@@ -6,10 +6,21 @@ import { useSpaceLibraryContext } from "../SpaceLibraryContext";
 import { formatBytes, formatTime } from "../libraryFormat";
 import { AlbumCover, LibraryItemThumbnail } from "../SpaceLibraryPrimitives";
 
-const collectionRailCardClassName = [
-  "w-[180px] shrink-0 overflow-hidden rounded-xl border-0 bg-card p-0 text-left shadow-xs",
+// Button's base styles are built for a control, not a card: inline-flex with
+// centred items, whitespace-nowrap, and a fixed h-9. Left alone they squash a
+// card into a 36px pill with the icon and label side by side. These classes
+// undo exactly those four things so the card can stack and size to content.
+const collectionCardResetClassName = [
+  "h-auto min-w-0 flex-col items-stretch justify-start gap-0 whitespace-normal",
+].join(" ");
+
+export const collectionCardClassName = [
+  collectionCardResetClassName,
+  "overflow-hidden rounded-xl border-0 bg-card p-0 text-left shadow-xs",
   "inset-ring-1 inset-ring-foreground/10 transition-colors hover:bg-accent",
 ].join(" ");
+
+const collectionRailCardClassName = [collectionCardClassName, "w-[180px] shrink-0"].join(" ");
 
 export function SpaceLibraryCollectionOverview() {
   return (
@@ -97,32 +108,33 @@ export function SpaceLibraryAlbumsOverview() {
       <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
         {visibleAlbumFolders.map((folder) => (
           <Button
-            className="rounded-xl border-0 bg-card p-4 text-left shadow-xs inset-ring-1 inset-ring-foreground/10 hover:bg-accent"
+            className={`${collectionCardClassName} p-4`}
             type="button"
             key={folder.id}
             onClick={() => setSelectedAlbumFolderId(folder.id)}
           >
-            <Folder size={26} />
-            <p className="mb-0 mt-5 truncate text-xs font-medium">{folder.name}</p>
-            <p className="mb-0 mt-1 text-[10px] text-muted-foreground">
+            {/* An explicit size class opts out of Button's [&_svg]:size-4 rule. */}
+            <Folder className="size-[26px]" />
+            <span className="mt-5 block truncate text-xs font-medium">{folder.name}</span>
+            <span className="mt-1 block text-[10px] text-muted-foreground">
               {folder.album_count + folder.folder_count} items
-            </p>
+            </span>
           </Button>
         ))}
         {visibleAlbumsForFolder.map((album) => (
           <Button
-            className="overflow-hidden rounded-xl border-0 bg-card p-0 text-left shadow-xs inset-ring-1 inset-ring-foreground/10 hover:bg-accent"
+            className={collectionCardClassName}
             type="button"
             key={album.id}
             onClick={() => selectCollection("albums", album.id)}
           >
             <AlbumCover spaceId={spaceId} itemId={album.cover_item_id} />
-            <div className="p-3">
-              <p className="m-0 truncate text-xs font-medium">{album.name}</p>
-              <p className="mb-0 mt-1 text-[10px] text-muted-foreground">
+            <span className="block p-3">
+              <span className="block truncate text-xs font-medium">{album.name}</span>
+              <span className="mt-1 block text-[10px] text-muted-foreground">
                 {album.item_count} items
-              </p>
-            </div>
+              </span>
+            </span>
           </Button>
         ))}
       </div>

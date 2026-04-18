@@ -15,10 +15,10 @@ export type {
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
 import {
-  providersConfigureRemote,
   providersConfigPaths,
   providersDisconnectRemote,
   providersRefresh,
+  providersImportCloudConnection,
   providersSaveRemote,
   providersSelectRemote,
   providersSnapshot,
@@ -32,7 +32,7 @@ import type {
   ProviderRemote,
   ProviderWorkflow,
   ProvidersSnapshot,
-  RcloneConfigPaths,
+  CloudConfigPaths,
   RemoteEditDraft,
 } from "@/models/interfaces/services/misty-api";
 import type { CurrentLicense } from "@/models/types/features/installer/types";
@@ -49,12 +49,19 @@ import {
   stableConfig,
   updateTokenField,
 } from "@/pages/Providers/providerUtils";
+import {
+  beginCloudAuthorization,
+  cloudConnectionsSnapshot,
+  cloudConnectionToken,
+  deleteCloudConnection,
+  type CloudProvider,
+} from "@/features/cloud/cloudConnections";
 
 const PROVIDER_AUTH_TIMEOUT_MS = 3 * 60 * 1000;
-const PROVIDER_AUTH_CANCEL_RESULT = "cancel";
 
 let connectionGeneration = 0;
 let providersLoadPromise: Promise<void> | null = null;
+let cloudLeaseRefreshTimer: number | null = null;
 
 export const useProvidersStore = create<ProvidersStore>((set, get) => ({
   providers: null,
@@ -109,6 +116,8 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
     providersLoadPromise = (async () => {
       set({ loading: true, error: null });
       try {
+        await refreshCloudConnectionLeases();
+        scheduleCloudLeaseRefresh();
         const next = refresh ? await providersRefresh() : await providersSnapshot();
         set({
           providers: next,
@@ -458,16 +467,69 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
       },
     });
     try {
-      const step = await providersConfigureRemote({
-        name: session.remoteName.trim(),
-        providerType: session.providerType,
-        parameters: normalizeProviderParametersForSession(session),
-        state: session.step?.state ?? "",
-        result: providerContinuationResult(session),
-        mode: session.mode,
-        continuing: session.step != null,
-        continueExisting: false,
-      });
+      const normalizedParameters = normalizeProviderParametersForSession(session);
+      const remoteName = session.remoteName.trim();
+      let step: ProviderConfigStep;
+      if (!polling) {
+        const authorization = await beginCloudAuthorization({
+          provider: session.providerType as CloudProvider,
+          name: remoteName,
+          clientId: normalizedParameters.client_id,
+          clientSecret: normalizedParameters.client_secret,
+        });
+        step = {
+          kind: "browser_auth",
+          name: remoteName,
+          state: authorization.state_expires_at,
+          result: "pending",
+          done: false,
+          error: "",
+          authorizeUrl: authorization.authorization_url,
+          instructions: "Complete sign-in in the browser.",
+          pollAfterMs: 1_000,
+          option: null,
+        };
+      } else {
+        const cloud = await cloudConnectionsSnapshot();
+        const connected = cloud.connections.find(
+          (candidate) =>
+            candidate.provider === session.providerType && candidate.name === remoteName,
+        );
+        if (!connected) {
+          step = {
+            kind: "browser_auth",
+            name: remoteName,
+            state: session.step?.state ?? "",
+            result: "pending",
+            done: false,
+            error: "",
+            authorizeUrl: session.step?.authorizeUrl ?? "",
+            instructions: "Complete sign-in in the browser.",
+            pollAfterMs: 1_000,
+            option: null,
+          };
+        } else {
+          const lease = await cloudConnectionToken(connected.id);
+          await providersImportCloudConnection({
+            name: remoteName,
+            providerType: connected.provider,
+            connectionId: connected.id,
+            accessToken: lease.access_token,
+          });
+          step = {
+            kind: "done",
+            name: remoteName,
+            state: "",
+            result: "done",
+            done: true,
+            error: "",
+            authorizeUrl: "",
+            instructions: "",
+            pollAfterMs: 0,
+            option: null,
+          };
+        }
+      }
       if (generation !== connectionGeneration || !get().connection) return;
 
       const current = get().connection!;
@@ -623,6 +685,13 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
     if (!name) return;
     set({ working: true, error: null, message: null });
     try {
+      try {
+        const draft = await providersSelectRemote(name);
+        const connectionId = draft.config.misty_connection_id;
+        if (connectionId) await deleteCloudConnection(connectionId);
+      } catch {
+        // The local connection is still removed when the account session is unavailable.
+      }
       const providers = await providersDisconnectRemote(name);
       set({
         providers,
@@ -646,7 +715,7 @@ export function selectProviderWorkspaceDerived(workspace: ProvidersWorkspaceStat
     validRemoteName: workspace.draft ? isValidRemoteName(workspace.draft) : false,
     configKeys: workspace.draft
       ? Object.keys(workspace.draft.config)
-          .filter((key) => key !== "type")
+          .filter((key) => key !== "type" && key !== "misty_connection_id")
           .sort(
             (left, right) =>
               configPriority(left) - configPriority(right) || left.localeCompare(right),
@@ -838,6 +907,34 @@ function licenseAllowsRemoteManagement(license: CurrentLicense): boolean {
   return license.allows_use && (license.status === "active" || license.status === "trialing");
 }
 
+async function refreshCloudConnectionLeases(): Promise<void> {
+  if (!hasTauriInternals()) return;
+  try {
+    const snapshot = await cloudConnectionsSnapshot();
+    await Promise.all(
+      snapshot.connections.map(async (connection) => {
+        const lease = await cloudConnectionToken(connection.id);
+        await providersImportCloudConnection({
+          name: connection.name,
+          providerType: connection.provider,
+          connectionId: connection.id,
+          accessToken: lease.access_token,
+        });
+      }),
+    );
+  } catch {
+    // Signed-out and offline users retain their last local connection metadata.
+  }
+}
+
+function scheduleCloudLeaseRefresh(): void {
+  if (cloudLeaseRefreshTimer != null || typeof window === "undefined") return;
+  cloudLeaseRefreshTimer = window.setInterval(
+    () => void refreshCloudConnectionLeases(),
+    45 * 60 * 1_000,
+  );
+}
+
 function providerConnectionErrorText(error: unknown, polling: boolean): string {
   const message = errorText(error);
   if (!polling) return message;
@@ -875,21 +972,6 @@ function providerAuthorizationTimedOutMessage(): string {
 function providerAuthorizationPollDelay(pollAfterMs?: number): number {
   const requested = pollAfterMs && pollAfterMs > 0 ? pollAfterMs : 750;
   return Math.min(Math.max(500, requested), 1500);
-}
-
-function providerContinuationResult(session: ProviderConnectionSession): string {
-  if (!session.step) return "";
-  if (session.step.option) {
-    return normalizeProviderParameterValue(
-      session.step.option.name,
-      session.parameters[session.step.option.name] ??
-        defaultProviderOptionValue(session.step.option),
-    );
-  }
-  if (session.step.kind === "browser_auth" || session.step.authorizeUrl) {
-    return session.step.result || "true";
-  }
-  return session.step.result ?? "";
 }
 
 function providerFlowSuccessSuffix(mode: ProviderConfigMode): string {
@@ -951,22 +1033,7 @@ async function cancelProviderAuthorization(
     !session.remoteName.trim()
   )
     return;
-  if (!session.step?.state) return;
-  try {
-    await providersConfigureRemote({
-      name: session.remoteName.trim(),
-      providerType: session.providerType,
-      parameters: normalizeProviderParametersForSession(session),
-      state: session.step.state,
-      result: PROVIDER_AUTH_CANCEL_RESULT,
-      mode: session.mode,
-      continuing: true,
-      continueExisting: false,
-    });
-  } catch {
-    // Best effort: the dialog/poller is already closed locally, and rclone may have
-    // already torn down the one-time sign-in service.
-  }
+  // Server-held OAuth states expire automatically and contain no file data.
 }
 
 function isRecoverableAuthPollingError(error: unknown): boolean {

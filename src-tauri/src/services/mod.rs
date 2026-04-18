@@ -5,6 +5,7 @@ pub mod autostart;
 pub mod claude;
 pub mod commands;
 pub mod devices;
+mod direct_cloud;
 pub mod directory_size;
 pub mod document_intelligence;
 pub mod environment;

@@ -15,7 +15,6 @@ if ($PSVersionTable.PSEdition -eq "Core" -and -not $IsWindows) {
 }
 
 $appDir = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-$serviceLibDir = Join-Path $appDir "src-tauri\target\misty-service\host"
 
 function Assert-Command {
     param([Parameter(Mandatory = $true)][string]$Name)
@@ -58,7 +57,6 @@ Assert-Command "node"
 Assert-Command "npm.cmd"
 Assert-Command "cargo"
 Assert-Command "rustc"
-Assert-Command "go"
 
 Push-Location $appDir
 try {
@@ -81,16 +79,8 @@ try {
         Invoke-Checked "npm.cmd" "ci"
     }
 
-    Invoke-Checked "npm.cmd" "run" "service:archive"
-
-    $storageDll = Join-Path $serviceLibDir "misty_service.dll"
-    if (-not (Test-Path $storageDll -PathType Leaf)) {
-        throw "The embedded storage build did not create $storageDll"
-    }
-
-    $env:MISTY_SERVICE_GO_LIB_DIR = $serviceLibDir
     $bundles = if ($Bundle -eq "both") { @("nsis", "msi") } else { @($Bundle) }
-    $tauriArguments = @("run", "tauri", "--", "build", "--features=embedded-storage-go", "--bundles") + $bundles
+    $tauriArguments = @("run", "tauri", "--", "build", "--bundles") + $bundles
     Invoke-Checked "npm.cmd" @tauriArguments
 
     $bundleRoot = Join-Path $appDir "src-tauri\target\release\bundle"

@@ -71,7 +71,7 @@ import type {
   ProviderConfigStep,
   ProvidersSnapshot,
   StorageSnapshot,
-  RcloneConfigPaths,
+  CloudConfigPaths,
   RemoteEditDraft,
   RemoteTestResult,
   RenameItemRequest,
@@ -603,6 +603,15 @@ export function providersRefresh(): Promise<ProvidersSnapshot> {
   return invoke("providers_refresh");
 }
 
+export function providersImportCloudConnection(request: {
+  name: string;
+  providerType: string;
+  connectionId: string;
+  accessToken: string;
+}): Promise<ProvidersSnapshot> {
+  return invoke("providers_import_cloud_connection", request);
+}
+
 export function providersSelectRemote(name: string): Promise<RemoteEditDraft> {
   return invoke("providers_select_remote", { name });
 }
@@ -615,7 +624,7 @@ export function providersTestRemote(name: string): Promise<RemoteTestResult> {
   return invoke("providers_test_remote", { name });
 }
 
-export function providersConfigPaths(): Promise<RcloneConfigPaths> {
+export function providersConfigPaths(): Promise<CloudConfigPaths> {
   return invoke("providers_config_paths");
 }
 

@@ -209,6 +209,7 @@ export interface SpaceMessage {
   file_node_ids: string[];
   library_item_ids?: string[];
   attachments?: MessageAttachment[];
+  reactions?: SpaceMessageReaction[];
   reply_to_message_id?: string;
   edited_at?: string;
   /**
@@ -217,6 +218,12 @@ export interface SpaceMessage {
    */
   origin?: MessageOrigin;
   created_at: string;
+}
+
+export interface SpaceMessageReaction {
+  emoji: string;
+  count: number;
+  reacted_by_me?: boolean;
 }
 
 export interface SpaceNode {
@@ -460,16 +467,6 @@ export interface LibraryDiscovery {
   memories: LibraryDiscoveryGroup[];
   trips: LibraryDiscoveryGroup[];
   duplicates: LibraryDiscoveryGroup[];
-  map_points: LibraryMapPoint[];
-}
-
-export interface LibraryMapPoint {
-  id: string;
-  name: string;
-  latitude: number;
-  longitude: number;
-  item_count: number;
-  cover_item_id?: string;
 }
 
 export interface LibraryPinnedCollection {
@@ -519,6 +516,11 @@ export interface LibrarySharedReference {
 export interface SpaceStorageUsage {
   space_id: string;
   storage_available?: boolean;
+  /** Usage attributed to the selected Space. */
+  space_used_bytes?: number;
+  /** Pending storage attributed to the selected Space. */
+  space_reserved_bytes?: number;
+  /** Usage across the Space owner's shared storage pool. */
   used_bytes?: number;
   reserved_bytes?: number;
   limit_bytes?: number;

@@ -97,6 +97,7 @@ const transferBehaviorOptions = ["Ask Every Time", "Use Default Location"];
 const themeOptions = ["System", "Dark", "Light"];
 const scaleOptions = ["Small", "Default", "Large"];
 const keymapOptions = ["System", "VS Code", "Finder"];
+const terminalOptions = ["System Default", "Terminal", "iTerm", "Warp", "Ghostty", "Alacritty"];
 
 const settingsControlButtonClass = "w-[220px] max-w-full gap-1.5";
 
@@ -283,13 +284,40 @@ function GeneralSettings(props: SettingsContentProps) {
         <SettingsRow
           label="Files starting folder"
           description="Choose the default starting location for file browsing."
-          last
         >
           <WorkspaceRootControl
             value={workspaceRoot}
             disabled={props.working}
             onChange={(value) =>
               props.onSettingChange("general", "preferred_workspace_root", value)
+            }
+          />
+        </SettingsRow>
+        <SettingsRow
+          label="Terminal app"
+          description="Choose which terminal opens from the Files toolbar."
+          last
+        >
+          <SelectControl
+            value={Math.max(
+              0,
+              terminalOptions.indexOf(
+                stringSetting(
+                  props.document,
+                  "general",
+                  "preferred_terminal_app",
+                  "System Default",
+                ),
+              ),
+            )}
+            options={terminalOptions}
+            disabled={props.working}
+            onChange={(value) =>
+              props.onSettingChange(
+                "general",
+                "preferred_terminal_app",
+                terminalOptions[value] ?? "System Default",
+              )
             }
           />
         </SettingsRow>
@@ -483,12 +511,7 @@ function AppearanceSettings(props: SettingsContentProps) {
               description="Choose an image, GIF, or video to show behind Misty pages."
             >
               <WallpaperControl
-                value={stringSetting(
-                  props.document,
-                  "appearance",
-                  "wallpaper_path",
-                  stringSetting(props.document, "appearance", "home_wallpaper_path", ""),
-                )}
+                value={stringSetting(props.document, "appearance", "wallpaper_path", "")}
                 disabled={props.working}
                 onChange={(value) => props.onSettingChange("appearance", "wallpaper_path", value)}
               />
@@ -499,12 +522,7 @@ function AppearanceSettings(props: SettingsContentProps) {
               last
             >
               <OpacityControl
-                value={numberSetting(
-                  props.document,
-                  "appearance",
-                  "panel_opacity",
-                  numberSetting(props.document, "appearance", "home_panel_opacity", 0.82),
-                )}
+                value={numberSetting(props.document, "appearance", "panel_opacity", 0.82)}
                 disabled={props.working}
                 onCommit={(value) => props.onSettingChange("appearance", "panel_opacity", value)}
               />

@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Space } from "@/models/interfaces/features/spaces/types";
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
 import { SpaceSectionNavigation } from "@/features/spaces/components/SpaceSectionNavigation";
-import { spaceSectionPath } from "@/features/spaces/components/SpacePanelContent";
+import { spaceSectionPath } from "@/features/spaces/components/spacePanel/spacePanelRoute";
 
 describe("SpaceSectionNavigation", () => {
   let container: HTMLDivElement;
@@ -46,6 +46,7 @@ describe("SpaceSectionNavigation", () => {
       "Chat",
       "Tasks",
       "Notes",
+      "Drawings",
       "Library",
     ]);
     expect(container.textContent).toContain("Library context");
@@ -74,7 +75,7 @@ describe("SpaceSectionNavigation", () => {
     });
 
     const labels = [...container.querySelectorAll("a")].map((link) => link.textContent?.trim());
-    expect(labels).toEqual(["Notes", "Library"]);
+    expect(labels).toEqual(["Notes", "Drawings", "Library"]);
   });
 
   it("keeps Space management out of the primary strip", async () => {
@@ -108,6 +109,7 @@ describe("SpaceSectionNavigation", () => {
 
     const labels = [...container.querySelectorAll("a")].map((link) => link.textContent?.trim());
     expect(labels).not.toContain("Notes");
+    expect(labels).not.toContain("Drawings");
     expect(labels).not.toContain("Library");
   });
 

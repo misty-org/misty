@@ -34,7 +34,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
     if (sameScope && state.phase === "ready") return;
 
     const generation = ++notesLoadGeneration;
-    registry = createDefaultNotesRegistry(accountId);
+    registry = createDefaultNotesRegistry(accountId, spaceId, spaceName);
     const activeRegistry = registry;
     set((current) => ({
       registry: activeRegistry,
@@ -67,9 +67,15 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
     const activeRegistry = registry;
     const { notes, errors } = await activeRegistry.listAllNotes();
     if (generation !== notesLoadGeneration || registry !== activeRegistry) return;
-    set({
-      notes: spaceId ? scopeNotes(notes, spaceId, spaceName ?? "") : notes,
-      connectorErrors: errors,
+    set((state) => {
+      const scoped = spaceId ? scopeNotes(notes, spaceId, spaceName ?? "") : notes;
+      return {
+        notes: scoped,
+        connectorErrors: errors,
+        selectedNoteId: scoped.some((note) => note.id === state.selectedNoteId)
+          ? state.selectedNoteId
+          : scoped[0]?.id,
+      };
     });
   },
 
@@ -150,7 +156,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
       set((state) => ({
         notes: [created, ...state.notes],
         selectedNoteId: created.id,
-        editingNoteId: created.id,
+        editingNoteId: connector?.capabilities.update ? created.id : undefined,
         query: "",
       }));
       return created;
@@ -292,6 +298,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
 }));
 
 export function resetNotesAccountState(): void {
+  closeOpenNoteCollaborationSessions();
   notesLoadGeneration += 1;
   registry = createDefaultNotesRegistry();
   useNotesStore.setState({
@@ -313,6 +320,11 @@ export function resetNotesAccountState(): void {
     integrationsOpen: false,
     connectorRevision: 0,
   });
+}
+
+function closeOpenNoteCollaborationSessions(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent("misty:note-collaboration-close-all"));
 }
 
 function findNote(notes: UnifiedNote[], noteId: string): UnifiedNote | undefined {

@@ -10,7 +10,6 @@ const protectedRoots = [
   resolve(sourceRoot, "pages/Account"),
   resolve(sourceRoot, "pages/Agents"),
   resolve(sourceRoot, "pages/Files"),
-  resolve(sourceRoot, "pages/Home"),
   resolve(sourceRoot, "pages/Providers"),
   resolve(sourceRoot, "pages/Settings"),
   resolve(sourceRoot, "pages/Spaces"),

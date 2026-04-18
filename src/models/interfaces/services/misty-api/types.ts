@@ -940,7 +940,7 @@ export interface RemoteTestResult {
   checkedUnix: number | null;
 }
 
-export interface RcloneConfigPaths {
+export interface CloudConfigPaths {
   configPath: string | null;
   cachePath: string | null;
   tempPath: string | null;

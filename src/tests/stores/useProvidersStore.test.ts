@@ -78,12 +78,12 @@ describe("Providers workspace feedback", () => {
         },
       },
     }));
-    vi.mocked(providersSaveRemote).mockRejectedValue(new Error("rclone refused the config"));
+    vi.mocked(providersSaveRemote).mockRejectedValue(new Error("provider refused the config"));
 
     await useProvidersStore.getState().saveWorkspaceRemote("pane-a");
 
     const { workspaces } = useProvidersStore.getState();
-    expect(workspaces["pane-a"].error).toContain("rclone refused the config");
+    expect(workspaces["pane-a"].error).toContain("provider refused the config");
     expect(workspaces["pane-b"].error).toBeNull();
     expect(useProvidersStore.getState().working).toBe(false);
   });
