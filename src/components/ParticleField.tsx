@@ -34,8 +34,8 @@ export function ParticleField() {
     particlesRef.current = Array.from({ length: particleCount }, () => ({
       x: Math.random() * canvas.offsetWidth,
       y: Math.random() * canvas.offsetHeight,
-      vx: (Math.random() - 0.5) * 0.3,
-      vy: (Math.random() - 0.5) * 0.3,
+      vx: (Math.random() - 0.5) * 0.75,
+      vy: (Math.random() - 0.5) * 0.75,
       size: Math.random() * 1.5 + 0.5,
       opacity: Math.random() * 0.4 + 0.1,
     }));
@@ -55,7 +55,7 @@ export function ParticleField() {
 
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(59, 130, 246, ${p.opacity})`;
+        ctx.fillStyle = `rgba(161, 161, 170, ${p.opacity})`;
         ctx.fill();
       }
 
@@ -71,7 +71,7 @@ export function ParticleField() {
             ctx.beginPath();
             ctx.moveTo(particles[i].x, particles[i].y);
             ctx.lineTo(particles[j].x, particles[j].y);
-            ctx.strokeStyle = `rgba(59, 130, 246, ${0.06 * (1 - distance / connectionDist)})`;
+            ctx.strokeStyle = `rgba(161, 161, 170, ${0.06 * (1 - distance / connectionDist)})`;
             ctx.lineWidth = 0.5;
             ctx.stroke();
           }
