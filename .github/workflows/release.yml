@@ -44,8 +44,9 @@ jobs:
   publish:
     name: Signed ${{ matrix.name }}
     needs: gate
+    environment: production
     permissions:
-      contents: write
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -56,11 +57,13 @@ jobs:
           - name: macOS Intel
             platform: macos-15-intel
             args: "--target x86_64-apple-darwin --bundles app,dmg"
-          - name: Windows x64
-            platform: windows-latest
-            args: "--bundles nsis"
     runs-on: ${{ matrix.platform }}
     timeout-minutes: 90
+    env:
+      MISTY_PUBLIC_API_URL: ${{ vars.MISTY_PUBLIC_API_URL }}
+      VITE_APP_ENVIRONMENT: ${{ vars.VITE_APP_ENVIRONMENT }}
+      VITE_DISTRIBUTION_CHANNEL: ${{ vars.VITE_DISTRIBUTION_CHANNEL }}
+      VITE_RELEASE_CHANNEL: ${{ vars.VITE_RELEASE_CHANNEL }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -74,28 +77,6 @@ jobs:
         run: npm run release:verify-version
         env:
           RELEASE_VERSION: ${{ github.ref_name }}
-      - name: Import Windows Authenticode certificate
-        if: runner.os == 'Windows'
-        shell: pwsh
-        env:
-          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
-          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
-        run: |
-          if (-not $env:WINDOWS_CERTIFICATE -or -not $env:WINDOWS_CERTIFICATE_PASSWORD) {
-            throw "Windows signing secrets are required."
-          }
-          $certificatePath = Join-Path $env:RUNNER_TEMP "misty-signing.pfx"
-          [IO.File]::WriteAllBytes(
-            $certificatePath,
-            [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE)
-          )
-          $password = ConvertTo-SecureString $env:WINDOWS_CERTIFICATE_PASSWORD -AsPlainText -Force
-          $certificate = Import-PfxCertificate `
-            -FilePath $certificatePath `
-            -CertStoreLocation Cert:\CurrentUser\My `
-            -Password $password
-          Remove-Item $certificatePath -Force
-          "WINDOWS_CERTIFICATE_THUMBPRINT=$($certificate.Thumbprint)" >> $env:GITHUB_ENV
       - name: Prepare signed release configuration
         run: npm run release:config
         env:
@@ -103,16 +84,9 @@ jobs:
           TAURI_UPDATER_ENDPOINT: ${{ vars.TAURI_UPDATER_ENDPOINT }}
           TAURI_CSP_CONNECT_SOURCES: ${{ vars.TAURI_CSP_CONNECT_SOURCES }}
           TAURI_CSP_IMAGE_SOURCES: ${{ vars.TAURI_CSP_IMAGE_SOURCES }}
-          WINDOWS_CERTIFICATE_THUMBPRINT: ${{ env.WINDOWS_CERTIFICATE_THUMBPRINT }}
-          WINDOWS_TIMESTAMP_URL: ${{ vars.WINDOWS_TIMESTAMP_URL }}
-          VITE_PRIVACY_POLICY_URL: ${{ vars.VITE_PRIVACY_POLICY_URL }}
-          VITE_TERMS_URL: ${{ vars.VITE_TERMS_URL }}
-          VITE_DESKTOP_LICENSE_URL: ${{ vars.VITE_DESKTOP_LICENSE_URL }}
-          VITE_SUPPORT_URL: ${{ vars.VITE_SUPPORT_URL }}
-          VITE_SECURITY_URL: ${{ vars.VITE_SECURITY_URL }}
       - uses: tauri-apps/tauri-action@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.MISTY_RELEASE_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -122,13 +96,15 @@ jobs:
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
+          owner: misty-org
+          repo: misty-public
+          releaseCommitish: main
           tagName: misty-v__VERSION__
           releaseName: "Misty __VERSION__ beta"
-          releaseBody: "Signed public-beta desktop build. Review generated release notes before publishing."
+          releaseBody: "Signed public-beta desktop build. Add customer-facing release notes before publishing."
           releaseDraft: true
-          prerelease: true
-          generateReleaseNotes: true
+          prerelease: false
+          generateReleaseNotes: false
           uploadUpdaterJson: true
-          updaterJsonPreferNsis: true
           uploadUpdaterSignatures: true
           args: "${{ matrix.args }} --config artifacts/release/tauri.release.conf.json"

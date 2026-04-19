@@ -1034,8 +1034,8 @@ mod tests {
         cache.set_now_for_tests(1_800_000_000_000);
         let cache_key = ClipboardCache::remote_file_key(&remote_key("Photos/IMG_0481.jpeg"));
 
-        let first = cache.temp_path_for(&cache_key, "IMG_0481.jpeg");
-        let second = cache.temp_path_for(&cache_key, "IMG_0481.jpeg");
+        let first = cache.temp_path_for(&cache_key, "IMG_0481.jpeg"); // gitleaks:allow -- test filename
+        let second = cache.temp_path_for(&cache_key, "IMG_0481.jpeg"); // gitleaks:allow -- test filename
 
         assert_ne!(first, second);
         assert_eq!(first.parent(), second.parent());
