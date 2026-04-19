@@ -157,6 +157,25 @@ namespace misty::panel {
     // Clipboard operation type for copy/cut
     enum class ClipboardOp { NONE, COPY, CUT };
 
+    // Shared across all file-explorer panes and tabs. Registered once under
+    // "Clipboard" in UIRegistry so copying in pane A / tab 1 is pasteable from
+    // pane B / tab 2.
+    struct ClipboardState : public core::UIState {
+        ClipboardOp op = ClipboardOp::NONE;
+        std::vector<std::string> paths;
+        std::vector<UnifiedFileItem> items;
+
+        bool has_content() const {
+            return op != ClipboardOp::NONE && !items.empty();
+        }
+
+        void clear() {
+            op = ClipboardOp::NONE;
+            paths.clear();
+            items.clear();
+        }
+    };
+
     struct FileExplorerState : public core::UIState {
         FileExplorerState() {
             std::memset(current_path, 0, sizeof(current_path));
@@ -194,6 +213,11 @@ namespace misty::panel {
 
         // Pending navigation - set by external code, processed by panel
         std::string pending_navigation_path;
+        std::string pending_shared_refresh_path;
+
+        // Transient per-tab sync state for manual "run now" refreshes.
+        bool sync_request_in_flight = false;
+        uint64_t sync_request_generation = 0;
 
         // Download tracking - paths currently being downloaded
         std::unordered_set<std::string> downloading_files;
@@ -204,11 +228,6 @@ namespace misty::panel {
 
         // Track last disconnected account notification to prevent spam
         std::string last_disconnected_notification_folder;
-
-        // Clipboard state for copy/cut/paste
-        ClipboardOp clipboard_op = ClipboardOp::NONE;
-        std::vector<std::string> clipboard_paths;
-        std::vector<UnifiedFileItem> clipboard_items;  // Full metadata for cross-source paste
 
         // Rename state
         bool show_rename_modal = false;

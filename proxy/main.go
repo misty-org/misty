@@ -1,13 +1,16 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -15,6 +18,31 @@ import (
 	"github.com/kannachi323/misty/proxy/core/restic"
 	"github.com/kannachi323/misty/proxy/core/syncindex"
 )
+
+// noisePatterns are substrings of log lines we never want to surface.
+// Keep this list short — only for third-party chatter we can't silence at
+// the source. The tsnet auth-URL banner is printed from a goroutine that
+// bypasses our Logf/UserLogf hooks in some paths, so we filter by content.
+var noisePatterns = []string{
+	"To start this tsnet server",
+}
+
+// filterWriter wraps an io.Writer and drops any write whose payload matches
+// one of the configured substrings. Used to silence known-noisy third-party
+// log lines without losing our own log output.
+type filterWriter struct {
+	inner    io.Writer
+	patterns []string
+}
+
+func (w *filterWriter) Write(p []byte) (int, error) {
+	for _, pat := range w.patterns {
+		if bytes.Contains(p, []byte(pat)) {
+			return len(p), nil
+		}
+	}
+	return w.inner.Write(p)
+}
 
 // plainSlogHandler writes log records as plain "YYYY/MM/DD HH:MM:SS message"
 // lines to stderr, with no level prefix. We install it as the slog default to
@@ -26,6 +54,11 @@ type plainSlogHandler struct{}
 
 func (plainSlogHandler) Enabled(context.Context, slog.Level) bool { return true }
 func (plainSlogHandler) Handle(_ context.Context, r slog.Record) error {
+	for _, pat := range noisePatterns {
+		if strings.Contains(r.Message, pat) {
+			return nil
+		}
+	}
 	t := r.Time
 	if t.IsZero() {
 		t = time.Now()
@@ -40,21 +73,32 @@ func (h plainSlogHandler) WithGroup(string) slog.Handler      { return h }
 // path that successfully loaded. The lookup is deterministic regardless of
 // the proxy's working directory:
 //
-//  1. assets/misty.env next to the executable — what the bundled
-//     desktop app (Misty.app, Windows installer, Linux AppImage) ships.
-//  2. .env next to the executable — for "go build -o dist/misty-proxy ."
+//  1. $HOME/misty/misty.env — the user's per-machine config, shared with
+//     the desktop client (which always reads this file). Authoritative.
+//  2. ../Resources/assets/misty.env relative to the executable — what the
+//     bundled Misty.app ships as a seed/fallback when the user file is
+//     missing. (In Misty.app, Contents/MacOS holds binaries only and
+//     assets live under Contents/Resources per Apple's bundle convention.)
+//  3. assets/misty.env next to the executable — for flat non-.app layouts
+//     like Linux AppImage or Windows installer.
+//  4. .env next to the executable — for "go build -o dist/misty-proxy ."
 //     style installs.
-//  3. .env in the current working directory — for `go run .` from
+//  5. .env in the current working directory — for `go run .` from
 //     the proxy/ source dir during development.
 //
-// Anything missing is fine; the proxy falls through to bare os.Getenv
-// which already handles the "no env at all" case via clear errors at the
-// call sites (auth.go, license.go).
+// godotenv.Load does not overwrite already-set env vars, so ordering is
+// "first hit wins." Anything missing is fine; the proxy falls through to
+// bare os.Getenv which already handles the "no env at all" case via clear
+// errors at the call sites (auth.go, license.go).
 func loadEnv() string {
 	var candidates []string
+	if home, err := os.UserHomeDir(); err == nil {
+		candidates = append(candidates, filepath.Join(home, "misty", "misty.env"))
+	}
 	if exe, err := os.Executable(); err == nil {
 		dir := filepath.Dir(exe)
 		candidates = append(candidates,
+			filepath.Join(dir, "..", "Resources", "assets", "misty.env"),
 			filepath.Join(dir, "assets", "misty.env"),
 			filepath.Join(dir, ".env"),
 		)
@@ -74,6 +118,11 @@ func main() {
 	// the slog default with its NOTICE-prefixed handler by the time main runs.
 	slog.SetDefault(slog.New(plainSlogHandler{}))
 
+	// Drop known-noisy third-party lines (e.g. tsnet's auth-URL banner that
+	// loops every 5s). log.Println/Printf writes go through log.Default()'s
+	// writer, so swapping it catches anything the standard log package emits.
+	log.SetOutput(&filterWriter{inner: os.Stderr, patterns: noisePatterns})
+
 	if loaded := loadEnv(); loaded != "" {
 		log.Println("env loaded from", loaded)
 	} else {
@@ -89,6 +138,11 @@ func main() {
 		panic(err)
 	}
 	proxy.SyncIndex = syncindex.NewService(proxy.Database)
+
+	pollInterval := syncindex.PollIntervalFromEnv(30)
+	proxy.SyncPoller = syncindex.NewPoller(proxy.SyncIndex, pollInterval)
+	proxy.SyncPoller.Start()
+	log.Printf("syncindex: poller started with interval %s", pollInterval)
 
 	// Periodically clean up expired/revoked refresh tokens
 	go func() {

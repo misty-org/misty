@@ -4,6 +4,7 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <nlohmann/json.hpp>
 #include "core/ui/ui_registry.h"
 #include "core/net/http_client.h"
 #include "core/manager/env_manager.h"
@@ -85,7 +86,26 @@ namespace misty::panel {
         }
 
         // ── Persistence flag ─────────────────────────────────────────────────
+        // Durable user state — lives under ~/misty/config/ (not ~/misty/.cache/,
+        // which is reserved for regenerable cloud-service caches).
+        static std::filesystem::path config_path() {
+            const char* home = std::getenv("HOME");
+            if (!home || *home == '\0') return {};
+            return std::filesystem::path(home) / "misty" / "config" / "onboarding.json";
+        }
+
         static bool is_complete() {
+            const auto path = config_path();
+            if (!path.empty() && std::filesystem::exists(path)) {
+                try {
+                    std::ifstream file(path);
+                    auto data = nlohmann::json::parse(file, nullptr, false);
+                    if (!data.is_discarded()) {
+                        return data.value("complete", false);
+                    }
+                } catch (...) {}
+            }
+            // Legacy fallback: pre-migration users have a flag file under .cache.
             const char* home = std::getenv("HOME");
             if (!home) return false;
             return std::filesystem::exists(
@@ -93,11 +113,14 @@ namespace misty::panel {
         }
 
         static void mark_complete() {
-            const char* home = std::getenv("HOME");
-            if (!home) return;
-            std::string dir = std::string(home) + "/misty/.cache";
-            std::filesystem::create_directories(dir);
-            std::ofstream(dir + "/onboarding_complete").close();
+            const auto path = config_path();
+            if (path.empty()) return;
+            try {
+                std::filesystem::create_directories(path.parent_path());
+                nlohmann::json data = {{"complete", true}};
+                std::ofstream file(path);
+                if (file.is_open()) file << data.dump(2);
+            } catch (...) {}
         }
     };
 

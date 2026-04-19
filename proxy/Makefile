@@ -14,3 +14,13 @@ build:
 	mkdir -p dist
 	go build -o dist/misty-proxy .
 	go build -o dist/misty-pwd-helper ./cmd/misty-pwd-helper
+
+# Release build: strip DWARF + symbol table (-s -w) and trim embedded build
+# paths (-trimpath). Cuts ~30% off the proxy binary. Use for DMG builds;
+# dev builds should stay on `make build` so stack traces stay readable.
+# misty-pwd-helper is not built here — it's only useful alongside restic,
+# which is not bundled (vault is a plugin, not core).
+.PHONY: release
+release:
+	mkdir -p dist
+	go build -trimpath -ldflags="-s -w" -o dist/misty-proxy .

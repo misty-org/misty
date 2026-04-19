@@ -102,6 +102,110 @@ func (s *Service) RefetchDirectory(ctx context.Context, remoteName, dirPath stri
 	return s.ListDirectory(ctx, remoteName, dirPath)
 }
 
+// MarkLocalDirty records a local filesystem change against the sync index so
+// the reconciler can pick it up without waiting for the next full refetch.
+// This is the entry point for the client's FSEvents watcher and for explicit
+// user actions like "New File" or "Delete local".
+//
+// If the entry already exists, only local-side columns are touched — we never
+// clobber RemoteMTime/RemoteSize gathered from a prior rclone listing. If it
+// doesn't, a new row is written with RemoteExists=false, which reconcileState
+// then classifies as LOC (push-only, dirty).
+func (s *Service) MarkLocalDirty(ctx context.Context, remoteName, relPath string, localExists, isDir bool, mtime string, size int64) error {
+	if s == nil || s.database == nil || s.database.Conn == nil {
+		return fmt.Errorf("sync index database unavailable")
+	}
+	if remoteName == "" {
+		return fmt.Errorf("remote is required")
+	}
+	if relPath == "" {
+		return fmt.Errorf("path is required")
+	}
+	if !rclone.RemoteExists(remoteName) {
+		return fmt.Errorf("remote not found")
+	}
+
+	root, err := s.ensureRoot(remoteName)
+	if err != nil {
+		return err
+	}
+
+	now := dbpkg.NowRFC3339()
+	if mtime == "" {
+		mtime = now
+	}
+
+	entryID := dbpkg.MakeSyncEntryID(root.ID, relPath)
+	existing, err := dbpkg.GetSyncEntry(s.database.Conn, entryID)
+	if err != nil {
+		return err
+	}
+
+	entry := dbpkg.SyncEntry{
+		ID:            entryID,
+		RootID:        root.ID,
+		RelPath:       relPath,
+		ParentRelPath: path.Dir(relPath),
+		Name:          path.Base(relPath),
+		IsDir:         isDir,
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	}
+	if entry.ParentRelPath == "." {
+		entry.ParentRelPath = ""
+	}
+	if existing != nil {
+		// Keep remote-side fields intact; only local columns move.
+		entry.CreatedAt = existing.CreatedAt
+		entry.RemoteExists = existing.RemoteExists
+		entry.RemoteMTime = existing.RemoteMTime
+		entry.RemoteSize = existing.RemoteSize
+		entry.RemoteRevision = existing.RemoteRevision
+		entry.MimeType = existing.MimeType
+		entry.LastSeenRemote = existing.LastSeenRemote
+		entry.IsDir = existing.IsDir || isDir
+	}
+	entry.LocalExists = localExists
+	if localExists {
+		entry.LocalMTime = mtime
+		entry.LocalSize = sql.NullInt64{Int64: size, Valid: !entry.IsDir}
+		entry.LastSeenLocal = now
+	} else {
+		entry.LocalMTime = ""
+		entry.LocalSize = sql.NullInt64{}
+		entry.LastSeenLocal = now
+	}
+	entry.StateCode, entry.IsDirty, entry.SyncDirection = reconcileState(entry)
+
+	tx, err := s.database.Conn.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	root.UpdatedAt = now
+	if err = dbpkg.UpsertSyncRoot(tx, *root); err != nil {
+		return err
+	}
+	if err = dbpkg.UpsertSyncEntry(tx, entry); err != nil {
+		return err
+	}
+	if err = tx.Commit(); err != nil {
+		return err
+	}
+
+	if entry.IsDirty {
+		if err = dbpkg.SetSyncRootDirtyBit(s.database.Conn, root.ID, true, ""); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (s *Service) ListDirectory(_ context.Context, remoteName, dirPath string) (*DirectoryResponse, error) {
 	if s == nil || s.database == nil || s.database.Conn == nil {
 		return nil, fmt.Errorf("sync index database unavailable")

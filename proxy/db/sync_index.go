@@ -41,6 +41,8 @@ type SyncEntry struct {
 	StateCode      string
 	LastSeenLocal  string
 	LastSeenRemote string
+	RetryCount     int
+	LastError      string
 	CreatedAt      string
 	UpdatedAt      string
 }
@@ -95,14 +97,19 @@ func GetSyncRootByRemoteName(conn *sql.DB, remoteName string) (*SyncRoot, error)
 }
 
 func UpsertSyncEntry(exec sqlExecer, entry SyncEntry) error {
+	// retry_count and last_error are intentionally NOT in the ON CONFLICT UPDATE
+	// SET list: they're reconciler bookkeeping and must survive a subsequent
+	// refetch/MarkLocalDirty that would otherwise clobber them back to 0/''.
+	// The reconciler mutates them through ClearSyncEntryDirty /
+	// IncrementSyncEntryRetry, which are the only writers.
 	_, err := exec.Exec(`
 		INSERT INTO sync_entries (
 			id, root_id, rel_path, parent_rel_path, name, is_dir, local_exists, remote_exists,
 			is_dirty, sync_direction, local_mtime, local_size, remote_mtime, remote_size,
 			remote_revision, mime_type, state_code, last_seen_local_at, last_seen_remote_at,
-			created_at, updated_at
+			retry_count, last_error, created_at, updated_at
 		)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			parent_rel_path = excluded.parent_rel_path,
 			name = excluded.name,
@@ -126,7 +133,7 @@ func UpsertSyncEntry(exec sqlExecer, entry SyncEntry) error {
 		entry.SyncDirection, nullIfEmpty(entry.LocalMTime), nullableInt(entry.LocalSize),
 		nullIfEmpty(entry.RemoteMTime), nullableInt(entry.RemoteSize), nullIfEmpty(entry.RemoteRevision),
 		entry.MimeType, entry.StateCode, nullIfEmpty(entry.LastSeenLocal), nullIfEmpty(entry.LastSeenRemote),
-		entry.CreatedAt, entry.UpdatedAt)
+		entry.RetryCount, entry.LastError, entry.CreatedAt, entry.UpdatedAt)
 	return err
 }
 
@@ -135,7 +142,7 @@ func ListSyncEntriesByParent(conn *sql.DB, rootID, parentRelPath string) ([]Sync
 		SELECT id, root_id, rel_path, parent_rel_path, name, is_dir, local_exists, remote_exists,
 		       is_dirty, sync_direction, local_mtime, local_size, remote_mtime, remote_size,
 		       remote_revision, mime_type, state_code, last_seen_local_at, last_seen_remote_at,
-		       created_at, updated_at
+		       retry_count, last_error, created_at, updated_at
 		FROM sync_entries
 		WHERE root_id = ? AND parent_rel_path = ?
 		ORDER BY is_dir DESC, name COLLATE NOCASE ASC
@@ -147,26 +154,10 @@ func ListSyncEntriesByParent(conn *sql.DB, rootID, parentRelPath string) ([]Sync
 
 	var entries []SyncEntry
 	for rows.Next() {
-		var entry SyncEntry
-		var isDir, localExists, remoteExists, isDirty int
-		var localMTime, remoteMTime, remoteRevision, lastSeenLocal, lastSeenRemote sql.NullString
-		if err := rows.Scan(
-			&entry.ID, &entry.RootID, &entry.RelPath, &entry.ParentRelPath, &entry.Name, &isDir,
-			&localExists, &remoteExists, &isDirty, &entry.SyncDirection, &localMTime, &entry.LocalSize,
-			&remoteMTime, &entry.RemoteSize, &remoteRevision, &entry.MimeType, &entry.StateCode,
-			&lastSeenLocal, &lastSeenRemote, &entry.CreatedAt, &entry.UpdatedAt,
-		); err != nil {
+		entry, err := scanSyncEntryRow(rows)
+		if err != nil {
 			return nil, err
 		}
-		entry.IsDir = isDir != 0
-		entry.LocalExists = localExists != 0
-		entry.RemoteExists = remoteExists != 0
-		entry.IsDirty = isDirty != 0
-		entry.LocalMTime = localMTime.String
-		entry.RemoteMTime = remoteMTime.String
-		entry.RemoteRevision = remoteRevision.String
-		entry.LastSeenLocal = lastSeenLocal.String
-		entry.LastSeenRemote = lastSeenRemote.String
 		entries = append(entries, entry)
 	}
 	return entries, rows.Err()
@@ -222,6 +213,195 @@ func SetSyncRootDirtyBit(exec sqlExecer, rootID string, dirty bool, lastRefetchA
 		SET dirty_bit = ?, last_refetch_at = COALESCE(?, last_refetch_at), updated_at = ?
 		WHERE id = ?
 	`, boolToInt(dirty), nullIfEmpty(lastRefetchAt), NowRFC3339(), rootID)
+	return err
+}
+
+func GetSyncEntry(conn *sql.DB, id string) (*SyncEntry, error) {
+	row := conn.QueryRow(`
+		SELECT id, root_id, rel_path, parent_rel_path, name, is_dir, local_exists, remote_exists,
+		       is_dirty, sync_direction, local_mtime, local_size, remote_mtime, remote_size,
+		       remote_revision, mime_type, state_code, last_seen_local_at, last_seen_remote_at,
+		       retry_count, last_error, created_at, updated_at
+		FROM sync_entries
+		WHERE id = ?
+	`, id)
+	entry, err := scanSyncEntryRow(row)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &entry, nil
+}
+
+// syncEntryScanner is satisfied by both *sql.Row (single-row) and *sql.Rows
+// (iterator). Kept local so the helper can serve both call sites.
+type syncEntryScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanSyncEntryRow(row syncEntryScanner) (SyncEntry, error) {
+	var entry SyncEntry
+	var isDir, localExists, remoteExists, isDirty int
+	var localMTime, remoteMTime, remoteRevision, lastSeenLocal, lastSeenRemote, lastError sql.NullString
+	err := row.Scan(
+		&entry.ID, &entry.RootID, &entry.RelPath, &entry.ParentRelPath, &entry.Name, &isDir,
+		&localExists, &remoteExists, &isDirty, &entry.SyncDirection, &localMTime, &entry.LocalSize,
+		&remoteMTime, &entry.RemoteSize, &remoteRevision, &entry.MimeType, &entry.StateCode,
+		&lastSeenLocal, &lastSeenRemote, &entry.RetryCount, &lastError, &entry.CreatedAt, &entry.UpdatedAt,
+	)
+	if err != nil {
+		return SyncEntry{}, err
+	}
+	entry.IsDir = isDir != 0
+	entry.LocalExists = localExists != 0
+	entry.RemoteExists = remoteExists != 0
+	entry.IsDirty = isDirty != 0
+	entry.LocalMTime = localMTime.String
+	entry.RemoteMTime = remoteMTime.String
+	entry.RemoteRevision = remoteRevision.String
+	entry.LastSeenLocal = lastSeenLocal.String
+	entry.LastSeenRemote = lastSeenRemote.String
+	entry.LastError = lastError.String
+	return entry, nil
+}
+
+func ListEnabledSyncRoots(conn *sql.DB) ([]SyncRoot, error) {
+	rows, err := conn.Query(`
+		SELECT id, remote_name, remote_type, provider_folder, folder_name, mount_root,
+		       enabled, dirty_bit, last_refetch_at, last_poll_at, created_at, updated_at
+		FROM sync_roots
+		WHERE enabled = 1
+		ORDER BY remote_name
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var roots []SyncRoot
+	for rows.Next() {
+		var root SyncRoot
+		var enabled, dirtyBit int
+		var lastRefetch, lastPoll sql.NullString
+		if err := rows.Scan(
+			&root.ID, &root.RemoteName, &root.RemoteType, &root.ProviderFolder, &root.FolderName, &root.MountRoot,
+			&enabled, &dirtyBit, &lastRefetch, &lastPoll, &root.CreatedAt, &root.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		root.Enabled = enabled != 0
+		root.DirtyBit = dirtyBit != 0
+		root.LastRefetchAt = lastRefetch.String
+		root.LastPollAt = lastPoll.String
+		roots = append(roots, root)
+	}
+	return roots, rows.Err()
+}
+
+func ListSyncEntryDirectories(conn *sql.DB, rootID string) ([]string, error) {
+	rows, err := conn.Query(`
+		SELECT DISTINCT parent_rel_path
+		FROM sync_entries
+		WHERE root_id = ?
+	`, rootID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var dirs []string
+	for rows.Next() {
+		var parent string
+		if err := rows.Scan(&parent); err != nil {
+			return nil, err
+		}
+		dirs = append(dirs, parent)
+	}
+	return dirs, rows.Err()
+}
+
+func SetSyncRootLastPollAt(exec sqlExecer, rootID, lastPollAt string) error {
+	_, err := exec.Exec(`
+		UPDATE sync_roots
+		SET last_poll_at = ?, updated_at = ?
+		WHERE id = ?
+	`, nullIfEmpty(lastPollAt), NowRFC3339(), rootID)
+	return err
+}
+
+// ListDirtySyncEntries returns dirty entries for a root ordered by retry_count
+// then updated_at ASC so fresh work jumps ahead of repeated failures. The limit
+// keeps each reconciler pass bounded; the next poll tick picks up the rest.
+func ListDirtySyncEntries(conn *sql.DB, rootID string, limit int) ([]SyncEntry, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	rows, err := conn.Query(`
+		SELECT id, root_id, rel_path, parent_rel_path, name, is_dir, local_exists, remote_exists,
+		       is_dirty, sync_direction, local_mtime, local_size, remote_mtime, remote_size,
+		       remote_revision, mime_type, state_code, last_seen_local_at, last_seen_remote_at,
+		       retry_count, last_error, created_at, updated_at
+		FROM sync_entries
+		WHERE root_id = ? AND is_dirty = 1
+		ORDER BY retry_count ASC, updated_at ASC
+		LIMIT ?
+	`, rootID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var entries []SyncEntry
+	for rows.Next() {
+		entry, err := scanSyncEntryRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		entries = append(entries, entry)
+	}
+	return entries, rows.Err()
+}
+
+// ClearSyncEntryDirty marks an entry as successfully reconciled: drops the
+// dirty bit, resets retry bookkeeping, and stamps updated_at. Called by the
+// reconciler on success.
+func ClearSyncEntryDirty(exec sqlExecer, id, now string) error {
+	_, err := exec.Exec(`
+		UPDATE sync_entries
+		SET is_dirty = 0,
+		    sync_direction = 'none',
+		    retry_count = 0,
+		    last_error = '',
+		    updated_at = ?
+		WHERE id = ?
+	`, now, id)
+	return err
+}
+
+// IncrementSyncEntryRetry records a reconcile failure: bumps retry_count,
+// stores the truncated error, and stamps updated_at. The entry stays dirty so
+// it's retried on the next tick (subject to retry_count ordering).
+func IncrementSyncEntryRetry(exec sqlExecer, id, lastError, now string) error {
+	if len(lastError) > 512 {
+		lastError = lastError[:512]
+	}
+	_, err := exec.Exec(`
+		UPDATE sync_entries
+		SET retry_count = retry_count + 1,
+		    last_error = ?,
+		    updated_at = ?
+		WHERE id = ?
+	`, lastError, now, id)
+	return err
+}
+
+// DeleteSyncEntry removes a single row by ID. Used by the reconciler when a
+// pull resolves to "row no longer exists on either side" and the entry should
+// be forgotten entirely.
+func DeleteSyncEntry(exec sqlExecer, id string) error {
+	_, err := exec.Exec(`DELETE FROM sync_entries WHERE id = ?`, id)
 	return err
 }
 

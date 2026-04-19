@@ -247,9 +247,16 @@ namespace misty::panel {
         if (state.pending_navigation_path.empty()) return;
 
         std::string path = state.pending_navigation_path;
+        const bool notify_shared_refresh = state.pending_shared_refresh_path == path;
         printf("Explorer: Detected pending navigation to: %s\n", path.c_str());
         state.pending_navigation_path.clear();
+        if (notify_shared_refresh) {
+            state.pending_shared_refresh_path.clear();
+        }
         navigate_to_path(path);
+        if (notify_shared_refresh) {
+            notify_shared_path_refresh(path);
+        }
     }
 
     void FileExplorerPanel::render_search_overlay(SearchState& search_state, const ImVec2& list_start, float list_height) {
@@ -341,6 +348,65 @@ namespace misty::panel {
     void FileExplorerPanel::reset_selection(FileExplorerState& state) {
         state.selected_files.clear();
         state.last_selected_index = -1;
+    }
+
+    void FileExplorerPanel::notify_shared_path_refresh(const std::string& path) {
+        if (!shared_path_refresh_callback_ || path.empty()) {
+            return;
+        }
+        shared_path_refresh_callback_(path);
+    }
+
+    void FileExplorerPanel::request_manual_refresh(FileExplorerState& state) {
+        std::string current(state.current_path);
+        if (current.empty()) {
+            return;
+        }
+
+        if (state.sync_request_in_flight) {
+            return;
+        }
+
+        if (!path_utils::is_remote_path(current)) {
+            navigate_to_path(current, false);
+            notify_shared_path_refresh(current);
+            return;
+        }
+
+        const auto info = path_utils::parse_remote_path(current);
+        if (info.remote_name.empty()) {
+            navigate_to_path(current, false);
+            notify_shared_path_refresh(current);
+            return;
+        }
+
+        state.sync_request_in_flight = true;
+        const uint64_t request_generation = ++state.sync_request_generation;
+        auto& services = registry_.get_state<ServicesState>("Services");
+        services.run_sync_now(info.remote_name,
+            [this, current, request_generation](bool success, const std::string&, const std::string& error) {
+                auto& state = registry_.get_state<FileExplorerState>(state_key_);
+                std::lock_guard<std::mutex> lock(state.mu);
+                if (request_generation != state.sync_request_generation) {
+                    return;
+                }
+
+                state.sync_request_in_flight = false;
+
+                const std::string effective_path = !state.pending_navigation_path.empty()
+                    ? state.pending_navigation_path
+                    : std::string(state.current_path);
+                if (effective_path != current) {
+                    return;
+                }
+
+                if (success) {
+                    state.pending_navigation_path = current;
+                    state.pending_shared_refresh_path = current;
+                } else {
+                    state.error_msg = error.empty() ? "Sync failed." : error;
+                }
+            });
     }
 
     std::string FileExplorerPanel::selected_preview_path(FileExplorerState& state) const {
@@ -574,8 +640,9 @@ namespace misty::panel {
                     preview_selected_path_ = preview_path;
                 }
 
+                ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, 8.0f);
                 if (ImGui::BeginChild("##explorer_list", ImVec2(list_width, content_avail.y),
-                                      false, ImGuiWindowFlags_AlwaysVerticalScrollbar)) {
+                                      false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse)) {
                     // Save window-relative position of the list area before rendering it.
                     // We'll reuse this to position the overlay child on top.
                     ImVec2 list_start = ImGui::GetCursorPos();
@@ -601,6 +668,7 @@ namespace misty::panel {
                     }
                 }
                 ImGui::EndChild();
+                ImGui::PopStyleVar();
 
                 if (show_preview) {
                     ImGui::SameLine(0.0f, 0.0f);
@@ -642,6 +710,18 @@ namespace misty::panel {
                     lock.unlock();
                     render_preview_pane(preview_path, preview_width);
                     lock.lock();
+                }
+
+                const bool can_begin_pane_drag =
+                    body_drag_source_callback_ &&
+                    ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup) &&
+                    ImGui::IsMouseDragging(ImGuiMouseButton_Left) &&
+                    !ImGui::IsAnyItemHovered() &&
+                    !ImGui::IsAnyItemActive() &&
+                    !preview_pane_resizing_ &&
+                    !state.chat_resizing;
+                if (can_begin_pane_drag) {
+                    body_drag_source_callback_();
                 }
             }
             ImGui::EndChild();
@@ -905,6 +985,8 @@ namespace misty::panel {
             old_folder_names[mapping.remote_name] = mapping.folder_name;
         }
 
+        std::vector<ServicesState::RemoteWatchInfo> watch_infos;
+        {
         std::lock_guard<std::mutex> svc_lock(services.mu);
 
         workspace.remote_mappings.clear();
@@ -939,8 +1021,16 @@ namespace misty::panel {
             }
             mount_utils::ensure_remote_directory(mapping.provider_folder, mapping.folder_name);
 
+            ServicesState::RemoteWatchInfo watch;
+            watch.remote_name = mapping.remote_name;
+            watch.mount_path = mount_utils::get_mount_root() + "/" + mapping.provider_folder + "/" + mapping.folder_name;
+            watch_infos.push_back(std::move(watch));
+
             workspace.remote_mappings.push_back(mapping);
         }
+        }
+
+        services.reconcile_fs_watchers(watch_infos);
     }
 
 }
