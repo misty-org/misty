@@ -667,8 +667,8 @@ void SettingsPanel::render_shortcuts(SettingsState& state) {
     render_value_row("Paste", commands.label("explorer.paste"));
     render_value_row("Toggle Chat", commands.label("explorer.toggle_chat"));
     render_value_row("New Tab", commands.label("explorer.new_tab"));
-    render_value_row("Restore Tab", commands.label("explorer.restore_tab"));
-    render_value_row("Close Pane", commands.label("explorer.close_pane"));
+    render_value_row("Reopen Closed", commands.label("explorer.restore_tab"));
+    render_value_row("Close Current", commands.label("explorer.close_pane"));
     render_value_row("Restore Pane", commands.label("explorer.restore_pane"));
     render_value_row("Split Vertical", commands.label("explorer.split_vertical"));
     render_value_row("Split Horizontal", commands.label("explorer.split_horizontal"));

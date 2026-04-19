@@ -50,7 +50,7 @@ const std::vector<DefaultCommandEntry>& default_command_entries() {
         {"explorer.toggle_claude", MISTY_PRIMARY_SHORTCUT "+Shift+A"},
         {"explorer.new_tab", MISTY_PRIMARY_SHORTCUT "+T"},
         {"explorer.restore_tab", MISTY_PRIMARY_SHORTCUT "+Shift+T"},
-        {"explorer.close_pane", MISTY_PRIMARY_SHORTCUT "+D"},
+        {"explorer.close_pane", MISTY_PRIMARY_SHORTCUT "+W"},
         {"explorer.restore_pane", MISTY_PRIMARY_SHORTCUT "+Ctrl+Backslash"},
         {"explorer.split_vertical", MISTY_PRIMARY_SHORTCUT "+Backslash"},
         {"explorer.split_horizontal", MISTY_PRIMARY_SHORTCUT "+Shift+Backslash"},
@@ -153,6 +153,57 @@ void sync_missing_user_commands(const std::filesystem::path& user_path) {
     }
 }
 
+void sync_updated_default_shortcuts(const std::filesystem::path& user_path) {
+    if (user_path.empty() || !std::filesystem::exists(user_path)) {
+        return;
+    }
+
+#if defined(__APPLE__)
+    const std::string legacy_close = "Cmd+D";
+    const std::string updated_close = "Cmd+W";
+#else
+    const std::string legacy_close = "Ctrl+D";
+    const std::string updated_close = "Ctrl+W";
+#endif
+
+    std::ifstream input(user_path);
+    if (!input.is_open()) {
+        return;
+    }
+
+    std::vector<std::string> lines;
+    std::string line;
+    bool updated = false;
+    while (std::getline(input, line)) {
+        const std::string trimmed = trim_copy(line);
+        if (!trimmed.empty() && trimmed[0] != '#') {
+            const size_t eq = trimmed.find('=');
+            if (eq != std::string::npos) {
+                const std::string key = trim_copy(trimmed.substr(0, eq));
+                const std::string value = trim_copy(trimmed.substr(eq + 1));
+                if (key == "explorer.close_pane" && value == legacy_close) {
+                    line = "explorer.close_pane = " + updated_close;
+                    updated = true;
+                }
+            }
+        }
+        lines.push_back(std::move(line));
+    }
+    input.close();
+
+    if (!updated) {
+        return;
+    }
+
+    std::ofstream output(user_path, std::ios::trunc);
+    if (!output.is_open()) {
+        return;
+    }
+    for (const auto& entry : lines) {
+        output << entry << "\n";
+    }
+}
+
 } // namespace
 
 CommandManager& CommandManager::get() {
@@ -166,6 +217,7 @@ void CommandManager::load() {
     const std::filesystem::path user_path = user_commands_path();
     ensure_user_commands_file(user_path);
     sync_missing_user_commands(user_path);
+    sync_updated_default_shortcuts(user_path);
 
     user_shortcut_overrides_.clear();
     if (!user_path.empty() && std::filesystem::exists(user_path)) {

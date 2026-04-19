@@ -58,20 +58,24 @@ namespace misty::panel {
         std::string dest_dir(state.current_path);
         bool dest_is_cloud = path_utils::is_remote_path(dest_dir);
 
+        auto& clipboard = registry_.get_state<ClipboardState>("Clipboard");
+        const ClipboardOp op_at_paste = clipboard.op;
+        const std::vector<UnifiedFileItem> items_to_paste = clipboard.items;
+
         bool queued_cloud_uploads = false;
 
-        for (const auto& item : state.clipboard_items) {
+        for (const auto& item : items_to_paste) {
             bool src_is_cloud = (item.source == FileSource::REMOTE);
 
             if (!src_is_cloud && !dest_is_cloud) {
                 // Local -> Local
-                perform_paste_local_to_local(state, item, dest_dir);
+                perform_paste_local_to_local(state, item, dest_dir, op_at_paste);
             } else if (!dest_is_cloud && src_is_cloud) {
                 // Cloud -> Local
-                perform_paste_cloud_to_local(state, item, dest_dir);
+                perform_paste_cloud_to_local(state, item, dest_dir, op_at_paste);
             } else if (dest_is_cloud) {
                 // Local/Cloud -> Cloud (queues into sidebar upload queue)
-                perform_paste_to_cloud(state, item, dest_dir);
+                perform_paste_to_cloud(state, item, dest_dir, op_at_paste);
                 queued_cloud_uploads = true;
             }
         }
@@ -83,17 +87,17 @@ namespace misty::panel {
         }
 
         // Clear clipboard after cut (keep after copy so user can paste multiple times)
-        if (state.clipboard_op == ClipboardOp::CUT) {
-            state.clipboard_op = ClipboardOp::NONE;
-            state.clipboard_paths.clear();
-            state.clipboard_items.clear();
+        if (op_at_paste == ClipboardOp::CUT) {
+            clipboard.clear();
         }
 
         // Refresh directory
         navigate_to_path(std::string(state.current_path), false);
+        notify_shared_path_refresh(std::string(state.current_path));
     }
 
-    void FileExplorerPanel::perform_paste_local_to_local(FileExplorerState& state, const UnifiedFileItem& item, const std::string& dest_dir) {
+    void FileExplorerPanel::perform_paste_local_to_local(FileExplorerState& state, const UnifiedFileItem& item, const std::string& dest_dir, ClipboardOp op) {
+        (void)state;
         fs::path src(item.path);
         fs::path dest = fs::path(dest_dir) / src.filename();
 
@@ -109,13 +113,13 @@ namespace misty::panel {
         }
 
         std::error_code ec;
-        if (state.clipboard_op == ClipboardOp::COPY) {
+        if (op == ClipboardOp::COPY) {
             if (fs::is_directory(src)) {
                 fs::copy(src, dest, fs::copy_options::recursive, ec);
             } else {
                 fs::copy_file(src, dest, ec);
             }
-        } else if (state.clipboard_op == ClipboardOp::CUT) {
+        } else if (op == ClipboardOp::CUT) {
             fs::rename(src, dest, ec);
         }
 
@@ -124,12 +128,13 @@ namespace misty::panel {
             notif.add_notification("Paste Failed", ec.message(), NotificationType::ERROR);
         } else {
             auto& notif = registry_.get_state<NotificationState>("Notifications");
-            std::string action = (state.clipboard_op == ClipboardOp::COPY) ? "Copied" : "Moved";
+            std::string action = (op == ClipboardOp::COPY) ? "Copied" : "Moved";
             notif.add_notification("Success", action + " " + item.name, NotificationType::SUCCESS);
         }
     }
 
-    void FileExplorerPanel::perform_paste_to_cloud(FileExplorerState& state, const UnifiedFileItem& item, const std::string& dest_dir) {
+    void FileExplorerPanel::perform_paste_to_cloud(FileExplorerState& state, const UnifiedFileItem& item, const std::string& dest_dir, ClipboardOp op) {
+        (void)state;
         // Skip directories
         if (item.is_dir) {
             auto& notif = registry_.get_state<NotificationState>("Notifications");
@@ -158,7 +163,7 @@ namespace misty::panel {
         }
 
         std::error_code ec;
-        if (state.clipboard_op == ClipboardOp::CUT) {
+        if (op == ClipboardOp::CUT) {
             fs::rename(src, dest, ec);
         } else {
             fs::copy_file(src, dest, ec);
@@ -191,7 +196,8 @@ namespace misty::panel {
         }
     }
 
-    void FileExplorerPanel::perform_paste_cloud_to_local(FileExplorerState& state, const UnifiedFileItem& item, const std::string& dest_dir) {
+    void FileExplorerPanel::perform_paste_cloud_to_local(FileExplorerState& state, const UnifiedFileItem& item, const std::string& dest_dir, ClipboardOp op) {
+        (void)state;
         if (item.is_dir) {
             auto& notif = registry_.get_state<NotificationState>("Notifications");
             notif.add_notification("Paste Skipped", "Folder download not supported: " + item.name, NotificationType::INFO);
@@ -214,7 +220,7 @@ namespace misty::panel {
             }
 
             std::error_code ec;
-            if (state.clipboard_op == ClipboardOp::CUT) {
+            if (op == ClipboardOp::CUT) {
                 fs::rename(src, dest, ec);
             } else {
                 fs::copy_file(src, dest, ec);
@@ -225,7 +231,7 @@ namespace misty::panel {
                 notif.add_notification("Paste Failed", ec.message(), NotificationType::ERROR);
             } else {
                 auto& notif = registry_.get_state<NotificationState>("Notifications");
-                std::string action = (state.clipboard_op == ClipboardOp::COPY) ? "Copied" : "Moved";
+                std::string action = (op == ClipboardOp::COPY) ? "Copied" : "Moved";
                 notif.add_notification("Success", action + " " + item.name, NotificationType::SUCCESS);
             }
             return;
@@ -308,37 +314,39 @@ namespace misty::panel {
     }
 
     void FileExplorerPanel::perform_copy(FileExplorerState& state) {
-        state.clipboard_op = ClipboardOp::COPY;
-        state.clipboard_paths.clear();
-        state.clipboard_items.clear();
+        auto& clipboard = registry_.get_state<ClipboardState>("Clipboard");
+        clipboard.op = ClipboardOp::COPY;
+        clipboard.paths.clear();
+        clipboard.items.clear();
         for (const auto& sel : state.selected_files) {
             for (const auto& f : state.files) {
                 if (f.id == sel) {
-                    state.clipboard_paths.push_back(f.path);
-                    state.clipboard_items.push_back(f);
+                    clipboard.paths.push_back(f.path);
+                    clipboard.items.push_back(f);
                     break;
                 }
             }
         }
         auto& notif = registry_.get_state<NotificationState>("Notifications");
-        notif.add_notification("Clipboard", "Copied " + std::to_string(state.clipboard_paths.size()) + " items", NotificationType::INFO);
+        notif.add_notification("Clipboard", "Copied " + std::to_string(clipboard.paths.size()) + " items", NotificationType::INFO);
     }
 
     void FileExplorerPanel::perform_cut(FileExplorerState& state) {
-        state.clipboard_op = ClipboardOp::CUT;
-        state.clipboard_paths.clear();
-        state.clipboard_items.clear();
+        auto& clipboard = registry_.get_state<ClipboardState>("Clipboard");
+        clipboard.op = ClipboardOp::CUT;
+        clipboard.paths.clear();
+        clipboard.items.clear();
         for (const auto& sel : state.selected_files) {
             for (const auto& f : state.files) {
                 if (f.id == sel) {
-                    state.clipboard_paths.push_back(f.path);
-                    state.clipboard_items.push_back(f);
+                    clipboard.paths.push_back(f.path);
+                    clipboard.items.push_back(f);
                     break;
                 }
             }
         }
         auto& notif = registry_.get_state<NotificationState>("Notifications");
-        notif.add_notification("Clipboard", "Cut " + std::to_string(state.clipboard_paths.size()) + " items", NotificationType::INFO);
+        notif.add_notification("Clipboard", "Cut " + std::to_string(clipboard.paths.size()) + " items", NotificationType::INFO);
     }
 
     void FileExplorerPanel::perform_delete_selected(FileExplorerState& state) {
@@ -485,6 +493,84 @@ namespace misty::panel {
 
         if (!has_remote_targets || local_success_count > 0) {
             navigate_to_path(std::string(state.current_path), false);
+            notify_shared_path_refresh(std::string(state.current_path));
+        }
+    }
+
+    void FileExplorerPanel::perform_delete_local_selected(FileExplorerState& state) {
+        // Clears the local mirror of selected remote files. The cloud copy is
+        // untouched — after the next refetch, the proxy will report state=REM
+        // because its local-dir scan sees the file missing, and the sync badge
+        // flips back to not-synced. This is the "uncache" gesture users expect
+        // alongside the full "Delete" that removes the cloud object too.
+        struct LocalCacheTarget {
+            std::string id;
+            std::string path;
+            UnifiedFileItem item;
+        };
+
+        std::vector<LocalCacheTarget> targets;
+        targets.reserve(state.selected_files.size());
+        for (const auto& sel : state.selected_files) {
+            for (const auto& f : state.files) {
+                if (f.id != sel) continue;
+                if (f.source != FileSource::REMOTE) break;
+                if (!fs::exists(f.path)) break;
+                targets.push_back({f.id, f.path, f});
+                break;
+            }
+        }
+        if (targets.empty()) return;
+
+        size_t success_count = 0;
+        std::vector<std::string> permission_paths;
+        for (const auto& target : targets) {
+            std::error_code ec;
+            const std::string trash_path = unique_trash_target_path(target.path);
+            fs::rename(target.path, trash_path, ec);
+            if (ec) {
+                if (is_permission_error(ec)) {
+                    permission_paths.push_back(target.path);
+                    continue;
+                }
+                state.error_msg = "Failed to move to trash: " + ec.message();
+                continue;
+            }
+            UnifiedFileItem trashed;
+            trashed.path = trash_path;
+            trashed.id = trashed.path;
+            trashed.name = fs::path(trash_path).filename().string();
+            trashed.is_dir = fs::is_directory(trash_path);
+            trashed.status = SyncStatus::DELETED;
+            state.move_to_trash(trashed);
+            purge_from_recent(state, target.path);
+            state.selected_files.erase(target.id);
+            ++success_count;
+
+            // Flip the DB row to local_exists=false immediately so the next
+            // listing reflects REM without waiting for a full refetch scan.
+            if (!target.item.remote_name.empty() && !target.item.remote_path.empty()) {
+                auto& services = registry_.get_state<ServicesState>("Services");
+                services.mark_local_dirty(target.item.remote_name, target.item.remote_path,
+                    /*local_exists*/ false, target.item.is_dir, "", 0,
+                    [](bool, const std::string&, const std::string&) {});
+            }
+        }
+
+        auto& notif = registry_.get_state<NotificationState>("Notifications");
+        if (success_count > 0) {
+            notif.add_notification("Local cache cleared",
+                "Cleared local copy of " + std::to_string(success_count) + " items",
+                NotificationType::SUCCESS);
+        }
+        if (!permission_paths.empty()) {
+            state.permission_delete_paths = std::move(permission_paths);
+            state.permission_delete_permanent = false;
+            state.show_permission_delete_modal = true;
+        }
+        if (success_count > 0) {
+            navigate_to_path(std::string(state.current_path), false);
+            notify_shared_path_refresh(std::string(state.current_path));
         }
     }
 
@@ -590,6 +676,7 @@ namespace misty::panel {
         }
 
         navigate_to_path(std::string(state.current_path), false);
+        notify_shared_path_refresh(std::string(state.current_path));
     }
 
     void FileExplorerPanel::retry_permission_delete(FileExplorerState& state) {
@@ -645,6 +732,7 @@ namespace misty::panel {
         }
 
         navigate_to_path(std::string(state.current_path), false);
+        notify_shared_path_refresh(std::string(state.current_path));
     }
 
 }

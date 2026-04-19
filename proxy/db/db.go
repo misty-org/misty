@@ -2,6 +2,7 @@ package db
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -103,6 +104,43 @@ CREATE INDEX IF NOT EXISTS idx_sync_entries_root_updated
     ON sync_entries(root_id, updated_at);
 `
 
-	_, err := conn.Exec(schema)
+	if _, err := conn.Exec(schema); err != nil {
+		return err
+	}
+
+	// Additive migrations for columns added after the initial schema shipped.
+	// SQLite doesn't support "ADD COLUMN IF NOT EXISTS", so probe table_info
+	// before issuing the ALTER.
+	if err := addColumnIfMissing(conn, "sync_entries", "retry_count", "INTEGER NOT NULL DEFAULT 0"); err != nil {
+		return err
+	}
+	if err := addColumnIfMissing(conn, "sync_entries", "last_error", "TEXT NOT NULL DEFAULT ''"); err != nil {
+		return err
+	}
+	return nil
+}
+
+func addColumnIfMissing(conn *sql.DB, table, column, columnDef string) error {
+	rows, err := conn.Query(fmt.Sprintf("PRAGMA table_info(%s)", table))
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var cid int
+		var name, ctype string
+		var notnull, pk int
+		var dflt sql.NullString
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dflt, &pk); err != nil {
+			return err
+		}
+		if name == column {
+			return nil
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	_, err = conn.Exec(fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", table, column, columnDef))
 	return err
 }

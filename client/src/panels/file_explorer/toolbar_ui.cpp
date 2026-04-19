@@ -8,6 +8,7 @@
 #include "core/commands/command_manager.h"
 #include "core/manager/asset_manager.h"
 #include "panels/search/search_state.h"
+#include "panels/services/services_state.h"
 
 using namespace misty::core;
 
@@ -97,20 +98,28 @@ void FileExplorerPanel::show_nav_history(FileExplorerState& state, float button_
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.21f, 0.21f, 0.21f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.28f, 0.28f, 0.28f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.16f, 0.16f, 0.16f, 1.0f));
-    auto& sync_tex = AssetManager::get().get_svg_texture("sync-16", 16);
+    const bool sync_in_flight = state.sync_request_in_flight;
+    const char* refresh_icon_name = sync_in_flight ? "cloud-24" : "sync-16";
+    const ImVec4 refresh_tint = sync_in_flight
+        ? ImVec4(0.34f, 0.76f, 0.96f, 1.0f)
+        : ImVec4(0.7f, 0.7f, 0.7f, 1.0f);
+
+    if (sync_in_flight) ImGui::BeginDisabled();
+    auto& sync_tex = AssetManager::get().get_svg_texture(refresh_icon_name, 16);
     if (sync_tex.id != 0) {
         if (ImGui::ImageButton("##refresh", sync_tex.id, ImVec2(16, 16), ImVec2(0, 0), ImVec2(1, 1),
-                ImVec4(0, 0, 0, 0), ImVec4(0.7f, 0.7f, 0.7f, 1.0f))) {
-            std::string current(state.current_path);
-            if (!current.empty()) navigate_to_path(current, false);
+                ImVec4(0, 0, 0, 0), refresh_tint)) {
+            request_manual_refresh(state);
         }
-    } else if (ImGui::Button("R", ImVec2(button_width, 0))) {
-        std::string current(state.current_path);
-        if (!current.empty()) navigate_to_path(current, false);
+    } else if (ImGui::Button(sync_in_flight ? "..." : "R", ImVec2(button_width, 0))) {
+        request_manual_refresh(state);
     }
+    if (sync_in_flight) ImGui::EndDisabled();
     if (ImGui::IsItemHovered()) {
-        if (path_utils::is_remote_path(state.current_path)) {
-            ImGui::SetTooltip("Refetch Items (%s)", CommandManager::get().label("explorer.refresh").c_str());
+        if (sync_in_flight) {
+            ImGui::SetTooltip("Syncing remote changes...");
+        } else if (path_utils::is_remote_path(state.current_path)) {
+            ImGui::SetTooltip("Sync Now (%s)", CommandManager::get().label("explorer.refresh").c_str());
         } else {
             ImGui::SetTooltip("Refresh (%s)", CommandManager::get().label("explorer.refresh").c_str());
         }

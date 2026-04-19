@@ -3,6 +3,7 @@
 #include <string>
 #include <mutex>
 #include <atomic>
+#include <memory>
 #include <set>
 #include <unordered_map>
 #include <vector>
@@ -10,6 +11,7 @@
 #include "core/ui/ui_registry.h"
 #include "core/net/http_client.h"
 #include "core/threading/worker_pool.h"
+#include "core/sync/fs_watcher.h"
 
 namespace misty::panel {
 
@@ -88,8 +90,28 @@ namespace misty::panel {
                                 const std::string& path,
                                 FilesCallback callback);
 
+        // Triggers an out-of-band poll + reconcile pass on the proxy without
+        // waiting for the 30s tick. Intended for the toolbar Refresh button:
+        // a click should drain any pending dirty entries and pull remote-side
+        // drift immediately before the UI re-lists. When remote is empty the
+        // proxy walks every enabled root. Callback carries the JSON summary
+        // ({refetched_dirs, dirty_entries}) so the caller can surface progress.
+        void run_sync_now(const std::string& remote,
+                          FilesCallback callback);
+
         void fetch_sync_items(const std::string& remote,
                               const std::string& path,
+                              FilesCallback callback);
+
+        // Reports a local-only filesystem change to the proxy so the sync
+        // index picks it up before the next refetch. mtime may be empty — the
+        // proxy will default to "now" in that case.
+        void mark_local_dirty(const std::string& remote,
+                              const std::string& path,
+                              bool local_exists,
+                              bool is_dir,
+                              const std::string& mtime,
+                              int64_t size,
                               FilesCallback callback);
 
         void download_file(const std::string& remote,
@@ -112,6 +134,24 @@ namespace misty::panel {
                          const std::string& query,
                          const std::string& path,
                          FilesCallback callback);
+
+        // ----- Local filesystem watcher orchestration -----
+
+        struct RemoteWatchInfo {
+            std::string remote_name;   // rclone remote name
+            std::string mount_path;    // absolute local path to watch
+        };
+
+        // Start/stop FSEvents-backed watchers so each connected remote's
+        // on-disk mirror drains change notifications to /api/sync/dirty.
+        // Called by the file explorer whenever remote_mappings is rebuilt.
+        void reconcile_fs_watchers(const std::vector<RemoteWatchInfo>& watches);
+
+        // Suppress/unsuppress a local path across all active watchers, used
+        // by the downloader so its own writes don't round-trip back through
+        // the dirty pipeline.
+        void suppress_fs_path(const std::string& local_path);
+        void unsuppress_fs_path(const std::string& local_path);
 
         std::mutex mu;
         std::string error_msg;
@@ -181,7 +221,19 @@ namespace misty::panel {
         void load_remote_aliases_locked();
         void save_remote_aliases_locked() const;
 
+        struct WatchEntry {
+            std::string mount_path;
+            std::unique_ptr<core::sync::FsWatcher> watcher;
+        };
+
+        void dispatch_fs_events(const std::string& remote_name,
+                                const std::string& mount_path,
+                                std::vector<core::sync::FsEvent> events);
+
         core::WorkerPool* worker_pool_ = nullptr;
         std::unordered_map<std::string, std::string> remote_aliases_;
+
+        std::mutex watchers_mu_;
+        std::unordered_map<std::string, WatchEntry> watchers_;
     };
 }

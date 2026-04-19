@@ -513,6 +513,173 @@ namespace misty::panel {
         );
     }
 
+    void ServicesState::run_sync_now(const std::string& remote, FilesCallback callback) {
+        if (!worker_pool_) return;
+
+        worker_pool_->add(
+            [remote, callback]() {
+                std::string base = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
+                if (base.empty()) {
+                    callback(false, "", "PROXY_SERVICE_URL not set");
+                    return;
+                }
+
+                std::string url = base + "/api/sync/run-now";
+                // An empty remote triggers a global pass; only include the key
+                // when the caller scoped the refresh to a specific remote.
+                std::string body;
+                if (remote.empty()) {
+                    body = "{}";
+                } else {
+                    body = core::build_json_object({{"remote", remote}});
+                }
+
+                std::map<std::string, std::string> headers;
+                headers["Accept"] = "application/json";
+                headers["Content-Type"] = "application/json";
+
+                auto response = core::HTTPClient::get().post(url, body, headers);
+                if (response.status_code >= 200 && response.status_code < 300) {
+                    callback(true, response.body, "");
+                } else {
+                    std::string err = "HTTP " + std::to_string(response.status_code);
+                    if (!response.body.empty()) err += ": " + response.body;
+                    std::cerr << "run_sync_now(" << remote << "): " << err << std::endl;
+                    callback(false, "", err);
+                }
+            },
+            []() {},
+            [callback](const std::string& err) {
+                callback(false, "", err);
+            }
+        );
+    }
+
+    void ServicesState::reconcile_fs_watchers(const std::vector<RemoteWatchInfo>& watches) {
+        std::lock_guard<std::mutex> lock(watchers_mu_);
+
+        std::unordered_map<std::string, std::string> desired;
+        desired.reserve(watches.size());
+        for (const auto& w : watches) {
+            if (w.remote_name.empty() || w.mount_path.empty()) continue;
+            desired[w.remote_name] = w.mount_path;
+        }
+
+        // Stop watchers whose remote disappeared or whose mount moved.
+        for (auto it = watchers_.begin(); it != watchers_.end();) {
+            auto match = desired.find(it->first);
+            if (match == desired.end() || match->second != it->second.mount_path) {
+                it = watchers_.erase(it);
+            } else {
+                ++it;
+            }
+        }
+
+        // Start watchers for newly-seen remotes.
+        for (const auto& [remote_name, mount_path] : desired) {
+            if (watchers_.count(remote_name)) continue;
+
+            auto watcher = std::make_unique<core::sync::FsWatcher>();
+            ServicesState* self = this;
+            std::string remote_copy = remote_name;
+            std::string mount_copy = mount_path;
+
+            bool started = watcher->start(
+                mount_path,
+                [self, remote_copy, mount_copy](std::vector<core::sync::FsEvent> events) {
+                    self->dispatch_fs_events(remote_copy, mount_copy, std::move(events));
+                });
+            if (!started) continue;
+
+            WatchEntry entry;
+            entry.mount_path = mount_path;
+            entry.watcher = std::move(watcher);
+            watchers_[remote_name] = std::move(entry);
+        }
+    }
+
+    void ServicesState::suppress_fs_path(const std::string& local_path) {
+        std::lock_guard<std::mutex> lock(watchers_mu_);
+        for (auto& [_, entry] : watchers_) {
+            if (entry.watcher) entry.watcher->suppress(local_path);
+        }
+    }
+
+    void ServicesState::unsuppress_fs_path(const std::string& local_path) {
+        std::lock_guard<std::mutex> lock(watchers_mu_);
+        for (auto& [_, entry] : watchers_) {
+            if (entry.watcher) entry.watcher->unsuppress(local_path);
+        }
+    }
+
+    void ServicesState::dispatch_fs_events(const std::string& remote_name,
+                                           const std::string& mount_path,
+                                           std::vector<core::sync::FsEvent> events) {
+        if (!worker_pool_) return;
+        for (const auto& ev : events) {
+            if (ev.path.size() <= mount_path.size()) continue;
+            if (ev.path.compare(0, mount_path.size(), mount_path) != 0) continue;
+            if (ev.path[mount_path.size()] != '/') continue;
+
+            std::string rel = ev.path.substr(mount_path.size() + 1);
+            if (rel.empty()) continue;
+
+            bool local_exists = ev.kind != core::sync::FsEventKind::DELETED;
+            mark_local_dirty(remote_name, rel,
+                             local_exists, ev.is_dir, ev.mtime, ev.size,
+                             [](bool, const std::string&, const std::string&) {});
+        }
+    }
+
+    void ServicesState::mark_local_dirty(const std::string& remote,
+                                         const std::string& path,
+                                         bool local_exists,
+                                         bool is_dir,
+                                         const std::string& mtime,
+                                         int64_t size,
+                                         FilesCallback callback) {
+        if (!worker_pool_) {
+            if (callback) callback(false, "", "worker pool unavailable");
+            return;
+        }
+
+        worker_pool_->add(
+            [remote, path, local_exists, is_dir, mtime, size, callback]() {
+                std::string base = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
+                if (base.empty()) {
+                    if (callback) callback(false, "", "PROXY_SERVICE_URL not set");
+                    return;
+                }
+
+                json body;
+                body["remote"] = remote;
+                body["path"] = path;
+                body["local_exists"] = local_exists;
+                body["is_dir"] = is_dir;
+                body["mtime"] = mtime;
+                body["size"] = size;
+
+                std::map<std::string, std::string> headers;
+                headers["Accept"] = "application/json";
+                headers["Content-Type"] = "application/json";
+
+                auto response = core::HTTPClient::get().post(base + "/api/sync/dirty", body.dump(), headers);
+                if (response.status_code >= 200 && response.status_code < 300) {
+                    if (callback) callback(true, response.body, "");
+                } else {
+                    std::string err = "HTTP " + std::to_string(response.status_code);
+                    if (!response.body.empty()) err += ": " + response.body;
+                    std::cerr << "mark_local_dirty(" << remote << ", " << path << "): " << err << std::endl;
+                    if (callback) callback(false, "", err);
+                }
+            },
+            []() {},
+            [callback](const std::string& err) {
+                if (callback) callback(false, "", err);
+            }
+        );
+    }
+
     void ServicesState::fetch_sync_items(const std::string& remote,
                                          const std::string& path,
                                          FilesCallback callback) {
@@ -556,11 +723,22 @@ namespace misty::panel {
                                        DownloadCallback callback) {
         if (!worker_pool_) return;
 
+        // Block the local-side watcher from reporting our own writes until
+        // the download finishes. The wrapping callback always unsuppresses,
+        // so a failure path can't leave the path blocked forever.
+        suppress_fs_path(local_path);
+        auto wrapped = [this, local_path, callback](bool success,
+                                                     const std::string& out_path,
+                                                     const std::string& err) {
+            this->unsuppress_fs_path(local_path);
+            if (callback) callback(success, out_path, err);
+        };
+
         worker_pool_->add(
-            [remote, remote_path, local_path, callback, progress_cb]() {
+            [remote, remote_path, local_path, wrapped, progress_cb]() {
                 std::string base = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
                 if (base.empty()) {
-                    callback(false, "", "PROXY_SERVICE_URL not set");
+                    wrapped(false, "", "PROXY_SERVICE_URL not set");
                     return;
                 }
 
@@ -576,14 +754,14 @@ namespace misty::panel {
                     url, local_path, {}, progress_cb);
 
                 if (result.success) {
-                    callback(true, local_path, "");
+                    wrapped(true, local_path, "");
                 } else {
-                    callback(false, "", result.error_message);
+                    wrapped(false, "", result.error_message);
                 }
             },
             []() {},
-            [callback](const std::string& err) {
-                callback(false, "", err);
+            [wrapped](const std::string& err) {
+                wrapped(false, "", err);
             }
         );
     }

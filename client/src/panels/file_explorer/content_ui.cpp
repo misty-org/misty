@@ -18,6 +18,20 @@ using namespace misty::core;
 namespace misty::panel {
 namespace {
 
+constexpr float kNameColumnWidth = 320.0f;
+constexpr float kSizeColumnWidth = 96.0f;
+constexpr float kTypeColumnWidth = 120.0f;
+constexpr float kModifiedColumnWidth = 180.0f;
+constexpr float kStateColumnWidth = 72.0f;
+constexpr float kSyncColumnWidth = 56.0f;
+constexpr float kTableMinInnerWidth =
+    kNameColumnWidth +
+    kSizeColumnWidth +
+    kTypeColumnWidth +
+    kModifiedColumnWidth +
+    kStateColumnWidth +
+    kSyncColumnWidth;
+
 enum class FileTableColumn : int {
     Name = 0,
     Size = 1,
@@ -111,7 +125,12 @@ void select_item(FileExplorerState& state, const UnifiedFileItem& file, int inde
 } // namespace
 void FileExplorerPanel::show_directory_contents(FileExplorerState& state) {
     static ImGuiTableFlags flags = ImGuiTableFlags_Reorderable | ImGuiTableFlags_Sortable |
-        ImGuiTableFlags_Hideable | ImGuiTableFlags_ScrollY | ImGuiTableFlags_Resizable;
+        ImGuiTableFlags_Hideable | ImGuiTableFlags_ScrollY | ImGuiTableFlags_ScrollX |
+        ImGuiTableFlags_Resizable;
+    const ImVec4 scrollbar_bg(1.0f, 1.0f, 1.0f, 0.04f);
+    const ImVec4 scrollbar_grab(0.96f, 0.96f, 0.96f, 0.32f);
+    const ImVec4 scrollbar_grab_hovered(0.98f, 0.98f, 0.98f, 0.46f);
+    const ImVec4 scrollbar_grab_active(1.0f, 1.0f, 1.0f, 0.62f);
 
     const bool loading = state.is_loading;
     const bool show_loading_animation = loading && state.show_loading_animation &&
@@ -124,15 +143,25 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state) {
     if (!loading && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && !io.WantTextInput) {
         if (CommandManager::get().matches("explorer.copy")) perform_copy(state);
         if (CommandManager::get().matches("explorer.cut")) perform_cut(state);
-        if (CommandManager::get().matches("explorer.paste") && state.clipboard_op != ClipboardOp::NONE && !state.clipboard_items.empty()) perform_paste(state);
+        if (CommandManager::get().matches("explorer.paste")) {
+            auto& clipboard = registry_.get_state<ClipboardState>("Clipboard");
+            if (clipboard.has_content()) perform_paste(state);
+        }
         if (CommandManager::get().matches("explorer.delete") && !state.selected_files.empty()) perform_delete_selected(state);
         if (CommandManager::get().matches("explorer.rename") && !state.selected_files.empty()) initiate_rename(state);
         if (CommandManager::get().matches("explorer.refresh")) {
             std::string current(state.current_path);
-            if (!current.empty()) navigate_to_path(current, false);
+            if (!current.empty()) {
+                request_manual_refresh(state);
+            }
         }
     }
 
+    ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, 8.0f);
+    ImGui::PushStyleColor(ImGuiCol_ScrollbarBg, scrollbar_bg);
+    ImGui::PushStyleColor(ImGuiCol_ScrollbarGrab, scrollbar_grab);
+    ImGui::PushStyleColor(ImGuiCol_ScrollbarGrabHovered, scrollbar_grab_hovered);
+    ImGui::PushStyleColor(ImGuiCol_ScrollbarGrabActive, scrollbar_grab_active);
     ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.45f, 0.45f, 0.45f, 0.35f));
     ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.45f, 0.45f, 0.45f, 0.35f));
     ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0.45f, 0.45f, 0.45f, 0.45f));
@@ -176,14 +205,18 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state) {
             ImGui::EndChild();
         }
         ImGui::PopStyleVar();
-    } else if (ImGui::BeginTable("FileTable", 6, flags | ImGuiTableFlags_NoHostExtendY,
-                                 ImVec2(0.0f, ImGui::GetContentRegionAvail().y))) {
-        ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch | ImGuiTableColumnFlags_DefaultSort);
-        ImGui::TableSetupColumn("Size", ImGuiTableColumnFlags_WidthFixed, 80.0f);
-        ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 80.0f);
-        ImGui::TableSetupColumn("Last Modified", ImGuiTableColumnFlags_WidthFixed, 150.0f);
-        ImGui::TableSetupColumn("State", ImGuiTableColumnFlags_WidthFixed, 60.0f);
-        ImGui::TableSetupColumn("Sync", ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoSort, 48.0f);
+    } else {
+        const float table_inner_width = std::max(ImGui::GetContentRegionAvail().x, kTableMinInnerWidth);
+        if (ImGui::BeginTable("FileTable", 6, flags | ImGuiTableFlags_NoHostExtendY,
+                              ImVec2(0.0f, ImGui::GetContentRegionAvail().y), table_inner_width)) {
+        ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_DefaultSort,
+                                kNameColumnWidth);
+        ImGui::TableSetupColumn("Size", ImGuiTableColumnFlags_WidthFixed, kSizeColumnWidth);
+        ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, kTypeColumnWidth);
+        ImGui::TableSetupColumn("Last Modified", ImGuiTableColumnFlags_WidthFixed, kModifiedColumnWidth);
+        ImGui::TableSetupColumn("State", ImGuiTableColumnFlags_WidthFixed, kStateColumnWidth);
+        ImGui::TableSetupColumn("Sync", ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoSort,
+                                kSyncColumnWidth);
         ImGui::TableHeadersRow();
 
         if (ImGuiTableSortSpecs* sorts_specs = ImGui::TableGetSortSpecs()) {
@@ -215,9 +248,11 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state) {
         }
         show_background_context_menu(state);
         ImGui::EndTable();
+        }
     }
 
-    ImGui::PopStyleColor(3);
+    ImGui::PopStyleColor(7);
+    ImGui::PopStyleVar();
 
     if (loading && overlay_size.x > 0.0f && overlay_size.y > 0.0f) {
         ImGui::SetCursorScreenPos(overlay_min);

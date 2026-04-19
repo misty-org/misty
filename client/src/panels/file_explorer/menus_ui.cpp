@@ -82,6 +82,7 @@ void FileExplorerPanel::show_context_menu(FileExplorerState& state) {
                 : std::vector<MatchedExtensionAction>{};
             bool all_local_available = !state.selected_files.empty();
             bool all_deletable = !state.selected_files.empty();
+            bool any_remote_with_local_mirror = false;
             for (const auto& f : state.files) {
                 if (state.selected_files.count(f.id) == 0) continue;
                 bool is_avail = (f.status == SyncStatus::LOCAL || f.status == SyncStatus::SYNCED || f.status == SyncStatus::MODIFIED);
@@ -90,6 +91,9 @@ void FileExplorerPanel::show_context_menu(FileExplorerState& state) {
                     if (f.source != FileSource::REMOTE) {
                         all_deletable = false;
                     }
+                }
+                if (f.source == FileSource::REMOTE && fs::exists(f.path)) {
+                    any_remote_with_local_mirror = true;
                 }
             }
 
@@ -151,7 +155,7 @@ void FileExplorerPanel::show_context_menu(FileExplorerState& state) {
                 ImGui::MenuItem("Cut", CommandManager::get().label("explorer.cut").c_str(), false, false);
             }
 
-            bool can_paste = state.clipboard_op != ClipboardOp::NONE && !state.clipboard_items.empty();
+            bool can_paste = registry_.get_state<ClipboardState>("Clipboard").has_content();
             if (ImGui::MenuItem("Paste", CommandManager::get().label("explorer.paste").c_str(), false, can_paste)) perform_paste(state);
 
             ImGui::Separator();
@@ -169,6 +173,10 @@ void FileExplorerPanel::show_context_menu(FileExplorerState& state) {
                 ImGui::MenuItem("Delete", "Del", false, false);
             }
             ImGui::PopStyleColor();
+
+            if (any_remote_with_local_mirror && !is_trash_view) {
+                if (ImGui::MenuItem("Delete local")) perform_delete_local_selected(state);
+            }
 
             ImGui::Separator();
             bool is_starred = state.is_starred(state.context_menu_target_path);
@@ -253,6 +261,7 @@ void FileExplorerPanel::show_rename_modal(FileExplorerState& state) {
                     auto& notif = registry_.get_state<NotificationState>("Notifications");
                     notif.add_notification("Renamed", "Renamed to " + new_name, NotificationType::SUCCESS);
                     navigate_to_path(std::string(state.current_path), false);
+                    notify_shared_path_refresh(std::string(state.current_path));
                 }
             }
             state.show_rename_modal = false;
@@ -285,7 +294,7 @@ void FileExplorerPanel::show_background_context_menu(FileExplorerState& state) {
 
     if (ImGui::BeginPopup("BackgroundContextMenu")) {
         bool is_cloud = path_utils::is_remote_path(state.current_path);
-        bool can_paste = state.clipboard_op != ClipboardOp::NONE && !state.clipboard_items.empty();
+        bool can_paste = registry_.get_state<ClipboardState>("Clipboard").has_content();
         if (ImGui::MenuItem("Paste", CommandManager::get().label("explorer.paste").c_str(), false, can_paste)) perform_paste(state);
 
         ImGui::Separator();
@@ -371,6 +380,9 @@ void FileExplorerPanel::show_new_entry_modal(FileExplorerState& state) {
                         if (!remote_name.empty()) {
                             std::string folder_path = remote_path.empty() ? name : remote_path + "/" + name;
                             auto& services = registry_.get_state<ServicesState>("Services");
+                            services.mark_local_dirty(remote_name, folder_path, /*local_exists*/ true,
+                                                     /*is_dir*/ true, "", 0,
+                                                     [](bool, const std::string&, const std::string&) {});
                             services.create_folder(remote_name, folder_path,
                                 [this, name](bool success, const std::string&, const std::string& error) {
                                     auto& notif = registry_.get_state<NotificationState>("Notifications");
@@ -381,13 +393,24 @@ void FileExplorerPanel::show_new_entry_modal(FileExplorerState& state) {
                     }
                 } else {
                     if (auto f = std::fopen(p.string().c_str(), "w")) std::fclose(f);
-                    if (is_cloud_dir) trigger_upload(p.string(), current_dir);
+                    if (is_cloud_dir) {
+                        auto [remote_name, remote_path] = path_utils::parse_remote_name_and_path(current_dir);
+                        if (!remote_name.empty()) {
+                            std::string file_path = remote_path.empty() ? name : remote_path + "/" + name;
+                            auto& services = registry_.get_state<ServicesState>("Services");
+                            services.mark_local_dirty(remote_name, file_path, /*local_exists*/ true,
+                                                     /*is_dir*/ false, "", 0,
+                                                     [](bool, const std::string&, const std::string&) {});
+                        }
+                        trigger_upload(p.string(), current_dir);
+                    }
                 }
 
                 if (!ec) {
                     auto& notif = registry_.get_state<NotificationState>("Notifications");
                     notif.add_notification("Created", std::string(state.new_entry_is_dir ? "Folder " : "File ") + name + " created", NotificationType::SUCCESS);
                     navigate_to_path(current_dir, false);
+                    notify_shared_path_refresh(current_dir);
                 }
             }
             state.new_entry_name_buffer[0] = '\0';
