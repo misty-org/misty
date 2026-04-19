@@ -71,3 +71,47 @@ export interface LoginResponse {
   username: string;
   email: string;
 }
+
+export interface AccountDeletionResponse {
+  request: {
+    id: string;
+    status: "processing" | "scheduled" | "completed" | "failed";
+    purge_after: string;
+    created_at: string;
+    updated_at: string;
+  };
+  status_token: string;
+}
+
+export interface AccountExportManifest {
+  account_data: Record<string, unknown>;
+  documents: Array<{
+    kind: "note" | "drawing";
+    id: string;
+    space_id: string;
+    title: string;
+    acl_version: number;
+    created_at: string;
+    updated_at: string;
+    download_url: string;
+    expires_at: string;
+  }>;
+  assets: Array<{
+    kind: "note" | "drawing" | "library" | "message_attachment";
+    id: string;
+    parent_id: string;
+    filename: string;
+    mime_type: string;
+    byte_size: number;
+    sha256: string;
+    created_at: string;
+    download: {
+      url: string;
+      expires_at: string;
+      filename: string;
+      mime_type: string;
+      byte_size: number;
+      sha256: string;
+    };
+  }>;
+}

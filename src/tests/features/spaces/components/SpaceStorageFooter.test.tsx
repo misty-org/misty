@@ -2,7 +2,10 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { SpaceStorageUsage } from "@/models/interfaces/features/spaces/types";
-import { formatStorageBytes, SpaceStorageFooter } from "@/features/spaces/components/spacePanel/SpaceStorageFooter";
+import {
+  formatStorageBytes,
+  SpaceStorageFooter,
+} from "@/features/spaces/components/spacePanel/SpaceStorageFooter";
 
 describe("SpaceStorageFooter", () => {
   let container: HTMLDivElement;

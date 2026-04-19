@@ -22,15 +22,20 @@ impl<R: Runtime> Keystore<R> {
     }
 
     pub fn retrieve(&self, payload: RetrieveRequest) -> crate::Result<RetrieveResponse> {
-        let value =
-            keyring::Entry::new(&payload.service, &credential_user(&payload.service, &payload.user))?
-                .get_password()?;
+        let value = keyring::Entry::new(
+            &payload.service,
+            &credential_user(&payload.service, &payload.user),
+        )?
+        .get_password()?;
         Ok(RetrieveResponse { value: Some(value) })
     }
 
     pub fn remove(&self, payload: RemoveRequest) -> crate::Result<()> {
-        keyring::Entry::new(&payload.service, &credential_user(&payload.service, &payload.user))?
-            .delete_credential()?;
+        keyring::Entry::new(
+            &payload.service,
+            &credential_user(&payload.service, &payload.user),
+        )?
+        .delete_credential()?;
         Ok(())
     }
 }
@@ -54,12 +59,15 @@ fn normalize_profile(profile: &str) -> Option<String> {
     if profile.len() > 32 {
         return None;
     }
-    if !chars.all(|character| character.is_ascii_lowercase() || character.is_ascii_digit() || character == '-') {
+    if !chars.all(|character| {
+        character.is_ascii_lowercase() || character.is_ascii_digit() || character == '-'
+    }) {
         return None;
     }
     Some(profile)
 }
 
+#[cfg(test)]
 fn profile_token_user(profile: Option<&str>) -> String {
     profile
         .and_then(normalize_profile)
@@ -99,7 +107,10 @@ mod tests {
             credential_user(TOKEN_SERVICE, TOKEN_USER),
             profile_token_user(std::env::var("MISTY_PROFILE").ok().as_deref())
         );
-        assert_eq!(credential_user(TOKEN_SERVICE, "tester:david"), "tester:david");
+        assert_eq!(
+            credential_user(TOKEN_SERVICE, "tester:david"),
+            "tester:david"
+        );
         assert_eq!(credential_user("other", TOKEN_USER), TOKEN_USER);
     }
 }

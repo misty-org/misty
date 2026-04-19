@@ -1,0 +1,113 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Scan current release source
+        run: >-
+          docker run --rm -v "$PWD:/repo"
+          zricethezav/gitleaks@sha256:e1b35e12a8c6fa8901f060459cfb6b2fc4c484d3afbe3b029733a3bbfab07055
+          detect --source=/repo --no-git --redact --config=/repo/.gitleaks.toml
+
+  web:
+    name: Web quality and production build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm run build:desktop
+      - run: npm run report:bundle-size
+      - name: Audit production dependencies
+        run: npm run audit:production
+      - name: Generate web SBOM and third-party notices
+        run: npm run release:metadata
+      - uses: actions/upload-artifact@v6
+        with:
+          name: web-release-metadata
+          path: artifacts/release
+          if-no-files-found: error
+
+  native:
+    name: Rust and macOS bundle
+    runs-on: macos-14
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Install pinned Rust toolchain
+        run: rustup show
+      - name: Check Rust formatting
+        run: cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
+      - name: Lint Rust
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets
+      - name: Test Rust
+        run: cargo test --manifest-path src-tauri/Cargo.toml --locked
+      - name: Generate Rust SBOM
+        run: |
+          cargo install cargo-cyclonedx --version 0.5.9 --locked
+          cargo cyclonedx --manifest-path src-tauri/Cargo.toml --format json
+          test -n "$(find src-tauri -maxdepth 1 -name '*.cdx.json' -print -quit)"
+      - name: Build unsigned macOS beta bundle
+        run: npm run build:mac:test
+      - name: Generate macOS artifact checksums
+        run: node scripts/generate-release-metadata.mjs src-tauri/target/release/bundle
+      - uses: actions/upload-artifact@v6
+        with:
+          name: macos-unsigned-beta
+          path: |
+            src-tauri/target/release/bundle
+            src-tauri/*.cdx.json
+          if-no-files-found: error
+
+  windows:
+    name: Windows beta bundle
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Install pinned Rust toolchain
+        run: rustup show
+      - name: Build unsigned Windows beta bundle
+        run: npm run build:windows:test
+      - name: Generate Windows artifact checksums
+        run: node scripts/generate-release-metadata.mjs src-tauri/target/release/bundle
+      - uses: actions/upload-artifact@v6
+        with:
+          name: windows-unsigned-beta
+          path: src-tauri/target/release/bundle
+          if-no-files-found: error

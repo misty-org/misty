@@ -231,8 +231,7 @@ export function estimateAssets(assets: MediaAsset[]): MediaIndexEstimate {
     estimatedWeeklyPercent: Math.min(
       100,
       Math.ceil(
-        (estimatedMicrousd /
-          (useUserStore.getState().me?.tier === "pro" ? 1_000_000 : 150_000)) *
+        (estimatedMicrousd / (useUserStore.getState().me?.tier === "pro" ? 1_000_000 : 150_000)) *
           100,
       ),
     ),

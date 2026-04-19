@@ -107,7 +107,7 @@ export function SpacePanelContent(props: {
               <SpacePanelSidebarContext
                 section={section}
                 activeSpaceId={activeSpaceId}
-                activeSpaceName={activeSpace?.name ?? "Notes"}
+                activeSpaceName={activeSpace?.name ?? "Journal"}
                 settingsSection={settingsSection}
                 libraryCollection={route.libraryCollection}
                 conversations={conversations}

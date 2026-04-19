@@ -562,19 +562,27 @@ impl OperationQueueService {
                 let transfer_id = self.transfers.create_transfer(record).await?;
                 descriptor.transfer_id = transfer_id;
             }
+            // The queue and executable payloads use separate locks. Keep newly
+            // visible operations paused until their payloads are registered so
+            // a pump finishing an earlier operation cannot execute them in the
+            // small window between enqueue and payload insertion.
+            descriptor.paused = true;
         }
         self.clear_redo_stack().await;
         let (_, operation_ids) = self
             .queue
             .enqueue_batch_with_ids(label, preserve_order, descriptors)
             .await;
-        self.sync_all_transfers_from_queue().await;
         {
             let mut stored = self.payloads.lock().await;
             for (operation_id, payload) in operation_ids.iter().copied().zip(payloads) {
                 stored.insert(operation_id, payload);
             }
         }
+        for operation_id in &operation_ids {
+            let _ = self.queue.resume_operation(*operation_id).await;
+        }
+        self.sync_all_transfers_from_queue().await;
         self.schedule_pump();
         Ok((self.snapshot_with_redo_state().await, operation_ids))
     }
@@ -3456,19 +3464,28 @@ mod tests {
         operation_id: u64,
         expected: OperationStatus,
     ) {
-        for _ in 0..100 {
+        let mut last_status = None;
+        let mut last_error = String::new();
+        for _ in 0..250 {
             let snapshot = service.snapshot().await;
-            let status = snapshot
+            let operation = snapshot
                 .operations
                 .iter()
-                .find(|operation| operation.operation_id == operation_id)
-                .map(|operation| operation.status);
+                .find(|operation| operation.operation_id == operation_id);
+            let status = operation.map(|operation| operation.status);
+            last_status = status;
+            last_error = operation
+                .map(|operation| operation.error_message.clone())
+                .unwrap_or_default();
             if status == Some(expected) {
                 return;
             }
             tokio::time::sleep(std::time::Duration::from_millis(20)).await;
         }
-        panic!("operation {operation_id} did not reach {expected:?}");
+        panic!(
+            "operation {operation_id} did not reach {expected:?}; \
+             last observed status: {last_status:?}; error: {last_error}"
+        );
     }
 
     fn newest_operation_id(snapshot: &OperationQueueSnapshot) -> u64 {

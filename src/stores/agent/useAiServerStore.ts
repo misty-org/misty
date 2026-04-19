@@ -30,6 +30,7 @@ export type {
 } from "@/models/interfaces/stores/agent/useAiServerStore";
 import { appSnapshot } from "@/stores/backend";
 import { normalizeApiBaseUrl, withDefaultApiPath } from "@/stores/backend";
+import { addRequestCorrelation } from "@/platform/requestCorrelation";
 import {
   isAccountSessionTransitioning,
   readAccountSessionGeneration,
@@ -73,8 +74,8 @@ export async function createAgentSession(
           spaceId: legacySpaceId,
         }
       : typeof optionsOrJob === "object"
-      ? optionsOrJob
-      : { agentJobId: optionsOrJob, spaceId: legacySpaceId };
+        ? optionsOrJob
+        : { agentJobId: optionsOrJob, spaceId: legacySpaceId };
   return managedAiRequest<CreateSessionResponse>("/ai/sessions", {
     method: "POST",
     body:
@@ -152,6 +153,7 @@ export async function managedAiRequest<T = unknown>(path: string, init?: Request
   const token = await readAccountAuthToken();
   assertStableManagedAiAccount(accountGeneration);
   const headers = new Headers(init?.headers);
+  addRequestCorrelation(headers);
   if (init?.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   if (token && !headers.has("Authorization")) headers.set("Authorization", `Bearer ${token}`);
   let response: Response;
@@ -177,9 +179,7 @@ export async function managedAiRequest<T = unknown>(path: string, init?: Request
     }
     if (payload) {
       if (payload.code === "hosted_ai_limit_reached") {
-        const reset = payload.reset_at
-          ? new Date(payload.reset_at).toLocaleDateString()
-          : "Monday";
+        const reset = payload.reset_at ? new Date(payload.reset_at).toLocaleDateString() : "Monday";
         throw new ManagedAiRequestError(
           `Weekly hosted AI usage is fully used. Try again after the reset on ${reset} or upgrade to Pro.`,
           response.status,

@@ -3,8 +3,7 @@ import {
   BookOpenText,
   CheckSquare2,
   MessagesSquare,
-  NotebookPen,
-  PenTool,
+  BookHeart,
   type LucideIcon,
 } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -17,8 +16,7 @@ import { spaceNotesEnabled } from "@/features/notes/availability";
 const sections = [
   { id: "chat", label: "Chat", icon: MessagesSquare },
   { id: "tasks", label: "Tasks", icon: CheckSquare2 },
-  { id: "notes", label: "Notes", icon: NotebookPen },
-  { id: "drawings", label: "Drawings", icon: PenTool },
+  { id: "journal", label: "Journal", icon: BookHeart },
   { id: "library", label: "Library", icon: BookOpenText },
 ] as const;
 
@@ -35,14 +33,11 @@ export function SpaceSectionNavigation({
     (state) => state.spaces.find((item) => item.id === spaceId)?.permissions,
   );
   const visibleSections = sections
-    .filter(({ id }) => id !== "notes" || spaceNotesEnabled)
     .filter(({ id }) => id !== "chat" || permissions?.["messages.read"] !== false)
     .filter(({ id }) => id !== "tasks" || permissions?.["tasks.view"] !== false)
-    .filter(({ id }) => id !== "library" || permissions?.["library.view"] !== false)
-    // Notes are Space content, so they follow the Library permission rather than
-    // introducing a permission the backend does not issue yet.
-    .filter(({ id }) => id !== "notes" || permissions?.["library.view"] !== false)
-    .filter(({ id }) => id !== "drawings" || permissions?.["library.view"] !== false);
+    .filter(({ id }) => id !== "library" || permissions?.["library.view"] !== false);
+  const journalDestination =
+    spaceNotesEnabled && permissions?.["library.view"] !== false ? "notes" : "drawings";
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -54,10 +49,12 @@ export function SpaceSectionNavigation({
         {visibleSections.map(({ id, label, icon: Icon }) => (
           <SpaceNavigationLink
             key={id}
-            active={section === id}
+            active={
+              id === "journal" ? section === "notes" || section === "drawings" : section === id
+            }
             icon={Icon}
             label={label}
-            to={`/spaces/${encodeURIComponent(spaceId)}/${id}`}
+            to={`/spaces/${encodeURIComponent(spaceId)}/${id === "journal" ? journalDestination : id}`}
           />
         ))}
       </nav>

@@ -25,7 +25,6 @@
     "core:webview:allow-create-webview-window",
     "core:webview:allow-set-webview-auto-resize",
     "core:webview:allow-set-webview-zoom",
-    "clipboard-manager:default",
     "clipboard-manager:allow-read-text",
     "clipboard-manager:allow-write-text",
     "clipboard-manager:allow-read-image",
@@ -33,15 +32,26 @@
     "clipboard-manager:allow-write-image",
     "core:event:default",
     "deep-link:default",
-    "dialog:default",
+    "dialog:allow-message",
+    "dialog:allow-open",
     "drag:default",
     "keystore:default",
-    "os:default",
-    "opener:default",
+    "os:allow-arch",
+    "os:allow-platform",
+    "os:allow-version",
+    "process:allow-restart",
+    "updater:default",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        { "url": "https://*" },
+        { "url": "http://*" },
+        { "url": "mailto:*" }
+      ]
+    },
     {
       "identifier": "opener:allow-open-path",
       "allow": [
-        { "path": "$HOME/**" },
         { "path": "$DESKTOP/**" },
         { "path": "$DOCUMENT/**" },
         { "path": "$DOWNLOAD/**" },
@@ -51,7 +61,8 @@
         { "path": "$TEMP/**" },
         { "path": "$APPDATA/**" },
         { "path": "$APPLOCALDATA/**" },
-        { "path": "$APPCACHE/**" }
+        { "path": "$APPCACHE/**" },
+        { "path": "$HOME/.misty/**" }
       ]
     }
   ]
