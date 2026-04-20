@@ -85,16 +85,16 @@ namespace misty::panel {
             return !after.empty() && after != "/";
         }
 
-        // Structure: ~/misty/mnt/{ProviderFolder}/{remote_name}/{relative_path}
+        // Structure: ~/misty/mnt/{ProviderFolder}/{folder_name}/{relative_path}
         //
-        // Returns (provider_folder, remote_name, relative_path).
+        // Returns (provider_folder, folder_name, relative_path).
         // Examples:
         //   ~/misty/mnt/OneDrive                     → ("OneDrive", "", "")
-        //   ~/misty/mnt/OneDrive/onedrive-123         → ("OneDrive", "onedrive-123", "")
-        //   ~/misty/mnt/OneDrive/onedrive-123/Docs    → ("OneDrive", "onedrive-123", "Docs")
+        //   ~/misty/mnt/OneDrive/mattdev727          → ("OneDrive", "mattdev727", "")
+        //   ~/misty/mnt/OneDrive/mattdev727/Docs     → ("OneDrive", "mattdev727", "Docs")
         struct RemotePathInfo {
             std::string provider_folder;  // "OneDrive", "Google Drive", etc.
-            std::string remote_name;      // rclone remote name
+            std::string remote_name;      // mount folder segment; resolve via WorkspaceState when needed
             std::string relative_path;    // path within the remote
         };
 
@@ -218,6 +218,10 @@ namespace misty::panel {
         // Transient per-tab sync state for manual "run now" refreshes.
         bool sync_request_in_flight = false;
         uint64_t sync_request_generation = 0;
+        bool current_dir_watched = false;
+        bool sync_watch_request_in_flight = false;
+        bool watched_refresh_in_flight = false;
+        std::chrono::steady_clock::time_point next_watched_refresh_at{};
 
         // Download tracking - paths currently being downloaded
         std::unordered_set<std::string> downloading_files;

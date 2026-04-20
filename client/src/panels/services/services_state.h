@@ -52,6 +52,12 @@ namespace misty::panel {
                                                      const std::string& error)>;
 
     using UploadCallback = std::function<void(bool success, const std::string& error_msg)>;
+    using DirtyIndicatorCallback = std::function<void(const std::string& remote,
+                                                      const std::string& path,
+                                                      bool local_exists,
+                                                      bool is_dir,
+                                                      const std::string& mtime,
+                                                      int64_t size)>;
 
     class ServicesState : public core::UIState {
     public:
@@ -89,6 +95,14 @@ namespace misty::panel {
         void refetch_sync_items(const std::string& remote,
                                 const std::string& path,
                                 FilesCallback callback);
+
+        void watch_sync_dir(const std::string& remote,
+                            const std::string& path,
+                            FilesCallback callback);
+
+        void unwatch_sync_dir(const std::string& remote,
+                              const std::string& path,
+                              FilesCallback callback);
 
         // Triggers an out-of-band poll + reconcile pass on the proxy without
         // waiting for the 30s tick. Intended for the toolbar Refresh button:
@@ -152,6 +166,7 @@ namespace misty::panel {
         // the dirty pipeline.
         void suppress_fs_path(const std::string& local_path);
         void unsuppress_fs_path(const std::string& local_path);
+        void register_dirty_indicator_callback(const std::string& key, DirtyIndicatorCallback callback);
 
         std::mutex mu;
         std::string error_msg;
@@ -235,5 +250,7 @@ namespace misty::panel {
 
         std::mutex watchers_mu_;
         std::unordered_map<std::string, WatchEntry> watchers_;
+        std::mutex dirty_indicator_mu_;
+        std::unordered_map<std::string, DirtyIndicatorCallback> dirty_indicator_callbacks_;
     };
 }

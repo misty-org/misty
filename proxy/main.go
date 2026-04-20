@@ -138,11 +138,9 @@ func main() {
 		panic(err)
 	}
 	proxy.SyncIndex = syncindex.NewService(proxy.Database)
-
-	pollInterval := syncindex.PollIntervalFromEnv(30)
-	proxy.SyncPoller = syncindex.NewPoller(proxy.SyncIndex, pollInterval)
-	proxy.SyncPoller.Start()
-	log.Printf("syncindex: poller started with interval %s", pollInterval)
+	proxy.SyncManager = syncindex.NewManager(proxy.SyncIndex, 0)
+	proxy.SyncManager.Start()
+	log.Printf("syncindex: manager started")
 
 	// Periodically clean up expired/revoked refresh tokens
 	go func() {
@@ -156,6 +154,9 @@ func main() {
 	}()
 
 	rclone.Init()
+	if err := rclone.EnsureAllRemoteDefaults(); err != nil {
+		log.Println("rclone: ensure remote defaults:", err)
+	}
 
 	// MVault depends on the restic binary being on PATH and meeting the
 	// minimum version. We do the check at startup so misconfigured installs

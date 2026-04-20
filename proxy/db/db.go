@@ -102,6 +102,58 @@ CREATE INDEX IF NOT EXISTS idx_sync_entries_root_dirty
     ON sync_entries(root_id, is_dirty);
 CREATE INDEX IF NOT EXISTS idx_sync_entries_root_updated
     ON sync_entries(root_id, updated_at);
+
+CREATE TABLE IF NOT EXISTS file_metadata (
+    remote_name TEXT NOT NULL,
+    rel_path TEXT NOT NULL,
+    parent_rel_path TEXT NOT NULL DEFAULT '',
+    name TEXT NOT NULL,
+    is_dir INTEGER NOT NULL DEFAULT 0,
+    local_exists INTEGER NOT NULL DEFAULT 0,
+    local_mtime TEXT,
+    local_size INTEGER,
+    remote_exists INTEGER NOT NULL DEFAULT 0,
+    remote_mtime TEXT,
+    remote_size INTEGER,
+    remote_revision TEXT NOT NULL DEFAULT '',
+    mime_type TEXT NOT NULL DEFAULT '',
+    local_dirty INTEGER NOT NULL DEFAULT 0,
+    last_local_event_at TEXT,
+    last_local_seen_at TEXT,
+    last_remote_seen_at TEXT,
+    last_compared_at TEXT,
+    last_synced_at TEXT,
+    last_error TEXT NOT NULL DEFAULT '',
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (remote_name, rel_path)
+);
+
+CREATE INDEX IF NOT EXISTS idx_file_metadata_remote_parent_name
+    ON file_metadata(remote_name, parent_rel_path, name);
+CREATE INDEX IF NOT EXISTS idx_file_metadata_remote_updated
+    ON file_metadata(remote_name, updated_at);
+CREATE INDEX IF NOT EXISTS idx_file_metadata_remote_dirty
+    ON file_metadata(remote_name, local_dirty);
+
+CREATE TABLE IF NOT EXISTS watched_dirs (
+    remote_name TEXT NOT NULL,
+    rel_path TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (remote_name, rel_path)
+);
+
+CREATE TABLE IF NOT EXISTS file_hash (
+    remote_name TEXT NOT NULL,
+    rel_path TEXT NOT NULL,
+    side TEXT NOT NULL,
+    algorithm TEXT NOT NULL,
+    hash_value TEXT NOT NULL,
+    observed_mtime TEXT,
+    observed_size INTEGER,
+    computed_at TEXT NOT NULL,
+    PRIMARY KEY (remote_name, rel_path, side, algorithm)
+);
 `
 
 	if _, err := conn.Exec(schema); err != nil {

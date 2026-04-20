@@ -4,11 +4,71 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
+	"strings"
 
 	"github.com/rclone/rclone/fs/config"
 	"github.com/rclone/rclone/fs/fspath"
 	"github.com/rclone/rclone/fs/rc"
 )
+
+const defaultDriveImportFormats = "csv,doc,docx,htm,html,odp,ods,odt,ppt,pptx,rtf,tsv,txt,xls,xlsx"
+
+func desiredDriveImportFormats() string {
+	if value := strings.TrimSpace(os.Getenv("MISTY_DRIVE_IMPORT_FORMATS")); value != "" {
+		return value
+	}
+	return defaultDriveImportFormats
+}
+
+func normalizeCommaList(value string) string {
+	parts := strings.Split(value, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.ToLower(strings.TrimSpace(part))
+		if part == "" {
+			continue
+		}
+		out = append(out, part)
+	}
+	return strings.Join(out, ",")
+}
+
+// EnsureRemoteDefaults persists Misty's provider-specific default options on
+// an existing remote. This is safe to call repeatedly.
+func EnsureRemoteDefaults(name string) error {
+	Init()
+	if GetRemoteType(name) != "drive" {
+		return nil
+	}
+
+	desired := desiredDriveImportFormats()
+	if desired == "" {
+		return nil
+	}
+
+	current, _ := config.FileGetValue(name, "import_formats")
+	if normalizeCommaList(current) == normalizeCommaList(desired) {
+		return nil
+	}
+	return config.SetValueAndSave(name, "import_formats", desired)
+}
+
+// EnsureAllRemoteDefaults upgrades existing remotes in-place so newly-added
+// backend defaults apply without requiring the user to reconnect accounts.
+func EnsureAllRemoteDefaults() error {
+	Init()
+	var errs []string
+	for _, remote := range ListRemotes() {
+		if err := EnsureRemoteDefaults(remote.Name); err != nil {
+			errs = append(errs, fmt.Sprintf("%s: %v", remote.Name, err))
+		}
+	}
+	if len(errs) != 0 {
+		return fmt.Errorf("ensure remote defaults: %s", strings.Join(errs, "; "))
+	}
+	return nil
+}
 
 // ListRemotes returns all configured remotes from rclone.conf.
 func ListRemotes() []RemoteInfo {
@@ -60,6 +120,9 @@ func CreateRemote(ctx context.Context, name, providerType string, params map[str
 	}
 
 	config.SaveConfig()
+	if err := EnsureRemoteDefaults(name); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -167,6 +230,9 @@ func FinalizeRemoteName(ctx context.Context, tempName string) string {
 	if err := RenameRemote(tempName, newName); err != nil {
 		log.Printf("finalize remote %q: rename to %q: %v", tempName, newName, err)
 		return tempName
+	}
+	if err := EnsureRemoteDefaults(newName); err != nil {
+		log.Printf("finalize remote %q: ensure defaults on %q: %v", tempName, newName, err)
 	}
 	return newName
 }

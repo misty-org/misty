@@ -53,6 +53,7 @@ namespace misty::panel {
         void render_search_overlay(panel::SearchState& search_state, const ImVec2& list_start, float list_height);
         void process_deferred_search_actions(panel::SearchState& search_state);
         void update_periodic_save(panel::FileExplorerState& state);
+        void update_periodic_watched_sync(panel::FileExplorerState& state);
         void render_chat_overlay(panel::FileExplorerState& state,
                                  float overlay_width,
                                  float overlay_height,
@@ -65,11 +66,16 @@ namespace misty::panel {
         void update_navigation_history(panel::FileExplorerState& state, const std::string& target_path, bool update_history);
         void set_active_path(panel::FileExplorerState& state, const std::string& path);
         void reset_selection(panel::FileExplorerState& state);
+        bool resolve_remote_path_context(const std::string& path,
+                                         std::string& remote_name,
+                                         std::string& remote_path) const;
         void notify_shared_path_refresh(const std::string& path);
         void request_manual_refresh(panel::FileExplorerState& state);
+        void toggle_current_sync_watch(panel::FileExplorerState& state);
 
         void show_nav_history(panel::FileExplorerState& state, float button_width, float spacing);
-        void show_search_bar(panel::FileExplorerState& state);
+        void show_search_bar(panel::FileExplorerState& state, SearchState& search_state);
+        void show_breadcrumb_bar(panel::FileExplorerState& state);
         void show_inline_search(panel::FileExplorerState& state, SearchState& search_state);
         void show_directory_contents(panel::FileExplorerState& state);
         void render_preview_pane(const std::string& selected_path, float preview_width);
@@ -120,7 +126,8 @@ namespace misty::panel {
                                  const std::string& target_path, uint64_t navigation_generation);
         void handle_remote_folder_fetch(const std::string& remote_name, const std::string& target_path,
                                         uint64_t navigation_generation,
-                                        bool success, const std::string& body, const std::string& error);
+                                        bool success, const std::string& body, const std::string& error,
+                                        bool preserve_selection = false);
         void download_remote_file(const UnifiedFileItem& file);
         bool delete_remote_file(const UnifiedFileItem& file, std::string* error_message = nullptr);
 

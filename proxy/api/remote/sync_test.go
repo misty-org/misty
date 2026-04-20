@@ -36,41 +36,22 @@ func TestSyncListReturnsSeededDirectoryRows(t *testing.T) {
 	defer cleanup()
 
 	now := dbpkg.NowRFC3339()
-	root := dbpkg.SyncRoot{
-		ID:             "drive-alice",
-		RemoteName:     "drive-alice",
-		RemoteType:     "drive",
-		ProviderFolder: "Google Drive",
-		FolderName:     "alice",
-		MountRoot:      "/tmp/misty/mnt",
-		Enabled:        true,
-		CreatedAt:      now,
-		UpdatedAt:      now,
-	}
-	if err := dbpkg.UpsertSyncRoot(database.Conn, root); err != nil {
-		t.Fatalf("UpsertSyncRoot: %v", err)
-	}
-
-	entry := dbpkg.SyncEntry{
-		ID:            dbpkg.MakeSyncEntryID(root.ID, "docs/report.txt"),
-		RootID:        root.ID,
+	row := dbpkg.FileMetadata{
+		RemoteName:    "drive-alice",
 		RelPath:       "docs/report.txt",
 		ParentRelPath: "docs",
 		Name:          "report.txt",
 		LocalExists:   true,
 		RemoteExists:  true,
-		IsDirty:       true,
-		SyncDirection: "push",
+		LocalDirty:    true,
 		LocalMTime:    now,
 		RemoteMTime:   now,
 		LocalSize:     sql.NullInt64{Int64: 42, Valid: true},
 		RemoteSize:    sql.NullInt64{Int64: 42, Valid: true},
-		StateCode:     "MOD",
-		CreatedAt:     now,
 		UpdatedAt:     now,
 	}
-	if err := dbpkg.UpsertSyncEntry(database.Conn, entry); err != nil {
-		t.Fatalf("UpsertSyncEntry: %v", err)
+	if err := dbpkg.UpsertFileMetadata(database.Conn, row); err != nil {
+		t.Fatalf("UpsertFileMetadata: %v", err)
 	}
 
 	service := syncindex.NewService(database)
@@ -101,7 +82,8 @@ func TestSyncRefetchRejectsMissingRemote(t *testing.T) {
 		t.Fatalf("expected 503 for nil service, got %d", rr.Code)
 	}
 
-	rr = doRequest(SyncRefetch(&syncindex.Service{}), http.MethodPost, "/api/sync/refetch", bytes.NewBufferString(`{"path":"docs"}`))
+	manager := syncindex.NewManager(syncindex.NewService(&dbpkg.Database{}), 0)
+	rr = doRequest(SyncRefetch(manager), http.MethodPost, "/api/sync/refetch", bytes.NewBufferString(`{"path":"docs"}`))
 	if rr.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400 for missing remote, got %d: %s", rr.Code, rr.Body.String())
 	}
