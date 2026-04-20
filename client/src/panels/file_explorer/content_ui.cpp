@@ -90,6 +90,42 @@ std::string icon_name_for_file(const FileExplorerState& state, const UnifiedFile
     return "file-16";
 }
 
+const char* sync_icon_name_for_item(const UnifiedFileItem& file) {
+    if (file.source != FileSource::REMOTE) return nullptr;
+    return file.sync_dirty ? "x-circle-fill-16" : "cloud-24";
+}
+
+ImVec4 sync_icon_tint_for_item(const UnifiedFileItem& file) {
+    return file.sync_dirty
+        ? ImVec4(0.91f, 0.30f, 0.24f, 1.0f)
+        : ImVec4(0.18f, 0.80f, 0.44f, 1.0f);
+}
+
+const char* sync_icon_name_for_item(const FileExplorerState& state, const UnifiedFileItem& file) {
+    if (file.source != FileSource::REMOTE) return nullptr;
+    const bool sync_in_progress = state.sync_request_in_flight && file.sync_dirty;
+    if (sync_in_progress) return "sync-16";
+    return sync_icon_name_for_item(file);
+}
+
+ImVec4 sync_icon_tint_for_item(const FileExplorerState& state, const UnifiedFileItem& file) {
+    const bool sync_in_progress = state.sync_request_in_flight && file.sync_dirty;
+    if (sync_in_progress) {
+        return ImVec4(0.34f, 0.76f, 0.96f, 1.0f);
+    }
+    return sync_icon_tint_for_item(file);
+}
+
+void show_sync_tooltip_for_item(const UnifiedFileItem& file) {
+    if (file.source != FileSource::REMOTE) return;
+    if (file.sync_dirty) {
+        if (!file.sync_direction.empty()) ImGui::SetTooltip("Dirty (%s)", file.sync_direction.c_str());
+        else ImGui::SetTooltip("Dirty");
+    } else {
+        ImGui::SetTooltip("In Sync");
+    }
+}
+
 void render_empty_state(float icon_size) {
     float avail_h = ImGui::GetContentRegionAvail().y;
     float avail_w = ImGui::GetContentRegionAvail().x;
@@ -125,12 +161,7 @@ void select_item(FileExplorerState& state, const UnifiedFileItem& file, int inde
 } // namespace
 void FileExplorerPanel::show_directory_contents(FileExplorerState& state) {
     static ImGuiTableFlags flags = ImGuiTableFlags_Reorderable | ImGuiTableFlags_Sortable |
-        ImGuiTableFlags_Hideable | ImGuiTableFlags_ScrollY | ImGuiTableFlags_ScrollX |
-        ImGuiTableFlags_Resizable;
-    const ImVec4 scrollbar_bg(1.0f, 1.0f, 1.0f, 0.04f);
-    const ImVec4 scrollbar_grab(0.96f, 0.96f, 0.96f, 0.32f);
-    const ImVec4 scrollbar_grab_hovered(0.98f, 0.98f, 0.98f, 0.46f);
-    const ImVec4 scrollbar_grab_active(1.0f, 1.0f, 1.0f, 0.62f);
+        ImGuiTableFlags_Hideable | ImGuiTableFlags_Resizable;
 
     const bool loading = state.is_loading;
     const bool show_loading_animation = loading && state.show_loading_animation &&
@@ -157,11 +188,6 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state) {
         }
     }
 
-    ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, 8.0f);
-    ImGui::PushStyleColor(ImGuiCol_ScrollbarBg, scrollbar_bg);
-    ImGui::PushStyleColor(ImGuiCol_ScrollbarGrab, scrollbar_grab);
-    ImGui::PushStyleColor(ImGuiCol_ScrollbarGrabHovered, scrollbar_grab_hovered);
-    ImGui::PushStyleColor(ImGuiCol_ScrollbarGrabActive, scrollbar_grab_active);
     ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.45f, 0.45f, 0.45f, 0.35f));
     ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.45f, 0.45f, 0.45f, 0.35f));
     ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0.45f, 0.45f, 0.45f, 0.45f));
@@ -175,7 +201,6 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state) {
         if (state.files.empty()) {
             render_empty_state(48.0f);
         } else {
-            ImGui::BeginChild("##grid_scroll", ImVec2(0, 0), false, ImGuiWindowFlags_AlwaysVerticalScrollbar);
             float avail_w = ImGui::GetContentRegionAvail().x;
             int cols = std::max(1, static_cast<int>(avail_w / (cell_w + padding)));
             const float base_x = ImGui::GetCursorPosX();
@@ -202,13 +227,11 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state) {
 
             show_context_menu(state);
             show_background_context_menu(state);
-            ImGui::EndChild();
         }
         ImGui::PopStyleVar();
     } else {
         const float table_inner_width = std::max(ImGui::GetContentRegionAvail().x, kTableMinInnerWidth);
-        if (ImGui::BeginTable("FileTable", 6, flags | ImGuiTableFlags_NoHostExtendY,
-                              ImVec2(0.0f, ImGui::GetContentRegionAvail().y), table_inner_width)) {
+        if (ImGui::BeginTable("FileTable", 6, flags, ImVec2(0.0f, 0.0f), table_inner_width)) {
         ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_DefaultSort,
                                 kNameColumnWidth);
         ImGui::TableSetupColumn("Size", ImGuiTableColumnFlags_WidthFixed, kSizeColumnWidth);
@@ -251,8 +274,7 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state) {
         }
     }
 
-    ImGui::PopStyleColor(7);
-    ImGui::PopStyleVar();
+    ImGui::PopStyleColor(3);
 
     if (loading && overlay_size.x > 0.0f && overlay_size.y > 0.0f) {
         ImGui::SetCursorScreenPos(overlay_min);
@@ -420,22 +442,16 @@ void FileExplorerPanel::show_file_item(FileExplorerState& state, int i) {
     ImGui::TableNextColumn();
     ImGui::SetCursorPosY(ImGui::GetCursorPosY() + content_padding_y);
     if (file.source == FileSource::REMOTE) {
-        const char* icon_name = file.sync_dirty ? "x-circle-fill-16" : "cloud-24";
-        auto& sync_icon = AssetManager::get().get_svg_texture(icon_name, 16);
+        auto& sync_icon = AssetManager::get().get_svg_texture(sync_icon_name_for_item(state, file), 16);
         if (sync_icon.id != 0) {
-            const ImVec4 tint = file.sync_dirty ? ImVec4(0.91f, 0.30f, 0.24f, 1.0f) : ImVec4(0.18f, 0.80f, 0.44f, 1.0f);
-            ImGui::Image(sync_icon.id, ImVec2(16, 16), ImVec2(0, 0), ImVec2(1, 1), tint, ImVec4(0, 0, 0, 0));
+            ImGui::Image(sync_icon.id, ImVec2(16, 16), ImVec2(0, 0), ImVec2(1, 1),
+                sync_icon_tint_for_item(state, file), ImVec4(0, 0, 0, 0));
         } else {
             ImGui::TextUnformatted(file.sync_dirty ? "!" : "");
         }
 
         if (ImGui::IsItemHovered()) {
-            if (file.sync_dirty) {
-                if (!file.sync_direction.empty()) ImGui::SetTooltip("Dirty (%s)", file.sync_direction.c_str());
-                else ImGui::SetTooltip("Dirty");
-            } else {
-                ImGui::SetTooltip("In Sync");
-            }
+            show_sync_tooltip_for_item(file);
         }
     } else {
         ImGui::TextUnformatted("-");
@@ -469,9 +485,31 @@ void FileExplorerPanel::show_grid_item(FileExplorerState& state, int i, float ce
     }
 
     float text_y = icon_y + icon_size + 6.0f;
-    const float text_wrap_width = cell_w - 10.0f;
+    const bool has_sync_badge = file.source == FileSource::REMOTE;
+    const float sync_badge_size = has_sync_badge ? 14.0f : 0.0f;
+    const float sync_badge_gap = has_sync_badge ? 4.0f : 0.0f;
+    const float text_wrap_width = cell_w - 10.0f - sync_badge_size - sync_badge_gap;
     ImVec2 name_size = ImGui::CalcTextSize(file.name.c_str(), nullptr, false, text_wrap_width);
-    float text_x = cell_pos.x + (cell_w - std::min(name_size.x, text_wrap_width)) * 0.5f;
+    const float visible_text_width = std::min(name_size.x, text_wrap_width);
+    const float label_group_width = visible_text_width + sync_badge_size + sync_badge_gap;
+    float group_x = cell_pos.x + (cell_w - label_group_width) * 0.5f;
+    float text_x = group_x + sync_badge_size + sync_badge_gap;
+    if (has_sync_badge) {
+        const ImVec2 badge_min(group_x, text_y + 1.0f);
+        const ImVec2 badge_max(badge_min.x + sync_badge_size, badge_min.y + sync_badge_size);
+        auto& sync_icon = AssetManager::get().get_svg_texture(sync_icon_name_for_item(state, file), 14);
+        if (sync_icon.id != 0) {
+            dl->AddImage(sync_icon.id, badge_min, badge_max, ImVec2(0, 0), ImVec2(1, 1),
+                ImGui::ColorConvertFloat4ToU32(sync_icon_tint_for_item(state, file)));
+        } else {
+            dl->AddText(ImVec2(group_x, text_y), IM_COL32(212, 212, 216, 255), file.sync_dirty ? "!" : "*");
+        }
+        if (hovered &&
+            io.MousePos.x >= badge_min.x && io.MousePos.x <= badge_max.x &&
+            io.MousePos.y >= badge_min.y && io.MousePos.y <= badge_max.y) {
+            show_sync_tooltip_for_item(file);
+        }
+    }
     dl->AddText(ImGui::GetFont(), ImGui::GetFontSize(), ImVec2(text_x, text_y),
         is_selected ? IM_COL32(255, 255, 255, 255) : IM_COL32(212, 212, 216, 255),
         file.name.c_str(), nullptr, text_wrap_width);

@@ -513,6 +513,82 @@ namespace misty::panel {
         );
     }
 
+    void ServicesState::watch_sync_dir(const std::string& remote,
+                                       const std::string& path,
+                                       FilesCallback callback) {
+        if (!worker_pool_) return;
+
+        worker_pool_->add(
+            [remote, path, callback]() {
+                std::string base = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
+                if (base.empty()) {
+                    callback(false, "", "PROXY_SERVICE_URL not set");
+                    return;
+                }
+
+                std::string url = base + "/api/sync/watch-dir";
+                std::string body = core::build_json_object({
+                    {"remote", remote},
+                    {"path", path},
+                });
+
+                std::map<std::string, std::string> headers;
+                headers["Accept"] = "application/json";
+                headers["Content-Type"] = "application/json";
+
+                auto response = core::HTTPClient::get().put(url, body, headers);
+                if (response.status_code >= 200 && response.status_code < 300) {
+                    callback(true, response.body, "");
+                } else {
+                    std::string err = "HTTP " + std::to_string(response.status_code);
+                    if (!response.body.empty()) err += ": " + response.body;
+                    std::cerr << "watch_sync_dir(" << remote << ", " << path << "): " << err << std::endl;
+                    callback(false, "", err);
+                }
+            },
+            []() {},
+            [callback](const std::string& err) {
+                callback(false, "", err);
+            }
+        );
+    }
+
+    void ServicesState::unwatch_sync_dir(const std::string& remote,
+                                         const std::string& path,
+                                         FilesCallback callback) {
+        if (!worker_pool_) return;
+
+        worker_pool_->add(
+            [remote, path, callback]() {
+                std::string base = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
+                if (base.empty()) {
+                    callback(false, "", "PROXY_SERVICE_URL not set");
+                    return;
+                }
+
+                std::string url = base + "/api/sync/watch-dir?remote=" + core::url_encode(remote)
+                    + "&path=" + core::url_encode(path);
+
+                std::map<std::string, std::string> headers;
+                headers["Accept"] = "application/json";
+
+                auto response = core::HTTPClient::get().del(url, headers);
+                if (response.status_code >= 200 && response.status_code < 300) {
+                    callback(true, response.body, "");
+                } else {
+                    std::string err = "HTTP " + std::to_string(response.status_code);
+                    if (!response.body.empty()) err += ": " + response.body;
+                    std::cerr << "unwatch_sync_dir(" << remote << ", " << path << "): " << err << std::endl;
+                    callback(false, "", err);
+                }
+            },
+            []() {},
+            [callback](const std::string& err) {
+                callback(false, "", err);
+            }
+        );
+    }
+
     void ServicesState::run_sync_now(const std::string& remote, FilesCallback callback) {
         if (!worker_pool_) return;
 
@@ -612,6 +688,16 @@ namespace misty::panel {
         }
     }
 
+    void ServicesState::register_dirty_indicator_callback(const std::string& key,
+                                                          DirtyIndicatorCallback callback) {
+        std::lock_guard<std::mutex> lock(dirty_indicator_mu_);
+        if (!callback) {
+            dirty_indicator_callbacks_.erase(key);
+            return;
+        }
+        dirty_indicator_callbacks_[key] = std::move(callback);
+    }
+
     void ServicesState::dispatch_fs_events(const std::string& remote_name,
                                            const std::string& mount_path,
                                            std::vector<core::sync::FsEvent> events) {
@@ -625,6 +711,17 @@ namespace misty::panel {
             if (rel.empty()) continue;
 
             bool local_exists = ev.kind != core::sync::FsEventKind::DELETED;
+            std::vector<DirtyIndicatorCallback> callbacks;
+            {
+                std::lock_guard<std::mutex> lock(dirty_indicator_mu_);
+                callbacks.reserve(dirty_indicator_callbacks_.size());
+                for (const auto& [_, callback] : dirty_indicator_callbacks_) {
+                    if (callback) callbacks.push_back(callback);
+                }
+            }
+            for (const auto& callback : callbacks) {
+                callback(remote_name, rel, local_exists, ev.is_dir, ev.mtime, ev.size);
+            }
             mark_local_dirty(remote_name, rel,
                              local_exists, ev.is_dir, ev.mtime, ev.size,
                              [](bool, const std::string&, const std::string&) {});

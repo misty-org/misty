@@ -413,7 +413,8 @@ namespace misty::panel {
         }
 
         const float visible_tab_width = std::max(0.0f, size.x - kTabStripSidePadding);
-        const bool needs_horizontal_scroll = total_tab_content_width > visible_tab_width;
+        const bool allow_horizontal_scroll = pane_count() > 1;
+        const bool needs_horizontal_scroll = allow_horizontal_scroll && total_tab_content_width > visible_tab_width;
         out_height = std::min(
             kTabBarHeight + (needs_horizontal_scroll ? (kTabStripScrollbarSize + 4.0f) : 4.0f),
             size.y);

@@ -11,6 +11,7 @@
 #include <nlohmann/json.hpp>
 #include <filesystem>
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 
 namespace fs = std::filesystem;
@@ -27,6 +28,84 @@ static std::string format_size(int64_t bytes) {
     if (bytes < 1024) return std::to_string(bytes) + " B";
     if (bytes < 1024 * 1024) return std::to_string(bytes / 1024) + " KB";
     return std::to_string(bytes / (1024 * 1024)) + " MB";
+}
+
+static std::string lowercase_copy(std::string value) {
+    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
+    return value;
+}
+
+static std::string trim_copy(std::string value) {
+    auto not_space = [](unsigned char c) { return !std::isspace(c); };
+    value.erase(value.begin(), std::find_if(value.begin(), value.end(), not_space));
+    value.erase(std::find_if(value.rbegin(), value.rend(), not_space).base(), value.end());
+    return value;
+}
+
+static std::string type_label_for_item(const UnifiedFileItem& file) {
+    if (file.is_dir) return "folder";
+    if (!file.mime_type.empty()) return lowercase_copy(file.mime_type);
+    std::string ext = fs::path(file.name).extension().string();
+    if (!ext.empty() && ext[0] == '.') ext.erase(ext.begin());
+    return lowercase_copy(ext);
+}
+
+static bool type_filter_matches(const UnifiedFileItem& file, const std::string& raw_token) {
+    const std::string token = lowercase_copy(trim_copy(raw_token));
+    if (token.empty()) return true;
+    if (file.is_dir) {
+        return token == "dir" || token == "dirs" || token == "folder" || token == "folders";
+    }
+
+    const std::string ext = lowercase_copy(fs::path(file.name).extension().string());
+    if (!ext.empty()) {
+        if (ext == "." + token) return true;
+        if (ext.size() > 1 && ext.substr(1) == token) return true;
+    }
+
+    const std::string mime_type = lowercase_copy(file.mime_type);
+    if (!mime_type.empty()) {
+        if (mime_type == token) return true;
+        if (mime_type.find(token) != std::string::npos) return true;
+        const size_t slash = mime_type.find('/');
+        if (slash != std::string::npos && mime_type.substr(slash + 1) == token) return true;
+    }
+    return false;
+}
+
+static SearchResult make_result_from_item(const UnifiedFileItem& item,
+                                          const std::string& current_path,
+                                          int fuzzy_score) {
+    SearchResult result;
+    result.name = item.name;
+    result.source = item.source;
+    result.is_dir = item.is_dir;
+    result.size = item.size;
+    result.fuzzy_score = fuzzy_score;
+    result.virtual_path = item.path;
+    result.dedup_key = (item.source == FileSource::REMOTE ? "remote:" : "local:") + item.path;
+    result.remote_name = item.remote_name;
+    result.remote_path = item.remote_path;
+
+    if (item.source == FileSource::REMOTE) {
+        std::string parent = fs::path(item.remote_path).parent_path().string();
+        if (parent == ".") parent.clear();
+        result.path_display = parent.empty() ? current_path : parent;
+    } else {
+        fs::path current(current_path);
+        fs::path item_path(item.path);
+        fs::path display_path = item.is_dir ? item_path : item_path.parent_path();
+        std::error_code ec;
+        fs::path relative = current.empty() ? display_path : fs::relative(display_path, current, ec);
+        if (!ec && !relative.empty() && relative != ".") {
+            result.path_display = relative.string();
+        } else {
+            result.path_display = display_path.string();
+        }
+    }
+    return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -48,19 +127,24 @@ SearchPanel::SearchPanel(core::UIRegistry& ui_registry,
 
 void SearchPanel::toggle() {
     auto& state = ui_registry_.get_state<SearchState>(search_state_key_);
-    state.is_open = !state.is_open;
-    if (state.is_open) {
+    if (state.is_open && state.query_buf[0] != '\0') {
         std::lock_guard<std::mutex> lock(state.mu);
+        state.is_open = false;
+        state.pending_submit = false;
+        state.pending_navigate_index = -1;
+        state.selected_index = 0;
         state.cache_results.clear();
         state.api_results.clear();
         state.seen_ids.clear();
         state.pending_api_tasks.store(0);
         state.api_search_done = true;
-        state.selected_index = 0;
-        state.just_opened = true;
         std::memset(state.query_buf, 0, sizeof(state.query_buf));
-        state.last_submitted_query = "";
+        state.last_submitted_query.clear();
+        return;
     }
+
+    state.is_open = true;
+    state.just_opened = true;
 }
 
 // ---------------------------------------------------------------------------
@@ -69,6 +153,15 @@ void SearchPanel::toggle() {
 
 void SearchPanel::submit_search(const std::string& query) {
     auto& state = ui_registry_.get_state<SearchState>(search_state_key_);
+
+    std::string current_path;
+    std::vector<UnifiedFileItem> current_files;
+    {
+        auto& fe_state = ui_registry_.get_state<FileExplorerState>(explorer_state_key_);
+        std::lock_guard<std::mutex> lock(fe_state.mu);
+        current_path = fe_state.current_path;
+        current_files = fe_state.files;
+    }
 
     uint64_t gen;
     {
@@ -85,25 +178,80 @@ void SearchPanel::submit_search(const std::string& query) {
 
     state.last_submitted_query = query;
 
-    // Read current_path on the main thread
-    std::string local_root;
-    {
-        auto& fe_state = ui_registry_.get_state<FileExplorerState>(explorer_state_key_);
-        std::lock_guard<std::mutex> lk(fe_state.mu);
-        local_root = std::string(fe_state.current_path);
+    if (!query.empty() && query[0] == ':') {
+        const std::string type_token = query.substr(1);
+        std::vector<SearchResult> filtered;
+        filtered.reserve(current_files.size());
+        for (const auto& item : current_files) {
+            if (!type_filter_matches(item, type_token)) continue;
+            filtered.push_back(make_result_from_item(item, current_path, 0));
+        }
+        std::sort(filtered.begin(), filtered.end(), [](const SearchResult& a, const SearchResult& b) {
+            if (a.is_dir != b.is_dir) return a.is_dir > b.is_dir;
+            return lowercase_copy(a.name) < lowercase_copy(b.name);
+        });
+        std::lock_guard<std::mutex> lock(state.mu);
+        if (state.query_generation == gen) {
+            state.cache_results = std::move(filtered);
+            state.api_search_done = true;
+        }
+        return;
     }
 
-    // Local filesystem scan on worker thread
+    std::vector<SearchResult> current_results;
+    current_results.reserve(current_files.size());
+    for (const auto& item : current_files) {
+        int score = search::fuzzy_score(query, item.name);
+        if (score < 0) continue;
+        current_results.push_back(make_result_from_item(item, current_path, score));
+    }
+    std::sort(current_results.begin(), current_results.end(), [](const SearchResult& a, const SearchResult& b) {
+        return a.fuzzy_score > b.fuzzy_score;
+    });
+    {
+        std::lock_guard<std::mutex> lock(state.mu);
+        if (state.query_generation == gen) {
+            state.cache_results = current_results;
+            for (const auto& result : current_results) {
+                state.seen_ids.insert(result.dedup_key);
+            }
+        }
+    }
+
+    if (path_utils::is_remote_path(current_path)) {
+        std::string remote_name;
+        std::string remote_path;
+        std::string provider_folder;
+        std::string folder_name;
+        const auto info = path_utils::parse_remote_path(current_path);
+        if (!info.provider_folder.empty() && !info.remote_name.empty()) {
+            remote_path = info.relative_path;
+            remote_name = info.remote_name;
+            provider_folder = info.provider_folder;
+            folder_name = info.remote_name;
+            auto& workspace = ui_registry_.get_state<WorkspaceState>("Workspace");
+            for (const auto& mapping : workspace.remote_mappings) {
+                if (mapping.provider_folder == info.provider_folder &&
+                    (mapping.folder_name == info.remote_name || mapping.remote_name == info.remote_name)) {
+                    remote_name = mapping.remote_name;
+                    folder_name = mapping.folder_name;
+                    break;
+                }
+            }
+        }
+        if (!remote_name.empty()) {
+            search_remote_scope(state, query, gen, remote_name, remote_path, provider_folder, folder_name);
+            return;
+        }
+    }
+
     worker_pool_.add(
-        [this, &state, query, gen, local_root]() {
-            scan_local(state, query, gen, local_root);
+        [this, &state, query, gen, current_path]() {
+            scan_local(state, query, gen, current_path);
         },
         []() {},
         [](const std::string&) {}
     );
-
-    // API searches fire in parallel per connected remote
-    launch_api_searches(state, query, gen);
 }
 
 // ---------------------------------------------------------------------------
@@ -118,6 +266,7 @@ void SearchPanel::scan_local(SearchState& state, const std::string& query, uint6
         if (fs::exists(local_root, ec)) {
             int local_count = 0;
             const int kMaxLocal = 3000;
+            const int kMaxDepth = 8;
             auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(800);
             try {
                 for (auto it = fs::recursive_directory_iterator(local_root,
@@ -125,6 +274,9 @@ void SearchPanel::scan_local(SearchState& state, const std::string& query, uint6
                      it != fs::recursive_directory_iterator(); ++it) {
                     if (local_count >= kMaxLocal) break;
                     if (std::chrono::steady_clock::now() > deadline) break;
+                    if (it.depth() >= kMaxDepth && it->is_directory(ec)) {
+                        it.disable_recursion_pending();
+                    }
 
                     std::string name = it->path().filename().string();
                     if (name.empty() || name[0] == '.') {
@@ -178,32 +330,26 @@ void SearchPanel::scan_local(SearchState& state, const std::string& query, uint6
     {
         std::lock_guard<std::mutex> lock(state.mu);
         if (state.query_generation == generation) {
-            state.cache_results = std::move(results);
+            for (auto& r : results) {
+                if (!state.seen_ids.count(r.dedup_key)) {
+                    state.seen_ids.insert(r.dedup_key);
+                    state.api_results.push_back(std::move(r));
+                }
+            }
+            state.api_search_done = true;
         }
     }
 }
 
-// ---------------------------------------------------------------------------
-// launch_api_searches — fires one search per connected remote via unified API
-// ---------------------------------------------------------------------------
-
-void SearchPanel::launch_api_searches(SearchState& state, const std::string& query, uint64_t generation) {
+void SearchPanel::search_remote_scope(SearchState& state,
+                                      const std::string& query,
+                                      uint64_t generation,
+                                      const std::string& remote_name,
+                                      const std::string& remote_path,
+                                      const std::string& provider_folder,
+                                      const std::string& folder_name) {
     auto& services = ui_registry_.get_state<ServicesState>("Services");
-
-    // Snapshot connections
-    std::vector<RemoteConnection> remotes;
-    {
-        std::lock_guard<std::mutex> lock(services.mu);
-        remotes.assign(services.connections.begin(), services.connections.end());
-    }
-
-    if (remotes.empty()) {
-        state.api_search_done = true;
-        return;
-    }
-
-    int total_tasks = static_cast<int>(remotes.size());
-    state.pending_api_tasks.store(total_tasks);
+    state.pending_api_tasks.store(1);
 
     auto finish_task = [&state, generation]() {
         if (state.pending_api_tasks.fetch_sub(1) == 1) {
@@ -214,81 +360,63 @@ void SearchPanel::launch_api_searches(SearchState& state, const std::string& que
         }
     };
 
-    for (auto& remote : remotes) {
-        std::string remote_name = remote.name;
-        std::string display_name = remote.display_name.empty() ? remote.name : remote.display_name;
-        std::string folder_name = remote.alias.empty() ? remote.name : remote.alias;
-        auto& workspace = ui_registry_.get_state<WorkspaceState>("Workspace");
-        for (const auto& mapping : workspace.remote_mappings) {
-            if (mapping.remote_name == remote_name) {
-                folder_name = mapping.folder_name;
-                break;
+    services.search_files(remote_name, query, remote_path,
+        [this, &state, generation, remote_name, provider_folder, folder_name, query, finish_task]
+        (bool success, const std::string& body, const std::string&) {
+            if (!success) {
+                finish_task();
+                return;
             }
-        }
 
-        services.search_files(remote_name, query, "",
-            [this, &state, generation, remote_name, display_name, folder_name, query, finish_task]
-            (bool success, const std::string& body, const std::string& /*error*/) {
-                if (!success) {
-                    finish_task();
-                    return;
-                }
+            json j = json::parse(body, nullptr, false);
+            if (j.is_discarded()) {
+                finish_task();
+                return;
+            }
 
-                json j = json::parse(body, nullptr, false);
-                if (j.is_discarded()) {
-                    finish_task();
-                    return;
-                }
+            std::string mount_root = path_utils::get_mount_root();
+            std::vector<SearchResult> results;
 
-                std::string mount_root = path_utils::get_mount_root();
-                std::vector<SearchResult> results;
+            for (auto& item : j.value("items", json::array())) {
+                std::string name = item.value("name", "");
+                if (name.empty()) continue;
 
-                for (auto& item : j.value("items", json::array())) {
-                    std::string name = item.value("name", "");
-                    if (name.empty()) continue;
+                int score = search::fuzzy_score(query, name);
+                if (score < 0) score = 0;
 
-                    int score = search::fuzzy_score(query, name);
-                    if (score < 0) score = 0;
+                std::string item_path = item.value("path", "");
+                std::string dedup = "remote:" + remote_name + "/" + item_path;
 
-                    std::string item_path = item.value("path", "");
-                    std::string dedup = "remote:" + remote_name + "/" + item_path;
+                SearchResult r;
+                r.name         = name;
+                r.source       = FileSource::REMOTE;
+                r.is_dir       = item.value("is_dir", false);
+                r.size         = item.value("size", int64_t(0));
+                r.fuzzy_score  = score;
+                r.dedup_key    = dedup;
+                r.remote_name  = remote_name;
+                r.remote_path  = item_path;
+                r.virtual_path = mount_root + "/" + provider_folder + "/" + folder_name + (item_path.empty() ? "" : "/" + item_path);
 
-                    SearchResult r;
-                    r.name         = name;
-                    r.source       = FileSource::REMOTE;
-                    r.is_dir       = item.value("is_dir", false);
-                    r.size         = item.value("size", int64_t(0));
-                    r.fuzzy_score  = score;
-                    r.dedup_key    = dedup;
-                    r.remote_name  = remote_name;
-                    r.remote_path  = item_path;
-                    r.virtual_path = mount_root + "/" + display_name + "/" + folder_name + (item_path.empty() ? "" : "/" + item_path);
-                    r.path_display = display_name + (item_path.empty() ? "" : " › " + item_path);
+                std::string parent = item_path.empty() ? "" : fs::path(item_path).parent_path().string();
+                if (parent == ".") parent.clear();
+                r.path_display = provider_folder + " › " + folder_name + (parent.empty() ? "" : " › " + parent);
+                results.push_back(std::move(r));
+            }
 
-                    // Trim filename from path_display to show parent
-                    if (!r.is_dir && !item_path.empty()) {
-                        fs::path p(item_path);
-                        std::string parent = p.parent_path().string();
-                        r.path_display = display_name + (parent.empty() ? "" : " › " + parent);
-                    }
-
-                    results.push_back(std::move(r));
-                }
-
-                {
-                    std::lock_guard<std::mutex> lock(state.mu);
-                    if (state.query_generation == generation) {
-                        for (auto& r : results) {
-                            if (!state.seen_ids.count(r.dedup_key)) {
-                                state.seen_ids.insert(r.dedup_key);
-                                state.api_results.push_back(std::move(r));
-                            }
+            {
+                std::lock_guard<std::mutex> lock(state.mu);
+                if (state.query_generation == generation) {
+                    for (auto& r : results) {
+                        if (!state.seen_ids.count(r.dedup_key)) {
+                            state.seen_ids.insert(r.dedup_key);
+                            state.api_results.push_back(std::move(r));
                         }
                     }
                 }
-                finish_task();
-            });
-    }
+            }
+            finish_task();
+        });
 }
 
 // ---------------------------------------------------------------------------

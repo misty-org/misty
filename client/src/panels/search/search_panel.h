@@ -23,7 +23,13 @@ public:
 
 private:
     void scan_local(SearchState& state, const std::string& query, uint64_t generation, const std::string& local_root);
-    void launch_api_searches(SearchState& state, const std::string& query, uint64_t generation);
+    void search_remote_scope(SearchState& state,
+                             const std::string& query,
+                             uint64_t generation,
+                             const std::string& remote_name,
+                             const std::string& remote_path,
+                             const std::string& provider_folder,
+                             const std::string& folder_name);
 
     core::UIRegistry& ui_registry_;
     core::WorkerPool& worker_pool_;

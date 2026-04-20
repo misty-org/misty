@@ -42,6 +42,7 @@ namespace misty::panel {
         update_navigation_history(state, mount_root, update_history);
         state.files = std::move(new_files);
         set_active_path(state, mount_root);
+        state.current_dir_watched = false;
         reset_selection(state);
         state.is_loading = false;
         state.show_loading_animation = false;
@@ -90,6 +91,7 @@ namespace misty::panel {
         update_navigation_history(state, target_path, update_history);
         state.files = std::move(new_files);
         set_active_path(state, target_path);
+        state.current_dir_watched = false;
         reset_selection(state);
         state.is_loading = false;
         state.show_loading_animation = false;
@@ -172,9 +174,6 @@ namespace misty::panel {
                                                   uint64_t navigation_generation) {
         auto& state = registry_.get_state<FileExplorerState>(state_key_);
 
-        printf("fetch_remote_folder: remote=%s path=%s target=%s\n",
-               remote_name.c_str(), remote_path.c_str(), target_path.c_str());
-
         // Mark loading immediately on the UI thread so interactions are blocked
         // while the listing resolves, but delay the spinner slightly so fast
         // cache hits don't flash the animation for a single frame.
@@ -250,11 +249,11 @@ namespace misty::panel {
                                                          uint64_t navigation_generation,
                                                          bool success,
                                                          const std::string& body,
-                                                         const std::string& error) {
+                                                         const std::string& error,
+                                                         bool preserve_selection) {
         auto& state = registry_.get_state<FileExplorerState>(state_key_);
 
         if (!success) {
-            printf("handle_remote_folder_fetch FAILED: %s\n", error.c_str());
             std::lock_guard<std::mutex> lock(state.mu);
             if (state.navigation_generation.load(std::memory_order_relaxed) != navigation_generation ||
                 std::string(state.current_path) != target_path) {
@@ -272,7 +271,7 @@ namespace misty::panel {
             auto items_json = json.value("items", nlohmann::json::array());
             std::string resp_remote = json.value("remote", remote_name);
             std::string resp_path = json.value("path", std::string(""));
-
+            const bool watched = json.value("watched", false);
             // Look up provider folder for constructing local paths
             auto& workspace = registry_.get_state<WorkspaceState>("Workspace");
             std::string provider_folder;
@@ -319,22 +318,38 @@ namespace misty::panel {
 
                 new_files.push_back(std::move(item));
             }
-
-            printf("handle_remote_folder_fetch: got %zu items for %s\n", new_files.size(), resp_remote.c_str());
-
             std::lock_guard<std::mutex> lock(state.mu);
             if (state.navigation_generation.load(std::memory_order_relaxed) != navigation_generation ||
                 std::string(state.current_path) != target_path) {
                 return;
             }
+            std::unordered_set<std::string> selected_paths;
+            if (preserve_selection) {
+                for (const auto& sel_id : state.selected_files) {
+                    selected_paths.insert(state.path_for_selection(sel_id));
+                }
+            }
             state.files = std::move(new_files);
-            reset_selection(state);
+            state.current_dir_watched = watched;
+            state.sync_watch_request_in_flight = false;
+            if (preserve_selection) {
+                state.selected_files.clear();
+                state.last_selected_index = -1;
+                for (int index = 0; index < static_cast<int>(state.files.size()); ++index) {
+                    if (selected_paths.count(state.files[index].path) == 0) {
+                        continue;
+                    }
+                    state.selected_files.insert(state.files[index].id);
+                    state.last_selected_index = index;
+                }
+            } else {
+                reset_selection(state);
+            }
             state.is_loading = false;
             state.show_loading_animation = false;
             state.sort_dirty = true;
             state.error_msg.clear();
         } catch (const std::exception& e) {
-            printf("handle_remote_folder_fetch PARSE ERROR: %s\n", e.what());
             std::lock_guard<std::mutex> lock(state.mu);
             if (state.navigation_generation.load(std::memory_order_relaxed) != navigation_generation ||
                 std::string(state.current_path) != target_path) {

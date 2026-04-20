@@ -122,18 +122,25 @@ struct FsWatcher::Impl {
         bool renamed = (flags & kFSEventStreamEventFlagItemRenamed) != 0;
         bool removed = (flags & kFSEventStreamEventFlagItemRemoved) != 0;
         bool created = (flags & kFSEventStreamEventFlagItemCreated) != 0;
-        bool modified = (flags & (kFSEventStreamEventFlagItemModified |
-                                  kFSEventStreamEventFlagItemFinderInfoMod |
-                                  kFSEventStreamEventFlagItemInodeMetaMod |
-                                  kFSEventStreamEventFlagItemChangeOwner |
-                                  kFSEventStreamEventFlagItemXattrMod)) != 0;
+        bool content_modified = (flags & kFSEventStreamEventFlagItemModified) != 0;
+        bool metadata_only = (flags & (kFSEventStreamEventFlagItemFinderInfoMod |
+                                       kFSEventStreamEventFlagItemInodeMetaMod |
+                                       kFSEventStreamEventFlagItemChangeOwner |
+                                       kFSEventStreamEventFlagItemXattrMod)) != 0;
+
+        // Opening a file can generate metadata-only noise on macOS. We only
+        // want events that imply actual sync-relevant changes: content writes,
+        // creates, deletes, or rename-style atomic saves.
+        if (!removed && !created && !renamed && !content_modified && metadata_only) {
+            return;
+        }
 
         FsEventKind kind;
         if (!exists) {
             kind = FsEventKind::DELETED;
         } else if (renamed) {
             kind = FsEventKind::CREATED;
-        } else if (created && !modified) {
+        } else if (created && !content_modified) {
             kind = FsEventKind::CREATED;
         } else {
             kind = FsEventKind::MODIFIED;

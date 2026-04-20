@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/rclone/rclone/fs"
+	rclonehash "github.com/rclone/rclone/fs/hash"
 	"github.com/rclone/rclone/fs/object"
 	"github.com/rclone/rclone/fs/operations"
 	"github.com/rclone/rclone/fs/walk"
@@ -28,6 +29,11 @@ func ListDir(ctx context.Context, remote, dirPath string) ([]FileItem, error) {
 	}
 
 	items := make([]FileItem, 0, len(entries))
+	supportedHashes := f.Hashes()
+	hashType := rclonehash.None
+	if supportedHashes.Count() > 0 {
+		hashType = supportedHashes.GetOne()
+	}
 	for _, entry := range entries {
 		item := FileItem{
 			Name:    entry.Remote(),
@@ -42,6 +48,12 @@ func ListDir(ctx context.Context, remote, dirPath string) ([]FileItem, error) {
 			item.IsDir = false
 			item.Size = e.Size()
 			item.MimeType = fs.MimeType(ctx, e)
+			if hashType != rclonehash.None {
+				if hashValue, err := e.Hash(ctx, hashType); err == nil && hashValue != "" {
+					item.HashAlgo = hashType.String()
+					item.Hash = hashValue
+				}
+			}
 		}
 		items = append(items, item)
 	}
@@ -84,6 +96,9 @@ func DownloadFile(ctx context.Context, remote, filePath string, w io.Writer) (in
 // UploadFile uploads a file from the provided reader to a remote directory.
 func UploadFile(ctx context.Context, remote, dirPath, fileName string, size int64, reader io.Reader) error {
 	Init()
+	if err := EnsureRemoteDefaults(remote); err != nil {
+		return fmt.Errorf("failed to apply remote defaults: %w", err)
+	}
 	f, err := fs.NewFs(ctx, remote+":"+dirPath)
 	if err != nil {
 		return fmt.Errorf("failed to create fs: %w", err)
