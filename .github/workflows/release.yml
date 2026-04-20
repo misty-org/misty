@@ -17,6 +17,8 @@ jobs:
     name: Release quality gate
     runs-on: ubuntu-latest
     timeout-minutes: 35
+    env:
+      NODE_OPTIONS: --max-old-space-size=4096
     steps:
       - uses: actions/checkout@v6
         with:
@@ -60,6 +62,7 @@ jobs:
     runs-on: ${{ matrix.platform }}
     timeout-minutes: 90
     env:
+      NODE_OPTIONS: --max-old-space-size=4096
       MISTY_PUBLIC_API_URL: ${{ vars.MISTY_PUBLIC_API_URL }}
       VITE_APP_ENVIRONMENT: ${{ vars.VITE_APP_ENVIRONMENT }}
       VITE_DISTRIBUTION_CHANNEL: ${{ vars.VITE_DISTRIBUTION_CHANNEL }}
