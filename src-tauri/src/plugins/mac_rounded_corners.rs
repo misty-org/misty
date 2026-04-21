@@ -425,20 +425,29 @@ unsafe fn apply_continuous_corner_mask(ns_window: id, radius: f64) {
 #[cfg(target_os = "macos")]
 unsafe fn position_traffic_lights(ns_window: id, offset_x: f64, offset_y: f64) {
     let default_x = 20.0;
-    let default_y = 0.0;
 
     let close_button: id = msg_send![ns_window, standardWindowButton: 0];
     let miniaturize_button: id = msg_send![ns_window, standardWindowButton: 1];
     let zoom_button: id = msg_send![ns_window, standardWindowButton: 2];
 
+    if close_button.is_null() {
+        return;
+    }
+
+    let close_frame: cocoa::foundation::NSRect = msg_send![close_button, frame];
+    let titlebar_view: id = msg_send![close_button, superview];
+    let default_y = if titlebar_view.is_null() {
+        close_frame.origin.y
+    } else {
+        let titlebar_bounds: cocoa::foundation::NSRect = msg_send![titlebar_view, bounds];
+        ((titlebar_bounds.size.height - close_frame.size.height) / 2.0).max(0.0)
+    };
+
     let new_x = default_x + offset_x;
     let new_y = default_y - offset_y;
 
-    if !close_button.is_null() {
-        let frame: cocoa::foundation::NSRect = msg_send![close_button, frame];
-        let new_frame = cocoa::foundation::NSRect::new(NSPoint::new(new_x, new_y), frame.size);
-        let _: () = msg_send![close_button, setFrame: new_frame];
-    }
+    let new_frame = cocoa::foundation::NSRect::new(NSPoint::new(new_x, new_y), close_frame.size);
+    let _: () = msg_send![close_button, setFrame: new_frame];
 
     if !miniaturize_button.is_null() {
         let frame: cocoa::foundation::NSRect = msg_send![miniaturize_button, frame];
