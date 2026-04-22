@@ -1,0 +1,96 @@
+name: Publish macOS DMG
+
+on:
+  workflow_dispatch:
+    inputs:
+      notarize:
+        description: Notarize and staple the DMG
+        required: false
+        default: true
+        type: boolean
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  publish-macos-dmg:
+    runs-on: macos-14
+    env:
+      MACOS_CERTIFICATE_PATH: ${{ runner.temp }}/misty-developer-id.p12
+      MACOS_KEYCHAIN_PATH: ${{ runner.temp }}/misty-signing.keychain-db
+      MACOS_KEYCHAIN_PASSWORD: ${{ secrets.MACOS_DEVELOPER_ID_CERT_PASSWORD }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install macOS release dependencies
+        run: |
+          brew install create-dmg dylibbundler grpc protobuf openssl@3 ninja
+
+      - name: Configure client build
+        run: |
+          cmake -S client -B client/build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$(brew --prefix grpc);$(brew --prefix protobuf);$(brew --prefix openssl@3)"
+
+      - name: Import Developer ID certificate
+        env:
+          MACOS_DEVELOPER_ID_CERT_P12: ${{ secrets.MACOS_DEVELOPER_ID_CERT_P12 }}
+        run: |
+          if [[ -z "${MACOS_DEVELOPER_ID_CERT_P12:-}" ]]; then
+            echo "error: MACOS_DEVELOPER_ID_CERT_P12 is not configured" >&2
+            exit 1
+          fi
+          echo "$MACOS_DEVELOPER_ID_CERT_P12" | base64 -D > "$MACOS_CERTIFICATE_PATH"
+          security create-keychain -p "$MACOS_KEYCHAIN_PASSWORD" "$MACOS_KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$MACOS_KEYCHAIN_PATH"
+          security unlock-keychain -p "$MACOS_KEYCHAIN_PASSWORD" "$MACOS_KEYCHAIN_PATH"
+          security import "$MACOS_CERTIFICATE_PATH" \
+            -P "$MACOS_KEYCHAIN_PASSWORD" \
+            -A \
+            -t cert \
+            -f pkcs12 \
+            -k "$MACOS_KEYCHAIN_PATH"
+          security list-keychains -d user -s "$MACOS_KEYCHAIN_PATH" login.keychain-db
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$MACOS_KEYCHAIN_PASSWORD" "$MACOS_KEYCHAIN_PATH"
+
+      - name: Write signing configuration
+        env:
+          MACOS_DEVELOPER_ID: ${{ secrets.MACOS_DEVELOPER_ID }}
+          MACOS_NOTARY_APPLE_ID: ${{ secrets.MACOS_NOTARY_APPLE_ID }}
+          MACOS_NOTARY_APP_PASSWORD: ${{ secrets.MACOS_NOTARY_APP_PASSWORD }}
+          MACOS_NOTARY_TEAM_ID: ${{ secrets.MACOS_NOTARY_TEAM_ID }}
+        run: |
+          cat > releases/macos/.env <<EOF
+          DEVELOPER_ID="${MACOS_DEVELOPER_ID}"
+          APPLE_ID="${MACOS_NOTARY_APPLE_ID}"
+          APPLE_TEAM_ID="${MACOS_NOTARY_TEAM_ID}"
+          APPLE_APP_PASSWORD="${MACOS_NOTARY_APP_PASSWORD}"
+          EOF
+
+      - name: Run macOS DMG pipeline
+        run: |
+          args=()
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.notarize }}" != "true" ]]; then
+            args+=(--skip-notarize)
+          fi
+          ./releases/macos/publish_dmg.sh "${args[@]}"
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: misty-macos-dmg
+          path: releases/Misty-*.dmg
+          if-no-files-found: error
+
+      - name: Publish GitHub release asset
+        if: github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: releases/Misty-*.dmg
+          generate_release_notes: true
