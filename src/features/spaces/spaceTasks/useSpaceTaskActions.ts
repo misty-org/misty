@@ -4,7 +4,7 @@ import { errorText } from "@/lib/format";
 import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
 import type { SpaceTaskStatus } from "@/models/types/features/spaces/types";
 import type { SpaceTask } from "@/models/interfaces/features/spaces/types";
-import type { TaskDraft } from "../SpaceTasksViews";
+import type { TaskDraft } from "../SpacePlannerViews";
 import { createTaskInput, dueAtForRequest, emptyDraft, taskDraft } from "./taskDraft";
 import { mergeTasks, optimisticMove } from "./taskOrdering";
 import type { SpaceTasksData } from "./useSpaceTasksData";

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { spansToText } from "../integrations";
+import { spansToText } from "../connections";
 import type { SpaceMessage } from "@/models/interfaces/features/spaces/types";
 
 /**

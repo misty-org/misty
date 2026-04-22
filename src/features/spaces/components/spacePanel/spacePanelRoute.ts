@@ -3,18 +3,19 @@ import { useLocation } from "react-router-dom";
 
 const validSections = new Set([
   "chat",
-  "tasks",
+  "planner",
   "notes",
   "drawings",
   "library",
   "members",
   "settings",
 ]);
-const validSettingsSections = new Set(["general", "chat", "integrations"]);
+const validSettingsSections = new Set(["general", "members", "connections"]);
 
 export interface SpacePanelRoute {
   activeSpaceId: string;
   section: string;
+  taskView: string;
   settingsSection: string;
   libraryCollection: string;
   conversationId: string | null;
@@ -31,13 +32,25 @@ export function useSpacePanelRoute(): SpacePanelRoute {
   const location = useLocation();
   const search = useMemo(() => new URLSearchParams(location.search), [location.search]);
   const routeParts = location.pathname.split("/").filter(Boolean);
-  const routeSection = routeParts[2] === "files" ? "library" : (routeParts[2] ?? "chat");
+  const requestedSection = routeParts[2] ?? "chat";
+  const routeSection =
+    requestedSection === "files"
+      ? "library"
+      : requestedSection === "tasks"
+        ? "planner"
+        : requestedSection;
+  const requestedSettingsSection =
+    routeParts[3] === "integrations" ? "connections" : (routeParts[3] ?? "");
 
   return {
     activeSpaceId: routeParts[0] === "spaces" ? decodeRouteSegment(routeParts[1] ?? "") : "",
     section: validSections.has(routeSection) ? routeSection : "chat",
-    settingsSection: validSettingsSections.has(routeParts[3] ?? "")
-      ? (routeParts[3] as string)
+    taskView:
+      routeSection === "planner" && ["board", "list", "calendar"].includes(routeParts[3] ?? "")
+        ? (routeParts[3] as string)
+        : "board",
+    settingsSection: validSettingsSections.has(requestedSettingsSection)
+      ? requestedSettingsSection
       : "general",
     libraryCollection: search.get("collection") ?? "recent",
     conversationId: search.get("conversation"),

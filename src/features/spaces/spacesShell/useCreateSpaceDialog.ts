@@ -12,7 +12,7 @@ import { restoreDocumentInteractivityAfterModalClose } from "./spacesShellStorag
 export const CREATE_STEP_COUNT = 3;
 
 /**
- * The three-step "Create a Space" flow: name, template, integrations.
+ * The three-step "Create a Space" flow: name, template, connections.
  *
  * Templates load lazily the first time the dialog opens, and a failure there is
  * non-fatal — a Blank Space is always offered as a fallback.
@@ -126,7 +126,7 @@ export function useCreateSpaceDialog(options: {
 
 function beginProviderConnection(spaceId: string, provider: SpaceIntegrationProvider) {
   void spacesApi
-    .beginProviderConnection(spaceId, provider, `/spaces/${spaceId}/settings/integrations`)
+    .beginProviderConnection(spaceId, provider, `/spaces/${spaceId}/settings/connections`)
     .then((start) => openExternalLink(start.authorization_url))
     .catch(() => {
       // The resumable setup card remains available in Chat and Settings.

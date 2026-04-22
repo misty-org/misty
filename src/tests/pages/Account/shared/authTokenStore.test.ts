@@ -84,4 +84,28 @@ describe("multi-account auth token storage", () => {
     expect(store.listSavedAccountSessions()).toHaveLength(2);
     expect(store.readActiveSavedAccountSession()).toBeNull();
   });
+
+  it("prunes saved-account metadata when its Keychain session no longer exists", async () => {
+    const graceSession = {
+      ...grace,
+      lastUsedAt: "2026-07-31T00:00:00.000Z",
+    };
+    keychainValue = JSON.stringify({
+      version: 1,
+      activeAccountId: grace.id,
+      sessions: [{ account: graceSession, token: "grace-token" }],
+    });
+    localStorage.setItem(
+      "misty:account-sessions",
+      JSON.stringify([{ ...ada, lastUsedAt: "2026-07-30T00:00:00.000Z" }, graceSession]),
+    );
+    localStorage.setItem("misty:active-account-id", ada.id);
+    const store = await import("@/stores/account/useAuthTokenStore");
+
+    await expect(store.activateAccountSession(ada.id)).rejects.toThrow(
+      "That saved Misty session is no longer available.",
+    );
+    expect(store.listSavedAccountSessions()).toEqual([graceSession]);
+    expect(store.readActiveSavedAccountSession()).toEqual(graceSession);
+  });
 });

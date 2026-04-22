@@ -1,5 +1,5 @@
 import type { SpaceTask } from "@/models/interfaces/features/spaces/types";
-import type { TaskDraft } from "../SpaceTasksViews";
+import type { TaskDraft } from "../SpacePlannerViews";
 import { toLocalInput } from "../SpaceTaskPrimitives";
 
 export function localTimezone() {

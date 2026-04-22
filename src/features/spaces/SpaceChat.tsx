@@ -1,6 +1,7 @@
 export type { ChatComposerSuggestion } from "@/models/types/features/spaces/SpaceChat";
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { MessagesSquare } from "lucide-react";
 
 import { useAuth } from "@/features/auth/AuthContext";
 import { useMinimumSpin } from "@/hooks/useMinimumSpin";
@@ -9,9 +10,8 @@ import { mergeSpaceMessages } from "@/stores/spaces/useSpaceMessageSpansStore";
 import type { MistyPickerSource } from "@/models/interfaces/features/picker/MistyPicker";
 import type { SpaceMessage } from "@/models/interfaces/features/spaces/types";
 import { useSpaceConversationChat } from "./useSpaceConversationChat";
-import { useDiscordPublish } from "./integrations";
+import { useDiscordPublish } from "./connections";
 import { DeleteMessageDialog } from "./components/SpaceChatMessages";
-import { ActiveUsersCapsule } from "./components/ActiveUsersCapsule";
 import { SpaceSetupCards } from "./components/SpaceSetupCards";
 import { ChatReadOnlyNotice } from "./spaceChat/ChatReadOnlyNotice";
 import { SpaceChatComposer } from "./spaceChat/SpaceChatComposer";
@@ -113,11 +113,6 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
   }, [spaceId, user?.id]);
 
   useEffect(() => {
-    store.setViewingSpace(spaceId);
-    return () => store.setViewingSpace("");
-  }, [store.setViewingSpace, spaceId]);
-
-  useEffect(() => {
     const messageId = searchParams.get("message");
     const target = messageId ? document.getElementById(`message-${messageId}`) : endRef.current;
     target?.scrollIntoView({ block: messageId ? "center" : "end" });
@@ -127,15 +122,17 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
 
   return (
     <div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-background text-foreground">
-      {scope.activeViewers.length > 0 ? (
-        <div className="absolute right-4 top-3 z-10">
-          <ActiveUsersCapsule
-            viewers={scope.activeViewers}
-            members={scope.allMembers}
-            currentUserId={user?.id}
-          />
-        </div>
-      ) : null}
+      <header className="misty-spaces-toolbar flex h-11 shrink-0 items-center gap-2.5 px-3">
+        <span className="grid size-7 shrink-0 place-items-center text-muted-foreground">
+          <MessagesSquare size={16} strokeWidth={1.75} />
+        </span>
+        <span className="min-w-0 flex-1">
+          <h1 className="truncate text-[13px] font-semibold leading-tight">
+            {conversationId ? scope.activeConversation?.title || "Conversation" : "Everyone"}
+          </h1>
+        </span>
+      </header>
+
       {!conversationId ? (
         <SpaceSetupCards
           spaceId={spaceId}

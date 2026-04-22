@@ -14,7 +14,7 @@ Misty is a Tauri application with one desktop React interface for desktop, iPad,
 - `src/stores/` — cross-feature Zustand stores only. Feature-specific state should live with its feature.
 - `src-tauri/` — Rust application core and tracked iOS/Android platform projects.
 - `src-tauri/src/services/direct_cloud.rs` — native Google Drive, Dropbox, and Microsoft OneDrive client runtime.
-- `scripts/` — builds, security checks, smoke tests, size enforcement, and safe cleanup.
+- `src/tests/contracts/` — executable architecture, source-size, readability, and UI contracts.
 
 ## Setup
 
@@ -33,50 +33,45 @@ npm run dev:mobile
 npm run build:desktop
 npm run build:mobile
 npm run build:android
-npm run windows:stage-assets
+misty-cli desktop windows stage-assets
 ```
 
 Use the Tauri desktop runner when you need native app behavior:
 
 ```sh
-npm run tauri:desktop
+misty-cli desktop dev
 ```
 
 For side-by-side local auth/session testing, start one Tauri instance per profile in separate terminals:
 
 ```sh
-npm run tauri:desktop -- --profile owner
-npm run tauri:desktop -- --profile collaborator
+misty-cli desktop dev --profile owner
+misty-cli desktop dev --profile collaborator
 ```
 
 Each profile gets a separate app identifier, browser storage, and auth vault entry. The launcher also creates `~/.misty/.profiles/<profile>` for profile-scoped session metadata, while Misty's normal files, assets, remotes, cache, and database stay rooted in `~/.misty`.
 
 The `mobile` build mode is the native iPad packaging target; it uses the same component tree and layout as desktop. Android packages require a 600dp smallest screen width, and the iOS target is restricted to the iPad device family.
 
-For a native Windows NSIS or MSI test build, including the temporary asset-copy workflow, see [docs/windows-build.md](docs/windows-build.md).
-
-Platform release commands, signing preflights, simulator smoke tests, macOS notarization, and Android security checks are listed in `package.json`.
+Desktop development, cleanup, icons, Windows staging, and manual releases are owned by `misty-cli`. Tauri's native iOS and Android projects remain available through the standard Tauri CLI.
 
 ## Quality checks
 
 ```sh
 npm run check:format
-npm run check:readability
 npm run check
-npm run security:mobile:audit
-npm run security:android:audit
 cd src-tauri && cargo fmt --check && cargo check && cargo test
 ```
 
-`npm run format` formats frontend source with Prettier. `npm run check:readability` rejects newly compacted source lines over 160 characters, with narrow exceptions for comments, URLs, and data literals.
+`npm run format` formats frontend source with Prettier. Vitest enforces the repository's readability, source-size, and UI architecture contracts.
 
-`npm run check:size` limits new hand-written source and scripts to 500 lines. Existing larger files are frozen at their recorded ceilings and must leave the baseline after they are split below the limit.
+New hand-written source is limited to 500 lines. Existing larger files are frozen at their recorded ceilings and must leave the fixture baseline after they are split below the limit.
 
 ## Generated-file cleanup
 
 ```sh
-npm run clean:preview
-npm run clean
+misty-cli desktop clean
+misty-cli desktop clean --apply
 ```
 
 Cleanup targets only generated web, Rust, native-platform, design-QA, cache, and `.DS_Store` files. It skips in-use directories and never removes environment/signing files, dependencies, or tracked platform sources.

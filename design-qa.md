@@ -1,97 +1,69 @@
-# Space chat Discord-layout design QA
+# Misty Spaces — File Manager Architecture QA
+
+Date: 2026-07-30
 
 ## Evidence
 
-- Source visual truth: `/var/folders/hd/3cy894z92v70m7crvhv8rwmr0000gn/T/TemporaryItems/NSIRD_screencaptureui_rfbQG9/Screenshot 2026-07-22 at 3.55.33 PM.png`
-- Rendered implementation: `/Users/mtccool668/misty-org/misty/chat-discord-layout-implementation.png`
-- Focused side-by-side comparison: `/Users/mtccool668/misty-org/misty/chat-discord-layout-comparison.png`
-- First-pass implementation evidence: `/Users/mtccool668/misty-org/misty/chat-discord-layout-implementation-pass1.png`
-- Source pixels: 1814 × 1588; density unknown.
-- Implementation pixels/CSS viewport: 1280 × 900 at device scale factor 1.
-- Focused comparison normalization: source scaled to 620 px wide and centered on a 640 × 600 field; implementation chat region cropped from x=360, y=28 at 920 × 844, scaled to 620 px wide, and centered on a 640 × 600 field. The two fields were combined into one 1280 × 600 image.
-- State: dark desktop Space chat with two members, five realistic messages across two calendar dates, grouped consecutive messages, and an uploaded PNG avatar for Maya. Account settings also showed the uploaded avatar and `Change PNG` control.
+- Source visual truth: `/var/folders/hd/3cy894z92v70m7crvhv8rwmr0000gn/T/TemporaryItems/NSIRD_screencaptureui_bqRE3e/Screenshot 2026-07-30 at 9.52.01 AM.png`
+- Journal implementation: `/Users/mtccool668/misty-org/misty/.codex/audits/spaces-file-manager-shell-2026-07-30/qa/journal-final-v3.png`
+- Library implementation: `/Users/mtccool668/misty-org/misty/.codex/audits/spaces-file-manager-shell-2026-07-30/qa/library-final-v2.png`
+- Chat implementation: `/Users/mtccool668/misty-org/misty/.codex/audits/spaces-file-manager-shell-2026-07-30/qa/chat-final-v2.png`
+- Tasks implementation: `/Users/mtccool668/misty-org/misty/.codex/audits/spaces-file-manager-shell-2026-07-30/qa/tasks-final-v2.png`
+- Four-mode implementation contact sheet: `/Users/mtccool668/misty-org/misty/.codex/audits/spaces-file-manager-shell-2026-07-30/qa/spaces-four-modes-final.png`
+- Full source-to-Journal comparison: `/Users/mtccool668/misty-org/misty/.codex/audits/spaces-file-manager-shell-2026-07-30/qa/source-vs-journal-final.png`
+- Focused header comparison: `/Users/mtccool668/misty-org/misty/.codex/audits/spaces-file-manager-shell-2026-07-30/qa/source-vs-journal-header-final.png`
+
+## Viewport and normalization
+
+- Source screenshot: 2048 × 1280 pixels.
+- Native implementation captures: 2992 × 1818 pixels from the signed-in macOS desktop app.
+- The full-view comparison scales the source to 1024 × 640. The implementation is scaled proportionally to 1024 pixels wide and centered within the same 1024 × 640 field.
+- The focused comparison uses the normalized top 220 pixels of both views.
+- State: dark desktop UI. The source is a populated File Manager screen; the implementation is the corresponding signed-in Spaces shell with empty Journal, Library, and Tasks states plus a populated Chat state.
+- The File Manager is an architectural reference rather than a literal content target. File paths, file rows, and inspector content were intentionally not copied into Spaces.
 
 ## Full-view comparison
 
-The Misty full view intentionally includes its app rail, Space navigation, and composer, while the Discord source is a chat-only crop. The main chat region preserves the source hierarchy: avatar gutter, sender and compact time metadata, unboxed message text, consecutive-message grouping, centered date rules, and rich-content space below message text.
+The implementation now follows the source screen’s flat pane architecture:
 
-## Focused comparison
+- one compact primary strip across the top;
+- one compact contextual toolbar below it;
+- a persistent left sidebar with a workspace switcher, mode-specific navigation, and bottom-aligned storage;
+- simple one-pixel pane boundaries;
+- direct selected-row fills instead of floating navigation cards;
+- content surfaces that use empty space rather than nested outer cards.
 
-The combined comparison makes the important chat details readable. Avatar size, sender/header alignment, compact follow-up rows, date-divider rhythm, and dark-surface contrast closely follow the source. The source contains a large video attachment and reply preview that are not present in the seeded implementation state; Misty's existing attachment and reply renderers remain intact, so this is a content-state difference rather than removed functionality.
+Journal, Library, Chat, and Tasks keep the same shell dimensions when switching. Mode changes were exercised in the native app and do not insert an exit frame or remounting highlight, so there is no route-level flash.
+
+The focused comparison confirms that the primary strip, contextual row, switcher, selected sidebar row, button heights, and divider rhythm use the same compact desktop grammar as the File Manager reference.
 
 ## Findings
 
-- No actionable P0, P1, or P2 visual differences remain.
-- P3: Discord uses more varied sender-name colors in the reference. Misty keeps names on its existing foreground token to preserve product consistency and predictable contrast.
-- P3: The source shows a denser conversation because it contains more messages and a large attachment. The seeded state is intentionally smaller so grouping and both date transitions remain inspectable.
-
-## Required fidelity surfaces
-
-- Fonts and typography: Misty's existing Inter typography is retained. Sender names use a compact semibold treatment, message copy is 15 px with 24 px line height, and timestamps are smaller tabular text. Message timestamps contain time only; calendar dates live in separators.
-- Spacing and layout rhythm: 40 px round avatars appear on the first row of a sender group. Follow-up messages reuse the same 44 px gutter, group starts have additional vertical spacing, and date labels sit between full-width rules.
-- Colors and visual tokens: Existing Misty background, foreground, muted, border, and hover tokens produce the same low-contrast dark hierarchy as the source without introducing Discord-specific hardcoded colors.
-- Image quality and asset fidelity: Uploaded PNGs render through the existing Radix avatar image with cover cropping and a crisp circular mask. Initials remain as the no-image fallback; no placeholder bitmap was added to production code.
-- Copy and content: Seeded chat copy is realistic collaboration content. UI labels are `Upload PNG`/`Change PNG`; message headers show sender, optional Agent/source badges, and time only.
-
-## Interaction and runtime checks
-
-- Opened the seeded authenticated Space chat in the in-app browser.
-- Confirmed date separators for July 21 and July 22, 2026.
-- Confirmed nearby same-sender messages render as compact follow-up rows.
-- Opened Account settings and exercised the actual `Change PNG` file-chooser flow.
-- Reloaded chat and confirmed the protected member avatar renders on historical messages.
-- Checked browser console output; no app runtime errors remained in the final capture.
+- No actionable P0, P1, or P2 issues remain.
+- Fonts and typography: Misty’s existing Inter family, weight hierarchy, and antialiasing are preserved. Headings use sentence case; toolbar and sidebar labels have compact desktop sizing; labels remain readable without decorative overstatement.
+- Spacing and layout rhythm: the shell uses a 48px primary strip, 44px contextual rows, 40px sidebar rows, a 240–268px contextual rail, and one-pixel pane dividers. The loading shell matches the same geometry to prevent a layout flash.
+- Colors and visual tokens: existing background, sidebar, border, foreground, muted, accent, and primary tokens are reused. Selected sidebar rows use the same subdued directional fill as File Manager. No new decorative palette was introduced.
+- Image quality and asset fidelity: these application surfaces contain no raster imagery. Existing Lucide and React Icons assets remain crisp, consistently slotted, and aligned.
+- Copy and content: app-specific labels are concise and mode-appropriate. Journal and Library retain one central empty-state message and one primary action. Tasks uses useful shortcuts (`All tasks`, `Assigned to me`, `Unassigned`, `Due this week`) rather than repeating the Board/List/Calendar toolbar.
+- Interaction states: Chat, Tasks, Journal, and Library mode links were activated in the native app. Active state changes remain immediate and stable. Tasks board/list/calendar controls and task shortcuts remain real routes; primary actions remain present.
+- P3 follow-up: populated notes, task cards, and library-item density could receive a second data-rich polish pass after real content is available, but the shell itself is complete.
 
 ## Comparison history
 
-1. First pass: the browser-only preview emitted a native `app_snapshot` notice over the first message, a P2 visual obstruction. The non-Tauri demo bootstrap was updated to skip native-only desktop initialization while retaining production behavior.
-2. Post-fix pass: the notice disappeared, the authenticated chat loaded, profile PNGs rendered, and the final focused comparison showed no remaining P0/P1/P2 findings.
+1. Initial shell pass moved Chat, Tasks, Journal, and Library into the top strip and removed the large mode dock from the sidebar.
+2. The first live Tasks capture exposed a P2 hierarchy problem: the sidebar was empty and the board still used three oversized rounded containers.
+3. The second pass flattened Tasks into divider-based columns and added task navigation. A live capture then exposed P2 duplication because the sidebar repeated Board/List/Calendar from the toolbar.
+4. The final pass replaced those duplicates with contextual task shortcuts, widened the rail slightly for readable workspace names, expanded Journal and Library search fields to the available toolbar width, and aligned loading placeholders to final shell geometry.
+5. The final four-mode contact sheet shows stable shell geometry and no remaining P0/P1/P2 drift.
 
-## Implementation checklist
+## Verification
 
-- [x] Profile PNG upload with client and server validation.
-- [x] Authenticated profile and Space-member avatar delivery.
-- [x] Avatar rendering in Space chat with initials fallback.
-- [x] Discord-style sender grouping and compact rows.
-- [x] Time-only message metadata.
-- [x] Date dividers between calendar days.
-- [x] Targeted unit tests, server tests, and browser interaction checks.
-
-## Reply-preview follow-up — July 22, 2026
-
-### Evidence
-
-- Source visual truth: `/var/folders/hd/3cy894z92v70m7crvhv8rwmr0000gn/T/TemporaryItems/NSIRD_screencaptureui_u2mgDm/Screenshot 2026-07-22 at 4.31.08 PM.png`
-- Browser-rendered implementation: `/Users/mtccool668/misty-org/misty/.codex-reply-preview-refined-crop.png`
-- Focused side-by-side comparison: `/Users/mtccool668/misty-org/misty/.codex-reply-comparison-refined.png`
-- Source pixels: 688 × 360 at an inferred 2× desktop capture density.
-- Implementation viewport: 344 × 230 CSS px at device scale factor 1; the comparable 344 × 180 reply region was captured from the browser.
-- Density normalization: the source was downsampled to 344 × 180 before comparison. The implementation uses the same CSS-sized field. Horizontal translation from the source's arbitrary crop was ignored; avatar, rail, and content relationships were compared relative to one another.
-- State: dark Space chat with a reply to a person, a referenced image attachment, the reply sender header, and three same-sender compact follow-up messages.
-
-### Full-view and focused comparison
-
-The browser-rendered reply preserves the reference hierarchy: a compact one-line source preview above the reply, an elbow rail anchored to the replying message's avatar gutter, a small source avatar, `@name`, message excerpt, image indicator, then the new sender header and message. The focused comparison was required because the reference itself is a cropped chat fragment; it shows the avatar-to-content rhythm, connector geometry, and vertical grouping clearly.
-
-### Findings and required fidelity surfaces
-
-- No actionable P0, P1, or P2 differences remain.
-- Fonts and typography: reply context is 13 px with semibold identity text; sender headers are 15 px semibold; message text remains 15 px/24 px. The one-line source excerpt truncates safely at narrow widths.
-- Spacing and layout rhythm: the final pass uses a 20 px avatar-to-content gap consistently in the reply preview and message rows. The 37 px rail reaches from the replying avatar column to the source preview without colliding with its avatar.
-- Colors and visual tokens: the rail uses the muted foreground token and the preview uses Misty's foreground/primary tokens. Discord role colors were not copied because Misty does not currently store an equivalent per-member chat color.
-- Image quality and asset fidelity: production member avatars remain real uploaded PNGs with initials fallback. The reference's image cue is represented with the existing icon library and a foreground tile; no placeholder bitmap or handcrafted SVG was added.
-- Copy and content: the preview derives from the actual referenced message, flattens line breaks for one-line display, preserves mentions, and falls back to `Original message unavailable` when necessary.
-
-### Interaction and runtime checks
-
-- Rendered the production `SpaceChatMessages` component with a realistic reply state in the in-app browser.
-- Activated the unique `Jump to Souls's message` control and confirmed it retained the chat state.
-- Checked browser warnings and errors; none were present.
-- TypeScript, Prettier, and the targeted four-test Space chat suite passed.
-
-### Comparison history
-
-1. First pass: the reply rail and ordering matched, but the 12 px avatar-to-content gap was visibly tighter than the source and the image cue lacked the source's filled tile treatment (P2).
-2. Final pass: widened both message and reply grids to 20 px, tuned the rail length, strengthened reply-preview typography, and added the filled image cue. The normalized comparison showed consistent relative alignment with no remaining P0/P1/P2 findings.
+- Native signed-in app captures completed for Chat, Tasks, Journal, and Library.
+- Primary mode links tested by activating all four destinations.
+- TypeScript check passed.
+- Targeted Spaces and notes suite passed: 7 files, 21 tests.
+- Desktop production build passed.
+- `git diff --check` passed.
+- The in-app browser preview could not share the native app’s authenticated session, so signed-in visual verification was performed against the running native desktop app. The browser itself showed no implementation-specific console evidence for the signed-in Spaces state.
 
 final result: passed
