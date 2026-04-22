@@ -161,7 +161,8 @@ void select_item(FileExplorerState& state, const UnifiedFileItem& file, int inde
 } // namespace
 void FileExplorerPanel::show_directory_contents(FileExplorerState& state) {
     static ImGuiTableFlags flags = ImGuiTableFlags_Reorderable | ImGuiTableFlags_Sortable |
-        ImGuiTableFlags_Hideable | ImGuiTableFlags_Resizable;
+        ImGuiTableFlags_Hideable | ImGuiTableFlags_Resizable |
+        ImGuiTableFlags_ScrollX | ImGuiTableFlags_SizingFixedFit;
 
     const bool loading = state.is_loading;
     const bool show_loading_animation = loading && state.show_loading_animation &&
@@ -230,47 +231,50 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state) {
         }
         ImGui::PopStyleVar();
     } else {
-        const float table_inner_width = std::max(ImGui::GetContentRegionAvail().x, kTableMinInnerWidth);
+        const float table_inner_width = kTableMinInnerWidth;
         if (ImGui::BeginTable("FileTable", 6, flags, ImVec2(0.0f, 0.0f), table_inner_width)) {
-        ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_DefaultSort,
-                                kNameColumnWidth);
-        ImGui::TableSetupColumn("Size", ImGuiTableColumnFlags_WidthFixed, kSizeColumnWidth);
-        ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, kTypeColumnWidth);
-        ImGui::TableSetupColumn("Last Modified", ImGuiTableColumnFlags_WidthFixed, kModifiedColumnWidth);
-        ImGui::TableSetupColumn("State", ImGuiTableColumnFlags_WidthFixed, kStateColumnWidth);
-        ImGui::TableSetupColumn("Sync", ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoSort,
-                                kSyncColumnWidth);
-        ImGui::TableHeadersRow();
+            ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_DefaultSort,
+                                    kNameColumnWidth);
+            ImGui::TableSetupColumn("Size", ImGuiTableColumnFlags_WidthFixed, kSizeColumnWidth);
+            ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, kTypeColumnWidth);
+            ImGui::TableSetupColumn("Last Modified", ImGuiTableColumnFlags_WidthFixed, kModifiedColumnWidth);
+            ImGui::TableSetupColumn("State", ImGuiTableColumnFlags_WidthFixed, kStateColumnWidth);
+            ImGui::TableSetupColumn("Sync",
+                                    ImGuiTableColumnFlags_WidthFixed |
+                                        ImGuiTableColumnFlags_NoSort |
+                                        ImGuiTableColumnFlags_NoResize,
+                                    kSyncColumnWidth);
+            ImGui::TableHeadersRow();
 
-        if (ImGuiTableSortSpecs* sorts_specs = ImGui::TableGetSortSpecs()) {
-            if (sorts_specs->SpecsDirty || state.sort_dirty) {
-                apply_table_sort(state, *sorts_specs);
-                sorts_specs->SpecsDirty = false;
-                state.sort_dirty = false;
+            if (ImGuiTableSortSpecs* sorts_specs = ImGui::TableGetSortSpecs()) {
+                if (sorts_specs->SpecsDirty || state.sort_dirty) {
+                    apply_table_sort(state, *sorts_specs);
+                    sorts_specs->SpecsDirty = false;
+                    state.sort_dirty = false;
+                }
             }
-        }
 
-        if (state.files.empty()) {
-            ImGui::TableNextRow();
-            ImGui::TableSetColumnIndex(0);
-            render_empty_state(40.0f);
-        } else {
-            for (int i = 0; i < static_cast<int>(state.files.size()); ++i) {
-                show_file_item(state, i);
+            if (state.files.empty()) {
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0);
+                render_empty_state(40.0f);
+            } else {
+                for (int i = 0; i < static_cast<int>(state.files.size()); ++i) {
+                    show_file_item(state, i);
+                }
             }
-        }
 
-        show_context_menu(state);
-        if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) &&
-            ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup) &&
-            !ImGui::IsAnyItemHovered() &&
-            !ImGui::IsPopupOpen("FileContextMenu")) {
-            state.context_menu_target_path.clear();
-            state.selected_files.clear();
-            ImGui::OpenPopup("BackgroundContextMenu");
-        }
-        show_background_context_menu(state);
-        ImGui::EndTable();
+            show_context_menu(state);
+            if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) &&
+                ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup) &&
+                !ImGui::IsAnyItemHovered() &&
+                !ImGui::IsPopupOpen("FileContextMenu")) {
+                state.context_menu_target_path.clear();
+                state.selected_files.clear();
+                ImGui::OpenPopup("BackgroundContextMenu");
+            }
+            show_background_context_menu(state);
+            ImGui::EndTable();
         }
     }
 

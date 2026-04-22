@@ -130,6 +130,16 @@ namespace misty::panel {
                                         bool preserve_selection = false);
         void download_remote_file(const UnifiedFileItem& file);
         bool delete_remote_file(const UnifiedFileItem& file, std::string* error_message = nullptr);
+        static void apply_remote_folder_fetch(core::UIRegistry& registry,
+                                              const std::string& state_key,
+                                              const std::string& remote_name,
+                                              const std::string& target_path,
+                                              uint64_t navigation_generation,
+                                              bool success,
+                                              const std::string& body,
+                                              const std::string& error,
+                                              bool preserve_selection = false);
+        static bool delete_remote_file_impl(const UnifiedFileItem& file, std::string* error_message);
 
     private:
         core::UIRegistry& registry_;
