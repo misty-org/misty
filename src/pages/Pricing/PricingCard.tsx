@@ -17,6 +17,7 @@ interface PricingCardProps {
   name: string;
   price: string | null;
   period?: string;
+  description?: string;
   features: string[];
   inherits?: string;
   comingSoon?: boolean;
@@ -30,6 +31,7 @@ export default function PricingCard({
   name,
   price,
   period,
+  description,
   features,
   inherits,
   comingSoon = false,
@@ -55,10 +57,11 @@ export default function PricingCard({
 
         <div className="mb-4">
           <h3 className="text-2xl font-bold text-text mb-0.5">{name}</h3>
-          <div className="flex items-baseline gap-1">
+          <div className="flex items-baseline gap-1.5 mb-1.5">
             <span className="text-lg font-bold text-text/60">{price ?? "Free"}</span>
-            {period && <span className="text-text-muted text-sm">{period}</span>}
+            {period && <span className="text-text-muted text-xs">{period}</span>}
           </div>
+          {description && <p className="text-xs text-text-muted">{description}</p>}
         </div>
 
         {inherits ? (

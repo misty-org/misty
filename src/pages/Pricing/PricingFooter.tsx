@@ -2,28 +2,28 @@ import { useState } from "react";
 
 const faqs = [
   {
-    q: "What is the right plan for me?",
-    a: "Lite is free forever and covers everything you need to manage files across multiple cloud providers. Pro is a yearly plan that unlocks unlimited accounts, the Misty clipboard, and priority support. Max is a one-time purchase that gives you everything in Pro permanently, plus lifetime updates and unlimited clipboard transfers.",
+    q: "Is this a one-time purchase?",
+    a: "Yes. Pro and Max are perpetual licenses — you pay once and own it. There are no subscriptions, no renewals, and no expiration. Future updates are included.",
+  },
+  {
+    q: "What counts as a device?",
+    a: "A device is any machine you install and activate Misty on — a laptop, desktop, or server. Pro covers one device. Max covers all your devices, including future platforms like mobile.",
   },
   {
     q: "What's the difference between Pro and Max?",
-    a: "Pro is billed yearly and includes all premium features. Max is a one-time payment that gives you everything in Pro forever — no renewals, no expiration. Max also includes unlimited clipboard transfer data and priority feature requests.",
+    a: "Pro gives you every feature on a single device for $30. Max gives you every feature on unlimited devices for $89. If you have two or more devices, Max is almost always the better deal.",
   },
   {
-    q: "What payment options are available?",
-    a: "We accept all major credit and debit cards. Payment is processed securely. Pro licenses are tied to your Misty account.",
+    q: "What if I get a new computer?",
+    a: "You can reassign your Pro license to a different device from your dashboard. Max has no restrictions — just install and activate on any device you own.",
   },
   {
-    q: "Can I use Misty on multiple devices?",
-    a: "Yes. Your Misty account works across all your devices. Both Lite and Pro are account-based, so your plan follows you wherever you install the app.",
+    q: "What does Lite include?",
+    a: "Lite is free forever. It includes one cloud provider, full file management, background transfers, unified search, and the Misty CLI. No credit card required.",
   },
   {
     q: "How does Misty handle my data?",
-    a: "Misty never stores your files or credentials on any external server. All cloud provider communication is proxied through a local service running on your own machine. Your data stays yours.",
-  },
-  {
-    q: "Is Misty open source?",
-    a: "Yes. Misty's core is open source. You can inspect the code, build from source, or contribute on GitHub.",
+    a: "Misty never touches your files. All communication with cloud providers happens through a local proxy running on your machine. Your credentials and file data never leave your device.",
   },
 ];
 
@@ -48,9 +48,7 @@ function FAQItem({ q, a }: { q: string; a: string }) {
         </svg>
       </button>
       {open && (
-        <p className="pb-4 text-sm text-text-muted leading-relaxed">
-          {a}
-        </p>
+        <p className="pb-4 text-sm text-text-muted leading-relaxed">{a}</p>
       )}
     </div>
   );
@@ -58,7 +56,7 @@ function FAQItem({ q, a }: { q: string; a: string }) {
 
 export default function PricingQA() {
   return (
-    <div className="">
+    <div>
       <h2 className="text-lg font-semibold text-text mb-6">Questions & Answers</h2>
       <div>
         {faqs.map((faq) => (

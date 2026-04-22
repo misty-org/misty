@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router";
+import { logoutRequest } from "./pages/Dashboard/api";
 
 interface User {
   id: string;
@@ -36,6 +37,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
 
   const logout = useCallback(() => {
+    logoutRequest().catch(() => {});
     setUser(null);
     navigate("/");
   }, [navigate]);

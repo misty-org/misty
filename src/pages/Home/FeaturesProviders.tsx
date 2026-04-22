@@ -11,18 +11,7 @@ import { GrOnedrive } from "react-icons/gr";
 export default function FeaturesProviders() {
   return (
     <div>
-      <div className="text-center mb-16 md:mb-20">
-        <h2 className="text-2xl md:text-3xl font-bold text-text mb-4 text-balance">
-          Your files are <span className="text-white">everywhere</span>
-        </h2>
-        <p className="text-text-muted max-w-2xl mx-auto text-pretty">
-          Google Drive for docs. S3 for backups. Box for shared folders. Misty
-          gives you one place to browse, search, and move files across the
-          cloud services people already use.
-        </p>
-      </div>
-
-      <div className="glass-card rounded-2xl p-6 md:p-8">
+      <div className="glass-card rounded-2xl p-4 md:p-6">
         <p className="text-sm font-medium text-center text-text-muted mb-6">
           Popular cloud providers
         </p>

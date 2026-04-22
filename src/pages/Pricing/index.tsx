@@ -9,7 +9,6 @@ export default function Pricing() {
 
   function buildStripeLink(link?: string) {
     if (!link || !user?.email) return undefined;
-
     const url = new URL(link);
     url.searchParams.set("locked_prefilled_email", user.email);
     url.searchParams.set("client_reference_id", user.id);
@@ -24,14 +23,16 @@ export default function Pricing() {
         <PricingCard
           name="Lite"
           price="Free"
+          description="Everything you need to get started."
           features={liteFeatures}
           ctaTo="/download"
-          ctaLabel="Get Lite"
+          ctaLabel="Get started"
         />
         <PricingCard
           name="Pro"
-          price="$20"
-          period="/ year"
+          price="$30"
+          period="per device"
+          description="Full power on the devices you use most."
           features={proFeatures}
           ctaHref={buildStripeLink(import.meta.env.VITE_STRIPE_LINK_PRO)}
           ctaTo={user ? undefined : "/signin"}
@@ -42,7 +43,8 @@ export default function Pricing() {
         <PricingCard
           name="Max"
           price="$89"
-          period="lifetime"
+          period="unlimited devices"
+          description="Every device, every platform, every feature."
           features={maxFeatures}
           ctaHref={buildStripeLink(import.meta.env.VITE_STRIPE_LINK_MAX)}
           ctaTo={user ? undefined : "/signin"}

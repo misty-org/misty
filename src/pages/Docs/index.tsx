@@ -6,7 +6,7 @@ import CenterPanel from "./CenterPanel";
 import RightPanel from "./RightPanel";
 
 const guideCategories: Category[] = [
-  { key: "getting-started", label: "Getting Started", ids: ["introduction", "installation", "quick-start"] },
+  { key: "getting-started", label: "Getting Started", ids: ["introduction", "installation"] },
   { key: "architecture", label: "Architecture", ids: ["architecture"] },
   { key: "extensions", label: "Extensions & CLI", ids: ["extensions", "cli"] },
 ];

@@ -26,7 +26,7 @@ const posts = [
 
 const tagColors: Record<string, string> = {
   Announcement: "bg-primary/10 text-primary border-primary/20",
-  Engineering: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+  Engineering: "bg-zinc-500/10 text-zinc-400 border-zinc-500/20",
 };
 
 export default function BlogPreview() {

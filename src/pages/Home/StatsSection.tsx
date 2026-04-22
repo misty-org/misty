@@ -1,59 +1,23 @@
 const stats = [
-  {
-    value: "55",
-    unit: "%",
-    label: "Of users rely on 3+ different cloud services",
-    sub: "Photos on Google Photos, documents on Dropbox, backups on iCloud — all separate.",
-  },
-  {
-    value: "2.3B",
-    unit: "",
-    label: "Personal cloud storage users worldwide in 2025",
-    sub: "Up from 1.1 billion in 2014. Cloud storage is now a universal part of daily life.",
-  },
-  {
-    value: "71",
-    unit: "%",
-    label: "Store photos in the cloud",
-    sub: "While 50% use cloud for backups and 41% for music and video — spread across different platforms.",
-  },
-  {
-    value: "3+",
-    unit: "services",
-    label: "The average person's file footprint",
-    sub: "People spread files across platforms for organisation, backup, and platform-specific perks.",
-  },
+  { value: "55%", label: "rely on 3+ cloud services" },
+  { value: "2.3B", label: "cloud storage users worldwide" },
+  { value: "71%", label: "store photos in the cloud" },
+  { value: "3+", label: "services per person on average" },
 ];
 
 export default function StatsSection() {
   return (
-    <div>
-      <div className="text-center mb-10">
-        <h2 className="text-2xl md:text-3xl font-bold text-text mb-3">
-          Your files are scattered. You shouldn't have to be.
-        </h2>
-        <p className="text-text-muted text-sm max-w-xl mx-auto">
-          Cloud storage adoption is at an all-time high — but managing files across multiple services is still a mess.
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div className="glass-card rounded-2xl p-4 md:p-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-border">
         {stats.map((stat) => (
-          <div key={stat.label} className="glass-card rounded-2xl p-6 flex flex-col gap-2">
-            <div className="flex items-end gap-1.5">
-              <span className="text-4xl font-bold text-white tracking-tight">{stat.value}</span>
-              {stat.unit && (
-                <span className="text-sm font-medium text-text-muted mb-1.5">{stat.unit}</span>
-              )}
-            </div>
-            <p className="text-sm font-semibold text-text">{stat.label}</p>
-            <p className="text-xs text-text-muted leading-relaxed">{stat.sub}</p>
+          <div key={stat.label} className="flex flex-col items-center text-center px-4 gap-1">
+            <span className="text-2xl md:text-3xl font-bold text-white tracking-tight">{stat.value}</span>
+            <span className="text-xs text-text-muted leading-snug">{stat.label}</span>
           </div>
         ))}
       </div>
-
-      <p className="text-center text-[11px] text-text-muted/50 mt-4">
-        Sources: GoodFirms Personal Cloud Storage Trends Report
+      <p className="text-center text-[11px] text-text-muted/50 mt-5">
+        Source: GoodFirms Personal Cloud Storage Trends Report
       </p>
     </div>
   );

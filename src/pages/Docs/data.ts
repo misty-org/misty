@@ -6,6 +6,12 @@ export interface Endpoint {
   response: string;
 }
 
+export interface Step {
+  heading: string;
+  text: string;
+  screenshot?: string | null; // string = real src, null = placeholder box, undefined = no image
+}
+
 export interface GuideSection {
   id: string;
   label: string;
@@ -13,6 +19,7 @@ export interface GuideSection {
   title: string;
   prose: string[];
   notes: { kind: "tip" | "note" | "warning"; text: string }[];
+  steps?: Step[];
 }
 
 export interface ApiSection {

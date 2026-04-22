@@ -1,42 +1,142 @@
+import { useEffect, useRef, useState } from "react";
 import { HiOutlineBolt, HiOutlineShieldCheck, HiOutlineMagnifyingGlass, HiOutlineArrowsRightLeft, HiOutlineLockClosed, HiOutlineSignal } from "react-icons/hi2";
+
+const searchProviders = ["Google Drive", "OneDrive", "Dropbox"];
+
+function SearchDiagram() {
+  const [step, setStep] = useState(0);
+
+  useEffect(() => {
+    const durations = [700, 700, 700, 1400];
+    let current = 0;
+    let t: number;
+    function tick() {
+      setStep(current);
+      t = window.setTimeout(() => {
+        current = (current + 1) % 4;
+        tick();
+      }, durations[current]);
+    }
+    tick();
+    return () => clearTimeout(t);
+  }, []);
+
+  return (
+    <div className="flex items-center gap-2 text-xs text-text-muted flex-wrap">
+      {searchProviders.map((p, i) => (
+        <span
+          key={p}
+          className={`px-2.5 py-1.5 rounded-lg border transition-all duration-300 ${
+            step === i ? "border-white/25 text-white bg-elevated" : "border-border bg-surface"
+          }`}
+        >
+          {p}
+        </span>
+      ))}
+      <span className={`transition-colors duration-300 ${step === 3 ? "text-white" : "text-text-muted"}`}>&rarr;</span>
+      <span
+        className={`px-2.5 py-1.5 rounded-lg border font-medium transition-all duration-300 ${
+          step === 3 ? "border-white/25 text-white bg-elevated" : "border-border text-text bg-elevated"
+        }`}
+      >
+        One index
+      </span>
+    </div>
+  );
+}
+
+function OAuthPacket() {
+  return (
+    <div className="flex items-center text-xs text-text-muted gap-2">
+      <div className="px-3 py-2 rounded-lg bg-surface border border-border shrink-0">
+        <span className="text-text font-medium">Your device</span>
+      </div>
+      <div className="flex-1 flex flex-col items-center gap-0.5 min-w-0">
+        <span className="text-[10px]">OAuth</span>
+        <div className="relative w-full h-3 flex items-center">
+          <div className="absolute inset-x-0 border-t border-dashed border-border" />
+          <div className="animate-oauth-packet w-1.5 h-1.5 rounded-full bg-zinc-400" />
+        </div>
+      </div>
+      <div className="px-3 py-2 rounded-lg bg-surface border border-border shrink-0">
+        <span>Cloud provider</span>
+      </div>
+    </div>
+  );
+}
+
+const filePool = [
+  "photos.zip", "report.pdf", "backup/", "video.mp4",
+  "archive.tar", "assets/", "notes.docx", "data.csv", "exports/",
+];
+
+function TransferTrack({ speed, initialProgress, initialIdx }: { speed: number; initialProgress: number; initialIdx: number }) {
+  const [progress, setProgress] = useState(initialProgress);
+  const [idx, setIdx] = useState(initialIdx);
+  const progressRef = useRef(initialProgress);
+
+  useEffect(() => {
+    const t = setInterval(() => {
+      progressRef.current += speed;
+      if (progressRef.current >= 100) {
+        progressRef.current = 0;
+        setIdx((i) => (i + 3) % filePool.length);
+      }
+      setProgress(progressRef.current);
+    }, 50);
+    return () => clearInterval(t);
+  }, [speed]);
+
+  return (
+    <div className="flex items-center gap-3">
+      <span className="text-text-muted w-28 truncate">{filePool[idx]}</span>
+      <div className="flex-1 h-1.5 rounded-full bg-surface overflow-hidden">
+        <div
+          className="h-full rounded-full bg-text-muted"
+          style={{ width: `${progress}%`, transition: progress < speed * 2 ? "none" : "width 50ms linear" }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function DirectConnections() {
+  const providers = ["Google Drive", "OneDrive", "Dropbox"];
+  const [active, setActive] = useState(0);
+
+  useEffect(() => {
+    const t = setInterval(() => setActive((i) => (i + 1) % providers.length), 1200);
+    return () => clearInterval(t);
+  }, []);
+
+  return (
+    <div className="flex flex-col gap-2 text-xs text-text-muted">
+      {providers.map((provider, i) => (
+        <div
+          key={provider}
+          className={`flex items-center gap-3 transition-opacity duration-400 ${
+            active === i ? "opacity-100" : "opacity-35"
+          }`}
+        >
+          <span
+            className={`w-2 h-2 rounded-full shrink-0 transition-colors duration-300 ${
+              active === i ? "bg-zinc-300" : "bg-zinc-700"
+            }`}
+          />
+          <span className="w-24">{provider}</span>
+          <div className="flex-1 border-t border-border" />
+          <span className="text-[10px]">Connected</span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function FeaturesShowcase() {
   return (
     <div className="flex flex-col gap-4">
-      {/* Misty helps you — full width */}
-      <div className="glass-card rounded-2xl p-10 md:p-14">
-        <h3 className="text-xl font-bold text-text mb-6">Misty helps you</h3>
-        <ul className="flex flex-col gap-4 text-sm md:text-base text-text-muted">
-          <li className="flex items-start gap-3">
-            <svg className="w-5 h-5 text-primary shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-            </svg>
-            <span>Manage local drives and remote storage from one place</span>
-          </li>
-          <li className="flex items-start gap-3">
-            <svg className="w-5 h-5 text-primary shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-            </svg>
-            <span>Drag and drop files between platforms with local file operations</span>
-          </li>
-          <li className="flex items-start gap-3">
-            <svg className="w-5 h-5 text-primary shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-            </svg>
-            <span>Search across all connected providers at once</span>
-          </li>
-          <li className="flex items-start gap-3">
-            <svg className="w-5 h-5 text-primary shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-            </svg>
-            <span>Link multiple accounts from the same service</span>
-          </li>
-        </ul>
-      </div>
-
       {/* Fast — full width */}
-      <div className="glass-card rounded-2xl p-10 md:p-14 text-center relative overflow-hidden">
-        {/* Streak lines */}
+      <div className="glass-card rounded-2xl p-4 md:p-6 text-center relative overflow-hidden">
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute top-[30%] left-0 w-20 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent animate-streak" />
           <div className="absolute top-[50%] left-0 w-32 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent animate-streak-2" />
@@ -59,7 +159,7 @@ export default function FeaturesShowcase() {
 
       {/* 2-col row */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="glass-card rounded-2xl p-10 md:p-14">
+        <div className="glass-card rounded-2xl p-4 md:p-6">
           <div className="w-10 h-10 rounded-lg bg-surface border border-border flex items-center justify-center mb-5">
             <HiOutlineMagnifyingGlass className="w-5 h-5 text-text-muted" />
           </div>
@@ -67,16 +167,9 @@ export default function FeaturesShowcase() {
           <p className="text-text-muted text-pretty mb-5">
             One query across every connected provider. No more switching between tabs to find a file.
           </p>
-          {/* Mini diagram */}
-          <div className="flex items-center gap-3 text-xs text-text-muted">
-            <span className="px-2.5 py-1.5 rounded-lg bg-surface border border-border">Google Drive</span>
-            <span className="px-2.5 py-1.5 rounded-lg bg-surface border border-border">OneDrive</span>
-            <span className="px-2.5 py-1.5 rounded-lg bg-surface border border-border">Dropbox</span>
-            <span className="text-text-muted">&rarr;</span>
-            <span className="px-2.5 py-1.5 rounded-lg bg-elevated border border-border text-text font-medium">One index</span>
-          </div>
+          <SearchDiagram />
         </div>
-        <div className="glass-card rounded-2xl p-10 md:p-14">
+        <div className="glass-card rounded-2xl p-4 md:p-6">
           <div className="w-10 h-10 rounded-lg bg-surface border border-border flex items-center justify-center mb-5">
             <HiOutlineArrowsRightLeft className="w-5 h-5 text-text-muted" />
           </div>
@@ -84,35 +177,23 @@ export default function FeaturesShowcase() {
           <p className="text-text-muted text-pretty mb-5">
             Moves and copies run quietly while you keep working. Large transfers don't block anything.
           </p>
-          {/* Mini transfer queue */}
           <div className="flex flex-col gap-2 text-xs">
-            <div className="flex items-center gap-3">
-              <span className="text-text-muted w-28 truncate">photos.zip</span>
-              <div className="flex-1 h-1.5 rounded-full bg-surface overflow-hidden">
-                <div className="h-full rounded-full bg-text-muted animate-fill-1" />
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-text-muted w-28 truncate">report.pdf</span>
-              <div className="flex-1 h-1.5 rounded-full bg-surface overflow-hidden">
-                <div className="h-full rounded-full bg-text-muted animate-fill-2" />
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-text-muted w-28 truncate">backup/</span>
-              <div className="flex-1 h-1.5 rounded-full bg-surface overflow-hidden">
-                <div className="h-full rounded-full bg-text-muted animate-fill-3" />
-              </div>
-            </div>
+            <TransferTrack speed={1.4} initialProgress={20} initialIdx={0} />
+            <TransferTrack speed={2.2} initialProgress={55} initialIdx={1} />
+            <TransferTrack speed={0.8} initialProgress={8}  initialIdx={2} />
           </div>
         </div>
       </div>
 
       {/* Secure — full width */}
-      <div className="glass-card rounded-2xl p-10 md:p-14 text-center">
+      <div className="glass-card rounded-2xl p-4 md:p-6 text-center">
         <div className="flex justify-center mb-6">
-          <div className="w-12 h-12 rounded-xl bg-surface border border-border flex items-center justify-center">
-            <HiOutlineShieldCheck className="w-6 h-6 text-text" />
+          <div className="relative flex items-center justify-center">
+            <div className="absolute w-12 h-12 rounded-xl border border-white/10 animate-shield-ring" />
+            <div className="absolute w-12 h-12 rounded-xl border border-white/5 animate-shield-ring [animation-delay:1s]" />
+            <div className="w-12 h-12 rounded-xl bg-surface border border-border flex items-center justify-center relative">
+              <HiOutlineShieldCheck className="w-6 h-6 text-text" />
+            </div>
           </div>
         </div>
         <h2 className="text-2xl md:text-3xl font-bold text-text tracking-tight mb-4">
@@ -123,9 +204,9 @@ export default function FeaturesShowcase() {
         </p>
       </div>
 
-      {/* 2-col row */}
+      {/* 2-col: Local-only + Direct connections */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="glass-card rounded-2xl p-10 md:p-14">
+        <div className="glass-card rounded-2xl p-4 md:p-6">
           <div className="w-10 h-10 rounded-lg bg-surface border border-border flex items-center justify-center mb-5">
             <HiOutlineLockClosed className="w-5 h-5 text-text-muted" />
           </div>
@@ -133,25 +214,9 @@ export default function FeaturesShowcase() {
           <p className="text-text-muted text-pretty mb-5">
             All processing happens on your device. Nothing is routed through our servers.
           </p>
-          {/* Mini architecture diagram */}
-          <div className="flex items-center justify-between text-xs text-text-muted gap-2">
-            <div className="flex flex-col items-center gap-1.5">
-              <div className="px-3 py-2 rounded-lg bg-surface border border-border text-center">
-                <span className="text-text font-medium">Your device</span>
-              </div>
-            </div>
-            <div className="flex flex-col items-center gap-1">
-              <span className="text-[10px] text-text-muted">OAuth</span>
-              <div className="w-16 border-t border-dashed border-border" />
-            </div>
-            <div className="flex flex-col items-center gap-1.5">
-              <div className="px-3 py-2 rounded-lg bg-surface border border-border text-center">
-                <span>Cloud provider</span>
-              </div>
-            </div>
-          </div>
+          <OAuthPacket />
         </div>
-        <div className="glass-card rounded-2xl p-10 md:p-14">
+        <div className="glass-card rounded-2xl p-4 md:p-6">
           <div className="w-10 h-10 rounded-lg bg-surface border border-border flex items-center justify-center mb-5">
             <HiOutlineSignal className="w-5 h-5 text-text-muted" />
           </div>
@@ -159,17 +224,7 @@ export default function FeaturesShowcase() {
           <p className="text-text-muted text-pretty mb-5">
             Every API call goes straight from your machine to the provider. Optional Tailscale support for secure remote access.
           </p>
-          {/* Mini connection diagram */}
-          <div className="flex flex-col gap-2 text-xs text-text-muted">
-            {["Google Drive", "OneDrive", "Dropbox"].map((provider) => (
-              <div key={provider} className="flex items-center gap-3">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                <span className="w-24">{provider}</span>
-                <div className="flex-1 border-t border-border" />
-                <span className="text-[10px]">Connected</span>
-              </div>
-            ))}
-          </div>
+          <DirectConnections />
         </div>
       </div>
     </div>

@@ -9,7 +9,7 @@ import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import Waitlist from "./pages/Waitlist";
 import Docs from "./pages/Docs";
-import ApiReference from "./pages/Docs/ApiReference";
+import Settings from "./pages/Dashboard";
 import Changelog from "./pages/Changelog";
 import Blog from "./pages/Blog";
 import Roadmap from "./pages/Roadmap";
@@ -24,7 +24,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <Home />, handle: { title: "Misty - Home" } },
       { path: "docs", element: <Docs />, handle: { title: "Misty - Docs" } },
-      { path: "docs/api", element: <ApiReference />, handle: { title: "Misty - API Reference" } },
+      { path: "settings", element: <Settings />, handle: { title: "Misty - Settings" } },
       { path: "download", element: <Download />, handle: { title: "Misty - Download" } },
       { path: "pricing", element: <Pricing />, handle: { title: "Misty - Pricing" } },
       { path: "changelog", element: <Changelog />, handle: { title: "Misty - Changelog" } },

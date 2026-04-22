@@ -7,13 +7,14 @@ export const guideSections: Section[] = [
     category: "getting-started",
     title: "What is Misty?",
     prose: [
-      "Misty is a desktop file manager that unifies all your cloud storage providers into a single window. Instead of switching between Google Drive, OneDrive, and Dropbox in separate browser tabs, you browse, move, and organize everything in one place.",
-      "Misty runs entirely on your machine. There's no cloud relay, no third-party server in the middle. Your credentials and file data never leave your device.",
-      "The app is built with a C++ ImGui frontend and a Go backend that communicate over gRPC. This gives you a fast, native UI with the flexibility and reliability of Go for all the cloud provider integrations.",
+      "Misty is a desktop file manager that brings your cloud storage — Google Drive, OneDrive, Dropbox, Amazon S3, and SFTP — into a single native window. Instead of juggling browser tabs and separate apps, you browse, move, and manage everything from one place.",
+      "At its core is a local Go proxy that runs on your machine and talks directly to cloud provider APIs. There is no Misty relay server. Your credentials and file data never leave your device — OAuth tokens are stored locally and refreshed automatically.",
+      "Beyond file management, Misty ships with a plugin system for extending the UI with custom workflows, restic-powered encrypted backups (Vault), a Gemini-powered AI assistant that understands your files, Tailscale integration for secure remote access, and a CLI for working from the terminal.",
+      "The desktop client is built with C++ and ImGui for a fast, native UI. The local proxy communicates with the client over HTTP on localhost. Everything runs on your machine — there is no Misty cloud service.",
     ],
     notes: [
-      { kind: "tip", text: "Misty is open source. You can inspect the code, build from source, or contribute on GitHub." },
       { kind: "note", text: "Misty supports Windows 10+, macOS 12+, and Linux (x86_64 and ARM64)." },
+      { kind: "tip", text: "Misty is open source. You can inspect the code, build from source, or contribute on GitHub." },
     ],
   },
   {
@@ -22,14 +23,41 @@ export const guideSections: Section[] = [
     category: "getting-started",
     title: "Installation",
     prose: [
-      "Download the latest release for your platform from the download page. Misty is available for Windows, macOS, and Linux.",
-      "Windows — Run the installer (.exe) and follow the prompts. Misty will be added to your Start menu and can optionally start on login.",
-      "macOS — Open the .dmg, drag Misty to Applications, and launch it. On first run you may need to allow it in System Settings > Privacy & Security.",
-      "Linux — Download the .AppImage or .deb package. For AppImage, make it executable (chmod +x) and run it. For Debian-based distros, install with dpkg -i.",
-      "After installation, launch Misty and create an account. The local proxy service starts automatically in the background — no manual configuration needed.",
+      "Getting started takes a few minutes. Download Misty, install it, create a free account, and connect your first cloud provider.",
+    ],
+    steps: [
+      {
+        heading: "Download Misty",
+        text: "Head to the download page and grab the latest release for your platform. Misty is available for Windows, macOS, and Linux.",
+      },
+      {
+        heading: "Install",
+        text: "Windows — Run the .exe installer and follow the prompts. Misty is added to your Start menu and can optionally launch on startup. macOS — Open the .dmg and drag Misty to Applications. On first run, allow it in System Settings › Privacy & Security. Linux — Download the .AppImage or .deb. For AppImage, mark it executable (chmod +x) and run it. For .deb, install with dpkg -i misty.deb.",
+      },
+      {
+        heading: "Launch Misty",
+        text: "Open Misty. The local proxy starts automatically in the background — no configuration needed. On first launch you'll be taken to the sign-in screen.",
+        screenshot: null,
+      },
+      {
+        heading: "Create an account",
+        text: "Register with your email and a password. Misty creates a local user profile tied to your machine. No payment is required for a free account.",
+        screenshot: null,
+      },
+      {
+        heading: "Connect your first provider",
+        text: "Open Settings and click Add Provider. Choose Google Drive, OneDrive, Dropbox, S3, or SFTP. Misty opens your browser for the OAuth flow — you authorize access directly with the provider. Your credentials are stored locally and never sent to Misty's servers.",
+        screenshot: "/misty-connect.png",
+      },
+      {
+        heading: "Browse your files",
+        text: "Once connected, your provider appears in the sidebar. Browse, upload, download, move, and organize files across all your connected providers from a single window.",
+        screenshot: "/misty-browse.png",
+      },
     ],
     notes: [
       { kind: "tip", text: "Misty auto-updates by default. You can disable this in Settings if you prefer to update manually." },
+      { kind: "tip", text: "You can connect multiple accounts from the same provider — for example, a personal and a work Google Drive." },
     ],
   },
   {
@@ -47,22 +75,6 @@ export const guideSections: Section[] = [
     notes: [
       { kind: "note", text: "The proxy requires an internet connection to reach cloud provider APIs, but it runs entirely on localhost. It does not need to be publicly accessible." },
       { kind: "tip", text: "Advanced users can self-host the proxy on a separate machine (a homelab server, VPS, or NAS) and connect to it remotely. See the API Reference for details." },
-    ],
-  },
-  {
-    id: "quick-start",
-    label: "Quick Start",
-    category: "getting-started",
-    title: "Quick Start",
-    prose: [
-      "1. Download & install — Grab Misty for your platform from the download page and create an account.",
-      "2. Connect providers — Link your Google Drive, OneDrive, or Dropbox accounts through the app's settings. Misty uses OAuth so you never enter your cloud password directly.",
-      "3. Browse & manage — View all your cloud files in one place. Move, copy, and organize across providers using the Misty clipboard.",
-      "4. Transfer files — Drag and drop files between providers, or use the clipboard to queue up cross-provider transfers that run in the background.",
-    ],
-    notes: [
-      { kind: "tip", text: "You can connect multiple accounts from the same provider — for example, a personal and a work Google Drive." },
-      { kind: "note", text: "Some features like unlimited accounts and the Misty clipboard require a Pro or Max plan. Check the pricing page for details." },
     ],
   },
   {

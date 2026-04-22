@@ -21,6 +21,37 @@ export function GuideCenterPanel({ section }: { section: GuideSection }) {
         ))}
       </div>
 
+      {section.steps && (
+        <div className="mt-10 flex flex-col gap-10">
+          {section.steps.map((step, i) => (
+            <div key={i} id={`${section.id}-step-${i}`} className="scroll-mt-20">
+              <div className="flex items-start gap-3 mb-4">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-surface border border-border text-xs font-bold text-text flex items-center justify-center mt-0.5">
+                  {i + 1}
+                </span>
+                <div>
+                  <h3 className="text-sm font-semibold text-text mb-1">{step.heading}</h3>
+                  <p className="text-sm text-text-secondary leading-relaxed">{step.text}</p>
+                </div>
+              </div>
+              {step.screenshot !== undefined && (
+                step.screenshot === null ? (
+                  <div className="w-full rounded-xl border border-dashed border-border bg-surface/40 h-52 flex items-center justify-center">
+                    <span className="text-xs text-text-muted">Screenshot — {step.heading}</span>
+                  </div>
+                ) : (
+                  <img
+                    src={step.screenshot}
+                    alt={step.heading}
+                    className="w-full rounded-xl border border-border block"
+                  />
+                )
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="mt-8 flex flex-col gap-4">
         {section.notes.map((n, i) => (
           <div key={i} id={`${section.id}-${n.kind}`} className="scroll-mt-20">

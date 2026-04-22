@@ -1,20 +1,21 @@
 export const liteFeatures = [
-  "Access to all cloud providers supported by Misty",
-  "Up to 3 cloud accounts simultaneously",
+  "1 cloud provider (Google Drive, OneDrive, Dropbox, S3, SFTP)",
+  "Full file management — browse, upload, download, move",
   "Background transfers",
-  "Browse and manage files across providers",
+  "Unified search across your provider",
+  "Misty CLI",
 ];
 
 export const proFeatures = [
-  "Unlimited cloud accounts",
-  "Misty clipboard for cross-provider file operations",
+  "Unlimited cloud providers",
+  "Vault — encrypted, restic-powered backups",
+  "AI file assistant (Gemini)",
+  "Plugins & extensions",
   "Priority support",
-  "Early access to new features",
 ];
 
 export const maxFeatures = [
-  "Everything in Pro, forever",
-  "Unlimited Misty clipboard transfer data",
-  "Lifetime updates",
+  "All Pro features on unlimited devices",
+  "Future platform support (mobile, web)",
   "Priority feature requests",
 ];

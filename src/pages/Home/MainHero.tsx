@@ -42,7 +42,7 @@ export default function MainHero() {
       </h1>
 
       <p className="mx-auto mb-5 max-w-2xl text-base leading-relaxed text-pretty text-text-muted">
-        Manage local files, cloud storage, backups, and AI-powered workflows — extended with plugins, all in one interface.
+        Manage local files, cloud storage, and backups in one interface. Build powerful workflows with fully customizable plugins.
       </p>
 
       <div className="flex flex-wrap justify-center gap-5">
