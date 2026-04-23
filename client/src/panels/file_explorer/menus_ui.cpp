@@ -107,11 +107,11 @@ void FileExplorerPanel::show_context_menu(FileExplorerState& state) {
             if (ImGui::MenuItem("Open With...", nullptr, false, can_open_directly)) {
                 std::string target_path = target_file ? target_file->path : "";
                 if (!target_path.empty()) {
-                    core::ApplicationPicker::pick([this, target_path](std::optional<std::string> app) {
+                    core::ApplicationPicker::pick([registry = &registry_, target_path](std::optional<std::string> app) {
                         if (!app.has_value()) return;
                         OpenWithManager::get().set_association_for_path(target_path, *app);
                         if (!core::open_path_with_application(*app, target_path)) {
-                            auto& notif = registry_.get_state<NotificationState>("Notifications");
+                            auto& notif = registry->get_state<NotificationState>("Notifications");
                             notif.add_notification("Open With Failed", "Could not open file.", NotificationType::ERROR);
                         }
                     });
@@ -386,8 +386,8 @@ void FileExplorerPanel::show_new_entry_modal(FileExplorerState& state) {
                                                      /*is_dir*/ true, "", 0,
                                                      [](bool, const std::string&, const std::string&) {});
                             services.create_folder(remote_name, folder_path,
-                                [this, name](bool success, const std::string&, const std::string& error) {
-                                    auto& notif = registry_.get_state<NotificationState>("Notifications");
+                                [registry = &registry_, name](bool success, const std::string&, const std::string& error) {
+                                    auto& notif = registry->get_state<NotificationState>("Notifications");
                                     if (success) notif.add_notification("Created", "Folder " + name + " created", NotificationType::SUCCESS);
                                     else notif.add_notification("Cloud Error", "Failed to create folder: " + error, NotificationType::ERROR);
                                 });
