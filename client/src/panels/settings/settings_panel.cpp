@@ -10,6 +10,7 @@
 #include <system_error>
 
 #include "core/commands/command_manager.h"
+#include "core/manager/env_manager.h"
 #include "core/manager/session_manager.h"
 #include "core/ui/imgui_utils.h"
 #include "imgui.h"
@@ -73,70 +74,78 @@ void SettingsPanel::render() {
     ensure_connection_config_loaded(state);
     sync_account_buffers(state);
 
-    constexpr float kPanelPaddingX = 32.0f;
-    constexpr float kPanelPaddingY = 24.0f;
-    constexpr float kSidebarPaddingX = 12.0f;
-    constexpr float kSidebarPaddingY = 24.0f;
-    constexpr float kColumnGap = 24.0f;
+    constexpr float kSidebarPaddingX  = 12.0f;
+    constexpr float kSidebarPaddingY  = 24.0f;
+    constexpr float kContentPaddingX  = 32.0f;
+    constexpr float kScrollPaddingY   = 24.0f;
+    constexpr float kColumnGap        = 24.0f;
 
-    ImGuiWindowFlags flags =
+    constexpr ImGuiWindowFlags flags =
         ImGuiWindowFlags_NoTitleBar |
         ImGuiWindowFlags_NoResize |
         ImGuiWindowFlags_NoMove |
         ImGuiWindowFlags_NoCollapse;
 
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.18f, 0.18f, 0.18f, 1.0f));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(kPanelPaddingX, kPanelPaddingY));
+    core::WithWindowStyle(ImVec4(0.12f, 0.12f, 0.12f, 1.0f), ImVec2(0.0f, 0.0f), [&]() {
+        if (ImGui::Begin("SettingsPanel", nullptr, flags)) {
+            const float total_w = ImGui::GetContentRegionAvail().x;
+            const float total_h = ImGui::GetContentRegionAvail().y;
+            const float sidebar_w = 228.0f;
+            const float content_w = std::max(0.0f, total_w - sidebar_w - kColumnGap);
 
-    if (ImGui::Begin("SettingsPanel", nullptr, flags)) {
-        const float total_w = ImGui::GetContentRegionAvail().x;
-        const float sidebar_w = 228.0f;
-        const float content_w = std::max(0.0f, total_w - sidebar_w - kColumnGap);
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(kSidebarPaddingX, kSidebarPaddingY));
+            ImGui::BeginChild("##settings_sidebar", ImVec2(sidebar_w, 0.0f), false);
+            render_sidebar(state, sidebar_w);
+            ImGui::EndChild();
+            ImGui::PopStyleVar();
 
-        ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.14f, 0.14f, 0.14f, 1.0f));
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(kSidebarPaddingX, kSidebarPaddingY));
-        ImGui::BeginChild("##settings_sidebar", ImVec2(sidebar_w, 0.0f), false);
-        render_sidebar(state, sidebar_w);
-        ImGui::EndChild();
-        ImGui::PopStyleVar();
-        ImGui::PopStyleColor();
+            // Vertical divider
+            ImGui::SameLine(0.0f, 0.0f);
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            ImVec2 p = ImGui::GetCursorScreenPos();
+            dl->AddLine(ImVec2(p.x, p.y),
+                        ImVec2(p.x, p.y + total_h),
+                        IM_COL32(60, 60, 60, 255), 1.0f);
 
-        ImGui::SameLine(0.0f, kColumnGap);
+            ImGui::SameLine(0.0f, kColumnGap);
 
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
-        ImGui::BeginChild("##settings_content_outer", ImVec2(content_w, 0.0f), false);
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(kContentPaddingX, 0.0f));
+            ImGui::BeginChild("##settings_content_outer", ImVec2(content_w, 0.0f), false);
 
-        const float status_h = state.status_timer > 0.0f ? 42.0f : 0.0f;
-        const float scroll_h = std::max(0.0f, ImGui::GetContentRegionAvail().y - status_h);
+            const float status_h = state.status_timer > 0.0f ? 42.0f : 0.0f;
+            const float scroll_h = std::max(0.0f, ImGui::GetContentRegionAvail().y - status_h);
 
-        ImGui::BeginChild("##settings_content_scroll", ImVec2(0.0f, scroll_h), false,
-                          ImGuiWindowFlags_AlwaysVerticalScrollbar);
-        render_content(state);
-        ImGui::EndChild();
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, kScrollPaddingY));
+            ImGui::BeginChild("##settings_content_scroll", ImVec2(0.0f, scroll_h), false,
+                              ImGuiWindowFlags_AlwaysVerticalScrollbar);
+            if (state.active_section != state.prev_section) {
+                ImGui::SetScrollY(0.0f);
+                state.prev_section = state.active_section;
+            }
+            render_content(state);
+            ImGui::EndChild();
+            ImGui::PopStyleVar(); // scroll child padding
 
-        if (state.status_timer > 0.0f) {
-            render_status_bar(state);
+            if (state.status_timer > 0.0f) {
+                render_status_bar(state);
+            }
+
+            ImGui::EndChild();
+            ImGui::PopStyleVar(); // content outer padding
         }
-
-        ImGui::EndChild();
-        ImGui::PopStyleVar();
-    }
-    ImGui::End();
-
-    ImGui::PopStyleVar();
-    ImGui::PopStyleColor();
+        ImGui::End();
+    });
 }
 
 void SettingsPanel::render_sidebar(SettingsState& state, float width) {
     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.56f, 0.56f, 0.56f, 1.0f));
-    ImGui::SetCursorPosX(16.0f);
     ImGui::TextUnformatted("SETTINGS");
     ImGui::PopStyleColor();
 
     ImGui::Spacing();
     ImGui::Spacing();
 
-    const float btn_w = width - 28.0f;
+    const float btn_w = width;
     render_section_button("Account", SettingsSection::Account, state, btn_w);
     render_section_button("General", SettingsSection::General, state, btn_w);
     render_section_button("Sync", SettingsSection::Sync, state, btn_w);
@@ -152,7 +161,6 @@ void SettingsPanel::render_section_button(const char* label, SettingsSection sec
                                           SettingsState& state, float width) {
     (void) width;
     const bool selected = state.active_section == section;
-    ImGui::SetCursorPosX(10.0f);
 
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(12.0f, 9.0f));
@@ -218,7 +226,7 @@ void SettingsPanel::render_subsection_header(const char* title) {
 void SettingsPanel::render_value_row(const char* label, const std::string& value) {
     ImGui::PushID(label);
 
-    if (ImGui::BeginTable("##value_row", 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_NoSavedSettings)) {
+    if (ImGui::BeginTable("##value_row", 2, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoSavedSettings)) {
         ImGui::TableSetupColumn("##label", ImGuiTableColumnFlags_WidthFixed, 180.0f);
         ImGui::TableSetupColumn("##value", ImGuiTableColumnFlags_WidthStretch);
 
@@ -243,7 +251,7 @@ void SettingsPanel::render_value_row(const char* label, const std::string& value
 void SettingsPanel::render_toggle_row(const char* label, const char* subtitle, bool& value) {
     ImGui::PushID(label);
 
-    if (ImGui::BeginTable("##toggle_row", 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_NoSavedSettings)) {
+    if (ImGui::BeginTable("##toggle_row", 2, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoSavedSettings)) {
         ImGui::TableSetupColumn("##left", ImGuiTableColumnFlags_WidthStretch);
         ImGui::TableSetupColumn("##right", ImGuiTableColumnFlags_WidthFixed, 84.0f);
 
@@ -268,7 +276,7 @@ bool SettingsPanel::render_action_row(const char* label, const char* subtitle, c
     bool pressed = false;
     ImGui::PushID(label);
 
-    if (ImGui::BeginTable("##action_row", 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_NoSavedSettings)) {
+    if (ImGui::BeginTable("##action_row", 2, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoSavedSettings)) {
         ImGui::TableSetupColumn("##left", ImGuiTableColumnFlags_WidthStretch);
         ImGui::TableSetupColumn("##right", ImGuiTableColumnFlags_WidthFixed, action_width + 12.0f);
 
@@ -320,19 +328,13 @@ void SettingsPanel::sync_account_buffers(SettingsState& state) {
 void SettingsPanel::ensure_connection_config_loaded(SettingsState& state) {
     if (state.connection_config_loaded) return;
 
-    std::ifstream config_file("misty.conf");
-    if (config_file.is_open()) {
-        std::string mount_path;
-        std::string server_address;
-        std::getline(config_file, mount_path);
-        std::getline(config_file, server_address);
-
-        if (!mount_path.empty()) {
-            std::strncpy(state.mount_path, mount_path.c_str(), sizeof(state.mount_path) - 1);
-        }
-        if (!server_address.empty()) {
-            std::strncpy(state.server_address, server_address.c_str(), sizeof(state.server_address) - 1);
-        }
+    const std::string mount_path = core::EnvManager::get().get("MISTY_MOUNT_PATH", "");
+    const std::string server_address = core::EnvManager::get().get("MISTY_GRPC_ADDRESS", "");
+    if (!mount_path.empty()) {
+        std::strncpy(state.mount_path, mount_path.c_str(), sizeof(state.mount_path) - 1);
+    }
+    if (!server_address.empty()) {
+        std::strncpy(state.server_address, server_address.c_str(), sizeof(state.server_address) - 1);
     }
 
     state.connection_config_loaded = true;

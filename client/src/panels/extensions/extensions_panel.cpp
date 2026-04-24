@@ -7,6 +7,7 @@
 #include "core/manager/asset_manager.h"
 #include "core/ui/imgui_utils.h"
 #include "imgui.h"
+#include "panels/activity/activity_state.h"
 #include "panels/notification/notification_state.h"
 
 namespace misty::panel {
@@ -220,10 +221,10 @@ void ExtensionsPanel::render_plugin_card(const core::PluginInfo& plugin) {
         if (core::StyledButton(("Sandbox##" + plugin.id).c_str(), ImVec2(130.0f, 0.0f), core::ButtonTheme::Primary())) {
             std::string error;
             if (!core::PluginHost::get().open_plugin_sandbox(plugin.plugin_dir, &error)) {
-                auto& notifications = ui_registry_.get_state<NotificationState>("Notifications");
-                notifications.add_notification("Sandbox Failed",
-                                               error.empty() ? "Could not open plugin sandbox." : error,
-                                               NotificationType::ERROR);
+                auto& activity = ui_registry_.get_state<ActivityState>("Activity");
+                activity.add_entry("System",
+                    error.empty() ? "Could not open plugin sandbox." : error,
+                    ActivityEntryType::ERROR);
             }
         }
 

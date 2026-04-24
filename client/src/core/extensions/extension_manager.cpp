@@ -326,79 +326,26 @@ std::vector<InstalledExtension> ExtensionManager::installed_extensions() {
 }
 
 std::vector<MatchedExtensionAction> ExtensionManager::matching_file_actions(const ExtensionFileContext& file) {
-    std::lock_guard<std::mutex> lock(mu_);
-    load_if_needed_locked();
-
-    std::vector<MatchedExtensionAction> matches;
-    for (const auto& extension : installed_extensions_) {
-        for (const auto& action : extension.file_actions) {
-            if (!matches_action(action, file)) {
-                continue;
-            }
-
-            matches.push_back(MatchedExtensionAction{
-                .extension_id = extension.id,
-                .extension_name = extension.name,
-                .extension_version = extension.version,
-                .extension_dir = extension.extension_dir,
-                .bundled = extension.bundled,
-                .action = action,
-            });
-        }
-    }
-
-    std::sort(matches.begin(), matches.end(), [](const MatchedExtensionAction& lhs, const MatchedExtensionAction& rhs) {
-        if (lhs.action.title != rhs.action.title) {
-            return lhs.action.title < rhs.action.title;
-        }
-        return lhs.extension_name < rhs.extension_name;
-    });
-    return matches;
+    (void)file;
+    // Misty no longer supports external file-action extensions that launch
+    // executables. All extensions are in-process plugins.
+    return {};
 }
 
 bool ExtensionManager::invoke_file_action(const MatchedExtensionAction& matched,
                                           const ExtensionFileContext& file,
                                           std::string* error) {
-    const std::string executable_template = resolve_template(matched.action.executable, matched, file);
-    const std::string executable = resolve_executable(executable_template, matched.extension_dir);
-    if (executable.empty()) {
-        if (error) {
-            *error = "Extension executable was not found.";
-        }
-        return false;
+    (void)matched;
+    (void)file;
+    if (error) {
+        *error = "External extensions are disabled. Use in-process plugins under ~/misty/public/plugins or ~/misty/local/plugins.";
     }
-
-    std::vector<std::string> args;
-    args.reserve(matched.action.args.size());
-    for (const auto& arg : matched.action.args) {
-        args.push_back(resolve_template(arg, matched, file));
-    }
-
-    std::string working_directory = matched.action.working_directory.empty()
-        ? matched.extension_dir
-        : resolve_template(matched.action.working_directory, matched, file);
-    if (!working_directory.empty()) {
-        fs::path cwd_path(working_directory);
-        if (cwd_path.is_relative()) {
-            working_directory = (fs::path(matched.extension_dir) / cwd_path).lexically_normal().string();
-        }
-    }
-
-    if (!launch_detached_process(executable, args, working_directory)) {
-        if (error) {
-            *error = "Failed to launch extension process.";
-        }
-        return false;
-    }
-
-    return true;
+    return false;
 }
 
 std::vector<std::string> ExtensionManager::discovery_roots() const {
-    std::vector<std::string> roots;
-    roots.push_back((get_executable_path().parent_path() / "extensions").string());
-    roots.push_back((fs::path(EnvManager::get().get_user_home_dir()) / ".misty" / "extensions").string());
-    return roots;
+    // External file-action extensions are disabled.
+    return {};
 }
 
 void ExtensionManager::load_if_needed_locked() {

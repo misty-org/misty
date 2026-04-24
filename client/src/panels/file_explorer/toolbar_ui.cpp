@@ -13,6 +13,99 @@
 using namespace misty::core;
 
 namespace misty::panel {
+namespace {
+constexpr float kPathFieldTrim = 96.0f;
+
+struct BreadcrumbSegment {
+    std::string label;
+    std::string target_path;
+};
+
+std::vector<BreadcrumbSegment> build_breadcrumb_segments(const std::string& current_path) {
+    std::vector<BreadcrumbSegment> segments;
+    if (current_path.empty()) {
+        return segments;
+    }
+
+    if (current_path == FileExplorerState::VIRTUAL_PATH_RECENT) {
+        return {{"Recent", current_path}};
+    }
+    if (current_path == FileExplorerState::VIRTUAL_PATH_STARRED) {
+        return {{"Starred", current_path}};
+    }
+    if (current_path == FileExplorerState::VIRTUAL_PATH_TRASH) {
+        return {{"Trash", current_path}};
+    }
+
+    if (path_utils::is_remote_path(current_path) || current_path == path_utils::get_mount_root() || current_path == path_utils::get_mount_root() + "/") {
+        const std::string mount_root = path_utils::get_mount_root();
+        segments.push_back({"Cloud", mount_root});
+        const auto info = path_utils::parse_remote_path(current_path);
+        if (!info.provider_folder.empty()) {
+            const std::string provider_path = mount_root + "/" + info.provider_folder;
+            segments.push_back({info.provider_folder, provider_path});
+            if (!info.remote_name.empty()) {
+                std::string remote_path = provider_path + "/" + info.remote_name;
+                segments.push_back({info.remote_name, remote_path});
+                if (!info.relative_path.empty()) {
+                    std::string cumulative = remote_path;
+                    for (const auto& part : path_utils::split_path(info.relative_path)) {
+                        cumulative += "/" + part;
+                        segments.push_back({part, cumulative});
+                    }
+                }
+            }
+        }
+        return segments;
+    }
+
+    const char* home = std::getenv("HOME");
+    const std::string home_path = home ? home : "";
+    fs::path path(current_path);
+    fs::path cumulative;
+
+    if (!home_path.empty() && current_path.rfind(home_path, 0) == 0) {
+        cumulative = fs::path(home_path);
+        segments.push_back({"~", cumulative.string()});
+        std::error_code ec;
+        fs::path relative = fs::relative(path, cumulative, ec);
+        if (!ec) {
+            for (const auto& part : relative) {
+                cumulative /= part;
+                segments.push_back({part.string(), cumulative.string()});
+            }
+            return segments;
+        }
+    }
+
+    if (path.is_absolute()) {
+        cumulative = path.root_path();
+        segments.push_back({cumulative.string().empty() ? "/" : cumulative.string(), cumulative.string().empty() ? "/" : cumulative.string()});
+    }
+    for (const auto& part : path.relative_path()) {
+        cumulative /= part;
+        segments.push_back({part.string(), cumulative.string()});
+    }
+    if (segments.empty()) {
+        segments.push_back({current_path, current_path});
+    }
+    return segments;
+}
+
+void clear_scoped_search(SearchState& search_state) {
+    search_state.is_open = false;
+    search_state.pending_submit = false;
+    search_state.pending_navigate_index = -1;
+    search_state.selected_index = 0;
+    search_state.cache_results.clear();
+    search_state.api_results.clear();
+    search_state.seen_ids.clear();
+    search_state.pending_api_tasks.store(0);
+    search_state.api_search_done = true;
+    search_state.last_submitted_query.clear();
+}
+} // namespace
+
 void FileExplorerPanel::show_inline_search(FileExplorerState& state, SearchState& search_state) {
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 7));
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
@@ -99,10 +192,8 @@ void FileExplorerPanel::show_nav_history(FileExplorerState& state, float button_
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.28f, 0.28f, 0.28f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.16f, 0.16f, 0.16f, 1.0f));
     const bool sync_in_flight = state.sync_request_in_flight;
-    const char* refresh_icon_name = sync_in_flight ? "cloud-24" : "sync-16";
-    const ImVec4 refresh_tint = sync_in_flight
-        ? ImVec4(0.34f, 0.76f, 0.96f, 1.0f)
-        : ImVec4(0.7f, 0.7f, 0.7f, 1.0f);
+    const char* refresh_icon_name = "sync-16";
+    const ImVec4 refresh_tint(0.7f, 0.7f, 0.7f, 1.0f);
 
     if (sync_in_flight) ImGui::BeginDisabled();
     auto& sync_tex = AssetManager::get().get_svg_texture(refresh_icon_name, 16);
@@ -111,7 +202,7 @@ void FileExplorerPanel::show_nav_history(FileExplorerState& state, float button_
                 ImVec4(0, 0, 0, 0), refresh_tint)) {
             request_manual_refresh(state);
         }
-    } else if (ImGui::Button(sync_in_flight ? "..." : "R", ImVec2(button_width, 0))) {
+    } else if (ImGui::Button("R", ImVec2(button_width, 0))) {
         request_manual_refresh(state);
     }
     if (sync_in_flight) ImGui::EndDisabled();
@@ -128,59 +219,125 @@ void FileExplorerPanel::show_nav_history(FileExplorerState& state, float button_
     ImGui::PopStyleVar(2);
 }
 
-void FileExplorerPanel::show_search_bar(FileExplorerState& state) {
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 8));
+void FileExplorerPanel::show_search_bar(FileExplorerState& state, SearchState& search_state) {
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8, 6));
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
 
-    const float icon_size = 16.0f;
-    const float btn_size = 32.0f;
-    const float spacing = 8.0f;
+    const float control_height = ImGui::GetFrameHeight();
+    const float action_btn_size = std::max(16.0f, control_height - 10.0f);
+    const float spacing = 3.0f;
     const bool is_local = !path_utils::is_remote_path(state.current_path);
-    const int icon_button_count = is_local ? 5 : 4;
-    const float icon_button_width = icon_size + ImGui::GetStyle().FramePadding.x * 2.0f;
+    const auto remote_info = path_utils::parse_remote_path(state.current_path);
+    const bool can_toggle_watch = !is_local && !remote_info.provider_folder.empty() && !remote_info.remote_name.empty();
+    const int action_button_count = is_local ? 4 : (can_toggle_watch ? 4 : 3);
     const float total_available = ImGui::GetContentRegionAvail().x;
-    const float path_width = std::max(
-        100.0f,
-        total_available - icon_button_width * icon_button_count - spacing * icon_button_count
-    );
+    const float action_width = action_btn_size * action_button_count +
+                               spacing * static_cast<float>(std::max(0, action_button_count - 1));
+    const float search_width = std::clamp(total_available * 0.18f, 130.0f, 190.0f);
+    const float reserved_trailing_width = action_width + search_width + spacing;
+    const float path_width = std::max(120.0f, total_available - reserved_trailing_width - spacing - kPathFieldTrim);
+
+    if (CommandManager::get().matches("search.toggle")) {
+        search_state.is_open = true;
+        search_state.just_opened = true;
+    }
 
     ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.21f, 0.21f, 0.21f, 1.0f));
     ImGui::SetNextItemWidth(path_width);
-    bool entered = ImGui::InputTextWithHint("##path", "Go to path...", state.search_path, sizeof(state.search_path) - 1, ImGuiInputTextFlags_EnterReturnsTrue);
-    if (entered) {
-        navigate_to_path(state.search_path, true, false);
-    }
+    const bool path_submitted = ImGui::InputTextWithHint("##path_input", "Jump to path", state.search_path,
+                                                         sizeof(state.search_path), ImGuiInputTextFlags_EnterReturnsTrue);
     ImGui::PopStyleColor();
+    if (path_submitted) {
+        std::string target(state.search_path);
+        if (!target.empty()) {
+            navigate_to_path(target, true, false);
+        }
+    }
+
+    ImGui::SameLine(0, spacing);
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.21f, 0.21f, 0.21f, 1.0f));
+    ImGui::SetNextItemWidth(search_width);
+    if (search_state.just_opened) {
+        ImGui::SetKeyboardFocusHere();
+        search_state.just_opened = false;
+    }
+    bool changed = ImGui::InputTextWithHint("##scope_search", "Find in folder...  (:pdf)", search_state.query_buf,
+                                            sizeof(search_state.query_buf), ImGuiInputTextFlags_EnterReturnsTrue);
+    const bool submitted = ImGui::IsItemDeactivatedAfterEdit();
+    const bool input_active = ImGui::IsItemActive();
+    ImGui::PopStyleColor();
+
+    std::string query(search_state.query_buf);
+    if (changed) {
+        search_state.last_input_change_at = std::chrono::steady_clock::now();
+        search_state.pending_submit = false;
+        search_state.pending_navigate_index = -1;
+        search_state.selected_index = 0;
+        if (query.empty()) {
+            clear_scoped_search(search_state);
+        } else {
+            search_state.is_open = true;
+        }
+    }
+    if (submitted && ((!query.empty() && query[0] == ':' && query.size() > 1) || query.size() >= 2)) {
+        search_state.pending_submit = true;
+        search_state.is_open = true;
+    } else if (!query.empty()) {
+        const auto elapsed = std::chrono::steady_clock::now() - search_state.last_input_change_at;
+        const bool type_filter = query[0] == ':' && query.size() > 1;
+        if ((type_filter || query.size() >= 2) &&
+            query != search_state.last_submitted_query &&
+            elapsed >= std::chrono::milliseconds(type_filter ? 0 : 180)) {
+            search_state.pending_submit = true;
+            search_state.is_open = true;
+        }
+    } else if (!input_active) {
+        clear_scoped_search(search_state);
+    }
+    if (CommandManager::get().matches("search.cancel")) {
+        std::memset(search_state.query_buf, 0, sizeof(search_state.query_buf));
+        clear_scoped_search(search_state);
+    }
 
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.21f, 0.21f, 0.21f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.28f, 0.28f, 0.28f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.16f, 0.16f, 0.16f, 1.0f));
 
-    ImGui::SameLine(0, spacing);
-    auto& search_tex = AssetManager::get().get_svg_texture("search-16", 16);
-    if (search_tex.id != 0) {
-        if (ImGui::ImageButton("##opensearch", search_tex.id, ImVec2(icon_size, icon_size), ImVec2(0, 0), ImVec2(1, 1),
-                ImVec4(0, 0, 0, 0), ImVec4(0.7f, 0.7f, 0.7f, 1.0f))) {
-            registry_.get_state<SearchState>(search_state_key_).is_open = true;
+    const ImVec4 inactive_tint(0.7f, 0.7f, 0.7f, 1.0f);
+    const ImVec4 active_tint(0.95f, 0.95f, 0.95f, 1.0f);
+    if (can_toggle_watch) {
+        ImGui::SameLine(0, spacing);
+        const bool watch_busy = state.sync_watch_request_in_flight;
+        const bool watched = state.current_dir_watched;
+        const char* watch_icon_name = watched ? "git-branch-check-16" : "git-branch-16";
+        const ImVec4 watch_tint = watched ? ImVec4(0.96f, 0.83f, 0.29f, 1.0f) : inactive_tint;
+        auto& watch_tex = AssetManager::get().get_svg_texture(watch_icon_name, 16);
+        if (watch_busy) ImGui::BeginDisabled();
+        if (watch_tex.id != 0) {
+            if (ImGui::ImageButton("##togglewatchdir", watch_tex.id, ImVec2(action_btn_size, action_btn_size),
+                    ImVec2(0, 0), ImVec2(1, 1), ImVec4(0, 0, 0, 0), watch_tint)) {
+                toggle_current_sync_watch(state);
+            }
+        } else if (ImGui::Button(watched ? "B*" : "B", ImVec2(action_btn_size, action_btn_size))) {
+            toggle_current_sync_watch(state);
         }
-    } else if (ImGui::Button("S", ImVec2(btn_size, 0))) {
-        registry_.get_state<SearchState>(search_state_key_).is_open = true;
-    }
-    if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Search (%s)", CommandManager::get().label("search.toggle").c_str());
+        if (watch_busy) ImGui::EndDisabled();
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip(watched ? "Unwatch Sync Directory" : "Watch Sync Directory");
+        }
     }
 
     ImGui::SameLine(0, spacing);
     ImVec4 icon_tint = state.grid_view
-        ? ImVec4(0.95f, 0.95f, 0.95f, 1.0f)
-        : ImVec4(0.7f, 0.7f, 0.7f, 1.0f);
+        ? active_tint
+        : inactive_tint;
     auto& grid_tex = AssetManager::get().get_svg_texture("apps-16", 16);
     if (grid_tex.id != 0) {
-        if (ImGui::ImageButton("##gridview", grid_tex.id, ImVec2(icon_size, icon_size), ImVec2(0, 0), ImVec2(1, 1),
+        if (ImGui::ImageButton("##gridview", grid_tex.id, ImVec2(action_btn_size, action_btn_size), ImVec2(0, 0), ImVec2(1, 1),
                 ImVec4(0, 0, 0, 0), icon_tint)) {
             state.grid_view = true;
         }
-    } else if (ImGui::Button("G", ImVec2(btn_size, 0))) {
+    } else if (ImGui::Button("G", ImVec2(action_btn_size, action_btn_size))) {
         state.grid_view = true;
     }
     if (ImGui::IsItemHovered()) {
@@ -189,15 +346,15 @@ void FileExplorerPanel::show_search_bar(FileExplorerState& state) {
 
     ImGui::SameLine(0, spacing);
     icon_tint = !state.grid_view
-        ? ImVec4(0.95f, 0.95f, 0.95f, 1.0f)
-        : ImVec4(0.7f, 0.7f, 0.7f, 1.0f);
+        ? active_tint
+        : inactive_tint;
     auto& list_tex = AssetManager::get().get_svg_texture("rows-16", 16);
     if (list_tex.id != 0) {
-        if (ImGui::ImageButton("##listview", list_tex.id, ImVec2(icon_size, icon_size), ImVec2(0, 0), ImVec2(1, 1),
+        if (ImGui::ImageButton("##listview", list_tex.id, ImVec2(action_btn_size, action_btn_size), ImVec2(0, 0), ImVec2(1, 1),
                 ImVec4(0, 0, 0, 0), icon_tint)) {
             state.grid_view = false;
         }
-    } else if (ImGui::Button("L", ImVec2(btn_size, 0))) {
+    } else if (ImGui::Button("L", ImVec2(action_btn_size, action_btn_size))) {
         state.grid_view = false;
     }
     if (ImGui::IsItemHovered()) {
@@ -206,15 +363,15 @@ void FileExplorerPanel::show_search_bar(FileExplorerState& state) {
 
     ImGui::SameLine(0, spacing);
     ImVec4 preview_tint = preview_pane_open_
-        ? ImVec4(0.95f, 0.95f, 0.95f, 1.0f)
-        : ImVec4(0.7f, 0.7f, 0.7f, 1.0f);
+        ? active_tint
+        : inactive_tint;
     auto& preview_tex = AssetManager::get().get_svg_texture("file-media-16", 16);
     if (preview_tex.id != 0) {
-        if (ImGui::ImageButton("##togglepreview", preview_tex.id, ImVec2(icon_size, icon_size),
+        if (ImGui::ImageButton("##togglepreview", preview_tex.id, ImVec2(action_btn_size, action_btn_size),
                 ImVec2(0, 0), ImVec2(1, 1), ImVec4(0, 0, 0, 0), preview_tint)) {
             preview_pane_open_ = !preview_pane_open_;
         }
-    } else if (ImGui::Button("P", ImVec2(btn_size, 0))) {
+    } else if (ImGui::Button("P", ImVec2(action_btn_size, action_btn_size))) {
         preview_pane_open_ = !preview_pane_open_;
     }
     if (ImGui::IsItemHovered()) {
@@ -224,17 +381,17 @@ void FileExplorerPanel::show_search_bar(FileExplorerState& state) {
     if (is_local) {
         ImGui::SameLine(0, spacing);
         icon_tint = state.show_hidden
-            ? ImVec4(0.95f, 0.95f, 0.95f, 1.0f)
-            : ImVec4(0.7f, 0.7f, 0.7f, 1.0f);
+            ? active_tint
+            : inactive_tint;
         auto& hidden_tex = AssetManager::get().get_svg_texture(state.show_hidden ? "eye-16" : "eye-closed-16", 16);
         if (hidden_tex.id != 0) {
-            if (ImGui::ImageButton("##togglehidden", hidden_tex.id, ImVec2(icon_size, icon_size), ImVec2(0, 0), ImVec2(1, 1),
+            if (ImGui::ImageButton("##togglehidden", hidden_tex.id, ImVec2(action_btn_size, action_btn_size), ImVec2(0, 0), ImVec2(1, 1),
                     ImVec4(0, 0, 0, 0), icon_tint)) {
                 state.show_hidden = !state.show_hidden;
                 std::string current(state.current_path);
                 if (!current.empty()) navigate_to_path(current, false);
             }
-        } else if (ImGui::Button("H", ImVec2(btn_size, 0))) {
+        } else if (ImGui::Button("H", ImVec2(action_btn_size, action_btn_size))) {
             state.show_hidden = !state.show_hidden;
             std::string current(state.current_path);
             if (!current.empty()) navigate_to_path(current, false);
@@ -245,6 +402,48 @@ void FileExplorerPanel::show_search_bar(FileExplorerState& state) {
     }
 
     ImGui::PopStyleColor(3);
+    ImGui::PopStyleVar(2);
+}
+
+void FileExplorerPanel::show_breadcrumb_bar(FileExplorerState& state) {
+    const std::vector<BreadcrumbSegment> breadcrumbs = build_breadcrumb_segments(state.current_path);
+    const float avail_width = ImGui::GetContentRegionAvail().x;
+    constexpr float kBreadcrumbFramePaddingX = 6.0f;
+    constexpr float kBreadcrumbSeparatorGap = 6.0f;
+    float total_breadcrumb_width = 0.0f;
+    for (size_t index = 0; index < breadcrumbs.size(); ++index) {
+        if (index > 0) {
+            total_breadcrumb_width += kBreadcrumbSeparatorGap;
+            total_breadcrumb_width += ImGui::CalcTextSize("/").x;
+            total_breadcrumb_width += kBreadcrumbSeparatorGap;
+        }
+        total_breadcrumb_width += ImGui::CalcTextSize(breadcrumbs[index].label.c_str()).x +
+                                  kBreadcrumbFramePaddingX * 2.0f;
+    }
+    const bool allow_horizontal_scroll = total_breadcrumb_width > avail_width;
+    ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, 4.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(kBreadcrumbFramePaddingX, 3.0f));
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoScrollWithMouse;
+    if (allow_horizontal_scroll) {
+        flags |= ImGuiWindowFlags_HorizontalScrollbar;
+    } else {
+        flags |= ImGuiWindowFlags_NoScrollbar;
+    }
+    ImGui::BeginChild("##breadcrumbs", ImVec2(0.0f, 26.0f), false, flags);
+    for (size_t index = 0; index < breadcrumbs.size(); ++index) {
+        if (index > 0) {
+            ImGui::SameLine(0.0f, 6.0f);
+            ImGui::TextDisabled("/");
+            ImGui::SameLine(0.0f, 6.0f);
+        }
+        const bool is_active = breadcrumbs[index].target_path == state.current_path;
+        if (is_active) ImGui::BeginDisabled();
+        if (ImGui::Button(breadcrumbs[index].label.c_str())) {
+            navigate_to_path(breadcrumbs[index].target_path, true, false);
+        }
+        if (is_active) ImGui::EndDisabled();
+    }
+    ImGui::EndChild();
     ImGui::PopStyleVar(2);
 }
 

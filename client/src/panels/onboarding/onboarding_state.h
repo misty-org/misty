@@ -37,6 +37,10 @@ namespace misty::panel {
         int  tour_slide                      = 0;
         static constexpr int TOUR_SLIDE_COUNT = 3;
 
+        // Set by the panel instead of calling switch_view, so the BootLoader
+        // can intercept the transition without knowing about the view system.
+        bool go_to_login = false;
+
         // ── Helpers ──────────────────────────────────────────────────────────
         void advance() { ++step; error_msg = ""; }
 
@@ -62,14 +66,14 @@ namespace misty::panel {
             std::map<std::string, std::string> headers;
             headers["Content-Type"] = "application/json";
 
-            std::string server_url = core::EnvManager::get().get("MISTY_SERVER_URL", "");
+            std::string server_url = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
             if (server_url.empty()) {
-                error_msg     = "MISTY_SERVER_URL is not set.";
+                error_msg     = "PROXY_SERVICE_URL is not set.";
                 is_submitting = false;
                 return;
             }
 
-            auto resp = core::HTTPClient::get().post(server_url + "/register", body, headers);
+            auto resp = core::HTTPClient::get().post(server_url + "/api/register", body, headers);
             is_submitting = false;
 
             if (resp.status_code == 200 || resp.status_code == 201) {

@@ -16,5 +16,10 @@ namespace misty::core {
     bool launch_detached_process(const std::string& executable_path,
                                  const std::vector<std::string>& args = {},
                                  const std::string& working_directory = "");
+    bool launch_detached_process(const std::string& executable_path,
+                                 const std::vector<std::string>& args,
+                                 const std::string& working_directory,
+                                 const std::string& stdout_path,
+                                 const std::string& stderr_path);
 
 }

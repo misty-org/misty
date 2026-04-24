@@ -5,6 +5,7 @@
 
 #include "linux_app.h"
 #include "core/manager/asset_manager.h"
+#include "core/manager/env_manager.h"
 #include "stb_image.h"
 
 #include "imgui_impl_glfw.h"
@@ -14,8 +15,47 @@
 #include <cstdio>
 #include <iostream>
 #include <stdexcept>
+#include <filesystem>
 
 namespace misty {
+
+std::pair<int, int> LinuxApp::window_size() const {
+    if (!window_) {
+        return {0, 0};
+    }
+    int w = 0;
+    int h = 0;
+    glfwGetWindowSize(window_, &w, &h);
+    return {w, h};
+}
+
+void LinuxApp::set_window_size(int width, int height) {
+    if (!window_ || width <= 0 || height <= 0) {
+        return;
+    }
+    glfwSetWindowSize(window_, width, height);
+}
+
+void LinuxApp::center_window() {
+    if (!window_) {
+        return;
+    }
+    GLFWmonitor* monitor = glfwGetPrimaryMonitor();
+    if (!monitor) {
+        return;
+    }
+    int win_w = 0;
+    int win_h = 0;
+    glfwGetWindowSize(window_, &win_w, &win_h);
+    int mx = 0;
+    int my = 0;
+    int mw = 0;
+    int mh = 0;
+    glfwGetMonitorWorkarea(monitor, &mx, &my, &mw, &mh);
+    const int x = mx + std::max(0, (mw - win_w) / 2);
+    const int y = my + std::max(0, (mh - win_h) / 2);
+    glfwSetWindowPos(window_, x, y);
+}
 
 void LinuxApp::init_platform() {
     init_glfw();
@@ -119,12 +159,25 @@ void LinuxApp::configure_imgui_io() {
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-    io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 
 #if GLFW_VERSION_MAJOR >= 3 && GLFW_VERSION_MINOR >= 3
     io.ConfigDpiScaleFonts = true;
-    io.ConfigDpiScaleViewports = true;
 #endif
+
+    static std::string ini_path;
+    if (ini_path.empty()) {
+        const std::string home = core::EnvManager::get().get_user_home_dir();
+        if (!home.empty()) {
+            namespace fs = std::filesystem;
+            const fs::path path = fs::path(home) / "misty" / "config" / "imgui.ini";
+            std::error_code ec;
+            fs::create_directories(path.parent_path(), ec);
+            ini_path = path.string();
+        }
+    }
+    if (!ini_path.empty()) {
+        io.IniFilename = ini_path.c_str();
+    }
 }
 
 void LinuxApp::configure_imgui_style() {
@@ -196,13 +249,6 @@ void LinuxApp::render_frame() {
     glClear(GL_COLOR_BUFFER_BIT);
 
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
-    ImGuiIO& io = ImGui::GetIO();
-    if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
-        ImGui::UpdatePlatformWindows();
-        ImGui::RenderPlatformWindowsDefault();
-        glfwMakeContextCurrent(window_);
-    }
 
     glfwSwapBuffers(window_);
 }

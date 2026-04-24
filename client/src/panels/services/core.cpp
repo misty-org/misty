@@ -110,7 +110,7 @@ namespace misty::panel {
             ImGuiWindowFlags_NoMove |
             ImGuiWindowFlags_NoCollapse;
 
-        core::WithWindowStyle(ImVec4(0.18f, 0.18f, 0.18f, 1.0f), ImVec2(32.0f, 24.0f), [&]() {
+        core::WithWindowStyle(ImVec4(0.12f, 0.12f, 0.12f, 1.0f), ImVec2(32.0f, 24.0f), [&]() {
         if (ImGui::Begin("ServicesPanel", nullptr, flags)) {
             show_header(state);
 

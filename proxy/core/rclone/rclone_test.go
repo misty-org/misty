@@ -187,6 +187,48 @@ func TestGetRemoteType(t *testing.T) {
 	}
 }
 
+func TestEnsureRemoteDefaultsNoopForNonDrive(t *testing.T) {
+	remote, _, cleanup := setupTest(t)
+	defer cleanup()
+
+	if err := EnsureRemoteDefaults(remote); err != nil {
+		t.Fatal("EnsureRemoteDefaults:", err)
+	}
+	if value, ok := config.FileGetValue(remote, "import_formats"); ok && value != "" {
+		t.Fatalf("expected no import_formats for local remote, got %q", value)
+	}
+}
+
+func TestEnsureRemoteDefaultsSetsDriveImportFormats(t *testing.T) {
+	tmpConf := filepath.Join(t.TempDir(), "rclone.conf")
+	if err := os.WriteFile(tmpConf, []byte(""), 0600); err != nil {
+		t.Fatal(err)
+	}
+	initOnce = sync.Once{}
+	if err := config.SetConfigPath(tmpConf); err != nil {
+		t.Fatal(err)
+	}
+	configfile.Install()
+	initOnce.Do(func() {})
+
+	remote := "test-drive"
+	if err := config.SetValueAndSave(remote, "type", "drive"); err != nil {
+		t.Fatal("SetValueAndSave type:", err)
+	}
+	defer DeleteRemote(remote)
+
+	if err := EnsureRemoteDefaults(remote); err != nil {
+		t.Fatal("EnsureRemoteDefaults:", err)
+	}
+	value, ok := config.FileGetValue(remote, "import_formats")
+	if !ok {
+		t.Fatal("expected import_formats to be set")
+	}
+	if normalizeCommaList(value) != normalizeCommaList(defaultDriveImportFormats) {
+		t.Fatalf("unexpected import_formats: %q", value)
+	}
+}
+
 // --- File operation tests ---
 // All operations use the local backend pointing at a temp directory.
 // For the "local" remote type, the path IS the filesystem path.

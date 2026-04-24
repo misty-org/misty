@@ -10,6 +10,8 @@
 #include "application.h"
 #include <memory>
 #include <curl/curl.h>
+#include <filesystem>
+#include "core/system/util.h"
 
 std::unique_ptr<misty::Application> create_application() {
     #ifdef _WIN32
@@ -26,6 +28,14 @@ std::unique_ptr<misty::Application> create_application() {
 
 int main(int, char**) {
     curl_global_init(CURL_GLOBAL_DEFAULT);
+
+    // Stabilize relative asset/config paths: many client resources are loaded
+    // via "assets/..." relative paths. Anchor cwd to the executable directory
+    // so launching from Finder/Explorer (or arbitrary shells) behaves the same.
+    try {
+        std::filesystem::current_path(misty::core::get_executable_path().parent_path());
+    } catch (...) {
+    }
 
     auto app = create_application();
     app->run();
