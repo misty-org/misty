@@ -124,12 +124,10 @@ namespace misty {
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
         io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // Enable Docking
-        io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;       // Enable Multi-Viewport / Platform Windows
 
         // Experimental DPI features (GLFW 3.3+)
         if (GLFW_VERSION_MAJOR >= 3 && GLFW_VERSION_MINOR >= 3) {
             io.ConfigDpiScaleFonts = true;
-            io.ConfigDpiScaleViewports = true;
         }
 
         static std::string ini_path;
@@ -218,13 +216,6 @@ namespace misty {
         glClear(GL_COLOR_BUFFER_BIT);
 
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-        
-		ImGuiIO& io = ImGui::GetIO();
-        if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
-            ImGui::UpdatePlatformWindows();
-            ImGui::RenderPlatformWindowsDefault();
-            glfwMakeContextCurrent(window_);
-        }
 
         glfwSwapBuffers(window_);
     }

@@ -3,6 +3,11 @@
 scripts/.signing.env
 releases/macos/launcher.bin
 releases/macos/build/
+releases/linux/build/
+releases/linux/squashfs-root/
+releases/linux/*.AppImage
+releases/linux/*.AppImage.zsync
+releases/linux/.codex
 releases/macos/Misty-*.dmg
 releases/*.dmg
 releases/**/*.dmg
@@ -15,6 +20,7 @@ releases/**/*.app/
 releases/**/*.framework/
 releases/**/*.dSYM/
 releases/**/*.xcarchive/
+releases/**/*.AppImage
 **/.cache/
 **/.DS_Store
 **/build
@@ -28,6 +34,9 @@ releases/**/*.xcarchive/
 **/bin/
 **/sessions
 proxy/~/
+proxy/proxy
+proxy/dist/
+client/.codex
 
 # Large binary blobs under asset folders
 **/assets/**/*.png

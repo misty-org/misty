@@ -60,7 +60,7 @@ namespace misty::panel {
     }
 
     void NavbarPanel::show_logo_icon() {
-        const char* path = "assets/icons/misty.png";
+        const char* path = "assets/logos/misty.png";
         const char* label = "mist_v1";
 
         auto& logo_image = core::AssetManager::get().get_image_texture(path);

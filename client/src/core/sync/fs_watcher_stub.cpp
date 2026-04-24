@@ -1,4 +1,4 @@
-#if !defined(__APPLE__)
+#if !defined(__APPLE__) && !defined(__linux__)
 
 #include "core/sync/fs_watcher.h"
 

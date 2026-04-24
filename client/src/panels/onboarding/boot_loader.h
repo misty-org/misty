@@ -40,6 +40,12 @@ private:
         std::string body;
     };
 
+    enum class SearchStep {
+        CheckPort,
+        ProbeExistingProxy,
+        WaitForLaunchedProxy,
+    };
+
     // Port search
     void        init_port_search();
     int         load_saved_port();
@@ -56,15 +62,17 @@ private:
     bool               ensure_proxy_config_saved(int port);
 
     // Async HTTP probe
-    void begin_probe(const std::string& url);
+    void begin_probe(const std::string& base_url);
     bool consume_probe(ProbeResult& out);
 
     // Auth flow
+    void mark_proxy_ready();
     void transition_after_proxy_ready();
     void render_onboarding();
     void render_login();
 
     // State machine + render
+    float loading_progress() const;
     void tick_state_machine();
 
     // ── Dependencies ────────────────────────────────────────────────────────
@@ -90,6 +98,7 @@ private:
 
     // ── Timing ──────────────────────────────────────────────────────────────
     std::chrono::steady_clock::time_point search_start_{};
+    std::chrono::steady_clock::time_point boot_started_at_{};
     std::chrono::steady_clock::time_point port_launch_time_{};
     std::chrono::steady_clock::time_point next_probe_{};
     std::chrono::steady_clock::time_point ready_at_{};
@@ -102,7 +111,9 @@ private:
     std::atomic<bool> probe_in_flight_{false};
     std::mutex        probe_mu_{};
     bool              probe_ready_ = false;
+    bool              proxy_ready_ = false;
     ProbeResult       last_probe_{};
+    SearchStep        search_step_ = SearchStep::CheckPort;
 };
 
 } // namespace misty::panel
