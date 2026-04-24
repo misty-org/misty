@@ -549,6 +549,7 @@ void ClaudePanel::render_profiles_modal(ClaudeState& state) {
         state.show_profiles_modal = false;
     }
 
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if (!ImGui::BeginPopupModal("Claude Profiles", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         return;
     }

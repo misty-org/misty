@@ -44,6 +44,7 @@ namespace misty::view {
         void render_current_view();
         ViewID get_current_view_id() const;
         AppView* get_current_view() const;
+        void clear();
 
         static ViewRegistry& get();
 
@@ -60,4 +61,5 @@ namespace misty::view {
     void switch_view(ViewID id);
     void render_current_view();
     ViewID get_current_view_id();
+    void clear_views();
 }

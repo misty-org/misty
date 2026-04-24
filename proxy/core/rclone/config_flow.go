@@ -14,20 +14,20 @@ import (
 type ConfigStepKind string
 
 const (
-	ConfigStepDone    ConfigStepKind = "done"     // flow complete, remote saved
-	ConfigStepChoose  ConfigStepKind = "choose"   // exclusive list — user must pick an example
-	ConfigStepSuggest ConfigStepKind = "suggest"  // examples + free-text allowed
-	ConfigStepConfirm ConfigStepKind = "confirm"  // yes/no question
-	ConfigStepInput   ConfigStepKind = "input"    // free-text input
+	ConfigStepDone    ConfigStepKind = "done"    // flow complete, remote saved
+	ConfigStepChoose  ConfigStepKind = "choose"  // exclusive list — user must pick an example
+	ConfigStepSuggest ConfigStepKind = "suggest" // examples + free-text allowed
+	ConfigStepConfirm ConfigStepKind = "confirm" // yes/no question
+	ConfigStepInput   ConfigStepKind = "input"   // free-text input
 )
 
 // ConfigOption is the client-facing projection of a single question.
 type ConfigOption struct {
-	Name     string              `json:"name"`
-	Help     string              `json:"help"`
-	Default  string              `json:"default"`
-	Required bool                `json:"required"`
-	Password bool                `json:"password"`
+	Name     string               `json:"name"`
+	Help     string               `json:"help"`
+	Default  string               `json:"default"`
+	Required bool                 `json:"required"`
+	Password bool                 `json:"password"`
 	Examples []ConfigOptionChoice `json:"examples,omitempty"`
 }
 
@@ -39,8 +39,8 @@ type ConfigOptionChoice struct {
 // ConfigStep is what the HTTP endpoints return. The client renders the
 // option using Kind, then POSTs back State + a user-supplied Result.
 type ConfigStep struct {
-	Name   string         `json:"name"`            // remote name this step belongs to
-	State  string         `json:"state"`           // opaque — round-trip unchanged
+	Name   string         `json:"name"`  // remote name this step belongs to
+	State  string         `json:"state"` // opaque — round-trip unchanged
 	Kind   ConfigStepKind `json:"kind"`
 	Option *ConfigOption  `json:"option,omitempty"`
 	Error  string         `json:"error,omitempty"` // non-fatal warning from rclone
@@ -127,6 +127,9 @@ func advance(ctx context.Context, name string, out *fs.ConfigOut) (*ConfigStep, 
 		// final state) or out has empty state with no option/oauth.
 		if out == nil || (out.State == "" && out.Option == nil && out.OAuth == nil) {
 			config.SaveConfig()
+			if err := EnsureRemoteDefaults(name); err != nil {
+				return nil, fmt.Errorf("config defaults: %w", err)
+			}
 			return &ConfigStep{
 				Name: name,
 				Kind: ConfigStepDone,

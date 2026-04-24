@@ -86,6 +86,13 @@ namespace misty::core {
         return data->progress_cb(now, total) ? 0 : 1;
     }
 
+    static HttpResponse execute_curl_request_with_timeouts(const std::string& method,
+                                                           const std::string& url,
+                                                           const std::string& body,
+                                                           const std::map<std::string, std::string>& headers,
+                                                           long connect_timeout_seconds,
+                                                           long total_timeout_seconds);
+
     HTTPClient& HTTPClient::get() {
         static HTTPClient instance;
         return instance;
@@ -110,6 +117,15 @@ namespace misty::core {
         return perform_request("GET", url, "", headers);
     }
 
+    HttpResponse HTTPClient::get_with_timeouts(const std::string& url,
+                                               long connect_timeout_seconds,
+                                               long total_timeout_seconds,
+                                               const std::map<std::string, std::string>& headers) {
+        HttpResponse response = execute_curl_request_with_timeouts("GET", url, "", headers, connect_timeout_seconds, total_timeout_seconds);
+        update_proxy_status(url, response.status_code);
+        return response;
+    }
+
     HttpResponse HTTPClient::post(const std::string& url, const std::string& body, const std::map<std::string, std::string>& headers) {
         return perform_request("POST", url, body, headers);
     }
@@ -123,7 +139,12 @@ namespace misty::core {
     }
 
     // Makes a single HTTP request (no retry logic)
-    static HttpResponse execute_curl_request(const std::string& method, const std::string& url, const std::string& body, const std::map<std::string, std::string>& headers) {
+    static HttpResponse execute_curl_request_with_timeouts(const std::string& method,
+                                                           const std::string& url,
+                                                           const std::string& body,
+                                                           const std::map<std::string, std::string>& headers,
+                                                           long connect_timeout_seconds,
+                                                           long total_timeout_seconds) {
         HttpResponse response;
         response.status_code = 0;
         response.body = "";
@@ -173,8 +194,8 @@ namespace misty::core {
         curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
 
         // Set timeouts to prevent blocking forever
-        curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 10L);  // 10 seconds to connect
-        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);          // 30 seconds total
+        curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, connect_timeout_seconds);
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT, total_timeout_seconds);
 
         // Perform request
         CURLcode res = curl_easy_perform(curl);
@@ -196,6 +217,13 @@ namespace misty::core {
         curl_easy_cleanup(curl);
 
         return response;
+    }
+
+    static HttpResponse execute_curl_request(const std::string& method,
+                                            const std::string& url,
+                                            const std::string& body,
+                                            const std::map<std::string, std::string>& headers) {
+        return execute_curl_request_with_timeouts(method, url, body, headers, 10L, 30L);
     }
 
     static DownloadResult execute_curl_download(const std::string& url,

@@ -14,6 +14,8 @@ type FileItem struct {
 	Size     int64     `json:"size"`
 	ModTime  time.Time `json:"mod_time"`
 	MimeType string    `json:"mime_type,omitempty"`
+	HashAlgo string    `json:"hash_algo,omitempty"`
+	Hash     string    `json:"hash,omitempty"`
 }
 
 type ListResponse struct {

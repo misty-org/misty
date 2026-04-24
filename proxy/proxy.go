@@ -13,7 +13,6 @@ import (
 	"github.com/kannachi323/misty/proxy/core/ai"
 	"github.com/kannachi323/misty/proxy/core/auth"
 	"github.com/kannachi323/misty/proxy/core/license"
-	"github.com/kannachi323/misty/proxy/core/tsbase"
 	"github.com/kannachi323/misty/proxy/core/syncindex"
 	"github.com/kannachi323/misty/proxy/db"
 )
@@ -21,20 +20,16 @@ import (
 type Proxy struct {
 	Router         *chi.Mux
 	APIRouter      *chi.Mux
-	TSBase         *tsbase.TSBase
+	Port           int
 	Database       *db.Database
 	SyncIndex      *syncindex.Service
-	SyncPoller     *syncindex.Poller
+	SyncManager    *syncindex.Manager
 	LicenseManager *license.Manager
 	VaultService   *vault.Service
 	AIService      *ai.Service
 }
 
 func CreateProxy() (*Proxy, error) {
-	home, _ := os.UserHomeDir()
-	dataDir := filepath.Join(home, "misty", "minidfs", "tailscale")
-	os.MkdirAll(dataDir, 0700)
-
 	proxy := &Proxy{
 		Router: chi.NewRouter(),
 	}
@@ -46,11 +41,6 @@ func CreateProxy() (*Proxy, error) {
 	workDir, _ := os.Getwd()
 	staticDir := filepath.Join(workDir, "static")
 	proxy.Router.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.Dir(staticDir))))
-	base, err := tsbase.CreateTSBase(dataDir)
-	if err != nil {
-		return nil, err
-	}
-	proxy.TSBase = base
 	proxy.Database = &db.Database{}
 	proxy.LicenseManager = license.NewManager(proxy.Database)
 	proxy.VaultService = vault.NewService()
@@ -79,6 +69,7 @@ func (proxy *Proxy) MountHandlers() {
 	proxy.APIRouter.Post("/login", api.LoginUser(proxy.Database, proxy.LicenseManager))
 	proxy.APIRouter.Post("/logout", api.LogoutUser(proxy.Database))
 	proxy.APIRouter.Post("/refresh", api.RefreshToken(proxy.Database, proxy.LicenseManager))
+	proxy.APIRouter.Get("/ready", api.Ready(proxy.Port))
 
 	// Protected routes (JWT required)
 	proxy.APIRouter.Group(func(r chi.Router) {
@@ -87,12 +78,8 @@ func (proxy *Proxy) MountHandlers() {
 		r.Get("/license", api.GetLicense(proxy.LicenseManager))
 		r.Post("/ai/file-context", api.AskFileContext(proxy.AIService))
 
-		r.Get("/ts-status", api.GetTSStatus(proxy.TSBase))
-		r.Get("/ts-peers", api.GetPeers(proxy.TSBase))
-		r.Get("/ts-ping", api.PingServer(proxy.TSBase))
-
 		r.Get("/devices", api.GetDevices(proxy.Database))
-		r.Post("/devices", api.RegisterDevice(proxy.TSBase, proxy.Database))
+		r.Post("/devices", api.RegisterDevice(proxy.Database))
 		r.Put("/devices", api.UpdateDevice(proxy.Database))
 		r.Delete("/devices", api.DeleteDevice(proxy.Database))
 
@@ -109,10 +96,12 @@ func (proxy *Proxy) MountHandlers() {
 		r.Post("/remotes/config/continue", remote.ConfigContinue())
 		r.Delete("/remotes/config", remote.ConfigCancel())
 		r.Get("/files", remote.ListFiles())
-		r.Post("/sync/refetch", remote.SyncRefetch(proxy.SyncIndex))
+		r.Post("/sync/refetch", remote.SyncRefetch(proxy.SyncManager))
 		r.Get("/sync/list", remote.SyncList(proxy.SyncIndex))
-		r.Post("/sync/dirty", remote.SyncDirty(proxy.SyncIndex))
-		r.Post("/sync/run-now", remote.SyncRunNow(proxy.SyncPoller))
+		r.Post("/sync/dirty", remote.SyncDirty(proxy.SyncManager))
+		r.Post("/sync/run-now", remote.SyncRunNow(proxy.SyncManager))
+		r.Put("/sync/watch-dir", remote.SyncWatchDir(proxy.SyncManager))
+		r.Delete("/sync/watch-dir", remote.SyncUnwatchDir(proxy.SyncManager))
 		r.Get("/file/download", remote.DownloadFile())
 		r.Post("/file/upload", remote.UploadFile())
 		r.Post("/mkdir", remote.MkDir())

@@ -18,4 +18,5 @@ type DirectoryResponse struct {
 	Remote   string          `json:"remote"`
 	Path     string          `json:"path"`
 	DirtyBit bool            `json:"dirty_bit"`
+	Watched  bool            `json:"watched"`
 }

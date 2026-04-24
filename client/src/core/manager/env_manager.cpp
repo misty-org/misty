@@ -1,5 +1,7 @@
 #include <cctype>
 #include <fstream>
+#include <filesystem>
+#include <nlohmann/json.hpp>
 #ifdef _WIN32
 #include <windows.h>
 #include <shellapi.h>
@@ -15,6 +17,7 @@
 #include "env_manager.h"
 #include "core/system/util.h"
 
+namespace fs = std::filesystem;
 
 namespace misty::core {
     EnvManager& EnvManager::get() {
@@ -24,7 +27,7 @@ namespace misty::core {
             if (home_dir.empty()) {
                 throw std::runtime_error("Could not determine user home directory");
             }
-            instance.set_env_file_path(home_dir + "/misty/misty.env");
+            instance.set_env_file_path(home_dir + "/misty/config/misty.json");
             instance.load_env_file();
         });
         return instance;
@@ -65,32 +68,40 @@ namespace misty::core {
     void EnvManager::load_env_file() {
         if (loaded_) return;
 
-        std::ifstream file(env_file_path_);
-        if (!file.is_open()) {
-            loaded_ = true;
-            return;
+        const fs::path config_path(env_file_path_);
+        const bool is_json = config_path.extension() == ".json";
+
+        if (is_json && fs::exists(config_path)) {
+            try {
+                std::ifstream file(config_path);
+                nlohmann::json j = nlohmann::json::parse(file, nullptr, true, true);
+
+                const int proxy_port = j.value("proxy", nlohmann::json::object()).value("port", 0);
+                const std::string proxy_url = j.value("proxy", nlohmann::json::object()).value("url", std::string());
+                const std::string proxy_path = j.value("proxy", nlohmann::json::object()).value("path", std::string());
+                const std::string grpc_address = j.value("grpc", nlohmann::json::object()).value("address", std::string("localhost:50051"));
+                const std::string mount_path = j.value("mount", nlohmann::json::object()).value("path", std::string("misty"));
+                const std::string server_url = j.value("server", nlohmann::json::object()).value("url", std::string());
+                const std::string cert_path = j.value("ssl", nlohmann::json::object()).value("cert_path", std::string());
+
+                if (!proxy_path.empty()) env_["MISTY_PROXY_PATH"] = proxy_path;
+                if (!server_url.empty()) env_["MISTY_SERVER_URL"] = server_url;
+                if (!cert_path.empty()) env_["SSL_CERT_PATH"] = cert_path;
+                env_["MISTY_GRPC_ADDRESS"] = grpc_address;
+                env_["MISTY_MOUNT_PATH"] = mount_path;
+
+                if (!proxy_url.empty()) {
+                    env_["PROXY_SERVICE_URL"] = proxy_url;
+                } else if (proxy_port > 0) {
+                    env_["PROXY_SERVICE_URL"] = "http://127.0.0.1:" + std::to_string(proxy_port);
+                }
+
+                loaded_ = true;
+                return;
+            } catch (...) {
+            }
         }
 
-        std::string line;
-        while (std::getline(file, line)) {
-            line = trim(line);
-
-            if (line.empty()) continue;
-            if (line[0] == '#') continue;
-
-            size_t eq_pos = line.find('=');
-            if (eq_pos == std::string::npos) continue;
-
-            std::string key = trim(line.substr(0, eq_pos));
-            std::string value = trim(line.substr(eq_pos + 1));
-
-            if (key.empty()) continue;
-            value = unquote(value);
-
-            env_[key] = value;
-        }
-
-        file.close();
         loaded_ = true;
     }
 

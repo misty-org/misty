@@ -9,8 +9,9 @@ import (
 	"path/filepath"
 	"time"
 
-	dbpkg "github.com/kannachi323/misty/proxy/db"
 	"github.com/kannachi323/misty/proxy/core/rclone"
+	dbpkg "github.com/kannachi323/misty/proxy/db"
+	rclonehash "github.com/rclone/rclone/fs/hash"
 )
 
 type Service struct {
@@ -22,8 +23,155 @@ func NewService(database *dbpkg.Database) *Service {
 }
 
 func (s *Service) RefetchDirectory(ctx context.Context, remoteName, dirPath string) (*DirectoryResponse, error) {
+	return s.RefreshDirectory(ctx, remoteName, dirPath)
+}
+
+func (s *Service) ListDirectory(_ context.Context, remoteName, dirPath string) (*DirectoryResponse, error) {
 	if s == nil || s.database == nil || s.database.Conn == nil {
-		return nil, fmt.Errorf("sync index database unavailable")
+		return nil, fmt.Errorf("sync metadata database unavailable")
+	}
+	if remoteName == "" {
+		return nil, fmt.Errorf("remote is required")
+	}
+
+	rows, err := dbpkg.ListFileMetadataByParent(s.database.Conn, remoteName, dirPath)
+	if err != nil {
+		return nil, err
+	}
+
+	items := make([]DirectoryItem, 0, len(rows))
+	for _, row := range rows {
+		state, dirty, direction := deriveDirectoryItemState(row)
+		localPath := buildLocalPath(remoteName, row.RelPath)
+		size, modTime := row.RemoteSize.Int64, row.RemoteMTime
+		if row.LocalExists {
+			if row.LocalSize.Valid {
+				size = row.LocalSize.Int64
+			}
+			if row.LocalMTime != "" {
+				modTime = row.LocalMTime
+			}
+		}
+		items = append(items, DirectoryItem{
+			Name:          row.Name,
+			Path:          row.RelPath,
+			LocalPath:     localPath,
+			IsDir:         row.IsDir,
+			Size:          size,
+			ModTime:       modTime,
+			MimeType:      row.MimeType,
+			State:         state,
+			SyncDirty:     dirty,
+			SyncDirection: direction,
+		})
+	}
+
+	dirtyBit, err := dbpkg.RemoteHasDirtyEntries(s.database.Conn, remoteName)
+	if err != nil {
+		return nil, err
+	}
+	watched, err := dbpkg.IsWatchedDir(s.database.Conn, remoteName, dirPath)
+	if err != nil {
+		return nil, err
+	}
+
+	return &DirectoryResponse{
+		Items:    items,
+		Remote:   remoteName,
+		Path:     dirPath,
+		DirtyBit: dirtyBit,
+		Watched:  watched,
+	}, nil
+}
+
+func (s *Service) MarkLocalDirty(_ context.Context, remoteName, relPath string, localExists, isDir bool, mtime string, size int64) error {
+	if s == nil || s.database == nil || s.database.Conn == nil {
+		return fmt.Errorf("sync metadata database unavailable")
+	}
+	if remoteName == "" {
+		return fmt.Errorf("remote is required")
+	}
+	if relPath == "" {
+		return fmt.Errorf("path is required")
+	}
+
+	now := dbpkg.NowRFC3339()
+	row, err := dbpkg.GetFileMetadata(s.database.Conn, remoteName, relPath)
+	if err != nil {
+		return err
+	}
+	if row == nil {
+		row = &dbpkg.FileMetadata{
+			RemoteName:    remoteName,
+			RelPath:       relPath,
+			ParentRelPath: parentPath(relPath),
+			Name:          path.Base(relPath),
+		}
+	}
+	prev := *row
+
+	row.IsDir = row.IsDir || isDir
+	row.ParentRelPath = parentPath(relPath)
+	row.Name = path.Base(relPath)
+	row.LocalExists = localExists
+	row.LastComparedAt = now
+	row.UpdatedAt = now
+	row.LastError = ""
+	if localExists {
+		if mtime == "" {
+			mtime = now
+		}
+		row.LocalMTime = mtime
+		row.LocalSize = sql.NullInt64{Int64: size, Valid: !row.IsDir}
+		row.LastLocalSeen = now
+	} else {
+		row.LocalMTime = ""
+		row.LocalSize = sql.NullInt64{}
+		row.LastLocalSeen = now
+	}
+	if row.LocalDirty || localObservationChanged(prev, *row) {
+		row.LocalDirty = true
+		row.LastLocalEvent = now
+	}
+	return dbpkg.UpsertFileMetadata(s.database.Conn, *row)
+}
+
+func (s *Service) WatchDir(remoteName, dirPath string) error {
+	if s == nil || s.database == nil || s.database.Conn == nil {
+		return fmt.Errorf("sync metadata database unavailable")
+	}
+	if remoteName == "" {
+		return fmt.Errorf("remote is required")
+	}
+	now := dbpkg.NowRFC3339()
+	return dbpkg.UpsertWatchedDir(s.database.Conn, dbpkg.WatchedDir{
+		RemoteName: remoteName,
+		RelPath:    dirPath,
+		CreatedAt:  now,
+		UpdatedAt:  now,
+	})
+}
+
+func (s *Service) UnwatchDir(remoteName, dirPath string) error {
+	if s == nil || s.database == nil || s.database.Conn == nil {
+		return fmt.Errorf("sync metadata database unavailable")
+	}
+	if remoteName == "" {
+		return fmt.Errorf("remote is required")
+	}
+	return dbpkg.DeleteWatchedDir(s.database.Conn, remoteName, dirPath)
+}
+
+func (s *Service) ListWatchedDirs() ([]dbpkg.WatchedDir, error) {
+	if s == nil || s.database == nil || s.database.Conn == nil {
+		return nil, fmt.Errorf("sync metadata database unavailable")
+	}
+	return dbpkg.ListWatchedDirs(s.database.Conn)
+}
+
+func (s *Service) RefreshDirectory(ctx context.Context, remoteName, dirPath string) (*DirectoryResponse, error) {
+	if s == nil || s.database == nil || s.database.Conn == nil {
+		return nil, fmt.Errorf("sync metadata database unavailable")
 	}
 	if remoteName == "" {
 		return nil, fmt.Errorf("remote is required")
@@ -32,283 +180,152 @@ func (s *Service) RefetchDirectory(ctx context.Context, remoteName, dirPath stri
 		return nil, fmt.Errorf("remote not found")
 	}
 
-	root, err := s.ensureRoot(remoteName)
-	if err != nil {
-		return nil, err
-	}
-
 	remoteItems, err := rclone.ListDir(ctx, remoteName, dirPath)
 	if err != nil {
 		return nil, err
 	}
-
-	localItems, err := scanLocalDirectory(buildLocalPath(*root, dirPath))
+	localItems, err := scanLocalDirectory(buildLocalPath(remoteName, dirPath))
 	if err != nil {
 		return nil, err
+	}
+
+	existingRows, err := dbpkg.ListFileMetadataByParent(s.database.Conn, remoteName, dirPath)
+	if err != nil {
+		return nil, err
+	}
+
+	existingByName := make(map[string]dbpkg.FileMetadata, len(existingRows))
+	for _, row := range existingRows {
+		existingByName[row.Name] = row
+	}
+
+	remoteByName := make(map[string]rclone.FileItem, len(remoteItems))
+	for _, item := range remoteItems {
+		remoteByName[item.Name] = item
+	}
+
+	names := make(map[string]struct{}, len(remoteByName)+len(localItems)+len(existingByName))
+	for name := range remoteByName {
+		names[name] = struct{}{}
+	}
+	for name := range localItems {
+		names[name] = struct{}{}
+	}
+	for name := range existingByName {
+		names[name] = struct{}{}
 	}
 
 	now := dbpkg.NowRFC3339()
-	merged := mergeDirectoryItems(root.ID, dirPath, remoteItems, localItems, now)
+	for name := range names {
+		prev, hadPrev := existingByName[name]
+		remoteItem, hasRemote := remoteByName[name]
+		localItem, hasLocal := localItems[name]
 
-	tx, err := s.database.Conn.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback()
+		row := dbpkg.FileMetadata{
+			RemoteName:    remoteName,
+			ParentRelPath: dirPath,
+			Name:          name,
+			UpdatedAt:     now,
 		}
-	}()
-
-	root.LastRefetchAt = now
-	root.UpdatedAt = now
-	if err = dbpkg.UpsertSyncRoot(tx, *root); err != nil {
-		return nil, err
-	}
-
-	existingPaths, err := dbpkg.ListSyncEntryPathsByParent(s.database.Conn, root.ID, dirPath)
-	if err != nil {
-		return nil, err
-	}
-	seen := make(map[string]struct{}, len(merged))
-	for _, item := range merged {
-		seen[item.entry.RelPath] = struct{}{}
-		if err = dbpkg.UpsertSyncEntry(tx, item.entry); err != nil {
-			return nil, err
+		if hadPrev {
+			row = prev
+			row.UpdatedAt = now
 		}
-	}
-	for _, existingPath := range existingPaths {
-		if _, ok := seen[existingPath]; ok {
+
+		relPath := ""
+		if hasRemote {
+			relPath = remoteItem.Path
+		} else if hadPrev {
+			relPath = prev.RelPath
+		} else {
+			relPath = joinRemotePath(dirPath, name)
+		}
+		row.RelPath = relPath
+		row.ParentRelPath = dirPath
+		row.Name = name
+
+		row.LocalExists = hasLocal
+		if hasLocal {
+			row.IsDir = row.IsDir || localItem.isDir
+			row.LocalMTime = localItem.modTime
+			row.LocalSize = sql.NullInt64{Int64: localItem.size, Valid: !localItem.isDir}
+			row.LastLocalSeen = now
+		} else {
+			row.LocalMTime = ""
+			row.LocalSize = sql.NullInt64{}
+			if hadPrev {
+				row.LastLocalSeen = now
+			}
+		}
+
+		row.RemoteExists = hasRemote
+		if hasRemote {
+			row.IsDir = row.IsDir || remoteItem.IsDir
+			row.RemoteMTime = remoteItem.ModTime.UTC().Format(time.RFC3339Nano)
+			row.RemoteSize = sql.NullInt64{Int64: remoteItem.Size, Valid: !remoteItem.IsDir}
+			row.RemoteRevision = ""
+			row.MimeType = remoteItem.MimeType
+			row.LastRemoteSeen = now
+		} else {
+			row.RemoteMTime = ""
+			row.RemoteSize = sql.NullInt64{}
+			row.RemoteRevision = ""
+			if hadPrev {
+				row.LastRemoteSeen = now
+			}
+		}
+
+		if localObservationChanged(prev, row) {
+			row.LocalDirty = true
+			if row.LastLocalEvent == "" {
+				row.LastLocalEvent = now
+			}
+		}
+
+		row.LastComparedAt = now
+		row.LastError = ""
+
+		if hasRemote && remoteItem.HashAlgo != "" && remoteItem.Hash != "" {
+			if err := dbpkg.UpsertFileHash(s.database.Conn, dbpkg.FileHash{
+				RemoteName:    remoteName,
+				RelPath:       row.RelPath,
+				Side:          "remote",
+				Algorithm:     remoteItem.HashAlgo,
+				HashValue:     remoteItem.Hash,
+				ObservedMTime: row.RemoteMTime,
+				ObservedSize:  row.RemoteSize,
+				ComputedAt:    now,
+			}); err != nil {
+				return nil, err
+			}
+		}
+
+		if !row.LocalExists && !row.RemoteExists {
+			if hadPrev {
+				if err := dbpkg.DeleteFileMetadata(s.database.Conn, remoteName, row.RelPath); err != nil {
+					return nil, err
+				}
+			}
 			continue
 		}
-		if err = dbpkg.DeleteSyncEntriesByPathPrefix(tx, root.ID, existingPath); err != nil {
+
+		if err := s.reconcileObservedEntry(ctx, &row, remoteItem, hadPrev, prev, now); err != nil {
+			row.LastError = err.Error()
+		}
+
+		if err := dbpkg.UpsertFileMetadata(s.database.Conn, row); err != nil {
 			return nil, err
 		}
 	}
-
-	if err = tx.Commit(); err != nil {
-		return nil, err
-	}
-
-	dirtyBit, err := dbpkg.RootHasDirtyEntries(s.database.Conn, root.ID)
-	if err != nil {
-		return nil, err
-	}
-	if err = dbpkg.SetSyncRootDirtyBit(s.database.Conn, root.ID, dirtyBit, now); err != nil {
-		return nil, err
-	}
-	root.DirtyBit = dirtyBit
 
 	return s.ListDirectory(ctx, remoteName, dirPath)
 }
 
-// MarkLocalDirty records a local filesystem change against the sync index so
-// the reconciler can pick it up without waiting for the next full refetch.
-// This is the entry point for the client's FSEvents watcher and for explicit
-// user actions like "New File" or "Delete local".
-//
-// If the entry already exists, only local-side columns are touched — we never
-// clobber RemoteMTime/RemoteSize gathered from a prior rclone listing. If it
-// doesn't, a new row is written with RemoteExists=false, which reconcileState
-// then classifies as LOC (push-only, dirty).
-func (s *Service) MarkLocalDirty(ctx context.Context, remoteName, relPath string, localExists, isDir bool, mtime string, size int64) error {
-	if s == nil || s.database == nil || s.database.Conn == nil {
-		return fmt.Errorf("sync index database unavailable")
-	}
-	if remoteName == "" {
-		return fmt.Errorf("remote is required")
-	}
-	if relPath == "" {
-		return fmt.Errorf("path is required")
-	}
-	if !rclone.RemoteExists(remoteName) {
-		return fmt.Errorf("remote not found")
-	}
-
-	root, err := s.ensureRoot(remoteName)
-	if err != nil {
-		return err
-	}
-
-	now := dbpkg.NowRFC3339()
-	if mtime == "" {
-		mtime = now
-	}
-
-	entryID := dbpkg.MakeSyncEntryID(root.ID, relPath)
-	existing, err := dbpkg.GetSyncEntry(s.database.Conn, entryID)
-	if err != nil {
-		return err
-	}
-
-	entry := dbpkg.SyncEntry{
-		ID:            entryID,
-		RootID:        root.ID,
-		RelPath:       relPath,
-		ParentRelPath: path.Dir(relPath),
-		Name:          path.Base(relPath),
-		IsDir:         isDir,
-		CreatedAt:     now,
-		UpdatedAt:     now,
-	}
-	if entry.ParentRelPath == "." {
-		entry.ParentRelPath = ""
-	}
-	if existing != nil {
-		// Keep remote-side fields intact; only local columns move.
-		entry.CreatedAt = existing.CreatedAt
-		entry.RemoteExists = existing.RemoteExists
-		entry.RemoteMTime = existing.RemoteMTime
-		entry.RemoteSize = existing.RemoteSize
-		entry.RemoteRevision = existing.RemoteRevision
-		entry.MimeType = existing.MimeType
-		entry.LastSeenRemote = existing.LastSeenRemote
-		entry.IsDir = existing.IsDir || isDir
-	}
-	entry.LocalExists = localExists
-	if localExists {
-		entry.LocalMTime = mtime
-		entry.LocalSize = sql.NullInt64{Int64: size, Valid: !entry.IsDir}
-		entry.LastSeenLocal = now
-	} else {
-		entry.LocalMTime = ""
-		entry.LocalSize = sql.NullInt64{}
-		entry.LastSeenLocal = now
-	}
-	entry.StateCode, entry.IsDirty, entry.SyncDirection = reconcileState(entry)
-
-	tx, err := s.database.Conn.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback()
-		}
-	}()
-
-	root.UpdatedAt = now
-	if err = dbpkg.UpsertSyncRoot(tx, *root); err != nil {
-		return err
-	}
-	if err = dbpkg.UpsertSyncEntry(tx, entry); err != nil {
-		return err
-	}
-	if err = tx.Commit(); err != nil {
-		return err
-	}
-
-	if entry.IsDirty {
-		if err = dbpkg.SetSyncRootDirtyBit(s.database.Conn, root.ID, true, ""); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (s *Service) ListDirectory(_ context.Context, remoteName, dirPath string) (*DirectoryResponse, error) {
-	if s == nil || s.database == nil || s.database.Conn == nil {
-		return nil, fmt.Errorf("sync index database unavailable")
-	}
-	if remoteName == "" {
-		return nil, fmt.Errorf("remote is required")
-	}
-
-	root, err := dbpkg.GetSyncRootByRemoteName(s.database.Conn, remoteName)
-	if err != nil {
-		return nil, err
-	}
-	if root == nil {
-		return &DirectoryResponse{Remote: remoteName, Path: dirPath, Items: []DirectoryItem{}}, nil
-	}
-
-	entries, err := dbpkg.ListSyncEntriesByParent(s.database.Conn, root.ID, dirPath)
-	if err != nil {
-		return nil, err
-	}
-
-	items := make([]DirectoryItem, 0, len(entries))
-	for _, entry := range entries {
-		localPath := buildLocalPath(*root, entry.RelPath)
-		size, modTime := entry.RemoteSize.Int64, entry.RemoteMTime
-		if entry.LocalExists {
-			if entry.LocalSize.Valid {
-				size = entry.LocalSize.Int64
-			}
-			if entry.LocalMTime != "" {
-				modTime = entry.LocalMTime
-			}
-		}
-		items = append(items, DirectoryItem{
-			Name:          entry.Name,
-			Path:          entry.RelPath,
-			LocalPath:     localPath,
-			IsDir:         entry.IsDir,
-			Size:          size,
-			ModTime:       modTime,
-			MimeType:      entry.MimeType,
-			State:         entry.StateCode,
-			SyncDirty:     entry.IsDirty,
-			SyncDirection: entry.SyncDirection,
-		})
-	}
-
-	return &DirectoryResponse{
-		Items:    items,
-		Remote:   remoteName,
-		Path:     dirPath,
-		DirtyBit: root.DirtyBit,
-	}, nil
-}
-
-func (s *Service) ensureRoot(remoteName string) (*dbpkg.SyncRoot, error) {
-	root, err := dbpkg.GetSyncRootByRemoteName(s.database.Conn, remoteName)
-	if err != nil {
-		return nil, err
-	}
-
-	remoteType := rclone.GetRemoteType(remoteName)
-	providerFolder, folderName, mountRoot := resolveMountMapping(remoteName, remoteType)
-	now := dbpkg.NowRFC3339()
-
-	if root == nil {
-		root = &dbpkg.SyncRoot{
-			ID:             dbpkg.MakeSyncRootID(remoteName),
-			RemoteName:     remoteName,
-			RemoteType:     remoteType,
-			ProviderFolder: providerFolder,
-			FolderName:     folderName,
-			MountRoot:      mountRoot,
-			Enabled:        true,
-			DirtyBit:       false,
-			CreatedAt:      now,
-			UpdatedAt:      now,
-		}
-	} else {
-		root.RemoteType = remoteType
-		root.ProviderFolder = providerFolder
-		root.FolderName = folderName
-		root.MountRoot = mountRoot
-		root.Enabled = true
-		root.UpdatedAt = now
-		if root.CreatedAt == "" {
-			root.CreatedAt = now
-		}
-	}
-
-	return root, nil
-}
-
 type localDirItem struct {
 	name    string
-	relPath string
 	isDir   bool
 	size    int64
 	modTime string
-}
-
-type mergedDirItem struct {
-	entry dbpkg.SyncEntry
 }
 
 func scanLocalDirectory(dir string) (map[string]localDirItem, error) {
@@ -336,114 +353,375 @@ func scanLocalDirectory(dir string) (map[string]localDirItem, error) {
 	return items, nil
 }
 
-func mergeDirectoryItems(rootID, parentRelPath string, remoteItems []rclone.FileItem, localItems map[string]localDirItem, now string) []mergedDirItem {
-	remoteByName := make(map[string]rclone.FileItem, len(remoteItems))
-	for _, item := range remoteItems {
-		remoteByName[item.Name] = item
+func (s *Service) reconcileObservedEntry(ctx context.Context, row *dbpkg.FileMetadata, remoteItem rclone.FileItem, hadPrev bool, prev dbpkg.FileMetadata, now string) error {
+	remoteChanged := hadPrev && remoteObservationChanged(prev, *row)
+	localChanged := row.LocalDirty || (hadPrev && localObservationChanged(prev, *row)) || (!hadPrev && row.LocalExists)
+
+	if row.IsDir {
+		return s.reconcileDirectoryEntry(ctx, row, remoteChanged || !hadPrev, localChanged, now)
 	}
-
-	names := make(map[string]struct{}, len(remoteByName)+len(localItems))
-	for name := range remoteByName {
-		names[name] = struct{}{}
-	}
-	for name := range localItems {
-		names[name] = struct{}{}
-	}
-
-	items := make([]mergedDirItem, 0, len(names))
-	for name := range names {
-		remoteItem, hasRemote := remoteByName[name]
-		localItem, hasLocal := localItems[name]
-
-		relPath := remoteItem.Path
-		if relPath == "" {
-			relPath = joinRemotePath(parentRelPath, name)
-		}
-
-		entry := dbpkg.SyncEntry{
-			ID:            dbpkg.MakeSyncEntryID(rootID, relPath),
-			RootID:        rootID,
-			RelPath:       relPath,
-			ParentRelPath: parentRelPath,
-			Name:          name,
-			CreatedAt:     now,
-			UpdatedAt:     now,
-		}
-
-		if hasRemote {
-			entry.IsDir = remoteItem.IsDir
-			entry.RemoteExists = true
-			entry.RemoteMTime = remoteItem.ModTime.UTC().Format(time.RFC3339Nano)
-			entry.RemoteSize = sql.NullInt64{Int64: remoteItem.Size, Valid: !remoteItem.IsDir}
-			entry.MimeType = remoteItem.MimeType
-			entry.LastSeenRemote = now
-		}
-		if hasLocal {
-			entry.IsDir = localItem.isDir
-			entry.LocalExists = true
-			entry.LocalMTime = localItem.modTime
-			entry.LocalSize = sql.NullInt64{Int64: localItem.size, Valid: !localItem.isDir}
-			entry.LastSeenLocal = now
-		}
-
-		entry.StateCode, entry.IsDirty, entry.SyncDirection = reconcileState(entry)
-		items = append(items, mergedDirItem{entry: entry})
-	}
-
-	return items
+	return s.reconcileFileEntry(ctx, row, remoteItem, remoteChanged || (!hadPrev && row.RemoteExists), localChanged, now)
 }
 
-func reconcileState(entry dbpkg.SyncEntry) (state string, dirty bool, direction string) {
+func (s *Service) reconcileDirectoryEntry(ctx context.Context, row *dbpkg.FileMetadata, remoteChanged, localChanged bool, now string) error {
 	switch {
-	case entry.LocalExists && !entry.RemoteExists:
-		return "LOC", true, "push"
-	case entry.RemoteExists && !entry.LocalExists:
-		return "REM", false, "none"
-	case !entry.LocalExists && !entry.RemoteExists:
-		return "REM", false, "none"
+	case row.LocalDirty && row.LocalExists && !row.RemoteExists:
+		if err := rclone.MkDir(ctx, row.RemoteName, row.RelPath); err != nil {
+			return fmt.Errorf("mkdir remote: %w", err)
+		}
+		row.RemoteExists = true
+		row.LocalDirty = false
+		row.LastSyncedAt = now
+	case row.LocalDirty && !row.LocalExists && row.RemoteExists:
+		if err := rclone.DeletePath(ctx, row.RemoteName, row.RelPath); err != nil {
+			return fmt.Errorf("delete remote dir: %w", err)
+		}
+		row.RemoteExists = false
+		row.LocalDirty = false
+		row.LastSyncedAt = now
+	case !row.RemoteExists && row.LocalExists && !localChanged && remoteChanged:
+		if err := os.RemoveAll(buildLocalPath(row.RemoteName, row.RelPath)); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("remove local dir: %w", err)
+		}
+		row.LocalExists = false
+		row.LastLocalSeen = now
+		row.LastSyncedAt = now
+	case row.LocalExists && row.RemoteExists && row.LocalDirty:
+		row.LocalDirty = false
+		row.LastSyncedAt = now
 	}
-
-	if metadataMatches(entry) {
-		return "LOC", false, "none"
-	}
-
-	direction = "conflict"
-	localTime, localOK := parseTime(entry.LocalMTime)
-	remoteTime, remoteOK := parseTime(entry.RemoteMTime)
-	switch {
-	case localOK && remoteOK && localTime.After(remoteTime):
-		direction = "push"
-	case localOK && remoteOK && remoteTime.After(localTime):
-		direction = "pull"
-	case localOK && !remoteOK:
-		direction = "push"
-	case !localOK && remoteOK:
-		direction = "pull"
-	}
-	return "MOD", true, direction
+	return nil
 }
 
-func metadataMatches(entry dbpkg.SyncEntry) bool {
-	if entry.IsDir {
-		return true
+func (s *Service) reconcileFileEntry(ctx context.Context, row *dbpkg.FileMetadata, remoteItem rclone.FileItem, remoteChanged, localChanged bool, now string) error {
+	switch {
+	case row.LocalDirty && !row.LocalExists && row.RemoteExists:
+		if remoteChanged {
+			return s.pullFile(ctx, row, remoteItem, now, false)
+		}
+		if err := rclone.DeletePath(ctx, row.RemoteName, row.RelPath); err != nil {
+			return fmt.Errorf("delete remote file: %w", err)
+		}
+		row.RemoteExists = false
+		row.LocalDirty = false
+		row.LastSyncedAt = now
+		return nil
+
+	case row.LocalDirty && row.LocalExists && !row.RemoteExists:
+		return s.pushFile(ctx, row, now)
+
+	case row.LocalDirty && row.LocalExists && row.RemoteExists:
+		same, err := s.contentsEqual(ctx, *row, remoteItem)
+		if err != nil {
+			return err
+		}
+		if same {
+			row.LocalDirty = false
+			row.LastSyncedAt = now
+			return nil
+		}
+		if remoteChanged {
+			if localDefinitelyNewer(*row, remoteChanged) {
+				return s.pushFile(ctx, row, now)
+			}
+			return s.pullFile(ctx, row, remoteItem, now, true)
+		}
+		return s.pushFile(ctx, row, now)
+
+	case !row.LocalDirty && !row.RemoteExists && row.LocalExists && remoteChanged:
+		localPath := buildLocalPath(row.RemoteName, row.RelPath)
+		if err := os.Remove(localPath); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("remove local file: %w", err)
+		}
+		row.LocalExists = false
+		row.LastLocalSeen = now
+		row.LastSyncedAt = now
+		return nil
+
+	case !row.LocalDirty && row.RemoteExists && row.LocalExists && remoteChanged:
+		same, err := s.contentsEqual(ctx, *row, remoteItem)
+		if err != nil {
+			return err
+		}
+		if same {
+			row.LastSyncedAt = now
+			return nil
+		}
+		return s.pullFile(ctx, row, remoteItem, now, false)
+
+	case !row.LocalDirty && row.RemoteExists && row.LocalExists && !remoteChanged && localChanged:
+		same, err := s.contentsEqual(ctx, *row, remoteItem)
+		if err != nil {
+			return err
+		}
+		if same {
+			row.LocalDirty = false
+			row.LastSyncedAt = now
+			return nil
+		}
+		return s.pushFile(ctx, row, now)
 	}
-	if !entry.LocalSize.Valid || !entry.RemoteSize.Valid {
-		return false
+	return nil
+}
+
+func (s *Service) pushFile(ctx context.Context, row *dbpkg.FileMetadata, now string) error {
+	localPath := buildLocalPath(row.RemoteName, row.RelPath)
+	file, err := os.Open(localPath)
+	if err != nil {
+		return fmt.Errorf("open local file: %w", err)
 	}
-	if entry.LocalSize.Int64 != entry.RemoteSize.Int64 {
-		return false
+	defer file.Close()
+
+	size := int64(0)
+	if row.LocalSize.Valid {
+		size = row.LocalSize.Int64
+	}
+	if err := rclone.UploadFile(ctx, row.RemoteName, parentPath(row.RelPath), path.Base(row.RelPath), size, file); err != nil {
+		return fmt.Errorf("upload remote file: %w", err)
 	}
 
-	localTime, localOK := parseTime(entry.LocalMTime)
-	remoteTime, remoteOK := parseTime(entry.RemoteMTime)
+	row.RemoteExists = true
+	row.RemoteMTime = row.LocalMTime
+	row.RemoteSize = row.LocalSize
+	row.LocalDirty = false
+	row.LastSyncedAt = now
+
+	remoteHash, _ := dbpkg.GetFileHash(s.database.Conn, row.RemoteName, row.RelPath, "remote")
+	localHash, err := s.computeLocalHash(row.RemoteName, row.RelPath, preferredHashAlgorithm(remoteHash))
+	if err == nil && localHash != nil {
+		if err := dbpkg.UpsertFileHash(s.database.Conn, *localHash); err != nil {
+			return err
+		}
+		if err := dbpkg.UpsertFileHash(s.database.Conn, dbpkg.FileHash{
+			RemoteName:    row.RemoteName,
+			RelPath:       row.RelPath,
+			Side:          "remote",
+			Algorithm:     localHash.Algorithm,
+			HashValue:     localHash.HashValue,
+			ObservedMTime: row.RemoteMTime,
+			ObservedSize:  row.RemoteSize,
+			ComputedAt:    now,
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Service) pullFile(ctx context.Context, row *dbpkg.FileMetadata, remoteItem rclone.FileItem, now string, backupLocal bool) error {
+	localPath := buildLocalPath(row.RemoteName, row.RelPath)
+	if err := os.MkdirAll(filepath.Dir(localPath), 0755); err != nil {
+		return fmt.Errorf("mkdir local parent: %w", err)
+	}
+
+	if backupLocal && row.LocalExists {
+		backupPath := localPath + ".tmp"
+		_ = os.Remove(backupPath)
+		if err := os.Rename(localPath, backupPath); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("stash local file: %w", err)
+		}
+	}
+
+	file, err := os.Create(localPath)
+	if err != nil {
+		return fmt.Errorf("create local file: %w", err)
+	}
+	defer file.Close()
+
+	if _, err := rclone.DownloadFile(ctx, row.RemoteName, row.RelPath, file); err != nil {
+		return fmt.Errorf("download remote file: %w", err)
+	}
+	if !remoteItem.ModTime.IsZero() {
+		_ = os.Chtimes(localPath, remoteItem.ModTime, remoteItem.ModTime)
+	}
+	if err := file.Close(); err != nil {
+		return fmt.Errorf("close local file: %w", err)
+	}
+	info, err := os.Stat(localPath)
+	if err != nil {
+		return fmt.Errorf("stat local file: %w", err)
+	}
+
+	row.LocalExists = true
+	row.LocalMTime = info.ModTime().UTC().Format(time.RFC3339Nano)
+	row.LocalSize = sql.NullInt64{Int64: info.Size(), Valid: true}
+	row.LocalDirty = false
+	row.LastLocalSeen = now
+	row.LastSyncedAt = now
+
+	remoteHash, _ := dbpkg.GetFileHash(s.database.Conn, row.RemoteName, row.RelPath, "remote")
+	localHash, err := s.computeLocalHash(row.RemoteName, row.RelPath, preferredHashAlgorithm(remoteHash))
+	if err == nil && localHash != nil {
+		if err := dbpkg.UpsertFileHash(s.database.Conn, *localHash); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Service) contentsEqual(ctx context.Context, row dbpkg.FileMetadata, remoteItem rclone.FileItem) (bool, error) {
+	if row.IsDir {
+		return true, nil
+	}
+	if row.LocalExists && row.RemoteExists &&
+		row.LocalSize.Valid && row.RemoteSize.Valid &&
+		row.LocalSize.Int64 >= 0 && row.RemoteSize.Int64 >= 0 &&
+		row.LocalSize.Int64 != row.RemoteSize.Int64 {
+		return false, nil
+	}
+
+	remoteHash, err := dbpkg.GetFileHash(s.database.Conn, row.RemoteName, row.RelPath, "remote")
+	if err != nil {
+		return false, err
+	}
+	if remoteItem.HashAlgo != "" && remoteItem.Hash != "" {
+		remoteHash = &dbpkg.FileHash{
+			RemoteName:    row.RemoteName,
+			RelPath:       row.RelPath,
+			Side:          "remote",
+			Algorithm:     remoteItem.HashAlgo,
+			HashValue:     remoteItem.Hash,
+			ObservedMTime: row.RemoteMTime,
+			ObservedSize:  row.RemoteSize,
+			ComputedAt:    dbpkg.NowRFC3339(),
+		}
+	}
+	if remoteHash != nil && row.LocalExists {
+		localHash, err := s.computeLocalHash(row.RemoteName, row.RelPath, preferredHashAlgorithm(remoteHash))
+		if err != nil {
+			return false, err
+		}
+		if localHash != nil {
+			if err := dbpkg.UpsertFileHash(s.database.Conn, *localHash); err != nil {
+				return false, err
+			}
+			return localHash.Algorithm == remoteHash.Algorithm && localHash.HashValue == remoteHash.HashValue, nil
+		}
+	}
+
+	localTime, localOK := parseTime(row.LocalMTime)
+	remoteTime, remoteOK := parseTime(row.RemoteMTime)
 	if !localOK || !remoteOK {
-		return false
+		return false, nil
 	}
 	diff := localTime.Sub(remoteTime)
 	if diff < 0 {
 		diff = -diff
 	}
-	return diff <= 2*time.Second
+	if row.LocalSize.Valid && row.RemoteSize.Valid && row.LocalSize.Int64 >= 0 && row.RemoteSize.Int64 >= 0 {
+		return diff <= 2*time.Second && row.LocalSize.Int64 == row.RemoteSize.Int64, nil
+	}
+	return diff <= 2*time.Second, nil
+}
+
+func (s *Service) computeLocalHash(remoteName, relPath, algorithm string) (*dbpkg.FileHash, error) {
+	localPath := buildLocalPath(remoteName, relPath)
+	info, err := os.Stat(localPath)
+	if err != nil {
+		return nil, err
+	}
+	if info.IsDir() {
+		return nil, nil
+	}
+
+	existing, err := dbpkg.GetFileHash(s.database.Conn, remoteName, relPath, "local")
+	if err != nil {
+		return nil, err
+	}
+	mtime := info.ModTime().UTC().Format(time.RFC3339Nano)
+	size := sql.NullInt64{Int64: info.Size(), Valid: true}
+	if existing != nil && existing.Algorithm == algorithm && existing.ObservedMTime == mtime && existing.ObservedSize.Valid && existing.ObservedSize.Int64 == size.Int64 {
+		return existing, nil
+	}
+
+	hashType := rclonehash.CRC32
+	if algorithm != "" {
+		if err := hashType.Set(algorithm); err != nil {
+			hashType = rclonehash.CRC32
+		}
+	}
+
+	file, err := os.Open(localPath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	sums, err := rclonehash.StreamTypes(file, rclonehash.NewHashSet(hashType))
+	if err != nil {
+		return nil, err
+	}
+	value := sums[hashType]
+	return &dbpkg.FileHash{
+		RemoteName:    remoteName,
+		RelPath:       relPath,
+		Side:          "local",
+		Algorithm:     hashType.String(),
+		HashValue:     value,
+		ObservedMTime: mtime,
+		ObservedSize:  size,
+		ComputedAt:    dbpkg.NowRFC3339(),
+	}, nil
+}
+
+func deriveDirectoryItemState(row dbpkg.FileMetadata) (state string, dirty bool, direction string) {
+	switch {
+	case row.LocalDirty && row.LocalExists && !row.RemoteExists:
+		if row.IsDir {
+			return "LOC", true, "push"
+		}
+		return "LOC", true, "push"
+	case row.LocalDirty && !row.LocalExists && row.RemoteExists:
+		return "MOD", true, "push"
+	case row.LocalDirty && row.LocalExists && row.RemoteExists:
+		return "MOD", true, "push"
+	case row.RemoteExists && !row.LocalExists:
+		return "REM", false, "none"
+	case row.LocalExists && row.RemoteExists:
+		return "LOC", false, "none"
+	case row.LocalExists && !row.RemoteExists:
+		return "LOC", true, "push"
+	default:
+		return "REM", false, "none"
+	}
+}
+
+func localObservationChanged(prev, current dbpkg.FileMetadata) bool {
+	return prev.LocalExists != current.LocalExists ||
+		!timesEqual(prev.LocalMTime, current.LocalMTime) ||
+		prev.LocalSize.Int64 != current.LocalSize.Int64 ||
+		prev.LocalSize.Valid != current.LocalSize.Valid
+}
+
+func remoteObservationChanged(prev, current dbpkg.FileMetadata) bool {
+	return prev.RemoteExists != current.RemoteExists ||
+		!timesEqual(prev.RemoteMTime, current.RemoteMTime) ||
+		sizeMeaningfullyChanged(prev.RemoteSize, current.RemoteSize) ||
+		prev.RemoteRevision != current.RemoteRevision
+}
+
+func timesEqual(lhs, rhs string) bool {
+	if lhs == rhs {
+		return true
+	}
+	left, leftOK := parseTime(lhs)
+	right, rightOK := parseTime(rhs)
+	if leftOK && rightOK {
+		return left.Equal(right)
+	}
+	return false
+}
+
+func sizeMeaningfullyChanged(prev, current sql.NullInt64) bool {
+	if prev.Valid != current.Valid {
+		return true
+	}
+	if !prev.Valid {
+		return false
+	}
+	if prev.Int64 < 0 || current.Int64 < 0 {
+		return false
+	}
+	return prev.Int64 != current.Int64
 }
 
 func parseTime(value string) (time.Time, bool) {
@@ -457,18 +735,12 @@ func parseTime(value string) (time.Time, bool) {
 	return parsed, true
 }
 
-func buildLocalPath(root dbpkg.SyncRoot, relPath string) string {
-	pathParts := []string{root.MountRoot}
-	if root.ProviderFolder != "" {
-		pathParts = append(pathParts, root.ProviderFolder)
+func parentPath(relPath string) string {
+	parent := path.Dir(relPath)
+	if parent == "." {
+		return ""
 	}
-	if root.FolderName != "" {
-		pathParts = append(pathParts, root.FolderName)
-	}
-	if relPath != "" {
-		pathParts = append(pathParts, filepath.FromSlash(relPath))
-	}
-	return filepath.Join(pathParts...)
+	return parent
 }
 
 func joinRemotePath(parentRelPath, name string) string {
@@ -476,4 +748,42 @@ func joinRemotePath(parentRelPath, name string) string {
 		return name
 	}
 	return path.Join(parentRelPath, name)
+}
+
+func buildLocalPath(remoteName, relPath string) string {
+	remoteType := rclone.GetRemoteType(remoteName)
+	providerFolder, folderName, root := resolveMountMapping(remoteName, remoteType)
+	pathParts := []string{root}
+	if providerFolder != "" {
+		pathParts = append(pathParts, providerFolder)
+	}
+	if folderName != "" {
+		pathParts = append(pathParts, folderName)
+	}
+	if relPath != "" {
+		pathParts = append(pathParts, filepath.FromSlash(relPath))
+	}
+	return filepath.Join(pathParts...)
+}
+
+func preferredHashAlgorithm(remoteHash *dbpkg.FileHash) string {
+	if remoteHash != nil && remoteHash.Algorithm != "" {
+		return remoteHash.Algorithm
+	}
+	return rclonehash.CRC32.String()
+}
+
+func localDefinitelyNewer(row dbpkg.FileMetadata, remoteChanged bool) bool {
+	if !remoteChanged {
+		return true
+	}
+	localTime, localOK := parseTime(row.LocalMTime)
+	remoteTime, remoteOK := parseTime(row.RemoteMTime)
+	if !localOK {
+		return false
+	}
+	if !remoteOK {
+		return true
+	}
+	return localTime.After(remoteTime)
 }

@@ -104,8 +104,11 @@ namespace misty::panel {
         }
     }
 
-    FileTreePanel::~FileTreePanel() {
-        save_layout_state();
+    FileTreePanel::~FileTreePanel() noexcept {
+        try {
+            save_layout_state();
+        } catch (...) {
+        }
     }
 
     void FileTreePanel::init_default_layout() {
@@ -413,7 +416,8 @@ namespace misty::panel {
         }
 
         const float visible_tab_width = std::max(0.0f, size.x - kTabStripSidePadding);
-        const bool needs_horizontal_scroll = total_tab_content_width > visible_tab_width;
+        const bool allow_horizontal_scroll = pane_count() > 1;
+        const bool needs_horizontal_scroll = allow_horizontal_scroll && total_tab_content_width > visible_tab_width;
         out_height = std::min(
             kTabBarHeight + (needs_horizontal_scroll ? (kTabStripScrollbarSize + 4.0f) : 4.0f),
             size.y);
@@ -1715,7 +1719,7 @@ namespace misty::panel {
 
     void FileTreePanel::notify_layout_error(const std::string& title, const std::string& message) {
         auto& notifications = ui_registry_.get_state<NotificationState>("Notifications");
-        notifications.add_notification(title, message, NotificationType::INFO, 3.5f);
+        notifications.add_notification(title + ": " + message, 3.5f);
     }
 
     std::string FileTreePanel::layout_state_file_path() const {

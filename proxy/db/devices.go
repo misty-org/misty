@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/kannachi323/misty/proxy/core/tsbase"
 )
 
 type Device struct {
@@ -24,7 +23,7 @@ type Device struct {
 }
 
 // UpdateDevice inserts or updates a device. deviceName and mountPath are optional.
-func UpdateDevice(db *sql.DB, peer *tsbase.TSPeer, deviceName, mountPath string) error {
+func UpdateDevice(db *sql.DB, peerHostName, peerType, peerAddress, deviceName, mountPath string) error {
 	now := time.Now()
 
 	deviceID, err := uuid.NewUUID()
@@ -43,10 +42,10 @@ func UpdateDevice(db *sql.DB, peer *tsbase.TSPeer, deviceName, mountPath string)
 			mount_path = COALESCE(EXCLUDED.mount_path, devices.mount_path),
 			last_seen = EXCLUDED.last_seen,
 			updated_at = EXCLUDED.updated_at
-	`, deviceID, peer.PeerHostName, string(peer.PeerType), peer.PeerAddress, deviceName, mountPath, now, now, now)
+	`, deviceID, peerHostName, peerType, peerAddress, deviceName, mountPath, now, now, now)
 
 	if err != nil {
-		log.Printf("Failed to insert/update device %s: %v", peer.PeerHostName, err)
+		log.Printf("Failed to insert/update device %s: %v", peerHostName, err)
 		return err
 	}
 
@@ -235,14 +234,4 @@ func GetDevicesByWorkspace(db *sql.DB, workspaceID string) ([]*Device, error) {
 	}
 
 	return devices, nil
-}
-
-func SyncDevicesFromPeers(db *sql.DB, peers []*tsbase.TSPeer) error {
-	for _, peer := range peers {
-		if err := UpdateDevice(db, peer, "", ""); err != nil {
-			log.Printf("Failed to sync device %s: %v", peer.PeerHostName, err)
-			// Continue with other devices even if one fails
-		}
-	}
-	return nil
 }

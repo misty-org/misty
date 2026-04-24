@@ -118,7 +118,7 @@ func (r *Reconciler) push(ctx context.Context, root dbpkg.SyncRoot, entry dbpkg.
 		return r.markReconciled(entry)
 
 	default:
-		localPath := buildLocalPath(root, entry.RelPath)
+		localPath := buildLocalPath(root.RemoteName, entry.RelPath)
 		f, err := os.Open(localPath)
 		if err != nil {
 			return fmt.Errorf("open local: %w", err)
@@ -152,7 +152,7 @@ func (r *Reconciler) pull(ctx context.Context, root dbpkg.SyncRoot, entry dbpkg.
 		return r.markReconciled(entry)
 	}
 	if entry.IsDir {
-		localPath := buildLocalPath(root, entry.RelPath)
+		localPath := buildLocalPath(root.RemoteName, entry.RelPath)
 		if err := os.MkdirAll(localPath, 0o755); err != nil {
 			return fmt.Errorf("mkdir local: %w", err)
 		}
@@ -169,7 +169,7 @@ func (r *Reconciler) pullWithBackup(ctx context.Context, root dbpkg.SyncRoot, en
 		return r.markReconciled(entry)
 	}
 	if entry.IsDir {
-		localPath := buildLocalPath(root, entry.RelPath)
+		localPath := buildLocalPath(root.RemoteName, entry.RelPath)
 		if err := os.MkdirAll(localPath, 0o755); err != nil {
 			return fmt.Errorf("mkdir local: %w", err)
 		}
@@ -184,7 +184,7 @@ func (r *Reconciler) pullWithBackup(ctx context.Context, root dbpkg.SyncRoot, en
 // the user can recover the pre-sync contents if the chosen-remote policy went
 // the wrong way.
 func (r *Reconciler) pullFile(ctx context.Context, root dbpkg.SyncRoot, entry dbpkg.SyncEntry, backupLocal bool) error {
-	localPath := buildLocalPath(root, entry.RelPath)
+	localPath := buildLocalPath(root.RemoteName, entry.RelPath)
 
 	if err := os.MkdirAll(filepath.Dir(localPath), 0o755); err != nil {
 		return fmt.Errorf("mkdir parent: %w", err)
