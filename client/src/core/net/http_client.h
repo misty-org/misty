@@ -35,6 +35,10 @@ namespace misty::core {
         static HTTPClient& get();
 
         HttpResponse get(const std::string& url, const std::map<std::string, std::string>& headers = {});
+        HttpResponse get_with_timeouts(const std::string& url,
+                                       long connect_timeout_seconds,
+                                       long total_timeout_seconds,
+                                       const std::map<std::string, std::string>& headers = {});
         HttpResponse post(const std::string& url, const std::string& body, const std::map<std::string, std::string>& headers = {});
         HttpResponse put(const std::string& url, const std::string& body, const std::map<std::string, std::string>& headers = {});
         HttpResponse del(const std::string& url, const std::map<std::string, std::string>& headers = {});

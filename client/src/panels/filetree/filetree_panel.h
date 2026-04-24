@@ -20,7 +20,7 @@ namespace misty::panel {
         FileTreePanel(core::UIRegistry& ui_registry,
                       core::WorkerPool& worker_pool,
                       std::shared_ptr<MistyClient> client);
-        ~FileTreePanel();
+        ~FileTreePanel() noexcept;
 
         void render(const ImVec2& pos, const ImVec2& size);
         void handle_commands();

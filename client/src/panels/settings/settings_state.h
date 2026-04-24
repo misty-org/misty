@@ -20,6 +20,7 @@ namespace misty::panel {
 
     struct SettingsState : public core::UIState {
         SettingsSection active_section = SettingsSection::Account;
+        SettingsSection prev_section   = SettingsSection::Account;
 
         // Account
         char account_display_name[128] = "";
