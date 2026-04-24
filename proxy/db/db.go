@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -25,6 +26,14 @@ func (db *Database) GetDSN() string {
 
 func (db *Database) StartDatabase() error {
 	dsn := db.GetDSN()
+	if dsn != "" && dsn != ":memory:" && !strings.HasPrefix(dsn, "file:") {
+		if dir := filepath.Dir(dsn); dir != "" && dir != "." && dir != string(filepath.Separator) {
+			if err := os.MkdirAll(dir, 0700); err != nil {
+				log.Println("Failed to create database directory:", err)
+				return err
+			}
+		}
+	}
 
 	conn, err := sql.Open("sqlite3", dsn+"?_foreign_keys=on")
 	if err != nil {
@@ -39,6 +48,12 @@ func (db *Database) StartDatabase() error {
 
 	db.Conn = conn
 
+	if err := ensureAuthSchema(conn); err != nil {
+		log.Println("Failed to ensure auth schema:", err)
+		_ = conn.Close()
+		return err
+	}
+
 	if err := ensureSyncSchema(conn); err != nil {
 		log.Println("Failed to ensure sync schema: ", err)
 		_ = conn.Close()
@@ -52,6 +67,86 @@ func (db *Database) Stop() {
 	if db.Conn != nil {
 		db.Conn.Close()
 	}
+}
+
+func ensureAuthSchema(conn *sql.DB) error {
+	const schema = `
+CREATE TABLE IF NOT EXISTS users (
+    id    TEXT PRIMARY KEY,
+    name  TEXT NOT NULL,
+    email TEXT NOT NULL UNIQUE
+);
+
+CREATE TABLE IF NOT EXISTS refresh_tokens (
+    id         TEXT PRIMARY KEY,
+    user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash TEXT NOT NULL UNIQUE,
+    expires_at DATETIME NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT (datetime('now')),
+    revoked    INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id   ON refresh_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_token_hash ON refresh_tokens(token_hash);
+
+CREATE TABLE IF NOT EXISTS license_cache (
+    id         INTEGER PRIMARY KEY CHECK (id = 1),
+    token      TEXT NOT NULL,
+    tier       TEXT NOT NULL,
+    expires_at DATETIME NOT NULL
+);
+`
+	if _, err := conn.Exec(schema); err != nil {
+		return err
+	}
+
+	// If the users table was created by an older migration that included a
+	// password column, the column is harmless for reads but INSERT will fail
+	// the NOT NULL constraint. Drop it if present.
+	return dropColumnIfPresent(conn, "users", "password")
+}
+
+// dropColumnIfPresent rebuilds the table without the named column when SQLite
+// is too old to support ALTER TABLE … DROP COLUMN (pre-3.35).
+func dropColumnIfPresent(conn *sql.DB, table, column string) error {
+	rows, err := conn.Query(fmt.Sprintf("PRAGMA table_info(%s)", table))
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	found := false
+	for rows.Next() {
+		var cid, notnull, pk int
+		var name, ctype string
+		var dflt sql.NullString
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dflt, &pk); err != nil {
+			return err
+		}
+		if name == column {
+			found = true
+			break
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if !found {
+		return nil
+	}
+
+	// Rebuild without the unwanted column.
+	_, err = conn.Exec(`
+CREATE TABLE IF NOT EXISTS users_migrated (
+    id    TEXT PRIMARY KEY,
+    name  TEXT NOT NULL,
+    email TEXT NOT NULL UNIQUE
+);
+INSERT OR IGNORE INTO users_migrated (id, name, email)
+    SELECT id, name, email FROM users;
+DROP TABLE users;
+ALTER TABLE users_migrated RENAME TO users;
+`)
+	return err
 }
 
 func ensureSyncSchema(conn *sql.DB) error {

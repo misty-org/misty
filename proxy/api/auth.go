@@ -52,7 +52,7 @@ func RegisterUser(db *db.Database) http.HandlerFunc {
 		body, _ := json.Marshal(map[string]string{
 			"name": req.Name, "email": req.Email, "password": req.Password,
 		})
-		resp, err := http.Post(base+"/register", "application/json", bytes.NewReader(body))
+		resp, err := http.Post(base+"/api/register", "application/json", bytes.NewReader(body))
 		if err != nil {
 			http.Error(w, "Server unreachable", http.StatusServiceUnavailable)
 			return
@@ -108,7 +108,7 @@ func LoginUser(db *db.Database, lm *license.Manager) http.HandlerFunc {
 
 		// Verify credentials against the central server
 		body, _ := json.Marshal(map[string]string{"email": req.Email, "password": req.Password})
-		resp, err := http.Post(base+"/login", "application/json", bytes.NewReader(body))
+		resp, err := http.Post(base+"/api/login", "application/json", bytes.NewReader(body))
 		if err != nil {
 			http.Error(w, "Server unreachable", http.StatusServiceUnavailable)
 			return

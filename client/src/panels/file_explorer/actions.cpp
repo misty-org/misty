@@ -1,6 +1,7 @@
 #include "panels/file_explorer/file_explorer_panel.h"
 #include "panels/activity/download_state.h"
 #include "panels/activity/upload_state.h"
+#include "panels/activity/activity_state.h"
 #include "panels/file_sidebar/file_sidebar_state.h"
 #include "panels/notification/notification_state.h"
 #include "panels/services/services_state.h"
@@ -124,12 +125,12 @@ namespace misty::panel {
         }
 
         if (ec) {
-            auto& notif = registry_.get_state<NotificationState>("Notifications");
-            notif.add_notification("Paste Failed", ec.message(), NotificationType::ERROR);
+            auto& activity = registry_.get_state<ActivityState>("Activity");
+            activity.add_entry("File", "Paste failed: " + ec.message(), ActivityEntryType::ERROR);
         } else {
             auto& notif = registry_.get_state<NotificationState>("Notifications");
             std::string action = (op == ClipboardOp::COPY) ? "Copied" : "Moved";
-            notif.add_notification("Success", action + " " + item.name, NotificationType::SUCCESS);
+            notif.add_notification(action + " " + item.name);
         }
     }
 
@@ -137,14 +138,14 @@ namespace misty::panel {
         (void)state;
         // Skip directories
         if (item.is_dir) {
-            auto& notif = registry_.get_state<NotificationState>("Notifications");
-            notif.add_notification("Paste Skipped", "Folder upload not supported: " + item.name, NotificationType::INFO);
+            auto& activity = registry_.get_state<ActivityState>("Activity");
+            activity.add_entry("File", "Folder upload not supported: " + item.name);
             return;
         }
 
         if (!fs::exists(item.path)) {
-            auto& notif = registry_.get_state<NotificationState>("Notifications");
-            notif.add_notification("Paste Failed", "File not available locally: " + item.name + ". Download it first.", NotificationType::ERROR);
+            auto& activity = registry_.get_state<ActivityState>("Activity");
+            activity.add_entry("File", "File not available locally: " + item.name + ". Download it first.", ActivityEntryType::ERROR);
             return;
         }
 
@@ -170,8 +171,8 @@ namespace misty::panel {
         }
 
         if (ec) {
-            auto& notif = registry_.get_state<NotificationState>("Notifications");
-            notif.add_notification("Paste Failed", "Failed to copy to mount: " + ec.message(), NotificationType::ERROR);
+            auto& activity = registry_.get_state<ActivityState>("Activity");
+            activity.add_entry("File", "Paste failed: " + ec.message(), ActivityEntryType::ERROR);
             return;
         }
 
@@ -201,8 +202,8 @@ namespace misty::panel {
     void FileExplorerPanel::perform_paste_cloud_to_local(FileExplorerState& state, const UnifiedFileItem& item, const std::string& dest_dir, ClipboardOp op) {
         (void)state;
         if (item.is_dir) {
-            auto& notif = registry_.get_state<NotificationState>("Notifications");
-            notif.add_notification("Paste Skipped", "Folder download not supported: " + item.name, NotificationType::INFO);
+            auto& activity = registry_.get_state<ActivityState>("Activity");
+            activity.add_entry("File", "Folder download not supported: " + item.name);
             return;
         }
 
@@ -229,12 +230,12 @@ namespace misty::panel {
             }
 
             if (ec) {
-                auto& notif = registry_.get_state<NotificationState>("Notifications");
-                notif.add_notification("Paste Failed", ec.message(), NotificationType::ERROR);
+                auto& activity = registry_.get_state<ActivityState>("Activity");
+                activity.add_entry("File", "Paste failed: " + ec.message(), ActivityEntryType::ERROR);
             } else {
                 auto& notif = registry_.get_state<NotificationState>("Notifications");
                 std::string action = (op == ClipboardOp::COPY) ? "Copied" : "Moved";
-                notif.add_notification("Success", action + " " + item.name, NotificationType::SUCCESS);
+                notif.add_notification(action + " " + item.name);
             }
             return;
         }
@@ -249,8 +250,7 @@ namespace misty::panel {
         uint64_t download_id = downloads.start_download(
             item.name, dest_path, item.remote_name, item.size);
 
-        uint64_t notif_id = notifications.add_notification(
-            "Downloading for Paste", item.name, NotificationType::DOWNLOAD, 15.0f);
+        uint64_t notif_id = notifications.add_notification("downloading...", 15.0f);
 
         services.download_file(
             item.remote_name, item.remote_path, dest_path,
@@ -266,10 +266,11 @@ namespace misty::panel {
                 notifications.dismiss(notif_id);
                 if (success) {
                     downloads.complete_download(download_id);
-                    notifications.add_notification("Paste Complete", file_name, NotificationType::SUCCESS, 5.0f);
+                    notifications.add_notification("Copied " + file_name);
                 } else {
                     downloads.fail_download(download_id, error);
-                    notifications.add_notification("Paste Failed", file_name + ": " + error, NotificationType::ERROR, 5.0f);
+                    auto& activity = registry->get_state<ActivityState>("Activity");
+                    activity.add_entry("File", "Paste failed: " + file_name + ": " + error, ActivityEntryType::ERROR);
                 }
             });
     }
@@ -289,13 +290,14 @@ namespace misty::panel {
             resolve_remote_path_context(dest_dir, remote_name, remote_path);
 
             if (remote_name.empty()) {
-                notifications.add_notification("Upload Failed", "Cannot upload to mount root. Navigate into a remote folder.", NotificationType::ERROR);
+                auto& activity = registry_.get_state<ActivityState>("Activity");
+                activity.add_entry("File", "Cannot upload to mount root. Navigate into a remote folder.", ActivityEntryType::ERROR);
                 return;
             }
 
             uint64_t upload_id = uploads.start_upload(file_name, local_path, remote_name, file_size);
             uploads.set_retry_context(upload_id, remote_name, remote_path);
-            notifications.add_notification("Uploading", file_name, NotificationType::DOWNLOAD, 15.0f);
+            notifications.add_notification("uploading...", 15.0f);
 
             services.upload_file(remote_name, remote_path, local_path,
                 [registry = &registry_, upload_id](size_t bytes_uploaded, size_t total_bytes) -> bool {
@@ -308,10 +310,11 @@ namespace misty::panel {
                     auto& notifications = registry->get_state<NotificationState>("Notifications");
                     if (success) {
                         uploads.complete_upload(upload_id);
-                        notifications.add_notification("Upload Complete", file_name, NotificationType::SUCCESS, 5.0f);
+                        notifications.add_notification("Uploaded " + file_name);
                     } else {
                         uploads.fail_upload(upload_id, error_msg);
-                        notifications.add_notification("Upload Failed", file_name + ": " + error_msg, NotificationType::ERROR, 5.0f);
+                        auto& activity = registry->get_state<ActivityState>("Activity");
+                        activity.add_entry("File", "Upload failed: " + file_name + ": " + error_msg, ActivityEntryType::ERROR);
                     }
                 });
         }
@@ -331,8 +334,9 @@ namespace misty::panel {
                 }
             }
         }
+        size_t n = clipboard.paths.size();
         auto& notif = registry_.get_state<NotificationState>("Notifications");
-        notif.add_notification("Clipboard", "Copied " + std::to_string(clipboard.paths.size()) + " items", NotificationType::INFO);
+        notif.add_notification("Copied " + std::to_string(n) + (n == 1 ? " item" : " items"));
     }
 
     void FileExplorerPanel::perform_cut(FileExplorerState& state) {
@@ -349,8 +353,9 @@ namespace misty::panel {
                 }
             }
         }
+        size_t n = clipboard.paths.size();
         auto& notif = registry_.get_state<NotificationState>("Notifications");
-        notif.add_notification("Clipboard", "Cut " + std::to_string(clipboard.paths.size()) + " items", NotificationType::INFO);
+        notif.add_notification("Cut " + std::to_string(n) + (n == 1 ? " item" : " items"));
     }
 
     void FileExplorerPanel::perform_delete_selected(FileExplorerState& state) {
@@ -418,7 +423,7 @@ namespace misty::panel {
 
         if (local_success_count > 0) {
             auto& notif = registry_.get_state<NotificationState>("Notifications");
-            notif.add_notification("Deleted", "Deleted " + std::to_string(local_success_count) + " items", NotificationType::SUCCESS);
+            notif.add_notification("Deleted " + std::to_string(local_success_count) + (local_success_count == 1 ? " item" : " items"));
         }
 
         if (!permission_paths.empty()) {
@@ -481,23 +486,24 @@ namespace misty::panel {
                     }
 
                     if (remote_success_count > 0) {
-                        notif.add_notification("Deleted", "Deleted " + std::to_string(remote_success_count) + " items", NotificationType::SUCCESS);
+                        notif.add_notification("Deleted " + std::to_string(remote_success_count) + (remote_success_count == 1 ? " item" : " items"));
                     }
                     if (!first_error.empty()) {
-                        notif.add_notification("Delete Failed", first_error, NotificationType::ERROR);
+                        auto& activity = registry->get_state<ActivityState>("Activity");
+                        activity.add_entry("File", "Delete failed: " + first_error, ActivityEntryType::ERROR);
                     }
                 },
                 []() {},
                 [registry = &registry_, state_key = state_key_](const std::string& err) {
                     auto& state = registry->get_state<FileExplorerState>(state_key);
-                    auto& notif = registry->get_state<NotificationState>("Notifications");
                     {
                         std::lock_guard<std::mutex> lock(state.mu);
                         state.is_loading = false;
                         state.show_loading_animation = false;
                         state.error_msg = err;
                     }
-                    notif.add_notification("Delete Failed", err, NotificationType::ERROR);
+                    auto& activity = registry->get_state<ActivityState>("Activity");
+                    activity.add_entry("File", "Delete failed: " + err, ActivityEntryType::ERROR);
                 }
             );
         }
@@ -568,11 +574,9 @@ namespace misty::panel {
             }
         }
 
-        auto& notif = registry_.get_state<NotificationState>("Notifications");
         if (success_count > 0) {
-            notif.add_notification("Local cache cleared",
-                "Cleared local copy of " + std::to_string(success_count) + " items",
-                NotificationType::SUCCESS);
+            auto& notif = registry_.get_state<NotificationState>("Notifications");
+            notif.add_notification("Cleared local copy of " + std::to_string(success_count) + (success_count == 1 ? " item" : " items"));
         }
         if (!permission_paths.empty()) {
             state.permission_delete_paths = std::move(permission_paths);
@@ -682,7 +686,7 @@ namespace misty::panel {
 
         if (success_count > 0) {
             auto& notif = registry_.get_state<NotificationState>("Notifications");
-            notif.add_notification("Deleted", "Deleted " + std::to_string(success_count) + " items", NotificationType::SUCCESS);
+            notif.add_notification("Deleted " + std::to_string(success_count) + (success_count == 1 ? " item" : " items"));
         }
 
         if (!permission_paths.empty()) {
@@ -744,7 +748,7 @@ namespace misty::panel {
 
         if (success_count > 0) {
             auto& notif = registry_.get_state<NotificationState>("Notifications");
-            notif.add_notification("Deleted", "Deleted " + std::to_string(success_count) + " items", NotificationType::SUCCESS);
+            notif.add_notification("Deleted " + std::to_string(success_count) + (success_count == 1 ? " item" : " items"));
         }
 
         navigate_to_path(std::string(state.current_path), false);

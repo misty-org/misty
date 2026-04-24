@@ -193,25 +193,25 @@ namespace misty::view {
         }
 
         notification_panel_->render();
-        show_session_expired_modal();
     }
 
     void FilesView::schedule_proxy_probe() {
         bool expected = false;
-        if (!proxy_probe_in_flight_.compare_exchange_strong(expected, true)) {
+        if (!proxy_probe_in_flight_->compare_exchange_strong(expected, true)) {
             return;
         }
 
+        auto probe_state = proxy_probe_in_flight_;
         worker_pool_.add(
             []() {
                 core::ProxyManager::get().ensure_running();
             },
-            [this]() {
-                proxy_probe_in_flight_.store(false);
+            [probe_state]() {
+                probe_state->store(false);
             },
-            [this](const std::string&) {
+            [probe_state](const std::string&) {
                 core::SessionManager::get().mark_proxy_unavailable();
-                proxy_probe_in_flight_.store(false);
+                probe_state->store(false);
             }
         );
     }
@@ -251,7 +251,7 @@ namespace misty::view {
                 ImGui::GetWindowWidth() - kButtonWidth - 16.0f,
                 (kBannerHeight - 32.0f) * 0.5f
             ));
-            if (proxy_probe_in_flight_.load()) {
+            if (proxy_probe_in_flight_->load()) {
                 ImGui::BeginDisabled();
                 ImGui::Button("Checking...", ImVec2(kButtonWidth, 32.0f));
                 ImGui::EndDisabled();
@@ -266,83 +266,4 @@ namespace misty::view {
         return kBannerHeight;
     }
 
-    void FilesView::show_session_expired_modal() {
-        if (!core::SessionManager::get().is_session_expired()) {
-            return;
-        }
-
-        ImGuiViewport* vp = ImGui::GetMainViewport();
-        ImGui::SetNextWindowPos(vp->WorkPos);
-        ImGui::SetNextWindowSize(vp->WorkSize);
-        ImGui::SetNextWindowBgAlpha(0.0f);
-
-        ImGuiWindowFlags host_flags =
-            ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-            ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar |
-            ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDecoration |
-            ImGuiWindowFlags_NoNav;
-
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-        if (ImGui::Begin("##session_host", nullptr, host_flags)) {
-            ImGui::OpenPopup("##session_expired");
-
-            ImGui::SetNextWindowPos(vp->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-            ImGui::SetNextWindowSize(ImVec2(360.0f, 0.0f), ImGuiCond_Always);
-
-            ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.10f, 0.10f, 0.11f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.22f, 0.22f, 0.24f, 1.0f));
-            ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 10.0f);
-            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(28.0f, 28.0f));
-            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 12.0f));
-
-            if (ImGui::BeginPopupModal("##session_expired", nullptr,
-                    ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-                    ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize)) {
-
-                const float w = ImGui::GetContentRegionAvail().x;
-
-                auto& lock_icon = core::AssetManager::get().get_svg_texture("lock-24", 32);
-                if (lock_icon.id) {
-                    ImGui::SetCursorPosX((w - 32.0f) * 0.5f);
-                    ImGui::Image(lock_icon.id, ImVec2(32.0f, 32.0f));
-                    ImGui::Spacing();
-                }
-
-                ImGui::PushFont(core::AssetManager::get().get_font(core::FontID::ROBOTO_LARGE));
-                const char* title = "Session Expired";
-                ImGui::SetCursorPosX((w - ImGui::CalcTextSize(title).x) * 0.5f);
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.90f, 0.90f, 0.90f, 1.0f));
-                ImGui::TextUnformatted(title);
-                ImGui::PopStyleColor();
-                ImGui::PopFont();
-
-                ImGui::Spacing();
-
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.58f, 0.58f, 0.58f, 1.0f));
-                ImGui::TextWrapped(
-                    "Your session has expired and could not be renewed. "
-                    "Please log in again to continue.");
-                ImGui::PopStyleColor();
-
-                ImGui::Spacing();
-                ImGui::Separator();
-                ImGui::Spacing();
-
-                if (core::StyledButton("Log In Again", ImVec2(w, 42.0f),
-                                       core::ButtonTheme::Primary())) {
-                    core::SessionManager::get().clear_token();
-                    core::SessionManager::get().clear_session_expired();
-                    ImGui::CloseCurrentPopup();
-                    view::switch_view(view::ViewID::Login);
-                }
-
-                ImGui::EndPopup();
-            }
-
-            ImGui::PopStyleVar(3);
-            ImGui::PopStyleColor(2);
-        }
-        ImGui::End();
-        ImGui::PopStyleVar();
-    }
 }

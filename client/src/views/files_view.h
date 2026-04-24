@@ -31,7 +31,6 @@ namespace misty::view {
         void init_panels();
         void schedule_proxy_probe();
         float render_proxy_status_banner(const ImVec2& pos, float width);
-        void show_session_expired_modal();
 
     private:
         core::UIRegistry& ui_registry_;
@@ -48,7 +47,8 @@ namespace misty::view {
         bool is_resizing_sidebar_ = false;
         float claude_panel_width_ = 380.0f;
         bool is_resizing_claude_panel_ = false;
-        std::atomic<bool> proxy_probe_in_flight_{false};
+        std::shared_ptr<std::atomic_bool> proxy_probe_in_flight_ =
+            std::make_shared<std::atomic_bool>(false);
 
         static constexpr float kSidebarMinWidth = 180.0f;
         static constexpr float kSidebarMaxWidth = 400.0f;

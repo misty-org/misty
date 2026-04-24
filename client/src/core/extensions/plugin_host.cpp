@@ -18,6 +18,7 @@
 #include <glad/glad.h>
 #include "imgui.h"
 #include "panels/file_explorer/file_explorer_state.h"
+#include "panels/activity/activity_state.h"
 #include "panels/notification/notification_state.h"
 #include "views/app_view.h"
 
@@ -253,16 +254,15 @@ struct PluginHost::Impl {
         if (!h) return;
         auto* self = as_impl(h);
         if (!self->ui_registry) return;
-        panel::NotificationType type = panel::NotificationType::INFO;
-        switch (level) {
-            case MISTY_NOTIFICATION_SUCCESS: type = panel::NotificationType::SUCCESS; break;
-            case MISTY_NOTIFICATION_ERROR:   type = panel::NotificationType::ERROR;   break;
-            case MISTY_NOTIFICATION_INFO:
-            default:                         type = panel::NotificationType::INFO;    break;
+        const std::string sender = title ? title : "Extension";
+        const std::string msg = message ? message : "";
+        if (level == MISTY_NOTIFICATION_ERROR) {
+            auto& activity = self->ui_registry->get_state<panel::ActivityState>("Activity");
+            activity.add_entry(sender, msg, panel::ActivityEntryType::ERROR);
+        } else {
+            auto& notifications = self->ui_registry->get_state<panel::NotificationState>("Notifications");
+            notifications.add_notification(sender + ": " + msg);
         }
-        auto& notifications = self->ui_registry->get_state<panel::NotificationState>("Notifications");
-        notifications.add_notification(title ? title : "Extension",
-                                       message ? message : "", type);
     }
     static std::uint32_t c_create_texture(void* h, int width, int height,
                                           const unsigned char* rgba_pixels) {
@@ -504,10 +504,10 @@ struct PluginHost::Impl {
         append_diagnostic(plugin_index, std::move(message));
 
         if (ui_registry && !plugins[plugin_index].info.diagnostics.empty()) {
-            auto& notifications = ui_registry->get_state<panel::NotificationState>("Notifications");
-            notifications.add_notification("Plugin Disabled",
-                                           plugins[plugin_index].info.name + " faulted and was disabled.",
-                                           panel::NotificationType::ERROR);
+            auto& activity = ui_registry->get_state<panel::ActivityState>("Activity");
+            activity.add_entry("System",
+                               plugins[plugin_index].info.name + " faulted and was disabled.",
+                               panel::ActivityEntryType::ERROR);
         }
 
         for (auto& panel : panels) {
@@ -567,9 +567,9 @@ void PluginHost::set_ui_registry(UIRegistry* registry) {
 
 std::vector<std::string> PluginHost::discovery_roots() const {
     std::vector<std::string> roots;
-    roots.push_back((get_executable_path().parent_path() / "plugins").string());
     if (const char* home = std::getenv("HOME"); home && *home) {
-        roots.push_back((fs::path(home) / ".misty" / "plugins").string());
+        roots.push_back((fs::path(home) / "misty" / "public" / "plugins").string());
+        roots.push_back((fs::path(home) / "misty" / "local" / "plugins").string());
     }
     return roots;
 }
@@ -728,14 +728,18 @@ bool PluginHost::load_plugin_directory(const fs::path& plugin_dir, bool bundled)
 
     info.library_path = resolved_library.string();
 
-    PluginVerificationResult verification = verify_plugin_manifest(json, plugin_dir, resolved_library, selected);
-    info.verified = verification.signature_verified;
-    info.signer = verification.signer;
-    if (plugin_requires_signature() && !verification.has_signature) {
-        info.diagnostics.push_back("This Misty build requires signed plugins. Unsigned plugins are rejected.");
-    }
-    for (auto& diagnostic : verification.diagnostics) {
-        info.diagnostics.push_back(std::move(diagnostic));
+    // Public plugins (~/misty/public/plugins) must be signed and verified.
+    // Local plugins (~/misty/local/plugins) are allowed to be unsigned.
+    if (bundled) {
+        PluginVerificationResult verification = verify_plugin_manifest(json, plugin_dir, resolved_library, selected);
+        info.verified = verification.signature_verified;
+        info.signer = verification.signer;
+        if (!verification.has_signature) {
+            info.diagnostics.push_back("Public plugins must be signed.");
+        }
+        for (auto& diagnostic : verification.diagnostics) {
+            info.diagnostics.push_back(std::move(diagnostic));
+        }
     }
     if (!info.diagnostics.empty()) {
         impl_->plugins.push_back({std::move(info), {}});

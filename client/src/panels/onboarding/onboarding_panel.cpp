@@ -157,7 +157,7 @@ namespace misty::panel {
         ImGui::PushStyleColor(ImGuiCol_Text,          ImVec4(0.75f, 0.75f, 0.75f, 1.0f));
         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
         if (ImGui::Button("I've used Misty before", ImVec2(w, 44.0f))) {
-            view::switch_view(view::ViewID::Login);
+            state.go_to_login = true;
         }
         ImGui::PopStyleVar();
         ImGui::PopStyleColor(4);
@@ -628,7 +628,7 @@ namespace misty::panel {
         show_ghost_button_link("Maybe later", w);
         if (ImGui::IsItemClicked()) {
             OnboardingState::mark_complete();
-            view::switch_view(view::ViewID::Files);
+            state.go_to_login = true;
         }
     }
 

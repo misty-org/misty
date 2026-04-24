@@ -3,6 +3,7 @@
 #include "core/extensions/plugin_host.h"
 #include "core/manager/proxy_manager.h"
 #include "core/manager/session_manager.h"
+#include "core/manager/env_manager.h"
 #include "views/files_view.h"
 #include "views/register_view.h"
 #include "views/login_view.h"
@@ -15,36 +16,95 @@
 #include "views/edit_profile_view.h"
 #include "panels/file_explorer/file_explorer_state.h"
 #include "panels/onboarding/onboarding_state.h"
+#include "panels/onboarding/boot_loader.h"
 
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
+
+namespace {
+void append_startup_log(const std::string& line) {
+    const char* home = std::getenv("HOME");
+    if (!home || *home == '\0') return;
+    namespace fs = std::filesystem;
+    const fs::path path = fs::path(home) / "misty" / ".cache" / "misty-client.log";
+    std::error_code ec;
+    fs::create_directories(path.parent_path(), ec);
+    std::ofstream f(path, std::ios::app);
+    if (!f.is_open()) return;
+    f << line << "\n";
+}
+} // namespace
 
 
 namespace misty {
     void Application::run() {
         try {
+            append_startup_log("startup: begin");
             init_platform();
+            append_startup_log("startup: platform initialized");
+            {
+                const auto saved_size = window_size();
+                set_window_size(560, 640);
+                center_window();
+                panel::BootLoader boot(ui_registry_, worker_pool_);
+                append_startup_log("startup: boot_loader loop begin");
+                while (is_running()) {
+                    prepare_frame();
+                    const bool done = boot.render();
+                    render_frame();
+                    if (done) {
+                        if (!boot.success()) {
+                            append_startup_log("startup: boot_loader failed");
+                            worker_pool_.shutdown();
+                            cleanup();
+                            return;
+                        }
+                        break;
+                    }
+                }
+                append_startup_log("startup: boot_loader loop end");
+                set_window_size(saved_size.first, saved_size.second);
+            }
+            append_startup_log("startup: boot_loader ok");
+            core::EnvManager::get().reload();
+            append_startup_log("startup: env reloaded");
             init_client();
+            append_startup_log("startup: init_client ok");
             core::PluginHost::get().set_ui_registry(&ui_registry_);
+            append_startup_log("startup: plugin host ui registry set");
             core::PluginHost::get().discover_and_load();
+            append_startup_log("startup: plugins discovered");
             core::CommandManager::get().load();
+            append_startup_log("startup: commands loaded");
             core::ProxyManager::get().ensure_running();
+            append_startup_log("startup: proxy ensure_running returned");
             //init_file_sync();
             
             // Initialize and start background file status sync
             file_sync_service_ = std::make_unique<core::FileSyncService>(ui_registry_);
             file_sync_service_->start();
+            append_startup_log("startup: file sync service started");
 
             init_views();
+            append_startup_log("startup: views initialized");
 
             
         } catch (const std::exception& e) {
             std::cout << "Exception caught in Application::run: " << e.what() << std::endl;
+            append_startup_log(std::string("startup: exception: ") + e.what());
+            worker_pool_.shutdown();
+            view::clear_views();
             cleanup();
+            return;
         }
         std::cout << "Entering main loop." << std::endl;
+        append_startup_log("startup: entering main loop");
         while (is_running()) {
             prepare_frame();
-            
+
             view::render_current_view();
+            errors_panel_.render();
             core::PluginHost::get().process_shortcuts();
             core::PluginHost::get().render_open_panels();
             render_frame();
@@ -62,6 +122,8 @@ namespace misty {
         }
 
         core::PluginHost::get().shutdown();
+        worker_pool_.shutdown();
+        view::clear_views();
         cleanup();
     }
 
@@ -71,17 +133,11 @@ namespace misty {
     }
 
     void Application::init_client() {
-        std::string mount_path, channel_address;
-        std::ifstream config_file("misty.conf");
-		if (config_file.is_open()) {
-            std::getline(config_file, mount_path);
-            std::getline(config_file, channel_address);
-            config_file.close();
-        } else {
-            throw std::runtime_error("Failed to open mount configuration file.");
-        }
+        std::string mount_path = core::EnvManager::get().get("MISTY_MOUNT_PATH", "");
+        std::string channel_address = core::EnvManager::get().get("MISTY_GRPC_ADDRESS", "");
+
         if (mount_path.empty() || channel_address.empty()) {
-            throw std::runtime_error("Mount path is empty or invalid in configuration file.");
+            throw std::runtime_error("Misty is not configured (missing mount path or gRPC address in ~/misty/config/misty.json).");
         }
     }
 
@@ -97,16 +153,11 @@ namespace misty {
         view::register_view(view::ViewID::Extensions, std::make_unique<view::ExtensionsView>(ui_registry_));
         view::register_view(view::ViewID::Vault,
             std::make_unique<view::VaultView>(ui_registry_, worker_pool_));
-        view::register_view(view::ViewID::Activity, std::make_unique<view::ActivityView>(ui_registry_));
+        // ActivityView removed — Activity is now a modal panel in the navbar
         view::register_view(view::ViewID::Settings, std::make_unique<view::SettingsView>(ui_registry_));
         view::register_view(view::ViewID::EditProfile, std::make_unique<view::EditProfileView>(ui_registry_));
 
-        if (core::SessionManager::get().is_authenticated()) {
-            view::switch_view(view::ViewID::Files);
-        } else if (panel::OnboardingState::is_complete()) {
-            view::switch_view(view::ViewID::Login);
-        } else {
-            view::switch_view(view::ViewID::Onboarding);
-        }
+        // Auth is guaranteed by the BootLoader — always start in FilesView.
+        view::switch_view(view::ViewID::Files);
     }
 };

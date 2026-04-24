@@ -28,11 +28,13 @@ add_subdirectory(${CMAKE_SOURCE_DIR}/vendor/glfw EXCLUDE_FROM_ALL)
 set(LUNASVG_BUILD_SHARED OFF CACHE BOOL "" FORCE)
 add_subdirectory(${CMAKE_SOURCE_DIR}/vendor/lunasvg EXCLUDE_FROM_ALL)
 
-# GoogleTest
-set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
-set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)
-add_subdirectory(${CMAKE_SOURCE_DIR}/vendor/googletest EXCLUDE_FROM_ALL)
+# GoogleTest (only for non-Release builds)
+if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+    set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
+    set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)
+    add_subdirectory(${CMAKE_SOURCE_DIR}/vendor/googletest EXCLUDE_FROM_ALL)
+endif()
 
 
 

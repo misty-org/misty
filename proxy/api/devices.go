@@ -2,9 +2,11 @@ package api
 
 import (
 	"encoding/json"
+	"net"
 	"net/http"
+	"os"
+	"strings"
 
-	"github.com/kannachi323/misty/proxy/core/tsbase"
 	"github.com/kannachi323/misty/proxy/db"
 )
 
@@ -31,40 +33,51 @@ func GetDevices(database *db.Database) http.HandlerFunc {
 	}
 }
 
-func RegisterDevice(ts *tsbase.TSBase, database *db.Database) http.HandlerFunc {
+func RegisterDevice(database *db.Database) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Get the server peer (current device)
-		serverPeer := ts.GetServerPeer()
-		if serverPeer == nil {
-			http.Error(w, "Server peer not available", http.StatusBadRequest)
-			return
+		var deviceInfo struct {
+			PeerHostName string `json:"peer_hostname"`
+			PeerType     string `json:"peer_type"`
+			PeerAddress  string `json:"peer_address"`
+			DeviceName   string `json:"device_name"`
+			MountPath    string `json:"mount_path"`
 		}
 
-		// Parse request body for additional device information
-		var deviceInfo struct {
-			DeviceName string `json:"device_name"`
-			MountPath  string `json:"mount_path"`
-		}
-		
 		if r.Body != nil {
 			decoder := json.NewDecoder(r.Body)
 			if err := decoder.Decode(&deviceInfo); err != nil {
-				// If JSON parsing fails, continue with empty values
-				// (device_name and mount_path are optional)
+				http.Error(w, "Invalid JSON in request body", http.StatusBadRequest)
+				return
 			}
 		}
 
-		// Update/register the device in the database with additional info
-		err := db.UpdateDevice(database.Conn, serverPeer, deviceInfo.DeviceName, deviceInfo.MountPath)
-		if err != nil {
-			http.Error(w, "Failed to register device", http.StatusInternalServerError)
+		if deviceInfo.PeerHostName == "" {
+			if host, err := os.Hostname(); err == nil {
+				deviceInfo.PeerHostName = host
+			}
+		}
+		deviceInfo.PeerHostName = strings.TrimSpace(deviceInfo.PeerHostName)
+		if deviceInfo.PeerHostName == "" {
+			http.Error(w, "peer_hostname is required", http.StatusBadRequest)
 			return
 		}
 
-		// Also sync all peers to the database
-		allPeers, err := ts.GetPeers()
-		if err == nil {
-			db.SyncDevicesFromPeers(database.Conn, allPeers)
+		if deviceInfo.PeerType == "" {
+			deviceInfo.PeerType = "unknown"
+		}
+
+		if deviceInfo.PeerAddress == "" {
+			host := r.RemoteAddr
+			if h, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+				host = h
+			}
+			deviceInfo.PeerAddress = host
+		}
+
+		err := db.UpdateDevice(database.Conn, deviceInfo.PeerHostName, deviceInfo.PeerType, deviceInfo.PeerAddress, deviceInfo.DeviceName, deviceInfo.MountPath)
+		if err != nil {
+			http.Error(w, "Failed to register device", http.StatusInternalServerError)
+			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -72,14 +85,18 @@ func RegisterDevice(ts *tsbase.TSBase, database *db.Database) http.HandlerFunc {
 			"status":  "success",
 			"message": "Device registered successfully",
 		}
-		
+
+		response["peer_hostname"] = deviceInfo.PeerHostName
+		response["peer_type"] = deviceInfo.PeerType
+		response["peer_address"] = deviceInfo.PeerAddress
+
 		if deviceInfo.DeviceName != "" {
 			response["device_name"] = deviceInfo.DeviceName
 		}
 		if deviceInfo.MountPath != "" {
 			response["mount_path"] = deviceInfo.MountPath
 		}
-		
+
 		json.NewEncoder(w).Encode(response)
 	}
 }
