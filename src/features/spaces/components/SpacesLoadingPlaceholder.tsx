@@ -74,7 +74,13 @@ export function SpacePageLoadingPlaceholder(props: { label?: string; onRetry?: (
 
 export function SpacesAppLoadingPlaceholder() {
   return (
-    <div className="misty-spaces-workbench grid h-full min-h-0 grid-cols-[var(--misty-spaces-rail-width)_minmax(0,1fr)] grid-rows-[minmax(0,1fr)_32px] overflow-hidden bg-background">
+    <div
+      className={[
+        "misty-spaces-workbench grid h-full min-h-0",
+        "grid-cols-[var(--misty-spaces-rail-width)_minmax(0,1fr)]",
+        "grid-rows-[minmax(0,1fr)_32px] overflow-hidden bg-background",
+      ].join(" ")}
+    >
       <aside className="col-start-1 row-start-1 flex min-h-0 flex-col overflow-hidden border-r border-sidebar-border/60 bg-sidebar px-3 pb-2 pt-3">
         <Skeleton className="h-10 rounded-md" />
         <div className="mt-5 grid gap-2">

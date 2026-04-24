@@ -231,10 +231,9 @@ describe("SpaceNotes beta simplification", () => {
     await act(async () => buttonByText("Delete note").click());
     await wait();
 
-    expect(spaceRequestMock).toHaveBeenLastCalledWith(
-      "/spaces/space-product/notes/note_delete",
-      { method: "DELETE" },
-    );
+    expect(spaceRequestMock).toHaveBeenLastCalledWith("/spaces/space-product/notes/note_delete", {
+      method: "DELETE",
+    });
     expect(useNotesStore.getState().notes).toEqual([]);
     expect(useNotesStore.getState().selectedNoteId).toBeUndefined();
   });

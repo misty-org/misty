@@ -78,10 +78,20 @@ export function SpacesIndexRedirect() {
           {spaces.map((space) => (
             <Link
               key={space.id}
-              className="group flex min-h-24 min-w-0 items-center gap-3 rounded-xl border border-border/65 bg-card/35 px-4 py-3 text-foreground no-underline outline-none transition-colors hover:border-border hover:bg-accent/45 focus-visible:ring-2 focus-visible:ring-ring"
+              className={[
+                "group flex min-h-24 min-w-0 items-center gap-3 rounded-xl border",
+                "border-border/65 bg-card/35 px-4 py-3 text-foreground no-underline outline-none",
+                "transition-colors hover:border-border hover:bg-accent/45",
+                "focus-visible:ring-2 focus-visible:ring-ring",
+              ].join(" ")}
               to={`/spaces/${encodeURIComponent(space.id)}/chat`}
             >
-              <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-accent text-muted-foreground transition-colors group-hover:text-foreground">
+              <span
+                className={[
+                  "grid size-10 shrink-0 place-items-center rounded-lg bg-accent",
+                  "text-muted-foreground transition-colors group-hover:text-foreground",
+                ].join(" ")}
+              >
                 <PanelsTopLeft size={18} strokeWidth={1.75} />
               </span>
               <span className="min-w-0">
