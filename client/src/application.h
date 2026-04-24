@@ -2,8 +2,10 @@
 #include "core/ui/ui_registry.h"
 #include "core/threading/worker_pool.h"
 #include "core/threading/file_sync_service.h"
+#include "panels/errors/errors_panel.h"
 #include "views/app_view.h"
 #include "dfs/client/misty_client.h"
+#include <utility>
 
 
 namespace misty {
@@ -24,12 +26,16 @@ namespace misty {
         virtual void render_frame() = 0;
         virtual bool is_running() = 0;
         virtual void cleanup() = 0;
+        virtual std::pair<int, int> window_size() const = 0;
+        virtual void set_window_size(int width, int height) = 0;
+        virtual void center_window() = 0;
 
     protected:
         core::UIRegistry ui_registry_;
         core::WorkerPool worker_pool_;
         std::shared_ptr<MistyClient> client_;
         std::unique_ptr<core::FileSyncService> file_sync_service_;
+        panel::ErrorsPanel errors_panel_;
 
     };  
 };

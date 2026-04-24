@@ -8,6 +8,7 @@
 #include "core/file_picker/application_picker.h"
 #include "core/manager/open_with_manager.h"
 #include "core/system/util.h"
+#include "panels/activity/activity_state.h"
 #include "panels/notification/notification_state.h"
 #include "panels/search/search_state.h"
 #include "panels/services/services_state.h"
@@ -99,8 +100,8 @@ void FileExplorerPanel::show_context_menu(FileExplorerState& state) {
 
             if (ImGui::MenuItem("Open", nullptr, false, can_open_directly)) {
                 if (!open_context_menu_target(state)) {
-                    auto& notif = registry_.get_state<NotificationState>("Notifications");
-                    notif.add_notification("Open Failed", "Could not open file.", NotificationType::ERROR);
+                    auto& activity = registry_.get_state<ActivityState>("Activity");
+                    activity.add_entry("File", "Could not open file.", ActivityEntryType::ERROR);
                 }
             }
 
@@ -111,8 +112,8 @@ void FileExplorerPanel::show_context_menu(FileExplorerState& state) {
                         if (!app.has_value()) return;
                         OpenWithManager::get().set_association_for_path(target_path, *app);
                         if (!core::open_path_with_application(*app, target_path)) {
-                            auto& notif = registry->get_state<NotificationState>("Notifications");
-                            notif.add_notification("Open With Failed", "Could not open file.", NotificationType::ERROR);
+                            auto& activity = registry->get_state<ActivityState>("Activity");
+                            activity.add_entry("File", "Could not open file with selected application.", ActivityEntryType::ERROR);
                         }
                     });
                 }
@@ -129,10 +130,10 @@ void FileExplorerPanel::show_context_menu(FileExplorerState& state) {
                         if (ImGui::MenuItem(label.c_str())) {
                             std::string error;
                             if (!ExtensionManager::get().invoke_file_action(matched, extension_context, &error)) {
-                                auto& notif = registry_.get_state<NotificationState>("Notifications");
-                                notif.add_notification("Extension Failed",
+                                auto& activity = registry_.get_state<ActivityState>("Activity");
+                                activity.add_entry("File",
                                     error.empty() ? "Could not launch extension." : error,
-                                    NotificationType::ERROR);
+                                    ActivityEntryType::ERROR);
                             }
                         }
 
@@ -185,7 +186,7 @@ void FileExplorerPanel::show_context_menu(FileExplorerState& state) {
                     if (f.path != state.context_menu_target_path) continue;
                     state.toggle_star(f);
                     auto& notif = registry_.get_state<NotificationState>("Notifications");
-                    notif.add_notification("Starred", is_starred ? "Removed from starred" : "Added to starred", NotificationType::SUCCESS);
+                    notif.add_notification(is_starred ? "Removed from starred" : "Added to starred");
                     break;
                 }
             }
@@ -259,7 +260,7 @@ void FileExplorerPanel::show_rename_modal(FileExplorerState& state) {
                 fs::rename(old_path, new_path, ec);
                 if (!ec) {
                     auto& notif = registry_.get_state<NotificationState>("Notifications");
-                    notif.add_notification("Renamed", "Renamed to " + new_name, NotificationType::SUCCESS);
+                    notif.add_notification("Renamed to " + new_name);
                     navigate_to_path(std::string(state.current_path), false);
                     notify_shared_path_refresh(std::string(state.current_path));
                 }
@@ -387,9 +388,13 @@ void FileExplorerPanel::show_new_entry_modal(FileExplorerState& state) {
                                                      [](bool, const std::string&, const std::string&) {});
                             services.create_folder(remote_name, folder_path,
                                 [registry = &registry_, name](bool success, const std::string&, const std::string& error) {
-                                    auto& notif = registry->get_state<NotificationState>("Notifications");
-                                    if (success) notif.add_notification("Created", "Folder " + name + " created", NotificationType::SUCCESS);
-                                    else notif.add_notification("Cloud Error", "Failed to create folder: " + error, NotificationType::ERROR);
+                                    if (success) {
+                                        auto& notif = registry->get_state<NotificationState>("Notifications");
+                                        notif.add_notification("Created folder " + name);
+                                    } else {
+                                        auto& activity = registry->get_state<ActivityState>("Activity");
+                                        activity.add_entry("File", "Failed to create folder: " + error, ActivityEntryType::ERROR);
+                                    }
                                 });
                         }
                     }
@@ -412,7 +417,7 @@ void FileExplorerPanel::show_new_entry_modal(FileExplorerState& state) {
 
                 if (!ec) {
                     auto& notif = registry_.get_state<NotificationState>("Notifications");
-                    notif.add_notification("Created", std::string(state.new_entry_is_dir ? "Folder " : "File ") + name + " created", NotificationType::SUCCESS);
+                    notif.add_notification(std::string("Created ") + (state.new_entry_is_dir ? "folder " : "file ") + name);
                     navigate_to_path(current_dir, false);
                     notify_shared_path_refresh(current_dir);
                 }

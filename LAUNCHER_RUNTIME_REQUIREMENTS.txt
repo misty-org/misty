@@ -1,0 +1,172 @@
+Misty Launcher Runtime Requirements (client + proxy)
+====================================================
+
+This document lists the directories/files Misty expects at runtime (or will
+create at runtime), so a launcher can preflight and/or create them before
+starting the GUI client and background proxy service.
+
+Notes
+-----
+- Many client paths are *relative* (e.g. "assets/..."), so the launcher's
+  working directory (cwd) matters.
+- "~" below means the current user's home directory (HOME / USERPROFILE).
+
+
+CLIENT (GUI) — install directory files
+--------------------------------------
+
+Misty's client binary loads most resources via relative paths (e.g. "assets/...").
+At startup, the client sets its cwd to the executable directory to keep this
+stable regardless of where it was launched from.
+
+REQUIRED
+- assets/ (directory)
+  - Used at startup and throughout UI rendering:
+    - assets/fonts/*.ttf
+    - assets/themes/default.css
+    - assets/icons/*.svg and assets/icons/misty.png
+    - assets/misty_sprite.png
+    - assets/logo/mist_v1 (platform window icon)
+    - assets/terms_of_service.html
+
+OPTIONAL (features degrade gracefully if missing)
+- imgui.ini
+  - ImGui may create this in cwd, but Misty explicitly sets ImGui to use
+    ~/misty/config/imgui.ini instead.
+
+
+CLIENT (GUI) — per-user state/config (home directory)
+-----------------------------------------------------
+
+These are read/written under the user's home directory. A launcher can
+optionally pre-create the parent directories to avoid first-run races.
+
+Unified config (shared with proxy)
+- ~/misty/config/misty.json
+  - Source of truth for runtime config (structured, read once at startup).
+  - At minimum should include:
+    - proxy.port (int)
+    - grpc.address (string)
+    - mount.path (string)
+  - Optional:
+    - proxy.path (string)         [explicit proxy executable path]
+    - server.url (string)         [central server base URL]
+    - ssl.cert_path (string)      [CA bundle path for libcurl]
+
+Durable user config (created by the client on demand)
+- ~/misty/config/commands.msy
+  - Created automatically if missing; user-editable keybindings.
+
+- ~/misty/config/onboarding.json
+  - Created when onboarding is completed.
+  - Legacy fallback read: ~/misty/.cache/onboarding_complete
+
+- ~/misty/config/llm.json
+  - Created by settings UI when saving custom LLM config.
+
+- ~/misty/config/claude_profiles.json
+  - Created by Claude panel when saving profiles.
+
+Regenerable caches (created by the client on demand)
+- ~/misty/.cache/
+  - explorer_state.json
+  - filetree_state.json
+  - listings/<remote_name>/<encoded_path>.json
+  - trash/ (trash folder used by file explorer)
+
+Remote mount root (created by the client)
+- ~/misty/mnt/
+  - Base directory for remote mounts (provider-folder layout).
+  - The client ensures this exists at file explorer startup.
+
+Session / per-user state (created by the client on demand)
+- ~/.misty/
+  - token, refresh_token, license_token, user_id, email
+  - open_with.json (OpenWithManager)
+
+Plugins (centralized under ~/misty)
+- ~/misty/public/plugins/   (must be signed)
+- ~/misty/local/plugins/    (may be unsigned / developer local)
+- ~/misty/public/keys/      (trusted public keys for verifying signed plugins)
+
+
+PROXY (background service) — runtime files/dirs
+-----------------------------------------------
+
+The proxy will start without many optional components (it logs and keeps
+serving /api/hello), but the following locations matter.
+
+Env loading
+- The proxy reads ~/misty/config/misty.json and also supports .env fallbacks:
+  1) ~/misty/misty.env
+  2) <exe_dir>/../Resources/assets/misty.env        (macOS app bundle fallback)
+  3) <exe_dir>/assets/misty.env
+  4) <exe_dir>/.env
+  5) ./ .env (current working directory)
+
+Database
+- DB_PATH (env var) OR default: ~/misty/db/data.db
+  - The proxy now creates the parent directory automatically.
+
+Rclone config + OAuth callback template (created by proxy at startup)
+- ~/misty/rclone.conf
+- ~/misty/oauth_callback.html
+- ~/misty/ (parent dir is created)
+
+Sync mount root + remote metadata (shared with client)
+- ~/misty/mnt/ (mount root; used for local copies / sync reconciliation)
+- ~/misty/remotes.json (optional; created/managed by client services UI)
+
+Vault (restic) support (optional)
+- restic binary:
+  - If missing or too old, proxy still starts but vault endpoints return errors.
+  - Override via env: MISTY_RESTIC_PATH
+
+- restic registry dir (created when restic.Init runs)
+  - ~/misty/restic/
+  - ~/misty/restic/repos.json
+  - ~/misty/restic/passwords/ (fallback password storage)
+
+- misty-pwd-helper (optional but recommended for keyring storage)
+  - Override via env: MISTY_PWD_HELPER
+  - Otherwise searched in:
+    - proxy/dist/ next to source checkout
+    - ~/misty/bin/
+    - executable-adjacent paths
+    - PATH
+
+Static files (optional)
+- ./static/ (relative to proxy working directory)
+  - Used for /static/* routes; missing directory just means 404s.
+
+
+PROXY (background service) — env vars worth validating
+------------------------------------------------------
+
+Required only for specific features (proxy can still start without them):
+- MISTY_SERVER_URL (required for /api/register, /api/login, and license checks)
+- LICENSE_SECRET (required to validate/verify license tokens)
+- JWT_SECRET (optional; default "misty-dev-secret")
+
+Optional:
+- GEMINI_API_KEY or GOOGLE_API_KEY (enables AI file-context endpoint)
+- MISTY_AI_MODEL, MISTY_AI_BASE_URL (AI config)
+- MISTY_DRIVE_IMPORT_FORMATS (rclone drive import behavior)
+- MISTY_SYNC_WATCH_POLL_SEC, MISTY_SYNC_POLL_SEC, MISTY_SYNC_POLL_TIMEOUT_SEC
+  (sync tuning)
+
+
+Launcher preflight checklist (suggested)
+----------------------------------------
+
+1) Ensure `assets/` exists next to the client executable (fonts/themes/icons/etc).
+2) Ensure `~/misty/config/misty.json` exists with proxy/grpc/mount configured.
+3) (Optional) Create these directories ahead of time:
+   - ~/misty/.cache
+   - ~/misty/config
+   - ~/misty/mnt
+   - ~/.misty
+   - ~/misty/public/plugins
+   - ~/misty/public/keys
+   - ~/misty/local/plugins
+4) Start proxy (or let the client manage it via proxy.port from misty.json).

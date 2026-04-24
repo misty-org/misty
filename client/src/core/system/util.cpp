@@ -14,12 +14,16 @@
 #include <processthreadsapi.h>
 #include <stringapiset.h>
 #elif __APPLE__
+#include <errno.h>
+#include <fcntl.h>
 #include <mach-o/dyld.h>
 #include <pwd.h>
 #include <sys/wait.h>
 #include <unistd.h>
 #include <sys/stat.h>
 #elif __linux__
+#include <errno.h>
+#include <fcntl.h>
 #include <pwd.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -238,6 +242,14 @@ namespace misty::core {
     bool launch_detached_process(const std::string& executable_path,
                                  const std::vector<std::string>& args,
                                  const std::string& working_directory) {
+        return launch_detached_process(executable_path, args, working_directory, "", "");
+    }
+
+    bool launch_detached_process(const std::string& executable_path,
+                                 const std::vector<std::string>& args,
+                                 const std::string& working_directory,
+                                 const std::string& stdout_path,
+                                 const std::string& stderr_path) {
         if (executable_path.empty()) {
             return false;
         }
@@ -275,13 +287,32 @@ namespace misty::core {
         CloseHandle(process_info.hProcess);
         return true;
 #else
+        int exec_status_pipe[2]{-1, -1};
+        if (pipe(exec_status_pipe) != 0) {
+            return false;
+        }
+        // Ensure the write end closes automatically on successful exec.
+        fcntl(exec_status_pipe[1], F_SETFD, fcntl(exec_status_pipe[1], F_GETFD) | FD_CLOEXEC);
+
         pid_t pid = fork();
         if (pid < 0) {
+            close(exec_status_pipe[0]);
+            close(exec_status_pipe[1]);
             return false;
         }
         if (pid > 0) {
-            return true;
+            close(exec_status_pipe[1]);
+            int child_errno = 0;
+            const ssize_t n = read(exec_status_pipe[0], &child_errno, sizeof(child_errno));
+            close(exec_status_pipe[0]);
+            // Success path: child exec'd; pipe closed with no data.
+            if (n == 0) {
+                return true;
+            }
+            return false;
         }
+
+        close(exec_status_pipe[0]);
 
         if (setsid() < 0) {
             _exit(1);
@@ -293,8 +324,11 @@ namespace misty::core {
 
         FILE* null_file = freopen("/dev/null", "r", stdin);
         (void)null_file;
-        freopen("/dev/null", "w", stdout);
-        freopen("/dev/null", "w", stderr);
+
+        const char* out_path = stdout_path.empty() ? "/dev/null" : stdout_path.c_str();
+        const char* err_path = stderr_path.empty() ? "/dev/null" : stderr_path.c_str();
+        freopen(out_path, "a", stdout);
+        freopen(err_path, "a", stderr);
 
         std::vector<char*> argv;
         argv.push_back(const_cast<char*>(executable_path.c_str()));
@@ -304,6 +338,8 @@ namespace misty::core {
         argv.push_back(nullptr);
 
         execve(executable_path.c_str(), argv.data(), environ);
+        const int err = errno;
+        (void)write(exec_status_pipe[1], &err, sizeof(err));
         _exit(1);
 #endif
     }

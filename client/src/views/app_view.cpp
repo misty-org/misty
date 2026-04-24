@@ -50,6 +50,16 @@ namespace misty::view {
         return current_view_;
     }
 
+    void ViewRegistry::clear() {
+        std::unordered_map<ViewID, std::unique_ptr<AppView>> views;
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            current_view_ = nullptr;
+            current_view_id_ = ViewID::Default;
+            views.swap(views_);
+        }
+    }
+
     ViewRegistry& ViewRegistry::get() {
         static ViewRegistry instance;
         return instance;
@@ -70,5 +80,9 @@ namespace misty::view {
 
     ViewID get_current_view_id() {
         return ViewRegistry::get().get_current_view_id();
+    }
+
+    void clear_views() {
+        ViewRegistry::get().clear();
     }
 }

@@ -220,11 +220,10 @@ std::vector<std::string> trusted_public_keys() {
     }
 
     std::vector<fs::path> roots;
-    roots.emplace_back(get_executable_path().parent_path() / "plugin_keys");
     if (const std::string user_trust_dir = trim_copy(MISTY_PLUGIN_USER_TRUST_DIR); !user_trust_dir.empty()) {
         roots.emplace_back(user_trust_dir);
     } else if (const char* home = std::getenv("HOME"); home && *home) {
-        roots.emplace_back(fs::path(home) / ".misty" / "plugin_keys");
+        roots.emplace_back(fs::path(home) / "misty" / "public" / "keys");
     }
 
     for (const auto& root : roots) {

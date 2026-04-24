@@ -104,8 +104,11 @@ namespace misty::panel {
         }
     }
 
-    FileTreePanel::~FileTreePanel() {
-        save_layout_state();
+    FileTreePanel::~FileTreePanel() noexcept {
+        try {
+            save_layout_state();
+        } catch (...) {
+        }
     }
 
     void FileTreePanel::init_default_layout() {
@@ -1716,7 +1719,7 @@ namespace misty::panel {
 
     void FileTreePanel::notify_layout_error(const std::string& title, const std::string& message) {
         auto& notifications = ui_registry_.get_state<NotificationState>("Notifications");
-        notifications.add_notification(title, message, NotificationType::INFO, 3.5f);
+        notifications.add_notification(title + ": " + message, 3.5f);
     }
 
     std::string FileTreePanel::layout_state_file_path() const {
