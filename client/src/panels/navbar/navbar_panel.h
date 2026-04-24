@@ -3,6 +3,7 @@
 #include "navbar_state.h"
 #include "panels/panel.h"
 #include "panels/profile/profile_panel.h"
+#include "panels/activity/activity_panel.h"
 #include "core/ui/svg_loader.h"
 
 
@@ -15,16 +16,18 @@ namespace misty::panel {
 
 
     private:
-        void show_nav_item(const char* icon, const char* label, 
+        void show_nav_item(const char* icon, const char* label,
             int size, view::ViewID view_id, NavbarState& state);
-            
+
         void show_logo_icon();
         void show_profile_button();
+        void show_activity_button();
 
     private:
 		float nav_width_ = 77.0f;
         UIRegistry& ui_registry_;
         SVGTexture folder_icon_;
         ProfilePanel profile_panel_;
+        ActivityPanel activity_panel_;
     };
 }

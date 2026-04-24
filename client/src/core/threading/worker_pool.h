@@ -20,6 +20,7 @@ namespace misty::core {
         explicit WorkerPool(size_t thread_count = std::thread::hardware_concurrency());
         ~WorkerPool();
 
+        void shutdown();
         void add(
             std::function<void()> on_task, 
             std::function<void()> on_finish, 

@@ -2,6 +2,7 @@
 #include "panels/services/services_state.h"
 #include "panels/services/remote/remote_state.h"
 #include "panels/activity/download_state.h"
+#include "panels/activity/activity_state.h"
 #include "panels/notification/notification_state.h"
 #include "panels/workspace/workspace_state.h"
 #include "core/cache/listing_cache.h"
@@ -124,13 +125,10 @@ namespace misty::panel {
         if (!services.is_remote_connected(resolved_remote_name)) {
             if (state.last_disconnected_notification_folder != resolved_remote_name) {
                 state.last_disconnected_notification_folder = resolved_remote_name;
-                auto& notifications = registry_.get_state<NotificationState>("Notifications");
-                notifications.add_notification(
-                    "Not Connected",
+                auto& activity = registry_.get_state<ActivityState>("Activity");
+                activity.add_entry("System",
                     "Remote '" + resolved_remote_name + "' is not connected. Go to Services to connect.",
-                    NotificationType::ERROR,
-                    5.0f
-                );
+                    ActivityEntryType::ERROR);
             }
             navigate_to_remote_mount_root(update_history);
             return;
@@ -398,8 +396,7 @@ namespace misty::panel {
         uint64_t download_id = downloads.start_download(
             file.name, local_path, file.remote_name, file.size);
 
-        uint64_t notif_id = notifications.add_notification(
-            "Downloading", file.name, NotificationType::DOWNLOAD, 15.0f);
+        uint64_t notif_id = notifications.add_notification("downloading...", 15.0f);
 
         services.download_file(
             file.remote_name, file.remote_path, local_path,
@@ -419,7 +416,7 @@ namespace misty::panel {
 
                 if (success) {
                     downloads.complete_download(download_id);
-                    notifications.add_notification("Download Complete", file_name, NotificationType::SUCCESS, 5.0f);
+                    notifications.add_notification("Downloaded " + file_name);
 
                     std::lock_guard<std::mutex> lock(state.mu);
                     for (auto& f : state.files) {
@@ -433,7 +430,8 @@ namespace misty::panel {
                     }
                 } else {
                     downloads.fail_download(download_id, error);
-                    notifications.add_notification("Download Failed", file_name + ": " + error, NotificationType::ERROR, 5.0f);
+                    auto& activity = registry->get_state<ActivityState>("Activity");
+                    activity.add_entry("File", "Download failed: " + file_name + ": " + error, ActivityEntryType::ERROR);
                 }
             });
     }

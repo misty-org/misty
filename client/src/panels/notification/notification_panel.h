@@ -14,16 +14,16 @@ namespace misty::panel {
         void render() override;
 
     private:
-        void render_notification(const Notification& notif, float y_offset);
-        ImVec4 get_notification_color(NotificationType type);
-        const char* get_notification_icon(NotificationType type);
+        void render_capsule(const Notification& notif);
 
         core::UIRegistry& registry_;
 
-        static constexpr float NOTIFICATION_WIDTH = 320.0f;
-        static constexpr float NOTIFICATION_HEIGHT = 70.0f;
-        static constexpr float NOTIFICATION_PADDING = 8.0f;
-        static constexpr float NOTIFICATION_MARGIN = 16.0f;
+        static constexpr float CAPSULE_HEIGHT = 32.0f;
+        static constexpr float CAPSULE_MAX_WIDTH = 300.0f;
+        static constexpr float CAPSULE_PAD_X = 16.0f;
+        static constexpr float CAPSULE_PAD_Y = 7.0f;
+        static constexpr float CAPSULE_MARGIN_BOTTOM = 20.0f;
+        static constexpr float CAPSULE_SPACING = 6.0f;
     };
 
 }
