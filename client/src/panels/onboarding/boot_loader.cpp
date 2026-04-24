@@ -2,10 +2,22 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 
 #include <nlohmann/json.hpp>
+
+#ifdef _WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#else
+#include <arpa/inet.h>
+#include <cerrno>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <unistd.h>
+#endif
 
 #include "core/manager/asset_manager.h"
 #include "core/manager/session_manager.h"
@@ -22,11 +34,135 @@ namespace misty::panel {
 
 namespace {
 
-void centered_title(const char* text) {
-    const float w  = ImGui::GetContentRegionAvail().x;
-    const float tw = ImGui::CalcTextSize(text).x;
-    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (w - tw) * 0.5f);
-    ImGui::TextUnformatted(text);
+constexpr auto kMinimumBootScreenTime = std::chrono::milliseconds(7000);
+
+#ifdef _WIN32
+using SocketHandle = SOCKET;
+constexpr SocketHandle kInvalidSocket = INVALID_SOCKET;
+
+bool ensure_winsock_ready() {
+    static const bool ready = []() {
+        WSADATA wsa_data{};
+        return WSAStartup(MAKEWORD(2, 2), &wsa_data) == 0;
+    }();
+    return ready;
+}
+
+void close_socket(SocketHandle socket) {
+    if (socket != kInvalidSocket) closesocket(socket);
+}
+#else
+using SocketHandle = int;
+constexpr SocketHandle kInvalidSocket = -1;
+
+void close_socket(SocketHandle socket) {
+    if (socket != kInvalidSocket) close(socket);
+}
+#endif
+
+bool is_port_occupied(int port) {
+    if (port <= 0 || port > 65535) return true;
+
+#ifdef _WIN32
+    if (!ensure_winsock_ready()) return true;
+#endif
+
+    SocketHandle socket_fd = ::socket(AF_INET, SOCK_STREAM, 0);
+    if (socket_fd == kInvalidSocket) return true;
+
+    sockaddr_in addr{};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(static_cast<uint16_t>(port));
+    addr.sin_addr.s_addr = htonl(INADDR_ANY);
+
+#ifdef _WIN32
+    const int addr_len = static_cast<int>(sizeof(addr));
+#else
+    const socklen_t addr_len = static_cast<socklen_t>(sizeof(addr));
+#endif
+
+    const int bind_result = ::bind(
+        socket_fd,
+        reinterpret_cast<const sockaddr*>(&addr),
+        addr_len);
+    close_socket(socket_fd);
+
+    if (bind_result == 0) return false;
+    return true;
+}
+
+float ease_out_cubic(float t) {
+    t = std::clamp(t, 0.0f, 1.0f);
+    const float inv = 1.0f - t;
+    return 1.0f - inv * inv * inv;
+}
+
+void draw_sprite_frame(ImDrawList* draw_list, const ImVec2& center, float sprite_size) {
+    static constexpr int   kCols = 10;
+    static constexpr int   kRows = 5;
+    static constexpr int   kFrames = kCols * kRows;
+    static constexpr float kFrameRate = 18.0f;
+
+    auto& sprite = core::AssetManager::get().get_image_texture(
+        "assets/animations/misty_sprite.png");
+    if (sprite.id == 0) return;
+
+    const float time = static_cast<float>(ImGui::GetTime());
+    const int frame = static_cast<int>(time * kFrameRate) % kFrames;
+    const int col = frame % kCols;
+    const int row = frame / kCols;
+
+    const float uv_w = 1.0f / static_cast<float>(kCols);
+    const float uv_h = 1.0f / static_cast<float>(kRows);
+    const ImVec2 uv0(col * uv_w, row * uv_h);
+    const ImVec2 uv1((col + 1) * uv_w, (row + 1) * uv_h);
+
+    const float bob = std::sin(time * 2.6f) * 5.0f;
+    const float pulse = 0.55f + 0.45f * std::sin(time * 2.2f);
+    const float half = sprite_size * 0.5f;
+    const ImVec2 sprite_center(center.x, center.y + bob);
+
+    draw_list->AddCircleFilled(
+        sprite_center,
+        sprite_size * 0.45f,
+        IM_COL32(31, 111, 235, static_cast<int>(28.0f + pulse * 42.0f)),
+        72);
+    draw_list->AddCircleFilled(
+        ImVec2(sprite_center.x, sprite_center.y + 10.0f),
+        sprite_size * 0.32f,
+        IM_COL32(255, 255, 255, 12),
+        64);
+    draw_list->AddImage(
+        static_cast<ImTextureID>(static_cast<intptr_t>(sprite.id)),
+        ImVec2(sprite_center.x - half, sprite_center.y - half),
+        ImVec2(sprite_center.x + half, sprite_center.y + half),
+        uv0,
+        uv1);
+}
+
+void draw_progress_bar(ImDrawList* draw_list,
+                       const ImVec2& min,
+                       const ImVec2& max,
+                       float progress,
+                       ImU32 fill_color) {
+    progress = std::clamp(progress, 0.0f, 1.0f);
+
+    draw_list->AddRectFilled(min, max, IM_COL32(255, 255, 255, 18), 999.0f);
+    if (progress <= 0.0f) return;
+
+    const ImVec2 fill_max(min.x + (max.x - min.x) * progress, max.y);
+    draw_list->AddRectFilled(min, fill_max, fill_color, 999.0f);
+
+    const float shimmer_w = std::min(26.0f, fill_max.x - min.x);
+    if (shimmer_w > 2.0f) {
+        draw_list->AddRectFilledMultiColor(
+            ImVec2(fill_max.x - shimmer_w, min.y),
+            fill_max,
+            IM_COL32(255, 255, 255, 0),
+            IM_COL32(255, 255, 255, 110),
+            IM_COL32(255, 255, 255, 110),
+            IM_COL32(255, 255, 255, 0));
+    }
 }
 
 bool save_json_atomic(const std::string& path, const json& j) {
@@ -152,6 +288,15 @@ bool BootLoader::ensure_proxy_config_saved(int port) {
 
     j["proxy"]["port"] = port;
     j["proxy"]["url"]  = "http://127.0.0.1:" + std::to_string(port);
+    if (!proxy_path_.empty()) {
+        j["proxy"]["path"] = proxy_path_;
+    }
+    if (j.value("grpc", json::object()).value("address", std::string()).empty()) {
+        j["grpc"]["address"] = "localhost:50051";
+    }
+    if (j.value("mount", json::object()).value("path", std::string()).empty()) {
+        j["mount"]["path"] = "misty";
+    }
     return save_json_atomic(cfg, j);
 }
 
@@ -184,10 +329,14 @@ void BootLoader::init_port_search() {
     port_idx_                 = 0;
     current_port_             = ports_to_try_[0];
     launched_on_current_port_ = false;
+    proxy_ready_              = false;
+    search_step_              = SearchStep::CheckPort;
     search_start_             = std::chrono::steady_clock::now();
+    boot_started_at_          = search_start_;
     next_probe_               = search_start_;   // probe immediately
-    status_line_              = "Looking for background service\xe2\x80\xa6";
+    status_line_              = "Looking for background service...";
     error_line_.clear();
+    { std::scoped_lock lk(probe_mu_); probe_ready_ = false; }
 }
 
 void BootLoader::advance_port() {
@@ -200,8 +349,9 @@ void BootLoader::advance_port() {
     }
     current_port_             = ports_to_try_[port_idx_];
     launched_on_current_port_ = false;
+    search_step_              = SearchStep::CheckPort;
     { std::scoped_lock lk(probe_mu_); probe_ready_ = false; }
-    status_line_ = "Trying port " + std::to_string(current_port_) + "\xe2\x80\xa6";
+    status_line_ = "Trying port " + std::to_string(current_port_) + "...";
     next_probe_  = std::chrono::steady_clock::now() + std::chrono::milliseconds(50);
 }
 
@@ -222,7 +372,7 @@ bool BootLoader::launch_on_current_port() {
     }
 
     status_line_ = "Starting background service on port "
-                 + std::to_string(current_port_) + "\xe2\x80\xa6";
+                 + std::to_string(current_port_) + "...";
 
     return misty::core::launch_detached_process(
         proxy_path_,
@@ -234,7 +384,7 @@ bool BootLoader::launch_on_current_port() {
 
 // ── Async probe ───────────────────────────────────────────────────────────────
 
-void BootLoader::begin_probe(const std::string& url) {
+void BootLoader::begin_probe(const std::string& base_url) {
     bool expected = false;
     if (!probe_in_flight_.compare_exchange_strong(expected, true)) return;
 
@@ -242,10 +392,11 @@ void BootLoader::begin_probe(const std::string& url) {
     auto shared = std::make_shared<Shared>();
 
     worker_pool_.add(
-        [url, shared]() {
-            auto r = misty::core::HTTPClient::get().get_with_timeouts(url, 1L, 2L);
-            shared->status = r.status_code;
-            shared->body   = std::move(r.body);
+        [base_url, shared]() {
+            auto ready = misty::core::HTTPClient::get().get_with_timeouts(
+                base_url + "/api/ready", 1L, 2L);
+            shared->status = ready.status_code;
+            shared->body   = std::move(ready.body);
         },
         [this, shared]() {
             { std::scoped_lock lk(probe_mu_);
@@ -271,6 +422,16 @@ bool BootLoader::consume_probe(ProbeResult& out) {
 
 // ── Auth flow ─────────────────────────────────────────────────────────────────
 
+void BootLoader::mark_proxy_ready() {
+    proxy_ready_ = true;
+    status_line_ = "Background service ready. Finalizing startup...";
+
+    if (std::chrono::steady_clock::now() - boot_started_at_ >= kMinimumBootScreenTime) {
+        proxy_ready_ = false;
+        transition_after_proxy_ready();
+    }
+}
+
 void BootLoader::transition_after_proxy_ready() {
     if (core::SessionManager::get().is_authenticated()) {
         success_  = true;
@@ -281,6 +442,23 @@ void BootLoader::transition_after_proxy_ready() {
     } else {
         phase_ = Phase::Onboarding;
     }
+}
+
+float BootLoader::loading_progress() const {
+    const float minimum_seconds =
+        std::chrono::duration<float>(kMinimumBootScreenTime).count();
+    const float elapsed_seconds =
+        std::chrono::duration<float>(std::chrono::steady_clock::now() - boot_started_at_).count();
+
+    if (minimum_seconds <= 0.0f) return 1.0f;
+
+    if (elapsed_seconds <= minimum_seconds) {
+        const float ratio = elapsed_seconds / minimum_seconds;
+        return 0.08f + 0.80f * ease_out_cubic(ratio);
+    }
+
+    const float tail_seconds = elapsed_seconds - minimum_seconds;
+    return std::min(0.98f, 0.88f + 0.10f * (1.0f - std::exp(-tail_seconds * 0.85f)));
 }
 
 void BootLoader::render_onboarding() {
@@ -348,10 +526,20 @@ void BootLoader::tick_state_machine() {
 
     // ── Proxy search ──────────────────────────────────────────────────────────
     const auto now = std::chrono::steady_clock::now();
+    constexpr auto kLaunchReadyTimeout = std::chrono::seconds(5);
+    constexpr auto kSearchTimeout = std::chrono::seconds(20);
 
-    // Global 5-second deadline
-    if (now - search_start_ > std::chrono::seconds(5)) {
-        error_line_ = "Could not start the background service within 5 seconds. "
+    if (proxy_ready_) {
+        if (now - boot_started_at_ >= kMinimumBootScreenTime) {
+            proxy_ready_ = false;
+            transition_after_proxy_ready();
+        }
+        return;
+    }
+
+    // Overall search deadline
+    if (now - search_start_ > kSearchTimeout) {
+        error_line_ = "Could not start the background service within 20 seconds. "
                       "Check ~/misty/.cache/misty-proxy.log for details.";
         phase_ = Phase::Failed;
         return;
@@ -360,48 +548,61 @@ void BootLoader::tick_state_machine() {
     // Wait for any in-flight probe
     if (probe_in_flight_.load()) return;
 
-    // Per-port timeout: give up on a launched port after 1.5 s
-    if (launched_on_current_port_ &&
-        now - port_launch_time_ > std::chrono::milliseconds(1500)) {
-        advance_port();
-        return;
-    }
-
-    // Rate-limit probes
-    if (now < next_probe_) return;
-    next_probe_ = now + std::chrono::milliseconds(250);
-
-    // Consume any available probe result
     ProbeResult probe{};
-    if (consume_probe(probe)) {
-        if (probe.status_code >= 200 && probe.status_code < 300) {
-            // Found a working proxy on current_port_!
-            ensure_proxy_config_saved(current_port_);
-            status_line_ = "Background service ready.";
-            transition_after_proxy_ready();
+    const bool has_probe_result = consume_probe(probe);
+    const std::string base_url = "http://127.0.0.1:" + std::to_string(current_port_);
+
+    if (search_step_ == SearchStep::CheckPort) {
+        if (is_port_occupied(current_port_)) {
+            status_line_ = "Port " + std::to_string(current_port_) + " is in use. Checking service...";
+            search_step_ = SearchStep::ProbeExistingProxy;
+            next_probe_ = now + std::chrono::milliseconds(50);
+        } else {
+            if (!launch_on_current_port()) {
+                advance_port();
+                return;
+            }
+            launched_on_current_port_ = true;
+            port_launch_time_ = now;
+            search_step_ = SearchStep::WaitForLaunchedProxy;
+            next_probe_ = now + std::chrono::milliseconds(400);
             return;
         }
+    }
 
-        // Port not responding
-        if (!launched_on_current_port_) {
-            // Nothing running here — try to launch
-            if (launch_on_current_port()) {
-                launched_on_current_port_ = true;
-                port_launch_time_         = now;
-                // Give the process a moment before probing again
-                next_probe_ = now + std::chrono::milliseconds(400);
+    if (search_step_ == SearchStep::ProbeExistingProxy) {
+        if (has_probe_result) {
+            if (probe.status_code >= 200 && probe.status_code < 300) {
+                ensure_proxy_config_saved(current_port_);
+                mark_proxy_ready();
             } else {
-                // No binary or launch failed — skip this port
                 advance_port();
             }
             return;
         }
-        // Already launched, still not responding — keep probing (rate-limited above)
+
+        if (now < next_probe_) return;
+        next_probe_ = now + std::chrono::milliseconds(250);
+        begin_probe(base_url);
+        return;
     }
 
-    // Kick off next probe
-    const std::string url = "http://127.0.0.1:" + std::to_string(current_port_) + "/api/hello";
-    begin_probe(url);
+    if (search_step_ == SearchStep::WaitForLaunchedProxy) {
+        if (now - port_launch_time_ > kLaunchReadyTimeout) {
+            advance_port();
+            return;
+        }
+
+        if (has_probe_result && probe.status_code >= 200 && probe.status_code < 300) {
+            ensure_proxy_config_saved(current_port_);
+            mark_proxy_ready();
+            return;
+        }
+
+        if (now < next_probe_) return;
+        next_probe_ = now + std::chrono::milliseconds(250);
+        begin_probe(base_url);
+    }
 }
 
 // ── Render ────────────────────────────────────────────────────────────────────
@@ -425,9 +626,9 @@ bool BootLoader::render() {
     ImGui::SetNextWindowPos(vp->WorkPos,  ImGuiCond_Always);
     ImGui::SetNextWindowSize(vp->WorkSize, ImGuiCond_Always);
 
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.067f, 0.067f, 0.075f, 1.0f));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(40.0f, 36.0f));
-    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,   ImVec2(0.0f,  12.0f));
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.031f, 0.039f, 0.055f, 1.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,   ImVec2(0.0f, 12.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,  ImVec2(12.0f, 10.0f));
 
     const bool open = ImGui::Begin("Misty Boot", nullptr, kFlags);
@@ -436,70 +637,156 @@ bool BootLoader::render() {
         return false;
     }
 
-    const float w = ImGui::GetContentRegionAvail().x;
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    const ImVec2 win_min = ImGui::GetWindowPos();
+    const ImVec2 win_max(win_min.x + ImGui::GetWindowSize().x, win_min.y + ImGui::GetWindowSize().y);
 
-    // Brand icon
-    auto& icon = core::AssetManager::get().get_svg_texture("cloud-24", 40);
-    if (icon.id) {
-        ImGui::SetCursorPosX((w - 40.0f) * 0.5f);
-        ImGui::Image(icon.id, ImVec2(40.0f, 40.0f));
-        ImGui::Spacing();
+    draw_list->AddRectFilledMultiColor(
+        win_min,
+        win_max,
+        IM_COL32(9, 10, 16, 255),
+        IM_COL32(12, 16, 24, 255),
+        IM_COL32(18, 24, 36, 255),
+        IM_COL32(10, 10, 18, 255));
+    draw_list->AddCircleFilled(
+        ImVec2(win_min.x + 120.0f, win_min.y + 140.0f),
+        180.0f,
+        IM_COL32(34, 197, 94, 16),
+        96);
+    draw_list->AddCircleFilled(
+        ImVec2(win_max.x - 120.0f, win_min.y + 120.0f),
+        220.0f,
+        IM_COL32(59, 130, 246, 22),
+        96);
+
+    const float card_w = std::max(320.0f, std::min(460.0f, vp->WorkSize.x - 48.0f));
+    const float card_h = (phase_ == Phase::Failed) ? 410.0f : 360.0f;
+    const ImVec2 card_min(
+        vp->WorkPos.x + (vp->WorkSize.x - card_w) * 0.5f,
+        vp->WorkPos.y + (vp->WorkSize.y - card_h) * 0.5f);
+    const ImVec2 card_max(card_min.x + card_w, card_min.y + card_h);
+    const ImVec2 content_min(card_min.x + 32.0f, card_min.y + 28.0f);
+    const float content_w = card_w - 64.0f;
+
+    draw_list->AddRectFilled(card_min, card_max, IM_COL32(15, 18, 26, 235), 28.0f);
+    draw_list->AddRect(
+        card_min,
+        card_max,
+        IM_COL32(255, 255, 255, 18),
+        28.0f,
+        0,
+        1.0f);
+
+    ImGui::SetCursorScreenPos(content_min);
+    ImGui::BeginGroup();
+
+    const float group_start_x = ImGui::GetCursorPosX();
+    ImGui::Dummy(ImVec2(content_w, 164.0f));
+    draw_sprite_frame(
+        draw_list,
+        ImVec2(card_min.x + card_w * 0.5f, card_min.y + 108.0f),
+        132.0f);
+
+    const char* title = "Starting Misty";
+    std::string subtitle = "Booting local services, checking ports, and preparing your session.";
+    if (proxy_ready_) {
+        subtitle = "Services are online. Finishing startup before handing off to the app.";
+    } else if (phase_ == Phase::Done) {
+        subtitle = "Everything is ready. Entering your workspace.";
+    } else if (phase_ == Phase::Failed) {
+        title = "Startup needs attention";
+        subtitle = "The local background service did not come up cleanly.";
     }
 
     ImGui::PushFont(core::AssetManager::get().get_font(core::FontID::ROBOTO_BOLD_LARGE));
-    centered_title("Starting Misty");
+    const float title_w = ImGui::CalcTextSize(title).x;
+    ImGui::SetCursorPosX(group_start_x + std::max(0.0f, (content_w - title_w) * 0.5f));
+    ImGui::TextUnformatted(title);
     ImGui::PopFont();
-    ImGui::Spacing();
 
-    // Status / error
-    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.72f, 0.72f, 0.72f, 1.0f));
+    ImGui::Dummy(ImVec2(0.0f, 8.0f));
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.73f, 0.78f, 0.86f, 0.95f));
+    ImGui::PushTextWrapPos(group_start_x + content_w);
+    ImGui::TextWrapped("%s", subtitle.c_str());
+    ImGui::PopTextWrapPos();
+    ImGui::PopStyleColor();
+
+    ImGui::Dummy(ImVec2(0.0f, 14.0f));
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.86f, 0.89f, 0.94f, 1.0f));
+    ImGui::PushTextWrapPos(group_start_x + content_w);
     ImGui::TextWrapped("%s", status_line_.c_str());
+    ImGui::PopTextWrapPos();
     ImGui::PopStyleColor();
 
     if (!error_line_.empty()) {
-        ImGui::Spacing();
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.90f, 0.44f, 0.44f, 1.0f));
+        ImGui::Dummy(ImVec2(0.0f, 10.0f));
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.50f, 0.50f, 1.0f));
+        ImGui::PushTextWrapPos(group_start_x + content_w);
         ImGui::TextWrapped("%s", error_line_.c_str());
+        ImGui::PopTextWrapPos();
         ImGui::PopStyleColor();
     }
 
-    ImGui::Spacing();
-    ImGui::Separator();
-    ImGui::Spacing();
+    ImGui::Dummy(ImVec2(0.0f, 18.0f));
+    const ImVec2 bar_min = ImGui::GetCursorScreenPos();
+    const float progress = (phase_ == Phase::Failed) ? 1.0f
+        : (phase_ == Phase::Done ? 1.0f : loading_progress());
+    const ImU32 progress_color = (phase_ == Phase::Failed)
+        ? IM_COL32(234, 88, 88, 255)
+        : IM_COL32(59, 130, 246, 255);
+    ImGui::Dummy(ImVec2(content_w, 6.0f));
+    draw_progress_bar(
+        draw_list,
+        bar_min,
+        ImVec2(bar_min.x + content_w, bar_min.y + 4.0f),
+        progress,
+        progress_color);
+
+    ImGui::Dummy(ImVec2(0.0f, 16.0f));
 
     if (phase_ == Phase::Searching) {
-        // Animated progress bar — no buttons, nothing to click
-        ImGui::ProgressBar(-1.0f, ImVec2(-1.0f, 0.0f));
-
         if (!proxy_log_path_.empty() && file_exists(proxy_log_path_)) {
-            ImGui::Spacing();
-            if (ImGui::Button("Open log"))
+            const ImVec2 button_size(90.0f, 30.0f);
+            ImGui::SetCursorPosX(group_start_x + std::max(0.0f, (content_w - button_size.x) * 0.5f));
+            if (ImGui::Button("Open log", button_size)) {
                 misty::core::open_path_default(proxy_log_path_);
+            }
         }
 
     } else if (phase_ == Phase::Failed) {
-        if (core::StyledButton("Retry", ImVec2(120.0f, 44.0f), core::ButtonTheme::Primary())) {
-            // Reset to port 3000 and try again
+        const ImVec2 retry_size(118.0f, 42.0f);
+        const ImVec2 log_size(90.0f, 42.0f);
+        const ImVec2 quit_size(88.0f, 42.0f);
+        const bool show_log = !proxy_log_path_.empty() && file_exists(proxy_log_path_);
+        const float total_w = retry_size.x + quit_size.x + 12.0f + (show_log ? (log_size.x + 12.0f) : 0.0f);
+        ImGui::SetCursorPosX(group_start_x + std::max(0.0f, (content_w - total_w) * 0.5f));
+
+        if (core::StyledButton("Retry", retry_size, core::ButtonTheme::Primary())) {
             proxy_path_ = auto_detect_proxy_path();
             init_port_search();
             phase_ = Phase::Searching;
         }
-        if (!proxy_log_path_.empty() && file_exists(proxy_log_path_)) {
+
+        if (show_log) {
             ImGui::SameLine(0.0f, 12.0f);
-            if (ImGui::Button("Open log"))
+            if (ImGui::Button("Open log", log_size)) {
                 misty::core::open_path_default(proxy_log_path_);
+            }
         }
+
         ImGui::SameLine(0.0f, 12.0f);
-        if (ImGui::Button("Quit"))
-            done_ = true;   // success_ stays false → Application shuts down
+        if (ImGui::Button("Quit", quit_size)) {
+            done_ = true;
+        }
 
     } else if (phase_ == Phase::Done) {
-        // Already-authenticated fast path: proxy was running, user was logged in
         if (ready_at_.time_since_epoch().count() != 0 &&
             std::chrono::steady_clock::now() - ready_at_ > std::chrono::milliseconds(150)) {
             done_ = true;
         }
     }
+
+    ImGui::EndGroup();
 
     ImGui::End();
     ImGui::PopStyleVar(3);
