@@ -30,7 +30,7 @@ export function SpacesRealtimeBridge() {
       reportedErrorRef.current = "";
       return;
     }
-    if (isAccountSwitchError(error)) {
+    if (isAccountSwitchError(error) || isReconnectError(error)) {
       clearError();
       return;
     }
@@ -53,15 +53,17 @@ function isAccountSwitchError(message: string): boolean {
   return normalized.includes("account switch") || normalized === "account_changed";
 }
 
-function spaceActivityMessage(message: string): string {
+function isReconnectError(message: string): boolean {
   const normalized = message.trim().toLowerCase();
-  if (
+  return (
     normalized === "load failed" ||
     normalized.includes("failed to fetch") ||
     normalized.includes("networkerror") ||
-    normalized.includes("network request failed")
-  ) {
-    return "Spaces couldn’t refresh. Check your connection and try again.";
-  }
+    normalized.includes("network request failed") ||
+    normalized.includes("while misty reconnects")
+  );
+}
+
+function spaceActivityMessage(message: string): string {
   return `Spaces needs attention: ${message.trim()}`;
 }

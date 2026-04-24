@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Cable, Settings2, Trash2, UsersRound } from "lucide-react";
+import { Cable, Lightbulb, Settings2, Trash2, UsersRound } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import {
@@ -17,6 +17,7 @@ import { Button } from "@/ui";
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui";
 import { Input } from "@/ui";
 import { Separator } from "@/ui";
+import { Switch } from "@/ui";
 import {
   DiscordConnectionPanel,
   GoogleCalendarConnectionPanel,
@@ -28,20 +29,24 @@ import {
   type DesktopSettingsNavEntry,
 } from "@/pages/Settings/DesktopSettingsUI";
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
+import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
 import { SpaceMembers } from "./SpaceMembers";
+import { canManageSpaceLifecycle } from "../mistySpace";
 
-type SpaceSettingsSection = "general" | "members" | "connections";
+type SpaceSettingsSection = "general" | "members" | "connections" | "suggestions";
 
 const settingsItems: readonly DesktopSettingsNavEntry<SpaceSettingsSection>[] = [
   { id: "general", label: "General", icon: Settings2 },
   { id: "members", label: "Members", icon: UsersRound },
   { id: "connections", label: "Connections", icon: Cable },
+  { id: "suggestions", label: "Suggestions", icon: Lightbulb },
 ];
 
 const sectionDescriptions: Record<SpaceSettingsSection, string> = {
   general: "Name, access, ownership, and Space lifecycle.",
   members: "Manage member access, invitations, and permissions.",
   connections: "Services connected to this Space.",
+  suggestions: "Optional action suggestions for explicit agreements in conversations.",
 };
 
 export function SpaceSettings({ spaceId, section }: { spaceId: string; section: string }) {
@@ -65,6 +70,9 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [dangerBusy, setDangerBusy] = useState(false);
   const isOwner = space?.role === "owner";
+  const canRename = isOwner && canManageSpaceLifecycle(space, "rename");
+  const canLeave = !isOwner && canManageSpaceLifecycle(space, "leave");
+  const canDelete = isOwner && canManageSpaceLifecycle(space, "delete");
   const encodedSpaceId = encodeURIComponent(spaceId);
   const locationState = location.state as { spaceSettingsReturnTo?: string } | null;
   const fallbackReturnPath = `/spaces/${encodedSpaceId}/chat`;
@@ -89,7 +97,7 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
   const saveName = async (event: FormEvent) => {
     event.preventDefault();
     const nextName = name.trim();
-    if (!space || !isOwner || !nextName || nextName === space.name || saving) return;
+    if (!space || !canRename || !nextName || nextName === space.name || saving) return;
     clearError();
     setSaving(true);
     try {
@@ -99,7 +107,7 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
     }
   };
   const submitLeave = async () => {
-    if (!space || isOwner || dangerBusy) return;
+    if (!space || !canLeave || dangerBusy) return;
     setDangerBusy(true);
     clearError();
     try {
@@ -112,7 +120,7 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
     }
   };
   const submitDelete = async () => {
-    if (!space || !isOwner || deleteConfirmation !== space.name || dangerBusy) return;
+    if (!space || !canDelete || deleteConfirmation !== space.name || dangerBusy) return;
     setDangerBusy(true);
     clearError();
     try {
@@ -174,11 +182,11 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
                     <Input
                       aria-label="Space name"
                       maxLength={80}
-                      disabled={!isOwner || saving}
+                      disabled={!canRename || saving}
                       value={name}
                       onChange={(event) => setName(event.target.value)}
                     />
-                    {isOwner ? (
+                    {canRename ? (
                       <Button
                         className="shrink-0"
                         type="submit"
@@ -188,7 +196,7 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
                       </Button>
                     ) : null}
                   </form>
-                  {!isOwner ? (
+                  {!canRename ? (
                     <p className="mb-0 mt-3 text-xs text-muted-foreground">
                       Only the Space owner can change its name.
                     </p>
@@ -226,7 +234,7 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
                   </p>
                 </CardHeader>
                 <CardContent>
-                  {isOwner ? (
+                  {canDelete ? (
                     <div className="flex flex-wrap items-center justify-between gap-4">
                       <div className="min-w-0 flex-1">
                         <p className="m-0 text-sm font-medium">Delete this Space</p>
@@ -248,7 +256,7 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
                         Delete Space
                       </Button>
                     </div>
-                  ) : (
+                  ) : canLeave ? (
                     <div className="flex flex-wrap items-center justify-between gap-4">
                       <div className="min-w-0 flex-1">
                         <p className="m-0 text-sm font-medium">Leave this Space</p>
@@ -268,7 +276,7 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
                         Leave Space
                       </Button>
                     </div>
-                  )}
+                  ) : null}
                 </CardContent>
               </Card>
             </div>
@@ -282,6 +290,10 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
               <NotionConnectionPanel spaceId={spaceId} canManage={isOwner} />
               <DiscordConnectionPanel spaceId={spaceId} canManage={isOwner} />
             </div>
+          ) : null}
+
+          {activeSection === "suggestions" ? (
+            <SuggestionSettingsPanel spaceId={spaceId} isOwner={isOwner} />
           ) : null}
         </DesktopSettingsFrame>
 
@@ -376,6 +388,91 @@ function DangerError({ message }: { message: string }) {
     >
       {message}
     </p>
+  );
+}
+
+function SuggestionSettingsPanel({ spaceId, isOwner }: { spaceId: string; isOwner: boolean }) {
+  const [enabled, setEnabled] = useState(false);
+  const [usage, setUsage] = useState({ used: 0, limit: 0 });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let active = true;
+    void spacesApi
+      .actionSuggestionSettings(spaceId)
+      .then((settings) => {
+        if (!active) return;
+        setEnabled(settings.enabled);
+        setUsage({ used: settings.weekly_used, limit: settings.weekly_limit });
+        setLoading(false);
+      })
+      .catch((reason: unknown) => {
+        if (!active) return;
+        setError(
+          reason instanceof Error ? reason.message : "Suggestion settings could not be loaded.",
+        );
+        setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [spaceId]);
+  const change = async (next: boolean) => {
+    if (!isOwner || saving) return;
+    setSaving(true);
+    setError("");
+    try {
+      const settings = await spacesApi.updateActionSuggestionSettings(spaceId, next);
+      setEnabled(settings.enabled);
+      setUsage({ used: settings.weekly_used, limit: settings.weekly_limit });
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "The setting could not be changed.");
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Action suggestions</CardTitle>
+        <p className="mb-0 mt-1 text-xs leading-relaxed text-muted-foreground">
+          When people explicitly agree on a plan, Misty may offer a private review card with tasks,
+          events, notes, roadmap items, or follow-ups. It never runs an action automatically.
+        </p>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-start justify-between gap-5">
+          <div>
+            <p className="m-0 text-sm font-medium">Suggest actions from agreements</p>
+            <p className="mb-0 mt-1 text-xs text-muted-foreground">
+              Off by default. Any participant can veto analysis in a private conversation.
+            </p>
+          </div>
+          <Switch
+            aria-label="Suggest actions from agreements"
+            checked={enabled}
+            disabled={loading || saving || !isOwner}
+            onCheckedChange={(next) => void change(next)}
+          />
+        </div>
+        {enabled ? (
+          <p className="mb-0 mt-4 text-xs text-muted-foreground">
+            This week: {usage.used} of {usage.limit} detector checks used.
+          </p>
+        ) : null}
+        {!isOwner ? (
+          <p className="mb-0 mt-4 text-xs text-muted-foreground">
+            Only the Space owner can change this setting.
+          </p>
+        ) : null}
+        {error ? (
+          <p className="mb-0 mt-4 text-xs text-destructive" role="alert">
+            {error}
+          </p>
+        ) : null}
+      </CardContent>
+    </Card>
   );
 }
 

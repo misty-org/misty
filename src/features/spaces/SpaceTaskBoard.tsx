@@ -4,7 +4,11 @@ import { Button } from "@/ui";
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui";
 import { Input } from "@/ui";
 import type { SpaceTaskStatus } from "@/models/types/features/spaces/types";
-import type { SpaceMember, SpaceTask } from "@/models/interfaces/features/spaces/types";
+import type {
+  SpaceAgentMembership,
+  SpaceMember,
+  SpaceTask,
+} from "@/models/interfaces/features/spaces/types";
 import {
   dueTone,
   shortDue,
@@ -20,6 +24,7 @@ import {
   usePointerDrag,
   type PointerDragPayload,
 } from "@/features/dnd/PointerDragContext";
+import { agentTaskDisplayState } from "@/features/agents/agentWorkState";
 
 const boardStatuses: Array<{ id: SpaceTaskStatus; label: string }> = [
   { id: "todo", label: "To do" },
@@ -37,6 +42,7 @@ const acceptsTask = (payload: PointerDragPayload) => payload.kind === TASK_DRAG_
 export function SpaceTaskBoard({
   tasks,
   members,
+  agents,
   totals,
   busy,
   canManage,
@@ -46,6 +52,7 @@ export function SpaceTaskBoard({
 }: {
   tasks: SpaceTask[];
   members: SpaceMember[];
+  agents: SpaceAgentMembership[];
   totals: Record<string, number>;
   busy: string;
   canManage: boolean;
@@ -74,6 +81,7 @@ export function SpaceTaskBoard({
             .filter((task) => task.status === column.id)
             .sort((left, right) => left.rank - right.rank)}
           members={members}
+          agents={agents}
           total={totals[column.id]}
           busy={busy}
           canManage={canManage}
@@ -105,6 +113,7 @@ function BoardColumn({
   column,
   tasks,
   members,
+  agents,
   total,
   busy,
   canManage,
@@ -121,6 +130,7 @@ function BoardColumn({
   column: { id: SpaceTaskStatus; label: string };
   tasks: SpaceTask[];
   members: SpaceMember[];
+  agents: SpaceAgentMembership[];
   total?: number;
   busy: string;
   canManage: boolean;
@@ -174,6 +184,7 @@ function BoardColumn({
           <TaskCard
             task={task}
             members={members}
+            agents={agents}
             busy={busy === task.id}
             canManage={canManage}
             onOpen={onOpen}
@@ -239,6 +250,7 @@ function BoardColumn({
 function TaskCard({
   task,
   members,
+  agents,
   busy,
   canManage,
   onOpen,
@@ -247,6 +259,7 @@ function TaskCard({
 }: {
   task: SpaceTask;
   members: SpaceMember[];
+  agents: SpaceAgentMembership[];
   busy: boolean;
   canManage: boolean;
   onOpen: (task: SpaceTask) => void;
@@ -254,6 +267,8 @@ function TaskCard({
   onDropBefore: (payload: PointerDragPayload) => void;
 }) {
   const assignee = members.find((member) => member.user_id === task.assignee_user_id);
+  const agent = agents.find((item) => item.agent_id === task.assignee_agent_id);
+  const notes = task.notes.trim();
   const { startDrag, state } = usePointerDrag();
   const dragging = state.payload?.kind === TASK_DRAG_KIND && state.payload.id === task.id;
   const draggedRef = useRef(false);
@@ -295,7 +310,10 @@ function TaskCard({
     >
       <CardHeader className="p-3 pb-2">
         <div
-          className="flex w-full items-start gap-1.5 rounded-md text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          className={[
+            "grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-1.5 rounded-md",
+            "text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+          ].join(" ")}
           role="button"
           tabIndex={0}
           onClick={openTask}
@@ -306,7 +324,14 @@ function TaskCard({
           }}
         >
           <GripVertical className="mt-0.5 size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-          <CardTitle className="line-clamp-3 flex-1 text-sm leading-5">{task.title}</CardTitle>
+          <div className="min-w-0">
+            <CardTitle className="line-clamp-3 text-sm leading-5">{task.title}</CardTitle>
+            {notes ? (
+              <p className="mb-0 mt-1 line-clamp-2 text-xs leading-4 text-muted-foreground">
+                {notes}
+              </p>
+            ) : null}
+          </div>
           {busy ? <LoaderCircle className="size-3.5 animate-spin text-muted-foreground" /> : null}
         </div>
       </CardHeader>
@@ -320,9 +345,12 @@ function TaskCard({
               {shortDue(task.due_at)}
             </span>
           ) : null}
-          <span className="ml-auto">
-            <TaskMemberAvatar member={assignee} />
-          </span>
+          {agent ? <AgentTaskState taskId={task.id} agent={agent} /> : null}
+          {assignee || agent ? (
+            <span className="ml-auto">
+              <TaskMemberAvatar member={assignee} agent={agent} />
+            </span>
+          ) : null}
         </div>
         {canManage ? (
           <TaskInlineSelect
@@ -336,6 +364,37 @@ function TaskCard({
         ) : null}
       </CardContent>
     </Card>
+  );
+}
+
+function AgentTaskState({ taskId, agent }: { taskId: string; agent: SpaceAgentMembership }) {
+  const state = agentTaskDisplayState(taskId, agent);
+  const labels = {
+    ready: "Ready",
+    queued: "Queued",
+    working: "Working",
+    awaiting_approval: "Awaiting approval",
+    needs_approval: "Needs approval",
+    retrying: "Retrying",
+    failed: "Failed",
+    disabled: "Disabled",
+    update_available: "Update available",
+    assigned: "Assigned",
+  } as const;
+  const attention = state === "needs_approval" || state === "failed";
+  return (
+    <span
+      className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
+        attention
+          ? "bg-destructive/12 text-destructive"
+          : state === "working"
+            ? "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300"
+            : "bg-muted text-muted-foreground"
+      }`}
+      title={`${agent.name}: ${labels[state]}`}
+    >
+      {labels[state]}
+    </span>
   );
 }
 

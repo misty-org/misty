@@ -1,10 +1,23 @@
 # Public beta product surface
 
 The public beta includes account/profile/authentication, Spaces and membership,
-Chat, Journal notes/drawings, direct R2-backed Journal/Library assets, the
-shipping Agent/runtime paths, the three user-controlled cloud connections,
-billing/entitlements when live mode is configured, updates, diagnostics, data
-export, and account deletion.
+Chat, Journal notes/drawings, direct R2-backed Journal/Library assets, Agents,
+the three user-controlled cloud connections, billing/entitlements when live
+mode is configured, updates, diagnostics, data export, and account deletion.
+
+Agents are reusable definitions and first-class, permissioned Space members.
+The Agents destination is management-only; all interaction happens through
+normal Space Conversations, assignments, mentions, or enabled automations.
+Files and Transfers additionally require an expiring per-user, per-device
+grant. The first-class model ships only with the coordinated minimum desktop,
+server, and database version; no Agent Dock or private-session fallback exists.
+
+Action suggestions are an owner-enabled, participant-vetoable enhancement to
+human conversations. Misty performs neutral detection but is never an Agent
+identity. A suggestion is shared conversation UI, not a message, and cannot
+execute until a member reviews every selected action, chooses an eligible
+participating Agent, and accepts the exact payload. Private conversations may
+create only conversation-scoped resources and native Misty calendar events.
 
 The API is the feature boundary:
 

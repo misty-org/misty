@@ -12,7 +12,15 @@ import type { SpaceTasksData } from "./useSpaceTasksData";
 export type TaskPatch = Partial<
   Pick<
     SpaceTask,
-    "title" | "notes" | "status" | "priority" | "assignee_user_id" | "due_at" | "due_timezone"
+    | "title"
+    | "notes"
+    | "status"
+    | "priority"
+    | "assignee_user_id"
+    | "assignee_agent_id"
+    | "due_at"
+    | "due_timezone"
+    | "source_refs"
   >
 >;
 
@@ -50,12 +58,15 @@ export function useSpaceTaskActions(options: {
     setBusy("task");
     try {
       const patch = {
-        ...draft,
+        status: draft.status,
+        priority: draft.priority,
+        assignee_user_id: draft.assignee_user_id || undefined,
+        assignee_agent_id: draft.assignee_agent_id || undefined,
         title: draft.title.trim(),
         notes: draft.notes.trim(),
         due_at: dueAtForRequest(draft.due_at),
         due_timezone: draft.due_timezone.trim() || "UTC",
-        source_refs: editing?.source_refs ?? [],
+        source_refs: draft.source_refs,
       };
       const saved = editing
         ? await spacesApi.updateTask(spaceId, editing, patch)

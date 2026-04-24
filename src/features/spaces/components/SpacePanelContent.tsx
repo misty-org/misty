@@ -6,15 +6,17 @@ import { useMinimumSpin } from "@/hooks/useMinimumSpin";
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
 import type {
   Space,
+  SpaceAgentMembership,
   SpaceConversation,
   SpaceMember,
-  SpacesSnapshot,
 } from "@/models/interfaces/features/spaces/types";
 import { CreateEditConversationDialog } from "./CreateEditConversationDialog";
+import { SpaceManagementNavigation } from "./SpaceManagementNavigation";
+import { SpaceSectionNavigation } from "./SpaceSectionNavigation";
 import { SpacePanelSidebarContext } from "./spacePanel/SpacePanelSidebarContext";
 import { SpacePanelSkeleton } from "./spacePanel/SpacePanelSkeleton";
+import { SpaceSidebarHeader } from "./spacePanel/SpaceSidebarHeader";
 import { SpaceStorageFooter } from "./spacePanel/SpaceStorageFooter";
-import { SpaceSwitcherMenu } from "./spacePanel/SpaceSwitcherMenu";
 import { useSpaceLibraryUsage } from "./spacePanel/useSpaceLibraryUsage";
 import { useSpacePanelConversations } from "./spacePanel/useSpacePanelConversations";
 import {
@@ -22,14 +24,14 @@ import {
   spaceSectionPath,
   useSpacePanelRoute,
 } from "./spacePanel/spacePanelRoute";
+import { preferredMistySpace } from "../mistySpace";
 
 const emptyMembers: SpaceMember[] = [];
+const emptyAgents: SpaceAgentMembership[] = [];
 
 export function SpacePanelContent(props: {
   spaces: Space[];
-  limits: SpacesSnapshot["entitlements"] | null;
   loading: boolean;
-  onAddSpace: () => void;
   notices?: ReactNode;
 }) {
   const navigate = useNavigate();
@@ -41,9 +43,10 @@ export function SpacePanelContent(props: {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingConversation, setEditingConversation] = useState<SpaceConversation | null>(null);
 
-  const { members, snapshotReady, loadMembers } = useSpacesStore(
+  const { members, agents, snapshotReady, loadMembers } = useSpacesStore(
     useShallow((state) => ({
       members: state.membersBySpace[activeSpaceId] ?? emptyMembers,
+      agents: state.agentMembershipsBySpace[activeSpaceId] ?? emptyAgents,
       snapshotReady: state.snapshotReady,
       loadMembers: state.loadMembers,
     })),
@@ -59,12 +62,17 @@ export function SpacePanelContent(props: {
   // Land on the first Space when the route points at one that is not loaded.
   useEffect(() => {
     if (!activeSpaceId || props.loading || activeSpace || props.spaces.length === 0) return;
-    navigate(spaceSectionPath(props.spaces[0].id, section, settingsSection), { replace: true });
+    const fallback = preferredMistySpace(props.spaces);
+    if (fallback)
+      navigate(spaceSectionPath(fallback.id, section, settingsSection), { replace: true });
   }, [activeSpace, activeSpaceId, navigate, props.loading, props.spaces, section, settingsSection]);
 
   useEffect(() => {
     if (!user || !snapshotReady || !activeSpaceId || !activeSpace) return;
-    void loadMembers(activeSpaceId);
+    // Stale routes can lose access between the snapshot and this request. The
+    // store repairs those with a fresh snapshot; other request failures should
+    // not become unhandled promise rejections in the desktop webview.
+    void loadMembers(activeSpaceId).catch(() => undefined);
   }, [activeSpace, activeSpaceId, loadMembers, snapshotReady, user]);
 
   const handleConversationSaved = (saved: SpaceConversation) => {
@@ -72,19 +80,38 @@ export function SpacePanelContent(props: {
     navigate(spaceConversationPath(activeSpaceId, saved.id));
   };
 
+  const activeSpaceNavigation = activeSpaceId ? (
+    <SpacePanelSidebarContext
+      section={section}
+      plannerSection={route.plannerSection}
+      roadmapId={route.roadmapId}
+      activeSpaceId={activeSpaceId}
+      activeSpaceName={activeSpace?.name ?? "Journal"}
+      settingsSection={settingsSection}
+      libraryCollection={route.libraryCollection}
+      conversations={conversations}
+      activeConversationId={route.conversationId}
+      currentUserId={user?.id}
+      activeDrawingId={route.drawingId}
+      onCreateConversation={() => {
+        setEditingConversation(null);
+        setDialogOpen(true);
+      }}
+      onEditConversation={(conversation) => {
+        setEditingConversation(conversation);
+        setDialogOpen(true);
+      }}
+    />
+  ) : null;
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <SpaceSwitcherMenu
-        spaces={props.spaces}
-        activeSpace={activeSpace}
-        activeSpaceId={activeSpaceId}
-        canAddSpace={props.limits?.unlimited_spaces !== false}
-        onAddSpace={props.onAddSpace}
-        onSwitchSpace={(spaceId) => {
-          if (!spaceId || spaceId === activeSpaceId) return;
-          navigate(spaceSectionPath(spaceId, section, settingsSection));
-        }}
-      />
+      {activeSpace ? (
+        <SpaceSidebarHeader
+          space={activeSpace}
+          actions={<SpaceManagementNavigation space={activeSpace} section={section} />}
+        />
+      ) : null}
 
       {props.notices ? (
         <div className="misty-transient-scrollbar mb-3 max-h-40 shrink-0 overflow-y-auto">
@@ -97,26 +124,12 @@ export function SpacePanelContent(props: {
       ) : activeSpaceId ? (
         <>
           <div className="misty-transient-scrollbar min-h-0 flex-1 overflow-x-hidden overflow-y-auto pb-2 [overscroll-behavior:contain]">
-            <SpacePanelSidebarContext
-              section={section}
-              taskView={route.taskView}
-              activeSpaceId={activeSpaceId}
-              activeSpaceName={activeSpace?.name ?? "Journal"}
-              settingsSection={settingsSection}
-              libraryCollection={route.libraryCollection}
-              conversations={conversations}
-              activeConversationId={route.conversationId}
-              currentUserId={user?.id}
-              activeDrawingId={route.drawingId}
-              onCreateConversation={() => {
-                setEditingConversation(null);
-                setDialogOpen(true);
-              }}
-              onEditConversation={(conversation) => {
-                setEditingConversation(conversation);
-                setDialogOpen(true);
-              }}
-            />
+            <SpaceSectionNavigation spaceId={activeSpaceId} section={section} />
+            {activeSpaceNavigation ? (
+              <div className="mt-3 border-t border-sidebar-border/45 pt-3">
+                {activeSpaceNavigation}
+              </div>
+            ) : null}
           </div>
           <SpaceStorageFooter
             usage={libraryUsage}
@@ -130,6 +143,7 @@ export function SpacePanelContent(props: {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         members={members}
+        agents={agents}
         currentUserId={user?.id}
         conversation={editingConversation}
         onSaved={handleConversationSaved}

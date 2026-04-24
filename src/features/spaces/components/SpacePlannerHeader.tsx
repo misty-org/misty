@@ -1,15 +1,5 @@
 import { useState, type ReactNode } from "react";
-import {
-  CalendarDays,
-  KanbanSquare,
-  List,
-  LoaderCircle,
-  Plus,
-  RefreshCcw,
-  Search,
-  SlidersHorizontal,
-  X,
-} from "lucide-react";
+import { LoaderCircle, Plus, RefreshCcw, Search, SlidersHorizontal, X } from "lucide-react";
 import { SiGooglecalendar } from "react-icons/si";
 
 import { Badge } from "@/ui";
@@ -23,16 +13,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/ui";
-import { Tabs, TabsList, TabsTrigger } from "@/ui";
 import type { SpaceCalendarSource } from "@/models/interfaces/features/spaces/types";
-import type { TaskViewMode } from "@/models/types/features/spaces/SpacePlanner";
 
-/**
- * The Planner header stays compact while keeping all three established task
- * views directly reachable.
- */
+/** Compact task controls shared by the Board and List presentations. */
 export function SpacePlannerHeader({
-  view,
   query,
   activeFilterCount,
   sources,
@@ -41,13 +25,11 @@ export function SpacePlannerHeader({
   canManageIntegrations,
   calendarImportAvailable,
   filters,
-  onView,
   onQuery,
   onSync,
   onImport,
   onCreate,
 }: {
-  view: TaskViewMode;
   query: string;
   activeFilterCount: number;
   sources: SpaceCalendarSource[];
@@ -57,7 +39,6 @@ export function SpacePlannerHeader({
   calendarImportAvailable: boolean;
   /** Filter controls, shown only when the user opens the popover. */
   filters: ReactNode;
-  onView: (view: TaskViewMode) => void;
   onQuery: (value: string) => void;
   onSync: () => void;
   onImport: () => void;
@@ -71,23 +52,7 @@ export function SpacePlannerHeader({
 
   return (
     <header className="misty-spaces-toolbar flex min-h-11 flex-wrap items-center gap-2 px-3 py-1.5">
-      <h1 className="sr-only">Planner</h1>
-      <Tabs value={view} onValueChange={(next) => onView(next as TaskViewMode)}>
-        <TabsList variant="line" className="h-8 p-0" aria-label="Task views">
-          <TabsTrigger className="gap-1.5 rounded-sm px-2.5 text-xs" value="board">
-            <KanbanSquare className="size-3.5" />
-            Board
-          </TabsTrigger>
-          <TabsTrigger className="gap-1.5 rounded-sm px-2.5 text-xs" value="list">
-            <List className="size-3.5" />
-            List
-          </TabsTrigger>
-          <TabsTrigger className="gap-1.5 rounded-sm px-2.5 text-xs" value="calendar">
-            <CalendarDays className="size-3.5" />
-            Calendar
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
+      <h1 className="m-0 text-sm font-semibold">Tasks</h1>
 
       <div className="ml-auto flex items-center gap-2">
         {showSearch ? (

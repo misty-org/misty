@@ -1,69 +1,68 @@
-# Misty Spaces — File Manager Architecture QA
+# Calendar Design QA
 
-Date: 2026-07-30
+## Comparison target
 
-## Evidence
+- Source visual truth: `/Users/mtccool668/.codex/generated_images/019fd053-89af-7613-8197-e33e8f4d75cf/exec-40fba718-c294-46a6-82d3-83b3fb55f55d.png`
+- Browser-rendered implementation: `/Users/mtccool668/.codex/visualizations/2026/08/05/019fd053-89af-7613-8197-e33e8f4d75cf/implementation-week.jpg`
+- Combined comparison evidence: `/Users/mtccool668/.codex/visualizations/2026/08/05/019fd053-89af-7613-8197-e33e8f4d75cf/calendar-design-comparison.png`
+- Source pixels: 2079 × 756. The source was center-cropped to 2016 × 756 and normalized to 1024 × 384.
+- Implementation pixels and CSS viewport: 1024 × 384 at device pixel ratio 1.
+- State: dark Week view, Aug 2–8, 2026, 30-minute precision, visible all-day task deadline, two timed calendar events, timeline scrolled to 9 AM.
 
-- Source visual truth: `/var/folders/hd/3cy894z92v70m7crvhv8rwmr0000gn/T/TemporaryItems/NSIRD_screencaptureui_bqRE3e/Screenshot 2026-07-30 at 9.52.01 AM.png`
-- Journal implementation: `/Users/mtccool668/misty-org/misty/.codex/audits/spaces-file-manager-shell-2026-07-30/qa/journal-final-v3.png`
-- Library implementation: `/Users/mtccool668/misty-org/misty/.codex/audits/spaces-file-manager-shell-2026-07-30/qa/library-final-v2.png`
-- Chat implementation: `/Users/mtccool668/misty-org/misty/.codex/audits/spaces-file-manager-shell-2026-07-30/qa/chat-final-v2.png`
-- Tasks implementation: `/Users/mtccool668/misty-org/misty/.codex/audits/spaces-file-manager-shell-2026-07-30/qa/tasks-final-v2.png`
-- Four-mode implementation contact sheet: `/Users/mtccool668/misty-org/misty/.codex/audits/spaces-file-manager-shell-2026-07-30/qa/spaces-four-modes-final.png`
-- Full source-to-Journal comparison: `/Users/mtccool668/misty-org/misty/.codex/audits/spaces-file-manager-shell-2026-07-30/qa/source-vs-journal-final.png`
-- Focused header comparison: `/Users/mtccool668/misty-org/misty/.codex/audits/spaces-file-manager-shell-2026-07-30/qa/source-vs-journal-header-final.png`
+## Full-view comparison evidence
 
-## Viewport and normalization
+The implementation preserves the selected composition: a header-free toolbar with range navigation on the left; view, calendar sources, zoom, refresh, and New event actions on the right; a sticky seven-day header and all-day row; a vertically scrollable time grid; and compact differentiated event blocks. Grid proportions, 72-pixel time gutter, toolbar height, control grouping, calendar borders, card radii, and dark surface balance align with the normalized source.
 
-- Source screenshot: 2048 × 1280 pixels.
-- Native implementation captures: 2992 × 1818 pixels from the signed-in macOS desktop app.
-- The full-view comparison scales the source to 1024 × 640. The implementation is scaled proportionally to 1024 pixels wide and centered within the same 1024 × 640 field.
-- The focused comparison uses the normalized top 220 pixels of both views.
-- State: dark desktop UI. The source is a populated File Manager screen; the implementation is the corresponding signed-in Spaces shell with empty Journal, Library, and Tasks states plus a populated Chat state.
-- The File Manager is an architectural reference rather than a literal content target. File paths, file rows, and inspector content were intentionally not copied into Spaces.
+The live current-time line is intentionally dynamic. The source depicts 11:24 AM, while the implementation uses the browser's actual current time; it was therefore outside the 9 AM comparison crop.
 
-## Full-view comparison
+## Focused comparison evidence
 
-The implementation now follows the source screen’s flat pane architecture:
-
-- one compact primary strip across the top;
-- one compact contextual toolbar below it;
-- a persistent left sidebar with a workspace switcher, mode-specific navigation, and bottom-aligned storage;
-- simple one-pixel pane boundaries;
-- direct selected-row fills instead of floating navigation cards;
-- content surfaces that use empty space rather than nested outer cards.
-
-Journal, Library, Chat, and Tasks keep the same shell dimensions when switching. Mode changes were exercised in the native app and do not insert an exit frame or remounting highlight, so there is no route-level flash.
-
-The focused comparison confirms that the primary strip, contextual row, switcher, selected sidebar row, button heights, and divider rhythm use the same compact desktop grammar as the File Manager reference.
+Focused toolbar and event-card inspection was necessary because control density and small event text were the most fidelity-sensitive regions. The final toolbar keeps all controls visible at 1024 pixels without overlap, preserves keyboard-focus affordances, and uses Misty's existing Inter typography and button tokens. Thirty-minute events retain both title and time, and task deadlines use a checkbox icon and a distinct blue surface so they cannot be mistaken for calendar events.
 
 ## Findings
 
-- No actionable P0, P1, or P2 issues remain.
-- Fonts and typography: Misty’s existing Inter family, weight hierarchy, and antialiasing are preserved. Headings use sentence case; toolbar and sidebar labels have compact desktop sizing; labels remain readable without decorative overstatement.
-- Spacing and layout rhythm: the shell uses a 48px primary strip, 44px contextual rows, 40px sidebar rows, a 240–268px contextual rail, and one-pixel pane dividers. The loading shell matches the same geometry to prevent a layout flash.
-- Colors and visual tokens: existing background, sidebar, border, foreground, muted, accent, and primary tokens are reused. Selected sidebar rows use the same subdued directional fill as File Manager. No new decorative palette was introduced.
-- Image quality and asset fidelity: these application surfaces contain no raster imagery. Existing Lucide and React Icons assets remain crisp, consistently slotted, and aligned.
-- Copy and content: app-specific labels are concise and mode-appropriate. Journal and Library retain one central empty-state message and one primary action. Tasks uses useful shortcuts (`All tasks`, `Assigned to me`, `Unassigned`, `Due this week`) rather than repeating the Board/List/Calendar toolbar.
-- Interaction states: Chat, Tasks, Journal, and Library mode links were activated in the native app. Active state changes remain immediate and stable. Tasks board/list/calendar controls and task shortcuts remain real routes; primary actions remain present.
-- P3 follow-up: populated notes, task cards, and library-item density could receive a second data-rich polish pass after real content is available, but the shell itself is complete.
+- No remaining P0, P1, or P2 findings.
+- Typography: passed. Existing Inter variable typography, weights, line heights, truncation, and hierarchy remain readable at the comparison viewport.
+- Spacing and layout rhythm: passed. Toolbar groups, day columns, all-day row, time gutter, event padding, borders, and scroll containment match the intended density.
+- Colors and visual tokens: passed. Misty's background, border, foreground, focus, and semantic event colors preserve the source's dark balance and accessible contrast.
+- Image quality and asset fidelity: passed. The target contains no raster imagery. Visible interface icons come from the project's established icon libraries; no custom SVG, CSS art, placeholder imagery, or generated asset substitute was introduced.
+- Copy and content: passed. Calendar creates events, the primary action says New event, and task deadlines remain visibly distinct calendar items.
+- Responsiveness: passed for the target desktop viewport and a 2048-pixel wide check. The toolbar and calendar use contained horizontal scrolling below their minimum usable width rather than overlapping or clipping controls.
 
 ## Comparison history
 
-1. Initial shell pass moved Chat, Tasks, Journal, and Library into the top strip and removed the large mode dock from the sidebar.
-2. The first live Tasks capture exposed a P2 hierarchy problem: the sidebar was empty and the board still used three oversized rounded containers.
-3. The second pass flattened Tasks into divider-based columns and added task navigation. A live capture then exposed P2 duplication because the sidebar repeated Board/List/Calendar from the toolbar.
-4. The final pass replaced those duplicates with contextual task shortcuts, widened the rail slightly for readable workspace names, expanded Journal and Library search fields to the available toolbar width, and aligned loading placeholders to final shell geometry.
-5. The final four-mode contact sheet shows stable shell geometry and no remaining P0/P1/P2 drift.
+### Pass 1
 
-## Verification
+- P1: the selected-day number was transparent inside its white circle. Fixed by applying an explicit dark foreground to the selected date marker.
+- P2: the 30-minute timeline used an 88-pixel hour height, twice the normalized source density. Fixed by setting 60/30/15-minute scales to 36/44/72 pixels per hour.
+- P2: a 30-minute event card omitted its time. Fixed by raising the minimum card height and tightening the time label.
 
-- Native signed-in app captures completed for Chat, Tasks, Journal, and Library.
-- Primary mode links tested by activating all four destinations.
-- TypeScript check passed.
-- Targeted Spaces and notes suite passed: 7 files, 21 tests.
-- Desktop production build passed.
-- `git diff --check` passed.
-- The in-app browser preview could not share the native app’s authenticated session, so signed-in visual verification was performed against the running native desktop app. The browser itself showed no implementation-specific console evidence for the signed-in Spaces state.
+### Pass 2
+
+- Post-fix evidence: the combined comparison shows a readable selected-day number, matching time-grid density, visible event times, and no control overlap.
+- No actionable P0, P1, or P2 differences remain.
+
+## Primary interactions tested
+
+- Switched among Month, Week, and Day from the toolbar menu.
+- Zoomed the Day/Week timeline from 30 to 15 minutes and verified the scrollable timeline height increased from 1168 to 1840 pixels.
+- Navigated to the previous week and returned to Today.
+- Opened Calendars and toggled Google Calendar visibility; Google events disappeared while the Misty deadline remained independent.
+- Verified the New event action targets Google Calendar event creation and does not create a task.
+- Checked browser console warnings and errors: none.
+
+## Follow-up polish
+
+- P3: external calendar event colors currently follow Misty's semantic event color rather than reproducing per-calendar source colors from the concept image. This is acceptable until calendar-source color metadata is available.
+
+## Implementation checklist
+
+- [x] Month, Week, and Day calendar views
+- [x] Agenda → Calendar sidebar hierarchy
+- [x] Event-first toolbar without a redundant Calendar heading
+- [x] Scrollable timeline with 60/30/15-minute zoom
+- [x] Visible-calendar source controls
+- [x] Distinct task deadlines and calendar events
+- [x] Browser interaction and console verification
 
 final result: passed

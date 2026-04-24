@@ -1,17 +1,13 @@
 import type {
   AccountAuthUser,
-  AccountDeletionResponse,
-  AccountExportManifest,
+  AccountHandoffPath,
   AccountMeResponse,
-  BillingUsageResponse,
   LoginResponse,
 } from "@/models/interfaces/stores/account/useAccountStore";
 export type {
   AccountAuthUser,
-  AccountDeletionResponse,
-  AccountExportManifest,
+  AccountHandoffPath,
   AccountMeResponse,
-  BillingUsageResponse,
   LoginResponse,
 } from "@/models/interfaces/stores/account/useAccountStore";
 import { appSnapshot } from "@/stores/backend";
@@ -235,41 +231,16 @@ export function accountFetchMe(): Promise<AccountMeResponse> {
   return getJson("/me");
 }
 
-export function accountFetchBillingUsage(): Promise<BillingUsageResponse> {
-  return getJson("/billing/usage");
-}
-
-export function accountCreateCheckout(
-  tier: "pro",
-  interval: "month" | "year",
-): Promise<{ url: string }> {
-  return postJson("/billing/checkout-session", { tier, interval });
-}
-
-export function accountCreatePortalSession(): Promise<{ url: string }> {
-  return postJson("/billing/portal-session");
-}
-
-export function accountBeginDeletion(
-  password: string,
-  confirmation: string,
-): Promise<AccountDeletionResponse> {
-  return postJson("/me/deletion", { password, confirmation });
-}
-
-export function accountRequestExportManifest(password: string): Promise<AccountExportManifest> {
-  return postJson("/me/export", { password });
-}
-
-export async function accountUpdateProfile(name: string): Promise<void> {
-  await requestJson("PUT", "/me/profile", { name });
-}
-
-export async function accountUpdateAvatar(file: Blob): Promise<number> {
-  const response = await accountAvatarRequest("PUT", file);
-  const payload = (await response.json()) as { avatar_version?: number };
-  if (!payload.avatar_version) throw new Error("Misty did not confirm the profile image update.");
-  return payload.avatar_version;
+/**
+ * Mints a single-use URL that opens the website already signed in.
+ *
+ * Account management lives on the web now: a browser is a better place to show
+ * someone what data is held about them and to run irreversible actions. The
+ * desktop app still reads `/me` for license gating, but it no longer edits
+ * anything about the account.
+ */
+export function accountCreateHandoffUrl(path?: AccountHandoffPath): Promise<{ url: string }> {
+  return postJson("/auth/handoff", path ? { path } : {});
 }
 
 export async function accountFetchAvatar(): Promise<Blob> {
@@ -277,7 +248,7 @@ export async function accountFetchAvatar(): Promise<Blob> {
   return response.blob();
 }
 
-async function accountAvatarRequest(method: "GET" | "PUT", body?: Blob): Promise<Response> {
+async function accountAvatarRequest(method: "GET", body?: Blob): Promise<Response> {
   const accountGeneration = readAccountSessionGeneration();
   const apiBase = await resolveAccountApiBase();
   assertAccountGeneration(accountGeneration);
@@ -302,10 +273,6 @@ async function accountAvatarRequest(method: "GET" | "PUT", body?: Blob): Promise
   return response;
 }
 
-export async function accountUpdateDevice(device: string): Promise<void> {
-  await requestJson("PUT", "/me/device", { device });
-}
-
 export async function accountUpdateTelemetryPreferences(
   analyticsEnabled: boolean,
   errorReportingEnabled: boolean,
@@ -314,19 +281,6 @@ export async function accountUpdateTelemetryPreferences(
     analytics_enabled: analyticsEnabled,
     error_reporting_enabled: errorReportingEnabled,
   });
-}
-
-export async function accountLogout(): Promise<SavedAccountSession | null> {
-  await accountRevokeCurrentSession();
-  return await clearAccountAuthToken();
-}
-
-export async function accountRevokeCurrentSession(): Promise<void> {
-  try {
-    await postJson("/logout");
-  } catch {
-    // Local sign-out and account switching must still work while offline.
-  }
 }
 
 class AccountApiError extends Error {

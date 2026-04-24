@@ -1,5 +1,6 @@
 import { Fragment, type FormEvent } from "react";
 import { Sparkles } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage, Badge } from "@/ui";
 import { MessageOriginBadge } from "@/features/spaces/components/MessageOriginBadge";
 import {
@@ -14,6 +15,8 @@ import { MessageEditForm } from "./MessageEditForm";
 import { MessageHoverActions } from "./MessageHoverActions";
 import { MessageReactions } from "./MessageReactions";
 import { MessageReplyPreview } from "./MessageReplyPreview";
+import { AgentRunInline } from "./AgentRunInline";
+import { SuggestedActionsCard } from "./SuggestedActionsCard";
 import { canPublish, initials } from "./messageHelpers";
 
 export interface ChatMessageRowProps {
@@ -116,6 +119,9 @@ export function ChatMessageRow({
             onLibraryItem={props.onLibraryItem}
             onReload={props.onReload}
           />
+          {message.triggered_runs?.map((run) => (
+            <AgentRunInline key={run.id} run={run} />
+          ))}
           <MessageReactions
             message={message}
             canWrite={props.canWrite}
@@ -140,6 +146,16 @@ export function ChatMessageRow({
           />
         ) : null}
       </article>
+      {props.actionSuggestions
+        ?.filter((batch) => batch.anchor_message_id === message.id)
+        .map((batch) => (
+          <SuggestedActionsCard
+            key={batch.id}
+            spaceId={props.spaceId}
+            batch={batch}
+            onChanged={props.onActionSuggestionsChanged ?? (() => {})}
+          />
+        ))}
     </Fragment>
   );
 }
@@ -163,9 +179,15 @@ function MessageHeader({ message }: { message: SpaceMessage }) {
 }
 
 function MessageContent({ span }: { span: MessageSpan }) {
-  return span.type === "text" ? (
-    <>{span.text}</>
-  ) : (
+  if (span.type === "text") return <>{span.text}</>;
+  if (span.type === "link") {
+    return (
+      <Link className="font-medium text-primary underline underline-offset-2" to={span.url}>
+        {span.label}
+      </Link>
+    );
+  }
+  return (
     <span className="rounded bg-primary/10 px-1 py-0.5 font-medium text-primary">
       @{span.label}
     </span>

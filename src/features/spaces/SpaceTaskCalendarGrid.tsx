@@ -2,10 +2,11 @@ import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import { Badge, Button, Card } from "@/ui";
 import type {
   SpaceCalendarEvent,
+  SpaceAgentMembership,
   SpaceMember,
   SpaceTask,
 } from "@/models/interfaces/features/spaces/types";
-import { memberName } from "./SpaceTaskPrimitives";
+import { taskAssigneeName } from "./SpaceTaskPrimitives";
 
 const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -14,6 +15,7 @@ export function SpaceTaskCalendar({
   tasks,
   events,
   members,
+  agents,
   onMonth,
   onOpenTask,
   onOpenEvent,
@@ -22,6 +24,7 @@ export function SpaceTaskCalendar({
   tasks: SpaceTask[];
   events: SpaceCalendarEvent[];
   members: SpaceMember[];
+  agents: SpaceAgentMembership[];
   onMonth: (month: Date) => void;
   onOpenTask: (task: SpaceTask) => void;
   onOpenEvent: (event: SpaceCalendarEvent) => void;
@@ -108,7 +111,7 @@ export function SpaceTaskCalendar({
                   <Button
                     className="h-6 justify-start truncate rounded-md border-l-2 border-violet-500 bg-violet-500/10 px-1.5 text-[10px] font-normal text-violet-700 hover:bg-violet-500/20 dark:text-violet-300"
                     variant="ghost"
-                    title={`${task.task_key} · ${memberName(members, task.assignee_user_id)}`}
+                    title={`${task.task_key} · ${taskAssigneeName(members, agents, task)}`}
                     type="button"
                     key={task.id}
                     onClick={() => onOpenTask(task)}

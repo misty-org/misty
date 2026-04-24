@@ -22,6 +22,13 @@ afterAll(() => vi.unstubAllGlobals());
 describe("app route memory", () => {
   beforeEach(() => useAppRouteMemoryStore.getState().resetAppRoute());
 
+  it("defaults to the Spaces workspace mode", () => {
+    expect(useAppRouteMemoryStore.getState()).toMatchObject({
+      lastAppRoute: "/spaces",
+      lastSpacesRoute: "/spaces",
+    });
+  });
+
   it("remembers the exact Spaces destination separately from the current app route", () => {
     useAppRouteMemoryStore.getState().rememberAppRoute("/spaces/space-2/chat?conversation=group-4");
     useAppRouteMemoryStore.getState().rememberAppRoute("/files");

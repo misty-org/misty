@@ -4,6 +4,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger, cn } from "@/
 import type { Space } from "@/models/interfaces/features/spaces/types";
 import { SpaceMembersPopover } from "./SpaceMembersPopover";
 
+export { SpacesUtilityTray } from "./SpacesUtilityTray";
+
 export function SpaceManagementNavigation({
   space,
   section,

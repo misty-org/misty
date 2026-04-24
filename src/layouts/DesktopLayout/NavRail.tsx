@@ -14,6 +14,8 @@ import {
   navIconTileBaseClass,
   navItemLabelActiveClass,
   navItemLabelBaseClass,
+  navButtonActiveClass,
+  navItemBaseClass,
   navLinkActiveClass,
   navLinkBaseClass,
   profileDockClass,
@@ -81,7 +83,7 @@ export const ActivityNavButton = memo(
     return (
       <Button
         ref={ref}
-        className={`group/nav-item ${navLinkBaseClass} ${props.open ? navLinkActiveClass : ""}`}
+        className={`group/nav-item ${navItemBaseClass} ${props.open ? navButtonActiveClass : ""}`}
         variant="ghost"
         type="button"
         aria-haspopup="dialog"
@@ -106,7 +108,7 @@ export const ActivityNavButton = memo(
 export function SettingsNavButton(props: { open: boolean; onClick: () => void }) {
   return (
     <Button
-      className={`group/nav-item ${navLinkBaseClass} ${props.open ? navLinkActiveClass : ""}`}
+      className={`group/nav-item ${navItemBaseClass} ${props.open ? navButtonActiveClass : ""}`}
       variant="ghost"
       type="button"
       aria-haspopup="dialog"

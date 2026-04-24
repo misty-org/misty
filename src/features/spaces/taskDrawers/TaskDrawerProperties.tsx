@@ -1,6 +1,6 @@
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { Input, Label } from "@/ui";
-import type { SpaceMember } from "@/models/interfaces/features/spaces/types";
+import type { SpaceAgentMembership, SpaceMember } from "@/models/interfaces/features/spaces/types";
 import type { SpaceTaskPriority, SpaceTaskStatus } from "@/models/types/features/spaces/types";
 import type { TaskDraft } from "@/models/types/features/spaces/SpaceTaskPrimitives";
 import { TaskInlineSelect, taskPriorityOptions, taskStatusOptions } from "../SpaceTaskPrimitives";
@@ -10,11 +10,13 @@ export function TaskDrawerProperties({
   draft,
   setDraft,
   members,
+  agents,
   canManage,
 }: {
   draft: TaskDraft;
   setDraft: Dispatch<SetStateAction<TaskDraft>> | ((draft: TaskDraft) => void);
   members: SpaceMember[];
+  agents: SpaceAgentMembership[];
   canManage: boolean;
 }) {
   return (
@@ -41,11 +43,29 @@ export function TaskDrawerProperties({
         <TaskInlineSelect
           label="Task assignee"
           disabled={!canManage}
-          value={draft.assignee_user_id}
-          onChange={(value) => setDraft({ ...draft, assignee_user_id: value })}
+          value={
+            draft.assignee_agent_id
+              ? `agent:${draft.assignee_agent_id}`
+              : draft.assignee_user_id
+                ? `person:${draft.assignee_user_id}`
+                : ""
+          }
+          onChange={(value) =>
+            setDraft({
+              ...draft,
+              assignee_user_id: value.startsWith("person:") ? value.slice(7) : "",
+              assignee_agent_id: value.startsWith("agent:") ? value.slice(6) : "",
+            })
+          }
           options={[
             ["", "Unassigned"],
-            ...members.map((member): [string, string] => [member.user_id, member.name]),
+            ...members.map((member): [string, string] => [`person:${member.user_id}`, member.name]),
+            ...agents
+              .filter((agent) => agent.enabled)
+              .map((agent): [string, string] => [
+                `agent:${agent.agent_id}`,
+                `${agent.name} · Agent`,
+              ]),
           ]}
         />
       </TaskProperty>

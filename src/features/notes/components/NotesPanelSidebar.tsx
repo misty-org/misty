@@ -5,12 +5,15 @@ import { Plus } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { Button } from "@/ui";
 import { SpaceSidebarSection } from "@/features/spaces/components/SpaceSidebarSection";
+import { SpaceSidebarPageSection } from "@/features/spaces/components/SpaceSidebarPageSection";
 import { useNotesStore } from "@/stores/notes";
 import { selectVisibleNotes } from "@/features/notes/noteFilters";
 import { NoteListPanel } from "./NoteListPanel";
 import { NewNoteDialog } from "./NewNoteDialog";
 
-export function NotesPanelSidebar(props: NotesPanelSidebarProps) {
+export function NotesPanelSidebar(
+  props: NotesPanelSidebarProps & { section?: { active: boolean; to: string } },
+) {
   const [newNoteOpen, setNewNoteOpen] = useState(false);
   const store = useNotesStore(
     useShallow((state) => ({
@@ -35,38 +38,51 @@ export function NotesPanelSidebar(props: NotesPanelSidebarProps) {
     [store.notes, store.query, props.spaceId],
   );
 
+  const action = (
+    <Button
+      type="button"
+      size="icon"
+      variant="ghost"
+      className="size-6 shrink-0 opacity-0 shadow-none group-hover/sidebar-page:opacity-100 group-hover/sidebar-header:opacity-100 focus-visible:opacity-100"
+      title="New note"
+      aria-label="New note"
+      onClick={() => setNewNoteOpen(true)}
+    >
+      <Plus size={13} />
+    </Button>
+  );
+  const content = (
+    <NoteListPanel
+      notes={visibleNotes}
+      query={store.query}
+      loading={loading}
+      spaceName={props.spaceName}
+      showHeader={false}
+      selectedNoteId={store.selectedNoteId}
+      connectorErrors={store.connectorErrors}
+      onSelectNote={actions.selectNote}
+      onNewNote={() => setNewNoteOpen(true)}
+      onClearQuery={() => actions.setQuery("")}
+    />
+  );
+
   return (
     <>
-      <SpaceSidebarSection
-        title="Notes"
-        count={visibleNotes.length}
-        action={
-          <Button
-            type="button"
-            size="icon"
-            variant="ghost"
-            className="size-6 shrink-0 opacity-0 shadow-none group-hover/sidebar-header:opacity-100 focus-visible:opacity-100"
-            title="New note"
-            aria-label="New note"
-            onClick={() => setNewNoteOpen(true)}
-          >
-            <Plus size={13} />
-          </Button>
-        }
-      >
-        <NoteListPanel
-          notes={visibleNotes}
-          query={store.query}
-          loading={loading}
-          spaceName={props.spaceName}
-          showHeader={false}
-          selectedNoteId={store.selectedNoteId}
-          connectorErrors={store.connectorErrors}
-          onSelectNote={actions.selectNote}
-          onNewNote={() => setNewNoteOpen(true)}
-          onClearQuery={() => actions.setQuery("")}
-        />
-      </SpaceSidebarSection>
+      {props.section ? (
+        <SpaceSidebarPageSection
+          active={props.section.active}
+          label="Notes"
+          to={props.section.to}
+          count={visibleNotes.length}
+          action={action}
+        >
+          {content}
+        </SpaceSidebarPageSection>
+      ) : (
+        <SpaceSidebarSection title="Notes" count={visibleNotes.length} action={action}>
+          {content}
+        </SpaceSidebarSection>
+      )}
       <NewNoteDialog
         open={newNoteOpen}
         onOpenChange={setNewNoteOpen}

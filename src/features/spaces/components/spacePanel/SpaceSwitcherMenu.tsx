@@ -94,7 +94,7 @@ export function SpaceSwitcherMenu({
         <DropdownMenuItem
           className="min-h-9 gap-2"
           disabled={!canAddSpace}
-          title={canAddSpace ? undefined : "You already own three Spaces"}
+          title={canAddSpace ? undefined : "You’ve reached your Space limit"}
           onSelect={() => onAddSpace()}
         >
           <Plus size={14} />
