@@ -15,6 +15,7 @@ import { useSpaceConversationChat } from "./useSpaceConversationChat";
 import { useDiscordPublish } from "./connections";
 import { DeleteMessageDialog } from "./components/SpaceChatMessages";
 import { SpaceSetupCards } from "./components/SpaceSetupCards";
+import { ChatPresencePill } from "./spaceChat/ChatPresencePill";
 import { ChatReadOnlyNotice } from "./spaceChat/ChatReadOnlyNotice";
 import { SpaceChatComposer } from "./spaceChat/SpaceChatComposer";
 import { SpaceChatPicker } from "./spaceChat/SpaceChatPicker";
@@ -184,44 +185,35 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
 
   return (
     <div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-charcoal-bg text-cream">
-      <header className="flex h-11 shrink-0 items-center gap-2.5 border-b border-charcoal-border bg-charcoal-bg px-3">
-        <span className="grid size-7 shrink-0 place-items-center text-cream-muted">
-          <MessagesSquare size={16} strokeWidth={1.75} />
-        </span>
-        <span className="min-w-0 flex-1">
-          <h1 className="truncate text-[13px] font-semibold leading-tight">
-            {conversationId ? scope.activeConversation?.title || "Conversation" : "Everyone"}
-          </h1>
-        </span>
-        {canClearEveryone ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="size-8 text-cream-muted"
-            aria-label="Clear Everyone history"
-            onClick={() => void clearChat()}
-          >
-            <Trash2 size={15} />
-          </Button>
-        ) : null}
-        {conversationId && !scope.activeConversation?.direct_agent_id ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="size-8 text-cream-muted"
-            aria-label={
-              suggestionVeto
-                ? "Resume action suggestions"
-                : "Pause action suggestions in this conversation"
-            }
-            title={suggestionVeto ? "Resume suggestions" : "Pause suggestions"}
-            onClick={() => void toggleSuggestionVeto()}
-          >
-            {suggestionVeto ? <LightbulbOff size={15} /> : <Lightbulb size={15} />}
-          </Button>
-        ) : null}
+      <header className="flex min-h-11 shrink-0 items-center gap-2 border-b border-charcoal-border bg-charcoal-bg px-3 py-1.5">
+        <h1 className="m-0 text-sm font-semibold">
+          {scope.activeConversation?.title || "Everyone"}
+        </h1>
+
+        <div className="ml-auto flex items-center gap-2">
+          {conversationId && !scope.activeConversation?.direct_agent_id ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="size-8 text-cream-muted"
+              aria-label={
+                suggestionVeto
+                  ? "Resume action suggestions"
+                  : "Pause action suggestions in this conversation"
+              }
+              title={suggestionVeto ? "Resume suggestions" : "Pause suggestions"}
+              onClick={() => void toggleSuggestionVeto()}
+            >
+              {suggestionVeto ? (
+                <LightbulbOff className="size-4" />
+              ) : (
+                <Lightbulb className="size-4" />
+              )}
+            </Button>
+          ) : null}
+          <ChatPresencePill spaceId={spaceId} />
+        </div>
       </header>
 
       {!conversationId ? (
