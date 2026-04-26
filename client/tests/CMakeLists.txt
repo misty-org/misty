@@ -1,12 +1,16 @@
 if(BUILD_TESTING AND (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo"))
     file(GLOB_RECURSE MISTY_TEST_SOURCES CONFIGURE_DEPENDS
-        "${CMAKE_SOURCE_DIR}/src/tests/*.cpp"
-        "${CMAKE_SOURCE_DIR}/src/tests/*.h"
+        "${CMAKE_SOURCE_DIR}/tests/*.cpp"
+        "${CMAKE_SOURCE_DIR}/tests/*.h"
     )
 
     if(MISTY_TEST_SOURCES)
         set(MISTY_TEST_SUPPORT_SOURCES
             "${CMAKE_SOURCE_DIR}/src/core/sync/fs_watcher.h"
+            "${CMAKE_SOURCE_DIR}/src/core/threading/worker_pool.cpp"
+            "${CMAKE_SOURCE_DIR}/src/panels/file_explorer/file_explorer_state.cpp"
+            "${CMAKE_SOURCE_DIR}/src/panels/activity/upload_state.cpp"
+            "${CMAKE_SOURCE_DIR}/src/panels/activity/download_state.cpp"
         )
 
         if(APPLE)
@@ -21,8 +25,14 @@ if(BUILD_TESTING AND (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STRE
             ${MISTY_TEST_SOURCES}
             ${MISTY_TEST_SUPPORT_SOURCES}
         )
-        target_include_directories(misty_tests PRIVATE "${CMAKE_SOURCE_DIR}/src")
-        target_link_libraries(misty_tests PRIVATE gtest_main)
+        target_include_directories(misty_tests PRIVATE
+            "${CMAKE_SOURCE_DIR}/src"
+            "${CMAKE_SOURCE_DIR}/src/proto_src"
+            "${CMAKE_SOURCE_DIR}/vendor/imgui"
+            "${CMAKE_SOURCE_DIR}/vendor/imgui/backends"
+            "${CMAKE_SOURCE_DIR}/vendor/json/single_include"
+        )
+        target_link_libraries(misty_tests PRIVATE gtest_main misty_proto)
 
         if(APPLE)
             target_link_libraries(misty_tests PRIVATE
@@ -33,6 +43,6 @@ if(BUILD_TESTING AND (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STRE
         include(GoogleTest)
         gtest_discover_tests(misty_tests)
     else()
-        message(STATUS "No client tests found under src/tests/; skipping misty_tests target.")
+        message(STATUS "No client tests found under tests/; skipping misty_tests target.")
     endif()
 endif()
