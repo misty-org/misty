@@ -201,4 +201,4 @@ if(EXISTS "${CMAKE_SOURCE_DIR}/extensions")
 endif()
 
 add_custom_target(misty_assets ALL ${MISTY_ASSET_COMMANDS})
-add_dependencies(misty_assets misty misty_plugin_sandbox preview_manager_manifest)
+add_dependencies(misty_assets misty misty_plugin_sandbox)

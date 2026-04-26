@@ -6,6 +6,5 @@ include(cmake/Options.cmake)
 include(cmake/Dependencies.cmake)
 
 add_subdirectory(proto)
-add_subdirectory(plugins)
 add_subdirectory(src)
 add_subdirectory(tests)
