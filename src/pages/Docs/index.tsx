@@ -6,9 +6,12 @@ import CenterPanel from "./CenterPanel";
 import RightPanel from "./RightPanel";
 
 const guideCategories: Category[] = [
-  { key: "getting-started", label: "Getting Started", ids: ["introduction", "installation"] },
-  { key: "architecture", label: "Architecture", ids: ["architecture"] },
-  { key: "extensions", label: "Extensions & CLI", ids: ["extensions", "cli"] },
+  { key: "getting-started", label: "Getting Started", ids: ["introduction", "installation", "setup"] },
+  { key: "providers", label: "Providers", ids: ["providers-overview", "google-drive", "onedrive", "s3-sftp"] },
+  { key: "backups", label: "Backups", ids: ["backups-overview", "snapshots", "restore"] },
+  { key: "search", label: "Search", ids: ["search-overview", "indexing", "search-workflows"] },
+  { key: "plugins", label: "Plugins", ids: ["plugins-overview", "building-plugins", "cli"] },
+  { key: "mistyai", label: "MistyAI", ids: ["mistyai-overview", "ask-mistyai", "mistyai-actions"] },
 ];
 
 export default function Docs() {
@@ -28,7 +31,12 @@ export default function Docs() {
           open={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
         />
-        <CenterPanel section={section} />
+        <CenterPanel
+          section={section}
+          sections={guideSections}
+          activeId={activeId}
+          onSelect={setActiveId}
+        />
         <RightPanel section={section} />
 
         <button

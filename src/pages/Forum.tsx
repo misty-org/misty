@@ -106,7 +106,7 @@ const threads: Thread[] = [
         author: "Misty Team",
         avatar: "MT",
         date: "Jan 2026",
-        body: "Dropbox is on our roadmap! It's currently in the 'In Progress' phase. We're working on the OAuth flow and file listing API integration. Stay tuned.",
+        body: "Dropbox is on our roadmap! It's currently in the 'In Progress' phase. We're working on the Oauth flow and file listing Api integration. Stay tuned.",
         likes: 24,
       },
       {
@@ -128,13 +128,13 @@ const threads: Thread[] = [
   },
   {
     id: 3,
-    title: "OAuth token refresh fails after sleep/hibernate",
+    title: "Oauth token refresh fails after sleep/hibernate",
     category: "bug-reports",
     author: "linux_power",
     avatar: "LP",
     date: "Feb 2026",
     solved: true,
-    body: "After my laptop wakes from suspend, Misty loses the connection to Google Drive and the OAuth token doesn't auto-refresh. I have to manually disconnect and reconnect the account.\n\nOS: Arch Linux (Wayland)\nMisty: v0.2.1\nSteps:\n1. Connect Google Drive account\n2. Suspend laptop for 30+ minutes\n3. Wake and try to browse Drive files\n4. Get 'Authentication failed' error",
+    body: "After my laptop wakes from suspend, Misty loses the connection to Google Drive and the Oauth token doesn't auto-refresh. I have to manually disconnect and reconnect the account.\n\nOs: Arch Linux (Wayland)\nMisty: v0.2.1\nSteps:\n1. Connect Google Drive account\n2. Suspend laptop for 30+ minutes\n3. Wake and try to browse Drive files\n4. Get 'Authentication failed' error",
     replies: [
       {
         author: "Misty Team",
@@ -185,7 +185,7 @@ const threads: Thread[] = [
         author: "Misty Team",
         avatar: "MT",
         date: "Mar 2026",
-        body: "Misty uses gRPC streaming for transfers, so large files are handled in chunks rather than loaded into memory all at once. There's no hard file size limit. For 50GB of video, you should be fine — the main bottleneck will be your internet upload/download speed, not Misty itself.",
+        body: "Misty uses Grpc streaming for transfers, so large files are handled in chunks rather than loaded into memory all at once. There's no hard file size limit. For 50GB of video, you should be fine — the main bottleneck will be your internet upload/download speed, not Misty itself.",
         likes: 11,
       },
       {
@@ -224,13 +224,13 @@ const threads: Thread[] = [
     author: "photo_fan",
     avatar: "PF",
     date: "Mar 2026",
-    body: "When I try to preview .heic files from my iCloud Drive, I just get a blank preview panel. JPG and PNG work fine. Is HEIC supposed to be supported?\n\nOS: macOS 14.3\nMisty: v0.3.0",
+    body: "When I try to preview .heic files from my iCloud Drive, I just get a blank preview panel. Jpg and Png work fine. Is Heic supposed to be supported?\n\nOs: macOS 14.3\nMisty: v0.3.0",
     replies: [
       {
         author: "Misty Team",
         avatar: "MT",
         date: "Mar 2026",
-        body: "HEIC preview support is not yet implemented — we currently only handle common raster formats (JPG, PNG, GIF, WebP). We'll add HEIC support in an upcoming release. Thanks for the report!",
+        body: "Heic preview support is not yet implemented — we currently only handle common raster formats (Jpg, Png, Gif, Webp). We'll add Heic support in an upcoming release. Thanks for the report!",
         likes: 7,
       },
     ],
@@ -238,12 +238,12 @@ const threads: Thread[] = [
   },
   {
     id: 8,
-    title: "Built a script to auto-organize cloud files with Misty + API",
+    title: "Built a script to auto-organize cloud files with Misty + Api",
     category: "show-and-tell",
     author: "script_kid",
     avatar: "SK",
     date: "Mar 2026",
-    body: "I wrote a small Python script that uses the Misty API to automatically sort files in my Google Drive by file type. Photos go into /Photos, documents into /Docs, etc. Runs on a cron job once a day.\n\nHappy to share the script if anyone's interested — it's about 60 lines of code.",
+    body: "I wrote a small Python script that uses the Misty Api to automatically sort files in my Google Drive by file type. Photos go into /Photos, documents into /Docs, etc. Runs on a cron job once a day.\n\nHappy to share the script if anyone's interested — it's about 60 lines of code.",
     replies: [
       {
         author: "alex_dev",
@@ -313,12 +313,12 @@ function ThreadRow({ thread, onClick }: { thread: Thread; onClick: () => void })
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap mb-1">
           {thread.pinned && (
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-primary bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20">
+            <span className="text-[10px] font-semibold tracking-[0.14em] text-primary bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20">
               Pinned
             </span>
           )}
           {thread.solved && (
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-success bg-success/10 px-1.5 py-0.5 rounded border border-success/20">
+            <span className="text-[10px] font-semibold tracking-[0.14em] text-success bg-success/10 px-1.5 py-0.5 rounded border border-success/20">
               Solved
             </span>
           )}
@@ -363,12 +363,12 @@ function ThreadDetail({ thread, onBack }: { thread: Thread; onBack: () => void }
         <div className="px-6 py-5">
           <div className="flex items-center gap-2 flex-wrap mb-3">
             {thread.pinned && (
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-primary bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20">
+              <span className="text-[10px] font-semibold tracking-[0.14em] text-primary bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20">
                 Pinned
               </span>
             )}
             {thread.solved && (
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-success bg-success/10 px-1.5 py-0.5 rounded border border-success/20">
+              <span className="text-[10px] font-semibold tracking-[0.14em] text-success bg-success/10 px-1.5 py-0.5 rounded border border-success/20">
                 Solved
               </span>
             )}
@@ -403,7 +403,7 @@ function ThreadDetail({ thread, onBack }: { thread: Thread; onBack: () => void }
       {/* Replies */}
       {thread.replies.length > 0 && (
         <div className="space-y-3">
-          <span className="text-xs font-semibold uppercase tracking-widest text-text-muted block px-1 mb-2">
+          <span className="text-xs font-semibold tracking-[0.18em] text-text-muted block px-1 mb-2">
             Replies
           </span>
           {thread.replies.map((reply, i) => (

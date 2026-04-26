@@ -19,7 +19,7 @@ const posts = [
     title: "Building a Cross-Platform Desktop App with ImGui and Go",
     date: "February 2026",
     summary:
-      "Technical lessons from combining a C++ ImGui frontend with a Go gRPC backend — the trade-offs, the wins, and what we'd do differently.",
+      "Technical lessons from combining a C++ ImGui frontend with a Go Grpc backend — the trade-offs, the wins, and what we'd do differently.",
     tag: "Engineering",
   },
 ];

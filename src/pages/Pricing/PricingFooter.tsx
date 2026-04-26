@@ -19,7 +19,7 @@ const faqs = [
   },
   {
     q: "What does Lite include?",
-    a: "Lite is free forever. It includes one cloud provider, full file management, background transfers, unified search, and the Misty CLI. No credit card required.",
+    a: "Lite is free forever. It includes one cloud provider, full file management, background transfers, unified search, and the Misty Cli. No credit card required.",
   },
   {
     q: "How does Misty handle my data?",

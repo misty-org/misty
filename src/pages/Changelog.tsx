@@ -18,9 +18,9 @@ const changelog = [
     date: "February 2026",
     summary: "Stability & progress reporting",
     changes: [
-      "Fixed crash when reconnecting expired OAuth sessions",
+      "Fixed crash when reconnecting expired Oauth sessions",
       "Improved file upload progress reporting",
-      "Minor UI polish and animation fixes",
+      "Minor Ui polish and animation fixes",
     ],
   },
   {
@@ -40,7 +40,7 @@ const changelog = [
     summary: "Initial release",
     changes: [
       "ImGui-based desktop client with local file browsing",
-      "Go backend proxy with gRPC communication",
+      "Go backend proxy with Grpc communication",
       "Basic file operations (copy, move, delete)",
       "Cross-platform builds for Windows and macOS",
     ],

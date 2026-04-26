@@ -7,9 +7,9 @@ const changelog = [
     summary: "OneDrive integration & transfer queue",
     changes: [
       "Added OneDrive as a supported storage provider",
-      "New transfer queue UI with real-time progress tracking",
-      "gRPC streaming for large file transfers",
-      "Bug fixes for OAuth token refresh flow",
+      "New transfer queue Ui with real-time progress tracking",
+      "Grpc streaming for large file transfers",
+      "Bug fixes for Oauth token refresh flow",
     ],
   },
   {
@@ -29,7 +29,7 @@ const changelog = [
     summary: "Initial release",
     changes: [
       "ImGui-based desktop client with local file browsing",
-      "Go backend proxy with gRPC communication",
+      "Go backend proxy with Grpc communication",
       "Basic file operations (copy, move, delete)",
       "Cross-platform builds for Windows and Linux",
     ],

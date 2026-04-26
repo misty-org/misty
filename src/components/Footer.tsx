@@ -17,7 +17,7 @@ const columns = [
       { to: "/docs/getting-started", text: "Getting Started" },
       { to: "/docs/providers", text: "Cloud Providers" },
       { to: "/docs/self-hosting", text: "Self-Hosting" },
-      { to: "/docs/api", text: "API Reference" },
+      { to: "/docs/api", text: "Api reference" },
     ],
   },
   {
@@ -62,7 +62,7 @@ export default function Footer() {
         <div className="flex gap-12 sm:gap-16">
           {columns.map((col) => (
             <div key={col.label} className="flex flex-col gap-3">
-              <span className="text-xs font-medium text-text-muted uppercase tracking-wider">{col.label}</span>
+              <span className="text-xs font-medium text-text-muted tracking-[0.14em]">{col.label}</span>
               {col.links.map((link) =>
                 link.to.startsWith("http") || link.to.startsWith("mailto") ? (
                   <a key={link.text} href={link.to} target="_blank" rel="noopener noreferrer" className="text-sm text-text-muted/60 hover:text-text transition-colors">{link.text}</a>

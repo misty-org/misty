@@ -1,15 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { NavLink, useNavigate, useLocation } from "react-router";
 import { useAuth } from "../AuthContext";
+import { useUserStore } from "../store/userStore";
 
 const navItems = [
   { to: "/download", label: "Download" },
   { to: "/pricing", label: "Pricing" },
+  { to: "/docs", label: "Docs" },
 ];
 
-const docsLinks = [
-  { to: "/docs", label: "Guide" },
-];
 
 const resourcesLinks = [
   { to: "/changelog", label: "Changelog" },
@@ -20,17 +19,33 @@ const resourcesLinks = [
 
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [docsOpen, setDocsOpen] = useState(false);
   const [resourcesOpen, setResourcesOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const me = useUserStore((s) => s.me);
+
+  const displayName = me?.name ?? user?.name ?? "";
+  const initials = displayName
+    ? displayName.split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2)
+    : user?.email?.[0]?.toUpperCase() ?? "";
 
   useEffect(() => {
     setMenuOpen(false);
-    setDocsOpen(false);
     setResourcesOpen(false);
+    setProfileOpen(false);
   }, [location]);
+
+  useEffect(() => {
+    if (!profileOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (!profileMenuRef.current?.contains(e.target as Node)) setProfileOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [profileOpen]);
 
   useEffect(() => {
     const handleScroll = () => {};
@@ -38,13 +53,7 @@ export default function Navbar() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  function openDocs() {
-    setResourcesOpen(false);
-    setDocsOpen(true);
-  }
-
   function openResources() {
-    setDocsOpen(false);
     setResourcesOpen(true);
   }
 
@@ -82,36 +91,6 @@ export default function Navbar() {
             </NavLink>
           ))}
 
-          {/* Docs dropdown */}
-          <div className="relative" onMouseEnter={openDocs} onMouseLeave={() => setDocsOpen(false)}>
-            <NavLink
-              to="/docs"
-              onClick={() => setDocsOpen(false)}
-              className={`relative px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 block ${
-                location.pathname.startsWith("/docs") ? "text-white" : "text-text hover:text-white"
-              }`}
-            >
-              Docs
-              {location.pathname.startsWith("/docs") && <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-primary rounded-full" />}
-            </NavLink>
-            <div className={`absolute left-1/2 -translate-x-1/2 top-full pt-1 w-44 transition-all duration-200 ${docsOpen ? "opacity-100 visible" : "opacity-0 invisible"}`}>
-              <div className="glass-card rounded-xl overflow-hidden shadow-xl shadow-bg/50">
-                {docsLinks.map(({ to, label }) => (
-                  <NavLink
-                    key={to}
-                    to={to}
-                    end
-                    className={({ isActive }) => `block px-4 py-2.5 text-sm transition-colors ${
-                      isActive ? "text-white bg-primary/10" : "text-text hover:text-white hover:bg-elevated"
-                    }`}
-                  >
-                    {label}
-                  </NavLink>
-                ))}
-              </div>
-            </div>
-          </div>
-
           {/* Resources dropdown */}
           <div className="relative" onMouseEnter={openResources} onMouseLeave={() => setResourcesOpen(false)}>
             <NavLink
@@ -144,19 +123,30 @@ export default function Navbar() {
 
           <div className="pl-4 border-l border-border">
             {user ? (
-              <NavLink
-                to="/settings"
-                className={({ isActive }) => `relative px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 block ${
-                  isActive ? "text-white" : "text-text hover:text-white"
-                }`}
-              >
-                {({ isActive }) => (
-                  <>
-                    Settings
-                    {isActive && <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-primary rounded-full" />}
-                  </>
+              <div ref={profileMenuRef} className="relative">
+                <button
+                  onClick={() => setProfileOpen((o) => !o)}
+                  className="w-8 h-8 rounded-full bg-white hover:bg-zinc-200 flex items-center justify-center text-xs font-semibold text-black transition-colors"
+                >
+                  {initials}
+                </button>
+                {profileOpen && (
+                  <div className="absolute right-0 top-full pt-2">
+                    <div className="w-44 glass-card rounded-xl overflow-hidden shadow-xl shadow-bg/50">
+                      <div className="px-4 py-3 border-b border-border/50">
+                        <p className="text-sm font-medium text-text truncate">{displayName}</p>
+                        <p className="text-xs text-text-muted truncate">{user.email}</p>
+                      </div>
+                      <NavLink to="/settings" className="block px-4 py-2.5 text-sm text-text-muted hover:text-text hover:bg-elevated transition-colors">
+                        Settings
+                      </NavLink>
+                      <button onClick={logout} className="w-full text-left px-4 py-2.5 text-sm text-text-muted hover:text-text hover:bg-elevated transition-colors border-t border-border/30">
+                        Sign out
+                      </button>
+                    </div>
+                  </div>
                 )}
-              </NavLink>
+              </div>
             ) : (
               <button
                 onClick={() => navigate("/signin", { state: { from: location.pathname } })}
@@ -188,15 +178,7 @@ export default function Navbar() {
                 {label}
               </NavLink>
             ))}
-            <span className="px-4 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-widest text-text-muted">Docs</span>
-            {docsLinks.map(({ to, label }) => (
-              <NavLink key={to} to={to} end className={({ isActive }) => `px-4 pl-6 py-2 rounded-lg text-sm font-medium transition-colors ${
-                isActive ? "text-primary bg-primary/10" : "text-text-muted hover:text-text hover:bg-elevated"
-              }`}>
-                {label}
-              </NavLink>
-            ))}
-            <span className="px-4 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-widest text-text-muted">Resources</span>
+            <span className="px-4 pt-3 pb-1 text-[11px] font-semibold tracking-[0.18em] text-text-muted">Resources</span>
             {resourcesLinks.map(({ to, label }) => (
               <NavLink key={to} to={to} end className={({ isActive }) => `px-4 pl-6 py-2 rounded-lg text-sm font-medium transition-colors ${
                 isActive ? "text-primary bg-primary/10" : "text-text-muted hover:text-text hover:bg-elevated"
@@ -205,11 +187,16 @@ export default function Navbar() {
               </NavLink>
             ))}
             {user ? (
-              <NavLink to="/settings" className={({ isActive }) => `mt-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                isActive ? "text-primary bg-primary/10" : "text-text-muted hover:text-text hover:bg-elevated"
-              }`}>
-                Settings
-              </NavLink>
+              <>
+                <NavLink to="/settings" className={({ isActive }) => `mt-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  isActive ? "text-primary bg-primary/10" : "text-text-muted hover:text-text hover:bg-elevated"
+                }`}>
+                  Settings
+                </NavLink>
+                <button onClick={logout} className="px-4 py-2.5 text-left text-sm font-medium text-text-muted hover:text-text hover:bg-elevated rounded-lg transition-colors">
+                  Sign out
+                </button>
+              </>
             ) : (
               <button onClick={() => navigate("/signin")} className="mt-2 px-4 py-2.5 bg-white text-bg text-sm font-medium rounded-lg">Sign In</button>
             )}

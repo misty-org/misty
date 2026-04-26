@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { HiOutlineBolt, HiOutlineShieldCheck, HiOutlineMagnifyingGlass, HiOutlineArrowsRightLeft, HiOutlineLockClosed, HiOutlineSignal } from "react-icons/hi2";
 
 const searchProviders = ["Google Drive", "OneDrive", "Dropbox"];
 
@@ -52,7 +51,7 @@ function OAuthPacket() {
         <span className="text-text font-medium">Your device</span>
       </div>
       <div className="flex-1 flex flex-col items-center gap-0.5 min-w-0">
-        <span className="text-[10px]">OAuth</span>
+        <span className="text-[10px]">Oauth</span>
         <div className="relative w-full h-3 flex items-center">
           <div className="absolute inset-x-0 border-t border-dashed border-border" />
           <div className="animate-oauth-packet w-1.5 h-1.5 rounded-full bg-zinc-400" />
@@ -143,16 +142,11 @@ export default function FeaturesShowcase() {
           <div className="absolute top-[70%] left-0 w-16 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent animate-streak-3" />
         </div>
         <div className="relative">
-          <div className="flex justify-center mb-6">
-            <div className="w-12 h-12 rounded-xl bg-surface border border-border flex items-center justify-center">
-              <HiOutlineBolt className="w-6 h-6 text-text" />
-            </div>
-          </div>
           <h2 className="text-2xl md:text-3xl font-bold text-text tracking-tight mb-4">
             <span className="text-white">Fast</span>, zero bloat.
           </h2>
           <p className="text-text-muted max-w-xl mx-auto text-pretty">
-            Files stream on demand — no full sync, no waiting. Search across every provider at once and never lose your place.
+            Misty is built for files streaming on demand. Files will sync in the backgro, no waiting. Search across every provider at once and never lose your place.
           </p>
         </div>
       </div>
@@ -160,9 +154,6 @@ export default function FeaturesShowcase() {
       {/* 2-col row */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="glass-card rounded-2xl p-4 md:p-6">
-          <div className="w-10 h-10 rounded-lg bg-surface border border-border flex items-center justify-center mb-5">
-            <HiOutlineMagnifyingGlass className="w-5 h-5 text-text-muted" />
-          </div>
           <h3 className="text-xl font-bold text-text mb-3">Unified search</h3>
           <p className="text-text-muted text-pretty mb-5">
             One query across every connected provider. No more switching between tabs to find a file.
@@ -170,9 +161,6 @@ export default function FeaturesShowcase() {
           <SearchDiagram />
         </div>
         <div className="glass-card rounded-2xl p-4 md:p-6">
-          <div className="w-10 h-10 rounded-lg bg-surface border border-border flex items-center justify-center mb-5">
-            <HiOutlineArrowsRightLeft className="w-5 h-5 text-text-muted" />
-          </div>
           <h3 className="text-xl font-bold text-text mb-3">Background transfers</h3>
           <p className="text-text-muted text-pretty mb-5">
             Moves and copies run quietly while you keep working. Large transfers don't block anything.
@@ -187,29 +175,17 @@ export default function FeaturesShowcase() {
 
       {/* Secure — full width */}
       <div className="glass-card rounded-2xl p-4 md:p-6 text-center">
-        <div className="flex justify-center mb-6">
-          <div className="relative flex items-center justify-center">
-            <div className="absolute w-12 h-12 rounded-xl border border-white/10 animate-shield-ring" />
-            <div className="absolute w-12 h-12 rounded-xl border border-white/5 animate-shield-ring [animation-delay:1s]" />
-            <div className="w-12 h-12 rounded-xl bg-surface border border-border flex items-center justify-center relative">
-              <HiOutlineShieldCheck className="w-6 h-6 text-text" />
-            </div>
-          </div>
-        </div>
         <h2 className="text-2xl md:text-3xl font-bold text-text tracking-tight mb-4">
           <span className="text-white">Secure</span> by design.
         </h2>
         <p className="text-text-muted max-w-xl mx-auto text-pretty">
-          Your credentials never leave your machine. Direct connections over OAuth — no relay servers, no middlemen, no data we can see.
+          Your credentials never leave your machine. Direct connections over Oauth — no relay servers, no middlemen, no data we can see.
         </p>
       </div>
 
       {/* 2-col: Local-only + Direct connections */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="glass-card rounded-2xl p-4 md:p-6">
-          <div className="w-10 h-10 rounded-lg bg-surface border border-border flex items-center justify-center mb-5">
-            <HiOutlineLockClosed className="w-5 h-5 text-text-muted" />
-          </div>
           <h3 className="text-xl font-bold text-text mb-3">Local-only</h3>
           <p className="text-text-muted text-pretty mb-5">
             All processing happens on your device. Nothing is routed through our servers.
@@ -217,12 +193,9 @@ export default function FeaturesShowcase() {
           <OAuthPacket />
         </div>
         <div className="glass-card rounded-2xl p-4 md:p-6">
-          <div className="w-10 h-10 rounded-lg bg-surface border border-border flex items-center justify-center mb-5">
-            <HiOutlineSignal className="w-5 h-5 text-text-muted" />
-          </div>
           <h3 className="text-xl font-bold text-text mb-3">Direct connections</h3>
           <p className="text-text-muted text-pretty mb-5">
-            Every API call goes straight from your machine to the provider. Optional Tailscale support for secure remote access.
+            Every Api call goes straight from your machine to the provider. Optional Tailscale support for secure remote access.
           </p>
           <DirectConnections />
         </div>

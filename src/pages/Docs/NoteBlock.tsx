@@ -11,7 +11,7 @@ export default function NoteBlock({ kind, text }: { kind: "tip" | "note" | "warn
   const s = styles[kind];
   return (
     <div className={`rounded-lg border ${s.border} ${s.bg} p-4`}>
-      <span className={`text-xs font-semibold uppercase tracking-wider ${s.icon}`}>{s.label}</span>
+      <span className={`text-xs font-semibold tracking-[0.14em] ${s.icon}`}>{s.label}</span>
       <p className="mt-1.5 text-sm text-text-secondary leading-relaxed">{text}</p>
     </div>
   );

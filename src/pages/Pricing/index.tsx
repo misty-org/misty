@@ -26,7 +26,7 @@ export default function Pricing() {
           description="Everything you need to get started."
           features={liteFeatures}
           ctaTo="/download"
-          ctaLabel="Get started"
+          ctaLabel="Download"
         />
         <PricingCard
           name="Pro"

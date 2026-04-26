@@ -1,5 +1,9 @@
 import type { Section, GuideSection, ApiSection } from "./data";
 
+function formatLabel(value: string) {
+  return value.charAt(0) + value.slice(1).toLowerCase();
+}
+
 function getAnchors(section: Section): { id: string; label: string }[] {
   if ("prose" in section) {
     const guide = section as GuideSection;
@@ -14,7 +18,7 @@ function getAnchors(section: Section): { id: string; label: string }[] {
     const api = section as ApiSection;
     return api.endpoints.map((ep, i) => ({
       id: `${section.id}-ep-${i}`,
-      label: `${ep.method} ${ep.path}`,
+      label: `${formatLabel(ep.method)} ${ep.path}`,
     }));
   }
 
@@ -27,7 +31,7 @@ export default function RightPanel({ section }: { section: Section }) {
   return (
     <aside className="sticky top-16 h-[calc(100vh-4rem)] self-start overflow-y-auto border-l border-border-subtle hidden lg:block scrollbar-hide">
       <div className="py-6 px-5">
-        <span className="text-[11px] font-semibold uppercase tracking-widest text-text-muted mb-3 block">
+        <span className="text-[11px] font-semibold text-text-muted mb-3 block">
           Contents
         </span>
         <nav className="flex flex-col gap-1">

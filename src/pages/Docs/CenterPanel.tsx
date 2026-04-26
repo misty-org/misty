@@ -3,15 +3,56 @@ import { methodColor } from "./data";
 import CodeBlock from "./CodeBlock";
 import NoteBlock from "./NoteBlock";
 
-
-export default function CenterPanel({ section }: { section: Section }) {
-  if ("prose" in section) {
-    return <GuideCenterPanel section={section as GuideSection} />;
-  }
-  return <ApiCenterPanel section={section as ApiSection} />;
+function formatLabel(value: string) {
+  return value.charAt(0) + value.slice(1).toLowerCase();
 }
 
-export function GuideCenterPanel({ section }: { section: GuideSection }) {
+export default function CenterPanel({
+  section,
+  sections,
+  activeId,
+  onSelect,
+}: {
+  section: Section;
+  sections: Section[];
+  activeId: string;
+  onSelect: (id: string) => void;
+}) {
+  const currentIndex = sections.findIndex((item) => item.id === activeId);
+  const previousSection = currentIndex > 0 ? sections[currentIndex - 1] : null;
+  const nextSection = currentIndex < sections.length - 1 ? sections[currentIndex + 1] : null;
+
+  if ("prose" in section) {
+    return (
+      <GuideCenterPanel
+        section={section as GuideSection}
+        previousSection={previousSection}
+        nextSection={nextSection}
+        onSelect={onSelect}
+      />
+    );
+  }
+  return (
+    <ApiCenterPanel
+      section={section as ApiSection}
+      previousSection={previousSection}
+      nextSection={nextSection}
+      onSelect={onSelect}
+    />
+  );
+}
+
+export function GuideCenterPanel({
+  section,
+  previousSection,
+  nextSection,
+  onSelect,
+}: {
+  section: GuideSection;
+  previousSection: Section | null;
+  nextSection: Section | null;
+  onSelect: (id: string) => void;
+}) {
   return (
     <div className="px-6 py-8 sm:px-8 sm:py-10 min-w-0">
       <h1 className="text-2xl font-bold text-text mb-6">{section.title}</h1>
@@ -59,11 +100,23 @@ export function GuideCenterPanel({ section }: { section: GuideSection }) {
           </div>
         ))}
       </div>
+
+      <SectionPager previousSection={previousSection} nextSection={nextSection} onSelect={onSelect} />
     </div>
   );
 }
 
-export function ApiCenterPanel({ section }: { section: ApiSection }) {
+export function ApiCenterPanel({
+  section,
+  previousSection,
+  nextSection,
+  onSelect,
+}: {
+  section: ApiSection;
+  previousSection: Section | null;
+  nextSection: Section | null;
+  onSelect: (id: string) => void;
+}) {
   return (
     <div className="px-6 py-8 sm:px-8 sm:py-10 min-w-0">
       <div className="flex items-center gap-3 mb-2">
@@ -81,7 +134,7 @@ export function ApiCenterPanel({ section }: { section: ApiSection }) {
           <div key={i} id={`${section.id}-ep-${i}`} className="scroll-mt-20">
             <div className="flex items-center gap-3 mb-4">
               <span className={`font-mono text-xs font-bold ${methodColor[ep.method]}`}>
-                {ep.method}
+                {formatLabel(ep.method)}
               </span>
               <code className="font-mono text-sm text-text-secondary">{ep.path}</code>
             </div>
@@ -92,6 +145,48 @@ export function ApiCenterPanel({ section }: { section: ApiSection }) {
             </div>
           </div>
         ))}
+      </div>
+
+      <SectionPager previousSection={previousSection} nextSection={nextSection} onSelect={onSelect} />
+    </div>
+  );
+}
+
+function SectionPager({
+  previousSection,
+  nextSection,
+  onSelect,
+}: {
+  previousSection: Section | null;
+  nextSection: Section | null;
+  onSelect: (id: string) => void;
+}) {
+  if (!previousSection && !nextSection) return null;
+
+  return (
+    <div className="mt-12 border-t border-border pt-6">
+      <div className="grid gap-3 sm:grid-cols-2">
+        {previousSection ? (
+          <button
+            onClick={() => onSelect(previousSection.id)}
+            className="text-left transition-colors hover:text-white"
+          >
+            <p className="text-xs text-text-muted mb-1">← Previous</p>
+            <p className="text-sm font-medium text-text">{previousSection.title}</p>
+          </button>
+        ) : (
+          <div />
+        )}
+
+        {nextSection ? (
+          <button
+            onClick={() => onSelect(nextSection.id)}
+            className="text-left transition-colors hover:text-white sm:text-right"
+          >
+            <p className="text-xs text-text-muted mb-1">Up next →</p>
+            <p className="text-sm font-medium text-text">{nextSection.title}</p>
+          </button>
+        ) : null}
       </div>
     </div>
   );

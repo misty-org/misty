@@ -19,7 +19,7 @@ export default function Sidebar({
     <nav className="flex flex-col gap-6 py-6 px-4">
       {categories.map((cat) => (
         <div key={cat.key}>
-          <span className="text-[11px] font-semibold uppercase tracking-widest text-text-muted px-3 mb-2 block">
+          <span className="text-[11px] font-semibold text-text-muted px-3 mb-2 block">
             {cat.label}
           </span>
           <div className="flex flex-col gap-0.5">
@@ -30,7 +30,7 @@ export default function Sidebar({
                 <button
                   key={id}
                   onClick={() => { onSelect(id); onClose(); }}
-                  className={`flex items-center gap-2 text-left px-3 py-1.5 rounded-lg text-sm transition-colors cursor-pointer ${
+                  className={`flex w-full items-center gap-2 text-left px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer ${
                     active
                       ? "bg-primary/10 text-white font-medium"
                       : "text-text hover:text-white hover:bg-elevated"
@@ -53,7 +53,7 @@ export default function Sidebar({
 
   return (
     <>
-      <aside className="sticky top-16 h-[calc(100vh-4rem)] self-start overflow-y-auto border-r border-border-subtle hidden lg:block scrollbar-hide">{inner}</aside>
+      <aside className="sticky top-16 h-[calc(100vh-4rem)] self-start overflow-y-auto border-r border-border-subtle hidden lg:block">{inner}</aside>
       {open && (
         <>
           <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={onClose} />

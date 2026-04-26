@@ -1,5 +1,4 @@
 import { NavLink } from "react-router";
-import { GlowCard } from "../../components/GlowCard";
 
 const CheckIcon = ({ muted }: { muted?: boolean }) => (
   <svg
@@ -41,7 +40,7 @@ export default function PricingCard({
   ctaLabel,
 }: PricingCardProps) {
   return (
-    <GlowCard className="h-full min-h-92">
+    <div className="h-full min-h-92 rounded-2xl border border-border bg-surface/50">
       <div className="p-6 flex flex-col h-full relative">
         {(comingSoon || popular) && (
           <div className="absolute top-3 right-3">
@@ -50,7 +49,7 @@ export default function PricingCard({
                 ? "bg-primary text-bg border-primary"
                 : "bg-primary/10 text-primary border-primary/20"
             }`}>
-              {popular ? "Most Popular" : "Coming Soon"}
+              {popular ? "Recommended" : "Coming Soon"}
             </span>
           </div>
         )}
@@ -65,13 +64,9 @@ export default function PricingCard({
         </div>
 
         {inherits ? (
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-2">
-            Everything in {inherits}
-          </h2>
+          <p className="text-xs text-text-muted mb-2">Everything in {inherits}, plus:</p>
         ) : (
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-2">
-            Includes
-          </h2>
+          <p className="text-xs text-text-muted mb-2">Includes</p>
         )}
 
         <ul className="flex-1 flex flex-col gap-2 mb-4">
@@ -105,6 +100,6 @@ export default function PricingCard({
           </span>
         )}
       </div>
-    </GlowCard>
+    </div>
   );
 }

@@ -1,15 +1,15 @@
 export const liteFeatures = [
-  "1 cloud provider (Google Drive, OneDrive, Dropbox, S3, SFTP)",
+  "1 cloud provider (Google Drive, OneDrive, Dropbox, S3, Sftp)",
   "Full file management — browse, upload, download, move",
   "Background transfers",
   "Unified search across your provider",
-  "Misty CLI",
+  "Misty Cli",
 ];
 
 export const proFeatures = [
   "Unlimited cloud providers",
   "Vault — encrypted, restic-powered backups",
-  "AI file assistant (Gemini)",
+  "Ai file assistant (Gemini)",
   "Plugins & extensions",
   "Priority support",
 ];

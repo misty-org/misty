@@ -21,7 +21,7 @@ export default function FeaturesProviders() {
             { Icon: GrOnedrive, label: "OneDrive" },
             { Icon: SiDropbox, label: "Dropbox" },
             { Icon: SiAmazons3, label: "Amazon S3" },
-            { Icon: SiMega, label: "MEGA" },
+            { Icon: SiMega, label: "Mega" },
             { Icon: SiGooglecloudstorage, label: "Google Cloud Storage" },
             { Icon: SiBox, label: "Box" },
           ].map(({ Icon, label }) => (

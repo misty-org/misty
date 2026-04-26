@@ -62,7 +62,7 @@ const conversations = [
     thanks: "Perfect, that's what I needed!",
   },
   {
-    q: "Find all PDFs larger than 10 MB",
+    q: "Find all Pdfs larger than 10 MB",
     a: <>3 files found across <span className="text-text font-mono">Google Drive</span> and local storage</>,
     thanks: "Great, thanks!",
   },
@@ -139,7 +139,7 @@ function ChatCycler() {
   );
 }
 
-const extensions = ["Image optimizer", "PDF converter", "Bulk renamer"];
+const extensions = ["Image optimizer", "Pdf converter", "Bulk renamer"];
 
 function ExtensionList() {
   const [active, setActive] = useState(0);
@@ -185,7 +185,7 @@ export default function ExpandedFeatures() {
         <p className="text-text-muted text-pretty max-w-2xl mx-auto mb-2">
           Create restic-powered snapshots of any local or remote folder. Restore
           to any point in time, check integrity, and prune old copies — all from
-          inside Misty. Passwords live in your OS keyring, never ours.
+          inside Misty. Passwords live in your Os keyring, never ours.
         </p>
         <p className="text-xs text-text-muted/60 mb-6">
           Powered by{" "}
@@ -230,7 +230,7 @@ export default function ExpandedFeatures() {
           <h3 className="text-xl font-bold text-text mb-3">Built to be extended.</h3>
           <p className="text-text-muted text-pretty mb-4">
             Launch custom workflows as isolated processes, embed panels into the
-            UI, and build tools that treat your files as first-class citizens.
+            Ui, and build tools that treat your files as first-class citizens.
           </p>
           <ExtensionList />
           <div className="flex justify-end mt-auto">
