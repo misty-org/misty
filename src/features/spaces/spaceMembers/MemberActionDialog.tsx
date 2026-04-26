@@ -39,7 +39,7 @@ export function MemberActionDialog({
         </AlertDialogHeader>
         {error ? (
           <p
-            className="m-0 rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+            className="m-0 rounded-lg border border-charcoal-active/25 bg-charcoal-active px-3 py-2 text-xs text-cream-bright"
             role="alert"
           >
             {error}
@@ -50,7 +50,7 @@ export function MemberActionDialog({
           <AlertDialogAction
             className={
               memberAction?.kind === "remove"
-                ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                ? "bg-charcoal-active text-cream-bright hover:bg-charcoal-active"
                 : ""
             }
             disabled={actionBusy}

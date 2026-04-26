@@ -9,7 +9,7 @@ export function ChatReplyBanner({
   onCancel: () => void;
 }) {
   return (
-    <div className="mx-3 mt-3 flex items-center justify-between rounded-md border-l-2 border-primary bg-muted px-3 py-1.5 text-xs text-muted-foreground">
+    <div className="mx-3 mt-3 flex items-center justify-between rounded-md border-l-2 border-charcoal-active bg-charcoal-card px-3 py-1.5 text-xs text-cream-muted">
       <span>Replying to {senderName}</span>
       <InputGroupButton
         variant="ghost"

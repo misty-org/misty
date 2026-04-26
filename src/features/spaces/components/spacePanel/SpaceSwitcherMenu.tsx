@@ -39,25 +39,25 @@ export function SpaceSwitcherMenu({
       <DropdownMenuTrigger asChild>
         <Button
           className={[
-            "misty-spaces-interactive mb-1 h-10 w-full min-w-0 justify-start gap-2 rounded-md",
-            "border-sidebar-border/55 bg-sidebar-accent/20 px-2 text-left",
-            "text-sidebar-accent-foreground shadow-none",
-            "hover:border-sidebar-border/80 hover:bg-sidebar-accent/30",
+            "mb-1 h-10 w-full min-w-0 justify-start gap-2 rounded-md",
+            "border-charcoal-border/55 bg-charcoal-active px-2 text-left",
+            "text-cream-bright shadow-none",
+            "hover:border-charcoal-border/80 hover:bg-charcoal-active",
           ].join(" ")}
           variant="outline"
           type="button"
           aria-label={activeSpace?.name ? `Space menu: ${activeSpace.name}` : "Space menu"}
           title={title}
         >
-          <span className="grid size-[30px] shrink-0 place-items-center text-muted-foreground">
+          <span className="grid size-[30px] shrink-0 place-items-center text-cream-muted">
             <PanelsTopLeft size={16} strokeWidth={1.75} />
           </span>
           <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{title}</span>
-          <ChevronDown className="shrink-0 text-muted-foreground" size={15} />
+          <ChevronDown className="shrink-0 text-cream-muted" size={15} />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
-        className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-[240px] bg-popover before:hidden"
+        className="w-[240px] min-w-[240px] bg-charcoal-card before:hidden"
         align="start"
         sideOffset={6}
       >
@@ -67,19 +67,19 @@ export function SpaceSwitcherMenu({
             return (
               <DropdownMenuItem
                 key={space.id}
-                className={`min-h-9 gap-2 ${active ? "bg-accent text-accent-foreground" : ""}`}
+                className={`min-h-9 gap-2 ${active ? "bg-charcoal-hover text-cream" : ""}`}
                 aria-current={active ? "true" : undefined}
                 onSelect={() => {
                   if (!active) onSwitchSpace(space.id);
                 }}
               >
-                <span className="grid size-4 shrink-0 place-items-center text-muted-foreground">
+                <span className="grid size-4 shrink-0 place-items-center text-cream-muted">
                   <PanelsTopLeft size={13} strokeWidth={1.75} />
                 </span>
                 <span className="min-w-0 flex-1 truncate">{space.name}</span>
                 {active ? (
                   <Check
-                    className="shrink-0 text-foreground"
+                    className="shrink-0 text-cream"
                     size={14}
                     strokeWidth={2}
                     aria-hidden="true"

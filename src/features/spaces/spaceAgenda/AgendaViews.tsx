@@ -30,11 +30,11 @@ export function AgendaMonthView({ anchor, entries, onOpen }: AgendaViewProps) {
 
   return (
     <div className="misty-transient-scrollbar h-full min-h-0 overflow-auto">
-      <div className="grid min-h-full min-w-[760px] grid-rows-[auto_repeat(6,minmax(112px,1fr))] border-l border-t border-border/60">
-        <div className="grid grid-cols-7 border-b border-border/60 bg-background">
+      <div className="grid min-h-full min-w-[760px] grid-rows-[auto_repeat(6,minmax(112px,1fr))] border-l border-t border-charcoal-border/60">
+        <div className="grid grid-cols-7 border-b border-charcoal-border/60 bg-charcoal-bg">
           {days.slice(0, 7).map((day) => (
             <div
-              className="border-r border-border/60 px-3 py-2.5 text-center text-[11px] font-medium uppercase tracking-wide text-muted-foreground"
+              className="border-r border-charcoal-border/60 px-3 py-2.5 text-center text-[11px] font-medium uppercase tracking-wide text-cream-muted"
               key={day.toISOString()}
             >
               {day.toLocaleDateString(undefined, { weekday: "short" })}
@@ -50,8 +50,8 @@ export function AgendaMonthView({ anchor, entries, onOpen }: AgendaViewProps) {
               return (
                 <section
                   className={cn(
-                    "min-h-0 border-b border-r border-border/60 px-1.5 py-1.5",
-                    muted && "bg-muted/10 text-muted-foreground",
+                    "min-h-0 border-b border-r border-charcoal-border/60 px-1.5 py-1.5",
+                    muted && "bg-charcoal-card text-cream-muted",
                   )}
                   key={day.toISOString()}
                   aria-label={day.toDateString()}
@@ -60,7 +60,7 @@ export function AgendaMonthView({ anchor, entries, onOpen }: AgendaViewProps) {
                     <span
                       className={cn(
                         "grid size-6 place-items-center rounded-full text-xs",
-                        today && "bg-foreground font-semibold text-zinc-950",
+                        today && "bg-cream font-semibold text-charcoal-bg",
                       )}
                     >
                       {day.getDate()}
@@ -71,7 +71,7 @@ export function AgendaMonthView({ anchor, entries, onOpen }: AgendaViewProps) {
                       <AgendaMonthChip entry={entry} key={entry.id} onOpen={onOpen} />
                     ))}
                     {items.length > 4 ? (
-                      <span className="px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                      <span className="px-1.5 py-0.5 text-[10px] font-medium text-cream-muted">
                         +{items.length - 4} more
                       </span>
                     ) : null}
@@ -147,27 +147,27 @@ export function AgendaTimelineView({
       }}
     >
       <div
-        className="relative min-h-full border-l border-t border-border/60"
+        className="relative min-h-full border-l border-t border-charcoal-border/60"
         style={{ minWidth: view === "week" ? 920 : 640 }}
       >
-        <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-md">
+        <div className="sticky top-0 z-30 bg-charcoal-bg ">
           <div
-            className="grid min-h-14 border-b border-border/60"
+            className="grid min-h-14 border-b border-charcoal-border/60"
             style={{ gridTemplateColumns: `72px repeat(${dayCount}, minmax(0, 1fr))` }}
           >
-            <div className="border-r border-border/60" />
+            <div className="border-r border-charcoal-border/60" />
             {days.map((day) => (
               <div
-                className="flex items-center justify-center gap-2 border-r border-border/60 px-2 text-center"
+                className="flex items-center justify-center gap-2 border-r border-charcoal-border/60 px-2 text-center"
                 key={day.toISOString()}
               >
-                <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                <span className="text-[11px] font-medium uppercase tracking-wide text-cream-muted">
                   {day.toLocaleDateString(undefined, { weekday: "short" })}
                 </span>
                 <span
                   className={cn(
                     "grid size-7 place-items-center rounded-full text-sm font-semibold",
-                    isSameDay(day, now) && "bg-foreground text-zinc-950",
+                    isSameDay(day, now) && "bg-cream text-charcoal-bg",
                   )}
                 >
                   {day.getDate()}
@@ -176,15 +176,15 @@ export function AgendaTimelineView({
             ))}
           </div>
           <div
-            className="grid min-h-[54px] border-b border-border/60"
+            className="grid min-h-[54px] border-b border-charcoal-border/60"
             style={{ gridTemplateColumns: `72px repeat(${dayCount}, minmax(0, 1fr))` }}
           >
-            <div className="flex items-center justify-center border-r border-border/60 text-xs text-muted-foreground">
+            <div className="flex items-center justify-center border-r border-charcoal-border/60 text-xs text-cream-muted">
               All day
             </div>
             {days.map((day) => (
               <div
-                className="flex min-w-0 flex-col justify-center gap-1 border-r border-border/60 px-1.5 py-1"
+                className="flex min-w-0 flex-col justify-center gap-1 border-r border-charcoal-border/60 px-1.5 py-1"
                 key={day.toISOString()}
               >
                 {(grouped[dayKey(day)] ?? [])
@@ -205,14 +205,14 @@ export function AgendaTimelineView({
             gridTemplateColumns: `72px repeat(${dayCount}, minmax(0, 1fr))`,
           }}
         >
-          <div className="relative border-r border-border/60" aria-hidden="true">
+          <div className="relative border-r border-charcoal-border/60" aria-hidden="true">
             {hours.map((hour) => {
               const labelTop = hour === 0 ? 8 : hour * hourHeight;
               if (showNow && currentTimeMatchesHour && hour === now.getHours()) return null;
               return (
                 <span
                   className={cn(
-                    "absolute right-3 text-[11px] text-muted-foreground",
+                    "absolute right-3 text-[11px] text-cream-muted",
                     hour === 0 ? "top-2" : "-translate-y-1/2",
                   )}
                   key={hour}
@@ -226,14 +226,14 @@ export function AgendaTimelineView({
           {days.map((day) => {
             const timedEntries = (grouped[dayKey(day)] ?? []).filter((entry) => !entry.all_day);
             return (
-              <div className="relative border-r border-border/60" key={day.toISOString()}>
+              <div className="relative border-r border-charcoal-border/60" key={day.toISOString()}>
                 {slots.map((slot) => {
                   const major = (slot * zoomMinutes) % 60 === 0;
                   return (
                     <div
                       className={cn(
                         "pointer-events-none absolute inset-x-0 border-t",
-                        major ? "border-border/60" : "border-border/30",
+                        major ? "border-charcoal-border/60" : "border-charcoal-border/30",
                       )}
                       key={slot}
                       style={{ top: slot * slotHeight }}
@@ -259,12 +259,12 @@ export function AgendaTimelineView({
               aria-label={`Current time ${currentTimeLabel}`}
             >
               <span className="absolute left-[72px] right-0 flex -translate-y-1/2 items-center">
-                <span className="size-3 shrink-0 -translate-x-1/2 rounded-full bg-red-500" />
-                <span className="-ml-1.5 h-px w-2 shrink-0 bg-red-500" />
-                <span className="shrink-0 whitespace-nowrap rounded bg-background px-1.5 py-0.5 text-[10px] font-semibold text-red-500">
+                <span className="size-3 shrink-0 -translate-x-1/2 rounded-full bg-charcoal-active" />
+                <span className="-ml-1.5 h-px w-2 shrink-0 bg-charcoal-active" />
+                <span className="shrink-0 whitespace-nowrap rounded bg-charcoal-bg px-1.5 py-0.5 text-[10px] font-semibold text-cream-bright">
                   {currentTimeLabel}
                 </span>
-                <span className="h-px min-w-0 flex-1 bg-red-500" />
+                <span className="h-px min-w-0 flex-1 bg-charcoal-active" />
               </span>
             </div>
           ) : null}
@@ -379,12 +379,12 @@ function EntryIcon({ entry, className }: { entry: SpaceAgendaEntry; className?: 
 
 function kindSurface(kind: SpaceAgendaEntry["kind"]) {
   return kind === "task"
-    ? "border-blue-400/30 bg-blue-500/20 text-blue-100 hover:bg-blue-500/25"
+    ? "border-sage-fg/30 bg-sage-bg text-sage-fg hover:bg-sage-bg"
     : kind === "event"
-      ? "border-violet-400/30 bg-violet-500/20 text-violet-100 hover:bg-violet-500/25"
+      ? "border-sage-fg/30 bg-sage-bg text-sage-fg hover:bg-sage-bg"
       : kind === "roadmap_node"
-        ? "border-amber-400/30 bg-amber-500/20 text-amber-100 hover:bg-amber-500/25"
-        : "border-emerald-400/30 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/25";
+        ? "border-sage-fg/30 bg-sage-bg text-sage-fg hover:bg-sage-bg"
+        : "border-status-green/30 bg-status-green text-sage-fg hover:bg-status-green";
 }
 
 function isSameDay(left: Date, right: Date) {

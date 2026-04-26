@@ -3,13 +3,15 @@ import { Button } from "@/ui";
 import type { LibraryAssetStack } from "@/models/interfaces/features/spaces/types";
 
 const trayClass =
-  "absolute left-4 flex items-center gap-1 rounded-xl border border-white/10 bg-black/55 p-1 text-white backdrop-blur-sm";
+  "absolute left-4 flex items-center gap-1 rounded-xl border border-charcoal-border/10 bg-charcoal-workspace p-1 text-cream-bright ";
 
 const liveEffects = ["still", "loop", "bounce", "long_exposure"] as const;
 
 function chipClass(active: boolean) {
   return `rounded-lg border-0 px-2 py-1 text-[10px] font-medium ${
-    active ? "bg-white text-black" : "bg-transparent text-white/75 hover:bg-white/10"
+    active
+      ? "bg-charcoal-active text-charcoal-bg"
+      : "bg-transparent text-cream-bright/75 hover:bg-charcoal-active"
   }`;
 }
 

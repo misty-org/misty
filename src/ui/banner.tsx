@@ -5,10 +5,7 @@ import { X } from "lucide-react";
 import { cn } from "@/ui";
 
 /**
- * Notification-style banner built on the vega/zinc semantic tokens (the same
- * ones alert.tsx and popover.tsx consume). Colored variants tint the shared
- * --misty-info/success/warning/danger tokens rather than hardcoding hex, so
- * banners re-theme automatically across graphite/aurora/copper/light.
+ * Notification banner using the fixed warm-charcoal palette.
  *
  * Compose it as:
  *   <Banner variant="warning" onDismiss={fn}>
@@ -25,20 +22,19 @@ import { cn } from "@/ui";
 const bannerVariants = cva(
   [
     "group/banner relative flex w-full items-start gap-3 rounded-lg border px-3.5 py-3",
-    "text-left text-sm shadow-sm backdrop-blur-sm *:[svg]:size-4 *:[svg]:shrink-0",
+    "text-left text-sm shadow-sm *:[svg]:size-4 *:[svg]:shrink-0",
   ].join(" "),
   {
     variants: {
       variant: {
         default:
-          "border-border bg-card text-card-foreground [&_[data-slot=banner-icon]]:text-muted-foreground",
-        info: "border-info/30 bg-info/10 text-foreground [&_[data-slot=banner-icon]]:text-info",
+          "border-charcoal-border bg-charcoal-card text-cream [&_[data-slot=banner-icon]]:text-cream-muted",
+        info: "border-sage-fg/30 bg-sage-bg text-cream [&_[data-slot=banner-icon]]:text-sage-fg",
         success:
-          "border-success/30 bg-success/10 text-foreground [&_[data-slot=banner-icon]]:text-success",
-        warning:
-          "border-warning/35 bg-warning/10 text-foreground [&_[data-slot=banner-icon]]:text-warning",
+          "border-status-green/30 bg-sage-bg text-cream [&_[data-slot=banner-icon]]:text-sage-fg",
+        warning: "border-sage-fg/35 bg-sage-bg text-cream [&_[data-slot=banner-icon]]:text-sage-fg",
         danger:
-          "border-destructive/35 bg-destructive/10 text-foreground [&_[data-slot=banner-icon]]:text-destructive",
+          "border-charcoal-active/35 bg-charcoal-active text-cream [&_[data-slot=banner-icon]]:text-cream-bright",
       },
     },
     defaultVariants: {
@@ -80,9 +76,9 @@ function Banner({
           data-slot="banner-dismiss"
           className={[
             "absolute right-2 top-2 grid size-6 place-items-center rounded-md",
-            "text-muted-foreground opacity-70 transition hover:bg-foreground/10",
-            "hover:text-foreground hover:opacity-100 focus-visible:outline-none",
-            "focus-visible:ring-2 focus-visible:ring-ring/50",
+            "text-cream-muted opacity-70 transition hover:bg-charcoal-hover",
+            "hover:text-cream hover:opacity-100 focus-visible:outline-none",
+            "focus-visible:ring-2 focus-visible:ring-charcoal-active/50",
           ].join(" ")}
         >
           <X className="size-3.5" />
@@ -131,7 +127,7 @@ function BannerDescription({ className, ...props }: React.ComponentProps<"div">)
     <div
       data-slot="banner-description"
       className={cn(
-        "min-w-0 text-sm text-muted-foreground [overflow-wrap:anywhere] [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-foreground",
+        "min-w-0 text-sm text-cream-muted [overflow-wrap:anywhere] [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-cream",
         className,
       )}
       {...props}

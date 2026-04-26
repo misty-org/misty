@@ -81,7 +81,7 @@ export function MessageAttachments(props: MessageAttachmentsProps) {
         <div className="mt-2 flex flex-wrap gap-1.5">
           {message.attachments?.map((attachment) => (
             <div
-              className="inline-flex items-center gap-1 rounded-md bg-muted/50 p-1 pl-2 text-xs"
+              className="inline-flex items-center gap-1 rounded-md bg-charcoal-card p-1 pl-2 text-xs"
               key={attachment.id}
             >
               <Paperclip className="size-3" />

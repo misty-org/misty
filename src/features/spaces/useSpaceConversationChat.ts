@@ -10,12 +10,14 @@ export function useSpaceConversationChat(
 ) {
   const [conversations, setConversations] = useState<SpaceConversation[]>([]);
   const [messages, setMessages] = useState<SpaceMessage[]>([]);
+  const [loadedConversationId, setLoadedConversationId] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => {
     if (!conversationId || !canRead) {
       setConversations([]);
       setMessages([]);
+      setLoadedConversationId("");
       setError("");
       setLoading(false);
       return;
@@ -23,6 +25,8 @@ export function useSpaceConversationChat(
     let active = true;
     setLoading(true);
     setError("");
+    setMessages([]);
+    setLoadedConversationId("");
     void Promise.all([
       spacesApi.conversations(spaceId),
       spacesApi.conversationMessages(spaceId, conversationId),
@@ -31,6 +35,7 @@ export function useSpaceConversationChat(
         if (!active) return;
         setConversations(conversationResult.conversations);
         setMessages([...messageResult.messages].reverse());
+        setLoadedConversationId(conversationId);
       })
       .catch((reason) => {
         if (active)
@@ -91,5 +96,13 @@ export function useSpaceConversationChat(
       window.removeEventListener("misty:space-agent-run-event", updateAgentRun);
     };
   }, [canRead, conversationId, spaceId]);
-  return { conversations, messages, setMessages, loading, error, setError };
+  return {
+    conversations,
+    messages,
+    setMessages,
+    loadedConversationId,
+    loading,
+    error,
+    setError,
+  };
 }

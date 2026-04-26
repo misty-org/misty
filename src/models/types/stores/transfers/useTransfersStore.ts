@@ -5,10 +5,7 @@ import type { TransferPage } from "@/models/interfaces/services/misty-api";
 import { errorText } from "@/lib/format";
 import { selectGeneralPreferences, useSettingsStore } from "@/stores/app";
 
-import type {
-  TransferWorkspaceState,
-  TransfersStore,
-} from "@/models/interfaces/stores/transfers/useTransfersStore";
+import type { TransferWorkspaceState, TransfersStore } from "@/stores/transfers/useTransfersStore";
 
 export type TransferLocationScope = "all" | "local" | "remote";
 

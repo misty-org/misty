@@ -32,7 +32,7 @@ export function SpaceTaskEventDrawer({
 
   return (
     <Sheet open onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="w-[min(460px,96vw)] bg-background sm:max-w-[460px]">
+      <SheetContent className="w-[min(460px,96vw)] bg-charcoal-bg sm:max-w-[460px]">
         <SheetHeader className="pr-8 text-left">
           <Badge className="mb-1 w-fit" variant="secondary">
             Google Calendar
@@ -49,7 +49,7 @@ export function SpaceTaskEventDrawer({
           {organizer ? <EventFact icon={UserRound} value={organizer} /> : null}
           {source ? <EventFact icon={CalendarDays} value={source.display_name} /> : null}
           {event.description ? (
-            <p className="m-0 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
+            <p className="m-0 whitespace-pre-wrap text-sm leading-6 text-cream-muted">
               {event.description}
             </p>
           ) : null}
@@ -68,7 +68,7 @@ export function SpaceTaskEventDrawer({
 
 function EventFact({ icon: Icon, value }: { icon: typeof Clock3; value: string }) {
   return (
-    <div className="flex items-start gap-3 text-sm text-muted-foreground">
+    <div className="flex items-start gap-3 text-sm text-cream-muted">
       <Icon className="mt-0.5 size-4 shrink-0" />
       <span>{value}</span>
     </div>

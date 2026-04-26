@@ -11,8 +11,8 @@ import type { WorkspaceTabKind } from "@/stores/spaces/useSpacesTabsStore";
 
 const utilityButtonClass = [
   "relative grid h-[26px] w-[30px] place-items-center rounded-md border-0 bg-transparent p-0",
-  "text-muted-foreground hover:bg-transparent hover:text-foreground",
-  "focus-visible:ring-2 focus-visible:ring-ring",
+  "text-cream-muted hover:bg-transparent hover:text-cream",
+  "focus-visible:ring-2 focus-visible:ring-charcoal-active",
 ].join(" ");
 
 export const workspaceToolDefinitions: ReadonlyArray<{

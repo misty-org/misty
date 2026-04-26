@@ -24,24 +24,22 @@ export function SpaceSidebarPageSection(props: {
         <Link
           className={cn(
             "min-w-0 flex-1 truncate rounded-sm text-xs font-semibold no-underline outline-none",
-            "focus-visible:ring-2 focus-visible:ring-sidebar-ring",
-            props.active
-              ? "text-sidebar-accent-foreground"
-              : "text-muted-foreground hover:text-sidebar-accent-foreground",
+            "focus-visible:ring-2 focus-visible:ring-charcoal-active",
+            props.active ? "text-cream-bright" : "text-cream-muted hover:text-cream-bright",
           )}
           to={props.to}
           aria-current={props.active ? "page" : undefined}
         >
           {props.label}
           {typeof props.count === "number" && props.count > 0 ? (
-            <span className="font-medium text-muted-foreground"> - {props.count}</span>
+            <span className="font-medium text-cream-muted"> - {props.count}</span>
           ) : null}
         </Link>
         {props.action}
         <Button
           type="button"
           variant="ghost"
-          className="h-auto w-auto shrink-0 p-0 text-muted-foreground shadow-none hover:bg-transparent hover:text-sidebar-accent-foreground"
+          className="h-auto w-auto shrink-0 p-0 text-cream-muted shadow-none hover:bg-transparent hover:text-cream-bright"
           aria-label={`${expanded ? "Collapse" : "Expand"} ${props.label}`}
           aria-controls={contentId}
           aria-expanded={expanded}

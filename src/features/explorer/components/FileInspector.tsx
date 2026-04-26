@@ -1,5 +1,15 @@
-import type { FileInspectorProps } from "@/models/interfaces/features/explorer/components/FileInspector";
-export type { FileInspectorProps } from "@/models/interfaces/features/explorer/components/FileInspector";
+import { formatBytes, formatDate } from "@/features/explorer/utils/fileFormat";
+import { GlobalPreviewDialog } from "@/features/explorer/components/GlobalPreview";
+import {
+  ArchiveContentsPreview,
+  AudioPreview,
+  FolderContentsPreview,
+  PreviewImage,
+  useFileMetadata,
+  useFilePreview,
+  useFolderPreview,
+} from "@/features/explorer/components/FileInspectorPreview";
+import { inspectorStyles } from "@/features/explorer/components/FileInspectorStyles";
 import { FileSearch, Maximize2 } from "lucide-react";
 import { lazy, Suspense, useState, type ReactNode } from "react";
 import { Button } from "@/ui";
@@ -9,18 +19,6 @@ import type {
   FileEntry,
 } from "@/models/interfaces/services/misty-api";
 import { directorySizeRecordForPath } from "@/stores/explorer";
-import { formatBytes, formatDate } from "../utils/fileFormat";
-import { GlobalPreviewDialog } from "./GlobalPreview";
-import {
-  ArchiveContentsPreview,
-  AudioPreview,
-  FolderContentsPreview,
-  PreviewImage,
-  useFileMetadata,
-  useFilePreview,
-  useFolderPreview,
-} from "./FileInspectorPreview";
-import { inspectorStyles } from "./FileInspectorStyles";
 
 const PdfViewer = lazy(() => import("./PdfViewer"));
 
@@ -213,4 +211,13 @@ function itemsLabel(entry: FileEntry | null, listing: DirectoryListing | null): 
     return `${listing.totalCount} ${listing.totalCount === 1 ? "item" : "items"}`;
   }
   return entry.kind === "folder" ? "-" : "1 item";
+}
+
+export interface FileInspectorProps {
+  listing: DirectoryListing | null;
+  selectedEntry: FileEntry | null;
+  selectedCount: number;
+  directorySizes: Record<string, DirectorySizeRecord>;
+  onOpenEntry: (entry: FileEntry) => void;
+  onPreviewSaved?: () => void | Promise<void>;
 }

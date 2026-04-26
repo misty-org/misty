@@ -1,15 +1,15 @@
 import type { MultiPanelStoreHook } from "@/models/types/workspace/useMultiPanelStore";
-export type { MultiPanelStoreHook } from "@/models/types/workspace/useMultiPanelStore";
-import type { MultiPanelStoreOptions, MultiPanelStore } from "@/models/interfaces/workspace";
-export type { MultiPanelStoreOptions, MultiPanelStore } from "@/models/interfaces/workspace";
-import { create } from "zustand";
-import type { SplitOrientation } from "@/models/types/workspace/types";
 import type {
+  MultiPanelStoreOptions,
+  MultiPanelStore,
   MultiPanelClosedPane,
   MultiPanelLayout,
   MultiPanelPane,
   MultiPanelTab,
 } from "@/models/interfaces/workspace";
+export type { MultiPanelStoreHook } from "@/models/types/workspace/useMultiPanelStore";
+export type { MultiPanelStoreOptions, MultiPanelStore } from "@/models/interfaces/workspace";
+import { create } from "zustand";
 import {
   explorerPathName,
   normalizeExplorerPath,
@@ -736,3 +736,7 @@ function titleFromPath(path: string): string {
   if (path === "misty://trash") return "Trash";
   return explorerPathName(path) || "Home";
 }
+
+export type SplitOrientation = "vertical" | "horizontal";
+
+export type MultiPanelPaneRestoreMode = "same_lane" | "new_lane";

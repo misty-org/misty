@@ -20,12 +20,12 @@ export function LibraryVersionList(props: LibraryVersionListProps) {
   const { canEdit, activeEdit, editSaving } = props;
 
   return (
-    <section className="mt-6 border-t border-border/60 pt-5">
+    <section className="mt-6 border-t border-charcoal-border/60 pt-5">
       <div className="flex items-center justify-between">
         <h3 className="m-0 text-sm">Versions</h3>
         {canEdit ? (
           <Button
-            className={!activeEdit ? "text-foreground" : undefined}
+            className={!activeEdit ? "text-cream" : undefined}
             size="sm"
             variant="outline"
             type="button"
@@ -35,15 +35,15 @@ export function LibraryVersionList(props: LibraryVersionListProps) {
             Original
           </Button>
         ) : !activeEdit ? (
-          <span className="text-[10px] text-muted-foreground">Original selected</span>
+          <span className="text-[10px] text-cream-muted">Original selected</span>
         ) : null}
       </div>
-      {props.error ? <p className="mb-0 mt-3 text-xs text-red-200">{props.error}</p> : null}
+      {props.error ? <p className="mb-0 mt-3 text-xs text-cream-bright">{props.error}</p> : null}
 
       <div className="mt-3 grid gap-1">
         {props.versions.map((version) => (
           <div
-            className={`flex items-center gap-2 rounded-lg bg-muted/40 px-2 py-2 ${version.is_current ? "ring-1 ring-primary" : ""}`}
+            className={`flex items-center gap-2 rounded-lg bg-charcoal-card px-2 py-2 ${version.is_current ? "ring-1 ring-charcoal-active" : ""}`}
             key={version.id}
           >
             <Button
@@ -56,7 +56,7 @@ export function LibraryVersionList(props: LibraryVersionListProps) {
                 Edit {version.version_number}
                 {version.is_current ? " · Current" : ""}
               </span>
-              <span className="mt-0.5 block text-[10px] text-muted-foreground">
+              <span className="mt-0.5 block text-[10px] text-cream-muted">
                 {libraryRenditionStatus(version)} · {formatTime(version.created_at)}
               </span>
             </Button>
@@ -74,7 +74,7 @@ export function LibraryVersionList(props: LibraryVersionListProps) {
             ) : null}
             {canEdit && !version.is_current ? (
               <Button
-                className="grid size-6 place-items-center border-0 bg-transparent text-muted-foreground"
+                className="grid size-6 place-items-center border-0 bg-transparent text-cream-muted"
                 type="button"
                 disabled={editSaving}
                 onClick={() => props.onDelete(version.id)}

@@ -40,25 +40,25 @@ export function AgentRunInline({ run: initial }: { run: SpaceMessageAgentRun }) 
   const approval = detail?.approvals.find((item) => item.state === "pending");
 
   return (
-    <div className="mt-2 max-w-xl rounded-lg border border-border/70 bg-muted/25 px-3 py-2 text-xs">
-      <div className="flex items-center gap-2 font-medium text-foreground">
+    <div className="mt-2 max-w-xl rounded-lg border border-charcoal-border/70 bg-charcoal-card px-3 py-2 text-xs">
+      <div className="flex items-center gap-2 font-medium text-cream">
         {run.state === "failed" ? (
-          <AlertTriangle className="size-3.5 text-destructive" />
+          <AlertTriangle className="size-3.5 text-cream-bright" />
         ) : run.state === "queued" || run.state === "working" || run.state === "retrying" ? (
-          <LoaderCircle className="size-3.5 animate-spin text-primary" />
+          <LoaderCircle className="size-3.5 animate-spin text-cream-bright" />
         ) : (
-          <Sparkles className="size-3.5 text-primary" />
+          <Sparkles className="size-3.5 text-cream-bright" />
         )}
         {statusLabel(run.state)}
       </div>
       {approval ? (
-        <div className="mt-2 space-y-1 text-muted-foreground">
+        <div className="mt-2 space-y-1 text-cream-muted">
           <p>{approval.action_summary || "Review the requested Agent action."}</p>
           <p>Requester: you · Risk: approval required</p>
         </div>
       ) : null}
       {run.error_message || error ? (
-        <p className="mt-1 text-destructive">{run.error_message || error}</p>
+        <p className="mt-1 text-cream-bright">{run.error_message || error}</p>
       ) : null}
       {run.run_id ? (
         <div className="mt-2 flex flex-wrap gap-2">

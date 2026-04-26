@@ -129,9 +129,9 @@ export function SpaceTaskDrawer(props: SpaceTaskDrawerProps) {
 
   return (
     <Sheet open onOpenChange={(open) => !open && !busy && onClose()}>
-      <SheetContent className="flex w-[min(600px,96vw)] max-w-none flex-col gap-0 bg-[var(--misty-app-modal-bg,var(--popover))] p-0 sm:max-w-none">
+      <SheetContent className="flex w-[min(600px,96vw)] max-w-none flex-col gap-0 bg-charcoal-card p-0 sm:max-w-none">
         <form className="flex min-h-0 flex-1 flex-col" onSubmit={props.onSave}>
-          <SheetHeader className="border-b border-border/60 px-5 py-4 pr-14 text-left">
+          <SheetHeader className="border-b border-charcoal-border/60 px-5 py-4 pr-14 text-left">
             <div className="flex items-center gap-3">
               <div className="min-w-0 flex-1">
                 <SheetTitle>{editing ? editing.task_key : "New task"}</SheetTitle>
@@ -150,7 +150,7 @@ export function SpaceTaskDrawer(props: SpaceTaskDrawerProps) {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem
-                      className="text-destructive focus:text-destructive"
+                      className="text-cream-bright focus:text-cream-bright"
                       onSelect={props.onArchive}
                     >
                       <Archive className="mr-2 size-4" />
@@ -229,7 +229,7 @@ export function SpaceTaskDrawer(props: SpaceTaskDrawerProps) {
             />
           </div>
 
-          <SheetFooter className="flex-row justify-end gap-2 border-t border-border/60 px-5 py-4">
+          <SheetFooter className="flex-row justify-end gap-2 border-t border-charcoal-border/60 px-5 py-4">
             <Button variant="outline" type="button" disabled={busy} onClick={onClose}>
               Cancel
             </Button>
@@ -290,7 +290,7 @@ function TaskSources({
       <div className="flex items-center justify-between gap-2">
         <div>
           <p className="m-0 text-sm font-medium">File context</p>
-          <p className="mb-0 mt-0.5 text-xs text-muted-foreground">
+          <p className="mb-0 mt-0.5 text-xs text-cream-muted">
             Agents can read only items explicitly attached here.
           </p>
         </div>
@@ -308,13 +308,13 @@ function TaskSources({
           {refs.map((ref) => (
             <div
               key={`${ref.kind}:${ref.resource_id}`}
-              className="flex items-center gap-2 rounded-md border border-border/70 px-2.5 py-2"
+              className="flex items-center gap-2 rounded-md border border-charcoal-border/70 px-2.5 py-2"
             >
-              <FileText className="size-4 shrink-0 text-muted-foreground" />
+              <FileText className="size-4 shrink-0 text-cream-muted" />
               <span className="min-w-0 flex-1 truncate text-xs">
                 {ref.display_name || ref.resource_id}
               </span>
-              <span className="text-[10px] text-muted-foreground">
+              <span className="text-[10px] text-cream-muted">
                 {ref.kind === "library_item" ? "Library link" : "Task attachment"}
               </span>
               <Button
@@ -350,13 +350,13 @@ function TaskActivity({
   return (
     <section className="grid gap-2" aria-label="Task activity">
       <div className="flex items-center gap-2">
-        <Bot className="size-4 text-muted-foreground" />
+        <Bot className="size-4 text-cream-muted" />
         <p className="m-0 text-sm font-medium">Activity</p>
       </div>
       {loading ? (
-        <p className="m-0 text-xs text-muted-foreground">Loading activity…</p>
+        <p className="m-0 text-xs text-cream-muted">Loading activity…</p>
       ) : activity.length ? (
-        <div className="grid gap-2 border-l border-border pl-3">
+        <div className="grid gap-2 border-l border-charcoal-border pl-3">
           {activity.map((item) => {
             const actor =
               item.actor_kind === "agent"
@@ -373,11 +373,11 @@ function TaskActivity({
               <div key={item.id} className="grid gap-0.5 text-xs">
                 <div className="flex items-center gap-2">
                   <span className="font-medium">{actor}</span>
-                  <span className="capitalize text-muted-foreground">{item.kind}</span>
+                  <span className="capitalize text-cream-muted">{item.kind}</span>
                 </div>
                 {item.message ? <p className="m-0 whitespace-pre-wrap">{item.message}</p> : null}
                 {warning ? (
-                  <p className="m-0 whitespace-pre-wrap rounded bg-amber-500/10 p-2 text-amber-800 dark:text-amber-300">
+                  <p className="m-0 whitespace-pre-wrap rounded bg-sage-bg p-2 text-sage-fg">
                     {warning}
                   </p>
                 ) : null}
@@ -386,7 +386,7 @@ function TaskActivity({
           })}
         </div>
       ) : (
-        <p className="m-0 text-xs text-muted-foreground">No Agent activity yet.</p>
+        <p className="m-0 text-xs text-cream-muted">No Agent activity yet.</p>
       )}
     </section>
   );
@@ -394,9 +394,9 @@ function TaskActivity({
 
 function TaskProvenance({ task }: { task: SpaceTask }) {
   return (
-    <div className="rounded-lg bg-muted/30 p-3">
-      <details className="text-xs text-muted-foreground">
-        <summary className="cursor-pointer font-medium text-foreground">Provenance</summary>
+    <div className="rounded-lg bg-charcoal-card p-3">
+      <details className="text-xs text-cream-muted">
+        <summary className="cursor-pointer font-medium text-cream">Provenance</summary>
         <div className="mt-2 grid gap-1">
           {task.created_by_agent_id ? <span>Generated task</span> : null}
           <span>

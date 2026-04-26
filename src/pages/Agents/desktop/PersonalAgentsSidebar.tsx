@@ -39,7 +39,7 @@ export function PersonalAgentsSidebar(props: PersonalAgentsSidebarProps) {
   return (
     <section className="flex min-h-0 flex-1 flex-col" aria-label="Agents">
       <div className="flex shrink-0 items-center justify-between gap-2 px-2 pb-3">
-        <h2 className="m-0 truncate text-sm font-semibold text-muted-foreground">Agents</h2>
+        <h2 className="m-0 truncate text-sm font-semibold text-cream-muted">Agents</h2>
         <Button size="icon" variant="ghost" className="size-8" onClick={props.onCreate}>
           <Plus size={14} />
           <span className="sr-only">Create Agent</span>
@@ -58,10 +58,8 @@ export function PersonalAgentsSidebar(props: PersonalAgentsSidebarProps) {
                     className={[
                       "h-auto min-w-0 flex-1 justify-start gap-1.5 rounded-md px-0 py-0",
                       "text-left text-xs font-semibold shadow-none",
-                      "hover:bg-transparent hover:text-sidebar-accent-foreground",
-                      props.selectedAgentId === agent.id
-                        ? "text-sidebar-accent-foreground"
-                        : "text-muted-foreground",
+                      "hover:bg-transparent hover:text-cream-bright",
+                      props.selectedAgentId === agent.id ? "text-cream-bright" : "text-cream-muted",
                     ].join(" ")}
                     onClick={() => props.onSelect(agent)}
                   >
@@ -84,7 +82,7 @@ export function PersonalAgentsSidebar(props: PersonalAgentsSidebarProps) {
                 </ContextMenuItem>
                 <ContextMenuSeparator />
                 <ContextMenuItem
-                  className="text-destructive focus:text-destructive"
+                  className="text-cream-bright focus:text-cream-bright"
                   onSelect={() => props.onDelete(agent.id)}
                 >
                   <Trash2 size={14} /> Delete
@@ -94,9 +92,7 @@ export function PersonalAgentsSidebar(props: PersonalAgentsSidebarProps) {
           </section>
         ))}
         {!loading && agents.length === 0 ? (
-          <p className="px-2.5 py-3 text-xs text-muted-foreground">
-            Create an Agent for repeat work.
-          </p>
+          <p className="px-2.5 py-3 text-xs text-cream-muted">Create an Agent for repeat work.</p>
         ) : null}
       </nav>
     </section>

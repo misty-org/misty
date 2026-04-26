@@ -62,16 +62,10 @@ export function ProfilePopover(props: {
     const anchor = props.anchorRef.current;
     if (!anchor) return;
     const anchorRect = anchor.getBoundingClientRect();
-    const titlebarInset =
-      Number.parseFloat(
-        window
-          .getComputedStyle(document.documentElement)
-          .getPropertyValue("--misty-window-titlebar-inset"),
-      ) || 0;
     const viewport = {
       width: window.innerWidth,
       height: window.innerHeight,
-      topInset: titlebarInset,
+      topInset: 28,
       gutter: viewportGutter,
     };
     const measuredMenu = menuRef.current?.getBoundingClientRect();
@@ -231,24 +225,24 @@ export function ProfilePopover(props: {
         role="menu"
         aria-label="Profile"
       >
-        <div className="grid grid-cols-[42px_minmax(0,1fr)] items-center gap-3 border-b border-[var(--misty-border-soft)] px-2 pb-3 pt-1">
+        <div className="grid grid-cols-[42px_minmax(0,1fr)] items-center gap-3 border-b border-charcoal-border px-2 pb-3 pt-1">
           <span
             className={[
               "relative grid h-10 w-10 place-items-center rounded-full",
-              "bg-[var(--misty-neutral-selected-bg,var(--misty-surface-3))] text-sm font-bold",
+              "bg-charcoal-active text-sm font-bold",
             ].join(" ")}
           >
             {account ? initials : <UserCircle size={24} strokeWidth={1.75} />}
           </span>
           <span className="min-w-0">
             <strong className="block truncate text-sm">{displayName}</strong>
-            <small className="block truncate text-xs text-[var(--misty-text-muted)]">
+            <small className="block truncate text-xs text-cream-muted">
               {email || "Not signed in"}
             </small>
           </span>
         </div>
         <div className="grid gap-1 py-2">
-          <span className="px-2.5 py-1 text-[10px] font-bold capitalize text-[var(--misty-text-subtle)]">
+          <span className="px-2.5 py-1 text-[10px] font-bold capitalize text-cream-muted">
             User/Profile Settings
           </span>
           <Button
@@ -261,20 +255,14 @@ export function ProfilePopover(props: {
             <span>Account settings</span>
             {/* This leaves the app for the browser, so say so rather than
                 surprising people with a new window. */}
-            <ExternalLink
-              size={13}
-              className="ml-auto text-[var(--misty-text-subtle)]"
-              aria-hidden="true"
-            />
+            <ExternalLink size={13} className="ml-auto text-cream-muted" aria-hidden="true" />
             <span className="sr-only">(opens in your browser)</span>
           </Button>
           <Button
             ref={switchAccountsRef}
             className={[
               profileMenuItemClass,
-              accountChooserOpen
-                ? "bg-[var(--misty-neutral-selected-bg,var(--misty-surface-3))] text-[var(--misty-text)]"
-                : "",
+              accountChooserOpen ? "bg-charcoal-active text-cream" : "",
             ].join(" ")}
             type="button"
             role="menuitem"
@@ -287,16 +275,14 @@ export function ProfilePopover(props: {
             <span>Switch accounts</span>
             <ChevronRight
               size={14}
-              className={
-                accountChooserOpen ? "text-[var(--misty-text)]" : "text-[var(--misty-text-subtle)]"
-              }
+              className={accountChooserOpen ? "text-cream" : "text-cream-muted"}
             />
           </Button>
           <Button
             className={[
               profileMenuItemClass,
-              "text-[var(--misty-danger)] hover:bg-[color-mix(in_srgb,var(--misty-danger)_12%,transparent)]",
-              "hover:text-[var(--misty-danger)]",
+              "text-cream-bright hover:text-cream-bright",
+              "hover:text-cream-bright",
             ].join(" ")}
             type="button"
             role="menuitem"
@@ -316,17 +302,15 @@ export function ProfilePopover(props: {
           role="menu"
           aria-label="Switch accounts"
         >
-          <div className="flex items-center justify-between gap-3 border-b border-[var(--misty-border-soft)] px-2 pb-2 pt-1">
+          <div className="flex items-center justify-between gap-3 border-b border-charcoal-border px-2 pb-2 pt-1">
             <div>
               <strong className="block text-sm">Switch accounts</strong>
-              <small className="text-[11px] text-[var(--misty-text-subtle)]">
-                Your saved Misty sessions
-              </small>
+              <small className="text-[11px] text-cream-muted">Your saved Misty sessions</small>
             </div>
             <Button
               className={[
                 "grid size-8 place-items-center rounded-lg border-0 bg-transparent",
-                "text-[var(--misty-text-muted)] hover:bg-[var(--misty-surface-2)] hover:text-[var(--misty-text)]",
+                "text-cream-muted hover:text-cream-bright",
               ].join(" ")}
               type="button"
               aria-label="Close account chooser"
@@ -351,35 +335,33 @@ export function ProfilePopover(props: {
                   <span
                     className={[
                       "grid size-9 place-items-center rounded-full",
-                      "bg-[var(--misty-neutral-selected-bg,var(--misty-surface-3))]",
-                      "text-xs font-bold text-[var(--misty-text)]",
+                      "bg-charcoal-active",
+                      "text-xs font-bold text-cream",
                     ].join(" ")}
                   >
                     {savedInitials}
                   </span>
                   <span className="min-w-0">
-                    <strong className="block truncate text-xs text-[var(--misty-text)]">
-                      {saved.name}
-                    </strong>
-                    <small className="block truncate text-[10px] text-[var(--misty-text-subtle)]">
+                    <strong className="block truncate text-xs text-cream">{saved.name}</strong>
+                    <small className="block truncate text-[10px] text-cream-muted">
                       {switchingAccountId === saved.id ? "Switching…" : saved.email}
                     </small>
                   </span>
                   {active ? (
-                    <Check size={15} className="text-emerald-300" aria-label="Active account" />
+                    <Check size={15} className="text-sage-fg" aria-label="Active account" />
                   ) : null}
                 </Button>
               );
             })}
             {accounts.length === 0 ? (
-              <p className="m-0 px-2 py-3 text-xs text-[var(--misty-text-subtle)]">
+              <p className="m-0 px-2 py-3 text-xs text-cream-muted">
                 No saved accounts are available yet.
               </p>
             ) : null}
           </div>
           {switchError ? (
             <p
-              className="m-0 mb-2 rounded-lg border border-red-400/20 bg-red-950/20 px-2.5 py-2 text-[11px] leading-relaxed text-red-200"
+              className="m-0 mb-2 rounded-lg border border-charcoal-active/20 bg-charcoal-active px-2.5 py-2 text-[11px] leading-relaxed text-cream-bright"
               role="alert"
             >
               {switchError}
@@ -395,7 +377,7 @@ export function ProfilePopover(props: {
             <Plus size={17} />
             <span>Add another account</span>
           </Button>
-          <p className="m-0 px-2.5 pb-1 pt-2 text-[10px] leading-relaxed text-[var(--misty-text-subtle)]">
+          <p className="m-0 px-2.5 pb-1 pt-2 text-[10px] leading-relaxed text-cream-muted">
             Accounts remain signed in securely on this device. Only one account is active in the app
             at a time.
           </p>

@@ -85,12 +85,12 @@ export function RoadmapNodeDefinitionManager(props: {
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
       <DialogContent className="max-h-[82vh] max-w-3xl overflow-hidden p-0">
-        <DialogHeader className="border-b border-border/60 px-5 py-4">
+        <DialogHeader className="border-b border-charcoal-border/60 px-5 py-4">
           <DialogTitle>Custom roadmap nodes</DialogTitle>
           <DialogDescription>Create a shared node type for this Space.</DialogDescription>
         </DialogHeader>
         <div className="grid min-h-0 md:grid-cols-[220px_minmax(0,1fr)]">
-          <aside className="border-b border-border/60 p-2 md:border-b-0 md:border-r">
+          <aside className="border-b border-charcoal-border/60 p-2 md:border-b-0 md:border-r">
             <Button
               variant="ghost"
               className="h-9 w-full justify-start gap-2 text-xs"
@@ -116,7 +116,7 @@ export function RoadmapNodeDefinitionManager(props: {
             {failure ? (
               <p
                 role="alert"
-                className="mb-4 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive"
+                className="mb-4 rounded-lg bg-charcoal-active px-3 py-2 text-xs text-cream-bright"
               >
                 {failure}
               </p>
@@ -169,10 +169,10 @@ export function RoadmapNodeDefinitionManager(props: {
                   </Select>
                 </Field>
               </div>
-              <label className="flex items-center justify-between rounded-lg border border-border/60 p-3 text-xs">
+              <label className="flex items-center justify-between rounded-lg border border-charcoal-border/60 p-3 text-xs">
                 <span>
                   <strong className="block">Show target dates in Agenda</strong>
-                  <span className="text-muted-foreground">
+                  <span className="text-cream-muted">
                     Instances gain an optional shared target date.
                   </span>
                 </span>
@@ -206,7 +206,7 @@ export function RoadmapNodeDefinitionManager(props: {
                 <div className="grid gap-2">
                   {(draft.field_schema ?? []).map((field, index) => (
                     <div
-                      className="grid grid-cols-[minmax(0,1fr)_140px_auto] gap-2 rounded-lg border border-border/60 p-2"
+                      className="grid grid-cols-[minmax(0,1fr)_140px_auto] gap-2 rounded-lg border border-charcoal-border/60 p-2"
                       key={field.id}
                     >
                       <Input
@@ -272,7 +272,7 @@ export function RoadmapNodeDefinitionManager(props: {
                           }
                         >
                           <Archive
-                            className={cn("size-3.5", field.archived && "text-destructive")}
+                            className={cn("size-3.5", field.archived && "text-cream-bright")}
                           />
                         </Button>
                       </div>
@@ -298,12 +298,12 @@ export function RoadmapNodeDefinitionManager(props: {
             </div>
           </div>
         </div>
-        <DialogFooter className="border-t border-border/60 px-5 py-3">
+        <DialogFooter className="border-t border-charcoal-border/60 px-5 py-3">
           {selected ? (
             <Button
               type="button"
               variant="ghost"
-              className="mr-auto text-destructive"
+              className="mr-auto text-cream-bright"
               disabled={busy}
               onClick={() => void archive()}
             >

@@ -45,7 +45,7 @@ export function CreateSpaceDialog({
             {Array.from({ length: CREATE_STEP_COUNT }, (_, step) => (
               <span
                 key={step}
-                className={`h-1 flex-1 rounded-full ${step <= dialog.step ? "bg-primary" : "bg-muted"}`}
+                className={`h-1 flex-1 rounded-full ${step <= dialog.step ? "bg-charcoal-active" : "bg-charcoal-card"}`}
               />
             ))}
           </div>
@@ -77,7 +77,7 @@ export function CreateSpaceDialog({
 
           {error ? (
             <p
-              className="mb-0 mt-3 rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-xs leading-relaxed text-destructive"
+              className="mb-0 mt-3 rounded-lg border border-charcoal-active/25 bg-charcoal-active px-3 py-2 text-xs leading-relaxed text-cream-bright"
               role="alert"
             >
               {error}

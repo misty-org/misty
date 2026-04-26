@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger, cn } from "@/ui";
 import type { Space } from "@/models/interfaces/features/spaces/types";
 import { SpaceMembersPopover } from "./SpaceMembersPopover";
+import { SpaceUsagePopover } from "./SpaceUsagePopover";
 
 export { SpacesUtilityTray } from "./SpacesUtilityTray";
 
@@ -23,6 +24,7 @@ export function SpaceManagementNavigation({
     <div className="ml-auto flex shrink-0 items-center gap-1 pl-3">
       <TooltipProvider delayDuration={400}>
         <nav className="flex items-center gap-1" aria-label="Space management">
+          <SpaceUsagePopover space={space} />
           <SpaceMembersPopover space={space} />
           <ManagementLink
             active={section === "settings"}
@@ -57,10 +59,8 @@ function ManagementLink({
       <TooltipTrigger asChild>
         <Link
           className={cn(
-            "relative grid size-8 place-items-center rounded-md no-underline outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
-            active
-              ? "misty-active-marker-bottom text-foreground"
-              : "text-muted-foreground hover:bg-accent/65 hover:text-foreground",
+            "relative grid size-8 place-items-center rounded-md no-underline outline-none transition-colors focus-visible:ring-2 focus-visible:ring-charcoal-active",
+            active ? "text-cream-bright" : "text-cream-muted hover:text-cream-bright",
           )}
           to={to}
           state={state}

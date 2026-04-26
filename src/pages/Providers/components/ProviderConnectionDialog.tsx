@@ -1,72 +1,77 @@
-import type { ProviderConnectionDialogProps } from "@/models/interfaces/pages/Providers/components/ProviderConnectionDialog";
-export type { ProviderConnectionDialogProps } from "@/models/interfaces/pages/Providers/components/ProviderConnectionDialog";
+import { providerOptionsForConnection } from "@/pages/Providers/providerUtils";
+import { ProviderLogo } from "@/pages/Providers/components/ProviderLogo";
 import { useEffect, useMemo, useState } from "react";
-import { Button } from "@/ui";
-import { Alert, AlertDescription, AlertTitle } from "@/ui";
 import {
+  Button,
+  Alert,
+  AlertDescription,
+  AlertTitle,
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  AssetIcon,
+  EmptyState,
 } from "@/ui";
-import { Input } from "@/ui";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui";
 import type {
   ProviderWorkflow,
   ProviderWorkflowOption,
 } from "@/models/interfaces/services/misty-api";
 import { iconAssets } from "@/assets/icons";
-import { AssetIcon } from "@/ui";
-import { providerOptionsForConnection } from "../providerUtils";
 import type { ProviderConnectionSession } from "@/models/interfaces/stores/providers/useProvidersStore";
-import { ProviderLogo } from "./ProviderLogo";
-import { EmptyState } from "@/ui";
 
 const providerDialogClass =
-  "flex max-h-[min(760px,calc(100vh-48px))] w-[min(560px,calc(100vw-48px))] max-w-none flex-col overflow-hidden bg-popover p-0";
+  "flex max-h-[min(760px,calc(100vh-48px))] w-[min(560px,calc(100vw-48px))] max-w-none flex-col overflow-hidden bg-charcoal-card p-0";
 
 const providerHeaderClass =
-  "flex grid-cols-[1fr_auto] items-start justify-between gap-5 border-b border-border px-5 py-[18px] text-left";
+  "flex grid-cols-[1fr_auto] items-start justify-between gap-5 border-b border-charcoal-border px-5 py-[18px] text-left";
 
-const providerProgressClass = "grid grid-cols-3 border-b border-border bg-muted/35 px-5 py-[11px]";
+const providerProgressClass =
+  "grid grid-cols-3 border-b border-charcoal-border bg-charcoal-card px-5 py-[11px]";
 
 const providerBodyClass = "min-h-[280px] overflow-auto p-5";
 
 const providerFooterClass =
-  "mt-0 flex-row justify-end gap-[9px] border-t border-border px-5 py-3.5";
+  "mt-0 flex-row justify-end gap-[9px] border-t border-charcoal-border px-5 py-3.5";
 
 const providerWorkflowGridClass = "grid grid-cols-2 gap-2.5";
 
-const providerSearchClass = "mb-3 grid gap-2 rounded-md bg-muted/35 p-3";
+const providerSearchClass = "mb-3 grid gap-2 rounded-md bg-charcoal-card p-3";
 
 const providerWorkflowButtonClass =
   "grid h-auto min-w-0 grid-cols-[38px_minmax(0,1fr)_18px] items-center justify-start gap-[11px] rounded-lg p-3 text-left";
 
-const providerWorkflowButtonSelectedClass = "border-primary bg-primary/10";
+const providerWorkflowButtonSelectedClass = "border-charcoal-active bg-charcoal-active";
 
-const providerWorkflowMarkClass = "grid h-[38px] w-[38px] place-items-center text-primary";
+const providerWorkflowMarkClass = "grid h-[38px] w-[38px] place-items-center text-cream-bright";
 
 const providerFormClass = "mx-auto grid max-w-[520px] gap-3.5";
 
-const providerFieldClass = "grid gap-2 text-[13px] font-semibold text-muted-foreground";
+const providerFieldClass = "grid gap-2 text-[13px] font-semibold text-cream-muted";
 
-const providerFormHelpClass = "text-[11px] font-medium normal-case text-muted-foreground";
+const providerFormHelpClass = "text-[11px] font-medium normal-case text-cream-muted";
 
 const providerSummaryClass =
-  "flex items-center justify-between rounded-md bg-muted/40 px-3 py-2.5 text-muted-foreground";
+  "flex items-center justify-between rounded-md bg-charcoal-card px-3 py-2.5 text-cream-muted";
 
-const providerInstructionsClass = "border-l-2 border-primary pl-[11px] text-[13px] text-foreground";
+const providerInstructionsClass =
+  "border-l-2 border-charcoal-active pl-[11px] text-[13px] text-cream";
 
 const providerAuthorizeStateClass =
   "mx-auto my-[30px] grid max-w-[430px] justify-items-center gap-2.5 text-center";
 
 const providerAuthorizeIconClass =
-  "grid h-[58px] w-[58px] place-items-center rounded-full border border-primary/30 bg-primary/10 text-primary";
+  "grid h-[58px] w-[58px] place-items-center rounded-full border border-charcoal-active/30 bg-charcoal-active text-cream-bright";
 
-const providerAuthorizeCompleteIconClass =
-  "border-[color-mix(in_srgb,var(--misty-success)_30%,transparent)] bg-[color-mix(in_srgb,var(--misty-success)_10%,transparent)] text-[var(--misty-success)]";
+const providerAuthorizeCompleteIconClass = "border-charcoal-border bg-charcoal-hover text-sage-fg";
 
 const EMPTY_SELECT_VALUE = "__misty_empty__";
 
@@ -163,7 +168,7 @@ export function ProviderConnectionDialog(props: ProviderConnectionDialogProps) {
                 {session.step?.instructions ||
                   "Misty opened the authorization page in your browser and is waiting for it to finish."}
               </p>
-              <small className="text-muted-foreground">
+              <small className="text-cream-muted">
                 {session.polling
                   ? `Checking authorization${session.authPollAttempts > 0 ? ` (${session.authPollAttempts})` : ""}...`
                   : "Return here after the browser sign-in completes."}
@@ -258,8 +263,8 @@ function ProviderPicker(props: {
   return (
     <>
       <label className={providerSearchClass}>
-        <span className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
-          <strong className="text-foreground">Provider backend</strong>
+        <span className="flex items-center justify-between gap-3 text-xs text-cream-muted">
+          <strong className="text-cream">Provider backend</strong>
           <span>
             {filteredWorkflows.length} of {props.workflows.length}
           </span>
@@ -319,7 +324,7 @@ function ProviderWorkflowButton(props: {
         <strong className="block overflow-hidden text-ellipsis">
           {props.workflow.name || props.workflow.type}
         </strong>
-        <small className="mt-[3px] block overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-muted-foreground">
+        <small className="mt-[3px] block overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-cream-muted">
           {props.workflow.description || props.workflow.type}
         </small>
       </span>
@@ -350,9 +355,7 @@ function ProviderConfiguration(props: {
       </label>
       <div className={providerSummaryClass}>
         <span>Provider</span>
-        <strong className="text-foreground">
-          {props.workflow?.name || props.session.providerType}
-        </strong>
+        <strong className="text-cream">{props.workflow?.name || props.session.providerType}</strong>
       </div>
       {options.map((option) => (
         <ProviderOptionField
@@ -442,15 +445,15 @@ function ProviderOptionField(props: {
 function ProgressStep(props: { label: string; active: boolean; complete: boolean }) {
   return (
     <div
-      className={`flex items-center justify-center gap-[7px] text-xs ${props.active || props.complete ? "text-foreground" : "text-muted-foreground"}`}
+      className={`flex items-center justify-center gap-[7px] text-xs ${props.active || props.complete ? "text-cream" : "text-cream-muted"}`}
     >
       <span
         className={`block h-[12px] w-[12px] shrink-0 rounded-full ${
           props.complete || props.active
             ? props.complete
-              ? "bg-[var(--misty-success)]"
-              : "bg-primary"
-            : "border border-border bg-transparent"
+              ? "bg-status-green"
+              : "bg-charcoal-active"
+            : "border border-charcoal-border bg-transparent"
         }`}
       />
       {props.label}
@@ -479,4 +482,16 @@ function submitLabel(session: ProviderConnectionSession): string {
   if (session.step) return "Continue";
   if (session.mode === "repair") return "Configure";
   return "Connect Remote";
+}
+
+export interface ProviderConnectionDialogProps {
+  session: ProviderConnectionSession;
+  workflows: ProviderWorkflow[];
+  onClose: () => void;
+  onChooseProvider: (providerType: string) => void;
+  onName: (name: string) => void;
+  onParameter: (key: string, value: string) => void;
+  onAdvance: () => void;
+  onSubmit: (polling?: boolean) => void;
+  onOpenAuthorize: () => void;
 }

@@ -1,7 +1,3 @@
-import type { TokenField } from "@/models/types/pages/Providers/providerUtils";
-export type { TokenField } from "@/models/types/pages/Providers/providerUtils";
-import type { ProviderConnectionLike } from "@/models/interfaces/pages/Providers/providerUtils";
-export type { ProviderConnectionLike } from "@/models/interfaces/pages/Providers/providerUtils";
 import type { ProviderConfigMode } from "@/models/types/services/misty-api";
 import type {
   ProviderConfigStep,
@@ -213,4 +209,17 @@ function tokenPriority(key: string): number {
   if (key === "expiry") return 3;
   if (key === "expires_in") return 4;
   return 5;
+}
+
+export type TokenField = {
+  key: string;
+  value: string;
+  sensitive: boolean;
+};
+
+export interface ProviderConnectionLike {
+  mode: ProviderConfigMode;
+  providerType: string;
+  parameters: Record<string, string>;
+  step: ProviderConfigStep | null;
 }

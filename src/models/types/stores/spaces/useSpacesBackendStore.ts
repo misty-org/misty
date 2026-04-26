@@ -49,7 +49,7 @@ import type {
 } from "@/models/interfaces/features/spaces/types";
 import { normalizeApiBaseUrl, withDefaultApiPath } from "@/stores/backend";
 
-import type { LibraryUploadOptions } from "@/models/interfaces/stores/spaces/useSpacesBackendStore";
+import type { LibraryUploadOptions } from "@/stores/spaces/useSpacesBackendStore";
 
 export type SpacePresenceViewer = { user_id: string; active: boolean };
 

@@ -1,5 +1,3 @@
-import type { TauriInternals } from "@/models/types/platform/tauri";
-export type { TauriInternals } from "@/models/types/platform/tauri";
 export function getTauriInternals(): TauriInternals | null {
   if (typeof window === "undefined") return null;
   return (
@@ -18,3 +16,8 @@ export function safeTauriAssetUrl(path: string): string {
   }
   return path;
 }
+
+export type TauriInternals = {
+  convertFileSrc?: (filePath: string, protocol?: string) => string;
+  invoke?: unknown;
+};

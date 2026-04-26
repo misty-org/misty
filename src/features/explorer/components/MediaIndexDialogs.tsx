@@ -32,7 +32,7 @@ export function MediaIndexApprovalDialog(props: {
         <AlertDialogHeader className="text-left">
           <div className="flex items-start gap-3">
             <span
-              className="grid size-9 shrink-0 place-items-center rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-300"
+              className="grid size-9 shrink-0 place-items-center rounded-lg bg-sage-bg text-sage-fg"
               aria-hidden="true"
             >
               <Sparkles size={18} />
@@ -44,7 +44,7 @@ export function MediaIndexApprovalDialog(props: {
               </AlertDialogTitle>
               <AlertDialogDescription className="leading-6">
                 About {minutes.toFixed(minutes < 10 ? 1 : 0)} minutes remain and may use up to{" "}
-                <strong className="font-medium text-foreground">
+                <strong className="font-medium text-cream">
                   {props.estimate.estimatedWeeklyPercent}% of your weekly hosted AI usage
                 </strong>
                 . Failed analysis and infrastructure retries do not count.
@@ -52,14 +52,14 @@ export function MediaIndexApprovalDialog(props: {
             </div>
           </div>
         </AlertDialogHeader>
-        <div className="max-h-28 overflow-auto rounded-md bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+        <div className="max-h-28 overflow-auto rounded-md bg-charcoal-card px-3 py-2 text-xs text-cream-muted">
           {props.estimate.fileNames.map((name) => (
             <div key={name} className="truncate py-0.5">
               {name}
             </div>
           ))}
         </div>
-        <p className="m-0 text-xs leading-5 text-muted-foreground">
+        <p className="m-0 text-xs leading-5 text-cream-muted">
           Analysis continues while Misty is open and resumes from the last completed 30-second chunk
           after a restart.
         </p>
@@ -96,7 +96,7 @@ export function MediaIndexRemovalDialog(props: {
         <AlertDialogHeader className="text-left">
           <div className="flex items-start gap-3">
             <span
-              className="grid size-9 shrink-0 place-items-center rounded-lg bg-destructive/10 text-destructive"
+              className="grid size-9 shrink-0 place-items-center rounded-lg bg-charcoal-active text-cream-bright"
               aria-hidden="true"
             >
               <AlertTriangle size={18} />
@@ -116,7 +116,7 @@ export function MediaIndexRemovalDialog(props: {
         </AlertDialogHeader>
         {props.error ? (
           <p
-            className="m-0 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
+            className="m-0 rounded-md bg-charcoal-active px-3 py-2 text-sm text-cream-bright"
             role="alert"
           >
             {props.error}

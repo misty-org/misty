@@ -18,7 +18,7 @@ import { useLibraryViewerPlayback } from "./libraryViewer/useLibraryViewerPlayba
 import type { LibraryItemViewerProps } from "@/models/interfaces/features/spaces/SpaceLibraryViewer";
 
 const dialogClass =
-  "grid h-[min(860px,calc(100dvh-32px))] min-h-0 w-[min(1320px,calc(100vw-32px))] max-w-none grid-cols-[minmax(0,1fr)_minmax(300px,340px)] grid-rows-[56px_minmax(0,1fr)] gap-0 overflow-hidden rounded-xl border-border/80 bg-background p-0 shadow-lg sm:max-w-none [&>button]:hidden";
+  "grid h-[min(860px,calc(100dvh-32px))] min-h-0 w-[min(1320px,calc(100vw-32px))] max-w-none grid-cols-[minmax(0,1fr)_minmax(300px,340px)] grid-rows-[56px_minmax(0,1fr)] gap-0 overflow-hidden rounded-xl border-charcoal-border/80 bg-charcoal-bg p-0 shadow-lg sm:max-w-none [&>button]:hidden";
 
 export function LibraryItemViewer(props: LibraryItemViewerProps) {
   if (!props.item) return null;
@@ -138,13 +138,13 @@ function LibraryItemViewerContent(props: LibraryItemViewerProps & { item: SpaceL
           }
         }}
       >
-        <header className="relative z-20 col-span-2 flex min-w-0 items-center justify-between gap-4 border-b border-border/60 bg-background px-4">
+        <header className="relative z-20 col-span-2 flex min-w-0 items-center justify-between gap-4 border-b border-charcoal-border/60 bg-charcoal-bg px-4">
           <div className="min-w-0">
             <DialogTitle className="truncate text-sm font-medium">{item.display_name}</DialogTitle>
             <DialogDescription className="sr-only">
               Preview and edit {item.display_name}.
             </DialogDescription>
-            <p className="m-0 mt-0.5 text-[10px] text-muted-foreground">
+            <p className="m-0 mt-0.5 text-[10px] text-cream-muted">
               {index + 1} of {items.length}
             </p>
           </div>

@@ -130,7 +130,7 @@ export const ExplorerPaneToolbarActions = memo(function ExplorerPaneToolbarActio
             className="w-64"
             aria-label="More file actions"
           >
-            <DropdownMenuLabel className="text-xs text-muted-foreground">Sort</DropdownMenuLabel>
+            <DropdownMenuLabel className="text-xs text-cream-muted">Sort</DropdownMenuLabel>
             {toolbarSortOptions.map((option) => {
               const active = props.sort.column === option.column;
               return (
@@ -155,9 +155,7 @@ export const ExplorerPaneToolbarActions = memo(function ExplorerPaneToolbarActio
               </span>
             </DropdownMenuCheckboxItem>
             <DropdownMenuSeparator />
-            <DropdownMenuLabel className="text-xs text-muted-foreground">
-              Location
-            </DropdownMenuLabel>
+            <DropdownMenuLabel className="text-xs text-cream-muted">Location</DropdownMenuLabel>
             <DropdownMenuItem onSelect={runRefresh}>
               <RefreshCcw className={refreshSpinning ? "animate-spin" : undefined} />
               Refresh
@@ -176,7 +174,7 @@ export const ExplorerPaneToolbarActions = memo(function ExplorerPaneToolbarActio
             {props.selectedCount > 0 ? (
               <>
                 <DropdownMenuSeparator />
-                <DropdownMenuLabel className="text-xs text-muted-foreground">
+                <DropdownMenuLabel className="text-xs text-cream-muted">
                   {props.selectedCount === 1 ? "Selection" : `${props.selectedCount} Selected`}
                 </DropdownMenuLabel>
                 <DropdownMenuItem disabled={!props.canOpenWithSelected} onSelect={props.onOpenWith}>

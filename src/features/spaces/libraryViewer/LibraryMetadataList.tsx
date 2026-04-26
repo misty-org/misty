@@ -17,7 +17,7 @@ export function LibraryMetadataList({
       : "";
 
   return (
-    <dl className="mt-6 grid gap-3 border-t border-border/60 pt-5 text-xs">
+    <dl className="mt-6 grid gap-3 border-t border-charcoal-border/60 pt-5 text-xs">
       <LibraryMetadataRow label="Type" value={mimeType} />
       <LibraryMetadataRow label="Size" value={formatBytes(Number(metadata.byte_size ?? 0))} />
       <LibraryMetadataRow label="Added" value={formatTime(item.added_at)} />

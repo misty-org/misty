@@ -30,12 +30,12 @@ export function SpacesReconnectScreen(props: { onReconnect: () => void }) {
 
   return (
     <main
-      className="grid h-full min-h-0 place-items-center overflow-hidden bg-background px-6 text-center"
+      className="grid h-full min-h-0 place-items-center overflow-hidden bg-charcoal-bg px-6 text-center"
       aria-busy="true"
       aria-live="polite"
       role="status"
     >
-      <h1 className="m-0 max-w-md text-lg font-semibold tracking-tight text-foreground">
+      <h1 className="m-0 max-w-md text-lg font-semibold tracking-tight text-cream">
         {reconnectPhrases[phraseIndex]}
       </h1>
     </main>

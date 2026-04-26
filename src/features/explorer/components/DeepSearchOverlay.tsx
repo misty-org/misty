@@ -1,21 +1,33 @@
-import type { DeepSearchOverlayProps } from "@/models/interfaces/features/explorer/components/DeepSearchOverlay";
-export type { DeepSearchOverlayProps } from "@/models/interfaces/features/explorer/components/DeepSearchOverlay";
-import { Input } from "@/ui";
-import { Button } from "@/ui";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/ui";
+import { formatBytes, formatDate } from "@/features/explorer/utils/fileFormat";
+import {
+  revealSearchResultInPane,
+  searchResultNavigationTarget,
+} from "@/features/explorer/utils/searchNavigation";
+import {
+  searchResultContext,
+  searchResultSummary,
+} from "@/features/explorer/components/ExplorerToolbarSupport";
+import { SearchResultThumbnail } from "@/features/explorer/components/SearchResultThumbnail";
+import {
+  compileEntryFilterMatcher,
+  entryMatchesQuery,
+} from "@/features/explorer/components/FileBrowserFilters";
+import {
+  Input,
+  Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/ui";
 import { CornerDownLeft, ListFilter, Loader2, Search } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import type { SearchQueryScope } from "@/models/types/services/misty-api";
 import type { SearchResult } from "@/models/interfaces/services/misty-api";
-import { formatBytes, formatDate } from "../utils/fileFormat";
-import { useSearchStore } from "@/stores/explorer";
-import { revealSearchResultInPane, searchResultNavigationTarget } from "../utils/searchNavigation";
-import { searchResultContext, searchResultSummary } from "./ExplorerToolbarSupport";
-import { SearchResultThumbnail } from "./SearchResultThumbnail";
-import { useExplorerStore } from "@/stores/explorer";
-import { compileEntryFilterMatcher, entryMatchesQuery } from "./FileBrowserFilters";
+import { useSearchStore, useExplorerStore } from "@/stores/explorer";
 
 const scopeOptions: Array<{ value: SearchQueryScope; label: string }> = [
   { value: "everything", label: "All" },
@@ -27,41 +39,38 @@ const emptyPaneEntries: SearchResult["entry"][] = [];
 
 const overlayStyles = {
   panel:
-    "left-1/2 top-[clamp(58px,14vh,150px)] grid max-h-[min(650px,calc(100vh-86px))] w-[min(680px,calc(100vw-28px))] max-w-none translate-x-[-50%] translate-y-0 grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-0 overflow-hidden rounded-xl border-border bg-popover p-0 text-popover-foreground shadow-2xl [&>button]:hidden",
+    "left-1/2 top-[clamp(58px,14vh,150px)] grid max-h-[min(650px,calc(100vh-86px))] w-[min(680px,calc(100vw-28px))] max-w-none translate-x-[-50%] translate-y-0 grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-0 overflow-hidden rounded-xl border-charcoal-border bg-charcoal-card p-0 text-cream shadow-2xl [&>button]:hidden",
   header: "grid min-h-[74px] grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-5",
   searchBox:
-    "grid h-full min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-4 text-muted-foreground",
+    "grid h-full min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-4 text-cream-muted",
   input:
-    "h-full min-w-0 border-0 bg-transparent p-0 text-xl font-medium tracking-tight text-foreground shadow-none outline-none placeholder:text-muted-foreground focus-visible:ring-0",
+    "h-full min-w-0 border-0 bg-transparent p-0 text-xl font-medium tracking-tight text-cream shadow-none outline-none placeholder:text-cream-muted focus-visible:ring-0",
   keyHint:
-    "rounded-md border border-border bg-muted px-2 py-1 text-[11px] font-medium text-muted-foreground",
+    "rounded-md border border-charcoal-border bg-charcoal-card px-2 py-1 text-[11px] font-medium text-cream-muted",
   controls:
-    "flex min-w-0 flex-wrap items-center gap-2 border-y border-border/80 bg-muted/20 px-5 py-2.5",
+    "flex min-w-0 flex-wrap items-center gap-2 border-y border-charcoal-border/80 bg-charcoal-card px-5 py-2.5",
   scopes: "flex min-w-0 flex-wrap items-center gap-2",
-  scope: "h-8 rounded-md px-3 text-xs font-medium text-muted-foreground",
-  scopeActive: "bg-accent text-accent-foreground",
+  scope: "h-8 rounded-md px-3 text-xs font-medium text-cream-muted",
+  scopeActive: "bg-charcoal-hover text-cream",
   status:
-    "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap px-3 py-1.5 text-xs text-muted-foreground",
+    "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap px-3 py-1.5 text-xs text-cream-muted",
   results: "min-h-[148px] overflow-auto p-2.5",
   result:
-    "grid min-h-[64px] w-full grid-cols-[44px_minmax(0,1fr)_auto] items-center gap-3 rounded-lg border-0 bg-transparent px-3 py-2 text-left text-foreground shadow-none",
-  resultSelected: "bg-accent text-accent-foreground hover:bg-accent hover:text-accent-foreground",
+    "grid min-h-[64px] w-full grid-cols-[44px_minmax(0,1fr)_auto] items-center gap-3 rounded-lg border-0 bg-transparent px-3 py-2 text-left text-cream shadow-none",
+  resultSelected: "bg-charcoal-hover text-cream hover:bg-charcoal-hover hover:text-cream",
   resultIcon:
-    "grid size-11 place-items-center overflow-hidden rounded-md bg-muted text-muted-foreground",
+    "grid size-11 place-items-center overflow-hidden rounded-md bg-charcoal-card text-cream-muted",
   resultImage: "size-full object-cover",
   resultText: "grid min-w-0 gap-0.5 leading-tight",
   resultName:
-    "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-medium text-foreground",
-  resultSummary:
-    "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs text-muted-foreground",
-  resultPath:
-    "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs text-muted-foreground/75",
-  resultMeta: "hidden text-right text-xs text-muted-foreground sm:block",
-  empty:
-    "grid min-h-[148px] place-items-center px-5 py-9 text-center text-sm text-muted-foreground",
+    "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-medium text-cream",
+  resultSummary: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs text-cream-muted",
+  resultPath: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs text-cream-muted/75",
+  resultMeta: "hidden text-right text-xs text-cream-muted sm:block",
+  empty: "grid min-h-[148px] place-items-center px-5 py-9 text-center text-sm text-cream-muted",
   footer:
-    "flex min-h-10 items-center justify-between gap-3 border-t border-border/80 bg-muted/20 px-5 text-[11px] text-muted-foreground",
-  error: "text-destructive",
+    "flex min-h-10 items-center justify-between gap-3 border-t border-charcoal-border/80 bg-charcoal-card px-5 text-[11px] text-cream-muted",
+  error: "text-cream-bright",
 } as const;
 
 export const DeepSearchOverlay = memo(function DeepSearchOverlay(props: DeepSearchOverlayProps) {
@@ -248,7 +257,7 @@ export const DeepSearchOverlay = memo(function DeepSearchOverlay(props: DeepSear
               ))}
             </div>
           ) : (
-            <span className="text-xs text-muted-foreground">
+            <span className="text-xs text-cream-muted">
               {filterResults.length} matching items in this folder
             </span>
           )}
@@ -338,4 +347,9 @@ function SearchResultRow(props: {
       <span className={overlayStyles.resultMeta}>{meta}</span>
     </Button>
   );
+}
+
+export interface DeepSearchOverlayProps {
+  activePaneId: string;
+  currentPath: string;
 }

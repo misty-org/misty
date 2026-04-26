@@ -115,8 +115,6 @@ export function FileGrid(props: FileBrowserProps & { listing: DirectoryListing }
   }, [createOffset, endIndex, props.listing.entries, startIndex]);
   const gridTop = gridPadding + startRow * rowStride;
   const gridItemStyle = {
-    "--file-grid-thumb-width": `${gridThumbWidth}px`,
-    "--file-grid-thumb-height": `${gridThumbHeight}px`,
     minHeight: `${gridItemHeight}px`,
   } as CSSProperties;
 

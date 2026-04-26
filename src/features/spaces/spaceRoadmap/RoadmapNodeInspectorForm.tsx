@@ -125,7 +125,7 @@ export function RoadmapNodeForm({
         />
       ))}
       {canManage ? (
-        <Button variant="ghost" className="justify-start text-destructive" onClick={onArchive}>
+        <Button variant="ghost" className="justify-start text-cream-bright" onClick={onArchive}>
           <Archive className="size-4" />
           Archive node
         </Button>
@@ -212,10 +212,10 @@ function NodeValueField({
 function Header({ title, status }: { title: string; status: string }) {
   return (
     <div>
-      <p className="m-0 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+      <p className="m-0 text-[10px] font-semibold uppercase tracking-wider text-cream-muted">
         {title}
       </p>
-      <p className="mt-1 text-xs text-muted-foreground">{status}</p>
+      <p className="mt-1 text-xs text-cream-muted">{status}</p>
     </div>
   );
 }

@@ -161,25 +161,33 @@ export const roadmapNodeColors: Record<
   SpaceRoadmapNodeColor,
   { accent: string; soft: string; hex: string }
 > = {
-  slate: { accent: "border-l-slate-400 text-slate-300", soft: "bg-slate-500/10", hex: "#94a3b8" },
-  blue: { accent: "border-l-blue-400 text-blue-300", soft: "bg-blue-500/10", hex: "#60a5fa" },
-  cyan: { accent: "border-l-cyan-400 text-cyan-300", soft: "bg-cyan-500/10", hex: "#22d3ee" },
+  slate: {
+    accent: "border-l-charcoal-active text-cream-muted",
+    soft: "bg-charcoal-card",
+    hex: "#948D84",
+  },
+  blue: { accent: "border-l-sage-fg text-sage-fg", soft: "bg-sage-bg", hex: "#A3BFAB" },
+  cyan: { accent: "border-l-sage-fg text-sage-fg", soft: "bg-sage-bg", hex: "#A3BFAB" },
   emerald: {
-    accent: "border-l-emerald-400 text-emerald-300",
-    soft: "bg-emerald-500/10",
-    hex: "#34d399",
+    accent: "border-l-sage-fg text-sage-fg",
+    soft: "bg-status-green",
+    hex: "#52825A",
   },
-  amber: { accent: "border-l-amber-400 text-amber-300", soft: "bg-amber-500/10", hex: "#fbbf24" },
+  amber: { accent: "border-l-sage-fg text-sage-fg", soft: "bg-sage-bg", hex: "#A3BFAB" },
   orange: {
-    accent: "border-l-orange-400 text-orange-300",
-    soft: "bg-orange-500/10",
-    hex: "#fb923c",
+    accent: "border-l-sage-fg text-sage-fg",
+    soft: "bg-sage-bg",
+    hex: "#443E38",
   },
-  rose: { accent: "border-l-rose-400 text-rose-300", soft: "bg-rose-500/10", hex: "#fb7185" },
+  rose: {
+    accent: "border-l-charcoal-active text-cream",
+    soft: "bg-charcoal-hover",
+    hex: "#443E38",
+  },
   violet: {
-    accent: "border-l-violet-400 text-violet-300",
-    soft: "bg-violet-500/10",
-    hex: "#a78bfa",
+    accent: "border-l-sage-fg text-sage-fg",
+    soft: "bg-sage-bg",
+    hex: "#948D84",
   },
 };
 

@@ -4,9 +4,9 @@ import { Button } from "@/ui";
 import { LibraryCanEditContext } from "./LibraryCanEditContext";
 
 const cardClass =
-  "group relative overflow-hidden rounded-xl bg-card shadow-xs inset-ring-1 inset-ring-foreground/10";
+  "group relative overflow-hidden rounded-xl bg-charcoal-card shadow-xs inset-ring-1 inset-ring-cream/10";
 const nudgeClass =
-  "grid size-6 place-items-center rounded-md border-0 bg-muted text-muted-foreground";
+  "grid size-6 place-items-center rounded-md border-0 bg-charcoal-card text-cream-muted";
 
 export interface LibraryCollectionCardProps {
   icon: LucideIcon;
@@ -44,12 +44,12 @@ export function LibraryCollectionCard({
       >
         <Icon size={22} />
         <p className="mb-0 mt-3 truncate text-xs font-medium">{label}</p>
-        <p className="mb-0 mt-1 text-[10px] text-muted-foreground">{count} items</p>
+        <p className="mb-0 mt-1 text-[10px] text-cream-muted">{count} items</p>
       </Button>
 
       {canEdit && onTogglePin && !disabled ? (
         <Button
-          className={`absolute right-2 top-2 grid size-7 place-items-center rounded-lg border-0 ${pinned ? "bg-accent text-foreground" : "bg-transparent text-muted-foreground opacity-0 group-hover:opacity-100 focus:opacity-100"}`}
+          className={`absolute right-2 top-2 grid size-7 place-items-center rounded-lg border-0 ${pinned ? "bg-charcoal-hover text-cream" : "bg-transparent text-cream-muted opacity-0 group-hover:opacity-100 focus:opacity-100"}`}
           type="button"
           onClick={onTogglePin}
           title={pinned ? "Unpin" : "Pin collection"}

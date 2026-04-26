@@ -17,7 +17,7 @@ export function PluginCard({
   onOpenDetails: () => void;
 }) {
   return (
-    <Card className="relative h-full gap-3 transition-colors hover:bg-muted/40" size="sm">
+    <Card className="relative h-full gap-3 transition-colors hover:bg-charcoal-card" size="sm">
       <CardHeader className="grid-cols-[auto_minmax(0,1fr)] items-center gap-3">
         <ExtensionCatalogIcon
           className="size-10"
@@ -25,16 +25,16 @@ export function PluginCard({
           pluginId={plugin.id}
           pluginName={plugin.name}
           roundedClassName="rounded-lg"
-          textClassName="text-xs font-semibold text-white"
+          textClassName="text-xs font-semibold text-cream-bright"
         />
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-2">
-            <p className="truncate text-sm font-medium text-foreground">{plugin.name}</p>
+            <p className="truncate text-sm font-medium text-cream">{plugin.name}</p>
             <Badge className="shrink-0 text-[10px]" variant={statusBadgeVariant(plugin)}>
               {pluginStatus(plugin)}
             </Badge>
           </div>
-          <p className="truncate text-xs text-muted-foreground">
+          <p className="truncate text-xs text-cream-muted">
             {plugin.author || "Misty"} · v{plugin.version}
           </p>
         </div>
@@ -43,7 +43,7 @@ export function PluginCard({
       {/* Grows so the action row stays pinned to the bottom of every card in a
           row, whatever length the overview clamps to. */}
       <CardContent className="flex-1">
-        <p className="line-clamp-2 text-xs leading-5 text-muted-foreground">{plugin.overview}</p>
+        <p className="line-clamp-2 text-xs leading-5 text-cream-muted">{plugin.overview}</p>
       </CardContent>
 
       <CardFooter className="justify-end">

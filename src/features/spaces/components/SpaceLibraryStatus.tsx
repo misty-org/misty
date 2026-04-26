@@ -130,7 +130,7 @@ export function SpaceLibraryInlineStatus() {
       ) : null}
       {localError ? (
         <Button
-          className="mb-4 rounded-xl border border-red-400/20 bg-red-950/20 px-3 py-2 text-left text-xs text-red-200"
+          className="mb-4 rounded-xl border border-charcoal-active/20 bg-charcoal-active px-3 py-2 text-left text-xs text-cream-bright"
           type="button"
           onClick={() => setLocalError("")}
         >
@@ -182,7 +182,7 @@ function SpaceLibraryFacetSuggestions({
 
   return (
     <div
-      className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl bg-muted/35 p-3"
+      className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl bg-charcoal-card p-3"
       onMouseDown={(event) => event.preventDefault()}
     >
       {searchFacets.media_types.length > 0 ? (
@@ -252,7 +252,7 @@ function SpaceLibrarySelectionToolbar({
   onClear: () => void;
 }) {
   return (
-    <div className="mb-4 flex min-h-10 flex-wrap items-center gap-2 rounded-xl bg-muted/50 px-3 py-2">
+    <div className="mb-4 flex min-h-10 flex-wrap items-center gap-2 rounded-xl bg-charcoal-card px-3 py-2">
       <span className="mr-1 text-xs font-medium">{selectedCount} selected</span>
       {canCopy && collection !== "deleted" ? (
         <Button size="sm" variant="outline" type="button" disabled={bulkSaving} onClick={onCopy}>
@@ -308,7 +308,7 @@ function SpaceLibrarySelectionToolbar({
         )
       ) : null}
       <Button
-        className="ml-auto grid size-7 place-items-center rounded-lg border-0 bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
+        className="ml-auto grid size-7 place-items-center rounded-lg border-0 bg-transparent text-cream-muted hover:bg-charcoal-card hover:text-cream"
         type="button"
         disabled={bulkSaving}
         onClick={onClear}

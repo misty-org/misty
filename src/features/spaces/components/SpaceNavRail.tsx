@@ -117,13 +117,13 @@ export function SpaceNavRail() {
               className={cn(
                 "size-9 transition duration-150",
                 active
-                  ? "ring-2 ring-foreground/70 group-hover/space:ring-foreground/70"
-                  : "ring-1 ring-border/55 group-hover/space:ring-border",
-                "group-focus-visible/space:ring-ring",
+                  ? "ring-2 ring-cream/70 group-hover/space:ring-cream/70"
+                  : "ring-1 ring-charcoal-border/55 group-hover/space:ring-charcoal-border",
+                "group-focus-visible/space:ring-charcoal-active",
               )}
             />
             {invitation ? (
-              <span className="absolute bottom-1 right-1 grid size-4 place-items-center rounded-full border border-background bg-foreground text-background">
+              <span className="absolute bottom-1 right-1 grid size-4 place-items-center rounded-full border border-charcoal-bg bg-cream text-charcoal-bg">
                 <LockKeyhole className="size-2.5" strokeWidth={2.2} aria-hidden="true" />
                 <span className="sr-only">Invitation pending</span>
               </span>
@@ -132,13 +132,13 @@ export function SpaceNavRail() {
         );
       })}
 
-      <span className="my-1 h-px w-7 bg-border/55" aria-hidden="true" />
+      <span className="my-1 h-px w-7 bg-charcoal-border" aria-hidden="true" />
       <Link
         className={cn(
-          "grid size-[46px] shrink-0 place-items-center rounded-[14px] border border-border/55",
-          "bg-transparent text-muted-foreground no-underline outline-none transition-all",
-          "hover:border-border hover:text-foreground",
-          "focus-visible:ring-2 focus-visible:ring-ring",
+          "grid size-[46px] shrink-0 place-items-center rounded-[14px] border border-charcoal-border/55",
+          "bg-transparent text-cream-muted no-underline outline-none transition-all",
+          "hover:border-charcoal-border hover:text-cream",
+          "focus-visible:ring-2 focus-visible:ring-charcoal-active",
           !canAddSpace && "pointer-events-none opacity-45",
         )}
         to="/spaces?createSpace=1"
@@ -182,10 +182,10 @@ function spaceRailLinkClass(active: boolean, dropTarget: boolean): string {
   return cn(
     "group/space relative grid size-[50px] shrink-0 place-items-center rounded-full bg-transparent outline-none",
     "transition-all",
-    "focus-visible:ring-2 focus-visible:ring-ring",
-    active && "text-foreground",
+    "focus-visible:ring-2 focus-visible:ring-charcoal-active",
+    active && "text-cream",
     dropTarget &&
-      "after:pointer-events-none after:absolute after:-top-0.5 after:h-0.5 after:w-8 after:rounded-full after:bg-foreground after:content-['']",
+      "after:pointer-events-none after:absolute after:-top-0.5 after:h-0.5 after:w-8 after:rounded-full after:bg-cream after:content-['']",
   );
 }
 

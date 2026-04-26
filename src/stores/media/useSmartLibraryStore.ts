@@ -1,7 +1,3 @@
-import type { SmartLibraryPhase } from "@/models/types/stores/media/useSmartLibraryStore";
-export type { SmartLibraryPhase } from "@/models/types/stores/media/useSmartLibraryStore";
-import type { SmartLibraryStore } from "@/models/interfaces/stores/media/useSmartLibraryStore";
-export type { SmartLibraryStore } from "@/models/interfaces/stores/media/useSmartLibraryStore";
 import { create } from "zustand";
 import {
   smartLibraryApplyResults,
@@ -535,4 +531,42 @@ function startPolling(get: () => SmartLibraryStore): void {
 function stopPolling(): void {
   if (pollTimer !== null) window.clearInterval(pollTimer);
   pollTimer = null;
+}
+
+export type SmartLibraryPhase =
+  | "idle"
+  | "scanning"
+  | "preflight"
+  | "uploading"
+  | "processing"
+  | "reindexing"
+  | "review"
+  | "complete"
+  | "error";
+
+export interface SmartLibraryStore {
+  loaded: boolean;
+  phase: SmartLibraryPhase;
+  library: FolderLibraryStatus | null;
+  progress: SmartLibraryProgress | null;
+  estimate: AnalysisEstimate | null;
+  reindexPlan: SemanticReindexPlan | null;
+  reindexProcessed: number;
+  error: string | null;
+  pendingDrop: SmartLibraryImportPreflight | null;
+  load: () => Promise<void>;
+  chooseFolder: (rootPath: string) => Promise<void>;
+  addFiles: (paths: string[]) => Promise<void>;
+  requestDroppedFiles: (paths: string[]) => Promise<void>;
+  confirmDroppedFiles: () => Promise<void>;
+  cancelDroppedFiles: () => void;
+  discoverChanges: () => Promise<void>;
+  rescan: () => Promise<void>;
+  trySample: () => Promise<void>;
+  analyzeFolder: () => Promise<void>;
+  refreshProgress: () => Promise<void>;
+  checkIndexUpgrade: () => Promise<void>;
+  upgradeIndex: () => Promise<void>;
+  setAssetTags: (assetId: string, tags: string[]) => Promise<void>;
+  removeLibrary: () => Promise<void>;
 }

@@ -10,18 +10,16 @@ export function ArchiveReader(props: { entries: ArchiveEntry[]; format: string }
         <FileArchive size={26} />
         <div>
           <strong className="block">{props.format.toUpperCase()} archive</strong>
-          <span className="text-xs text-muted-foreground">
-            {props.entries.length} visible entries
-          </span>
+          <span className="text-xs text-cream-muted">{props.entries.length} visible entries</span>
         </div>
       </div>
       {props.entries.map((entry, index) => (
         <div
           key={`${entry.path}:${index}`}
-          className="grid grid-cols-[minmax(0,1fr)_auto] gap-4 rounded-lg border border-border px-3 py-2 text-sm"
+          className="grid grid-cols-[minmax(0,1fr)_auto] gap-4 rounded-lg border border-charcoal-border px-3 py-2 text-sm"
         >
           <span className="truncate">{entry.path}</span>
-          <span className="text-muted-foreground">
+          <span className="text-cream-muted">
             {entry.isDir ? "Folder" : formatBytes(entry.uncompressedSize)}
           </span>
         </div>
@@ -38,9 +36,9 @@ export function PreviewMessage(props: {
 }) {
   return (
     <div className="grid min-h-[520px] place-items-center p-8 text-center">
-      <div className="grid max-w-md justify-items-center gap-3 text-muted-foreground">
+      <div className="grid max-w-md justify-items-center gap-3 text-cream-muted">
         {props.icon}
-        <strong className="text-base text-foreground">{props.title}</strong>
+        <strong className="text-base text-cream">{props.title}</strong>
         <p className="m-0 text-sm leading-6">{props.detail}</p>
         {props.action}
       </div>
@@ -73,18 +71,18 @@ export function InspectorDetail(props: { label: string; value: string; compact?:
   if (props.compact)
     return (
       <div>
-        <dt className="text-[10px] font-medium text-muted-foreground">{props.label}</dt>
-        <dd className="m-0 mt-0.5 break-words text-[11px] leading-4 text-foreground/80">
+        <dt className="text-[10px] font-medium text-cream-muted">{props.label}</dt>
+        <dd className="m-0 mt-0.5 break-words text-[11px] leading-4 text-cream/80">
           {props.value}
         </dd>
       </div>
     );
   return (
     <div>
-      <dt className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+      <dt className="text-[11px] font-medium uppercase tracking-wider text-cream-muted">
         {props.label}
       </dt>
-      <dd className="m-0 mt-1 break-words text-sm leading-5 text-foreground/80">{props.value}</dd>
+      <dd className="m-0 mt-1 break-words text-sm leading-5 text-cream/80">{props.value}</dd>
     </div>
   );
 }

@@ -87,9 +87,9 @@ export function LegacyLibraryAssetViewer(props: {
     >
       <DialogContent
         aria-describedby={undefined}
-        className="grid h-[min(860px,calc(100vh-48px))] w-[calc(100%-2rem)] max-w-[1280px] min-h-0 grid-rows-[minmax(0,1fr)_minmax(280px,42%)] gap-0 overflow-hidden rounded-xl bg-card p-0 text-card-foreground lg:grid-cols-[minmax(0,1.55fr)_minmax(330px,0.65fr)] lg:grid-rows-1 [&>[data-slot=dialog-close]]:hidden"
+        className="grid h-[min(860px,calc(100vh-48px))] w-[calc(100%-2rem)] max-w-[1280px] min-h-0 grid-rows-[minmax(0,1fr)_minmax(280px,42%)] gap-0 overflow-hidden rounded-xl bg-charcoal-card p-0 text-cream lg:grid-cols-[minmax(0,1.55fr)_minmax(330px,0.65fr)] lg:grid-rows-1 [&>[data-slot=dialog-close]]:hidden"
       >
-        <div className="relative grid min-h-0 place-items-center overflow-hidden bg-background">
+        <div className="relative grid min-h-0 place-items-center overflow-hidden bg-charcoal-bg">
           {preview ? (
             <img
               className="size-full object-contain"
@@ -97,7 +97,7 @@ export function LegacyLibraryAssetViewer(props: {
               alt={props.asset.description || props.asset.name}
             />
           ) : (
-            <div className="grid justify-items-center gap-3 text-muted-foreground">
+            <div className="grid justify-items-center gap-3 text-cream-muted">
               <File size={72} strokeWidth={1.2} />
               <span>{props.asset.mimeType || "Open with the full reader"}</span>
             </div>
@@ -114,25 +114,25 @@ export function LegacyLibraryAssetViewer(props: {
             <X size={18} />
           </Button>
         </div>
-        <aside className="min-h-0 overflow-y-auto border-t border-border p-5 lg:border-l lg:border-t-0">
+        <aside className="min-h-0 overflow-y-auto border-t border-charcoal-border p-5 lg:border-l lg:border-t-0">
           <div className="grid gap-5">
             <div className="min-w-0">
               <DialogTitle className="m-0 break-words text-xl font-bold tracking-[-0.02em]">
                 {props.asset.name}
               </DialogTitle>
-              <p className="m-0 mt-1 break-all text-xs text-muted-foreground">
+              <p className="m-0 mt-1 break-all text-xs text-cream-muted">
                 {props.asset.relativePath}
               </p>
             </div>
             {props.asset.description ? (
               <div>
                 <DetailLabel>Description</DetailLabel>
-                <p className="m-0 mt-1 text-sm leading-6 text-muted-foreground">
+                <p className="m-0 mt-1 text-sm leading-6 text-cream-muted">
                   {props.asset.description}
                 </p>
               </div>
             ) : null}
-            <div className="grid grid-cols-2 gap-3 rounded-lg bg-muted/40 p-3 text-sm">
+            <div className="grid grid-cols-2 gap-3 rounded-lg bg-charcoal-card p-3 text-sm">
               <DetailStat
                 label="Type"
                 value={props.asset.assetKind || props.asset.mimeType || "File"}
@@ -166,7 +166,7 @@ export function LegacyLibraryAssetViewer(props: {
                 {displayedTags.map((tag) => (
                   <span
                     key={tag}
-                    className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-xs"
+                    className="inline-flex items-center gap-1 rounded-full border border-charcoal-border px-2.5 py-1 text-xs"
                   >
                     {tag}
                     <Button
@@ -192,7 +192,7 @@ export function LegacyLibraryAssetViewer(props: {
                     variant="outline"
                     size="sm"
                     disabled={tagControlsDisabled}
-                    className="h-auto rounded-full border-dashed px-2.5 py-1 text-xs text-muted-foreground"
+                    className="h-auto rounded-full border-dashed px-2.5 py-1 text-xs text-cream-muted"
                     aria-expanded={tagsExpanded}
                     onClick={() => setTagsExpanded((current) => !current)}
                   >
@@ -216,7 +216,7 @@ export function LegacyLibraryAssetViewer(props: {
               </div>
               {pendingRemoval ? (
                 <div
-                  className="mt-3 rounded-lg border border-destructive/25 bg-destructive/10 p-3"
+                  className="mt-3 rounded-lg border border-charcoal-active/25 bg-charcoal-active p-3"
                   role="alertdialog"
                   aria-labelledby="remove-tag-title"
                   aria-describedby="remove-tag-description"
@@ -225,7 +225,7 @@ export function LegacyLibraryAssetViewer(props: {
                     Remove “{pendingRemoval}”?
                   </strong>
                   <p
-                    className="m-0 mt-1 text-xs leading-5 text-muted-foreground"
+                    className="m-0 mt-1 text-xs leading-5 text-cream-muted"
                     id="remove-tag-description"
                   >
                     This removes the tag from {props.asset.name}. Other files will keep it.
@@ -280,7 +280,7 @@ export function LegacyLibraryAssetViewer(props: {
                 </form>
               ) : null}
               {tagMutationError ? (
-                <p className="m-0 mt-2 text-xs leading-5 text-destructive" role="alert">
+                <p className="m-0 mt-2 text-xs leading-5 text-cream-bright" role="alert">
                   {tagMutationError}
                 </p>
               ) : null}

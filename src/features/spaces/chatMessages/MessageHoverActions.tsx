@@ -26,7 +26,7 @@ export function MessageHoverActions(props: MessageHoverActionsProps) {
     message.origin?.publish_state === "published" ? "Send to Discord again" : "Send to Discord";
 
   return (
-    <div className="absolute right-3 top-1 z-10 flex max-w-[min(360px,calc(100%-72px))] items-center gap-0.5 rounded-md border border-border/70 bg-background/95 p-0.5 opacity-0 shadow-sm transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+    <div className="absolute right-3 top-1 z-10 flex max-w-[min(360px,calc(100%-72px))] items-center gap-0.5 rounded-md border border-charcoal-border/70 bg-charcoal-bg p-0.5 opacity-0 shadow-sm transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
       {quickReactionEmojis.map((emoji) => {
         const reacted =
           message.reactions?.find((item) => item.emoji === emoji)?.reacted_by_me === true;
@@ -35,7 +35,7 @@ export function MessageHoverActions(props: MessageHoverActionsProps) {
             variant="ghost"
             size="icon"
             className={`flex size-7 items-center justify-center rounded text-sm leading-none transition-colors ${
-              reacted ? "bg-primary/10" : "hover:bg-muted"
+              reacted ? "bg-charcoal-active" : "hover:bg-charcoal-card"
             }`}
             type="button"
             key={emoji}
@@ -48,7 +48,7 @@ export function MessageHoverActions(props: MessageHoverActionsProps) {
           </Button>
         );
       })}
-      <span className="mx-0.5 h-5 w-px bg-border/80" aria-hidden="true" />
+      <span className="mx-0.5 h-5 w-px bg-charcoal-border" aria-hidden="true" />
 
       <ActionButton icon={<Reply />} label="Reply" onClick={() => props.onReply(message.id)} />
       {props.canPublishToDiscord ? (
@@ -71,7 +71,7 @@ export function MessageHoverActions(props: MessageHoverActionsProps) {
           icon={<Trash2 />}
           label="Delete message"
           title="Delete"
-          className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+          className="text-cream-muted hover:bg-charcoal-active hover:text-cream-bright"
           onClick={() => props.onDelete(message)}
         />
       ) : null}

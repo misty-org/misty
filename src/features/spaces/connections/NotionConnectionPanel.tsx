@@ -149,7 +149,7 @@ export function NotionConnectionPanel({
         </div>
         {loading ? (
           <LoaderCircle
-            className="size-4 shrink-0 animate-spin text-muted-foreground"
+            className="size-4 shrink-0 animate-spin text-cream-muted"
             aria-label="Checking Notion"
           />
         ) : availability?.configured === false ? (
@@ -184,14 +184,14 @@ export function NotionConnectionPanel({
 
       {error ? (
         <CardContent>
-          <p className="m-0 text-xs text-destructive" role="alert">
+          <p className="m-0 text-xs text-cream-bright" role="alert">
             {error}
           </p>
         </CardContent>
       ) : null}
 
       {expanded && integrations.length ? (
-        <CardContent className="grid gap-4 border-t border-border/60 pt-4">
+        <CardContent className="grid gap-4 border-t border-charcoal-border/60 pt-4">
           {canManage
             ? integrations.map((integration) => (
                 <NotionAccount
@@ -250,20 +250,18 @@ function NotionAccount({
   onSave: () => void;
 }) {
   return (
-    <div className="grid gap-3 rounded-lg border border-border/70 p-3">
+    <div className="grid gap-3 rounded-lg border border-charcoal-border/70 p-3">
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="m-0 text-sm font-medium">{integration.display_name || "Notion account"}</p>
-          <p className="mb-0 mt-0.5 text-xs text-muted-foreground">
+          <p className="mb-0 mt-0.5 text-xs text-cream-muted">
             {selected.size} source{selected.size === 1 ? "" : "s"} selected
           </p>
         </div>
         <Button
           aria-label={resources ? "Refresh Notion sources" : undefined}
           className={
-            resources
-              ? "size-8 text-muted-foreground/70 shadow-none hover:text-foreground"
-              : undefined
+            resources ? "size-8 text-cream-muted/70 shadow-none hover:text-cream" : undefined
           }
           variant={resources ? "ghost" : "outline"}
           size={resources ? "icon" : "sm"}
@@ -286,7 +284,7 @@ function NotionAccount({
             <div className="grid max-h-72 gap-1 overflow-auto">
               {resources.map((resource) => (
                 <label
-                  className="flex cursor-pointer items-center gap-3 rounded-md px-2 py-2 hover:bg-muted/60"
+                  className="flex cursor-pointer items-center gap-3 rounded-md px-2 py-2 hover:bg-charcoal-card"
                   key={resourceKey(resource)}
                 >
                   <Checkbox
@@ -311,7 +309,7 @@ function NotionAccount({
             </Button>
           </>
         ) : (
-          <p className="m-0 text-sm text-muted-foreground">
+          <p className="m-0 text-sm text-cream-muted">
             No pages or databases are available to this Notion connection.
           </p>
         )
@@ -322,8 +320,8 @@ function NotionAccount({
 
 function ResourceRow({ resource }: { resource: ProviderSharedResource }) {
   return (
-    <div className="flex items-center gap-3 rounded-md border border-border/60 px-3 py-2">
-      <FileText className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+    <div className="flex items-center gap-3 rounded-md border border-charcoal-border/60 px-3 py-2">
+      <FileText className="size-4 shrink-0 text-cream-muted" aria-hidden />
       <span className="min-w-0 flex-1 truncate text-sm">{resource.display_name}</span>
       <Badge variant="outline">{resourceLabel(resource.resource_type)}</Badge>
     </div>

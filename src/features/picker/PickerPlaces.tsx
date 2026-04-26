@@ -1,5 +1,4 @@
-import type { PickerPlacesProps } from "@/models/interfaces/features/picker/PickerPlaces";
-export type { PickerPlacesProps } from "@/models/interfaces/features/picker/PickerPlaces";
+import type { MountedDevice, ProviderRemote } from "@/models/interfaces/services/misty-api";
 import { Download, FileText, Folder, HardDrive, Home, Monitor } from "lucide-react";
 import { useMemo } from "react";
 
@@ -122,14 +121,14 @@ export function PickerPlaces(props: PickerPlacesProps) {
 function PlacesSection({ children, label }: { children: React.ReactNode; label: string }) {
   return (
     <section className="grid gap-0.5">
-      <h3 className="px-2 pb-1 text-[11px] font-medium text-muted-foreground">{label}</h3>
+      <h3 className="px-2 pb-1 text-[11px] font-medium text-cream-muted">{label}</h3>
       {children}
     </section>
   );
 }
 
 function PlacesHint({ children }: { children: React.ReactNode }) {
-  return <p className="m-0 px-2 py-1 text-xs text-muted-foreground">{children}</p>;
+  return <p className="m-0 px-2 py-1 text-xs text-cream-muted">{children}</p>;
 }
 
 function PlaceRow({
@@ -147,15 +146,27 @@ function PlaceRow({
     <Button
       className={cn(
         "h-8 w-full justify-start gap-2 px-2 font-normal shadow-none",
-        active && "bg-accent text-accent-foreground",
+        active && "bg-charcoal-hover text-cream",
       )}
       variant="ghost"
       type="button"
       aria-current={active ? "true" : undefined}
       onClick={onSelect}
     >
-      <span className="shrink-0 text-muted-foreground">{icon}</span>
+      <span className="shrink-0 text-cream-muted">{icon}</span>
       <span className="min-w-0 truncate">{label}</span>
     </Button>
   );
+}
+
+export interface PickerPlacesProps {
+  homePath: string;
+  activePath: string;
+  mountRoot: string;
+  remotes: ProviderRemote[];
+  remoteLoading: boolean;
+  devices: MountedDevice[];
+  devicesLoading: boolean;
+  pinnedPaths: string[];
+  onNavigate: (path: string) => void;
 }

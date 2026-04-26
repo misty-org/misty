@@ -36,7 +36,7 @@ import {
   updateTokenField,
 } from "@/pages/Providers/providerUtils";
 
-import type { ProvidersSet } from "@/models/types/stores/providers/useProvidersStore";
+import type { ProvidersSet } from "@/stores/providers/useProvidersStore";
 
 export interface ProviderConnectionSession {
   mode: ProviderConfigMode;

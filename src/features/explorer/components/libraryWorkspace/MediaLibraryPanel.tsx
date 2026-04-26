@@ -74,7 +74,7 @@ export function MediaLibraryPanel() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 className="m-0 text-xl font-bold">Media Search</h2>
-          <p className="m-0 mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
+          <p className="m-0 mt-1 max-w-2xl text-sm leading-6 text-cream-muted">
             Search spoken words and visual scenes at exact timestamps. Misty indexes only{" "}
             {snapshot?.rootPath ?? "~/Movies"}; original files never leave your Mac.
           </p>
@@ -112,9 +112,9 @@ export function MediaLibraryPanel() {
           ) : null}
         </div>
       </div>
-      <div className="rounded-lg bg-muted/40 p-4 text-sm">
+      <div className="rounded-lg bg-charcoal-card p-4 text-sm">
         <strong>Private, resumable preparation</strong>
-        <p className="m-0 mt-1 text-muted-foreground">
+        <p className="m-0 mt-1 text-cream-muted">
           Misty strips paths and metadata, sends 30-second compressed audio with up to four
           shot-aware 512px frames, and remembers progress across restarts. Each file is limited to
           120 minutes; total minutes are unlimited and always confirmed with a weekly hosted AI
@@ -123,12 +123,12 @@ export function MediaLibraryPanel() {
         </p>
       </div>
       {!snapshot?.ffmpegAvailable && loaded ? (
-        <p className="rounded-lg bg-warning/10 p-4 text-sm text-warning">
+        <p className="rounded-lg bg-sage-bg p-4 text-sm text-sage-fg">
           FFmpeg and FFprobe are required. Install FFmpeg, then scan again.
         </p>
       ) : null}
       {error ? (
-        <p className="rounded-lg bg-destructive/10 p-4 text-sm text-destructive">{error}</p>
+        <p className="rounded-lg bg-charcoal-active p-4 text-sm text-cream-bright">{error}</p>
       ) : null}
       {snapshot?.assets.length ? (
         <div className="grid gap-2">
@@ -146,14 +146,14 @@ export function MediaLibraryPanel() {
             return (
               <div
                 key={asset.assetId}
-                className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-lg border border-border/60 p-3"
+                className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-lg border border-charcoal-border/60 p-3"
               >
-                <span className="grid size-11 place-items-center rounded-md bg-muted">
+                <span className="grid size-11 place-items-center rounded-md bg-charcoal-card">
                   {asset.mediaType === "audio" ? <Music size={20} /> : <Film size={20} />}
                 </span>
                 <span className="min-w-0">
                   <strong className="block truncate">{asset.name}</strong>
-                  <small className="block text-muted-foreground">
+                  <small className="block text-cream-muted">
                     {formatMediaDuration(asset.durationMs)} · {asset.mediaType} ·{" "}
                     {asset.status === "unsupported"
                       ? asset.failureCode === "duration_limit_exceeded"
@@ -211,7 +211,7 @@ export function MediaLibraryPanel() {
                       variant="ghost"
                       size="icon-sm"
                       aria-label={`Remove index for ${asset.name}`}
-                      className="text-muted-foreground hover:text-destructive"
+                      className="text-cream-muted hover:text-cream-bright"
                       onClick={() =>
                         setRemoveTarget({ kind: "asset", assetId: asset.assetId, name: asset.name })
                       }

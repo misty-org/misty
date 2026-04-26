@@ -1,5 +1,3 @@
-import type { AgentSourcesProps } from "@/models/interfaces/features/agents/AgentSources";
-export type { AgentSourcesProps } from "@/models/interfaces/features/agents/AgentSources";
 import { Button } from "@/ui";
 import { FileText, Presentation, Sheet, TextQuote } from "lucide-react";
 import { agentsOpenCitation } from "@/stores/agents/useAgentsStore";
@@ -15,9 +13,11 @@ export function AgentSources({ citations, compact = false, onOpen }: AgentSource
     void agentsOpenCitation({ citation }).catch(() => undefined);
   };
   return (
-    <section className={`agent-sources${compact ? " is-compact" : ""}`} aria-label="Sources">
-      <strong className="agent-sources-title">Sources</strong>
-      <div className="agent-sources-list">
+    <section className="mt-2 grid gap-1.5" aria-label="Sources">
+      {!compact ? (
+        <strong className="text-[10px] font-semibold capitalize text-cream-muted">Sources</strong>
+      ) : null}
+      <div className="flex flex-wrap gap-1.5">
         {citations.map((citation, index) => {
           const Icon =
             citation.kind === "slide"
@@ -33,19 +33,27 @@ export function AgentSources({ citations, compact = false, onOpen }: AgentSource
                 citation.id ||
                 `${citation.scopeId}:${citation.relativePath || citation.fileName}:${citation.label}:${index}`
               }
-              className="agent-source"
+              className="grid min-h-7 max-w-full grid-cols-[18px_14px_minmax(0,auto)_auto] items-center gap-1 rounded-md border border-charcoal-border bg-charcoal-card px-2 py-1 text-left text-[11px] text-cream-muted hover:border-charcoal-active hover:bg-charcoal-hover hover:text-cream"
               type="button"
               title={citation.excerpt ?? `${citation.fileName}, ${citation.label}`}
               onClick={() => open(citation)}
             >
-              <span className="agent-source-index">{index + 1}</span>
+              <span className="grid size-[18px] place-items-center rounded bg-sage-bg text-[9px] font-bold text-sage-fg">
+                {index + 1}
+              </span>
               <Icon size={13} aria-hidden="true" />
-              <span className="agent-source-name">{citation.fileName}</span>
-              <span className="agent-source-location">{citation.label}</span>
+              <span className="truncate">{citation.fileName}</span>
+              <span className="whitespace-nowrap text-cream-muted">{citation.label}</span>
             </Button>
           );
         })}
       </div>
     </section>
   );
+}
+
+export interface AgentSourcesProps {
+  citations: AgentCitation[];
+  onOpen?: (citation: AgentCitation) => void | Promise<void>;
+  compact?: boolean;
 }

@@ -1,8 +1,9 @@
-import type { RefObject } from "react";
+import type { RefObject, UIEventHandler } from "react";
 import { SpaceChatMessages } from "../components/SpaceChatMessages";
 import type { MistyPickerSource } from "@/models/interfaces/features/picker/MistyPicker";
 import type { SpaceMessage } from "@/models/interfaces/features/spaces/types";
 import type { SpaceActionSuggestionBatch } from "@/models/interfaces/features/spaces/types";
+import type { PendingAgentRun } from "./usePendingAgentRuns";
 import type { SpaceChatPermissions } from "./useSpaceChatPermissions";
 import type { MessageEditingState } from "./useMessageEditing";
 import type { ChatSuggestionsState } from "./useChatSuggestions";
@@ -23,10 +24,13 @@ export interface SpaceChatThreadProps {
   setError: (message: string) => void;
   loading: boolean;
   endRef: RefObject<HTMLDivElement | null>;
+  scrollRef: RefObject<HTMLDivElement | null>;
+  onScroll: UIEventHandler<HTMLDivElement>;
   onOpenPicker: (source: MistyPickerSource) => void;
   onBeginMention: () => void;
   onReply: (messageId: string) => void;
   onDelete: (message: SpaceMessage) => void;
+  pendingAgentRuns: PendingAgentRun[];
   actionSuggestions: SpaceActionSuggestionBatch[];
   onActionSuggestionsChanged: () => void;
 }
@@ -40,6 +44,7 @@ export function SpaceChatThread(props: SpaceChatThreadProps) {
       error={props.error}
       loading={props.loading}
       messages={scope.messages}
+      pendingAgentRuns={props.pendingAgentRuns}
       actionSuggestions={props.actionSuggestions}
       onActionSuggestionsChanged={props.onActionSuggestionsChanged}
       currentUserId={props.currentUserId}
@@ -60,6 +65,8 @@ export function SpaceChatThread(props: SpaceChatThreadProps) {
         props.onBeginMention();
       }}
       endRef={props.endRef}
+      scrollRef={props.scrollRef}
+      onScroll={props.onScroll}
       onEditingText={editing.setEditingText}
       onCancelEditing={editing.cancel}
       onSaveEdited={(event, message) => void actions.saveEdited(event, message)}

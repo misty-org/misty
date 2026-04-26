@@ -1,11 +1,18 @@
-import type { ExplorerStoreSetter } from "@/models/types/features/explorer/store/helpers/view_size";
-export type { ExplorerStoreSetter } from "@/models/types/features/explorer/store/helpers/view_size";
+import { clipboardImagePng } from "@/features/explorer/utils/clipboardImage";
+import { explorerRuntime, getExplorerStore } from "@/features/explorer/store/runtime";
+import * as H from "@/features/explorer/store/helpers/index";
 import { create } from "zustand";
 import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { open } from "@tauri-apps/plugin-dialog";
 import { hasTauriInternals } from "@/platform/tauri";
 import { isAndroidBuild, isNativeMobileBuild } from "@/platform/buildTarget";
-import { useAppStore } from "@/stores/app";
+import {
+  useAppStore,
+  selectAdvancedPreferences,
+  selectGeneralPreferences,
+  selectNotificationPreferences,
+  useSettingsStore,
+} from "@/stores/app";
 import {
   clipboardNativeFileRefs,
   explorerCalculateDirectorySizes,
@@ -58,16 +65,8 @@ import type {
   MultiPanelPane,
   MultiPanelTab,
 } from "@/models/interfaces/workspace";
-import {
-  selectAdvancedPreferences,
-  selectGeneralPreferences,
-  selectNotificationPreferences,
-  useSettingsStore,
-} from "@/stores/app";
 import { useOperationQueueStore } from "@/stores/explorer";
 import { useTransfersStore } from "@/stores/transfers";
-import { clipboardImagePng } from "../../utils/clipboardImage";
-
 import type {
   ExplorerSortColumn,
   ExplorerSortDirection,
@@ -82,8 +81,6 @@ import type {
   ExplorerInlineEditState,
   ExplorerSortState,
 } from "@/models/interfaces/features/explorer/store/types";
-import { explorerRuntime, getExplorerStore } from "../runtime";
-import * as H from "./index";
 
 export function stringArray(value: unknown): string[] {
   return Array.isArray(value)
@@ -356,3 +353,10 @@ export function compareText(left: string | null, right: string | null): number {
 export function typeLabel(entry: FileEntry): string {
   return entry.kind === "folder" ? "Folder" : entry.mimeType || entry.extension || entry.kind;
 }
+
+export type ExplorerStoreSetter = (
+  partial:
+    | Partial<ExplorerStore>
+    | ExplorerStore
+    | ((state: ExplorerStore) => Partial<ExplorerStore> | ExplorerStore),
+) => void;

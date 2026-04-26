@@ -129,9 +129,11 @@ export class PostHogTelemetryClient implements TelemetryClient {
   }
   private syncOptState(): void {
     if (!this.instance) return;
-    this.analyticsEnabled || this.errorEnabled
-      ? this.instance.opt_in_capturing({ captureEventName: false })
-      : this.instance.opt_out_capturing();
+    if (this.analyticsEnabled || this.errorEnabled) {
+      this.instance.opt_in_capturing({ captureEventName: false });
+    } else {
+      this.instance.opt_out_capturing();
+    }
   }
 }
 

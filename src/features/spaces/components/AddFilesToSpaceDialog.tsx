@@ -193,7 +193,7 @@ export function AddFilesToSpaceDialog({
         </DialogHeader>
 
         <div className="grid min-h-0 gap-4 overflow-hidden">
-          <label className="grid gap-2 text-xs font-medium text-muted-foreground">
+          <label className="grid gap-2 text-xs font-medium text-cream-muted">
             Destination Space
             <Select
               value={spaceId}
@@ -215,13 +215,13 @@ export function AddFilesToSpaceDialog({
           </label>
 
           {!loading && eligibleSpaces.length === 0 ? (
-            <p className="m-0 rounded-md bg-muted/60 px-3 py-2 text-sm text-muted-foreground">
+            <p className="m-0 rounded-md bg-charcoal-card px-3 py-2 text-sm text-cream-muted">
               You do not have upload permission in any Space.
             </p>
           ) : null}
 
           <section className="grid min-h-0 gap-2" aria-label="Files to copy">
-            <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+            <div className="flex items-center justify-between gap-3 text-xs text-cream-muted">
               <span>
                 {jobs.length} {jobs.length === 1 ? "file" : "files"}
               </span>
@@ -232,14 +232,14 @@ export function AddFilesToSpaceDialog({
               {jobs.map((job) => (
                 <div
                   key={job.id}
-                  className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-md bg-muted/40 px-2.5 py-2"
+                  className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-md bg-charcoal-card px-2.5 py-2"
                 >
                   <JobIcon stage={job.stage} />
                   <span className="min-w-0">
                     <span className="block truncate text-xs font-medium" title={job.path}>
                       {job.name}
                     </span>
-                    <span className="block truncate text-[10px] text-muted-foreground">
+                    <span className="block truncate text-[10px] text-cream-muted">
                       {job.error || stageLabel(job.stage)}
                     </span>
                   </span>
@@ -251,7 +251,7 @@ export function AddFilesToSpaceDialog({
 
           {message ? (
             <p
-              className="m-0 rounded-md bg-muted/60 px-3 py-2 text-xs text-muted-foreground"
+              className="m-0 rounded-md bg-charcoal-card px-3 py-2 text-xs text-cream-muted"
               role="status"
             >
               {message}
@@ -301,11 +301,11 @@ export function AddFilesToSpaceDialog({
 }
 
 function JobIcon({ stage }: { stage: UploadStage }) {
-  if (stage === "ready") return <CheckCircle2 className="size-4 text-emerald-600" />;
+  if (stage === "ready") return <CheckCircle2 className="size-4 text-sage-fg" />;
   if (stage === "failed" || stage === "canceled")
-    return <XCircle className="size-4 text-destructive" />;
-  if (stage !== "queued") return <LoaderCircle className="size-4 animate-spin text-primary" />;
-  return <Copy className="size-4 text-muted-foreground" />;
+    return <XCircle className="size-4 text-cream-bright" />;
+  if (stage !== "queued") return <LoaderCircle className="size-4 animate-spin text-cream-bright" />;
+  return <Copy className="size-4 text-cream-muted" />;
 }
 
 function jobProgress(job: AddToSpaceJob): number {

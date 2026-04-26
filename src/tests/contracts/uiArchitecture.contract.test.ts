@@ -31,8 +31,8 @@ describe("UI architecture contract", () => {
       ) {
         failures.push(`${relative}: import Radix only inside src/ui`);
       }
-      if (relative.startsWith("src/ui/") && /\[--(?:radix|cmdk|reka)-[^\]]+\]/.test(text)) {
-        failures.push(`${relative}: wrap CSS properties in var(...)`);
+      if (/var\(--|["']--[a-z][a-z0-9-]*["']\s*:/.test(text)) {
+        failures.push(`${relative}: use Tailwind classes instead of CSS custom properties`);
       }
       if (!protectedRoots.some((root) => relative.startsWith(root))) continue;
       const forbidden = [
