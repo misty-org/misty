@@ -94,6 +94,9 @@ namespace misty::panel {
         void show_permanent_delete_modal(panel::FileExplorerState& state);
         void show_permission_delete_modal(panel::FileExplorerState& state);
 
+#ifdef MISTY_TESTING
+    public:
+#endif
         // File operation helpers
         void perform_copy(panel::FileExplorerState& state);
         void perform_cut(panel::FileExplorerState& state);
@@ -111,6 +114,9 @@ namespace misty::panel {
         bool open_context_menu_target(panel::FileExplorerState& state);
         const UnifiedFileItem* find_context_menu_target(const panel::FileExplorerState& state) const;
 
+#ifdef MISTY_TESTING
+    private:
+#endif
         // Async local filesystem navigation
         void navigate_to_local_path_async(const std::string& path, bool update_history, uint64_t navigation_generation);
 

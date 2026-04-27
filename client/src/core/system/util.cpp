@@ -1,4 +1,5 @@
 #include "core/system/util.h"
+#include <cstdio>
 #include <iostream>
 #include <cstdlib>
 #include <map>
@@ -33,6 +34,8 @@
 #ifndef _WIN32
 extern char** environ;
 #endif
+
+namespace fs = std::filesystem;
 
 namespace misty::core {
     namespace {
@@ -111,6 +114,31 @@ namespace misty::core {
             return run_process_blocking("/usr/bin/osascript", args) == 0;
         }
 #endif
+    }
+
+    std::string format_bytes(uint64_t bytes) {
+        if (bytes < 1024) {
+            return std::to_string(bytes) + " B";
+        }
+        if (bytes < 1024ULL * 1024) {
+            return std::to_string(bytes / 1024) + " KB";
+        }
+        if (bytes < 1024ULL * 1024 * 1024) {
+            char buf[32];
+            std::snprintf(buf, sizeof(buf), "%.1f MB", static_cast<double>(bytes) / (1024.0 * 1024.0));
+            return buf;
+        }
+
+        char buf[32];
+        std::snprintf(buf, sizeof(buf), "%.2f GB", static_cast<double>(bytes) / (1024.0 * 1024.0 * 1024.0));
+        return buf;
+    }
+
+    std::string format_bytes(int64_t bytes) {
+        if (bytes <= 0) {
+            return "0 B";
+        }
+        return format_bytes(static_cast<uint64_t>(bytes));
     }
 
     bool open_path_default(const std::string& path) {
@@ -344,4 +372,22 @@ namespace misty::core {
 #endif
     }
 
+
+    uint64_t get_directory_size(const std::string& dir_path) {
+        uint64_t total = 0;
+        std::error_code ec;
+        if (!fs::exists(dir_path, ec)) return 0;
+
+        for (const auto& entry : fs::recursive_directory_iterator(
+                dir_path, fs::directory_options::skip_permission_denied, ec)) {
+            if (entry.is_regular_file(ec)) {
+                total += entry.file_size(ec);
+            }
+        }
+        return total;
+    }
+
+    std::string default_string(const std::string& value, const char* fallback) {
+        return value.empty() ? std::string(fallback) : value;
+    }
 }

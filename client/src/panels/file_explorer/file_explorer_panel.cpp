@@ -10,7 +10,6 @@
 #include "panels/search/search_panel.h"
 #include "core/commands/command_manager.h"
 #include "core/manager/asset_manager.h"
-#include "core/extensions/extension_manager.h"
 #include <glad/glad.h>
 #include <nlohmann/json.hpp>
 #include <algorithm>
@@ -211,10 +210,6 @@ namespace misty::panel {
 
         // Sync remote account mappings
         sync_account_mappings();
-
-        // Extension discovery is cheap and lets the explorer surface matching
-        // actions immediately on first render.
-        core::ExtensionManager::get().reload();
 
         // Fetch workspaces if not already done
         if (!workspace_state.has_fetched) {

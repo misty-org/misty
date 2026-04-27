@@ -4,6 +4,7 @@
 #include <cstring>
 #include <sstream>
 
+#include "core/system/util.h"
 #include "core/ui/imgui_utils.h"
 
 namespace misty::panel {
@@ -34,16 +35,6 @@ namespace misty::panel {
             return out;
         }
 
-        std::string format_bytes(long long n) {
-            if (n <= 0) return "0 B";
-            const char* units[] = {"B", "KB", "MB", "GB", "TB"};
-            double v = static_cast<double>(n);
-            int i = 0;
-            while (v >= 1024.0 && i < 4) { v /= 1024.0; i++; }
-            char buf[64];
-            std::snprintf(buf, sizeof(buf), "%.2f %s", v, units[i]);
-            return buf;
-        }
     } // namespace
 
     VaultPanel::VaultPanel(core::UIRegistry& registry) : registry_(registry) {}
@@ -378,8 +369,8 @@ namespace misty::panel {
             ImGui::Spacing();
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.7f, 0.7f, 0.7f, 1.0f));
             ImGui::Text("%s / %s   |   elapsed %.1fs   |   ETA %.1fs",
-                        format_bytes(p.bytes_processed).c_str(),
-                        format_bytes(p.total_bytes).c_str(),
+                        core::format_bytes(p.bytes_processed).c_str(),
+                        core::format_bytes(p.total_bytes).c_str(),
                         p.seconds_elapsed, p.seconds_remaining);
             if (!p.current_file.empty()) {
                 ImGui::TextWrapped("%s", p.current_file.c_str());

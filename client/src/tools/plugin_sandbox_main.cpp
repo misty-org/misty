@@ -13,8 +13,8 @@
 #include "imgui_impl_opengl3.h"
 
 #include "core/commands/command_manager.h"
-#include "core/extensions/plugin_host.h"
-#include "core/extensions/plugin_signing.h"
+#include "core/plugins/plugin_host.h"
+#include "core/plugins/plugin_signing.h"
 
 namespace fs = std::filesystem;
 

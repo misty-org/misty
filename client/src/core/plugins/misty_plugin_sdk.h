@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "core/extensions/misty_plugin_c_api.h"
+#include "core/plugins/misty_plugin_c_api.h"
 
 namespace misty {
 

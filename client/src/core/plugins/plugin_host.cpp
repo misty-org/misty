@@ -1,4 +1,4 @@
-#include "core/extensions/plugin_host.h"
+#include "core/plugins/plugin_host.h"
 
 #include <algorithm>
 #include <cctype>
@@ -14,7 +14,7 @@
 
 #include "core/commands/command_manager.h"
 #include "core/system/util.h"
-#include "core/extensions/plugin_signing.h"
+#include "core/plugins/plugin_signing.h"
 #include <glad/glad.h>
 #include "imgui.h"
 #include "panels/file_explorer/file_explorer_state.h"

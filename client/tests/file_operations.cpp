@@ -16,9 +16,7 @@
 #include "panels/notification/notification_state.h"
 #include "panels/services/services_state.h"
 
-#define private public
 #include "panels/file_explorer/file_explorer_panel.h"
-#undef private
 
 namespace fs = std::filesystem;
 

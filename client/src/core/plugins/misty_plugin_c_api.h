@@ -1,5 +1,4 @@
-#ifndef MISTY_PLUGIN_C_API_H
-#define MISTY_PLUGIN_C_API_H
+#pragma once
 
 #include <stddef.h>
 #include <stdint.h>
@@ -110,6 +109,4 @@ typedef int      (*MistyPluginRegisterFn)(const MistyPluginContext*);
 
 #ifdef __cplusplus
 }
-#endif
-
 #endif
