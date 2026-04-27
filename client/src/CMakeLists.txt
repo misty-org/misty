@@ -74,7 +74,6 @@ list(APPEND MISTY_APP_SOURCES ${MISTY_PLATFORM_SOURCES})
 
 set(MISTY_COMMON_INCLUDE_DIRS
     "${CMAKE_SOURCE_DIR}/src"
-    "${CMAKE_BINARY_DIR}/generated"
     "${CMAKE_SOURCE_DIR}/vendor/glad/include"
     "${CMAKE_SOURCE_DIR}/vendor/lunasvg/include"
     "${CMAKE_SOURCE_DIR}/vendor/stb_image"
@@ -86,6 +85,8 @@ set(MISTY_COMMON_INCLUDE_DIRS
 
 add_executable(misty ${MISTY_APP_SOURCES})
 target_include_directories(misty PRIVATE ${MISTY_COMMON_INCLUDE_DIRS})
+target_compile_definitions(misty PRIVATE $<$<CONFIG:Debug>:MISTY_DEBUG_BUILD=1>)
+misty_configure_plugin_host(misty)
 target_link_libraries(misty
     PRIVATE
         misty_proto
@@ -127,8 +128,8 @@ target_link_libraries(misty_server PRIVATE misty_proto OpenSSL::Crypto)
 
 set(MISTY_SANDBOX_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/plugin_sandbox_main.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/core/extensions/plugin_host.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/core/extensions/plugin_signing.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/core/plugins/plugin_host.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/core/plugins/plugin_signing.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/core/commands/command_manager.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/core/system/util.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/views/app_view.cpp"
@@ -140,12 +141,12 @@ add_executable(misty_plugin_sandbox ${MISTY_SANDBOX_SOURCES})
 set_target_properties(misty_plugin_sandbox PROPERTIES OUTPUT_NAME "misty-plugin-sandbox")
 target_include_directories(misty_plugin_sandbox PRIVATE
     "${CMAKE_SOURCE_DIR}/src"
-    "${CMAKE_BINARY_DIR}/generated"
     "${CMAKE_SOURCE_DIR}/vendor/glad/include"
     "${CMAKE_SOURCE_DIR}/vendor/imgui/backends"
     "${CMAKE_SOURCE_DIR}/vendor/imgui"
     "${CMAKE_SOURCE_DIR}/vendor/json/single_include"
 )
+misty_configure_plugin_host(misty_plugin_sandbox)
 target_link_libraries(misty_plugin_sandbox
     PRIVATE
         glfw

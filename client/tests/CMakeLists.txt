@@ -32,6 +32,7 @@ if(BUILD_TESTING AND (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STRE
             "${CMAKE_SOURCE_DIR}/vendor/imgui/backends"
             "${CMAKE_SOURCE_DIR}/vendor/json/single_include"
         )
+        target_compile_definitions(misty_tests PRIVATE MISTY_TESTING)
         target_link_libraries(misty_tests PRIVATE gtest_main misty_proto)
 
         if(APPLE)

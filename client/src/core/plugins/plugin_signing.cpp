@@ -1,4 +1,4 @@
-#include "core/extensions/plugin_signing.h"
+#include "core/plugins/plugin_signing.h"
 
 #include <algorithm>
 #include <array>
@@ -11,9 +11,9 @@
 #include <openssl/evp.h>
 #include <openssl/pem.h>
 
-#include "core/extensions/misty_plugin_sdk.h"
+#include "core/plugins/misty_plugin_sdk.h"
 #include "core/system/util.h"
-#include "plugin_build_config.h"
+#include "core/plugins/plugin_config.h"
 
 namespace fs = std::filesystem;
 

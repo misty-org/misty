@@ -1,6 +1,6 @@
 #include "application.h"
 #include "core/commands/command_manager.h"
-#include "core/extensions/plugin_host.h"
+#include "core/plugins/plugin_host.h"
 #include "core/manager/proxy_manager.h"
 #include "core/manager/session_manager.h"
 #include "core/manager/env_manager.h"
@@ -34,6 +34,21 @@ void append_startup_log(const std::string& line) {
     if (!f.is_open()) return;
     f << line << "\n";
 }
+
+bool truthy_env(const char* name) {
+    const char* value = std::getenv(name);
+    if (!value || *value == '\0') return false;
+    const std::string v(value);
+    return v == "1" || v == "true" || v == "TRUE" || v == "yes" || v == "YES" || v == "on" || v == "ON";
+}
+
+bool should_run_boot_loader() {
+#ifdef MISTY_DEBUG_BUILD
+    return truthy_env("MISTY_BOOT_LOADER") || truthy_env("MISTY_RUN_BOOT_LOADER");
+#else
+    return true;
+#endif
+}
 } // namespace
 
 
@@ -43,7 +58,7 @@ namespace misty {
             append_startup_log("startup: begin");
             init_platform();
             append_startup_log("startup: platform initialized");
-            {
+            if (should_run_boot_loader()) {
                 const auto saved_size = window_size();
                 set_window_size(560, 640);
                 center_window();
@@ -65,8 +80,10 @@ namespace misty {
                 }
                 append_startup_log("startup: boot_loader loop end");
                 set_window_size(saved_size.first, saved_size.second);
+                append_startup_log("startup: boot_loader ok");
+            } else {
+                append_startup_log("startup: boot_loader skipped for debug build");
             }
-            append_startup_log("startup: boot_loader ok");
             core::EnvManager::get().reload();
             append_startup_log("startup: env reloaded");
             init_client();

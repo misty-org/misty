@@ -11,7 +11,7 @@ ExtensionsView::ExtensionsView(core::UIRegistry& ui_registry)
 
 void ExtensionsView::init_panels() {
     navbar_panel_ = std::make_shared<panel::NavbarPanel>(ui_registry_);
-    extensions_panel_ = std::make_shared<panel::ExtensionsPanel>(ui_registry_);
+    plugins_panel_ = std::make_shared<panel::PluginsPanel>(ui_registry_);
     notification_panel_ = std::make_shared<panel::NotificationPanel>(ui_registry_);
 }
 
@@ -36,7 +36,7 @@ void ExtensionsView::render() {
 
     ImGui::SetNextWindowPos(ImVec2(sx, sy), ImGuiCond_Always);
     ImGui::SetNextWindowSize(ImVec2(sw, sh), ImGuiCond_Always);
-    extensions_panel_->render();
+    plugins_panel_->render();
 
     notification_panel_->render();
 }
