@@ -2,15 +2,26 @@ import { describe, expect, it } from "vitest";
 import { desktopNavItems, desktopRouteIdFromPath } from "@/routing/navigation";
 
 describe("first-class Agent navigation", () => {
-  it("keeps workspace modes and Agents out of the primary rail", () => {
+  it("puts global destinations in the primary rail", () => {
+    expect(desktopNavItems.map((item) => item.id)).toEqual([
+      "home",
+      "files",
+      "agents",
+      "extensions",
+    ]);
     expect(desktopNavItems.map((item) => item.id)).not.toContain("spaces");
-    expect(desktopNavItems.map((item) => item.id)).not.toContain("files");
-    expect(desktopNavItems.map((item) => item.id)).not.toContain("extensions");
-    expect(desktopNavItems.map((item) => item.id)).not.toContain("agents");
+    expect(desktopNavItems.map((item) => item.id)).not.toContain("transfers");
   });
 
-  it("maps legacy Agent routes to Spaces for compatible app chrome", () => {
-    expect(desktopRouteIdFromPath("/agents")).toBe("spaces");
-    expect(desktopRouteIdFromPath("/assistant")).toBe("spaces");
+  it("treats Home as a first-class desktop route", () => {
+    expect(desktopRouteIdFromPath("/home")).toBe("home");
+  });
+
+  it("maps global destinations to their own app pages", () => {
+    expect(desktopRouteIdFromPath("/files")).toBe("files");
+    expect(desktopRouteIdFromPath("/agents")).toBe("agents");
+    expect(desktopRouteIdFromPath("/assistant")).toBe("agents");
+    expect(desktopRouteIdFromPath("/code")).toBe("code");
+    expect(desktopRouteIdFromPath("/extensions")).toBe("extensions");
   });
 });

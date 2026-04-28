@@ -18,12 +18,12 @@ const presetIcons: Record<string, LucideIcon> = {
 };
 
 const accentClasses: Record<string, string> = {
-  indigo: "border border-charcoal-border bg-charcoal-card text-cream-bright",
-  violet: "border border-charcoal-border bg-charcoal-card text-cream-bright",
-  blue: "border border-charcoal-border bg-charcoal-card text-cream-bright",
-  emerald: "border border-charcoal-border bg-charcoal-card text-cream-bright",
-  amber: "border border-charcoal-border bg-charcoal-card text-cream-bright",
-  rose: "border border-charcoal-border bg-charcoal-card text-cream-bright",
+  indigo: "bg-agent-indigo text-avatar-ink",
+  violet: "bg-agent-violet text-avatar-ink",
+  blue: "bg-agent-blue text-avatar-ink",
+  emerald: "bg-agent-emerald text-avatar-ink",
+  amber: "bg-agent-amber text-avatar-ink",
+  rose: "bg-agent-rose text-avatar-ink",
   neutral: "border border-charcoal-border bg-charcoal-card text-cream-bright",
 };
 

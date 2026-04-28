@@ -65,7 +65,6 @@ export type SettingsSection =
   | "privacy"
   | "transfers"
   | "search"
-  | "notifications"
   | "shortcuts"
   | "advanced";
 

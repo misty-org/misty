@@ -18,23 +18,15 @@ export type {
   AppNoticeEntry,
   FramePacingState,
 } from "@/models/types/layouts";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Outlet } from "react-router-dom";
-import { useShallow } from "zustand/react/shallow";
 import { Minus, Square, X } from "lucide-react";
 import { hideRuntimeAssetOnError, revealRuntimeAssetOnLoad } from "@/platform/runtimeAsset";
 import type { AppTab } from "@/models/types/routing/types";
-import {
-  selectNotificationPreferences,
-  settingsBoolean,
-  useAppStore,
-  useSettingsStore,
-} from "@/stores/app";
+import { settingsBoolean, useAppStore, useSettingsStore } from "@/stores/app";
 import { openAccountSettingsInBrowser } from "@/features/account/openAccountSettings";
-import { useExplorerStore } from "@/stores/explorer";
-import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
-import { DeepSearchOverlay } from "@/features/explorer/components/DeepSearchOverlay";
 import { MediaSearchViewer } from "@/features/explorer/components/MediaSearchViewer";
+import { GlobalMisty } from "@/features/global-search/GlobalMisty";
 import { SpacesRealtimeBridge } from "@/features/spaces/SpacesRealtimeBridge";
 import { SpaceNavRail } from "@/features/spaces/components/SpaceNavRail";
 import {
@@ -46,6 +38,7 @@ import {
   desktopTitlebarTitleClass,
   navbarBottomClass,
   navbarGroupClass,
+  navbarSpacesClass,
   tabletFrameClass,
   tabletNavbarClass,
   tabletRouteShellClass,
@@ -58,14 +51,14 @@ import { settingsFallbackRoute } from "./helpers";
 import { useDesktopWindowChrome } from "./useDesktopWindowChrome";
 import { useDesktopFrameStyle } from "./useDesktopFrameStyle";
 import { useDesktopBootstrap } from "./useDesktopBootstrap";
-import { useUnreadBadgeSync } from "./useUnreadBadgeSync";
-import { ActivityNavButton, NavGroup, ProfileNavButton, SettingsNavButton } from "./NavRail";
+import { NavGroup, ProfileNavButton, SettingsNavButton } from "./NavRail";
 import { ProfilePopover } from "./ProfilePopover";
 import { AppNoticePublisher, RouteNotice } from "./RouteNotices";
 import { TransferCompletionNotifier, WorkStatusPopup } from "./TransferStatus";
-import { ActivityOverlay, RemotesOverlay, SettingsOverlay } from "./SettingsOverlays";
+import { RemotesOverlay, SettingsOverlay } from "./SettingsOverlays";
 import { FramePacingOverlay } from "./FramePacingOverlay";
 import { useAuth } from "@/features/auth/AuthContext";
+import { ActivityBridge, unreadActivityCountForTool, useActivityStore } from "@/features/activity";
 
 // Windows "restore" caption glyph: two offset squares, the front one masked with
 // the titlebar background so the overlap reads cleanly.
@@ -82,7 +75,7 @@ export function DesktopLayout(props: {
   getRouteId: (pathname: string) => AppTab;
   navItems: DesktopNavItem[];
 }) {
-  const { refreshUser } = useAuth();
+  const { user, refreshUser } = useAuth();
   const {
     location,
     navigate,
@@ -108,17 +101,6 @@ export function DesktopLayout(props: {
   } = useDesktopWindowChrome();
   const { app: frameApp, mistyLogoSource } = useDesktopFrameStyle();
 
-  const localUnreadActivityCount = useExplorerStore(
-    (state) => state.notificationHistory.filter((notification) => !notification.read).length,
-  );
-  const cloudUnreadActivityCount = useSpacesStore(
-    (state) =>
-      [...state.inbox.unreads, ...state.inbox.mentions].filter((item) => !item.seen_at).length,
-  );
-  const unreadActivityCount = localUnreadActivityCount + cloudUnreadActivityCount;
-  const notificationPreferences = useSettingsStore(
-    useShallow((state) => selectNotificationPreferences(state.settings?.document)),
-  );
   const framePacingOverlayEnabled = useSettingsStore((state) =>
     settingsBoolean(
       state.settings?.document ?? {},
@@ -127,18 +109,21 @@ export function DesktopLayout(props: {
       false,
     ),
   );
-  useUnreadBadgeSync({
-    badgeCountEnabled: notificationPreferences.badgeCountEnabled,
-    unreadActivityCount,
-  });
 
-  const activityAnchorRef = useRef<HTMLButtonElement | null>(null);
   const profileAnchorRef = useRef<HTMLButtonElement | null>(null);
-  const [activityOpen, setActivityOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [remotesOpen, setRemotesOpen] = useState(false);
   const navItems = props.navItems;
+  const activityItems = useActivityStore((state) => state.allItems);
+  const navBadges = useMemo(
+    () => ({
+      files: unreadActivityCountForTool(activityItems, "files"),
+      agents: unreadActivityCountForTool(activityItems, "agents"),
+      extensions: unreadActivityCountForTool(activityItems, "extensions"),
+    }),
+    [activityItems],
+  );
   const refreshUserAfterSettings = useCallback(() => {
     void refreshUser().catch(() => undefined);
   }, [refreshUser]);
@@ -173,7 +158,6 @@ export function DesktopLayout(props: {
   const closeRemotesOverlay = useCallback(() => {
     setRemotesOpen(false);
   }, []);
-
   useEffect(() => {
     if (!location.pathname.startsWith("/settings")) return;
     openSettingsOverlay();
@@ -257,7 +241,7 @@ export function DesktopLayout(props: {
         aria-label="Primary"
         onPointerDown={usesNativeWindowChrome ? startTitlebarDrag : undefined}
       >
-        <div className="flex h-[46px] w-[54px] shrink-0 items-start justify-center pt-3">
+        <div className="flex h-14 w-[54px] shrink-0 items-start justify-center pt-3">
           {mistyLogoSource ? (
             <img
               className="h-[34px] w-[34px] object-contain"
@@ -268,19 +252,23 @@ export function DesktopLayout(props: {
             />
           ) : null}
         </div>
+        <span className="mb-0.5 h-px w-7 shrink-0 bg-charcoal-border" aria-hidden="true" />
         <div className={navbarGroupClass}>
+          {navItems.length ? (
+            <NavGroup
+              currentPath={location.pathname}
+              items={navItems}
+              badges={navBadges}
+              iconOnly
+            />
+          ) : null}
+        </div>
+        <span className="my-0.5 h-px w-7 shrink-0 bg-charcoal-border" aria-hidden="true" />
+        <div className={navbarSpacesClass}>
           <SpaceNavRail />
-          {navItems.length ? <NavGroup currentPath={location.pathname} items={navItems} /> : null}
         </div>
         <div className={navbarBottomClass}>
-          <ActivityNavButton
-            ref={activityAnchorRef}
-            open={activityOpen}
-            badge={notificationPreferences.badgeCountEnabled ? unreadActivityCount : 0}
-            onClick={() => {
-              setActivityOpen((open) => !open);
-            }}
-          />
+          <span className="mb-0.5 h-px w-7 shrink-0 bg-charcoal-border" aria-hidden="true" />
           <SettingsNavButton
             open={settingsOpen || location.pathname.startsWith("/settings")}
             onClick={openSettingsOverlay}
@@ -303,7 +291,6 @@ export function DesktopLayout(props: {
       <WorkStatusPopup />
       <TransferCompletionNotifier />
       <FramePacingOverlay enabled={framePacingOverlayEnabled} />
-      <ActivityOverlay open={activityOpen} onClose={() => setActivityOpen(false)} />
       <ProfilePopover
         anchorRef={profileAnchorRef}
         currentPath={location.pathname}
@@ -313,14 +300,19 @@ export function DesktopLayout(props: {
       />
       <RemotesOverlay open={remotesOpen} onClose={closeRemotesOverlay} />
       <SettingsOverlay open={settingsOpen} onClose={closeSettingsOverlay} />
-      <DeepSearchOverlay
-        activePaneId={activePaneId}
-        currentPath={
-          activePanePath || frameApp?.environment.homeDir || app?.environment.homeDir || ""
-        }
-      />
+      {user?.id ? (
+        <GlobalMisty
+          accountId={user.id}
+          currentPath={`${location.pathname}${location.search}`}
+          activePaneId={activePaneId}
+          activePanePath={
+            activePanePath || frameApp?.environment.homeDir || app?.environment.homeDir || ""
+          }
+        />
+      ) : null}
       <MediaSearchViewer />
       <SpacesRealtimeBridge />
+      <ActivityBridge />
     </main>
   );
 }

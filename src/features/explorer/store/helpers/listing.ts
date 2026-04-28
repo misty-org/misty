@@ -70,10 +70,8 @@ import { explorerPathKey, normalizeExplorerPath } from "../../utils/pathNormaliz
 import type {
   NavigationMode,
   ExplorerDialogState,
-  ExplorerNotificationType,
 } from "@/models/types/features/explorer/store/types";
 import type {
-  ExplorerNotification,
   ExplorerStore,
   PaneExplorerState,
   ExplorerBatchRenameItem,
@@ -113,56 +111,6 @@ export function shouldShowLoadingSkeleton(pane: PaneExplorerState, path: string)
   const target = H.normalizedPath(path);
   const mount = H.normalizedPath(mountRoot);
   return target === mount || target.startsWith(`${mount}/`);
-}
-
-export async function publishDesktopNotification(
-  notification: ExplorerNotification,
-  enabled: boolean,
-): Promise<void> {
-  if (!enabled || typeof Notification === "undefined") return;
-  try {
-    const permission =
-      Notification.permission === "default"
-        ? await Notification.requestPermission()
-        : Notification.permission;
-    if (permission !== "granted") return;
-    const title =
-      notification.type === "error"
-        ? "Misty needs attention"
-        : notification.type === "success"
-          ? "Misty completed an action"
-          : "Misty";
-    new Notification(title, {
-      body: notification.message,
-      tag: `misty-${notification.id}`,
-    });
-  } catch {
-    // Some webviews disable the Web Notification API; in-app Activity still records the event.
-  }
-}
-
-export function playNotificationSound(type: ExplorerNotificationType): void {
-  try {
-    const AudioContextConstructor =
-      window.AudioContext ||
-      (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!AudioContextConstructor) return;
-    const context = new AudioContextConstructor();
-    const oscillator = context.createOscillator();
-    const gain = context.createGain();
-    oscillator.type = "sine";
-    oscillator.frequency.value = type === "error" ? 220 : type === "success" ? 660 : 440;
-    gain.gain.setValueAtTime(0.001, context.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.045, context.currentTime + 0.015);
-    gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.16);
-    oscillator.connect(gain);
-    gain.connect(context.destination);
-    oscillator.start();
-    oscillator.stop(context.currentTime + 0.18);
-    window.setTimeout(() => void context.close(), 260);
-  } catch {
-    // Audio output can be unavailable or blocked until user interaction.
-  }
 }
 
 export function applyNavigationResult(

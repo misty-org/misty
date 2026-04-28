@@ -77,9 +77,9 @@ export function SpaceLibraryHeader(props: SpaceLibraryHeaderProps) {
 
   return (
     <header className="flex min-h-11 shrink-0 flex-wrap items-center gap-2 border-b border-charcoal-border bg-charcoal-bg px-3 py-1.5">
-      <h1 className="m-0 text-sm font-semibold">Library</h1>
+      <h1 className="m-0 shrink-0 text-sm font-semibold">Library</h1>
 
-      <div className="ml-auto flex items-center gap-2">
+      <div className="ml-auto flex items-center gap-3">
         {showSearch ? (
           <div className="relative w-44">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-cream-muted" />

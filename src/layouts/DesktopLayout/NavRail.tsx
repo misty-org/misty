@@ -1,10 +1,11 @@
 import { forwardRef, memo } from "react";
 import { NavLink } from "react-router-dom";
-import { Bell, Settings as SettingsIcon, UserCircle } from "lucide-react";
+import { Settings as SettingsIcon, UserCircle } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
-import { Avatar, AvatarFallback, AvatarImage, Button } from "@/ui";
+import { Avatar, AvatarFallback, AvatarImage, Button, cn } from "@/ui";
 import { useAuth } from "@/features/auth/AuthContext";
 import { useAccountAvatarUrl } from "@/hooks/useAccountAvatarUrl";
+import { avatarColorClass, avatarInkClass } from "@/lib/avatarPalette";
 import { useSetupStore } from "@/stores/app";
 import { useUserStore } from "@/stores/account/useUserStore";
 import type { DesktopNavItem } from "@/models/types/layouts";
@@ -15,7 +16,7 @@ import {
   navItemLabelActiveClass,
   navItemLabelBaseClass,
   navButtonActiveClass,
-  navItemBaseClass,
+  navIconOnlyItemBaseClass,
   navLinkActiveClass,
   navLinkBaseClass,
   profileDockClass,
@@ -23,7 +24,7 @@ import {
 import { emailName, formatBadgeCount, initialsForProfile } from "./helpers";
 
 const notificationBadgeClass = [
-  "absolute right-px top-0.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-status-green",
+  "absolute right-px top-0.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-notification-red",
   "px-[5px] text-[10px] font-bold leading-none text-cream-bright ring-2 ring-charcoal-workspace",
 ].join(" ");
 
@@ -32,6 +33,7 @@ export function NavGroup(props: {
   badges?: Partial<Record<string, number>>;
   currentPath: string;
   routeOverrides?: Partial<Record<string, string>>;
+  iconOnly?: boolean;
 }) {
   return (
     <>
@@ -42,7 +44,8 @@ export function NavGroup(props: {
           <NavLink
             aria-current={selected ? "page" : undefined}
             aria-label={item.label}
-            className={`group/nav-item ${navLinkBaseClass} ${selected ? navLinkActiveClass : ""}`}
+            title={item.label}
+            className={`group/nav-item ${props.iconOnly ? navIconOnlyItemBaseClass : navLinkBaseClass} ${selected ? navLinkActiveClass : ""}`}
             end={item.exact}
             key={item.id}
             to={props.routeOverrides?.[item.id] ?? item.path}
@@ -55,9 +58,13 @@ export function NavGroup(props: {
                 </span>
               ) : null}
             </span>
-            <span className={`${navItemLabelBaseClass} ${selected ? navItemLabelActiveClass : ""}`}>
-              {item.label}
-            </span>
+            {props.iconOnly ? null : (
+              <span
+                className={`${navItemLabelBaseClass} ${selected ? navItemLabelActiveClass : ""}`}
+              >
+                {item.label}
+              </span>
+            )}
           </NavLink>
         );
       })}
@@ -71,44 +78,10 @@ function isNavItemActive(item: DesktopNavItem, pathname: string): boolean {
   return pathname === item.path || pathname.startsWith(`${item.path}/`);
 }
 
-export const ActivityNavButton = memo(
-  forwardRef<
-    HTMLButtonElement,
-    {
-      badge: number;
-      open: boolean;
-      onClick: () => void;
-    }
-  >(function ActivityNavButton(props, ref) {
-    return (
-      <Button
-        ref={ref}
-        className={`group/nav-item ${navItemBaseClass} ${props.open ? navButtonActiveClass : ""}`}
-        variant="ghost"
-        type="button"
-        aria-haspopup="dialog"
-        aria-expanded={props.open}
-        aria-label="Activity"
-        onClick={props.onClick}
-      >
-        <span className={`${navIconTileBaseClass} ${props.open ? navIconTileActiveClass : ""}`}>
-          <Bell className={navIconClass} strokeWidth={1.85} />
-          {props.badge ? (
-            <span className={notificationBadgeClass}>{formatBadgeCount(props.badge)}</span>
-          ) : null}
-        </span>
-        <span className={`${navItemLabelBaseClass} ${props.open ? navItemLabelActiveClass : ""}`}>
-          Activity
-        </span>
-      </Button>
-    );
-  }),
-);
-
 export function SettingsNavButton(props: { open: boolean; onClick: () => void }) {
   return (
     <Button
-      className={`group/nav-item ${navItemBaseClass} ${props.open ? navButtonActiveClass : ""}`}
+      className={`group/nav-item ${navIconOnlyItemBaseClass} ${props.open ? navButtonActiveClass : ""}`}
       variant="ghost"
       type="button"
       aria-haspopup="dialog"
@@ -117,10 +90,7 @@ export function SettingsNavButton(props: { open: boolean; onClick: () => void })
       onClick={props.onClick}
     >
       <span className={`${navIconTileBaseClass} ${props.open ? navIconTileActiveClass : ""}`}>
-        <SettingsIcon className={navIconClass} strokeWidth={1.85} />
-      </span>
-      <span className={`${navItemLabelBaseClass} ${props.open ? navItemLabelActiveClass : ""}`}>
-        Settings
+        <SettingsIcon className="size-7" strokeWidth={1.85} />
       </span>
     </Button>
   );
@@ -156,6 +126,7 @@ export const ProfileNavButton = memo(
       <Button
         ref={ref}
         className={profileDockClass}
+        variant="ghost"
         type="button"
         aria-label="Profile"
         aria-haspopup="menu"
@@ -163,14 +134,33 @@ export const ProfileNavButton = memo(
         onClick={props.onClick}
       >
         {account ? (
-          <Avatar className="size-full">
+          <Avatar
+            className={cn(
+              "size-9 shrink-0 rounded-full transition duration-150",
+              props.open
+                ? "ring-2 ring-cream/70"
+                : "ring-1 ring-charcoal-border/55 group-hover/profile:ring-charcoal-border",
+            )}
+          >
             {avatarUrl ? (
               <AvatarImage src={avatarUrl} alt={`${displayName} profile picture`} />
             ) : null}
-            <AvatarFallback className="font-bold text-cream">{initials}</AvatarFallback>
+            <AvatarFallback
+              className={cn(
+                "rounded-full text-[10px] font-bold",
+                account?.id
+                  ? cn(avatarColorClass(account.id), avatarInkClass)
+                  : "bg-charcoal-bg text-cream",
+              )}
+            >
+              {initials}
+            </AvatarFallback>
           </Avatar>
         ) : (
-          <UserCircle size={24} strokeWidth={1.75} />
+          <UserCircle
+            className="size-6 text-cream-muted transition-colors group-hover/profile:text-cream"
+            strokeWidth={1.75}
+          />
         )}
       </Button>
     );

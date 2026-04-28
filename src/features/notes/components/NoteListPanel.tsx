@@ -1,7 +1,6 @@
 import type { UnifiedNote } from "@/models/types/features/notes/types";
 import { Star } from "lucide-react";
 import { Button, EmptyState, ScrollArea, Skeleton, cn } from "@/ui";
-import { relativeTime } from "@/features/notes/noteFilters";
 import { SyncErrorNotice } from "./NotesConnectionCards";
 
 const listPanelClass = "flex flex-col min-h-0 overflow-hidden";
@@ -9,9 +8,9 @@ const listPanelClass = "flex flex-col min-h-0 overflow-hidden";
 const listHeaderClass = "flex h-9 shrink-0 items-center justify-between gap-2 px-2";
 
 const rowClass =
-  "relative block w-full cursor-pointer rounded-md px-3 py-2.5 text-left transition-colors";
+  "misty-marker-host relative block w-full cursor-pointer rounded-md px-3 py-2.5 text-left transition-colors";
 
-const rowSelectedClass = "bg-charcoal-active text-cream-bright";
+const rowSelectedClass = "misty-active-marker-side text-cream-bright";
 
 export function NoteListPanel(props: NoteListPanelProps) {
   const showHeader = props.showHeader !== false;
@@ -24,7 +23,7 @@ export function NoteListPanel(props: NoteListPanelProps) {
         </div>
       ) : null}
 
-      <ScrollArea className="min-h-0">
+      <ScrollArea className="-mx-3 min-h-0 px-3">
         {Object.entries(props.connectorErrors).map(([connectorId, message]) => (
           <SyncErrorNotice key={connectorId} message={message} />
         ))}
@@ -74,34 +73,24 @@ function NoteListItem(props: NoteListItemProps) {
       className={cn(rowClass, "h-auto font-normal", props.selected && rowSelectedClass)}
       onClick={props.onSelect}
     >
-      <span className="flex min-w-0 flex-col gap-1">
-        <span className="flex min-w-0 items-center gap-1.5">
-          <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-cream">
-            {note.title}
-          </span>
-          {note.favorite ? <Star size={12} className="shrink-0 fill-sage-fg text-sage-fg" /> : null}
+      <span className="flex min-w-0 items-center gap-1.5">
+        <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-cream">
+          {note.title}
         </span>
-
-        <span className="line-clamp-2 text-[12px] leading-[1.45] text-cream-muted">
-          {note.preview}
-        </span>
-
-        <span className="text-[11px] tabular-nums text-cream-muted/60">
-          {relativeTime(note.updatedAt)}
-        </span>
+        {note.favorite ? <Star size={12} className="shrink-0 fill-sage-fg text-sage-fg" /> : null}
       </span>
     </Button>
   );
 }
 
 function NoteListSkeleton() {
+  // Same row height as a real (now single-line) note row, so the list
+  // doesn't jump once loading finishes.
   return (
-    <div aria-hidden="true">
-      {[0, 1, 2, 3, 4].map((row) => (
-        <div key={row} className="space-y-2 border-b border-charcoal-border/60 px-3 py-3">
+    <div aria-hidden="true" className="grid gap-0.5">
+      {[0, 1, 2].map((row) => (
+        <div key={row} className={rowClass}>
           <Skeleton className="h-3.5 w-2/3" />
-          <Skeleton className="h-3 w-full" />
-          <Skeleton className="h-3 w-4/5" />
         </div>
       ))}
     </div>

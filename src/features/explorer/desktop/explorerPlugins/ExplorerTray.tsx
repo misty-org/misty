@@ -12,6 +12,7 @@ import { explorerTrayStyles } from "../ExplorerDesktopPluginStyles";
 import { ExplorerPluginTabMenu } from "./ExplorerPluginTabMenu";
 import { isTransfersTabPath } from "./tabPaths";
 import type { TransferRecord } from "@/models/interfaces/services/misty-api";
+import { unreadActivityCountForTool, useActivityStore } from "@/features/activity";
 
 const transferBadgeStatuses = new Set<TransferRecord["status"]>([
   "queued",
@@ -75,19 +76,35 @@ export function ExplorerTray(props: {
 
 export function ExplorerTransfersTabButton(props: { onClick: () => void }) {
   const rows = useTransfersStore((state) => state.transfers?.rows ?? emptyTransferRows);
+  const activityItems = useActivityStore((state) => state.allItems);
   const active = useMultiPanelStore((state) => {
     const tab = state.tabs.find((candidate) => candidate.id === state.activeTabId);
     return Boolean(tab && isTransfersTabPath(tab.path));
   });
-  const badgeCount = rows.filter((row) => transferBadgeStatuses.has(row.status)).length;
+  const activeTransferCount = rows.filter((row) => transferBadgeStatuses.has(row.status)).length;
+  const newTransferCount = unreadActivityCountForTool(activityItems, "transfers");
+  const badgeCount = newTransferCount || activeTransferCount;
+  const openTransfers = () => {
+    const activity = useActivityStore.getState();
+    for (const item of activity.allItems) {
+      if (
+        !item.readAt &&
+        item.target.kind === "workspace-tool" &&
+        item.target.tool === "transfers"
+      ) {
+        activity.markRead(item.id);
+      }
+    }
+    props.onClick();
+  };
   return (
     <span className={explorerTrayStyles.triggerWrap}>
       <Button
         className={cx(explorerTrayStyles.trigger, active && explorerTrayStyles.triggerActive)}
         type="button"
         title="Transfers"
-        aria-label="Transfers"
-        onClick={props.onClick}
+        aria-label={newTransferCount ? `Transfers, ${newTransferCount} new` : "Transfers"}
+        onClick={openTransfers}
       >
         <ArrowRightLeft size={16} />
       </Button>

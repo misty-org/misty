@@ -242,9 +242,6 @@ export function ProfilePopover(props: {
           </span>
         </div>
         <div className="grid gap-1 py-2">
-          <span className="px-2.5 py-1 text-[10px] font-bold capitalize text-cream-muted">
-            User/Profile Settings
-          </span>
           <Button
             className={profileMenuItemClass}
             type="button"

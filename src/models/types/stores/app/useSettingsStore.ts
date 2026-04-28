@@ -35,10 +35,10 @@ export type SettingsSection =
   | "app"
   | "agent"
   | "appearance"
+  | "notifications"
   | "privacy"
   | "transfers"
   | "search"
-  | "notifications"
   | "shortcuts"
   | "advanced";
 

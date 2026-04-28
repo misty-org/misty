@@ -11,7 +11,7 @@ const validSections = new Set([
   "members",
   "settings",
 ]);
-const validSettingsSections = new Set(["general", "members", "connections"]);
+const validSettingsSections = new Set(["general", "members", "connections", "suggestions"]);
 
 export interface SpacePanelRoute {
   activeSpaceId: string;

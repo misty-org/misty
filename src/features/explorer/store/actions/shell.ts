@@ -64,6 +64,7 @@ import {
 } from "@/stores/app";
 import { useOperationQueueStore } from "@/stores/explorer";
 import { useTransfersStore } from "@/stores/transfers";
+import { useActivityStore } from "@/features/activity";
 import { clipboardImagePng } from "../../utils/clipboardImage";
 import type { ExplorerGet, ExplorerSet } from "@/models/types/features/explorer/store/types";
 import type { ExplorerStore } from "@/models/interfaces/features/explorer/store/types";
@@ -151,8 +152,6 @@ export function createShellActions(set: ExplorerSet, get: ExplorerGet): Partial<
         notificationPreferences.digestNotificationsEnabled && type !== "error";
       const alertSuppressed = quietSuppressed || digestSuppressed;
       const showToast = notificationPreferences.inAppNotificationsEnabled && !alertSuppressed;
-      const showDesktop = notificationPreferences.desktopNotificationsEnabled && !alertSuppressed;
-      const playSound = notificationPreferences.soundNotificationsEnabled && !alertSuppressed;
       const recordActivity = showInActivity;
       const id = explorerRuntime.nextExplorerNotificationId++;
       const notification = {
@@ -171,9 +170,23 @@ export function createShellActions(set: ExplorerSet, get: ExplorerGet): Partial<
           ? [...state.notificationHistory, notification].slice(-200)
           : state.notificationHistory,
       }));
-      void H.publishDesktopNotification(notification, showDesktop);
-      if (playSound) {
-        H.playNotificationSound(type);
+      if (recordActivity) {
+        useActivityStore.getState().ingestLocal({
+          id: `explorer-${id}`,
+          kind: type === "error" ? "failure" : type === "success" ? "completion" : "system",
+          title:
+            type === "error"
+              ? "Misty needs attention"
+              : type === "success"
+                ? "Misty completed an action"
+                : "Misty activity",
+          body: trimmed,
+          attention: type === "error",
+          target: /transfer|upload|download|copy|move/i.test(trimmed)
+            ? { kind: "workspace-tool", tool: "transfers" }
+            : { kind: "workspace-tool", tool: "files" },
+          notify: true,
+        });
       }
       if (showToast && durationMs > 0) {
         window.setTimeout(() => {
@@ -197,6 +210,17 @@ export function createShellActions(set: ExplorerSet, get: ExplorerGet): Partial<
       set((state) => ({
         notificationHistory: [...state.notificationHistory, notification].slice(-200),
       }));
+      useActivityStore.getState().ingestLocal({
+        id: `explorer-${id}`,
+        kind: type === "error" ? "failure" : type === "success" ? "completion" : "system",
+        title: type === "error" ? "Misty needs attention" : "Misty activity",
+        body: trimmed,
+        attention: type === "error",
+        target: /transfer|upload|download|copy|move/i.test(trimmed)
+          ? { kind: "workspace-tool", tool: "transfers" }
+          : { kind: "workspace-tool", tool: "files" },
+        notify: true,
+      });
       return id;
     },
     dismissNotification: (id) =>

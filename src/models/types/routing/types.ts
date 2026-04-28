@@ -1,4 +1,6 @@
 export type AppTab =
+  | "home"
+  | "code"
   | "files"
   | "spaces"
   | "assistant"

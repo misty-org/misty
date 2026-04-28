@@ -143,7 +143,11 @@ describe("SpaceNotes beta simplification", () => {
     });
 
     await act(async () => {
-      root.render(<NotesPanelSidebar spaceId="space-product" spaceName="Product" />);
+      root.render(
+        <MemoryRouter>
+          <NotesPanelSidebar spaceId="space-product" spaceName="Product" />
+        </MemoryRouter>,
+      );
     });
 
     expect(document.body.textContent).toContain("Product");

@@ -137,7 +137,7 @@ export function SpacePanelContent(props: {
       {spacesListSkeletonVisible ? (
         <SpacePanelSkeleton />
       ) : activeSpaceId ? (
-        <div className="misty-transient-scrollbar min-h-0 flex-1 overflow-x-hidden overflow-y-auto pb-2 [overscroll-behavior:contain]">
+        <div className="misty-transient-scrollbar -mx-3 min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3 pb-2 [overscroll-behavior:contain]">
           <SpaceSectionNavigation spaceId={activeSpaceId} section={section} />
           {activeSpaceNavigation ? (
             <div className="mt-3 border-t border-charcoal-border/45 pt-3">

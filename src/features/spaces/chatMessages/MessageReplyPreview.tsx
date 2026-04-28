@@ -1,5 +1,6 @@
 import { ImageIcon } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage, Button } from "@/ui";
+import { Avatar, AvatarFallback, AvatarImage, Button, cn } from "@/ui";
+import { avatarColorClass, avatarInkClass, robotAvatarClass } from "@/lib/avatarPalette";
 import type { SpaceMessage } from "@/models/interfaces/features/spaces/types";
 import { hasAnyAttachment, initials, messageReplyPreviewText } from "./messageHelpers";
 
@@ -36,7 +37,14 @@ export function MessageReplyPreview({
           <>
             <Avatar className="size-[18px] shrink-0">
               {avatarUrl ? <AvatarImage src={avatarUrl} alt="" /> : null}
-              <AvatarFallback className="text-[7px] font-semibold">
+              <AvatarFallback
+                className={cn(
+                  "text-[7px] font-semibold",
+                  message.sender_kind === "agent"
+                    ? cn(robotAvatarClass, avatarInkClass)
+                    : cn(avatarColorClass(message.sender_name), avatarInkClass),
+                )}
+              >
                 {message.sender_kind === "agent" ? "AI" : initials(message.sender_name)}
               </AvatarFallback>
             </Avatar>

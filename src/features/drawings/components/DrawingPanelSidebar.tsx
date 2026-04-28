@@ -1,7 +1,7 @@
-import { FilePenLine, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Skeleton, cn } from "@/ui";
+import { Button, ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger, Skeleton, cn } from "@/ui";
 import { SpaceSidebarSection } from "@/features/spaces/components/SpaceSidebarSection";
 import { SpaceSidebarPageSection } from "@/features/spaces/components/SpaceSidebarPageSection";
 import { useSpaceDrawings } from "../hooks/useSpaceDrawings";
@@ -37,25 +37,39 @@ export function DrawingPanelSidebar(props: {
               <Skeleton key={index} className="h-9 rounded-lg" />
             ))
           : drawings.drawings.map((drawing) => (
-              <Button
-                key={drawing.id}
-                type="button"
-                variant="ghost"
-                className={cn(
-                  "relative h-9 min-w-0 justify-start gap-2 rounded-md px-3 text-left text-xs font-normal",
-                  props.activeDrawingId === drawing.id
-                    ? "bg-charcoal-active text-cream-bright font-medium"
-                    : "text-cream-muted hover:bg-charcoal-hover hover:text-cream",
-                )}
-                onClick={() =>
-                  navigate(
-                    `/spaces/${encodeURIComponent(props.spaceId)}/drawings/${encodeURIComponent(drawing.id)}`,
-                  )
-                }
-              >
-                <FilePenLine size={15} className="shrink-0" />
-                <span className="truncate">{drawing.title}</span>
-              </Button>
+              <ContextMenu key={drawing.id}>
+                <ContextMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className={cn(
+                      "misty-marker-host relative h-9 min-w-0 justify-start gap-2 rounded-md px-3 text-left text-xs font-normal",
+                      props.activeDrawingId === drawing.id
+                        ? "misty-active-marker-side text-cream-bright font-medium"
+                        : "text-cream-muted hover:text-cream",
+                    )}
+                    onClick={() =>
+                      navigate(
+                        `/spaces/${encodeURIComponent(props.spaceId)}/drawings/${encodeURIComponent(drawing.id)}`,
+                      )
+                    }
+                  >
+                    <span className="truncate">{drawing.title}</span>
+                  </Button>
+                </ContextMenuTrigger>
+                <ContextMenuContent className="w-44 text-xs">
+                  <ContextMenuItem
+                    className="text-cream-bright focus:bg-charcoal-active focus:text-cream-bright"
+                    onClick={async () => {
+                      if (window.confirm(`Delete “${drawing.title}”?`)) {
+                        await drawings.remove(drawing.id);
+                      }
+                    }}
+                  >
+                    Delete drawing
+                  </ContextMenuItem>
+                </ContextMenuContent>
+              </ContextMenu>
             ))}
       </nav>
 

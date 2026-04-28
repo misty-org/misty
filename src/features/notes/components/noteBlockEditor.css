@@ -1,7 +1,7 @@
 .misty-note-block-editor {
   position: relative;
   min-height: 0;
-  color: #e6e1da;
+  color: #e0e0e0;
   font-family:
     system-ui,
     -apple-system,
@@ -26,7 +26,7 @@
 .misty-note-block-editor .bn-editor {
   margin: 0;
   background: transparent !important;
-  color: #e6e1da !important;
+  color: #e0e0e0 !important;
 }
 
 .misty-note-block-editor .bn-editor {
@@ -45,7 +45,7 @@
   display: flex;
   align-items: center;
   gap: 2px;
-  color: #948d84;
+  color: #8c8c8c;
 }
 
 .misty-note-block-editor
@@ -115,8 +115,8 @@
 
 .misty-note-block-editor .bn-editor [data-content-type="codeBlock"] pre,
 .misty-note-block-editor .bn-editor code {
-  border-color: #292624;
-  background: #100f0e;
+  border-color: #262626;
+  background: #0f0f0f;
 }
 
 .misty-note-block-editor .bn-editor [data-content-type="codeBlock"] pre {
@@ -140,9 +140,9 @@
 .misty-note-block-editor .bn-formatting-toolbar,
 .misty-note-block-editor .bn-file-panel,
 .misty-note-block-editor .bn-link-toolbar {
-  border: 1px solid #292624 !important;
-  background: #1a1918 !important;
-  color: #e6e1da !important;
+  border: 1px solid #262626 !important;
+  background: #191919 !important;
+  color: #e0e0e0 !important;
   box-shadow: none !important;
 }
 

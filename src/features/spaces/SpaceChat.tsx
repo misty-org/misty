@@ -1,5 +1,5 @@
 export type { ChatComposerSuggestion } from "@/models/types/features/spaces/SpaceChat";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Lightbulb, LightbulbOff, MessagesSquare, Trash2 } from "lucide-react";
 import { Button } from "@/ui";
@@ -114,6 +114,10 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
     canBrowseLibrary: access.canBrowseLibrary,
     openPicker,
   });
+  const mentionNames = useMemo(
+    () => [...scope.members.map((member) => member.name), ...scope.agents.map((agent) => agent.name)],
+    [scope.members, scope.agents],
+  );
 
   const discord = useDiscordPublish(spaceId, conversationId, (published) =>
     conversationChat.setMessages((current) => mergeSpaceMessages(current, [published])),
@@ -186,11 +190,11 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
   return (
     <div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-charcoal-bg text-cream">
       <header className="flex min-h-11 shrink-0 items-center gap-2 border-b border-charcoal-border bg-charcoal-bg px-3 py-1.5">
-        <h1 className="m-0 text-sm font-semibold">
+        <h1 className="m-0 shrink-0 text-sm font-semibold">
           {scope.activeConversation?.title || "Everyone"}
         </h1>
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-3">
           {conversationId && !scope.activeConversation?.direct_agent_id ? (
             <Button
               type="button"
@@ -259,6 +263,7 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
           sending={store.sending}
           canUploadAttachments={access.canUploadAttachments}
           canBrowseLibrary={access.canBrowseLibrary}
+          mentionNames={mentionNames}
           replyToSenderName={
             scope.messages.find((item) => item.id === draft.replyToMessageId)?.sender_name ??
             "message"

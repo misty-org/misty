@@ -1,4 +1,5 @@
 import { Avatar, AvatarFallback, cn } from "@/ui";
+import { avatarColorClass, avatarInkClass } from "@/lib/avatarPalette";
 import type { Space } from "@/models/interfaces/features/spaces/types";
 
 export function SpaceAvatar({ space, className }: { space: Space; className?: string }) {
@@ -9,7 +10,13 @@ export function SpaceAvatar({ space, className }: { space: Space; className?: st
       className={cn("shrink-0 rounded-full", className)}
       aria-label={`${space.name} default profile picture`}
     >
-      <AvatarFallback className="rounded-full bg-charcoal-bg text-[10px] font-bold text-cream">
+      <AvatarFallback
+        className={cn(
+          "rounded-full text-[10px] font-bold",
+          avatarColorClass(space.id),
+          avatarInkClass,
+        )}
+      >
         {initials}
       </AvatarFallback>
     </Avatar>

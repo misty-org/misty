@@ -6,6 +6,7 @@ import type { Space } from "@/models/interfaces/features/spaces/types";
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
 import { SpaceSectionNavigation } from "@/features/spaces/components/SpaceSectionNavigation";
 import { spaceSectionPath } from "@/features/spaces/components/spacePanel/spacePanelRoute";
+import { useActivityStore } from "@/features/activity";
 
 describe("SpaceSectionNavigation", () => {
   let container: HTMLDivElement;
@@ -18,11 +19,13 @@ describe("SpaceSectionNavigation", () => {
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
+    useActivityStore.setState({ allItems: [] });
   });
 
   afterEach(async () => {
     await act(async () => root.unmount());
     useSpacesStore.setState({ spaces: [] });
+    useActivityStore.setState({ allItems: [] });
     container.remove();
   });
 
@@ -91,6 +94,43 @@ describe("SpaceSectionNavigation", () => {
     const labels = [...container.querySelectorAll("a")].map((link) => link.textContent?.trim());
     expect(labels).not.toContain("Members");
     expect(labels).not.toContain("Settings");
+  });
+
+  it("puts a new-item count on the section that owns the update", async () => {
+    useSpacesStore.setState({ spaces: [spaceFixture()] });
+    useActivityStore.setState({
+      allItems: [
+        {
+          id: "spaces:9",
+          accountId: "account-1",
+          source: "spaces",
+          sourceId: "9",
+          kind: "mention",
+          title: "Mention",
+          body: "Please review",
+          createdAt: "2026-08-08T12:00:00Z",
+          attention: true,
+          target: { kind: "space-chat", spaceId: "space-1" },
+        },
+      ],
+    });
+
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={["/spaces/space-1/planner"]}>
+          <SpaceSectionNavigation spaceId="space-1" section="planner" />
+        </MemoryRouter>,
+      );
+    });
+
+    expect(container.querySelector('[aria-label="1 new"]')?.closest("a")?.textContent).toContain(
+      "Chat",
+    );
+    expect(
+      [...container.querySelectorAll("a")]
+        .find((link) => link.textContent?.includes("Planner"))
+        ?.querySelector('[aria-label$="new"]'),
+    ).toBeNull();
   });
 
   it("hides Library when access is denied", async () => {

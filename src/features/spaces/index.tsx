@@ -30,7 +30,7 @@ const validSpaceSections = new Set([
   "members",
   "settings",
 ]);
-const validSettingsSections = new Set(["general", "members", "connections"]);
+const validSettingsSections = new Set(["general", "members", "connections", "suggestions"]);
 const validPlannerViews = new Set(["board", "list", "calendar"]);
 
 export function SpaceDetail() {

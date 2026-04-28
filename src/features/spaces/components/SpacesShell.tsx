@@ -7,19 +7,16 @@ import { Button, PermissionState } from "@/ui";
 import { useAuth } from "@/features/auth/AuthContext";
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
 import { useAppStore } from "@/stores/app";
-import { useExplorerStore } from "@/stores/explorer";
 import {
   activeSpacesTab,
   defaultSpaceRoute,
   normalizeSpacesTabRoute,
   spacesTabsSessionKey,
   useSpacesTabsStore,
-  type WorkspaceTabKind,
 } from "@/stores/spaces/useSpacesTabsStore";
 import { SpacePanelContent } from "./SpacePanelContent";
 import { spacesBottomBarActionsId, SpacesBottomBarToggle } from "./SpacesBottomBar";
-import { SpacesHeader } from "./SpacesHeader";
-import { SpacesWorkspaceSurface } from "./SpacesWorkspaceSurface";
+import { SpacesHeader, type SpaceTabDestination } from "./SpacesHeader";
 import { SpacePageFrame } from "./SpacePageLayout";
 import { SpacesReconnectScreen } from "./SpacesReconnectScreen";
 import { SpacesAppLoadingPlaceholder } from "./SpacesLoadingPlaceholder";
@@ -87,7 +84,6 @@ export default function SpacesShell() {
     closeWorkspaceTab,
     reorderWorkspaceTabs,
     selectWorkspaceTab,
-    renameWorkspaceTab,
     updateActiveSpaceRoute,
     pruneTabSessions,
   } = useSpacesTabsStore(
@@ -97,7 +93,6 @@ export default function SpacesShell() {
       closeWorkspaceTab: state.closeTab,
       reorderWorkspaceTabs: state.reorderTabs,
       selectWorkspaceTab: state.selectTab,
-      renameWorkspaceTab: state.renameTab,
       updateActiveSpaceRoute: state.updateActiveSpaceRoute,
       pruneTabSessions: state.pruneSessions,
     })),
@@ -162,16 +157,10 @@ export default function SpacesShell() {
   useEffect(() => writePanelVisible(panelVisible), [panelVisible]);
   useEffect(() => {
     if (!accountId || !snapshotReady) return;
-    const removed = pruneTabSessions(
+    pruneTabSessions(
       accountId,
       spaces.map((space) => space.id),
     );
-    const homePath = useAppStore.getState().app?.environment.homeDir;
-    if (!homePath) return;
-    for (const tab of removed) {
-      if (tab.kind === "file-manager")
-        void useExplorerStore.getState().deleteWorkspace(tab.workspaceId, homePath);
-    }
   }, [accountId, pruneTabSessions, snapshotReady, spaces]);
   useEffect(() => {
     if (!accountId || !activeSpace?.id) return;
@@ -185,10 +174,6 @@ export default function SpacesShell() {
       if (normalizedRoute !== pendingRoute) return;
       pendingTabRouteRef.current = null;
     }
-    // Tab selection does not navigate, so an active tool tab can legitimately
-    // sit over the current Space URL. Only reconcile the URL when React Router
-    // reports a new navigation; otherwise opening File Manager (or another
-    // tool) would immediately create and activate a duplicate Space tab.
     if (handledLocationKeyRef.current === location.key) return;
     handledLocationKeyRef.current = location.key;
     if (activeTab?.kind === "space") {
@@ -216,43 +201,16 @@ export default function SpacesShell() {
     rememberSpaceSubpageRoute(accountId, panelRoute.activeSpaceId, currentSpacesRoute);
   }, [accountId, activeTab?.kind, currentSpacesRoute, panelRoute.activeSpaceId]);
 
-  const openTool = (kind: WorkspaceTabKind) => {
+  const addSpaceTab = (destination: SpaceTabDestination) => {
     if (!accountId || !activeSpace?.id) return;
-    const tabId = addWorkspaceTab(
-      accountId,
-      activeSpace.id,
-      kind,
-      kind === "space" ? currentSpacesRoute : undefined,
-    );
+    const route = newSpaceTabRoute(activeSpace.id, destination);
+    const tabId = addWorkspaceTab(accountId, activeSpace.id, "space", route);
     if (!tabId) {
       useAppStore.getState().setMessage("This Space already has 16 open tabs.");
       return;
     }
-    if (kind === "space") {
-      const next = useSpacesTabsStore
-        .getState()
-        .sessions[spacesTabsSessionKey(accountId, activeSpace.id)]?.tabs.find(
-          (tab) => tab.id === tabId && tab.kind === "space",
-        );
-      if (next?.kind === "space" && next.route !== currentSpacesRoute) {
-        pendingTabRouteRef.current = next.route;
-        navigate(next.route);
-      }
-    }
-  };
-
-  /**
-   * A File Manager tab owns one Explorer workspace, so its title is the
-   * workspace's name — renaming the tab renames the workspace behind it.
-   */
-  const renameTopLevelTab = (tabId: string, title: string) => {
-    if (!accountId || !activeSpace?.id) return;
-    const stored = renameWorkspaceTab(accountId, activeSpace.id, tabId, title);
-    if (!stored) return;
-    const renamed = tabSession?.tabs.find((tab) => tab.id === tabId);
-    if (renamed?.kind === "file-manager") {
-      void useExplorerStore.getState().renameWorkspace(renamed.workspaceId, stored);
-    }
+    pendingTabRouteRef.current = route;
+    navigate(route);
   };
 
   const selectTopLevelTab = (tabId: string) => {
@@ -269,11 +227,7 @@ export default function SpacesShell() {
   const closeTopLevelTab = (tabId: string) => {
     if (!accountId || !activeSpace?.id) return;
     const wasActive = activeTab?.id === tabId;
-    const closed = closeWorkspaceTab(accountId, activeSpace.id, tabId);
-    if (closed?.kind === "file-manager") {
-      const homePath = useAppStore.getState().app?.environment.homeDir;
-      if (homePath) void useExplorerStore.getState().deleteWorkspace(closed.workspaceId, homePath);
-    }
+    closeWorkspaceTab(accountId, activeSpace.id, tabId);
     if (!wasActive) return;
     const next = activeSpacesTab(
       useSpacesTabsStore.getState().sessions[spacesTabsSessionKey(accountId, activeSpace.id)],
@@ -333,14 +287,13 @@ export default function SpacesShell() {
         <div className="col-span-full row-start-1 min-w-0">
           <SpacesHeader
             session={tabSession}
-            onOpenTool={openTool}
+            onAddTab={addSpaceTab}
             onCloseTab={closeTopLevelTab}
             onReorderTab={(tabId, fromIndex, toIndex) => {
               if (accountId && activeSpace?.id)
                 reorderWorkspaceTabs(accountId, activeSpace.id, tabId, fromIndex, toIndex);
             }}
             onSelectTab={selectTopLevelTab}
-            onRenameTab={renameTopLevelTab}
           />
         </div>
 
@@ -383,8 +336,6 @@ export default function SpacesShell() {
             ) : (
               <Outlet context={outletContext} />
             )
-          ) : activeTab ? (
-            <SpacesWorkspaceSurface tab={activeTab} />
           ) : (
             <Outlet context={outletContext} />
           )}
@@ -408,4 +359,11 @@ export default function SpacesShell() {
       </div>
     </MotionConfig>
   );
+}
+
+function newSpaceTabRoute(spaceId: string, destination: SpaceTabDestination): string {
+  const base = `/spaces/${encodeURIComponent(spaceId)}`;
+  if (destination === "journal") return defaultSpaceRoute(spaceId);
+  if (destination === "planner") return `${base}/planner/tasks/board`;
+  return `${base}/${destination}`;
 }
