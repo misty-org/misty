@@ -24,12 +24,6 @@ file(GLOB_RECURSE MISTY_VIEW_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/views/*.h"
 )
 
-set(MISTY_GUI_DFS_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/dfs/client/misty_client.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/dfs/client/misty_client.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/dfs/file_manager.h"
-)
-
 set(MISTY_SERVER_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/dfs/server/server.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/dfs/server/misty_impl.cpp"
@@ -49,7 +43,6 @@ set(MISTY_APP_SOURCES
     ${MISTY_CORE_SOURCES}
     ${MISTY_PANEL_SOURCES}
     ${MISTY_VIEW_SOURCES}
-    ${MISTY_GUI_DFS_SOURCES}
 )
 
 if(WIN32)
@@ -74,7 +67,6 @@ list(APPEND MISTY_APP_SOURCES ${MISTY_PLATFORM_SOURCES})
 
 set(MISTY_COMMON_INCLUDE_DIRS
     "${CMAKE_SOURCE_DIR}/src"
-    "${CMAKE_BINARY_DIR}/generated"
     "${CMAKE_SOURCE_DIR}/vendor/glad/include"
     "${CMAKE_SOURCE_DIR}/vendor/lunasvg/include"
     "${CMAKE_SOURCE_DIR}/vendor/stb_image"
@@ -86,9 +78,10 @@ set(MISTY_COMMON_INCLUDE_DIRS
 
 add_executable(misty ${MISTY_APP_SOURCES})
 target_include_directories(misty PRIVATE ${MISTY_COMMON_INCLUDE_DIRS})
+target_compile_definitions(misty PRIVATE $<$<CONFIG:Debug>:MISTY_DEBUG_BUILD=1>)
+misty_configure_plugin_host(misty)
 target_link_libraries(misty
     PRIVATE
-        misty_proto
         glfw
         lunasvg
         OpenGL::GL
@@ -127,8 +120,8 @@ target_link_libraries(misty_server PRIVATE misty_proto OpenSSL::Crypto)
 
 set(MISTY_SANDBOX_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/plugin_sandbox_main.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/core/extensions/plugin_host.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/core/extensions/plugin_signing.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/core/plugins/plugin_host.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/core/plugins/plugin_signing.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/core/commands/command_manager.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/core/system/util.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/views/app_view.cpp"
@@ -140,12 +133,12 @@ add_executable(misty_plugin_sandbox ${MISTY_SANDBOX_SOURCES})
 set_target_properties(misty_plugin_sandbox PROPERTIES OUTPUT_NAME "misty-plugin-sandbox")
 target_include_directories(misty_plugin_sandbox PRIVATE
     "${CMAKE_SOURCE_DIR}/src"
-    "${CMAKE_BINARY_DIR}/generated"
     "${CMAKE_SOURCE_DIR}/vendor/glad/include"
     "${CMAKE_SOURCE_DIR}/vendor/imgui/backends"
     "${CMAKE_SOURCE_DIR}/vendor/imgui"
     "${CMAKE_SOURCE_DIR}/vendor/json/single_include"
 )
+misty_configure_plugin_host(misty_plugin_sandbox)
 target_link_libraries(misty_plugin_sandbox
     PRIVATE
         glfw
@@ -201,4 +194,4 @@ if(EXISTS "${CMAKE_SOURCE_DIR}/extensions")
 endif()
 
 add_custom_target(misty_assets ALL ${MISTY_ASSET_COMMANDS})
-add_dependencies(misty_assets misty misty_plugin_sandbox preview_manager_manifest)
+add_dependencies(misty_assets misty misty_plugin_sandbox)

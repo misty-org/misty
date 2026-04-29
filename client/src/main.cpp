@@ -8,6 +8,7 @@
 #endif
 
 #include "application.h"
+#include <cstdlib>
 #include <memory>
 #include <curl/curl.h>
 #include <filesystem>
@@ -25,9 +26,28 @@ std::unique_ptr<misty::Application> create_application() {
     #endif
 }
 
+namespace {
+    void set_boot_loader_opt_in() {
+#ifdef _WIN32
+        _putenv_s("MISTY_BOOT_LOADER", "1");
+#else
+        setenv("MISTY_BOOT_LOADER", "1", 1);
+#endif
+    }
 
-int main(int, char**) {
+    void parse_dev_flags(int argc, char** argv) {
+        for (int i = 1; i < argc; ++i) {
+            const std::string arg = argv[i] ? argv[i] : "";
+            if (arg == "--boot-loader" || arg == "--boot") {
+                set_boot_loader_opt_in();
+            }
+        }
+    }
+} // namespace
+
+int main(int argc, char** argv) {
     curl_global_init(CURL_GLOBAL_DEFAULT);
+    parse_dev_flags(argc, argv);
 
     // Stabilize relative asset/config paths: many client resources are loaded
     // via "assets/..." relative paths. Anchor cwd to the executable directory

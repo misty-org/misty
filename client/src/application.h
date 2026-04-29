@@ -4,9 +4,10 @@
 #include "core/threading/file_sync_service.h"
 #include "panels/errors/errors_panel.h"
 #include "views/app_view.h"
-#include "dfs/client/misty_client.h"
+#include <memory>
 #include <utility>
 
+class MistyClient;
 
 namespace misty {
     class Application {

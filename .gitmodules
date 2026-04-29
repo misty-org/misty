@@ -2,10 +2,6 @@
 	path = client/vendor/octicons
 	url = git@github.com:primer/octicons.git
 	shallow = true
-[submodule "client/vendor/nanosvg"]
-	path = client/vendor/nanosvg
-	url = git@github.com:memononen/nanosvg.git
-	shallow = true
 [submodule "client/vendor/lunasvg"]
 	path = client/vendor/lunasvg
 	url = git@github.com:sammycage/lunasvg.git

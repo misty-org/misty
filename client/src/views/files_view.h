@@ -6,13 +6,14 @@
 
 #include "views/app_view.h"
 #include "core/ui/ui_registry.h"
-#include "dfs/client/misty_client.h"
 #include "core/threading/worker_pool.h"
 #include "panels/claude/claude_panel.h"
 #include "panels/file_sidebar/file_sidebar_panel.h"
 #include "panels/filetree/filetree_panel.h"
 #include "panels/navbar/navbar_panel.h"
 #include "panels/notification/notification_panel.h"
+
+class MistyClient;
 
 namespace misty::view {
     class FilesView : public view::AppView {

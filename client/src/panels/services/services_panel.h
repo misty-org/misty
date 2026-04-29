@@ -14,6 +14,13 @@ namespace misty::panel {
         ~ServicesPanel() override = default;
         void render() override;
 
+        // Supported provider types for "Add Account" buttons
+        struct ProviderInfo {
+            std::string type;          // rclone type: "onedrive", "drive", "dropbox", etc.
+            std::string display_name;  // UI label
+        };
+        static const std::vector<ProviderInfo>& supported_providers();
+
     private:
         void show_header(ServicesState& state);
         void show_cloud_section(ServicesState& state);
@@ -25,13 +32,6 @@ namespace misty::panel {
         void show_loading_overlay();
         void show_disconnect_confirm_modal(ServicesState& state);
         void show_rename_remote_modal(ServicesState& state);
-
-        // Supported provider types for "Add Account" buttons
-        struct ProviderInfo {
-            std::string type;          // rclone type: "onedrive", "drive", "dropbox", etc.
-            std::string display_name;  // UI label
-        };
-        static const std::vector<ProviderInfo>& supported_providers();
 
     private:
         static constexpr float kMinCardWidth = 230.0f;

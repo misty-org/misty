@@ -21,7 +21,7 @@ class TempDir {
 public:
     TempDir() {
         path_ = fs::temp_directory_path() /
-                fs::path("misty-fswatcher-test-" + 
+                fs::path("misty-fswatcher-test-" +
                          std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) + "-" +
                          std::to_string(counter_++));
         fs::create_directories(path_);

@@ -37,6 +37,24 @@ namespace misty::panel {
         bool connected = false;
     };
 
+    struct ProviderType {
+        std::string type;
+        std::string display_name;
+    };
+
+    struct RcloneHealth {
+        bool ready = false;
+        bool loaded = false;
+        bool loading = false;
+        bool link_present = false;
+        std::string rclone_path;
+        std::string rclone_version;
+        std::string config_path;
+        std::string link_path;
+        std::string link_target;
+        std::string error;
+    };
+
     // Unified callback types
     using FilesCallback = std::function<void(bool success,
                                              const std::string& response_body,
@@ -68,6 +86,15 @@ namespace misty::panel {
 
         // Refresh all connections from GET /api/remotes
         void refresh_connections();
+
+        // Refresh supported providers from GET /api/remotes/types.
+        void refresh_provider_types();
+
+        // Refresh external rclone runtime health from GET /api/remotes/health.
+        void refresh_rclone_health(bool force = false);
+
+        // Kill running proxy processes and launch the configured proxy again.
+        void restart_proxy();
 
         // Check if any remotes are connected
         bool has_connections();
@@ -175,6 +202,11 @@ namespace misty::panel {
         bool initial_load_done = false;
 
         std::set<RemoteConnection> connections;
+        std::vector<ProviderType> provider_types;
+        bool provider_types_loading = false;
+        bool provider_types_loaded = false;
+        RcloneHealth rclone_health;
+        bool proxy_restart_in_flight = false;
 
         // Set to true whenever `connections` changes (e.g. after a successful
         // refresh or a new remote is added). The file explorer panel polls
