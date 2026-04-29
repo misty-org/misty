@@ -2,235 +2,212 @@ package rclone
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"path"
+	"sort"
 	"strings"
 	"time"
-
-	"github.com/rclone/rclone/fs"
-	rclonehash "github.com/rclone/rclone/fs/hash"
-	"github.com/rclone/rclone/fs/object"
-	"github.com/rclone/rclone/fs/operations"
-	"github.com/rclone/rclone/fs/walk"
 )
 
-// ListDir lists the contents of a directory on a remote.
+type lsjsonItem struct {
+	Path     string            `json:"Path"`
+	Name     string            `json:"Name"`
+	Size     int64             `json:"Size"`
+	MimeType string            `json:"MimeType"`
+	ModTime  string            `json:"ModTime"`
+	IsDir    bool              `json:"IsDir"`
+	Hashes   map[string]string `json:"Hashes"`
+}
+
 func ListDir(ctx context.Context, remote, dirPath string) ([]FileItem, error) {
-	Init()
-	f, err := fs.NewFs(ctx, remote+":"+dirPath)
+	out, err := runRclone(ctx, "lsjson", remoteSpec(remote, dirPath), "--hash")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create fs: %w", err)
+		return nil, fmt.Errorf("list directory: %w", err)
 	}
 
-	entries, err := f.List(ctx, "")
-	if err != nil {
-		return nil, fmt.Errorf("failed to list directory: %w", err)
+	var raw []lsjsonItem
+	if err := json.Unmarshal(out, &raw); err != nil {
+		return nil, fmt.Errorf("parse lsjson: %w", err)
 	}
 
-	items := make([]FileItem, 0, len(entries))
-	supportedHashes := f.Hashes()
-	hashType := rclonehash.None
-	if supportedHashes.Count() > 0 {
-		hashType = supportedHashes.GetOne()
-	}
-	for _, entry := range entries {
-		item := FileItem{
-			Name:    entry.Remote(),
-			Path:    path.Join(dirPath, entry.Remote()),
-			ModTime: entry.ModTime(ctx),
-		}
-		switch e := entry.(type) {
-		case fs.Directory:
-			item.IsDir = true
-			item.Size = e.Size()
-		case fs.Object:
-			item.IsDir = false
-			item.Size = e.Size()
-			item.MimeType = fs.MimeType(ctx, e)
-			if hashType != rclonehash.None {
-				if hashValue, err := e.Hash(ctx, hashType); err == nil && hashValue != "" {
-					item.HashAlgo = hashType.String()
-					item.Hash = hashValue
-				}
-			}
-		}
-		items = append(items, item)
+	items := make([]FileItem, 0, len(raw))
+	for _, entry := range raw {
+		items = append(items, fileItemFromLsjson(dirPath, entry))
 	}
 	return items, nil
 }
 
-// DownloadFile streams a file from a remote to the provided writer.
 func DownloadFile(ctx context.Context, remote, filePath string, w io.Writer) (int64, error) {
-	Init()
-
-	dir := path.Dir(filePath)
-	// path.Dir returns "." for a bare filename (file at root). rclone treats
-	// "remote:." as a different filesystem than "remote:" — the former misses
-	// the actual root and NewObject returns "object not found". Normalize.
-	if dir == "." {
-		dir = ""
-	}
-	name := path.Base(filePath)
-
-	f, err := fs.NewFs(ctx, remote+":"+dir)
+	written, err := streamRclone(ctx, w, nil, "cat", remoteSpec(remote, filePath))
 	if err != nil {
-		return 0, fmt.Errorf("failed to create fs: %w", err)
+		return written, fmt.Errorf("download file: %w", err)
 	}
-
-	obj, err := f.NewObject(ctx, name)
-	if err != nil {
-		return 0, fmt.Errorf("file not found: %w", err)
-	}
-
-	reader, err := obj.Open(ctx)
-	if err != nil {
-		return 0, fmt.Errorf("failed to open file: %w", err)
-	}
-	defer reader.Close()
-
-	written, err := io.Copy(w, reader)
-	return written, err
+	return written, nil
 }
 
-// UploadFile uploads a file from the provided reader to a remote directory.
-func UploadFile(ctx context.Context, remote, dirPath, fileName string, size int64, reader io.Reader) error {
-	Init()
+func UploadFile(ctx context.Context, remote, dirPath, fileName string, _ int64, reader io.Reader) error {
 	if err := EnsureRemoteDefaults(remote); err != nil {
-		return fmt.Errorf("failed to apply remote defaults: %w", err)
+		return fmt.Errorf("apply remote defaults: %w", err)
 	}
-	f, err := fs.NewFs(ctx, remote+":"+dirPath)
-	if err != nil {
-		return fmt.Errorf("failed to create fs: %w", err)
-	}
-
-	info := object.NewStaticObjectInfo(fileName, time.Now(), size, true, nil, nil)
-	_, err = f.Put(ctx, reader, info)
-	if err != nil {
-		return fmt.Errorf("failed to upload file: %w", err)
+	target := remoteSpec(remote, path.Join(dirPath, fileName))
+	if _, err := streamRclone(ctx, io.Discard, reader, "rcat", target); err != nil {
+		return fmt.Errorf("upload file: %w", err)
 	}
 	return nil
 }
 
-// MkDir creates a directory on a remote.
 func MkDir(ctx context.Context, remote, dirPath string) error {
-	Init()
-	f, err := fs.NewFs(ctx, remote+":"+dirPath)
-	if err != nil {
-		return fmt.Errorf("failed to create fs: %w", err)
+	if _, err := runRclone(ctx, "mkdir", remoteSpec(remote, dirPath)); err != nil {
+		return fmt.Errorf("mkdir: %w", err)
 	}
-	return operations.Mkdir(ctx, f, "")
+	return nil
 }
 
-// DeletePath deletes a file or directory on a remote.
 func DeletePath(ctx context.Context, remote, filePath string) error {
-	Init()
-
-	dir := path.Dir(filePath)
-	// See note in DownloadFile: rclone treats "remote:." differently from
-	// "remote:". Normalize the bare-filename case so root files are deletable.
-	if dir == "." {
-		dir = ""
+	if _, err := runRclone(ctx, "deletefile", remoteSpec(remote, filePath)); err == nil {
+		return nil
 	}
-	name := path.Base(filePath)
-
-	f, err := fs.NewFs(ctx, remote+":"+dir)
-	if err != nil {
-		return fmt.Errorf("failed to create fs: %w", err)
+	if _, err := runRclone(ctx, "purge", remoteSpec(remote, filePath)); err != nil {
+		return fmt.Errorf("delete path: %w", err)
 	}
-
-	// Try as file first
-	obj, err := f.NewObject(ctx, name)
-	if err == nil {
-		return operations.DeleteFile(ctx, obj)
-	}
-
-	// If not a file, try as directory
-	dirFs, err := fs.NewFs(ctx, remote+":"+filePath)
-	if err != nil {
-		return fmt.Errorf("path not found: %w", err)
-	}
-	return operations.Purge(ctx, dirFs, "")
+	return nil
 }
 
-// About returns storage quota information for a remote.
 func About(ctx context.Context, remote string) (*AboutInfo, error) {
-	Init()
-	f, err := fs.NewFs(ctx, remote+":")
+	out, err := runRclone(ctx, "about", remoteSpec(remote, ""), "--json")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create fs: %w", err)
+		return nil, fmt.Errorf("about: %w", err)
 	}
-
-	aboutFunc := f.Features().About
-	if aboutFunc == nil {
-		return nil, fmt.Errorf("remote %q does not support storage info", remote)
+	var raw struct {
+		Total   int64 `json:"total"`
+		Used    int64 `json:"used"`
+		Free    int64 `json:"free"`
+		Trashed int64 `json:"trashed"`
 	}
-
-	usage, err := aboutFunc(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get storage info: %w", err)
+	if err := json.Unmarshal(out, &raw); err != nil {
+		return nil, fmt.Errorf("parse about: %w", err)
 	}
-
-	info := &AboutInfo{Remote: remote}
-	if usage.Total != nil {
-		info.Total = *usage.Total
-	}
-	if usage.Used != nil {
-		info.Used = *usage.Used
-	}
-	if usage.Free != nil {
-		info.Free = *usage.Free
-	}
-	if usage.Trashed != nil {
-		info.Trashed = *usage.Trashed
-	}
-	return info, nil
+	return &AboutInfo{
+		Remote:  remote,
+		Total:   raw.Total,
+		Used:    raw.Used,
+		Free:    raw.Free,
+		Trashed: raw.Trashed,
+	}, nil
 }
 
-// Search walks a remote directory tree and returns files matching the query string.
-// Results are capped at maxResults.
 func Search(ctx context.Context, remote, basePath, query string, maxResults int) ([]FileItem, error) {
-	Init()
 	if maxResults <= 0 {
 		maxResults = 50
 	}
 
-	f, err := fs.NewFs(ctx, remote+":"+basePath)
+	out, err := runRclone(ctx, "lsjson", remoteSpec(remote, basePath), "--recursive", "--hash")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create fs: %w", err)
+		return nil, fmt.Errorf("search list: %w", err)
+	}
+
+	var raw []lsjsonItem
+	if err := json.Unmarshal(out, &raw); err != nil {
+		return nil, fmt.Errorf("parse search lsjson: %w", err)
 	}
 
 	query = strings.ToLower(query)
-	var results []FileItem
-
-	err = walk.ListR(ctx, f, "", true, -1, walk.ListAll, func(entries fs.DirEntries) error {
-		for _, entry := range entries {
-			if len(results) >= maxResults {
-				return io.EOF // stop walking
-			}
-			if strings.Contains(strings.ToLower(entry.Remote()), query) {
-				item := FileItem{
-					Name:    path.Base(entry.Remote()),
-					Path:    path.Join(basePath, entry.Remote()),
-					ModTime: entry.ModTime(ctx),
-				}
-				switch e := entry.(type) {
-				case fs.Directory:
-					item.IsDir = true
-				case fs.Object:
-					item.Size = e.Size()
-					item.MimeType = fs.MimeType(ctx, e)
-				}
-				results = append(results, item)
-			}
+	results := make([]FileItem, 0, min(maxResults, len(raw)))
+	for _, entry := range raw {
+		name := entry.Name
+		if name == "" {
+			name = path.Base(entry.Path)
 		}
-		return nil
-	})
+		if !strings.Contains(strings.ToLower(name), query) &&
+			!strings.Contains(strings.ToLower(entry.Path), query) {
+			continue
+		}
+		results = append(results, fileItemFromLsjson(basePath, entry))
+		if len(results) >= maxResults {
+			break
+		}
+	}
+	return results, nil
+}
 
-	// io.EOF is our intentional stop signal, not an error
-	if err == io.EOF {
-		err = nil
+func remoteSpec(remote, remotePath string) string {
+	if remotePath == "." {
+		remotePath = ""
+	}
+	return remote + ":" + remotePath
+}
+
+func fileItemFromLsjson(basePath string, entry lsjsonItem) FileItem {
+	name := entry.Name
+	if name == "" {
+		name = path.Base(entry.Path)
+	}
+	itemPath := entry.Path
+	if itemPath == "" {
+		itemPath = name
+	}
+	if basePath != "" {
+		itemPath = path.Join(basePath, itemPath)
 	}
 
-	return results, err
+	hashAlgo, hashValue := preferredRemoteHash(entry.Hashes)
+	return FileItem{
+		Name:     name,
+		Path:     itemPath,
+		IsDir:    entry.IsDir,
+		Size:     entry.Size,
+		ModTime:  parseRcloneTime(entry.ModTime),
+		MimeType: entry.MimeType,
+		HashAlgo: hashAlgo,
+		Hash:     hashValue,
+	}
+}
+
+func preferredRemoteHash(hashes map[string]string) (string, string) {
+	if len(hashes) == 0 {
+		return "", ""
+	}
+	for _, key := range []string{"CRC-32", "CRC32", "MD5", "SHA-1", "SHA1"} {
+		if value := strings.TrimSpace(hashes[key]); value != "" {
+			return normalizeHashAlgorithm(key), strings.ToLower(value)
+		}
+	}
+	keys := make([]string, 0, len(hashes))
+	for key := range hashes {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		if value := strings.TrimSpace(hashes[key]); value != "" {
+			return normalizeHashAlgorithm(key), strings.ToLower(value)
+		}
+	}
+	return "", ""
+}
+
+func normalizeHashAlgorithm(value string) string {
+	switch strings.ToUpper(strings.ReplaceAll(value, "-", "")) {
+	case "CRC32":
+		return "CRC-32"
+	case "SHA1":
+		return "SHA-1"
+	case "MD5":
+		return "MD5"
+	default:
+		return value
+	}
+}
+
+func parseRcloneTime(value string) time.Time {
+	if value == "" {
+		return time.Time{}
+	}
+	for _, layout := range []string{time.RFC3339Nano, time.RFC3339} {
+		if parsed, err := time.Parse(layout, value); err == nil {
+			return parsed
+		}
+	}
+	return time.Time{}
 }

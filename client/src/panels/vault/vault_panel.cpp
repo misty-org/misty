@@ -369,8 +369,8 @@ namespace misty::panel {
             ImGui::Spacing();
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.7f, 0.7f, 0.7f, 1.0f));
             ImGui::Text("%s / %s   |   elapsed %.1fs   |   ETA %.1fs",
-                        core::format_bytes(p.bytes_processed).c_str(),
-                        core::format_bytes(p.total_bytes).c_str(),
+                        core::format_bytes(static_cast<int64_t>(p.bytes_processed)).c_str(),
+                        core::format_bytes(static_cast<int64_t>(p.total_bytes)).c_str(),
                         p.seconds_elapsed, p.seconds_remaining);
             if (!p.current_file.empty()) {
                 ImGui::TextWrapped("%s", p.current_file.c_str());

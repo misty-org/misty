@@ -2,16 +2,22 @@ package syncindex
 
 import (
 	"context"
+	"crypto/md5"
+	"crypto/sha1"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
+	"hash"
+	"hash/crc32"
+	"io"
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/kannachi323/misty/proxy/core/rclone"
 	dbpkg "github.com/kannachi323/misty/proxy/db"
-	rclonehash "github.com/rclone/rclone/fs/hash"
 )
 
 type Service struct {
@@ -634,28 +640,22 @@ func (s *Service) computeLocalHash(remoteName, relPath, algorithm string) (*dbpk
 		return existing, nil
 	}
 
-	hashType := rclonehash.CRC32
-	if algorithm != "" {
-		if err := hashType.Set(algorithm); err != nil {
-			hashType = rclonehash.CRC32
-		}
-	}
+	hashAlgo, hasher := newFileHasher(algorithm)
 
 	file, err := os.Open(localPath)
 	if err != nil {
 		return nil, err
 	}
 	defer file.Close()
-	sums, err := rclonehash.StreamTypes(file, rclonehash.NewHashSet(hashType))
-	if err != nil {
+	if _, err := io.Copy(hasher, file); err != nil {
 		return nil, err
 	}
-	value := sums[hashType]
+	value := hex.EncodeToString(hasher.Sum(nil))
 	return &dbpkg.FileHash{
 		RemoteName:    remoteName,
 		RelPath:       relPath,
 		Side:          "local",
-		Algorithm:     hashType.String(),
+		Algorithm:     hashAlgo,
 		HashValue:     value,
 		ObservedMTime: mtime,
 		ObservedSize:  size,
@@ -770,7 +770,18 @@ func preferredHashAlgorithm(remoteHash *dbpkg.FileHash) string {
 	if remoteHash != nil && remoteHash.Algorithm != "" {
 		return remoteHash.Algorithm
 	}
-	return rclonehash.CRC32.String()
+	return "CRC-32"
+}
+
+func newFileHasher(algorithm string) (string, hash.Hash) {
+	switch strings.ToUpper(strings.ReplaceAll(algorithm, "-", "")) {
+	case "MD5":
+		return "MD5", md5.New()
+	case "SHA1":
+		return "SHA-1", sha1.New()
+	default:
+		return "CRC-32", crc32.NewIEEE()
+	}
 }
 
 func localDefinitelyNewer(row dbpkg.FileMetadata, remoteChanged bool) bool {

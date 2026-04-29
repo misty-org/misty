@@ -4,8 +4,8 @@
 
 #include "core/ui/ui_registry.h"
 #include "core/threading/worker_pool.h"
-#include "dfs/client/misty_client.h"
 #include <functional>
+#include <memory>
 #include <vector>
 #include <unordered_map>
 #include <unordered_set>
@@ -17,6 +17,7 @@
 #include "panels/devices/device_state.h"
 #include "panels/devices/device_watcher.h"
 
+class MistyClient;
 
 namespace misty::panel {
     class FileSidebarPanel : public Panel {

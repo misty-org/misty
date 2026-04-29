@@ -70,6 +70,7 @@ func (proxy *Proxy) MountHandlers() {
 	proxy.APIRouter.Post("/logout", api.LogoutUser(proxy.Database))
 	proxy.APIRouter.Post("/refresh", api.RefreshToken(proxy.Database, proxy.LicenseManager))
 	proxy.APIRouter.Get("/ready", api.Ready(proxy.Port))
+	proxy.APIRouter.Get("/remotes/health", remote.Health())
 
 	// Protected routes (JWT required)
 	proxy.APIRouter.Group(func(r chi.Router) {

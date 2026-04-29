@@ -7,6 +7,11 @@ type RemoteInfo struct {
 	Type string `json:"type"`
 }
 
+type ProviderType struct {
+	Type string `json:"type"`
+	Name string `json:"name"`
+}
+
 type FileItem struct {
 	Name     string    `json:"name"`
 	Path     string    `json:"path"`

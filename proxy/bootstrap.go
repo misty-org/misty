@@ -48,7 +48,7 @@ auth.submit = Enter
 modal.confirm = Enter
 modal.cancel = Escape
 `
-	defaultLLMConfigSeed = "{\n  \"api_url\": \"https://api.openai.com/v1/chat/completions\",\n  \"model\": \"\",\n  \"api_key\": \"\"\n}\n"
+	defaultLLMConfigSeed      = "{\n  \"api_url\": \"https://api.openai.com/v1/chat/completions\",\n  \"model\": \"\",\n  \"api_key\": \"\"\n}\n"
 	defaultClaudeProfilesSeed = "{\n  \"selected_profile_index\": -1,\n  \"profiles\": []\n}\n"
 )
 
@@ -69,6 +69,7 @@ func ensureMistyHomeLayout() error {
 		filepath.Join(root, "mnt"),
 		filepath.Join(root, "tailscale"),
 		filepath.Join(root, "minidfs", "tailscale"),
+		filepath.Join(root, "rclone"),
 		filepath.Join(root, "restic"),
 		filepath.Join(root, "restic", "passwords"),
 	}
@@ -79,11 +80,11 @@ func ensureMistyHomeLayout() error {
 	}
 
 	seedFiles := map[string]string{
-		filepath.Join(root, "remotes.json"):                 "{\n  \"remotes\": {}\n}\n",
-		filepath.Join(root, "restic", "repos.json"):         "[]\n",
-		filepath.Join(root, "rclone.conf"):                  "",
-		filepath.Join(root, "config", "commands.msy"):       defaultCommandsSeed,
-		filepath.Join(root, "config", "llm.json"):           defaultLLMConfigSeed,
+		filepath.Join(root, "remotes.json"):                   "{\n  \"remotes\": {}\n}\n",
+		filepath.Join(root, "restic", "repos.json"):           "[]\n",
+		filepath.Join(root, "rclone", "rclone.conf"):          "",
+		filepath.Join(root, "config", "commands.msy"):         defaultCommandsSeed,
+		filepath.Join(root, "config", "llm.json"):             defaultLLMConfigSeed,
 		filepath.Join(root, "config", "claude_profiles.json"): defaultClaudeProfilesSeed,
 	}
 	for path, body := range seedFiles {

@@ -9,14 +9,13 @@ import (
 	"time"
 
 	"github.com/kannachi323/misty/proxy/core/rclone"
-	"github.com/rclone/rclone/lib/oauthutil"
 )
 
 // in-flight OAuth tracking
 var (
-	oauthMu       sync.Mutex
-	oauthPending  = map[string]bool{}               // remote name -> in progress
-	oauthCancels  = map[string]context.CancelFunc{} // remote name -> cancel active flow
+	oauthMu      sync.Mutex
+	oauthPending = map[string]bool{}               // remote name -> in progress
+	oauthCancels = map[string]context.CancelFunc{} // remote name -> cancel active flow
 )
 
 func beginOAuthFlow(name string, cancel context.CancelFunc) bool {
@@ -54,7 +53,7 @@ func cancelOAuthFlow(name string) {
 
 func stopOAuthWebserver() {
 	client := &http.Client{Timeout: 2 * time.Second}
-	req, err := http.NewRequest(http.MethodGet, oauthutil.RedirectURL+"?error=cancelled", nil)
+	req, err := http.NewRequest(http.MethodGet, "http://127.0.0.1:53682/?error=cancelled", nil)
 	if err != nil {
 		return
 	}
@@ -138,9 +137,9 @@ func DeleteRemote() http.HandlerFunc {
 	}
 }
 
-// ConfigStart begins an interactive rclone config flow. Returns the first
-// user-facing step — typically after OAuth has completed transparently
-// inside this call, so this request can block for a while.
+// ConfigStart begins external rclone setup. With the CLI-backed rclone
+// implementation this usually returns DONE after rclone config create
+// completes; the request can still block while rclone handles browser auth.
 func ConfigStart() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
@@ -235,15 +234,7 @@ func ConfigCancel() http.HandlerFunc {
 
 func ListTypes() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Supported provider types (matching our imported backends)
-		types := []map[string]string{
-			{"type": "onedrive", "name": "Microsoft OneDrive"},
-			{"type": "drive", "name": "Google Drive"},
-			{"type": "dropbox", "name": "Dropbox"},
-			{"type": "s3", "name": "Amazon S3"},
-			{"type": "sftp", "name": "SFTP"},
-		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(types)
+		json.NewEncoder(w).Encode(rclone.ListProviderTypes())
 	}
 }

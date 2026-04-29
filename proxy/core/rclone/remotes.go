@@ -5,14 +5,16 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sort"
 	"strings"
-
-	"github.com/rclone/rclone/fs/config"
-	"github.com/rclone/rclone/fs/fspath"
-	"github.com/rclone/rclone/fs/rc"
+	"unicode"
 )
 
 const defaultDriveImportFormats = "csv,doc,docx,htm,html,odp,ods,odt,ppt,pptx,rtf,tsv,txt,xls,xlsx"
+
+var fallbackProviderTypes = []ProviderType{
+	{Type: "local", Name: "Local"},
+}
 
 func desiredDriveImportFormats() string {
 	if value := strings.TrimSpace(os.Getenv("MISTY_DRIVE_IMPORT_FORMATS")); value != "" {
@@ -34,10 +36,7 @@ func normalizeCommaList(value string) string {
 	return strings.Join(out, ",")
 }
 
-// EnsureRemoteDefaults persists Misty's provider-specific default options on
-// an existing remote. This is safe to call repeatedly.
 func EnsureRemoteDefaults(name string) error {
-	Init()
 	if GetRemoteType(name) != "drive" {
 		return nil
 	}
@@ -47,17 +46,14 @@ func EnsureRemoteDefaults(name string) error {
 		return nil
 	}
 
-	current, _ := config.FileGetValue(name, "import_formats")
+	current, _ := getConfigValue(name, "import_formats")
 	if normalizeCommaList(current) == normalizeCommaList(desired) {
 		return nil
 	}
-	return config.SetValueAndSave(name, "import_formats", desired)
+	return setConfigValue(name, "import_formats", desired)
 }
 
-// EnsureAllRemoteDefaults upgrades existing remotes in-place so newly-added
-// backend defaults apply without requiring the user to reconnect accounts.
 func EnsureAllRemoteDefaults() error {
-	Init()
 	var errs []string
 	for _, remote := range ListRemotes() {
 		if err := EnsureRemoteDefaults(remote.Name); err != nil {
@@ -70,113 +66,137 @@ func EnsureAllRemoteDefaults() error {
 	return nil
 }
 
-// ListRemotes returns all configured remotes from rclone.conf.
 func ListRemotes() []RemoteInfo {
-	Init()
-	sections := config.FileSections()
-	remotes := make([]RemoteInfo, 0, len(sections))
-	for _, name := range sections {
-		t, _ := config.FileGetValue(name, "type")
-		remotes = append(remotes, RemoteInfo{
+	remotes, err := readConfig()
+	if err != nil {
+		return nil
+	}
+	names := make([]string, 0, len(remotes))
+	for name := range remotes {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	out := make([]RemoteInfo, 0, len(names))
+	for _, name := range names {
+		out = append(out, RemoteInfo{
 			Name: name,
-			Type: t,
+			Type: remotes[name]["type"],
 		})
 	}
-	return remotes
+	return out
 }
 
-// CreateRemote creates a new rclone remote.
-//
-// We pass All: false so rclone's updateRemote() enables AutoConfirm on the
-// context. That makes backendConfigStep auto-answer every Option question
-// with its Default value, which is exactly what we need for:
-//   - OneDrive's "choose_type" (defaults to "onedrive")
-//   - OneDrive's drive selection (defaults to the first drive in /me/drives)
-//   - OneDrive's "Drive OK?" confirmation (defaults to true)
-//   - Google Drive's scope / root / team drive questions
-//
-// NonInteractive stays false so rclone's interactive backendConfig runs the
-// full state machine inline — OAuth (via local callback server) included —
-// and persists drive_id + drive_type before returning.
-func CreateRemote(ctx context.Context, name, providerType string, params map[string]string) error {
-	Init()
+func ListProviderTypes() []ProviderType {
+	providers, err := providerTypesFromBinary(context.Background())
+	if err == nil && len(providers) != 0 {
+		return providers
+	}
+	return append([]ProviderType(nil), fallbackProviderTypes...)
+}
 
-	// Reject if a remote with this name already exists.
-	for _, existing := range config.FileSections() {
-		if existing == name {
-			return fmt.Errorf("remote %q already exists", name)
+func providerTypesFromBinary(ctx context.Context) ([]ProviderType, error) {
+	out, err := runRclone(ctx, "help", "backends")
+	if err != nil {
+		return nil, err
+	}
+
+	seen := map[string]struct{}{}
+	var providers []ProviderType
+	for _, line := range strings.Split(string(out), "\n") {
+		if !strings.HasPrefix(line, "  ") && !strings.HasPrefix(line, "\t") {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
+		}
+		name := fields[0]
+		if !looksLikeBackendName(name) {
+			continue
+		}
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		seen[name] = struct{}{}
+		desc := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), name))
+		if desc == "" {
+			desc = name
+		}
+		providers = append(providers, ProviderType{Type: name, Name: desc})
+	}
+	sort.Slice(providers, func(i, j int) bool {
+		return strings.ToLower(providers[i].Name) < strings.ToLower(providers[j].Name)
+	})
+	return providers, nil
+}
+
+func looksLikeBackendName(value string) bool {
+	for _, r := range value {
+		if !(unicode.IsLower(r) || unicode.IsDigit(r) || r == '_' || r == '-') {
+			return false
 		}
 	}
+	return value != ""
+}
 
-	keyValues := rc.Params{}
-	for k, v := range params {
-		keyValues[k] = v
+func CreateRemote(ctx context.Context, name, providerType string, params map[string]string) error {
+	if !validRemoteName(name) {
+		return fmt.Errorf("invalid remote name %q", name)
+	}
+	if strings.TrimSpace(providerType) == "" {
+		return fmt.Errorf("provider type is required")
+	}
+	if RemoteExists(name) {
+		return fmt.Errorf("remote %q already exists", name)
 	}
 
-	if _, err := config.CreateRemote(ctx, name, providerType, keyValues, config.UpdateRemoteOpt{
-		All: false,
-	}); err != nil {
+	args := []string{"config", "create", name, providerType, "--auto-confirm"}
+	for k, v := range params {
+		if strings.TrimSpace(k) == "" {
+			continue
+		}
+		args = append(args, k, v)
+	}
+	env := oauthTemplateEnv(name)
+	if _, err := runRcloneWithEnv(ctx, env, args...); err != nil {
 		return fmt.Errorf("create remote: %w", err)
 	}
-
-	config.SaveConfig()
 	if err := EnsureRemoteDefaults(name); err != nil {
 		return err
 	}
 	return nil
 }
 
-// RenameRemote moves all keys from oldName to newName and deletes oldName.
-// Returns an error if newName is already taken or oldName doesn't exist.
-// The caller should dedupe beforehand if it wants "rename over existing"
-// semantics (see FinalizeRemoteName for an example).
 func RenameRemote(oldName, newName string) error {
-	Init()
 	if oldName == newName {
 		return nil
 	}
-	data := config.LoadedData()
-
-	for _, existing := range data.GetSectionList() {
-		if existing == newName {
-			return fmt.Errorf("remote %q already exists", newName)
-		}
+	if !validRemoteName(oldName) || !validRemoteName(newName) {
+		return fmt.Errorf("invalid remote name")
 	}
 
-	keys := data.GetKeyList(oldName)
-	if len(keys) == 0 {
+	configMu.Lock()
+	defer configMu.Unlock()
+	if err := ensureConfigFile(); err != nil {
+		return err
+	}
+	remotes, err := readConfigLocked()
+	if err != nil {
+		return err
+	}
+	if _, ok := remotes[newName]; ok {
+		return fmt.Errorf("remote %q already exists", newName)
+	}
+	values, ok := remotes[oldName]
+	if !ok {
 		return fmt.Errorf("remote %q not found", oldName)
 	}
-	for _, k := range keys {
-		if v, ok := data.GetValue(oldName, k); ok {
-			data.SetValue(newName, k, v)
-		}
-	}
-	data.DeleteSection(oldName)
-	config.SaveConfig()
-	return nil
+	remotes[newName] = values
+	delete(remotes, oldName)
+	return writeConfigLocked(remotes)
 }
 
-// FinalizeRemoteName tries to rename a just-created remote from its
-// throwaway name (e.g. "onedrive-1712345678") to the authenticated
-// user's email (e.g. "alice@contoso.com"). The provider type is
-// already reflected in the mount path's parent directory, so there's
-// no need to repeat it in the name.
-//
-// Silently no-ops for backends without OAuth or when email resolution
-// fails — the temp name stays in place.
-//
-// Collision handling:
-//   - Same email, same provider → reconnect. Drop the stale section,
-//     rename the fresh one into its slot so vault repos / pinned paths
-//     that reference the stable name keep working.
-//   - Same email, different provider → fall back to "<type>-<email>"
-//     (e.g. a second account with the same email on Dropbox becomes
-//     "dropbox-alice@contoso.com") so the two don't clash. The first
-//     one to connect keeps the clean email-only name.
-//
-// Returns the final name of the remote (either the renamed one or,
-// on any kind of failure, the original tempName).
 func FinalizeRemoteName(ctx context.Context, tempName string) string {
 	email, err := ResolveUserEmail(ctx, tempName)
 	if err != nil {
@@ -187,36 +207,27 @@ func FinalizeRemoteName(ctx context.Context, tempName string) string {
 		return tempName
 	}
 
-	providerType, _ := config.FileGetValue(tempName, "type")
+	providerType := GetRemoteType(tempName)
 	if providerType == "" {
 		return tempName
 	}
 
-	// Email characters (@, ., +) are already in rclone's allowed set, but
-	// run through MakeConfigName in case the provider ever hands us
-	// something exotic.
-	newName := fspath.MakeConfigName(email)
+	newName := makeConfigName(email)
 	if newName == tempName {
 		return tempName
 	}
 
 	if RemoteExists(newName) {
-		existingType, _ := config.FileGetValue(newName, "type")
+		existingType := GetRemoteType(newName)
 		switch {
 		case existingType == providerType:
-			// Reconnect: same account, fresh token. Replace in place.
 			DeleteRemote(newName)
 		default:
-			// Cross-provider collision (e.g. alice@gmail.com on both
-			// Drive and Dropbox). Fall back to "<type>-<email>" for
-			// the newcomer; the existing entry keeps its clean name.
-			fallback := fspath.MakeConfigName(providerType + "-" + email)
+			fallback := makeConfigName(providerType + "-" + email)
 			if fallback == tempName {
 				return tempName
 			}
 			if RemoteExists(fallback) {
-				// Same provider + email as an existing <type>-<email>
-				// section — treat as reconnect on the fallback name.
 				DeleteRemote(fallback)
 			}
 			if err := RenameRemote(tempName, fallback); err != nil {
@@ -237,26 +248,56 @@ func FinalizeRemoteName(ctx context.Context, tempName string) string {
 	return newName
 }
 
-// DeleteRemote removes a remote from rclone.conf.
 func DeleteRemote(name string) {
-	Init()
-	config.DeleteRemote(name)
-}
-
-// GetRemoteType returns the provider type for a given remote name.
-func GetRemoteType(name string) string {
-	Init()
-	t, _ := config.FileGetValue(name, "type")
-	return t
-}
-
-// RemoteExists checks if a remote with the given name exists.
-func RemoteExists(name string) bool {
-	Init()
-	for _, s := range config.FileSections() {
-		if s == name {
-			return true
-		}
+	if !validRemoteName(name) {
+		return
 	}
-	return false
+	configMu.Lock()
+	defer configMu.Unlock()
+	if err := ensureConfigFile(); err != nil {
+		return
+	}
+	remotes, err := readConfigLocked()
+	if err != nil {
+		return
+	}
+	delete(remotes, name)
+	_ = writeConfigLocked(remotes)
+}
+
+func GetRemoteType(name string) string {
+	value, _ := getConfigValue(name, "type")
+	return value
+}
+
+func RemoteExists(name string) bool {
+	remotes, err := readConfig()
+	if err != nil {
+		return false
+	}
+	_, ok := remotes[name]
+	return ok
+}
+
+func oauthTemplateEnv(name string) []string {
+	tmpl := OAuthTemplatePath()
+	if tmpl == "" || name == "" {
+		return nil
+	}
+	return []string{configEnvKey(name, "config_template_file") + "=" + tmpl}
+}
+
+func configEnvKey(remote, key string) string {
+	normalize := func(value string) string {
+		var b strings.Builder
+		for _, r := range strings.ToUpper(value) {
+			if (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
+				b.WriteRune(r)
+			} else {
+				b.WriteRune('_')
+			}
+		}
+		return b.String()
+	}
+	return "RCLONE_CONFIG_" + normalize(remote) + "_" + normalize(key)
 }

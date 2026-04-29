@@ -5,14 +5,15 @@
 #include <memory>
 
 #include "core/ui/ui_registry.h"
-#include "dfs/client/misty_client.h"
 #include "panels/panel.h"
 #include "core/threading/worker_pool.h"
 #include "panels/file_explorer/file_explorer_state.h"
+#include "panels/file_explorer/operation_journal.h"
 #include "panels/workspace/workspace_state.h"
 #include "panels/activity/upload_state.h"
 #include "panels/search/search_state.h"
 
+class MistyClient;
 
 namespace misty::panel {
     class SearchPanel;  // forward declaration
@@ -91,7 +92,8 @@ namespace misty::panel {
                                      const ImVec2& min,
                                      const ImVec2& max,
                                      bool prominent,
-                                     bool auto_navigate);
+                                     bool auto_navigate,
+                                     bool draw_hover_feedback = true);
         void handle_drag_navigation_target(panel::FileExplorerState& state,
                                            const std::string& target_path,
                                            const ImVec2& min,
@@ -114,6 +116,8 @@ namespace misty::panel {
         void perform_copy(panel::FileExplorerState& state);
         void perform_cut(panel::FileExplorerState& state);
         void perform_paste(panel::FileExplorerState& state);
+        void perform_undo(panel::FileExplorerState& state);
+        void perform_redo(panel::FileExplorerState& state);
         void perform_drop_items(panel::FileExplorerState& state,
                                 const std::vector<panel::UnifiedFileItem>& items,
                                 const std::string& dest_dir,
@@ -130,6 +134,13 @@ namespace misty::panel {
         void retry_permission_delete(panel::FileExplorerState& state);
         bool open_context_menu_target(panel::FileExplorerState& state);
         const UnifiedFileItem* find_context_menu_target(const panel::FileExplorerState& state) const;
+        void record_file_operation(panel::FileOperationRecord record);
+        bool undo_file_operation(panel::FileExplorerState& state,
+                                 const panel::FileOperationRecord& record,
+                                 std::string* error_message);
+        bool redo_file_operation(panel::FileExplorerState& state,
+                                 const panel::FileOperationRecord& record,
+                                 std::string* error_message);
 
 #ifdef MISTY_TESTING
     private:
