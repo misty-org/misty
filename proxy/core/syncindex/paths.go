@@ -9,7 +9,9 @@ import (
 
 type remoteAliasFile struct {
 	Remotes map[string]struct {
-		Alias string `json:"alias"`
+		Alias          string `json:"alias"`
+		ProviderFolder string `json:"provider_folder"`
+		FolderName     string `json:"folder_name"`
 	} `json:"remotes"`
 }
 
@@ -29,25 +31,35 @@ func remotesMetadataPath() string {
 	return filepath.Join(home, "misty", "remotes.json")
 }
 
-func loadRemoteAlias(remoteName string) string {
+type remoteMetadata struct {
+	Alias          string
+	ProviderFolder string
+	FolderName     string
+}
+
+func loadRemoteMetadata(remoteName string) remoteMetadata {
 	path := remotesMetadataPath()
 	body, err := os.ReadFile(path)
 	if err != nil {
-		return ""
+		return remoteMetadata{}
 	}
 
 	var metadata remoteAliasFile
 	if err := json.Unmarshal(body, &metadata); err != nil {
-		return ""
+		return remoteMetadata{}
 	}
 	if metadata.Remotes == nil {
-		return ""
+		return remoteMetadata{}
 	}
 	entry, ok := metadata.Remotes[remoteName]
 	if !ok {
-		return ""
+		return remoteMetadata{}
 	}
-	return strings.TrimSpace(entry.Alias)
+	return remoteMetadata{
+		Alias:          strings.TrimSpace(entry.Alias),
+		ProviderFolder: strings.TrimSpace(entry.ProviderFolder),
+		FolderName:     strings.TrimSpace(entry.FolderName),
+	}
 }
 
 func displayNameForType(remoteType string) string {
@@ -100,9 +112,15 @@ func sanitizeFolderName(preferred, fallback string) string {
 }
 
 func resolveMountMapping(remoteName, remoteType string) (providerFolder string, folderName string, root string) {
-	alias := loadRemoteAlias(remoteName)
-	providerFolder = displayNameForType(remoteType)
-	folderName = sanitizeFolderName(alias, remoteName)
+	metadata := loadRemoteMetadata(remoteName)
+	providerFolder = metadata.ProviderFolder
+	if providerFolder == "" {
+		providerFolder = displayNameForType(remoteType)
+	}
+	folderName = metadata.FolderName
+	if folderName == "" {
+		folderName = sanitizeFolderName(metadata.Alias, remoteName)
+	}
 	root = mountRoot()
 	return providerFolder, folderName, root
 }

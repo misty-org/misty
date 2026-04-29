@@ -49,7 +49,6 @@ namespace misty::panel {
         void navigate_to_path(const std::string& path, bool update_history = true, bool create_if_missing = true);
 
     private:
-        void apply_workspace_mount_if_ready(panel::FileExplorerState& state, panel::WorkspaceState& workspace_state);
         void handle_pending_navigation(panel::FileExplorerState& state);
         void render_search_overlay(panel::SearchState& search_state, const ImVec2& list_start, float list_height);
         void process_deferred_search_actions(panel::SearchState& search_state);
@@ -123,8 +122,17 @@ namespace misty::panel {
                                 const std::string& dest_dir,
                                 panel::ClipboardOp op);
         void perform_paste_local_to_local(panel::FileExplorerState& state, const panel::UnifiedFileItem& item, const std::string& dest_dir, panel::ClipboardOp op);
-        void perform_paste_to_cloud(panel::FileExplorerState& state, const panel::UnifiedFileItem& item, const std::string& dest_dir, panel::ClipboardOp op);
+        bool perform_paste_to_cloud(panel::FileExplorerState& state, const panel::UnifiedFileItem& item, const std::string& dest_dir, panel::ClipboardOp op);
+        bool perform_paste_cloud_to_cloud(panel::FileExplorerState& state, const panel::UnifiedFileItem& item, const std::string& dest_dir, panel::ClipboardOp op);
         void perform_paste_cloud_to_local(panel::FileExplorerState& state, const panel::UnifiedFileItem& item, const std::string& dest_dir, panel::ClipboardOp op);
+        void queue_cross_device_move(const panel::UnifiedFileItem& item,
+                                     const std::string& source_dir,
+                                     const std::string& dest_dir,
+                                     const std::filesystem::path& src,
+                                     const std::filesystem::path& dest,
+                                     std::function<void()> on_success = {});
+        void request_background_move_refresh(const std::string& source_dir,
+                                             const std::string& dest_dir);
         void trigger_upload(const std::string& local_path, const std::string& dest_dir);
         void perform_delete_selected(panel::FileExplorerState& state);
         void perform_delete_local_selected(panel::FileExplorerState& state);
@@ -184,7 +192,6 @@ namespace misty::panel {
         std::string window_name_;
 
         std::string initial_start_path_;
-        bool workspace_mount_applied_ = false;
         SearchPanel* search_panel_ = nullptr;
         std::function<void()> body_drag_source_callback_;
         std::function<void(const std::string&)> shared_path_refresh_callback_;

@@ -28,6 +28,7 @@ namespace misty::panel {
         bool account_buffers_initialized = false;
 
         // General
+        int theme_index = 0; // 0=System, 1=Dark, 2=Light
         int startup_view_index = 0; // 0=Files, 1=Services, 2=Activity
 
         // Connection

@@ -28,6 +28,7 @@ namespace {
     constexpr float kSettingsContentMaxWidth = 760.0f;
     constexpr float kSettingsRowHeight = 54.0f;
     constexpr float kSettingsActionRowHeight = 68.0f;
+    constexpr float kSettingsToggleRowHeight = 72.0f;
     constexpr float kSettingsHeaderHeight = 82.0f;
     constexpr float kSettingsGroupHeight = 36.0f;
     constexpr float kSettingsValueWidth = 240.0f;
@@ -85,7 +86,7 @@ void SettingsPanel::render() {
             ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(kContentPaddingX, kContentPaddingY));
             ImGui::BeginChild("##settings_content", ImVec2(content_w, 0.0f), ImGuiChildFlags_AlwaysUseWindowPadding);
             if (state.active_section == SettingsSection::General) {
-                general();
+                general(state);
             } else if (state.active_section == SettingsSection::Account) {
                 account(state);
             }
@@ -163,40 +164,51 @@ void SettingsPanel::account(SettingsState& state) {
         state.account_buffers_initialized = true;
     }
 
-    const std::string user_id = fallback_string(core::SessionManager::get().get_user_id(), "Unavailable");
-
-    profile_header(state.account_display_name, state.account_email, "Photo upload - coming soon");
+    content_header("Account");
+    status_message(state);
+    profile_header(state.account_display_name, state.account_email, "Manage your account details.");
     if (text_input_row("Display name", state.account_display_name, sizeof(state.account_display_name), "Save changes")) {
         auto& profile = registry_.get_state<ProfileState>("Profile");
         profile.display_name = state.account_display_name;
+        state.status_message = "Display name updated.";
+        state.status_timer = 3.0f;
+        state.status_is_error = false;
     }
     readonly_input_row("Email", state.account_email, "Email cannot be changed.");
 
-    settings_row("Member since", "March 12, 2026");
-    settings_row("User id", user_id.c_str());
-
     ImGui::Dummy(ImVec2(0.0f, kSettingsFieldGap));
-    group_header("S e c u r i t y");
-    action_row("Password", "Reset via email link.", "Reset");
-    settings_row("Two-factor authentication", "Coming soon", false, true);
-    settings_row("Active sessions", "Coming soon", false, true);
+    group_header("Security");
+    if (action_row("Password", "Send a reset link to your account email.", "Reset")) {
+        state.status_message = "Password reset is not available in the desktop client yet.";
+        state.status_timer = 4.0f;
+        state.status_is_error = false;
+    }
+    if (action_row("Session", "Sign out of this device.", "Sign out")) {
+        core::SessionManager::get().clear_token();
+        view::switch_view(view::ViewID::Login);
+    }
 }
 
-void SettingsPanel::general() {
+void SettingsPanel::general(SettingsState& state) {
     content_header("General");
+    status_message(state);
 
-    group_header("A p p e a r a n c e");
-    settings_row("Theme", "System");
-    settings_row("Language", "English");
-    settings_row("Density", "Coming soon", false, true);
+    group_header("Appearance");
+    if (theme_row(state)) {
+        state.status_message = "Theme preference updated.";
+        state.status_timer = 3.0f;
+        state.status_is_error = false;
+    }
 
-    group_header("A p p");
+    group_header("Sync");
+    if (toggle_row("Auto sync", "Keep cloud changes syncing automatically.", &state.auto_sync_enabled)) {
+        state.status_message = state.auto_sync_enabled ? "Auto sync enabled." : "Auto sync paused.";
+        state.status_timer = 3.0f;
+        state.status_is_error = false;
+    }
+
+    group_header("App");
     settings_row("Version", "v0.1.0-beta");
-    settings_row("Release channel", "Stable");
-    settings_row("Check for updates", "Coming soon", false, true);
-    settings_row("Auto-update", "Coming soon", false, true);
-
-    group_header("N o t i f i c a t i o n s");
 }
 
 void SettingsPanel::profile_header(const char* display_name, const char* email, const char* note) {
@@ -344,6 +356,27 @@ void SettingsPanel::group_header(const char* title) {
     ImGui::Dummy(ImVec2(width, kSettingsGroupHeight));
 }
 
+void SettingsPanel::status_message(SettingsState& state) {
+    if (state.status_timer <= 0.0f || state.status_message.empty()) {
+        return;
+    }
+
+    state.status_timer = std::max(0.0f, state.status_timer - ImGui::GetIO().DeltaTime);
+    if (state.status_timer <= 0.0f) {
+        state.status_message.clear();
+        state.status_is_error = false;
+        return;
+    }
+
+    core::WithStyle([&](core::StyleScope& style) {
+        style.color(ImGuiCol_Text, state.status_is_error
+            ? ImVec4(0.92f, 0.52f, 0.52f, 1.0f)
+            : ImVec4(0.60f, 0.82f, 0.64f, 1.0f));
+        ImGui::TextWrapped("%s", state.status_message.c_str());
+    });
+    ImGui::Dummy(ImVec2(0.0f, 18.0f));
+}
+
 bool SettingsPanel::action_row(const char* label,
                                const char* subtitle,
                                const char* action_label,
@@ -393,6 +426,117 @@ bool SettingsPanel::action_row(const char* label,
     );
     ImGui::SetCursorScreenPos(ImVec2(start.x, start.y + row_height));
     return pressed;
+}
+
+bool SettingsPanel::toggle_row(const char* label,
+                               const char* subtitle,
+                               bool* value) {
+    bool changed = false;
+    const float row_height = kSettingsToggleRowHeight;
+    const float toggle_width = 68.0f;
+    const float toggle_height = 30.0f;
+    const ImVec2 start = ImGui::GetCursorScreenPos();
+    const float width = settings_content_width();
+    ImGui::Dummy(ImVec2(width, row_height));
+
+    ImGui::SetCursorScreenPos(ImVec2(start.x, start.y + 13.0f));
+    core::WithStyle([&](core::StyleScope& style) {
+        style.color(ImGuiCol_Text, ImVec4(0.96f, 0.96f, 0.96f, 1.0f));
+        ImGui::TextUnformatted(label);
+    });
+    core::WithStyle([&](core::StyleScope& style) {
+        style.color(ImGuiCol_Text, ImVec4(0.76f, 0.76f, 0.80f, 1.0f));
+        ImGui::TextUnformatted(subtitle);
+    });
+
+    const ImVec2 toggle_pos(start.x + width - toggle_width, start.y + (row_height - toggle_height) * 0.5f);
+    ImGui::SetCursorScreenPos(toggle_pos);
+    ImGui::PushID(label);
+    if (ImGui::InvisibleButton("##toggle", ImVec2(toggle_width, toggle_height))) {
+        *value = !*value;
+        changed = true;
+    }
+
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    const ImU32 track_color = *value ? IM_COL32(78, 141, 255, 255) : IM_COL32(62, 62, 66, 255);
+    const ImU32 knob_color = IM_COL32(245, 245, 245, 255);
+    dl->AddRectFilled(toggle_pos,
+                      ImVec2(toggle_pos.x + toggle_width, toggle_pos.y + toggle_height),
+                      track_color,
+                      toggle_height * 0.5f);
+
+    const float knob_radius = toggle_height * 0.5f - 4.0f;
+    const float knob_center_x = *value
+        ? toggle_pos.x + toggle_width - toggle_height * 0.5f
+        : toggle_pos.x + toggle_height * 0.5f;
+    dl->AddCircleFilled(ImVec2(knob_center_x, toggle_pos.y + toggle_height * 0.5f), knob_radius, knob_color, 24);
+    ImGui::PopID();
+
+    ImGui::GetWindowDrawList()->AddLine(
+        ImVec2(start.x, start.y + row_height),
+        ImVec2(start.x + width, start.y + row_height),
+        IM_COL32(32, 32, 35, 255),
+        1.0f
+    );
+    ImGui::SetCursorScreenPos(ImVec2(start.x, start.y + row_height));
+    return changed;
+}
+
+bool SettingsPanel::theme_row(SettingsState& state) {
+    bool changed = false;
+    static constexpr const char* kThemeLabels[] = {"System", "Dark", "Light"};
+    static constexpr int kThemeCount = static_cast<int>(sizeof(kThemeLabels) / sizeof(kThemeLabels[0]));
+
+    const float row_height = 72.0f;
+    const float segment_width = 94.0f;
+    const float segment_height = 34.0f;
+    const float segment_gap = 8.0f;
+    const float control_width = kThemeCount * segment_width + (kThemeCount - 1) * segment_gap;
+
+    const ImVec2 start = ImGui::GetCursorScreenPos();
+    const float width = settings_content_width();
+    ImGui::Dummy(ImVec2(width, row_height));
+
+    ImGui::SetCursorScreenPos(ImVec2(start.x, start.y + 13.0f));
+    core::WithStyle([&](core::StyleScope& style) {
+        style.color(ImGuiCol_Text, ImVec4(0.96f, 0.96f, 0.96f, 1.0f));
+        ImGui::TextUnformatted("Theme");
+    });
+    core::WithStyle([&](core::StyleScope& style) {
+        style.color(ImGuiCol_Text, ImVec4(0.76f, 0.76f, 0.80f, 1.0f));
+        ImGui::TextUnformatted("Choose how the app should look.");
+    });
+
+    float x = start.x + width - control_width;
+    const float y = start.y + (row_height - segment_height) * 0.5f;
+    for (int i = 0; i < kThemeCount; ++i) {
+        ImGui::SetCursorScreenPos(ImVec2(x, y));
+        ImGui::PushID(i);
+        const bool selected = state.theme_index == i;
+        core::WithStyle([&](core::StyleScope& style) {
+            style.var(ImGuiStyleVar_FrameRounding, 8.0f);
+            style.var(ImGuiStyleVar_FramePadding, ImVec2(12.0f, 8.0f));
+            style.color(ImGuiCol_Button, selected ? ImVec4(0.30f, 0.38f, 0.52f, 1.0f) : ImVec4(0.14f, 0.14f, 0.16f, 1.0f));
+            style.color(ImGuiCol_ButtonHovered, selected ? ImVec4(0.34f, 0.42f, 0.56f, 1.0f) : ImVec4(0.18f, 0.18f, 0.21f, 1.0f));
+            style.color(ImGuiCol_ButtonActive, ImVec4(0.22f, 0.29f, 0.42f, 1.0f));
+            style.color(ImGuiCol_Text, ImVec4(0.96f, 0.96f, 0.96f, 1.0f));
+            if (ImGui::Button(kThemeLabels[i], ImVec2(segment_width, segment_height))) {
+                state.theme_index = i;
+                changed = true;
+            }
+        });
+        ImGui::PopID();
+        x += segment_width + segment_gap;
+    }
+
+    ImGui::GetWindowDrawList()->AddLine(
+        ImVec2(start.x, start.y + row_height),
+        ImVec2(start.x + width, start.y + row_height),
+        IM_COL32(32, 32, 35, 255),
+        1.0f
+    );
+    ImGui::SetCursorScreenPos(ImVec2(start.x, start.y + row_height));
+    return changed;
 }
 
 void SettingsPanel::settings_row(const char* label,

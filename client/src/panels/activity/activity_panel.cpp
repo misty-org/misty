@@ -57,11 +57,17 @@ namespace misty::panel {
             ImGui::SetWindowFontScale(1.0f);
 
             ImGui::SameLine();
-            float clear_w = 50.0f;
-            ImGui::SetCursorPosX(POPUP_W - 2.0f * 16.0f - clear_w);
+            const float clear_w = 50.0f;
+            const float read_w = 86.0f;
+            const float button_gap = 8.0f;
+            ImGui::SetCursorPosX(POPUP_W - 2.0f * 16.0f - clear_w - button_gap - read_w);
             ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.3f, 0.3f, 0.5f));
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.45f, 0.45f, 0.45f, 1.0f));
+            if (ImGui::Button("Mark all read##activity", ImVec2(read_w, 0))) {
+                state.mark_all_read();
+            }
+            ImGui::SameLine(0, button_gap);
             if (ImGui::Button("Clear##activity", ImVec2(clear_w, 0))) {
                 state.clear();
             }
