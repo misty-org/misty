@@ -1,7 +1,7 @@
+import { accountScopeResetEvent } from "@/features/auth";
 import type { OrderedExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import YProvider from "y-partyserver/provider";
 import * as Y from "yjs";
-import { accountScopeResetEvent } from "@/stores/account/accountEvents";
 import { drawingsApi } from "../api/drawingsApi";
 import type { DrawingAssetReference, DrawingCollaborationTicket } from "../types";
 

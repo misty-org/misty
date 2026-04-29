@@ -1,4 +1,4 @@
-import type { SearchResult } from "@/models/interfaces/services/misty-api";
+import type { SearchResult } from "@/services/misty/model/misty-api";
 
 export type GlobalAiMode = "search" | "ask" | "action";
 

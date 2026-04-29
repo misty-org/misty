@@ -1,15 +1,15 @@
-import type { SpaceNotesProps } from "@/models/interfaces/features/notes/SpaceNotes";
-export type { SpaceNotesProps } from "@/models/interfaces/features/notes/SpaceNotes";
+import { useAuth } from "@/features/auth";
+import { JournalAttribution } from "@/features/journal";
+import { useSpacesStore } from "@/features/spaces";
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
-import { useAuth } from "@/features/auth/AuthContext";
-import { useNotesStore } from "@/stores/notes";
-import { NotesTopBar } from "./components/NotesTopBar";
-import { NoteReadingPane } from "./components/NoteReadingPane";
 import { NewNoteDialog } from "./components/NewNoteDialog";
-import { JournalAttribution } from "@/features/journal/components/JournalAttribution";
-import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
+import { NoteReadingPane } from "./components/NoteReadingPane";
+import { NotesTopBar } from "./components/NotesTopBar";
+import type { SpaceNotesProps } from "./model/interfaces/SpaceNotes";
+import { useNotesStore } from "./store";
+export type { SpaceNotesProps } from "./model/interfaces/SpaceNotes";
 
 const shellClass =
   "relative grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-charcoal-bg text-cream";
@@ -63,7 +63,7 @@ export function SpaceNotes(props: SpaceNotesProps) {
   }, [referenceOnly, searchParams, setSearchParams]);
   useEffect(() => {
     if (user?.id) void actions.load(user.id, props.spaceId, props.spaceName);
-  }, [actions.load, props.spaceId, props.spaceName, user?.id]);
+  }, [actions, props.spaceId, props.spaceName, user?.id]);
 
   useEffect(() => {
     let refreshTimer: number | null = null;
@@ -80,7 +80,7 @@ export function SpaceNotes(props: SpaceNotesProps) {
       if (refreshTimer != null) window.clearTimeout(refreshTimer);
       window.removeEventListener("misty:space-note-event", scheduleRefresh);
     };
-  }, [actions.refresh, props.spaceId]);
+  }, [actions, props.spaceId]);
 
   const loading = store.phase === "loading" || store.phase === "idle";
 

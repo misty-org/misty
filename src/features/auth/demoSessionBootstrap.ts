@@ -1,5 +1,5 @@
-import { saveAccountAuthToken } from "@/stores/account/useAuthTokenStore";
-import type { SavedAccountSession } from "@/models/interfaces/stores/account/useAuthTokenStore";
+import type { SavedAccountSession } from "./model/stores/account/interfaces/useAuthTokenStore";
+import { saveAccountAuthToken } from "./store/useAuthTokenStore";
 
 const demoEmailSuffix = "@demo.misty.local";
 

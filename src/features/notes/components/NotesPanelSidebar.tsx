@@ -1,16 +1,15 @@
-import type { NotesPanelSidebarProps } from "@/models/interfaces/features/notes/SpaceNotes";
-export type { NotesPanelSidebarProps } from "@/models/interfaces/features/notes/SpaceNotes";
-import { useMemo, useState } from "react";
+import { SpaceSidebarPageSection, SpaceSidebarSection } from "@/features/spaces";
+import { Button } from "@/shared/ui";
 import { Plus } from "lucide-react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
-import { Button } from "@/ui";
-import { SpaceSidebarSection } from "@/features/spaces/components/SpaceSidebarSection";
-import { SpaceSidebarPageSection } from "@/features/spaces/components/SpaceSidebarPageSection";
-import { useNotesStore } from "@/stores/notes";
-import { selectVisibleNotes } from "@/features/notes/noteFilters";
-import { NoteListPanel } from "./NoteListPanel";
+import type { NotesPanelSidebarProps } from "../model/interfaces/SpaceNotes";
+import { selectVisibleNotes } from "../noteFilters";
+import { useNotesStore } from "../store";
 import { NewNoteDialog } from "./NewNoteDialog";
+import { NoteListPanel } from "./NoteListPanel";
+export type { NotesPanelSidebarProps } from "../model/interfaces/SpaceNotes";
 
 export function NotesPanelSidebar(
   props: NotesPanelSidebarProps & { section?: { active: boolean; to: string } },

@@ -1,16 +1,16 @@
-import { useMemo, useRef, useState, type DragEvent } from "react";
-import { Link, useLocation } from "react-router-dom";
-import { LockKeyhole, Plus } from "lucide-react";
-import { cn } from "@/ui";
-import type { Space } from "@/models/interfaces/features/spaces/types";
-import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
-import { invitedSpacePreview } from "../spaceInvitation";
-import { SpaceAvatar } from "./SpaceAvatar";
 import {
   formatActivityBadge,
   unreadActivityCountForSpace,
   useActivityStore,
 } from "@/features/activity";
+import type { Space } from "@/services/spaces/dto/interfaces/types";
+import { cn } from "@/shared/ui";
+import { LockKeyhole, Plus } from "lucide-react";
+import { useMemo, useRef, useState, type DragEvent } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { invitedSpacePreview } from "../spaceInvitation";
+import { useSpacesStore } from "../store/useSpacesStore";
+import { SpaceAvatar } from "./SpaceAvatar";
 
 const validRailSections = new Set(["chat", "planner", "notes", "drawings", "library"]);
 const spaceOrderStorageKey = "misty:space-nav-order:v1";

@@ -1,5 +1,5 @@
+import { Button, Skeleton } from "@/shared/ui";
 import { useEffect, useState } from "react";
-import { Button, Skeleton } from "@/ui";
 
 export function SpacePageLoadingPlaceholder(props: { label?: string; onRetry?: () => void }) {
   const [retryVisible, setRetryVisible] = useState(false);

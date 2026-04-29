@@ -1,6 +1,6 @@
-import { useId, useState, type ReactNode } from "react";
+import { Button, cn } from "@/shared/ui";
 import { ChevronRight } from "lucide-react";
-import { Button, cn } from "@/ui";
+import { useId, useState, type ReactNode } from "react";
 
 export function SpaceSidebarSection({
   title,

@@ -1,24 +1,24 @@
-import { useEffect, useMemo, useRef } from "react";
-import { useNavigate } from "react-router-dom";
-import { useShallow } from "zustand/react/shallow";
-import { ArrowUp, CircleAlert, Loader2, X } from "lucide-react";
-import { AnimatePresence, MotionConfig, motion } from "motion/react";
-import { Button, ScrollArea, ToggleGroup, ToggleGroupItem } from "@/ui";
 import {
   revealSearchResultInPane,
   searchResultNavigationTarget,
-} from "@/features/explorer/utils/searchNavigation";
-import { useExplorerStore } from "@/stores/explorer";
-import type { GlobalAiContextRef, GlobalAiMode, GlobalSearchResult } from "./types";
-import { useGlobalSearchStore } from "./useGlobalSearchStore";
+  useExplorerStore,
+} from "@/features/file-explorer";
+import { Button, ScrollArea, ToggleGroup, ToggleGroupItem } from "@/shared/ui";
+import { ArrowUp, CircleAlert, Loader2, X } from "lucide-react";
+import { AnimatePresence, MotionConfig, motion } from "motion/react";
+import { useEffect, useMemo, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import { useShallow } from "zustand/react/shallow";
 import { mergeGlobalMistyContext } from "./globalMistyContext";
+import { GlobalMistyLauncher } from "./GlobalMistyLauncher";
 import {
   ConversationMenu,
   ConversationView,
   ModeIcon,
   SearchResults,
 } from "./GlobalMistyPanelContent";
-import { GlobalMistyLauncher } from "./GlobalMistyLauncher";
+import type { GlobalAiContextRef, GlobalAiMode, GlobalSearchResult } from "./types";
+import { useGlobalSearchStore } from "./useGlobalSearchStore";
 
 const panelClass = [
   "pointer-events-auto absolute bottom-0 left-1/2 flex",
@@ -103,7 +103,7 @@ export function GlobalMisty(props: {
   useEffect(() => setAccount(props.accountId), [props.accountId, setAccount]);
   useEffect(() => {
     if (!open) return;
-    setContext(mergeGlobalMistyContext(context, currentContext));
+    setContext(mergeGlobalMistyContext(useGlobalSearchStore.getState().context, currentContext));
     window.setTimeout(() => inputRef.current?.focus(), 0);
   }, [currentContext, open, setContext]);
   useEffect(() => {

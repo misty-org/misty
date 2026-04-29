@@ -1,12 +1,12 @@
-import type { ComponentType } from "react";
-import { Check } from "lucide-react";
-import { SiDiscord, SiGooglecalendar, SiNotion } from "react-icons/si";
-import { Button, Input } from "@/ui";
 import type {
   ProviderConnectionAvailability,
   SpaceIntegrationProvider,
   SpaceTemplate,
-} from "@/models/interfaces/features/spaces/types";
+} from "@/services/spaces/dto/interfaces/types";
+import { Button, Input } from "@/shared/ui";
+import { Check } from "lucide-react";
+import type { ComponentType } from "react";
+import { SiDiscord, SiGooglecalendar, SiNotion } from "react-icons/si";
 
 export const blankTemplateFallback: SpaceTemplate[] = [
   {

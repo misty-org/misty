@@ -1,6 +1,4 @@
-import { MessagesSquare, Pencil, Plus, Trash2, Users } from "lucide-react";
-import { SiDiscord } from "react-icons/si";
-import { Link } from "react-router-dom";
+import type { SpaceConversation } from "@/services/spaces/dto/interfaces/types";
 import {
   Button,
   ContextMenu,
@@ -9,8 +7,10 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
   cn,
-} from "@/ui";
-import type { SpaceConversation } from "@/models/interfaces/features/spaces/types";
+} from "@/shared/ui";
+import { MessagesSquare, Pencil, Plus, Trash2, Users } from "lucide-react";
+import { SiDiscord } from "react-icons/si";
+import { Link } from "react-router-dom";
 import { SpaceSidebarSection } from "./SpaceSidebarSection";
 
 export function SpaceChatConversationList({
@@ -22,6 +22,7 @@ export function SpaceChatConversationList({
   onEditConversation,
   onDeleteConversation,
   isSpaceOwner = false,
+  isMistySpace = false,
 }: {
   activeSpaceId: string;
   conversations: SpaceConversation[];
@@ -31,6 +32,7 @@ export function SpaceChatConversationList({
   onEditConversation?: (conversation: SpaceConversation) => void;
   onDeleteConversation?: (conversation: SpaceConversation) => void;
   isSpaceOwner?: boolean;
+  isMistySpace?: boolean;
 }) {
   const mistyConversations = conversations.filter(
     (conversation) => conversation.origin !== "discord",
@@ -49,7 +51,7 @@ export function SpaceChatConversationList({
         onEdit={onEditConversation}
         onDelete={onDeleteConversation}
         isSpaceOwner={isSpaceOwner}
-        showEveryone
+        showEveryone={!isMistySpace}
       />
       {discord.length ? (
         <DiscordConversationGroup

@@ -1,4 +1,4 @@
-import { HomeDashboard } from "@/features/home/HomeDashboard";
+import { HomeDashboard } from "@/features/home";
 
 export default function HomePage() {
   return <HomeDashboard />;

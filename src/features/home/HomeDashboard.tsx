@@ -1,5 +1,13 @@
-import { useMemo } from "react";
-import { Link } from "react-router-dom";
+import {
+  activityTargetHref,
+  unreadActivityCountForSpace,
+  useActivityStore,
+  type ActivityItem,
+} from "@/features/activity";
+import { useAuth } from "@/features/auth";
+import { SpaceAvatar } from "@/features/spaces";
+import type { Space } from "@/services/spaces/dto/interfaces/types";
+import { Button, Card, CardContent, CardHeader, CardTitle, Skeleton } from "@/shared/ui";
 import {
   AtSign,
   Bell,
@@ -8,23 +16,15 @@ import {
   CheckCircle2,
   CircleAlert,
   Clock3,
+  ListChecks,
   Mail,
   MessageCircle,
-  ListChecks,
   RefreshCcw,
   Users,
   type LucideIcon,
 } from "lucide-react";
-import { useAuth } from "@/features/auth/AuthContext";
-import {
-  activityTargetHref,
-  unreadActivityCountForSpace,
-  useActivityStore,
-  type ActivityItem,
-} from "@/features/activity";
-import { SpaceAvatar } from "@/features/spaces/components/SpaceAvatar";
-import type { Space } from "@/models/interfaces/features/spaces/types";
-import { Button, Card, CardContent, CardHeader, CardTitle, Skeleton } from "@/ui";
+import { useMemo } from "react";
+import { Link } from "react-router-dom";
 import { useHomeDashboardData, type HomeAgendaItem } from "./useHomeDashboardData";
 
 const spaceCardClass = [

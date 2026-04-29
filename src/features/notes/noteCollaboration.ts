@@ -1,4 +1,4 @@
-import { spaceRequest } from "@/stores/spaces/useSpacesBackendStore";
+import { spaceRequest } from "@/services/spaces/api";
 import YProvider from "y-partyserver/provider";
 import * as Y from "yjs";
 

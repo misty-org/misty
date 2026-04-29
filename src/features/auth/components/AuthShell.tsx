@@ -1,6 +1,6 @@
-import type { ReactNode } from "react";
+import { Button } from "@/shared/ui";
 import { ArrowLeft } from "lucide-react";
-import { Button } from "@/ui";
+import type { ReactNode } from "react";
 
 export default function AuthShell({ title, description, children, onBack }: AuthShellProps) {
   return (

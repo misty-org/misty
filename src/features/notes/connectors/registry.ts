@@ -2,8 +2,8 @@ import type {
   NotesConnector,
   NotesIntegrationCard,
   SyncResult,
-} from "@/models/interfaces/features/notes/connectors";
-import type { UnifiedNote } from "@/models/types/features/notes/types";
+} from "../model/interfaces/connectors";
+import type { UnifiedNote } from "../model/types/types";
 import { createMistyNativeNotesConnector } from "./mistyNativeNotes";
 
 /**

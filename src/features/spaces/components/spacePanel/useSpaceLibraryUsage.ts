@@ -1,7 +1,7 @@
+import { spacesApi } from "@/services/spaces/api";
+import type { Space, SpaceStorageUsage } from "@/services/spaces/dto/interfaces/types";
 import { useEffect, useMemo, useState } from "react";
-import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
-import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
-import type { Space, SpaceStorageUsage } from "@/models/interfaces/features/spaces/types";
+import { useSpacesStore } from "../../store/useSpacesStore";
 
 /**
  * Storage quota for the active Space, refreshed whenever the Library changes.

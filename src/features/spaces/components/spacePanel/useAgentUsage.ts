@@ -1,6 +1,6 @@
+import { spacesApi } from "@/services/spaces/api";
+import type { AgentUsage } from "@/services/spaces/dto/interfaces/agentUsageTypes";
 import { useEffect, useState } from "react";
-import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
-import type { AgentUsage } from "@/models/interfaces/features/spaces/agentUsageTypes";
 
 /**
  * The account's weekly hosted-AI allowance.

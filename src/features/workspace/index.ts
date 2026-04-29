@@ -1,5 +1,6 @@
 export { ChromeTabStrip } from "./ChromeTabStrip";
 export type { ChromeTabStripProps, ChromeTabStripTab } from "./ChromeTabStrip";
+export type { MultiPanelClosedPane, MultiPanelPane, MultiPanelTab } from "./model/interfaces/types";
 export { MultiPanelWorkspace } from "./MultiPanelWorkspace";
 export type { MultiPanelWorkspaceProps } from "./MultiPanelWorkspace";
 export { NewTabMenu } from "./NewTabMenu";

@@ -1,14 +1,9 @@
-import type {
-  MistyPickerProps,
-  MistyPickerSource,
-} from "@/models/interfaces/features/picker/MistyPicker";
-export type {
-  MistyPickerProps,
-  MistyPickerSource,
-} from "@/models/interfaces/features/picker/MistyPicker";
-import { useState } from "react";
 import { FolderOpen, LibraryBig } from "lucide-react";
+import { useState } from "react";
+import type { MistyPickerProps, MistyPickerSource } from "./model/interfaces/MistyPicker";
+export type { MistyPickerProps, MistyPickerSource } from "./model/interfaces/MistyPicker";
 
+import { MistyLibraryPicker } from "@/features/space-library";
 import {
   Dialog,
   DialogContent,
@@ -17,8 +12,7 @@ import {
   DialogTitle,
   ToggleGroup,
   ToggleGroupItem,
-} from "@/ui";
-import { MistyLibraryPicker } from "@/features/spaces/components/MistyLibraryPicker";
+} from "@/shared/ui";
 import { MistyFilePicker } from "./FilePicker";
 
 const sharedPickerDialogClassName = [

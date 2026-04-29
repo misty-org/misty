@@ -1,5 +1,5 @@
+import { Button, cn, PortalToId } from "@/shared/ui";
 import type { ReactNode } from "react";
-import { Button, cn, PortalToId } from "@/ui";
 
 export const spacesBottomBarActionsId = "misty-spaces-bottom-bar-actions";
 

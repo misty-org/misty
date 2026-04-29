@@ -1,4 +1,4 @@
-import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
+import { useSpacesStore } from "@/features/spaces";
 import type { GlobalAiActionProposal } from "./types";
 
 export function proposeAction(prompt: string): GlobalAiActionProposal {

@@ -1,0 +1,1 @@
+export { openAccountSettingsInBrowser } from "./openAccountSettings";

@@ -1,12 +1,11 @@
-import { spaceNotesEnabled } from "@/features/notes/availability";
-import { NotesPanelSidebar } from "@/features/notes/components/NotesPanelSidebar";
-import { DrawingPanelSidebar } from "@/features/drawings/components/DrawingPanelSidebar";
-import type { SpaceConversation } from "@/models/interfaces/features/spaces/types";
+import { DrawingPanelSidebar } from "@/features/drawings";
+import { NotesPanelSidebar, spaceNotesEnabled } from "@/features/notes";
+import type { SpaceConversation } from "@/services/spaces/dto/interfaces/types";
+import { rememberedJournalRoute } from "../../spacesShell/spaceSubpageMemory";
 import { SpaceChatConversationList } from "../SpaceChatConversationList";
 import { SpaceSidebarSection } from "../SpaceSidebarSection";
-import { rememberedJournalRoute } from "../../spacesShell/spaceSubpageMemory";
-import { PlannerPanelSidebar } from "./PlannerPanelSidebar";
 import { librarySidebarItems } from "./librarySidebarItems";
+import { PlannerPanelSidebar } from "./PlannerPanelSidebar";
 import { SpaceSidebarLink } from "./SpaceSidebarLink";
 
 export interface SpacePanelSidebarContextProps {
@@ -25,6 +24,7 @@ export interface SpacePanelSidebarContextProps {
   onEditConversation?: (conversation: SpaceConversation) => void;
   onDeleteConversation?: (conversation: SpaceConversation) => void;
   isSpaceOwner?: boolean;
+  isMistySpace?: boolean;
 }
 
 /**
@@ -47,6 +47,7 @@ export function SpacePanelSidebarContext(props: SpacePanelSidebarContextProps) {
           onEditConversation={props.onEditConversation}
           onDeleteConversation={props.onDeleteConversation}
           isSpaceOwner={props.isSpaceOwner}
+          isMistySpace={props.isMistySpace}
         />
       </div>
     );

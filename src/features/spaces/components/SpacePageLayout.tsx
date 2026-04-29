@@ -1,5 +1,5 @@
+import { cn } from "@/shared/ui";
 import type { HTMLAttributes, ReactNode } from "react";
-import { cn } from "@/ui";
 
 export function SpacePageFrame({
   children,

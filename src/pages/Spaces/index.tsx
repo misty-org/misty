@@ -1,1 +1,1 @@
-export { default, SpacesIndexRedirect, SpaceDetail } from "@/features/spaces";
+export { SpaceDetail, SpacesIndexRedirect, default } from "@/features/spaces";

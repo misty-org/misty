@@ -1,7 +1,7 @@
-import type { RefObject } from "react";
+import { Button } from "@/shared/ui";
 import { ArrowUp, Loader2 } from "lucide-react";
 import { motion } from "motion/react";
-import { Button } from "@/ui";
+import type { RefObject } from "react";
 import { ModeIcon } from "./GlobalMistyPanelContent";
 import type { GlobalAiMode } from "./types";
 
