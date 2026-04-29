@@ -85,6 +85,19 @@ namespace misty::panel {
         void apply_table_sort(panel::FileExplorerState& state, const ImGuiTableSortSpecs& sort_specs);
         void show_file_item(panel::FileExplorerState& state, int i);
         void show_grid_item(panel::FileExplorerState& state, int i, float cell_w, float cell_h);
+        void begin_file_drag_source(panel::FileExplorerState& state, const panel::UnifiedFileItem& file, int index, bool is_selected);
+        void handle_file_drop_target(panel::FileExplorerState& state,
+                                     const std::string& dest_dir,
+                                     const ImVec2& min,
+                                     const ImVec2& max,
+                                     bool prominent,
+                                     bool auto_navigate);
+        void handle_drag_navigation_target(panel::FileExplorerState& state,
+                                           const std::string& target_path,
+                                           const ImVec2& min,
+                                           const ImVec2& max,
+                                           bool prominent,
+                                           std::function<void()> navigate_callback = {});
 
         // Context menu + file operations
         void show_context_menu(panel::FileExplorerState& state);
@@ -101,6 +114,10 @@ namespace misty::panel {
         void perform_copy(panel::FileExplorerState& state);
         void perform_cut(panel::FileExplorerState& state);
         void perform_paste(panel::FileExplorerState& state);
+        void perform_drop_items(panel::FileExplorerState& state,
+                                const std::vector<panel::UnifiedFileItem>& items,
+                                const std::string& dest_dir,
+                                panel::ClipboardOp op);
         void perform_paste_local_to_local(panel::FileExplorerState& state, const panel::UnifiedFileItem& item, const std::string& dest_dir, panel::ClipboardOp op);
         void perform_paste_to_cloud(panel::FileExplorerState& state, const panel::UnifiedFileItem& item, const std::string& dest_dir, panel::ClipboardOp op);
         void perform_paste_cloud_to_local(panel::FileExplorerState& state, const panel::UnifiedFileItem& item, const std::string& dest_dir, panel::ClipboardOp op);
