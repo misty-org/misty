@@ -53,30 +53,88 @@ namespace misty::panel {
                 state.dirty_ = true;
             }
         }
+
+        fs::path normalized_path(const fs::path& path) {
+            std::error_code ec;
+            fs::path normalized = fs::weakly_canonical(path, ec);
+            if (ec) {
+                normalized = path.lexically_normal();
+            }
+            return normalized;
+        }
+
+        bool is_same_path(const fs::path& lhs, const fs::path& rhs) {
+            return normalized_path(lhs) == normalized_path(rhs);
+        }
+
+        bool is_same_or_child_path(const fs::path& maybe_child, const fs::path& maybe_parent) {
+            fs::path child = normalized_path(maybe_child);
+            fs::path parent = normalized_path(maybe_parent);
+
+            auto child_it = child.begin();
+            auto parent_it = parent.begin();
+            for (; parent_it != parent.end(); ++parent_it, ++child_it) {
+                if (child_it == child.end() || *child_it != *parent_it) {
+                    return false;
+                }
+            }
+            return true;
+        }
     }
 
     void FileExplorerPanel::perform_paste(FileExplorerState& state) {
         std::string dest_dir(state.current_path);
-        bool dest_is_cloud = path_utils::is_remote_path(dest_dir);
 
         auto& clipboard = registry_.get_state<ClipboardState>("Clipboard");
         const ClipboardOp op_at_paste = clipboard.op;
         const std::vector<UnifiedFileItem> items_to_paste = clipboard.items;
 
-        bool queued_cloud_uploads = false;
+        perform_drop_items(state, items_to_paste, dest_dir, op_at_paste);
 
-        for (const auto& item : items_to_paste) {
+        // Clear clipboard after cut (keep after copy so user can paste multiple times)
+        if (op_at_paste == ClipboardOp::CUT) {
+            clipboard.clear();
+        }
+    }
+
+    void FileExplorerPanel::perform_drop_items(FileExplorerState& state,
+                                               const std::vector<UnifiedFileItem>& items,
+                                               const std::string& dest_dir,
+                                               ClipboardOp op) {
+        if (items.empty() || dest_dir.empty() || op == ClipboardOp::NONE) {
+            return;
+        }
+
+        bool dest_is_cloud = path_utils::is_remote_path(dest_dir);
+        bool queued_cloud_uploads = false;
+        size_t skipped_count = 0;
+
+        for (const auto& item : items) {
+            if (item.path.empty()) {
+                ++skipped_count;
+                continue;
+            }
+
+            if (op == ClipboardOp::CUT) {
+                const fs::path src(item.path);
+                const fs::path dest(dest_dir);
+                if (is_same_path(src.parent_path(), dest) || (item.is_dir && is_same_or_child_path(dest, src))) {
+                    ++skipped_count;
+                    continue;
+                }
+            }
+
             bool src_is_cloud = (item.source == FileSource::REMOTE);
 
             if (!src_is_cloud && !dest_is_cloud) {
                 // Local -> Local
-                perform_paste_local_to_local(state, item, dest_dir, op_at_paste);
+                perform_paste_local_to_local(state, item, dest_dir, op);
             } else if (!dest_is_cloud && src_is_cloud) {
                 // Cloud -> Local
-                perform_paste_cloud_to_local(state, item, dest_dir, op_at_paste);
+                perform_paste_cloud_to_local(state, item, dest_dir, op);
             } else if (dest_is_cloud) {
                 // Local/Cloud -> Cloud (queues into sidebar upload queue)
-                perform_paste_to_cloud(state, item, dest_dir, op_at_paste);
+                perform_paste_to_cloud(state, item, dest_dir, op);
                 queued_cloud_uploads = true;
             }
         }
@@ -87,14 +145,19 @@ namespace misty::panel {
             sidebar_state.pending_upload_start = true;
         }
 
-        // Clear clipboard after cut (keep after copy so user can paste multiple times)
-        if (op_at_paste == ClipboardOp::CUT) {
-            clipboard.clear();
+        if (skipped_count == items.size()) {
+            auto& activity = registry_.get_state<ActivityState>("Activity");
+            activity.add_entry("File", "Drop ignored: destination is not valid for the selected item.", ActivityEntryType::ERROR);
+            return;
         }
 
-        // Refresh directory
+        // Refresh the active directory so moved items disappear immediately; also
+        // ask sibling panes showing the destination to refresh.
         navigate_to_path(std::string(state.current_path), false);
         notify_shared_path_refresh(std::string(state.current_path));
+        if (dest_dir != std::string(state.current_path)) {
+            notify_shared_path_refresh(dest_dir);
+        }
     }
 
     void FileExplorerPanel::perform_paste_local_to_local(FileExplorerState& state, const UnifiedFileItem& item, const std::string& dest_dir, ClipboardOp op) {
