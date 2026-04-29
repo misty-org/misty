@@ -24,6 +24,7 @@ type Proxy struct {
 	Database       *db.Database
 	SyncIndex      *syncindex.Service
 	SyncManager    *syncindex.Manager
+	SyncPoller     *syncindex.Poller
 	LicenseManager *license.Manager
 	VaultService   *vault.Service
 	AIService      *ai.Service
@@ -84,12 +85,6 @@ func (proxy *Proxy) MountHandlers() {
 		r.Put("/devices", api.UpdateDevice(proxy.Database))
 		r.Delete("/devices", api.DeleteDevice(proxy.Database))
 
-		r.Get("/workspaces", api.GetWorkspaces(proxy.Database))
-		r.Get("/workspace", api.GetWorkspace(proxy.Database))
-		r.Post("/workspaces", api.CreateWorkspace(proxy.Database))
-		r.Put("/workspaces", api.UpdateWorkspace(proxy.Database))
-		r.Delete("/workspaces", api.DeleteWorkspace(proxy.Database))
-
 		// ---- rclone unified endpoints ----
 		r.Get("/remotes", remote.ListRemotes())
 		r.Delete("/remotes", remote.DeleteRemote())
@@ -100,11 +95,15 @@ func (proxy *Proxy) MountHandlers() {
 		r.Post("/sync/refetch", remote.SyncRefetch(proxy.SyncManager))
 		r.Get("/sync/list", remote.SyncList(proxy.SyncIndex))
 		r.Post("/sync/dirty", remote.SyncDirty(proxy.SyncManager))
-		r.Post("/sync/run-now", remote.SyncRunNow(proxy.SyncManager))
+		r.Post("/sync/mark-synced", remote.SyncMarkSynced(proxy.SyncManager))
+		r.Post("/sync/run-now", remote.SyncRunNow(proxy.SyncPoller))
 		r.Put("/sync/watch-dir", remote.SyncWatchDir(proxy.SyncManager))
 		r.Delete("/sync/watch-dir", remote.SyncUnwatchDir(proxy.SyncManager))
 		r.Get("/file/download", remote.DownloadFile())
 		r.Post("/file/upload", remote.UploadFile())
+		r.Post("/folder/download", remote.DownloadFolder())
+		r.Post("/folder/upload", remote.UploadFolder())
+		r.Post("/folder/transfer", remote.TransferFolder())
 		r.Post("/mkdir", remote.MkDir())
 		r.Delete("/file", remote.DeleteFile())
 		r.Get("/search", remote.Search())

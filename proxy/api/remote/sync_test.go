@@ -74,6 +74,9 @@ func TestSyncListReturnsSeededDirectoryRows(t *testing.T) {
 	if resp.Items[0].State != "MOD" || !resp.Items[0].SyncDirty || resp.Items[0].SyncDirection != "push" {
 		t.Fatalf("unexpected item state: %+v", resp.Items[0])
 	}
+	if resp.Items[0].DirtyReason == "" {
+		t.Fatalf("expected dirty reason, got empty item: %+v", resp.Items[0])
+	}
 }
 
 func TestSyncRefetchRejectsMissingRemote(t *testing.T) {
@@ -86,6 +89,71 @@ func TestSyncRefetchRejectsMissingRemote(t *testing.T) {
 	rr = doRequest(SyncRefetch(manager), http.MethodPost, "/api/sync/refetch", bytes.NewBufferString(`{"path":"docs"}`))
 	if rr.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400 for missing remote, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestSyncMarkSyncedClearsDirtyAfterDownload(t *testing.T) {
+	database, cleanup := setupSyncTestDB(t)
+	defer cleanup()
+
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+
+	localPath := filepath.Join(tempHome, "misty", "mnt", "drive-alice", "docs", "report.txt")
+	if err := os.MkdirAll(filepath.Dir(localPath), 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	if err := os.WriteFile(localPath, []byte("hello world"), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	now := dbpkg.NowRFC3339()
+	row := dbpkg.FileMetadata{
+		RemoteName:    "drive-alice",
+		RelPath:       "docs/report.txt",
+		ParentRelPath: "docs",
+		Name:          "report.txt",
+		LocalExists:   false,
+		RemoteExists:  true,
+		LocalDirty:    true,
+		RemoteMTime:   now,
+		RemoteSize:    sql.NullInt64{Int64: 11, Valid: true},
+		UpdatedAt:     now,
+	}
+	if err := dbpkg.UpsertFileMetadata(database.Conn, row); err != nil {
+		t.Fatalf("UpsertFileMetadata: %v", err)
+	}
+
+	service := syncindex.NewService(database)
+	manager := syncindex.NewManager(service, 0)
+	rr := doRequest(
+		SyncMarkSynced(manager),
+		http.MethodPost,
+		"/api/sync/mark-synced",
+		bytes.NewBufferString(`{"remote":"drive-alice","path":"docs/report.txt"}`),
+	)
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	updated, err := dbpkg.GetFileMetadata(database.Conn, "drive-alice", "docs/report.txt")
+	if err != nil {
+		t.Fatalf("GetFileMetadata: %v", err)
+	}
+	if updated == nil {
+		t.Fatal("expected updated row")
+	}
+	if updated.LocalDirty {
+		t.Fatalf("expected LocalDirty=false, got true: %+v", *updated)
+	}
+	if !updated.LocalExists {
+		t.Fatalf("expected LocalExists=true, got false: %+v", *updated)
+	}
+	if !updated.LocalSize.Valid || updated.LocalSize.Int64 != 11 {
+		t.Fatalf("expected LocalSize=11, got %+v", updated.LocalSize)
+	}
+	if updated.LastSyncedAt == "" {
+		t.Fatalf("expected LastSyncedAt to be set: %+v", *updated)
 	}
 }
 

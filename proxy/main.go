@@ -36,7 +36,6 @@ func (plainSlogHandler) Handle(_ context.Context, r slog.Record) error {
 func (h plainSlogHandler) WithAttrs([]slog.Attr) slog.Handler { return h }
 func (h plainSlogHandler) WithGroup(string) slog.Handler      { return h }
 
-
 func main() {
 	// Restore clean log output: rclone's fs/log init() has already replaced
 	// the slog default with its NOTICE-prefixed handler by the time main runs.
@@ -82,10 +81,15 @@ func main() {
 	if err := proxy.Database.StartDatabase(); err != nil {
 		panic(err)
 	}
+	defer proxy.Database.Stop()
 	proxy.SyncIndex = syncindex.NewService(proxy.Database)
 	proxy.SyncManager = syncindex.NewManager(proxy.SyncIndex, 0)
 	proxy.SyncManager.Start()
 	log.Printf("syncindex: manager started")
+	proxy.SyncPoller = syncindex.NewPoller(proxy.SyncIndex, syncindex.PollIntervalFromEnv(30))
+	proxy.SyncPoller.Start()
+	defer proxy.SyncPoller.Stop()
+	log.Printf("syncindex: poller started")
 
 	// Periodically clean up expired/revoked refresh tokens
 	go func() {
@@ -128,7 +132,4 @@ func main() {
 	if err := http.ListenAndServe(addr, proxy.Router); err != nil {
 		panic(err)
 	}
-
-	proxy.Database.Stop()
-
 }

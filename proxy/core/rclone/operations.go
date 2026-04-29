@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -56,6 +58,102 @@ func UploadFile(ctx context.Context, remote, dirPath, fileName string, _ int64, 
 		return fmt.Errorf("upload file: %w", err)
 	}
 	return nil
+}
+
+func DownloadFolder(ctx context.Context, remote, remotePath, localPath string) error {
+	if strings.TrimSpace(localPath) == "" {
+		return fmt.Errorf("local path is required")
+	}
+	if err := os.MkdirAll(localPath, 0o700); err != nil {
+		return fmt.Errorf("create local folder: %w", err)
+	}
+	if _, err := runRclone(ctx, "copy", remoteSpec(remote, remotePath), localPath, "--create-empty-src-dirs"); err != nil {
+		return fmt.Errorf("download folder: %w", err)
+	}
+	return nil
+}
+
+func UploadFolder(ctx context.Context, remote, remotePath, localPath string) error {
+	if err := EnsureRemoteDefaults(remote); err != nil {
+		return fmt.Errorf("apply remote defaults: %w", err)
+	}
+	info, err := os.Stat(localPath)
+	if err != nil {
+		return fmt.Errorf("stat local folder: %w", err)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("local path is not a folder")
+	}
+	if _, err := runRclone(ctx, "copy", localPath, remoteSpec(remote, remotePath), "--create-empty-src-dirs"); err != nil {
+		return fmt.Errorf("upload folder: %w", err)
+	}
+	return nil
+}
+
+func TransferFolder(ctx context.Context, sourceRemote, sourcePath, destRemote, destPath string) error {
+	stagingRoot, err := NewMistyTmpDir("folder-transfer-")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(stagingRoot)
+
+	folderName := path.Base(path.Clean(sourcePath))
+	if folderName == "." || folderName == "/" {
+		folderName = "folder"
+	}
+	stagingFolder := filepath.Join(stagingRoot, folderName)
+
+	if err := DownloadFolder(ctx, sourceRemote, sourcePath, stagingFolder); err != nil {
+		return err
+	}
+	if err := UploadFolder(ctx, destRemote, destPath, stagingFolder); err != nil {
+		return err
+	}
+	return nil
+}
+
+func MistyTmpRoot() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return "", fmt.Errorf("resolve user home directory: %w", err)
+	}
+	root := filepath.Join(home, "misty", "tmp")
+	if err := os.MkdirAll(root, 0o700); err != nil {
+		return "", fmt.Errorf("create misty tmp: %w", err)
+	}
+	return root, nil
+}
+
+func NewMistyTmpDir(pattern string) (string, error) {
+	root, err := MistyTmpRoot()
+	if err != nil {
+		return "", err
+	}
+	dir, err := os.MkdirTemp(root, pattern)
+	if err != nil {
+		return "", fmt.Errorf("create misty temp folder: %w", err)
+	}
+	return dir, nil
+}
+
+func IsMistyTmpPath(candidate string) (bool, error) {
+	root, err := MistyTmpRoot()
+	if err != nil {
+		return false, err
+	}
+	absRoot, err := filepath.Abs(root)
+	if err != nil {
+		return false, err
+	}
+	absCandidate, err := filepath.Abs(candidate)
+	if err != nil {
+		return false, err
+	}
+	rel, err := filepath.Rel(absRoot, absCandidate)
+	if err != nil {
+		return false, err
+	}
+	return rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))), nil
 }
 
 func MkDir(ctx context.Context, remote, dirPath string) error {
