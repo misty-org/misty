@@ -216,6 +216,18 @@ void FileExplorerPanel::show_rename_modal(FileExplorerState& state) {
                 if (!ec) {
                     auto& notif = registry_.get_state<NotificationState>("Notifications");
                     notif.add_notification("Renamed to " + new_name);
+                    FileOperationRecord record;
+                    record.kind = FileOperationKind::RenameLocal;
+                    record.origin_dir = old_path.parent_path().string();
+                    record.destination_dir = new_path.parent_path().string();
+                    record.description = "Renamed " + old_path.filename().string() + " to " + new_name;
+                    record.items.push_back({
+                        old_path.string(),
+                        new_path.string(),
+                        new_name,
+                        fs::is_directory(new_path)
+                    });
+                    record_file_operation(std::move(record));
                     navigate_to_path(std::string(state.current_path), false);
                     notify_shared_path_refresh(std::string(state.current_path));
                 }

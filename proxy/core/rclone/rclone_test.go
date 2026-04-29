@@ -9,9 +9,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-
-	"github.com/rclone/rclone/fs/config"
-	"github.com/rclone/rclone/fs/config/configfile"
 )
 
 // setupTest creates a temp rclone config, a temp data dir, and a "test-local"
@@ -26,17 +23,11 @@ func setupTest(t *testing.T) (remote string, root string, cleanup func()) {
 		t.Fatal(err)
 	}
 
-	// Reset init so we can re-init with the temp config
+	t.Setenv("MISTY_RCLONE_CONFIG", tmpConf)
 	initOnce = sync.Once{}
-
-	// Point rclone at our temp config
-	if err := config.SetConfigPath(tmpConf); err != nil {
-		t.Fatal(err)
+	if err := Init(); err != nil {
+		t.Skipf("rclone binary unavailable: %v", err)
 	}
-	configfile.Install()
-
-	// Mark init as done so operations don't try to re-init with the real path
-	initOnce.Do(func() {})
 
 	// Create a temp data directory
 	root = filepath.Join(t.TempDir(), "data")
@@ -113,7 +104,7 @@ func TestRenameRemote(t *testing.T) {
 
 	// Stash a couple of extra keys on the temp remote so we can verify
 	// RenameRemote actually moves the whole section, not just `type`.
-	if err := config.SetValueAndSave(oldName, "custom_key", "custom_value"); err != nil {
+	if err := setConfigValue(oldName, "custom_key", "custom_value"); err != nil {
 		t.Fatal("SetValueAndSave:", err)
 	}
 
@@ -131,7 +122,7 @@ func TestRenameRemote(t *testing.T) {
 	if got := GetRemoteType(newName); got != "local" {
 		t.Errorf("RenameRemote: type under new name = %q, want %q", got, "local")
 	}
-	if v, ok := config.FileGetValue(newName, "custom_key"); !ok || v != "custom_value" {
+	if v, ok := getConfigValue(newName, "custom_key"); !ok || v != "custom_value" {
 		t.Errorf("RenameRemote: custom_key under new name = (%q, %v), want (%q, true)", v, ok, "custom_value")
 	}
 
@@ -194,7 +185,7 @@ func TestEnsureRemoteDefaultsNoopForNonDrive(t *testing.T) {
 	if err := EnsureRemoteDefaults(remote); err != nil {
 		t.Fatal("EnsureRemoteDefaults:", err)
 	}
-	if value, ok := config.FileGetValue(remote, "import_formats"); ok && value != "" {
+	if value, ok := getConfigValue(remote, "import_formats"); ok && value != "" {
 		t.Fatalf("expected no import_formats for local remote, got %q", value)
 	}
 }
@@ -204,15 +195,14 @@ func TestEnsureRemoteDefaultsSetsDriveImportFormats(t *testing.T) {
 	if err := os.WriteFile(tmpConf, []byte(""), 0600); err != nil {
 		t.Fatal(err)
 	}
+	t.Setenv("MISTY_RCLONE_CONFIG", tmpConf)
 	initOnce = sync.Once{}
-	if err := config.SetConfigPath(tmpConf); err != nil {
-		t.Fatal(err)
+	if err := Init(); err != nil {
+		t.Skipf("rclone binary unavailable: %v", err)
 	}
-	configfile.Install()
-	initOnce.Do(func() {})
 
 	remote := "test-drive"
-	if err := config.SetValueAndSave(remote, "type", "drive"); err != nil {
+	if err := setConfigValue(remote, "type", "drive"); err != nil {
 		t.Fatal("SetValueAndSave type:", err)
 	}
 	defer DeleteRemote(remote)
@@ -220,7 +210,7 @@ func TestEnsureRemoteDefaultsSetsDriveImportFormats(t *testing.T) {
 	if err := EnsureRemoteDefaults(remote); err != nil {
 		t.Fatal("EnsureRemoteDefaults:", err)
 	}
-	value, ok := config.FileGetValue(remote, "import_formats")
+	value, ok := getConfigValue(remote, "import_formats")
 	if !ok {
 		t.Fatal("expected import_formats to be set")
 	}

@@ -14,8 +14,6 @@ import (
 	"testing"
 
 	"github.com/kannachi323/misty/proxy/core/rclone"
-	"github.com/rclone/rclone/fs/config"
-	"github.com/rclone/rclone/fs/config/configfile"
 )
 
 const testRemote = "api-test-local"
@@ -27,10 +25,10 @@ func setupAPI(t *testing.T) (root string, cleanup func()) {
 	tmpConf := filepath.Join(t.TempDir(), "rclone.conf")
 	os.WriteFile(tmpConf, []byte(""), 0600)
 
-	// Access the unexported initOnce via the rclone package's Init.
-	// We need to reset it — use config APIs directly instead.
-	config.SetConfigPath(tmpConf)
-	configfile.Install()
+	t.Setenv("MISTY_RCLONE_CONFIG", tmpConf)
+	if err := rclone.Init(); err != nil {
+		t.Skipf("rclone binary unavailable: %v", err)
+	}
 
 	root = filepath.Join(t.TempDir(), "data")
 	os.MkdirAll(root, 0755)
@@ -125,15 +123,35 @@ func TestListTypesHandler(t *testing.T) {
 		t.Error("ListTypes: expected non-empty list")
 	}
 
-	// Check that onedrive is in the list
 	found := false
 	for _, typ := range types {
-		if typ["type"] == "onedrive" {
+		if typ["type"] == "local" {
 			found = true
 		}
 	}
 	if !found {
-		t.Error("ListTypes: expected 'onedrive' in types list")
+		t.Error("ListTypes: expected 'local' in types list")
+	}
+}
+
+func TestHealthHandler(t *testing.T) {
+	rr := doRequest(Health(), "GET", "/api/remotes/health", nil)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("Health: expected 200, got %d", rr.Code)
+	}
+
+	var body map[string]any
+	if err := json.NewDecoder(rr.Body).Decode(&body); err != nil {
+		t.Fatalf("Health: decode response: %v", err)
+	}
+	if _, ok := body["ready"]; !ok {
+		t.Fatal("Health: missing ready")
+	}
+	if _, ok := body["config_path"]; !ok {
+		t.Fatal("Health: missing config_path")
+	}
+	if _, ok := body["link_path"]; !ok {
+		t.Fatal("Health: missing link_path")
 	}
 }
 

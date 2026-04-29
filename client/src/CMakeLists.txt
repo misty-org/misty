@@ -24,12 +24,6 @@ file(GLOB_RECURSE MISTY_VIEW_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/views/*.h"
 )
 
-set(MISTY_GUI_DFS_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/dfs/client/misty_client.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/dfs/client/misty_client.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/dfs/file_manager.h"
-)
-
 set(MISTY_SERVER_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/dfs/server/server.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/dfs/server/misty_impl.cpp"
@@ -49,7 +43,6 @@ set(MISTY_APP_SOURCES
     ${MISTY_CORE_SOURCES}
     ${MISTY_PANEL_SOURCES}
     ${MISTY_VIEW_SOURCES}
-    ${MISTY_GUI_DFS_SOURCES}
 )
 
 if(WIN32)
@@ -89,7 +82,6 @@ target_compile_definitions(misty PRIVATE $<$<CONFIG:Debug>:MISTY_DEBUG_BUILD=1>)
 misty_configure_plugin_host(misty)
 target_link_libraries(misty
     PRIVATE
-        misty_proto
         glfw
         lunasvg
         OpenGL::GL

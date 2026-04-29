@@ -54,6 +54,7 @@ struct ActiveFileDrag {
     int last_source_frame = -100;
     int last_mouse_down_frame = -100;
     int preview_drawn_frame = -100;
+    int last_prominent_target_hover_frame = -100;
     bool drop_consumed = false;
 };
 
@@ -74,39 +75,45 @@ bool has_active_file_drag() {
             g_active_file_drag.last_mouse_down_frame >= frame - 1);
 }
 
-float drag_hover_progress(const std::string& target_path) {
-    if (g_active_file_drag.hover_path != target_path) {
-        return 0.0f;
-    }
-    const auto elapsed = std::chrono::steady_clock::now() - g_active_file_drag.hover_started_at;
-    const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count();
-    return std::clamp(static_cast<float>(elapsed_ms) /
-                          static_cast<float>(kDragHoverNavigateDelay.count()),
-                      0.0f,
-                      1.0f);
+bool has_imgui_file_drag_payload() {
+    const ImGuiPayload* payload = ImGui::GetDragDropPayload();
+    return payload != nullptr && payload->IsDataType(kFileDragPayloadType);
 }
 
-void draw_drag_hover_highlight(const ImVec2& min, const ImVec2& max, bool prominent, float progress) {
+bool has_file_drag_context() {
+    return has_active_file_drag() || has_imgui_file_drag_payload();
+}
+
+const ImGuiPayload* accept_file_drag_payload_for_current_item() {
+    const ImGuiPayload* payload = ImGui::GetDragDropPayload();
+    if (payload == nullptr || !payload->IsDataType(kFileDragPayloadType)) {
+        return nullptr;
+    }
+
+    const ImGuiPayload* accepted_payload = nullptr;
+    if (ImGui::BeginDragDropTarget()) {
+        accepted_payload = ImGui::AcceptDragDropPayload(
+            kFileDragPayloadType,
+            ImGuiDragDropFlags_AcceptBeforeDelivery |
+                ImGuiDragDropFlags_AcceptNoDrawDefaultRect |
+                ImGuiDragDropFlags_AcceptNoPreviewTooltip);
+        ImGui::EndDragDropTarget();
+    }
+    return accepted_payload;
+}
+
+bool prominent_drag_target_hovered_this_frame() {
+    return g_active_file_drag.last_prominent_target_hover_frame == ImGui::GetFrameCount();
+}
+
+void draw_drag_navigation_hover_feedback(const ImVec2& min, const ImVec2& max) {
     ImDrawList* dl = ImGui::GetWindowDrawList();
     const float pulse = 0.5f + 0.5f * std::sin(static_cast<float>(ImGui::GetTime() * 9.0));
-    const int fill_alpha = prominent ? static_cast<int>(44.0f + 28.0f * pulse)
-                                     : static_cast<int>(24.0f + 18.0f * pulse);
-    const ImU32 fill = IM_COL32(59, 130, 246, fill_alpha);
-    const ImU32 stroke = prominent ? IM_COL32(96, 165, 250, 240) : IM_COL32(96, 165, 250, 200);
-    const float rounding = prominent ? 6.0f : 2.0f;
-    dl->AddRectFilled(min, max, fill, rounding);
-    dl->AddRect(min, max, stroke, rounding, 0, prominent ? 2.0f : 1.5f);
-
-    if (progress > 0.0f) {
-        const float bar_h = prominent ? 3.0f : 2.0f;
-        const ImVec2 bar_min(min.x + 2.0f, max.y - bar_h - 2.0f);
-        const ImVec2 bar_max(max.x - 2.0f, max.y - 2.0f);
-        dl->AddRectFilled(bar_min, bar_max, IM_COL32(24, 24, 27, 150), bar_h);
-        dl->AddRectFilled(bar_min,
-                          ImVec2(bar_min.x + (bar_max.x - bar_min.x) * progress, bar_max.y),
-                          IM_COL32(147, 197, 253, 255),
-                          bar_h);
-    }
+    const int fill_alpha = static_cast<int>(14.0f + 18.0f * pulse);
+    const int stroke_alpha = static_cast<int>(105.0f + 95.0f * pulse);
+    const float rounding = 4.0f;
+    dl->AddRectFilled(min, max, IM_COL32(255, 255, 255, fill_alpha), rounding);
+    dl->AddRect(min, max, IM_COL32(255, 255, 255, stroke_alpha), rounding, 0, 1.5f);
 }
 
 std::vector<UnifiedFileItem> selected_drag_items(const FileExplorerState& state) {
@@ -140,6 +147,18 @@ bool same_drag_items(const std::vector<UnifiedFileItem>& lhs, const std::vector<
 bool active_drag_contains_path(const std::string& path) {
     return std::any_of(g_active_file_drag.items.begin(), g_active_file_drag.items.end(),
         [&](const UnifiedFileItem& item) { return item.path == path; });
+}
+
+bool mouse_in_rect(const ImVec2& min, const ImVec2& max) {
+    const ImVec2 mouse = ImGui::GetIO().MousePos;
+    return mouse.x >= min.x && mouse.x <= max.x && mouse.y >= min.y && mouse.y <= max.y;
+}
+
+bool show_open_folder_for_drag_hover(const UnifiedFileItem& file, const ImVec2& min, const ImVec2& max) {
+    return file.is_dir &&
+           has_file_drag_context() &&
+           mouse_in_rect(min, max) &&
+           !active_drag_contains_path(file.path);
 }
 
 void draw_file_drag_preview(const FileExplorerState& state) {
@@ -231,9 +250,9 @@ int compare_strings(const std::string& lhs, const std::string& rhs) {
     return 0;
 }
 
-std::string icon_name_for_file(const FileExplorerState& state, const UnifiedFileItem& file) {
+std::string icon_name_for_file(const FileExplorerState& state, const UnifiedFileItem& file, bool open_directory) {
     if (state.is_downloading(file.path)) return "download-16";
-    if (file.is_dir) return "file-directory-fill-16";
+    if (file.is_dir) return open_directory ? "file-directory-open-fill-24" : "file-directory-fill-16";
 
     std::string ext = fs::path(file.name).extension().string();
     if (ext == ".cpp" || ext == ".h" || ext == ".hpp" || ext == ".c" || ext == ".cc" ||
@@ -251,6 +270,10 @@ std::string icon_name_for_file(const FileExplorerState& state, const UnifiedFile
         return "file-zip-16";
     }
     return "file-16";
+}
+
+std::string icon_name_for_file(const FileExplorerState& state, const UnifiedFileItem& file) {
+    return icon_name_for_file(state, file, false);
 }
 
 const char* sync_icon_name_for_item(const UnifiedFileItem& file) {
@@ -365,15 +388,22 @@ void FileExplorerPanel::handle_file_drop_target(FileExplorerState& state,
                                                 const ImVec2& min,
                                                 const ImVec2& max,
                                                 bool prominent,
-                                                bool auto_navigate) {
-    if (dest_dir.empty() || max.x <= min.x || max.y <= min.y || !has_active_file_drag()) {
+                                                bool auto_navigate,
+                                                bool draw_hover_feedback) {
+    if (dest_dir.empty() || max.x <= min.x || max.y <= min.y || !has_file_drag_context()) {
         return;
     }
 
-    const ImVec2 mouse = ImGui::GetIO().MousePos;
-    const bool hovered = mouse.x >= min.x && mouse.x <= max.x && mouse.y >= min.y && mouse.y <= max.y;
-    if (!hovered) {
+    if (!mouse_in_rect(min, max)) {
         return;
+    }
+
+    const ImGuiPayload* accepted_payload = accept_file_drag_payload_for_current_item();
+    if (prominent) {
+        g_active_file_drag.last_prominent_target_hover_frame = ImGui::GetFrameCount();
+    }
+    if (prominent && draw_hover_feedback) {
+        draw_drag_navigation_hover_feedback(min, max);
     }
 
     const auto now = std::chrono::steady_clock::now();
@@ -381,9 +411,6 @@ void FileExplorerPanel::handle_file_drop_target(FileExplorerState& state,
         g_active_file_drag.hover_path = dest_dir;
         g_active_file_drag.hover_started_at = now;
     }
-
-    const float progress = auto_navigate ? drag_hover_progress(dest_dir) : 0.0f;
-    draw_drag_hover_highlight(min, max, prominent, progress);
 
     if (auto_navigate &&
         !active_drag_contains_path(dest_dir) &&
@@ -394,7 +421,8 @@ void FileExplorerPanel::handle_file_drop_target(FileExplorerState& state,
         return;
     }
 
-    if (!ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+    const bool payload_delivered = accepted_payload != nullptr && accepted_payload->IsDelivery();
+    if (!payload_delivered && !ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
         return;
     }
 
@@ -420,13 +448,20 @@ void FileExplorerPanel::handle_drag_navigation_target(FileExplorerState& state,
                                                       bool prominent,
                                                       std::function<void()> navigate_callback) {
     (void)state;
-    if (target_path.empty() || max.x <= min.x || max.y <= min.y || !has_active_file_drag()) {
+    if (target_path.empty() || max.x <= min.x || max.y <= min.y || !has_file_drag_context()) {
         return;
     }
 
-    const ImVec2 mouse = ImGui::GetIO().MousePos;
-    if (mouse.x < min.x || mouse.x > max.x || mouse.y < min.y || mouse.y > max.y) {
+    if (!mouse_in_rect(min, max)) {
         return;
+    }
+
+    accept_file_drag_payload_for_current_item();
+    if (prominent) {
+        g_active_file_drag.last_prominent_target_hover_frame = ImGui::GetFrameCount();
+    }
+    if (prominent) {
+        draw_drag_navigation_hover_feedback(min, max);
     }
 
     const auto now = std::chrono::steady_clock::now();
@@ -435,7 +470,6 @@ void FileExplorerPanel::handle_drag_navigation_target(FileExplorerState& state,
         g_active_file_drag.hover_started_at = now;
     }
 
-    draw_drag_hover_highlight(min, max, prominent, drag_hover_progress(target_path));
     if (g_active_file_drag.auto_navigated_path == target_path ||
         now - g_active_file_drag.hover_started_at < kDragHoverNavigateDelay) {
         return;
@@ -469,6 +503,8 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state) {
             auto& clipboard = registry_.get_state<ClipboardState>("Clipboard");
             if (clipboard.has_content()) perform_paste(state);
         }
+        if (CommandManager::get().matches("explorer.undo")) perform_undo(state);
+        if (CommandManager::get().matches("explorer.redo")) perform_redo(state);
         if (CommandManager::get().matches("explorer.delete") && !state.selected_files.empty()) perform_delete_selected(state);
         if (CommandManager::get().matches("explorer.rename") && !state.selected_files.empty()) initiate_rename(state);
         if (CommandManager::get().matches("explorer.refresh")) {
@@ -568,7 +604,7 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state) {
         }
     }
 
-    if (!ImGui::IsAnyItemHovered()) {
+    if (!prominent_drag_target_hovered_this_frame() && !ImGui::IsAnyItemHovered()) {
         handle_file_drop_target(state, std::string(state.current_path), overlay_min, overlay_max, false, false);
     }
     draw_file_drag_preview(state);
@@ -651,8 +687,6 @@ void FileExplorerPanel::show_file_item(FileExplorerState& state, int i) {
     const UnifiedFileItem& file = state.files[i];
     bool is_selected = state.selected_files.count(file.id) > 0;
 
-    auto& icon = AssetManager::get().get_svg_texture(icon_name_for_file(state, file), 16);
-
     float row_height = 32.0f;
     ImGui::TableNextRow(ImGuiTableRowFlags_None, row_height);
     ImGui::TableNextColumn();
@@ -686,8 +720,10 @@ void FileExplorerPanel::show_file_item(FileExplorerState& state, int i) {
                                 row_min,
                                 row_max,
                                 true,
-                                true);
+                                true,
+                                false);
     }
+    const bool show_open_folder_icon = show_open_folder_for_drag_hover(file, row_min, row_max);
 
     if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)) {
         if (file.is_dir) {
@@ -713,6 +749,7 @@ void FileExplorerPanel::show_file_item(FileExplorerState& state, int i) {
     float content_padding_y = (row_height - 16.0f) / 2.0f;
     ImVec2 icon_p = ImVec2(p.x + 4.0f, p.y + content_padding_y);
     ImGui::SetCursorScreenPos(icon_p);
+    auto& icon = AssetManager::get().get_svg_texture(icon_name_for_file(state, file, show_open_folder_icon), 16);
     if (icon.id != 0) {
         ImU32 icon_col = file.is_dir ? IM_COL32(230, 191, 76, 255) : IM_COL32(100, 170, 230, 255);
         ImGui::GetWindowDrawList()->AddImage(icon.id, icon_p, ImVec2(icon_p.x + 16, icon_p.y + 16), ImVec2(0, 0), ImVec2(1, 1), icon_col);
@@ -771,7 +808,6 @@ void FileExplorerPanel::show_grid_item(FileExplorerState& state, int i, float ce
     ImGuiIO& io = ImGui::GetIO();
     const UnifiedFileItem& file = state.files[i];
     bool is_selected = state.selected_files.count(file.id) > 0;
-    auto& icon = AssetManager::get().get_svg_texture(icon_name_for_file(state, file), 32);
 
     ImVec2 cell_pos = ImGui::GetCursorScreenPos();
     std::string btn_id = "##grid_" + file.id;
@@ -788,6 +824,8 @@ void FileExplorerPanel::show_grid_item(FileExplorerState& state, int i, float ce
     const float icon_size = 32.0f;
     float icon_x = cell_pos.x + (cell_w - icon_size) * 0.5f;
     float icon_y = cell_pos.y + 10.0f;
+    const bool show_open_folder_icon = show_open_folder_for_drag_hover(file, cell_pos, cell_max);
+    auto& icon = AssetManager::get().get_svg_texture(icon_name_for_file(state, file, show_open_folder_icon), 32);
     if (icon.id != 0) {
         ImU32 icon_col = file.is_dir ? IM_COL32(230, 191, 76, 255) : IM_COL32(100, 170, 230, 255);
         dl->AddImage(icon.id, ImVec2(icon_x, icon_y), ImVec2(icon_x + icon_size, icon_y + icon_size), ImVec2(0, 0), ImVec2(1, 1), icon_col);
@@ -827,7 +865,7 @@ void FileExplorerPanel::show_grid_item(FileExplorerState& state, int i, float ce
     if (clicked) select_item(state, file, i, is_selected, io);
     begin_file_drag_source(state, file, i, is_selected);
     if (file.is_dir) {
-        handle_file_drop_target(state, file.path, cell_pos, cell_max, true, true);
+        handle_file_drop_target(state, file.path, cell_pos, cell_max, true, true, false);
     }
 
     if (double_clicked) {

@@ -75,6 +75,24 @@ namespace misty::panel {
             return haystack.find(normalized_query) != std::string::npos;
         }
 
+        std::vector<ServicesPanel::ProviderInfo> provider_snapshot(ServicesState& state) {
+            std::lock_guard<std::mutex> lock(state.mu);
+            if (state.provider_types.empty()) {
+                return ServicesPanel::supported_providers();
+            }
+
+            std::vector<ServicesPanel::ProviderInfo> providers;
+            providers.reserve(state.provider_types.size());
+            for (const auto& provider : state.provider_types) {
+                if (provider.type.empty()) continue;
+                providers.push_back({
+                    provider.type,
+                    provider.display_name.empty() ? provider.type : provider.display_name,
+                });
+            }
+            return providers;
+        }
+
         core::ButtonColors neutral_button_theme() {
             core::ButtonColors colors;
             colors.button = ImVec4(0.23f, 0.23f, 0.24f, 1.0f);
@@ -83,6 +101,15 @@ namespace misty::panel {
             colors.text = ImVec4(0.94f, 0.94f, 0.95f, 1.0f);
             colors.rounding = 8.0f;
             return colors;
+        }
+
+        std::string ellipsize_path_text(const std::string& text, float max_width) {
+            if (text.empty() || ImGui::CalcTextSize(text.c_str()).x <= max_width) return text;
+            static constexpr const char* kEllipsis = "...";
+            const std::size_t keep = std::min<std::size_t>(text.size(), 28);
+            std::string compact = kEllipsis + text.substr(text.size() - keep);
+            if (ImGui::CalcTextSize(compact.c_str()).x <= max_width) return compact;
+            return ellipsize_text(text, max_width);
         }
     } // namespace
 
@@ -167,7 +194,7 @@ namespace misty::panel {
         ImGui::Spacing();
         core::ColoredText(ImVec4(0.82f, 0.82f, 0.84f, 1.0f), "%zu connected", connection_count);
         ImGui::SameLine(0.0f, 18.0f);
-        core::ColoredText(ImVec4(0.58f, 0.58f, 0.62f, 1.0f), "%zu providers", supported_providers().size());
+        core::ColoredText(ImVec4(0.58f, 0.58f, 0.62f, 1.0f), "%zu providers", provider_snapshot(state).size());
         ImGui::SameLine(0.0f, 18.0f);
         core::ColoredText(ImVec4(0.66f, 0.66f, 0.69f, 1.0f),
                           "%s", is_refreshing ? "Refreshing remotes" : "Ready");
@@ -327,16 +354,99 @@ namespace misty::panel {
     }
 
     void ServicesPanel::show_add_account_section(ServicesState& state) {
-        const float add_button_width = 136.0f;
-        ImGui::PushItemWidth(std::max(180.0f, ImGui::GetContentRegionAvail().x - add_button_width - kCardSpacing));
+        RcloneHealth rclone_health;
+        bool proxy_restart_in_flight = false;
+        {
+            std::lock_guard<std::mutex> lock(state.mu);
+            rclone_health = state.rclone_health;
+            proxy_restart_in_flight = state.proxy_restart_in_flight;
+        }
+
+        if (!rclone_health.loaded) {
+            state.refresh_rclone_health();
+        }
+
+        const ImVec4 panel_bg = rclone_health.ready
+            ? ImVec4(0.15f, 0.18f, 0.15f, 1.0f)
+            : ImVec4(0.18f, 0.14f, 0.14f, 1.0f);
+        const ImVec4 heading_color = rclone_health.ready
+            ? ImVec4(0.90f, 0.95f, 0.90f, 1.0f)
+            : ImVec4(0.96f, 0.90f, 0.90f, 1.0f);
+        const ImVec4 detail_color = rclone_health.ready
+            ? ImVec4(0.68f, 0.76f, 0.68f, 1.0f)
+            : ImVec4(0.82f, 0.72f, 0.72f, 1.0f);
+
+        ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 10.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16.0f, 14.0f));
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, panel_bg);
+        if (ImGui::BeginChild("##rclone_health", ImVec2(0.0f, 92.0f), true,
+                              ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse)) {
+            const char* status_title = rclone_health.loading
+                ? "Checking rclone"
+                : (rclone_health.ready ? "rclone ready" : "rclone required");
+            core::ColoredText(heading_color, "%s", status_title);
+            ImGui::Spacing();
+
+            if (rclone_health.loading) {
+                core::ColoredText(detail_color, "Waiting for proxy health status...");
+            } else if (rclone_health.ready) {
+                const std::string version = rclone_health.rclone_version.empty()
+                    ? "External rclone detected."
+                    : "Version " + rclone_health.rclone_version;
+                core::ColoredText(detail_color, "%s", version.c_str());
+                if (!rclone_health.rclone_path.empty()) {
+                    core::ColoredText(detail_color, "%s",
+                                      ellipsize_path_text(rclone_health.rclone_path, core::AvailableWidth()).c_str());
+                }
+                if (rclone_health.link_present && !rclone_health.link_path.empty()) {
+                    std::string managed = "Managed link: " + rclone_health.link_path;
+                    core::ColoredText(detail_color, "%s",
+                                      ellipsize_path_text(managed, core::AvailableWidth()).c_str());
+                }
+            } else {
+                const std::string message = !rclone_health.error.empty()
+                    ? rclone_health.error
+                    : "Misty could not find an rclone binary.";
+                core::ColoredText(detail_color, "%s", message.c_str());
+                if (!rclone_health.link_path.empty()) {
+                    std::string hint = "Expected link: " + rclone_health.link_path;
+                    core::ColoredText(detail_color, "%s",
+                                      ellipsize_path_text(hint, core::AvailableWidth()).c_str());
+                }
+            }
+        }
+        ImGui::EndChild();
+        ImGui::PopStyleColor();
+        ImGui::PopStyleVar(2);
+
+        ImGui::Spacing();
+        ImGui::PushItemWidth(core::AvailableWidth());
         ImGui::InputTextWithHint("##services_search", "Search connected services", remote_search_buf_,
                                  sizeof(remote_search_buf_));
         ImGui::PopItemWidth();
-        ImGui::SameLine(0.0f, kCardSpacing);
-        if (core::StyledButton("Add Service", ImVec2(add_button_width, 0.0f), core::ButtonTheme::Primary())) {
+        ImGui::Spacing();
+
+        const bool disable_add = !rclone_health.loading && rclone_health.loaded && !rclone_health.ready;
+        const float action_width = (core::AvailableWidth() - kCardSpacing) * 0.5f;
+        if (disable_add) ImGui::BeginDisabled();
+        if (core::StyledButton("Add Service", ImVec2(action_width, 0.0f), core::ButtonTheme::Primary())) {
             provider_search_buf_[0] = '\0';
+            state.refresh_provider_types();
+            state.refresh_rclone_health(true);
             state.show_login_modal = true;
         }
+        if (disable_add) ImGui::EndDisabled();
+        ImGui::SameLine(0.0f, kCardSpacing);
+        if (core::StyledButton("Check", ImVec2(action_width, 0.0f), neutral_button_theme())) {
+            state.refresh_rclone_health(true);
+        }
+
+        ImGui::Spacing();
+        if (proxy_restart_in_flight) ImGui::BeginDisabled();
+        if (core::StyledButton("Restart Proxy", ImVec2(core::FillWidth(), 0.0f), neutral_button_theme())) {
+            state.restart_proxy();
+        }
+        if (proxy_restart_in_flight) ImGui::EndDisabled();
     }
 
     void ServicesPanel::show_login_modal(ServicesState& state) {
@@ -381,7 +491,8 @@ namespace misty::panel {
             ImGui::PopItemWidth();
 
             size_t visible_count = 0;
-            for (const auto& provider : supported_providers()) {
+            const auto providers = provider_snapshot(state);
+            for (const auto& provider : providers) {
                 if (!matches_provider_filter(provider.type, provider.display_name, provider_search_buf_)) {
                     continue;
                 }

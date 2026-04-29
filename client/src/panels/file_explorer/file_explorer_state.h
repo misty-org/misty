@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <vector>
 #include <string>
 #include <stack>
@@ -131,6 +132,33 @@ namespace misty::panel {
         inline std::pair<std::string, std::string> parse_remote_name_and_path(const std::string& path) {
             auto info = parse_remote_path(path);
             return { info.remote_name, info.relative_path };
+        }
+
+        inline std::string strip_trailing_separators(std::string path) {
+            while (path.size() > 1 && (path.back() == '/' || path.back() == '\\')) {
+                if (path.size() == 3 && path[1] == ':') {
+                    break;
+                }
+                path.pop_back();
+            }
+            return path;
+        }
+
+        inline std::string normalize_for_history(const std::string& path) {
+            if (path.empty() || path.rfind("misty://", 0) == 0) {
+                return strip_trailing_separators(path);
+            }
+
+            std::error_code ec;
+            fs::path normalized = fs::weakly_canonical(fs::path(path), ec);
+            if (ec) {
+                normalized = fs::path(path).lexically_normal();
+            }
+            return strip_trailing_separators(normalized.generic_string());
+        }
+
+        inline bool same_history_path(const std::string& lhs, const std::string& rhs) {
+            return normalize_for_history(lhs) == normalize_for_history(rhs);
         }
 
         // Split a path into components

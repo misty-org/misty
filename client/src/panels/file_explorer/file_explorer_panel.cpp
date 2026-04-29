@@ -216,10 +216,10 @@ namespace misty::panel {
             workspace_state.fetch_workspaces_async(worker_pool_);
         }
 
-        // Use workspace mount path if available, otherwise fall back to client mount path
+        // Use workspace mount path if available, otherwise fall back to the mount root.
         std::string start_path = workspace_state.get_current_mount_path();
-        if (start_path.empty() && client_) {
-            start_path = client_->GetClientMountPath();
+        if (start_path.empty()) {
+            start_path = path_utils::get_mount_root();
         }
 
         if (!initial_path_override.empty()) {
@@ -443,11 +443,11 @@ namespace misty::panel {
         if (!update_history) return;
 
         std::string current_path_str(state.current_path);
-        if (!current_path_str.empty() && current_path_str != target_path) {
+        if (!current_path_str.empty() && !path_utils::same_history_path(current_path_str, target_path)) {
             state.back_history.push(current_path_str);
-        }
-        while (!state.forward_history.empty()) {
-            state.forward_history.pop();
+            while (!state.forward_history.empty()) {
+                state.forward_history.pop();
+            }
         }
     }
 

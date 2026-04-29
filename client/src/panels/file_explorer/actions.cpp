@@ -54,6 +54,15 @@ namespace misty::panel {
             }
         }
 
+        void purge_from_starred(FileExplorerState& state, const std::string& path) {
+            auto it = std::remove_if(state.starred_files.begin(), state.starred_files.end(),
+                [&](const UnifiedFileItem& f) { return f.path == path; });
+            if (it != state.starred_files.end()) {
+                state.starred_files.erase(it, state.starred_files.end());
+                state.dirty_ = true;
+            }
+        }
+
         fs::path normalized_path(const fs::path& path) {
             std::error_code ec;
             fs::path normalized = fs::weakly_canonical(path, ec);
@@ -79,6 +88,231 @@ namespace misty::panel {
                 }
             }
             return true;
+        }
+
+        FileOperationRecord make_single_item_record(FileOperationKind kind,
+                                                    const fs::path& source,
+                                                    const fs::path& destination,
+                                                    bool is_dir,
+                                                    std::string description) {
+            FileOperationRecord record;
+            record.kind = kind;
+            record.origin_dir = source.parent_path().string();
+            record.destination_dir = destination.parent_path().string();
+            record.description = std::move(description);
+            record.items.push_back({
+                source.string(),
+                destination.string(),
+                destination.filename().string(),
+                is_dir
+            });
+            return record;
+        }
+
+        std::string item_label(const FileOperationItem& item, const fs::path& fallback) {
+            if (!item.display_name.empty()) {
+                return item.display_name;
+            }
+            if (!fallback.filename().empty()) {
+                return fallback.filename().string();
+            }
+            return fallback.string();
+        }
+
+        void set_journal_error(std::string* error_message, const std::string& message) {
+            if (error_message) {
+                *error_message = message;
+            }
+        }
+
+        bool unsafe_remove_target(const fs::path& path) {
+            if (path.empty()) {
+                return true;
+            }
+
+            const fs::path normalized = normalized_path(path);
+            return normalized.empty() || normalized == normalized.root_path();
+        }
+
+        bool ensure_parent_directory(const fs::path& path, std::string* error_message) {
+            const fs::path parent = path.parent_path();
+            if (parent.empty()) {
+                return true;
+            }
+
+            std::error_code ec;
+            if (fs::exists(parent, ec)) {
+                if (!fs::is_directory(parent, ec)) {
+                    set_journal_error(error_message, "Parent path is not a folder: " + parent.string());
+                    return false;
+                }
+                return true;
+            }
+
+            fs::create_directories(parent, ec);
+            if (ec) {
+                set_journal_error(error_message, "Could not create parent folder " + parent.string() + ": " + ec.message());
+                return false;
+            }
+            return true;
+        }
+
+        bool validate_move_without_overwrite(const FileOperationItem& item,
+                                             const fs::path& source,
+                                             const fs::path& destination,
+                                             std::string* error_message) {
+            if (source.empty() || destination.empty()) {
+                set_journal_error(error_message, "Operation record is missing a path.");
+                return false;
+            }
+            if (is_same_path(source, destination)) {
+                return true;
+            }
+
+            std::error_code ec;
+            if (!fs::exists(source, ec)) {
+                set_journal_error(error_message, "Cannot move " + item_label(item, source) + ": source no longer exists.");
+                return false;
+            }
+            if (fs::exists(destination, ec)) {
+                set_journal_error(error_message, "Cannot move " + item_label(item, destination) + ": destination already exists.");
+                return false;
+            }
+            if (!ensure_parent_directory(destination, error_message)) {
+                return false;
+            }
+            return true;
+        }
+
+        bool move_path_without_overwrite(const FileOperationItem& item,
+                                         const fs::path& source,
+                                         const fs::path& destination,
+                                         std::string* error_message) {
+            if (!validate_move_without_overwrite(item, source, destination, error_message)) {
+                return false;
+            }
+            if (is_same_path(source, destination)) {
+                return true;
+            }
+
+            std::error_code ec;
+            fs::rename(source, destination, ec);
+            if (ec) {
+                set_journal_error(error_message, "Could not move " + item_label(item, source) + ": " + ec.message());
+                return false;
+            }
+            return true;
+        }
+
+        bool copy_path_without_overwrite(const FileOperationItem& item,
+                                         const fs::path& source,
+                                         const fs::path& destination,
+                                         std::string* error_message) {
+            if (source.empty() || destination.empty()) {
+                set_journal_error(error_message, "Operation record is missing a path.");
+                return false;
+            }
+            if (is_same_path(source, destination)) {
+                set_journal_error(error_message, "Cannot redo copy of " + item_label(item, source) + ": source and destination are the same path.");
+                return false;
+            }
+
+            std::error_code ec;
+            if (!fs::exists(source, ec)) {
+                set_journal_error(error_message, "Cannot copy " + item_label(item, source) + ": source no longer exists.");
+                return false;
+            }
+            if (fs::exists(destination, ec)) {
+                set_journal_error(error_message, "Cannot copy " + item_label(item, destination) + ": destination already exists.");
+                return false;
+            }
+            if (!ensure_parent_directory(destination, error_message)) {
+                return false;
+            }
+
+            const bool source_is_dir = item.is_dir || fs::is_directory(source, ec);
+            ec.clear();
+            if (source_is_dir) {
+                fs::copy(source, destination, fs::copy_options::recursive, ec);
+            } else {
+                fs::copy_file(source, destination, fs::copy_options::none, ec);
+            }
+            if (ec) {
+                set_journal_error(error_message, "Could not copy " + item_label(item, source) + ": " + ec.message());
+                return false;
+            }
+            return true;
+        }
+
+        bool remove_copy_destination(FileExplorerState& state,
+                                     const FileOperationItem& item,
+                                     std::string* error_message) {
+            const fs::path destination(item.destination_path);
+            if (unsafe_remove_target(destination)) {
+                set_journal_error(error_message, "Refusing to remove unsafe path while undoing copy.");
+                return false;
+            }
+            if (!item.source_path.empty() && is_same_path(fs::path(item.source_path), destination)) {
+                set_journal_error(error_message, "Refusing to remove copy destination because it matches the source path.");
+                return false;
+            }
+
+            std::error_code ec;
+            if (!fs::exists(destination, ec)) {
+                return true;
+            }
+
+            fs::remove_all(destination, ec);
+            if (ec) {
+                set_journal_error(error_message, "Could not remove copied " + item_label(item, destination) + ": " + ec.message());
+                return false;
+            }
+            purge_from_recent(state, destination.string());
+            purge_from_starred(state, destination.string());
+            return true;
+        }
+
+        bool validate_record_moves(const FileOperationRecord& record,
+                                   bool undo_direction,
+                                   std::string* error_message) {
+            for (const auto& item : record.items) {
+                const fs::path source = undo_direction
+                    ? fs::path(item.destination_path)
+                    : fs::path(item.source_path);
+                const fs::path destination = undo_direction
+                    ? fs::path(item.source_path)
+                    : fs::path(item.destination_path);
+                if (!validate_move_without_overwrite(item, source, destination, error_message)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        UnifiedFileItem make_local_operation_item(const fs::path& path,
+                                                  const FileOperationItem& source_item,
+                                                  SyncStatus status = SyncStatus::LOCAL) {
+            UnifiedFileItem item;
+            item.path = path.string();
+            item.id = item.path;
+            item.name = path.filename().empty() ? item_label(source_item, path) : path.filename().string();
+            std::error_code ec;
+            item.is_dir = fs::is_directory(path, ec);
+            if (ec) {
+                item.is_dir = source_item.is_dir;
+            }
+            item.source = FileSource::LOCAL;
+            item.status = status;
+            item.state_code = status == SyncStatus::DELETED ? "DEL" : "LOC";
+            return item;
+        }
+
+        void remove_trash_listing(FileExplorerState& state, const std::string& path) {
+            auto it = std::remove_if(state.trash_files.begin(), state.trash_files.end(),
+                [&](const UnifiedFileItem& item) { return item.path == path; });
+            if (it != state.trash_files.end()) {
+                state.trash_files.erase(it, state.trash_files.end());
+            }
         }
     }
 
@@ -194,6 +428,12 @@ namespace misty::panel {
             auto& notif = registry_.get_state<NotificationState>("Notifications");
             std::string action = (op == ClipboardOp::COPY) ? "Copied" : "Moved";
             notif.add_notification(action + " " + item.name);
+            record_file_operation(make_single_item_record(
+                op == ClipboardOp::COPY ? FileOperationKind::CopyLocal : FileOperationKind::MoveLocal,
+                src,
+                dest,
+                item.is_dir,
+                action + " " + item.name));
         }
     }
 
@@ -238,7 +478,6 @@ namespace misty::panel {
             activity.add_entry("File", "Paste failed: " + ec.message(), ActivityEntryType::ERROR);
             return;
         }
-
         // Queue into sidebar upload queue
         std::string remote_name;
         std::string remote_path;
@@ -299,6 +538,12 @@ namespace misty::panel {
                 auto& notif = registry_.get_state<NotificationState>("Notifications");
                 std::string action = (op == ClipboardOp::COPY) ? "Copied" : "Moved";
                 notif.add_notification(action + " " + item.name);
+                record_file_operation(make_single_item_record(
+                    op == ClipboardOp::COPY ? FileOperationKind::CopyLocal : FileOperationKind::MoveLocal,
+                    src,
+                    dest,
+                    item.is_dir,
+                    action + " " + item.name));
             }
             return;
         }
@@ -383,6 +628,206 @@ namespace misty::panel {
         }
     }
 
+    void FileExplorerPanel::record_file_operation(FileOperationRecord record) {
+        if (record.items.empty()) {
+            return;
+        }
+        auto& journal = registry_.get_state<FileOperationJournalState>("FileOperationJournal");
+        journal.push(std::move(record));
+    }
+
+    void FileExplorerPanel::perform_undo(FileExplorerState& state) {
+        auto& journal = registry_.get_state<FileOperationJournalState>("FileOperationJournal");
+        const FileOperationRecord* record = journal.peek_undo();
+        if (record == nullptr) {
+            auto& notif = registry_.get_state<NotificationState>("Notifications");
+            notif.add_notification("Nothing to undo");
+            return;
+        }
+        const std::string origin_dir = record->origin_dir;
+        const std::string destination_dir = record->destination_dir;
+        const std::string description = record->description.empty()
+            ? file_operation_kind_label(record->kind)
+            : record->description;
+
+        std::string error;
+        if (!undo_file_operation(state, *record, &error)) {
+            auto& activity = registry_.get_state<ActivityState>("Activity");
+            activity.add_entry("File", error.empty() ? "Undo is not implemented for this operation yet." : error,
+                ActivityEntryType::ERROR);
+            return;
+        }
+
+        FileOperationRecord completed;
+        if (journal.take_undo(completed)) {
+            journal.complete_undo(std::move(completed));
+        }
+        state.selected_files.clear();
+        navigate_to_path(std::string(state.current_path), false);
+        notify_shared_path_refresh(std::string(state.current_path));
+        if (!origin_dir.empty()) {
+            notify_shared_path_refresh(origin_dir);
+        }
+        if (!destination_dir.empty() && destination_dir != origin_dir) {
+            notify_shared_path_refresh(destination_dir);
+        }
+        auto& notif = registry_.get_state<NotificationState>("Notifications");
+        notif.add_notification("Undid " + description);
+    }
+
+    void FileExplorerPanel::perform_redo(FileExplorerState& state) {
+        auto& journal = registry_.get_state<FileOperationJournalState>("FileOperationJournal");
+        const FileOperationRecord* record = journal.peek_redo();
+        if (record == nullptr) {
+            auto& notif = registry_.get_state<NotificationState>("Notifications");
+            notif.add_notification("Nothing to redo");
+            return;
+        }
+        const std::string origin_dir = record->origin_dir;
+        const std::string destination_dir = record->destination_dir;
+        const std::string description = record->description.empty()
+            ? file_operation_kind_label(record->kind)
+            : record->description;
+
+        std::string error;
+        if (!redo_file_operation(state, *record, &error)) {
+            auto& activity = registry_.get_state<ActivityState>("Activity");
+            activity.add_entry("File", error.empty() ? "Redo is not implemented for this operation yet." : error,
+                ActivityEntryType::ERROR);
+            return;
+        }
+
+        FileOperationRecord completed;
+        if (journal.take_redo(completed)) {
+            journal.complete_redo(std::move(completed));
+        }
+        state.selected_files.clear();
+        navigate_to_path(std::string(state.current_path), false);
+        notify_shared_path_refresh(std::string(state.current_path));
+        if (!origin_dir.empty()) {
+            notify_shared_path_refresh(origin_dir);
+        }
+        if (!destination_dir.empty() && destination_dir != origin_dir) {
+            notify_shared_path_refresh(destination_dir);
+        }
+        auto& notif = registry_.get_state<NotificationState>("Notifications");
+        notif.add_notification("Redid " + description);
+    }
+
+    bool FileExplorerPanel::undo_file_operation(FileExplorerState& state,
+                                                const FileOperationRecord& record,
+                                                std::string* error_message) {
+        (void)state;
+        switch (record.kind) {
+            case FileOperationKind::CopyLocal:
+                for (auto it = record.items.rbegin(); it != record.items.rend(); ++it) {
+                    if (!remove_copy_destination(state, *it, error_message)) {
+                        return false;
+                    }
+                }
+                return true;
+            case FileOperationKind::MoveLocal:
+            case FileOperationKind::RenameLocal:
+                if (!validate_record_moves(record, true, error_message)) {
+                    return false;
+                }
+                for (auto it = record.items.rbegin(); it != record.items.rend(); ++it) {
+                    const fs::path source(it->source_path);
+                    const fs::path destination(it->destination_path);
+                    if (!move_path_without_overwrite(*it, destination, source, error_message)) {
+                        return false;
+                    }
+                    state.track_move(destination.string(), make_local_operation_item(source, *it));
+                }
+                return true;
+            case FileOperationKind::TrashLocal:
+                if (!validate_record_moves(record, true, error_message)) {
+                    return false;
+                }
+                for (auto it = record.items.rbegin(); it != record.items.rend(); ++it) {
+                    const fs::path source(it->source_path);
+                    const fs::path trash_path(it->destination_path);
+                    if (!move_path_without_overwrite(*it, trash_path, source, error_message)) {
+                        return false;
+                    }
+                    remove_trash_listing(state, trash_path.string());
+                    state.track_move(trash_path.string(), make_local_operation_item(source, *it));
+                }
+                return true;
+            case FileOperationKind::UploadToRemote:
+            case FileOperationKind::DownloadFromRemote:
+            case FileOperationKind::RemoteDelete:
+            case FileOperationKind::PermanentDeleteLocal:
+            case FileOperationKind::Custom:
+                break;
+        }
+
+        if (error_message) {
+            *error_message = "Undo is only available for local copy, move, rename, and trash operations right now.";
+        }
+        return false;
+    }
+
+    bool FileExplorerPanel::redo_file_operation(FileExplorerState& state,
+                                                const FileOperationRecord& record,
+                                                std::string* error_message) {
+        (void)state;
+        switch (record.kind) {
+            case FileOperationKind::CopyLocal:
+                for (const auto& item : record.items) {
+                    if (!copy_path_without_overwrite(item,
+                            fs::path(item.source_path),
+                            fs::path(item.destination_path),
+                            error_message)) {
+                        return false;
+                    }
+                }
+                return true;
+            case FileOperationKind::MoveLocal:
+            case FileOperationKind::RenameLocal:
+                if (!validate_record_moves(record, false, error_message)) {
+                    return false;
+                }
+                for (const auto& item : record.items) {
+                    const fs::path source(item.source_path);
+                    const fs::path destination(item.destination_path);
+                    if (!move_path_without_overwrite(item, source, destination, error_message)) {
+                        return false;
+                    }
+                    state.track_move(source.string(), make_local_operation_item(destination, item));
+                }
+                return true;
+            case FileOperationKind::TrashLocal:
+                if (!validate_record_moves(record, false, error_message)) {
+                    return false;
+                }
+                for (const auto& item : record.items) {
+                    const fs::path source(item.source_path);
+                    const fs::path trash_path(item.destination_path);
+                    if (!move_path_without_overwrite(item, source, trash_path, error_message)) {
+                        return false;
+                    }
+                    UnifiedFileItem trash_item = make_local_operation_item(trash_path, item, SyncStatus::DELETED);
+                    trash_item.name = item_label(item, trash_path);
+                    state.move_to_trash(trash_item);
+                    state.track_move(source.string(), trash_item);
+                    purge_from_recent(state, source.string());
+                }
+                return true;
+            case FileOperationKind::UploadToRemote:
+            case FileOperationKind::DownloadFromRemote:
+            case FileOperationKind::RemoteDelete:
+            case FileOperationKind::PermanentDeleteLocal:
+            case FileOperationKind::Custom:
+                break;
+        }
+
+        if (error_message) {
+            *error_message = "Redo is only available for local copy, move, rename, and trash operations right now.";
+        }
+        return false;
+    }
+
     void FileExplorerPanel::perform_copy(FileExplorerState& state) {
         auto& clipboard = registry_.get_state<ClipboardState>("Clipboard");
         clipboard.op = ClipboardOp::COPY;
@@ -451,6 +896,10 @@ namespace misty::panel {
 
         std::vector<DeleteTarget> remote_targets;
         std::vector<std::string> permission_paths;
+        FileOperationRecord local_trash_record;
+        local_trash_record.kind = FileOperationKind::TrashLocal;
+        local_trash_record.origin_dir = std::string(state.current_path);
+        local_trash_record.description = "Moved items to trash";
         size_t local_success_count = 0;
         for (const auto& target : targets) {
             bool is_cloud = target.item.source == FileSource::REMOTE;
@@ -479,6 +928,12 @@ namespace misty::panel {
                      state.track_move(target.path, item);
                      purge_from_recent(state, target.path);
                      state.selected_files.erase(target.id);
+                     local_trash_record.items.push_back({
+                         target.path,
+                         trash_path,
+                         target.item.name,
+                         target.item.is_dir
+                     });
                      ++local_success_count;
                 }
             }
@@ -487,6 +942,7 @@ namespace misty::panel {
         if (local_success_count > 0) {
             auto& notif = registry_.get_state<NotificationState>("Notifications");
             notif.add_notification("Deleted " + std::to_string(local_success_count) + (local_success_count == 1 ? " item" : " items"));
+            record_file_operation(std::move(local_trash_record));
         }
 
         if (!permission_paths.empty()) {
@@ -604,6 +1060,10 @@ namespace misty::panel {
 
         size_t success_count = 0;
         std::vector<std::string> permission_paths;
+        FileOperationRecord local_trash_record;
+        local_trash_record.kind = FileOperationKind::TrashLocal;
+        local_trash_record.origin_dir = std::string(state.current_path);
+        local_trash_record.description = "Cleared local copies";
         for (const auto& target : targets) {
             std::error_code ec;
             const std::string trash_path = unique_trash_target_path(target.path);
@@ -625,6 +1085,12 @@ namespace misty::panel {
             state.move_to_trash(trashed);
             purge_from_recent(state, target.path);
             state.selected_files.erase(target.id);
+            local_trash_record.items.push_back({
+                target.path,
+                trash_path,
+                target.item.name,
+                target.item.is_dir
+            });
             ++success_count;
 
             // Flip the DB row to local_exists=false immediately so the next
@@ -640,6 +1106,7 @@ namespace misty::panel {
         if (success_count > 0) {
             auto& notif = registry_.get_state<NotificationState>("Notifications");
             notif.add_notification("Cleared local copy of " + std::to_string(success_count) + (success_count == 1 ? " item" : " items"));
+            record_file_operation(std::move(local_trash_record));
         }
         if (!permission_paths.empty()) {
             state.permission_delete_paths = std::move(permission_paths);

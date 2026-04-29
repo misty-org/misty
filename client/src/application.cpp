@@ -150,12 +150,7 @@ namespace misty {
     }
 
     void Application::init_client() {
-        std::string mount_path = core::EnvManager::get().get("MISTY_MOUNT_PATH", "");
-        std::string channel_address = core::EnvManager::get().get("MISTY_GRPC_ADDRESS", "");
-
-        if (mount_path.empty() || channel_address.empty()) {
-            throw std::runtime_error("Misty is not configured (missing mount path or gRPC address in ~/misty/config/misty.json).");
-        }
+        client_.reset();
     }
 
     void Application::init_views() {
