@@ -104,6 +104,22 @@ void clear_scoped_search(SearchState& search_state) {
     search_state.api_search_done = true;
     search_state.last_submitted_query.clear();
 }
+
+void discard_current_history_entries(std::stack<std::string>& history, const std::string& current_path) {
+    while (!history.empty() && path_utils::same_history_path(history.top(), current_path)) {
+        history.pop();
+    }
+}
+
+void push_history_entry_if_distinct(std::stack<std::string>& history, const std::string& path) {
+    if (path.empty()) {
+        return;
+    }
+    if (!history.empty() && path_utils::same_history_path(history.top(), path)) {
+        return;
+    }
+    history.push(path);
+}
 } // namespace
 
 void FileExplorerPanel::show_inline_search(FileExplorerState& state, SearchState& search_state) {
@@ -165,27 +181,59 @@ void FileExplorerPanel::show_nav_history(FileExplorerState& state, float button_
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6.0f, 6.0f));
 
+    const std::string current_path(state.current_path);
+    discard_current_history_entries(state.back_history, current_path);
+    discard_current_history_entries(state.forward_history, current_path);
+
     bool can_back = !state.back_history.empty();
+    std::string back_target;
+    if (can_back) back_target = state.back_history.top();
     if (!can_back) ImGui::BeginDisabled();
     if (ImGui::Button("<", ImVec2(button_width, 0)) && !state.back_history.empty()) {
-        state.forward_history.push(std::string(state.current_path));
+        push_history_entry_if_distinct(state.forward_history, current_path);
         std::string target = state.back_history.top();
         state.back_history.pop();
         navigate_to_path(target, false);
     }
     if (!can_back) ImGui::EndDisabled();
+    if (can_back) {
+        const ImVec2 min = ImGui::GetItemRectMin();
+        const ImVec2 max = ImGui::GetItemRectMax();
+        handle_drag_navigation_target(state, back_target, min, max, true, [this, &state, back_target]() {
+            if (state.back_history.empty()) return;
+            push_history_entry_if_distinct(state.forward_history, std::string(state.current_path));
+            if (state.back_history.top() == back_target) {
+                state.back_history.pop();
+            }
+            navigate_to_path(back_target, false);
+        });
+    }
 
     ImGui::SameLine(0, spacing);
 
     bool can_fwd = !state.forward_history.empty();
+    std::string forward_target;
+    if (can_fwd) forward_target = state.forward_history.top();
     if (!can_fwd) ImGui::BeginDisabled();
     if (ImGui::Button(">", ImVec2(button_width, 0)) && !state.forward_history.empty()) {
-        state.back_history.push(std::string(state.current_path));
+        push_history_entry_if_distinct(state.back_history, current_path);
         std::string target = state.forward_history.top();
         state.forward_history.pop();
         navigate_to_path(target, false);
     }
     if (!can_fwd) ImGui::EndDisabled();
+    if (can_fwd) {
+        const ImVec2 min = ImGui::GetItemRectMin();
+        const ImVec2 max = ImGui::GetItemRectMax();
+        handle_drag_navigation_target(state, forward_target, min, max, true, [this, &state, forward_target]() {
+            if (state.forward_history.empty()) return;
+            push_history_entry_if_distinct(state.back_history, std::string(state.current_path));
+            if (state.forward_history.top() == forward_target) {
+                state.forward_history.pop();
+            }
+            navigate_to_path(forward_target, false);
+        });
+    }
 
     ImGui::SameLine(0, spacing);
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.21f, 0.21f, 0.21f, 1.0f));
@@ -442,6 +490,12 @@ void FileExplorerPanel::show_breadcrumb_bar(FileExplorerState& state) {
             navigate_to_path(breadcrumbs[index].target_path, true, false);
         }
         if (is_active) ImGui::EndDisabled();
+        handle_file_drop_target(state,
+                                breadcrumbs[index].target_path,
+                                ImGui::GetItemRectMin(),
+                                ImGui::GetItemRectMax(),
+                                true,
+                                !is_active);
     }
     ImGui::EndChild();
     ImGui::PopStyleVar(2);

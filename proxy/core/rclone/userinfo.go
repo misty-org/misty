@@ -9,8 +9,6 @@ import (
 	"net/http"
 	"strings"
 	"time"
-
-	"github.com/rclone/rclone/fs/config"
 )
 
 // userInfoTimeout is the cap we put on email-resolution HTTP calls. The
@@ -30,12 +28,12 @@ const userInfoTimeout = 10 * time.Second
 func ResolveUserEmail(ctx context.Context, name string) (string, error) {
 	Init()
 
-	remoteType, _ := config.FileGetValue(name, "type")
+	remoteType := GetRemoteType(name)
 	if remoteType == "" {
 		return "", fmt.Errorf("remote %q has no type", name)
 	}
 
-	tokenStr, _ := config.FileGetValue(name, "token")
+	tokenStr, _ := getConfigValue(name, "token")
 	if tokenStr == "" {
 		// local, sftp, s3 with static creds — nothing OAuth-shaped to read.
 		return "", nil

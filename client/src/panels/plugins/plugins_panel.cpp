@@ -1,9 +1,9 @@
-#include "panels/extensions/extensions_panel.h"
+#include "panels/plugins/plugins_panel.h"
 
 #include <algorithm>
 #include <sstream>
 
-#include "core/extensions/plugin_host.h"
+#include "core/plugins/plugin_host.h"
 #include "core/manager/asset_manager.h"
 #include "core/ui/imgui_utils.h"
 #include "imgui.h"
@@ -30,32 +30,14 @@ void render_badge(const std::string& text, const ImVec4& color) {
     ImGui::PopStyleVar(2);
 }
 
-std::string action_summary(const misty::core::ExtensionFileAction& action) {
-    std::ostringstream summary;
-    summary << action.title;
-    if (!action.extensions.empty()) {
-        summary << "  ";
-        for (std::size_t i = 0; i < action.extensions.size(); ++i) {
-            if (i > 0) {
-                summary << ", ";
-            }
-            summary << action.extensions[i];
-        }
-    }
-    return summary.str();
-}
-
 } // namespace
 
-ExtensionsPanel::ExtensionsPanel(core::UIRegistry& ui_registry)
+PluginsPanel::PluginsPanel(core::UIRegistry& ui_registry)
     : ui_registry_(ui_registry) {
 }
 
-void ExtensionsPanel::render() {
-    auto& file_action_manager = core::ExtensionManager::get();
+void PluginsPanel::render() {
     auto& plugin_host = core::PluginHost::get();
-    const auto file_action_extensions = file_action_manager.installed_extensions();
-    const auto file_action_roots = file_action_manager.discovery_roots();
     const auto plugins = plugin_host.loaded_plugins();
     const auto plugin_roots = plugin_host.discovery_roots();
 
@@ -68,11 +50,11 @@ void ExtensionsPanel::render() {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(24.0f, 24.0f));
 
     if (ImGui::Begin("Plugins", nullptr, flags)) {
-        render_header(file_action_extensions.size(), plugins.size());
+        render_header(plugins.size());
         ImGui::Spacing();
         render_plugin_roots(plugin_roots);
         ImGui::Spacing();
-        if (ImGui::BeginChild("ExtensionsList", ImVec2(0, 0), false)) {
+        if (ImGui::BeginChild("PluginsList", ImVec2(0, 0), false)) {
             if (!plugins.empty()) {
                 {
                     core::CustomFont title_font(core::AssetManager::get().get_font(core::FontID::ROBOTO_BOLD));
@@ -85,23 +67,8 @@ void ExtensionsPanel::render() {
                 }
             }
 
-            ImGui::Separator();
-            ImGui::Spacing();
-            render_file_action_roots(file_action_roots);
-            ImGui::Spacing();
-
-            if (file_action_extensions.empty()) {
-                render_empty_state(file_action_roots);
-            } else {
-                {
-                    core::CustomFont title_font(core::AssetManager::get().get_font(core::FontID::ROBOTO_BOLD));
-                    ImGui::Text("File Action Extensions");
-                }
-                ImGui::Spacing();
-                for (const auto& extension : file_action_extensions) {
-                    render_extension_card(extension);
-                    ImGui::Spacing();
-                }
+            if (plugins.empty()) {
+                render_empty_state(plugin_roots);
             }
             ImGui::EndChild();
         }
@@ -112,8 +79,8 @@ void ExtensionsPanel::render() {
     ImGui::PopStyleColor();
 }
 
-void ExtensionsPanel::render_header(std::size_t file_action_count, std::size_t plugin_count) {
-    if (ImGui::BeginTable("ExtensionsHeader", 2, ImGuiTableFlags_SizingStretchProp)) {
+void PluginsPanel::render_header(std::size_t plugin_count) {
+    if (ImGui::BeginTable("PluginsHeader", 2, ImGuiTableFlags_SizingStretchProp)) {
         ImGui::TableSetupColumn("Title", ImGuiTableColumnFlags_WidthStretch, 1.0f);
         ImGui::TableSetupColumn("Action", ImGuiTableColumnFlags_WidthFixed, 96.0f);
         ImGui::TableNextRow();
@@ -123,12 +90,11 @@ void ExtensionsPanel::render_header(std::size_t file_action_count, std::size_t p
             core::CustomFont title_font(core::AssetManager::get().get_font(core::FontID::ROBOTO_BOLD_LARGE));
             ImGui::Text("Plugins");
         }
-        ImGui::TextDisabled("%zu file-action, %zu plugin", file_action_count, plugin_count);
+        ImGui::TextDisabled("%zu plugin", plugin_count);
 
         ImGui::TableSetColumnIndex(1);
         ImGui::SetCursorPosX(std::max(0.0f, ImGui::GetContentRegionAvail().x - 96.0f));
         if (core::StyledButton("Reload", ImVec2(96.0f, 0.0f), core::ButtonTheme::Primary())) {
-            core::ExtensionManager::get().reload();
             core::PluginHost::get().reload();
         }
 
@@ -136,29 +102,22 @@ void ExtensionsPanel::render_header(std::size_t file_action_count, std::size_t p
     }
 }
 
-void ExtensionsPanel::render_file_action_roots(const std::vector<std::string>& roots) {
-    ImGui::TextDisabled("File-action roots");
-    for (const auto& root : roots) {
-        ImGui::BulletText("%s", root.c_str());
-    }
-}
-
-void ExtensionsPanel::render_plugin_roots(const std::vector<std::string>& roots) {
+void PluginsPanel::render_plugin_roots(const std::vector<std::string>& roots) {
     ImGui::TextDisabled("Plugin roots");
     for (const auto& root : roots) {
         ImGui::BulletText("%s", root.c_str());
     }
 }
 
-void ExtensionsPanel::render_empty_state(const std::vector<std::string>& roots) {
+void PluginsPanel::render_empty_state(const std::vector<std::string>& roots) {
     ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 12.0f);
     ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.16f, 0.16f, 0.18f, 1.0f));
 
-    if (ImGui::BeginChild("ExtensionsEmpty", ImVec2(0, 180.0f), true)) {
+    if (ImGui::BeginChild("PluginsEmpty", ImVec2(0, 180.0f), true)) {
         core::CustomFont title_font(core::AssetManager::get().get_font(core::FontID::ROBOTO_BOLD));
-        ImGui::Text("No extensions discovered");
+        ImGui::Text("No plugins discovered");
         ImGui::Spacing();
-        ImGui::TextWrapped("Drop an extension folder with a manifest into one of the discovery roots to make it available here.");
+        ImGui::TextWrapped("Drop a plugin folder with a manifest into one of the discovery roots to make it available here.");
         if (!roots.empty()) {
             ImGui::Spacing();
             ImGui::TextDisabled("Suggested location");
@@ -171,7 +130,7 @@ void ExtensionsPanel::render_empty_state(const std::vector<std::string>& roots) 
     ImGui::PopStyleVar();
 }
 
-void ExtensionsPanel::render_plugin_card(const core::PluginInfo& plugin) {
+void PluginsPanel::render_plugin_card(const core::PluginInfo& plugin) {
     const float base_height = 180.0f + (plugin.commands.empty() ? 0.0f : 24.0f * plugin.commands.size()) +
         (plugin.panels.empty() ? 0.0f : 24.0f * plugin.panels.size()) +
         (plugin.diagnostics.empty() ? 0.0f : 20.0f * plugin.diagnostics.size());
@@ -277,67 +236,7 @@ void ExtensionsPanel::render_plugin_card(const core::PluginInfo& plugin) {
     ImGui::PopStyleVar();
 }
 
-void ExtensionsPanel::render_extension_card(const core::InstalledExtension& extension) {
-    const float action_rows = static_cast<float>(std::max<std::size_t>(1, extension.file_actions.size()));
-    const float card_height = 160.0f + (action_rows * 24.0f);
-    const std::string card_id = "extension_card_" + extension.id;
-
-    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 12.0f);
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.16f, 0.16f, 0.18f, 1.0f));
-
-    if (ImGui::BeginChild(card_id.c_str(), ImVec2(0, card_height), true)) {
-        core::CustomFont title_font(core::AssetManager::get().get_font(core::FontID::ROBOTO_BOLD));
-        ImGui::Text("%s", extension.name.c_str());
-        ImGui::SameLine();
-        ImGui::TextDisabled("v%s", extension.version.c_str());
-
-        render_badge(extension.bundled ? "Bundled" : "User", badge_color(extension.bundled));
-        ImGui::SameLine();
-        render_badge(extension.enabled ? "Enabled" : "Disabled", badge_color(extension.enabled));
-
-        if (!extension.author.empty()) {
-            ImGui::TextDisabled("By %s", extension.author.c_str());
-        } else {
-            ImGui::TextDisabled("%s", extension.id.c_str());
-        }
-
-        if (!extension.description.empty()) {
-            ImGui::Spacing();
-            ImGui::TextWrapped("%s", extension.description.c_str());
-        }
-
-        ImGui::Spacing();
-        ImGui::Separator();
-        ImGui::Spacing();
-
-        ImGui::TextDisabled("File actions");
-        if (extension.file_actions.empty()) {
-            ImGui::TextWrapped("This extension is installed but does not expose any file actions.");
-        } else {
-            for (const auto& action : extension.file_actions) {
-                ImGui::BulletText("%s", action_summary(action).c_str());
-                if (!action.description.empty()) {
-                    ImGui::TextDisabled("%s", action.description.c_str());
-                }
-            }
-        }
-
-        if (!extension.platforms.empty()) {
-            ImGui::Spacing();
-            ImGui::TextDisabled("Platforms: %s", join_strings(extension.platforms).c_str());
-        }
-
-        ImGui::Spacing();
-        ImGui::TextDisabled("Path");
-        ImGui::TextWrapped("%s", extension.extension_dir.c_str());
-    }
-    ImGui::EndChild();
-
-    ImGui::PopStyleColor();
-    ImGui::PopStyleVar();
-}
-
-std::string ExtensionsPanel::join_strings(const std::vector<std::string>& values) {
+std::string PluginsPanel::join_strings(const std::vector<std::string>& values) {
     std::ostringstream joined;
     for (std::size_t i = 0; i < values.size(); ++i) {
         if (i > 0) {

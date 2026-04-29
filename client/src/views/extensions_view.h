@@ -3,7 +3,7 @@
 #include <memory>
 
 #include "core/ui/ui_registry.h"
-#include "panels/extensions/extensions_panel.h"
+#include "panels/plugins/plugins_panel.h"
 #include "panels/navbar/navbar_panel.h"
 #include "panels/notification/notification_panel.h"
 #include "views/app_view.h"
@@ -23,7 +23,7 @@ private:
 
     core::UIRegistry& ui_registry_;
     std::shared_ptr<panel::NavbarPanel> navbar_panel_;
-    std::shared_ptr<panel::ExtensionsPanel> extensions_panel_;
+    std::shared_ptr<panel::PluginsPanel> plugins_panel_;
     std::shared_ptr<panel::NotificationPanel> notification_panel_;
 };
 

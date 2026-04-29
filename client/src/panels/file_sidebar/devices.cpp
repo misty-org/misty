@@ -1,5 +1,6 @@
 #include "file_sidebar_panel.h"
 
+#include "core/system/util.h"
 #include "panels/file_explorer/file_explorer_state.h"
 
 #include <algorithm>
@@ -41,21 +42,6 @@ namespace {
             col);
 
         return clicked;
-    }
-
-    static std::string format_bytes(uint64_t bytes) {
-        if (bytes == 0) return "";
-        if (bytes < 1024ULL * 1024)
-            return std::to_string(bytes / 1024) + " KB";
-        double gb = static_cast<double>(bytes) / (1024.0 * 1024.0 * 1024.0);
-        if (gb >= 1.0) {
-            char buf[32];
-            std::snprintf(buf, sizeof(buf), "%.1f GB", gb);
-            return buf;
-        }
-        char buf[32];
-        std::snprintf(buf, sizeof(buf), "%.0f MB", static_cast<double>(bytes) / (1024.0 * 1024.0));
-        return buf;
     }
 
 }
@@ -216,7 +202,7 @@ namespace misty::panel {
 
                 std::string info = dev.fs_type;
                 if (dev.total_bytes > 0)
-                    info += "  ·  " + format_bytes(dev.free_bytes) + " free";
+                    info += "  ·  " + core::format_bytes(dev.free_bytes) + " free";
                 dl->AddText(ImGui::GetFont(), ImGui::GetFontSize() * 0.85f,
                             ImVec2(cursor.x + 8.0f, cursor.y + 22.0f),
                             IM_COL32(130, 130, 130, 255), info.c_str());

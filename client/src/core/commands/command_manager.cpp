@@ -43,6 +43,8 @@ const std::vector<DefaultCommandEntry>& default_command_entries() {
         {"explorer.copy", MISTY_PRIMARY_SHORTCUT "+C"},
         {"explorer.cut", MISTY_PRIMARY_SHORTCUT "+X"},
         {"explorer.paste", MISTY_PRIMARY_SHORTCUT "+V"},
+        {"explorer.undo", MISTY_PRIMARY_SHORTCUT "+Z"},
+        {"explorer.redo", MISTY_PRIMARY_SHORTCUT "+Shift+Z"},
         {"explorer.delete", "Delete"},
         {"explorer.rename", "F2"},
         {"explorer.refresh", MISTY_PRIMARY_SHORTCUT "+R"},

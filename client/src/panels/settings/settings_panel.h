@@ -1,9 +1,10 @@
 #pragma once
 
-#include <string>
+#include <cstddef>
 
 #include "core/ui/ui_registry.h"
 #include "panels/settings/settings_state.h"
+#include "core/ui/imgui_utils.h"
 
 namespace misty::panel {
 
@@ -15,35 +16,31 @@ namespace misty::panel {
         void render();
 
     private:
-        void render_sidebar(SettingsState& state, float width);
-        void render_content(SettingsState& state);
-
-        void render_account(SettingsState& state);
-        void render_general(SettingsState& state);
-        void render_sync(SettingsState& state);
-        void render_vault(SettingsState& state);
-        void render_storage(SettingsState& state);
-        void render_connection(SettingsState& state);
-        void render_ai(SettingsState& state);
-        void render_shortcuts(SettingsState& state);
-        void render_about(SettingsState& state);
-
-        // Helpers
-        void render_section_button(const char* label, SettingsSection section, SettingsState& state, float width);
-        void render_section_header(const char* title);
-        void render_section_subtitle(const char* subtitle);
-        void render_section_intro(const char* title, const char* subtitle);
-        void render_subsection_header(const char* title);
-        void render_value_row(const char* label, const std::string& value);
-        void render_toggle_row(const char* label, const char* subtitle, bool& value);
-        bool render_action_row(const char* label, const char* subtitle, const char* action_label,
-                               float action_width = 132.0f, bool primary = false, bool danger = false);
-        void render_status_bar(SettingsState& state);
-        void sync_account_buffers(SettingsState& state);
-        void ensure_connection_config_loaded(SettingsState& state);
-        void set_status(SettingsState& state, std::string message, float seconds = 3.0f, bool is_error = false);
+        void divider(float height);
+        void sidebar(SettingsState& state, float width);
+        void section_button(SettingsSection section,
+                            SettingsState& state,
+                            const core::ButtonFields& fields);
+        void account(SettingsState& state);
+        void general();
+        void content_header(const char* title);
+        void group_header(const char* title);
+        void settings_row(const char* label,
+                          const char* value,
+                          bool enabled = true,
+                          bool muted_value = false);
+        void profile_header(const char* display_name, const char* email, const char* note);
+        bool text_input_row(const char* label,
+                            char* buffer,
+                            std::size_t buffer_size,
+                            const char* action_label = nullptr);
+        void readonly_input_row(const char* label, const char* value, const char* helper = nullptr);
+        bool action_row(const char* label,
+                        const char* subtitle,
+                        const char* action_label,
+                        bool enabled = true);
 
         core::UIRegistry& registry_;
     };
 
-} // namespace misty::panel
+}

@@ -1,11 +1,14 @@
 #pragma once
 
+#include <cstdint>
 #include <filesystem>
 #include <string>
 #include <map>
 #include <vector>
 
 namespace misty::core {
+    std::string format_bytes(uint64_t bytes);
+    std::string format_bytes(int64_t bytes);
     bool open_file_in_browser(const std::string& path);
     bool open_path_default(const std::string& path);
     bool open_path_with_application(const std::string& application_path, const std::string& target_path);
@@ -21,5 +24,8 @@ namespace misty::core {
                                  const std::string& working_directory,
                                  const std::string& stdout_path,
                                  const std::string& stderr_path);
+    
+    uint64_t get_directory_size(const std::string& dir_path);
+    std::string default_string(const std::string& value, const char* fallback);
 
 }
