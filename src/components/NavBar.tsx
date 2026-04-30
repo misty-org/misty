@@ -28,6 +28,7 @@ export default function Navbar() {
   const me = useUserStore((s) => s.me);
 
   const displayName = me?.name ?? user?.name ?? "";
+  const isDocsPage = location.pathname.startsWith("/docs");
   const initials = displayName
     ? displayName.split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2)
     : user?.email?.[0]?.toUpperCase() ?? "";
@@ -61,13 +62,13 @@ export default function Navbar() {
     <nav className="fixed top-0 left-0 right-0 z-50 transition-all duration-300 bg-[#07090b]">
       <div
         style={{
-          maxWidth: location.pathname === "/" ? "1000px" : "100%",
+          maxWidth: location.pathname === "/" ? "1060px" : "100%",
           transition: "max-width 0.5s cubic-bezier(0.4, 0, 0.2, 1)",
         }}
-        className="w-full mx-auto px-4 h-16 flex items-center justify-between"
+        className={`w-full mx-auto h-16 flex items-center justify-between ${isDocsPage ? "px-4" : "px-3 sm:px-4"}`}
       >
         <NavLink to="/" className="group flex items-center gap-1">
-          <img src="/misty.png" alt="Misty logo" className="w-12 h-12" />
+          <img src="/misty.png" alt="Misty logo" className="w-13 h-13" />
           <span className="text-lg font-semibold text-text tracking-tight">Misty</span>
         </NavLink>
 

@@ -1,7 +1,7 @@
 import PricingHeader from "./PricingHeader";
 import PricingCard from "./PricingCard";
 import PricingQA from "./PricingFooter";
-import { liteFeatures, proFeatures, maxFeatures } from "./data";
+import { freeFeatures, personalFeatures, unlimitedFeatures } from "./data";
 import { useAuth } from "../../AuthContext";
 
 export default function Pricing() {
@@ -16,40 +16,37 @@ export default function Pricing() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 pt-32 pb-20">
+    <div className="max-w-7xl mx-auto px-3 sm:px-4 pt-32 pb-20">
       <PricingHeader />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-20 items-stretch">
         <PricingCard
-          name="Lite"
+          name="Free"
           price="Free"
-          description="Everything you need to get started."
-          features={liteFeatures}
+          description="A lightweight starting point for one provider."
+          features={freeFeatures}
           ctaTo="/download"
-          ctaLabel="Download"
+          ctaLabel="Download Free"
         />
         <PricingCard
-          name="Pro"
-          price="$30"
-          period="per device"
-          description="Full power on the devices you use most."
-          features={proFeatures}
-          ctaHref={buildStripeLink(import.meta.env.VITE_STRIPE_LINK_PRO)}
-          ctaTo={user ? undefined : "/signin"}
-          ctaLabel="Get Pro"
-          inherits="Lite"
+          name="Personal"
+          price="$25"
+          period="up to 5 devices"
+          description="A generous paid plan for one person across the devices they actually use."
+          features={personalFeatures}
+          ctaTo={user ? "/download" : "/signin"}
+          ctaLabel="Start 14-day Free Trial"
           popular
         />
         <PricingCard
-          name="Max"
+          name="Unlimited"
           price="$89"
           period="unlimited devices"
-          description="Every device, every platform, every feature."
-          features={maxFeatures}
-          ctaHref={buildStripeLink(import.meta.env.VITE_STRIPE_LINK_MAX)}
+          description="No limits, premium support, and faster bug-fix updates as your setup grows."
+          features={unlimitedFeatures}
+          ctaHref={buildStripeLink(import.meta.env.VITE_STRIPE_LINK_UNLIMITED ?? import.meta.env.VITE_STRIPE_LINK_MAX)}
           ctaTo={user ? undefined : "/signin"}
-          ctaLabel="Get Max"
-          inherits="Pro"
+          ctaLabel="Get Unlimited"
         />
       </div>
 

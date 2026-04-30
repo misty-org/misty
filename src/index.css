@@ -22,8 +22,15 @@
 }
 
 html {
+  font-size: 17px;
   scroll-behavior: auto;
   overflow-y: scroll;
+}
+
+@media (max-width: 639px) {
+  html {
+    font-size: 16.5px;
+  }
 }
 
 body {

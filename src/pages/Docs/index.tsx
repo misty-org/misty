@@ -10,7 +10,7 @@ const guideCategories: Category[] = [
   { key: "providers", label: "Providers", ids: ["providers-overview", "google-drive", "onedrive", "s3-sftp"] },
   { key: "backups", label: "Backups", ids: ["backups-overview", "snapshots", "restore"] },
   { key: "search", label: "Search", ids: ["search-overview", "indexing", "search-workflows"] },
-  { key: "plugins", label: "Plugins", ids: ["plugins-overview", "building-plugins", "cli"] },
+  { key: "plugins", label: "Plugins", ids: ["plugins-overview", "building-plugins"] },
   { key: "mistyai", label: "MistyAI", ids: ["mistyai-overview", "ask-mistyai", "mistyai-actions"] },
 ];
 

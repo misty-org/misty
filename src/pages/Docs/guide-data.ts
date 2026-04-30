@@ -9,7 +9,7 @@ export const guideSections: Section[] = [
     prose: [
       "Misty is a file manager that brings your local and cloud storage into one native app. Instead of jumping between browser tabs and separate tools, you can browse, move, and manage everything in one place.",
       "At its core, Misty uses a local proxy that connects directly to multiple cloud providers. That proxy runs on your machine, and your data never passes through a Misty server.",
-      "Alongside file management, Misty includes a plugin system for custom workflows, encrypted Vault backups powered by restic, a Gemini-powered AI assistant that understands your files, Tailscale support for secure remote access, and a CLI for working from the terminal.",
+      "Alongside file management, Misty includes a plugin system for custom workflows, encrypted Vault backups powered by restic, a Gemini-powered AI assistant that understands your files, and Tailscale support for secure remote access.",
       "The desktop client is built with C++ and ImGui for a fast native experience. The local proxy communicates with the app over HTTP on localhost, so everything stays on your machine."
     ],
     notes: [
@@ -50,7 +50,7 @@ export const guideSections: Section[] = [
     title: "Setup",
     prose: [
       "After installation, the fastest path is to sign in, connect one provider, and let Misty build its first index in the background.",
-      "You can expand later into multiple providers, backups, plugins, or command line workflows without having to redo the initial setup.",
+      "You can expand later into multiple providers, backups, plugins, or remote access workflows without having to redo the initial setup.",
       "If you are migrating from another workflow, start small and verify the basics first.",
     ],
     notes: [
@@ -217,20 +217,6 @@ export const guideSections: Section[] = [
     ],
     notes: [
       { kind: "note", text: "Start small and useful. A focused plugin almost always lands better than a broad one." },
-    ],
-  },
-  {
-    id: "cli",
-    label: "Using the command line",
-    category: "plugins",
-    title: "Using the command line",
-    prose: [
-      "Misty includes a CLI that wraps the local proxy so you can work with your files from the terminal when that feels faster.",
-      "This is useful for scripting, quick checks, and workflows that already live in shell tools.",
-      "The CLI works best when you treat it as an extension of the app rather than a separate product.",
-    ],
-    notes: [
-      { kind: "tip", text: "Use the CLI when you want quick automation or terminal based workflows without giving up the Misty model." },
     ],
   },
   {

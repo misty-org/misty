@@ -51,7 +51,7 @@ export default function Changelog() {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   return (
-    <div className="max-w-4xl mx-auto px-4 pt-32 pb-20">
+    <div className="max-w-5xl mx-auto px-3 sm:px-4 pt-32 pb-20">
       <div className="mb-12">
         <h1 className="text-3xl md:text-5xl font-bold text-text mb-4">
           Changelog
