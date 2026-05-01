@@ -22,9 +22,10 @@ namespace misty::panel {
                             SettingsState& state,
                             const core::ButtonFields& fields);
         void account(SettingsState& state);
-        void general();
+        void general(SettingsState& state);
         void content_header(const char* title);
         void group_header(const char* title);
+        void status_message(SettingsState& state);
         void settings_row(const char* label,
                           const char* value,
                           bool enabled = true,
@@ -39,6 +40,10 @@ namespace misty::panel {
                         const char* subtitle,
                         const char* action_label,
                         bool enabled = true);
+        bool toggle_row(const char* label,
+                        const char* subtitle,
+                        bool* value);
+        bool theme_row(SettingsState& state);
 
         core::UIRegistry& registry_;
     };

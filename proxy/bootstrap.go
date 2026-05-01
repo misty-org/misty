@@ -67,6 +67,7 @@ func ensureMistyHomeLayout() error {
 		filepath.Join(root, "config"),
 		filepath.Join(root, "db"),
 		filepath.Join(root, "mnt"),
+		filepath.Join(root, "tmp"),
 		filepath.Join(root, "tailscale"),
 		filepath.Join(root, "minidfs", "tailscale"),
 		filepath.Join(root, "rclone"),

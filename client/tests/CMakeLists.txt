@@ -9,6 +9,7 @@ if(BUILD_TESTING AND (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STRE
             "${CMAKE_SOURCE_DIR}/src/core/sync/fs_watcher.h"
             "${CMAKE_SOURCE_DIR}/src/core/threading/worker_pool.cpp"
             "${CMAKE_SOURCE_DIR}/src/panels/file_explorer/file_explorer_state.cpp"
+            "${CMAKE_SOURCE_DIR}/src/panels/activity/activity_state.cpp"
             "${CMAKE_SOURCE_DIR}/src/panels/activity/upload_state.cpp"
             "${CMAKE_SOURCE_DIR}/src/panels/activity/download_state.cpp"
         )

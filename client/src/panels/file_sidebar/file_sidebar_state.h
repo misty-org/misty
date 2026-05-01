@@ -21,6 +21,8 @@ namespace misty::panel {
         std::string error_message;
         std::string remote_name;   // rclone remote name for the upload target
         std::string remote_path;   // path within the remote
+        bool cleanup_after_upload = false;
+        std::string cleanup_path;
     };
 
     struct FileSidebarState : public core::UIState {

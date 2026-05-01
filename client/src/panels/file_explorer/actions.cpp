@@ -10,6 +10,8 @@
 #include "core/net/http_client.h"
 #include "core/manager/env_manager.h"
 #include <algorithm>
+#include <atomic>
+#include <chrono>
 #include <cstdlib>
 #include <cstdio>
 #include <system_error>
@@ -22,6 +24,46 @@ namespace misty::panel {
             if (!ec) return false;
             return ec == std::make_error_code(std::errc::permission_denied) ||
                    ec == std::make_error_code(std::errc::operation_not_permitted);
+        }
+
+        bool can_use_local_mirror(const UnifiedFileItem& item) {
+            if (item.path.empty()) {
+                return false;
+            }
+            if (item.source != FileSource::REMOTE) {
+                return true;
+            }
+            return item.status == SyncStatus::SYNCED ||
+                   item.status == SyncStatus::MODIFIED ||
+                   fs::exists(item.path);
+        }
+
+        bool is_cross_device_error(const std::error_code& ec) {
+            return ec == std::make_error_code(std::errc::cross_device_link);
+        }
+
+        bool copy_path_then_remove_source(const fs::path& src, const fs::path& dest, std::error_code& ec) {
+            ec.clear();
+            if (fs::is_directory(src)) {
+                fs::copy(src, dest, fs::copy_options::recursive, ec);
+            } else {
+                fs::copy_file(src, dest, ec);
+            }
+            if (ec) {
+                return false;
+            }
+
+            std::error_code remove_ec;
+            if (fs::is_directory(src)) {
+                fs::remove_all(src, remove_ec);
+            } else {
+                fs::remove(src, remove_ec);
+            }
+            if (remove_ec) {
+                ec = remove_ec;
+                return false;
+            }
+            return true;
         }
 
         std::string local_trash_dir() {
@@ -43,6 +85,115 @@ namespace misty::panel {
                     (source.stem().string() + "_" + std::to_string(counter++) + source.extension().string())).string();
             }
             return target;
+        }
+
+        fs::path unique_child_path(const std::string& dest_dir, const std::string& file_name) {
+            const fs::path source_name = fs::path(file_name).filename();
+            fs::path dest = fs::path(dest_dir) / (source_name.empty() ? fs::path("untitled") : source_name);
+
+            if (fs::exists(dest)) {
+                std::string stem = dest.stem().string();
+                std::string ext = dest.extension().string();
+                int counter = 1;
+                while (fs::exists(dest)) {
+                    dest = fs::path(dest_dir) / (stem + " (" + std::to_string(counter) + ")" + ext);
+                    counter++;
+                }
+            }
+
+            return dest;
+        }
+
+        fs::path cloud_transfer_staging_root() {
+            const char* home = std::getenv("HOME");
+            return fs::path(home ? home : "/tmp") / "misty" / "tmp" / "transfers";
+        }
+
+        fs::path unique_cloud_transfer_staging_path(const std::string& file_name) {
+            static std::atomic<uint64_t> counter{0};
+            const auto now = std::chrono::steady_clock::now().time_since_epoch();
+            const auto ticks = std::chrono::duration_cast<std::chrono::microseconds>(now).count();
+            fs::path dir = cloud_transfer_staging_root() /
+                (std::to_string(ticks) + "-" + std::to_string(counter.fetch_add(1, std::memory_order_relaxed)));
+
+            std::error_code ec;
+            fs::create_directories(dir, ec);
+
+            fs::path safe_name = fs::path(file_name).filename();
+            if (safe_name.empty()) {
+                safe_name = "download";
+            }
+            return dir / safe_name;
+        }
+
+        std::string join_remote_child_path(const std::string& parent, const std::string& child) {
+            std::string clean_child = fs::path(child).filename().string();
+            if (clean_child.empty()) {
+                clean_child = child;
+            }
+            if (parent.empty()) {
+                return clean_child;
+            }
+            if (parent.back() == '/') {
+                return parent + clean_child;
+            }
+            return parent + "/" + clean_child;
+        }
+
+        void cleanup_cloud_transfer_staging_path(const std::string& path) {
+            if (path.empty()) {
+                return;
+            }
+
+            std::error_code ec;
+            fs::path file(path);
+            fs::remove(file, ec);
+
+            ec.clear();
+            fs::path parent = file.parent_path();
+            if (!parent.empty()) {
+                fs::remove(parent, ec);
+            }
+        }
+
+        bool queue_cloud_upload(core::UIRegistry& registry,
+                                const std::string& local_path,
+                                const std::string& file_name,
+                                const std::string& remote_name,
+                                const std::string& remote_path,
+                                bool cleanup_after_upload = false,
+                                const std::string& cleanup_path = "") {
+            if (remote_name.empty()) {
+                auto& activity = registry.get_state<ActivityState>("Activity");
+                activity.add_entry("File", "Cannot upload to mount root. Navigate into a remote folder.", ActivityEntryType::ERROR);
+                return false;
+            }
+
+            std::error_code ec;
+            if (!fs::exists(local_path, ec)) {
+                auto& activity = registry.get_state<ActivityState>("Activity");
+                activity.add_entry("File", "Upload source is missing: " + local_path, ActivityEntryType::ERROR);
+                return false;
+            }
+
+            auto& sidebar_state = registry.get_state<FileSidebarState>("FileSidebar");
+            size_t file_size = 0;
+            try { file_size = fs::file_size(local_path); } catch (...) {}
+
+            {
+                std::lock_guard<std::mutex> lock(sidebar_state.upload_mutex);
+                FileUploadProgress progress;
+                progress.file_path = local_path;
+                progress.file_name = file_name.empty() ? fs::path(local_path).filename().string() : file_name;
+                progress.file_size = file_size;
+                progress.remote_name = remote_name;
+                progress.remote_path = remote_path;
+                progress.cleanup_after_upload = cleanup_after_upload;
+                progress.cleanup_path = cleanup_path;
+                sidebar_state.upload_queue.push_back(std::move(progress));
+            }
+
+            return true;
         }
 
         void purge_from_recent(FileExplorerState& state, const std::string& path) {
@@ -358,18 +509,21 @@ namespace misty::panel {
                 }
             }
 
-            bool src_is_cloud = (item.source == FileSource::REMOTE);
+            const bool src_is_cloud = (item.source == FileSource::REMOTE);
+            const bool remote_has_local_mirror = src_is_cloud && fs::exists(item.path);
 
-            if (!src_is_cloud && !dest_is_cloud) {
+            if ((!src_is_cloud || remote_has_local_mirror) && !dest_is_cloud) {
                 // Local -> Local
                 perform_paste_local_to_local(state, item, dest_dir, op);
             } else if (!dest_is_cloud && src_is_cloud) {
                 // Cloud -> Local
                 perform_paste_cloud_to_local(state, item, dest_dir, op);
+            } else if (dest_is_cloud && src_is_cloud) {
+                // Cloud -> Cloud: stage through a local temp file, then queue upload.
+                perform_paste_cloud_to_cloud(state, item, dest_dir, op);
             } else if (dest_is_cloud) {
-                // Local/Cloud -> Cloud (queues into sidebar upload queue)
-                perform_paste_to_cloud(state, item, dest_dir, op);
-                queued_cloud_uploads = true;
+                // Local -> Cloud (queues into sidebar upload queue)
+                queued_cloud_uploads = perform_paste_to_cloud(state, item, dest_dir, op) || queued_cloud_uploads;
             }
         }
 
@@ -419,6 +573,23 @@ namespace misty::panel {
             }
         } else if (op == ClipboardOp::CUT) {
             fs::rename(src, dest, ec);
+            if (is_cross_device_error(ec)) {
+                queue_cross_device_move(
+                    item,
+                    src.parent_path().string(),
+                    dest.parent_path().string(),
+                    src,
+                    dest,
+                    [this, item, src, dest]() {
+                        record_file_operation(make_single_item_record(
+                            FileOperationKind::MoveLocal,
+                            src,
+                            dest,
+                            item.is_dir,
+                            "Moved " + item.name));
+                    });
+                return;
+            }
         }
 
         if (ec) {
@@ -437,38 +608,46 @@ namespace misty::panel {
         }
     }
 
-    void FileExplorerPanel::perform_paste_to_cloud(FileExplorerState& state, const UnifiedFileItem& item, const std::string& dest_dir, ClipboardOp op) {
+    bool FileExplorerPanel::perform_paste_to_cloud(FileExplorerState& state, const UnifiedFileItem& item, const std::string& dest_dir, ClipboardOp op) {
         (void)state;
         // Skip directories
         if (item.is_dir) {
             auto& activity = registry_.get_state<ActivityState>("Activity");
             activity.add_entry("File", "Folder upload not supported: " + item.name);
-            return;
+            return false;
         }
 
         if (!fs::exists(item.path)) {
             auto& activity = registry_.get_state<ActivityState>("Activity");
             activity.add_entry("File", "File not available locally: " + item.name + ". Download it first.", ActivityEntryType::ERROR);
-            return;
+            return false;
         }
 
         // Copy the file into the mount directory
         fs::path src(item.path);
-        fs::path dest = fs::path(dest_dir) / src.filename();
-
-        if (fs::exists(dest)) {
-            std::string stem = dest.stem().string();
-            std::string ext = dest.extension().string();
-            int counter = 1;
-            while (fs::exists(dest)) {
-                dest = fs::path(dest_dir) / (stem + " (" + std::to_string(counter) + ")" + ext);
-                counter++;
-            }
-        }
+        fs::path dest = unique_child_path(dest_dir, src.filename().string());
 
         std::error_code ec;
         if (op == ClipboardOp::CUT) {
             fs::rename(src, dest, ec);
+            if (is_cross_device_error(ec)) {
+                std::string remote_name;
+                std::string remote_path;
+                resolve_remote_path_context(dest_dir, remote_name, remote_path);
+                queue_cross_device_move(
+                    item,
+                    src.parent_path().string(),
+                    dest.parent_path().string(),
+                    src,
+                    dest,
+                    [this, dest_str = dest.string(), file_name = dest.filename().string(), remote_name, remote_path]() {
+                        if (queue_cloud_upload(registry_, dest_str, file_name, remote_name, remote_path)) {
+                            auto& sidebar_state = registry_.get_state<FileSidebarState>("FileSidebar");
+                            sidebar_state.pending_upload_start = true;
+                        }
+                    });
+                return true;
+            }
         } else {
             fs::copy_file(src, dest, ec);
         }
@@ -476,29 +655,108 @@ namespace misty::panel {
         if (ec) {
             auto& activity = registry_.get_state<ActivityState>("Activity");
             activity.add_entry("File", "Paste failed: " + ec.message(), ActivityEntryType::ERROR);
-            return;
+            return false;
         }
+
         // Queue into sidebar upload queue
         std::string remote_name;
         std::string remote_path;
         resolve_remote_path_context(dest_dir, remote_name, remote_path);
 
-        auto& sidebar_state = registry_.get_state<FileSidebarState>("FileSidebar");
         std::string dest_str = dest.string();
         std::string file_name = dest.filename().string();
-        size_t file_size = 0;
-        try { file_size = fs::file_size(dest_str); } catch (...) {}
+        return queue_cloud_upload(registry_, dest_str, file_name, remote_name, remote_path);
+    }
 
-        {
-            std::lock_guard<std::mutex> lock(sidebar_state.upload_mutex);
-            FileUploadProgress progress;
-            progress.file_path = dest_str;
-            progress.file_name = file_name;
-            progress.file_size = file_size;
-            progress.remote_name = remote_name;
-            progress.remote_path = remote_path;
-            sidebar_state.upload_queue.push_back(std::move(progress));
+    bool FileExplorerPanel::perform_paste_cloud_to_cloud(FileExplorerState& state, const UnifiedFileItem& item, const std::string& dest_dir, ClipboardOp op) {
+        (void)state;
+        (void)op;
+
+        std::string remote_name;
+        std::string remote_path;
+        resolve_remote_path_context(dest_dir, remote_name, remote_path);
+        if (remote_name.empty()) {
+            auto& activity = registry_.get_state<ActivityState>("Activity");
+            activity.add_entry("File", "Cannot upload to mount root. Navigate into a remote folder.", ActivityEntryType::ERROR);
+            return false;
         }
+
+        if (item.is_dir) {
+            auto& services = registry_.get_state<ServicesState>("Services");
+            auto& notifications = registry_.get_state<NotificationState>("Notifications");
+
+            const std::string dest_folder_path = join_remote_child_path(remote_path, item.name);
+            uint64_t notif_id = notifications.add_notification("transferring...", 15.0f);
+
+            services.transfer_folder(
+                item.remote_name, item.remote_path, remote_name, dest_folder_path,
+                [registry = &registry_, file_name = item.name, notif_id](bool success,
+                                                                         const std::string&,
+                                                                         const std::string& error) {
+                    auto& notifications = registry->get_state<NotificationState>("Notifications");
+                    notifications.dismiss(notif_id);
+                    if (success) {
+                        notifications.add_notification("Transferred " + file_name);
+                    } else {
+                        auto& activity = registry->get_state<ActivityState>("Activity");
+                        activity.add_entry("File", "Folder transfer failed: " + file_name + ": " + error, ActivityEntryType::ERROR);
+                    }
+                });
+            return true;
+        }
+
+        fs::path dest = unique_child_path(dest_dir, item.name);
+        fs::path staging_path = unique_cloud_transfer_staging_path(dest.filename().string());
+
+        auto& services = registry_.get_state<ServicesState>("Services");
+        auto& downloads = registry_.get_state<DownloadState>("Downloads");
+        auto& notifications = registry_.get_state<NotificationState>("Notifications");
+
+        const std::string staging_str = staging_path.string();
+        const std::string dest_file_name = dest.filename().string();
+
+        uint64_t download_id = downloads.start_download(
+            item.name, staging_str, item.remote_name, item.size);
+        uint64_t notif_id = notifications.add_notification("preparing transfer...", 15.0f);
+
+        services.download_file(
+            item.remote_name, item.remote_path, staging_str,
+            [registry = &registry_, download_id](size_t bytes_downloaded, size_t) -> bool {
+                auto& downloads = registry->get_state<DownloadState>("Downloads");
+                downloads.update_progress(download_id, static_cast<int64_t>(bytes_downloaded));
+                return true;
+            },
+            [registry = &registry_,
+             file_name = dest_file_name,
+             source_name = item.name,
+             staging_str,
+             remote_name,
+             remote_path,
+             download_id,
+             notif_id](bool success, const std::string& local_path, const std::string& error) {
+                auto& downloads = registry->get_state<DownloadState>("Downloads");
+                auto& notifications = registry->get_state<NotificationState>("Notifications");
+                notifications.dismiss(notif_id);
+
+                if (!success) {
+                    downloads.fail_download(download_id, error);
+                    cleanup_cloud_transfer_staging_path(staging_str);
+                    auto& activity = registry->get_state<ActivityState>("Activity");
+                    activity.add_entry("File", "Cloud transfer failed: " + source_name + ": " + error, ActivityEntryType::ERROR);
+                    return;
+                }
+
+                downloads.complete_download(download_id);
+                if (queue_cloud_upload(*registry, local_path, file_name, remote_name, remote_path,
+                                       true, staging_str)) {
+                    auto& sidebar_state = registry->get_state<FileSidebarState>("FileSidebar");
+                    sidebar_state.pending_upload_start = true;
+                } else {
+                    cleanup_cloud_transfer_staging_path(staging_str);
+                }
+            });
+
+        return true;
     }
 
     void FileExplorerPanel::perform_paste_cloud_to_local(FileExplorerState& state, const UnifiedFileItem& item, const std::string& dest_dir, ClipboardOp op) {
@@ -527,6 +785,23 @@ namespace misty::panel {
             std::error_code ec;
             if (op == ClipboardOp::CUT) {
                 fs::rename(src, dest, ec);
+                if (is_cross_device_error(ec)) {
+                    queue_cross_device_move(
+                        item,
+                        src.parent_path().string(),
+                        dest.parent_path().string(),
+                        src,
+                        dest,
+                        [this, item, src, dest]() {
+                            record_file_operation(make_single_item_record(
+                                FileOperationKind::MoveLocal,
+                                src,
+                                dest,
+                                item.is_dir,
+                                "Moved " + item.name));
+                        });
+                    return;
+                }
             } else {
                 fs::copy_file(src, dest, ec);
             }
@@ -581,6 +856,75 @@ namespace misty::panel {
                     activity.add_entry("File", "Paste failed: " + file_name + ": " + error, ActivityEntryType::ERROR);
                 }
             });
+    }
+
+    void FileExplorerPanel::queue_cross_device_move(const UnifiedFileItem& item,
+                                                    const std::string& source_dir,
+                                                    const std::string& dest_dir,
+                                                    const fs::path& src,
+                                                    const fs::path& dest,
+                                                    std::function<void()> on_success) {
+        auto& activity = registry_.get_state<ActivityState>("Activity");
+        activity.add_entry("File", "Moving " + item.name + " in the background.", ActivityEntryType::INFO);
+
+        struct MoveResult {
+            std::string error;
+        };
+
+        auto result = std::make_shared<MoveResult>();
+        worker_pool_.add(
+            [result, src, dest]() {
+                std::error_code ec;
+                if (!copy_path_then_remove_source(src, dest, ec)) {
+                    result->error = ec.message();
+                }
+            },
+            [this, result, item, source_dir, dest_dir, on_success = std::move(on_success)]() mutable {
+                if (!result->error.empty()) {
+                    auto& activity = registry_.get_state<ActivityState>("Activity");
+                    activity.add_entry("File", "Background move failed: " + item.name + ": " + result->error,
+                        ActivityEntryType::ERROR);
+                    request_background_move_refresh(source_dir, dest_dir);
+                    return;
+                }
+
+                if (on_success) {
+                    on_success();
+                }
+
+                auto& activity = registry_.get_state<ActivityState>("Activity");
+                activity.add_entry("File", "Moved " + item.name, ActivityEntryType::SUCCESS);
+
+                auto& notifications = registry_.get_state<NotificationState>("Notifications");
+                notifications.add_notification("Moved " + item.name);
+
+                request_background_move_refresh(source_dir, dest_dir);
+            },
+            [this, item, source_dir, dest_dir](const std::string& err_msg) {
+                auto& activity = registry_.get_state<ActivityState>("Activity");
+                activity.add_entry("File", "Background move failed: " + item.name + ": " + err_msg,
+                    ActivityEntryType::ERROR);
+                request_background_move_refresh(source_dir, dest_dir);
+            });
+    }
+
+    void FileExplorerPanel::request_background_move_refresh(const std::string& source_dir,
+                                                            const std::string& dest_dir) {
+        auto& state = registry_.get_state<FileExplorerState>(state_key_);
+        {
+            std::lock_guard<std::mutex> lock(state.mu);
+            const std::string effective_path = !state.pending_navigation_path.empty()
+                ? state.pending_navigation_path
+                : std::string(state.current_path);
+            if (effective_path == source_dir || effective_path == dest_dir) {
+                state.pending_navigation_path = effective_path;
+            }
+        }
+
+        notify_shared_path_refresh(source_dir);
+        if (dest_dir != source_dir) {
+            notify_shared_path_refresh(dest_dir);
+        }
     }
 
     void FileExplorerPanel::trigger_upload(const std::string& local_path, const std::string& dest_dir) {
@@ -836,8 +1180,12 @@ namespace misty::panel {
         for (const auto& sel : state.selected_files) {
             for (const auto& f : state.files) {
                 if (f.id == sel) {
-                    clipboard.paths.push_back(f.path);
-                    clipboard.items.push_back(f);
+                    UnifiedFileItem copied = f;
+                    if (can_use_local_mirror(copied)) {
+                        copied.source = FileSource::LOCAL;
+                    }
+                    clipboard.paths.push_back(copied.path);
+                    clipboard.items.push_back(std::move(copied));
                     break;
                 }
             }
@@ -855,8 +1203,12 @@ namespace misty::panel {
         for (const auto& sel : state.selected_files) {
             for (const auto& f : state.files) {
                 if (f.id == sel) {
-                    clipboard.paths.push_back(f.path);
-                    clipboard.items.push_back(f);
+                    UnifiedFileItem copied = f;
+                    if (can_use_local_mirror(copied)) {
+                        copied.source = FileSource::LOCAL;
+                    }
+                    clipboard.paths.push_back(copied.path);
+                    clipboard.items.push_back(std::move(copied));
                     break;
                 }
             }
