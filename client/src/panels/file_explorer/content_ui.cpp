@@ -304,12 +304,26 @@ ImVec4 sync_icon_tint_for_item(const FileExplorerState& state, const UnifiedFile
 
 void show_sync_tooltip_for_item(const UnifiedFileItem& file) {
     if (file.source != FileSource::REMOTE) return;
+    if (!ImGui::BeginTooltip()) return;
     if (file.sync_dirty) {
-        if (!file.sync_direction.empty()) ImGui::SetTooltip("Dirty (%s)", file.sync_direction.c_str());
-        else ImGui::SetTooltip("Dirty");
+        if (!file.sync_direction.empty()) ImGui::Text("Dirty (%s)", file.sync_direction.c_str());
+        else ImGui::TextUnformatted("Dirty");
+        if (!file.dirty_reason.empty()) {
+            ImGui::Separator();
+            ImGui::PushTextWrapPos(ImGui::GetFontSize() * 28.0f);
+            ImGui::TextUnformatted(file.dirty_reason.c_str());
+            ImGui::PopTextWrapPos();
+        }
     } else {
-        ImGui::SetTooltip("In Sync");
+        ImGui::TextUnformatted("In Sync");
+        if (!file.dirty_reason.empty()) {
+            ImGui::Separator();
+            ImGui::PushTextWrapPos(ImGui::GetFontSize() * 28.0f);
+            ImGui::TextUnformatted(file.dirty_reason.c_str());
+            ImGui::PopTextWrapPos();
+        }
     }
+    ImGui::EndTooltip();
 }
 
 void render_empty_state(float icon_size) {

@@ -156,6 +156,7 @@ func EnsureRuntimeLayout() (RuntimeCheck, error) {
 		filepath.Join(home, "misty", ".cache"),
 		filepath.Join(home, "misty", "mnt"),
 		filepath.Join(home, "misty", "db"),
+		filepath.Join(home, "misty", "tmp"),
 		filepath.Join(home, "misty", "public", "keys"),
 		filepath.Join(home, "misty", "public", "plugins"),
 		filepath.Join(home, "misty", "local", "plugins"),

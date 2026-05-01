@@ -11,6 +11,7 @@ type DirectoryItem struct {
 	State         string `json:"state"`
 	SyncDirty     bool   `json:"sync_dirty"`
 	SyncDirection string `json:"sync_direction"`
+	DirtyReason   string `json:"dirty_reason,omitempty"`
 }
 
 type DirectoryResponse struct {

@@ -9,6 +9,7 @@
 #include "panels/search/search_state.h"
 #include "panels/search/search_panel.h"
 #include "core/commands/command_manager.h"
+#include "core/cache/listing_cache.h"
 #include "core/manager/asset_manager.h"
 #include <glad/glad.h>
 #include <nlohmann/json.hpp>
@@ -211,16 +212,7 @@ namespace misty::panel {
         // Sync remote account mappings
         sync_account_mappings();
 
-        // Fetch workspaces if not already done
-        if (!workspace_state.has_fetched) {
-            workspace_state.fetch_workspaces_async(worker_pool_);
-        }
-
-        // Use workspace mount path if available, otherwise fall back to the mount root.
-        std::string start_path = workspace_state.get_current_mount_path();
-        if (start_path.empty()) {
-            start_path = path_utils::get_mount_root();
-        }
+        std::string start_path = path_utils::get_mount_root();
 
         if (!initial_path_override.empty()) {
             start_path = std::move(initial_path_override);
@@ -268,34 +260,6 @@ namespace misty::panel {
 
         // Set as pending navigation - will be processed in render()
         file_explorer_state.pending_navigation_path = start_path;
-    }
-
-    void FileExplorerPanel::apply_workspace_mount_if_ready(FileExplorerState& state, WorkspaceState& workspace_state) {
-        if (workspace_mount_applied_) return;
-        if (!workspace_state.has_fetched || workspace_state.is_fetching) return;
-
-        std::string workspace_path = workspace_state.get_current_mount_path();
-        if (workspace_path.empty()) {
-            workspace_mount_applied_ = true;
-            return;
-        }
-
-        printf("DEBUG: render - workspace_path=%s, last_opened_path=%s, initial_start_path_=%s\n",
-            workspace_path.c_str(), state.last_opened_path.c_str(), initial_start_path_.c_str());
-
-        if (!state.last_opened_path.empty() && initial_start_path_ == state.last_opened_path) {
-            workspace_mount_applied_ = true;
-            return;
-        }
-
-        std::string current_path = state.current_path;
-        bool no_history = state.back_history.empty() && state.forward_history.empty();
-        bool is_at_initial = current_path.empty() || current_path == initial_start_path_;
-        if (no_history && is_at_initial && state.pending_navigation_path.empty()) {
-            state.pending_navigation_path = workspace_path;
-        }
-
-        workspace_mount_applied_ = true;
     }
 
     void FileExplorerPanel::handle_pending_navigation(FileExplorerState& state) {
@@ -382,59 +346,7 @@ namespace misty::panel {
     }
 
     void FileExplorerPanel::update_periodic_watched_sync(FileExplorerState& state) {
-        using namespace std::chrono_literals;
-
-        if (!state.current_dir_watched ||
-            state.watched_refresh_in_flight ||
-            state.sync_request_in_flight ||
-            state.sync_watch_request_in_flight ||
-            state.is_loading) {
-            return;
-        }
-
-        const std::string current(state.current_path);
-        if (current.empty() || !path_utils::is_remote_path(current)) {
-            return;
-        }
-
-        const auto now = std::chrono::steady_clock::now();
-        if (state.next_watched_refresh_at.time_since_epoch().count() != 0 &&
-            now < state.next_watched_refresh_at) {
-            return;
-        }
-
-        std::string remote_name;
-        std::string remote_path;
-        if (!resolve_remote_path_context(current, remote_name, remote_path) || remote_name.empty()) {
-            state.next_watched_refresh_at = now + 5s;
-            return;
-        }
-
-        state.watched_refresh_in_flight = true;
-        state.next_watched_refresh_at = now + 5s;
-        const uint64_t navigation_generation = state.navigation_generation.load(std::memory_order_relaxed);
-
-        auto& services = registry_.get_state<ServicesState>("Services");
-        services.fetch_sync_items(
-            remote_name, remote_path,
-            [registry = &registry_, state_key = state_key_, remote_name, current, navigation_generation]
-            (bool success, const std::string& body, const std::string& error) {
-                auto& state = registry->get_state<FileExplorerState>(state_key);
-                {
-                    std::lock_guard<std::mutex> lock(state.mu);
-                    if (state.navigation_generation.load(std::memory_order_relaxed) != navigation_generation ||
-                        std::string(state.current_path) != current) {
-                        return;
-                    }
-                    state.watched_refresh_in_flight = false;
-                }
-
-                if (!success) {
-                    return;
-                }
-                FileExplorerPanel::apply_remote_folder_fetch(
-                    *registry, state_key, remote_name, current, navigation_generation, true, body, error, true);
-            });
+        (void)state;
     }
 
     void FileExplorerPanel::update_navigation_history(FileExplorerState& state,
@@ -526,31 +438,65 @@ namespace misty::panel {
 
         state.sync_request_in_flight = true;
         const uint64_t request_generation = ++state.sync_request_generation;
+        const uint64_t navigation_generation = state.navigation_generation.load(std::memory_order_relaxed);
         auto& services = registry_.get_state<ServicesState>("Services");
-        services.refetch_sync_items(remote_name, remote_path,
-            [registry = &registry_, state_key = state_key_, current, request_generation]
+        services.run_sync_now(remote_name,
+            [this, registry = &registry_, state_key = state_key_, remote_name, remote_path, current, request_generation, navigation_generation]
             (bool success, const std::string&, const std::string& error) {
                 auto& state = registry->get_state<FileExplorerState>(state_key);
-                std::lock_guard<std::mutex> lock(state.mu);
-                if (request_generation != state.sync_request_generation) {
-                    return;
+                {
+                    std::lock_guard<std::mutex> lock(state.mu);
+                    if (request_generation != state.sync_request_generation) {
+                        return;
+                    }
+
+                    const std::string effective_path = !state.pending_navigation_path.empty()
+                        ? state.pending_navigation_path
+                        : std::string(state.current_path);
+                    if (effective_path != current) {
+                        state.sync_request_in_flight = false;
+                        return;
+                    }
+
+                    if (!success) {
+                        state.sync_request_in_flight = false;
+                        state.error_msg = error.empty() ? "Sync failed." : error;
+                        return;
+                    }
                 }
 
-                state.sync_request_in_flight = false;
+                auto& services = registry->get_state<ServicesState>("Services");
+                services.fetch_sync_items(
+                    remote_name, remote_path,
+                    [this, registry, state_key, remote_name, current, request_generation, navigation_generation]
+                    (bool list_success, const std::string& body, const std::string& list_error) {
+                        auto& state = registry->get_state<FileExplorerState>(state_key);
+                        {
+                            std::lock_guard<std::mutex> lock(state.mu);
+                            if (request_generation != state.sync_request_generation) {
+                                return;
+                            }
 
-                const std::string effective_path = !state.pending_navigation_path.empty()
-                    ? state.pending_navigation_path
-                    : std::string(state.current_path);
-                if (effective_path != current) {
-                    return;
-                }
+                            state.sync_request_in_flight = false;
 
-                if (success) {
-                    state.pending_navigation_path = current;
-                    state.pending_shared_refresh_path = current;
-                } else {
-                    state.error_msg = error.empty() ? "Sync failed." : error;
-                }
+                            const std::string effective_path = !state.pending_navigation_path.empty()
+                                ? state.pending_navigation_path
+                                : std::string(state.current_path);
+                            if (effective_path != current) {
+                                return;
+                            }
+
+                            if (!list_success) {
+                                state.error_msg = list_error.empty() ? "Sync list failed." : list_error;
+                                return;
+                            }
+                        }
+
+                        core::listing_cache::save(remote_name, path_utils::parse_remote_path(current).relative_path, body);
+                        FileExplorerPanel::apply_remote_folder_fetch(
+                            *registry, state_key, remote_name, current, navigation_generation, true, body, "", true);
+                        this->notify_shared_path_refresh(current);
+                    });
             });
     }
 
@@ -569,19 +515,58 @@ namespace misty::panel {
         state.sync_watch_request_in_flight = true;
         const bool should_watch = !state.current_dir_watched;
         auto& services = registry_.get_state<ServicesState>("Services");
-        auto callback = [registry = &registry_, state_key = state_key_, current, should_watch]
+        auto callback = [registry = &registry_,
+                         state_key = state_key_,
+                         current,
+                         remote_name,
+                         remote_path,
+                         should_watch]
                         (bool success, const std::string&, const std::string& error) {
             auto& state = registry->get_state<FileExplorerState>(state_key);
-            std::lock_guard<std::mutex> lock(state.mu);
-            if (std::string(state.current_path) != current) {
+            uint64_t navigation_generation = 0;
+            {
+                std::lock_guard<std::mutex> lock(state.mu);
+                if (std::string(state.current_path) != current) {
+                    return;
+                }
+                state.sync_watch_request_in_flight = false;
+                if (success) {
+                    state.current_dir_watched = should_watch;
+                    if (!should_watch) {
+                        state.watched_refresh_in_flight = false;
+                        state.next_watched_refresh_at = {};
+                    }
+                    navigation_generation = state.navigation_generation.load(std::memory_order_relaxed);
+                } else {
+                    state.error_msg = error.empty() ? "Failed to update watched sync directory." : error;
+                }
+            }
+
+            if (!success) {
                 return;
             }
-            state.sync_watch_request_in_flight = false;
-            if (success) {
-                state.current_dir_watched = should_watch;
-            } else {
-                state.error_msg = error.empty() ? "Failed to update watched sync directory." : error;
-            }
+
+            auto& services = registry->get_state<ServicesState>("Services");
+            services.fetch_sync_items(
+                remote_name,
+                remote_path,
+                [registry, state_key, remote_name, remote_path, current, navigation_generation]
+                (bool list_success, const std::string& body, const std::string&) {
+                    if (!list_success) {
+                        return;
+                    }
+                    misty::core::listing_cache::save(remote_name, remote_path, body);
+                    FileExplorerPanel::apply_remote_folder_fetch(
+                        *registry,
+                        state_key,
+                        remote_name,
+                        current,
+                        navigation_generation,
+                        true,
+                        body,
+                        "",
+                        true);
+                });
         };
 
         if (should_watch) {
@@ -747,9 +732,7 @@ namespace misty::panel {
 
     void FileExplorerPanel::render() {
         auto& state = registry_.get_state<FileExplorerState>(state_key_);
-        auto& workspace_state = registry_.get_state<WorkspaceState>("Workspace");
         auto& services_state = registry_.get_state<ServicesState>("Services");
-        apply_workspace_mount_if_ready(state, workspace_state);
 
         // If services connections changed (new remote added, one disconnected),
         // resync mappings + materialize provider/remote mount directories now,
@@ -1183,6 +1166,7 @@ namespace misty::panel {
         }
 
         std::vector<ServicesState::RemoteWatchInfo> watch_infos;
+        std::vector<RemoteMountMetadata> mount_metadata;
         {
         std::lock_guard<std::mutex> svc_lock(services.mu);
 
@@ -1223,10 +1207,17 @@ namespace misty::panel {
             watch.mount_path = mount_utils::get_mount_root() + "/" + mapping.provider_folder + "/" + mapping.folder_name;
             watch_infos.push_back(std::move(watch));
 
+            RemoteMountMetadata metadata;
+            metadata.remote_name = mapping.remote_name;
+            metadata.provider_folder = mapping.provider_folder;
+            metadata.folder_name = mapping.folder_name;
+            mount_metadata.push_back(std::move(metadata));
+
             workspace.remote_mappings.push_back(mapping);
         }
         }
 
+        services.sync_remote_mount_metadata(mount_metadata);
         services.reconcile_fs_watchers(watch_infos);
     }
 

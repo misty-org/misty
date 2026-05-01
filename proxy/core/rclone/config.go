@@ -1,7 +1,6 @@
 package rclone
 
 import (
-	_ "embed"
 	"fmt"
 	"os"
 	"os/exec"
@@ -10,9 +9,6 @@ import (
 	"strings"
 	"sync"
 )
-
-//go:embed assets/oauth_callback.html
-var oauthCallbackHTML []byte
 
 var (
 	initOnce          sync.Once
@@ -56,9 +52,9 @@ func Init() error {
 			return
 		}
 
-		tmplPath := filepath.Join(rcloneDir, "oauth_callback.html")
-		if err := os.WriteFile(tmplPath, oauthCallbackHTML, 0o600); err == nil {
-			oauthTemplatePath = tmplPath
+		formsDir := filepath.Join(home, "misty", "forms")
+		if err := os.MkdirAll(formsDir, 0o700); err == nil {
+			oauthTemplatePath = filepath.Join(formsDir, "oauth_callback.html")
 		}
 
 		path, err := findRcloneBinary()

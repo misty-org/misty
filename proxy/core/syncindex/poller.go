@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	dbpkg "github.com/kannachi323/misty/proxy/db"
 	"github.com/kannachi323/misty/proxy/core/rclone"
+	dbpkg "github.com/kannachi323/misty/proxy/db"
 )
 
 // Poller refetches every enabled sync root on a fixed cadence so the DB
@@ -19,10 +19,11 @@ import (
 // — i.e. every directory the user has ever browsed — which keeps cost bounded
 // to the working set rather than the full cloud tree.
 type Poller struct {
-	service    *Service
-	reconciler *Reconciler
-	interval   time.Duration
-	timeout    time.Duration
+	service          *Service
+	reconciler       *Reconciler
+	interval         time.Duration
+	refetchTimeout   time.Duration
+	reconcileTimeout time.Duration
 
 	startOnce sync.Once
 	stopOnce  sync.Once
@@ -34,14 +35,14 @@ func NewPoller(service *Service, interval time.Duration) *Poller {
 	if interval <= 0 {
 		interval = 30 * time.Second
 	}
-	timeout := pollTimeoutForInterval(interval)
 	return &Poller{
-		service:    service,
-		reconciler: NewReconciler(service),
-		interval:   interval,
-		timeout:    timeout,
-		stop:       make(chan struct{}),
-		done:       make(chan struct{}),
+		service:          service,
+		reconciler:       NewReconciler(service),
+		interval:         interval,
+		refetchTimeout:   pollRefetchTimeoutForInterval(interval),
+		reconcileTimeout: pollReconcileTimeout(),
+		stop:             make(chan struct{}),
+		done:             make(chan struct{}),
 	}
 }
 
@@ -59,11 +60,11 @@ func PollIntervalFromEnv(defaultSec int) time.Duration {
 	return time.Duration(defaultSec) * time.Second
 }
 
-func pollTimeoutForInterval(interval time.Duration) time.Duration {
+func pollRefetchTimeoutForInterval(interval time.Duration) time.Duration {
 	if interval <= 0 {
 		interval = 30 * time.Second
 	}
-	if s := os.Getenv("MISTY_SYNC_POLL_TIMEOUT_SEC"); s != "" {
+	if s := os.Getenv("MISTY_SYNC_REFETCH_TIMEOUT_SEC"); s != "" {
 		if n, err := strconv.Atoi(s); err == nil && n > 0 {
 			return time.Duration(n) * time.Second
 		}
@@ -73,6 +74,24 @@ func pollTimeoutForInterval(interval time.Duration) time.Duration {
 		timeout = 2 * time.Minute
 	}
 	return timeout
+}
+
+func pollReconcileTimeout() time.Duration {
+	if s := os.Getenv("MISTY_SYNC_RECONCILE_TIMEOUT_SEC"); s != "" {
+		if n, err := strconv.Atoi(s); err == nil && n > 0 {
+			return time.Duration(n) * time.Second
+		}
+	}
+	return 30 * time.Minute
+}
+
+func RunNowTimeout() time.Duration {
+	if s := os.Getenv("MISTY_SYNC_RUN_NOW_TIMEOUT_SEC"); s != "" {
+		if n, err := strconv.Atoi(s); err == nil && n > 0 {
+			return time.Duration(n) * time.Second
+		}
+	}
+	return 35 * time.Minute
 }
 
 func (p *Poller) Start() {
@@ -105,11 +124,9 @@ func (p *Poller) run() {
 		case <-p.stop:
 			return
 		case <-ticker.C:
-			ctx, cancel := context.WithTimeout(context.Background(), p.timeout)
-			if err := p.Tick(ctx); err != nil {
+			if err := p.Tick(context.Background()); err != nil {
 				log.Println("syncindex poller:", err)
 			}
-			cancel()
 		}
 	}
 }
@@ -123,6 +140,11 @@ func (p *Poller) run() {
 func (p *Poller) RunNow(ctx context.Context, remoteName string) (int, int, error) {
 	if p == nil || p.service == nil || p.service.database == nil || p.service.database.Conn == nil {
 		return 0, 0, nil
+	}
+	if remoteName != "" {
+		if err := p.service.BackfillQueueForRemote(remoteName); err != nil {
+			return 0, 0, err
+		}
 	}
 
 	roots, err := dbpkg.ListEnabledSyncRoots(p.service.database.Conn)
@@ -162,7 +184,10 @@ func (p *Poller) RunNow(ctx context.Context, remoteName string) (int, int, error
 			if err := ctx.Err(); err != nil {
 				return refetchedDirs, dirtyBefore, err
 			}
-			if _, err := p.service.RefetchDirectory(ctx, root.RemoteName, dir); err != nil {
+			dirCtx, cancel := context.WithTimeout(context.Background(), p.reconcileTimeout)
+			_, err := p.service.RefreshDirectory(dirCtx, root.RemoteName, dir)
+			cancel()
+			if err != nil {
 				log.Printf("syncindex run-now: refetch %s:%s: %v", root.RemoteName, dir, err)
 				continue
 			}
@@ -177,7 +202,10 @@ func (p *Poller) RunNow(ctx context.Context, remoteName string) (int, int, error
 		}
 
 		if p.reconciler != nil {
-			if err := p.reconciler.ReconcileRoot(ctx, root); err != nil {
+			reconcileCtx, cancel := context.WithTimeout(context.Background(), p.reconcileTimeout)
+			err := p.reconciler.ReconcileRoot(reconcileCtx, root)
+			cancel()
+			if err != nil {
 				log.Printf("syncindex run-now: reconcile %s: %v", root.RemoteName, err)
 			}
 		}
@@ -225,7 +253,10 @@ func (p *Poller) Tick(ctx context.Context) error {
 			if err := ctx.Err(); err != nil {
 				return err
 			}
-			if _, err := p.service.RefetchDirectory(ctx, root.RemoteName, dir); err != nil {
+			dirCtx, cancel := context.WithTimeout(context.Background(), p.reconcileTimeout)
+			_, err := p.service.RefreshDirectory(dirCtx, root.RemoteName, dir)
+			cancel()
+			if err != nil {
 				log.Printf("syncindex poller: refetch %s:%s: %v", root.RemoteName, dir, err)
 			}
 		}
@@ -235,7 +266,10 @@ func (p *Poller) Tick(ctx context.Context) error {
 		// inside ReconcileRoot; a hard error at the root level (e.g. the
 		// dirty_bit update) is logged but shouldn't block other roots.
 		if p.reconciler != nil {
-			if err := p.reconciler.ReconcileRoot(ctx, root); err != nil {
+			reconcileCtx, cancel := context.WithTimeout(context.Background(), p.reconcileTimeout)
+			err := p.reconciler.ReconcileRoot(reconcileCtx, root)
+			cancel()
+			if err != nil {
 				log.Printf("syncindex poller: reconcile %s: %v", root.RemoteName, err)
 			}
 		}

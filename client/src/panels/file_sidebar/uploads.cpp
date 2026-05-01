@@ -6,10 +6,29 @@
 #include "panels/activity/upload_state.h"
 
 #include <cstdio>
+#include <system_error>
 
 namespace fs = std::filesystem;
 
 namespace misty::panel {
+    namespace {
+        void cleanup_upload_artifact(bool cleanup_after_upload, const std::string& cleanup_path) {
+            if (!cleanup_after_upload || cleanup_path.empty()) {
+                return;
+            }
+
+            std::error_code ec;
+            fs::path path(cleanup_path);
+            fs::remove(path, ec);
+
+            ec.clear();
+            fs::path parent = path.parent_path();
+            if (!parent.empty()) {
+                fs::remove(parent, ec);
+            }
+        }
+    }
+
     void FileSidebarPanel::show_uploader_modal(FileSidebarState& state) {
         if (!state.show_uploader_modal) return;
 
@@ -71,6 +90,8 @@ namespace misty::panel {
         int64_t file_size = 0;
         std::string remote_name;
         std::string remote_path;
+        bool cleanup_after_upload = false;
+        std::string cleanup_path;
 
         {
             std::lock_guard<std::mutex> lock(state.upload_mutex);
@@ -84,6 +105,8 @@ namespace misty::panel {
             file_size = static_cast<int64_t>(state.upload_queue[index].file_size);
             remote_name = state.upload_queue[index].remote_name;
             remote_path = state.upload_queue[index].remote_path;
+            cleanup_after_upload = state.upload_queue[index].cleanup_after_upload;
+            cleanup_path = state.upload_queue[index].cleanup_path;
         }
 
         // Register this upload in UploadState for activity tracking
@@ -104,7 +127,7 @@ namespace misty::panel {
         };
 
         // Completion callback
-        auto completion_cb = [this, &state, &upload_state, index, upload_id](bool success, const std::string& error_msg) {
+        auto completion_cb = [this, &state, &upload_state, index, upload_id, cleanup_after_upload, cleanup_path](bool success, const std::string& error_msg) {
             {
                 std::lock_guard<std::mutex> lock(state.upload_mutex);
                 if (index < state.upload_queue.size()) {
@@ -120,6 +143,7 @@ namespace misty::panel {
             } else {
                 upload_state.fail_upload(upload_id, error_msg);
             }
+            cleanup_upload_artifact(cleanup_after_upload, cleanup_path);
 
             if (!state.cancel_upload.load()) {
                 start_next_upload(state);

@@ -25,43 +25,40 @@ namespace misty::panel {
 
     class ActivityState : public core::UIState {
     public:
+        ActivityState();
+
         bool is_open = false;
 
         void add_entry(const std::string& sender, const std::string& message,
-                       ActivityEntryType type = ActivityEntryType::INFO) {
-            std::lock_guard<std::mutex> lock(mu_);
-            ActivityEntry entry;
-            entry.id = next_id_++;
-            entry.sender = sender;
-            entry.message = message;
-            entry.timestamp = std::chrono::system_clock::now();
-            entry.type = type;
-            entries_.push_back(std::move(entry));
-            if (entries_.size() > MAX_ENTRIES) {
-                entries_.erase(entries_.begin());
-            }
-        }
+                       ActivityEntryType type = ActivityEntryType::INFO);
 
         std::vector<ActivityEntry> get_entries() {
             std::lock_guard<std::mutex> lock(mu_);
             return entries_;
         }
 
-        void clear() {
-            std::lock_guard<std::mutex> lock(mu_);
-            entries_.clear();
-        }
+        void clear();
 
         size_t count() {
             std::lock_guard<std::mutex> lock(mu_);
             return entries_.size();
         }
 
+        size_t unread_count() const {
+            return unread_count_.load();
+        }
+
+        void mark_all_read();
+
     private:
+        void load_state();
+        void persist_state();
+
         static constexpr size_t MAX_ENTRIES = 200;
         std::mutex mu_;
         std::vector<ActivityEntry> entries_;
         std::atomic<uint64_t> next_id_{1};
+        std::atomic<size_t> unread_count_{0};
     };
 
 }

@@ -42,6 +42,12 @@ namespace misty::panel {
         std::string display_name;
     };
 
+    struct RemoteMountMetadata {
+        std::string remote_name;
+        std::string provider_folder;
+        std::string folder_name;
+    };
+
     struct RcloneHealth {
         bool ready = false;
         bool loaded = false;
@@ -113,6 +119,7 @@ namespace misty::panel {
         bool get_remote_card_state(const std::string& remote_name, RemoteCardState& out);
         std::string get_remote_alias(const std::string& remote_name);
         bool set_remote_alias(const std::string& remote_name, const std::string& alias);
+        void sync_remote_mount_metadata(const std::vector<RemoteMountMetadata>& mappings);
 
         // File operations — all use unified rclone proxy endpoints
         void fetch_files(const std::string& remote,
@@ -155,6 +162,10 @@ namespace misty::panel {
                               int64_t size,
                               FilesCallback callback);
 
+        void mark_local_synced(const std::string& remote,
+                               const std::string& path,
+                               FilesCallback callback);
+
         void download_file(const std::string& remote,
                           const std::string& remote_path,
                           const std::string& local_path,
@@ -166,6 +177,12 @@ namespace misty::panel {
                         const std::string& local_path,
                         core::UploadProgressCallback progress_cb,
                         UploadCallback callback);
+
+        void transfer_folder(const std::string& source_remote,
+                             const std::string& source_path,
+                             const std::string& dest_remote,
+                             const std::string& dest_path,
+                             FilesCallback callback);
 
         void create_folder(const std::string& remote,
                           const std::string& path,
@@ -279,6 +296,7 @@ namespace misty::panel {
 
         core::WorkerPool* worker_pool_ = nullptr;
         std::unordered_map<std::string, std::string> remote_aliases_;
+        std::unordered_map<std::string, RemoteMountMetadata> remote_mount_metadata_;
 
         std::mutex watchers_mu_;
         std::unordered_map<std::string, WatchEntry> watchers_;

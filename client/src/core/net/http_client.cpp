@@ -107,6 +107,14 @@ namespace misty::core {
         if (!is_proxy_url(url)) return;
 
         if (status_code == 0) {
+            std::string proxy_url = EnvManager::get().get("PROXY_SERVICE_URL", "");
+            if (!proxy_url.empty()) {
+                HttpResponse health = execute_curl_request_with_timeouts("GET", proxy_url + "/api/ready", "", {}, 2L, 5L);
+                if (health.status_code != 0) {
+                    SessionManager::get().mark_proxy_available();
+                    return;
+                }
+            }
             SessionManager::get().mark_proxy_unavailable();
         } else {
             SessionManager::get().mark_proxy_available();
@@ -121,8 +129,70 @@ namespace misty::core {
                                                long connect_timeout_seconds,
                                                long total_timeout_seconds,
                                                const std::map<std::string, std::string>& headers) {
-        HttpResponse response = execute_curl_request_with_timeouts("GET", url, "", headers, connect_timeout_seconds, total_timeout_seconds);
+        auto merged_headers = SessionManager::get().get_auth_headers();
+        for (const auto& [key, value] : headers) {
+            merged_headers[key] = value;
+        }
+
+        HttpResponse response = execute_curl_request_with_timeouts("GET", url, "", merged_headers, connect_timeout_seconds, total_timeout_seconds);
+        if (response.status_code == 0 && is_proxy_url(url) && ProxyManager::get().ensure_running()) {
+            response = execute_curl_request_with_timeouts("GET", url, "", merged_headers, connect_timeout_seconds, total_timeout_seconds);
+        }
         update_proxy_status(url, response.status_code);
+
+        if (response.status_code == 401 &&
+            !SessionManager::get().is_session_expired() &&
+            !is_refreshing_.exchange(true)) {
+            RefreshResult refresh_result = attempt_token_refresh();
+            if (refresh_result == RefreshResult::Success) {
+                auto retry_headers = SessionManager::get().get_auth_headers();
+                for (const auto& [key, value] : headers) {
+                    retry_headers[key] = value;
+                }
+                response = execute_curl_request_with_timeouts("GET", url, "", retry_headers, connect_timeout_seconds, total_timeout_seconds);
+                update_proxy_status(url, response.status_code);
+            } else if (refresh_result == RefreshResult::Failed) {
+                SessionManager::get().mark_session_expired();
+            }
+            is_refreshing_.store(false);
+        }
+
+        return response;
+    }
+
+    HttpResponse HTTPClient::post_with_timeouts(const std::string& url,
+                                                const std::string& body,
+                                                long connect_timeout_seconds,
+                                                long total_timeout_seconds,
+                                                const std::map<std::string, std::string>& headers) {
+        auto merged_headers = SessionManager::get().get_auth_headers();
+        for (const auto& [key, value] : headers) {
+            merged_headers[key] = value;
+        }
+
+        HttpResponse response = execute_curl_request_with_timeouts("POST", url, body, merged_headers, connect_timeout_seconds, total_timeout_seconds);
+        if (response.status_code == 0 && is_proxy_url(url) && ProxyManager::get().ensure_running()) {
+            response = execute_curl_request_with_timeouts("POST", url, body, merged_headers, connect_timeout_seconds, total_timeout_seconds);
+        }
+        update_proxy_status(url, response.status_code);
+
+        if (response.status_code == 401 &&
+            !SessionManager::get().is_session_expired() &&
+            !is_refreshing_.exchange(true)) {
+            RefreshResult refresh_result = attempt_token_refresh();
+            if (refresh_result == RefreshResult::Success) {
+                auto retry_headers = SessionManager::get().get_auth_headers();
+                for (const auto& [key, value] : headers) {
+                    retry_headers[key] = value;
+                }
+                response = execute_curl_request_with_timeouts("POST", url, body, retry_headers, connect_timeout_seconds, total_timeout_seconds);
+                update_proxy_status(url, response.status_code);
+            } else if (refresh_result == RefreshResult::Failed) {
+                SessionManager::get().mark_session_expired();
+            }
+            is_refreshing_.store(false);
+        }
+
         return response;
     }
 

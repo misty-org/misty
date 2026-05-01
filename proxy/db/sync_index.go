@@ -128,10 +128,10 @@ func UpsertSyncEntry(exec sqlExecer, entry SyncEntry) error {
 			last_seen_local_at = excluded.last_seen_local_at,
 			last_seen_remote_at = excluded.last_seen_remote_at,
 			updated_at = excluded.updated_at
-	`, entry.ID, entry.RootID, entry.RelPath, entry.ParentRelPath, entry.Name, boolToInt(entry.IsDir),
+		`, entry.ID, entry.RootID, entry.RelPath, entry.ParentRelPath, entry.Name, boolToInt(entry.IsDir),
 		boolToInt(entry.LocalExists), boolToInt(entry.RemoteExists), boolToInt(entry.IsDirty),
 		entry.SyncDirection, nullIfEmpty(entry.LocalMTime), nullableInt(entry.LocalSize),
-		nullIfEmpty(entry.RemoteMTime), nullableInt(entry.RemoteSize), nullIfEmpty(entry.RemoteRevision),
+		nullIfEmpty(entry.RemoteMTime), nullableInt(entry.RemoteSize), entry.RemoteRevision,
 		entry.MimeType, entry.StateCode, nullIfEmpty(entry.LastSeenLocal), nullIfEmpty(entry.LastSeenRemote),
 		entry.RetryCount, entry.LastError, entry.CreatedAt, entry.UpdatedAt)
 	return err

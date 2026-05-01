@@ -69,6 +69,8 @@ namespace misty::panel {
         // Remote metadata (empty for local files)
         std::string remote_name;       // rclone remote name, e.g. "onedrive-john"
         std::string remote_path;       // path within the remote, e.g. "/Documents/report.pdf"
+        std::string remote_mod_time;   // RFC3339Nano mod time from sync index
+        std::string dirty_reason;      // sync-index explanation for MOD / dirty state
     };
 
     // Path utilities for file explorer navigation
