@@ -2,14 +2,19 @@ package db
 
 import (
 	"database/sql"
+	_ "embed"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 )
+
+//go:embed sql/init.sql
+var sqliteInitSQL string
 
 type Database struct {
 	Conn *sql.DB
@@ -60,6 +65,12 @@ func (db *Database) StartDatabase() error {
 		return err
 	}
 
+	if err := (&Database{Conn: conn}).CleanupExpiredAccessTokenRevocations(time.Now().UTC()); err != nil {
+		log.Println("Failed to cleanup expired access token revocations:", err)
+		_ = conn.Close()
+		return err
+	}
+
 	return nil
 }
 
@@ -70,33 +81,11 @@ func (db *Database) Stop() {
 }
 
 func ensureAuthSchema(conn *sql.DB) error {
-	const schema = `
-CREATE TABLE IF NOT EXISTS users (
-    id    TEXT PRIMARY KEY,
-    name  TEXT NOT NULL,
-    email TEXT NOT NULL UNIQUE
-);
+	if err := ensureBootstrapSchema(conn); err != nil {
+		return err
+	}
 
-CREATE TABLE IF NOT EXISTS refresh_tokens (
-    id         TEXT PRIMARY KEY,
-    user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    token_hash TEXT NOT NULL UNIQUE,
-    expires_at DATETIME NOT NULL,
-    created_at DATETIME NOT NULL DEFAULT (datetime('now')),
-    revoked    INTEGER NOT NULL DEFAULT 0
-);
-
-CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id   ON refresh_tokens(user_id);
-CREATE INDEX IF NOT EXISTS idx_refresh_tokens_token_hash ON refresh_tokens(token_hash);
-
-CREATE TABLE IF NOT EXISTS license_cache (
-    id         INTEGER PRIMARY KEY CHECK (id = 1),
-    token      TEXT NOT NULL,
-    tier       TEXT NOT NULL,
-    expires_at DATETIME NOT NULL
-);
-`
-	if _, err := conn.Exec(schema); err != nil {
+	if err := addColumnIfMissing(conn, "users", "token_valid_after", "TEXT"); err != nil {
 		return err
 	}
 
@@ -150,108 +139,7 @@ ALTER TABLE users_migrated RENAME TO users;
 }
 
 func ensureSyncSchema(conn *sql.DB) error {
-	const schema = `
-CREATE TABLE IF NOT EXISTS sync_roots (
-    id TEXT PRIMARY KEY,
-    remote_name TEXT NOT NULL UNIQUE,
-    remote_type TEXT NOT NULL DEFAULT '',
-    provider_folder TEXT NOT NULL DEFAULT '',
-    folder_name TEXT NOT NULL DEFAULT '',
-    mount_root TEXT NOT NULL,
-    enabled INTEGER NOT NULL DEFAULT 1,
-    dirty_bit INTEGER NOT NULL DEFAULT 0,
-    last_refetch_at TEXT,
-    last_poll_at TEXT,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS sync_entries (
-    id TEXT PRIMARY KEY,
-    root_id TEXT NOT NULL REFERENCES sync_roots(id) ON DELETE CASCADE,
-    rel_path TEXT NOT NULL,
-    parent_rel_path TEXT NOT NULL DEFAULT '',
-    name TEXT NOT NULL,
-    is_dir INTEGER NOT NULL DEFAULT 0,
-    local_exists INTEGER NOT NULL DEFAULT 0,
-    remote_exists INTEGER NOT NULL DEFAULT 0,
-    is_dirty INTEGER NOT NULL DEFAULT 0,
-    sync_direction TEXT NOT NULL DEFAULT 'none',
-    local_mtime TEXT,
-    local_size INTEGER,
-    remote_mtime TEXT,
-    remote_size INTEGER,
-    remote_revision TEXT,
-    mime_type TEXT NOT NULL DEFAULT '',
-    state_code TEXT NOT NULL DEFAULT 'REM',
-    last_seen_local_at TEXT,
-    last_seen_remote_at TEXT,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    UNIQUE(root_id, rel_path)
-);
-
-CREATE INDEX IF NOT EXISTS idx_sync_entries_root_parent_name
-    ON sync_entries(root_id, parent_rel_path, name);
-CREATE INDEX IF NOT EXISTS idx_sync_entries_root_dirty
-    ON sync_entries(root_id, is_dirty);
-CREATE INDEX IF NOT EXISTS idx_sync_entries_root_updated
-    ON sync_entries(root_id, updated_at);
-
-CREATE TABLE IF NOT EXISTS file_metadata (
-    remote_name TEXT NOT NULL,
-    rel_path TEXT NOT NULL,
-    parent_rel_path TEXT NOT NULL DEFAULT '',
-    name TEXT NOT NULL,
-    is_dir INTEGER NOT NULL DEFAULT 0,
-    local_exists INTEGER NOT NULL DEFAULT 0,
-    local_mtime TEXT,
-    local_size INTEGER,
-    remote_exists INTEGER NOT NULL DEFAULT 0,
-    remote_mtime TEXT,
-    remote_size INTEGER,
-    remote_revision TEXT NOT NULL DEFAULT '',
-    mime_type TEXT NOT NULL DEFAULT '',
-    local_dirty INTEGER NOT NULL DEFAULT 0,
-    last_local_event_at TEXT,
-    last_local_seen_at TEXT,
-    last_remote_seen_at TEXT,
-    last_compared_at TEXT,
-    last_synced_at TEXT,
-    last_error TEXT NOT NULL DEFAULT '',
-    updated_at TEXT NOT NULL,
-    PRIMARY KEY (remote_name, rel_path)
-);
-
-CREATE INDEX IF NOT EXISTS idx_file_metadata_remote_parent_name
-    ON file_metadata(remote_name, parent_rel_path, name);
-CREATE INDEX IF NOT EXISTS idx_file_metadata_remote_updated
-    ON file_metadata(remote_name, updated_at);
-CREATE INDEX IF NOT EXISTS idx_file_metadata_remote_dirty
-    ON file_metadata(remote_name, local_dirty);
-
-CREATE TABLE IF NOT EXISTS watched_dirs (
-    remote_name TEXT NOT NULL,
-    rel_path TEXT NOT NULL DEFAULT '',
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    PRIMARY KEY (remote_name, rel_path)
-);
-
-CREATE TABLE IF NOT EXISTS file_hash (
-    remote_name TEXT NOT NULL,
-    rel_path TEXT NOT NULL,
-    side TEXT NOT NULL,
-    algorithm TEXT NOT NULL,
-    hash_value TEXT NOT NULL,
-    observed_mtime TEXT,
-    observed_size INTEGER,
-    computed_at TEXT NOT NULL,
-    PRIMARY KEY (remote_name, rel_path, side, algorithm)
-);
-`
-
-	if _, err := conn.Exec(schema); err != nil {
+	if err := ensureBootstrapSchema(conn); err != nil {
 		return err
 	}
 
@@ -289,5 +177,13 @@ func addColumnIfMissing(conn *sql.DB, table, column, columnDef string) error {
 		return err
 	}
 	_, err = conn.Exec(fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", table, column, columnDef))
+	return err
+}
+
+func ensureBootstrapSchema(conn *sql.DB) error {
+	if strings.TrimSpace(sqliteInitSQL) == "" {
+		return fmt.Errorf("embedded sqlite init.sql is empty")
+	}
+	_, err := conn.Exec(sqliteInitSQL)
 	return err
 }

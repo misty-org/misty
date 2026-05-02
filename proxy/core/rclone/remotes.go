@@ -10,17 +10,12 @@ import (
 	"unicode"
 )
 
-const defaultDriveImportFormats = "csv,doc,docx,htm,html,odp,ods,odt,ppt,pptx,rtf,tsv,txt,xls,xlsx"
-
 var fallbackProviderTypes = []ProviderType{
 	{Type: "local", Name: "Local"},
 }
 
 func desiredDriveImportFormats() string {
-	if value := strings.TrimSpace(os.Getenv("MISTY_DRIVE_IMPORT_FORMATS")); value != "" {
-		return value
-	}
-	return defaultDriveImportFormats
+	return normalizeCommaList(os.Getenv("MISTY_DRIVE_IMPORT_FORMATS"))
 }
 
 func normalizeCommaList(value string) string {
@@ -42,12 +37,19 @@ func EnsureRemoteDefaults(name string) error {
 	}
 
 	desired := desiredDriveImportFormats()
+	current, _ := getConfigValue(name, "import_formats")
+	current = normalizeCommaList(current)
+
+	// Binary uploads are the default. Only opt into Drive conversions when
+	// explicitly configured, and strip stale import_formats from existing remotes.
 	if desired == "" {
-		return nil
+		if current == "" {
+			return nil
+		}
+		return unsetConfigValue(name, "import_formats")
 	}
 
-	current, _ := getConfigValue(name, "import_formats")
-	if normalizeCommaList(current) == normalizeCommaList(desired) {
+	if current == desired {
 		return nil
 	}
 	return setConfigValue(name, "import_formats", desired)

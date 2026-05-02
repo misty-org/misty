@@ -27,6 +27,49 @@ std::string parent_remote_path(const std::string& remote_path) {
     return parent == "." ? std::string() : parent;
 }
 
+bool accumulate_sync_list_stream_chunk(const std::string& chunk,
+                                       nlohmann::json& aggregate,
+                                       std::string* error_out) {
+    try {
+        nlohmann::json event = nlohmann::json::parse(chunk);
+        const std::string type = event.value("type", std::string(""));
+        if (type == "items") {
+            aggregate["remote"] = event.value("remote", aggregate.value("remote", std::string("")));
+            aggregate["path"] = event.value("path", aggregate.value("path", std::string("")));
+            auto& items = aggregate["items"];
+            if (!items.is_array()) {
+                items = nlohmann::json::array();
+            }
+            for (const auto& item : event.value("items", nlohmann::json::array())) {
+                items.push_back(item);
+            }
+            return true;
+        }
+        if (type == "done") {
+            aggregate["remote"] = event.value("remote", aggregate.value("remote", std::string("")));
+            aggregate["path"] = event.value("path", aggregate.value("path", std::string("")));
+            aggregate["dirty_bit"] = event.value("dirty_bit", false);
+            aggregate["watched"] = event.value("watched", false);
+            return true;
+        }
+        if (type == "error") {
+            if (error_out) {
+                *error_out = event.value("error", std::string("stream error"));
+            }
+            return false;
+        }
+        if (error_out) {
+            *error_out = "unexpected sync stream event";
+        }
+        return false;
+    } catch (const std::exception& ex) {
+        if (error_out) {
+            *error_out = ex.what();
+        }
+        return false;
+    }
+}
+
 bool parse_rfc3339_utc(const std::string& value, std::time_t* seconds_out, long* nanos_out) {
     if (!seconds_out || !nanos_out || value.size() < 20) {
         return false;
@@ -380,6 +423,14 @@ namespace misty::panel {
         worker_pool_.add(
             [registry = &registry_, state_key = state_key_, remote_name, remote_path, target_path, navigation_generation]() {
                 auto& services = registry->get_state<ServicesState>("Services");
+                auto aggregate = std::make_shared<nlohmann::json>(nlohmann::json::object({
+                    {"items", nlohmann::json::array()},
+                    {"remote", remote_name},
+                    {"path", remote_path},
+                    {"dirty_bit", false},
+                    {"watched", false},
+                }));
+                auto saw_stream_update = std::make_shared<bool>(false);
 
                 std::string cached_body;
                 bool had_cache = core::listing_cache::load(remote_name, remote_path, cached_body);
@@ -388,13 +439,30 @@ namespace misty::panel {
                         *registry, state_key, remote_name, target_path, navigation_generation, true, cached_body, "");
                 }
 
-                services.fetch_sync_items(remote_name, remote_path,
-                    [registry, state_key, remote_name, remote_path, target_path, had_cache, navigation_generation]
-                    (bool list_success, const std::string& list_body, const std::string& list_error) {
-                        if (list_success) {
-                            core::listing_cache::save(remote_name, remote_path, list_body);
+                services.fetch_sync_items_stream(
+                    remote_name,
+                    remote_path,
+                    [registry, state_key, remote_name, target_path, navigation_generation, aggregate, saw_stream_update]
+                    (const std::string& chunk) {
+                        std::string parse_error;
+                        if (!accumulate_sync_list_stream_chunk(chunk, *aggregate, &parse_error)) {
                             FileExplorerPanel::apply_remote_folder_fetch(
-                                *registry, state_key, remote_name, target_path, navigation_generation, true, list_body, "");
+                                *registry, state_key, remote_name, target_path, navigation_generation, false, "",
+                                parse_error);
+                            return false;
+                        }
+                        *saw_stream_update = true;
+                        FileExplorerPanel::apply_remote_folder_fetch(
+                            *registry, state_key, remote_name, target_path, navigation_generation, true,
+                            aggregate->dump(), "");
+                        return true;
+                    },
+                    [registry, state_key, remote_name, remote_path, target_path, had_cache, navigation_generation, aggregate, saw_stream_update]
+                    (bool list_success, const std::string&, const std::string& list_error) {
+                        if (list_success) {
+                            if (*saw_stream_update) {
+                                core::listing_cache::save(remote_name, remote_path, aggregate->dump());
+                            }
                         } else if (!had_cache) {
                             FileExplorerPanel::apply_remote_folder_fetch(
                                 *registry, state_key, remote_name, target_path, navigation_generation, false, "",

@@ -221,6 +221,28 @@ func DeleteFileMetadata(exec sqlExecer, remoteName, relPath string) error {
 	return err
 }
 
+func DeleteFileMetadataByPathPrefix(exec sqlExecer, remoteName, relPath string) error {
+	likePrefix := relPath
+	if likePrefix != "" {
+		likePrefix += "/%"
+	}
+
+	var (
+		query string
+		args  []any
+	)
+	if relPath == "" {
+		query = `DELETE FROM file_metadata WHERE remote_name = ?`
+		args = []any{remoteName}
+	} else {
+		query = `DELETE FROM file_metadata WHERE remote_name = ? AND (rel_path = ? OR rel_path LIKE ?)`
+		args = []any{remoteName, relPath, likePrefix}
+	}
+
+	_, err := exec.Exec(query, args...)
+	return err
+}
+
 func RemoteHasDirtyEntries(conn *sql.DB, remoteName string) (bool, error) {
 	var exists int
 	if err := conn.QueryRow(`

@@ -6,6 +6,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <thread>
 
 #include "core/cache/listing_cache.h"
 #include "core/manager/env_manager.h"
@@ -61,6 +62,18 @@ void write_file(const fs::path& path, const std::string& body) {
     out << body;
 }
 
+bool wait_for(const std::function<bool()>& predicate,
+              std::chrono::milliseconds timeout = std::chrono::milliseconds(500)) {
+    const auto deadline = std::chrono::steady_clock::now() + timeout;
+    while (std::chrono::steady_clock::now() < deadline) {
+        if (predicate()) {
+            return true;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    return predicate();
+}
+
 struct StubDownloadBehavior {
     bool success = true;
     std::string error;
@@ -78,6 +91,7 @@ struct FolderTransferCall {
     std::string dest_remote;
     std::string dest_path;
 } g_folder_transfer;
+std::string g_last_delete_url;
 
 } // namespace
 
@@ -88,11 +102,17 @@ EnvManager& EnvManager::get() {
     return instance;
 }
 
-std::string EnvManager::get(const std::string&, const std::string& default_value) const {
+std::string EnvManager::get(const std::string& key, const std::string& default_value) const {
+    if (key == "PROXY_SERVICE_URL") {
+        return "http://proxy.test";
+    }
     return default_value;
 }
 
-std::string EnvManager::get(const std::string&) const {
+std::string EnvManager::get(const std::string& key) const {
+    if (key == "PROXY_SERVICE_URL") {
+        return "http://proxy.test";
+    }
     return {};
 }
 
@@ -116,7 +136,10 @@ HttpResponse HTTPClient::get(const std::string&, const std::map<std::string, std
 HttpResponse HTTPClient::get_with_timeouts(const std::string&, long, long, const std::map<std::string, std::string>&) { return {200, "", {}}; }
 HttpResponse HTTPClient::post(const std::string&, const std::string&, const std::map<std::string, std::string>&) { return {200, "", {}}; }
 HttpResponse HTTPClient::put(const std::string&, const std::string&, const std::map<std::string, std::string>&) { return {200, "", {}}; }
-HttpResponse HTTPClient::del(const std::string&, const std::map<std::string, std::string>&) { return {200, "", {}}; }
+HttpResponse HTTPClient::del(const std::string& url, const std::map<std::string, std::string>&) {
+    g_last_delete_url = url;
+    return {200, "", {}};
+}
 UploadResult HTTPClient::chunked_upload(const std::string&, const std::string&, size_t, size_t, UploadProgressCallback, std::atomic<bool>*) { return {}; }
 DownloadResult HTTPClient::download_to_file(const std::string&, const std::string&, const std::map<std::string, std::string>&, DownloadProgressCallback) { return {}; }
 bool HTTPClient::probe_proxy() { return true; }
@@ -153,6 +176,7 @@ void ServicesState::watch_sync_dir(const std::string&, const std::string&, Files
 void ServicesState::unwatch_sync_dir(const std::string&, const std::string&, FilesCallback) {}
 void ServicesState::run_sync_now(const std::string&, FilesCallback) {}
 void ServicesState::fetch_sync_items(const std::string&, const std::string&, FilesCallback) {}
+void ServicesState::fetch_sync_items_stream(const std::string&, const std::string&, StreamFilesCallback, FilesCallback) {}
 void ServicesState::mark_local_dirty(const std::string&, const std::string&, bool, bool, const std::string&, int64_t, FilesCallback) {}
 void ServicesState::mark_local_synced(const std::string&, const std::string&, FilesCallback) {}
 void ServicesState::upload_file(const std::string&, const std::string&, const std::string&, core::UploadProgressCallback progress_cb, UploadCallback callback) {
@@ -200,6 +224,19 @@ void ServicesState::download_file(const std::string&,
     }
     if (g_download_behavior.success) {
         write_file(local_path, g_download_behavior.local_body);
+        callback(true, local_path, "");
+    } else {
+        callback(false, local_path, g_download_behavior.error);
+    }
+}
+
+void ServicesState::download_folder(const std::string&,
+                                    const std::string&,
+                                    const std::string& local_path,
+                                    DownloadCallback callback) {
+    if (g_download_behavior.success) {
+        fs::create_directories(local_path);
+        write_file(fs::path(local_path) / "stub.txt", g_download_behavior.local_body);
         callback(true, local_path, "");
     } else {
         callback(false, local_path, g_download_behavior.error);
@@ -255,6 +292,53 @@ bool FileExplorerPanel::resolve_remote_path_context(const std::string& path,
     return true;
 }
 
+bool FileExplorerPanel::resolve_drop_destination_path(const std::string& path,
+                                                      std::string& resolved_path,
+                                                      std::string* error_message) const {
+    resolved_path = path;
+    if (!misty::panel::path_utils::is_remote_path(path)) {
+        return true;
+    }
+
+    const auto info = misty::panel::path_utils::parse_remote_path(path);
+    if (info.provider_folder.empty()) {
+        if (error_message) {
+            *error_message = "Navigate into a provider or remote folder before dropping items.";
+        }
+        return false;
+    }
+
+    if (!info.remote_name.empty()) {
+        return true;
+    }
+
+    const auto& workspace = registry_.get_state<WorkspaceState>("Workspace");
+    const RemoteAccountMapping* unique_mapping = nullptr;
+    for (const auto& mapping : workspace.remote_mappings) {
+        if (mapping.provider_folder != info.provider_folder) {
+            continue;
+        }
+        if (unique_mapping != nullptr) {
+            if (error_message) {
+                *error_message = "Provider has multiple accounts. Open it and drop into a specific remote.";
+            }
+            return false;
+        }
+        unique_mapping = &mapping;
+    }
+
+    if (unique_mapping == nullptr) {
+        if (error_message) {
+            *error_message = "Provider has no connected remote destination.";
+        }
+        return false;
+    }
+
+    resolved_path = misty::panel::path_utils::get_mount_root() + "/" +
+        unique_mapping->provider_folder + "/" + unique_mapping->folder_name;
+    return true;
+}
+
 void FileExplorerPanel::notify_shared_path_refresh(const std::string& path) {
     g_last_refresh_path = path;
 }
@@ -274,6 +358,7 @@ protected:
     void SetUp() override {
         g_last_navigate_path.clear();
         g_last_refresh_path.clear();
+        g_last_delete_url.clear();
         g_download_behavior = {};
         g_folder_transfer = {};
 
@@ -334,7 +419,7 @@ TEST_F(FileExplorerActionsTest, PerformDeleteRemovesLocalPath) {
     EXPECT_FALSE(fs::exists(target));
 }
 
-TEST_F(FileExplorerActionsTest, LocalPasteToCloudQueuesUploadAndRefreshesCurrentPath) {
+TEST_F(FileExplorerActionsTest, LocalPasteToCloudQueuesUploadWithoutImmediateExplorerRefresh) {
     const fs::path local_file = home_.path() / "local.txt";
     write_file(local_file, "payload");
 
@@ -360,8 +445,8 @@ TEST_F(FileExplorerActionsTest, LocalPasteToCloudQueuesUploadAndRefreshesCurrent
     EXPECT_TRUE(sidebar.pending_upload_start);
     EXPECT_EQ(sidebar.upload_queue[0].remote_name, "onedrive-alice");
     EXPECT_EQ(sidebar.upload_queue[0].remote_path, "Docs");
-    EXPECT_EQ(g_last_navigate_path, remote_dir.string());
-    EXPECT_EQ(g_last_refresh_path, remote_dir.string());
+    EXPECT_TRUE(g_last_navigate_path.empty());
+    EXPECT_TRUE(g_last_refresh_path.empty());
     EXPECT_TRUE(fs::exists(remote_dir / "local.txt"));
 }
 
@@ -386,6 +471,48 @@ TEST_F(FileExplorerActionsTest, CloudPasteToLocalUsesDownloadPathForNotSyncedFil
     ASSERT_EQ(items.size(), 1u);
     EXPECT_EQ(items[0].status, misty::panel::DownloadStatus::COMPLETED);
     EXPECT_TRUE(fs::exists(dest_dir / "remote.txt"));
+    EXPECT_TRUE(g_last_delete_url.empty());
+}
+
+TEST_F(FileExplorerActionsTest, CloudCutToLocalDeletesRemoteSourceForNotSyncedFile) {
+    const fs::path dest_dir = home_.path() / "Downloads";
+    fs::create_directories(dest_dir);
+
+    misty::panel::FileExplorerState state;
+    misty::panel::UnifiedFileItem item;
+    item.name = "remote.txt";
+    item.path = (home_.path() / "misty" / "mnt" / "OneDrive" / "alice" / "remote.txt").string();
+    item.remote_name = "onedrive-alice";
+    item.remote_path = "remote.txt";
+    item.source = misty::panel::FileSource::REMOTE;
+    item.status = misty::panel::SyncStatus::NOT_SYNCED;
+    item.size = 10;
+
+    panel_.perform_paste_cloud_to_local(state, item, dest_dir.string(), misty::panel::ClipboardOp::CUT);
+
+    EXPECT_TRUE(fs::exists(dest_dir / "remote.txt"));
+    EXPECT_NE(g_last_delete_url.find("/api/file?remote=onedrive-alice&path=remote.txt"), std::string::npos);
+}
+
+TEST_F(FileExplorerActionsTest, CloudFolderPasteToLocalDownloadsFolderContents) {
+    const fs::path dest_dir = home_.path() / "Downloads";
+    fs::create_directories(dest_dir);
+
+    misty::panel::FileExplorerState state;
+    misty::panel::UnifiedFileItem item;
+    item.name = "Folder";
+    item.path = (home_.path() / "misty" / "mnt" / "OneDrive" / "alice" / "Folder").string();
+    item.remote_name = "onedrive-alice";
+    item.remote_path = "Folder";
+    item.source = misty::panel::FileSource::REMOTE;
+    item.status = misty::panel::SyncStatus::NOT_SYNCED;
+    item.is_dir = true;
+
+    panel_.perform_paste_cloud_to_local(state, item, dest_dir.string(), misty::panel::ClipboardOp::COPY);
+
+    ASSERT_TRUE(wait_for([&]() { return fs::exists(dest_dir / "Folder" / "stub.txt"); }));
+    EXPECT_TRUE(g_last_delete_url.empty());
+    EXPECT_EQ(g_last_refresh_path, dest_dir.string());
 }
 
 TEST_F(FileExplorerActionsTest, CloudPasteToCloudStagesDownloadThenQueuesCleanupUpload) {
@@ -421,6 +548,27 @@ TEST_F(FileExplorerActionsTest, CloudPasteToCloudStagesDownloadThenQueuesCleanup
     EXPECT_EQ(items[0].status, misty::panel::DownloadStatus::COMPLETED);
 }
 
+TEST_F(FileExplorerActionsTest, CloudCutToCloudUploadsThenDeletesRemoteSourceForNotSyncedFile) {
+    const fs::path target_dir = home_.path() / "misty" / "mnt" / "OneDrive" / "alice" / "Target";
+    fs::create_directories(target_dir);
+
+    misty::panel::FileExplorerState state;
+    misty::panel::UnifiedFileItem item;
+    item.name = "remote.txt";
+    item.path = (home_.path() / "misty" / "mnt" / "OneDrive" / "alice" / "remote.txt").string();
+    item.remote_name = "onedrive-alice";
+    item.remote_path = "remote.txt";
+    item.source = misty::panel::FileSource::REMOTE;
+    item.status = misty::panel::SyncStatus::NOT_SYNCED;
+    item.size = 10;
+
+    panel_.perform_drop_items(state, {item}, target_dir.string(), misty::panel::ClipboardOp::CUT);
+
+    auto& sidebar = registry_.get_state<misty::panel::FileSidebarState>("FileSidebar");
+    EXPECT_TRUE(sidebar.upload_queue.empty());
+    EXPECT_NE(g_last_delete_url.find("/api/file?remote=onedrive-alice&path=remote.txt"), std::string::npos);
+}
+
 TEST_F(FileExplorerActionsTest, CloudFolderPasteToCloudUsesProxyFolderTransfer) {
     const fs::path target_dir = home_.path() / "misty" / "mnt" / "OneDrive" / "alice" / "Target";
     fs::create_directories(target_dir);
@@ -442,6 +590,54 @@ TEST_F(FileExplorerActionsTest, CloudFolderPasteToCloudUsesProxyFolderTransfer) 
     EXPECT_EQ(g_folder_transfer.source_path, "Folder");
     EXPECT_EQ(g_folder_transfer.dest_remote, "onedrive-alice");
     EXPECT_EQ(g_folder_transfer.dest_path, "Target/Folder");
+}
+
+TEST_F(FileExplorerActionsTest, CloudFolderPasteToProviderFolderUsesResolvedRemoteRoot) {
+    const fs::path provider_dir = home_.path() / "misty" / "mnt" / "OneDrive";
+    fs::create_directories(provider_dir);
+
+    misty::panel::FileExplorerState state;
+    misty::panel::UnifiedFileItem item;
+    item.name = "Folder";
+    item.path = (home_.path() / "misty" / "mnt" / "Google Drive" / "drive" / "Folder").string();
+    item.remote_name = "google-drive";
+    item.remote_path = "Folder";
+    item.source = misty::panel::FileSource::REMOTE;
+    item.status = misty::panel::SyncStatus::NOT_SYNCED;
+    item.is_dir = true;
+
+    panel_.perform_drop_items(state, {item}, provider_dir.string(), misty::panel::ClipboardOp::COPY);
+
+    EXPECT_TRUE(g_folder_transfer.called);
+    EXPECT_EQ(g_folder_transfer.source_remote, "google-drive");
+    EXPECT_EQ(g_folder_transfer.source_path, "Folder");
+    EXPECT_EQ(g_folder_transfer.dest_remote, "onedrive-alice");
+    EXPECT_EQ(g_folder_transfer.dest_path, "Folder");
+}
+
+TEST_F(FileExplorerActionsTest, CopyPreservesRemoteSourceForMirroredItems) {
+    const fs::path remote_file = home_.path() / "misty" / "mnt" / "OneDrive" / "alice" / "Docs" / "remote.txt";
+    write_file(remote_file, "payload");
+
+    auto& state = registry_.get_state<misty::panel::FileExplorerState>("Files");
+    misty::panel::UnifiedFileItem item;
+    item.id = "remote-item";
+    item.name = "remote.txt";
+    item.path = remote_file.string();
+    item.remote_name = "onedrive-alice";
+    item.remote_path = "Docs/remote.txt";
+    item.source = misty::panel::FileSource::REMOTE;
+    item.status = misty::panel::SyncStatus::SYNCED;
+    state.files = {item};
+    state.selected_files.insert(item.id);
+
+    panel_.perform_copy(state);
+
+    auto& clipboard = registry_.get_state<misty::panel::ClipboardState>("Clipboard");
+    ASSERT_EQ(clipboard.items.size(), 1u);
+    EXPECT_EQ(clipboard.items[0].source, misty::panel::FileSource::REMOTE);
+    EXPECT_EQ(clipboard.items[0].remote_name, "onedrive-alice");
+    EXPECT_EQ(clipboard.items[0].remote_path, "Docs/remote.txt");
 }
 
 TEST(UploadStateTest, FailedUploadRetainsRetryContext) {

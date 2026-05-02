@@ -198,6 +198,41 @@ namespace misty::panel {
         return false;
     }
 
+    bool FileTreePanel::drop_selected_items_to_path(const std::string& source_state_key,
+                                                    const std::string& dest_path,
+                                                    ClipboardOp op) {
+        if (dest_path.empty() || op == ClipboardOp::NONE) {
+            return false;
+        }
+
+        ExplorerTab* active_tab = get_active_tab(active_pane_id_);
+        if (!active_tab || !active_tab->explorer_panel) {
+            return false;
+        }
+
+        const std::string effective_source_key = source_state_key.empty()
+            ? active_tab->explorer_state_key
+            : source_state_key;
+        auto& source_state = ui_registry_.get_state<FileExplorerState>(effective_source_key);
+
+        std::vector<UnifiedFileItem> items;
+        items.reserve(source_state.selected_files.size());
+        for (const auto& selected_id : source_state.selected_files) {
+            auto it = std::find_if(source_state.files.begin(), source_state.files.end(),
+                [&](const UnifiedFileItem& candidate) { return candidate.id == selected_id; });
+            if (it != source_state.files.end()) {
+                items.push_back(*it);
+            }
+        }
+        if (items.empty()) {
+            return false;
+        }
+
+        auto& target_state = ui_registry_.get_state<FileExplorerState>(active_tab->explorer_state_key);
+        active_tab->explorer_panel->perform_drop_items(target_state, items, dest_path, op);
+        return true;
+    }
+
     void FileTreePanel::render(const ImVec2& pos, const ImVec2& size) {
         current_area_size_ = size;
         pending_pane_move_.reset();

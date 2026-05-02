@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/kannachi323/misty/proxy/core/jobs"
 	"github.com/kannachi323/misty/proxy/core/restic"
+	jobutil "github.com/kannachi323/misty/proxy/core/utils"
 )
 
 func (s *Service) StartBackup() http.HandlerFunc {
@@ -37,9 +37,9 @@ func (s *Service) StartBackup() http.HandlerFunc {
 			Hostname: req.Hostname,
 		}
 		repoCopy := *repo
-		job := s.Jobs.Start("backup", req.Repo, func(ctx context.Context, emit func(jobs.Event)) error {
+		job := s.Jobs.Start("backup", req.Repo, func(ctx context.Context, emit func(jobutil.Event)) error {
 			_, err := restic.Backup(ctx, repoCopy, req.Paths, opts, func(e restic.ProgressEvent) {
-				emit(jobs.Event{Payload: e})
+				emit(jobutil.Event{Payload: e})
 			})
 			return err
 		})
@@ -70,9 +70,9 @@ func (s *Service) StartRestore() http.HandlerFunc {
 			return
 		}
 		repoCopy := *repo
-		job := s.Jobs.Start("restore", req.Repo, func(ctx context.Context, emit func(jobs.Event)) error {
+		job := s.Jobs.Start("restore", req.Repo, func(ctx context.Context, emit func(jobutil.Event)) error {
 			return restic.Restore(ctx, repoCopy, req.SnapshotID, req.Target, func(e restic.ProgressEvent) {
-				emit(jobs.Event{Payload: e})
+				emit(jobutil.Event{Payload: e})
 			})
 		})
 		w.Header().Set("Content-Type", "application/json")
@@ -101,7 +101,7 @@ func (s *Service) StartForget() http.HandlerFunc {
 			return
 		}
 		repoCopy := *repo
-		job := s.Jobs.Start("forget", req.Repo, func(ctx context.Context, emit func(jobs.Event)) error {
+		job := s.Jobs.Start("forget", req.Repo, func(ctx context.Context, emit func(jobutil.Event)) error {
 			return restic.Forget(ctx, repoCopy, req.Policy, req.Prune)
 		})
 		w.Header().Set("Content-Type", "application/json")

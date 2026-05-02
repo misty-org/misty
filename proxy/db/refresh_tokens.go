@@ -1,9 +1,11 @@
 package db
 
 import (
+	"database/sql"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"log"
 	"time"
 
@@ -19,6 +21,38 @@ var (
 func HashToken(raw string) string {
 	h := sha256.Sum256([]byte(raw))
 	return hex.EncodeToString(h[:])
+}
+
+func parseStoredTime(raw any) (time.Time, error) {
+	switch v := raw.(type) {
+	case time.Time:
+		return v, nil
+	case string:
+		return parseStoredTimeString(v)
+	case []byte:
+		return parseStoredTimeString(string(v))
+	default:
+		return time.Time{}, fmt.Errorf("unsupported time value type %T", raw)
+	}
+}
+
+func parseStoredTimeString(value string) (time.Time, error) {
+	layouts := []string{
+		time.RFC3339Nano,
+		"2006-01-02 15:04:05.999999999-07:00",
+		"2006-01-02 15:04:05.999999999Z07:00",
+		"2006-01-02 15:04:05-07:00",
+		"2006-01-02 15:04:05Z07:00",
+		"2006-01-02 15:04:05.999999999",
+		"2006-01-02 15:04:05",
+	}
+
+	for _, layout := range layouts {
+		if parsed, err := time.Parse(layout, value); err == nil {
+			return parsed, nil
+		}
+	}
+	return time.Time{}, fmt.Errorf("unsupported time value %q", value)
 }
 
 func (db *Database) StoreRefreshToken(userID, rawToken string, expiresAt time.Time) error {
@@ -37,27 +71,40 @@ func (db *Database) StoreRefreshToken(userID, rawToken string, expiresAt time.Ti
 }
 
 // ValidateRefreshToken checks if a refresh token is valid.
-// If the token was revoked, it triggers theft detection and revokes ALL tokens for that user.
+// For the desktop app we keep this tolerant: a revoked token is rejected, but
+// we do not fan that out into revoking every token for the user.
 func (db *Database) ValidateRefreshToken(rawToken string) (string, error) {
 	tokenHash := HashToken(rawToken)
 
 	var userID string
-	var expiresAt time.Time
+	var expiresAtRaw any
 	var revoked bool
 
 	err := db.Conn.QueryRow(`
 		SELECT user_id, expires_at, revoked FROM refresh_tokens
 		WHERE token_hash = ?`,
 		tokenHash,
-	).Scan(&userID, &expiresAt, &revoked)
+	).Scan(&userID, &expiresAtRaw, &revoked)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", ErrTokenNotFound
+		}
+		log.Printf("Failed to scan refresh token for hash %s: %v", tokenHash, err)
+		return "", err
+	}
+
+	expiresAt, err := parseStoredTime(expiresAtRaw)
+	if err != nil {
+		log.Printf("Failed to parse refresh token expiry for user %s: %v", userID, err)
+		return "", err
+	}
+
+	if userID == "" {
 		return "", ErrTokenNotFound
 	}
 
-	// Theft detection: if a revoked token is presented, revoke ALL user tokens
 	if revoked {
-		log.Printf("SECURITY: Revoked refresh token reused for user %s — revoking all tokens", userID)
-		_ = db.RevokeAllUserRefreshTokens(userID)
+		log.Printf("Refresh token rejected because it was revoked for user %s", userID)
 		return "", ErrTokenRevoked
 	}
 

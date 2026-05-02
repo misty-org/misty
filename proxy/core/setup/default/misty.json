@@ -1,0 +1,8 @@
+{
+  "proxy": {
+    "port": 3000
+  },
+  "server": {
+    "url": "https://mistysys.com"
+  }
+}

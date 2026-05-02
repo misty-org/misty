@@ -41,6 +41,61 @@ func ListDir(ctx context.Context, remote, dirPath string) ([]FileItem, error) {
 	return items, nil
 }
 
+func ListDirStream(ctx context.Context, remote, dirPath string, onItem func(FileItem) error) error {
+	cmd, err := rcloneCmd(ctx, "lsjson", remoteSpec(remote, dirPath), "--hash")
+	if err != nil {
+		return err
+	}
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return fmt.Errorf("list directory: %w", err)
+	}
+
+	var stderr limitedBuffer
+	cmd.Stderr = &stderr
+
+	if err := cmd.Start(); err != nil {
+		return commandError([]string{"lsjson", remoteSpec(remote, dirPath)}, err, stderr.String())
+	}
+
+	decoder := json.NewDecoder(stdout)
+	tok, err := decoder.Token()
+	if err != nil {
+		_ = cmd.Wait()
+		return fmt.Errorf("parse lsjson: %w", err)
+	}
+	delim, ok := tok.(json.Delim)
+	if !ok || delim != '[' {
+		_ = cmd.Wait()
+		return fmt.Errorf("parse lsjson: expected array")
+	}
+
+	for decoder.More() {
+		var entry lsjsonItem
+		if err := decoder.Decode(&entry); err != nil {
+			_ = cmd.Wait()
+			return fmt.Errorf("parse lsjson: %w", err)
+		}
+		if onItem != nil {
+			if err := onItem(fileItemFromLsjson(dirPath, entry)); err != nil {
+				_ = cmd.Process.Kill()
+				_ = cmd.Wait()
+				return err
+			}
+		}
+	}
+
+	if _, err := decoder.Token(); err != nil {
+		_ = cmd.Wait()
+		return fmt.Errorf("parse lsjson: %w", err)
+	}
+	if err := cmd.Wait(); err != nil {
+		return commandError([]string{"lsjson", remoteSpec(remote, dirPath)}, err, stderr.String())
+	}
+	return nil
+}
+
 func DownloadFile(ctx context.Context, remote, filePath string, w io.Writer) (int64, error) {
 	written, err := streamRclone(ctx, w, nil, "cat", remoteSpec(remote, filePath))
 	if err != nil {

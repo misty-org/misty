@@ -190,7 +190,7 @@ func TestEnsureRemoteDefaultsNoopForNonDrive(t *testing.T) {
 	}
 }
 
-func TestEnsureRemoteDefaultsSetsDriveImportFormats(t *testing.T) {
+func TestEnsureRemoteDefaultsLeavesDriveBinaryByDefault(t *testing.T) {
 	tmpConf := filepath.Join(t.TempDir(), "rclone.conf")
 	if err := os.WriteFile(tmpConf, []byte(""), 0600); err != nil {
 		t.Fatal(err)
@@ -210,12 +210,67 @@ func TestEnsureRemoteDefaultsSetsDriveImportFormats(t *testing.T) {
 	if err := EnsureRemoteDefaults(remote); err != nil {
 		t.Fatal("EnsureRemoteDefaults:", err)
 	}
+
+	if value, ok := getConfigValue(remote, "import_formats"); ok && value != "" {
+		t.Fatalf("expected no import_formats for drive remote by default, got %q", value)
+	}
+}
+
+func TestEnsureRemoteDefaultsSetsDriveImportFormatsFromEnv(t *testing.T) {
+	tmpConf := filepath.Join(t.TempDir(), "rclone.conf")
+	if err := os.WriteFile(tmpConf, []byte(""), 0600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("MISTY_RCLONE_CONFIG", tmpConf)
+	t.Setenv("MISTY_DRIVE_IMPORT_FORMATS", "docx,pptx")
+	initOnce = sync.Once{}
+	if err := Init(); err != nil {
+		t.Skipf("rclone binary unavailable: %v", err)
+	}
+
+	remote := "test-drive"
+	if err := setConfigValue(remote, "type", "drive"); err != nil {
+		t.Fatal("SetValueAndSave type:", err)
+	}
+	defer DeleteRemote(remote)
+
+	if err := EnsureRemoteDefaults(remote); err != nil {
+		t.Fatal("EnsureRemoteDefaults:", err)
+	}
 	value, ok := getConfigValue(remote, "import_formats")
 	if !ok {
 		t.Fatal("expected import_formats to be set")
 	}
-	if normalizeCommaList(value) != normalizeCommaList(defaultDriveImportFormats) {
+	if normalizeCommaList(value) != "docx,pptx" {
 		t.Fatalf("unexpected import_formats: %q", value)
+	}
+}
+
+func TestEnsureRemoteDefaultsClearsStaleDriveImportFormats(t *testing.T) {
+	tmpConf := filepath.Join(t.TempDir(), "rclone.conf")
+	if err := os.WriteFile(tmpConf, []byte(""), 0600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("MISTY_RCLONE_CONFIG", tmpConf)
+	initOnce = sync.Once{}
+	if err := Init(); err != nil {
+		t.Skipf("rclone binary unavailable: %v", err)
+	}
+
+	remote := "test-drive"
+	if err := setConfigValue(remote, "type", "drive"); err != nil {
+		t.Fatal("SetValueAndSave type:", err)
+	}
+	if err := setConfigValue(remote, "import_formats", "docx,pptx"); err != nil {
+		t.Fatal("SetValueAndSave import_formats:", err)
+	}
+	defer DeleteRemote(remote)
+
+	if err := EnsureRemoteDefaults(remote); err != nil {
+		t.Fatal("EnsureRemoteDefaults:", err)
+	}
+	if value, ok := getConfigValue(remote, "import_formats"); ok && value != "" {
+		t.Fatalf("expected stale import_formats to be cleared, got %q", value)
 	}
 }
 

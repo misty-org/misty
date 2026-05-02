@@ -113,6 +113,47 @@ func (s *Service) refreshSyncRootDirtyBit(rootID, remoteName string) error {
 	return dbpkg.SetSyncRootDirtyBit(s.database.Conn, rootID, stillDirty, "")
 }
 
+func isMissingDirectoryError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(strings.ToLower(err.Error()), "directory not found")
+}
+
+func (s *Service) pruneMissingRemoteDirectory(root *dbpkg.SyncRoot, remoteName, dirPath string) error {
+	if s == nil || s.database == nil || s.database.Conn == nil {
+		return fmt.Errorf("sync metadata database unavailable")
+	}
+	if root == nil {
+		return fmt.Errorf("sync root is required")
+	}
+	if err := dbpkg.DeleteSyncEntriesByPathPrefix(s.database.Conn, root.ID, dirPath); err != nil {
+		return err
+	}
+	if err := dbpkg.DeleteFileMetadataByPathPrefix(s.database.Conn, remoteName, dirPath); err != nil {
+		return err
+	}
+	return s.refreshSyncRootDirtyBit(root.ID, remoteName)
+}
+
+func (s *Service) emptyDirectoryResponse(remoteName, dirPath string) (*DirectoryResponse, error) {
+	dirtyBit, err := dbpkg.RemoteHasDirtyEntries(s.database.Conn, remoteName)
+	if err != nil {
+		return nil, err
+	}
+	watched, err := dbpkg.IsWatchedDir(s.database.Conn, remoteName, dirPath)
+	if err != nil {
+		return nil, err
+	}
+	return &DirectoryResponse{
+		Items:    []DirectoryItem{},
+		Remote:   remoteName,
+		Path:     dirPath,
+		DirtyBit: dirtyBit,
+		Watched:  watched,
+	}, nil
+}
+
 func (s *Service) BackfillQueueForRemote(remoteName string) error {
 	root, err := s.ensureSyncRoot(remoteName)
 	if err != nil {
@@ -135,46 +176,38 @@ func (s *Service) RefetchDirectory(ctx context.Context, remoteName, dirPath stri
 	return s.refreshDirectory(ctx, remoteName, dirPath, false)
 }
 
-func (s *Service) ListDirectory(_ context.Context, remoteName, dirPath string) (*DirectoryResponse, error) {
-	if s == nil || s.database == nil || s.database.Conn == nil {
-		return nil, fmt.Errorf("sync metadata database unavailable")
+func directoryItemForRow(remoteName string, row dbpkg.FileMetadata) DirectoryItem {
+	state, dirty, direction := deriveDirectoryItemState(row)
+	reason := deriveDirectoryItemReason(row)
+	localPath := buildLocalPath(remoteName, row.RelPath)
+	size, modTime := row.RemoteSize.Int64, row.RemoteMTime
+	if row.LocalExists {
+		if row.LocalSize.Valid {
+			size = row.LocalSize.Int64
+		}
+		if row.LocalMTime != "" {
+			modTime = row.LocalMTime
+		}
 	}
-	if remoteName == "" {
-		return nil, fmt.Errorf("remote is required")
+	return DirectoryItem{
+		Name:          row.Name,
+		Path:          row.RelPath,
+		LocalPath:     localPath,
+		IsDir:         row.IsDir,
+		Size:          size,
+		ModTime:       modTime,
+		MimeType:      row.MimeType,
+		State:         state,
+		SyncDirty:     dirty,
+		SyncDirection: direction,
+		DirtyReason:   reason,
 	}
+}
 
-	rows, err := dbpkg.ListFileMetadataByParent(s.database.Conn, remoteName, dirPath)
-	if err != nil {
-		return nil, err
-	}
-
+func (s *Service) directoryResponseFromRows(remoteName, dirPath string, rows []dbpkg.FileMetadata) (*DirectoryResponse, error) {
 	items := make([]DirectoryItem, 0, len(rows))
 	for _, row := range rows {
-		state, dirty, direction := deriveDirectoryItemState(row)
-		reason := deriveDirectoryItemReason(row)
-		localPath := buildLocalPath(remoteName, row.RelPath)
-		size, modTime := row.RemoteSize.Int64, row.RemoteMTime
-		if row.LocalExists {
-			if row.LocalSize.Valid {
-				size = row.LocalSize.Int64
-			}
-			if row.LocalMTime != "" {
-				modTime = row.LocalMTime
-			}
-		}
-		items = append(items, DirectoryItem{
-			Name:          row.Name,
-			Path:          row.RelPath,
-			LocalPath:     localPath,
-			IsDir:         row.IsDir,
-			Size:          size,
-			ModTime:       modTime,
-			MimeType:      row.MimeType,
-			State:         state,
-			SyncDirty:     dirty,
-			SyncDirection: direction,
-			DirtyReason:   reason,
-		})
+		items = append(items, directoryItemForRow(remoteName, row))
 	}
 
 	dirtyBit, err := dbpkg.RemoteHasDirtyEntries(s.database.Conn, remoteName)
@@ -193,6 +226,90 @@ func (s *Service) ListDirectory(_ context.Context, remoteName, dirPath string) (
 		DirtyBit: dirtyBit,
 		Watched:  watched,
 	}, nil
+}
+
+func (s *Service) streamDirectoryRows(remoteName, dirPath string, rows []dbpkg.FileMetadata,
+	emit func(DirectoryStreamChunk) error) error {
+	dirtyBit, err := dbpkg.RemoteHasDirtyEntries(s.database.Conn, remoteName)
+	if err != nil {
+		return err
+	}
+	watched, err := dbpkg.IsWatchedDir(s.database.Conn, remoteName, dirPath)
+	if err != nil {
+		return err
+	}
+
+	const batchSize = 128
+	batch := make([]DirectoryItem, 0, batchSize)
+	flush := func() error {
+		if len(batch) == 0 {
+			return nil
+		}
+		items := append([]DirectoryItem(nil), batch...)
+		batch = batch[:0]
+		return emit(DirectoryStreamChunk{
+			Type:   "items",
+			Remote: remoteName,
+			Path:   dirPath,
+			Items:  items,
+		})
+	}
+
+	for _, row := range rows {
+		batch = append(batch, directoryItemForRow(remoteName, row))
+		if len(batch) >= batchSize {
+			if err := flush(); err != nil {
+				return err
+			}
+		}
+	}
+	if err := flush(); err != nil {
+		return err
+	}
+	return emit(DirectoryStreamChunk{
+		Type:     "done",
+		Remote:   remoteName,
+		Path:     dirPath,
+		DirtyBit: dirtyBit,
+		Watched:  watched,
+	})
+}
+
+func (s *Service) StreamDirectory(ctx context.Context, remoteName, dirPath string,
+	emit func(DirectoryStreamChunk) error) error {
+	if s == nil || s.database == nil || s.database.Conn == nil {
+		return fmt.Errorf("sync metadata database unavailable")
+	}
+	if remoteName == "" {
+		return fmt.Errorf("remote is required")
+	}
+
+	rows, err := dbpkg.ListFileMetadataByParent(s.database.Conn, remoteName, dirPath)
+	if err != nil {
+		return err
+	}
+	if len(rows) > 0 {
+		return s.streamDirectoryRows(remoteName, dirPath, rows, emit)
+	}
+	return s.refreshDirectoryStream(ctx, remoteName, dirPath, false, emit)
+}
+
+func (s *Service) ListDirectory(ctx context.Context, remoteName, dirPath string) (*DirectoryResponse, error) {
+	if s == nil || s.database == nil || s.database.Conn == nil {
+		return nil, fmt.Errorf("sync metadata database unavailable")
+	}
+	if remoteName == "" {
+		return nil, fmt.Errorf("remote is required")
+	}
+
+	rows, err := dbpkg.ListFileMetadataByParent(s.database.Conn, remoteName, dirPath)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return s.refreshDirectory(ctx, remoteName, dirPath, false)
+	}
+	return s.directoryResponseFromRows(remoteName, dirPath, rows)
 }
 
 func (s *Service) MarkLocalDirty(_ context.Context, remoteName, relPath string, localExists, isDir bool, mtime string, size int64) error {
@@ -355,6 +472,219 @@ func (s *Service) RefreshDirectory(ctx context.Context, remoteName, dirPath stri
 	return s.refreshDirectory(ctx, remoteName, dirPath, true)
 }
 
+func (s *Service) refreshDirectoryStream(ctx context.Context, remoteName, dirPath string, reconcile bool,
+	emit func(DirectoryStreamChunk) error) error {
+	if s == nil || s.database == nil || s.database.Conn == nil {
+		return fmt.Errorf("sync metadata database unavailable")
+	}
+	if remoteName == "" {
+		return fmt.Errorf("remote is required")
+	}
+	if !rclone.RemoteExists(remoteName) {
+		return fmt.Errorf("remote not found")
+	}
+	root, err := s.ensureSyncRoot(remoteName)
+	if err != nil {
+		return err
+	}
+
+	localItems, err := scanLocalDirectory(buildLocalPath(remoteName, dirPath))
+	if err != nil {
+		return err
+	}
+	existingRows, err := dbpkg.ListFileMetadataByParent(s.database.Conn, remoteName, dirPath)
+	if err != nil {
+		return err
+	}
+
+	existingByName := make(map[string]dbpkg.FileMetadata, len(existingRows))
+	for _, row := range existingRows {
+		existingByName[row.Name] = row
+	}
+
+	const batchSize = 128
+	batch := make([]DirectoryItem, 0, batchSize)
+	flush := func() error {
+		if len(batch) == 0 {
+			return nil
+		}
+		items := append([]DirectoryItem(nil), batch...)
+		batch = batch[:0]
+		return emit(DirectoryStreamChunk{
+			Type:   "items",
+			Remote: remoteName,
+			Path:   dirPath,
+			Items:  items,
+		})
+	}
+
+	now := dbpkg.NowRFC3339()
+	seenNames := make(map[string]struct{}, len(existingByName))
+	processRow := func(name string, remoteItem rclone.FileItem, hasRemote bool) error {
+		prev, hadPrev := existingByName[name]
+		localItem, hasLocal := localItems[name]
+
+		row := dbpkg.FileMetadata{
+			RemoteName:    remoteName,
+			ParentRelPath: dirPath,
+			Name:          name,
+			UpdatedAt:     now,
+		}
+		if hadPrev {
+			row = prev
+			row.UpdatedAt = now
+		}
+
+		relPath := ""
+		if hasRemote {
+			relPath = remoteItem.Path
+		} else if hadPrev {
+			relPath = prev.RelPath
+		} else {
+			relPath = joinRemotePath(dirPath, name)
+		}
+		row.RelPath = relPath
+		row.ParentRelPath = dirPath
+		row.Name = name
+
+		row.LocalExists = hasLocal
+		if hasLocal {
+			row.IsDir = row.IsDir || localItem.isDir
+			row.LocalMTime = localItem.modTime
+			row.LocalSize = sql.NullInt64{Int64: localItem.size, Valid: !localItem.isDir}
+			row.LastLocalSeen = now
+		} else {
+			row.LocalMTime = ""
+			row.LocalSize = sql.NullInt64{}
+			if hadPrev {
+				row.LastLocalSeen = now
+			}
+		}
+
+		row.RemoteExists = hasRemote
+		if hasRemote {
+			row.IsDir = row.IsDir || remoteItem.IsDir
+			row.RemoteMTime = remoteItem.ModTime.UTC().Format(time.RFC3339Nano)
+			row.RemoteSize = sql.NullInt64{Int64: remoteItem.Size, Valid: !remoteItem.IsDir}
+			row.RemoteRevision = ""
+			row.MimeType = remoteItem.MimeType
+			row.LastRemoteSeen = now
+		} else {
+			row.RemoteMTime = ""
+			row.RemoteSize = sql.NullInt64{}
+			row.RemoteRevision = ""
+			if hadPrev {
+				row.LastRemoteSeen = now
+			}
+		}
+
+		if localObservationChanged(prev, row) {
+			row.LocalDirty = true
+			if row.LastLocalEvent == "" {
+				row.LastLocalEvent = now
+			}
+		}
+
+		row.LastComparedAt = now
+		row.LastError = ""
+
+		if hasRemote && remoteItem.HashAlgo != "" && remoteItem.Hash != "" {
+			if err := dbpkg.UpsertFileHash(s.database.Conn, dbpkg.FileHash{
+				RemoteName:    remoteName,
+				RelPath:       row.RelPath,
+				Side:          "remote",
+				Algorithm:     remoteItem.HashAlgo,
+				HashValue:     remoteItem.Hash,
+				ObservedMTime: row.RemoteMTime,
+				ObservedSize:  row.RemoteSize,
+				ComputedAt:    now,
+			}); err != nil {
+				return err
+			}
+		}
+
+		if !row.LocalExists && !row.RemoteExists {
+			if hadPrev {
+				_ = dbpkg.DeleteSyncEntry(s.database.Conn, dbpkg.MakeSyncEntryID(root.ID, row.RelPath))
+				if err := dbpkg.DeleteFileMetadata(s.database.Conn, remoteName, row.RelPath); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+
+		if reconcile {
+			if err := s.reconcileObservedEntry(ctx, &row, remoteItem, hadPrev, prev, now); err != nil {
+				row.LastError = err.Error()
+			}
+		}
+
+		if err := dbpkg.UpsertFileMetadata(s.database.Conn, row); err != nil {
+			return err
+		}
+		if err := s.upsertSyncEntryForRow(root, row); err != nil {
+			return err
+		}
+		batch = append(batch, directoryItemForRow(remoteName, row))
+		if len(batch) >= batchSize {
+			return flush()
+		}
+		return nil
+	}
+
+	if err := rclone.ListDirStream(ctx, remoteName, dirPath, func(item rclone.FileItem) error {
+		seenNames[item.Name] = struct{}{}
+		return processRow(item.Name, item, true)
+	}); err != nil {
+		if isMissingDirectoryError(err) {
+			if pruneErr := s.pruneMissingRemoteDirectory(root, remoteName, dirPath); pruneErr != nil {
+				return pruneErr
+			}
+			return s.streamDirectoryRows(remoteName, dirPath, nil, emit)
+		}
+		return err
+	}
+
+	remainingNames := make(map[string]struct{}, len(localItems)+len(existingByName))
+	for name := range localItems {
+		if _, seen := seenNames[name]; !seen {
+			remainingNames[name] = struct{}{}
+		}
+	}
+	for name := range existingByName {
+		if _, seen := seenNames[name]; !seen {
+			remainingNames[name] = struct{}{}
+		}
+	}
+	for name := range remainingNames {
+		if err := processRow(name, rclone.FileItem{}, false); err != nil {
+			return err
+		}
+	}
+
+	stillDirty, err := dbpkg.RemoteHasDirtyEntries(s.database.Conn, remoteName)
+	if err != nil {
+		return err
+	}
+	if err := dbpkg.SetSyncRootDirtyBit(s.database.Conn, root.ID, stillDirty, now); err != nil {
+		return err
+	}
+	if err := flush(); err != nil {
+		return err
+	}
+	watched, err := dbpkg.IsWatchedDir(s.database.Conn, remoteName, dirPath)
+	if err != nil {
+		return err
+	}
+	return emit(DirectoryStreamChunk{
+		Type:     "done",
+		Remote:   remoteName,
+		Path:     dirPath,
+		DirtyBit: stillDirty,
+		Watched:  watched,
+	})
+}
+
 func (s *Service) refreshDirectory(ctx context.Context, remoteName, dirPath string, reconcile bool) (*DirectoryResponse, error) {
 	if s == nil || s.database == nil || s.database.Conn == nil {
 		return nil, fmt.Errorf("sync metadata database unavailable")
@@ -372,6 +702,12 @@ func (s *Service) refreshDirectory(ctx context.Context, remoteName, dirPath stri
 
 	remoteItems, err := rclone.ListDir(ctx, remoteName, dirPath)
 	if err != nil {
+		if isMissingDirectoryError(err) {
+			if pruneErr := s.pruneMissingRemoteDirectory(root, remoteName, dirPath); pruneErr != nil {
+				return nil, pruneErr
+			}
+			return s.emptyDirectoryResponse(remoteName, dirPath)
+		}
 		return nil, err
 	}
 	localItems, err := scanLocalDirectory(buildLocalPath(remoteName, dirPath))
@@ -513,10 +849,19 @@ func (s *Service) refreshDirectory(ctx context.Context, remoteName, dirPath stri
 			return nil, err
 		}
 	}
-	if err := s.refreshSyncRootDirtyBit(root.ID, remoteName); err != nil {
+	stillDirty, err := dbpkg.RemoteHasDirtyEntries(s.database.Conn, remoteName)
+	if err != nil {
 		return nil, err
 	}
-	return s.ListDirectory(ctx, remoteName, dirPath)
+	if err := dbpkg.SetSyncRootDirtyBit(s.database.Conn, root.ID, stillDirty, now); err != nil {
+		return nil, err
+	}
+
+	rows, err := dbpkg.ListFileMetadataByParent(s.database.Conn, remoteName, dirPath)
+	if err != nil {
+		return nil, err
+	}
+	return s.directoryResponseFromRows(remoteName, dirPath, rows)
 }
 
 type localDirItem struct {

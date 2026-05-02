@@ -9,7 +9,7 @@
 // listing_cache: simple on-disk cache for remote folder listings, used for
 // stale-while-revalidate rendering in the file explorer.
 //
-// Layout: ~/misty/.cache/listings/<remote_name>/<encoded_path>.json
+// Layout: ~/misty/.cache/remotes/<remote_name>/<encoded_path>.json
 //
 // The remote_path is URL-style encoded so '/' becomes %2F, keeping every
 // listing in a flat per-remote directory and avoiding file/directory name
@@ -20,6 +20,12 @@ namespace misty::core::listing_cache {
     namespace fs = std::filesystem;
 
     inline std::string root_dir() {
+        const char* home = std::getenv("HOME");
+        if (!home) home = ".";
+        return std::string(home) + "/misty/.cache/remotes";
+    }
+
+    inline std::string legacy_root_dir() {
         const char* home = std::getenv("HOME");
         if (!home) home = ".";
         return std::string(home) + "/misty/.cache/listings";
@@ -54,10 +60,17 @@ namespace misty::core::listing_cache {
         return remote_dir(remote) + "/" + encode_path(path) + ".json";
     }
 
+    inline std::string legacy_file_for(const std::string& remote, const std::string& path) {
+        return legacy_root_dir() + "/" + remote + "/" + encode_path(path) + ".json";
+    }
+
     // Returns true on hit; out_body receives the cached JSON body verbatim.
     inline bool load(const std::string& remote, const std::string& path, std::string& out_body) {
         if (remote.empty()) return false;
         std::ifstream f(file_for(remote, path), std::ios::binary);
+        if (!f) {
+            f.open(legacy_file_for(remote, path), std::ios::binary);
+        }
         if (!f) return false;
         std::ostringstream ss;
         ss << f.rdbuf();

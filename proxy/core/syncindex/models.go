@@ -21,3 +21,13 @@ type DirectoryResponse struct {
 	DirtyBit bool            `json:"dirty_bit"`
 	Watched  bool            `json:"watched"`
 }
+
+type DirectoryStreamChunk struct {
+	Type     string          `json:"type"`
+	Remote   string          `json:"remote,omitempty"`
+	Path     string          `json:"path,omitempty"`
+	Items    []DirectoryItem `json:"items,omitempty"`
+	DirtyBit bool            `json:"dirty_bit,omitempty"`
+	Watched  bool            `json:"watched,omitempty"`
+	Error    string          `json:"error,omitempty"`
+}

@@ -28,6 +28,9 @@ namespace misty::panel {
         void toggle_active_search();
         std::string active_explorer_state_key() const;
         bool invoke_command(const std::string& command_id);
+        bool drop_selected_items_to_path(const std::string& source_state_key,
+                                         const std::string& dest_path,
+                                         ClipboardOp op);
 
     private:
         enum class RestoreMode {

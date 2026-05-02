@@ -1,0 +1,49 @@
+# Runtime source of truth: ~/misty/config/commands.msy
+
+explorer.copy {
+  key = "CmdOrCtrl+C"
+  label = "Copy"
+}
+
+explorer.cut {
+  key = "CmdOrCtrl+X"
+  label = "Cut"
+}
+
+explorer.paste {
+  key = "CmdOrCtrl+V"
+  label = "Paste"
+}
+
+explorer.rename {
+  key = "F2"
+  mac = "Enter"
+  label = "Rename"
+}
+
+explorer.delete {
+  key = "Delete"
+  mac = "CmdOrCtrl+Backspace"
+  label = "Move to Trash"
+}
+
+explorer.select_all {
+  key = "CmdOrCtrl+A"
+  label = "Select All"
+}
+
+explorer.refresh {
+  key = "CmdOrCtrl+R"
+  label = "Refresh"
+}
+
+explorer.new_folder {
+  key = "CmdOrCtrl+Shift+N"
+  label = "New Folder"
+}
+
+explorer.find {
+  key = "CmdOrCtrl+F"
+  label = "Find"
+}
+

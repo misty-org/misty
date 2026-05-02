@@ -14,9 +14,9 @@
 
 namespace misty::panel {
 
-// BootLoader runs automatically on startup — no user interaction needed for the
-// proxy. It scans ports starting at 3000, reuses an already-running proxy or
-// launches a new one, then drives the onboarding / login flow.
+// BootLoader runs automatically on startup. It launches the proxy if needed
+// and probes the standard local proxy port range until the proxy reports ready,
+// then drives the onboarding / login flow.
 class BootLoader {
 public:
     BootLoader(core::UIRegistry& ui_registry, core::WorkerPool& worker_pool);
@@ -48,7 +48,7 @@ private:
 
     // Port search
     void        init_port_search();
-    int         load_saved_port();
+    int         load_saved_proxy_port();
     void        advance_port();
     bool        launch_on_current_port();
 
@@ -59,7 +59,6 @@ private:
     static std::string trim_copy(std::string v);
     static std::string proxy_binary_name();
     static std::string auto_detect_proxy_path();
-    bool               ensure_proxy_config_saved(int port);
 
     // Async HTTP probe
     void begin_probe(const std::string& base_url);

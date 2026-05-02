@@ -8,6 +8,8 @@
 namespace fs = std::filesystem;
 
 namespace {
+    constexpr const char* kFileDragPayloadType = "MISTY_FILE_ITEMS";
+
     bool RefreshButton(const char* id, float size = 14.0f) {
         ImGui::PushID(id);
         bool clicked = ImGui::InvisibleButton("##", ImVec2(size, size));
@@ -151,6 +153,20 @@ namespace misty::panel {
                 bool pressed      = ImGui::InvisibleButton("##dev", ImVec2(content_width - dots_w, item_h));
                 bool main_hovered = ImGui::IsItemHovered();
                 bool main_active  = ImGui::IsItemActive();
+                bool drop_delivered = false;
+                if (ImGui::BeginDragDropTarget()) {
+                    if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(
+                            kFileDragPayloadType, ImGuiDragDropFlags_AcceptBeforeDelivery)) {
+                        if (payload->Data != nullptr && payload->DataSize > 0 && payload->IsDelivery()) {
+                            const char* data = static_cast<const char*>(payload->Data);
+                            if (file_drop_handler_) {
+                                file_drop_handler_(std::string(data), dev.mount_path, ClipboardOp::CUT);
+                            }
+                            drop_delivered = true;
+                        }
+                    }
+                    ImGui::EndDragDropTarget();
+                }
 
                 // Three-dot button — always laid out, only drawn when item is hovered
                 ImGui::SameLine(0, 0);
@@ -226,7 +242,7 @@ namespace misty::panel {
 
                 ImGui::PopID();
 
-                if (pressed && !dots_hovered) {
+                if (pressed && !dots_hovered && !drop_delivered) {
                     const std::string explorer_state_key =
                         active_explorer_state_key_provider_ ? active_explorer_state_key_provider_() : "Files";
                     auto& fe_state = registry_.get_state<FileExplorerState>(explorer_state_key);

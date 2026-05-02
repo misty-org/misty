@@ -77,22 +77,13 @@ namespace misty::core {
                 nlohmann::json j = nlohmann::json::parse(file, nullptr, true, true);
 
                 const int proxy_port = j.value("proxy", nlohmann::json::object()).value("port", 0);
-                const std::string proxy_url = j.value("proxy", nlohmann::json::object()).value("url", std::string());
-                const std::string proxy_path = j.value("proxy", nlohmann::json::object()).value("path", std::string());
-                const std::string grpc_address = j.value("grpc", nlohmann::json::object()).value("address", std::string("localhost:50051"));
-                const std::string mount_path = j.value("mount", nlohmann::json::object()).value("path", std::string("misty"));
                 const std::string server_url = j.value("server", nlohmann::json::object()).value("url", std::string());
-                const std::string cert_path = j.value("ssl", nlohmann::json::object()).value("cert_path", std::string());
 
-                if (!proxy_path.empty()) env_["MISTY_PROXY_PATH"] = proxy_path;
                 if (!server_url.empty()) env_["MISTY_SERVER_URL"] = server_url;
-                if (!cert_path.empty()) env_["SSL_CERT_PATH"] = cert_path;
-                env_["MISTY_GRPC_ADDRESS"] = grpc_address;
-                env_["MISTY_MOUNT_PATH"] = mount_path;
+                env_["MISTY_GRPC_ADDRESS"] = "localhost:50051";
+                env_["MISTY_MOUNT_PATH"] = "misty";
 
-                if (!proxy_url.empty()) {
-                    env_["PROXY_SERVICE_URL"] = proxy_url;
-                } else if (proxy_port > 0) {
+                if (proxy_port > 0) {
                     env_["PROXY_SERVICE_URL"] = "http://127.0.0.1:" + std::to_string(proxy_port);
                 }
 

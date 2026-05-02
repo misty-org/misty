@@ -2,13 +2,8 @@
 #include "panels/workspace/workspace_state.h"
 #include "panels/services/services_state.h"
 #include "panels/services/remote/remote_state.h"
-#include "panels/activity/download_state.h"
-#include "panels/activity/upload_state.h"
-#include "panels/notification/notification_state.h"
-#include "panels/file_sidebar/file_sidebar_state.h"
 #include "panels/search/search_state.h"
 #include "panels/search/search_panel.h"
-#include "core/commands/command_manager.h"
 #include "core/cache/listing_cache.h"
 #include "core/manager/asset_manager.h"
 #include <glad/glad.h>
@@ -36,6 +31,48 @@ namespace misty::panel {
         constexpr float kPreviewZoomMin = 0.1f;
         constexpr float kPreviewZoomMax = 3.0f;
         constexpr float kPreviewSplitterWidth = 8.0f;
+        bool accumulate_sync_list_stream_chunk(const std::string& chunk,
+                                               nlohmann::json& aggregate,
+                                               std::string* error_out) {
+            try {
+                nlohmann::json event = nlohmann::json::parse(chunk);
+                const std::string type = event.value("type", std::string(""));
+                if (type == "items") {
+                    aggregate["remote"] = event.value("remote", aggregate.value("remote", std::string("")));
+                    aggregate["path"] = event.value("path", aggregate.value("path", std::string("")));
+                    auto& items = aggregate["items"];
+                    if (!items.is_array()) {
+                        items = nlohmann::json::array();
+                    }
+                    for (const auto& item : event.value("items", nlohmann::json::array())) {
+                        items.push_back(item);
+                    }
+                    return true;
+                }
+                if (type == "done") {
+                    aggregate["remote"] = event.value("remote", aggregate.value("remote", std::string("")));
+                    aggregate["path"] = event.value("path", aggregate.value("path", std::string("")));
+                    aggregate["dirty_bit"] = event.value("dirty_bit", false);
+                    aggregate["watched"] = event.value("watched", false);
+                    return true;
+                }
+                if (type == "error") {
+                    if (error_out) {
+                        *error_out = event.value("error", std::string("stream error"));
+                    }
+                    return false;
+                }
+                if (error_out) {
+                    *error_out = "unexpected sync stream event";
+                }
+                return false;
+            } catch (const std::exception& ex) {
+                if (error_out) {
+                    *error_out = ex.what();
+                }
+                return false;
+            }
+        }
         std::string trim_copy(std::string value) {
             auto not_space = [](unsigned char c) { return !std::isspace(c); };
             value.erase(value.begin(), std::find_if(value.begin(), value.end(), not_space));
@@ -219,11 +256,11 @@ namespace misty::panel {
         } else if (restore_persistent_state && !file_explorer_state.last_opened_path.empty()) {
         // Restore last opened path if valid
             std::string saved_path = file_explorer_state.last_opened_path;
-            
+
             printf("DEBUG: Constructor - Found last_opened_path: %s\n", saved_path.c_str());
 
             bool is_valid = true;
-            
+
             // Check if it's a virtual path
             if (saved_path.rfind("misty://", 0) == 0) {
                  // Always valid
@@ -235,7 +272,7 @@ namespace misty::panel {
                      is_valid = false;
                  }
             }
-            
+
             if (is_valid) {
                 start_path = saved_path;
                 printf("DEBUG: Constructor - Using saved path: %s\n", start_path.c_str());
@@ -405,6 +442,53 @@ namespace misty::panel {
         return true;
     }
 
+    bool FileExplorerPanel::resolve_drop_destination_path(const std::string& path,
+                                                          std::string& resolved_path,
+                                                          std::string* error_message) const {
+        resolved_path = path;
+        if (!path_utils::is_remote_path(path)) {
+            return true;
+        }
+
+        const auto info = path_utils::parse_remote_path(path);
+        if (info.provider_folder.empty()) {
+            if (error_message) {
+                *error_message = "Navigate into a provider or remote folder before dropping items.";
+            }
+            return false;
+        }
+
+        if (!info.remote_name.empty()) {
+            return true;
+        }
+
+        const auto& workspace = registry_.get_state<WorkspaceState>("Workspace");
+        const RemoteAccountMapping* unique_mapping = nullptr;
+        for (const auto& mapping : workspace.remote_mappings) {
+            if (mapping.provider_folder != info.provider_folder) {
+                continue;
+            }
+            if (unique_mapping != nullptr) {
+                if (error_message) {
+                    *error_message = "Provider has multiple accounts. Open it and drop into a specific remote.";
+                }
+                return false;
+            }
+            unique_mapping = &mapping;
+        }
+
+        if (unique_mapping == nullptr) {
+            if (error_message) {
+                *error_message = "Provider has no connected remote destination.";
+            }
+            return false;
+        }
+
+        resolved_path = path_utils::get_mount_root() + "/" +
+            unique_mapping->provider_folder + "/" + unique_mapping->folder_name;
+        return true;
+    }
+
     void FileExplorerPanel::notify_shared_path_refresh(const std::string& path) {
         if (!shared_path_refresh_callback_ || path.empty()) {
             return;
@@ -440,9 +524,9 @@ namespace misty::panel {
         const uint64_t request_generation = ++state.sync_request_generation;
         const uint64_t navigation_generation = state.navigation_generation.load(std::memory_order_relaxed);
         auto& services = registry_.get_state<ServicesState>("Services");
-        services.run_sync_now(remote_name,
+        services.refetch_sync_items(remote_name, remote_path,
             [this, registry = &registry_, state_key = state_key_, remote_name, remote_path, current, request_generation, navigation_generation]
-            (bool success, const std::string&, const std::string& error) {
+            (bool success, const std::string& body, const std::string& error) {
                 auto& state = registry->get_state<FileExplorerState>(state_key);
                 {
                     std::lock_guard<std::mutex> lock(state.mu);
@@ -463,40 +547,13 @@ namespace misty::panel {
                         state.error_msg = error.empty() ? "Sync failed." : error;
                         return;
                     }
+                    state.sync_request_in_flight = false;
                 }
 
-                auto& services = registry->get_state<ServicesState>("Services");
-                services.fetch_sync_items(
-                    remote_name, remote_path,
-                    [this, registry, state_key, remote_name, current, request_generation, navigation_generation]
-                    (bool list_success, const std::string& body, const std::string& list_error) {
-                        auto& state = registry->get_state<FileExplorerState>(state_key);
-                        {
-                            std::lock_guard<std::mutex> lock(state.mu);
-                            if (request_generation != state.sync_request_generation) {
-                                return;
-                            }
-
-                            state.sync_request_in_flight = false;
-
-                            const std::string effective_path = !state.pending_navigation_path.empty()
-                                ? state.pending_navigation_path
-                                : std::string(state.current_path);
-                            if (effective_path != current) {
-                                return;
-                            }
-
-                            if (!list_success) {
-                                state.error_msg = list_error.empty() ? "Sync list failed." : list_error;
-                                return;
-                            }
-                        }
-
-                        core::listing_cache::save(remote_name, path_utils::parse_remote_path(current).relative_path, body);
-                        FileExplorerPanel::apply_remote_folder_fetch(
-                            *registry, state_key, remote_name, current, navigation_generation, true, body, "", true);
-                        this->notify_shared_path_refresh(current);
-                    });
+                core::listing_cache::save(remote_name, remote_path, body);
+                FileExplorerPanel::apply_remote_folder_fetch(
+                    *registry, state_key, remote_name, current, navigation_generation, true, body, "", true);
+                this->notify_shared_path_refresh(current);
             });
     }
 
@@ -731,7 +788,6 @@ namespace misty::panel {
     // and automatically cleared when navigating to local paths
 
     void FileExplorerPanel::render() {
-        auto& state = registry_.get_state<FileExplorerState>(state_key_);
         auto& services_state = registry_.get_state<ServicesState>("Services");
 
         // If services connections changed (new remote added, one disconnected),
@@ -739,8 +795,39 @@ namespace misty::panel {
         // so the user doesn't have to navigate before the new layout appears.
         if (services_state.mappings_dirty.exchange(false)) {
             sync_account_mappings();
+
+            std::string refresh_path;
+            {
+                auto& state = registry_.get_state<FileExplorerState>(state_key_);
+                std::lock_guard<std::mutex> lock(state.mu);
+
+                if (state.pending_navigation_path.empty()) {
+                    const std::string current_path = state.current_path;
+                    const std::string mount_root = path_utils::get_mount_root();
+                    const bool current_is_mount_root =
+                        current_path == mount_root || current_path == mount_root + "/";
+                    const bool initial_is_remote =
+                        path_utils::is_remote_path(initial_start_path_) ||
+                        initial_start_path_ == mount_root ||
+                        initial_start_path_ == mount_root + "/";
+
+                    if (current_is_mount_root && initial_is_remote && !initial_start_path_.empty()) {
+                        refresh_path = initial_start_path_;
+                    } else if (current_is_mount_root || path_utils::is_remote_path(current_path)) {
+                        refresh_path = current_path;
+                    }
+                }
+            }
+
+            if (!refresh_path.empty()) {
+                navigate_to_path(refresh_path, false, false);
+                if (refresh_path == initial_start_path_) {
+                    initial_start_path_.clear();
+                }
+            }
         }
 
+        auto& state = registry_.get_state<FileExplorerState>(state_key_);
         handle_pending_navigation(state);
 
         ImGuiWindowFlags file_explorer_flags = ImGuiWindowFlags_NoTitleBar |
@@ -912,10 +999,29 @@ namespace misty::panel {
                                                          uint64_t navigation_generation) {
         auto& state = registry_.get_state<FileExplorerState>(state_key_);
 
-        // Immediately signal loading — UI stays responsive while worker scans
+        // Local-volume scans can be slow, especially under /Volumes. Keep the
+        // UI interactive and stream rows in batches instead of blocking until
+        // the whole directory has been stat'ed.
         state.is_loading = true;
         state.show_loading_animation = false;
         state.error_msg  = "";
+        reset_selection(state);
+        state.files.clear();
+        state.sort_dirty = true;
+        state.current_dir_watched = false;
+        state.sync_watch_request_in_flight = false;
+        state.watched_refresh_in_flight = false;
+        state.next_watched_refresh_at = {};
+
+        fs::path normalized_path = fs::path(path).lexically_normal();
+        std::string display_path = normalized_path.generic_string();
+        if (display_path.empty()) {
+            display_path = path;
+        }
+        strncpy(state.current_path, display_path.c_str(), sizeof(state.current_path) - 1);
+        state.current_path[sizeof(state.current_path) - 1] = '\0';
+        strncpy(state.search_path, display_path.c_str(), sizeof(state.search_path) - 1);
+        state.search_path[sizeof(state.search_path) - 1] = '\0';
 
         // Snapshot volatile UI state before leaving the UI thread
         const bool show_hidden = state.show_hidden;
@@ -927,17 +1033,38 @@ namespace misty::panel {
         worker_pool_.add(
             [registry = &registry_, state_key = state_key_, path, show_hidden, navigation_generation]() {
                 auto& state = registry->get_state<FileExplorerState>(state_key);
-                std::vector<UnifiedFileItem> new_files;
-                std::string new_path;
-
-                try {
-                    new_path = fs::canonical(fs::path(path)).generic_string();
-                } catch (...) {
+                std::string new_path = fs::path(path).lexically_normal().generic_string();
+                if (new_path.empty()) {
                     new_path = path;
                 }
 
+                constexpr std::size_t kLocalListBatchSize = 64;
+                std::vector<UnifiedFileItem> batch;
+                batch.reserve(kLocalListBatchSize);
+
+                auto flush_batch = [&](bool final_flush) {
+                    std::lock_guard<std::mutex> lk(state.mu);
+                    if (state.navigation_generation.load(std::memory_order_relaxed) != navigation_generation) {
+                        return false;
+                    }
+                    if (!batch.empty()) {
+                        state.files.insert(state.files.end(),
+                                           std::make_move_iterator(batch.begin()),
+                                           std::make_move_iterator(batch.end()));
+                        batch.clear();
+                        state.sort_dirty = true;
+                    }
+                    if (final_flush) {
+                        state.is_loading = false;
+                        state.show_loading_animation = false;
+                        state.sort_dirty = true;
+                    }
+                    return true;
+                };
+
                 try {
-                    for (const auto& entry : fs::directory_iterator(path)) {
+                    for (const auto& entry : fs::directory_iterator(
+                             path, fs::directory_options::skip_permission_denied)) {
                         std::string fname = entry.path().filename().generic_string();
                         if (!show_hidden && !fname.empty() && fname[0] == '.') continue;
 
@@ -945,24 +1072,38 @@ namespace misty::panel {
                         item.path   = entry.path().generic_string();
                         item.id     = item.path;
                         item.name   = fname;
-                        item.is_dir = entry.is_directory();
+                        std::error_code ec;
+                        item.is_dir = entry.is_directory(ec);
                         item.source = FileSource::LOCAL;
                         item.status = SyncStatus::LOCAL;
 
                         if (!item.is_dir) {
-                            try { item.size = fs::file_size(entry.path()); } catch (...) {}
+                            item.size = static_cast<int64_t>(entry.file_size(ec));
+                            if (ec) {
+                                ec.clear();
+                                item.size = 0;
+                            }
                         }
                         try {
-                            auto ftime = fs::last_write_time(entry.path());
+                            auto ftime = entry.last_write_time(ec);
+                            if (ec) {
+                                ec.clear();
+                            } else {
                             auto sctp  = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
                                 ftime - fs::file_time_type::clock::now() + std::chrono::system_clock::now());
                             auto t = std::chrono::system_clock::to_time_t(sctp);
                             char buf[32];
                             std::strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M", std::localtime(&t));
                             item.last_modified = buf;
+                            }
                         } catch (...) {}
 
-                        new_files.push_back(std::move(item));
+                        batch.push_back(std::move(item));
+                        if (batch.size() >= kLocalListBatchSize) {
+                            if (!flush_batch(false)) {
+                                return;
+                            }
+                        }
                     }
                 } catch (const std::exception& e) {
                     std::lock_guard<std::mutex> lk(state.mu);
@@ -976,25 +1117,8 @@ namespace misty::panel {
                     return;
                 }
 
-                // Apply results under lock
-                std::lock_guard<std::mutex> lk(state.mu);
-                if (state.navigation_generation.load(std::memory_order_relaxed) != navigation_generation) {
-                    return;
-                }
-                state.files = std::move(new_files);
-                strncpy(state.current_path, new_path.c_str(), sizeof(state.current_path) - 1);
-                state.current_path[sizeof(state.current_path) - 1] = '\0';
-                strncpy(state.search_path, new_path.c_str(), sizeof(state.search_path) - 1);
-                state.search_path[sizeof(state.search_path) - 1] = '\0';
-                state.current_dir_watched = false;
-                state.sync_watch_request_in_flight = false;
-                state.watched_refresh_in_flight = false;
-                state.next_watched_refresh_at = {};
-                state.selected_files.clear();
-                state.last_selected_index = -1;
-                state.is_loading = false;
-                state.show_loading_animation = false;
-                state.sort_dirty = true;
+                (void)new_path;
+                flush_batch(true);
             },
             []() {},
             [registry = &registry_, state_key = state_key_, navigation_generation](const std::string& err) {
@@ -1020,7 +1144,7 @@ namespace misty::panel {
             printf("Explorer: Handling virtual path: %s\n", path.c_str());
             std::vector<UnifiedFileItem> new_files;
             std::vector<UnifiedFileItem> new_trash_files;
-            
+
             if (path == FileExplorerState::VIRTUAL_PATH_RECENT) {
                 // Filter out deleted entries and local files that no longer exist on disk
                 // (covers external deletions and stale entries from previous sessions).
@@ -1053,10 +1177,10 @@ namespace misty::panel {
                         item.is_dir = entry.is_directory();
                         item.source = FileSource::LOCAL; // It's local now
                         item.status = SyncStatus::DELETED;
-                        
+
                          try {
                             if (!item.is_dir) item.size = fs::file_size(entry.path());
-                            
+
                             auto ftime = fs::last_write_time(entry.path());
                             auto sctp = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
                                 ftime - fs::file_time_type::clock::now() + std::chrono::system_clock::now()
@@ -1072,7 +1196,7 @@ namespace misty::panel {
                     }
                 }
             }
-            
+
             update_navigation_history(state, path, update_history);
             state.files = std::move(new_files);
             if (path == FileExplorerState::VIRTUAL_PATH_TRASH) {
@@ -1110,7 +1234,7 @@ namespace misty::panel {
             state.last_disconnected_notification_folder.clear();
             navigate_to_local_path_async(path, update_history, navigation_generation);
         }
-        
+
         state.dirty_ = true; // mark for next async save cycle
     }
 

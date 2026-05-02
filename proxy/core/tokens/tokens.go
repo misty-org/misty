@@ -1,3 +1,8 @@
+// jwt.go handles local access token and refresh token primitives for the proxy
+// we can generate tokens here using a secret key that is not exposed to clients
+//
+// Matthew Chen (kannachi323)
+
 package auth
 
 import (
@@ -10,7 +15,7 @@ import (
 	"github.com/google/uuid"
 )
 
-const RefreshTokenExpiry = 14 * 24 * time.Hour // 14 days
+const RefreshTokenExpiry = 14 * 24 * time.Hour
 
 type Claims struct {
 	UserID string `json:"user_id"`

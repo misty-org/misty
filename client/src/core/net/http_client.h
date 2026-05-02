@@ -28,6 +28,8 @@ namespace misty::core {
         std::string error_message;
     };
 
+    using StreamLineCallback = std::function<bool(const std::string& line)>;
+
   
 
     class HTTPClient {
@@ -39,6 +41,11 @@ namespace misty::core {
                                        long connect_timeout_seconds,
                                        long total_timeout_seconds,
                                        const std::map<std::string, std::string>& headers = {});
+        HttpResponse get_stream_with_timeouts(const std::string& url,
+                                              long connect_timeout_seconds,
+                                              long total_timeout_seconds,
+                                              StreamLineCallback line_callback,
+                                              const std::map<std::string, std::string>& headers = {});
         HttpResponse post_with_timeouts(const std::string& url,
                                         const std::string& body,
                                         long connect_timeout_seconds,
