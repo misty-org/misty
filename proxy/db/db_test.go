@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestEnsureSyncSchemaCreatesTablesAndIndexes(t *testing.T) {
@@ -62,6 +63,193 @@ func TestEnsureSyncSchemaCreatesTablesAndIndexes(t *testing.T) {
 		if err != nil {
 			t.Fatalf("missing column sync_entries.%s: %v", name, err)
 		}
+	}
+}
+
+func TestEnsureAuthSchemaCreatesRevokedAccessTokenTable(t *testing.T) {
+	conn, err := sql.Open("sqlite3", ":memory:?_foreign_keys=on")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+
+	if err := ensureAuthSchema(conn); err != nil {
+		t.Fatalf("ensureAuthSchema: %v", err)
+	}
+
+	var got string
+	err = conn.QueryRow(`
+		SELECT name
+		FROM sqlite_master
+		WHERE type = 'table' AND name = 'revoked_access_tokens'
+	`).Scan(&got)
+	if err != nil {
+		t.Fatalf("missing table revoked_access_tokens: %v", err)
+	}
+	if got != "revoked_access_tokens" {
+		t.Fatalf("got table %q, want revoked_access_tokens", got)
+	}
+
+	err = conn.QueryRow(`
+		SELECT name FROM pragma_table_info('users') WHERE name = 'token_valid_after'
+	`).Scan(&got)
+	if err != nil {
+		t.Fatalf("missing column users.token_valid_after: %v", err)
+	}
+}
+
+func TestAccessTokenRevocationPersists(t *testing.T) {
+	conn, err := sql.Open("sqlite3", ":memory:?_foreign_keys=on")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+
+	if err := ensureAuthSchema(conn); err != nil {
+		t.Fatalf("ensureAuthSchema: %v", err)
+	}
+
+	database := &Database{Conn: conn}
+	if err := database.RevokeAccessToken("tok-1", "user-1", time.Now().Add(15*time.Minute)); err != nil {
+		t.Fatalf("RevokeAccessToken: %v", err)
+	}
+
+	revoked, err := database.IsAccessTokenRevoked("tok-1")
+	if err != nil {
+		t.Fatalf("IsAccessTokenRevoked: %v", err)
+	}
+	if !revoked {
+		t.Fatal("expected token to be revoked")
+	}
+
+	revoked, err = database.IsAccessTokenRevoked("tok-2")
+	if err != nil {
+		t.Fatalf("IsAccessTokenRevoked missing token: %v", err)
+	}
+	if revoked {
+		t.Fatal("expected unrelated token to be clean")
+	}
+}
+
+func TestUserTokenValidAfterPersists(t *testing.T) {
+	conn, err := sql.Open("sqlite3", ":memory:?_foreign_keys=on")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+
+	if err := ensureAuthSchema(conn); err != nil {
+		t.Fatalf("ensureAuthSchema: %v", err)
+	}
+
+	database := &Database{Conn: conn}
+	if err := database.SetCurrentUser("user-1", "Test User", "test@example.com"); err != nil {
+		t.Fatalf("SetCurrentUser: %v", err)
+	}
+
+	cutoff := time.Now().UTC().Add(-5 * time.Minute).Round(0)
+	if err := database.SetUserTokenValidAfter("user-1", cutoff); err != nil {
+		t.Fatalf("SetUserTokenValidAfter: %v", err)
+	}
+
+	got, err := database.GetUserTokenValidAfter("user-1")
+	if err != nil {
+		t.Fatalf("GetUserTokenValidAfter: %v", err)
+	}
+	if got == nil {
+		t.Fatal("expected token_valid_after to be set")
+	}
+	if !got.Equal(cutoff) {
+		t.Fatalf("got %s, want %s", got.Format(time.RFC3339Nano), cutoff.Format(time.RFC3339Nano))
+	}
+}
+
+func TestSetCurrentUserEnforcesSingleUserAndClearsSessionState(t *testing.T) {
+	conn, err := sql.Open("sqlite3", ":memory:?_foreign_keys=on")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+
+	if err := ensureAuthSchema(conn); err != nil {
+		t.Fatalf("ensureAuthSchema: %v", err)
+	}
+
+	database := &Database{Conn: conn}
+	if err := database.SetCurrentUser("user-1", "User One", "one@example.com"); err != nil {
+		t.Fatalf("SetCurrentUser user-1: %v", err)
+	}
+	if err := database.StoreRefreshToken("user-1", "refresh-one", time.Now().Add(time.Hour)); err != nil {
+		t.Fatalf("StoreRefreshToken: %v", err)
+	}
+	if err := database.RevokeAccessToken("tok-1", "user-1", time.Now().Add(time.Hour)); err != nil {
+		t.Fatalf("RevokeAccessToken: %v", err)
+	}
+
+	if err := database.SetCurrentUser("user-2", "User Two", "two@example.com"); err != nil {
+		t.Fatalf("SetCurrentUser user-2: %v", err)
+	}
+
+	current, err := database.GetCurrentUser()
+	if err != nil {
+		t.Fatalf("GetCurrentUser: %v", err)
+	}
+	if current == nil || current.ID != "user-2" || current.Email != "two@example.com" {
+		t.Fatalf("unexpected current user: %#v", current)
+	}
+
+	var userCount int
+	if err := conn.QueryRow(`SELECT COUNT(*) FROM users`).Scan(&userCount); err != nil {
+		t.Fatalf("count users: %v", err)
+	}
+	if userCount != 1 {
+		t.Fatalf("users count = %d, want 1", userCount)
+	}
+
+	var refreshCount int
+	if err := conn.QueryRow(`SELECT COUNT(*) FROM refresh_tokens`).Scan(&refreshCount); err != nil {
+		t.Fatalf("count refresh_tokens: %v", err)
+	}
+	if refreshCount != 0 {
+		t.Fatalf("refresh token count = %d, want 0", refreshCount)
+	}
+
+	var revokedCount int
+	if err := conn.QueryRow(`SELECT COUNT(*) FROM revoked_access_tokens`).Scan(&revokedCount); err != nil {
+		t.Fatalf("count revoked_access_tokens: %v", err)
+	}
+	if revokedCount != 0 {
+		t.Fatalf("revoked token count = %d, want 0", revokedCount)
+	}
+}
+
+func TestValidateRefreshTokenRoundTrip(t *testing.T) {
+	conn, err := sql.Open("sqlite3", ":memory:?_foreign_keys=on")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+
+	if err := ensureAuthSchema(conn); err != nil {
+		t.Fatalf("ensureAuthSchema: %v", err)
+	}
+
+	database := &Database{Conn: conn}
+	if err := database.SetCurrentUser("user-1", "User One", "one@example.com"); err != nil {
+		t.Fatalf("SetCurrentUser: %v", err)
+	}
+
+	const rawToken = "refresh-one"
+	if err := database.StoreRefreshToken("user-1", rawToken, time.Now().Add(time.Hour)); err != nil {
+		t.Fatalf("StoreRefreshToken: %v", err)
+	}
+
+	userID, err := database.ValidateRefreshToken(rawToken)
+	if err != nil {
+		t.Fatalf("ValidateRefreshToken: %v", err)
+	}
+	if userID != "user-1" {
+		t.Fatalf("ValidateRefreshToken userID = %q, want %q", userID, "user-1")
 	}
 }
 

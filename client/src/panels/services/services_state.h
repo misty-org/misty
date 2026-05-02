@@ -65,6 +65,7 @@ namespace misty::panel {
     using FilesCallback = std::function<void(bool success,
                                              const std::string& response_body,
                                              const std::string& error)>;
+    using StreamFilesCallback = std::function<bool(const std::string& chunk)>;
 
     using DownloadCallback = std::function<void(bool success,
                                                 const std::string& local_path,
@@ -150,6 +151,10 @@ namespace misty::panel {
         void fetch_sync_items(const std::string& remote,
                               const std::string& path,
                               FilesCallback callback);
+        void fetch_sync_items_stream(const std::string& remote,
+                                     const std::string& path,
+                                     StreamFilesCallback chunk_callback,
+                                     FilesCallback callback);
 
         // Reports a local-only filesystem change to the proxy so the sync
         // index picks it up before the next refetch. mtime may be empty — the
@@ -171,6 +176,11 @@ namespace misty::panel {
                           const std::string& local_path,
                           DownloadProgressCallback progress_cb,
                           DownloadCallback callback);
+
+        void download_folder(const std::string& remote,
+                             const std::string& remote_path,
+                             const std::string& local_path,
+                             DownloadCallback callback);
 
         void upload_file(const std::string& remote,
                         const std::string& remote_path,

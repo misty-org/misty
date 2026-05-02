@@ -16,6 +16,7 @@
 #include "panels/services/remote/remote_state.h"
 #include "panels/devices/device_state.h"
 #include "panels/devices/device_watcher.h"
+#include "panels/file_explorer/file_explorer_state.h"
 
 class MistyClient;
 
@@ -31,6 +32,13 @@ namespace misty::panel {
 
         void set_active_explorer_state_key_provider(std::function<std::string()> provider) {
             active_explorer_state_key_provider_ = provider;
+        }
+
+        void set_file_drop_handler(
+            std::function<void(const std::string& source_state_key,
+                               const std::string& dest_path,
+                               ClipboardOp op)> handler) {
+            file_drop_handler_ = std::move(handler);
         }
 
     private:
@@ -53,6 +61,7 @@ namespace misty::panel {
         std::shared_ptr<MistyClient> client_;
         std::function<std::string()> mount_path_provider_;
         std::function<std::string()> active_explorer_state_key_provider_;
+        std::function<void(const std::string&, const std::string&, ClipboardOp)> file_drop_handler_;
 
         // Mounted device cache — refreshed on OS mount/unmount events or manual refresh
         std::vector<MountedDevice> cached_devices_;

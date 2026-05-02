@@ -9,15 +9,31 @@ namespace fs = std::filesystem;
 
 namespace misty::core {
 
-    static fs::path get_misty_dir() {
+    static fs::path get_legacy_misty_dir() {
         const char* home = getenv("HOME");
         return fs::path(home ? home : "/tmp") / ".misty";
     }
 
-    static void ensure_misty_dir() {
-        fs::path dir = get_misty_dir();
-        if (!fs::exists(dir)) {
-            fs::create_directories(dir);
+    static fs::path get_legacy_cache_session_dir() {
+        const char* home = getenv("HOME");
+        return fs::path(home ? home : "/tmp") / "misty" / ".cache" / "sessions";
+    }
+
+    static fs::path get_session_dir() {
+        const char* home = getenv("HOME");
+        return fs::path(home ? home : "/tmp") / "misty" / "config" / "sessions";
+    }
+
+    static void ensure_session_dir() {
+        fs::path dir = get_session_dir();
+        std::error_code ec;
+        if (!fs::exists(dir, ec)) {
+            fs::create_directories(dir, ec);
+            if (ec) {
+                std::cerr << "[SessionManager] failed to create session directory at "
+                          << dir << ": " << ec.message() << std::endl;
+                return;
+            }
             chmod(dir.c_str(), 0700);
         }
     }
@@ -32,13 +48,23 @@ namespace misty::core {
         return value;
     }
 
-    static void write_file_token(const fs::path& path, const std::string& value) {
-        ensure_misty_dir();
+    static bool write_file_token(const fs::path& path, const std::string& value) {
+        ensure_session_dir();
         std::ofstream file(path);
-        if (file.is_open()) {
-            file << value;
-            chmod(path.c_str(), 0600);
+        if (!file.is_open()) {
+            std::cerr << "[SessionManager] failed to open " << path << " for writing" << std::endl;
+            return false;
         }
+
+        file << value;
+        file.flush();
+        if (!file.good()) {
+            std::cerr << "[SessionManager] failed to write token file " << path << std::endl;
+            return false;
+        }
+
+        chmod(path.c_str(), 0600);
+        return true;
     }
 
     static void remove_file_token(const fs::path& path) {
@@ -57,39 +83,77 @@ namespace misty::core {
     }
 
     void SessionManager::load_tokens() {
-        token_         = read_file_token(get_misty_dir() / "token");
-        refresh_token_ = read_file_token(get_misty_dir() / "refresh_token");
-        license_token_ = read_file_token(get_misty_dir() / "license_token");
-        user_id_       = read_file_token(get_misty_dir() / "user_id");
-        email_         = read_file_token(get_misty_dir() / "email");
+        const fs::path session_dir = get_session_dir();
+        const fs::path legacy_cache_dir = get_legacy_cache_session_dir();
+        const fs::path legacy_dir = get_legacy_misty_dir();
+
+        auto load_with_legacy_fallback = [&](const char* filename) {
+            const std::string current = read_file_token(session_dir / filename);
+            if (!current.empty()) {
+                return current;
+            }
+
+            const std::string legacy_cache = read_file_token(legacy_cache_dir / filename);
+            if (!legacy_cache.empty()) {
+                if (write_file_token(session_dir / filename, legacy_cache)) {
+                    remove_file_token(legacy_cache_dir / filename);
+                }
+                return legacy_cache;
+            }
+
+            const std::string legacy = read_file_token(legacy_dir / filename);
+            if (!legacy.empty()) {
+                if (write_file_token(session_dir / filename, legacy)) {
+                    remove_file_token(legacy_dir / filename);
+                }
+            }
+            return legacy;
+        };
+
+        token_         = load_with_legacy_fallback("token");
+        refresh_token_ = load_with_legacy_fallback("refresh_token");
+        user_id_       = load_with_legacy_fallback("user_id");
+        email_         = load_with_legacy_fallback("email");
         if (!token_.empty())
             std::cerr << "[SessionManager] loaded access token (" << token_.size() << " bytes)" << std::endl;
         if (!refresh_token_.empty())
             std::cerr << "[SessionManager] loaded refresh token (" << refresh_token_.size() << " bytes)" << std::endl;
-        if (!license_token_.empty())
-            std::cerr << "[SessionManager] loaded license token (" << license_token_.size() << " bytes)" << std::endl;
     }
 
-    void SessionManager::save_tokens() const {
-        write_file_token(get_misty_dir() / "token",         token_);
-        write_file_token(get_misty_dir() / "refresh_token", refresh_token_);
-        write_file_token(get_misty_dir() / "license_token", license_token_);
-        std::cerr << "[SessionManager] persisted tokens" << std::endl;
+    bool SessionManager::save_tokens() const {
+        const fs::path session_dir = get_session_dir();
+        const bool access_ok = write_file_token(session_dir / "token", token_);
+        const bool refresh_ok = write_file_token(session_dir / "refresh_token", refresh_token_);
+        if (access_ok && refresh_ok) {
+            std::cerr << "[SessionManager] persisted tokens to " << session_dir << std::endl;
+            return true;
+        }
+        std::cerr << "[SessionManager] failed to persist session tokens to " << session_dir << std::endl;
+        return false;
     }
 
     void SessionManager::delete_tokens() const {
-        remove_file_token(get_misty_dir() / "token");
-        remove_file_token(get_misty_dir() / "refresh_token");
-        remove_file_token(get_misty_dir() / "license_token");
-        remove_file_token(get_misty_dir() / "user_id");
-        remove_file_token(get_misty_dir() / "email");
+        remove_file_token(get_session_dir() / "token");
+        remove_file_token(get_session_dir() / "refresh_token");
+        remove_file_token(get_session_dir() / "user_id");
+        remove_file_token(get_session_dir() / "email");
+        remove_file_token(get_legacy_cache_session_dir() / "token");
+        remove_file_token(get_legacy_cache_session_dir() / "refresh_token");
+        remove_file_token(get_legacy_cache_session_dir() / "user_id");
+        remove_file_token(get_legacy_cache_session_dir() / "email");
+        remove_file_token(get_legacy_misty_dir() / "token");
+        remove_file_token(get_legacy_misty_dir() / "refresh_token");
+        remove_file_token(get_legacy_misty_dir() / "user_id");
+        remove_file_token(get_legacy_misty_dir() / "email");
         std::cerr << "[SessionManager] removed all tokens" << std::endl;
     }
 
     void SessionManager::set_user_id(const std::string& user_id) {
         std::lock_guard<std::mutex> lock(mu_);
         user_id_ = user_id;
-        write_file_token(get_misty_dir() / "user_id", user_id_);
+        if (!write_file_token(get_session_dir() / "user_id", user_id_)) {
+            std::cerr << "[SessionManager] failed to persist user_id" << std::endl;
+        }
     }
 
     std::string SessionManager::get_user_id() const {
@@ -100,7 +164,9 @@ namespace misty::core {
     void SessionManager::set_email(const std::string& email) {
         std::lock_guard<std::mutex> lock(mu_);
         email_ = email;
-        write_file_token(get_misty_dir() / "email", email_);
+        if (!write_file_token(get_session_dir() / "email", email_)) {
+            std::cerr << "[SessionManager] failed to persist email" << std::endl;
+        }
     }
 
     std::string SessionManager::get_email() const {
@@ -108,25 +174,34 @@ namespace misty::core {
         return email_;
     }
 
-    void SessionManager::set_tokens(const std::string& access_token, const std::string& refresh_token) {
+    bool SessionManager::set_tokens(const std::string& access_token, const std::string& refresh_token) {
         std::lock_guard<std::mutex> lock(mu_);
+        const fs::path session_dir = get_session_dir();
+        const bool access_ok = write_file_token(session_dir / "token", access_token);
+        const bool refresh_ok = write_file_token(session_dir / "refresh_token", refresh_token);
+        if (!access_ok || !refresh_ok) {
+            std::cerr << "[SessionManager] refusing to replace session tokens because persistence failed" << std::endl;
+            return false;
+        }
         token_         = access_token;
         refresh_token_ = refresh_token;
-        save_tokens();
+        session_expired_ = false;
+        std::cerr << "[SessionManager] persisted tokens to " << session_dir << std::endl;
+        return true;
     }
 
-    void SessionManager::update_tokens(const std::string& access_token, const std::string& refresh_token) {
+    bool SessionManager::update_tokens(const std::string& access_token, const std::string& refresh_token) {
         std::lock_guard<std::mutex> lock(mu_);
         token_         = access_token;
         refresh_token_ = refresh_token;
-        save_tokens();
+        session_expired_ = false;
+        return save_tokens();
     }
 
     void SessionManager::clear_token() {
         std::lock_guard<std::mutex> lock(mu_);
         token_.clear();
         refresh_token_.clear();
-        license_token_.clear();
         user_id_.clear();
         email_.clear();
         delete_tokens();
@@ -140,17 +215,6 @@ namespace misty::core {
     std::string SessionManager::get_refresh_token() const {
         std::lock_guard<std::mutex> lock(mu_);
         return refresh_token_;
-    }
-
-    void SessionManager::set_license_token(const std::string& license_token) {
-        std::lock_guard<std::mutex> lock(mu_);
-        license_token_ = license_token;
-        write_file_token(get_misty_dir() / "license_token", license_token_);
-    }
-
-    std::string SessionManager::get_license_token() const {
-        std::lock_guard<std::mutex> lock(mu_);
-        return license_token_;
     }
 
     bool SessionManager::is_authenticated() const {
@@ -203,9 +267,6 @@ namespace misty::core {
         std::map<std::string, std::string> headers;
         if (!token_.empty()) {
             headers["Authorization"] = "Bearer " + token_;
-        }
-        if (!license_token_.empty()) {
-            headers["X-License-Token"] = license_token_;
         }
         return headers;
     }

@@ -75,9 +75,36 @@ void FileExplorerPanel::show_context_menu(FileExplorerState& state) {
             bool is_trash_view = (std::string(state.current_path) == FileExplorerState::VIRTUAL_PATH_TRASH);
             const UnifiedFileItem* target_file = find_context_menu_target(state);
             const bool can_open_directly = target_file && !target_file->is_dir && fs::exists(target_file->path);
+            const bool has_effective_target = target_file != nullptr;
+            auto ensure_target_selected = [&]() {
+                if (!target_file) {
+                    return;
+                }
+                if (state.selected_files.count(target_file->id) != 0) {
+                    return;
+                }
+                state.selected_files.clear();
+                state.selected_files.insert(target_file->id);
+                state.last_selected_index = -1;
+                for (int index = 0; index < static_cast<int>(state.files.size()); ++index) {
+                    if (state.files[index].id == target_file->id) {
+                        state.last_selected_index = index;
+                        break;
+                    }
+                }
+            };
+            bool can_clipboard = !state.selected_files.empty() || has_effective_target;
             bool all_local_available = !state.selected_files.empty();
             bool all_deletable = !state.selected_files.empty();
             bool any_remote_with_local_mirror = false;
+
+            if (state.selected_files.empty() && target_file) {
+                const bool is_avail = can_use_local_mirror(*target_file);
+                all_local_available = is_avail;
+                all_deletable = is_avail || target_file->source == FileSource::REMOTE;
+                any_remote_with_local_mirror = target_file->source == FileSource::REMOTE && fs::exists(target_file->path);
+            }
+
             for (const auto& f : state.files) {
                 if (state.selected_files.count(f.id) == 0) continue;
                 const bool is_avail = can_use_local_mirror(f);
@@ -117,9 +144,15 @@ void FileExplorerPanel::show_context_menu(FileExplorerState& state) {
                 ImGui::Separator();
             }
 
-            if (all_local_available) {
-                if (ImGui::MenuItem("Copy", CommandManager::get().label("explorer.copy").c_str())) perform_copy(state);
-                if (ImGui::MenuItem("Cut", CommandManager::get().label("explorer.cut").c_str())) perform_cut(state);
+            if (can_clipboard) {
+                if (ImGui::MenuItem("Copy", CommandManager::get().label("explorer.copy").c_str())) {
+                    ensure_target_selected();
+                    perform_copy(state);
+                }
+                if (ImGui::MenuItem("Cut", CommandManager::get().label("explorer.cut").c_str())) {
+                    ensure_target_selected();
+                    perform_cut(state);
+                }
             } else {
                 ImGui::MenuItem("Copy", CommandManager::get().label("explorer.copy").c_str(), false, false);
                 ImGui::MenuItem("Cut", CommandManager::get().label("explorer.cut").c_str(), false, false);
@@ -138,14 +171,20 @@ void FileExplorerPanel::show_context_menu(FileExplorerState& state) {
 
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.4f, 0.4f, 1.0f));
             if (all_deletable || is_trash_view) {
-                if (ImGui::MenuItem("Delete", "Del")) perform_delete_selected(state);
+                if (ImGui::MenuItem("Delete", "Del")) {
+                    ensure_target_selected();
+                    perform_delete_selected(state);
+                }
             } else {
                 ImGui::MenuItem("Delete", "Del", false, false);
             }
             ImGui::PopStyleColor();
 
             if (any_remote_with_local_mirror && !is_trash_view) {
-                if (ImGui::MenuItem("Delete local")) perform_delete_local_selected(state);
+                if (ImGui::MenuItem("Delete local")) {
+                    ensure_target_selected();
+                    perform_delete_local_selected(state);
+                }
             }
 
             ImGui::Separator();

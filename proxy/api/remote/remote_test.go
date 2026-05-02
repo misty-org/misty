@@ -277,6 +277,22 @@ func TestUploadFileMissingFileName(t *testing.T) {
 	}
 }
 
+func TestUploadFileAllowsEmptyPathForRemoteRoot(t *testing.T) {
+	_, cleanup := setupAPI(t)
+	defer cleanup()
+
+	req := httptest.NewRequest("POST",
+		"/api/file/upload?remote=missing-remote&path=", strings.NewReader("data"))
+	req.Header.Set("X-File-Name", "uploaded.txt")
+
+	rr := httptest.NewRecorder()
+	UploadFile().ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 for missing remote when path is empty, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
 func TestDownloadFolderHandler(t *testing.T) {
 	root, cleanup := setupAPI(t)
 	defer cleanup()
@@ -352,6 +368,30 @@ func TestUploadFolderHandler(t *testing.T) {
 	}
 }
 
+func TestUploadFolderAllowsEmptyPathForRemoteRoot(t *testing.T) {
+	_, cleanup := setupAPI(t)
+	defer cleanup()
+
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	localPath := filepath.Join(home, "misty", "tmp", "upload-folder")
+	if err := os.MkdirAll(localPath, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	body, _ := json.Marshal(map[string]string{
+		"remote":     "missing-remote",
+		"path":       "",
+		"local_path": localPath,
+	})
+
+	rr := doRequest(UploadFolder(), "POST", "/api/folder/upload", bytes.NewReader(body))
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 for missing remote when path is empty, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
 func TestTransferFolderHandler(t *testing.T) {
 	root, cleanup := setupAPI(t)
 	defer cleanup()
@@ -386,6 +426,23 @@ func TestTransferFolderHandler(t *testing.T) {
 	}
 	if string(data) != "transfer folder" {
 		t.Errorf("expected transfer folder, got %q", string(data))
+	}
+}
+
+func TestTransferFolderAllowsEmptyDestPathForRemoteRoot(t *testing.T) {
+	_, cleanup := setupAPI(t)
+	defer cleanup()
+
+	body, _ := json.Marshal(map[string]string{
+		"source_remote": testRemote,
+		"source_path":   "/source-folder",
+		"dest_remote":   "missing-remote",
+		"dest_path":     "",
+	})
+
+	rr := doRequest(TransferFolder(), "POST", "/api/folder/transfer", bytes.NewReader(body))
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 for missing dest remote when dest_path is empty, got %d: %s", rr.Code, rr.Body.String())
 	}
 }
 

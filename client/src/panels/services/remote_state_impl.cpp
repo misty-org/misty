@@ -26,6 +26,49 @@ namespace misty::panel {
         constexpr long kSyncRefetchTotalTimeoutSeconds = 120L;
         constexpr long kSyncRunNowConnectTimeoutSeconds = 10L;
         constexpr long kSyncRunNowTotalTimeoutSeconds = 1800L;
+
+        bool accumulate_sync_list_stream_chunk(const std::string& chunk,
+                                               json& aggregate,
+                                               std::string* error_out) {
+            try {
+                json event = json::parse(chunk);
+                const std::string type = event.value("type", std::string(""));
+                if (type == "items") {
+                    aggregate["remote"] = event.value("remote", aggregate.value("remote", std::string("")));
+                    aggregate["path"] = event.value("path", aggregate.value("path", std::string("")));
+                    auto& items = aggregate["items"];
+                    if (!items.is_array()) {
+                        items = json::array();
+                    }
+                    for (const auto& item : event.value("items", json::array())) {
+                        items.push_back(item);
+                    }
+                    return true;
+                }
+                if (type == "done") {
+                    aggregate["remote"] = event.value("remote", aggregate.value("remote", std::string("")));
+                    aggregate["path"] = event.value("path", aggregate.value("path", std::string("")));
+                    aggregate["dirty_bit"] = event.value("dirty_bit", false);
+                    aggregate["watched"] = event.value("watched", false);
+                    return true;
+                }
+                if (type == "error") {
+                    if (error_out) {
+                        *error_out = event.value("error", std::string("stream error"));
+                    }
+                    return false;
+                }
+                if (error_out) {
+                    *error_out = "unexpected sync stream event";
+                }
+                return false;
+            } catch (const std::exception& ex) {
+                if (error_out) {
+                    *error_out = ex.what();
+                }
+                return false;
+            }
+        }
     }
 
     ServicesState::ServicesState() = default;
@@ -34,7 +77,7 @@ namespace misty::panel {
     namespace {
         fs::path remote_metadata_path() {
             const char* home = std::getenv("HOME");
-            return fs::path(home ? home : "/tmp") / "misty" / "remotes.json";
+            return fs::path(home ? home : "/tmp") / "misty" / "rclone" / "remotes.json";
         }
 
         std::string trim_copy(std::string value) {
@@ -1073,10 +1116,41 @@ namespace misty::panel {
     void ServicesState::fetch_sync_items(const std::string& remote,
                                          const std::string& path,
                                          FilesCallback callback) {
+        auto aggregate = std::make_shared<json>(json::object({
+            {"items", json::array()},
+            {"remote", remote},
+            {"path", path},
+            {"dirty_bit", false},
+            {"watched", false},
+        }));
+        fetch_sync_items_stream(
+            remote,
+            path,
+            [remote, path, aggregate](const std::string& chunk) mutable {
+                std::string parse_error;
+                if (!accumulate_sync_list_stream_chunk(chunk, *aggregate, &parse_error)) {
+                    std::cerr << "fetch_sync_items(" << remote << ", " << path << "): " << parse_error << std::endl;
+                    return false;
+                }
+                return true;
+            },
+            [callback, aggregate](bool success, const std::string&, const std::string& error) {
+                if (success) {
+                    callback(true, aggregate->dump(), "");
+                } else {
+                    callback(false, "", error);
+                }
+            });
+    }
+
+    void ServicesState::fetch_sync_items_stream(const std::string& remote,
+                                                const std::string& path,
+                                                StreamFilesCallback chunk_callback,
+                                                FilesCallback callback) {
         if (!worker_pool_) return;
 
         worker_pool_->add(
-            [remote, path, callback]() {
+            [remote, path, chunk_callback, callback]() {
                 std::string base = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
                 if (base.empty()) {
                     callback(false, "", "PROXY_SERVICE_URL not set");
@@ -1089,13 +1163,14 @@ namespace misty::panel {
                 std::map<std::string, std::string> headers;
                 headers["Accept"] = "application/json";
 
-                auto response = core::HTTPClient::get().get_with_timeouts(
+                auto response = core::HTTPClient::get().get_stream_with_timeouts(
                     url,
                     kSyncListConnectTimeoutSeconds,
                     kSyncListTotalTimeoutSeconds,
+                    chunk_callback,
                     headers);
                 if (response.status_code >= 200 && response.status_code < 300) {
-                    callback(true, response.body, "");
+                    callback(true, "", "");
                 } else {
                     std::string err = "HTTP " + std::to_string(response.status_code);
                     if (!response.body.empty()) err += ": " + response.body;
@@ -1162,6 +1237,65 @@ namespace misty::panel {
         );
     }
 
+    void ServicesState::download_folder(const std::string& remote,
+                                        const std::string& remote_path,
+                                        const std::string& local_path,
+                                        DownloadCallback callback) {
+        if (!worker_pool_) return;
+
+        if (!local_path.empty()) {
+            suppress_fs_path(local_path);
+        }
+        auto wrapped = [this, local_path, callback](bool success,
+                                                    const std::string& out_path,
+                                                    const std::string& err) {
+            if (callback) callback(success, out_path, err);
+            if (!local_path.empty()) {
+                this->unsuppress_fs_path(local_path);
+            }
+        };
+
+        worker_pool_->add(
+            [remote, remote_path, local_path, wrapped]() {
+                std::string base = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
+                if (base.empty()) {
+                    wrapped(false, "", "PROXY_SERVICE_URL not set");
+                    return;
+                }
+
+                json body;
+                body["remote"] = remote;
+                body["path"] = remote_path;
+                if (!local_path.empty()) {
+                    body["local_path"] = local_path;
+                }
+
+                std::map<std::string, std::string> headers;
+                headers["Accept"] = "application/json";
+                headers["Content-Type"] = "application/json";
+
+                auto response = core::HTTPClient::get().post(base + "/api/folder/download", body.dump(), headers);
+                if (response.status_code >= 200 && response.status_code < 300) {
+                    try {
+                        json payload = json::parse(response.body);
+                        wrapped(true, payload.value("local_path", local_path), "");
+                    } catch (const std::exception& ex) {
+                        wrapped(false, "", ex.what());
+                    }
+                    return;
+                }
+
+                std::string err = "HTTP " + std::to_string(response.status_code);
+                if (!response.body.empty()) err += ": " + response.body;
+                wrapped(false, "", err);
+            },
+            []() {},
+            [wrapped](const std::string& err) {
+                wrapped(false, "", err);
+            }
+        );
+    }
+
     void ServicesState::upload_file(const std::string& remote,
                                     const std::string& remote_path,
                                     const std::string& local_path,
@@ -1194,9 +1328,10 @@ namespace misty::panel {
 
                 std::map<std::string, std::string> headers;
                 headers["X-File-Name"] = file_name;
-                headers["Content-Length"] = std::to_string(file_content.size());
+                headers["Content-Type"] = "application/octet-stream";
 
-                auto response = core::HTTPClient::get().post(url, file_content, headers);
+                auto response = core::HTTPClient::get().post_with_timeouts(
+                    url, file_content, 10L, 0L, headers);
 
                 if (response.status_code >= 200 && response.status_code < 300) {
                     if (progress_cb) {
@@ -1204,7 +1339,11 @@ namespace misty::panel {
                     }
                     callback(true, "");
                 } else {
-                    callback(false, "Upload failed: HTTP " + std::to_string(response.status_code));
+                    std::string err = "Upload failed: HTTP " + std::to_string(response.status_code);
+                    if (!response.body.empty()) {
+                        err += ": " + response.body;
+                    }
+                    callback(false, err);
                 }
             },
             []() {},

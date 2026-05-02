@@ -14,9 +14,10 @@ func UploadFile() http.HandlerFunc {
 		dirPath := r.URL.Query().Get("path")
 		fileName := r.Header.Get("X-File-Name")
 
-		if remoteName == "" || dirPath == "" || fileName == "" {
+		// Empty path means "upload into the remote root".
+		if remoteName == "" || fileName == "" {
 			log.Printf("upload: bad request remote=%q path=%q file=%q", remoteName, dirPath, fileName)
-			http.Error(w, "remote, path query params and X-File-Name header are required", http.StatusBadRequest)
+			http.Error(w, "remote query param and X-File-Name header are required", http.StatusBadRequest)
 			return
 		}
 

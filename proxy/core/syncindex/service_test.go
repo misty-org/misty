@@ -293,3 +293,100 @@ func TestMarkLocalDirtyCreatesSyncQueueEntry(t *testing.T) {
 		t.Fatalf("unexpected sync entry: %+v", entries[0])
 	}
 }
+
+func TestPruneMissingRemoteDirectoryRemovesIndexedSubtree(t *testing.T) {
+	database := setupServiceTestDB(t)
+	service := NewService(database)
+
+	root, err := service.ensureSyncRoot("drive-test")
+	if err != nil {
+		t.Fatalf("ensureSyncRoot: %v", err)
+	}
+
+	seedRow := func(relPath, parentRelPath, name string) {
+		t.Helper()
+
+		row := dbpkg.FileMetadata{
+			RemoteName:    "drive-test",
+			RelPath:       relPath,
+			ParentRelPath: parentRelPath,
+			Name:          name,
+			RemoteExists:  true,
+			RemoteMTime:   "2026-05-01T15:00:00Z",
+			RemoteSize:    sql.NullInt64{Int64: 123, Valid: true},
+			UpdatedAt:     "2026-05-01T15:00:00Z",
+		}
+		if err := dbpkg.UpsertFileMetadata(database.Conn, row); err != nil {
+			t.Fatalf("seed metadata %s: %v", relPath, err)
+		}
+		if err := service.upsertSyncEntryForRow(root, row); err != nil {
+			t.Fatalf("seed sync entry %s: %v", relPath, err)
+		}
+	}
+
+	seedRow("Screencastify/foo.txt", "Screencastify", "foo.txt")
+	seedRow("Screencastify/sub/bar.txt", "Screencastify/sub", "bar.txt")
+	seedRow("Keep/baz.txt", "Keep", "baz.txt")
+
+	if err := service.pruneMissingRemoteDirectory(root, "drive-test", "Screencastify"); err != nil {
+		t.Fatalf("pruneMissingRemoteDirectory: %v", err)
+	}
+
+	row, err := dbpkg.GetFileMetadata(database.Conn, "drive-test", "Screencastify/foo.txt")
+	if err != nil {
+		t.Fatalf("GetFileMetadata foo: %v", err)
+	}
+	if row != nil {
+		t.Fatalf("expected Screencastify/foo.txt to be pruned, got %+v", row)
+	}
+
+	row, err = dbpkg.GetFileMetadata(database.Conn, "drive-test", "Screencastify/sub/bar.txt")
+	if err != nil {
+		t.Fatalf("GetFileMetadata bar: %v", err)
+	}
+	if row != nil {
+		t.Fatalf("expected Screencastify/sub/bar.txt to be pruned, got %+v", row)
+	}
+
+	row, err = dbpkg.GetFileMetadata(database.Conn, "drive-test", "Keep/baz.txt")
+	if err != nil {
+		t.Fatalf("GetFileMetadata keep: %v", err)
+	}
+	if row == nil {
+		t.Fatal("expected unrelated Keep/baz.txt row to remain")
+	}
+
+	fooEntry, err := dbpkg.GetSyncEntry(database.Conn, dbpkg.MakeSyncEntryID(root.ID, "Screencastify/foo.txt"))
+	if err != nil {
+		t.Fatalf("GetSyncEntry foo: %v", err)
+	}
+	if fooEntry != nil {
+		t.Fatalf("expected Screencastify/foo.txt sync entry to be pruned, got %+v", fooEntry)
+	}
+
+	barEntry, err := dbpkg.GetSyncEntry(database.Conn, dbpkg.MakeSyncEntryID(root.ID, "Screencastify/sub/bar.txt"))
+	if err != nil {
+		t.Fatalf("GetSyncEntry bar: %v", err)
+	}
+	if barEntry != nil {
+		t.Fatalf("expected Screencastify/sub/bar.txt sync entry to be pruned, got %+v", barEntry)
+	}
+
+	keepEntry, err := dbpkg.GetSyncEntry(database.Conn, dbpkg.MakeSyncEntryID(root.ID, "Keep/baz.txt"))
+	if err != nil {
+		t.Fatalf("GetSyncEntry keep: %v", err)
+	}
+	if keepEntry == nil {
+		t.Fatal("expected unrelated Keep/baz.txt sync entry to remain")
+	}
+
+	dirs, err := dbpkg.ListSyncEntryDirectories(database.Conn, root.ID)
+	if err != nil {
+		t.Fatalf("ListSyncEntryDirectories: %v", err)
+	}
+	for _, dir := range dirs {
+		if dir == "Screencastify" || dir == "Screencastify/sub" {
+			t.Fatalf("expected stale directory %q to be pruned from sync entry directories", dir)
+		}
+	}
+}
