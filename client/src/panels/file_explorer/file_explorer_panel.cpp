@@ -4,6 +4,7 @@
 #include "panels/services/remote/remote_state.h"
 #include "panels/search/search_state.h"
 #include "panels/search/search_panel.h"
+#include "panels/transfers/transfer_window_state.h"
 #include "core/cache/listing_cache.h"
 #include "core/manager/asset_manager.h"
 #include <glad/glad.h>
@@ -788,6 +789,8 @@ namespace misty::panel {
     // and automatically cleared when navigating to local paths
 
     void FileExplorerPanel::render() {
+        const bool transfer_modal_open =
+            registry_.get_state<TransferWindowState>(kTransferWindowStateKey).is_open();
         auto& services_state = registry_.get_state<ServicesState>("Services");
 
         // If services connections changed (new remote added, one disconnected),
@@ -927,7 +930,7 @@ namespace misty::panel {
                     const ImVec2 splitter_size(kPreviewSplitterWidth, content_avail.y);
                     ImGui::InvisibleButton("##preview_splitter", splitter_size);
 
-                    const bool splitter_hovered = ImGui::IsItemHovered();
+                    const bool splitter_hovered = !transfer_modal_open && ImGui::IsItemHovered();
                     if (splitter_hovered || preview_pane_resizing_) {
                         ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
                     }
@@ -942,7 +945,9 @@ namespace misty::panel {
                         const float live_width = std::clamp(preview_pane_drag_start_width_ +
                                                             (preview_pane_drag_start_mouse_x_ - io.MousePos.x),
                                                             min_preview_width, max_width);
-                        if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+                        if (transfer_modal_open) {
+                            preview_pane_resizing_ = false;
+                        } else if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
                             preview_pane_resizing_ = false;
                             preview_pane_width_ = live_width;
                         }
@@ -964,6 +969,7 @@ namespace misty::panel {
 
                 const bool can_begin_pane_drag =
                     body_drag_source_callback_ &&
+                    !transfer_modal_open &&
                     ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup) &&
                     ImGui::IsMouseDragging(ImGuiMouseButton_Left) &&
                     !ImGui::IsAnyItemHovered() &&

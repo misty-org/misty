@@ -13,6 +13,7 @@
 #include "core/manager/asset_manager.h"
 #include "core/manager/env_manager.h"
 #include "core/net/http_client.h"
+#include "panels/transfers/transfer_window_state.h"
 
 namespace misty::panel {
 namespace {
@@ -309,6 +310,8 @@ void FileExplorerPanel::render_chat_overlay(FileExplorerState& state,
                                             float max_overlay_height,
                                             float overlay_bottom_y) {
     constexpr float kResizeHandleHeight = 8.0f;
+    const bool transfer_modal_open =
+        registry_.get_state<TransferWindowState>(kTransferWindowStateKey).is_open();
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(14.0f, 12.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 12.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
@@ -325,7 +328,7 @@ void FileExplorerPanel::render_chat_overlay(FileExplorerState& state,
         const ImVec2 handle_size(window_size.x, kResizeHandleHeight);
         ImGui::SetCursorScreenPos(handle_pos);
         ImGui::InvisibleButton("##chat_resize_handle", handle_size);
-        const bool handle_hovered = ImGui::IsItemHovered();
+        const bool handle_hovered = !transfer_modal_open && ImGui::IsItemHovered();
         if (handle_hovered || state.chat_resizing) {
             ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
         }
@@ -333,7 +336,9 @@ void FileExplorerPanel::render_chat_overlay(FileExplorerState& state,
             state.chat_resizing = true;
         }
         if (state.chat_resizing) {
-            if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+            if (transfer_modal_open) {
+                state.chat_resizing = false;
+            } else if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
                 const float new_height = overlay_bottom_y - ImGui::GetIO().MousePos.y;
                 state.chat_overlay_height = std::clamp(new_height, min_overlay_height, max_overlay_height);
             } else {
