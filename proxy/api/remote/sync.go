@@ -163,14 +163,39 @@ func SyncList(service *syncindex.Service) http.HandlerFunc {
 			return
 		}
 
-		resp, err := service.ListDirectory(r.Context(), remoteName, dirPath)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			http.Error(w, "streaming unsupported", http.StatusInternalServerError)
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		w.Header().Set("Content-Type", "application/x-ndjson")
+		w.Header().Set("Cache-Control", "no-cache")
+
+		encoder := json.NewEncoder(w)
+		wroteAny := false
+		err := service.StreamDirectory(r.Context(), remoteName, dirPath, func(chunk syncindex.DirectoryStreamChunk) error {
+			wroteAny = true
+			if err := encoder.Encode(chunk); err != nil {
+				return err
+			}
+			flusher.Flush()
+			return nil
+		})
+		if err == nil {
+			return
+		}
+		if !wroteAny {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		_ = encoder.Encode(syncindex.DirectoryStreamChunk{
+			Type:   "error",
+			Remote: remoteName,
+			Path:   dirPath,
+			Error:  err.Error(),
+		})
+		flusher.Flush()
 	}
 }
 

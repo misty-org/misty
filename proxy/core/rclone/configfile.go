@@ -141,6 +141,27 @@ func setConfigValue(name, key, value string) error {
 	return writeConfigLocked(remotes)
 }
 
+func unsetConfigValue(name, key string) error {
+	if !validRemoteName(name) {
+		return fmt.Errorf("invalid remote name %q", name)
+	}
+	configMu.Lock()
+	defer configMu.Unlock()
+	if err := ensureConfigFile(); err != nil {
+		return err
+	}
+	remotes, err := readConfigLocked()
+	if err != nil {
+		return err
+	}
+	values := remotes[name]
+	if values == nil {
+		return nil
+	}
+	delete(values, key)
+	return writeConfigLocked(remotes)
+}
+
 func validRemoteName(name string) bool {
 	name = strings.TrimSpace(name)
 	if name == "" || strings.Contains(name, ":") {

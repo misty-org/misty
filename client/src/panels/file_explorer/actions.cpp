@@ -26,12 +26,12 @@ namespace misty::panel {
                    ec == std::make_error_code(std::errc::operation_not_permitted);
         }
 
-        bool can_use_local_mirror(const UnifiedFileItem& item) {
+        bool remote_file_has_local_mirror(const UnifiedFileItem& item) {
             if (item.path.empty()) {
                 return false;
             }
-            if (item.source != FileSource::REMOTE) {
-                return true;
+            if (item.source != FileSource::REMOTE || item.is_dir) {
+                return false;
             }
             return item.status == SyncStatus::SYNCED ||
                    item.status == SyncStatus::MODIFIED ||
@@ -146,11 +146,11 @@ namespace misty::panel {
             }
 
             std::error_code ec;
-            fs::path file(path);
-            fs::remove(file, ec);
+            fs::path target(path);
+            fs::remove_all(target, ec);
 
             ec.clear();
-            fs::path parent = file.parent_path();
+            fs::path parent = target.parent_path();
             if (!parent.empty()) {
                 fs::remove(parent, ec);
             }
@@ -490,8 +490,28 @@ namespace misty::panel {
             return;
         }
 
-        bool dest_is_cloud = path_utils::is_remote_path(dest_dir);
+        std::string effective_dest_dir = dest_dir;
+        std::string destination_error;
+        const bool dest_is_cloud_path = path_utils::is_remote_path(dest_dir);
+        if (dest_is_cloud_path &&
+            !resolve_drop_destination_path(dest_dir, effective_dest_dir, &destination_error)) {
+            auto& activity = registry_.get_state<ActivityState>("Activity");
+            activity.add_entry("File",
+                destination_error.empty()
+                    ? "Drop ignored: destination is not valid for the selected item."
+                    : destination_error,
+                ActivityEntryType::ERROR);
+            return;
+        }
+
+        bool dest_is_cloud = false;
+        if (dest_is_cloud_path) {
+            std::string remote_name;
+            std::string remote_path;
+            dest_is_cloud = resolve_remote_path_context(effective_dest_dir, remote_name, remote_path) && !remote_name.empty();
+        }
         bool queued_cloud_uploads = false;
+        bool started_async_transfer = false;
         size_t skipped_count = 0;
 
         for (const auto& item : items) {
@@ -502,7 +522,7 @@ namespace misty::panel {
 
             if (op == ClipboardOp::CUT) {
                 const fs::path src(item.path);
-                const fs::path dest(dest_dir);
+                const fs::path dest(effective_dest_dir);
                 if (is_same_path(src.parent_path(), dest) || (item.is_dir && is_same_or_child_path(dest, src))) {
                     ++skipped_count;
                     continue;
@@ -510,20 +530,30 @@ namespace misty::panel {
             }
 
             const bool src_is_cloud = (item.source == FileSource::REMOTE);
-            const bool remote_has_local_mirror = src_is_cloud && fs::exists(item.path);
-
-            if ((!src_is_cloud || remote_has_local_mirror) && !dest_is_cloud) {
+            bool handled = false;
+            if (!src_is_cloud && !dest_is_cloud_path) {
                 // Local -> Local
-                perform_paste_local_to_local(state, item, dest_dir, op);
-            } else if (!dest_is_cloud && src_is_cloud) {
+                perform_paste_local_to_local(state, item, effective_dest_dir, op);
+                handled = true;
+            } else if (!dest_is_cloud_path && src_is_cloud) {
                 // Cloud -> Local
-                perform_paste_cloud_to_local(state, item, dest_dir, op);
+                started_async_transfer = true;
+                perform_paste_cloud_to_local(state, item, effective_dest_dir, op);
+                handled = true;
             } else if (dest_is_cloud && src_is_cloud) {
                 // Cloud -> Cloud: stage through a local temp file, then queue upload.
-                perform_paste_cloud_to_cloud(state, item, dest_dir, op);
+                started_async_transfer = true;
+                perform_paste_cloud_to_cloud(state, item, effective_dest_dir, op);
+                handled = true;
             } else if (dest_is_cloud) {
                 // Local -> Cloud (queues into sidebar upload queue)
-                queued_cloud_uploads = perform_paste_to_cloud(state, item, dest_dir, op) || queued_cloud_uploads;
+                started_async_transfer = true;
+                queued_cloud_uploads = perform_paste_to_cloud(state, item, effective_dest_dir, op) || queued_cloud_uploads;
+                handled = true;
+            }
+
+            if (!handled) {
+                ++skipped_count;
             }
         }
 
@@ -535,16 +565,23 @@ namespace misty::panel {
 
         if (skipped_count == items.size()) {
             auto& activity = registry_.get_state<ActivityState>("Activity");
-            activity.add_entry("File", "Drop ignored: destination is not valid for the selected item.", ActivityEntryType::ERROR);
+            if (dest_is_cloud_path && !dest_is_cloud) {
+                activity.add_entry("File", "Drop ignored: navigate into a specific remote folder before dropping items.", ActivityEntryType::ERROR);
+            } else {
+                activity.add_entry("File", "Drop ignored: destination is not valid for the selected item.", ActivityEntryType::ERROR);
+            }
             return;
         }
 
-        // Refresh the active directory so moved items disappear immediately; also
-        // ask sibling panes showing the destination to refresh.
-        navigate_to_path(std::string(state.current_path), false);
-        notify_shared_path_refresh(std::string(state.current_path));
-        if (dest_dir != std::string(state.current_path)) {
-            notify_shared_path_refresh(dest_dir);
+        // Synchronous local filesystem operations can refresh immediately.
+        // Async cloud transfers should stay in the background without forcing
+        // the explorer into a blocking loading state.
+        if (!started_async_transfer) {
+            navigate_to_path(std::string(state.current_path), false);
+            notify_shared_path_refresh(std::string(state.current_path));
+            if (effective_dest_dir != std::string(state.current_path)) {
+                notify_shared_path_refresh(effective_dest_dir);
+            }
         }
     }
 
@@ -670,7 +707,6 @@ namespace misty::panel {
 
     bool FileExplorerPanel::perform_paste_cloud_to_cloud(FileExplorerState& state, const UnifiedFileItem& item, const std::string& dest_dir, ClipboardOp op) {
         (void)state;
-        (void)op;
 
         std::string remote_name;
         std::string remote_path;
@@ -690,13 +726,25 @@ namespace misty::panel {
 
             services.transfer_folder(
                 item.remote_name, item.remote_path, remote_name, dest_folder_path,
-                [registry = &registry_, file_name = item.name, notif_id](bool success,
-                                                                         const std::string&,
-                                                                         const std::string& error) {
+                [registry = &registry_, item, op, file_name = item.name, notif_id](bool success,
+                                                                                    const std::string&,
+                                                                                    const std::string& error) {
                     auto& notifications = registry->get_state<NotificationState>("Notifications");
                     notifications.dismiss(notif_id);
                     if (success) {
-                        notifications.add_notification("Transferred " + file_name);
+                        if (op == ClipboardOp::CUT) {
+                            std::string delete_error;
+                            if (!FileExplorerPanel::delete_remote_file_impl(item, &delete_error)) {
+                                notifications.add_notification("Transferred " + file_name);
+                                auto& activity = registry->get_state<ActivityState>("Activity");
+                                activity.add_entry("File", "Remote move copied the folder, but failed to remove the source: " + delete_error,
+                                    ActivityEntryType::ERROR);
+                            } else {
+                                notifications.add_notification("Moved " + file_name);
+                            }
+                        } else {
+                            notifications.add_notification("Transferred " + file_name);
+                        }
                     } else {
                         auto& activity = registry->get_state<ActivityState>("Activity");
                         activity.add_entry("File", "Folder transfer failed: " + file_name + ": " + error, ActivityEntryType::ERROR);
@@ -727,6 +775,8 @@ namespace misty::panel {
                 return true;
             },
             [registry = &registry_,
+             item,
+             op,
              file_name = dest_file_name,
              source_name = item.name,
              staging_str,
@@ -747,13 +797,46 @@ namespace misty::panel {
                 }
 
                 downloads.complete_download(download_id);
-                if (queue_cloud_upload(*registry, local_path, file_name, remote_name, remote_path,
-                                       true, staging_str)) {
-                    auto& sidebar_state = registry->get_state<FileSidebarState>("FileSidebar");
-                    sidebar_state.pending_upload_start = true;
-                } else {
-                    cleanup_cloud_transfer_staging_path(staging_str);
+                if (op != ClipboardOp::CUT) {
+                    if (queue_cloud_upload(*registry, local_path, file_name, remote_name, remote_path,
+                                           true, staging_str)) {
+                        auto& sidebar_state = registry->get_state<FileSidebarState>("FileSidebar");
+                        sidebar_state.pending_upload_start = true;
+                    } else {
+                        cleanup_cloud_transfer_staging_path(staging_str);
+                    }
+                    return;
                 }
+
+                auto& services = registry->get_state<ServicesState>("Services");
+                services.upload_file(
+                    remote_name,
+                    remote_path,
+                    local_path,
+                    nullptr,
+                    [registry, item, file_name, source_name, staging_str](bool upload_success,
+                                                                          const std::string& upload_error) {
+                        cleanup_cloud_transfer_staging_path(staging_str);
+                        if (!upload_success) {
+                            auto& activity = registry->get_state<ActivityState>("Activity");
+                            activity.add_entry("File", "Cloud move failed: " + source_name + ": " + upload_error,
+                                ActivityEntryType::ERROR);
+                            return;
+                        }
+
+                        std::string delete_error;
+                        if (!FileExplorerPanel::delete_remote_file_impl(item, &delete_error)) {
+                            auto& notifications = registry->get_state<NotificationState>("Notifications");
+                            notifications.add_notification("Copied " + file_name);
+                            auto& activity = registry->get_state<ActivityState>("Activity");
+                            activity.add_entry("File", "Cloud move uploaded the file, but failed to remove the source: " + delete_error,
+                                ActivityEntryType::ERROR);
+                            return;
+                        }
+
+                        auto& notifications = registry->get_state<NotificationState>("Notifications");
+                        notifications.add_notification("Moved " + file_name);
+                    });
             });
 
         return true;
@@ -761,64 +844,127 @@ namespace misty::panel {
 
     void FileExplorerPanel::perform_paste_cloud_to_local(FileExplorerState& state, const UnifiedFileItem& item, const std::string& dest_dir, ClipboardOp op) {
         (void)state;
+        const std::string source_dir = fs::path(item.path).parent_path().string();
+
         if (item.is_dir) {
-            auto& activity = registry_.get_state<ActivityState>("Activity");
-            activity.add_entry("File", "Folder download not supported: " + item.name);
+            fs::path dest = unique_child_path(dest_dir, item.name);
+            fs::path staging_path = unique_cloud_transfer_staging_path(dest.filename().string());
+
+            auto& services = registry_.get_state<ServicesState>("Services");
+            auto& notifications = registry_.get_state<NotificationState>("Notifications");
+            uint64_t notif_id = notifications.add_notification("downloading folder...", 15.0f);
+
+            services.download_folder(
+                item.remote_name,
+                item.remote_path,
+                staging_path.string(),
+                [this,
+                 registry = &registry_,
+                 item,
+                 op,
+                 dest_dir,
+                 source_dir,
+                 dest_path = dest.string(),
+                 staging_str = staging_path.string(),
+                 notif_id](bool success, const std::string& local_path, const std::string& error) {
+                    auto& notifications = registry->get_state<NotificationState>("Notifications");
+                    notifications.dismiss(notif_id);
+
+                    if (!success) {
+                        cleanup_cloud_transfer_staging_path(staging_str);
+                        auto& activity = registry->get_state<ActivityState>("Activity");
+                        activity.add_entry("File", "Folder paste failed: " + item.name + ": " + error, ActivityEntryType::ERROR);
+                        return;
+                    }
+
+                    struct FolderTransferResult {
+                        std::string error;
+                    };
+
+                    auto result = std::make_shared<FolderTransferResult>();
+                    const std::string transfer_source = local_path.empty() ? staging_str : local_path;
+                    worker_pool_.add(
+                        [result, transfer_source, dest_path, op, staging_str]() {
+                            std::error_code ec;
+                            if (op == ClipboardOp::CUT) {
+                                fs::rename(transfer_source, dest_path, ec);
+                                if (is_cross_device_error(ec)) {
+                                    if (!copy_path_then_remove_source(transfer_source, dest_path, ec)) {
+                                        result->error = ec.message();
+                                    }
+                                } else if (ec) {
+                                    result->error = ec.message();
+                                }
+                            } else {
+                                fs::copy(transfer_source, dest_path, fs::copy_options::recursive, ec);
+                                if (ec) {
+                                    result->error = ec.message();
+                                }
+                            }
+                            cleanup_cloud_transfer_staging_path(staging_str);
+                        },
+                        [this, registry, item, op, source_dir, dest_dir, result]() {
+                            if (!result->error.empty()) {
+                                auto& activity = registry->get_state<ActivityState>("Activity");
+                                activity.add_entry("File", "Folder paste failed: " + item.name + ": " + result->error,
+                                    ActivityEntryType::ERROR);
+                                return;
+                            }
+
+                            auto& notifications = registry->get_state<NotificationState>("Notifications");
+                            if (op == ClipboardOp::CUT) {
+                                std::string delete_error;
+                                if (!FileExplorerPanel::delete_remote_file_impl(item, &delete_error)) {
+                                    notifications.add_notification("Copied " + item.name);
+                                    auto& activity = registry->get_state<ActivityState>("Activity");
+                                    activity.add_entry("File", "Move completed locally, but failed to remove remote source: " + delete_error,
+                                        ActivityEntryType::ERROR);
+                                } else {
+                                    notifications.add_notification("Moved " + item.name);
+                                }
+                            } else {
+                                notifications.add_notification("Copied " + item.name);
+                            }
+
+                            request_background_move_refresh(source_dir, dest_dir);
+                        },
+                        [registry, item](const std::string& err_msg) {
+                            auto& activity = registry->get_state<ActivityState>("Activity");
+                            activity.add_entry("File", "Folder paste failed: " + item.name + ": " + err_msg,
+                                ActivityEntryType::ERROR);
+                        });
+                });
             return;
         }
 
-        // If file is synced locally, just copy it
-        if (item.status == SyncStatus::SYNCED || item.status == SyncStatus::MODIFIED || fs::exists(item.path)) {
+        // If file is mirrored locally, use it as the transfer source. For CUT
+        // we still remove the cloud object after the local copy succeeds.
+        if (remote_file_has_local_mirror(item)) {
             fs::path src(item.path);
-            fs::path dest = fs::path(dest_dir) / src.filename();
-
-            if (fs::exists(dest)) {
-                std::string stem = dest.stem().string();
-                std::string ext = dest.extension().string();
-                int counter = 1;
-                while (fs::exists(dest)) {
-                    dest = fs::path(dest_dir) / (stem + " (" + std::to_string(counter) + ")" + ext);
-                    counter++;
-                }
-            }
+            fs::path dest = unique_child_path(dest_dir, src.filename().string());
 
             std::error_code ec;
-            if (op == ClipboardOp::CUT) {
-                fs::rename(src, dest, ec);
-                if (is_cross_device_error(ec)) {
-                    queue_cross_device_move(
-                        item,
-                        src.parent_path().string(),
-                        dest.parent_path().string(),
-                        src,
-                        dest,
-                        [this, item, src, dest]() {
-                            record_file_operation(make_single_item_record(
-                                FileOperationKind::MoveLocal,
-                                src,
-                                dest,
-                                item.is_dir,
-                                "Moved " + item.name));
-                        });
-                    return;
-                }
-            } else {
-                fs::copy_file(src, dest, ec);
-            }
+            fs::copy_file(src, dest, ec);
 
             if (ec) {
                 auto& activity = registry_.get_state<ActivityState>("Activity");
                 activity.add_entry("File", "Paste failed: " + ec.message(), ActivityEntryType::ERROR);
             } else {
                 auto& notif = registry_.get_state<NotificationState>("Notifications");
-                std::string action = (op == ClipboardOp::COPY) ? "Copied" : "Moved";
-                notif.add_notification(action + " " + item.name);
-                record_file_operation(make_single_item_record(
-                    op == ClipboardOp::COPY ? FileOperationKind::CopyLocal : FileOperationKind::MoveLocal,
-                    src,
-                    dest,
-                    item.is_dir,
-                    action + " " + item.name));
+                if (op == ClipboardOp::CUT) {
+                    std::string delete_error;
+                    if (!delete_remote_file(item, &delete_error)) {
+                        notif.add_notification("Copied " + item.name);
+                        auto& activity = registry_.get_state<ActivityState>("Activity");
+                        activity.add_entry("File", "Move completed locally, but failed to remove remote source: " + delete_error,
+                            ActivityEntryType::ERROR);
+                    } else {
+                        notif.add_notification("Moved " + item.name);
+                    }
+                } else {
+                    notif.add_notification("Copied " + item.name);
+                }
+                request_background_move_refresh(source_dir, dest_dir);
             }
             return;
         }
@@ -828,7 +974,7 @@ namespace misty::panel {
         auto& downloads = registry_.get_state<DownloadState>("Downloads");
         auto& notifications = registry_.get_state<NotificationState>("Notifications");
 
-        std::string dest_path = (fs::path(dest_dir) / item.name).string();
+        std::string dest_path = unique_child_path(dest_dir, item.name).string();
 
         uint64_t download_id = downloads.start_download(
             item.name, dest_path, item.remote_name, item.size);
@@ -842,14 +988,28 @@ namespace misty::panel {
                 downloads.update_progress(download_id, static_cast<int64_t>(bytes_downloaded));
                 return true;
             },
-            [registry = &registry_, file_name = item.name, download_id, notif_id](
+            [this, registry = &registry_, item, op, file_name = item.name, download_id, notif_id, source_dir, dest_dir](
                 bool success, const std::string& local_path, const std::string& error) {
+                (void)local_path;
                 auto& downloads = registry->get_state<DownloadState>("Downloads");
                 auto& notifications = registry->get_state<NotificationState>("Notifications");
                 notifications.dismiss(notif_id);
                 if (success) {
                     downloads.complete_download(download_id);
-                    notifications.add_notification("Copied " + file_name);
+                    if (op == ClipboardOp::CUT) {
+                        std::string delete_error;
+                        if (!FileExplorerPanel::delete_remote_file_impl(item, &delete_error)) {
+                            notifications.add_notification("Copied " + file_name);
+                            auto& activity = registry->get_state<ActivityState>("Activity");
+                            activity.add_entry("File", "Move completed locally, but failed to remove remote source: " + delete_error,
+                            ActivityEntryType::ERROR);
+                        } else {
+                            notifications.add_notification("Moved " + file_name);
+                        }
+                    } else {
+                        notifications.add_notification("Copied " + file_name);
+                    }
+                    this->request_background_move_refresh(source_dir, dest_dir);
                 } else {
                     downloads.fail_download(download_id, error);
                     auto& activity = registry->get_state<ActivityState>("Activity");
@@ -1180,12 +1340,8 @@ namespace misty::panel {
         for (const auto& sel : state.selected_files) {
             for (const auto& f : state.files) {
                 if (f.id == sel) {
-                    UnifiedFileItem copied = f;
-                    if (can_use_local_mirror(copied)) {
-                        copied.source = FileSource::LOCAL;
-                    }
-                    clipboard.paths.push_back(copied.path);
-                    clipboard.items.push_back(std::move(copied));
+                    clipboard.paths.push_back(f.path);
+                    clipboard.items.push_back(f);
                     break;
                 }
             }
@@ -1203,12 +1359,8 @@ namespace misty::panel {
         for (const auto& sel : state.selected_files) {
             for (const auto& f : state.files) {
                 if (f.id == sel) {
-                    UnifiedFileItem copied = f;
-                    if (can_use_local_mirror(copied)) {
-                        copied.source = FileSource::LOCAL;
-                    }
-                    clipboard.paths.push_back(copied.path);
-                    clipboard.items.push_back(std::move(copied));
+                    clipboard.paths.push_back(f.path);
+                    clipboard.items.push_back(f);
                     break;
                 }
             }
@@ -1306,9 +1458,9 @@ namespace misty::panel {
         const bool has_remote_targets = !remote_targets.empty();
         if (has_remote_targets) {
             const std::string origin_path(state.current_path);
-            state.is_loading = true;
-            state.show_loading_animation = true;
-            state.loading_animation_ready_at = std::chrono::steady_clock::now();
+            for (const auto& target : remote_targets) {
+                state.deleting_files.insert(target.path);
+            }
             worker_pool_.add(
                 [registry = &registry_, state_key = state_key_, remote_targets = std::move(remote_targets), origin_path]() {
                     struct RemoteDeleteResult {
@@ -1318,13 +1470,62 @@ namespace misty::panel {
                         std::string error;
                     };
 
+                    constexpr size_t kDeleteProgressChunk = 8;
                     std::vector<RemoteDeleteResult> results;
                     results.reserve(remote_targets.size());
+                    std::vector<RemoteDeleteResult> pending_updates;
+                    pending_updates.reserve(kDeleteProgressChunk);
+
+                    auto apply_progress = [&](std::vector<RemoteDeleteResult>& chunk) {
+                        if (chunk.empty()) {
+                            return;
+                        }
+
+                        auto& state = registry->get_state<FileExplorerState>(state_key);
+                        std::lock_guard<std::mutex> lock(state.mu);
+                        const bool same_dir = std::string(state.current_path) == origin_path &&
+                                              state.pending_navigation_path.empty();
+
+                        for (const auto& result : chunk) {
+                            state.selected_files.erase(result.id);
+                            state.deleting_files.erase(result.path);
+                            if (!result.success) {
+                                continue;
+                            }
+                            purge_from_recent(state, result.path);
+                        }
+
+                        if (!same_dir) {
+                            chunk.clear();
+                            return;
+                        }
+
+                        state.files.erase(
+                            std::remove_if(state.files.begin(), state.files.end(),
+                                [&](const UnifiedFileItem& file) {
+                                    for (const auto& result : chunk) {
+                                        if (result.success && file.path == result.path) {
+                                            return true;
+                                        }
+                                    }
+                                    return false;
+                                }),
+                            state.files.end());
+                        state.sort_dirty = true;
+                        chunk.clear();
+                    };
+
                     for (const auto& target : remote_targets) {
                         std::string error;
                         const bool success = FileExplorerPanel::delete_remote_file_impl(target.item, &error);
-                        results.push_back({target.id, target.path, success, std::move(error)});
+                        RemoteDeleteResult result{target.id, target.path, success, std::move(error)};
+                        results.push_back(result);
+                        pending_updates.push_back(std::move(result));
+                        if (pending_updates.size() >= kDeleteProgressChunk) {
+                            apply_progress(pending_updates);
+                        }
                     }
+                    apply_progress(pending_updates);
 
                     auto& state = registry->get_state<FileExplorerState>(state_key);
                     auto& notif = registry->get_state<NotificationState>("Notifications");
@@ -1333,15 +1534,13 @@ namespace misty::panel {
                     std::string first_error;
                     {
                         std::lock_guard<std::mutex> lock(state.mu);
-                        state.is_loading = false;
-                        state.show_loading_animation = false;
                         for (const auto& result : results) {
                             state.selected_files.erase(result.id);
+                            state.deleting_files.erase(result.path);
                             if (!result.success) {
                                 if (first_error.empty()) first_error = result.error;
                                 continue;
                             }
-                            purge_from_recent(state, result.path);
                             ++remote_success_count;
                         }
 
@@ -1369,8 +1568,7 @@ namespace misty::panel {
                     auto& state = registry->get_state<FileExplorerState>(state_key);
                     {
                         std::lock_guard<std::mutex> lock(state.mu);
-                        state.is_loading = false;
-                        state.show_loading_animation = false;
+                        state.deleting_files.clear();
                         state.error_msg = err;
                     }
                     auto& activity = registry->get_state<ActivityState>("Activity");

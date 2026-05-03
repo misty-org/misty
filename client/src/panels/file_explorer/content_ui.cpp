@@ -237,7 +237,8 @@ std::string type_label_for_item(const UnifiedFileItem& file) {
     return lowercase_copy(ext);
 }
 
-std::string state_label_for_item(const UnifiedFileItem& file) {
+std::string state_label_for_item(const FileExplorerState& state, const UnifiedFileItem& file) {
+    if (state.is_deleting(file.path)) return "DEL";
     if (!file.state_code.empty()) return file.state_code;
     return file.source == FileSource::REMOTE ? "REM" : "LOC";
 }
@@ -251,6 +252,7 @@ int compare_strings(const std::string& lhs, const std::string& rhs) {
 }
 
 std::string icon_name_for_file(const FileExplorerState& state, const UnifiedFileItem& file, bool open_directory) {
+    if (state.is_deleting(file.path)) return "trash-16";
     if (state.is_downloading(file.path)) return "download-16";
     if (file.is_dir) return open_directory ? "file-directory-open-fill-24" : "file-directory-fill-16";
 
@@ -500,7 +502,8 @@ void FileExplorerPanel::handle_drag_navigation_target(FileExplorerState& state,
 void FileExplorerPanel::show_directory_contents(FileExplorerState& state) {
     static ImGuiTableFlags flags = ImGuiTableFlags_Reorderable | ImGuiTableFlags_Sortable |
         ImGuiTableFlags_Hideable | ImGuiTableFlags_Resizable |
-        ImGuiTableFlags_ScrollX | ImGuiTableFlags_SizingFixedFit;
+        ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY |
+        ImGuiTableFlags_SizingFixedFit;
 
     const bool loading = state.is_loading;
     const bool show_loading_animation = loading && state.show_loading_animation &&
@@ -573,6 +576,7 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state) {
     } else {
         const float table_inner_width = kTableMinInnerWidth;
         if (ImGui::BeginTable("FileTable", 6, flags, ImVec2(0.0f, 0.0f), table_inner_width)) {
+            ImGui::TableSetupScrollFreeze(0, 1);
             ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_DefaultSort,
                                     kNameColumnWidth);
             ImGui::TableSetupColumn("Size", ImGuiTableColumnFlags_WidthFixed, kSizeColumnWidth);
@@ -625,12 +629,10 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state) {
 
     ImGui::PopStyleColor(3);
 
-    if (loading && overlay_size.x > 0.0f && overlay_size.y > 0.0f) {
+    if (show_loading_animation && overlay_size.x > 0.0f && overlay_size.y > 0.0f) {
         ImGui::SetCursorScreenPos(overlay_min);
         ImGui::InvisibleButton("##file_loading_blocker", overlay_size);
-        if (show_loading_animation) {
-            core::DrawMistyLoadingAnimation(overlay_min, overlay_max);
-        }
+        core::DrawMistyLoadingAnimation(overlay_min, overlay_max);
     }
 
     show_rename_modal(state);
@@ -644,7 +646,7 @@ void FileExplorerPanel::apply_table_sort(FileExplorerState& state, const ImGuiTa
         return;
     }
 
-    auto compare_for_column = [](const UnifiedFileItem& lhs, const UnifiedFileItem& rhs, ImGuiTableColumnSortSpecs spec) {
+    auto compare_for_column = [&state](const UnifiedFileItem& lhs, const UnifiedFileItem& rhs, ImGuiTableColumnSortSpecs spec) {
         int delta = 0;
 
         if (lhs.is_dir != rhs.is_dir) {
@@ -665,7 +667,7 @@ void FileExplorerPanel::apply_table_sort(FileExplorerState& state, const ImGuiTa
                     delta = compare_strings(lhs.last_modified, rhs.last_modified);
                     break;
                 case FileTableColumn::State:
-                    delta = compare_strings(state_label_for_item(lhs), state_label_for_item(rhs));
+                    delta = compare_strings(state_label_for_item(state, lhs), state_label_for_item(state, rhs));
                     break;
                 case FileTableColumn::Sync:
                     if (lhs.sync_dirty != rhs.sync_dirty) delta = lhs.sync_dirty ? 1 : -1;
@@ -750,6 +752,9 @@ void FileExplorerPanel::show_file_item(FileExplorerState& state, int i) {
             state.add_recent(file);
             open_file(file.path);
         } else if (file.source == FileSource::REMOTE) {
+            if (state.is_deleting(file.path)) {
+                return;
+            }
             if (fs::exists(file.path)) {
                 state.add_recent(file);
                 open_file(file.path);
@@ -766,6 +771,9 @@ void FileExplorerPanel::show_file_item(FileExplorerState& state, int i) {
     auto& icon = AssetManager::get().get_svg_texture(icon_name_for_file(state, file, show_open_folder_icon), 16);
     if (icon.id != 0) {
         ImU32 icon_col = file.is_dir ? IM_COL32(230, 191, 76, 255) : IM_COL32(100, 170, 230, 255);
+        if (state.is_deleting(file.path)) {
+            icon_col = IM_COL32(180, 180, 180, 210);
+        }
         ImGui::GetWindowDrawList()->AddImage(icon.id, icon_p, ImVec2(icon_p.x + 16, icon_p.y + 16), ImVec2(0, 0), ImVec2(1, 1), icon_col);
     }
     ImGui::Dummy(ImVec2(16, 16));
@@ -773,7 +781,13 @@ void FileExplorerPanel::show_file_item(FileExplorerState& state, int i) {
     ImGui::SameLine(0, 8.0f);
     float text_y_offset = (row_height - ImGui::GetTextLineHeight()) / 2.0f;
     ImGui::SetCursorScreenPos(ImVec2(ImGui::GetCursorScreenPos().x, p.y + text_y_offset));
-    ImGui::TextUnformatted(file.name.c_str());
+    if (state.is_deleting(file.path)) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.72f, 0.72f, 0.72f, 1.0f));
+        ImGui::TextUnformatted(file.name.c_str());
+        ImGui::PopStyleColor();
+    } else {
+        ImGui::TextUnformatted(file.name.c_str());
+    }
 
     ImGui::TableNextColumn();
     ImGui::SetCursorPosY(ImGui::GetCursorPosY() + text_y_offset);
@@ -797,7 +811,7 @@ void FileExplorerPanel::show_file_item(FileExplorerState& state, int i) {
 
     ImGui::TableNextColumn();
     ImGui::SetCursorPosY(ImGui::GetCursorPosY() + text_y_offset);
-    ImGui::TextUnformatted(state_label_for_item(file).c_str());
+    ImGui::TextUnformatted(state_label_for_item(state, file).c_str());
 
     ImGui::TableNextColumn();
     ImGui::SetCursorPosY(ImGui::GetCursorPosY() + content_padding_y);
@@ -842,6 +856,9 @@ void FileExplorerPanel::show_grid_item(FileExplorerState& state, int i, float ce
     auto& icon = AssetManager::get().get_svg_texture(icon_name_for_file(state, file, show_open_folder_icon), 32);
     if (icon.id != 0) {
         ImU32 icon_col = file.is_dir ? IM_COL32(230, 191, 76, 255) : IM_COL32(100, 170, 230, 255);
+        if (state.is_deleting(file.path)) {
+            icon_col = IM_COL32(180, 180, 180, 210);
+        }
         dl->AddImage(icon.id, ImVec2(icon_x, icon_y), ImVec2(icon_x + icon_size, icon_y + icon_size), ImVec2(0, 0), ImVec2(1, 1), icon_col);
     }
 
@@ -872,7 +889,9 @@ void FileExplorerPanel::show_grid_item(FileExplorerState& state, int i, float ce
         }
     }
     dl->AddText(ImGui::GetFont(), ImGui::GetFontSize(), ImVec2(text_x, text_y),
-        is_selected ? IM_COL32(255, 255, 255, 255) : IM_COL32(212, 212, 216, 255),
+        state.is_deleting(file.path)
+            ? IM_COL32(170, 170, 174, 255)
+            : (is_selected ? IM_COL32(255, 255, 255, 255) : IM_COL32(212, 212, 216, 255)),
         file.name.c_str(), nullptr, text_wrap_width);
     dl->PopClipRect();
 
@@ -893,6 +912,9 @@ void FileExplorerPanel::show_grid_item(FileExplorerState& state, int i, float ce
             state.add_recent(file);
             open_file(file.path);
         } else if (file.source == FileSource::REMOTE) {
+            if (state.is_deleting(file.path)) {
+                return;
+            }
             if (fs::exists(file.path)) {
                 state.add_recent(file);
                 open_file(file.path);

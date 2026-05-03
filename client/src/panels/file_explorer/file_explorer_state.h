@@ -255,9 +255,14 @@ namespace misty::panel {
 
         // Download tracking - paths currently being downloaded
         std::unordered_set<std::string> downloading_files;
+        std::unordered_set<std::string> deleting_files;
 
         bool is_downloading(const std::string& path) const {
             return downloading_files.count(path) > 0;
+        }
+
+        bool is_deleting(const std::string& path) const {
+            return deleting_files.count(path) > 0;
         }
 
         // Track last disconnected account notification to prevent spam

@@ -8,6 +8,7 @@
 #include "core/manager/session_manager.h"
 #include "core/ui/imgui_utils.h"
 #include "panels/file_explorer/file_explorer_state.h"
+#include "panels/transfers/transfer_window_state.h"
 
 namespace misty::view {
     FilesView::FilesView(core::UIRegistry& ui_registry,
@@ -17,7 +18,6 @@ namespace misty::view {
         , worker_pool_(worker_pool)
         , client_(std::move(client)) {
         init_panels();
-        schedule_proxy_probe();
     }
 
     FilesView::~FilesView() = default;
@@ -34,6 +34,12 @@ namespace misty::view {
         notification_panel_ = std::make_shared<panel::NotificationPanel>(ui_registry_);
         claude_panel_ = std::make_shared<panel::ClaudePanel>(ui_registry_, worker_pool_);
         filetree_panel_ = std::make_shared<panel::FileTreePanel>(ui_registry_, worker_pool_, client_);
+        file_sidebar_panel_->set_file_drop_handler(
+            [this](const std::string& source_state_key, const std::string& dest_path, panel::ClipboardOp op) {
+                if (filetree_panel_) {
+                    filetree_panel_->drop_selected_items_to_path(source_state_key, dest_path, op);
+                }
+            });
     }
 
     view::ViewID FilesView::get_view_id() {
@@ -50,6 +56,8 @@ namespace misty::view {
 
     void FilesView::render() {
         ImGuiViewport* viewport = ImGui::GetMainViewport();
+        const bool transfer_modal_open =
+            ui_registry_.get_state<panel::TransferWindowState>(panel::kTransferWindowStateKey).is_open();
 
         const float navbar_width = 77.0f;
         const float content_x = viewport->WorkPos.x + navbar_width;
@@ -78,16 +86,18 @@ namespace misty::view {
 
         ImGuiIO& io = ImGui::GetIO();
 
-        if (core::CommandManager::get().matches("search.toggle")) {
+        if (!transfer_modal_open && core::CommandManager::get().matches("search.toggle")) {
             filetree_panel_->toggle_active_search();
         }
-        if (core::CommandManager::get().matches("app.open_settings")) {
+        if (!transfer_modal_open && core::CommandManager::get().matches("app.open_settings")) {
             view::switch_view(view::ViewID::Settings);
         }
-        if (core::CommandManager::get().matches("explorer.toggle_claude")) {
+        if (!transfer_modal_open && core::CommandManager::get().matches("explorer.toggle_claude")) {
             claude_panel_->toggle();
         }
-        filetree_panel_->handle_commands();
+        if (!transfer_modal_open) {
+            filetree_panel_->handle_commands();
+        }
 
         if (claude_panel_->is_open()) {
             const std::string key = active_explorer_state_key();
@@ -100,8 +110,14 @@ namespace misty::view {
             }
         }
 
-        const bool hovered = io.MousePos.x >= handle_x0 && io.MousePos.x <= handle_x1 &&
+        const bool hovered = !transfer_modal_open &&
+                             io.MousePos.x >= handle_x0 && io.MousePos.x <= handle_x1 &&
                              io.MousePos.y >= handle_y0 && io.MousePos.y <= handle_y1;
+
+        if (transfer_modal_open) {
+            is_resizing_sidebar_ = false;
+            is_resizing_claude_panel_ = false;
+        }
 
         if (hovered || is_resizing_sidebar_) {
             ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
@@ -121,7 +137,7 @@ namespace misty::view {
             }
         }
 
-        if (hovered || is_resizing_sidebar_) {
+        if (!transfer_modal_open && (hovered || is_resizing_sidebar_)) {
             ImDrawList* fg = ImGui::GetForegroundDrawList();
             const float line_x = sidebar_pos.x + sidebar_w;
             fg->AddLine(
@@ -135,7 +151,8 @@ namespace misty::view {
             const float ch_x0 = claude_handle_x - kResizeHandleWidth * 0.5f;
             const float ch_x1 = ch_x0 + kResizeHandleWidth;
 
-            const bool ch_hovered = io.MousePos.x >= ch_x0 && io.MousePos.x <= ch_x1 &&
+            const bool ch_hovered = !transfer_modal_open &&
+                                    io.MousePos.x >= ch_x0 && io.MousePos.x <= ch_x1 &&
                                     io.MousePos.y >= handle_y0 && io.MousePos.y <= handle_y1;
 
             if (ch_hovered || is_resizing_claude_panel_) {
@@ -155,7 +172,7 @@ namespace misty::view {
                     is_resizing_claude_panel_ = false;
                 }
             }
-            if (ch_hovered || is_resizing_claude_panel_) {
+            if (!transfer_modal_open && (ch_hovered || is_resizing_claude_panel_)) {
                 ImDrawList* fg = ImGui::GetForegroundDrawList();
                 fg->AddLine(
                     ImVec2(claude_handle_x, handle_y0),
@@ -195,7 +212,7 @@ namespace misty::view {
         notification_panel_->render();
     }
 
-    void FilesView::schedule_proxy_probe() {
+    void FilesView::schedule_proxy_probe(bool force) {
         bool expected = false;
         if (!proxy_probe_in_flight_->compare_exchange_strong(expected, true)) {
             return;
@@ -203,8 +220,8 @@ namespace misty::view {
 
         auto probe_state = proxy_probe_in_flight_;
         worker_pool_.add(
-            []() {
-                core::ProxyManager::get().ensure_running();
+            [force]() {
+                core::ProxyManager::get().ensure_running(force);
             },
             [probe_state]() {
                 probe_state->store(false);
@@ -256,7 +273,7 @@ namespace misty::view {
                 ImGui::Button("Checking...", ImVec2(kButtonWidth, 32.0f));
                 ImGui::EndDisabled();
             } else if (ImGui::Button("Retry", ImVec2(kButtonWidth, 32.0f))) {
-                schedule_proxy_probe();
+                schedule_proxy_probe(true);
             }
         }
         ImGui::End();

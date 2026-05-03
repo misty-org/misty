@@ -7,7 +7,6 @@
 #include "views/app_view.h"
 #include <cstring>
 #include <iostream>
-#include "panels/panel_ui.h"
 
 namespace misty::panel {
     AuthLoginPanel::AuthLoginPanel(UIRegistry& registry)
@@ -78,7 +77,7 @@ namespace misty::panel {
         // Email
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.8f, 0.8f, 1.0f));
         auto& mail_icon = core::AssetManager::get().get_svg_texture("mail-16", 24);
-        IconText(mail_icon, 16.0f, "Email", 2.0f, -2.0f);
+        core::IconText(mail_icon, 16.0f, "Email", 2.0f, -2.0f);
         ImGui::PopStyleColor();
         ImGui::SetNextItemWidth(width);
         ImGui::InputTextWithHint("##email", "", state.email, sizeof(state.email));
@@ -88,7 +87,7 @@ namespace misty::panel {
         // Password
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.8f, 0.8f, 1.0f));
         auto& lock_icon = core::AssetManager::get().get_svg_texture("lock-16", 24);
-        IconText(lock_icon, 16.0f, "Password", 1.0f, -2.0f);
+        core::IconText(lock_icon, 16.0f, "Password", 1.0f, -2.0f);
         ImGui::PopStyleColor();
         ImGui::SetNextItemWidth(width);
         ImGui::InputTextWithHint("##password", "", state.password, sizeof(state.password), ImGuiInputTextFlags_Password);
