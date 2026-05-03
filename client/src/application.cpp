@@ -95,8 +95,6 @@ namespace misty {
             append_startup_log("startup: plugins discovered");
             core::CommandManager::get().load();
             append_startup_log("startup: commands loaded");
-            core::ProxyManager::get().ensure_running();
-            append_startup_log("startup: proxy ensure_running returned");
             //init_file_sync();
             
             // Initialize and start background file status sync

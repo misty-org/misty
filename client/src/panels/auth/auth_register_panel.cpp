@@ -7,7 +7,6 @@
 #include "views/app_view.h"
 #include <cstring>
 #include <iostream>
-#include "panels/panel_ui.h"
 
 namespace misty::panel {
     AuthRegisterPanel::AuthRegisterPanel(UIRegistry& registry)
@@ -76,7 +75,7 @@ namespace misty::panel {
         // Username
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.8f, 0.8f, 1.0f));
         auto& person_icon = core::AssetManager::get().get_svg_texture("person-16", 24);
-        IconText(person_icon, 16.0f, "Username", 1.0f, -2.0f);
+        core::IconText(person_icon, 16.0f, "Username", 1.0f, -2.0f);
         ImGui::PopStyleColor();
         ImGui::SetNextItemWidth(width);
         ImGui::InputTextWithHint("##username", "", state.full_name, sizeof(state.full_name));
@@ -84,7 +83,7 @@ namespace misty::panel {
         // Email
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.8f, 0.8f, 1.0f));
         auto& mail_icon = core::AssetManager::get().get_svg_texture("mail-16", 24);
-        IconText(mail_icon, 16.0f, "Email", 2.0f, -2.0f);
+        core::IconText(mail_icon, 16.0f, "Email", 2.0f, -2.0f);
         ImGui::PopStyleColor();
         ImGui::SetNextItemWidth(width);
         ImGui::InputTextWithHint("##email", "", state.email, sizeof(state.email));
@@ -92,7 +91,7 @@ namespace misty::panel {
         // Password
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.8f, 0.8f, 1.0f));
         auto& lock_icon = core::AssetManager::get().get_svg_texture("lock-16", 24);
-        IconText(lock_icon, 16.0f, "Password", 1.0f, -2.0f);
+        core::IconText(lock_icon, 16.0f, "Password", 1.0f, -2.0f);
         ImGui::PopStyleColor();
         ImGui::SetNextItemWidth(width);
         ImGui::InputTextWithHint("##password", "", state.password, sizeof(state.password), ImGuiInputTextFlags_Password);
@@ -100,7 +99,7 @@ namespace misty::panel {
         // Confirm password
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.8f, 0.8f, 1.0f));
         auto& lock_icon2 = core::AssetManager::get().get_svg_texture("lock-16", 24);
-        IconText(lock_icon2, 16.0f, "Confirm password", 1.0f, -2.0f);
+        core::IconText(lock_icon2, 16.0f, "Confirm password", 1.0f, -2.0f);
         ImGui::PopStyleColor();
         ImGui::SetNextItemWidth(width);
         ImGui::InputTextWithHint("##confirm_password", "", state.confirm_password, sizeof(state.confirm_password), ImGuiInputTextFlags_Password);
