@@ -18,7 +18,6 @@ namespace misty::view {
         , worker_pool_(worker_pool)
         , client_(std::move(client)) {
         init_panels();
-        schedule_proxy_probe();
     }
 
     FilesView::~FilesView() = default;
@@ -213,7 +212,7 @@ namespace misty::view {
         notification_panel_->render();
     }
 
-    void FilesView::schedule_proxy_probe() {
+    void FilesView::schedule_proxy_probe(bool force) {
         bool expected = false;
         if (!proxy_probe_in_flight_->compare_exchange_strong(expected, true)) {
             return;
@@ -221,8 +220,8 @@ namespace misty::view {
 
         auto probe_state = proxy_probe_in_flight_;
         worker_pool_.add(
-            []() {
-                core::ProxyManager::get().ensure_running();
+            [force]() {
+                core::ProxyManager::get().ensure_running(force);
             },
             [probe_state]() {
                 probe_state->store(false);
@@ -274,7 +273,7 @@ namespace misty::view {
                 ImGui::Button("Checking...", ImVec2(kButtonWidth, 32.0f));
                 ImGui::EndDisabled();
             } else if (ImGui::Button("Retry", ImVec2(kButtonWidth, 32.0f))) {
-                schedule_proxy_probe();
+                schedule_proxy_probe(true);
             }
         }
         ImGui::End();

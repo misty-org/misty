@@ -197,17 +197,9 @@ namespace misty::core {
         if (!is_proxy_url(url)) return;
 
         if (status_code == 0) {
-            std::string proxy_url = EnvManager::get().get("PROXY_SERVICE_URL", "");
-            if (!proxy_url.empty()) {
-                HttpResponse health = execute_curl_request_with_timeouts("GET", proxy_url + "/api/health", "", {}, 2L, 5L);
-                if (health.status_code != 0) {
-                    SessionManager::get().mark_proxy_available();
-                    return;
-                }
-            }
-            SessionManager::get().mark_proxy_unavailable();
+            ProxyManager::get().record_proxy_request_result(false);
         } else {
-            SessionManager::get().mark_proxy_available();
+            ProxyManager::get().record_proxy_request_result(true);
         }
     }
 

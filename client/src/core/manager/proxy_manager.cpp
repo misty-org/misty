@@ -17,6 +17,7 @@ extern char** environ;
 #endif
 
 #include "core/manager/env_manager.h"
+#include "core/manager/session_manager.h"
 #include "core/net/http_client.h"
 #include "core/system/util.h"
 
@@ -31,6 +32,9 @@ constexpr const char* kProxyBinaryName = "misty-proxy.exe";
 #else
 constexpr const char* kProxyBinaryName = "misty-proxy";
 #endif
+
+constexpr auto kProxyProbeRetryInterval = std::chrono::seconds(2);
+constexpr int kProxyUnavailablePromptIntervals = 4;
 
 bool is_local_proxy_url(const std::string& url) {
     return url.rfind("http://127.0.0.1", 0) == 0 ||
@@ -103,12 +107,52 @@ bool ProxyManager::should_manage_proxy() const {
     return !proxy_url.empty() && is_local_proxy_url(proxy_url);
 }
 
-bool ProxyManager::probe_proxy_once() const {
+bool ProxyManager::probe_proxy_once(bool force) const {
+    const auto now = std::chrono::steady_clock::now();
+    {
+        std::lock_guard<std::mutex> lock(mu_);
+        if (!force &&
+            last_probe_attempt_.time_since_epoch().count() != 0 &&
+            now - last_probe_attempt_ < kProxyProbeRetryInterval) {
+            return last_known_available_;
+        }
+        last_probe_attempt_ = now;
+    }
     return HTTPClient::get().probe_proxy();
 }
 
-bool ProxyManager::ensure_running() {
-    if (probe_proxy_once()) {
+void ProxyManager::record_proxy_request_result(bool available, const std::string& message) {
+    const auto now = std::chrono::steady_clock::now();
+    std::lock_guard<std::mutex> lock(mu_);
+
+    last_known_available_ = available;
+    if (available) {
+        consecutive_probe_failures_ = 0;
+        last_failure_recorded_at_ = std::chrono::steady_clock::time_point{};
+        SessionManager::get().mark_proxy_available();
+        return;
+    }
+
+    if (last_failure_recorded_at_.time_since_epoch().count() != 0 &&
+        now - last_failure_recorded_at_ < kProxyProbeRetryInterval) {
+        return;
+    }
+
+    last_failure_recorded_at_ = now;
+    ++consecutive_probe_failures_;
+    if (consecutive_probe_failures_ < kProxyUnavailablePromptIntervals) {
+        return;
+    }
+
+    SessionManager::get().mark_proxy_unavailable(
+        message.empty()
+            ? "Misty background service is unavailable. Local files remain available, but cloud and sync features are paused."
+            : message
+    );
+}
+
+bool ProxyManager::ensure_running(bool force) {
+    if (probe_proxy_once(force)) {
         return true;
     }
     if (!should_manage_proxy()) {
@@ -117,10 +161,11 @@ bool ProxyManager::ensure_running() {
 
     std::unique_lock<std::mutex> lock(mu_);
     const auto now = std::chrono::steady_clock::now();
-    if (last_launch_attempt_.time_since_epoch().count() != 0 &&
-        now - last_launch_attempt_ < std::chrono::seconds(3)) {
+    if (!force &&
+        last_launch_attempt_.time_since_epoch().count() != 0 &&
+        now - last_launch_attempt_ < kProxyProbeRetryInterval) {
         lock.unlock();
-        return wait_until_ready(std::chrono::seconds(2));
+        return wait_until_ready(kProxyProbeRetryInterval);
     }
 
     last_launch_attempt_ = now;
@@ -163,9 +208,14 @@ bool ProxyManager::wait_until_ready(std::chrono::milliseconds timeout) const {
         if (probe_proxy_once()) {
             return true;
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(250));
+        const auto remaining = deadline - std::chrono::steady_clock::now();
+        if (remaining <= std::chrono::milliseconds::zero()) {
+            break;
+        }
+        std::this_thread::sleep_for(
+            remaining < kProxyProbeRetryInterval ? remaining : kProxyProbeRetryInterval);
     }
-    return probe_proxy_once();
+    return probe_proxy_once(true);
 }
 
 std::string ProxyManager::resolve_proxy_executable() const {

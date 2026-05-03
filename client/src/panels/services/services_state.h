@@ -292,6 +292,7 @@ namespace misty::panel {
         void cancel_remote_config();
 
     private:
+        void refresh_connections(bool allow_background_retry);
         void load_remote_aliases_locked();
         void save_remote_aliases_locked() const;
 
