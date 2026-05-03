@@ -165,22 +165,6 @@ void draw_progress_bar(ImDrawList* draw_list,
     }
 }
 
-bool save_json_atomic(const std::string& path, const json& j) {
-    if (path.empty()) return false;
-    std::error_code ec;
-    fs::create_directories(fs::path(path).parent_path(), ec);
-    const std::string tmp = path + ".tmp";
-    {
-        std::ofstream f(tmp, std::ios::binary | std::ios::trunc);
-        if (!f.is_open()) return false;
-        f << j.dump(2) << "\n";
-        if (!f.good()) return false;
-    }
-    fs::rename(fs::path(tmp), fs::path(path), ec);
-    if (ec) { fs::remove(fs::path(tmp), ec); return false; }
-    return true;
-}
-
 } // namespace
 
 // ── Construction ─────────────────────────────────────────────────────────────
@@ -231,26 +215,10 @@ std::string BootLoader::proxy_binary_name() {
 }
 
 std::string BootLoader::auto_detect_proxy_path() {
-    // 1) Config-specified path
-    try {
-        const std::string cfg = misty_config_path();
-        if (file_exists(cfg)) {
-            const std::string body = read_text_file(cfg);
-            if (!body.empty()) {
-                json j = json::parse(body, nullptr, false);
-                if (!j.is_discarded()) {
-                    const std::string p = trim_copy(
-                        j.value("proxy", json::object()).value("path", std::string()));
-                    if (!p.empty() && file_exists(p)) return p;
-                }
-            }
-        }
-    } catch (...) {}
-
     const fs::path exe_dir = misty::core::get_executable_path().parent_path();
     const std::string name = proxy_binary_name();
 
-    // 2) Next to / near executable
+    // 1) Next to / near executable
     for (const auto& c : {
             exe_dir / name,
             exe_dir / "proxy" / name,
@@ -259,7 +227,7 @@ std::string BootLoader::auto_detect_proxy_path() {
         if (!c.empty() && fs::exists(c)) return c.string();
     }
 
-    // 3) Walk up from exe dir or cwd (dev builds)
+    // 2) Walk up from exe dir or cwd (dev builds)
     for (fs::path cur : {exe_dir, fs::current_path()}) {
         for (int i = 0; i < 6; ++i) {
             const fs::path c = cur / "proxy" / "dist" / name;
@@ -271,45 +239,19 @@ std::string BootLoader::auto_detect_proxy_path() {
     return {};
 }
 
-bool BootLoader::ensure_proxy_config_saved(int port) {
-    const std::string cfg = misty_config_path();
-    if (cfg.empty() || port <= 0 || port > 65535) return false;
-
-    json j = json::object();
-    try {
-        if (file_exists(cfg)) {
-            const std::string body = read_text_file(cfg);
-            if (!body.empty()) {
-                json parsed = json::parse(body, nullptr, false);
-                if (!parsed.is_discarded() && parsed.is_object()) j = std::move(parsed);
-            }
-        }
-    } catch (...) {}
-
-    j["proxy"]["port"] = port;
-    j["proxy"]["url"]  = "http://127.0.0.1:" + std::to_string(port);
-    if (!proxy_path_.empty()) {
-        j["proxy"]["path"] = proxy_path_;
-    }
-    if (j.value("grpc", json::object()).value("address", std::string()).empty()) {
-        j["grpc"]["address"] = "localhost:50051";
-    }
-    if (j.value("mount", json::object()).value("path", std::string()).empty()) {
-        j["mount"]["path"] = "misty";
-    }
-    return save_json_atomic(cfg, j);
-}
-
 // ── Port search ──────────────────────────────────────────────────────────────
 
-int BootLoader::load_saved_port() {
+int BootLoader::load_saved_proxy_port() {
     try {
         const std::string body = read_text_file(misty_config_path());
         if (!body.empty()) {
             json j = json::parse(body, nullptr, false);
             if (!j.is_discarded()) {
-                int p = j.value("proxy", json::object()).value("port", 0);
-                if (p > 0 && p <= 65535) return p;
+                const json proxy = j.value("proxy", json::object());
+                const int proxy_port = proxy.value("port", 0);
+                if (proxy_port > 0 && proxy_port <= 65535) {
+                    return proxy_port;
+                }
             }
         }
     } catch (...) {}
@@ -318,12 +260,14 @@ int BootLoader::load_saved_port() {
 
 void BootLoader::init_port_search() {
     ports_to_try_.clear();
-    const int saved = load_saved_port();
-
-    // Try saved port first (might already be running), then 3000 onwards.
-    if (saved != 3000) ports_to_try_.push_back(saved);
+    const int saved_port = load_saved_proxy_port();
+    if (saved_port > 0) {
+        ports_to_try_.push_back(saved_port);
+    }
     for (int p = 3000; p <= 3020; ++p) {
-        if (p != saved) ports_to_try_.push_back(p);
+        if (p != saved_port) {
+            ports_to_try_.push_back(p);
+        }
     }
 
     port_idx_                 = 0;
@@ -371,12 +315,11 @@ bool BootLoader::launch_on_current_port() {
         std::ofstream{proxy_log_path_, std::ios::app};   // touch
     }
 
-    status_line_ = "Starting background service on port "
-                 + std::to_string(current_port_) + "...";
+    status_line_ = "Starting background service...";
 
     return misty::core::launch_detached_process(
         proxy_path_,
-        {"--port", std::to_string(current_port_)},
+        {},
         fs::path(proxy_path_).parent_path().string(),
         proxy_log_path_,
         proxy_log_path_);
@@ -394,7 +337,7 @@ void BootLoader::begin_probe(const std::string& base_url) {
     worker_pool_.add(
         [base_url, shared]() {
             auto ready = misty::core::HTTPClient::get().get_with_timeouts(
-                base_url + "/api/ready", 1L, 2L);
+                base_url + "/api/health", 1L, 2L);
             shared->status = ready.status_code;
             shared->body   = std::move(ready.body);
         },
@@ -573,7 +516,6 @@ void BootLoader::tick_state_machine() {
     if (search_step_ == SearchStep::ProbeExistingProxy) {
         if (has_probe_result) {
             if (probe.status_code >= 200 && probe.status_code < 300) {
-                ensure_proxy_config_saved(current_port_);
                 mark_proxy_ready();
             } else {
                 advance_port();
@@ -594,7 +536,6 @@ void BootLoader::tick_state_machine() {
         }
 
         if (has_probe_result && probe.status_code >= 200 && probe.status_code < 300) {
-            ensure_proxy_config_saved(current_port_);
             mark_proxy_ready();
             return;
         }

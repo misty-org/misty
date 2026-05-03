@@ -17,8 +17,10 @@ class MistyClient;
 
 namespace misty::panel {
     class SearchPanel;  // forward declaration
+    class FileTreePanel;
 
     class FileExplorerPanel : public panel::Panel {
+        friend class FileTreePanel;
     public:
         FileExplorerPanel(core::UIRegistry& registry,
                           core::WorkerPool& worker_pool,
@@ -69,6 +71,9 @@ namespace misty::panel {
         bool resolve_remote_path_context(const std::string& path,
                                          std::string& remote_name,
                                          std::string& remote_path) const;
+        bool resolve_drop_destination_path(const std::string& path,
+                                           std::string& resolved_path,
+                                           std::string* error_message = nullptr) const;
         void notify_shared_path_refresh(const std::string& path);
         void request_manual_refresh(panel::FileExplorerState& state);
         void toggle_current_sync_watch(panel::FileExplorerState& state);

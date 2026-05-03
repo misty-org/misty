@@ -1,51 +1,28 @@
-package mistyconfig
+// very simple config logic that just creates or loads ~/misty/config/misty.json
+//
+// Matthew Chen (kannachi323)
+
+package setup
 
 import (
+	_ "embed"
 	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
 )
 
+//go:embed default/misty.json
+var defaultConfigSeed []byte
+
 type Config struct {
 	Proxy struct {
-		Port int    `json:"port"`
-		Path string `json:"path"`
+		Port int `json:"port"`
 	} `json:"proxy"`
-
-	GRPC struct {
-		Address string `json:"address"`
-	} `json:"grpc"`
-
-	Mount struct {
-		Path string `json:"path"`
-	} `json:"mount"`
 
 	Server struct {
 		URL string `json:"url"`
 	} `json:"server"`
-
-	SSL struct {
-		CertPath string `json:"cert_path"`
-	} `json:"ssl"`
-
-	License struct {
-		Secret string `json:"secret"`
-	} `json:"license"`
-
-	AI struct {
-		APIKey  string `json:"api_key"`
-		Model   string `json:"model"`
-		BaseURL string `json:"base_url"`
-	} `json:"ai"`
-}
-
-func Default() Config {
-	var cfg Config
-	cfg.Proxy.Port = 3000
-	cfg.GRPC.Address = "localhost:50051"
-	cfg.Mount.Path = "misty"
-	return cfg
 }
 
 func HomeDir() (string, error) {
@@ -72,27 +49,37 @@ func Load() (Config, bool, error) {
 	body, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return Default(), false, nil
+			cfg, err := loadDefaultConfig()
+			return cfg, false, err
 		}
 		return Config{}, false, err
 	}
 
-	var cfg Config
-	if err := json.Unmarshal(body, &cfg); err != nil {
+	cfg, err := decodeConfig(body)
+	if err != nil {
 		return Config{}, true, err
 	}
+	return cfg, true, nil
+}
 
+func loadDefaultConfig() (Config, error) {
+	return decodeConfig(defaultConfigSeed)
+}
+
+func decodeConfig(body []byte) (Config, error) {
+	var cfg Config
+	if err := json.Unmarshal(body, &cfg); err != nil {
+		return Config{}, err
+	}
+
+	normalizePort(&cfg)
+	return cfg, nil
+}
+
+func normalizePort(cfg *Config) {
 	if cfg.Proxy.Port == 0 {
 		cfg.Proxy.Port = 3000
 	}
-	if cfg.GRPC.Address == "" {
-		cfg.GRPC.Address = "localhost:50051"
-	}
-	if cfg.Mount.Path == "" {
-		cfg.Mount.Path = "misty"
-	}
-
-	return cfg, true, nil
 }
 
 func Save(cfg Config) ([]string, error) {
@@ -125,22 +112,6 @@ func Save(cfg Config) ([]string, error) {
 	return created, nil
 }
 
-// ApplyEnv sets process environment variables from cfg fields, without
-// overwriting values already present in the environment (process env wins).
-func ApplyEnv(cfg Config) {
-	set := func(key, val string) {
-		if val != "" && os.Getenv(key) == "" {
-			_ = os.Setenv(key, val)
-		}
-	}
-	set("MISTY_SERVER_URL", cfg.Server.URL)
-	set("SSL_CERT_PATH", cfg.SSL.CertPath)
-	set("LICENSE_SECRET", cfg.License.Secret)
-	set("GEMINI_API_KEY", cfg.AI.APIKey)
-	set("MISTY_AI_MODEL", cfg.AI.Model)
-	set("MISTY_AI_BASE_URL", cfg.AI.BaseURL)
-}
-
 type RuntimeCheck struct {
 	Created []string `json:"created"`
 }
@@ -154,13 +125,13 @@ func EnsureRuntimeLayout() (RuntimeCheck, error) {
 	paths := []string{
 		filepath.Join(home, "misty", "config"),
 		filepath.Join(home, "misty", ".cache"),
+		filepath.Join(home, "misty", "config", "sessions"),
 		filepath.Join(home, "misty", "mnt"),
 		filepath.Join(home, "misty", "db"),
 		filepath.Join(home, "misty", "tmp"),
 		filepath.Join(home, "misty", "public", "keys"),
 		filepath.Join(home, "misty", "public", "plugins"),
 		filepath.Join(home, "misty", "local", "plugins"),
-		filepath.Join(home, ".misty"),
 	}
 
 	var created []string

@@ -14,6 +14,7 @@
 #include "panels/file_explorer/file_explorer_state.h"
 #include "panels/notification/notification_state.h"
 #include "panels/search/search_state.h"
+#include "panels/transfers/transfer_window_state.h"
 
 namespace fs = std::filesystem;
 
@@ -198,10 +199,47 @@ namespace misty::panel {
         return false;
     }
 
+    bool FileTreePanel::drop_selected_items_to_path(const std::string& source_state_key,
+                                                    const std::string& dest_path,
+                                                    ClipboardOp op) {
+        if (dest_path.empty() || op == ClipboardOp::NONE) {
+            return false;
+        }
+
+        ExplorerTab* active_tab = get_active_tab(active_pane_id_);
+        if (!active_tab || !active_tab->explorer_panel) {
+            return false;
+        }
+
+        const std::string effective_source_key = source_state_key.empty()
+            ? active_tab->explorer_state_key
+            : source_state_key;
+        auto& source_state = ui_registry_.get_state<FileExplorerState>(effective_source_key);
+
+        std::vector<UnifiedFileItem> items;
+        items.reserve(source_state.selected_files.size());
+        for (const auto& selected_id : source_state.selected_files) {
+            auto it = std::find_if(source_state.files.begin(), source_state.files.end(),
+                [&](const UnifiedFileItem& candidate) { return candidate.id == selected_id; });
+            if (it != source_state.files.end()) {
+                items.push_back(*it);
+            }
+        }
+        if (items.empty()) {
+            return false;
+        }
+
+        auto& target_state = ui_registry_.get_state<FileExplorerState>(active_tab->explorer_state_key);
+        active_tab->explorer_panel->perform_drop_items(target_state, items, dest_path, op);
+        return true;
+    }
+
     void FileTreePanel::render(const ImVec2& pos, const ImVec2& size) {
         current_area_size_ = size;
         pending_pane_move_.reset();
         pending_tab_append_.reset();
+        const bool transfer_modal_open =
+            ui_registry_.get_state<TransferWindowState>(kTransferWindowStateKey).is_open();
 
         if (columns_.empty()) {
             return;
@@ -223,9 +261,14 @@ namespace misty::panel {
 
             const float handle_x0 = right_pos.x - kPaneHandleWidth;
             const float handle_x1 = right_pos.x;
-            const bool hovered = io.MousePos.x >= handle_x0 && io.MousePos.x <= handle_x1 &&
+            const bool hovered = !transfer_modal_open &&
+                                 io.MousePos.x >= handle_x0 && io.MousePos.x <= handle_x1 &&
                                  io.MousePos.y >= pos.y && io.MousePos.y <= pos.y + size.y;
             static bool resizing_vertical_split = false;
+
+            if (transfer_modal_open) {
+                resizing_vertical_split = false;
+            }
 
             if (hovered || resizing_vertical_split) {
                 ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
@@ -247,9 +290,11 @@ namespace misty::panel {
 
             render_column(0, pos, ImVec2(left_w, size.y));
             render_column(1, right_pos, ImVec2(right_w, size.y));
-            fg->AddLine(ImVec2(right_pos.x - kPaneHandleWidth * 0.5f, pos.y),
-                        ImVec2(right_pos.x - kPaneHandleWidth * 0.5f, pos.y + size.y),
-                        IM_COL32(100, 100, 100, 180), 2.0f);
+            if (!transfer_modal_open) {
+                fg->AddLine(ImVec2(right_pos.x - kPaneHandleWidth * 0.5f, pos.y),
+                            ImVec2(right_pos.x - kPaneHandleWidth * 0.5f, pos.y + size.y),
+                            IM_COL32(100, 100, 100, 180), 2.0f);
+            }
         }
 
         if (pending_tab_append_) {
@@ -295,9 +340,14 @@ namespace misty::panel {
 
         const float handle_y0 = bottom_pos.y - kPaneHandleWidth;
         const float handle_y1 = bottom_pos.y;
-        const bool hovered = io.MousePos.y >= handle_y0 && io.MousePos.y <= handle_y1 &&
+        const bool hovered = !ui_registry_.get_state<TransferWindowState>(kTransferWindowStateKey).is_open() &&
+                             io.MousePos.y >= handle_y0 && io.MousePos.y <= handle_y1 &&
                              io.MousePos.x >= pos.x && io.MousePos.x <= pos.x + size.x;
         static int resizing_column = -1;
+
+        if (ui_registry_.get_state<TransferWindowState>(kTransferWindowStateKey).is_open()) {
+            resizing_column = -1;
+        }
 
         if (hovered || resizing_column == column_index) {
             ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
@@ -319,9 +369,11 @@ namespace misty::panel {
 
         render_pane(column.pane_ids[0], pos, ImVec2(size.x, top_h));
         render_pane(column.pane_ids[1], bottom_pos, ImVec2(size.x, bottom_h));
-        fg->AddLine(ImVec2(pos.x, bottom_pos.y - kPaneHandleWidth * 0.5f),
-                    ImVec2(pos.x + size.x, bottom_pos.y - kPaneHandleWidth * 0.5f),
-                    IM_COL32(100, 100, 100, 180), 2.0f);
+        if (!ui_registry_.get_state<TransferWindowState>(kTransferWindowStateKey).is_open()) {
+            fg->AddLine(ImVec2(pos.x, bottom_pos.y - kPaneHandleWidth * 0.5f),
+                        ImVec2(pos.x + size.x, bottom_pos.y - kPaneHandleWidth * 0.5f),
+                        IM_COL32(100, 100, 100, 180), 2.0f);
+        }
     }
 
     void FileTreePanel::render_pane(int pane_id, const ImVec2& pos, const ImVec2& size) {
@@ -329,6 +381,8 @@ namespace misty::panel {
         if (!pane) {
             return;
         }
+        const bool transfer_modal_open =
+            ui_registry_.get_state<TransferWindowState>(kTransferWindowStateKey).is_open();
 
         float tab_height = 0.0f;
         render_tab_strip(pane_id, pos, size, tab_height);
@@ -365,7 +419,7 @@ namespace misty::panel {
             render_drag_overlay(pane_id, ImVec2(pos.x, explorer_y), ImVec2(size.x, explorer_h));
         }
 
-        if (active_pane_id_ == pane_id && drag_payload == nullptr) {
+        if (!transfer_modal_open && active_pane_id_ == pane_id && drag_payload == nullptr) {
             ImDrawList* fg = ImGui::GetForegroundDrawList();
             const ImVec2 border_max(std::max(pos.x, pos.x + size.x - 1.0f),
                                     std::max(pos.y, pos.y + size.y - 1.0f));

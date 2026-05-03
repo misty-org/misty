@@ -3,16 +3,15 @@ package api
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
-	"log"
+	"errors"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
-	"github.com/kannachi323/misty/proxy/core/auth"
-	"github.com/kannachi323/misty/proxy/core/license"
-	"github.com/kannachi323/misty/proxy/db"
+	"log"
+
+	auth "github.com/kannachi323/misty/proxy/core/tokens"
+	dbpkg "github.com/kannachi323/misty/proxy/db"
 )
 
 type UserRegisterRequest struct {
@@ -26,15 +25,7 @@ type UserLoginRequest struct {
 	Password string `json:"password"`
 }
 
-func serverURL() (string, error) {
-	u := os.Getenv("MISTY_SERVER_URL")
-	if u == "" {
-		return "", fmt.Errorf("MISTY_SERVER_URL not configured")
-	}
-	return u, nil
-}
-
-func RegisterUser(db *db.Database) http.HandlerFunc {
+func RegisterUser(db *dbpkg.Database, serverURL string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req UserRegisterRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -43,8 +34,7 @@ func RegisterUser(db *db.Database) http.HandlerFunc {
 		}
 		defer r.Body.Close()
 
-		base, err := serverURL()
-		if err != nil {
+		if serverURL == "" {
 			http.Error(w, "Server unavailable", http.StatusServiceUnavailable)
 			return
 		}
@@ -52,7 +42,7 @@ func RegisterUser(db *db.Database) http.HandlerFunc {
 		body, _ := json.Marshal(map[string]string{
 			"name": req.Name, "email": req.Email, "password": req.Password,
 		})
-		resp, err := http.Post(base+"/api/register", "application/json", bytes.NewReader(body))
+		resp, err := http.Post(serverURL+"/api/register", "application/json", bytes.NewReader(body))
 		if err != nil {
 			http.Error(w, "Server unreachable", http.StatusServiceUnavailable)
 			return
@@ -73,7 +63,7 @@ func RegisterUser(db *db.Database) http.HandlerFunc {
 		}
 		json.NewDecoder(resp.Body).Decode(&result)
 
-		if err := db.InsertOrIgnoreUser(result.UserID, req.Name, req.Email); err != nil {
+		if err := db.SetCurrentUser(result.UserID, req.Name, req.Email); err != nil {
 			http.Error(w, "Failed to store user locally", http.StatusInternalServerError)
 			return
 		}
@@ -88,10 +78,9 @@ type UserLoginResponse struct {
 	Email        string `json:"email"`
 	Token        string `json:"token"`
 	RefreshToken string `json:"refresh_token"`
-	LicenseToken string `json:"license_token"`
 }
 
-func LoginUser(db *db.Database, lm *license.Manager) http.HandlerFunc {
+func LoginUser(db *dbpkg.Database, serverURL string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req UserLoginRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -100,15 +89,14 @@ func LoginUser(db *db.Database, lm *license.Manager) http.HandlerFunc {
 		}
 		defer r.Body.Close()
 
-		base, err := serverURL()
-		if err != nil {
+		if serverURL == "" {
 			http.Error(w, "Server unavailable", http.StatusServiceUnavailable)
 			return
 		}
 
 		// Verify credentials against the central server
 		body, _ := json.Marshal(map[string]string{"email": req.Email, "password": req.Password})
-		resp, err := http.Post(base+"/api/login", "application/json", bytes.NewReader(body))
+		resp, err := http.Post(serverURL+"/api/login", "application/json", bytes.NewReader(body))
 		if err != nil {
 			http.Error(w, "Server unreachable", http.StatusServiceUnavailable)
 			return
@@ -131,25 +119,13 @@ func LoginUser(db *db.Database, lm *license.Manager) http.HandlerFunc {
 		}
 		json.NewDecoder(resp.Body).Decode(&serverUser)
 
-		// Look up existing local record by email to preserve cloud token associations
-		localUser, err := db.GetUserByEmail(req.Email)
-		if err != nil {
-			http.Error(w, "Database error", http.StatusInternalServerError)
+		if err := db.SetCurrentUser(serverUser.UserID, serverUser.Name, req.Email); err != nil {
+			http.Error(w, "Failed to store user locally", http.StatusInternalServerError)
 			return
 		}
 
-		var userID, userName string
-		if localUser != nil {
-			userID = localUser.ID
-			userName = localUser.Name
-		} else {
-			if err := db.InsertOrIgnoreUser(serverUser.UserID, serverUser.Name, req.Email); err != nil {
-				http.Error(w, "Failed to store user locally", http.StatusInternalServerError)
-				return
-			}
-			userID = serverUser.UserID
-			userName = serverUser.Name
-		}
+		userID := serverUser.UserID
+		userName := serverUser.Name
 
 		token, err := auth.GenerateToken(userID, req.Email)
 		if err != nil {
@@ -169,13 +145,6 @@ func LoginUser(db *db.Database, lm *license.Manager) http.HandlerFunc {
 			return
 		}
 
-		// Entitlement verification is one-time for perpetual pro access.
-		// Login still succeeds if the licensing server is unreachable.
-		licenseToken, err := lm.RefreshIfNeeded(req.Email, req.Password)
-		if err != nil {
-			log.Printf("Entitlement verification failed: %v", err)
-		}
-
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(UserLoginResponse{
 			ID:           userID,
@@ -183,7 +152,6 @@ func LoginUser(db *db.Database, lm *license.Manager) http.HandlerFunc {
 			Email:        req.Email,
 			Token:        token,
 			RefreshToken: refreshToken,
-			LicenseToken: licenseToken,
 		})
 	}
 }
@@ -195,10 +163,9 @@ type RefreshRequest struct {
 type RefreshResponse struct {
 	Token        string `json:"token"`
 	RefreshToken string `json:"refresh_token"`
-	LicenseToken string `json:"license_token"`
 }
 
-func RefreshToken(db *db.Database, lm *license.Manager) http.HandlerFunc {
+func RefreshToken(db *dbpkg.Database) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req RefreshRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.RefreshToken == "" {
@@ -209,14 +176,24 @@ func RefreshToken(db *db.Database, lm *license.Manager) http.HandlerFunc {
 
 		userID, err := db.ValidateRefreshToken(req.RefreshToken)
 		if err != nil {
-			log.Printf("Refresh token validation failed: %v", err)
-			http.Error(w, "Invalid or expired refresh token", http.StatusUnauthorized)
-			return
-		}
-
-		if err := db.RevokeRefreshToken(req.RefreshToken); err != nil {
-			http.Error(w, "Failed to revoke old token", http.StatusInternalServerError)
-			return
+			switch {
+			case errors.Is(err, dbpkg.ErrTokenNotFound):
+				log.Printf("Refresh token validation failed: token not found")
+				http.Error(w, "Invalid or expired refresh token", http.StatusUnauthorized)
+				return
+			case errors.Is(err, dbpkg.ErrTokenExpired):
+				log.Printf("Refresh token validation failed: token expired")
+				http.Error(w, "Invalid or expired refresh token", http.StatusUnauthorized)
+				return
+			case errors.Is(err, dbpkg.ErrTokenRevoked):
+				log.Printf("Refresh token validation failed: token revoked")
+				http.Error(w, "Invalid or expired refresh token", http.StatusUnauthorized)
+				return
+			default:
+				log.Printf("Refresh token validation failed: %v", err)
+				http.Error(w, "Failed to validate refresh token", http.StatusInternalServerError)
+				return
+			}
 		}
 
 		email, err := db.GetUserEmailByID(userID)
@@ -231,25 +208,10 @@ func RefreshToken(db *db.Database, lm *license.Manager) http.HandlerFunc {
 			return
 		}
 
-		newRefreshToken, err := auth.GenerateRefreshToken()
-		if err != nil {
-			http.Error(w, "Failed to generate refresh token", http.StatusInternalServerError)
-			return
-		}
-
-		expiresAt := time.Now().Add(auth.RefreshTokenExpiry)
-		if err := db.StoreRefreshToken(userID, newRefreshToken, expiresAt); err != nil {
-			http.Error(w, "Failed to store refresh token", http.StatusInternalServerError)
-			return
-		}
-
-		licenseToken := lm.GetCachedTokenForIdentity(userID, email)
-
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(RefreshResponse{
 			Token:        newAccessToken,
-			RefreshToken: newRefreshToken,
-			LicenseToken: licenseToken,
+			RefreshToken: req.RefreshToken,
 		})
 	}
 }
@@ -258,7 +220,7 @@ type LogoutRequest struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
-func LogoutUser(db *db.Database) http.HandlerFunc {
+func LogoutUser(db *dbpkg.Database) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		header := r.Header.Get("Authorization")
 		if header == "" || !strings.HasPrefix(header, "Bearer ") {
@@ -273,7 +235,10 @@ func LogoutUser(db *db.Database) http.HandlerFunc {
 			return
 		}
 
-		auth.BlacklistToken(claims.ID, claims.ExpiresAt.Time)
+		if err := db.RevokeAccessToken(claims.ID, claims.UserID, claims.ExpiresAt.Time); err != nil {
+			http.Error(w, "Failed to revoke access token", http.StatusInternalServerError)
+			return
+		}
 
 		var req LogoutRequest
 		if json.NewDecoder(r.Body).Decode(&req) == nil && req.RefreshToken != "" {

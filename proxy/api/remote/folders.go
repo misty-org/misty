@@ -80,8 +80,9 @@ func UploadFolder() http.HandlerFunc {
 			http.Error(w, "invalid request body", http.StatusBadRequest)
 			return
 		}
-		if req.Remote == "" || req.Path == "" || req.LocalPath == "" {
-			http.Error(w, "remote, path, and local_path are required", http.StatusBadRequest)
+		// Empty path means "upload into the remote root".
+		if req.Remote == "" || req.LocalPath == "" {
+			http.Error(w, "remote and local_path are required", http.StatusBadRequest)
 			return
 		}
 		if !rclone.RemoteExists(req.Remote) {
@@ -115,8 +116,9 @@ func TransferFolder() http.HandlerFunc {
 			http.Error(w, "invalid request body", http.StatusBadRequest)
 			return
 		}
-		if req.SourceRemote == "" || req.SourcePath == "" || req.DestRemote == "" || req.DestPath == "" {
-			http.Error(w, "source_remote, source_path, dest_remote, and dest_path are required", http.StatusBadRequest)
+		// Empty dest_path means "transfer into the destination remote root".
+		if req.SourceRemote == "" || req.SourcePath == "" || req.DestRemote == "" {
+			http.Error(w, "source_remote, source_path, and dest_remote are required", http.StatusBadRequest)
 			return
 		}
 		if !rclone.RemoteExists(req.SourceRemote) || !rclone.RemoteExists(req.DestRemote) {
