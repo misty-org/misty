@@ -1,5 +1,6 @@
 #include "activity_panel.h"
 #include "imgui.h"
+#include "panels/transfers/transfer_window_state.h"
 #include <ctime>
 #include <sstream>
 #include <iomanip>
@@ -59,11 +60,16 @@ namespace misty::panel {
             ImGui::SameLine();
             const float clear_w = 50.0f;
             const float read_w = 86.0f;
+            const float transfers_w = 78.0f;
             const float button_gap = 8.0f;
-            ImGui::SetCursorPosX(POPUP_W - 2.0f * 16.0f - clear_w - button_gap - read_w);
+            ImGui::SetCursorPosX(POPUP_W - 2.0f * 16.0f - clear_w - read_w - transfers_w - button_gap * 2.0f);
             ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.3f, 0.3f, 0.5f));
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.45f, 0.45f, 0.45f, 1.0f));
+            if (ImGui::Button("Transfers##activity", ImVec2(transfers_w, 0))) {
+                registry_.get_state<TransferWindowState>(kTransferWindowStateKey).open();
+            }
+            ImGui::SameLine(0, button_gap);
             if (ImGui::Button("Mark all read##activity", ImVec2(read_w, 0))) {
                 state.mark_all_read();
             }

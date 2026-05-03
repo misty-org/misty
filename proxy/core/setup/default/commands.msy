@@ -47,3 +47,7 @@ explorer.find {
   label = "Find"
 }
 
+app.toggle_transfers {
+  key = "CmdOrCtrl+Shift+Y"
+  label = "Transfers"
+}
