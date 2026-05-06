@@ -5,7 +5,7 @@
 
 #include "core/plugins/plugin_host.h"
 #include "core/manager/asset_manager.h"
-#include "core/ui/ui.h"
+#include "core/ui/ui_style.h"
 #include "imgui.h"
 #include "panels/activity/activity_state.h"
 #include "panels/notification/notification_state.h"

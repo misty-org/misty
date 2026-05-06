@@ -23,7 +23,7 @@
 #include "core/manager/session_manager.h"
 #include "core/net/http_client.h"
 #include "core/system/util.h"
-#include "core/ui/ui.h"
+#include "core/ui/ui_style.h"
 #include "panels/onboarding/onboarding_state.h"
 #include "imgui.h"
 

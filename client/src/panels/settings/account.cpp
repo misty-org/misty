@@ -1,5 +1,8 @@
 #include "panels/settings/account.h"
 
+#include <cstring>
+
+#include "core/manager/session_manager.h"
 #include "core/ui/ui_layout.h"
 #include "imgui.h"
 
@@ -7,11 +10,28 @@ namespace UI = misty::UI;
 
 namespace {
 
-void avatar(const char* display_name) {
+const char* identity_email(const misty::panel::SettingsState& state) {
+    if (state.account_email[0] != '\0') {
+        return state.account_email;
+    }
+    return "No email available";
+}
+
+void sync_session_identity(misty::panel::SettingsState& state) {
+    const std::string email = misty::core::SessionManager::get().get_email();
+    if (email.empty()) {
+        return;
+    }
+
+    std::strncpy(state.account_email, email.c_str(), sizeof(state.account_email) - 1);
+    state.account_email[sizeof(state.account_email) - 1] = '\0';
+}
+
+void avatar(const char* email) {
     const float size = 40.0f;
     const ImVec2 pos = ImGui::GetCursorScreenPos();
     const ImVec2 center(pos.x + size * 0.5f, pos.y + size * 0.5f);
-    const char letter = display_name[0] == '\0' ? 'M' : static_cast<char>(std::toupper(display_name[0]));
+    const char letter = email[0] == '\0' ? 'U' : static_cast<char>(std::toupper(email[0]));
 
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
     draw_list->AddCircleFilled(center, size * 0.5f, IM_COL32(34, 48, 74, 255), 24);
@@ -44,41 +64,60 @@ void field_hint(const char* text) {
     });
 }
 
+void title() {
+    UI::text({
+        .text = "Account",
+        .width = UI::Size::fill(),
+        .color = ImVec4(0.96f, 0.96f, 0.98f, 1.0f),
+        .font = UI::TextFont::BoldXLarge,
+    });
+}
+
 void identity_block(misty::panel::SettingsState& state) {
-    constexpr float kAvatarSize = 40.0f;
-    constexpr float kGap = 16.0f;
-    constexpr float kBlockHeight = 78.0f;
-
-    const ImVec2 start = ImGui::GetCursorScreenPos();
-    const float width = ImGui::GetContentRegionAvail().x;
-
-    ImGui::Dummy(ImVec2(width, kBlockHeight));
-
-    ImGui::SetCursorScreenPos(ImVec2(start.x, start.y + 2.0f));
-    avatar(state.account_display_name);
-
-    const float text_x = start.x + kAvatarSize + kGap;
-    ImGui::SetCursorScreenPos(ImVec2(text_x, start.y));
-    field_label("Display name");
-
-    ImGui::SetCursorScreenPos(ImVec2(text_x, start.y + 18.0f));
-    UI::text({
-        .text = state.account_display_name,
+    UI::row("##account_identity", {
         .width = UI::Size::fill(),
-        .color = ImVec4(0.95f, 0.95f, 0.97f, 1.0f),
-    });
+        .height = UI::Size::auto_size(),
+        .gap = UI::Spacing::xy(16.0f, 0.0f),
+        .justify = UI::Justify::Center,
+    }, [&]() {
+        UI::div("##account_avatar", {
+            .width = UI::Size::px(40.0f),
+            .height = UI::Size::px(40.0f),
+        }, [&]() {
+            avatar(identity_email(state));
+        });
 
-    ImGui::SetCursorScreenPos(ImVec2(text_x, start.y + 40.0f));
-    UI::text({
-        .text = state.account_email,
+        UI::column("##account_identity_text", {
+            .width = UI::Size::fill(),
+            .height = UI::Size::auto_size(),
+            .gap = UI::Spacing::xy(0.0f, 4.0f),
+        }, [&]() {
+            UI::text({
+                .text = identity_email(state),
+                .width = UI::Size::fill(),
+                .color = ImVec4(0.95f, 0.95f, 0.97f, 1.0f),
+            });
+            field_hint("Manage your account details.");
+        });
+    });
+}
+
+void email_field(misty::panel::SettingsState& state) {
+    UI::column("##email_field", {
         .width = UI::Size::fill(),
-        .color = ImVec4(0.58f, 0.60f, 0.64f, 1.0f),
+        .height = UI::Size::auto_size(),
+        .gap = UI::Spacing::xy(0.0f, 8.0f),
+    }, [&]() {
+        field_label("Email");
+        UI::input_text({
+            .label = "##account_email",
+            .buffer = state.account_email,
+            .buffer_size = sizeof(state.account_email),
+            .width = UI::Size::fill(),
+            .flags = ImGuiInputTextFlags_ReadOnly,
+        });
+        field_hint("Email cannot be changed.");
     });
-
-    ImGui::SetCursorScreenPos(ImVec2(text_x, start.y + 60.0f));
-    field_hint("Manage your account details.");
-
-    ImGui::SetCursorScreenPos(ImVec2(start.x, start.y + kBlockHeight));
 }
 
 void security_row(
@@ -112,79 +151,6 @@ void security_row(
     });
 }
 
-void title() {
-    UI::text({
-        .text = "Account",
-        .width = UI::Size::fill(),
-        .color = ImVec4(0.96f, 0.96f, 0.98f, 1.0f),
-        .font = UI::TextFont::BoldLarge,
-    });
-}
-
-void display_name_field(misty::panel::SettingsState& state) {
-    UI::column("##display_name_field", {
-        .width = UI::Size::fill(),
-        .height = UI::Size::auto_size(),
-        .gap = UI::Spacing::xy(0.0f, 8.0f),
-    }, [&]() {
-        field_label("Display name");
-        UI::row("##display_name_row", {
-            .width = UI::Size::fill(),
-            .height = UI::Size::auto_size(),
-            .gap = UI::Spacing::xy(10.0f, 0.0f),
-            .justify = UI::Justify::Center,
-        }, [&]() {
-            UI::div("##display_name_input", {
-                .width = UI::Size::fill(),
-                .height = UI::Size::px(32.0f),
-                .justify = UI::Justify::Center,
-            }, [&]() {
-                UI::input_text({
-                    .label = "##account_display_name",
-                    .buffer = state.account_display_name,
-                    .buffer_size = sizeof(state.account_display_name),
-                    .width = UI::Size::fill(),
-                });
-            });
-
-            UI::div("##save_changes_wrap", {
-                .width = UI::Size::px(110.0f),
-                .height = UI::Size::px(32.0f),
-            }, [&]() {
-                UI::button({
-                    .label = "Save changes",
-                    .width = UI::Size::fill(),
-                    .height = UI::Size::fill(),
-                    .variant = UI::ButtonVariant::Primary,
-                    .button_color = ImVec4(0.76f, 0.77f, 0.80f, 1.0f),
-                    .hover_color = ImVec4(0.82f, 0.83f, 0.86f, 1.0f),
-                    .active_color = ImVec4(0.69f, 0.70f, 0.73f, 1.0f),
-                    .text_color = ImVec4(0.10f, 0.10f, 0.12f, 1.0f),
-                    .rounding = 4.0f,
-                });
-            });
-        });
-    });
-}
-
-void email_field(misty::panel::SettingsState& state) {
-    UI::column("##email_field", {
-        .width = UI::Size::fill(),
-        .height = UI::Size::auto_size(),
-        .gap = UI::Spacing::xy(0.0f, 8.0f),
-    }, [&]() {
-        field_label("Email");
-        UI::input_text({
-            .label = "##account_email",
-            .buffer = state.account_email,
-            .buffer_size = sizeof(state.account_email),
-            .width = UI::Size::fill(),
-            .flags = ImGuiInputTextFlags_ReadOnly,
-        });
-        field_hint("Email cannot be changed.");
-    });
-}
-
 void security_section() {
     UI::column("##security_section", {
         .width = UI::Size::fill(),
@@ -208,7 +174,7 @@ void security_section() {
             "Password",
             "Send a reset link to your account email.",
             [&]() {
-                UI::button({
+                UI::button("##reset_password", {
                     .label = "Reset",
                     .width = UI::Size::fill(),
                     .height = UI::Size::fill(),
@@ -223,7 +189,7 @@ void security_section() {
             "Session",
             "Sign out of this device.",
             [&]() {
-                UI::button({
+                UI::button("##sign_out", {
                     .label = "Sign out",
                     .width = UI::Size::fill(),
                     .height = UI::Size::fill(),
@@ -240,7 +206,7 @@ void security_section() {
 namespace misty::panel {
 
 bool account_tab(SettingsState& state) {
-    bool clicked = UI::button("##settings_account", {
+    const bool clicked = UI::button("##settings_account", {
         .width = UI::Size::fill(),
         .height = UI::Size::px(32.0f),
         .variant = UI::ButtonVariant::Nav,
@@ -263,21 +229,24 @@ bool account_tab(SettingsState& state) {
     return clicked;
 }
 
-
 void account_content(SettingsState& state) {
+    sync_session_identity(state);
+
     UI::div("account_content", {
-        .mode = UI::Mode::ChildWindow,
+        .mode = UI::Mode::LayoutOnly,
         .width = UI::Size::fill(),
-        .height = UI::Size::fill(),
+        .height = UI::Size::auto_size(),
         .padding = UI::Spacing::xy(28.0f, 20.0f),
     }, [&]() {
         UI::column("##account_body", {
-            .width = UI::Size::px(620.0f),
+            .width = UI::Size::fill(),
             .height = UI::Size::auto_size(),
             .gap = UI::Spacing::xy(0.0f, 22.0f),
         }, [&]() {
             title();
-
+            identity_block(state);
+            email_field(state);
+            security_section();
         });
     });
 }

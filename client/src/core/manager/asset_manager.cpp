@@ -29,8 +29,10 @@ namespace misty::core {
         fonts_[FontID::DEFAULT] = io.Fonts->AddFontFromFileTTF("assets/fonts/Roboto-Regular.ttf", 18.0f);
         fonts_[FontID::ROBOTO_SMALL] = io.Fonts->AddFontFromFileTTF("assets/fonts/Roboto-Regular.ttf", 16.0f);
         fonts_[FontID::ROBOTO_LARGE] = io.Fonts->AddFontFromFileTTF("assets/fonts/Roboto-Regular.ttf", 24.0f);
+        fonts_[FontID::ROBOTO_XLARGE] = io.Fonts->AddFontFromFileTTF("assets/fonts/Roboto-Regular.ttf", 32.0f);
         fonts_[FontID::ROBOTO_BOLD] = io.Fonts->AddFontFromFileTTF("assets/fonts/Roboto-Bold.ttf", 18.0f);
         fonts_[FontID::ROBOTO_BOLD_LARGE] = io.Fonts->AddFontFromFileTTF("assets/fonts/Roboto-Bold.ttf", 24.0f);
+        fonts_[FontID::ROBOTO_BOLD_XLARGE] = io.Fonts->AddFontFromFileTTF("assets/fonts/Roboto-Bold.ttf", 32.0f);
         fonts_[FontID::ROBOTO_ITALIC] = io.Fonts->AddFontFromFileTTF("assets/fonts/Roboto-Italic.ttf", 18.0f);
         fonts_[FontID::ROBOTO_BOLD_ITALIC] = io.Fonts->AddFontFromFileTTF("assets/fonts/Roboto-BoldItalic.ttf", 18.0f);
     }

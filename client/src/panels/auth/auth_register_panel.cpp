@@ -3,7 +3,7 @@
 #include "core/commands/command_manager.h"
 #include "core/system/util.h"
 #include "core/manager/asset_manager.h"
-#include "core/ui/ui.h"
+#include "core/ui/ui_style.h"
 #include "views/app_view.h"
 #include <cstring>
 #include <iostream>

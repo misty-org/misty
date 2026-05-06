@@ -4,9 +4,11 @@
 #include <vector>
 
 #include "core/manager/asset_manager.h"
-#include "core/ui/ui.h"
+#include "core/ui/ui_style.h"
 
 namespace misty::UI {
+
+namespace {
 
 enum class FrameKind {
     Flex,
@@ -444,16 +446,43 @@ ImVec2 current_available_size() {
     );
 }
 
+void advance_frame_after_item() {
+    Frame* frame = current_frame();
+    if (!frame) {
+        return;
+    }
+
+    const ImVec2 rect_min = ImGui::GetItemRectMin();
+    const ImVec2 rect_size = ImGui::GetItemRectSize();
+
+    switch (frame->kind) {
+        case FrameKind::Flex:
+            if (frame->axis == Layout::Axis::Row) {
+                frame->cursor = ImVec2(rect_min.x + rect_size.x + frame->gap.x, frame->cursor.y);
+            } else {
+                frame->cursor = ImVec2(frame->cursor.x, rect_min.y + rect_size.y + frame->gap.y);
+            }
+            break;
+        case FrameKind::Grid:
+            frame->cursor = ImVec2(rect_min.x + rect_size.x + frame->gap.x, frame->cursor.y);
+            break;
+    }
+}
+
 ImFont* font_for_text(Layout::TextFont font) {
     switch (font) {
         case Layout::TextFont::Small:
-            return core::AssetManager::get().get_font(core::FontID::ROBOTO_SMALL);
+            return ::misty::core::AssetManager::get().get_font(::misty::core::FontID::ROBOTO_SMALL);
         case Layout::TextFont::Large:
-            return core::AssetManager::get().get_font(core::FontID::ROBOTO_LARGE);
+            return ::misty::core::AssetManager::get().get_font(::misty::core::FontID::ROBOTO_LARGE);
+        case Layout::TextFont::XLarge:
+            return ::misty::core::AssetManager::get().get_font(::misty::core::FontID::ROBOTO_XLARGE);
         case Layout::TextFont::Bold:
-            return core::AssetManager::get().get_font(core::FontID::ROBOTO_BOLD);
+            return ::misty::core::AssetManager::get().get_font(::misty::core::FontID::ROBOTO_BOLD);
         case Layout::TextFont::BoldLarge:
-            return core::AssetManager::get().get_font(core::FontID::ROBOTO_BOLD_LARGE);
+            return ::misty::core::AssetManager::get().get_font(::misty::core::FontID::ROBOTO_BOLD_LARGE);
+        case Layout::TextFont::BoldXLarge:
+            return ::misty::core::AssetManager::get().get_font(::misty::core::FontID::ROBOTO_BOLD_XLARGE);
         case Layout::TextFont::Default:
         default:
             return nullptr;
@@ -565,39 +594,25 @@ ButtonStyle button_style_for_variant(const Layout::ButtonProps& props) {
     return colors;
 }
 
-bool Layout::div(const char* id, const std::function<void()>& content) {
-    return Layout::div(id, BoxStyle{}, content);
-}
+} // namespace
 
-bool Layout::div(const char* id, const BoxStyle& style, const std::function<void()>& content) {
+bool div(const char* id, const BoxStyle& style, const std::function<void()>& content) {
     return begin_box(FrameKind::Flex, Layout::Axis::Column, 1, id, style, content);
 }
 
-bool Layout::row(const char* id, const std::function<void()>& content) {
-    return Layout::row(id, BoxStyle{}, content);
-}
-
-bool Layout::row(const char* id, const BoxStyle& style, const std::function<void()>& content) {
+bool row(const char* id, const BoxStyle& style, const std::function<void()>& content) {
     return begin_box(FrameKind::Flex, Layout::Axis::Row, 1, id, style, content);
 }
 
-bool Layout::column(const char* id, const std::function<void()>& content) {
-    return Layout::column(id, BoxStyle{}, content);
-}
-
-bool Layout::column(const char* id, const BoxStyle& style, const std::function<void()>& content) {
+bool column(const char* id, const BoxStyle& style, const std::function<void()>& content) {
     return begin_box(FrameKind::Flex, Layout::Axis::Column, 1, id, style, content);
 }
 
-bool Layout::grid(const char* id, int columns, const std::function<void()>& content) {
-    return Layout::grid(id, columns, BoxStyle{}, content);
-}
-
-bool Layout::grid(const char* id, int columns, const BoxStyle& style, const std::function<void()>& content) {
+bool grid(const char* id, int columns, const BoxStyle& style, const std::function<void()>& content) {
     return begin_box(FrameKind::Grid, Layout::Axis::Row, columns, id, style, content);
 }
 
-void Layout::spacer(float width, float height) {
+void spacer(float width, float height) {
     Frame* frame = current_frame();
     if (!frame) {
         ImGui::Dummy(ImVec2(width, height));
@@ -614,36 +629,62 @@ void Layout::spacer(float width, float height) {
     advance_parent(style, placement, ImGui::GetItemRectSize());
 }
 
-void Layout::text(const TextProps& props) {
+void text(const TextProps& props) {
     ImFont* font = font_for_text(props.font);
     if (font) {
         ImGui::PushFont(font);
     }
 
-    float natural_width = ImGui::CalcTextSize(props.text).x;
-    const float natural_height = ImGui::GetTextLineHeight();
-    if (props.wrapped && props.width.mode == Layout::SizeMode::Fill) {
-        natural_width = current_available_size().x;
+    const ImVec2 avail = current_available_size();
+    const TextOverflow overflow = props.wrapped ? TextOverflow::Wrap : props.overflow;
+    const float wrap_width = props.width.mode == Layout::SizeMode::Auto
+        ? avail.x
+        : std::max(1.0f, resolve_axis_size(props.width, avail.x));
+
+    ImVec2 natural_text_size = ImGui::CalcTextSize(props.text);
+    if (overflow == TextOverflow::Wrap) {
+        natural_text_size = ImGui::CalcTextSize(props.text, nullptr, false, wrap_width);
     }
 
-    const ImVec2 avail = current_available_size();
+    float natural_width = natural_text_size.x;
+    float natural_height = natural_text_size.y;
+    if (overflow == TextOverflow::Wrap && props.width.mode != Layout::SizeMode::Auto) {
+        natural_width = wrap_width;
+    }
+
     const ImVec2 size = resolve_widget_size(props.width, props.height, avail, natural_width, natural_height);
     justify_widget_cursor(size, props.justify);
     align_widget_cursor(size, props.align);
 
     if (props.color.w > 0.0f) {
         CustomStyleColor text_color(ImGuiCol_Text, props.color);
-        if (props.wrapped) {
+        if (overflow == TextOverflow::Wrap) {
             ImGui::PushTextWrapPos(ImGui::GetCursorScreenPos().x + (size.x > 0.0f ? size.x : avail.x));
             ImGui::TextUnformatted(props.text);
             ImGui::PopTextWrapPos();
+        } else if (overflow == TextOverflow::Clip) {
+            ImDrawList* draw_list = ImGui::GetWindowDrawList();
+            const ImVec2 min = ImGui::GetCursorScreenPos();
+            const ImVec2 max(min.x + size.x, min.y + size.y);
+            draw_list->PushClipRect(min, max, true);
+            draw_list->AddText(min, ImGui::ColorConvertFloat4ToU32(props.color), props.text);
+            draw_list->PopClipRect();
+            ImGui::Dummy(size);
         } else {
             ImGui::TextUnformatted(props.text);
         }
-    } else if (props.wrapped) {
+    } else if (overflow == TextOverflow::Wrap) {
         ImGui::PushTextWrapPos(ImGui::GetCursorScreenPos().x + (size.x > 0.0f ? size.x : avail.x));
         ImGui::TextUnformatted(props.text);
         ImGui::PopTextWrapPos();
+    } else if (overflow == TextOverflow::Clip) {
+        ImDrawList* draw_list = ImGui::GetWindowDrawList();
+        const ImVec2 min = ImGui::GetCursorScreenPos();
+        const ImVec2 max(min.x + size.x, min.y + size.y);
+        draw_list->PushClipRect(min, max, true);
+        draw_list->AddText(min, ImGui::GetColorU32(ImGuiCol_Text), props.text);
+        draw_list->PopClipRect();
+        ImGui::Dummy(size);
     } else {
         ImGui::TextUnformatted(props.text);
     }
@@ -651,41 +692,16 @@ void Layout::text(const TextProps& props) {
     if (font) {
         ImGui::PopFont();
     }
+
+    advance_frame_after_item();
 }
 
-bool Layout::button(const ButtonProps& props) {
+bool button(const char* id, const ButtonProps& props, const std::function<void()>& content) {
+    const bool has_content = static_cast<bool>(content);
     const ImVec2 avail = current_available_size();
-    const float natural_width = ImGui::CalcTextSize(props.label).x + ImGui::GetStyle().FramePadding.x * 2.0f;
-    const float natural_height = ImGui::GetFrameHeight();
-    const Size width = props.align == Align::Stretch && props.width.mode == SizeMode::Auto
-        ? Size::fill()
-        : props.width;
-    const ImVec2 size = resolve_widget_size(width, props.height, avail, natural_width, natural_height);
-    justify_widget_cursor(size, props.justify);
-    align_widget_cursor(size, props.align);
-
-    if (props.variant == ButtonVariant::Default) {
-        return ImGui::Button(props.label, size);
-    }
-
-    bool pressed = false;
-    const ButtonStyle colors = button_style_for_variant(props);
-    WithStyle([&](StyleScope& style) {
-        style.var(ImGuiStyleVar_FrameRounding, colors.rounding);
-        style.color(ImGuiCol_Button, colors.button);
-        style.color(ImGuiCol_ButtonHovered, colors.hovered);
-        style.color(ImGuiCol_ButtonActive, colors.active);
-        style.color(ImGuiCol_Text, colors.text);
-        pressed = ImGui::Button(props.label, size);
-    });
-    return pressed;
-}
-
-bool Layout::button(const char* id, const ButtonProps& props, const std::function<void()>& content) {
-    const ImVec2 avail = current_available_size();
-    const float natural_width = props.label[0] == '\0'
-        ? avail.x
-        : ImGui::CalcTextSize(props.label).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+    const float natural_width = (!has_content && props.label[0] != '\0')
+        ? ImGui::CalcTextSize(props.label).x + ImGui::GetStyle().FramePadding.x * 2.0f
+        : avail.x;
     const float natural_height = ImGui::GetFrameHeight();
     const Size width = props.align == Align::Stretch && props.width.mode == SizeMode::Auto
         ? Size::fill()
@@ -700,6 +716,25 @@ bool Layout::button(const char* id, const ButtonProps& props, const std::functio
 
     justify_widget_cursor(size, props.justify);
     align_widget_cursor(size, props.align);
+
+    if (!has_content) {
+        if (props.variant == ButtonVariant::Default) {
+            return ImGui::Button(props.label, size);
+        }
+
+        bool pressed = false;
+        const ButtonStyle colors = button_style_for_variant(props);
+        WithStyle([&](StyleScope& style) {
+            style.var(ImGuiStyleVar_FrameRounding, colors.rounding);
+            style.color(ImGuiCol_Button, colors.button);
+            style.color(ImGuiCol_ButtonHovered, colors.hovered);
+            style.color(ImGuiCol_ButtonActive, colors.active);
+            style.color(ImGuiCol_Text, colors.text);
+            pressed = ImGui::Button(props.label, size);
+        });
+        advance_frame_after_item();
+        return pressed;
+    }
 
     const ButtonStyle colors = button_style_for_variant(props);
     bool pressed = ImGui::InvisibleButton(id, size);
@@ -723,33 +758,32 @@ bool Layout::button(const char* id, const ButtonProps& props, const std::functio
     const ImVec2 content_min(rect_min.x + frame_padding.x, rect_min.y + frame_padding.y);
     const ImVec2 content_max(rect_max.x - frame_padding.x, rect_max.y - frame_padding.y);
 
-    if (content) {
-        Frame frame;
-        frame.kind = FrameKind::Flex;
-        frame.axis = Layout::Axis::Column;
-        frame.content_min = content_min;
-        frame.content_max = content_max;
-        frame.cursor = content_min;
+    Frame frame;
+    frame.kind = FrameKind::Flex;
+    frame.axis = Layout::Axis::Column;
+    frame.content_min = content_min;
+    frame.content_max = content_max;
+    frame.cursor = content_min;
 
-        ImGui::SetCursorScreenPos(content_min);
-        if (props.text_color.w > 0.0f || props.variant != ButtonVariant::Default || props.selected) {
-            CustomStyleColor text_color(ImGuiCol_Text, colors.text);
-            frame_stack().push_back(frame);
-            content();
-            frame_stack().pop_back();
-        } else {
-            frame_stack().push_back(frame);
-            content();
-            frame_stack().pop_back();
-        }
+    ImGui::SetCursorScreenPos(content_min);
+    if (props.text_color.w > 0.0f || props.variant != ButtonVariant::Default || props.selected) {
+        CustomStyleColor text_color(ImGuiCol_Text, colors.text);
+        frame_stack().push_back(frame);
+        content();
+        frame_stack().pop_back();
+    } else {
+        frame_stack().push_back(frame);
+        content();
+        frame_stack().pop_back();
     }
 
     ImGui::SetCursorScreenPos(post_button_cursor);
     ImGui::Dummy(ImVec2(0.0f, 0.0f));
+    advance_frame_after_item();
     return pressed;
 }
 
-bool Layout::input_text(const InputTextProps& props) {
+bool input_text(const InputTextProps& props) {
     if (!props.buffer || props.buffer_size == 0) {
         return false;
     }
@@ -767,16 +801,20 @@ bool Layout::input_text(const InputTextProps& props) {
     }
 
     if (props.hint && props.hint[0] != '\0') {
-        return ImGui::InputTextWithHint(
+        const bool changed = ImGui::InputTextWithHint(
             props.label,
             props.hint,
             props.buffer,
             props.buffer_size,
             props.flags
         );
+        advance_frame_after_item();
+        return changed;
     }
 
-    return ImGui::InputText(props.label, props.buffer, props.buffer_size, props.flags);
+    const bool changed = ImGui::InputText(props.label, props.buffer, props.buffer_size, props.flags);
+    advance_frame_after_item();
+    return changed;
 }
 
 } // namespace misty::UI

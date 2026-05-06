@@ -8,7 +8,8 @@
 
 #include "core/commands/command_manager.h"
 #include "core/manager/asset_manager.h"
-#include "core/ui/ui.h"
+#include "core/ui/ui_animate.h"
+#include "core/ui/ui_style.h"
 #include "panels/notification/notification_state.h"
 #include "panels/search/search_state.h"
 #include "panels/services/services_state.h"

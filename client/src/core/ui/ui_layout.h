@@ -52,8 +52,16 @@ public:
         Default,
         Small,
         Large,
+        XLarge,
         Bold,
         BoldLarge,
+        BoldXLarge,
+    };
+
+    enum class TextOverflow {
+        Visible,
+        Wrap,
+        Clip,
     };
 
     struct Size {
@@ -99,6 +107,7 @@ public:
         Align align = Align::Start;
         Justify justify = Justify::Start;
         bool wrapped = false;
+        TextOverflow overflow = TextOverflow::Visible;
         ImVec4 color = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
         TextFont font = TextFont::Default;
     };
@@ -130,30 +139,6 @@ public:
         ImGuiInputTextFlags flags = ImGuiInputTextFlags_None;
     };
 
-    static bool div(const char* id, const std::function<void()>& content);
-    static bool div(const char* id, const BoxStyle& style, const std::function<void()>& content = {});
-
-    static bool row(const char* id, const std::function<void()>& content);
-    static bool row(const char* id, const BoxStyle& style, const std::function<void()>& content = {});
-
-    static bool column(const char* id, const std::function<void()>& content);
-    static bool column(const char* id, const BoxStyle& style, const std::function<void()>& content = {});
-
-    static bool grid(const char* id, int columns, const std::function<void()>& content);
-    static bool grid(
-        const char* id,
-        int columns,
-        const BoxStyle& style,
-        const std::function<void()>& content = {});
-
-    static void spacer(float width, float height = 0.0f);
-    static void text(const TextProps& props);
-    static bool button(const ButtonProps& props);
-    static bool button(
-        const char* id,
-        const ButtonProps& props,
-        const std::function<void()>& content = {});
-    static bool input_text(const InputTextProps& props);
 };
 
 using Mode = Layout::Mode;
@@ -163,6 +148,7 @@ using Align = Layout::Align;
 using Justify = Layout::Justify;
 using ButtonVariant = Layout::ButtonVariant;
 using TextFont = Layout::TextFont;
+using TextOverflow = Layout::TextOverflow;
 using Size = Layout::Size;
 using Spacing = Layout::Spacing;
 using BoxStyle = Layout::BoxStyle;
@@ -170,60 +156,17 @@ using TextProps = Layout::TextProps;
 using ButtonProps = Layout::ButtonProps;
 using InputTextProps = Layout::InputTextProps;
 
-inline bool div(const char* id, const std::function<void()>& content) {
-    return Layout::div(id, content);
-}
+bool div(const char* id, const BoxStyle& style, const std::function<void()>& content = {});
 
-inline bool div(const char* id, const BoxStyle& style, const std::function<void()>& content = {}) {
-    return Layout::div(id, style, content);
-}
+bool row(const char* id, const BoxStyle& style, const std::function<void()>& content = {});
 
-inline bool row(const char* id, const std::function<void()>& content) {
-    return Layout::row(id, content);
-}
+bool column(const char* id, const BoxStyle& style, const std::function<void()>& content = {});
 
-inline bool row(const char* id, const BoxStyle& style, const std::function<void()>& content = {}) {
-    return Layout::row(id, style, content);
-}
+bool grid(const char* id, int columns, const BoxStyle& style, const std::function<void()>& content = {});
 
-inline bool column(const char* id, const std::function<void()>& content) {
-    return Layout::column(id, content);
-}
-
-inline bool column(const char* id, const BoxStyle& style, const std::function<void()>& content = {}) {
-    return Layout::column(id, style, content);
-}
-
-inline bool grid(const char* id, int columns, const std::function<void()>& content) {
-    return Layout::grid(id, columns, content);
-}
-
-inline bool grid(
-    const char* id,
-    int columns,
-    const BoxStyle& style,
-    const std::function<void()>& content = {}) {
-    return Layout::grid(id, columns, style, content);
-}
-
-inline void spacer(float width, float height = 0.0f) {
-    Layout::spacer(width, height);
-}
-
-inline void text(const TextProps& props) {
-    Layout::text(props);
-}
-
-inline bool button(const ButtonProps& props) {
-    return Layout::button(props);
-}
-
-inline bool button(const char* id, const ButtonProps& props, const std::function<void()>& content = {}) {
-    return Layout::button(id, props, content);
-}
-
-inline bool input_text(const InputTextProps& props) {
-    return Layout::input_text(props);
-}
+void spacer(float width, float height = 0.0f);
+void text(const TextProps& props);
+bool button(const char* id, const ButtonProps& props, const std::function<void()>& content = {});
+bool input_text(const InputTextProps& props);
 
 } // namespace misty::UI

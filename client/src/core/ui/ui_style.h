@@ -1,25 +1,19 @@
 #pragma once
 
-#include "core/ui/ui_animate.h"
 #include "imgui.h"
 
 namespace misty::UI {
-
-    struct WindowStyleProps {
-        ImVec4 bg_color = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
-        ImVec2 padding = ImVec2(0.0f, 0.0f);
-    };
 
     class CustomStyleColor {
     public:
         CustomStyleColor(ImGuiCol idx, const ImVec4& col) {
             ImGui::PushStyleColor(idx, col);
         }
-        
+
         ~CustomStyleColor() {
             ImGui::PopStyleColor();
         }
-        
+
         // Non-copyable
         CustomStyleColor(const CustomStyleColor&) = delete;
         CustomStyleColor& operator=(const CustomStyleColor&) = delete;
@@ -30,15 +24,15 @@ namespace misty::UI {
         CustomStyleVar(ImGuiStyleVar idx, float val) {
             ImGui::PushStyleVar(idx, val);
         }
-        
+
         CustomStyleVar(ImGuiStyleVar idx, const ImVec2& val) {
             ImGui::PushStyleVar(idx, val);
         }
-        
+
         ~CustomStyleVar() {
             ImGui::PopStyleVar();
         }
-        
+
         CustomStyleVar(const CustomStyleVar&) = delete;
         CustomStyleVar& operator=(const CustomStyleVar&) = delete;
     };
@@ -51,26 +45,30 @@ namespace misty::UI {
                 active_ = true;
             }
         }
-        
+
         ~CustomFont() {
             if (active_) {
                 ImGui::PopFont();
             }
         }
-        
+
         CustomFont(const CustomFont&) = delete;
         CustomFont& operator=(const CustomFont&) = delete;
-        
+
     private:
         bool active_ = false;
     };
-
 
     template<typename Func>
     inline void WithTextColor(const ImVec4& color, Func&& func) {
         CustomStyleColor style(ImGuiCol_Text, color);
         func();
     }
+
+    struct WindowStyleProps {
+        ImVec4 bg_color = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
+        ImVec2 padding = ImVec2(0.0f, 0.0f);
+    };
 
     template<typename Func>
     inline void WithWindowStyle(const WindowStyleProps& props, Func&& func) {

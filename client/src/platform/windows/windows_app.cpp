@@ -76,6 +76,13 @@ namespace misty {
     void WindowsApp::init_window() {
         window_ = glfwCreateWindow(1280, 720, "Misty Client", NULL, NULL);
         if (!window_) throw std::runtime_error("Failed to create GLFW window");
+        glfwSetWindowSizeLimits(
+            window_,
+            kPlatformMinWindowWidth,
+            kPlatformMinWindowHeight,
+            GLFW_DONT_CARE,
+            GLFW_DONT_CARE
+        );
         glfwMakeContextCurrent(window_); //VERY IMPORTANT
         glfwSetWindowUserPointer(window_, this);
         glfwSetWindowSizeCallback(window_, glfw_window_size_callback);
