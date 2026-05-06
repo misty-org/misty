@@ -73,12 +73,12 @@ private:
 // ---------------------------------------------------------------------------
 // Inline wrapper around MistyUiApi.
 // ---------------------------------------------------------------------------
-class UI {
+class PluginUI {
 public:
-    UI() = default;
-    UI(void* handle, const MistyUiApi* api)
+    PluginUI() = default;
+    PluginUI(void* handle, const MistyUiApi* api)
         : u_(handle), api_(api) {}
-    explicit UI(const MistyRenderContext* ctx)
+    explicit PluginUI(const MistyRenderContext* ctx)
         : u_(ctx ? ctx->ui_handle : nullptr),
           api_(ctx ? ctx->ui_api : nullptr) {}
 

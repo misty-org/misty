@@ -5,7 +5,7 @@
 
 #include "core/plugins/plugin_host.h"
 #include "core/manager/asset_manager.h"
-#include "core/ui/imgui_utils.h"
+#include "core/ui/ui.h"
 #include "imgui.h"
 #include "panels/activity/activity_state.h"
 #include "panels/notification/notification_state.h"
@@ -13,6 +13,36 @@
 namespace misty::panel {
 
 namespace {
+struct ButtonStyle {
+    ImVec4 button;
+    ImVec4 hovered;
+    ImVec4 active;
+    ImVec4 text;
+    float rounding;
+};
+
+ButtonStyle primary_button_style() {
+    return {
+        ImVec4(0.957f, 0.957f, 0.961f, 1.0f),
+        ImVec4(0.898f, 0.906f, 0.922f, 1.0f),
+        ImVec4(0.820f, 0.835f, 0.859f, 1.0f),
+        ImVec4(0.07f, 0.07f, 0.07f, 1.0f),
+        8.0f,
+    };
+}
+
+bool styled_button(const char* label, const ImVec2& size, const ButtonStyle& style) {
+    bool pressed = false;
+    misty::UI::WithStyle([&](misty::UI::StyleScope& scoped) {
+        scoped.var(ImGuiStyleVar_FrameRounding, style.rounding);
+        scoped.color(ImGuiCol_Button, style.button);
+        scoped.color(ImGuiCol_ButtonHovered, style.hovered);
+        scoped.color(ImGuiCol_ButtonActive, style.active);
+        scoped.color(ImGuiCol_Text, style.text);
+        pressed = ImGui::Button(label, size);
+    });
+    return pressed;
+}
 
 ImVec4 badge_color(bool accent) {
     return accent ? ImVec4(0.24f, 0.52f, 0.35f, 1.0f) : ImVec4(0.22f, 0.22f, 0.24f, 1.0f);
@@ -57,8 +87,9 @@ void PluginsPanel::render() {
         if (ImGui::BeginChild("PluginsList", ImVec2(0, 0), false)) {
             if (!plugins.empty()) {
                 {
-                    core::CustomFont title_font(core::AssetManager::get().get_font(core::FontID::ROBOTO_BOLD));
-                    ImGui::Text("Plugins");
+                    misty::UI::WithFont(core::AssetManager::get().get_font(core::FontID::ROBOTO_BOLD), [&]() {
+                        ImGui::Text("Plugins");
+                    });
                 }
                 ImGui::Spacing();
                 for (const auto& plugin : plugins) {
@@ -87,14 +118,15 @@ void PluginsPanel::render_header(std::size_t plugin_count) {
 
         ImGui::TableSetColumnIndex(0);
         {
-            core::CustomFont title_font(core::AssetManager::get().get_font(core::FontID::ROBOTO_BOLD_LARGE));
-            ImGui::Text("Plugins");
+            misty::UI::WithFont(core::AssetManager::get().get_font(core::FontID::ROBOTO_BOLD_LARGE), [&]() {
+                ImGui::Text("Plugins");
+            });
         }
         ImGui::TextDisabled("%zu plugin", plugin_count);
 
         ImGui::TableSetColumnIndex(1);
         ImGui::SetCursorPosX(std::max(0.0f, ImGui::GetContentRegionAvail().x - 96.0f));
-        if (core::StyledButton("Reload", ImVec2(96.0f, 0.0f), core::ButtonTheme::Primary())) {
+        if (styled_button("Reload", ImVec2(96.0f, 0.0f), primary_button_style())) {
             core::PluginHost::get().reload();
         }
 
@@ -114,8 +146,9 @@ void PluginsPanel::render_empty_state(const std::vector<std::string>& roots) {
     ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.16f, 0.16f, 0.18f, 1.0f));
 
     if (ImGui::BeginChild("PluginsEmpty", ImVec2(0, 180.0f), true)) {
-        core::CustomFont title_font(core::AssetManager::get().get_font(core::FontID::ROBOTO_BOLD));
-        ImGui::Text("No plugins discovered");
+        misty::UI::WithFont(core::AssetManager::get().get_font(core::FontID::ROBOTO_BOLD), [&]() {
+            ImGui::Text("No plugins discovered");
+        });
         ImGui::Spacing();
         ImGui::TextWrapped("Drop a plugin folder with a manifest into one of the discovery roots to make it available here.");
         if (!roots.empty()) {
@@ -141,8 +174,9 @@ void PluginsPanel::render_plugin_card(const core::PluginInfo& plugin) {
 
     if (ImGui::BeginChild(card_id.c_str(), ImVec2(0, base_height), true)) {
         {
-            core::CustomFont title_font(core::AssetManager::get().get_font(core::FontID::ROBOTO_BOLD));
-            ImGui::Text("%s", plugin.name.c_str());
+            misty::UI::WithFont(core::AssetManager::get().get_font(core::FontID::ROBOTO_BOLD), [&]() {
+                ImGui::Text("%s", plugin.name.c_str());
+            });
         }
         ImGui::SameLine();
         ImGui::TextDisabled("v%s", plugin.version.c_str());
@@ -177,7 +211,7 @@ void PluginsPanel::render_plugin_card(const core::PluginInfo& plugin) {
         }
 
         ImGui::Spacing();
-        if (core::StyledButton(("Sandbox##" + plugin.id).c_str(), ImVec2(130.0f, 0.0f), core::ButtonTheme::Primary())) {
+        if (styled_button(("Sandbox##" + plugin.id).c_str(), ImVec2(130.0f, 0.0f), primary_button_style())) {
             std::string error;
             if (!core::PluginHost::get().open_plugin_sandbox(plugin.plugin_dir, &error)) {
                 auto& activity = ui_registry_.get_state<ActivityState>("Activity");

@@ -1,7 +1,7 @@
 #include "panels/onboarding/onboarding_panel.h"
 #include "panels/services/services_state.h"
 #include "core/manager/asset_manager.h"
-#include "core/ui/imgui_utils.h"
+#include "core/ui/ui.h"
 #include "views/app_view.h"
 #include "imgui.h"
 #include <chrono>
@@ -10,6 +10,36 @@
 namespace misty::panel {
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
+    struct ButtonStyle {
+        ImVec4 button;
+        ImVec4 hovered;
+        ImVec4 active;
+        ImVec4 text;
+        float rounding;
+    };
+
+    static ButtonStyle primary_button_style() {
+        return {
+            ImVec4(0.957f, 0.957f, 0.961f, 1.0f),
+            ImVec4(0.898f, 0.906f, 0.922f, 1.0f),
+            ImVec4(0.820f, 0.835f, 0.859f, 1.0f),
+            ImVec4(0.07f, 0.07f, 0.07f, 1.0f),
+            8.0f,
+        };
+    }
+
+    static bool styled_button(const char* label, const ImVec2& size, const ButtonStyle& style) {
+        bool pressed = false;
+        misty::UI::WithStyle([&](misty::UI::StyleScope& scoped) {
+            scoped.var(ImGuiStyleVar_FrameRounding, style.rounding);
+            scoped.color(ImGuiCol_Button, style.button);
+            scoped.color(ImGuiCol_ButtonHovered, style.hovered);
+            scoped.color(ImGuiCol_ButtonActive, style.active);
+            scoped.color(ImGuiCol_Text, style.text);
+            pressed = ImGui::Button(label, size);
+        });
+        return pressed;
+    }
 
     static void centered_text(const char* text, ImU32 color = IM_COL32(220, 220, 220, 255)) {
         float w = ImGui::GetContentRegionAvail().x;
@@ -56,8 +86,7 @@ namespace misty::panel {
 
     bool OnboardingPanel::show_primary_button(const char* label, float width, bool enabled) {
         if (!enabled) ImGui::BeginDisabled();
-        bool clicked = core::StyledButton(label, ImVec2(width, 44.0f),
-                                          core::ButtonTheme::Primary());
+        bool clicked = styled_button(label, ImVec2(width, 44.0f), primary_button_style());
         if (!enabled) ImGui::EndDisabled();
         return clicked;
     }

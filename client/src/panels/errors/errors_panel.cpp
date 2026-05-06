@@ -2,11 +2,43 @@
 
 #include "core/manager/asset_manager.h"
 #include "core/manager/session_manager.h"
-#include "core/ui/imgui_utils.h"
+#include "core/ui/ui.h"
 #include "views/app_view.h"
 #include "imgui.h"
 
 namespace misty::panel {
+namespace {
+struct ButtonStyle {
+    ImVec4 button;
+    ImVec4 hovered;
+    ImVec4 active;
+    ImVec4 text;
+    float rounding;
+};
+
+ButtonStyle primary_button_style() {
+    return {
+        ImVec4(0.957f, 0.957f, 0.961f, 1.0f),
+        ImVec4(0.898f, 0.906f, 0.922f, 1.0f),
+        ImVec4(0.820f, 0.835f, 0.859f, 1.0f),
+        ImVec4(0.07f, 0.07f, 0.07f, 1.0f),
+        8.0f,
+    };
+}
+
+bool styled_button(const char* label, const ImVec2& size, const ButtonStyle& style) {
+    bool pressed = false;
+    misty::UI::WithStyle([&](misty::UI::StyleScope& scoped) {
+        scoped.var(ImGuiStyleVar_FrameRounding, style.rounding);
+        scoped.color(ImGuiCol_Button, style.button);
+        scoped.color(ImGuiCol_ButtonHovered, style.hovered);
+        scoped.color(ImGuiCol_ButtonActive, style.active);
+        scoped.color(ImGuiCol_Text, style.text);
+        pressed = ImGui::Button(label, size);
+    });
+    return pressed;
+}
+}
 
 void ErrorsPanel::render() {
     render_session_expired();
@@ -77,8 +109,7 @@ void ErrorsPanel::render_session_expired() {
         ImGui::Separator();
         ImGui::Spacing();
 
-        if (core::StyledButton("Log In Again", ImVec2(w, 42.0f),
-                               core::ButtonTheme::Primary())) {
+        if (styled_button("Log In Again", ImVec2(w, 42.0f), primary_button_style())) {
             core::SessionManager::get().clear_token();
             core::SessionManager::get().clear_session_expired();
             view::switch_view(view::ViewID::Login);

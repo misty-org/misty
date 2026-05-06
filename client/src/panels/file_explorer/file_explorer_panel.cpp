@@ -1,5 +1,5 @@
 #include "panels/file_explorer/file_explorer_panel.h"
-#include "panels/workspace/workspace_state.h"
+#include "panels/file_sidebar/remote_mount_state.h"
 #include "panels/services/services_state.h"
 #include "panels/services/remote/remote_state.h"
 #include "panels/search/search_state.h"
@@ -173,7 +173,7 @@ namespace misty::panel {
           search_state_key_(std::move(search_state_key)),
           window_name_("File Explorer##" + panel_id) {
 
-        auto& workspace_state = registry_.get_state<WorkspaceState>("Workspace");
+        auto& workspace_state = registry_.get_state<RemoteMountState>("RemoteMounts");
         auto& file_explorer_state = registry_.get_state<FileExplorerState>(state_key_);
 
         // Ensure mount directories exist (~/misty/mnt and ~/misty/mnt/OneDrive)
@@ -197,7 +197,7 @@ namespace misty::panel {
                                                             int64_t size) {
                 std::vector<std::string> acceptable_remote_names{remote_name};
                 {
-                    auto& workspace = registry->get_state<WorkspaceState>("Workspace");
+                    auto& workspace = registry->get_state<RemoteMountState>("RemoteMounts");
                     for (const auto& mapping : workspace.remote_mappings) {
                         if (mapping.remote_name != remote_name) {
                             continue;
@@ -431,7 +431,7 @@ namespace misty::panel {
         remote_path = info.relative_path;
         remote_name = info.remote_name;
 
-        const auto& workspace = registry_.get_state<WorkspaceState>("Workspace");
+        const auto& workspace = registry_.get_state<RemoteMountState>("RemoteMounts");
         for (const auto& mapping : workspace.remote_mappings) {
             if (mapping.provider_folder == info.provider_folder &&
                 (mapping.folder_name == info.remote_name || mapping.remote_name == info.remote_name)) {
@@ -463,7 +463,7 @@ namespace misty::panel {
             return true;
         }
 
-        const auto& workspace = registry_.get_state<WorkspaceState>("Workspace");
+        const auto& workspace = registry_.get_state<RemoteMountState>("RemoteMounts");
         const RemoteAccountMapping* unique_mapping = nullptr;
         for (const auto& mapping : workspace.remote_mappings) {
             if (mapping.provider_folder != info.provider_folder) {
@@ -1285,7 +1285,7 @@ namespace misty::panel {
     }
 
     void FileExplorerPanel::sync_account_mappings() {
-        auto& workspace = registry_.get_state<WorkspaceState>("Workspace");
+        auto& workspace = registry_.get_state<RemoteMountState>("RemoteMounts");
         auto& services = registry_.get_state<ServicesState>("Services");
 
         workspace.ensure_directories();
