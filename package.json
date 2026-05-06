@@ -15,8 +15,8 @@
     "dev:app": "npm run dev:web --workspace=@misty/app",
     "build:app": "npm run build:web --workspace=@misty/app",
     "test:app": "npm run test --workspace=@misty/app",
-    "dev:desktop": "npm run dev:desktop --workspace=@misty/app",
-    "build:desktop": "npm run build:desktop --workspace=@misty/app",
+    "dev:desktop": "npm run tauri --workspace=@misty/app -- dev",
+    "build:desktop": "npm run tauri --workspace=@misty/app -- build",
     "dev:website": "npm run dev --workspace=@misty/website",
     "build:website": "npm run build --workspace=@misty/website",
     "test:website": "npm run test --workspace=@misty/website"

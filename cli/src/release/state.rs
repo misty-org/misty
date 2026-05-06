@@ -61,32 +61,25 @@ pub(super) fn verify_versions(workspace: &Workspace, expected: &str) -> Result<(
 
 pub(super) fn require_release_checkout(workspace: &Workspace, fetch: bool) -> Result<()> {
     if fetch {
-        git(workspace, &workspace.misty, ["fetch", "origin", "main"])?;
+        git(workspace, &workspace.root, ["fetch", "origin", "main"])?;
     }
-    let branch = git(workspace, &workspace.misty, ["branch", "--show-current"])?;
+    let branch = git(workspace, &workspace.root, ["branch", "--show-current"])?;
     if branch != "main" {
         bail!("release start requires the main branch, found {branch}");
     }
-    if !git(workspace, &workspace.misty, ["status", "--porcelain"])?.is_empty() {
-        bail!("release start requires a clean Misty checkout");
+    if !git(workspace, &workspace.root, ["status", "--porcelain"])?.is_empty() {
+        bail!("release start requires a clean monorepo checkout");
     }
-    let head = git(workspace, &workspace.misty, ["rev-parse", "HEAD"])?;
-    let origin = git(workspace, &workspace.misty, ["rev-parse", "origin/main"])?;
+    let head = git(workspace, &workspace.root, ["rev-parse", "HEAD"])?;
+    let origin = git(workspace, &workspace.root, ["rev-parse", "origin/main"])?;
     if head != origin {
         bail!("local main is not synchronized with origin/main");
     }
     Ok(())
 }
 
-pub(super) fn require_clean_cli_checkout(workspace: &Workspace) -> Result<()> {
-    if !git(workspace, &workspace.cli, ["status", "--porcelain"])?.is_empty() {
-        bail!("release commands require a clean misty-cli checkout");
-    }
-    Ok(())
-}
-
 pub(super) fn ensure_source_tag(workspace: &Workspace, manifest: &ReleaseManifest) -> Result<()> {
-    let existing = source_tag_commit(&workspace.misty, &manifest.tag);
+    let existing = source_tag_commit(&workspace.root, &manifest.tag);
     if let Some(existing) = existing {
         if existing != manifest.source_commit {
             bail!("{} already points to another commit", manifest.tag);
@@ -100,11 +93,11 @@ pub(super) fn ensure_source_tag(workspace: &Workspace, manifest: &ReleaseManifes
                 "-m",
                 &format!("Misty {}", manifest.version),
             ])
-            .run(&workspace.misty)?;
+            .run(&workspace.root)?;
     }
     CommandSpec::new("git")
         .args(["push", "origin", &manifest.tag])
-        .run(&workspace.misty)
+        .run(&workspace.root)
 }
 
 fn source_tag_commit(repository: &Path, tag: &str) -> Option<String> {
@@ -205,18 +198,13 @@ pub(super) fn verify_build_identity(
     manifest: &ReleaseManifest,
 ) -> Result<()> {
     verify_versions(workspace, &manifest.version)?;
-    let source = git(workspace, &workspace.misty, ["rev-parse", "HEAD"])?;
-    let cli = git(workspace, &workspace.cli, ["rev-parse", "HEAD"])?;
+    let source = git(workspace, &workspace.root, ["rev-parse", "HEAD"])?;
     if source != manifest.source_commit {
-        bail!("Misty checkout does not match the release source commit");
+        bail!("monorepo checkout does not match the release source commit");
     }
-    if cli != manifest.cli_commit {
-        bail!("misty-cli checkout does not match the release tooling commit");
+    if !git(workspace, &workspace.root, ["status", "--porcelain"])?.is_empty() {
+        bail!("release builds require a clean monorepo checkout");
     }
-    if !git(workspace, &workspace.misty, ["status", "--porcelain"])?.is_empty() {
-        bail!("release builds require a clean Misty checkout");
-    }
-    require_clean_cli_checkout(workspace)?;
     Ok(())
 }
 
@@ -227,7 +215,6 @@ pub(super) fn verify_platform_identity(
     if platform.version != release.version
         || platform.tag != release.tag
         || platform.source_commit != release.source_commit
-        || platform.cli_commit != release.cli_commit
         || !release.platforms.contains(&platform.platform)
     {
         bail!("{} manifest does not match the release", platform.platform);
@@ -294,12 +281,11 @@ mod tests {
     }
 
     #[test]
-    fn platform_manifest_cannot_mix_source_or_cli_revisions() {
+    fn platform_manifest_cannot_mix_source_revisions() {
         let release = ReleaseManifest {
             version: "0.2.1".to_owned(),
             tag: "misty-v0.2.1".to_owned(),
             source_commit: "source-a".to_owned(),
-            cli_commit: "cli-a".to_owned(),
             cli_version: "0.1.0".to_owned(),
             config_sha256: "config".to_owned(),
             created_at: Utc::now(),
@@ -309,14 +295,13 @@ mod tests {
             version: release.version.clone(),
             tag: release.tag.clone(),
             source_commit: release.source_commit.clone(),
-            cli_commit: release.cli_commit.clone(),
             platform: "windows-x86_64".to_owned(),
             updater_asset: "Misty.exe".to_owned(),
             signature_asset: "Misty.exe.sig".to_owned(),
             files: vec![],
         };
         assert!(verify_platform_identity(&release, &platform).is_ok());
-        platform.cli_commit = "cli-b".to_owned();
+        platform.source_commit = "source-b".to_owned();
         assert!(verify_platform_identity(&release, &platform).is_err());
     }
 
@@ -326,7 +311,6 @@ mod tests {
             version: "0.2.1".to_owned(),
             tag: "misty-v0.2.1".to_owned(),
             source_commit: "source-a".to_owned(),
-            cli_commit: "cli-a".to_owned(),
             cli_version: "0.1.0".to_owned(),
             config_sha256: "config".to_owned(),
             created_at: Utc::now(),
