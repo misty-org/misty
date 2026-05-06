@@ -92,6 +92,14 @@ void LinuxApp::init_window() {
     if (!window_)
         throw std::runtime_error("Failed to create GLFW window");
 
+    glfwSetWindowSizeLimits(
+        window_,
+        kPlatformMinWindowWidth,
+        kPlatformMinWindowHeight,
+        GLFW_DONT_CARE,
+        GLFW_DONT_CARE
+    );
+
     glfwMakeContextCurrent(window_);
     glfwSetWindowUserPointer(window_, this);
     glfwSetWindowSizeCallback(window_, glfw_window_size_callback);

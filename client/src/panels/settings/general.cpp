@@ -3,8 +3,6 @@
 #include "core/ui/ui_layout.h"
 #include "imgui.h"
 
-namespace UI = misty::UI;
-
 namespace misty::panel {
 
 bool general_tab(SettingsState& state) {
@@ -35,12 +33,27 @@ void general_content(SettingsState& state) {
     (void)state;
 
     UI::div("general_content", {
-        .mode = UI::Mode::ChildWindow,
+        .mode = UI::Mode::LayoutOnly,
         .width = UI::Size::fill(),
-        .height = UI::Size::fill(),
+        .height = UI::Size::auto_size(),
+        .padding = UI::Spacing::xy(28.0f, 20.0f),
     }, [&]() {
-        UI::text({
-            .text = "General settings content",
+        UI::column("##general_body", {
+            .width = UI::Size::fill(),
+            .height = UI::Size::auto_size(),
+            .gap = UI::Spacing::xy(0.0f, 20.0f),
+        }, [&]() {
+            UI::text({
+                .text = "General",
+                .width = UI::Size::fill(),
+                .color = ImVec4(0.96f, 0.96f, 0.98f, 1.0f),
+                .font = UI::TextFont::BoldXLarge,
+            });
+            UI::text({
+                .text = "General settings content",
+                .width = UI::Size::fill(),
+                .color = ImVec4(0.76f, 0.78f, 0.82f, 1.0f),
+            });
         });
     });
 }

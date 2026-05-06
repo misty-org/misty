@@ -9,6 +9,7 @@ namespace misty::panel {
     enum class SettingsSection {
         Account,
         General,
+        Privacy,
         Sync,
         Vault,
         Storage,
@@ -23,10 +24,7 @@ namespace misty::panel {
         SettingsSection prev_section   = SettingsSection::Account;
 
         // Account
-        char account_display_name[128] = "";
         char account_email[256] = "";
-        char account_bio[512] = "";
-        bool account_buffers_initialized = false;
 
         // General
         int theme_index = 0; // 0=System, 1=Dark, 2=Light

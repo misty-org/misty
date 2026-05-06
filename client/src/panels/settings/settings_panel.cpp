@@ -1,9 +1,10 @@
 #include "panels/settings/account.h"
 #include "panels/settings/general.h"
+#include "panels/settings/privacy.h"
 #include "panels/settings/settings_panel.h"
 
 #include "core/ui/ui_layout.h"
-#include "core/ui/ui.h"
+#include "core/ui/ui_style.h"
 #include "imgui.h"
 
 namespace UI = misty::UI;
@@ -44,22 +45,30 @@ void SettingsPanel::render() {
 }
 
 void SettingsPanel::settings_content(SettingsState& state) {
-    UI::div("##settings_content", {
-        .mode = UI::Mode::ChildWindow,
-        .width = UI::Size::fill(),
-        .height = UI::Size::fill(),
-    }, [&]() {
-        switch (state.active_section) {
-            case SettingsSection::General:
-                general_content(state);
-                break;
-            case SettingsSection::Account:
-                account_content(state);
-                break;
-            default:
-                general_content(state);
-                break;
-        }
+    UI::WithStyle([&](UI::StyleScope& style) {
+        style.var(ImGuiStyleVar_ScrollbarSize, 8.0f);
+
+        UI::div("##settings_content", {
+            .mode = UI::Mode::ChildWindow,
+            .width = UI::Size::fill(),
+            .height = UI::Size::fill(),
+            .window_flags = ImGuiWindowFlags_AlwaysVerticalScrollbar,
+        }, [&]() {
+            switch (state.active_section) {
+                case SettingsSection::General:
+                    general_content(state);
+                    break;
+                case SettingsSection::Account:
+                    account_content(state);
+                    break;
+                case SettingsSection::Privacy:
+                    privacy_content(state);
+                    break;
+                default:
+                    general_content(state);
+                    break;
+            }
+        });
     });
 }
 
@@ -87,6 +96,8 @@ void SettingsPanel::sidebar_header(SettingsState& state) {
         UI::text({
             .text = "Settings",
             .width = UI::Size::fill(),
+            .font = UI::TextFont::BoldXLarge,
+            .color = ImVec4(0.96f, 0.96f, 0.98f, 1.0f),
         });
     });
 }
@@ -94,6 +105,7 @@ void SettingsPanel::sidebar_header(SettingsState& state) {
 void SettingsPanel::sidebar_tabs(SettingsState& state) {
     general_tab(state);
     account_tab(state);
+    privacy_tab(state);
 }
 
 } //namespace misty::panel

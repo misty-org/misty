@@ -1,7 +1,8 @@
 #include "panel.h"
 
 #include "core/commands/command_manager.h"
-#include "core/ui/ui.h"
+#include "core/ui/ui_animate.h"
+#include "core/ui/ui_style.h"
 #include "imgui.h"
 #include <cstdarg>
 #include <cstdio>

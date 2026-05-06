@@ -1,7 +1,7 @@
 #include "panels/onboarding/onboarding_panel.h"
 #include "panels/services/services_state.h"
 #include "core/manager/asset_manager.h"
-#include "core/ui/ui.h"
+#include "core/ui/ui_style.h"
 #include "views/app_view.h"
 #include "imgui.h"
 #include <chrono>
