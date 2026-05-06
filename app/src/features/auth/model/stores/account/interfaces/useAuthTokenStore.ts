@@ -11,6 +11,7 @@ export interface SavedAccountSession {
 export interface SecureAccountSession {
   account: SavedAccountSession;
   token: string;
+  deploymentScope?: string;
 }
 
 export interface SecureAccountVault {

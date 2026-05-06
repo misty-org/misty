@@ -1,4 +1,9 @@
-import { archiveList, explorerPrepareOpenItem, explorerPreviewItem } from "@/features/files/native";
+import {
+  archiveList,
+  connectedDevicesMediaUrl,
+  explorerPrepareOpenItem,
+  explorerPreviewItem,
+} from "@/features/files/native";
 import { errorText } from "@/shared/lib/format";
 import { safeTauriAssetUrl } from "@/shared/platform/tauri";
 import { useCallback, useEffect, useState } from "react";
@@ -66,6 +71,9 @@ async function loadGlobalPreview(source: GlobalPreviewSource): Promise<PreviewRe
     audioMimeTypes[extension] ||
     "application/octet-stream";
   const kind = globalPreviewKindForSource(extension, mimeType);
+  if (source.peer && (kind === "video" || kind === "audio" || kind === "pdf")) {
+    return { kind, url: await connectedDevicesMediaUrl(source.path), mimeType };
+  }
   const preparedPath = source.remote
     ? (
         await explorerPrepareOpenItem({

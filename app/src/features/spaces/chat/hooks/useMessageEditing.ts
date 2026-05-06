@@ -1,6 +1,6 @@
 import { spansToText } from "@/features/spaces/integrations";
 import type { SpaceMessage } from "@/api/spaces/dto/interfaces/types";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
 /**
  * Inline edit state for one message at a time.
@@ -31,10 +31,10 @@ export function useMessageEditing() {
     }, 0);
   };
 
-  const reset = () => {
+  const reset = useCallback(() => {
     setEditingMessageId("");
     setEditingText("");
-  };
+  }, []);
 
   return {
     editingMessageId,

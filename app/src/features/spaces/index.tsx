@@ -13,7 +13,6 @@ export * from "./store/agent-run-events";
 export * from "./store/reference-cache";
 export * from "./store/reference-mode";
 export * from "./store/useSpaceAgendaPreferences";
-export * from "./store/useSpaceDiscordStore";
 export * from "./store/useSpacesStore";
 export * from "./store/useSpacesTabsStore";
 

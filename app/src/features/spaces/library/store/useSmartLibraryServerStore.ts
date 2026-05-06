@@ -1,4 +1,4 @@
-import { managedAiRequest } from "@/features/agents";
+import { smartLibraryApi } from "@/api/ai/smart-library";
 import type {
   RegisterSmartLibraryFolderRequest,
   RegisterSmartLibraryFolderResponse,
@@ -36,29 +36,24 @@ export type {
   SmartLibraryResultsResponse,
 } from "@/features/files/explorer";
 
-const basePath = "/ai/smart-library";
-
 export function registerSmartLibraryFolder(
   body: RegisterSmartLibraryFolderRequest,
 ): Promise<RegisterSmartLibraryFolderResponse> {
-  return managedAiRequest(`${basePath}/folders`, { method: "POST", body: JSON.stringify(body) });
+  return smartLibraryApi.registerFolder(body);
 }
 
 export function submitSmartLibraryPreflight(
   folderId: string,
   preflight: FolderPreflight,
 ): Promise<{ estimate: AnalysisEstimate }> {
-  return managedAiRequest(`${basePath}/folders/${encodeURIComponent(folderId)}/preflight`, {
-    method: "POST",
-    body: JSON.stringify({
-      totalImages: preflight.totalImages,
-      supportedImages: preflight.supportedImages,
-      unsupportedImages: preflight.unsupportedImages,
-      alreadyAnalyzedImages: preflight.alreadyAnalyzedImages,
-      changedImages: preflight.changedImages,
-      eligibleImages: preflight.eligibleImages,
-      requestedImages: Math.min(500, preflight.pilotCappedImages),
-    }),
+  return smartLibraryApi.submitPreflight(folderId, {
+    totalImages: preflight.totalImages,
+    supportedImages: preflight.supportedImages,
+    unsupportedImages: preflight.unsupportedImages,
+    alreadyAnalyzedImages: preflight.alreadyAnalyzedImages,
+    changedImages: preflight.changedImages,
+    eligibleImages: preflight.eligibleImages,
+    requestedImages: Math.min(500, preflight.pilotCappedImages),
   });
 }
 
@@ -66,10 +61,7 @@ export function createSmartLibrarySample(
   folderId: string,
   candidates: SampleCandidate[],
 ): Promise<{ assetIds: string[]; estimate: AnalysisEstimate }> {
-  return managedAiRequest(`${basePath}/folders/${encodeURIComponent(folderId)}/sample`, {
-    method: "POST",
-    body: JSON.stringify({ candidates, maximumSampleImages: 25 }),
-  });
+  return smartLibraryApi.createSample(folderId, { candidates, maximumSampleImages: 25 });
 }
 
 export function approveSmartLibrarySample(
@@ -78,9 +70,10 @@ export function approveSmartLibrarySample(
   finalBatch: boolean,
 ): Promise<SmartLibraryProgress> {
   validatePreviewBatch(previews);
-  return managedAiRequest(`${basePath}/folders/${encodeURIComponent(folderId)}/sample/approve`, {
-    method: "POST",
-    body: JSON.stringify({ previews, finalBatch, billingMeter: SMART_LIBRARY_PILOT.billingMeter }),
+  return smartLibraryApi.approveSample(folderId, {
+    previews,
+    finalBatch,
+    billingMeter: SMART_LIBRARY_PILOT.billingMeter,
   });
 }
 
@@ -90,28 +83,23 @@ export function approveSmartLibraryFolder(
   finalBatch: boolean,
 ): Promise<SmartLibraryProgress> {
   validatePreviewBatch(previews);
-  return managedAiRequest(`${basePath}/folders/${encodeURIComponent(folderId)}/approve`, {
-    method: "POST",
-    body: JSON.stringify({
-      previews,
-      finalBatch,
-      billingMeter: SMART_LIBRARY_PILOT.billingMeter,
-      maximumSuccessfulImages: SMART_LIBRARY_PILOT.maximumSuccessfulImages,
-    }),
+  return smartLibraryApi.approveFolder(folderId, {
+    previews,
+    finalBatch,
+    billingMeter: SMART_LIBRARY_PILOT.billingMeter,
+    maximumSuccessfulImages: SMART_LIBRARY_PILOT.maximumSuccessfulImages,
   });
 }
 
 export function fetchSmartLibraryProgress(folderId: string): Promise<SmartLibraryProgress> {
-  return managedAiRequest(`${basePath}/folders/${encodeURIComponent(folderId)}/progress`);
+  return smartLibraryApi.progress(folderId);
 }
 
 export function fetchSmartLibraryResults(
   folderId: string,
   after: number,
 ): Promise<SmartLibraryResultsResponse> {
-  return managedAiRequest(
-    `${basePath}/folders/${encodeURIComponent(folderId)}/results?after=${after}`,
-  );
+  return smartLibraryApi.results(folderId, after);
 }
 
 export function updateSmartLibraryAssetTags(
@@ -119,26 +107,17 @@ export function updateSmartLibraryAssetTags(
   assetId: string,
   tags: string[],
 ): Promise<{ result: AnalysisResult }> {
-  return managedAiRequest(
-    `${basePath}/folders/${encodeURIComponent(folderId)}/assets/${encodeURIComponent(assetId)}/tags`,
-    {
-      method: "PUT",
-      body: JSON.stringify({ tags }),
-    },
-  );
+  return smartLibraryApi.updateAssetTags(folderId, assetId, tags);
 }
 
 export function submitSmartLibraryRescan(
   folderId: string,
   preflight: FolderPreflight,
 ): Promise<{ estimate: AnalysisEstimate }> {
-  return managedAiRequest(`${basePath}/folders/${encodeURIComponent(folderId)}/rescan`, {
-    method: "POST",
-    body: JSON.stringify({
-      changedImages: preflight.changedImages,
-      newImages: preflight.newImages,
-      requestedImages: preflight.pilotCappedImages,
-    }),
+  return smartLibraryApi.submitRescan(folderId, {
+    changedImages: preflight.changedImages,
+    newImages: preflight.newImages,
+    requestedImages: preflight.pilotCappedImages,
   });
 }
 
@@ -146,27 +125,21 @@ export function searchSemanticAssets(
   query: string,
   options: { limit?: number; folderId?: string } = {},
 ): Promise<SemanticSearchResponse> {
-  return managedAiRequest(`${basePath}/search`, {
-    method: "POST",
-    body: JSON.stringify({
-      query,
-      limit: options.limit ?? 100,
-      ...(options.folderId ? { folderId: options.folderId } : {}),
-    }),
+  return smartLibraryApi.search({
+    query,
+    limit: options.limit ?? 100,
+    ...(options.folderId ? { folderId: options.folderId } : {}),
   });
 }
 
 export function planSemanticReindex(
   options: { folderId?: string; cursor?: string; limit?: number; targetVersion?: number } = {},
 ): Promise<SemanticReindexPlan> {
-  return managedAiRequest(`${basePath}/reindex`, {
-    method: "POST",
-    body: JSON.stringify({
-      ...(options.folderId ? { folderId: options.folderId } : {}),
-      ...(options.cursor ? { cursor: options.cursor } : {}),
-      ...(options.limit ? { limit: options.limit } : {}),
-      ...(options.targetVersion ? { targetVersion: options.targetVersion } : {}),
-    }),
+  return smartLibraryApi.planReindex({
+    ...(options.folderId ? { folderId: options.folderId } : {}),
+    ...(options.cursor ? { cursor: options.cursor } : {}),
+    ...(options.limit ? { limit: options.limit } : {}),
+    ...(options.targetVersion ? { targetVersion: options.targetVersion } : {}),
   });
 }
 
@@ -174,10 +147,7 @@ export function completeSemanticReindex(
   jobId: string,
   assets: SemanticReindexInput[],
 ): Promise<SemanticReindexCompletion> {
-  return managedAiRequest(`${basePath}/reindex/${encodeURIComponent(jobId)}/complete`, {
-    method: "POST",
-    body: JSON.stringify({ assets }),
-  });
+  return smartLibraryApi.completeReindex(jobId, assets);
 }
 
 export function searchSmartLibrary(
@@ -185,16 +155,11 @@ export function searchSmartLibrary(
   query: string,
   limit = 100,
 ): Promise<SemanticSearchResponse> {
-  return managedAiRequest(`${basePath}/folders/${encodeURIComponent(folderId)}/search`, {
-    method: "POST",
-    body: JSON.stringify({ query, limit }),
-  });
+  return smartLibraryApi.searchFolder(folderId, query, limit);
 }
 
 export async function deleteSmartLibraryFolder(folderId: string): Promise<void> {
-  await managedAiRequest(`${basePath}/folders/${encodeURIComponent(folderId)}`, {
-    method: "DELETE",
-  });
+  await smartLibraryApi.removeFolder(folderId);
 }
 
 export function candidatesFromAssets(assets: SmartLibraryAsset[]): SampleCandidate[] {

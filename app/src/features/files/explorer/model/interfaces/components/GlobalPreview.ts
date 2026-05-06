@@ -14,6 +14,7 @@ export interface GlobalPreviewSource {
   uploadedMs?: number | null;
   readonly?: boolean;
   remote?: boolean;
+  peer?: boolean;
 }
 
 export interface PreviewResource {

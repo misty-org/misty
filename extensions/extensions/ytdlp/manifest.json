@@ -1,0 +1,43 @@
+{
+  "schema_version": 3,
+  "id": "ytdlp",
+  "name": "yt-dlp",
+  "version": "0.3.0",
+  "description": "Download YouTube media with yt-dlp and convert it to common audio or video formats.",
+  "author": "Misty",
+  "enabled": true,
+  "platforms": ["web"],
+  "runtime": {
+    "type": "web",
+    "entry": "web/index.html?plugin=ytdlp"
+  },
+  "launcher": {
+    "views": ["all"],
+    "show_in_launcher": true,
+    "requires_selected_file": false,
+    "open_mode": "popup"
+  },
+  "plugin": {
+    "runtime": "web",
+    "entry": "web/index.html?plugin=ytdlp"
+  },
+  "tools": [
+    {"id":"yt-dlp","version":"2026.06.09","platform":"macos","architecture":"aarch64","path":"tools/macos-aarch64/yt-dlp"},{"id":"ffmpeg","version":"7.1.1","platform":"macos","architecture":"aarch64","path":"tools/macos-aarch64/ffmpeg"},{"id":"ffprobe","version":"7.1.1","platform":"macos","architecture":"aarch64","path":"tools/macos-aarch64/ffprobe"},
+    {"id":"yt-dlp","version":"2026.06.09","platform":"macos","architecture":"x86_64","path":"tools/macos-x86_64/yt-dlp"},{"id":"ffmpeg","version":"7.1.1","platform":"macos","architecture":"x86_64","path":"tools/macos-x86_64/ffmpeg"},{"id":"ffprobe","version":"7.1.1","platform":"macos","architecture":"x86_64","path":"tools/macos-x86_64/ffprobe"},
+    {"id":"yt-dlp","version":"2026.06.09","platform":"linux","architecture":"x86_64","path":"tools/linux-x86_64/yt-dlp"},{"id":"ffmpeg","version":"7.1.1","platform":"linux","architecture":"x86_64","path":"tools/linux-x86_64/ffmpeg"},{"id":"ffprobe","version":"7.1.1","platform":"linux","architecture":"x86_64","path":"tools/linux-x86_64/ffprobe"},
+    {"id":"yt-dlp","version":"2026.06.09","platform":"windows","architecture":"x86_64","path":"tools/windows-x86_64/yt-dlp.exe"},{"id":"ffmpeg","version":"7.1.1","platform":"windows","architecture":"x86_64","path":"tools/windows-x86_64/ffmpeg.exe"},{"id":"ffprobe","version":"7.1.1","platform":"windows","architecture":"x86_64","path":"tools/windows-x86_64/ffprobe.exe"}
+  ],
+  "panels": [
+    {
+      "id": "ytdlp.panel",
+      "title": "yt-dlp",
+      "window_type": "panel",
+      "default_width": 640,
+      "default_height": 540,
+      "entry": "web/index.html?plugin=ytdlp",
+      "launcher": {
+        "views": ["all"]
+      }
+    }
+  ]
+}

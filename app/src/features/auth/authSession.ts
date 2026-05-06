@@ -1,4 +1,5 @@
 import { useActivityStore } from "@/features/activity";
+import { deploymentStorageKey, readDeploymentStorageItem } from "@/api/deployment/api";
 import { refreshAllAgentAccountState, resetAllAgentAccountState } from "@/features/agents";
 import { useExplorerStore } from "@/features/files/explorer";
 import { resetSearchAccountState } from "@/features/files/search";
@@ -14,6 +15,10 @@ import { useUserStore } from "./store/useUserStore";
 
 export const shouldPersistAuthUser = !isNativeMobileBuild;
 const authUserStorageKey = "misty_user";
+
+function scopedAuthUserStorageKey(): string {
+  return deploymentStorageKey(authUserStorageKey);
+}
 
 export function resetAccountScopedState(): void {
   useUserStore.getState().clear();
@@ -72,7 +77,7 @@ export function licenseFromMe(me: AccountMeResponse): CurrentLicense {
 
 export function readStoredUser(): AuthUser | null {
   try {
-    const stored = window.localStorage.getItem(authUserStorageKey);
+    const stored = readDeploymentStorageItem(authUserStorageKey);
     return stored ? (JSON.parse(stored) as AuthUser) : null;
   } catch {
     return null;
@@ -93,7 +98,7 @@ export function readInitialUser(): AuthUser | null {
 export function writeStoredUser(user: AuthUser | null): void {
   try {
     if (user) {
-      window.localStorage.setItem(authUserStorageKey, JSON.stringify(user));
+      window.localStorage.setItem(scopedAuthUserStorageKey(), JSON.stringify(user));
     } else {
       clearStoredUser();
     }
@@ -102,7 +107,7 @@ export function writeStoredUser(user: AuthUser | null): void {
 
 export function clearStoredUser(): void {
   try {
-    window.localStorage.removeItem(authUserStorageKey);
+    window.localStorage.removeItem(scopedAuthUserStorageKey());
   } catch {}
 }
 

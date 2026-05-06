@@ -108,7 +108,7 @@ export function ChatMessageRow({
               onSubmit={(event: FormEvent, target) => props.onSaveEdited(event, target)}
             />
           ) : (
-            <p className="whitespace-pre-wrap text-[15px] leading-6 text-cream/90">
+            <p className="whitespace-pre-wrap [overflow-wrap:anywhere] text-[15px] leading-6 text-cream/90">
               {message.content.map((span, index) => (
                 <MessageContent key={index} span={span} />
               ))}

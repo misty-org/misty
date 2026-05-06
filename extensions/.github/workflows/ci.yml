@@ -1,0 +1,22 @@
+name: Extensions CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run validate
+      - run: npm run build
+      - name: Verify install bundles
+        run: |
+          node -e 'for (const {id} of require("./catalog/index.json")) { const fs=require("fs"); if (!fs.existsSync(`dist/plugins/${id}/web/index.html`) || !fs.existsSync(`dist/plugins/${id}/manifest.json`)) throw new Error(`Incomplete bundle: ${id}`) }'

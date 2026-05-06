@@ -1,3 +1,4 @@
+import { deploymentStorageKey, readDeploymentStorageItem } from "@/api/deployment/api";
 import { useAuth } from "@/features/auth";
 import { useAppThemeStore } from "@/features/settings";
 import type {
@@ -346,7 +347,7 @@ function RoadmapFlow(props: Parameters<typeof RoadmapCanvas>[0]) {
 
 function readViewport(key: string) {
   try {
-    const viewport = JSON.parse(window.localStorage.getItem(key) ?? "null") as
+    const viewport = JSON.parse(readDeploymentStorageItem(key) ?? "null") as
       { x: number; y: number; zoom: number } | undefined;
     return viewport ? { ...viewport, zoom: Math.max(0.35, viewport.zoom) } : undefined;
   } catch {
@@ -355,7 +356,7 @@ function readViewport(key: string) {
 }
 function writeViewport(key: string, viewport: { x: number; y: number; zoom: number }) {
   try {
-    window.localStorage.setItem(key, JSON.stringify(viewport));
+    window.localStorage.setItem(deploymentStorageKey(key), JSON.stringify(viewport));
   } catch {
     /* optional */
   }

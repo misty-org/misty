@@ -1570,6 +1570,7 @@ fn file_entry_from_doc(doc: &SearchDoc, mount_root: &Path) -> FileEntry {
                 provider_type: (!doc.provider_type.is_empty()).then_some(doc.provider_type.clone()),
                 remote_name: (!doc.remote_name.is_empty()).then_some(doc.remote_name.clone()),
                 remote_path: (!doc.remote_path.is_empty()).then_some(doc.remote_path.clone()),
+                ..Default::default()
             },
         },
     }

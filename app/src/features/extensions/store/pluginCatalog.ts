@@ -1,4 +1,9 @@
-import { httpRequest } from "@/api/http";
+import {
+  DEFAULT_CATALOG_BASE_URL,
+  extensionCatalogApi,
+  githubSourceArchiveUrlForCatalog,
+  normalizeCatalogBaseUrl,
+} from "@/api/extensions/catalog";
 import { hasTauriInternals, safeTauriAssetUrl } from "@/shared/platform/tauri";
 import type {
   LocalPluginRecord,
@@ -9,59 +14,10 @@ import type {
   PluginRootKind,
 } from "../model/types";
 
-export const DEFAULT_CATALOG_BASE_URL =
-  "https://raw.githubusercontent.com/misty-org/misty-extensions/main/catalog";
-const catalogBaseUrl = normalizeCatalogBaseUrl(
-  import.meta.env.VITE_EXTENSIONS_URL ??
-    import.meta.env.VITE_EXTENSION_CATALOG_BASE_URL ??
-    import.meta.env.VITE_PLUGIN_CATALOG_BASE_URL,
-);
-const catalogSourceArchiveUrl = githubSourceArchiveUrlForCatalog(catalogBaseUrl);
+export { DEFAULT_CATALOG_BASE_URL, githubSourceArchiveUrlForCatalog, normalizeCatalogBaseUrl };
 
-export function normalizeCatalogBaseUrl(value: string | undefined): string {
-  const configured = value?.trim();
-  if (!configured) return DEFAULT_CATALOG_BASE_URL;
-
-  const repoSlugMatch = configured.match(/^([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)$/);
-  if (repoSlugMatch) {
-    const [, owner, repo] = repoSlugMatch;
-    return `https://raw.githubusercontent.com/${owner}/${repo}/main/catalog`;
-  }
-
-  const githubRepoMatch = configured.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+?)(?:\/)?$/);
-  if (githubRepoMatch) {
-    const [, owner, repo] = githubRepoMatch;
-    return `https://raw.githubusercontent.com/${owner}/${repo}/main/catalog`;
-  }
-
-  const githubTreeMatch = configured.match(
-    /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/tree\/([^/]+)(?:\/(.+))?$/,
-  );
-  if (githubTreeMatch) {
-    const [, owner, repo, branch, path] = githubTreeMatch;
-    return `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${path?.replace(/\/$/, "") || "catalog"}`;
-  }
-
-  return configured.replace(/\/$/, "");
-}
-
-export function githubSourceArchiveUrlForCatalog(baseUrl: string): string | null {
-  const rawMatch = baseUrl.match(
-    /^https:\/\/raw\.githubusercontent\.com\/([^/]+)\/([^/]+)\/([^/]+)(?:\/.*)?$/,
-  );
-  if (rawMatch) {
-    const [, owner, repo, branch] = rawMatch;
-    return `https://github.com/${owner}/${repo}/archive/refs/heads/${branch}.zip`;
-  }
-
-  const githubMatch = baseUrl.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)(?:\/.*)?$/);
-  if (githubMatch) {
-    const [, owner, repo] = githubMatch;
-    return `https://github.com/${owner}/${repo}/archive/refs/heads/main.zip`;
-  }
-
-  return null;
-}
+const catalogBaseUrl = extensionCatalogApi.baseUrl;
+const catalogSourceArchiveUrl = extensionCatalogApi.sourceArchiveUrl;
 
 export const REMOVED_PLUGIN_IDS = new Set(["git", "preview-panel", "preview_panel", "vault"]);
 
@@ -123,13 +79,9 @@ type RawPluginCatalogFile = {
 };
 
 export async function readCatalogIndex() {
-  const response = await httpRequest(`${catalogBaseUrl}/index.json`);
-  if (!response.ok) {
-    throw new Error(`Could not load extension catalog index.json: ${response.status}`);
-  }
-  return (parseCatalogJson(await response.text()) as PluginCatalogIndexEntry[]).filter(
-    (entry) => !REMOVED_PLUGIN_IDS.has(entry.id),
-  );
+  return (
+    parseCatalogJson(await extensionCatalogApi.indexText()) as PluginCatalogIndexEntry[]
+  ).filter((entry) => !REMOVED_PLUGIN_IDS.has(entry.id));
 }
 
 export function parseCatalogJson(text: string): unknown {
@@ -172,15 +124,11 @@ export async function readCatalogEntry(
   entry: PluginCatalogIndexEntry,
 ): Promise<RawPluginCatalogFile> {
   const urls = [catalogEntryUrl(entry), resolveUrl(`extensions/${entry.id}.json`)];
-  let lastStatus = "";
-  for (const url of Array.from(new Set(urls))) {
-    const response = await httpRequest(url);
-    if (response.ok) {
-      return parseCatalogJson(await response.text()) as RawPluginCatalogFile;
-    }
-    lastStatus = `${response.status} from ${url}`;
-  }
-  throw new Error(`Could not load extension catalog for ${entry.id}: ${lastStatus}`);
+  const text = await extensionCatalogApi.firstAvailableText(
+    urls,
+    `extension catalog for ${entry.id}`,
+  );
+  return parseCatalogJson(text) as RawPluginCatalogFile;
 }
 
 export function sourceArchiveArtifact(platform: string): PluginArtifact | null {
@@ -265,9 +213,13 @@ export function defaultArtifact(
 export async function resolveArtifactChecksum(plugin: PluginEntry): Promise<string | undefined> {
   if (plugin.artifact?.sha256) return plugin.artifact.sha256;
   if (!plugin.verified || !plugin.artifact?.url) return undefined;
-  const response = await httpRequest(`${plugin.artifact.url}.sha256`);
-  if (!response.ok) throw new Error(`The published checksum for ${plugin.name} is unavailable.`);
-  const checksum = (await response.text()).trim().split(/\s+/)[0]?.toLowerCase();
+  let text: string;
+  try {
+    text = await extensionCatalogApi.checksumText(plugin.artifact.url);
+  } catch {
+    throw new Error(`The published checksum for ${plugin.name} is unavailable.`);
+  }
+  const checksum = text.trim().split(/\s+/)[0]?.toLowerCase();
   if (!/^[a-f0-9]{64}$/.test(checksum))
     throw new Error(`The published checksum for ${plugin.name} is invalid.`);
   return checksum;

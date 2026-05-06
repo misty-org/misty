@@ -1,4 +1,4 @@
-import { managedAiRequest } from "@/features/agents";
+import { mediaSearchApi } from "@/api/ai/media-search";
 import type { MediaChunkIndexResponse, MediaSearchResponse } from "@/features/files/explorer";
 import type { PreparedMediaChunk } from "@/native/contracts";
 export type {
@@ -7,19 +7,15 @@ export type {
   MediaSearchResponse,
 } from "@/features/files/explorer";
 
-const basePath = "/ai/media-search";
 export function indexMediaChunk(chunk: PreparedMediaChunk): Promise<MediaChunkIndexResponse> {
-  return managedAiRequest(`${basePath}/chunks`, { method: "POST", body: JSON.stringify(chunk) });
+  return mediaSearchApi.indexChunk(chunk);
 }
 export function searchMedia(
   deviceId: string,
   query: string,
   limit = 20,
 ): Promise<MediaSearchResponse> {
-  return managedAiRequest(basePath + "/search", {
-    method: "POST",
-    body: JSON.stringify({ deviceId, query, limit }),
-  });
+  return mediaSearchApi.search(deviceId, query, limit);
 }
 export function fetchMediaSearchStatus(deviceId: string): Promise<{
   assets: Array<{
@@ -33,30 +29,19 @@ export function fetchMediaSearchStatus(deviceId: string): Promise<{
   maxDurationMinutes: number;
   totalDurationLimitMinutes: null;
 }> {
-  return managedAiRequest(basePath + "/status?deviceId=" + encodeURIComponent(deviceId));
+  return mediaSearchApi.status(deviceId);
 }
 export function deleteMediaSearchAsset(
   deviceId: string,
   assetId: string,
 ): Promise<{ deleted: boolean }> {
-  return managedAiRequest(
-    basePath +
-      "/assets/" +
-      encodeURIComponent(assetId) +
-      "?deviceId=" +
-      encodeURIComponent(deviceId),
-    { method: "DELETE" },
-  );
+  return mediaSearchApi.removeAsset(deviceId, assetId);
 }
 export function deleteMediaSearchDevice(deviceId: string): Promise<{ deleted: boolean }> {
-  return managedAiRequest(basePath + "/devices/" + encodeURIComponent(deviceId), {
-    method: "DELETE",
-  });
+  return mediaSearchApi.removeDevice(deviceId);
 }
 export function adoptLegacyMediaSearchDevice(
   deviceId: string,
 ): Promise<{ ready: boolean; adopted: boolean }> {
-  return managedAiRequest(basePath + "/devices/" + encodeURIComponent(deviceId) + "/adopt-legacy", {
-    method: "POST",
-  });
+  return mediaSearchApi.adoptLegacyDevice(deviceId);
 }

@@ -48,6 +48,7 @@ import {
   ExplorerPaneHeaderActions,
 } from "./ExplorerToolbarConnections";
 import { useExplorerDialogEvents } from "./explorerWorkspace/useExplorerDialogEvents";
+import { useConnectedDeviceDirectoryInvalidation } from "./explorerWorkspace/useConnectedDeviceDirectoryInvalidation";
 import {
   useAndroidLocalFolderGrant,
   useExplorerKeyboardShortcuts,
@@ -191,6 +192,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
   const { duplicateFinderPaneId, setDuplicateFinderPaneId, compareDialog, setCompareDialog } =
     useExplorerDialogEvents(activePaneIdRef);
   useTransferRefreshPolling(mountRoot);
+  useConnectedDeviceDirectoryInvalidation();
   const { resizeTarget, startSidebarResize, startPreviewResize } = usePanelResize({
     workspaceRef,
     mainRef,

@@ -2,6 +2,7 @@ import { unreadActivityCountForSpaceSection, useActivityStore } from "@/features
 import { useAuth } from "@/features/auth";
 import { isWebBuild } from "@/shared/platform/buildTarget";
 import { BookOpenText, CheckSquare2, MessagesSquare, Notebook } from "lucide-react";
+import { canOpenMistySpaceSection } from "../mistySpace";
 import { rememberedJournalRoute, rememberedPlannerRoute } from "../spacesShell/spaceSubpageMemory";
 import { useSpacesStore } from "../store/useSpacesStore";
 import { SpaceSidebarLink } from "./spacePanel/SpaceSidebarLink";
@@ -19,7 +20,7 @@ export function SpaceSectionNavigation({ spaceId, section }: { spaceId: string; 
   const space = useSpacesStore((state) => state.spaces.find((item) => item.id === spaceId));
   const permissions = space?.permissions;
   const visibleSections = sections
-    .filter(({ id }) => space?.kind !== "misty" || id === "chat")
+    .filter(({ id }) => !space || canOpenMistySpaceSection(space, id))
     .filter(({ id }) => id !== "chat" || permissions?.["messages.read"] !== false)
     .filter(({ id }) => id !== "planner" || permissions?.["tasks.view"] !== false)
     .filter(({ id }) => id !== "library" || !isWebBuild)

@@ -125,7 +125,8 @@ export function FileInspector(props: FileInspectorProps) {
             createdMs: displayEntry.createdMs,
             originalName: displayEntry.name,
             readonly: displayEntry.readonly,
-            remote: displayEntry.location.kind === "remote",
+            remote: displayEntry.location.kind !== "local",
+            peer: displayEntry.location.kind === "peer_device",
           }}
           onClose={() => setPreviewOpen(false)}
           onSaved={() => props.onPreviewSaved?.()}
