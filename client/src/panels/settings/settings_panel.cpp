@@ -12,8 +12,6 @@
 #include "core/ui/ui_style.h"
 #include "imgui.h"
 
-namespace UI = misty::UI;
-
 namespace misty::panel {
 
 void SettingsPanel::render() {
@@ -57,6 +55,7 @@ void SettingsPanel::settings_content(SettingsState& state) {
             .width = UI::Size::fill(),
             .height = UI::Size::fill(),
             .window_flags = ImGuiWindowFlags_AlwaysVerticalScrollbar,
+            .padding = UI::Spacing::xy(12.0f, 12.0f),
         }, [&]() {
             switch (state.active_section) {
                 case SettingsSection::General:
@@ -96,7 +95,7 @@ void SettingsPanel::sidebar(SettingsState& state) {
         .mode = UI::Mode::ChildWindow,
         .width = UI::Size::px(220.0f),
         .height = UI::Size::fill(),
-        .padding = UI::Spacing::xy(12.0f, 12.0f),
+        .padding = UI::Spacing::xy(24.0f, 12.0f),
         .gap = UI::Spacing::xy(0.0f, 8.0f),
     }, [&]() {
         sidebar_header(state);

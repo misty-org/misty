@@ -123,6 +123,6 @@ namespace misty::core {
         image_textures_[path] = tex;
         return image_textures_[path];
     }
-    
+
 
 }
