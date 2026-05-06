@@ -19,6 +19,28 @@ namespace fs = std::filesystem;
 
 namespace misty::panel {
 
+    inline std::string path_utf8_string(const fs::path& path) {
+#if defined(__cpp_char8_t)
+        const auto value = path.u8string();
+        return std::string(reinterpret_cast<const char*>(value.data()), value.size());
+#else
+        return path.u8string();
+#endif
+    }
+
+    inline std::string path_utf8_generic_string(const fs::path& path) {
+#if defined(__cpp_char8_t)
+        const auto value = path.generic_u8string();
+        return std::string(reinterpret_cast<const char*>(value.data()), value.size());
+#else
+        return path.generic_u8string();
+#endif
+    }
+
+    inline std::string path_utf8_filename(const fs::path& path) {
+        return path_utf8_string(path.filename());
+    }
+
     // File source type - local filesystem or cloud remote
     enum class FileSource {
         LOCAL,
@@ -348,18 +370,18 @@ namespace misty::panel {
         state.show_loading_animation = false;
 
         try {
-            std::string new_path = fs::canonical(fs::path(path)).generic_string();
+            std::string new_path = path_utf8_generic_string(fs::canonical(fs::path(path)));
             if (new_path == state.current_path) {
                 update_history = false;
             }
 
             std::vector<UnifiedFileItem> new_files;
             for (const auto& entry : fs::directory_iterator(path)) {
-                std::string fname = entry.path().filename().generic_string();
+                std::string fname = path_utf8_filename(entry.path());
                 if (!state.show_hidden && !fname.empty() && fname[0] == '.') continue;
 
                 UnifiedFileItem item;
-                item.path = entry.path().generic_string();
+                item.path = path_utf8_generic_string(entry.path());
                 item.id = item.path;
                 item.name = fname;
                 item.is_dir = entry.is_directory();

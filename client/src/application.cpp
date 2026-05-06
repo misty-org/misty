@@ -4,6 +4,7 @@
 #include "core/manager/proxy_manager.h"
 #include "core/manager/session_manager.h"
 #include "core/manager/env_manager.h"
+#include "core/manager/font_manager.h"
 #include "views/files_view.h"
 #include "views/register_view.h"
 #include "views/login_view.h"
@@ -66,6 +67,7 @@ namespace misty {
                 panel::BootLoader boot(ui_registry_, worker_pool_);
                 append_startup_log("startup: boot_loader loop begin");
                 while (is_running()) {
+                    core::FontManager::get().apply_pending_reload();
                     prepare_frame();
                     const bool done = boot.render();
                     render_frame();
@@ -118,6 +120,7 @@ namespace misty {
         std::cout << "Entering main loop." << std::endl;
         append_startup_log("startup: entering main loop");
         while (is_running()) {
+            core::FontManager::get().apply_pending_reload();
             prepare_frame();
 
             if (core::CommandManager::get().matches("app.toggle_transfers")) {

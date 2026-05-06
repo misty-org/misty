@@ -1,7 +1,6 @@
 #include "panels/settings/general.h"
 
 #include "core/ui/ui_layout.h"
-#include "imgui.h"
 
 namespace misty::panel {
 
@@ -12,6 +11,7 @@ bool general_tab(SettingsState& state) {
         .variant = UI::ButtonVariant::Nav,
         .hover_color = ImVec4(0.2f, 0.2f, 0.2f, 1.0f),
         .selected = state.active_section == SettingsSection::General,
+        .padding = UI::Spacing::xy(8.0f, 8.0f),
         .rounding = 8.0f,
     }, [&]() {
         UI::text({
@@ -41,7 +41,7 @@ void general_content(SettingsState& state) {
         UI::column("##general_body", {
             .width = UI::Size::fill(),
             .height = UI::Size::auto_size(),
-            .gap = UI::Spacing::xy(0.0f, 20.0f),
+            .gap = UI::Spacing::xy(0.0f, 24.0f),
         }, [&]() {
             UI::text({
                 .text = "General",
@@ -50,8 +50,9 @@ void general_content(SettingsState& state) {
                 .font = UI::TextFont::BoldXLarge,
             });
             UI::text({
-                .text = "General settings content",
-                .width = UI::Size::fill(),
+                .text = "General settings will live here.",
+                .width = UI::Size::px(420.0f),
+                .overflow = UI::TextOverflow::Wrap,
                 .color = ImVec4(0.76f, 0.78f, 0.82f, 1.0f),
             });
         });
