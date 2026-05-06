@@ -4,7 +4,7 @@
 #include "panels/activity/download_state.h"
 #include "panels/activity/activity_state.h"
 #include "panels/notification/notification_state.h"
-#include "panels/workspace/workspace_state.h"
+#include "panels/file_sidebar/remote_mount_state.h"
 #include "core/cache/listing_cache.h"
 #include <nlohmann/json.hpp>
 #include <cctype>
@@ -246,7 +246,7 @@ namespace misty::panel {
     // Navigate to ~/misty/mnt/ — show one entry per provider type
     void FileExplorerPanel::navigate_to_remote_mount_root(bool update_history) {
         auto& state = registry_.get_state<FileExplorerState>(state_key_);
-        auto& workspace = registry_.get_state<WorkspaceState>("Workspace");
+        auto& workspace = registry_.get_state<RemoteMountState>("RemoteMounts");
 
         std::string mount_root = path_utils::get_mount_root();
 
@@ -285,7 +285,7 @@ namespace misty::panel {
     // Navigate to ~/misty/mnt/OneDrive/ — show remotes of this provider type
     void FileExplorerPanel::navigate_to_provider_folder(const std::string& provider_folder, bool update_history) {
         auto& state = registry_.get_state<FileExplorerState>(state_key_);
-        auto& workspace = registry_.get_state<WorkspaceState>("Workspace");
+        auto& workspace = registry_.get_state<RemoteMountState>("RemoteMounts");
 
         std::string mount_root = path_utils::get_mount_root();
         std::string target_path = mount_root + "/" + provider_folder;
@@ -338,7 +338,7 @@ namespace misty::panel {
                                                  uint64_t navigation_generation) {
         auto& state = registry_.get_state<FileExplorerState>(state_key_);
         auto& services = registry_.get_state<ServicesState>("Services");
-        auto& workspace = registry_.get_state<WorkspaceState>("Workspace");
+        auto& workspace = registry_.get_state<RemoteMountState>("RemoteMounts");
 
         std::string resolved_remote_name = remote_name;
         std::string folder_name = remote_name;
@@ -523,7 +523,7 @@ namespace misty::panel {
             std::string resp_path = json.value("path", std::string(""));
             const bool watched = json.value("watched", false);
             // Look up provider folder for constructing local paths
-            auto& workspace = registry.get_state<WorkspaceState>("Workspace");
+            auto& workspace = registry.get_state<RemoteMountState>("RemoteMounts");
             std::string provider_folder;
             std::string folder_name = resp_remote;
             for (const auto& mapping : workspace.remote_mappings) {

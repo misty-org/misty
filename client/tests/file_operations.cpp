@@ -16,6 +16,7 @@
 #include "panels/activity/activity_state.h"
 #include "panels/activity/upload_state.h"
 #include "panels/file_sidebar/file_sidebar_state.h"
+#include "panels/file_sidebar/remote_mount_state.h"
 #include "panels/notification/notification_state.h"
 #include "panels/services/services_state.h"
 
@@ -280,7 +281,7 @@ bool FileExplorerPanel::resolve_remote_path_context(const std::string& path,
     remote_name = info.remote_name;
     remote_path = info.relative_path;
 
-    const auto& workspace = registry_.get_state<WorkspaceState>("Workspace");
+    const auto& workspace = registry_.get_state<RemoteMountState>("RemoteMounts");
     for (const auto& mapping : workspace.remote_mappings) {
         if (mapping.provider_folder == info.provider_folder &&
             (mapping.folder_name == info.remote_name || mapping.remote_name == info.remote_name)) {
@@ -312,7 +313,7 @@ bool FileExplorerPanel::resolve_drop_destination_path(const std::string& path,
         return true;
     }
 
-    const auto& workspace = registry_.get_state<WorkspaceState>("Workspace");
+    const auto& workspace = registry_.get_state<RemoteMountState>("RemoteMounts");
     const RemoteAccountMapping* unique_mapping = nullptr;
     for (const auto& mapping : workspace.remote_mappings) {
         if (mapping.provider_folder != info.provider_folder) {
@@ -362,7 +363,7 @@ protected:
         g_download_behavior = {};
         g_folder_transfer = {};
 
-        auto& workspace = registry_.get_state<misty::panel::WorkspaceState>("Workspace");
+        auto& workspace = registry_.get_state<misty::panel::RemoteMountState>("RemoteMounts");
         misty::panel::RemoteAccountMapping mapping;
         mapping.folder_name = "alice";
         mapping.remote_name = "onedrive-alice";

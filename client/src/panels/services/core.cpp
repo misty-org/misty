@@ -2,17 +2,26 @@
 
 #include "core/commands/command_manager.h"
 #include "core/manager/asset_manager.h"
-#include "core/ui/imgui_utils.h"
+#include "core/ui/ui.h"
 
 #include <algorithm>
 #include <cctype>
+#include <cstdarg>
 #include <cmath>
+#include <cstdio>
 #include <cstring>
 
 namespace misty::panel {
 
     namespace {
         constexpr float kRemoteCardHeight = 124.0f;
+        struct ButtonStyle {
+            ImVec4 button;
+            ImVec4 hovered;
+            ImVec4 active;
+            ImVec4 text;
+            float rounding;
+        };
 
         std::string display_name_for_provider(const std::string& type) {
             if (type == "drive") return "Google Drive";
@@ -93,14 +102,24 @@ namespace misty::panel {
             return providers;
         }
 
-        core::ButtonColors neutral_button_theme() {
-            core::ButtonColors colors;
-            colors.button = ImVec4(0.23f, 0.23f, 0.24f, 1.0f);
-            colors.hovered = ImVec4(0.29f, 0.29f, 0.31f, 1.0f);
-            colors.active = ImVec4(0.19f, 0.19f, 0.20f, 1.0f);
-            colors.text = ImVec4(0.94f, 0.94f, 0.95f, 1.0f);
-            colors.rounding = 8.0f;
-            return colors;
+        ButtonStyle primary_button_style() {
+            return {
+                ImVec4(0.957f, 0.957f, 0.961f, 1.0f),
+                ImVec4(0.898f, 0.906f, 0.922f, 1.0f),
+                ImVec4(0.820f, 0.835f, 0.859f, 1.0f),
+                ImVec4(0.07f, 0.07f, 0.07f, 1.0f),
+                8.0f,
+            };
+        }
+
+        ButtonStyle neutral_button_style() {
+            return {
+                ImVec4(0.23f, 0.23f, 0.24f, 1.0f),
+                ImVec4(0.29f, 0.29f, 0.31f, 1.0f),
+                ImVec4(0.19f, 0.19f, 0.20f, 1.0f),
+                ImVec4(0.94f, 0.94f, 0.95f, 1.0f),
+                8.0f,
+            };
         }
 
         std::string ellipsize_path_text(const std::string& text, float max_width) {
@@ -110,6 +129,40 @@ namespace misty::panel {
             std::string compact = kEllipsis + text.substr(text.size() - keep);
             if (ImGui::CalcTextSize(compact.c_str()).x <= max_width) return compact;
             return ellipsize_text(text, max_width);
+        }
+
+        float available_width(float reserve = 0.0f) {
+            const float width = ImGui::GetContentRegionAvail().x - reserve;
+            return width > 1.0f ? width : 1.0f;
+        }
+
+        float fill_width() {
+            return -FLT_MIN;
+        }
+
+        bool styled_button(const char* label, const ImVec2& size, const ButtonStyle& style) {
+            bool pressed = false;
+            misty::UI::WithStyle([&](misty::UI::StyleScope& scoped) {
+                scoped.var(ImGuiStyleVar_FrameRounding, style.rounding);
+                scoped.color(ImGuiCol_Button, style.button);
+                scoped.color(ImGuiCol_ButtonHovered, style.hovered);
+                scoped.color(ImGuiCol_ButtonActive, style.active);
+                scoped.color(ImGuiCol_Text, style.text);
+                pressed = ImGui::Button(label, size);
+            });
+            return pressed;
+        }
+
+        void text_colored(const ImVec4& color, const char* fmt, ...) {
+            char buffer[1024];
+            va_list args;
+            va_start(args, fmt);
+            std::vsnprintf(buffer, sizeof(buffer), fmt, args);
+            va_end(args);
+
+            misty::UI::WithTextColor(color, [&]() {
+                ImGui::TextUnformatted(buffer);
+            });
         }
     } // namespace
 
@@ -137,7 +190,10 @@ namespace misty::panel {
             ImGuiWindowFlags_NoMove |
             ImGuiWindowFlags_NoCollapse;
 
-        core::WithWindowStyle(ImVec4(0.12f, 0.12f, 0.12f, 1.0f), ImVec2(32.0f, 24.0f), [&]() {
+        misty::UI::WithWindowStyle({
+            .bg_color = ImVec4(0.12f, 0.12f, 0.12f, 1.0f),
+            .padding = ImVec2(32.0f, 24.0f),
+        }, [&]() {
         if (ImGui::Begin("ServicesPanel", nullptr, flags)) {
             show_header(state);
 
@@ -151,12 +207,12 @@ namespace misty::panel {
 
             if (!error_msg.empty()) {
                 ImGui::Spacing();
-                core::ColoredText(ImVec4(0.82f, 0.82f, 0.84f, 1.0f), "%s", error_msg.c_str());
+                text_colored(ImVec4(0.82f, 0.82f, 0.84f, 1.0f), "%s", error_msg.c_str());
             }
 
             if (!success_msg.empty()) {
                 ImGui::Spacing();
-                core::ColoredText(ImVec4(0.82f, 0.82f, 0.84f, 1.0f), "%s", success_msg.c_str());
+                text_colored(ImVec4(0.82f, 0.82f, 0.84f, 1.0f), "%s", success_msg.c_str());
             }
 
             ImGui::Spacing();
@@ -186,17 +242,17 @@ namespace misty::panel {
         }
 
         ImGui::BeginGroup();
-        core::WithFontScale(1.8f, []() {
-            core::ColoredText(ImVec4(1.0f, 1.0f, 1.0f, 1.0f), "Services");
+        misty::UI::WithFontScale(1.8f, []() {
+            text_colored(ImVec4(1.0f, 1.0f, 1.0f, 1.0f), "Services");
         });
-        core::ColoredText(ImVec4(0.70f, 0.70f, 0.70f, 1.0f),
+        text_colored(ImVec4(0.70f, 0.70f, 0.70f, 1.0f),
                           "Search your connected remotes and add new services from a single chooser.");
         ImGui::Spacing();
-        core::ColoredText(ImVec4(0.82f, 0.82f, 0.84f, 1.0f), "%zu connected", connection_count);
+        text_colored(ImVec4(0.82f, 0.82f, 0.84f, 1.0f), "%zu connected", connection_count);
         ImGui::SameLine(0.0f, 18.0f);
-        core::ColoredText(ImVec4(0.58f, 0.58f, 0.62f, 1.0f), "%zu providers", provider_snapshot(state).size());
+        text_colored(ImVec4(0.58f, 0.58f, 0.62f, 1.0f), "%zu providers", provider_snapshot(state).size());
         ImGui::SameLine(0.0f, 18.0f);
-        core::ColoredText(ImVec4(0.66f, 0.66f, 0.69f, 1.0f),
+        text_colored(ImVec4(0.66f, 0.66f, 0.69f, 1.0f),
                           "%s", is_refreshing ? "Refreshing remotes" : "Ready");
         ImGui::EndGroup();
 
@@ -205,7 +261,7 @@ namespace misty::panel {
         ImGui::Dummy(ImVec2(std::max(0.0f, ImGui::GetContentRegionAvail().x - refresh_width), 0.0f));
         ImGui::SameLine();
         if (is_refreshing) ImGui::BeginDisabled();
-        if (core::StyledButton("Refresh", ImVec2(refresh_width, 30.0f), core::ButtonTheme::Primary())) {
+        if (styled_button("Refresh", ImVec2(refresh_width, 30.0f), primary_button_style())) {
             state.refresh_connections();
         }
         if (is_refreshing) ImGui::EndDisabled();
@@ -218,10 +274,10 @@ namespace misty::panel {
             connection_count = state.connections.size();
         }
 
-        core::WithFontScale(1.2f, []() {
-            core::ColoredText(ImVec4(0.96f, 0.96f, 0.97f, 1.0f), "Connected Services");
+        misty::UI::WithFontScale(1.2f, []() {
+            text_colored(ImVec4(0.96f, 0.96f, 0.97f, 1.0f), "Connected Services");
         });
-        core::ColoredText(ImVec4(0.56f, 0.56f, 0.60f, 1.0f),
+        text_colored(ImVec4(0.56f, 0.56f, 0.60f, 1.0f),
                           connection_count == 0
                               ? "Add a service to start browsing, syncing, and backing up remote files."
                               : "Use search to filter the current remotes list.");
@@ -250,8 +306,8 @@ namespace misty::panel {
             ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(20.0f, 18.0f));
             if (ImGui::BeginChild("##services_empty_state", ImVec2(0.0f, 118.0f), true,
                                   ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse)) {
-                core::WithFontScale(1.1f, []() {
-                    core::ColoredText(ImVec4(0.96f, 0.96f, 0.97f, 1.0f), "No services connected yet");
+                misty::UI::WithFontScale(1.1f, []() {
+                    text_colored(ImVec4(0.96f, 0.96f, 0.97f, 1.0f), "No services connected yet");
                 });
                 ImGui::Spacing();
                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.60f, 0.60f, 0.64f, 1.0f));
@@ -270,7 +326,7 @@ namespace misty::panel {
             ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(20.0f, 18.0f));
             if (ImGui::BeginChild("##services_filtered_empty", ImVec2(0.0f, 92.0f), true,
                                   ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse)) {
-                core::ColoredText(ImVec4(0.96f, 0.96f, 0.97f, 1.0f), "No matching services");
+                text_colored(ImVec4(0.96f, 0.96f, 0.97f, 1.0f), "No matching services");
                 ImGui::Spacing();
                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.60f, 0.60f, 0.64f, 1.0f));
                 ImGui::TextWrapped("Try a different search term or clear the filter to see every connected remote.");
@@ -313,18 +369,18 @@ namespace misty::panel {
                 ImGui::TableSetupColumn("status", ImGuiTableColumnFlags_WidthFixed, 96.0f);
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
-                core::ColoredText(ImVec4(0.72f, 0.72f, 0.75f, 1.0f), "%s", provider_name.c_str());
+                text_colored(ImVec4(0.72f, 0.72f, 0.75f, 1.0f), "%s", provider_name.c_str());
                 ImGui::TableNextColumn();
-                core::ColoredText(status_color, "%s", status_label.c_str());
+                text_colored(status_color, "%s", status_label.c_str());
                 ImGui::EndTable();
             }
 
-            core::WithFontScale(1.12f, [&]() {
-                core::ColoredText(ImVec4(0.97f, 0.97f, 0.98f, 1.0f), "%s",
+            misty::UI::WithFontScale(1.12f, [&]() {
+                text_colored(ImVec4(0.97f, 0.97f, 0.98f, 1.0f), "%s",
                                   ellipsize_text(account_name, std::max(40.0f, card_width - 32.0f)).c_str());
             });
             ImGui::Spacing();
-            core::ColoredText(ImVec4(0.60f, 0.60f, 0.64f, 1.0f), "Available in Files and Vault");
+            text_colored(ImVec4(0.60f, 0.60f, 0.64f, 1.0f), "Available in Files and Vault");
             ImGui::Spacing();
 
             if (ImGui::BeginTable("##service_card_actions", 2,
@@ -333,7 +389,7 @@ namespace misty::panel {
                 ImGui::TableSetupColumn("disconnect", ImGuiTableColumnFlags_WidthFixed, 104.0f);
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
-                if (core::StyledButton("Rename", ImVec2(96.0f, 26.0f), neutral_button_theme())) {
+                if (styled_button("Rename", ImVec2(96.0f, 26.0f), neutral_button_style())) {
                     pending_rename_remote_ = conn.name;
                     std::memset(rename_remote_buf_, 0, sizeof(rename_remote_buf_));
                     if (!conn.alias.empty() && conn.alias.size() < sizeof(rename_remote_buf_)) {
@@ -341,7 +397,7 @@ namespace misty::panel {
                     }
                 }
                 ImGui::TableNextColumn();
-                if (core::StyledButton("Disconnect", ImVec2(104.0f, 26.0f), neutral_button_theme())) {
+                if (styled_button("Disconnect", ImVec2(104.0f, 26.0f), neutral_button_style())) {
                     pending_disconnect_remote_ = conn.name;
                 }
                 ImGui::EndTable();
@@ -384,34 +440,34 @@ namespace misty::panel {
             const char* status_title = rclone_health.loading
                 ? "Checking rclone"
                 : (rclone_health.ready ? "rclone ready" : "rclone required");
-            core::ColoredText(heading_color, "%s", status_title);
+            text_colored(heading_color, "%s", status_title);
             ImGui::Spacing();
 
             if (rclone_health.loading) {
-                core::ColoredText(detail_color, "Waiting for proxy health status...");
+                text_colored(detail_color, "Waiting for proxy health status...");
             } else if (rclone_health.ready) {
                 const std::string version = rclone_health.rclone_version.empty()
                     ? "External rclone detected."
                     : "Version " + rclone_health.rclone_version;
-                core::ColoredText(detail_color, "%s", version.c_str());
+                text_colored(detail_color, "%s", version.c_str());
                 if (!rclone_health.rclone_path.empty()) {
-                    core::ColoredText(detail_color, "%s",
-                                      ellipsize_path_text(rclone_health.rclone_path, core::AvailableWidth()).c_str());
+                    text_colored(detail_color, "%s",
+                                      ellipsize_path_text(rclone_health.rclone_path, available_width()).c_str());
                 }
                 if (rclone_health.link_present && !rclone_health.link_path.empty()) {
                     std::string managed = "Managed link: " + rclone_health.link_path;
-                    core::ColoredText(detail_color, "%s",
-                                      ellipsize_path_text(managed, core::AvailableWidth()).c_str());
+                    text_colored(detail_color, "%s",
+                                      ellipsize_path_text(managed, available_width()).c_str());
                 }
             } else {
                 const std::string message = !rclone_health.error.empty()
                     ? rclone_health.error
                     : "Misty could not find an rclone binary.";
-                core::ColoredText(detail_color, "%s", message.c_str());
+                text_colored(detail_color, "%s", message.c_str());
                 if (!rclone_health.link_path.empty()) {
                     std::string hint = "Expected link: " + rclone_health.link_path;
-                    core::ColoredText(detail_color, "%s",
-                                      ellipsize_path_text(hint, core::AvailableWidth()).c_str());
+                    text_colored(detail_color, "%s",
+                                      ellipsize_path_text(hint, available_width()).c_str());
                 }
             }
         }
@@ -420,16 +476,16 @@ namespace misty::panel {
         ImGui::PopStyleVar(2);
 
         ImGui::Spacing();
-        ImGui::PushItemWidth(core::AvailableWidth());
+        ImGui::PushItemWidth(available_width());
         ImGui::InputTextWithHint("##services_search", "Search connected services", remote_search_buf_,
                                  sizeof(remote_search_buf_));
         ImGui::PopItemWidth();
         ImGui::Spacing();
 
         const bool disable_add = !rclone_health.loading && rclone_health.loaded && !rclone_health.ready;
-        const float action_width = (core::AvailableWidth() - kCardSpacing) * 0.5f;
+        const float action_width = (available_width() - kCardSpacing) * 0.5f;
         if (disable_add) ImGui::BeginDisabled();
-        if (core::StyledButton("Add Service", ImVec2(action_width, 0.0f), core::ButtonTheme::Primary())) {
+        if (styled_button("Add Service", ImVec2(action_width, 0.0f), primary_button_style())) {
             provider_search_buf_[0] = '\0';
             state.refresh_provider_types();
             state.refresh_rclone_health(true);
@@ -437,13 +493,13 @@ namespace misty::panel {
         }
         if (disable_add) ImGui::EndDisabled();
         ImGui::SameLine(0.0f, kCardSpacing);
-        if (core::StyledButton("Check", ImVec2(action_width, 0.0f), neutral_button_theme())) {
+        if (styled_button("Check", ImVec2(action_width, 0.0f), neutral_button_style())) {
             state.refresh_rclone_health(true);
         }
 
         ImGui::Spacing();
         if (proxy_restart_in_flight) ImGui::BeginDisabled();
-        if (core::StyledButton("Restart Proxy", ImVec2(core::FillWidth(), 0.0f), neutral_button_theme())) {
+        if (styled_button("Restart Proxy", ImVec2(fill_width(), 0.0f), neutral_button_style())) {
             state.restart_proxy();
         }
         if (proxy_restart_in_flight) ImGui::EndDisabled();
@@ -469,11 +525,11 @@ namespace misty::panel {
 
             float w = ImGui::GetContentRegionAvail().x;
 
-            core::WithFontScale(1.3f, [&]() {
+            misty::UI::WithFontScale(1.3f, [&]() {
                 std::string title = "Add Service";
                 float title_w = ImGui::CalcTextSize(title.c_str()).x;
                 ImGui::SetCursorPosX((w - title_w) * 0.5f);
-                core::ColoredText(ImVec4(0.9f, 0.9f, 0.9f, 1.0f), "%s", title.c_str());
+                text_colored(ImVec4(0.9f, 0.9f, 0.9f, 1.0f), "%s", title.c_str());
             });
 
             ImGui::Spacing();
@@ -485,7 +541,7 @@ namespace misty::panel {
             ImGui::PopStyleColor();
 
             ImGui::Spacing();
-            ImGui::PushItemWidth(core::AvailableWidth());
+            ImGui::PushItemWidth(available_width());
             ImGui::InputTextWithHint("##provider_search", "Search providers", provider_search_buf_,
                                      sizeof(provider_search_buf_));
             ImGui::PopItemWidth();
@@ -499,7 +555,7 @@ namespace misty::panel {
 
                 ++visible_count;
                 ImGui::Spacing();
-                if (core::StyledButton(provider.display_name.c_str(), ImVec2(core::FillWidth(), 34.0f), neutral_button_theme())) {
+                if (styled_button(provider.display_name.c_str(), ImVec2(fill_width(), 34.0f), neutral_button_style())) {
                     auto now = std::chrono::system_clock::now();
                     auto epoch = std::chrono::duration_cast<std::chrono::seconds>(
                         now.time_since_epoch()).count();
@@ -524,7 +580,7 @@ namespace misty::panel {
             ImGui::Spacing();
 
             bool cancel_shortcut = core::CommandManager::get().matches("modal.cancel");
-            if (core::StyledButton("Cancel", ImVec2(w, 36.0f), neutral_button_theme()) || cancel_shortcut) {
+            if (styled_button("Cancel", ImVec2(w, 36.0f), neutral_button_style()) || cancel_shortcut) {
                 state.show_login_modal = false;
                 provider_search_buf_[0] = '\0';
                 state.auth_error.clear();
@@ -542,7 +598,7 @@ namespace misty::panel {
     void ServicesPanel::show_loading_overlay() {
         ImVec2 p  = ImGui::GetWindowPos();
         ImVec2 sz = ImGui::GetWindowSize();
-        core::DrawMistyLoadingAnimation(p, ImVec2(p.x + sz.x, p.y + sz.y));
+        misty::UI::DrawMistyLoadingAnimation(p, ImVec2(p.x + sz.x, p.y + sz.y));
     }
 
     void ServicesPanel::show_config_flow_modal(ServicesState& state) {
@@ -609,18 +665,18 @@ namespace misty::panel {
             float w = ImGui::GetContentRegionAvail().x;
 
             // Title
-            core::WithFontScale(1.3f, [&]() {
+            misty::UI::WithFontScale(1.3f, [&]() {
                 std::string provider_name = display_name_for_provider(provider_type);
                 std::string title = provider_name.empty() ? "Configure Service" : "Configure " + provider_name;
                 float tw = ImGui::CalcTextSize(title.c_str()).x;
                 ImGui::SetCursorPosX((w - tw) * 0.5f);
-                core::ColoredText(ImVec4(0.9f, 0.9f, 0.9f, 1.0f), "%s", title.c_str());
+                text_colored(ImVec4(0.9f, 0.9f, 0.9f, 1.0f), "%s", title.c_str());
             });
             ImGui::Spacing();
             if (!remote_name.empty() && remote_name.find('@') != std::string::npos) {
                 float subtitle_w = ImGui::CalcTextSize(remote_name.c_str()).x;
                 ImGui::SetCursorPosX((w - subtitle_w) * 0.5f);
-                core::ColoredText(ImVec4(0.62f, 0.62f, 0.66f, 1.0f), "%s", remote_name.c_str());
+                text_colored(ImVec4(0.62f, 0.62f, 0.66f, 1.0f), "%s", remote_name.c_str());
             }
             ImGui::Spacing();
 
@@ -635,7 +691,7 @@ namespace misty::panel {
                     ImGui::PopStyleColor();
                 } else {
                     if (!question_name.empty()) {
-                        core::ColoredText(ImVec4(0.92f, 0.92f, 0.93f, 1.0f), "%s", question_name.c_str());
+                        text_colored(ImVec4(0.92f, 0.92f, 0.93f, 1.0f), "%s", question_name.c_str());
                         ImGui::Spacing();
                     }
 
@@ -649,11 +705,11 @@ namespace misty::panel {
                     switch (kind) {
                         case ServicesState::ConfigStepKind::CONFIRM: {
                             float half = (w - 16.0f - 8.0f) * 0.5f;
-                            if (core::StyledButton("Yes", ImVec2(half, 32.0f), neutral_button_theme())) {
+                            if (styled_button("Yes", ImVec2(half, 32.0f), neutral_button_style())) {
                                 submitted = true; result_value = "true";
                             }
                             ImGui::SameLine(0, 8.0f);
-                            if (core::StyledButton("No", ImVec2(half, 32.0f), neutral_button_theme())) {
+                            if (styled_button("No", ImVec2(half, 32.0f), neutral_button_style())) {
                                 submitted = true; result_value = "false";
                             }
                             break;
@@ -668,24 +724,24 @@ namespace misty::panel {
                                     if (nl != std::string::npos) h = h.substr(0, nl);
                                     label += "  -  " + h;
                                 }
-                                core::ButtonColors theme = neutral_button_theme();
+                                ButtonStyle theme = neutral_button_style();
                                 if (c.value == default_value) {
                                     theme.button = ImVec4(0.30f, 0.30f, 0.32f, 1.0f);
                                     theme.hovered = ImVec4(0.34f, 0.34f, 0.36f, 1.0f);
                                     theme.active = ImVec4(0.24f, 0.24f, 0.26f, 1.0f);
                                 }
-                                if (core::StyledButton(label.c_str(), ImVec2(core::FillWidth(), 30.0f), theme)) {
+                                if (styled_button(label.c_str(), ImVec2(fill_width(), 30.0f), theme)) {
                                     submitted = true; result_value = c.value;
                                 }
                             }
                             if (kind == ServicesState::ConfigStepKind::SUGGEST) {
                                 ImGui::Spacing();
-                                ImGui::PushItemWidth(core::AvailableWidth());
+                                ImGui::PushItemWidth(available_width());
                                 ImGuiInputTextFlags flags = question_is_password ? ImGuiInputTextFlags_Password : 0;
                                 ImGui::InputText("##config_input", state.config_input_buf,
                                                  sizeof(state.config_input_buf), flags);
                                 ImGui::PopItemWidth();
-                                if (core::StyledButton("Submit custom value", ImVec2(core::FillWidth(), 32.0f), neutral_button_theme())) {
+                                if (styled_button("Submit custom value", ImVec2(fill_width(), 32.0f), neutral_button_style())) {
                                     submitted = true;
                                     result_value = state.config_input_buf;
                                 }
@@ -693,13 +749,13 @@ namespace misty::panel {
                             break;
                         }
                         case ServicesState::ConfigStepKind::INPUT: {
-                            ImGui::PushItemWidth(core::AvailableWidth());
+                            ImGui::PushItemWidth(available_width());
                             ImGuiInputTextFlags flags = question_is_password ? ImGuiInputTextFlags_Password : 0;
                             ImGui::InputText("##config_input", state.config_input_buf,
                                              sizeof(state.config_input_buf), flags);
                             ImGui::PopItemWidth();
                             ImGui::Spacing();
-                            if (core::StyledButton("Continue", ImVec2(core::FillWidth(), 32.0f), neutral_button_theme())) {
+                            if (styled_button("Continue", ImVec2(fill_width(), 32.0f), neutral_button_style())) {
                                 submitted = true;
                                 result_value = state.config_input_buf;
                             }
@@ -736,7 +792,7 @@ namespace misty::panel {
             ImGui::Separator();
             ImGui::Spacing();
 
-            if (core::StyledButton("Cancel", ImVec2(w, 32.0f), neutral_button_theme())) {
+            if (styled_button("Cancel", ImVec2(w, 32.0f), neutral_button_style())) {
                 state.cancel_remote_config();
                 ImGui::CloseCurrentPopup();
             }
@@ -858,11 +914,11 @@ namespace misty::panel {
                 ImGuiWindowFlags_NoMove     | ImGuiWindowFlags_AlwaysAutoResize)) {
             const float w = ImGui::GetContentRegionAvail().x;
 
-            core::WithFontScale(1.2f, [&]() {
+            misty::UI::WithFontScale(1.2f, [&]() {
                 const std::string title = "Name Service";
                 const float title_w = ImGui::CalcTextSize(title.c_str()).x;
                 ImGui::SetCursorPosX((w - title_w) * 0.5f);
-                core::ColoredText(ImVec4(0.92f, 0.92f, 0.93f, 1.0f), "%s", title.c_str());
+                text_colored(ImVec4(0.92f, 0.92f, 0.93f, 1.0f), "%s", title.c_str());
             });
 
             ImGui::Spacing();
@@ -871,7 +927,7 @@ namespace misty::panel {
             ImGui::PopStyleColor();
 
             ImGui::Spacing();
-            ImGui::PushItemWidth(core::AvailableWidth());
+            ImGui::PushItemWidth(available_width());
             ImGui::InputTextWithHint("##rename_remote_input", "For example: justnatureusa", rename_remote_buf_,
                                      sizeof(rename_remote_buf_));
             ImGui::PopItemWidth();
@@ -881,12 +937,12 @@ namespace misty::panel {
             ImGui::Spacing();
 
             const float half_w = (w - 8.0f) * 0.5f;
-            if (core::StyledButton("Skip", ImVec2(half_w, 34.0f), neutral_button_theme())) {
+            if (styled_button("Skip", ImVec2(half_w, 34.0f), neutral_button_style())) {
                 pending_rename_remote_.clear();
                 ImGui::CloseCurrentPopup();
             }
             ImGui::SameLine(0.0f, 8.0f);
-            if (core::StyledButton("Save", ImVec2(half_w, 34.0f), core::ButtonTheme::Primary())) {
+            if (styled_button("Save", ImVec2(half_w, 34.0f), primary_button_style())) {
                 state.set_remote_alias(pending_rename_remote_, rename_remote_buf_);
                 {
                     std::lock_guard<std::mutex> lock(state.mu);

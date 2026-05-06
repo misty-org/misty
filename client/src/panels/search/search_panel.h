@@ -1,7 +1,7 @@
 #pragma once
 
 #include "panels/search/search_state.h"
-#include "panels/workspace/workspace_state.h"
+#include "panels/file_sidebar/remote_mount_state.h"
 #include "core/ui/ui_registry.h"
 #include "core/threading/worker_pool.h"
 

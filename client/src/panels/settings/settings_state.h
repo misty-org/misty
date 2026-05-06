@@ -25,6 +25,7 @@ namespace misty::panel {
         // Account
         char account_display_name[128] = "";
         char account_email[256] = "";
+        char account_bio[512] = "";
         bool account_buffers_initialized = false;
 
         // General

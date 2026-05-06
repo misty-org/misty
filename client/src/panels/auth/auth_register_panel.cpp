@@ -3,12 +3,52 @@
 #include "core/commands/command_manager.h"
 #include "core/system/util.h"
 #include "core/manager/asset_manager.h"
-#include "core/ui/imgui_utils.h"
+#include "core/ui/ui.h"
 #include "views/app_view.h"
 #include <cstring>
 #include <iostream>
 
 namespace misty::panel {
+    namespace {
+        struct ButtonStyle {
+            ImVec4 button;
+            ImVec4 hovered;
+            ImVec4 active;
+            ImVec4 text;
+            float rounding;
+        };
+
+        ButtonStyle primary_button_style() {
+            return {
+                ImVec4(0.957f, 0.957f, 0.961f, 1.0f),
+                ImVec4(0.898f, 0.906f, 0.922f, 1.0f),
+                ImVec4(0.820f, 0.835f, 0.859f, 1.0f),
+                ImVec4(0.07f, 0.07f, 0.07f, 1.0f),
+                8.0f,
+            };
+        }
+
+        bool styled_button(const char* label, const ImVec2& size, const ButtonStyle& style) {
+            bool pressed = false;
+            misty::UI::WithStyle([&](misty::UI::StyleScope& scoped) {
+                scoped.var(ImGuiStyleVar_FrameRounding, style.rounding);
+                scoped.color(ImGuiCol_Button, style.button);
+                scoped.color(ImGuiCol_ButtonHovered, style.hovered);
+                scoped.color(ImGuiCol_ButtonActive, style.active);
+                scoped.color(ImGuiCol_Text, style.text);
+                pressed = ImGui::Button(label, size);
+            });
+            return pressed;
+        }
+
+        void icon_label(const core::SVGTexture& icon, float size, const char* text, float x_offset, float y_offset) {
+            ImGui::Image(icon.id, ImVec2(size, size));
+            ImGui::SameLine();
+            ImGui::SetCursorPos(ImVec2(ImGui::GetCursorPosX() + x_offset, ImGui::GetCursorPosY() + y_offset));
+            ImGui::TextUnformatted(text);
+        }
+    }
+
     AuthRegisterPanel::AuthRegisterPanel(UIRegistry& registry)
         : registry_(registry) {
     }
@@ -75,7 +115,7 @@ namespace misty::panel {
         // Username
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.8f, 0.8f, 1.0f));
         auto& person_icon = core::AssetManager::get().get_svg_texture("person-16", 24);
-        core::IconText(person_icon, 16.0f, "Username", 1.0f, -2.0f);
+        icon_label(person_icon, 16.0f, "Username", 1.0f, -2.0f);
         ImGui::PopStyleColor();
         ImGui::SetNextItemWidth(width);
         ImGui::InputTextWithHint("##username", "", state.full_name, sizeof(state.full_name));
@@ -83,7 +123,7 @@ namespace misty::panel {
         // Email
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.8f, 0.8f, 1.0f));
         auto& mail_icon = core::AssetManager::get().get_svg_texture("mail-16", 24);
-        core::IconText(mail_icon, 16.0f, "Email", 2.0f, -2.0f);
+        icon_label(mail_icon, 16.0f, "Email", 2.0f, -2.0f);
         ImGui::PopStyleColor();
         ImGui::SetNextItemWidth(width);
         ImGui::InputTextWithHint("##email", "", state.email, sizeof(state.email));
@@ -91,7 +131,7 @@ namespace misty::panel {
         // Password
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.8f, 0.8f, 1.0f));
         auto& lock_icon = core::AssetManager::get().get_svg_texture("lock-16", 24);
-        core::IconText(lock_icon, 16.0f, "Password", 1.0f, -2.0f);
+        icon_label(lock_icon, 16.0f, "Password", 1.0f, -2.0f);
         ImGui::PopStyleColor();
         ImGui::SetNextItemWidth(width);
         ImGui::InputTextWithHint("##password", "", state.password, sizeof(state.password), ImGuiInputTextFlags_Password);
@@ -99,7 +139,7 @@ namespace misty::panel {
         // Confirm password
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.8f, 0.8f, 1.0f));
         auto& lock_icon2 = core::AssetManager::get().get_svg_texture("lock-16", 24);
-        core::IconText(lock_icon2, 16.0f, "Confirm password", 1.0f, -2.0f);
+        icon_label(lock_icon2, 16.0f, "Confirm password", 1.0f, -2.0f);
         ImGui::PopStyleColor();
         ImGui::SetNextItemWidth(width);
         ImGui::InputTextWithHint("##confirm_password", "", state.confirm_password, sizeof(state.confirm_password), ImGuiInputTextFlags_Password);
@@ -142,7 +182,7 @@ namespace misty::panel {
     void AuthRegisterPanel::show_register_button(AuthRegisterState& state) {
         float width = ImGui::GetContentRegionAvail().x;
 
-        if (core::StyledButton("Create account", ImVec2(width, 40), core::ButtonTheme::Primary()) ||
+        if (styled_button("Create account", ImVec2(width, 40), primary_button_style()) ||
             core::CommandManager::get().matches("auth.submit")) {
             state.handle_create_account();
         }

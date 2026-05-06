@@ -23,7 +23,7 @@
 #include "core/manager/session_manager.h"
 #include "core/net/http_client.h"
 #include "core/system/util.h"
-#include "core/ui/imgui_utils.h"
+#include "core/ui/ui.h"
 #include "panels/onboarding/onboarding_state.h"
 #include "imgui.h"
 
@@ -33,6 +33,36 @@ using json   = nlohmann::json;
 namespace misty::panel {
 
 namespace {
+struct ButtonStyle {
+    ImVec4 button;
+    ImVec4 hovered;
+    ImVec4 active;
+    ImVec4 text;
+    float rounding;
+};
+
+ButtonStyle primary_button_style() {
+    return {
+        ImVec4(0.957f, 0.957f, 0.961f, 1.0f),
+        ImVec4(0.898f, 0.906f, 0.922f, 1.0f),
+        ImVec4(0.820f, 0.835f, 0.859f, 1.0f),
+        ImVec4(0.07f, 0.07f, 0.07f, 1.0f),
+        8.0f,
+    };
+}
+
+bool styled_button(const char* label, const ImVec2& size, const ButtonStyle& style) {
+    bool pressed = false;
+    misty::UI::WithStyle([&](misty::UI::StyleScope& scoped) {
+        scoped.var(ImGuiStyleVar_FrameRounding, style.rounding);
+        scoped.color(ImGuiCol_Button, style.button);
+        scoped.color(ImGuiCol_ButtonHovered, style.hovered);
+        scoped.color(ImGuiCol_ButtonActive, style.active);
+        scoped.color(ImGuiCol_Text, style.text);
+        pressed = ImGui::Button(label, size);
+    });
+    return pressed;
+}
 
 constexpr auto kMinimumBootScreenTime = std::chrono::milliseconds(7000);
 
@@ -702,7 +732,7 @@ bool BootLoader::render() {
         const float total_w = retry_size.x + quit_size.x + 12.0f + (show_log ? (log_size.x + 12.0f) : 0.0f);
         ImGui::SetCursorPosX(group_start_x + std::max(0.0f, (content_w - total_w) * 0.5f));
 
-        if (core::StyledButton("Retry", retry_size, core::ButtonTheme::Primary())) {
+        if (styled_button("Retry", retry_size, primary_button_style())) {
             proxy_path_ = auto_detect_proxy_path();
             init_port_search();
             phase_ = Phase::Searching;
