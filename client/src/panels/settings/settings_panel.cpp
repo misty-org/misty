@@ -1,7 +1,12 @@
 #include "panels/settings/account.h"
+#include "panels/settings/advanced.h"
+#include "panels/settings/appearance.h"
 #include "panels/settings/general.h"
+#include "panels/settings/notifications.h"
 #include "panels/settings/privacy.h"
 #include "panels/settings/settings_panel.h"
+#include "panels/settings/shortcuts.h"
+#include "panels/settings/sync.h"
 
 #include "core/ui/ui_layout.h"
 #include "core/ui/ui_style.h"
@@ -21,7 +26,6 @@ void SettingsPanel::render() {
     auto& state = registry_.get_state<SettingsState>("Settings");
     misty::UI::WithWindowStyle({
         .bg_color = ImVec4(0.12f, 0.12f, 0.12f, 1.0f),
-        .padding = ImVec2(12.0f, 12.0f),
     }, [&]() {
         if (ImGui::Begin("SettingsPanel", nullptr, flags)) {
             UI::row("##settings_shell", {
@@ -58,11 +62,26 @@ void SettingsPanel::settings_content(SettingsState& state) {
                 case SettingsSection::General:
                     general_content(state);
                     break;
+                case SettingsSection::Appearance:
+                    appearance_content(state);
+                    break;
                 case SettingsSection::Account:
                     account_content(state);
                     break;
                 case SettingsSection::Privacy:
                     privacy_content(state);
+                    break;
+                case SettingsSection::Sync:
+                    sync_content(state);
+                    break;
+                case SettingsSection::Notifications:
+                    notifications_content(state);
+                    break;
+                case SettingsSection::Shortcuts:
+                    shortcuts_content(state);
+                    break;
+                case SettingsSection::Advanced:
+                    advanced_content(state);
                     break;
                 default:
                     general_content(state);
@@ -89,7 +108,7 @@ void SettingsPanel::sidebar_header(SettingsState& state) {
     UI::div("##sidebar_header", {
         .mode = UI::Mode::LayoutOnly,
         .width = UI::Size::fill(),
-        .height = UI::Size::px(36.0f),
+        .height = UI::Size::px(48.0f),
         .padding = UI::Spacing::xy(8.0f, 8.0f),
         .rounding = 8.0f,
     }, [&]() {
@@ -104,8 +123,13 @@ void SettingsPanel::sidebar_header(SettingsState& state) {
 
 void SettingsPanel::sidebar_tabs(SettingsState& state) {
     general_tab(state);
+    appearance_tab(state);
     account_tab(state);
     privacy_tab(state);
+    sync_tab(state);
+    notifications_tab(state);
+    shortcuts_tab(state);
+    advanced_tab(state);
 }
 
 } //namespace misty::panel

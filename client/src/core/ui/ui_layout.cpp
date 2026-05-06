@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <vector>
 
-#include "core/manager/asset_manager.h"
+#include "core/manager/font_manager.h"
 #include "core/ui/ui_style.h"
 
 namespace misty::UI {
@@ -472,17 +472,17 @@ void advance_frame_after_item() {
 ImFont* font_for_text(Layout::TextFont font) {
     switch (font) {
         case Layout::TextFont::Small:
-            return ::misty::core::AssetManager::get().get_font(::misty::core::FontID::ROBOTO_SMALL);
+            return ::misty::core::FontManager::get().get_font(::misty::core::FontID::ROBOTO_SMALL);
         case Layout::TextFont::Large:
-            return ::misty::core::AssetManager::get().get_font(::misty::core::FontID::ROBOTO_LARGE);
+            return ::misty::core::FontManager::get().get_font(::misty::core::FontID::ROBOTO_LARGE);
         case Layout::TextFont::XLarge:
-            return ::misty::core::AssetManager::get().get_font(::misty::core::FontID::ROBOTO_XLARGE);
+            return ::misty::core::FontManager::get().get_font(::misty::core::FontID::ROBOTO_XLARGE);
         case Layout::TextFont::Bold:
-            return ::misty::core::AssetManager::get().get_font(::misty::core::FontID::ROBOTO_BOLD);
+            return ::misty::core::FontManager::get().get_font(::misty::core::FontID::ROBOTO_BOLD);
         case Layout::TextFont::BoldLarge:
-            return ::misty::core::AssetManager::get().get_font(::misty::core::FontID::ROBOTO_BOLD_LARGE);
+            return ::misty::core::FontManager::get().get_font(::misty::core::FontID::ROBOTO_BOLD_LARGE);
         case Layout::TextFont::BoldXLarge:
-            return ::misty::core::AssetManager::get().get_font(::misty::core::FontID::ROBOTO_BOLD_XLARGE);
+            return ::misty::core::FontManager::get().get_font(::misty::core::FontID::ROBOTO_BOLD_XLARGE);
         case Layout::TextFont::Default:
         default:
             return nullptr;
@@ -699,10 +699,13 @@ void text(const TextProps& props) {
 bool button(const char* id, const ButtonProps& props, const std::function<void()>& content) {
     const bool has_content = static_cast<bool>(content);
     const ImVec2 avail = current_available_size();
+    const ImVec2 frame_padding = (props.padding.x > 0.0f || props.padding.y > 0.0f)
+        ? ImVec2(props.padding.x, props.padding.y)
+        : ImGui::GetStyle().FramePadding;
     const float natural_width = (!has_content && props.label[0] != '\0')
-        ? ImGui::CalcTextSize(props.label).x + ImGui::GetStyle().FramePadding.x * 2.0f
+        ? ImGui::CalcTextSize(props.label).x + frame_padding.x * 2.0f
         : avail.x;
-    const float natural_height = ImGui::GetFrameHeight();
+    const float natural_height = std::max(ImGui::GetTextLineHeight() + frame_padding.y * 2.0f, ImGui::GetFrameHeight());
     const Size width = props.align == Align::Stretch && props.width.mode == SizeMode::Auto
         ? Size::fill()
         : props.width;
@@ -711,7 +714,7 @@ bool button(const char* id, const ButtonProps& props, const std::function<void()
         size.x = std::max(1.0f, natural_width);
     }
     if (size.y <= 0.0f) {
-        size.y = ImGui::GetFrameHeight();
+        size.y = natural_height;
     }
 
     justify_widget_cursor(size, props.justify);
@@ -726,6 +729,7 @@ bool button(const char* id, const ButtonProps& props, const std::function<void()
         const ButtonStyle colors = button_style_for_variant(props);
         WithStyle([&](StyleScope& style) {
             style.var(ImGuiStyleVar_FrameRounding, colors.rounding);
+            style.var(ImGuiStyleVar_FramePadding, frame_padding);
             style.color(ImGuiCol_Button, colors.button);
             style.color(ImGuiCol_ButtonHovered, colors.hovered);
             style.color(ImGuiCol_ButtonActive, colors.active);
@@ -754,7 +758,6 @@ bool button(const char* id, const ButtonProps& props, const std::function<void()
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
     draw_list->AddRectFilled(rect_min, rect_max, ImGui::ColorConvertFloat4ToU32(bg_color), colors.rounding);
 
-    const ImVec2 frame_padding = ImGui::GetStyle().FramePadding;
     const ImVec2 content_min(rect_min.x + frame_padding.x, rect_min.y + frame_padding.y);
     const ImVec2 content_max(rect_max.x - frame_padding.x, rect_max.y - frame_padding.y);
 

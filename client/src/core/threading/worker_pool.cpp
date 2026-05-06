@@ -1,4 +1,5 @@
 #include "core/threading/worker_pool.h"
+#include <algorithm>
 #include <iostream>
 
 namespace misty::core {
@@ -6,6 +7,7 @@ namespace misty::core {
         if (thread_count == 0) {
             thread_count = 1;
         }
+        thread_count = std::min<std::size_t>(thread_count, 4);
         std::cout << "[DEBUG] Initializing WorkerPool with " << thread_count << " threads." << std::endl;
         for (size_t i = 0; i < thread_count; ++i) {
             workers_.emplace_back(&WorkerPool::worker_thread, this);

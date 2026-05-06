@@ -2,6 +2,7 @@
 
 #include "core/commands/command_manager.h"
 #include "core/manager/asset_manager.h"
+#include "core/manager/font_manager.h"
 #include "core/ui/ui_animate.h"
 #include "core/ui/ui_style.h"
 
@@ -835,7 +836,7 @@ namespace misty::panel {
 
             float w = ImGui::GetContentRegionAvail().x;
 
-            ImGui::PushFont(core::AssetManager::get().get_font(core::FontID::ROBOTO_LARGE));
+            ImGui::PushFont(core::FontManager::get().get_font(core::FontID::ROBOTO_LARGE));
             const char* title = "Disconnect account?";
             ImGui::SetCursorPosX((w - ImGui::CalcTextSize(title).x) * 0.5f);
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.90f, 0.90f, 0.90f, 1.0f));

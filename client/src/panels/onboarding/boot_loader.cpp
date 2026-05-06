@@ -8,6 +8,9 @@
 
 #include <nlohmann/json.hpp>
 
+#include "core/manager/asset_manager.h"
+#include "core/manager/font_manager.h"
+
 #ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -19,7 +22,6 @@
 #include <unistd.h>
 #endif
 
-#include "core/manager/asset_manager.h"
 #include "core/manager/session_manager.h"
 #include "core/net/http_client.h"
 #include "core/system/util.h"
@@ -669,7 +671,7 @@ bool BootLoader::render() {
         subtitle = "The local background service did not come up cleanly.";
     }
 
-    ImGui::PushFont(core::AssetManager::get().get_font(core::FontID::ROBOTO_BOLD_LARGE));
+    ImGui::PushFont(core::FontManager::get().get_font(core::FontID::ROBOTO_BOLD_LARGE));
     const float title_w = ImGui::CalcTextSize(title).x;
     ImGui::SetCursorPosX(group_start_x + std::max(0.0f, (content_w - title_w) * 0.5f));
     ImGui::TextUnformatted(title);

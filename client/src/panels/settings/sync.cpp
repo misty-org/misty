@@ -1,21 +1,22 @@
-#include "panels/settings/general.h"
+#include "panels/settings/sync.h"
 
 #include "core/ui/ui_layout.h"
+#include "imgui.h"
 
 namespace misty::panel {
 
-bool general_tab(SettingsState& state) {
-    bool clicked = UI::button("##settings_general", {
+bool sync_tab(SettingsState& state) {
+    const bool clicked = UI::button("##settings_sync", {
         .width = UI::Size::fill(),
         .height = UI::Size::px(32.0f),
         .variant = UI::ButtonVariant::Nav,
         .hover_color = ImVec4(0.2f, 0.2f, 0.2f, 1.0f),
-        .selected = state.active_section == SettingsSection::General,
+        .selected = state.active_section == SettingsSection::Sync,
         .padding = UI::Spacing::xy(8.0f, 8.0f),
         .rounding = 8.0f,
     }, [&]() {
         UI::text({
-            .text = "General",
+            .text = "Sync",
             .width = UI::Size::fill(),
             .align = UI::Align::Start,
             .justify = UI::Justify::Center,
@@ -23,36 +24,35 @@ bool general_tab(SettingsState& state) {
     });
 
     if (clicked) {
-        state.active_section = SettingsSection::General;
+        state.active_section = SettingsSection::Sync;
     }
 
     return clicked;
 }
 
-void general_content(SettingsState& state) {
+void sync_content(SettingsState& state) {
     (void)state;
 
-    UI::div("general_content", {
+    UI::div("sync_content", {
         .mode = UI::Mode::LayoutOnly,
         .width = UI::Size::fill(),
         .height = UI::Size::auto_size(),
         .padding = UI::Spacing::xy(28.0f, 20.0f),
     }, [&]() {
-        UI::column("##general_body", {
+        UI::column("##sync_body", {
             .width = UI::Size::fill(),
             .height = UI::Size::auto_size(),
-            .gap = UI::Spacing::xy(0.0f, 24.0f),
+            .gap = UI::Spacing::xy(0.0f, 20.0f),
         }, [&]() {
             UI::text({
-                .text = "General",
+                .text = "Sync",
                 .width = UI::Size::fill(),
                 .color = ImVec4(0.96f, 0.96f, 0.98f, 1.0f),
                 .font = UI::TextFont::BoldXLarge,
             });
             UI::text({
-                .text = "General settings will live here.",
-                .width = UI::Size::px(420.0f),
-                .overflow = UI::TextOverflow::Wrap,
+                .text = "Sync settings content",
+                .width = UI::Size::fill(),
                 .color = ImVec4(0.76f, 0.78f, 0.82f, 1.0f),
             });
         });

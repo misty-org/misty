@@ -1,6 +1,7 @@
 #include "panels/errors/errors_panel.h"
 
 #include "core/manager/asset_manager.h"
+#include "core/manager/font_manager.h"
 #include "core/manager/session_manager.h"
 #include "core/ui/ui_style.h"
 #include "views/app_view.h"
@@ -89,7 +90,7 @@ void ErrorsPanel::render_session_expired() {
             ImGui::Spacing();
         }
 
-        ImGui::PushFont(core::AssetManager::get().get_font(core::FontID::ROBOTO_LARGE));
+        ImGui::PushFont(core::FontManager::get().get_font(core::FontID::ROBOTO_LARGE));
         const char* title = "Session Expired";
         ImGui::SetCursorPosX((w - ImGui::CalcTextSize(title).x) * 0.5f);
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.90f, 0.90f, 0.90f, 1.0f));

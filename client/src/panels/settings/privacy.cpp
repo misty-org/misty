@@ -186,6 +186,7 @@ bool privacy_tab(SettingsState& state) {
         .variant = UI::ButtonVariant::Nav,
         .hover_color = ImVec4(0.2f, 0.2f, 0.2f, 1.0f),
         .selected = state.active_section == SettingsSection::Privacy,
+        .padding = UI::Spacing::xy(8.0f, 8.0f),
         .rounding = 8.0f,
     }, [&]() {
         UI::text({

@@ -2,10 +2,22 @@
 #include "stb_image.h"
 #include <glad/glad.h>
 #include <fstream>
-#include <sstream>
 #include <iostream>
+#include <sstream>
 
 namespace misty::core {
+    namespace {
+        std::size_t rgba_texture_bytes(int width, int height, bool with_mipmaps) {
+            if (width <= 0 || height <= 0) {
+                return 0;
+            }
+
+            const std::size_t base = static_cast<std::size_t>(width) *
+                                     static_cast<std::size_t>(height) * 4;
+            return with_mipmaps ? (base * 4) / 3 : base;
+        }
+    }
+
     void AssetManager::shutdown() {
         for (auto& [name, texture] : svg_textures_) {
             unload_svg(texture);
@@ -24,51 +36,49 @@ namespace misty::core {
         return instance;
     }
 
-    void AssetManager::load_fonts() {
-        ImGuiIO& io = ImGui::GetIO();
-        fonts_[FontID::DEFAULT] = io.Fonts->AddFontFromFileTTF("assets/fonts/Roboto-Regular.ttf", 18.0f);
-        fonts_[FontID::ROBOTO_SMALL] = io.Fonts->AddFontFromFileTTF("assets/fonts/Roboto-Regular.ttf", 16.0f);
-        fonts_[FontID::ROBOTO_LARGE] = io.Fonts->AddFontFromFileTTF("assets/fonts/Roboto-Regular.ttf", 24.0f);
-        fonts_[FontID::ROBOTO_XLARGE] = io.Fonts->AddFontFromFileTTF("assets/fonts/Roboto-Regular.ttf", 32.0f);
-        fonts_[FontID::ROBOTO_BOLD] = io.Fonts->AddFontFromFileTTF("assets/fonts/Roboto-Bold.ttf", 18.0f);
-        fonts_[FontID::ROBOTO_BOLD_LARGE] = io.Fonts->AddFontFromFileTTF("assets/fonts/Roboto-Bold.ttf", 24.0f);
-        fonts_[FontID::ROBOTO_BOLD_XLARGE] = io.Fonts->AddFontFromFileTTF("assets/fonts/Roboto-Bold.ttf", 32.0f);
-        fonts_[FontID::ROBOTO_ITALIC] = io.Fonts->AddFontFromFileTTF("assets/fonts/Roboto-Italic.ttf", 18.0f);
-        fonts_[FontID::ROBOTO_BOLD_ITALIC] = io.Fonts->AddFontFromFileTTF("assets/fonts/Roboto-BoldItalic.ttf", 18.0f);
-    }
-
     void AssetManager::load_themes() {
         std::ifstream file("assets/themes/default.css");
         if (file.is_open()) {
             std::stringstream buffer;
             buffer << file.rdbuf();
             current_theme_ = buffer.str();
-            
-            // If theme changes, we must clear cache to re-render icons
-            svg_textures_.clear(); 
-        }
-    }
 
-    ImFont* AssetManager::get_font(const FontID& font_id) const {
-        if (!fonts_.contains(font_id)) {
-            return fonts_.at(FontID::DEFAULT);
+            // If theme changes, release old textures before clearing the cache.
+            for (auto& [_, texture] : svg_textures_) {
+                unload_svg(texture);
+            }
+            svg_textures_.clear();
         }
-        return fonts_.at(font_id);
     }
 
     const std::string& AssetManager::get_current_theme() const {
         return current_theme_;
     }
 
+    AssetCacheStats AssetManager::get_cache_stats() const {
+        AssetCacheStats stats;
+        stats.svg_texture_count = svg_textures_.size();
+        stats.image_texture_count = image_textures_.size();
+
+        for (const auto& [_, texture] : svg_textures_) {
+            stats.svg_texture_bytes += rgba_texture_bytes(texture.width, texture.height, false);
+        }
+        for (const auto& [_, texture] : image_textures_) {
+            stats.image_texture_bytes += rgba_texture_bytes(texture.width, texture.height, true);
+        }
+
+        return stats;
+    }
+
     SVGTexture& AssetManager::get_svg_texture(const std::string& name, int size) {
-        std::string key = name + ".svg";
+        std::string key = name + ".svg@" + std::to_string(size);
 
         auto it = svg_textures_.find(key);
         if (it != svg_textures_.end()) {
             return it->second;
         }
 
-        std::string path = "assets/icons/" + key;
+        std::string path = "assets/icons/" + name + ".svg";
         SVGTexture tex = load_svg(path, size, size);
 
         svg_textures_[key] = tex;

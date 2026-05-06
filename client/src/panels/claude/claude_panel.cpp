@@ -13,6 +13,7 @@
 #include <nlohmann/json.hpp>
 
 #include "core/manager/asset_manager.h"
+#include "core/manager/font_manager.h"
 
 namespace misty::panel {
 
@@ -236,11 +237,10 @@ void render_inline_formatted(const std::string& line) {
         return;
     }
 
-    auto& am = AssetManager::get();
-    ImFont* font_regular     = am.get_font(core::FontID::DEFAULT);
-    ImFont* font_bold        = am.get_font(core::FontID::ROBOTO_BOLD);
-    ImFont* font_italic      = am.get_font(core::FontID::ROBOTO_ITALIC);
-    ImFont* font_bold_italic = am.get_font(core::FontID::ROBOTO_BOLD_ITALIC);
+    ImFont* font_regular     = core::FontManager::get().get_font(core::FontID::DEFAULT);
+    ImFont* font_bold        = core::FontManager::get().get_font(core::FontID::ROBOTO_BOLD);
+    ImFont* font_italic      = core::FontManager::get().get_font(core::FontID::ROBOTO_ITALIC);
+    ImFont* font_bold_italic = core::FontManager::get().get_font(core::FontID::ROBOTO_BOLD_ITALIC);
 
     float wrap_width = ImGui::GetContentRegionAvail().x;
     float cursor_x = ImGui::GetCursorPosX();
@@ -320,8 +320,8 @@ void render_markdown(const std::vector<MdBlock>& blocks) {
         switch (b.type) {
             case BlockType::HEADING: {
                 ImFont* heading_font = (b.heading_level == 1)
-                    ? am.get_font(core::FontID::ROBOTO_BOLD_LARGE)
-                    : am.get_font(core::FontID::ROBOTO_BOLD);
+                    ? core::FontManager::get().get_font(core::FontID::ROBOTO_BOLD_LARGE)
+                    : core::FontManager::get().get_font(core::FontID::ROBOTO_BOLD);
                 float scale = (b.heading_level == 1) ? 1.0f :
                               (b.heading_level == 2) ? 1.0f : 0.95f;
                 ImGui::PushFont(heading_font);

@@ -116,6 +116,7 @@ public:
         const char* label = "";
         Size width = Size::auto_size();
         Size height = Size::auto_size();
+        Spacing padding = {};
         Align align = Align::Start;
         Justify justify = Justify::Start;
         ButtonVariant variant = ButtonVariant::Default;

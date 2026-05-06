@@ -5,6 +5,7 @@
 #include "mac_app.h"
 #include "core/manager/asset_manager.h"
 #include "core/manager/env_manager.h"
+#include "core/manager/font_manager.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 #include <cstdio>
@@ -117,11 +118,9 @@ namespace misty {
         configure_imgui_style();
 
         core::AssetManager::get().load_themes();
-        core::AssetManager::get().load_fonts();
-
-      
         ImGui_ImplGlfw_InitForOpenGL(window_, true);
         ImGui_ImplOpenGL3_Init(glsl_version_);
+        core::FontManager::get().load_fonts();
         glfwSetScrollCallback(window_, glfw_scroll_callback);
     }
 
