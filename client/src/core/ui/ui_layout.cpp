@@ -612,6 +612,16 @@ bool grid(const char* id, int columns, const BoxStyle& style, const std::functio
     return begin_box(FrameKind::Grid, Layout::Axis::Row, columns, id, style, content);
 }
 
+void raw(const std::function<void()>& content) {
+    auto& frames = frame_stack();
+    std::vector<Frame> saved_frames = std::move(frames);
+    frames.clear();
+    if (content) {
+        content();
+    }
+    frames = std::move(saved_frames);
+}
+
 void spacer(float width, float height) {
     Frame* frame = current_frame();
     if (!frame) {
@@ -626,6 +636,37 @@ void spacer(float width, float height) {
     const Placement placement = compute_placement(style);
     ImGui::SetCursorScreenPos(placement.pos);
     ImGui::Dummy(ImVec2(width, height));
+    advance_parent(style, placement, ImGui::GetItemRectSize());
+}
+
+void divider(const DividerProps& props) {
+    BoxStyle style;
+    style.width = props.width;
+    style.height = props.height;
+    style.margin = props.margin;
+    style.align = props.align;
+    style.justify = props.justify;
+
+    const Placement placement = compute_placement(style);
+    const ImVec2 size(
+        std::max(1.0f, placement.size.x),
+        std::max(1.0f, placement.size.y)
+    );
+
+    ImGui::SetCursorScreenPos(placement.pos);
+    ImGui::Dummy(size);
+
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    const ImVec4 divider_color = props.color.w > 0.0f
+        ? props.color
+        : ImGui::GetStyleColorVec4(ImGuiCol_Border);
+    draw_list->AddRectFilled(
+        placement.pos,
+        ImVec2(placement.pos.x + size.x, placement.pos.y + size.y),
+        ImGui::ColorConvertFloat4ToU32(divider_color),
+        props.rounding
+    );
+
     advance_parent(style, placement, ImGui::GetItemRectSize());
 }
 

@@ -140,6 +140,16 @@ public:
         ImGuiInputTextFlags flags = ImGuiInputTextFlags_None;
     };
 
+    struct DividerProps {
+        Size width = Size::fill();
+        Size height = Size::px(1.0f);
+        Spacing margin = {};
+        Align align = Align::Stretch;
+        Justify justify = Justify::Start;
+        ImVec4 color = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
+        float rounding = 0.0f;
+    };
+
 };
 
 using Mode = Layout::Mode;
@@ -156,6 +166,7 @@ using BoxStyle = Layout::BoxStyle;
 using TextProps = Layout::TextProps;
 using ButtonProps = Layout::ButtonProps;
 using InputTextProps = Layout::InputTextProps;
+using DividerProps = Layout::DividerProps;
 
 bool div(const char* id, const BoxStyle& style, const std::function<void()>& content = {});
 
@@ -165,7 +176,9 @@ bool column(const char* id, const BoxStyle& style, const std::function<void()>& 
 
 bool grid(const char* id, int columns, const BoxStyle& style, const std::function<void()>& content = {});
 
+void raw(const std::function<void()>& content);
 void spacer(float width, float height = 0.0f);
+void divider(const DividerProps& props = {});
 void text(const TextProps& props);
 bool button(const char* id, const ButtonProps& props, const std::function<void()>& content = {});
 bool input_text(const InputTextProps& props);
