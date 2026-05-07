@@ -60,7 +60,7 @@ float clamp_nonnegative(float value) {
 float resolve_axis_size(const Layout::Size& size, float available) {
     switch (size.mode) {
         case Layout::SizeMode::Pixels:
-            return clamp_nonnegative(size.value);
+            return clamp_nonnegative(std::min(size.value, available));
         case Layout::SizeMode::Fill:
             return clamp_nonnegative(available);
         case Layout::SizeMode::Percent:
@@ -827,16 +827,58 @@ bool button(const char* id, const ButtonProps& props, const std::function<void()
     return pressed;
 }
 
+bool image_button(const char* id, const ImageButtonProps& props) {
+    if (!props.texture_id) {
+        return false;
+    }
+
+    const ImVec2 avail = current_available_size();
+    const ImVec2 frame_padding = ImVec2(props.padding.x, props.padding.y);
+    const float natural_width = props.width.mode == SizeMode::Auto ? 52.0f : 0.0f;
+    const float natural_height = props.height.mode == SizeMode::Auto ? 30.0f : 0.0f;
+    const Size width = props.align == Align::Stretch && props.width.mode == SizeMode::Auto
+        ? Size::fill()
+        : props.width;
+    ImVec2 size = resolve_widget_size(width, props.height, avail, natural_width, natural_height);
+    if (size.x <= 0.0f) {
+        size.x = natural_width;
+    }
+    if (size.y <= 0.0f) {
+        size.y = natural_height;
+    }
+
+    justify_widget_cursor(size, props.justify);
+    align_widget_cursor(size, props.align);
+
+    bool pressed = false;
+    WithStyle([&](StyleScope& style) {
+        style.var(ImGuiStyleVar_FrameRounding, props.rounding);
+        style.var(ImGuiStyleVar_FramePadding, frame_padding);
+        style.var(ImGuiStyleVar_FrameBorderSize, 0.0f);
+        style.color(ImGuiCol_Button, props.button_color);
+        style.color(ImGuiCol_ButtonHovered, props.hover_color);
+        style.color(ImGuiCol_ButtonActive, props.active_color);
+        pressed = ImGui::ImageButton(id, props.texture_id, size, ImVec2(0, 0), ImVec2(1, 1), props.border_color, props.tint_color);
+    });
+
+    advance_frame_after_item();
+    return pressed;
+}
+
 bool input_text(const InputTextProps& props) {
     if (!props.buffer || props.buffer_size == 0) {
         return false;
     }
 
     const ImVec2 avail = current_available_size();
+    const ImVec2 frame_padding = (props.padding.x > 0.0f || props.padding.y > 0.0f)
+        ? ImVec2(props.padding.x, props.padding.y)
+        : ImGui::GetStyle().FramePadding;
     const Size width = props.align == Align::Stretch && props.width.mode == SizeMode::Auto
         ? Size::fill()
         : props.width;
-    const ImVec2 size = resolve_widget_size(width, props.height, avail, avail.x, ImGui::GetFrameHeight());
+    const float natural_height = std::max(ImGui::GetTextLineHeight() + frame_padding.y * 2.0f, ImGui::GetFrameHeight());
+    const ImVec2 size = resolve_widget_size(width, props.height, avail, avail.x, natural_height);
     justify_widget_cursor(size, props.justify);
     align_widget_cursor(size, props.align);
 
@@ -844,19 +886,91 @@ bool input_text(const InputTextProps& props) {
         ImGui::SetNextItemWidth(size.x);
     }
 
-    if (props.hint && props.hint[0] != '\0') {
-        const bool changed = ImGui::InputTextWithHint(
-            props.label,
-            props.hint,
-            props.buffer,
-            props.buffer_size,
-            props.flags
-        );
-        advance_frame_after_item();
-        return changed;
+    bool changed = false;
+    WithStyle([&](StyleScope& style) {
+        style.var(ImGuiStyleVar_FrameRounding, props.rounding);
+        style.var(ImGuiStyleVar_FramePadding, frame_padding);
+        if (props.bg_color.w > 0.0f) {
+            style.color(ImGuiCol_FrameBg, props.bg_color);
+        }
+        if (props.border_color.w > 0.0f) {
+            style.color(ImGuiCol_Border, props.border_color);
+        }
+        if (props.text_color.w > 0.0f) {
+            style.color(ImGuiCol_Text, props.text_color);
+        }
+
+        if (props.hint && props.hint[0] != '\0') {
+            changed = ImGui::InputTextWithHint(
+                props.label,
+                props.hint,
+                props.buffer,
+                props.buffer_size,
+                props.flags
+            );
+        } else {
+            changed = ImGui::InputText(props.label, props.buffer, props.buffer_size, props.flags);
+        }
+    });
+
+    advance_frame_after_item();
+    return changed;
+}
+
+bool select(const SelectProps& props) {
+    if (!props.selected_index || !props.options || props.option_count <= 0) {
+        return false;
     }
 
-    const bool changed = ImGui::InputText(props.label, props.buffer, props.buffer_size, props.flags);
+    const ImVec2 avail = current_available_size();
+    const ImVec2 frame_padding = (props.padding.x > 0.0f || props.padding.y > 0.0f)
+        ? ImVec2(props.padding.x, props.padding.y)
+        : ImGui::GetStyle().FramePadding;
+    const Size width = props.align == Align::Stretch && props.width.mode == SizeMode::Auto
+        ? Size::fill()
+        : props.width;
+    const float natural_height = std::max(ImGui::GetTextLineHeight() + frame_padding.y * 2.0f, ImGui::GetFrameHeight());
+    const ImVec2 size = resolve_widget_size(width, props.height, avail, avail.x, natural_height);
+
+    justify_widget_cursor(size, props.justify);
+    align_widget_cursor(size, props.align);
+
+    if (size.x > 0.0f) {
+        ImGui::SetNextItemWidth(size.x);
+    }
+
+    const int safe_index = std::clamp(*props.selected_index, 0, props.option_count - 1);
+    const char* preview = props.options[safe_index];
+    bool changed = false;
+
+    WithStyle([&](StyleScope& style) {
+        style.var(ImGuiStyleVar_FrameRounding, props.rounding);
+        style.var(ImGuiStyleVar_FramePadding, frame_padding);
+        if (props.bg_color.w > 0.0f) {
+            style.color(ImGuiCol_FrameBg, props.bg_color);
+        }
+        if (props.border_color.w > 0.0f) {
+            style.color(ImGuiCol_Border, props.border_color);
+        }
+        if (props.text_color.w > 0.0f) {
+            style.color(ImGuiCol_Text, props.text_color);
+        }
+
+        if (ImGui::BeginCombo(props.label, preview)) {
+            for (int i = 0; i < props.option_count; ++i) {
+                const bool selected = *props.selected_index == i;
+                if (ImGui::Selectable(props.options[i], selected)) {
+                    *props.selected_index = i;
+                    changed = true;
+                }
+                if (selected) {
+                    ImGui::SetItemDefaultFocus();
+                }
+            }
+            ImGui::EndCombo();
+        }
+    });
+
     advance_frame_after_item();
     return changed;
 }

@@ -1,12 +1,12 @@
-#include "panels/settings/account.h"
-#include "panels/settings/advanced.h"
-#include "panels/settings/appearance.h"
-#include "panels/settings/general.h"
-#include "panels/settings/notifications.h"
-#include "panels/settings/privacy.h"
+#include "panels/settings/settings_account.h"
+#include "panels/settings/settings_advanced.h"
+#include "panels/settings/settings_appearance.h"
+#include "panels/settings/settings_general.h"
+#include "panels/settings/settings_notifications.h"
+#include "panels/settings/settings_privacy.h"
 #include "panels/settings/settings_panel.h"
-#include "panels/settings/shortcuts.h"
-#include "panels/settings/sync.h"
+#include "panels/settings/settings_shortcuts.h"
+#include "panels/settings/settings_sync.h"
 
 #include "core/ui/ui_layout.h"
 #include "core/ui/ui_style.h"
@@ -22,6 +22,7 @@ void SettingsPanel::render() {
         ImGuiWindowFlags_NoCollapse;
 
     auto& state = registry_.get_state<SettingsState>("Settings");
+    state.ensure_app_settings_loaded();
     misty::UI::WithWindowStyle({
         .bg_color = ImVec4(0.12f, 0.12f, 0.12f, 1.0f),
     }, [&]() {
@@ -55,7 +56,7 @@ void SettingsPanel::settings_content(SettingsState& state) {
             .width = UI::Size::fill(),
             .height = UI::Size::fill(),
             .window_flags = ImGuiWindowFlags_AlwaysVerticalScrollbar,
-            .padding = UI::Spacing::xy(12.0f, 12.0f),
+            .padding = UI::Spacing::xy(24.0f, 12.0f),
         }, [&]() {
             switch (state.active_section) {
                 case SettingsSection::General:

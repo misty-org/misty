@@ -194,5 +194,6 @@ if(EXISTS "${CMAKE_SOURCE_DIR}/extensions")
     )
 endif()
 
+add_custom_command(TARGET misty POST_BUILD ${MISTY_ASSET_COMMANDS})
 add_custom_target(misty_assets ALL ${MISTY_ASSET_COMMANDS})
 add_dependencies(misty_assets misty misty_plugin_sandbox)

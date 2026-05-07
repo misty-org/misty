@@ -6,6 +6,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include "core/manager/settings_manager.h"
+
 namespace misty::core {
 namespace {
 
@@ -18,6 +20,23 @@ fs::path custom_fonts_path() {
         return {};
     }
     return fs::path(home) / "misty" / "config" / "fonts.json";
+}
+
+std::vector<CustomFontEntry> parse_font_entries(const json& data) {
+    std::vector<CustomFontEntry> fonts;
+    if (!data.is_array()) {
+        return fonts;
+    }
+
+    for (const auto& item : data) {
+        CustomFontEntry entry;
+        entry.label = item.value("label", "");
+        entry.path = item.value("path", "");
+        if (!entry.path.empty()) {
+            fonts.push_back(std::move(entry));
+        }
+    }
+    return fonts;
 }
 
 void merge_custom_fonts(
@@ -102,47 +121,47 @@ bool FontManager::apply_pending_reload(std::string* error) {
 }
 
 std::vector<CustomFontEntry> FontManager::load_custom_fonts() const {
-    std::vector<CustomFontEntry> fonts;
-    const fs::path path = custom_fonts_path();
-    if (path.empty() || !fs::exists(path)) {
-        return fonts;
-    }
-
-    try {
-        std::ifstream file(path);
-        json data = json::parse(file);
-        if (!data.is_array()) {
+    nlohmann::json settings = load_settings_document();
+    const json appearance = settings.value("appearance", json::object());
+    if (appearance.contains("custom_fonts")) {
+        const std::vector<CustomFontEntry> fonts = parse_font_entries(appearance["custom_fonts"]);
+        if (!fonts.empty() || appearance["custom_fonts"].is_array()) {
             return fonts;
         }
-
-        for (const auto& item : data) {
-            CustomFontEntry entry;
-            entry.label = item.value("label", "");
-            entry.path = item.value("path", "");
-            if (!entry.path.empty()) {
-                fonts.push_back(std::move(entry));
-            }
-        }
-    } catch (...) {
     }
 
-    return fonts;
+    const fs::path path = custom_fonts_path();
+    if (!path.empty() && fs::exists(path)) {
+        try {
+            std::ifstream file(path);
+            json data = json::parse(file);
+            const std::vector<CustomFontEntry> fonts = parse_font_entries(data);
+            if (!fonts.empty() || data.is_array()) {
+                std::string error;
+                save_custom_fonts(fonts, &error);
+                std::error_code ec;
+                fs::remove(path, ec);
+            }
+            return fonts;
+        } catch (...) {
+        }
+    }
+
+    return {};
 }
 
 bool FontManager::save_custom_fonts(
     const std::vector<CustomFontEntry>& fonts,
     std::string* error
 ) const {
-    const fs::path path = custom_fonts_path();
-    if (path.empty()) {
+    if (misty::core::settings_path().empty()) {
         if (error) {
-            *error = "Unable to resolve ~/misty/config/fonts.json.";
+            *error = "Unable to resolve ~/misty/config/settings.json.";
         }
         return false;
     }
 
-    try {
-        fs::create_directories(path.parent_path());
+    return update_settings_document([&](json& settings) {
         json data = json::array();
         for (const auto& font : fonts) {
             data.push_back({
@@ -150,22 +169,8 @@ bool FontManager::save_custom_fonts(
                 {"path", font.path},
             });
         }
-
-        std::ofstream file(path);
-        if (!file.is_open()) {
-            if (error) {
-                *error = "Failed to open ~/misty/config/fonts.json for writing.";
-            }
-            return false;
-        }
-        file << data.dump(2);
-        return true;
-    } catch (const std::exception& ex) {
-        if (error) {
-            *error = ex.what();
-        }
-        return false;
-    }
+        settings["appearance"]["custom_fonts"] = std::move(data);
+    }, error);
 }
 
 ImFont* FontManager::get_font(FontID font_id) const {
