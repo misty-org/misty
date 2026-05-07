@@ -1,4 +1,4 @@
-#include "panels/settings/appearance.h"
+#include "panels/settings/settings_appearance.h"
 
 #include <cstring>
 #include <filesystem>
@@ -7,28 +7,16 @@
 #include "core/manager/font_manager.h"
 #include "core/ui/ui_layout.h"
 #include "imgui.h"
+#include "panels/settings/settings_components.h"
 
 namespace misty::panel {
 namespace {
 
 namespace fs = std::filesystem;
 
-void section_label(const char* text) {
-    UI::text({
-        .text = text,
-        .width = UI::Size::fill(),
-        .color = ImVec4(0.82f, 0.84f, 0.88f, 1.0f),
-        .font = UI::TextFont::Small,
-    });
-}
-
-void divider(const char* id) {
-    UI::div(id, {
-        .width = UI::Size::fill(),
-        .height = UI::Size::px(0.5f),
-        .bg_color = ImVec4(0.14f, 0.16f, 0.20f, 1.0f),
-    }, []() {});
-}
+constexpr const char* kThemeOptions[] = {"System", "Dark", "Light"};
+constexpr const char* kScaleOptions[] = {"Small", "Default", "Large"};
+constexpr const char* kFontSizeOptions[] = {"Small", "Default", "Large"};
 
 void ensure_custom_fonts_loaded(SettingsState& state) {
     if (state.custom_fonts_loaded) {
@@ -147,21 +135,75 @@ void custom_font_row(SettingsState& state, int index) {
             }
         });
 
-        divider(("##custom_font_divider_" + std::to_string(index)).c_str());
+        UI::divider({
+            .color = kSettingsDividerColor,
+        });
+    });
+}
+
+void theme_section(SettingsState& state) {
+    settings_section("##appearance_theme", "Theme", {}, [&]() {
+        settings_row("##appearance_theme_mode", {
+            .start_width_pct = 0.52f,
+            .divider_color = kSettingsDividerColor,
+        }, [&]() {
+            settings_row_text("Theme mode", "Choose whether Misty follows the system appearance or uses a fixed theme.");
+        }, [&]() {
+            if (settings_select_control("##appearance_theme_mode_select", &state.theme_index, kThemeOptions, 3)) {
+                state.save_app_settings();
+            }
+        });
+
+        settings_row("##appearance_ui_scale", {
+            .start_width_pct = 0.52f,
+            .show_divider = false,
+            .divider_color = kSettingsDividerColor,
+        }, [&]() {
+            settings_row_text("UI scale", "Adjust overall interface scale and density.");
+        }, [&]() {
+            if (settings_select_control("##appearance_ui_scale_select", &state.ui_scale_index, kScaleOptions, 3)) {
+                state.save_app_settings();
+            }
+        });
+    });
+}
+
+void layout_section(SettingsState& state) {
+    settings_section("##appearance_layout", "Layout", {}, [&]() {
+        settings_row("##appearance_compact_mode", {
+            .start_width_pct = 0.52f,
+            .show_divider = false,
+            .divider_color = kSettingsDividerColor,
+        }, [&]() {
+            settings_row_text("Compact mode", "Reduce padding and spacing in file-heavy views.");
+        }, [&]() {
+            if (settings_toggle_switch("##appearance_compact_mode_toggle", &state.compact_mode_enabled)) {
+                state.save_app_settings();
+            }
+        });
+    });
+}
+
+void typography_section(SettingsState& state) {
+    settings_section("##appearance_typography", "Typography", {}, [&]() {
+        settings_row("##appearance_font_size", {
+            .start_width_pct = 0.52f,
+            .show_divider = false,
+            .divider_color = kSettingsDividerColor,
+        }, [&]() {
+            settings_row_text("Font size", "Choose the baseline text size Misty should use.");
+        }, [&]() {
+            if (settings_select_control("##appearance_font_size_select", &state.font_size_index, kFontSizeOptions, 3)) {
+                state.save_app_settings();
+            }
+        });
     });
 }
 
 void fonts_section(SettingsState& state) {
     ensure_custom_fonts_loaded(state);
 
-    UI::column("##appearance_fonts_section", {
-        .width = UI::Size::fill(),
-        .height = UI::Size::auto_size(),
-        .gap = UI::Spacing::xy(0.0f, 18.0f),
-    }, [&]() {
-        section_label("Fonts");
-        divider("##appearance_fonts_divider");
-
+    settings_section("##appearance_fonts_section", "Fonts", {}, [&]() {
         UI::text({
             .text = "Add custom fallback fonts to support filenames and text in additional languages.",
             .width = UI::Size::px(520.0f),
@@ -211,6 +253,7 @@ void fonts_section(SettingsState& state) {
                     state.status_message = error;
                     state.status_is_error = true;
                 } else {
+                    state.save_app_settings();
                     state.custom_fonts_dirty = false;
                     core::FontManager::get().queue_reload();
                     state.status_message = "Fonts will be applied.";
@@ -221,17 +264,38 @@ void fonts_section(SettingsState& state) {
         });
 
         if (!state.status_message.empty()) {
-            UI::text({
-                .text = state.status_message.c_str(),
-                .width = UI::Size::fill(),
-                .color = state.status_is_error
-                    ? ImVec4(0.88f, 0.44f, 0.44f, 1.0f)
-                    : ImVec4(0.55f, 0.82f, 0.64f, 1.0f),
-            });
+            settings_status_text(state.status_message, state.status_is_error);
         }
     });
 
     add_font_modal(state);
+}
+
+void media_section(SettingsState& state) {
+    settings_section("##appearance_media", "Media", {}, [&]() {
+        settings_row("##appearance_thumbnails", {
+            .start_width_pct = 0.52f,
+            .divider_color = kSettingsDividerColor,
+        }, [&]() {
+            settings_row_text("Thumbnail previews", "Show preview-rich file rows where supported.");
+        }, [&]() {
+            if (settings_toggle_switch("##appearance_thumbnails_toggle", &state.thumbnail_previews_enabled)) {
+                state.save_app_settings();
+            }
+        });
+
+        settings_row("##appearance_motion", {
+            .start_width_pct = 0.52f,
+            .show_divider = false,
+            .divider_color = kSettingsDividerColor,
+        }, [&]() {
+            settings_row_text("Reduced motion", "Tone down motion and animated transitions.");
+        }, [&]() {
+            if (settings_toggle_switch("##appearance_motion_toggle", &state.reduced_motion_enabled)) {
+                state.save_app_settings();
+            }
+        });
+    });
 }
 
 } // namespace
@@ -273,13 +337,12 @@ void appearance_content(SettingsState& state) {
             .height = UI::Size::auto_size(),
             .gap = UI::Spacing::xy(0.0f, 24.0f),
         }, [&]() {
-            UI::text({
-                .text = "Appearance",
-                .width = UI::Size::fill(),
-                .color = ImVec4(0.96f, 0.96f, 0.98f, 1.0f),
-                .font = UI::TextFont::BoldXLarge,
-            });
+            settings_page_title("Appearance");
+            theme_section(state);
+            layout_section(state);
+            typography_section(state);
             fonts_section(state);
+            media_section(state);
         });
     });
 }

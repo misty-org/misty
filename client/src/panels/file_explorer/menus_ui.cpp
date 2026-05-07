@@ -5,7 +5,7 @@
 
 #include "core/commands/command_manager.h"
 #include "core/file_picker/application_picker.h"
-#include "core/manager/open_with_manager.h"
+#include "core/manager/file_association_manager.h"
 #include "core/system/util.h"
 #include "panels/activity/activity_state.h"
 #include "panels/notification/notification_state.h"
@@ -47,7 +47,7 @@ bool FileExplorerPanel::open_context_menu_target(FileExplorerState& state) {
         return false;
     }
 
-    auto associated_app = OpenWithManager::get().association_for_path(file->path);
+    auto associated_app = FileAssociationManager::get().association_for_path(file->path);
     if (associated_app.has_value()) {
         return core::open_path_with_application(*associated_app, file->path);
     }
@@ -131,7 +131,7 @@ void FileExplorerPanel::show_context_menu(FileExplorerState& state) {
                 if (!target_path.empty()) {
                     core::ApplicationPicker::pick([registry = &registry_, target_path](std::optional<std::string> app) {
                         if (!app.has_value()) return;
-                        OpenWithManager::get().set_association_for_path(target_path, *app);
+                        FileAssociationManager::get().set_association_for_path(target_path, *app);
                         if (!core::open_path_with_application(*app, target_path)) {
                             auto& activity = registry->get_state<ActivityState>("Activity");
                             activity.add_entry("File", "Could not open file with selected application.", ActivityEntryType::ERROR);

@@ -135,9 +135,30 @@ public:
         const char* hint = nullptr;
         Size width = Size::fill();
         Size height = Size::auto_size();
+        Spacing padding = {};
         Align align = Align::Stretch;
         Justify justify = Justify::Start;
+        float rounding = 8.0f;
+        ImVec4 bg_color = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
+        ImVec4 border_color = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
+        ImVec4 text_color = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
         ImGuiInputTextFlags flags = ImGuiInputTextFlags_None;
+    };
+
+    struct SelectProps {
+        const char* label = "";
+        int* selected_index = nullptr;
+        const char* const* options = nullptr;
+        int option_count = 0;
+        Size width = Size::fill();
+        Size height = Size::auto_size();
+        Spacing padding = {};
+        Align align = Align::Stretch;
+        Justify justify = Justify::Start;
+        float rounding = 8.0f;
+        ImVec4 bg_color = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
+        ImVec4 border_color = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
+        ImVec4 text_color = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
     };
 
     struct DividerProps {
@@ -148,6 +169,21 @@ public:
         Justify justify = Justify::Start;
         ImVec4 color = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
         float rounding = 0.0f;
+    };
+
+    struct ImageButtonProps {
+        ImTextureID texture_id = 0;
+        Size width = Size::auto_size();
+        Size height = Size::auto_size();
+        Spacing padding = {};
+        Align align = Align::Start;
+        Justify justify = Justify::Start;
+        float rounding = 0.0f;
+        ImVec4 button_color = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
+        ImVec4 hover_color = ImVec4(1.0f, 1.0f, 1.0f, 0.08f);
+        ImVec4 active_color = ImVec4(1.0f, 1.0f, 1.0f, 0.12f);
+        ImVec4 tint_color = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
+        ImVec4 border_color = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
     };
 
 };
@@ -166,7 +202,9 @@ using BoxStyle = Layout::BoxStyle;
 using TextProps = Layout::TextProps;
 using ButtonProps = Layout::ButtonProps;
 using InputTextProps = Layout::InputTextProps;
+using SelectProps = Layout::SelectProps;
 using DividerProps = Layout::DividerProps;
+using ImageButtonProps = Layout::ImageButtonProps;
 
 bool div(const char* id, const BoxStyle& style, const std::function<void()>& content = {});
 
@@ -181,6 +219,8 @@ void spacer(float width, float height = 0.0f);
 void divider(const DividerProps& props = {});
 void text(const TextProps& props);
 bool button(const char* id, const ButtonProps& props, const std::function<void()>& content = {});
+bool image_button(const char* id, const ImageButtonProps& props);
 bool input_text(const InputTextProps& props);
+bool select(const SelectProps& props);
 
 } // namespace misty::UI
