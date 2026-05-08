@@ -7,6 +7,7 @@
 #include "panels/settings/settings_panel.h"
 #include "panels/settings/settings_shortcuts.h"
 #include "panels/settings/settings_sync.h"
+#include "panels/settings/settings_components.h"
 
 #include "core/ui/ui_layout.h"
 #include "core/ui/ui_style.h"
@@ -56,7 +57,7 @@ void SettingsPanel::settings_content(SettingsState& state) {
             .width = UI::Size::fill(),
             .height = UI::Size::fill(),
             .window_flags = ImGuiWindowFlags_AlwaysVerticalScrollbar,
-            .padding = UI::Spacing::xy(24.0f, 12.0f),
+            .padding = kSettingsShellPadding,
         }, [&]() {
             switch (state.active_section) {
                 case SettingsSection::General:
@@ -94,10 +95,10 @@ void SettingsPanel::settings_content(SettingsState& state) {
 void SettingsPanel::sidebar(SettingsState& state) {
     UI::div("##sidebar", {
         .mode = UI::Mode::ChildWindow,
-        .width = UI::Size::px(220.0f),
+        .width = UI::Size::px(180.0f),
         .height = UI::Size::fill(),
-        .padding = UI::Spacing::xy(24.0f, 12.0f),
-        .gap = UI::Spacing::xy(0.0f, 8.0f),
+        .padding = kSettingsSidebarPadding,
+        .gap = UI::Spacing::xy(0.0f, 5.0f),
     }, [&]() {
         sidebar_header(state);
         sidebar_tabs(state);
@@ -108,18 +109,19 @@ void SettingsPanel::sidebar_header(SettingsState& state) {
     UI::div("##sidebar_header", {
         .mode = UI::Mode::LayoutOnly,
         .width = UI::Size::fill(),
-        .height = UI::Size::px(48.0f),
-        .padding = UI::Spacing::xy(8.0f, 8.0f),
-        .rounding = 8.0f,
+        .height = UI::Size::auto_size(),
+        .margin = UI::Spacing::sides(0.0f, 0.0f, 0.0f, 20.0f),
     }, [&]() {
         UI::text({
             .text = "Settings",
             .width = UI::Size::fill(),
             .font = UI::TextFont::BoldXLarge,
             .color = ImVec4(0.96f, 0.96f, 0.98f, 1.0f),
+            .align = UI::Align::Start,
         });
     });
 }
+
 
 void SettingsPanel::sidebar_tabs(SettingsState& state) {
     general_tab(state);
