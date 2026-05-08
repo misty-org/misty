@@ -139,10 +139,8 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
         <DesktopSettingsFrame
           activeId={activeSection}
           ariaLabel={`${space.name} settings`}
-          hideNavigationLabel
           items={settingsItems}
           navigationLabel="Space settings sections"
-          navigationTitle={space.name}
           onClose={dismissSettings}
           onSelect={(nextSection) =>
             navigate(`/spaces/${encodedSpaceId}/settings/${nextSection}`, {

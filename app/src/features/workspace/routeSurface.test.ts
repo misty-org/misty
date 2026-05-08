@@ -1,30 +1,30 @@
 import { describe, expect, it } from "vitest";
-import {
-  shouldReturnWorkspaceHome,
-  workspaceSurfaceFromRoute,
-  workspaceTabMatchesRoute,
-} from "./routeSurface";
+import { workspaceSurfaceFromRoute, workspaceTabMatchesRoute } from "./routeSurface";
 
 describe("workspace deep links", () => {
-  it("keeps Home outside the desktop workspace", () => {
-    expect(workspaceSurfaceFromRoute("/home")).toBeNull();
+  it("keeps Settings outside the desktop workspace", () => {
+    expect(workspaceSurfaceFromRoute("/settings")).toBeNull();
   });
 
-  it("groups Space deep links by decoded Space id", () => {
+  it("gives each Space tool its own tab identity within the decoded Space scope", () => {
     expect(workspaceSurfaceFromRoute("/spaces/product%20launch/planner")).toMatchObject({
       surfaceId: "space",
-      groupKey: "space:product launch",
+      groupKey: "space:product launch:planner",
+      scopeKey: "space:product launch",
+      title: "Planner",
       route: "/spaces/product%20launch/planner",
     });
   });
 
-  it("keeps nested routes in the same Space workspace", () => {
+  it("matches nested routes only within the same Space tool tab", () => {
     const tab = {
       surfaceId: "space" as const,
-      groupKey: "space:product launch" as const,
+      groupKey: "space:product launch:journal" as const,
     };
 
     expect(workspaceTabMatchesRoute(tab, "/spaces/product%20launch/notes")).toBe(true);
+    expect(workspaceTabMatchesRoute(tab, "/spaces/product%20launch/drawings/one")).toBe(true);
+    expect(workspaceTabMatchesRoute(tab, "/spaces/product%20launch/planner")).toBe(false);
     expect(workspaceTabMatchesRoute(tab, "/spaces/another-space/notes")).toBe(false);
   });
 
@@ -33,7 +33,6 @@ describe("workspace deep links", () => {
     ["/terminal", "terminal"],
     ["/code", "code"],
     ["/files", "files"],
-    ["/transfers", "transfers"],
     ["/agents", "agents"],
     ["/extensions", "extensions"],
   ])("maps %s to the %s surface", (route, surfaceId) => {
@@ -41,10 +40,14 @@ describe("workspace deep links", () => {
   });
 });
 
-describe("workspace empty-route transition", () => {
-  it("returns Home only after the final existing tab closes", () => {
-    expect(shouldReturnWorkspaceHome(1, 0, "/browser")).toBe(true);
-    expect(shouldReturnWorkspaceHome(0, 0, "/browser")).toBe(false);
-    expect(shouldReturnWorkspaceHome(1, 0, "/home")).toBe(false);
+describe("home route", () => {
+  it("resolves to a stackable Home surface", () => {
+    // Home used to resolve to null, which meant it could only switch scope and
+    // never open a tab. It is an ordinary, stackable tab now.
+    expect(workspaceSurfaceFromRoute("/home")).toMatchObject({
+      surfaceId: "home",
+      groupKey: "tool:home",
+      instancePolicy: "multiple",
+    });
   });
 });

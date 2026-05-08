@@ -2,17 +2,18 @@ import { routes, useAppRouteMemoryStore, useAppStore } from "@/features/app-shel
 import { ProvidersWorkspacePanel, useProvidersStore } from "@/features/providers";
 import {
   selectAdvancedPreferences,
+  selectFilePreferences,
   selectGeneralPreferences,
   selectShortcutPreferences,
   useSettingsStore,
 } from "@/features/settings";
-import { TransfersWorkspacePanel } from "@/features/transfers";
 import { useMultiPanelStore } from "@/features/workspace";
 import { useTransientScrollbars } from "@/shared/hooks/useTransientScrollbars";
 import { isAndroidBuild } from "@/shared/platform/buildTarget";
 import { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
+import { ChromeTabShell } from "./ChromeTabShell";
 import { ExplorerLoadingShell } from "../components/ExplorerLoadingShell";
 import { ExplorerPane } from "../components/ExplorerPane";
 import { ExplorerSidebar } from "../components/ExplorerSidebar";
@@ -32,8 +33,6 @@ import {
   ExplorerTray,
   isChromeTabPath,
   isRemotesTabPath,
-  isTransfersTabPath,
-  openTransfersTab,
   parsePluginTabPath,
 } from "./ExplorerDesktopPlugins";
 import { cx } from "./ExplorerDesktopShared";
@@ -155,6 +154,20 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
   const shortcutPreferences = useSettingsStore(
     useShallow((state) => selectShortcutPreferences(state.settings?.document)),
   );
+  const filePreferences = useSettingsStore(
+    useShallow((state) => selectFilePreferences(state.settings?.document)),
+  );
+
+  useEffect(() => {
+    // Seeds the store-wide defaults a freshly opened pane inherits. Per-pane
+    // overrides from the toolbar live in `paneViewModes`/`paneShowHidden` and
+    // keep winning, so changing the default never yanks an open pane around.
+    if (!settingsLoaded) return;
+    useExplorerStore.setState({
+      showHidden: filePreferences.showHiddenFiles,
+      viewMode: filePreferences.defaultViewModeIndex === 1 ? "grid" : "list",
+    });
+  }, [filePreferences.defaultViewModeIndex, filePreferences.showHiddenFiles, settingsLoaded]);
   const environmentHomePath = app?.environment.homeDir ?? "/";
   const storageHomePath = resolvePreferredWorkspaceRoot(
     preferredWorkspaceRoot,
@@ -186,6 +199,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
     embedded: props.embedded,
     navigate,
   });
+
   const extensionsEnabled = !isAndroidBuild;
   useLegacyPluginTabMigration({ extensionsEnabled, homePath, navigate, workspacePathSignature });
   const activePaneIdRef = useRef(activePaneId);
@@ -300,15 +314,16 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
   );
   const renderPane = useCallback(
     (paneId: string, path: string) => {
+      // The dock supplies the tab strip, not the pane's own controls, so these
+      // belong to the embedded view just as much as the standalone route.
       const paneActions =
-        !props.embedded && activePaneId === paneId ? (
-          <ExplorerPaneHeaderActions paneId={paneId} />
-        ) : undefined;
-      if (isTransfersTabPath(path)) {
-        return <TransfersWorkspacePanel workspaceId={paneId} />;
-      }
+        activePaneId === paneId ? <ExplorerPaneHeaderActions paneId={paneId} /> : undefined;
       if (isRemotesTabPath(path)) {
-        return <ProvidersWorkspacePanel workspaceId={paneId} />;
+        return (
+          <ChromeTabShell embedded={props.embedded} label="Remotes" homePath={homePath}>
+            <ProvidersWorkspacePanel workspaceId={paneId} />
+          </ChromeTabShell>
+        );
       }
       if (path === libraryWorkspacePath) {
         return <LibraryWorkspace paneId={paneId} workingDirectory={homePath} />;
@@ -432,7 +447,6 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
             canOpenTerminalPath(activePath)
           }
           terminalPath={activePath}
-          onOpenTransfers={() => navigate(openTransfersTab().route)}
         />
       ),
     [

@@ -20,5 +20,6 @@ export {
   isTransfersTabPath,
   openTransfersTab,
   parsePluginTabPath,
+  returnToBrowseTab,
   toggleActiveTabPanelVisibility,
 } from "./explorerPlugins/tabPaths";

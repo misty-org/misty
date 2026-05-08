@@ -18,9 +18,6 @@ import { QuickInput, type QuickInputMode } from "./quickinput/QuickInput";
 import { useCodingWorkspaceStore } from "./store/useCodingWorkspaceStore";
 import { useFileWatcher } from "./watcher/useFileWatcher";
 
-const AiSettingsDialog = lazy(() =>
-  import("./ai/AiSettingsDialog").then((module) => ({ default: module.AiSettingsDialog })),
-);
 const InlineRewrite = lazy(() =>
   import("./ai/InlineRewrite").then((module) => ({ default: module.InlineRewrite })),
 );
@@ -63,8 +60,11 @@ export function CodingWorkspace() {
   const clearGit = useGitStore((state) => state.clear);
 
   const [quickInputMode, setQuickInputMode] = useState<QuickInputMode | null>(null);
-  const [aiSettingsOpen, setAiSettingsOpen] = useState(false);
   const [inlineRequest, setInlineRequest] = useState<InlineRequest | null>(null);
+
+  const openModelsSettings = useCallback(() => {
+    window.dispatchEvent(new CustomEvent("misty:open-settings", { detail: { section: "models" } }));
+  }, []);
 
   const filesRef = useRef<ImperativePanelHandle | null>(null);
 
@@ -271,19 +271,14 @@ export function CodingWorkspace() {
         </Panel>
       </PanelGroup>
 
-      <CodeStatusBar onOpenAiSettings={() => setAiSettingsOpen(true)} />
+      <CodeStatusBar onOpenAiSettings={openModelsSettings} />
 
       <QuickInput
         mode={quickInputMode}
         onClose={() => setQuickInputMode(null)}
-        onOpenSettings={() => setAiSettingsOpen(true)}
+        onOpenSettings={openModelsSettings}
         onOpenTerminal={openDockedTerminal}
       />
-      {aiSettingsOpen ? (
-        <Suspense fallback={null}>
-          <AiSettingsDialog open onClose={() => setAiSettingsOpen(false)} />
-        </Suspense>
-      ) : null}
       {inlineRequest ? (
         <Suspense fallback={null}>
           <InlineRewrite
@@ -294,7 +289,7 @@ export function CodingWorkspace() {
             onClose={() => setInlineRequest(null)}
             onApply={applyInlineRewrite}
             onOpenSettings={() => {
-              setAiSettingsOpen(true);
+              openModelsSettings();
               setInlineRequest(null);
             }}
           />

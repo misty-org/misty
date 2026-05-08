@@ -1,5 +1,16 @@
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
+import { browserHomeUrl } from "./browserHome";
+export * from "./browserSearchEngine";
+import { blankBrowserUrl } from "./browserUrl";
+
+export { blankBrowserUrl } from "./browserUrl";
+export {
+  browserHomeUrl,
+  configureBrowserHomeUrl,
+  defaultBrowserHomeUrl,
+  normalizeBrowserHomeUrl,
+} from "./browserHome";
 
 export type WorkspaceSurfaceId =
   | "home"
@@ -25,11 +36,7 @@ export interface BrowserTabState {
   faviconUrl: string | null;
 }
 
-export const blankBrowserUrl = "about:blank";
-/** Where a browser tab starts when nothing else asked for a URL. */
-export const defaultBrowserHomeUrl = "https://www.google.com";
-
-export function createBrowserTabState(url = defaultBrowserHomeUrl): BrowserTabState {
+export function createBrowserTabState(url = browserHomeUrl()): BrowserTabState {
   return {
     version: 1,
     url,
@@ -41,9 +48,7 @@ export function parseBrowserTabState(value: unknown): BrowserTabState {
   if (!value || typeof value !== "object") return createBrowserTabState();
   const candidate = value as Partial<BrowserTabState>;
   const url =
-    typeof candidate.url === "string" && candidate.url.trim()
-      ? candidate.url
-      : defaultBrowserHomeUrl;
+    typeof candidate.url === "string" && candidate.url.trim() ? candidate.url : browserHomeUrl();
   return {
     version: 1,
     url,
@@ -147,6 +152,8 @@ export interface WorkspaceSnapshot {
 export interface OpenWorkspaceSurfaceRequest {
   surfaceId: WorkspaceSurfaceId;
   groupKey: WorkspaceGroupKey;
+  /** Layout scope is separate from tab identity for tools hosted by a Space. */
+  scopeKey?: WorkspaceScopeKey;
   title: string;
   route: string;
   instanceKey?: string;

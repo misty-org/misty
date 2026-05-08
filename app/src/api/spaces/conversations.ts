@@ -57,6 +57,18 @@ export function createSpaceConversationsApi(request: SpaceRequest) {
       libraryItemIds: string[] = [],
       replyToMessageId = "",
       clientNonce = "",
+      inputModality: "text" | "voice" = "text",
+      directAgent?: {
+        agentId: string;
+        timezone?: string;
+        contextReferences: Array<{
+          device_id: string;
+          kind: "browser_tab" | "project_root";
+          opaque_ref: string;
+          display_name?: string;
+          capabilities: string[];
+        }>;
+      },
     ) =>
       request<{
         message: SpaceMessage;
@@ -72,6 +84,16 @@ export function createSpaceConversationsApi(request: SpaceRequest) {
             library_item_ids: libraryItemIds,
             reply_to_message_id: replyToMessageId,
             client_nonce: clientNonce,
+            input_modality: inputModality,
+            agent_invocations: directAgent
+              ? [
+                  {
+                    agent_id: directAgent.agentId,
+                    timezone: directAgent.timezone,
+                    context_references: directAgent.contextReferences,
+                  },
+                ]
+              : agentInvocations(content),
           }),
         },
       ),
@@ -91,6 +113,14 @@ export function createSpaceConversationsApi(request: SpaceRequest) {
     addConversationMessageReaction: reactionRequest(request, "PUT"),
     removeConversationMessageReaction: reactionRequest(request, "DELETE"),
   };
+}
+
+function agentInvocations(content: MessageSpan[]) {
+  const ids = new Set<string>();
+  for (const span of content) {
+    if (span.type === "mention" && "agent_id" in span && span.agent_id) ids.add(span.agent_id);
+  }
+  return [...ids].map((agent_id) => ({ agent_id }));
 }
 
 function deleteConversation(request: SpaceRequest, spaceId: string, conversationId: string) {

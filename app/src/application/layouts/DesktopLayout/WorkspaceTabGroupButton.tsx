@@ -79,10 +79,13 @@ export function WorkspaceTabGroupButton({
     <div
       draggable={displayTab !== undefined}
       className={cn(
-        "group/tab flex h-8 w-[180px] shrink-0 items-center rounded-t-md border border-b-0 text-xs",
+        // Tabs take the width their label needs, down to a floor, so a short
+        // one never claims a browser tab's worth of the strip.
+        "group/tab flex h-7 min-w-[92px] max-w-[196px] items-center rounded-md border text-xs",
+        "transition-all duration-150 select-none",
         containsActive
-          ? "border-charcoal-border bg-charcoal-bg text-cream-bright"
-          : "border-transparent text-cream-muted hover:bg-charcoal-card/60 hover:text-cream",
+          ? "border-charcoal-border/70 bg-charcoal-card text-cream-bright shadow-sm"
+          : "border-transparent text-cream-muted hover:bg-charcoal-card/40 hover:text-cream",
       )}
       onDragStart={(event) => {
         if (!displayTab) return;
@@ -131,11 +134,15 @@ export function WorkspaceTabGroupButton({
             />
           </span>
         ) : (
-          <Icon size={14} className="shrink-0" strokeWidth={1.7} />
+          <Icon
+            size={14}
+            className={cn("shrink-0", containsActive ? "text-cream-bright" : "text-cream-muted")}
+            strokeWidth={1.7}
+          />
         )}
-        <span className="min-w-0 flex-1 overflow-hidden whitespace-nowrap [mask-image:linear-gradient(to_right,black_calc(100%-18px),transparent_100%)]">
-          {displayLabel}
-        </span>
+        {/* Tabs are sized to their label, so the overflow cue has to be one
+            that only appears when the text really does not fit. */}
+        <span className="min-w-0 flex-1 truncate">{displayLabel}</span>
         {group.tabs.length > 1 ? (
           <span className="ml-1 shrink-0 rounded bg-charcoal-card px-1 text-[10px] leading-4 text-cream-muted">
             {group.tabs.length}

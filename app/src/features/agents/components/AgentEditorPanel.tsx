@@ -1,9 +1,6 @@
-import { useSpacesStore } from "@/features/spaces";
 import {
   Button,
-  Checkbox,
   Input,
-  Label,
   Select,
   SelectContent,
   SelectItem,
@@ -12,23 +9,13 @@ import {
   Textarea,
 } from "@/shared/ui";
 import { Trash2 } from "lucide-react";
-import type { ReasoningEffort } from "../model/interfaces/personal";
+import type { AgentRunMode, ReasoningEffort } from "../model/interfaces/personal";
 import type { AgentEditorState } from "../useAgentEditor";
 import { AgentEditorField as Field } from "./AgentEditorField";
 import { AgentModelPicker } from "./AgentModelPicker";
-import { PersonalAgentToolboxFieldset } from "./PersonalAgentToolboxFieldset";
-
-const CONTEXT_LABELS = {
-  space_chat: "Chat",
-  library: "Library",
-  notes: "Task notes",
-  tasks: "Planner",
-  members: "Members",
-};
 
 /** The Agent form, filling the right half of the Agents tab. */
 export function AgentEditorPanel({ editor }: { editor: AgentEditorState }) {
-  const spaces = useSpacesStore((state) => state.spaces);
   const isNew = editor.editing === "new";
 
   return (
@@ -65,7 +52,7 @@ export function AgentEditorPanel({ editor }: { editor: AgentEditorState }) {
       <div className="misty-transient-scrollbar min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto grid max-w-2xl gap-4 px-6 py-5">
           <p className="m-0 text-sm text-cream-muted">
-            Configure the reusable identity and choose the Spaces where this Agent is a member.
+            Give this Agent a name and describe how it should help.
           </p>
           <Field label="Name">
             <Input
@@ -74,106 +61,96 @@ export function AgentEditorPanel({ editor }: { editor: AgentEditorState }) {
               onChange={(event) => editor.setName(event.target.value)}
             />
           </Field>
-          <Field label="Description">
+          <Field label="Avatar (optional)">
             <Input
-              value={editor.description}
-              maxLength={400}
-              onChange={(event) => editor.setDescription(event.target.value)}
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              onChange={(event) => editor.setAvatarFile(event.target.files?.[0] ?? null)}
             />
           </Field>
-          <Field label="Instructions">
+          <Field label="What should this Agent help with?">
             <Textarea
               value={editor.instructions}
               rows={6}
               onChange={(event) => editor.setInstructions(event.target.value)}
             />
           </Field>
-          <Field label="Model">
-            <AgentModelPicker
-              models={editor.models}
-              value={editor.modelId}
-              onValueChange={editor.setModelId}
-              className="w-full border border-charcoal-border bg-charcoal-bg"
-            />
-          </Field>
-          <Field label="Reasoning effort">
-            <Select
-              value={editor.reasoningEffort || "medium"}
-              onValueChange={(value) => editor.setReasoningEffort(value as ReasoningEffort)}
-              disabled={!editor.supportsReasoning}
-            >
-              <SelectTrigger className="w-full border border-charcoal-border bg-charcoal-bg">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="low">Low</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="high">High</SelectItem>
-              </SelectContent>
-            </Select>
-            <span className="text-xs text-cream-muted">
-              {editor.supportsReasoning
-                ? "Higher effort means deeper reasoning and slower, costlier replies."
-                : "This model doesn't support adjustable reasoning. Pick a reasoning model to enable it."}
-            </span>
-          </Field>
-          <fieldset className="grid gap-2 rounded-lg border border-charcoal-border p-3">
-            <legend className="px-1 text-sm font-medium">Readable Space context</legend>
-            {Object.entries(CONTEXT_LABELS).map(([key, label]) => (
-              <Label className="flex items-center gap-2 font-normal" key={key}>
-                <Checkbox
-                  checked={editor.contextPermissions[key as keyof typeof CONTEXT_LABELS]}
-                  onCheckedChange={(checked) =>
-                    editor.setContextPermissions((current) => ({
-                      ...current,
-                      [key]: checked === true,
-                    }))
-                  }
+          <details className="rounded-xl border border-charcoal-border bg-charcoal-card p-4">
+            <summary className="cursor-pointer text-sm font-medium text-cream">
+              Advanced preferences
+            </summary>
+            <div className="mt-4 grid gap-4">
+              <Field label="Description">
+                <Input
+                  value={editor.description}
+                  maxLength={400}
+                  onChange={(event) => editor.setDescription(event.target.value)}
                 />
-                {label}
-              </Label>
-            ))}
-          </fieldset>
-          <PersonalAgentToolboxFieldset
-            actions={editor.toolbox.actions}
-            activity={editor.toolbox.activity}
-            loaded={editor.toolbox.loaded}
-            onActionsChange={editor.toolbox.setActions}
-            disabledSurfaces={editor.disabledSurfaces}
-            onDisabledSurfacesChange={editor.setDisabledSurfaces}
-          />
-          <fieldset className="grid gap-3 rounded-lg border border-charcoal-border p-3">
-            <legend className="px-1 text-sm font-medium">Share in Spaces</legend>
-            {spaces.map((space) => {
-              const grant = editor.grants[space.id] ?? {
-                enabled: false,
-                allMembers: true,
-                memberUserIds: [],
-              };
-              return (
-                <div className="grid gap-2" key={space.id}>
-                  <Label className="flex items-center gap-2 font-normal">
-                    <Checkbox
-                      checked={grant.enabled}
-                      onCheckedChange={(checked) =>
-                        editor.setGrants((current) => ({
-                          ...current,
-                          [space.id]: { ...grant, enabled: checked === true },
-                        }))
-                      }
-                    />
-                    {space.name}
-                  </Label>
-                  {grant.enabled ? (
-                    <p className="mb-0 ml-6 mt-0 text-xs text-cream-muted">
-                      Visible to everyone in this Space. Invocation is controlled by each
-                      member&apos;s Agents permission.
-                    </p>
-                  ) : null}
-                </div>
-              );
-            })}
-          </fieldset>
+              </Field>
+              <Field label="Model">
+                <AgentModelPicker
+                  models={editor.models}
+                  value={editor.modelId}
+                  onValueChange={editor.setModelId}
+                  className="w-full border border-charcoal-border bg-charcoal-bg"
+                />
+              </Field>
+              <Field label="Reasoning effort">
+                <Select
+                  value={editor.reasoningEffort || "medium"}
+                  onValueChange={(value) => editor.setReasoningEffort(value as ReasoningEffort)}
+                  disabled={!editor.supportsReasoning}
+                >
+                  <SelectTrigger className="w-full border border-charcoal-border bg-charcoal-bg">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                  </SelectContent>
+                </Select>
+                <span className="text-xs text-cream-muted">
+                  {editor.supportsReasoning
+                    ? "Higher effort means deeper reasoning and slower, costlier replies."
+                    : "This model doesn't support adjustable reasoning. Pick a reasoning model to enable it."}
+                </span>
+              </Field>
+              <Field label="Default run mode">
+                <Select
+                  value={editor.defaultRunMode}
+                  onValueChange={(value) => editor.setDefaultRunMode(value as AgentRunMode)}
+                >
+                  <SelectTrigger className="w-full border border-charcoal-border bg-charcoal-bg">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ask">Ask for approval</SelectItem>
+                    <SelectItem value="auto">Approve routine work</SelectItem>
+                    <SelectItem value="full">Full access</SelectItem>
+                  </SelectContent>
+                </Select>
+                <span className="text-xs text-cream-muted">
+                  Dangerous actions always ask, including deletion, pushes, credentials, and member
+                  changes.
+                </span>
+              </Field>
+              <Field label="Voice">
+                <Select value={editor.voiceId} onValueChange={editor.setVoiceId}>
+                  <SelectTrigger className="w-full border border-charcoal-border bg-charcoal-bg">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="alloy">Alloy</SelectItem>
+                    <SelectItem value="coral">Coral</SelectItem>
+                    <SelectItem value="nova">Nova</SelectItem>
+                    <SelectItem value="sage">Sage</SelectItem>
+                    <SelectItem value="verse">Verse</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+            </div>
+          </details>
           {editor.error ? <p className="m-0 text-sm text-cream-bright">{editor.error}</p> : null}
         </div>
       </div>

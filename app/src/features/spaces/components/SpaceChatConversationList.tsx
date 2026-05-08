@@ -35,9 +35,11 @@ export function SpaceChatConversationList({
   isMistySpace?: boolean;
 }) {
   const mistyConversations = conversations.filter(
-    (conversation) => conversation.origin !== "discord",
+    (conversation) => conversation.origin !== "discord" && !conversation.direct_agent_id,
   );
-  const discord = conversations.filter((conversation) => conversation.origin === "discord");
+  const discord = conversations.filter(
+    (conversation) => conversation.origin === "discord" && !conversation.direct_agent_id,
+  );
 
   return (
     <div className="grid gap-3">

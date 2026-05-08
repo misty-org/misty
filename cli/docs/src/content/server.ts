@@ -128,7 +128,11 @@ export const serverPages: DocPage[] = [
         title: "Environment behavior",
         blocks: [
           p(
-            "The command runs from the server directory and explicitly selects compose.dev.yml with .env.dev. On first use it also enables Connected Devices and creates persistent local pairing and ticket secrets. The Go server itself does not load an environment file.",
+            "The command runs from the server directory and explicitly selects compose.dev.yml with .env.dev. It starts the Space Agent workflow runtime and its isolated Postgres database along with the API, so no separate agent command is needed. On first use it also enables Connected Devices and creates persistent local pairing and ticket secrets. The Go server itself does not load an environment file.",
+          ),
+          note(
+            "Agent model access",
+            "Set AI_GATEWAY_API_KEY in server/.env.dev before assigning work to an agent. The stack can start without it, but agent runs will fail until the runtime can access AI Gateway.",
           ),
           note(
             "Attached mode",

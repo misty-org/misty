@@ -13,7 +13,7 @@ const leaseHeartbeatMs = 20_000;
 const activePollMs = 750;
 const idlePollMs = 4_000;
 const hiddenPollMs = 15_000;
-const nodeExecutionTimeoutMs = 60_000;
+const nodeExecutionTimeoutMs = 5 * 60_000;
 
 export class DesktopAgentJobWorker {
   private stopped = true;
@@ -110,6 +110,7 @@ async function executeWorkflowNodeOnDevice(
   job: ClaimedWorkflowNodeJob["job"],
 ): Promise<Record<string, unknown>> {
   if (job.operation.startsWith("browser.")) {
+    await registerRunBoundBrowserContext(job);
     return invoke<Record<string, unknown>>("browser_agent_execute", {
       request: browserAgentExecutionRequest(job),
     });
@@ -152,7 +153,8 @@ async function executeWorkflowNodeOnDevice(
 }
 
 export function browserAgentExecutionRequest(job: ClaimedWorkflowNodeJob["job"]) {
-  if (!job.operation.startsWith("browser.") || !job.deviceGrantId || !job.scopeId) {
+  const contextId = job.contextId;
+  if (!job.operation.startsWith("browser.") || !contextId || !job.scopeId) {
     throw new Error("invalid_browser_grant");
   }
   const agentId =
@@ -162,11 +164,39 @@ export function browserAgentExecutionRequest(job: ClaimedWorkflowNodeJob["job"])
   if (!agentId) throw new Error("invalid_browser_grant");
   return {
     scopeId: job.scopeId,
-    grantId: job.deviceGrantId,
+    grantId: contextId,
     agentId,
     operation: job.operation,
     input: job.input && typeof job.input === "object" ? job.input : {},
   };
+}
+
+async function registerRunBoundBrowserContext(job: ClaimedWorkflowNodeJob["job"]): Promise<void> {
+  const contextId = job.contextId;
+  const config =
+    job.config && typeof job.config === "object" ? (job.config as Record<string, unknown>) : {};
+  const agentId = String(config.agentId || "");
+  const capabilities = Array.isArray(config.contextCapabilities)
+    ? config.contextCapabilities.map(String)
+    : [];
+  const expiresAt = String(config.contextExpiresAt || "");
+  if (!contextId || !agentId || !expiresAt || capabilities.length === 0) {
+    throw new Error("invalid_browser_grant");
+  }
+  await invoke("browser_agent_grant_register", {
+    request: {
+      id: browserRuntimeIdForScope(job.scopeId),
+      scopeId: job.scopeId,
+      grantId: contextId,
+      agentId,
+      capabilities,
+      expiresAt,
+    },
+  });
+}
+
+function browserRuntimeIdForScope(scopeId: string): string {
+  return scopeId.startsWith("scope-") ? scopeId.slice("scope-".length) : scopeId;
 }
 
 export function deviceContentReference(
@@ -263,7 +293,7 @@ export interface ClaimedWorkflowNodeJob {
     nodeId: string;
     scopeId: string;
     operation: string;
-    deviceGrantId?: string;
+    contextId?: string;
     attempt: number;
     input: unknown;
     config: unknown;

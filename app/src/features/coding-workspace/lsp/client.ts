@@ -21,7 +21,10 @@ export class LspClient {
   private startPromise: Promise<void> | null = null;
   private starting = false;
 
-  constructor(readonly language: string, readonly cwd: string) {}
+  constructor(
+    readonly language: string,
+    readonly cwd: string,
+  ) {}
 
   onMessage(handler: Handler): () => void {
     this.handlers.add(handler);

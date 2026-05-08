@@ -31,7 +31,7 @@ export function createSpaceChatApi(request: SpaceRequest) {
             model_id: agent.model_id,
             enabled: agent.enabled,
             status: agent.work_state,
-            version: agent.approved_version,
+            version: agent.version,
             schedules_enabled: false,
             created_at: agent.created_at,
             updated_at: agent.updated_at,
@@ -69,6 +69,7 @@ export function createSpaceChatApi(request: SpaceRequest) {
           library_item_ids: libraryItemIds,
           reply_to_message_id: replyToMessageId,
           client_nonce: clientNonce,
+          agent_invocations: agentInvocations(content),
         }),
       }),
     runDetail: (runId: string) => request<SpaceRunDetail>(`/runs/${encodeURIComponent(runId)}`),
@@ -111,4 +112,12 @@ export function createSpaceChatApi(request: SpaceRequest) {
         body: JSON.stringify({ seq }),
       }),
   };
+}
+
+function agentInvocations(content: MessageSpan[]) {
+  const ids = new Set<string>();
+  for (const span of content) {
+    if (span.type === "mention" && "agent_id" in span && span.agent_id) ids.add(span.agent_id);
+  }
+  return [...ids].map((agent_id) => ({ agent_id }));
 }

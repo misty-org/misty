@@ -28,10 +28,12 @@ describe("navigator layout", () => {
       width: "icons",
       visibility: "sticky",
     });
-    expect(readNavigatorLayout(storage({ [legacyNavigatorCollapsedStorageKey]: "false" }))).toEqual({
-      width: "full",
-      visibility: "sticky",
-    });
+    expect(readNavigatorLayout(storage({ [legacyNavigatorCollapsedStorageKey]: "false" }))).toEqual(
+      {
+        width: "full",
+        visibility: "sticky",
+      },
+    );
   });
 
   it("migrates the older single three-state mode", () => {
@@ -68,6 +70,6 @@ describe("navigator layout", () => {
   });
 
   it("resolves the expected shell widths", () => {
-    expect(navigatorWidths).toEqual({ full: 232, icons: 72, hidden: 0 });
+    expect(navigatorWidths).toEqual({ full: 264, icons: 72, hidden: 0 });
   });
 });

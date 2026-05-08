@@ -2,7 +2,7 @@ import type { FramePacingState } from "@/application/layouts/model/types";
 
 export const desktopFrameClass = [
   "relative isolate grid h-full min-h-0",
-  "grid-rows-[28px_minmax(0,1fr)] overflow-hidden bg-charcoal-workspace text-cream",
+  "grid-rows-[36px_minmax(0,1fr)] overflow-hidden bg-charcoal-workspace text-cream",
 ].join(" ");
 
 export const tabletFrameClass = [
@@ -10,19 +10,20 @@ export const tabletFrameClass = [
   "grid-rows-[minmax(0,1fr)] overflow-hidden bg-charcoal-workspace pb-6 pt-7 text-cream",
 ].join(" ");
 
-export const desktopNavbarClass = "relative z-10 col-start-1 row-start-2 min-h-0 overflow-hidden";
+export const desktopNavbarClass =
+  "relative z-10 col-start-1 row-span-2 row-start-1 min-h-0 overflow-hidden";
 export const tabletNavbarClass = "relative z-10 col-start-1 row-start-1 min-h-0 overflow-hidden";
 
 // An auto-hiding navigator floats over the workspace instead of taking a grid
 // column, so revealing it never reflows the surfaces underneath.
 export const desktopFloatingNavbarClass =
-  "absolute bottom-0 left-0 top-7 z-40 shadow-[0_18px_44px_rgba(0,0,0,0.6)]";
+  "absolute bottom-0 left-0 top-0 z-40 shadow-[0_18px_44px_rgba(0,0,0,0.6)]";
 export const tabletFloatingNavbarClass =
   "absolute bottom-6 left-0 top-7 z-40 shadow-[0_18px_44px_rgba(0,0,0,0.6)]";
 export const navigatorRevealStripClass = "absolute inset-y-0 left-0 z-30 w-2";
 
 export const desktopRouteShellClass =
-  "relative z-10 col-start-2 row-start-2 min-h-0 overflow-hidden bg-charcoal-bg";
+  "relative z-10 col-start-2 row-span-2 row-start-1 min-h-0 overflow-hidden bg-charcoal-bg";
 export const tabletRouteShellClass =
   "relative z-10 col-start-2 row-start-1 min-h-0 overflow-hidden bg-charcoal-bg";
 
@@ -98,27 +99,37 @@ export const workStatusPopupClass = [
 export const workStatusPulseClass = "size-2.5 rounded-full bg-status-green";
 export const workStatusToastDurationMs = 3500;
 
+// Where the top band's controls stop: traffic lights plus the shell's own
+// buttons, with a gap. The dock header keeps its tabs to the right of this,
+// minus whatever width the navigator rail already covers.
+export const desktopTitlebarControlsEnd = 216;
+export const windowsTitlebarControlsEnd = 76;
+// Breathing room around the dock header's tab row, on every edge that is not
+// already spoken for by the titlebar controls.
+export const dockHeaderPadding = 8;
+
+// The window's top band is 38px: tall enough that the strip above the dock
+// tabs is a comfortable drag target. It stays click-through so the tabs
+// underneath keep working; the rail strip and the dock header do the dragging.
 export const desktopTitlebarClass =
-  "group/titlebar relative z-10 col-span-full row-start-1 h-full select-none border-b border-charcoal-border bg-charcoal-workspace";
+  "group/titlebar pointer-events-none absolute inset-x-0 top-0 z-30 h-[38px] select-none";
+
+// Empty band at the top of the rail: it lines the traffic lights up with the
+// dock header and gives the whole left side back to window dragging.
+export const navigatorTitlebarStripClass = "h-[38px] w-full shrink-0 select-none";
 
 export const desktopWallpaperLayerClass = "hidden";
 
-export const desktopTitlebarTitleClass =
-  "pointer-events-none absolute inset-x-28 top-0 flex h-full min-w-0 items-center justify-center truncate text-[13px] font-medium leading-none text-cream-muted";
-
-export const windowsTitlebarTitleClass =
-  "pointer-events-none absolute inset-y-0 left-3.5 right-[152px] flex min-w-0 items-center justify-start truncate text-[13px] font-medium leading-none text-cream-muted";
-
-export const desktopTitlebarDoubleClickLayerClass = "absolute inset-0 cursor-default";
 export const desktopTitlebarNavigationClass =
-  "absolute left-[76px] top-0 z-[4] flex h-full items-center gap-1";
+  "pointer-events-auto absolute top-0 z-[4] flex h-[38px] items-center pt-[3px] gap-3";
 export const desktopTitlebarNavigationButtonClass = [
   "grid size-7 place-items-center rounded-md border-0 bg-transparent p-0 text-cream-muted",
   "transition-colors hover:bg-charcoal-card hover:text-cream-bright",
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-charcoal-active",
   "disabled:pointer-events-none disabled:text-cream-faint/35",
 ].join(" ");
-export const windowsTitlebarControlsClass = "absolute right-0 top-0 z-[3] grid h-full grid-cols-3";
+export const windowsTitlebarControlsClass =
+  "pointer-events-auto absolute right-0 top-0 z-[3] grid h-full grid-cols-3";
 
 export const windowsTitlebarControlButtonClass =
   "grid h-full w-[46px] place-items-center border-0 bg-transparent p-0 text-cream-muted transition-colors hover:bg-charcoal-hover hover:text-cream";

@@ -13,8 +13,6 @@ import { useShallow } from "zustand/react/shallow";
 import { preferredMistySpace } from "../mistySpace";
 import { useSpacesStore } from "../store/useSpacesStore";
 import { CreateEditConversationDialog } from "./CreateEditConversationDialog";
-import { SpaceManagementNavigation } from "./SpaceManagementNavigation";
-import { SpaceSectionNavigation } from "./SpaceSectionNavigation";
 import { SpacePanelSidebarContext } from "./spacePanel/SpacePanelSidebarContext";
 import { SpacePanelSkeleton } from "./spacePanel/SpacePanelSkeleton";
 import { SpaceSidebarHeader } from "./spacePanel/SpaceSidebarHeader";
@@ -126,12 +124,7 @@ export function SpacePanelContent(props: {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {activeSpace ? (
-        <SpaceSidebarHeader
-          space={activeSpace}
-          actions={<SpaceManagementNavigation space={activeSpace} section={section} />}
-        />
-      ) : null}
+      {activeSpace ? <SpaceSidebarHeader space={activeSpace} /> : null}
 
       {props.notices ? (
         <div className="misty-transient-scrollbar mb-3 max-h-40 shrink-0 overflow-y-auto">
@@ -143,12 +136,7 @@ export function SpacePanelContent(props: {
         <SpacePanelSkeleton />
       ) : activeSpaceId ? (
         <div className="misty-transient-scrollbar -mx-3 min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3 pb-2 [overscroll-behavior:contain]">
-          <SpaceSectionNavigation spaceId={activeSpaceId} section={section} />
-          {activeSpaceNavigation ? (
-            <div className="mt-3 border-t border-charcoal-border/45 pt-3">
-              {activeSpaceNavigation}
-            </div>
-          ) : null}
+          {activeSpaceNavigation}
         </div>
       ) : null}
 

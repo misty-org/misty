@@ -22,7 +22,7 @@ export function NavigatorControls(props: {
   const sticky = props.layout.visibility === "sticky";
   return (
     <div
-      className={cn("flex items-center gap-0.5", props.className)}
+      className={cn("flex items-center gap-1", props.className)}
       data-misty-window-drag-block="true"
     >
       <button

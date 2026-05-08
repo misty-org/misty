@@ -195,20 +195,54 @@ fn normalize_settings_document(document: &mut Value) -> bool {
             ("preferred_workspace_root", json!("")),
             ("preferred_terminal_app", json!("System Default")),
             ("default_transfer_behavior_index", json!(0)),
+            ("startup_view_index", json!(0)),
+            ("reopen_last_session", json!(true)),
+            ("browser_search_engine_index", json!(0)),
         ],
     );
     changed |= ensure_section_defaults(
         root,
         "appearance",
         &[
-            ("theme_index", json!(0)),
             ("compact_mode_enabled", json!(false)),
-            ("reduced_motion_enabled", json!(false)),
             ("thumbnail_previews_enabled", json!(true)),
-            ("ui_scale_index", json!(1)),
-            ("font_size_index", json!(1)),
             ("wallpaper_path", json!("")),
             ("panel_opacity", json!(0.82)),
+            ("app_zoom", json!(1.0)),
+            ("navigator_width_index", json!(0)),
+            ("navigator_auto_hide", json!(false)),
+        ],
+    );
+    changed |= ensure_section_defaults(
+        root,
+        "files",
+        &[
+            ("default_view_mode_index", json!(0)),
+            ("show_hidden_files", json!(false)),
+        ],
+    );
+    changed |= ensure_section_defaults(
+        root,
+        "terminal",
+        &[
+            ("font_family", json!("")),
+            ("font_size", json!(13)),
+            ("cursor_blink", json!(true)),
+            ("cursor_style_index", json!(0)),
+            ("scrollback", json!(50000)),
+        ],
+    );
+    changed |= ensure_section_defaults(
+        root,
+        "editor",
+        &[
+            ("font_family", json!("")),
+            ("font_size", json!(12.5)),
+            ("tab_size", json!(2)),
+            ("word_wrap", json!(true)),
+            ("line_numbers", json!(true)),
+            ("autosave_delay_ms", json!(1000)),
+            ("format_on_save", json!(false)),
         ],
     );
     changed |= ensure_section_defaults(
@@ -225,6 +259,9 @@ fn normalize_settings_document(document: &mut Value) -> bool {
         &[
             ("automatic_file_discovery_enabled", json!(true)),
             ("discovery_interval_minutes", json!(15)),
+            ("max_depth", json!(18)),
+            ("include_hidden", json!(false)),
+            ("ignored_paths", json!("")),
         ],
     );
     changed |= ensure_section_defaults(
@@ -295,7 +332,6 @@ fn normalize_settings_document(document: &mut Value) -> bool {
         root,
         "shortcuts",
         &[
-            ("keymap_index", json!(0)),
             ("custom_shortcuts_enabled", json!(false)),
             ("shortcut_hints_enabled", json!(true)),
         ],
@@ -304,7 +340,6 @@ fn normalize_settings_document(document: &mut Value) -> bool {
         root,
         "advanced",
         &[
-            ("server_address", json!("localhost:50051")),
             ("mount_path", json!(".misty/mnt")),
             ("extension_tools_path", json!(default_extension_tools_path)),
             ("frame_pacing_overlay_enabled", json!(false)),
@@ -550,8 +585,14 @@ mod tests {
                     "custom_general_value": "kept"
                 },
                 "appearance": {
-                    "custom_theme": { "accent": "#80aaff" }
+                    "custom_theme": { "accent": "#80aaff" },
+                    "ui_scale_index": 2,
+                    "font_size_index": 2,
+                    "reduced_motion_enabled": true,
+                    "theme_index": 1
                 },
+                "shortcuts": { "keymap_index": 1 },
+                "advanced": { "server_address": "localhost:50051" },
                 "plugin_namespace": {
                     "enabled": true
                 }
@@ -627,6 +668,40 @@ mod tests {
             .get("search")
             .and_then(Value::as_object)
             .is_some_and(|search| search.contains_key("automatic_image_discovery_enabled")));
+
+        // Schema 3 retirements: controls that persisted but had no reader.
+        for (section, key) in [
+            ("appearance", "ui_scale_index"),
+            ("appearance", "font_size_index"),
+            ("appearance", "reduced_motion_enabled"),
+            ("appearance", "theme_index"),
+            ("shortcuts", "keymap_index"),
+            ("advanced", "server_address"),
+        ] {
+            assert!(
+                !document
+                    .get(section)
+                    .and_then(Value::as_object)
+                    .is_some_and(|entries| entries.contains_key(key)),
+                "{section}.{key} should have been pruned",
+            );
+        }
+
+        // Sections introduced alongside the redesign must be backfilled.
+        for (section, key) in [
+            ("editor", "tab_size"),
+            ("files", "default_view_mode_index"),
+            ("general", "reopen_last_session"),
+            ("appearance", "app_zoom"),
+        ] {
+            assert!(
+                document
+                    .get(section)
+                    .and_then(Value::as_object)
+                    .is_some_and(|entries| entries.contains_key(key)),
+                "{section}.{key} should have been backfilled",
+            );
+        }
 
         let _ = fs::remove_dir_all(
             settings_path

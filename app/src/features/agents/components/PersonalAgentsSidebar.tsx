@@ -11,6 +11,7 @@ import { useEffect } from "react";
 import { useShallow } from "zustand/react/shallow";
 import type { PersonalAgent } from "../model/interfaces/personal";
 import { usePersonalAgentsStore } from "../store/usePersonalAgentsStore";
+import { AgentAvatar } from "../AgentAvatar";
 
 export interface PersonalAgentsSidebarProps {
   selectedAgentId: string;
@@ -18,42 +19,6 @@ export interface PersonalAgentsSidebarProps {
   onEdit: (agent: PersonalAgent) => void;
   onCreate: () => void;
   onDelete: (agentId: string) => void;
-}
-
-function shortModel(id: string | undefined): string {
-  if (!id) return "";
-  const lower = id.toLowerCase();
-  const family = lower.includes("opus")
-    ? "Opus"
-    : lower.includes("sonnet")
-      ? "Sonnet"
-      : lower.includes("haiku")
-        ? "Haiku"
-        : null;
-  if (family) {
-    const match = lower.match(/(?:opus|sonnet|haiku)-?(\d+(?:[-.]\d+)?)/);
-    return match ? `${family} ${match[1].replace(/-/g, ".")}` : family;
-  }
-  if (lower.startsWith("gpt-")) {
-    const match = lower.match(/^gpt-(\d+(?:\.\d+)?)/);
-    return match ? `GPT-${match[1]}` : id.toUpperCase();
-  }
-  return id.split(/[-_/]/).slice(-2).join(" ").trim();
-}
-
-function agentInitial(name: string): string {
-  const trimmed = name.trim();
-  return trimmed ? trimmed[0].toLowerCase() : "?";
-}
-
-function agentSubtitle(agent: PersonalAgent): string {
-  const parts: string[] = [];
-  const model = shortModel(agent.model_id);
-  if (model) parts.push(model);
-  const tools = agent.tool_permissions?.integrations?.length ?? 0;
-  if (tools > 0) parts.push(`${tools} tool${tools === 1 ? "" : "s"}`);
-  if (parts.length > 0) return parts.join(" · ");
-  return agent.role?.trim() || "Agent";
 }
 
 export function PersonalAgentsSidebar(props: PersonalAgentsSidebarProps) {
@@ -96,8 +61,15 @@ export function PersonalAgentsSidebar(props: PersonalAgentsSidebarProps) {
                     ].join(" ")}
                     onClick={() => props.onSelect(agent)}
                   >
-                    <span className="relative grid size-[26px] shrink-0 place-items-center rounded-md bg-charcoal-hover text-[11px] font-medium text-cream-bright">
-                      {agentInitial(agent.name)}
+                    <span className="relative shrink-0">
+                      <AgentAvatar
+                        agentId={agent.id}
+                        avatar={agent.avatar}
+                        legacyIcon={agent.icon}
+                        name={agent.name}
+                        className="size-[26px]"
+                        iconClassName="size-3.5"
+                      />
                       {agent.enabled ? (
                         <span className="absolute -bottom-0.5 -right-0.5 size-2 rounded-full border-2 border-charcoal-sidebar bg-emerald-500" />
                       ) : null}
@@ -110,9 +82,6 @@ export function PersonalAgentsSidebar(props: PersonalAgentsSidebarProps) {
                         ].join(" ")}
                       >
                         {agent.name}
-                      </span>
-                      <span className="block truncate text-[11px] text-cream-muted">
-                        {agentSubtitle(agent)}
                       </span>
                     </span>
                   </Button>

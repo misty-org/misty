@@ -5,7 +5,7 @@ import { ExtensionsPage } from "@/features/extensions";
 import FilesPage from "@/features/files/explorer";
 import { HomeDashboard } from "@/features/home";
 import { TerminalWorkspace } from "@/features/terminal";
-import { TransfersWorkspacePanel } from "@/features/transfers";
+import { TransfersPage } from "@/features/transfers";
 import type { WorkspaceTab } from "@/features/workspace";
 import { cn } from "@/shared/ui";
 import { Plus } from "lucide-react";
@@ -24,7 +24,7 @@ export function WorkspaceSurface({ tab }: { tab: WorkspaceTab }) {
     case "files":
       return <FilesPage embedded workspaceId={tab.id} workspaceTitle={tab.title} />;
     case "transfers":
-      return <TransfersWorkspacePanel workspaceId={tab.instanceKey} />;
+      return <TransfersPage />;
     case "agents":
       return <AgentsPage />;
     case "extensions":

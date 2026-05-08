@@ -42,7 +42,7 @@ describe("v2 device workflow node worker", () => {
     expect(deviceWorkflowErrorCode(new Error("device_node_timeout"))).toBe("device_timeout");
   });
 
-  it("binds browser jobs to their server-selected grant, scope, and agent", () => {
+  it("binds browser jobs to their run context, scope, and agent", () => {
     expect(
       browserAgentExecutionRequest({
         id: "job",
@@ -50,14 +50,14 @@ describe("v2 device workflow node worker", () => {
         nodeId: "node",
         scopeId: "browser-tab-1",
         operation: "browser.inspect",
-        deviceGrantId: "grant-1",
+        contextId: "context-1",
         attempt: 1,
         input: { scopeId: "browser-tab-1" },
         config: { agentId: "agent-1" },
       }),
     ).toMatchObject({
       scopeId: "browser-tab-1",
-      grantId: "grant-1",
+      grantId: "context-1",
       agentId: "agent-1",
       operation: "browser.inspect",
     });

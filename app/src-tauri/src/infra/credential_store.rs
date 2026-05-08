@@ -47,6 +47,23 @@ pub fn store(service: &str, account: &str, value: &str) -> Result<(), Credential
     }
 }
 
+pub fn delete(service: &str, account: &str) -> Result<(), CredentialStoreError> {
+    #[cfg(all(target_os = "macos", debug_assertions))]
+    {
+        return delete_development_credential(service, account).map_err(Into::into);
+    }
+
+    #[cfg(not(all(target_os = "macos", debug_assertions)))]
+    {
+        let entry = keyring::Entry::new(service, account)?;
+        match entry.delete_password() {
+            Ok(()) => Ok(()),
+            Err(keyring::Error::NoEntry) => Ok(()),
+            Err(error) => Err(error.into()),
+        }
+    }
+}
+
 fn credential_file_name(service: &str, account: &str, profile: Option<&str>) -> String {
     let mut digest = Sha256::new();
     digest.update(profile.unwrap_or("default").as_bytes());
@@ -98,6 +115,16 @@ fn store_development_credential(service: &str, account: &str, value: &str) -> io
     file.sync_all()?;
     fs::rename(&temporary, &path)?;
     secure_file(&path)
+}
+
+#[cfg(all(target_os = "macos", debug_assertions))]
+fn delete_development_credential(service: &str, account: &str) -> io::Result<()> {
+    let path = development_credential_path(service, account)?;
+    match fs::remove_file(&path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error),
+    }
 }
 
 #[cfg(all(target_os = "macos", debug_assertions))]

@@ -37,13 +37,7 @@ export interface SearchOutcome {
 }
 
 export type GitFileStatus =
-  | "modified"
-  | "added"
-  | "deleted"
-  | "renamed"
-  | "untracked"
-  | "ignored"
-  | "conflicted";
+  "modified" | "added" | "deleted" | "renamed" | "untracked" | "ignored" | "conflicted";
 
 export interface GitFileEntry {
   path: string;
@@ -88,9 +82,10 @@ export function codeDeletePath(path: string): Promise<void> {
   return invoke("code_delete_path", { path });
 }
 
+/** The code explorer always lists dotfiles — they are source, not clutter. */
 export function codeListDirectory(path: string): Promise<DirectoryListing> {
   return invoke("explorer_list_directory", {
-    request: { path, showHidden: false, forceRemoteRefresh: false },
+    request: { path, showHidden: true, forceRemoteRefresh: false },
   });
 }
 

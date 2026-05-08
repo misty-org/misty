@@ -7,7 +7,6 @@ export type {
   GatewayModel,
   GlobalSpaceLibraryHit,
   PersonalAgent,
-  PersonalAgentGrant,
   ReasoningEffort,
 } from "./model/interfaces/personal";
 export * from "./modelSelection";

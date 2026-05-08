@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { createPortal } from "react-dom";
 
 const settingsOverlayLayerClass = [
-  "fixed inset-0 z-[2147482600] grid place-items-center bg-charcoal-workspace px-8 py-8",
+  "fixed inset-0 z-[2147482600] grid place-items-center bg-black/45 px-8 py-8",
   "animate-in fade-in-0 duration-200",
 ].join(" ");
 const settingsOverlayPanelClass = [
