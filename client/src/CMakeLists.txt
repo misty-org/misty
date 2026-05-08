@@ -13,6 +13,9 @@ file(GLOB_RECURSE MISTY_CORE_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/core/*.mm"
     "${CMAKE_CURRENT_SOURCE_DIR}/core/*.h"
 )
+list(REMOVE_ITEM MISTY_CORE_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/core/ui/stb_image_impl.cpp"
+)
 file(GLOB_RECURSE MISTY_PANEL_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/panels/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/panels/*.mm"
@@ -123,8 +126,17 @@ set(MISTY_SANDBOX_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/core/plugins/plugin_host.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/core/plugins/plugin_signing.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/core/commands/command_manager.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/core/manager/asset_manager.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/core/manager/env_manager.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/core/manager/font_manager.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/core/manager/settings_manager.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/core/system/util.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/core/ui/stb_image_impl.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/core/ui/svg_loader.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/core/ui/ui_animate.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/core/ui/ui_layout.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/panels/activity/activity_state.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/panels/panel.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/views/app_view.cpp"
     "${CMAKE_SOURCE_DIR}/vendor/glad/src/glad.cpp"
     ${MISTY_IMGUI_SOURCES}
@@ -135,6 +147,9 @@ set_target_properties(misty_plugin_sandbox PROPERTIES OUTPUT_NAME "misty-plugin-
 target_include_directories(misty_plugin_sandbox PRIVATE
     "${CMAKE_SOURCE_DIR}/src"
     "${CMAKE_SOURCE_DIR}/vendor/glad/include"
+    "${CMAKE_SOURCE_DIR}/vendor/lunasvg/include"
+    "${CMAKE_SOURCE_DIR}/vendor/stb_image"
+    "${CMAKE_SOURCE_DIR}/vendor/stb"
     "${CMAKE_SOURCE_DIR}/vendor/imgui/backends"
     "${CMAKE_SOURCE_DIR}/vendor/imgui"
     "${CMAKE_SOURCE_DIR}/vendor/json/single_include"
@@ -143,6 +158,7 @@ misty_configure_plugin_host(misty_plugin_sandbox)
 target_link_libraries(misty_plugin_sandbox
     PRIVATE
         glfw
+        lunasvg
         OpenGL::GL
         OpenSSL::Crypto
         ${CMAKE_DL_LIBS}

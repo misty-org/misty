@@ -54,6 +54,7 @@ public:
 
     void process_shortcuts();
     void render_open_panels();
+    void render_active_preview_scene();
     bool invoke_command(const std::string& command_id);
     bool open_panel(const std::string& panel_id);
     bool close_panel(const std::string& panel_id);

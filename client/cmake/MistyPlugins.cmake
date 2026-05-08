@@ -24,6 +24,7 @@ else()
 endif()
 
 set(MISTY_BUILD_BUNDLED_PLUGINS OFF CACHE BOOL "Build first-party plugins bundled with the client")
+set(MISTY_BUILD_DEV_PLUGINS ON CACHE BOOL "Build first-party development plugins for local preview and sandbox workflows")
 
 function(misty_configure_plugin_host target)
     target_compile_definitions(${target}

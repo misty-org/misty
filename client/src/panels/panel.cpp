@@ -2,8 +2,8 @@
 
 #include "core/manager/asset_manager.h"
 #include "core/commands/command_manager.h"
-#include "core/manager/font_manager.h"
 #include "core/ui/ui_animate.h"
+#include "core/ui/ui_layout.h"
 #include "core/ui/ui_style.h"
 #include "imgui.h"
 #include <cstdarg>
@@ -70,7 +70,7 @@ namespace misty::panel {
             return;
         }
 
-        show_error_modal({
+        render_error_modal({
             .is_open = true,
             .modal_id = modal_id,
             .title = "Error",
@@ -83,52 +83,87 @@ namespace misty::panel {
         });
     }
 
-    bool Panel::show_error_modal(const ErrorModalProps& props) {
+    bool render_error_modal(const ErrorModalProps& props) {
         if (!props.is_open) {
             return false;
         }
 
         ImGui::OpenPopup(props.modal_id);
         ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+        ImGui::SetNextWindowSizeConstraints(ImVec2(360.0f, 0.0f), ImVec2(520.0f, 10000.0f));
 
         bool confirmed = false;
         if (ImGui::BeginPopupModal(props.modal_id, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-            const float content_width = std::max(ImGui::GetContentRegionAvail().x, 280.0f);
-
-            if (props.icon_name && props.icon_name[0] != '\0') {
-                auto& icon = core::AssetManager::get().get_svg_texture(props.icon_name, static_cast<int>(props.icon_size));
-                if (icon.id) {
-                    ImGui::SetCursorPosX((content_width - props.icon_size) * 0.5f);
-                    ImGui::Image(icon.id, ImVec2(props.icon_size, props.icon_size));
-                    ImGui::Spacing();
-                }
-            }
-
-            ImGui::PushFont(core::FontManager::get().get_font(core::FontID::ROBOTO_LARGE));
-            const float title_width = ImGui::CalcTextSize(props.title).x;
-            ImGui::SetCursorPosX(std::max(0.0f, (content_width - title_width) * 0.5f));
-            text_colored(ImVec4(0.96f, 0.96f, 0.97f, 1.0f), "%s", props.title);
-            ImGui::PopFont();
-
-            ImGui::Spacing();
-            ImGui::Separator();
-            ImGui::Spacing();
-            text_colored(ImVec4(0.68f, 0.68f, 0.72f, 1.0f), "%s", props.message);
-            ImGui::Spacing();
-
-            const float button_width = 140.0f;
-            ImGui::SetCursorPosX(std::max(0.0f, (ImGui::GetWindowWidth() - button_width) * 0.5f));
-
             const bool confirm_shortcut = props.dismissible && core::CommandManager::get().matches("modal.confirm");
             const bool cancel_shortcut = props.dismissible && core::CommandManager::get().matches("modal.cancel");
-            if (styled_button(props.confirm_label, ImVec2(button_width, 0.0f), primary_button_style()) ||
-                confirm_shortcut || cancel_shortcut) {
-                confirmed = true;
-                if (props.on_confirm) {
-                    props.on_confirm();
-                }
-                ImGui::CloseCurrentPopup();
-            }
+
+            UI::column("##error_modal_content", {
+                .width = UI::Size::fill(),
+                .height = UI::Size::auto_size(),
+                .gap = UI::Spacing::xy(0.0f, 16.0f),
+            }, [&]() {
+                UI::div("##error_modal_shell", {
+                    .mode = UI::Mode::LayoutOnly,
+                    .width = UI::Size::fill(),
+                    .height = UI::Size::auto_size(),
+                    .padding = UI::Spacing::uniform(8.0f),
+                    .gap = UI::Spacing::xy(0.0f, 16.0f),
+                }, [&]() {
+                    if (props.icon_name && props.icon_name[0] != '\0') {
+                        auto& icon = core::AssetManager::get().get_svg_texture(
+                            props.icon_name,
+                            static_cast<int>(props.icon_size)
+                        );
+                        if (icon.id) {
+                            UI::image({
+                                .texture_id = icon.id,
+                                .width = UI::Size::px(props.icon_size),
+                                .height = UI::Size::px(props.icon_size),
+                                .align = UI::Align::Center,
+                            });
+                        }
+                    }
+
+                    UI::text({
+                        .text = props.title,
+                        .width = UI::Size::fill(),
+                        .align = UI::Align::Center,
+                        .font = UI::TextFont::BoldLarge,
+                        .color = ImVec4(0.96f, 0.96f, 0.97f, 1.0f),
+                    });
+
+                    UI::divider({
+                        .width = UI::Size::fill(),
+                        .height = UI::Size::px(1.0f),
+                        .color = ImVec4(0.22f, 0.22f, 0.24f, 1.0f),
+                    });
+
+                    UI::text({
+                        .text = props.message,
+                        .width = UI::Size::fill(),
+                        .wrapped = true,
+                        .color = ImVec4(0.68f, 0.68f, 0.72f, 1.0f),
+                    });
+
+                    UI::row("##error_modal_actions", {
+                        .width = UI::Size::fill(),
+                        .height = UI::Size::auto_size(),
+                        .justify = UI::Justify::Center,
+                    }, [&]() {
+                        if (UI::button("##error_modal_confirm", {
+                            .label = props.confirm_label,
+                            .width = UI::Size::px(140.0f),
+                            .variant = UI::ButtonVariant::Primary,
+                        }) || confirm_shortcut || cancel_shortcut) {
+                            confirmed = true;
+                            if (props.on_confirm) {
+                                props.on_confirm();
+                            }
+                            ImGui::CloseCurrentPopup();
+                        }
+                    });
+                });
+            });
 
             ImGui::EndPopup();
         }
@@ -136,7 +171,11 @@ namespace misty::panel {
         return confirmed;
     }
 
-    bool Panel::show_confirm_modal(const ConfirmModalProps& props) {
+    bool Panel::show_error_modal(const ErrorModalProps& props) {
+        return render_error_modal(props);
+    }
+
+    bool render_confirm_modal(const ConfirmModalProps& props) {
         if (props.is_open == nullptr) {
             return false;
         }
@@ -180,6 +219,10 @@ namespace misty::panel {
         return confirmed;
     }
 
+    bool Panel::show_confirm_modal(const ConfirmModalProps& props) {
+        return render_confirm_modal(props);
+    }
+
     bool Panel::show_empty_state(const EmptyStateProps& props) {
         bool action_pressed = false;
         misty::UI::WithStyle([&](misty::UI::StyleScope& style) {
@@ -211,7 +254,7 @@ namespace misty::panel {
         return action_pressed;
     }
 
-    void Panel::show_loading_modal(const LoadingModalProps& props) {
+    void render_loading_modal(const LoadingModalProps& props) {
         if (props.is_open) {
             ImGui::OpenPopup(props.modal_id);
         }
@@ -240,5 +283,9 @@ namespace misty::panel {
 
             ImGui::EndPopup();
         }
+    }
+
+    void Panel::show_loading_modal(const LoadingModalProps& props) {
+        render_loading_modal(props);
     }
 }
