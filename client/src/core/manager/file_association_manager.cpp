@@ -1,4 +1,4 @@
-#include "core/manager/open_with_manager.h"
+#include "core/manager/file_association_manager.h"
 
 #include <algorithm>
 #include <cctype>
@@ -8,6 +8,7 @@
 #include <nlohmann/json.hpp>
 
 #include "core/manager/env_manager.h"
+#include "core/manager/settings_manager.h"
 
 namespace fs = std::filesystem;
 
@@ -18,35 +19,14 @@ fs::path legacy_open_with_path() {
     return fs::path(EnvManager::get().get_user_home_dir()) / ".misty" / "open_with.json";
 }
 
-fs::path settings_path() {
-    return fs::path(EnvManager::get().get_user_home_dir()) / "misty" / "config" / "settings.json";
-}
-
-nlohmann::json load_settings_document(const fs::path& path) {
-    std::ifstream file(path);
-    if (!file.is_open()) {
-        return nlohmann::json::object();
-    }
-
-    try {
-        nlohmann::json json;
-        file >> json;
-        if (json.is_object()) {
-            return json;
-        }
-    } catch (...) {
-    }
-    return nlohmann::json::object();
-}
-
 } // namespace
 
-OpenWithManager& OpenWithManager::get() {
-    static OpenWithManager instance;
+FileAssociationManager& FileAssociationManager::get() {
+    static FileAssociationManager instance;
     return instance;
 }
 
-std::optional<std::string> OpenWithManager::association_for_path(const std::string& file_path) {
+std::optional<std::string> FileAssociationManager::association_for_path(const std::string& file_path) {
     std::lock_guard<std::mutex> lock(mu_);
     load_if_needed();
 
@@ -65,14 +45,14 @@ std::optional<std::string> OpenWithManager::association_for_path(const std::stri
     return it->second;
 }
 
-void OpenWithManager::set_association_for_path(const std::string& file_path, const std::string& application_path) {
+void FileAssociationManager::set_association_for_path(const std::string& file_path, const std::string& application_path) {
     std::lock_guard<std::mutex> lock(mu_);
     load_if_needed();
     associations_[association_key_for_path(file_path)] = application_path;
     save();
 }
 
-void OpenWithManager::load_if_needed() {
+void FileAssociationManager::load_if_needed() {
     if (loaded_) {
         return;
     }
@@ -90,15 +70,22 @@ void OpenWithManager::load_if_needed() {
         return true;
     };
 
-    const fs::path path = storage_path();
-    nlohmann::json settings = load_settings_document(path);
+    nlohmann::json settings = load_settings_document();
     const bool has_open_with_settings =
         settings.contains("open_with") && settings["open_with"].is_object();
     if (has_open_with_settings && load_associations(settings["open_with"])) {
         return;
     }
 
-    nlohmann::json legacy = load_settings_document(legacy_open_with_path());
+    std::ifstream legacy_file(legacy_open_with_path());
+    nlohmann::json legacy = nlohmann::json::object();
+    if (legacy_file.is_open()) {
+        try {
+            legacy_file >> legacy;
+        } catch (...) {
+            legacy = nlohmann::json::object();
+        }
+    }
     if (load_associations(legacy)) {
         save();
         std::error_code ec;
@@ -106,27 +93,18 @@ void OpenWithManager::load_if_needed() {
     }
 }
 
-void OpenWithManager::save() const {
-    const fs::path path(storage_path());
-    std::error_code ec;
-    fs::create_directories(path.parent_path(), ec);
-
+void FileAssociationManager::save() const {
     nlohmann::json open_with = nlohmann::json::object();
     for (const auto& [key, value] : associations_) {
         open_with[key] = value;
     }
 
-    nlohmann::json settings = load_settings_document(path);
-    settings["open_with"] = std::move(open_with);
-
-    std::ofstream file(path);
-    if (!file.is_open()) {
-        return;
-    }
-    file << settings.dump(2);
+    update_settings_document([&](nlohmann::json& settings) {
+        settings["open_with"] = std::move(open_with);
+    });
 }
 
-std::string OpenWithManager::association_key_for_path(const std::string& file_path) const {
+std::string FileAssociationManager::association_key_for_path(const std::string& file_path) const {
     fs::path path(file_path);
     std::string key = path.extension().string();
     if (key.empty()) {
@@ -139,8 +117,8 @@ std::string OpenWithManager::association_key_for_path(const std::string& file_pa
     return key;
 }
 
-std::string OpenWithManager::storage_path() const {
-    return settings_path().string();
+std::string FileAssociationManager::storage_path() const {
+    return misty::core::settings_path().string();
 }
 
 } // namespace misty::core

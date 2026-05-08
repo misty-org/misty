@@ -17,7 +17,7 @@ namespace misty::core {
     };
     class WorkerPool {
     public:
-        explicit WorkerPool(size_t thread_count = std::thread::hardware_concurrency());
+        explicit WorkerPool(size_t thread_count = 4);
         ~WorkerPool();
 
         void shutdown();

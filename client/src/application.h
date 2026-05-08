@@ -11,6 +11,9 @@
 class MistyClient;
 
 namespace misty {
+    inline constexpr int kPlatformMinWindowWidth = 900;
+    inline constexpr int kPlatformMinWindowHeight = 600;
+
     class Application {
     public:
 		Application() = default;

@@ -2,7 +2,7 @@
 #include "panels/search/fuzzy_match.h"
 #include "panels/file_explorer/file_explorer_state.h"
 #include "panels/services/services_state.h"
-#include "panels/workspace/workspace_state.h"
+#include "panels/file_sidebar/remote_mount_state.h"
 #include "core/net/http_client.h"
 #include "core/manager/env_manager.h"
 #include "core/manager/asset_manager.h"
@@ -229,7 +229,7 @@ void SearchPanel::submit_search(const std::string& query) {
             remote_name = info.remote_name;
             provider_folder = info.provider_folder;
             folder_name = info.remote_name;
-            auto& workspace = ui_registry_.get_state<WorkspaceState>("Workspace");
+            auto& workspace = ui_registry_.get_state<RemoteMountState>("RemoteMounts");
             for (const auto& mapping : workspace.remote_mappings) {
                 if (mapping.provider_folder == info.provider_folder &&
                     (mapping.folder_name == info.remote_name || mapping.remote_name == info.remote_name)) {
