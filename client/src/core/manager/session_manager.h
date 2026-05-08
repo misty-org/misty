@@ -1,13 +1,20 @@
 #pragma once
 
-#include <string>
+#include <functional>
 #include <map>
 #include <mutex>
+#include <string>
 
 namespace misty::core {
 
     class SessionManager {
     public:
+        enum class RefreshResult {
+            Success,
+            Unavailable,
+            Failed
+        };
+
         static SessionManager& get();
 
         // Store both tokens in memory and persist to secure storage
@@ -41,6 +48,7 @@ namespace misty::core {
         void mark_session_expired();
         bool is_session_expired() const;
         void clear_session_expired();
+        RefreshResult attempt_token_refresh();
 
         void mark_proxy_available();
         void mark_proxy_unavailable(const std::string& message = "");

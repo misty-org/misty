@@ -1,6 +1,8 @@
 #include "panel.h"
 
+#include "core/manager/asset_manager.h"
 #include "core/commands/command_manager.h"
+#include "core/manager/font_manager.h"
 #include "core/ui/ui_animate.h"
 #include "core/ui/ui_style.h"
 #include "imgui.h"
@@ -64,30 +66,74 @@ namespace misty::panel {
     }
 
     void Panel::show_error_modal(std::string& error_msg, const char* modal_id) {
-        if (!error_msg.empty()) {
-            ImGui::OpenPopup(modal_id);
+        if (error_msg.empty()) {
+            return;
         }
-        
+
+        show_error_modal({
+            .is_open = true,
+            .modal_id = modal_id,
+            .title = "Error",
+            .message = error_msg.c_str(),
+            .confirm_label = "OK",
+            .icon_name = "alert-24",
+            .icon_size = 28.0f,
+            .dismissible = true,
+            .on_confirm = [&error_msg]() { error_msg.clear(); },
+        });
+    }
+
+    bool Panel::show_error_modal(const ErrorModalProps& props) {
+        if (!props.is_open) {
+            return false;
+        }
+
+        ImGui::OpenPopup(props.modal_id);
         ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-        if (ImGui::BeginPopupModal(modal_id, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Error");
+
+        bool confirmed = false;
+        if (ImGui::BeginPopupModal(props.modal_id, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+            const float content_width = std::max(ImGui::GetContentRegionAvail().x, 280.0f);
+
+            if (props.icon_name && props.icon_name[0] != '\0') {
+                auto& icon = core::AssetManager::get().get_svg_texture(props.icon_name, static_cast<int>(props.icon_size));
+                if (icon.id) {
+                    ImGui::SetCursorPosX((content_width - props.icon_size) * 0.5f);
+                    ImGui::Image(icon.id, ImVec2(props.icon_size, props.icon_size));
+                    ImGui::Spacing();
+                }
+            }
+
+            ImGui::PushFont(core::FontManager::get().get_font(core::FontID::ROBOTO_LARGE));
+            const float title_width = ImGui::CalcTextSize(props.title).x;
+            ImGui::SetCursorPosX(std::max(0.0f, (content_width - title_width) * 0.5f));
+            text_colored(ImVec4(0.96f, 0.96f, 0.97f, 1.0f), "%s", props.title);
+            ImGui::PopFont();
+
+            ImGui::Spacing();
             ImGui::Separator();
-            ImGui::TextWrapped("%s", error_msg.c_str());
+            ImGui::Spacing();
+            text_colored(ImVec4(0.68f, 0.68f, 0.72f, 1.0f), "%s", props.message);
             ImGui::Spacing();
 
-            float button_width = 120.0f;
-            float window_width = ImGui::GetWindowWidth();
-            float button_x = (window_width - button_width) * 0.5f;
-            ImGui::SetCursorPosX(button_x);
+            const float button_width = 140.0f;
+            ImGui::SetCursorPosX(std::max(0.0f, (ImGui::GetWindowWidth() - button_width) * 0.5f));
 
-            if (ImGui::Button("OK", ImVec2(button_width, 0)) ||
-                core::CommandManager::get().matches("modal.confirm") ||
-                core::CommandManager::get().matches("modal.cancel")) {
-                error_msg = "";
+            const bool confirm_shortcut = props.dismissible && core::CommandManager::get().matches("modal.confirm");
+            const bool cancel_shortcut = props.dismissible && core::CommandManager::get().matches("modal.cancel");
+            if (styled_button(props.confirm_label, ImVec2(button_width, 0.0f), primary_button_style()) ||
+                confirm_shortcut || cancel_shortcut) {
+                confirmed = true;
+                if (props.on_confirm) {
+                    props.on_confirm();
+                }
                 ImGui::CloseCurrentPopup();
             }
+
             ImGui::EndPopup();
         }
+
+        return confirmed;
     }
 
     bool Panel::show_confirm_modal(const ConfirmModalProps& props) {

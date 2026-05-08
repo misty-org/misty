@@ -631,7 +631,8 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state) {
     const ImVec2 overlay_max(overlay_min.x + overlay_size.x, overlay_min.y + overlay_size.y);
 
     ImGuiIO& io = ImGui::GetIO();
-    if (!loading && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && !io.WantTextInput) {
+    const bool active_text_edit = io.WantTextInput && ImGui::IsAnyItemActive();
+    if (!loading && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && !active_text_edit) {
         if (CommandManager::get().matches("explorer.copy")) perform_copy(state);
         if (CommandManager::get().matches("explorer.cut")) perform_cut(state);
         if (CommandManager::get().matches("explorer.paste")) {

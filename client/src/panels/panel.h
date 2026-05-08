@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <string>
 
 #include "imgui.h"
@@ -29,6 +30,18 @@ namespace misty::panel {
         const char* message = "Please wait...";
     };
 
+    struct ErrorModalProps {
+        bool is_open = false;
+        const char* modal_id = "Error";
+        const char* title = "Error";
+        const char* message = "";
+        const char* confirm_label = "OK";
+        const char* icon_name = nullptr;
+        float icon_size = 32.0f;
+        bool dismissible = true;
+        std::function<void()> on_confirm;
+    };
+
     class Panel {
     public:
         virtual ~Panel() = default;
@@ -36,6 +49,7 @@ namespace misty::panel {
 
     protected:
         void show_error_modal(std::string& error_msg, const char* modal_id = "Error");
+        bool show_error_modal(const ErrorModalProps& props);
         bool show_confirm_modal(const ConfirmModalProps& props);
         bool show_empty_state(const EmptyStateProps& props);
         void show_loading_modal(const LoadingModalProps& props);
