@@ -1,4 +1,9 @@
 #include "session_manager.h"
+#include "core/manager/env_manager.h"
+#include "core/manager/proxy_manager.h"
+#include "core/net/http_client.h"
+
+#include <nlohmann/json.hpp>
 #include <iostream>
 #include <fstream>
 #include <filesystem>
@@ -236,6 +241,55 @@ namespace misty::core {
     void SessionManager::clear_session_expired() {
         std::lock_guard<std::mutex> lock(mu_);
         session_expired_ = false;
+    }
+
+    SessionManager::RefreshResult SessionManager::attempt_token_refresh() {
+        const std::string refresh_token = get_refresh_token();
+        if (refresh_token.empty()) {
+            return RefreshResult::Failed;
+        }
+
+        const std::string proxy_url = EnvManager::get().get("PROXY_SERVICE_URL", "");
+        if (proxy_url.empty()) {
+            return RefreshResult::Failed;
+        }
+
+        std::map<std::string, std::string> headers;
+        headers["Content-Type"] = "application/json";
+        const std::string json_body = build_json_object({{"refresh_token", refresh_token}});
+
+        HttpResponse response = execute_raw_http_request("POST", proxy_url + "/api/refresh", json_body, headers);
+        if (response.status_code == 0 && ProxyManager::get().ensure_running()) {
+            response = execute_raw_http_request("POST", proxy_url + "/api/refresh", json_body, headers);
+        }
+
+        if (response.status_code == 0) {
+            ProxyManager::get().record_proxy_request_result(false);
+        } else {
+            ProxyManager::get().record_proxy_request_result(true);
+        }
+
+        if (response.status_code == 200) {
+            try {
+                const auto json_resp = nlohmann::json::parse(response.body);
+                const std::string new_token = json_resp["token"].get<std::string>();
+                const std::string new_refresh = json_resp["refresh_token"].get<std::string>();
+                if (!update_tokens(new_token, new_refresh)) {
+                    std::cerr << "[SessionManager] token refresh succeeded but session persistence failed" << std::endl;
+                }
+                std::cerr << "[SessionManager] token refresh succeeded" << std::endl;
+                return RefreshResult::Success;
+            } catch (...) {
+                std::cerr << "[SessionManager] failed to parse refresh response" << std::endl;
+            }
+        } else if (response.status_code == 0) {
+            std::cerr << "[SessionManager] token refresh failed because proxy is unavailable" << std::endl;
+            return RefreshResult::Unavailable;
+        } else {
+            std::cerr << "[SessionManager] token refresh failed with status " << response.status_code << std::endl;
+        }
+
+        return RefreshResult::Failed;
     }
 
     void SessionManager::mark_proxy_available() {

@@ -2,6 +2,8 @@
 
 #include <string>
 #include <unordered_map>
+#include <utility>
+#include <vector>
 #include "imgui.h"
 
 namespace misty::core {
@@ -15,6 +17,8 @@ public:
     void register_runtime_command(const std::string& command_id, const std::string& default_shortcut);
     bool matches(const std::string& command_id, bool repeat = false) const;
     std::string label(const std::string& command_id) const;
+    std::vector<std::pair<std::string, std::string>> list_shortcuts() const;
+    bool save_shortcuts(const std::vector<std::pair<std::string, std::string>>& bindings, std::string* error = nullptr);
 
 private:
     struct Shortcut {
