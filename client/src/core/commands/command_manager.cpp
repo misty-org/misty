@@ -34,6 +34,12 @@ void write_command_block(std::ostream& out, const DefaultCommandEntry& entry) {
     out << "}\n\n";
 }
 
+void write_command_block(std::ostream& out, const std::string& command_id, const std::string& shortcut) {
+    out << command_id << " {\n";
+    out << "  key = \"" << shortcut << "\"\n";
+    out << "}\n\n";
+}
+
 std::unordered_map<std::string, std::string> parse_command_file_shortcuts(const std::filesystem::path& path) {
     std::unordered_map<std::string, std::string> shortcuts;
 
@@ -345,6 +351,71 @@ std::string CommandManager::label(const std::string& command_id) const {
     return label_for_shortcut(it->second);
 }
 
+std::vector<std::pair<std::string, std::string>> CommandManager::list_shortcuts() const {
+    std::vector<std::pair<std::string, std::string>> bindings;
+    bindings.reserve(shortcuts_.size());
+    for (const auto& [command_id, shortcut] : shortcuts_) {
+        bindings.emplace_back(command_id, label_for_shortcut(shortcut));
+    }
+    std::sort(bindings.begin(), bindings.end(), [](const auto& lhs, const auto& rhs) {
+        return lhs.first < rhs.first;
+    });
+    return bindings;
+}
+
+bool CommandManager::save_shortcuts(const std::vector<std::pair<std::string, std::string>>& bindings, std::string* error) {
+    const std::filesystem::path user_path = user_commands_path();
+    if (user_path.empty()) {
+        if (error) {
+            *error = "Unable to resolve ~/misty/config/commands.msy.";
+        }
+        return false;
+    }
+
+    std::error_code ec;
+    std::filesystem::create_directories(user_path.parent_path(), ec);
+    if (ec) {
+        if (error) {
+            *error = "Failed to create shortcut config directory: " + ec.message();
+        }
+        return false;
+    }
+
+    std::ofstream file(user_path, std::ios::trunc);
+    if (!file.is_open()) {
+        if (error) {
+            *error = "Failed to open ~/misty/config/commands.msy for writing.";
+        }
+        return false;
+    }
+
+    file << "# Misty keyboard commands\n";
+    file << "# Runtime source of truth: ~/misty/config/commands.msy\n";
+    file << "# Format:\n";
+    file << "# command.id {\n";
+    file << "#   key = \"CmdOrCtrl+K\"\n";
+    file << "#   mac = \"Enter\"   # optional platform override\n";
+    file << "# }\n\n";
+
+    for (const auto& [command_id, shortcut] : bindings) {
+        if (command_id.empty() || shortcut.empty()) {
+            continue;
+        }
+        write_command_block(file, command_id, shortcut);
+    }
+
+    file.flush();
+    if (!file.good()) {
+        if (error) {
+            *error = "Failed while writing ~/misty/config/commands.msy.";
+        }
+        return false;
+    }
+
+    load();
+    return true;
+}
+
 void CommandManager::load_defaults() {
     shortcuts_.clear();
     for (const auto& entry : default_command_entries()) {
@@ -430,8 +501,8 @@ bool CommandManager::match_shortcut(const Shortcut& shortcut, bool repeat) {
 
     ImGuiIO& io = ImGui::GetIO();
 #ifdef __APPLE__
-    const bool command_down = io.KeyCtrl;
-    const bool control_down = io.KeySuper;
+    const bool command_down = io.KeySuper;
+    const bool control_down = io.KeyCtrl;
     const bool primary_down = command_down;
 #else
     const bool command_down = io.KeySuper;

@@ -4,9 +4,10 @@
 
 #include "core/commands/command_manager.h"
 #include "core/manager/asset_manager.h"
+#include "core/manager/font_manager.h"
 #include "core/manager/proxy_manager.h"
 #include "core/manager/session_manager.h"
-#include "core/ui/imgui_utils.h"
+#include "core/ui/ui_style.h"
 #include "panels/file_explorer/file_explorer_state.h"
 #include "panels/transfers/transfer_window_state.h"
 
@@ -256,7 +257,7 @@ namespace misty::view {
         ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
 
         if (ImGui::Begin("##proxy_status_banner", nullptr, flags)) {
-            ImGui::PushFont(core::AssetManager::get().get_font(core::FontID::DEFAULT));
+            ImGui::PushFont(core::FontManager::get().get_font(core::FontID::DEFAULT));
             ImGui::TextUnformatted("Background Service Offline");
             ImGui::PopFont();
 

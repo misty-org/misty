@@ -293,7 +293,7 @@ void reset_preview_zoom(const MistyInvokeContext* ctx, void*) {
 
 void render_preview(const MistyRenderContext* ctx, void*) {
     misty::Host host(ctx);
-    misty::UI ui(ctx);
+    misty::PluginUI ui(ctx);
 
     char selected[kMaxSelectedPath];
     if (host.copy_selected_file_path(selected, sizeof(selected)) &&

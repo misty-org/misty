@@ -5,9 +5,13 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <iomanip>
+#include <sstream>
 
 #include "core/commands/command_manager.h"
-#include "core/ui/imgui_utils.h"
+#include "core/manager/asset_manager.h"
+#include "core/ui/ui_animate.h"
+#include "core/ui/ui_style.h"
 #include "panels/notification/notification_state.h"
 #include "panels/search/search_state.h"
 #include "panels/services/services_state.h"
@@ -328,6 +332,120 @@ void show_sync_tooltip_for_item(const UnifiedFileItem& file) {
     ImGui::EndTooltip();
 }
 
+std::string utf8_bytes_hex(const std::string& text) {
+    std::ostringstream out;
+    out << std::hex << std::setfill('0');
+    for (size_t i = 0; i < text.size(); ++i) {
+        if (i > 0) {
+            out << ' ';
+        }
+        out << std::setw(2) << static_cast<int>(static_cast<unsigned char>(text[i]));
+    }
+    return out.str();
+}
+
+std::string utf8_codepoints(const std::string& text) {
+    std::ostringstream out;
+    out << std::uppercase << std::hex;
+
+    bool first = true;
+    for (size_t i = 0; i < text.size();) {
+        const unsigned char c = static_cast<unsigned char>(text[i]);
+        uint32_t codepoint = 0;
+        size_t advance = 1;
+        bool valid = true;
+
+        if (c <= 0x7F) {
+            codepoint = c;
+        } else if ((c & 0xE0) == 0xC0 && i + 1 < text.size()) {
+            const unsigned char c1 = static_cast<unsigned char>(text[i + 1]);
+            if ((c1 & 0xC0) != 0x80) {
+                valid = false;
+            } else {
+                codepoint = (static_cast<uint32_t>(c & 0x1F) << 6) |
+                            static_cast<uint32_t>(c1 & 0x3F);
+                advance = 2;
+                if (codepoint < 0x80) {
+                    valid = false;
+                }
+            }
+        } else if ((c & 0xF0) == 0xE0 && i + 2 < text.size()) {
+            const unsigned char c1 = static_cast<unsigned char>(text[i + 1]);
+            const unsigned char c2 = static_cast<unsigned char>(text[i + 2]);
+            if ((c1 & 0xC0) != 0x80 || (c2 & 0xC0) != 0x80) {
+                valid = false;
+            } else {
+                codepoint = (static_cast<uint32_t>(c & 0x0F) << 12) |
+                            (static_cast<uint32_t>(c1 & 0x3F) << 6) |
+                            static_cast<uint32_t>(c2 & 0x3F);
+                advance = 3;
+                if (codepoint < 0x800 || (codepoint >= 0xD800 && codepoint <= 0xDFFF)) {
+                    valid = false;
+                }
+            }
+        } else if ((c & 0xF8) == 0xF0 && i + 3 < text.size()) {
+            const unsigned char c1 = static_cast<unsigned char>(text[i + 1]);
+            const unsigned char c2 = static_cast<unsigned char>(text[i + 2]);
+            const unsigned char c3 = static_cast<unsigned char>(text[i + 3]);
+            if ((c1 & 0xC0) != 0x80 || (c2 & 0xC0) != 0x80 || (c3 & 0xC0) != 0x80) {
+                valid = false;
+            } else {
+                codepoint = (static_cast<uint32_t>(c & 0x07) << 18) |
+                            (static_cast<uint32_t>(c1 & 0x3F) << 12) |
+                            (static_cast<uint32_t>(c2 & 0x3F) << 6) |
+                            static_cast<uint32_t>(c3 & 0x3F);
+                advance = 4;
+                if (codepoint < 0x10000 || codepoint > 0x10FFFF) {
+                    valid = false;
+                }
+            }
+        } else {
+            valid = false;
+        }
+
+        if (!first) {
+            out << ' ';
+        }
+        first = false;
+
+        if (valid) {
+            out << "U+" << std::setw(4) << std::setfill('0') << codepoint;
+            i += advance;
+        } else {
+            out << "INVALID(" << std::setw(2) << std::setfill('0')
+                << static_cast<int>(c) << ")";
+            ++i;
+        }
+    }
+
+    return out.str();
+}
+
+void show_filename_debug_tooltip(const std::string& text) {
+    if (!ImGui::BeginTooltip()) {
+        return;
+    }
+
+    ImGui::TextUnformatted("Rendered text");
+    ImGui::Separator();
+    ImGui::PushTextWrapPos(ImGui::GetFontSize() * 40.0f);
+    ImGui::TextUnformatted(text.c_str());
+    ImGui::PopTextWrapPos();
+
+    const std::string bytes = utf8_bytes_hex(text);
+    const std::string codepoints = utf8_codepoints(text);
+
+    ImGui::Separator();
+    ImGui::Text("Bytes: %zu", text.size());
+    ImGui::PushTextWrapPos(ImGui::GetFontSize() * 40.0f);
+    ImGui::TextUnformatted(bytes.c_str());
+    ImGui::Separator();
+    ImGui::TextUnformatted("Codepoints");
+    ImGui::TextUnformatted(codepoints.c_str());
+    ImGui::PopTextWrapPos();
+    ImGui::EndTooltip();
+}
+
 void render_empty_state(float icon_size) {
     float avail_h = ImGui::GetContentRegionAvail().y;
     float avail_w = ImGui::GetContentRegionAvail().x;
@@ -502,7 +620,7 @@ void FileExplorerPanel::handle_drag_navigation_target(FileExplorerState& state,
 void FileExplorerPanel::show_directory_contents(FileExplorerState& state) {
     static ImGuiTableFlags flags = ImGuiTableFlags_Reorderable | ImGuiTableFlags_Sortable |
         ImGuiTableFlags_Hideable | ImGuiTableFlags_Resizable |
-        ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY |
+        ImGuiTableFlags_ScrollX |
         ImGuiTableFlags_SizingFixedFit;
 
     const bool loading = state.is_loading;
@@ -513,7 +631,8 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state) {
     const ImVec2 overlay_max(overlay_min.x + overlay_size.x, overlay_min.y + overlay_size.y);
 
     ImGuiIO& io = ImGui::GetIO();
-    if (!loading && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && !io.WantTextInput) {
+    const bool active_text_edit = io.WantTextInput && ImGui::IsAnyItemActive();
+    if (!loading && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && !active_text_edit) {
         if (CommandManager::get().matches("explorer.copy")) perform_copy(state);
         if (CommandManager::get().matches("explorer.cut")) perform_cut(state);
         if (CommandManager::get().matches("explorer.paste")) {
@@ -632,7 +751,7 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state) {
     if (show_loading_animation && overlay_size.x > 0.0f && overlay_size.y > 0.0f) {
         ImGui::SetCursorScreenPos(overlay_min);
         ImGui::InvisibleButton("##file_loading_blocker", overlay_size);
-        core::DrawMistyLoadingAnimation(overlay_min, overlay_max);
+        misty::UI::DrawMistyLoadingAnimation(overlay_min, overlay_max);
     }
 
     show_rename_modal(state);
@@ -788,6 +907,9 @@ void FileExplorerPanel::show_file_item(FileExplorerState& state, int i) {
     } else {
         ImGui::TextUnformatted(file.name.c_str());
     }
+    if (ImGui::IsItemHovered()) {
+        show_filename_debug_tooltip(file.name);
+    }
 
     ImGui::TableNextColumn();
     ImGui::SetCursorPosY(ImGui::GetCursorPosY() + text_y_offset);
@@ -893,6 +1015,9 @@ void FileExplorerPanel::show_grid_item(FileExplorerState& state, int i, float ce
             ? IM_COL32(170, 170, 174, 255)
             : (is_selected ? IM_COL32(255, 255, 255, 255) : IM_COL32(212, 212, 216, 255)),
         file.name.c_str(), nullptr, text_wrap_width);
+    if (hovered) {
+        show_filename_debug_tooltip(file.name);
+    }
     dl->PopClipRect();
 
     if (clicked) select_item(state, file, i, is_selected, io);

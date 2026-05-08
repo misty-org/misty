@@ -26,6 +26,7 @@ func rcloneCmd(ctx context.Context, args ...string) (*exec.Cmd, error) {
 
 	cmd := exec.CommandContext(ctx, binaryPath, fullArgs...)
 	cmd.Env = os.Environ()
+	cmd.Env = ensureUTF8Locale(cmd.Env)
 	return cmd, nil
 }
 
@@ -119,6 +120,25 @@ func commandLabel(args []string) string {
 		return args[0]
 	}
 	return args[0] + " " + args[1]
+}
+
+func ensureUTF8Locale(env []string) []string {
+	filtered := make([]string, 0, len(env)+3)
+	for _, entry := range env {
+		if strings.HasPrefix(entry, "LANG=") ||
+			strings.HasPrefix(entry, "LC_ALL=") ||
+			strings.HasPrefix(entry, "LC_CTYPE=") {
+			continue
+		}
+		filtered = append(filtered, entry)
+	}
+
+	filtered = append(filtered,
+		"LANG=en_US.UTF-8",
+		"LC_ALL=en_US.UTF-8",
+		"LC_CTYPE=en_US.UTF-8",
+	)
+	return filtered
 }
 
 type countingWriter struct {
