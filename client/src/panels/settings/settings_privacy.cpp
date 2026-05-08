@@ -76,22 +76,12 @@ void legal_section() {
 } // namespace
 
 bool privacy_tab(SettingsState& state) {
-    const bool clicked = UI::button("##settings_privacy", {
-        .width = UI::Size::fill(),
-        .height = UI::Size::px(32.0f),
-        .variant = UI::ButtonVariant::Nav,
-        .hover_color = ImVec4(0.2f, 0.2f, 0.2f, 1.0f),
-        .selected = state.active_section == SettingsSection::Privacy,
-        .padding = UI::Spacing::xy(8.0f, 8.0f),
-        .rounding = 8.0f,
-    }, [&]() {
-        UI::text({
-            .text = "Privacy",
-            .width = UI::Size::fill(),
-            .align = UI::Align::Start,
-            .justify = UI::Justify::Center,
-        });
-    });
+    const bool clicked = settings_nav_item(
+        "##settings_privacy",
+        "Privacy",
+        "lock-16",
+        state.active_section == SettingsSection::Privacy
+    );
 
     if (clicked) {
         state.active_section = SettingsSection::Privacy;
@@ -101,22 +91,10 @@ bool privacy_tab(SettingsState& state) {
 }
 
 void privacy_content(SettingsState& state) {
-    UI::div("privacy_content", {
-        .mode = UI::Mode::LayoutOnly,
-        .width = UI::Size::fill(),
-        .height = UI::Size::auto_size(),
-        .padding = UI::Spacing::xy(28.0f, 20.0f),
-    }, [&]() {
-        UI::column("##privacy_body", {
-            .width = UI::Size::fill(),
-            .height = UI::Size::auto_size(),
-            .gap = UI::Spacing::xy(0.0f, 18.0f),
-        }, [&]() {
-            settings_page_title("Privacy");
-            data_handling_section(state);
-            export_section(state);
-            legal_section();
-        });
+    settings_page("privacy_content", "Privacy", [&]() {
+        data_handling_section(state);
+        export_section(state);
+        legal_section();
     });
 }
 

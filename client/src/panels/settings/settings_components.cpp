@@ -9,10 +9,10 @@
 namespace misty::panel {
 namespace {
 
-void control_slot(const char* id, const std::function<void()>& content) {
+void control_slot(const char* id, float height, const std::function<void()>& content) {
     UI::div(id, {
         .width = UI::Size::px(kSettingsControlWidth),
-        .height = UI::Size::px(kSettingsControlHeight),
+        .height = UI::Size::px(height),
         .align = UI::Align::End,
         .justify = UI::Justify::Start,
     }, [&]() {
@@ -30,6 +30,30 @@ void settings_page_title(const char* text) {
         .width = UI::Size::fill(),
         .color = kSettingsHeaderTextColor,
         .font = UI::TextFont::BoldXLarge,
+    });
+}
+
+void settings_page(
+    const char* id,
+    const char* title,
+    const std::function<void()>& content,
+    UI::Spacing gap) {
+    UI::div(id, {
+        .mode = UI::Mode::LayoutOnly,
+        .width = UI::Size::fill(),
+        .height = UI::Size::auto_size(),
+        .padding = kSettingsPagePadding,
+    }, [&]() {
+        UI::column((std::string(id) + "_body").c_str(), {
+            .width = UI::Size::fill(),
+            .height = UI::Size::auto_size(),
+            .gap = gap,
+        }, [&]() {
+            settings_page_title(title);
+            if (content) {
+                content();
+            }
+        });
     });
 }
 
@@ -69,7 +93,8 @@ bool settings_toggle_switch(const char* id, bool* value) {
 
     auto& icon = misty::core::AssetManager::get().get_svg_texture(
         *value ? "toggle-on-24" : "toggle-off-24",
-        52
+        52,
+        30
     );
 
     const bool pressed = UI::image_button(id, {
@@ -79,7 +104,7 @@ bool settings_toggle_switch(const char* id, bool* value) {
         .align = UI::Align::End,
         .button_color = ImVec4(0, 0, 0, 0),
         .hover_color = ImVec4(0, 0, 0, 0),
-        .active_color = ImVec4(1, 1, 1, 0.12f),
+        .active_color = ImVec4(0, 0, 0, 0),
         .tint_color = ImVec4(1, 1, 1, 1),
         .border_color = ImVec4(0, 0, 0, 0),
     });
@@ -91,15 +116,15 @@ bool settings_toggle_switch(const char* id, bool* value) {
 
 bool settings_select_control(const char* id, int* index, const char* const* options, int count) {
     bool changed = false;
-    control_slot((std::string(id) + "_slot").c_str(), [&]() {
+    control_slot((std::string(id) + "_slot").c_str(), kSettingsSelectControlHeight, [&]() {
         changed = UI::select({
             .label = id,
             .selected_index = index,
             .options = options,
             .option_count = count,
             .width = UI::Size::fill(),
-            .height = UI::Size::px(kSettingsControlHeight),
-            .padding = UI::Spacing::xy(10.0f, 8.0f),
+            .height = UI::Size::px(kSettingsSelectControlHeight),
+            .padding = UI::Spacing::xy(10.0f, 6.0f),
             .rounding = 6.0f,
             .bg_color = kSettingsControlBgColor,
             .border_color = kSettingsControlBorderColor,
@@ -111,7 +136,7 @@ bool settings_select_control(const char* id, int* index, const char* const* opti
 
 bool settings_input_control(const char* id, char* buffer, size_t buffer_size, bool read_only) {
     bool changed = false;
-    control_slot((std::string(id) + "_slot").c_str(), [&]() {
+    control_slot((std::string(id) + "_slot").c_str(), kSettingsControlHeight, [&]() {
         changed = UI::input_text({
             .label = id,
             .buffer = buffer,
@@ -127,6 +152,48 @@ bool settings_input_control(const char* id, char* buffer, size_t buffer_size, bo
         });
     });
     return changed;
+}
+
+bool settings_nav_item(const char* id, const char* label, const char* icon_name, bool selected) {
+    constexpr float kSettingsNavItemHeight = 36.0f;
+    constexpr float kSettingsNavIconSize = 18.0f;
+    constexpr float kSettingsNavIconGap = 12.0f;
+    const ImVec4 tint = selected
+        ? ImVec4(1.0f, 1.0f, 1.0f, 1.0f)
+        : ImVec4(0.68f, 0.68f, 0.68f, 1.0f);
+    auto& icon = misty::core::AssetManager::get().get_svg_texture(icon_name, 36);
+
+    return UI::button(id, {
+        .width = UI::Size::fill(),
+        .height = UI::Size::px(kSettingsNavItemHeight),
+        .variant = UI::ButtonVariant::Nav,
+        .hover_color = ImVec4(0.2f, 0.2f, 0.2f, 1.0f),
+        .selected = selected,
+        .padding = UI::Spacing::xy(8.0f, 6.0f),
+        .rounding = 8.0f,
+    }, [&]() {
+        UI::row((std::string(id) + "_content").c_str(), {
+            .width = UI::Size::fill(),
+            .height = UI::Size::fill(),
+            .gap = UI::Spacing::xy(kSettingsNavIconGap, 0.0f),
+            .align = UI::Align::Center,
+        }, [&]() {
+            UI::image({
+                .texture_id = icon.id,
+                .width = UI::Size::px(kSettingsNavIconSize),
+                .height = UI::Size::px(kSettingsNavIconSize),
+                .justify = UI::Justify::Center,
+                .tint_color = tint,
+            });
+            UI::text({
+                .text = label,
+                .width = UI::Size::fill(),
+                .align = UI::Align::Start,
+                .justify = UI::Justify::Center,
+                .color = tint,
+            });
+        });
+    });
 }
 
 void settings_status_text(const std::string& message, bool is_error) {
@@ -171,7 +238,8 @@ void settings_row(
             UI::div(value_id.c_str(), {
                 .width = props.end_width,
                 .height = UI::Size::auto_size(),
-                .align = UI::Align::End,
+                .align = UI::Align::Start,
+                .justify = UI::Justify::End,
             }, [&]() {
                 if (end_content) {
                     end_content();

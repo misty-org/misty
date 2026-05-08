@@ -30,13 +30,24 @@ inline constexpr ImVec4 kSettingsControlBorderColor = ImVec4(0.18f, 0.19f, 0.22f
 inline constexpr ImVec4 kSettingsControlTextColor = ImVec4(0.92f, 0.92f, 0.94f, 1.0f);
 inline constexpr float kSettingsControlWidth = 220.0f;
 inline constexpr float kSettingsControlHeight = 36.0f;
+inline constexpr float kSettingsSelectControlHeight = 32.0f;
+inline constexpr misty::UI::Spacing kSettingsShellPadding = misty::UI::Spacing::xy(28.0f, 20.0f);
+inline constexpr misty::UI::Spacing kSettingsSidebarPadding = misty::UI::Spacing::xy(20.0f, 20.0f);
+inline constexpr misty::UI::Spacing kSettingsPagePadding = misty::UI::Spacing::xy(0.0f, 0.0f);
+inline constexpr misty::UI::Spacing kSettingsPageGap = misty::UI::Spacing::xy(0.0f, 18.0f);
 
 void settings_page_title(const char* text);
+void settings_page(
+    const char* id,
+    const char* title,
+    const std::function<void()>& content,
+    misty::UI::Spacing gap = kSettingsPageGap);
 void settings_row_text(const char* label, const char* description);
 void settings_value_text(const char* value, bool muted = false);
 bool settings_toggle_switch(const char* id, bool* value);
 bool settings_select_control(const char* id, int* index, const char* const* options, int count);
 bool settings_input_control(const char* id, char* buffer, size_t buffer_size, bool read_only = false);
+bool settings_nav_item(const char* id, const char* label, const char* icon_name, bool selected);
 void settings_status_text(const std::string& message, bool is_error);
 
 void settings_section(

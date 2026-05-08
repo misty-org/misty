@@ -7,7 +7,6 @@
 #include "core/manager/asset_manager.h"
 #include "core/manager/env_manager.h"
 #include "core/manager/session_manager.h"
-#include "core/system/util.h"
 #include "core/ui/ui_layout.h"
 #include "imgui.h"
 #include "panels/settings/settings_components.h"
@@ -27,8 +26,11 @@ namespace {
     constexpr ImVec4 kControlTextColor = ImVec4(0.92f, 0.92f, 0.94f, 1.0f);
     constexpr float kControlWidth = 220.0f;
     constexpr float kControlHeight = 36.0f;
+    constexpr float kSelectControlHeight = 32.0f;
     constexpr float kDetailValueWidth = 360.0f;
     constexpr float kIconButtonSize = 28.0f;
+    constexpr float kCopyValueGap = 10.0f;
+    constexpr float kCopyValueTextWidth = kDetailValueWidth - kIconButtonSize - kCopyValueGap;
 
     constexpr const char* kStartupViewOptions[] = {"Files", "Services", "Activity"};
     constexpr const char* kReleaseChannelOptions[] = {"Stable"};
@@ -42,7 +44,8 @@ namespace {
 
         auto& icon = misty::core::AssetManager::get().get_svg_texture(
             *value ? "toggle-on-24" : "toggle-off-24",
-            52
+            52,
+            30
         );
 
         const bool pressed = UI::image_button(id, {
@@ -52,7 +55,7 @@ namespace {
             .align = UI::Align::End,
             .button_color = ImVec4(0, 0, 0, 0),
             .hover_color = ImVec4(0, 0, 0, 0),
-            .active_color = ImVec4(1, 1, 1, 0.12f),
+            .active_color = ImVec4(0, 0, 0, 0),
             .tint_color = ImVec4(1, 1, 1, 1),
             .border_color = ImVec4(0, 0, 0, 0),
         });
@@ -68,7 +71,7 @@ namespace {
             .texture_id = icon.id,
             .width = UI::Size::px(kIconButtonSize),
             .height = UI::Size::px(kIconButtonSize),
-            .align = UI::Align::End,
+            .align = UI::Align::Start,
             .button_color = ImVec4(0, 0, 0, 0),
             .hover_color = ImVec4(1, 1, 1, 0.06f),
             .active_color = ImVec4(1, 1, 1, 0.10f),
@@ -111,12 +114,12 @@ namespace {
         });
     }
 
-    void control_slot(const char* id, const std::function<void()>& content) {
+    void control_slot(const char* id, float height, const std::function<void()>& content) {
         UI::div(id, {
             .width = UI::Size::px(kControlWidth),
-            .height = UI::Size::px(kControlHeight),
+            .height = UI::Size::px(height),
             .align = UI::Align::End,
-            .justify = UI::Justify::Center,
+            .justify = UI::Justify::Start,
         }, [&]() {
             if (content) {
                 content();
@@ -126,15 +129,15 @@ namespace {
 
     bool combo_control(const char* id, int* index, const char* const* options, int count) {
         bool changed = false;
-        control_slot((std::string(id) + "_slot").c_str(), [&]() {
+        control_slot((std::string(id) + "_slot").c_str(), kSelectControlHeight, [&]() {
             changed = UI::select({
                 .label = id,
                 .selected_index = index,
                 .options = options,
                 .option_count = count,
                 .width = UI::Size::fill(),
-                .height = UI::Size::px(kControlHeight),
-                .padding = UI::Spacing::xy(10.0f, 8.0f),
+                .height = UI::Size::px(kSelectControlHeight),
+                .padding = UI::Spacing::xy(10.0f, 6.0f),
                 .rounding = 6.0f,
                 .bg_color = kControlBgColor,
                 .border_color = kControlBorderColor,
@@ -146,7 +149,7 @@ namespace {
 
     bool text_input_control(const char* id, char* buffer, size_t buffer_size, bool read_only = false) {
         bool changed = false;
-        control_slot((std::string(id) + "_slot").c_str(), [&]() {
+        control_slot((std::string(id) + "_slot").c_str(), kControlHeight, [&]() {
             changed = UI::input_text({
                 .label = id,
                 .buffer = buffer,
@@ -167,40 +170,27 @@ namespace {
     void copyable_value_row(const char* id, const char* label, const char* description, const std::string& value) {
         misty::panel::settings_row(id, {
             .start_width_pct = 0.52f,
-            .end_width = UI::Size::fill(),
+            .end_width = UI::Size::px(kDetailValueWidth),
             .show_divider = true,
             .divider_color = kDividerColor,
         }, [&]() {
             row_text(label, description);
         }, [&]() {
-            UI::column((std::string(id) + "_stack").c_str(), {
-                .width = UI::Size::px(kDetailValueWidth),
-                .height = UI::Size::auto_size(),
-                .align = UI::Align::End,
-                .gap = UI::Spacing::xy(0.0f, 0.0f),
+            UI::row((std::string(id) + "_actions").c_str(), {
+                .width = UI::Size::fill(),
+                .height = UI::Size::px(kIconButtonSize),
+                .align = UI::Align::Start,
+                .gap = UI::Spacing::xy(kCopyValueGap, 0.0f),
             }, [&]() {
-                UI::row((std::string(id) + "_actions").c_str(), {
-                    .width = UI::Size::fill(),
-                    .height = UI::Size::px(kIconButtonSize),
-                    .gap = UI::Spacing::xy(10.0f, 0.0f),
-                    .align = UI::Align::Center,
-                    .justify = UI::Justify::End,
-                }, [&]() {
-                    UI::div((std::string(id) + "_value").c_str(), {
-                        .width = UI::Size::fill(),
-                        .height = UI::Size::auto_size(),
-                        .align = UI::Align::End,
-                    }, [&]() {
-                        UI::text({
-                            .text = value.c_str(),
-                            .width = UI::Size::fill(),
-                            .align = UI::Align::End,
-                            .overflow = UI::TextOverflow::Clip,
-                            .color = kHeaderTextColor,
-                        });
-                    });
-                    copy_icon_button((std::string(id) + "_copy").c_str(), value);
+                UI::text({
+                    .text = value.c_str(),
+                    .width = UI::Size::px(kCopyValueTextWidth),
+                    .align = UI::Align::Start,
+                    .justify = UI::Justify::Center,
+                    .overflow = UI::TextOverflow::Clip,
+                    .color = kHeaderTextColor,
                 });
+                copy_icon_button((std::string(id) + "_copy").c_str(), value);
             });
         });
     }
@@ -256,27 +246,6 @@ namespace {
             return "Unavailable";
         }
         return (fs::path(home) / "misty").string();
-    }
-
-    void general_header() {
-        UI::column("##general_header_block", {
-            .width = UI::Size::fill(),
-            .height = UI::Size::px(48.0f),
-        }, [&]() {
-            UI::div("##general_header", {
-                .mode = UI::Mode::LayoutOnly,
-                .width = UI::Size::fill(),
-                .height = UI::Size::auto_size(),
-                .padding = UI::Spacing::xy(0.0f, 8.0f),
-            }, [&]() {
-                UI::text({
-                    .text = "General",
-                    .width = UI::Size::fill(),
-                    .font = UI::TextFont::BoldXLarge,
-                    .color = kHeaderTextColor,
-                });
-            });
-        });
     }
 
     void startup_section(misty::panel::SettingsState& state) {
@@ -376,7 +345,7 @@ namespace {
                         ? std::string("Update ") + state.available_version_label
                         : "Check now";
 
-                    control_slot("##general_updates_check_now_slot", [&]() {
+                    control_slot("##general_updates_check_now_slot", kControlHeight, [&]() {
                         if (UI::button("##general_updates_check_now_button", {
                             .label = button_label.c_str(),
                             .width = UI::Size::fill(),
@@ -463,7 +432,6 @@ namespace {
 
             misty::panel::settings_row("##general_behavior_open_links", {
                 .start_width_pct = 0.52f,
-                .show_divider = false,
                 .divider_color = kDividerColor,
             }, [&]() {
                 row_text("Open links externally", "Send external links to the system browser instead of handling them in-app.");
@@ -602,22 +570,12 @@ namespace {
 namespace misty::panel {
 
 bool general_tab(SettingsState& state) {
-    bool clicked = UI::button("##settings_general", {
-        .width = UI::Size::fill(),
-        .height = UI::Size::px(32.0f),
-        .variant = UI::ButtonVariant::Nav,
-        .hover_color = ImVec4(0.2f, 0.2f, 0.2f, 1.0f),
-        .selected = state.active_section == SettingsSection::General,
-        .padding = UI::Spacing::xy(8.0f, 8.0f),
-        .rounding = 8.0f,
-    }, [&]() {
-        UI::text({
-            .text = "General",
-            .width = UI::Size::fill(),
-            .align = UI::Align::Start,
-            .justify = UI::Justify::Center,
-        });
-    });
+    bool clicked = settings_nav_item(
+        "##settings_general",
+        "General",
+        "stack-16",
+        state.active_section == SettingsSection::General
+    );
 
     if (clicked) {
         state.active_section = SettingsSection::General;
@@ -627,41 +585,30 @@ bool general_tab(SettingsState& state) {
 }
 
 void general_content(SettingsState& state) {
-    UI::div("general_content", {
-        .mode = UI::Mode::LayoutOnly,
-        .width = UI::Size::pct(0.9f),
-        .height = UI::Size::auto_size(),
-    }, [&]() {
-        UI::column("##general_body", {
-            .width = UI::Size::fill(),
-            .height = UI::Size::auto_size(),
-            .gap = UI::Spacing::xy(0.0f, 18.0f),
-        }, [&]() {
-            general_header();
-            startup_section(state);
-            updates_section(state);
-            behavior_section(state);
-            system_section();
-            defaults_section(state);
+    settings_page("general_content", "General", [&]() {
+        startup_section(state);
+        updates_section(state);
+        behavior_section(state);
+        system_section();
+        defaults_section(state);
 
-            if (!state.status_message.empty()) {
-                UI::text({
-                    .text = state.status_message.c_str(),
-                    .width = UI::Size::fill(),
-                    .overflow = UI::TextOverflow::Wrap,
-                    .color = state.status_is_error
-                        ? ImVec4(0.88f, 0.44f, 0.44f, 1.0f)
-                        : kSuccessTextColor,
-                });
-            } else {
-                UI::text({
-                    .text = "General settings control startup, updates, system info, and file-manager defaults.",
-                    .width = UI::Size::px(520.0f),
-                    .overflow = UI::TextOverflow::Wrap,
-                    .color = kBodyTextColor,
-                });
-            }
-        });
+        if (!state.status_message.empty()) {
+            UI::text({
+                .text = state.status_message.c_str(),
+                .width = UI::Size::fill(),
+                .overflow = UI::TextOverflow::Wrap,
+                .color = state.status_is_error
+                    ? ImVec4(0.88f, 0.44f, 0.44f, 1.0f)
+                    : kSuccessTextColor,
+            });
+        } else {
+            UI::text({
+                .text = "General settings control startup, updates, system info, and file-manager defaults.",
+                .width = UI::Size::px(520.0f),
+                .overflow = UI::TextOverflow::Wrap,
+                .color = kBodyTextColor,
+            });
+        }
     });
 }
 

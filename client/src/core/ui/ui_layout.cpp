@@ -21,6 +21,7 @@ struct Frame {
     ImVec2 content_min{0.0f, 0.0f};
     ImVec2 content_max{0.0f, 0.0f};
     ImVec2 cursor{0.0f, 0.0f};
+    ImVec2 measured_max{0.0f, 0.0f};
     Layout::Spacing gap{};
     int columns = 1;
     int current_column = 0;
@@ -57,6 +58,29 @@ float clamp_nonnegative(float value) {
     return std::max(0.0f, value);
 }
 
+float spacing_axis_x(const Layout::Spacing& spacing) {
+    return spacing.left;
+}
+
+float spacing_axis_y(const Layout::Spacing& spacing) {
+    return spacing.top;
+}
+
+float spacing_total_x(const Layout::Spacing& spacing) {
+    return spacing.left + spacing.right;
+}
+
+float spacing_total_y(const Layout::Spacing& spacing) {
+    return spacing.top + spacing.bottom;
+}
+
+ImVec2 spacing_to_imgui_padding(const Layout::Spacing& spacing) {
+    return ImVec2(
+        std::max(spacing.left, spacing.right),
+        std::max(spacing.top, spacing.bottom)
+    );
+}
+
 float resolve_axis_size(const Layout::Size& size, float available) {
     switch (size.mode) {
         case Layout::SizeMode::Pixels:
@@ -71,30 +95,41 @@ float resolve_axis_size(const Layout::Size& size, float available) {
     }
 }
 
-float aligned_offset(float available, float item_size, Layout::Align align, float margin) {
-    const float extra = clamp_nonnegative(available - item_size - margin * 2.0f);
-    switch (align) {
-        case Layout::Align::Center:
-            return margin + extra * 0.5f;
-        case Layout::Align::End:
-            return margin + extra;
-        case Layout::Align::Stretch:
-        case Layout::Align::Start:
+float resolve_box_axis_size(const Layout::Size& size, float available) {
+    switch (size.mode) {
+        case Layout::SizeMode::Auto:
+            // Let auto-sized layout containers measure against the real space they can use.
+            // end_scope() shrinks them back down to their actual rendered content size.
+            return clamp_nonnegative(available);
         default:
-            return margin;
+            return resolve_axis_size(size, available);
     }
 }
 
-float justified_offset(float available, float item_size, Layout::Justify justify, float margin) {
-    const float extra = clamp_nonnegative(available - item_size - margin * 2.0f);
+float aligned_offset(float available, float item_size, Layout::Align align, float leading, float trailing) {
+    const float extra = clamp_nonnegative(available - item_size - leading - trailing);
+    switch (align) {
+        case Layout::Align::Center:
+            return leading + extra * 0.5f;
+        case Layout::Align::End:
+            return leading + extra;
+        case Layout::Align::Stretch:
+        case Layout::Align::Start:
+        default:
+            return leading;
+    }
+}
+
+float justified_offset(float available, float item_size, Layout::Justify justify, float leading, float trailing) {
+    const float extra = clamp_nonnegative(available - item_size - leading - trailing);
     switch (justify) {
         case Layout::Justify::Center:
-            return margin + extra * 0.5f;
+            return leading + extra * 0.5f;
         case Layout::Justify::End:
-            return margin + extra;
+            return leading + extra;
         case Layout::Justify::Start:
         default:
-            return margin;
+            return leading;
     }
 }
 
@@ -102,29 +137,41 @@ Placement place_in_root(const Layout::BoxStyle& style) {
     Placement placement;
     const ImVec2 root_pos = ImGui::GetCursorScreenPos();
     const ImVec2 avail = ImGui::GetContentRegionAvail();
-    const float width_avail = clamp_nonnegative(avail.x - style.margin.x * 2.0f);
-    const float height_avail = clamp_nonnegative(avail.y - style.margin.y * 2.0f);
+    const float width_avail = clamp_nonnegative(avail.x - spacing_total_x(style.margin));
+    const float height_avail = clamp_nonnegative(avail.y - spacing_total_y(style.margin));
 
-    placement.size.x = resolve_axis_size(style.width, width_avail);
-    placement.size.y = resolve_axis_size(style.height, height_avail);
+    placement.size.x = resolve_box_axis_size(style.width, width_avail);
+    placement.size.y = resolve_box_axis_size(style.height, height_avail);
 
     if (style.align == Layout::Align::Stretch &&
         (style.width.mode == Layout::SizeMode::Auto || style.width.mode == Layout::SizeMode::Fill)) {
         placement.size.x = width_avail;
     }
 
-    placement.pos.x = root_pos.x + aligned_offset(avail.x, placement.size.x, style.align, style.margin.x);
-    placement.pos.y = root_pos.y + justified_offset(avail.y, placement.size.y, style.justify, style.margin.y);
+    placement.pos.x = root_pos.x + aligned_offset(
+        avail.x,
+        placement.size.x,
+        style.align,
+        style.margin.left,
+        style.margin.right
+    );
+    placement.pos.y = root_pos.y + justified_offset(
+        avail.y,
+        placement.size.y,
+        style.justify,
+        style.margin.top,
+        style.margin.bottom
+    );
     placement.flow_size = ImVec2(
-        placement.size.x + style.margin.x * 2.0f,
-        placement.size.y + style.margin.y * 2.0f
+        placement.size.x + spacing_total_x(style.margin),
+        placement.size.y + spacing_total_y(style.margin)
     );
     return placement;
 }
 
 void wrap_grid_row(Frame& frame) {
     frame.cursor.x = frame.content_min.x;
-    frame.cursor.y += frame.row_height + frame.gap.y;
+    frame.cursor.y += frame.row_height + spacing_axis_y(frame.gap);
     frame.current_column = 0;
     frame.row_height = 0.0f;
     frame.has_items = false;
@@ -141,19 +188,19 @@ Placement place_in_grid(Frame& frame, const Layout::BoxStyle& style) {
     const ImVec2 cell_origin = frame.cursor;
     const float span_width =
         frame.grid_unit_width * static_cast<float>(placement.span) +
-        frame.gap.x * static_cast<float>(placement.span - 1);
-    const float width_avail = clamp_nonnegative(span_width - style.margin.x * 2.0f);
-    const float height_avail = clamp_nonnegative(frame.content_max.y - cell_origin.y - style.margin.y * 2.0f);
+        spacing_axis_x(frame.gap) * static_cast<float>(placement.span - 1);
+    const float width_avail = clamp_nonnegative(span_width - spacing_total_x(style.margin));
+    const float height_avail = clamp_nonnegative(frame.content_max.y - cell_origin.y - spacing_total_y(style.margin));
 
     placement.size.x =
         (style.width.mode == Layout::SizeMode::Auto || style.width.mode == Layout::SizeMode::Fill)
             ? width_avail
-            : resolve_axis_size(style.width, width_avail);
-    placement.size.y = resolve_axis_size(style.height, height_avail);
-    placement.pos = ImVec2(cell_origin.x + style.margin.x, cell_origin.y + style.margin.y);
+            : resolve_box_axis_size(style.width, width_avail);
+    placement.size.y = resolve_box_axis_size(style.height, height_avail);
+    placement.pos = ImVec2(cell_origin.x + style.margin.left, cell_origin.y + style.margin.top);
     placement.flow_size = ImVec2(
-        span_width + style.margin.x * 2.0f,
-        placement.size.y + style.margin.y * 2.0f
+        span_width + spacing_total_x(style.margin),
+        placement.size.y + spacing_total_y(style.margin)
     );
     return placement;
 }
@@ -164,9 +211,9 @@ Placement place_in_flex(Frame& frame, const Layout::BoxStyle& style) {
 
     if (frame.has_items) {
         if (frame.axis == Layout::Axis::Row) {
-            placement.pos.x += frame.gap.x;
+            placement.pos.x += spacing_axis_x(frame.gap);
         } else {
-            placement.pos.y += frame.gap.y;
+            placement.pos.y += spacing_axis_y(frame.gap);
         }
     }
 
@@ -174,11 +221,11 @@ Placement place_in_flex(Frame& frame, const Layout::BoxStyle& style) {
         frame.content_max.x - placement.pos.x,
         frame.content_max.y - placement.pos.y
     );
-    const float width_avail = clamp_nonnegative(available.x - style.margin.x * 2.0f);
-    const float height_avail = clamp_nonnegative(available.y - style.margin.y * 2.0f);
+    const float width_avail = clamp_nonnegative(available.x - spacing_total_x(style.margin));
+    const float height_avail = clamp_nonnegative(available.y - spacing_total_y(style.margin));
 
-    placement.size.x = resolve_axis_size(style.width, width_avail);
-    placement.size.y = resolve_axis_size(style.height, height_avail);
+    placement.size.x = resolve_box_axis_size(style.width, width_avail);
+    placement.size.y = resolve_box_axis_size(style.height, height_avail);
 
     if (frame.axis == Layout::Axis::Row) {
         if (style.align == Layout::Align::Stretch &&
@@ -186,21 +233,45 @@ Placement place_in_flex(Frame& frame, const Layout::BoxStyle& style) {
             placement.size.y = height_avail;
         }
 
-        placement.pos.x += justified_offset(available.x, placement.size.x, style.justify, style.margin.x);
-        placement.pos.y += aligned_offset(available.y, placement.size.y, style.align, style.margin.y);
+        placement.pos.x += justified_offset(
+            available.x,
+            placement.size.x,
+            style.justify,
+            style.margin.left,
+            style.margin.right
+        );
+        placement.pos.y += aligned_offset(
+            available.y,
+            placement.size.y,
+            style.align,
+            style.margin.top,
+            style.margin.bottom
+        );
     } else {
         if (style.align == Layout::Align::Stretch &&
             (style.width.mode == Layout::SizeMode::Auto || style.width.mode == Layout::SizeMode::Fill)) {
             placement.size.x = width_avail;
         }
 
-        placement.pos.x += aligned_offset(available.x, placement.size.x, style.align, style.margin.x);
-        placement.pos.y += justified_offset(available.y, placement.size.y, style.justify, style.margin.y);
+        placement.pos.x += aligned_offset(
+            available.x,
+            placement.size.x,
+            style.align,
+            style.margin.left,
+            style.margin.right
+        );
+        placement.pos.y += justified_offset(
+            available.y,
+            placement.size.y,
+            style.justify,
+            style.margin.top,
+            style.margin.bottom
+        );
     }
 
     placement.flow_size = ImVec2(
-        placement.size.x + style.margin.x * 2.0f,
-        placement.size.y + style.margin.y * 2.0f
+        placement.size.x + spacing_total_x(style.margin),
+        placement.size.y + spacing_total_y(style.margin)
     );
     return placement;
 }
@@ -222,9 +293,12 @@ void advance_parent(const Layout::BoxStyle& style, const Placement& placement, c
         return;
     }
 
+    frame->measured_max.x = std::max(frame->measured_max.x, placement.pos.x + actual_size.x + style.margin.right);
+    frame->measured_max.y = std::max(frame->measured_max.y, placement.pos.y + actual_size.y + style.margin.bottom);
+
     const ImVec2 occupied_size(
-        actual_size.x + style.margin.x * 2.0f,
-        actual_size.y + style.margin.y * 2.0f
+        actual_size.x + spacing_total_x(style.margin),
+        actual_size.y + spacing_total_y(style.margin)
     );
 
     if (frame->kind == FrameKind::Grid) {
@@ -234,7 +308,7 @@ void advance_parent(const Layout::BoxStyle& style, const Placement& placement, c
             wrap_grid_row(*frame);
         } else {
             frame->cursor = ImVec2(
-                frame->cursor.x + placement.flow_size.x + frame->gap.x,
+                frame->cursor.x + placement.flow_size.x + spacing_axis_x(frame->gap),
                 frame->cursor.y
             );
             frame->has_items = true;
@@ -243,9 +317,9 @@ void advance_parent(const Layout::BoxStyle& style, const Placement& placement, c
     }
 
     if (frame->axis == Layout::Axis::Row) {
-        frame->cursor = ImVec2(placement.pos.x + actual_size.x + style.margin.x, frame->cursor.y);
+        frame->cursor = ImVec2(placement.pos.x + actual_size.x + style.margin.right, frame->cursor.y);
     } else {
-        frame->cursor = ImVec2(frame->cursor.x, placement.pos.y + actual_size.y + style.margin.y);
+        frame->cursor = ImVec2(frame->cursor.x, placement.pos.y + actual_size.y + style.margin.bottom);
     }
     frame->has_items = true;
 }
@@ -262,8 +336,8 @@ bool should_use_child_window(const Layout::BoxStyle& style) {
            style.rounding > 0.0f ||
            style.bg_color.w > 0.0f ||
            style.border_color.w > 0.0f ||
-           style.padding.x > 0.0f ||
-           style.padding.y > 0.0f ||
+           spacing_total_x(style.padding) > 0.0f ||
+           spacing_total_y(style.padding) > 0.0f ||
            style.child_flags != ImGuiChildFlags_None ||
            style.window_flags != ImGuiWindowFlags_None;
 }
@@ -278,9 +352,6 @@ BoxScope begin_scope(const char* id, const Layout::BoxStyle& style) {
         if (style.border) {
             child_flags |= ImGuiChildFlags_Borders;
         }
-        if (style.padding.x > 0.0f || style.padding.y > 0.0f) {
-            child_flags |= ImGuiChildFlags_AlwaysUseWindowPadding;
-        }
         if (style.width.mode == Layout::SizeMode::Auto) {
             child_flags |= ImGuiChildFlags_AutoResizeX;
         }
@@ -289,7 +360,7 @@ BoxScope begin_scope(const char* id, const Layout::BoxStyle& style) {
         }
 
         ImGui::SetCursorScreenPos(scope.placement.pos);
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(style.padding.x, style.padding.y));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
         ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, style.rounding);
         ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, style.border ? 1.0f : 0.0f);
         int pushed_colors = 0;
@@ -302,27 +373,32 @@ BoxScope begin_scope(const char* id, const Layout::BoxStyle& style) {
             ++pushed_colors;
         }
         ImGui::BeginChild(id, scope.placement.size, child_flags, style.window_flags);
-        scope.content_min = ImGui::GetCursorScreenPos();
+        const ImVec2 child_origin = ImGui::GetCursorScreenPos();
+        scope.content_min = ImVec2(
+            child_origin.x + style.padding.left,
+            child_origin.y + style.padding.top
+        );
         const ImVec2 content_avail = ImGui::GetContentRegionAvail();
         scope.content_max = ImVec2(
-            scope.content_min.x + content_avail.x,
-            scope.content_min.y + content_avail.y
+            child_origin.x + std::max(0.0f, content_avail.x - style.padding.right),
+            child_origin.y + std::max(0.0f, content_avail.y - style.padding.bottom)
         );
         if (pushed_colors > 0) {
             ImGui::PopStyleColor(pushed_colors);
         }
         ImGui::PopStyleVar(3);
+        ImGui::SetCursorScreenPos(scope.content_min);
         return scope;
     }
 
     ImGui::SetCursorScreenPos(scope.placement.pos);
     scope.content_min = ImVec2(
-        scope.placement.pos.x + style.padding.x,
-        scope.placement.pos.y + style.padding.y
+        scope.placement.pos.x + style.padding.left,
+        scope.placement.pos.y + style.padding.top
     );
     scope.content_max = ImVec2(
-        scope.placement.pos.x + std::max(0.0f, scope.placement.size.x - style.padding.x),
-        scope.placement.pos.y + std::max(0.0f, scope.placement.size.y - style.padding.y)
+        scope.placement.pos.x + std::max(0.0f, scope.placement.size.x - style.padding.right),
+        scope.placement.pos.y + std::max(0.0f, scope.placement.size.y - style.padding.bottom)
     );
 
     if (style.bg_color.w > 0.0f || style.border || style.border_color.w > 0.0f) {
@@ -359,19 +435,19 @@ BoxScope begin_scope(const char* id, const Layout::BoxStyle& style) {
     return scope;
 }
 
-ImVec2 end_scope(const Layout::BoxStyle& style, const BoxScope& scope) {
+ImVec2 end_scope(const Layout::BoxStyle& style, const BoxScope& scope, const ImVec2* measured_max = nullptr) {
     if (scope.use_child) {
         ImGui::EndChild();
         return ImGui::GetItemRectSize();
     }
 
     ImVec2 actual_size = scope.placement.size;
-    const ImVec2 cursor = ImGui::GetCursorScreenPos();
+    const ImVec2 cursor = measured_max ? *measured_max : ImGui::GetCursorScreenPos();
     if (style.width.mode == Layout::SizeMode::Auto) {
-        actual_size.x = std::max(1.0f, cursor.x - scope.placement.pos.x + style.padding.x);
+        actual_size.x = std::max(1.0f, cursor.x - scope.placement.pos.x + style.padding.right);
     }
     if (style.height.mode == Layout::SizeMode::Auto) {
-        actual_size.y = std::max(1.0f, cursor.y - scope.placement.pos.y + style.padding.y);
+        actual_size.y = std::max(1.0f, cursor.y - scope.placement.pos.y + style.padding.bottom);
     }
     ImGui::SetCursorScreenPos(scope.placement.pos);
     ImGui::Dummy(actual_size);
@@ -386,6 +462,7 @@ bool begin_box(
     const Layout::BoxStyle& style,
     const std::function<void()>& content) {
     const BoxScope scope = begin_scope(id, style);
+    ImVec2 measured_max = scope.content_min;
     if (content) {
         Frame frame;
         frame.kind = kind;
@@ -393,10 +470,11 @@ bool begin_box(
         frame.content_min = scope.content_min;
         frame.content_max = scope.content_max;
         frame.cursor = scope.content_min;
+        frame.measured_max = scope.content_min;
         frame.gap = style.gap;
         frame.columns = std::max(1, columns);
         if (kind == FrameKind::Grid) {
-            const float total_gap = style.gap.x * static_cast<float>(frame.columns - 1);
+            const float total_gap = spacing_axis_x(style.gap) * static_cast<float>(frame.columns - 1);
             frame.grid_unit_width = clamp_nonnegative(
                 (frame.content_max.x - frame.content_min.x - total_gap) / static_cast<float>(frame.columns)
             );
@@ -404,9 +482,10 @@ bool begin_box(
 
         frame_stack().push_back(frame);
         content();
+        measured_max = frame_stack().back().measured_max;
         frame_stack().pop_back();
     }
-    const ImVec2 actual_size = end_scope(style, scope);
+    const ImVec2 actual_size = end_scope(style, scope, &measured_max);
     advance_parent(style, scope.placement, actual_size);
     return true;
 }
@@ -421,12 +500,16 @@ ImVec2 resolve_widget_size(
 
     if (width.mode == Layout::SizeMode::Auto) {
         size.x = natural_width;
+    } else if (width.mode == Layout::SizeMode::Pixels) {
+        size.x = clamp_nonnegative(width.value);
     } else {
         size.x = resolve_axis_size(width, available.x);
     }
 
     if (height.mode == Layout::SizeMode::Auto) {
         size.y = natural_height;
+    } else if (height.mode == Layout::SizeMode::Pixels) {
+        size.y = clamp_nonnegative(height.value);
     } else {
         size.y = resolve_axis_size(height, available.y);
     }
@@ -454,17 +537,19 @@ void advance_frame_after_item() {
 
     const ImVec2 rect_min = ImGui::GetItemRectMin();
     const ImVec2 rect_size = ImGui::GetItemRectSize();
+    frame->measured_max.x = std::max(frame->measured_max.x, rect_min.x + rect_size.x);
+    frame->measured_max.y = std::max(frame->measured_max.y, rect_min.y + rect_size.y);
 
     switch (frame->kind) {
         case FrameKind::Flex:
             if (frame->axis == Layout::Axis::Row) {
-                frame->cursor = ImVec2(rect_min.x + rect_size.x + frame->gap.x, frame->cursor.y);
+                frame->cursor = ImVec2(rect_min.x + rect_size.x + spacing_axis_x(frame->gap), frame->cursor.y);
             } else {
-                frame->cursor = ImVec2(frame->cursor.x, rect_min.y + rect_size.y + frame->gap.y);
+                frame->cursor = ImVec2(frame->cursor.x, rect_min.y + rect_size.y + spacing_axis_y(frame->gap));
             }
             break;
         case FrameKind::Grid:
-            frame->cursor = ImVec2(rect_min.x + rect_size.x + frame->gap.x, frame->cursor.y);
+            frame->cursor = ImVec2(rect_min.x + rect_size.x + spacing_axis_x(frame->gap), frame->cursor.y);
             break;
     }
 }
@@ -489,44 +574,26 @@ ImFont* font_for_text(Layout::TextFont font) {
     }
 }
 
-void justify_widget_cursor(const ImVec2& size, Layout::Justify justify) {
-    if (justify == Layout::Justify::Start) {
-        return;
-    }
-
+void position_widget_cursor(const ImVec2& size, Layout::Align align, Layout::Justify justify) {
     const ImVec2 avail = current_available_size();
-    const float extra = clamp_nonnegative(avail.y - size.y);
-    float offset = 0.0f;
+    const ImVec2 base = current_frame() ? current_frame()->cursor : ImGui::GetCursorScreenPos();
+    float offset_x = 0.0f;
+    float offset_y = 0.0f;
 
+    const float extra_y = clamp_nonnegative(avail.y - size.y);
     if (justify == Layout::Justify::Center) {
-        offset = extra * 0.5f;
+        offset_y = extra_y * 0.5f;
     } else if (justify == Layout::Justify::End) {
-        offset = extra;
+        offset_y = extra_y;
     }
-
-    if (offset > 0.0f) {
-        ImGui::SetCursorPosY(ImGui::GetCursorPosY() + offset);
-    }
-}
-
-void align_widget_cursor(const ImVec2& size, Layout::Align align) {
-    if (align == Layout::Align::Start || align == Layout::Align::Stretch) {
-        return;
-    }
-
-    const ImVec2 avail = current_available_size();
-    const float extra = clamp_nonnegative(avail.x - size.x);
-    float offset = 0.0f;
 
     if (align == Layout::Align::Center) {
-        offset = extra * 0.5f;
+        offset_x = clamp_nonnegative(avail.x - size.x) * 0.5f;
     } else if (align == Layout::Align::End) {
-        offset = extra;
+        offset_x = clamp_nonnegative(avail.x - size.x);
     }
 
-    if (offset > 0.0f) {
-        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + offset);
-    }
+    ImGui::SetCursorScreenPos(ImVec2(base.x + offset_x, base.y + offset_y));
 }
 
 struct ButtonStyle {
@@ -694,40 +761,59 @@ void text(const TextProps& props) {
     }
 
     const ImVec2 size = resolve_widget_size(props.width, props.height, avail, natural_width, natural_height);
-    justify_widget_cursor(size, props.justify);
-    align_widget_cursor(size, props.align);
+    position_widget_cursor(size, props.align, props.justify);
+    const ImVec2 origin = ImGui::GetCursorScreenPos();
+    const float inner_offset_x = [&]() {
+        if (props.width.mode == Layout::SizeMode::Auto || overflow == TextOverflow::Wrap) {
+            return 0.0f;
+        }
+
+        const float extra = clamp_nonnegative(size.x - natural_text_size.x);
+        if (props.align == Align::Center) {
+            return extra * 0.5f;
+        }
+        if (props.align == Align::End) {
+            return extra;
+        }
+        return 0.0f;
+    }();
+    const ImVec2 text_pos(origin.x + inner_offset_x, origin.y);
 
     if (props.color.w > 0.0f) {
         CustomStyleColor text_color(ImGuiCol_Text, props.color);
         if (overflow == TextOverflow::Wrap) {
-            ImGui::PushTextWrapPos(ImGui::GetCursorScreenPos().x + (size.x > 0.0f ? size.x : avail.x));
+            ImGui::PushTextWrapPos(origin.x + (size.x > 0.0f ? size.x : avail.x));
             ImGui::TextUnformatted(props.text);
             ImGui::PopTextWrapPos();
         } else if (overflow == TextOverflow::Clip) {
             ImDrawList* draw_list = ImGui::GetWindowDrawList();
-            const ImVec2 min = ImGui::GetCursorScreenPos();
-            const ImVec2 max(min.x + size.x, min.y + size.y);
+            const ImVec2 min = origin;
+            const ImVec2 max(origin.x + size.x, origin.y + size.y);
             draw_list->PushClipRect(min, max, true);
-            draw_list->AddText(min, ImGui::ColorConvertFloat4ToU32(props.color), props.text);
+            draw_list->AddText(text_pos, ImGui::ColorConvertFloat4ToU32(props.color), props.text);
             draw_list->PopClipRect();
             ImGui::Dummy(size);
         } else {
-            ImGui::TextUnformatted(props.text);
+            ImDrawList* draw_list = ImGui::GetWindowDrawList();
+            draw_list->AddText(text_pos, ImGui::ColorConvertFloat4ToU32(props.color), props.text);
+            ImGui::Dummy(size);
         }
     } else if (overflow == TextOverflow::Wrap) {
-        ImGui::PushTextWrapPos(ImGui::GetCursorScreenPos().x + (size.x > 0.0f ? size.x : avail.x));
+        ImGui::PushTextWrapPos(origin.x + (size.x > 0.0f ? size.x : avail.x));
         ImGui::TextUnformatted(props.text);
         ImGui::PopTextWrapPos();
     } else if (overflow == TextOverflow::Clip) {
         ImDrawList* draw_list = ImGui::GetWindowDrawList();
-        const ImVec2 min = ImGui::GetCursorScreenPos();
-        const ImVec2 max(min.x + size.x, min.y + size.y);
+        const ImVec2 min = origin;
+        const ImVec2 max(origin.x + size.x, origin.y + size.y);
         draw_list->PushClipRect(min, max, true);
-        draw_list->AddText(min, ImGui::GetColorU32(ImGuiCol_Text), props.text);
+        draw_list->AddText(text_pos, ImGui::GetColorU32(ImGuiCol_Text), props.text);
         draw_list->PopClipRect();
         ImGui::Dummy(size);
     } else {
-        ImGui::TextUnformatted(props.text);
+        ImDrawList* draw_list = ImGui::GetWindowDrawList();
+        draw_list->AddText(text_pos, ImGui::GetColorU32(ImGuiCol_Text), props.text);
+        ImGui::Dummy(size);
     }
 
     if (font) {
@@ -737,11 +823,32 @@ void text(const TextProps& props) {
     advance_frame_after_item();
 }
 
+void image(const ImageProps& props) {
+    if (!props.texture_id) {
+        return;
+    }
+
+    const ImVec2 avail = current_available_size();
+    const float natural_width = props.width.mode == SizeMode::Auto ? 16.0f : 0.0f;
+    const float natural_height = props.height.mode == SizeMode::Auto ? 16.0f : 0.0f;
+    ImVec2 size = resolve_widget_size(props.width, props.height, avail, natural_width, natural_height);
+    if (size.x <= 0.0f) {
+        size.x = natural_width;
+    }
+    if (size.y <= 0.0f) {
+        size.y = natural_height;
+    }
+
+    position_widget_cursor(size, props.align, props.justify);
+    ImGui::Image(props.texture_id, size, ImVec2(0, 0), ImVec2(1, 1), props.tint_color, props.border_color);
+    advance_frame_after_item();
+}
+
 bool button(const char* id, const ButtonProps& props, const std::function<void()>& content) {
     const bool has_content = static_cast<bool>(content);
     const ImVec2 avail = current_available_size();
-    const ImVec2 frame_padding = (props.padding.x > 0.0f || props.padding.y > 0.0f)
-        ? ImVec2(props.padding.x, props.padding.y)
+    const ImVec2 frame_padding = (spacing_total_x(props.padding) > 0.0f || spacing_total_y(props.padding) > 0.0f)
+        ? spacing_to_imgui_padding(props.padding)
         : ImGui::GetStyle().FramePadding;
     const float natural_width = (!has_content && props.label[0] != '\0')
         ? ImGui::CalcTextSize(props.label).x + frame_padding.x * 2.0f
@@ -758,8 +865,7 @@ bool button(const char* id, const ButtonProps& props, const std::function<void()
         size.y = natural_height;
     }
 
-    justify_widget_cursor(size, props.justify);
-    align_widget_cursor(size, props.align);
+    position_widget_cursor(size, props.align, props.justify);
 
     if (!has_content) {
         if (props.variant == ButtonVariant::Default) {
@@ -799,8 +905,11 @@ bool button(const char* id, const ButtonProps& props, const std::function<void()
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
     draw_list->AddRectFilled(rect_min, rect_max, ImGui::ColorConvertFloat4ToU32(bg_color), colors.rounding);
 
-    const ImVec2 content_min(rect_min.x + frame_padding.x, rect_min.y + frame_padding.y);
-    const ImVec2 content_max(rect_max.x - frame_padding.x, rect_max.y - frame_padding.y);
+    const Layout::Spacing content_padding = (spacing_total_x(props.padding) > 0.0f || spacing_total_y(props.padding) > 0.0f)
+        ? props.padding
+        : Layout::Spacing::xy(frame_padding.x, frame_padding.y);
+    const ImVec2 content_min(rect_min.x + content_padding.left, rect_min.y + content_padding.top);
+    const ImVec2 content_max(rect_max.x - content_padding.right, rect_max.y - content_padding.bottom);
 
     Frame frame;
     frame.kind = FrameKind::Flex;
@@ -833,7 +942,7 @@ bool image_button(const char* id, const ImageButtonProps& props) {
     }
 
     const ImVec2 avail = current_available_size();
-    const ImVec2 frame_padding = ImVec2(props.padding.x, props.padding.y);
+    const ImVec2 frame_padding = spacing_to_imgui_padding(props.padding);
     const float natural_width = props.width.mode == SizeMode::Auto ? 52.0f : 0.0f;
     const float natural_height = props.height.mode == SizeMode::Auto ? 30.0f : 0.0f;
     const Size width = props.align == Align::Stretch && props.width.mode == SizeMode::Auto
@@ -847,8 +956,7 @@ bool image_button(const char* id, const ImageButtonProps& props) {
         size.y = natural_height;
     }
 
-    justify_widget_cursor(size, props.justify);
-    align_widget_cursor(size, props.align);
+    position_widget_cursor(size, props.align, props.justify);
 
     bool pressed = false;
     WithStyle([&](StyleScope& style) {
@@ -871,16 +979,15 @@ bool input_text(const InputTextProps& props) {
     }
 
     const ImVec2 avail = current_available_size();
-    const ImVec2 frame_padding = (props.padding.x > 0.0f || props.padding.y > 0.0f)
-        ? ImVec2(props.padding.x, props.padding.y)
+    const ImVec2 frame_padding = (spacing_total_x(props.padding) > 0.0f || spacing_total_y(props.padding) > 0.0f)
+        ? spacing_to_imgui_padding(props.padding)
         : ImGui::GetStyle().FramePadding;
     const Size width = props.align == Align::Stretch && props.width.mode == SizeMode::Auto
         ? Size::fill()
         : props.width;
     const float natural_height = std::max(ImGui::GetTextLineHeight() + frame_padding.y * 2.0f, ImGui::GetFrameHeight());
     const ImVec2 size = resolve_widget_size(width, props.height, avail, avail.x, natural_height);
-    justify_widget_cursor(size, props.justify);
-    align_widget_cursor(size, props.align);
+    position_widget_cursor(size, props.align, props.justify);
 
     if (size.x > 0.0f) {
         ImGui::SetNextItemWidth(size.x);
@@ -923,8 +1030,8 @@ bool select(const SelectProps& props) {
     }
 
     const ImVec2 avail = current_available_size();
-    const ImVec2 frame_padding = (props.padding.x > 0.0f || props.padding.y > 0.0f)
-        ? ImVec2(props.padding.x, props.padding.y)
+    const ImVec2 frame_padding = (spacing_total_x(props.padding) > 0.0f || spacing_total_y(props.padding) > 0.0f)
+        ? spacing_to_imgui_padding(props.padding)
         : ImGui::GetStyle().FramePadding;
     const Size width = props.align == Align::Stretch && props.width.mode == SizeMode::Auto
         ? Size::fill()
@@ -932,8 +1039,7 @@ bool select(const SelectProps& props) {
     const float natural_height = std::max(ImGui::GetTextLineHeight() + frame_padding.y * 2.0f, ImGui::GetFrameHeight());
     const ImVec2 size = resolve_widget_size(width, props.height, avail, avail.x, natural_height);
 
-    justify_widget_cursor(size, props.justify);
-    align_widget_cursor(size, props.align);
+    position_widget_cursor(size, props.align, props.justify);
 
     if (size.x > 0.0f) {
         ImGui::SetNextItemWidth(size.x);
@@ -942,6 +1048,7 @@ bool select(const SelectProps& props) {
     const int safe_index = std::clamp(*props.selected_index, 0, props.option_count - 1);
     const char* preview = props.options[safe_index];
     bool changed = false;
+    const ImVec2 popup_item_padding(frame_padding.x + 2.0f, frame_padding.y + 4.0f);
 
     WithStyle([&](StyleScope& style) {
         style.var(ImGuiStyleVar_FrameRounding, props.rounding);
@@ -957,6 +1064,8 @@ bool select(const SelectProps& props) {
         }
 
         if (ImGui::BeginCombo(props.label, preview)) {
+            WithStyle([&](StyleScope& popup_style) {
+                popup_style.var(ImGuiStyleVar_FramePadding, popup_item_padding);
             for (int i = 0; i < props.option_count; ++i) {
                 const bool selected = *props.selected_index == i;
                 if (ImGui::Selectable(props.options[i], selected)) {
@@ -967,6 +1076,7 @@ bool select(const SelectProps& props) {
                     ImGui::SetItemDefaultFocus();
                 }
             }
+            });
             ImGui::EndCombo();
         }
     });

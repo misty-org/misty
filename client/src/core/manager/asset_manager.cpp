@@ -71,7 +71,13 @@ namespace misty::core {
     }
 
     SVGTexture& AssetManager::get_svg_texture(const std::string& name, int size) {
-        std::string key = name + ".svg@" + std::to_string(size);
+        return get_svg_texture(name, size, size);
+    }
+
+    SVGTexture& AssetManager::get_svg_texture(const std::string& name, int width, int height) {
+        width = std::max(1, width);
+        height = std::max(1, height);
+        std::string key = name + ".svg@" + std::to_string(width) + "x" + std::to_string(height);
 
         auto it = svg_textures_.find(key);
         if (it != svg_textures_.end()) {
@@ -79,7 +85,7 @@ namespace misty::core {
         }
 
         std::string path = "assets/icons/" + name + ".svg";
-        SVGTexture tex = load_svg(path, size, size);
+        SVGTexture tex = load_svg(path, width, height);
 
         svg_textures_[key] = tex;
         return svg_textures_[key];
