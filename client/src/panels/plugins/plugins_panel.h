@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-#include "core/plugins/plugin_host.h"
+#include "core/manager/plugin_manager.h"
 #include "core/ui/ui_registry.h"
 #include "panels/panel.h"
 
