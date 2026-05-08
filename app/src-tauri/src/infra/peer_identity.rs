@@ -4,7 +4,10 @@ use std::sync::{LazyLock, Mutex};
 use base64::{engine::general_purpose::STANDARD_NO_PAD, Engine as _};
 use iroh::SecretKey;
 
-use crate::error::{ApiError, ApiResult};
+use crate::{
+    error::{ApiError, ApiResult},
+    infra::credential_store,
+};
 
 const PEER_IDENTITY_SERVICE: &str = "com.misty.connected-devices.endpoint";
 static PEER_IDENTITY_CACHE: LazyLock<Mutex<HashMap<String, [u8; 32]>>> =
@@ -20,13 +23,12 @@ pub fn load_or_create(account_id: &str, local_device_id: &str) -> ApiResult<Secr
     {
         return Ok(SecretKey::from_bytes(&bytes));
     }
-    let entry = keyring::Entry::new(PEER_IDENTITY_SERVICE, &scope).map_err(|error| {
+    let bytes = match credential_store::load(PEER_IDENTITY_SERVICE, &scope).map_err(|error| {
         ApiError::Message(format!(
-            "Could not access the Connected Devices identity: {error}"
+            "Could not read the Connected Devices identity: {error}"
         ))
-    })?;
-    let bytes = match entry.get_password() {
-        Ok(encoded) => {
+    })? {
+        Some(encoded) => {
             let decoded = STANDARD_NO_PAD.decode(encoded).map_err(|_| {
                 ApiError::Message("The Connected Devices identity is damaged.".to_owned())
             })?;
@@ -34,22 +36,20 @@ pub fn load_or_create(account_id: &str, local_device_id: &str) -> ApiResult<Secr
                 ApiError::Message("The Connected Devices identity is damaged.".to_owned())
             })?
         }
-        Err(keyring::Error::NoEntry) => {
+        None => {
             let key = SecretKey::generate();
             let bytes = key.to_bytes();
-            entry
-                .set_password(&STANDARD_NO_PAD.encode(bytes))
-                .map_err(|error| {
-                    ApiError::Message(format!(
-                        "Could not secure the Connected Devices identity: {error}"
-                    ))
-                })?;
+            credential_store::store(
+                PEER_IDENTITY_SERVICE,
+                &scope,
+                &STANDARD_NO_PAD.encode(bytes),
+            )
+            .map_err(|error| {
+                ApiError::Message(format!(
+                    "Could not secure the Connected Devices identity: {error}"
+                ))
+            })?;
             bytes
-        }
-        Err(error) => {
-            return Err(ApiError::Message(format!(
-                "Could not read the Connected Devices identity: {error}"
-            )))
         }
     };
     if let Ok(mut cache) = PEER_IDENTITY_CACHE.lock() {

@@ -83,7 +83,7 @@ Notes:
 }
 
 func (s *SpacesService) resolveAssignedTaskToolbox(ctx context.Context, run *db.SpaceRun) (*agenttools.Registry, agenttools.Invocation, serveragent.ToolManifest, error) {
-	toolbox, err := agenttools.New(
+	registrations := []agenttools.Registration{
 		agenttools.Registration{Descriptor: assignedTasksQueryToolDescriptor(), Handler: func(toolCtx context.Context, _ agenttools.Invocation, tool serveragent.ToolRequest) (json.RawMessage, error) {
 			return s.executeAssignedTaskQuery(toolCtx, run, tool)
 		}},
@@ -93,7 +93,11 @@ func (s *SpacesService) resolveAssignedTaskToolbox(ctx context.Context, run *db.
 		agenttools.Registration{Descriptor: assignedTaskActivityToolDescriptor(), Handler: func(toolCtx context.Context, _ agenttools.Invocation, tool serveragent.ToolRequest) (json.RawMessage, error) {
 			return s.executeAssignedTaskActivity(toolCtx, run, tool)
 		}},
-	)
+		agenttools.Registration{Descriptor: assignedTaskAttachedFilesToolDescriptor(), Handler: func(toolCtx context.Context, _ agenttools.Invocation, tool serveragent.ToolRequest) (json.RawMessage, error) {
+			return s.executeAssignedTaskAttachedFiles(toolCtx, run, tool)
+		}},
+	}
+	toolbox, err := agenttools.New(registrations...)
 	if err != nil {
 		return nil, agenttools.Invocation{}, serveragent.ToolManifest{}, err
 	}
@@ -101,9 +105,18 @@ func (s *SpacesService) resolveAssignedTaskToolbox(ctx context.Context, run *db.
 		UserID: run.RequestingMemberID, SpaceID: run.SpaceID, AgentID: run.AgentID, RunID: run.ID,
 		Source: "task_assignment", Trigger: "task_assignment",
 	}
-	requested := []string{toolboxTasksQuery, "tasks.update_assigned", "task.activity.write"}
+	requested := []string{toolboxTasksQuery, "tasks.update_assigned", "task.activity.write", "attached_files.read"}
 	manifest, err := toolbox.Resolve(ctx, invocation, requested, authorizePersonalAgentTaskTool(s.database))
 	return toolbox, invocation, manifest, err
+}
+
+func assignedTaskAttachedFilesToolDescriptor() agenttools.Descriptor {
+	return agenttools.Descriptor{
+		Name: "attached_files.read", Version: 1, Description: "Read only files explicitly attached to the assigned Task.",
+		Risk: serveragent.RiskRead, InputSchema: TestingMustAPIRawJSON(map[string]any{"type": "object", "properties": map[string]any{}}), OutputSchema: agentToolObjectOutputSchema(),
+		AgentPermission: "attached_files.read", AllowCustomAgent: true, Approval: agenttools.ApprovalNone,
+		Locality: agenttools.LocalityServer, Idempotent: true, Sources: []string{"task_assignment"},
+	}
 }
 
 func assignedTasksQueryToolDescriptor() agenttools.Descriptor {
@@ -139,11 +152,16 @@ func authorizePersonalAgentTaskTool(database *db.Database) agenttools.Authorizer
 		if err != nil || !personalAgentToolPolicyAllows(policy, descriptor) {
 			return false, err
 		}
-		allowed, err := database.HasSpacePermission(ctx, invocation.UserID, invocation.SpaceID, descriptor.RequiredPermission)
-		if err != nil || !allowed {
-			return allowed, err
+		if descriptor.RequiredPermission != "" {
+			allowed, permissionErr := database.HasSpacePermission(ctx, invocation.UserID, invocation.SpaceID, descriptor.RequiredPermission)
+			if permissionErr != nil || !allowed {
+				return allowed, permissionErr
+			}
 		}
-		return database.EffectiveAgentSpacePermission(ctx, invocation.UserID, invocation.SpaceID, invocation.AgentID, descriptor.AgentPermission)
+		if descriptor.AgentPermission != "" {
+			return database.EffectiveAgentSpacePermission(ctx, invocation.UserID, invocation.SpaceID, invocation.AgentID, descriptor.AgentPermission)
+		}
+		return true, nil
 	}
 }
 
@@ -233,6 +251,25 @@ func (s *SpacesService) executeAssignedTaskActivity(ctx context.Context, run *db
 		return nil, err
 	}
 	return TestingMustAPIRawJSON(item), nil
+}
+
+func (s *SpacesService) executeAssignedTaskAttachedFiles(ctx context.Context, run *db.SpaceRun, _ serveragent.ToolRequest) (json.RawMessage, error) {
+	if err := s.database.ValidatePersonalAgentTaskRun(ctx, run.RequestingMemberID, run.ID, run.SourceTaskID, run.AgentID); err != nil {
+		return nil, err
+	}
+	task, err := s.database.SpaceTaskForMember(ctx, run.RequestingMemberID, run.SpaceID, run.SourceTaskID)
+	if err != nil || task.AssigneeAgentID != run.AgentID {
+		if err != nil {
+			return nil, err
+		}
+		return nil, db.ErrSpaceForbidden
+	}
+	membership, err := s.database.SpaceAgentMembership(ctx, run.RequestingMemberID, run.SpaceID, run.AgentID)
+	if err != nil {
+		return nil, err
+	}
+	content, warnings, sources := s.explicitTaskFileContext(ctx, run.RequestingMemberID, membership, task)
+	return TestingMustAPIRawJSON(map[string]any{"content": content, "warnings": warnings, "sources": sources}), nil
 }
 
 func (s *SpacesService) explicitTaskFileContext(ctx context.Context, userID string, membership *db.SpaceAgentMembership, task *db.SpaceTask) (string, string, []workflowv2.ContentRef) {

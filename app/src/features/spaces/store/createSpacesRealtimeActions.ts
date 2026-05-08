@@ -1,6 +1,7 @@
 import { applyAgentRunEvent } from "./agent-run-events";
 import * as referenceMode from "./reference-mode";
 import * as accessErrors from "@/api/spaces/access-errors";
+import { mergeSpaceMessages, messageFromSpaceEvent } from "@/features/spaces/chat";
 import { resolveSpacesApiBase, SpaceRequestError, spacesApi } from "@/api/spaces/api";
 import type { SpaceEvent } from "@/api/spaces/dto/interfaces/types";
 import { readRealtimeCursor, writeRealtimeCursor } from "@/api/spaces/realtime-cursor";
@@ -198,6 +199,7 @@ export async function applyRealtimeEvent(
   writeRealtimeCursor(accountId, event.id);
   const permissions = get().spaces.find((space) => space.id === event.space_id)?.permissions;
   if (event.type.startsWith("message.") && permissions?.["messages.read"] !== false) {
+    const includedMessage = messageFromSpaceEvent(event);
     const conversationId =
       typeof event.payload.conversation_id === "string" ? event.payload.conversation_id : "";
     window.dispatchEvent(
@@ -206,7 +208,17 @@ export async function applyRealtimeEvent(
       }),
     );
     if (conversationId) await get().loadInbox();
-    else await Promise.all([get().loadMessages(event.space_id), get().loadInbox()]);
+    else if (includedMessage) {
+      set((state) => ({
+        messagesBySpace: {
+          ...state.messagesBySpace,
+          [event.space_id]: mergeSpaceMessages(state.messagesBySpace[event.space_id] ?? [], [
+            includedMessage,
+          ]),
+        },
+      }));
+      await get().loadInbox();
+    } else await Promise.all([get().loadMessages(event.space_id), get().loadInbox()]);
   } else if (event.type.startsWith("agent.run.")) {
     applyAgentRunEvent(event, set);
     window.dispatchEvent(new CustomEvent("misty:space-agent-run-event", { detail: event }));

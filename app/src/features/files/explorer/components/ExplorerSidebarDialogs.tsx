@@ -75,10 +75,10 @@ export function WorkspaceDialog(props: {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete file layout</AlertDialogTitle>
+            <AlertDialogTitle>Delete profile</AlertDialogTitle>
             <AlertDialogDescription>
               Delete <strong className="font-medium text-cream">{props.state.title}</strong>? This
-              removes the saved layout, not any files.
+              removes the saved profile, not any files.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -95,7 +95,7 @@ export function WorkspaceDialog(props: {
     );
   }
 
-  const title = props.state.kind === "create" ? "New file layout" : "Rename file layout";
+  const title = props.state.kind === "create" ? "New profile" : "Rename profile";
   return (
     <Dialog
       open
@@ -113,7 +113,7 @@ export function WorkspaceDialog(props: {
         >
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
-            <DialogDescription>Give this Files pane arrangement a clear name.</DialogDescription>
+            <DialogDescription>Name this Files pane arrangement.</DialogDescription>
           </DialogHeader>
           <div className={fieldClass}>
             <Label className={fieldLabelClass} htmlFor="workspace-name">

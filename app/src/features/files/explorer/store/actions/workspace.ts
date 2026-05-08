@@ -56,7 +56,7 @@ export function createWorkspaceActions(set: ExplorerSet, get: ExplorerGet): Part
         const restoredClipboard = H.explorerClipboardFromPayload(processClipboard.local);
         if (shouldResetWorkspace) {
           const resetDocument = H.defaultWorkspaceDocument();
-          const workspace = H.defaultNativeWorkspace("workspace_0", "Workspace 1", homePath, get());
+          const workspace = H.defaultNativeWorkspace("workspace_0", "Profile 1", homePath, get());
           explorerRuntime.workspaceDocumentCache = await H.saveWorkspaceDocument({
             ...resetDocument,
             active_workspace_id: workspace.id,
@@ -66,7 +66,7 @@ export function createWorkspaceActions(set: ExplorerSet, get: ExplorerGet): Part
           set({
             ...H.workspaceMetadata(explorerRuntime.workspaceDocumentCache),
             clipboard: restoredClipboard,
-            operationError: "Misty reset a damaged Explorer layout and opened a clean file pane.",
+            operationError: "Misty reset a damaged Explorer profile and opened a clean file pane.",
           });
         } else {
           explorerRuntime.workspaceDocumentCache = workspaceDocument;
@@ -109,7 +109,7 @@ export function createWorkspaceActions(set: ExplorerSet, get: ExplorerGet): Part
         }
         set(H.workspaceMetadata(explorerRuntime.workspaceDocumentCache));
       } catch (error) {
-        set({ operationError: `Workspace restore failed: ${errorText(error)}` });
+        set({ operationError: `Profile restore failed: ${errorText(error)}` });
       }
       multi.initialize(homePath, H.titleFromPath(homePath));
       const fallbackDocument =
@@ -153,7 +153,7 @@ export function createWorkspaceActions(set: ExplorerSet, get: ExplorerGet): Part
         });
         await H.applyWorkspaceDocument(nextDocument, homePath);
       } catch (error) {
-        set({ operationError: `Workspace open failed: ${errorText(error)}` });
+        set({ operationError: `Profile open failed: ${errorText(error)}` });
       }
     },
 
@@ -166,13 +166,13 @@ export function createWorkspaceActions(set: ExplorerSet, get: ExplorerGet): Part
         document = await H.saveWorkspaceDocument({ ...document, active_workspace_id: workspaceId });
         await H.applyWorkspaceDocument(document, homePath);
       } catch (error) {
-        set({ operationError: `Workspace switch failed: ${errorText(error)}` });
+        set({ operationError: `Profile switch failed: ${errorText(error)}` });
       }
     },
 
     createWorkspace: async (title, homePath) => {
       const name = H.uniqueWorkspaceTitle(
-        title.trim() || "Workspace",
+        title.trim() || "Profile",
         explorerRuntime.workspaceDocumentCache?.workspaces ?? get().workspaceEntries,
       );
       try {
@@ -190,7 +190,7 @@ export function createWorkspaceActions(set: ExplorerSet, get: ExplorerGet): Part
         });
         await H.applyWorkspaceDocument(nextDocument, homePath);
       } catch (error) {
-        set({ operationError: `Workspace create failed: ${errorText(error)}` });
+        set({ operationError: `Profile create failed: ${errorText(error)}` });
       }
     },
 
@@ -210,7 +210,7 @@ export function createWorkspaceActions(set: ExplorerSet, get: ExplorerGet): Part
         const nextDocument = await H.saveWorkspaceDocument({ ...document, workspaces });
         set(H.workspaceMetadata(nextDocument));
       } catch (error) {
-        set({ operationError: `Workspace rename failed: ${errorText(error)}` });
+        set({ operationError: `Profile rename failed: ${errorText(error)}` });
       }
     },
 
@@ -241,7 +241,7 @@ export function createWorkspaceActions(set: ExplorerSet, get: ExplorerGet): Part
           set(H.workspaceMetadata(nextDocument));
         }
       } catch (error) {
-        set({ operationError: `Workspace delete failed: ${errorText(error)}` });
+        set({ operationError: `Profile delete failed: ${errorText(error)}` });
       }
     },
   };

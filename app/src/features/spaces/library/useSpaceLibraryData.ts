@@ -5,14 +5,17 @@ export type {
 } from "./types/useSpaceLibraryData";
 
 import { useSpacesStore } from "@/features/spaces";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useLibraryCatalog } from "./libraryData/useLibraryCatalog";
 import { useLibraryDerived } from "./libraryData/useLibraryDerived";
 import { useLibraryDialogState } from "./libraryData/useLibraryDialogState";
 import { useLibraryItems } from "./libraryData/useLibraryItems";
 import { useLibrarySearch } from "./libraryData/useLibrarySearch";
 import { useLibrarySelection } from "./libraryData/useLibrarySelection";
-import { useLibrarySensitiveAccess } from "./libraryData/useLibrarySensitiveAccess";
+import {
+  useLibrarySensitiveAccess,
+  type SensitiveScope,
+} from "./libraryData/useLibrarySensitiveAccess";
 import { useLibraryView } from "./libraryData/useLibraryView";
 import type { LibraryUploadJob } from "./types/useSpaceLibraryData";
 
@@ -46,6 +49,15 @@ export function useSpaceLibraryData(spaceId: string) {
     collection: view.collection,
     setLocalError,
   });
+  // The item fetch keys off this callback, so an inline arrow would refetch on
+  // every render — the requests then feed each other through their own state
+  // updates until the server starts answering 429.
+  const { setSensitiveGrants } = sensitive;
+  const onSensitiveGrantRejected = useCallback(
+    (scope: Exclude<SensitiveScope, "">) =>
+      setSensitiveGrants((grants) => ({ ...grants, [scope]: undefined })),
+    [setSensitiveGrants],
+  );
   const itemList = useLibraryItems({
     spaceId,
     collection: view.collection,
@@ -58,8 +70,7 @@ export function useSpaceLibraryData(spaceId: string) {
     semanticSearchEnabled: Boolean(catalog.peoplePolicy?.semantic_search_enabled),
     sensitiveCollectionScope: sensitive.sensitiveCollectionScope,
     sensitiveCollectionToken: sensitive.sensitiveCollectionToken,
-    onSensitiveGrantRejected: (scope) =>
-      sensitive.setSensitiveGrants((grants) => ({ ...grants, [scope]: undefined })),
+    onSensitiveGrantRejected,
     setLocalError,
   });
   const selection = useLibrarySelection(

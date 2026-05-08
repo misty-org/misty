@@ -48,6 +48,7 @@ import {
   ExplorerPaneHeaderActions,
 } from "./ExplorerToolbarConnections";
 import { useExplorerDialogEvents } from "./explorerWorkspace/useExplorerDialogEvents";
+import { useFilesDockWorkspace } from "./explorerWorkspace/useFilesDockWorkspace";
 import { useConnectedDeviceDirectoryInvalidation } from "./explorerWorkspace/useConnectedDeviceDirectoryInvalidation";
 import {
   useAndroidLocalFolderGrant,
@@ -72,7 +73,6 @@ import {
 } from "./ExplorerWorkspaceUtils";
 import { useExplorerDevices } from "./useExplorerDevices";
 export type { ResizeTarget } from "../model/types/workspace/index";
-
 export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: ExplorerWorkspaceProps) {
   const navigate = useNavigate();
   const app = useAppStore((state) => state.app);
@@ -178,6 +178,14 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
     (state) => state.panes[activePaneId]?.listing?.path ?? homePath,
   );
   const explorerInitialized = useExplorerStore((state) => state.initialized);
+  const openSidebarPathInNewTab = useFilesDockWorkspace({
+    workspaceId: props.workspaceId,
+    activePaneId,
+    activePath,
+    initialized: explorerInitialized,
+    embedded: props.embedded,
+    navigate,
+  });
   const extensionsEnabled = !isAndroidBuild;
   useLegacyPluginTabMigration({ extensionsEnabled, homePath, navigate, workspacePathSignature });
   const activePaneIdRef = useRef(activePaneId);
@@ -293,7 +301,9 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
   const renderPane = useCallback(
     (paneId: string, path: string) => {
       const paneActions =
-        activePaneId === paneId ? <ExplorerPaneHeaderActions paneId={paneId} /> : undefined;
+        !props.embedded && activePaneId === paneId ? (
+          <ExplorerPaneHeaderActions paneId={paneId} />
+        ) : undefined;
       if (isTransfersTabPath(path)) {
         return <TransfersWorkspacePanel workspaceId={paneId} />;
       }
@@ -322,16 +332,13 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
         />
       );
     },
-    [activePaneId, extensionsEnabled, homePath, pluginCommands, pluginPanels],
+    [activePaneId, extensionsEnabled, homePath, pluginCommands, pluginPanels, props.embedded],
   );
   const { inspector } = useExplorerAgentDock({
     activePaneId,
     activePath,
     fallbackInspector: previewVisible ? <ConnectedFileInspector /> : undefined,
   });
-  const openSidebarPathInNewTab = useCallback((path: string, title?: string) => {
-    useMultiPanelStore.getState().addTab(path, title);
-  }, []);
   // Remotes is presented as an overlay. Navigating to /providers is the shared
   // entry point: DesktopLayout turns it into "open the overlay and restore the
   // previous route", the same way /settings and /account behave.
@@ -425,7 +432,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
             canOpenTerminalPath(activePath)
           }
           terminalPath={activePath}
-          onOpenTransfers={openTransfersTab}
+          onOpenTransfers={() => navigate(openTransfersTab().route)}
         />
       ),
     [

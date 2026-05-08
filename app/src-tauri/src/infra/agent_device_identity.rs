@@ -3,7 +3,10 @@ use std::{
     sync::{LazyLock, Mutex},
 };
 
-use crate::error::{ApiError, ApiResult};
+use crate::{
+    error::{ApiError, ApiResult},
+    infra::credential_store,
+};
 
 const DEVICE_IDENTITY_SERVICE: &str = "com.misty.agents.device-identity";
 type DeviceIdentityCache = HashMap<String, Result<Option<String>, String>>;
@@ -19,18 +22,8 @@ pub fn load(local_device_id: &str) -> ApiResult<Option<String>> {
     if let Some(cached) = cache.get(local_device_id) {
         return cached.clone().map_err(ApiError::Message);
     }
-    let entry = keyring::Entry::new(DEVICE_IDENTITY_SERVICE, local_device_id).map_err(|error| {
-        ApiError::Message(format!(
-            "Could not access the agent device credential: {error}"
-        ))
-    })?;
-    let loaded = match entry.get_password() {
-        Ok(value) => Ok(Some(value)),
-        Err(keyring::Error::NoEntry) => Ok(None),
-        Err(error) => Err(format!(
-            "Could not read the agent device credential: {error}"
-        )),
-    };
+    let loaded = credential_store::load(DEVICE_IDENTITY_SERVICE, local_device_id)
+        .map_err(|error| format!("Could not read the agent device credential: {error}"));
     cache.insert(local_device_id.to_owned(), loaded.clone());
     loaded.map_err(ApiError::Message)
 }
@@ -42,16 +35,13 @@ pub fn store(local_device_id: &str, encoded_identity: &str) -> ApiResult<()> {
             "Agent device identity is invalid.".to_owned(),
         ));
     }
-    let entry = keyring::Entry::new(DEVICE_IDENTITY_SERVICE, local_device_id).map_err(|error| {
-        ApiError::Message(format!(
-            "Could not access the agent device credential: {error}"
-        ))
-    })?;
-    entry.set_password(encoded_identity).map_err(|error| {
-        ApiError::Message(format!(
-            "Could not secure the agent device credential: {error}"
-        ))
-    })?;
+    credential_store::store(DEVICE_IDENTITY_SERVICE, local_device_id, encoded_identity).map_err(
+        |error| {
+            ApiError::Message(format!(
+                "Could not secure the agent device credential: {error}"
+            ))
+        },
+    )?;
     if let Ok(mut cache) = DEVICE_IDENTITY_CACHE.lock() {
         cache.insert(
             local_device_id.to_owned(),

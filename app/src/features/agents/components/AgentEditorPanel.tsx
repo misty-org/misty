@@ -139,6 +139,8 @@ export function AgentEditorPanel({ editor }: { editor: AgentEditorState }) {
             activity={editor.toolbox.activity}
             loaded={editor.toolbox.loaded}
             onActionsChange={editor.toolbox.setActions}
+            disabledSurfaces={editor.disabledSurfaces}
+            onDisabledSurfacesChange={editor.setDisabledSurfaces}
           />
           <fieldset className="grid gap-3 rounded-lg border border-charcoal-border p-3">
             <legend className="px-1 text-sm font-medium">Share in Spaces</legend>

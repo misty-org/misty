@@ -155,9 +155,7 @@ export function AgentCreatorDialog({
     setSaving(true);
     setError("");
     try {
-      const grants = actions
-        .filter((action) => action.granted)
-        .map((action) => ({ capability: action.name, risk: action.risk }));
+      const grants = actions.map((action) => ({ capability: action.name, risk: action.risk }));
       let saved = await save(null, {
         name: name.trim(),
         role: role.trim(),
@@ -170,8 +168,10 @@ export function AgentCreatorDialog({
         reasoning_effort: supportsReasoning ? reasoning : "",
         context_permissions: context,
         tool_permissions: {
-          read: grants.some((grant) => grant.risk === "read"),
-          write: grants.some((grant) => grant.risk !== "read"),
+          mode: "inherit_invoker",
+          disabled_surfaces: [],
+          read: true,
+          write: true,
           integrations: [],
           grants,
         },

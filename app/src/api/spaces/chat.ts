@@ -44,6 +44,7 @@ export function createSpaceChatApi(request: SpaceRequest) {
       attachmentIds: string[] = [],
       libraryItemIds: string[] = [],
       replyToMessageId = "",
+      clientNonce = "",
     ) =>
       request<{
         message: SpaceMessage;
@@ -67,6 +68,7 @@ export function createSpaceChatApi(request: SpaceRequest) {
           attachment_ids: attachmentIds,
           library_item_ids: libraryItemIds,
           reply_to_message_id: replyToMessageId,
+          client_nonce: clientNonce,
         }),
       }),
     runDetail: (runId: string) => request<SpaceRunDetail>(`/runs/${encodeURIComponent(runId)}`),

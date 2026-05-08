@@ -4,7 +4,7 @@ import type { SpaceMessage } from "@/api/spaces/dto/interfaces/types";
 import type { MessageSpan } from "@/api/spaces/dto/types/types";
 import { avatarColorClass, avatarInkClass, robotAvatarClass } from "@/shared/lib/avatarPalette";
 import { Avatar, AvatarFallback, AvatarImage, Badge, cn } from "@/shared/ui";
-import { Bot, Sparkles } from "lucide-react";
+import { Bot, CircleAlert, LoaderCircle, Sparkles } from "lucide-react";
 import { Fragment, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { AgentRunInline } from "./AgentRunInline";
@@ -118,6 +118,23 @@ export function ChatMessageRow({
             </p>
           )}
 
+          {message.local_delivery_state ? (
+            <div
+              className="mt-1 flex items-center gap-1.5 text-[11px] text-cream-muted"
+              role="status"
+              aria-live={message.local_delivery_state === "failed" ? "assertive" : "polite"}
+            >
+              {message.local_delivery_state === "sending" ? (
+                <LoaderCircle className="size-3 animate-spin" aria-hidden="true" />
+              ) : (
+                <CircleAlert className="size-3" aria-hidden="true" />
+              )}
+              {message.local_delivery_state === "sending"
+                ? "Sending…"
+                : "Message couldn’t be sent."}
+            </div>
+          ) : null}
+
           <MessageAttachments
             message={message}
             nodes={props.nodes}
@@ -142,7 +159,7 @@ export function ChatMessageRow({
           />
         </div>
 
-        {props.canWrite ? (
+        {props.canWrite && !message.local_delivery_state ? (
           <MessageHoverActions
             message={message}
             currentUserId={props.currentUserId}

@@ -10,10 +10,10 @@ import { LockKeyhole, Plus } from "lucide-react";
 import { useMemo, useRef, useState, type DragEvent } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { invitedSpacePreview } from "../spaceInvitation";
+import { spaceDestination } from "../navigation";
 import { useSpacesStore } from "../store/useSpacesStore";
 import { SpaceAvatar } from "./SpaceAvatar";
 
-const validRailSections = new Set(["chat", "planner", "notes", "drawings", "library"]);
 const spaceOrderStorageKey = "misty:space-nav-order:v1";
 const spaceBadgeClass = [
   "absolute -right-0.5 -top-0.5 grid h-[17px] min-w-[17px] place-items-center rounded-full",
@@ -180,17 +180,7 @@ export function SpaceNavRail() {
   );
 }
 
-export function spaceDestination(pathname: string, spaceId: string): string {
-  const encodedSpaceId = encodeURIComponent(spaceId);
-  const base = `/spaces/${encodedSpaceId}`;
-  const parts = pathname.split("/").filter(Boolean);
-  if (parts[0] !== "spaces") return base;
-
-  const requestedSection = parts[2] === "files" ? "library" : parts[2];
-  return requestedSection && validRailSections.has(requestedSection)
-    ? `${base}/${requestedSection}`
-    : base;
-}
+export { spaceDestination } from "../navigation";
 
 function activeSpaceIdFromPath(pathname: string): string {
   const parts = pathname.split("/").filter(Boolean);

@@ -13,6 +13,10 @@ export type {
 export * from "./modelSelection";
 export * from "./store/agentAccountLifecycle";
 export { agentsDeviceSnapshot } from "./store/useAgentsStore";
-export { ensureServerAgentDevice, signedAgentDeviceRequest } from "./store/useAgentDeviceStore";
+export {
+  browserDeviceSessionId,
+  ensureServerAgentDevice,
+  signedAgentDeviceRequest,
+} from "./store/useAgentDeviceStore";
 export * from "./store/useAiServerStore";
 export * from "./store/usePersonalAgentsStore";

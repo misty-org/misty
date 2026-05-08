@@ -1,5 +1,5 @@
-import type { MultiPanelStoreHook, MultiPanelTab } from "@/features/workspace";
-import { useMultiPanelStore } from "@/features/workspace";
+import type { MultiPanelStoreHook, MultiPanelTab, WorkspaceTab } from "@/features/workspace";
+import { useMultiPanelStore, useWorkspaceStore } from "@/features/workspace";
 import type { PluginTabState } from "../../model/types/workspace/ExplorerDesktopPlugins";
 
 const transfersTabPath = "misty-transfers://history";
@@ -44,17 +44,16 @@ export function canOpenTerminalPath(path: string): boolean {
   return Boolean(trimmed) && !trimmed.includes("://");
 }
 
-export function openTransfersTab(): void {
-  const multi = useMultiPanelStore.getState();
-  const existing = multi.tabs.find((tab) => isTransfersTabPath(tab.path));
-  if (existing) {
-    multi.selectTab(existing.id);
-    return;
-  }
-  const tabId = multi.addTab(transfersTabPath, "Transfers");
-  useMultiPanelStore
-    .getState()
-    .setTabPanelVisibility(tabId, { sidebarVisible: false, previewVisible: false });
+export function openTransfersTab(): WorkspaceTab {
+  const workspace = useWorkspaceStore.getState();
+  return workspace.openSurface({
+    surfaceId: "transfers",
+    groupKey: "tool:transfers",
+    title: "Transfers",
+    route: "/transfers",
+    instancePolicy: "single",
+    paneId: workspace.layout.focusedPaneId,
+  });
 }
 
 export function toggleActiveTabPanelVisibility(panel: "sidebar" | "preview"): void {
