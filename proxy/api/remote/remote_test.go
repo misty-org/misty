@@ -497,40 +497,6 @@ func TestDeleteFileHandler(t *testing.T) {
 	}
 }
 
-func TestSearchHandler(t *testing.T) {
-	root, cleanup := setupAPI(t)
-	defer cleanup()
-
-	os.WriteFile(filepath.Join(root, "report.pdf"), []byte("pdf"), 0644)
-	os.WriteFile(filepath.Join(root, "notes.txt"), []byte("txt"), 0644)
-
-	rr := doRequest(Search(), "GET",
-		"/api/search?remote="+testRemote+"&q=report&path="+root, nil)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("Search: expected 200, got %d: %s", rr.Code, rr.Body.String())
-	}
-
-	var resp rclone.ListResponse
-	json.NewDecoder(rr.Body).Decode(&resp)
-
-	if len(resp.Items) != 1 {
-		t.Fatalf("expected 1 result, got %d", len(resp.Items))
-	}
-	if resp.Items[0].Name != "report.pdf" {
-		t.Errorf("expected 'report.pdf', got %q", resp.Items[0].Name)
-	}
-}
-
-func TestSearchMissingQuery(t *testing.T) {
-	_, cleanup := setupAPI(t)
-	defer cleanup()
-
-	rr := doRequest(Search(), "GET", "/api/search?remote="+testRemote, nil)
-	if rr.Code != http.StatusBadRequest {
-		t.Errorf("expected 400 for missing query, got %d", rr.Code)
-	}
-}
-
 func TestAboutHandler(t *testing.T) {
 	_, cleanup := setupAPI(t)
 	defer cleanup()

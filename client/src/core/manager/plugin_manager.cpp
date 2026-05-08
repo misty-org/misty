@@ -1,4 +1,4 @@
-#include "core/plugins/plugin_host.h"
+#include "core/manager/plugin_manager.h"
 
 #include <algorithm>
 #include <cctype>
@@ -12,11 +12,14 @@
 
 #include <nlohmann/json.hpp>
 
+#include "misty_plugin.h"
 #include "core/commands/command_manager.h"
 #include "core/system/util.h"
-#include "core/plugins/plugin_signing.h"
+#include "plugin_signing.h"
 #include <glad/glad.h>
 #include "imgui.h"
+#include "imgui_internal.h"
+#include "panels/panel.h"
 #include "panels/file_explorer/file_explorer_state.h"
 #include "panels/activity/activity_state.h"
 #include "panels/notification/notification_state.h"
@@ -183,7 +186,7 @@ private:
 
 } // namespace
 
-struct PluginHost::Impl {
+struct PluginManager::Impl {
     struct PluginCommand {
         std::string id;
         std::string title;
@@ -220,6 +223,7 @@ struct PluginHost::Impl {
     std::unordered_map<std::string, std::size_t> plugin_index_by_id;
     std::unordered_map<std::string, std::size_t> command_index_by_id;
     std::unordered_map<std::string, std::size_t> panel_index_by_id;
+    std::string active_preview_scene_id;
 
     Impl() = default;
 
@@ -303,6 +307,11 @@ struct PluginHost::Impl {
         buffer[max_copy] = '\0';
         return 1;
     }
+    static void c_set_preview_scene(void* h, const char* scene_id) {
+        if (!h) return;
+        auto* self = as_impl(h);
+        self->active_preview_scene_id = scene_id ? scene_id : "";
+    }
 
     // ----- UI API trampolines (stateless; ImGui owns the current window) -----
     static void c_ui_text(void*, const char* t) {
@@ -351,7 +360,7 @@ struct PluginHost::Impl {
             &c_open_panel, &c_close_panel, &c_is_panel_open, &c_invoke_command,
             &c_copy_current_view_id, &c_notify,
             &c_create_texture, &c_destroy_texture,
-            &c_copy_selected_file_path,
+            &c_copy_selected_file_path, &c_set_preview_scene,
         };
         return kApi;
     }
@@ -546,26 +555,26 @@ struct PluginHost::Impl {
     }
 };
 
-PluginHost& PluginHost::get() {
-    static PluginHost instance;
+PluginManager& PluginManager::get() {
+    static PluginManager instance;
     return instance;
 }
 
-PluginHost::PluginHost()
+PluginManager::PluginManager()
     : impl_(new Impl()) {
 }
 
-PluginHost::~PluginHost() {
+PluginManager::~PluginManager() {
     shutdown();
     delete impl_;
     impl_ = nullptr;
 }
 
-void PluginHost::set_ui_registry(UIRegistry* registry) {
+void PluginManager::set_ui_registry(UIRegistry* registry) {
     impl_->ui_registry = registry;
 }
 
-std::vector<std::string> PluginHost::discovery_roots() const {
+std::vector<std::string> PluginManager::discovery_roots() const {
     std::vector<std::string> roots;
     if (const char* home = std::getenv("HOME"); home && *home) {
         roots.push_back((fs::path(home) / "misty" / "public" / "plugins").string());
@@ -574,7 +583,7 @@ std::vector<std::string> PluginHost::discovery_roots() const {
     return roots;
 }
 
-void PluginHost::discover_and_load() {
+void PluginManager::discover_and_load() {
     std::vector<fs::path> roots;
     const auto root_strings = discovery_roots();
     roots.reserve(root_strings.size());
@@ -584,7 +593,7 @@ void PluginHost::discover_and_load() {
     discover_and_load(roots);
 }
 
-void PluginHost::discover_and_load(const std::vector<fs::path>& roots) {
+void PluginManager::discover_and_load(const std::vector<fs::path>& roots) {
     shutdown();
     for (std::size_t i = 0; i < roots.size(); ++i) {
         std::error_code ec;
@@ -601,7 +610,7 @@ void PluginHost::discover_and_load(const std::vector<fs::path>& roots) {
     }
 }
 
-bool PluginHost::load_plugin_directory(const fs::path& plugin_dir, bool bundled) {
+bool PluginManager::load_plugin_directory(const fs::path& plugin_dir, bool bundled) {
     PluginInfo info;
     info.plugin_dir = plugin_dir.string();
     info.bundled = bundled;
@@ -687,7 +696,10 @@ bool PluginHost::load_plugin_directory(const fs::path& plugin_dir, bool bundled)
         mv.library = trim_copy(vj.value("library", std::string()));
         mv.sha256 = trim_copy(vj.value("sha256", std::string()));
         mv.build_id = trim_copy(vj.value("build_id", std::string()));
-        mv.sdk_version = trim_copy(vj.value("sdk_version", std::string()));
+        mv.plugin_api_version = trim_copy(vj.value("plugin_api_version", std::string()));
+        if (mv.plugin_api_version.empty()) {
+            mv.plugin_api_version = trim_copy(vj.value("sdk_version", std::string()));
+        }
         variants.push_back(std::move(mv));
     }
 
@@ -818,11 +830,11 @@ bool PluginHost::load_plugin_directory(const fs::path& plugin_dir, bool bundled)
     return true;
 }
 
-void PluginHost::reload() {
+void PluginManager::reload() {
     discover_and_load();
 }
 
-void PluginHost::shutdown() {
+void PluginManager::shutdown() {
     CommandManager::get().clear_runtime_commands();
     impl_->panels.clear();
     impl_->commands.clear();
@@ -832,7 +844,7 @@ void PluginHost::shutdown() {
     impl_->plugins.clear();
 }
 
-void PluginHost::process_shortcuts() {
+void PluginManager::process_shortcuts() {
     MistyInvokeContext ctx = impl_->make_invoke_context();
     for (const auto& command : impl_->commands) {
         if (!impl_->is_plugin_active(command.plugin_index)) {
@@ -853,7 +865,7 @@ void PluginHost::process_shortcuts() {
     }
 }
 
-void PluginHost::render_open_panels() {
+void PluginManager::render_open_panels() {
     for (auto& panel : impl_->panels) {
         if (!panel.is_open || !impl_->is_plugin_active(panel.plugin_index)) {
             continue;
@@ -881,7 +893,124 @@ void PluginHost::render_open_panels() {
     }
 }
 
-bool PluginHost::invoke_command(const std::string& command_id) {
+void PluginManager::render_active_preview_scene() {
+    if (impl_->active_preview_scene_id.empty()) {
+        return;
+    }
+
+    const auto clear_preview_scene = [this]() {
+        impl_->active_preview_scene_id.clear();
+        ImGuiContext& g = *GImGui;
+        if (g.OpenPopupStack.Size > 0) {
+            ImGui::ClosePopupToLevel(0, true);
+        }
+    };
+
+    ImGuiIO& io = ImGui::GetIO();
+    if (io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Escape, false)) {
+        clear_preview_scene();
+        return;
+    }
+
+    if (impl_->active_preview_scene_id == "panel-preview.session-expired-modal") {
+        panel::render_error_modal({
+            .is_open = true,
+            .modal_id = "PanelPreviewSessionExpiredModal",
+            .title = "Session Expired",
+            .message = "Your session has expired and could not be renewed. Please log in again to continue.",
+            .confirm_label = "Log In Again",
+            .icon_name = "lock-24",
+            .icon_size = 32.0f,
+            .dismissible = false,
+            .on_confirm = [&clear_preview_scene]() {
+                clear_preview_scene();
+            },
+        });
+        return;
+    }
+
+    if (impl_->active_preview_scene_id == "panel-preview.generic-error-modal") {
+        panel::render_error_modal({
+            .is_open = true,
+            .modal_id = "PanelPreviewGenericErrorModal",
+            .title = "Could Not Complete Action",
+            .message = "Something went wrong while applying your changes. Please try again in a moment.",
+            .confirm_label = "OK",
+            .icon_name = "alert-24",
+            .icon_size = 28.0f,
+            .dismissible = true,
+            .on_confirm = [&clear_preview_scene]() {
+                clear_preview_scene();
+            },
+        });
+        return;
+    }
+
+    if (impl_->active_preview_scene_id == "panel-preview.destructive-confirm-modal") {
+        static bool is_open = true;
+        if (!is_open) {
+            is_open = true;
+            clear_preview_scene();
+            return;
+        }
+
+        const bool confirmed = panel::render_confirm_modal({
+            .is_open = &is_open,
+            .modal_id = "PanelPreviewDestructiveConfirmModal",
+            .title = "Delete 12 Files?",
+            .message = "This action cannot be undone. Files will be removed from this device immediately.",
+            .confirm_label = "Delete",
+            .cancel_label = "Cancel",
+            .dangerous = true,
+        });
+        if (confirmed || !is_open) {
+            is_open = true;
+            clear_preview_scene();
+        }
+        return;
+    }
+
+    if (impl_->active_preview_scene_id == "panel-preview.loading-modal") {
+        panel::render_loading_modal({
+            .is_open = true,
+            .modal_id = "PanelPreviewLoadingModal",
+            .title = "Syncing Workspace",
+            .message = "Misty is checking remote changes and preparing your files.",
+        });
+        return;
+    }
+
+    ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImDrawList* draw_list = ImGui::GetForegroundDrawList(viewport);
+    const char* hint = "Shift+Esc exits preview";
+    const ImVec2 text_size = ImGui::CalcTextSize(hint);
+    const ImVec2 padding(10.0f, 8.0f);
+    const ImVec2 box_size(text_size.x + padding.x * 2.0f, text_size.y + padding.y * 2.0f);
+    const ImVec2 box_min(
+        viewport->WorkPos.x + viewport->WorkSize.x - box_size.x - 16.0f,
+        viewport->WorkPos.y + 16.0f
+    );
+    const ImVec2 box_max(box_min.x + box_size.x, box_min.y + box_size.y);
+    draw_list->AddRectFilled(
+        box_min,
+        box_max,
+        IM_COL32(17, 17, 19, 240),
+        10.0f
+    );
+    draw_list->AddRect(
+        box_min,
+        box_max,
+        IM_COL32(39, 39, 42, 255),
+        10.0f
+    );
+    draw_list->AddText(
+        ImVec2(box_min.x + padding.x, box_min.y + padding.y),
+        IM_COL32(212, 212, 216, 255),
+        hint
+    );
+}
+
+bool PluginManager::invoke_command(const std::string& command_id) {
     auto it = impl_->command_index_by_id.find(command_id);
     if (it == impl_->command_index_by_id.end()) {
         return false;
@@ -905,15 +1034,15 @@ bool PluginHost::invoke_command(const std::string& command_id) {
     return true;
 }
 
-bool PluginHost::open_panel(const std::string& panel_id) {
+bool PluginManager::open_panel(const std::string& panel_id) {
     return impl_->open_panel(panel_id);
 }
 
-bool PluginHost::close_panel(const std::string& panel_id) {
+bool PluginManager::close_panel(const std::string& panel_id) {
     return impl_->close_panel(panel_id);
 }
 
-bool PluginHost::open_plugin_sandbox(const std::string& plugin_dir, std::string* error) const {
+bool PluginManager::open_plugin_sandbox(const std::string& plugin_dir, std::string* error) const {
     if (plugin_dir.empty()) {
         if (error) {
             *error = "Plugin directory is empty.";
@@ -942,7 +1071,7 @@ bool PluginHost::open_plugin_sandbox(const std::string& plugin_dir, std::string*
     return true;
 }
 
-std::vector<PluginInfo> PluginHost::loaded_plugins() const {
+std::vector<PluginInfo> PluginManager::loaded_plugins() const {
     std::vector<PluginInfo> snapshot;
     snapshot.reserve(impl_->plugins.size());
 

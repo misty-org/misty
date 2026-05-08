@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/cors"
 	"github.com/kannachi323/misty/proxy/api"
 	"github.com/kannachi323/misty/proxy/api/remote"
+	searchapi "github.com/kannachi323/misty/proxy/api/search"
 	"github.com/kannachi323/misty/proxy/api/vault"
 	"github.com/kannachi323/misty/proxy/core/setup"
 	"github.com/kannachi323/misty/proxy/core/syncindex"
@@ -68,6 +69,7 @@ func (proxy *Proxy) MountHandlers() {
 	proxy.APIRouter.Post("/logout", api.LogoutUser(proxy.Database))
 	proxy.APIRouter.Post("/refresh", api.RefreshToken(proxy.Database))
 	proxy.APIRouter.Get("/health", api.Health())
+	proxy.APIRouter.Post("/search", searchapi.Search())
 
 	// Protected routes (JWT required)
 	proxy.APIRouter.Group(func(r chi.Router) {
@@ -94,7 +96,6 @@ func (proxy *Proxy) MountHandlers() {
 		r.Post("/folder/transfer", remote.TransferFolder())
 		r.Post("/mkdir", remote.MkDir())
 		r.Delete("/file", remote.DeleteFile())
-		r.Get("/search", remote.Search())
 		r.Get("/about", remote.AboutRemote())
 		r.Post("/remotes", remote.CreateRemote())
 		r.Post("/remotes/config/start", remote.ConfigStart())

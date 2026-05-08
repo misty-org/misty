@@ -42,6 +42,10 @@ namespace misty::panel {
         std::function<void()> on_confirm;
     };
 
+    bool render_error_modal(const ErrorModalProps& props);
+    bool render_confirm_modal(const ConfirmModalProps& props);
+    void render_loading_modal(const LoadingModalProps& props);
+
     class Panel {
     public:
         virtual ~Panel() = default;
