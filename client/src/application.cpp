@@ -132,6 +132,7 @@ namespace misty {
             errors_panel_.render();
             core::PluginHost::get().process_shortcuts();
             core::PluginHost::get().render_open_panels();
+            core::PluginHost::get().render_active_preview_scene();
             if (transfer_window_panel_) {
                 transfer_window_panel_->render();
             }
