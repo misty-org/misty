@@ -132,6 +132,8 @@ void SettingsPanel::sidebar_tabs(SettingsState& state) {
     notifications_tab(state);
     shortcuts_tab(state);
     advanced_tab(state);
+
+    //will get back to this
 }
 
 } //namespace misty::panel
