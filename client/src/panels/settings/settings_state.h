@@ -2,12 +2,19 @@
 
 #include <string>
 #include <cstring>
+#include <array>
 #include <vector>
 
 #include "core/manager/font_manager.h"
 #include "core/ui/ui_registry.h"
 
 namespace misty::panel {
+
+    struct ShortcutEditorEntry {
+        std::string command_id;
+        std::string saved_value;
+        std::array<char, 96> edit_value{};
+    };
 
     enum class SettingsSection {
         General,
@@ -94,6 +101,8 @@ namespace misty::panel {
         int keymap_index = 0; // 0=System, 1=VS Code, 2=Finder
         bool custom_shortcuts_enabled = false;
         bool shortcut_hints_enabled = true;
+        std::vector<ShortcutEditorEntry> shortcut_editor_entries;
+        bool shortcut_editor_loaded = false;
 
         // Confirmation flags
         bool confirm_clear_recent = false;
