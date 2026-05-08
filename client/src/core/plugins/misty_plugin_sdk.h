@@ -60,6 +60,9 @@ public:
     void destroy_texture(std::uint32_t texture_id) {
         api_->destroy_texture(h_, texture_id);
     }
+    void set_preview_scene(const char* scene_id) {
+        api_->set_preview_scene(h_, scene_id);
+    }
 
     void* handle() const { return h_; }
     const MistyHostApi* api() const { return api_; }

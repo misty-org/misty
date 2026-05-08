@@ -17,6 +17,8 @@
 #include "core/plugins/plugin_signing.h"
 #include <glad/glad.h>
 #include "imgui.h"
+#include "imgui_internal.h"
+#include "panels/panel.h"
 #include "panels/file_explorer/file_explorer_state.h"
 #include "panels/activity/activity_state.h"
 #include "panels/notification/notification_state.h"
@@ -220,6 +222,7 @@ struct PluginHost::Impl {
     std::unordered_map<std::string, std::size_t> plugin_index_by_id;
     std::unordered_map<std::string, std::size_t> command_index_by_id;
     std::unordered_map<std::string, std::size_t> panel_index_by_id;
+    std::string active_preview_scene_id;
 
     Impl() = default;
 
@@ -303,6 +306,11 @@ struct PluginHost::Impl {
         buffer[max_copy] = '\0';
         return 1;
     }
+    static void c_set_preview_scene(void* h, const char* scene_id) {
+        if (!h) return;
+        auto* self = as_impl(h);
+        self->active_preview_scene_id = scene_id ? scene_id : "";
+    }
 
     // ----- UI API trampolines (stateless; ImGui owns the current window) -----
     static void c_ui_text(void*, const char* t) {
@@ -351,7 +359,7 @@ struct PluginHost::Impl {
             &c_open_panel, &c_close_panel, &c_is_panel_open, &c_invoke_command,
             &c_copy_current_view_id, &c_notify,
             &c_create_texture, &c_destroy_texture,
-            &c_copy_selected_file_path,
+            &c_copy_selected_file_path, &c_set_preview_scene,
         };
         return kApi;
     }
@@ -879,6 +887,123 @@ void PluginHost::render_open_panels() {
         ImGui::End();
         panel.is_open = keep_open;
     }
+}
+
+void PluginHost::render_active_preview_scene() {
+    if (impl_->active_preview_scene_id.empty()) {
+        return;
+    }
+
+    const auto clear_preview_scene = [this]() {
+        impl_->active_preview_scene_id.clear();
+        ImGuiContext& g = *GImGui;
+        if (g.OpenPopupStack.Size > 0) {
+            ImGui::ClosePopupToLevel(0, true);
+        }
+    };
+
+    ImGuiIO& io = ImGui::GetIO();
+    if (io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Escape, false)) {
+        clear_preview_scene();
+        return;
+    }
+
+    if (impl_->active_preview_scene_id == "panel-preview.session-expired-modal") {
+        panel::render_error_modal({
+            .is_open = true,
+            .modal_id = "PanelPreviewSessionExpiredModal",
+            .title = "Session Expired",
+            .message = "Your session has expired and could not be renewed. Please log in again to continue.",
+            .confirm_label = "Log In Again",
+            .icon_name = "lock-24",
+            .icon_size = 32.0f,
+            .dismissible = false,
+            .on_confirm = [&clear_preview_scene]() {
+                clear_preview_scene();
+            },
+        });
+        return;
+    }
+
+    if (impl_->active_preview_scene_id == "panel-preview.generic-error-modal") {
+        panel::render_error_modal({
+            .is_open = true,
+            .modal_id = "PanelPreviewGenericErrorModal",
+            .title = "Could Not Complete Action",
+            .message = "Something went wrong while applying your changes. Please try again in a moment.",
+            .confirm_label = "OK",
+            .icon_name = "alert-24",
+            .icon_size = 28.0f,
+            .dismissible = true,
+            .on_confirm = [&clear_preview_scene]() {
+                clear_preview_scene();
+            },
+        });
+        return;
+    }
+
+    if (impl_->active_preview_scene_id == "panel-preview.destructive-confirm-modal") {
+        static bool is_open = true;
+        if (!is_open) {
+            is_open = true;
+            clear_preview_scene();
+            return;
+        }
+
+        const bool confirmed = panel::render_confirm_modal({
+            .is_open = &is_open,
+            .modal_id = "PanelPreviewDestructiveConfirmModal",
+            .title = "Delete 12 Files?",
+            .message = "This action cannot be undone. Files will be removed from this device immediately.",
+            .confirm_label = "Delete",
+            .cancel_label = "Cancel",
+            .dangerous = true,
+        });
+        if (confirmed || !is_open) {
+            is_open = true;
+            clear_preview_scene();
+        }
+        return;
+    }
+
+    if (impl_->active_preview_scene_id == "panel-preview.loading-modal") {
+        panel::render_loading_modal({
+            .is_open = true,
+            .modal_id = "PanelPreviewLoadingModal",
+            .title = "Syncing Workspace",
+            .message = "Misty is checking remote changes and preparing your files.",
+        });
+        return;
+    }
+
+    ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImDrawList* draw_list = ImGui::GetForegroundDrawList(viewport);
+    const char* hint = "Shift+Esc exits preview";
+    const ImVec2 text_size = ImGui::CalcTextSize(hint);
+    const ImVec2 padding(10.0f, 8.0f);
+    const ImVec2 box_size(text_size.x + padding.x * 2.0f, text_size.y + padding.y * 2.0f);
+    const ImVec2 box_min(
+        viewport->WorkPos.x + viewport->WorkSize.x - box_size.x - 16.0f,
+        viewport->WorkPos.y + 16.0f
+    );
+    const ImVec2 box_max(box_min.x + box_size.x, box_min.y + box_size.y);
+    draw_list->AddRectFilled(
+        box_min,
+        box_max,
+        IM_COL32(17, 17, 19, 240),
+        10.0f
+    );
+    draw_list->AddRect(
+        box_min,
+        box_max,
+        IM_COL32(39, 39, 42, 255),
+        10.0f
+    );
+    draw_list->AddText(
+        ImVec2(box_min.x + padding.x, box_min.y + padding.y),
+        IM_COL32(212, 212, 216, 255),
+        hint
+    );
 }
 
 bool PluginHost::invoke_command(const std::string& command_id) {

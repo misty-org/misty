@@ -17,7 +17,7 @@ extern "C" {
 #  define MISTY_PLUGIN_EXPORT __attribute__((visibility("default")))
 #endif
 
-#define MISTY_PLUGIN_ABI_VERSION 3u
+#define MISTY_PLUGIN_ABI_VERSION 4u
 
 typedef enum MistyNotificationLevel {
     MISTY_NOTIFICATION_INFO = 0,
@@ -36,6 +36,7 @@ typedef struct MistyHostApi {
     uint32_t (*create_texture)(void* host, int width, int height, const unsigned char* rgba_pixels);
     void (*destroy_texture)(void* host, uint32_t texture_id);
     int  (*copy_selected_file_path)(void* host, char* buffer, size_t size);
+    void (*set_preview_scene)(void* host, const char* scene_id);
 } MistyHostApi;
 
 typedef struct MistyUiApi {

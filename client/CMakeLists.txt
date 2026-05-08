@@ -10,6 +10,6 @@ add_subdirectory(proto)
 add_subdirectory(src)
 add_subdirectory(tests)
 
-if(MISTY_BUILD_BUNDLED_PLUGINS)
+if(MISTY_BUILD_BUNDLED_PLUGINS OR MISTY_BUILD_DEV_PLUGINS)
     add_subdirectory(plugins)
 endif()
