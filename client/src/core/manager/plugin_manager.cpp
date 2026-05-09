@@ -1,4 +1,4 @@
-#include "core/plugins/plugin_host.h"
+#include "core/manager/plugin_manager.h"
 
 #include <algorithm>
 #include <cctype>
@@ -12,9 +12,10 @@
 
 #include <nlohmann/json.hpp>
 
+#include "misty_plugin.h"
 #include "core/commands/command_manager.h"
 #include "core/system/util.h"
-#include "core/plugins/plugin_signing.h"
+#include "plugin_signing.h"
 #include <glad/glad.h>
 #include "imgui.h"
 #include "imgui_internal.h"
@@ -185,7 +186,7 @@ private:
 
 } // namespace
 
-struct PluginHost::Impl {
+struct PluginManager::Impl {
     struct PluginCommand {
         std::string id;
         std::string title;
@@ -554,26 +555,26 @@ struct PluginHost::Impl {
     }
 };
 
-PluginHost& PluginHost::get() {
-    static PluginHost instance;
+PluginManager& PluginManager::get() {
+    static PluginManager instance;
     return instance;
 }
 
-PluginHost::PluginHost()
+PluginManager::PluginManager()
     : impl_(new Impl()) {
 }
 
-PluginHost::~PluginHost() {
+PluginManager::~PluginManager() {
     shutdown();
     delete impl_;
     impl_ = nullptr;
 }
 
-void PluginHost::set_ui_registry(UIRegistry* registry) {
+void PluginManager::set_ui_registry(UIRegistry* registry) {
     impl_->ui_registry = registry;
 }
 
-std::vector<std::string> PluginHost::discovery_roots() const {
+std::vector<std::string> PluginManager::discovery_roots() const {
     std::vector<std::string> roots;
     if (const char* home = std::getenv("HOME"); home && *home) {
         roots.push_back((fs::path(home) / "misty" / "public" / "plugins").string());
@@ -582,7 +583,7 @@ std::vector<std::string> PluginHost::discovery_roots() const {
     return roots;
 }
 
-void PluginHost::discover_and_load() {
+void PluginManager::discover_and_load() {
     std::vector<fs::path> roots;
     const auto root_strings = discovery_roots();
     roots.reserve(root_strings.size());
@@ -592,7 +593,7 @@ void PluginHost::discover_and_load() {
     discover_and_load(roots);
 }
 
-void PluginHost::discover_and_load(const std::vector<fs::path>& roots) {
+void PluginManager::discover_and_load(const std::vector<fs::path>& roots) {
     shutdown();
     for (std::size_t i = 0; i < roots.size(); ++i) {
         std::error_code ec;
@@ -609,7 +610,7 @@ void PluginHost::discover_and_load(const std::vector<fs::path>& roots) {
     }
 }
 
-bool PluginHost::load_plugin_directory(const fs::path& plugin_dir, bool bundled) {
+bool PluginManager::load_plugin_directory(const fs::path& plugin_dir, bool bundled) {
     PluginInfo info;
     info.plugin_dir = plugin_dir.string();
     info.bundled = bundled;
@@ -695,7 +696,10 @@ bool PluginHost::load_plugin_directory(const fs::path& plugin_dir, bool bundled)
         mv.library = trim_copy(vj.value("library", std::string()));
         mv.sha256 = trim_copy(vj.value("sha256", std::string()));
         mv.build_id = trim_copy(vj.value("build_id", std::string()));
-        mv.sdk_version = trim_copy(vj.value("sdk_version", std::string()));
+        mv.plugin_api_version = trim_copy(vj.value("plugin_api_version", std::string()));
+        if (mv.plugin_api_version.empty()) {
+            mv.plugin_api_version = trim_copy(vj.value("sdk_version", std::string()));
+        }
         variants.push_back(std::move(mv));
     }
 
@@ -826,11 +830,11 @@ bool PluginHost::load_plugin_directory(const fs::path& plugin_dir, bool bundled)
     return true;
 }
 
-void PluginHost::reload() {
+void PluginManager::reload() {
     discover_and_load();
 }
 
-void PluginHost::shutdown() {
+void PluginManager::shutdown() {
     CommandManager::get().clear_runtime_commands();
     impl_->panels.clear();
     impl_->commands.clear();
@@ -840,7 +844,7 @@ void PluginHost::shutdown() {
     impl_->plugins.clear();
 }
 
-void PluginHost::process_shortcuts() {
+void PluginManager::process_shortcuts() {
     MistyInvokeContext ctx = impl_->make_invoke_context();
     for (const auto& command : impl_->commands) {
         if (!impl_->is_plugin_active(command.plugin_index)) {
@@ -861,7 +865,7 @@ void PluginHost::process_shortcuts() {
     }
 }
 
-void PluginHost::render_open_panels() {
+void PluginManager::render_open_panels() {
     for (auto& panel : impl_->panels) {
         if (!panel.is_open || !impl_->is_plugin_active(panel.plugin_index)) {
             continue;
@@ -889,7 +893,7 @@ void PluginHost::render_open_panels() {
     }
 }
 
-void PluginHost::render_active_preview_scene() {
+void PluginManager::render_active_preview_scene() {
     if (impl_->active_preview_scene_id.empty()) {
         return;
     }
@@ -1006,7 +1010,7 @@ void PluginHost::render_active_preview_scene() {
     );
 }
 
-bool PluginHost::invoke_command(const std::string& command_id) {
+bool PluginManager::invoke_command(const std::string& command_id) {
     auto it = impl_->command_index_by_id.find(command_id);
     if (it == impl_->command_index_by_id.end()) {
         return false;
@@ -1030,15 +1034,15 @@ bool PluginHost::invoke_command(const std::string& command_id) {
     return true;
 }
 
-bool PluginHost::open_panel(const std::string& panel_id) {
+bool PluginManager::open_panel(const std::string& panel_id) {
     return impl_->open_panel(panel_id);
 }
 
-bool PluginHost::close_panel(const std::string& panel_id) {
+bool PluginManager::close_panel(const std::string& panel_id) {
     return impl_->close_panel(panel_id);
 }
 
-bool PluginHost::open_plugin_sandbox(const std::string& plugin_dir, std::string* error) const {
+bool PluginManager::open_plugin_sandbox(const std::string& plugin_dir, std::string* error) const {
     if (plugin_dir.empty()) {
         if (error) {
             *error = "Plugin directory is empty.";
@@ -1067,7 +1071,7 @@ bool PluginHost::open_plugin_sandbox(const std::string& plugin_dir, std::string*
     return true;
 }
 
-std::vector<PluginInfo> PluginHost::loaded_plugins() const {
+std::vector<PluginInfo> PluginManager::loaded_plugins() const {
     std::vector<PluginInfo> snapshot;
     snapshot.reserve(impl_->plugins.size());
 
