@@ -1,7 +1,7 @@
 #pragma once
 
 #include "panels/search/search_state.h"
-#include "panels/file_sidebar/remote_mount_state.h"
+#include "panels/search/search_impl.h"
 #include "core/ui/ui_registry.h"
 #include "core/threading/worker_pool.h"
 
@@ -15,26 +15,20 @@ public:
                 std::string search_state_key = "Search");
     ~SearchPanel() = default;
 
-    void render();  // no-op; search is rendered inline by FileExplorerPanel
+    void render();
     void toggle();
     void submit_search(const std::string& query);
     void navigate_to_result(const SearchResult& result);
-    void render_results(SearchState& state);
+    void render_results(SearchState& state, const std::string& current_path);
 
 private:
-    void scan_local(SearchState& state, const std::string& query, uint64_t generation, const std::string& local_root);
-    void search_remote_scope(SearchState& state,
-                             const std::string& query,
-                             uint64_t generation,
-                             const std::string& remote_name,
-                             const std::string& remote_path,
-                             const std::string& provider_folder,
-                             const std::string& folder_name);
+    SearchQuery build_query(const std::string& query_text) const;
 
     core::UIRegistry& ui_registry_;
     core::WorkerPool& worker_pool_;
     std::string explorer_state_key_;
     std::string search_state_key_;
+    SearchImpl search_impl_;
 };
 
 } // namespace misty::panel

@@ -52,7 +52,10 @@ namespace misty::panel {
 
     private:
         void handle_pending_navigation(panel::FileExplorerState& state);
-        void render_search_overlay(panel::SearchState& search_state, const ImVec2& list_start, float list_height);
+        void render_search_overlay(panel::FileExplorerState& state,
+                                   panel::SearchState& search_state,
+                                   const ImVec2& list_start,
+                                   float list_height);
         void process_deferred_search_actions(panel::SearchState& search_state);
         void update_periodic_save(panel::FileExplorerState& state);
         void update_periodic_watched_sync(panel::FileExplorerState& state);
@@ -81,7 +84,6 @@ namespace misty::panel {
         void show_nav_history(panel::FileExplorerState& state, float button_width, float spacing);
         void show_search_bar(panel::FileExplorerState& state, SearchState& search_state);
         void show_breadcrumb_bar(panel::FileExplorerState& state);
-        void show_inline_search(panel::FileExplorerState& state, SearchState& search_state);
         void show_directory_contents(panel::FileExplorerState& state);
         void render_preview_pane(const std::string& selected_path, float preview_width);
         bool load_preview_texture(const std::string& path, std::string* error_message);
