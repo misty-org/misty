@@ -1,4 +1,3 @@
-import { MessageOriginBadge } from "@/features/spaces";
 import type { SpaceChatMessagesProps } from "@/api/spaces/dto/interfaces/components/SpaceChatMessages";
 import type { SpaceMessage } from "@/api/spaces/dto/interfaces/types";
 import type { MessageSpan } from "@/api/spaces/dto/types/types";
@@ -15,7 +14,8 @@ import { MessageHoverActions } from "./MessageHoverActions";
 import { MessageReactions } from "./MessageReactions";
 import { MessageReplyPreview } from "./MessageReplyPreview";
 import { SuggestedActionsCard } from "./SuggestedActionsCard";
-import { canPublish, initials, isInFlightRun } from "./messageHelpers";
+import { initials, isInFlightRun } from "./messageHelpers";
+import { MessageOriginBadge } from "../../components/MessageOriginBadge";
 
 export interface ChatMessageRowProps {
   message: SpaceMessage;
@@ -43,6 +43,11 @@ export function ChatMessageRow({
   props,
 }: ChatMessageRowProps) {
   const rowClass = message.reply_to_message_id ? "row-start-2" : "row-start-1";
+  const publishProvider = props.canPublishToSlack?.(message)
+    ? "Slack"
+    : props.canPublishToDiscord?.(message)
+      ? "Discord"
+      : undefined;
 
   return (
     <Fragment>
@@ -96,7 +101,7 @@ export function ChatMessageRow({
         </div>
 
         <div className={`col-start-2 min-w-0 ${rowClass}`}>
-          {!compact ? <MessageHeader message={message} /> : null}
+          {!compact ? <MessageHeader message={message} publishProvider={publishProvider} /> : null}
 
           {props.editingMessageId === message.id ? (
             <MessageEditForm
@@ -164,15 +169,23 @@ export function ChatMessageRow({
             message={message}
             currentUserId={props.currentUserId}
             isOwner={props.isOwner}
-            publishing={props.publishingMessageId === message.id}
-            canPublishToDiscord={Boolean(
-              props.onPublishToDiscord && canPublish(message, props.currentUserId),
-            )}
             onReply={props.onReply}
             onToggleReaction={props.onToggleReaction}
-            onPublishToDiscord={props.onPublishToDiscord}
             onBeginEditing={props.onBeginEditing}
             onDelete={props.onDelete}
+            onPublish={
+              publishProvider === "Slack" && props.onPublishToSlack
+                ? () => props.onPublishToSlack?.(message)
+                : publishProvider === "Discord" && props.onPublishToDiscord
+                  ? () => props.onPublishToDiscord?.(message)
+                  : undefined
+            }
+            publishing={
+              publishProvider === "Slack"
+                ? props.publishingSlackMessageId === message.id
+                : props.publishingMessageId === message.id
+            }
+            publishProvider={publishProvider}
           />
         ) : null}
       </article>
@@ -190,7 +203,13 @@ export function ChatMessageRow({
   );
 }
 
-function MessageHeader({ message }: { message: SpaceMessage }) {
+function MessageHeader({
+  message,
+  publishProvider,
+}: {
+  message: SpaceMessage;
+  publishProvider?: "Discord" | "Slack";
+}) {
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 leading-5">
       <strong className="text-[15px] font-semibold text-cream">{message.sender_name}</strong>
@@ -200,7 +219,10 @@ function MessageHeader({ message }: { message: SpaceMessage }) {
           Agent
         </Badge>
       ) : null}
-      <MessageOriginBadge origin={message.origin} />
+      <MessageOriginBadge
+        origin={message.origin}
+        outboundProvider={publishProvider === "Slack" ? "slack" : "discord"}
+      />
       <time className="text-[11px] tabular-nums text-cream-muted">
         {formatChatMessageTime(message.created_at)}
       </time>

@@ -10,9 +10,17 @@ import { WebglAddon } from "@xterm/addon-webgl";
 import { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
 import { openSystemExternalLink } from "@/shared/platform/openExternalLink";
-import { AlertCircle, RotateCcw } from "lucide-react";
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useRef, useState } from "react";
 import { TerminalSearchOverlay } from "./TerminalSearchOverlay";
+import { TerminalPaneOverlays, type TerminalSessionStatus } from "./TerminalPaneOverlays";
+import {
+  localTerminalEnvironment,
+  preflightSshEnvironment,
+  terminalEnvironmentRequest,
+  trustSshHost,
+  type SshHostKeyStatus,
+  type TerminalEnvironment,
+} from "./sshEnvironments";
 import { MISTY_TERMINAL_THEME } from "./terminalTheme";
 import {
   bufferBySlot,
@@ -23,6 +31,10 @@ import {
 } from "./terminalRegistry";
 import { selectTerminalPreferences, useSettingsStore } from "@/features/settings";
 import { useShallow } from "zustand/react/shallow";
+import { useTerminalPaneHandle, type TerminalPaneHandle } from "./useTerminalPaneHandle";
+
+export type { TerminalPaneHandle } from "./useTerminalPaneHandle";
+export type { TerminalSessionStatus } from "./TerminalPaneOverlays";
 
 type TerminalOutputEvent = { sessionId: string; data: string };
 type TerminalExitEvent = { sessionId: string; exitCode?: number };
@@ -30,18 +42,6 @@ type TerminalExitEvent = { sessionId: string; exitCode?: number };
 const MISTY_MONOSPACE_STACK =
   'ui-monospace, "JetBrains Mono", "SF Mono", "Menlo", "Consolas", monospace';
 const CURSOR_STYLES = ["block", "bar", "underline"] as const;
-const MIN_FONT_SCALE = 0.6;
-const MAX_FONT_SCALE = 2.0;
-
-export interface TerminalPaneHandle {
-  focus: () => void;
-  clear: () => void;
-  bumpFontScale: (delta: number | "reset") => void;
-  copySelection: () => Promise<void>;
-  paste: () => Promise<void>;
-  toggleSearch: () => void;
-}
-
 interface TerminalPaneProps {
   slotId: string;
   tabId: string | null;
@@ -52,13 +52,28 @@ interface TerminalPaneProps {
   onCwdChange?: (cwd: string) => void;
   onExit?: (exitCode: number | undefined) => void;
   onFocus?: () => void;
+  environment?: TerminalEnvironment;
+  onSessionStatusChange?: (status: TerminalSessionStatus) => void;
+  onCancelSsh?: () => void;
 }
 
 /** Single xterm.js instance backed by a PTY session in Rust. */
 export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(
   function TerminalPane(props, handleRef) {
-    const { slotId, tabId, cwd, visible, focused, onTitleChange, onCwdChange, onExit, onFocus } =
-      props;
+    const {
+      slotId,
+      tabId,
+      cwd,
+      visible,
+      focused,
+      onTitleChange,
+      onCwdChange,
+      onExit,
+      onFocus,
+      onSessionStatusChange,
+      onCancelSsh,
+    } = props;
+    const environment = props.environment ?? localTerminalEnvironment;
 
     const hostRef = useRef<HTMLDivElement | null>(null);
     const terminalRef = useRef<Terminal | null>(null);
@@ -76,10 +91,9 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(
     // through a ref rather than the render-time value.
     const preferencesRef = useRef(terminalPreferences);
     preferencesRef.current = terminalPreferences;
-    const [status, setStatus] = useState<"starting" | "running" | "exited" | "unavailable">(
-      "starting",
-    );
+    const [status, setStatus] = useState<TerminalSessionStatus>("starting");
     const [error, setError] = useState("");
+    const [hostKey, setHostKey] = useState<SshHostKeyStatus | null>(null);
     const [searchOpen, setSearchOpen] = useState(false);
     const [restartToken, setRestartToken] = useState(0);
 
@@ -94,6 +108,8 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(
       onExitRef.current = onExit;
       onFocusRef.current = onFocus;
     }, [onTitleChange, onCwdChange, onExit, onFocus]);
+
+    useEffect(() => onSessionStatusChange?.(status), [onSessionStatusChange, status]);
 
     const fitAndPush = useCallback(() => {
       const term = terminalRef.current;
@@ -120,6 +136,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(
 
       setStatus("starting");
       setError("");
+      setHostKey(null);
 
       let disposed = false;
       const unlistens: UnlistenFn[] = [];
@@ -307,12 +324,25 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(
                   }).catch(() => undefined);
                 }
               } else {
+                if (environment.kind === "ssh") {
+                  setStatus("connecting");
+                  const preflight = await preflightSshEnvironment(environment.ssh.id);
+                  if (preflight.state === "confirmation_required") {
+                    setHostKey(preflight);
+                    setStatus("awaiting_fingerprint");
+                    return;
+                  }
+                  if (preflight.state !== "trusted") {
+                    throw new Error(preflight.message);
+                  }
+                }
                 const sessionId = await invoke<string>("terminal_create", {
                   request: {
                     cwd: cwd?.trim() || null,
                     cols: term.cols,
                     rows: term.rows,
                     env: {},
+                    environment: terminalEnvironmentRequest(environment),
                   },
                 });
                 if (!sessionId || disposed) return;
@@ -376,6 +406,21 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [slotId, restartToken]);
 
+    const confirmFingerprint = useCallback(async () => {
+      if (environment.kind !== "ssh" || !hostKey?.fingerprints[0]) return;
+      setStatus("connecting");
+      setError("");
+      try {
+        const result = await trustSshHost(environment.ssh.id, hostKey.fingerprints[0]);
+        if (result.state !== "trusted") throw new Error(result.message);
+        setHostKey(null);
+        setRestartToken((token) => token + 1);
+      } catch (nextError) {
+        setStatus("unavailable");
+        setError(nextError instanceof Error ? nextError.message : "Host confirmation failed.");
+      }
+    }, [environment, hostKey]);
+
     // Re-fit when the pane becomes visible (e.g., switched back to this tab
     // or unhidden a split). Uses rAF so layout has settled.
     useEffect(() => {
@@ -413,55 +458,13 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(
       terminalPreferences.scrollback,
     ]);
 
-    useImperativeHandle(
+    useTerminalPaneHandle({
       handleRef,
-      () => ({
-        focus: () => terminalRef.current?.focus(),
-        clear: () => {
-          terminalRef.current?.clear();
-          // ^L to the shell so the prompt re-emits and the buffer is truly clean
-          const sessionId = sessionIdRef.current;
-          if (sessionId) {
-            void invoke("terminal_write", { sessionId, data: "\x0c" }).catch(() => undefined);
-          }
-        },
-        bumpFontScale: (delta) => {
-          setFontScale((current) => {
-            if (delta === "reset") return 1;
-            const next = Math.round((current + delta) * 20) / 20;
-            return Math.max(MIN_FONT_SCALE, Math.min(MAX_FONT_SCALE, next));
-          });
-        },
-        copySelection: async () => {
-          const term = terminalRef.current;
-          if (!term) return;
-          const selection = term.getSelection();
-          if (!selection) return;
-          try {
-            await navigator.clipboard.writeText(selection);
-          } catch {
-            /* clipboard may be blocked; user can still ⌘C via native menu */
-          }
-        },
-        paste: async () => {
-          const term = terminalRef.current;
-          const sessionId = sessionIdRef.current;
-          if (!term || !sessionId) return;
-          try {
-            const text = await navigator.clipboard.readText();
-            if (!text) return;
-            // xterm handles bracketed paste automatically when the shell
-            // enabled it; write() emits the appropriate ^[[200~ / ^[[201~
-            // wrappers via paste().
-            term.paste(text);
-          } catch {
-            /* clipboard unavailable */
-          }
-        },
-        toggleSearch: () => setSearchOpen((current) => !current),
-      }),
-      [],
-    );
+      terminalRef,
+      sessionIdRef,
+      setFontScale,
+      setSearchOpen,
+    });
 
     return (
       <div
@@ -472,26 +475,14 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(
         {searchOpen && searchRef.current ? (
           <TerminalSearchOverlay search={searchRef.current} onClose={() => setSearchOpen(false)} />
         ) : null}
-        {status === "starting" ? (
-          <div className="pointer-events-none absolute inset-0 grid place-items-center bg-[#111312]/70 text-xs text-cream-muted">
-            Starting shell…
-          </div>
-        ) : null}
-        {status === "unavailable" ? (
-          <div className="absolute inset-0 grid place-items-center bg-[#111312] p-6">
-            <div className="max-w-sm rounded-md border border-charcoal-border bg-charcoal-card p-4 text-center text-xs text-cream-muted">
-              <AlertCircle className="mx-auto mb-2 text-cream-muted" size={20} />
-              <p className="mb-3">{error}</p>
-              <button
-                type="button"
-                className="inline-flex h-7 items-center gap-1.5 rounded border border-charcoal-border px-2 text-[11px] hover:bg-charcoal-hover"
-                onClick={() => setRestartToken((token) => token + 1)}
-              >
-                <RotateCcw size={11} /> Retry
-              </button>
-            </div>
-          </div>
-        ) : null}
+        <TerminalPaneOverlays
+          status={status}
+          error={error}
+          hostKey={hostKey}
+          onCancelSsh={onCancelSsh}
+          onConfirmFingerprint={() => void confirmFingerprint()}
+          onRestart={() => setRestartToken((token) => token + 1)}
+        />
       </div>
     );
   },

@@ -9,13 +9,9 @@ import {
 } from "@/shared/ui";
 import { invoke } from "@tauri-apps/api/core";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
-import { Copy, ExternalLink, MoreVertical, RefreshCw } from "lucide-react";
-import { useEffect } from "react";
-import {
-  browserRuntimeId,
-  setBrowserWebviewsSuspended,
-  useBrowserRuntimeStore,
-} from "./browserRuntime";
+import { Copy, ExternalLink, MoreVertical, RotateCw } from "lucide-react";
+import { browserRuntimeId, useBrowserRuntimeStore } from "./browserRuntime";
+import { useBrowserOverlayControl } from "./useBrowserOverlayControl";
 
 interface BrowserMenuProps {
   iconButtonClass: string;
@@ -25,10 +21,9 @@ interface BrowserMenuProps {
 }
 
 export function BrowserMenu(props: BrowserMenuProps) {
-  const suspensionReason = `browser-menu:${browserRuntimeId(props.tab)}`;
   const externalPage = /^https?:\/\//i.test(props.url);
-
-  useEffect(() => () => setBrowserWebviewsSuspended(false, suspensionReason), [suspensionReason]);
+  const suspensionReason = `browser-menu:${browserRuntimeId(props.tab)}`;
+  const overlay = useBrowserOverlayControl(suspensionReason);
 
   const reportError = (error: unknown) => {
     useBrowserRuntimeStore
@@ -62,7 +57,7 @@ export function BrowserMenu(props: BrowserMenuProps) {
   };
 
   return (
-    <DropdownMenu onOpenChange={(open) => setBrowserWebviewsSuspended(open, suspensionReason)}>
+    <DropdownMenu modal={false} open={overlay.open} onOpenChange={overlay.onOpenChange}>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
@@ -80,9 +75,13 @@ export function BrowserMenu(props: BrowserMenuProps) {
           <MoreVertical size={20} strokeWidth={1.8} />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" sideOffset={8} className="min-w-52">
+      <DropdownMenuContent
+        align="end"
+        sideOffset={8}
+        className="min-w-52 data-[state=closed]:animate-none data-[state=open]:animate-none"
+      >
         <DropdownMenuItem onSelect={() => void reload()}>
-          <RefreshCw />
+          <RotateCw />
           Reload
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => void copyAddress()}>

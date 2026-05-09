@@ -11,6 +11,7 @@ import { resolveAgentSpaceId } from "./agentSpaceSelection";
 import { usePersonalAgentsStore } from "./store/usePersonalAgentsStore";
 import { useAgentActivity } from "./useAgentActivity";
 import { useAgentEditor } from "./useAgentEditor";
+import { McpConnectionsSheet } from "./mcp/McpConnectionsSheet";
 
 export default function DesktopAgentsPage() {
   const editor = useAgentEditor();
@@ -21,6 +22,7 @@ export default function DesktopAgentsPage() {
   const activeScopeKey = useWorkspaceStore((state) => state.activeScopeKey);
   const [selectedAgentId, setSelectedAgentId] = useState(() => searchParams.get("agent") ?? "");
   const [spaceId, setSpaceId] = useState(() => searchParams.get("space") ?? "");
+  const [connectionsOpen, setConnectionsOpen] = useState(false);
   const selectedAgent = useMemo(
     () => agents.find((agent) => agent.id === selectedAgentId) ?? null,
     [agents, selectedAgentId],
@@ -55,33 +57,41 @@ export default function DesktopAgentsPage() {
     "grid h-full min-h-0 grid-cols-[240px_minmax(0,1fr)] overflow-hidden max-[700px]:grid-cols-[190px_minmax(0,1fr)]";
 
   return (
-    <main className={gridClass}>
-      <aside className="flex min-h-0 flex-col border-r border-charcoal-border bg-charcoal-sidebar p-3">
-        <PersonalAgentsSidebar
-          selectedAgentId={selectedAgentId}
-          onSelect={(agent) => {
-            editor.close();
-            setSelectedAgentId(agent.id);
-          }}
-          onEdit={editor.open}
-          onCreate={() => editor.open("new")}
-          onDelete={(agentId) => void editor.deleteAgent(agentId)}
-        />
-      </aside>
-      {editing ? (
-        <AgentEditorPanel editor={editor} />
-      ) : selectedAgent && spaceId ? (
-        <AgentConversationPanel
-          agent={selectedAgent}
-          spaceId={spaceId}
-          spaces={spaces}
-          onSpaceChange={setSpaceId}
-          onEdit={() => editor.open(selectedAgent)}
-          controller={activity}
-        />
-      ) : (
-        <AgentEmptyState onCreate={() => editor.open("new")} />
-      )}
-    </main>
+    <>
+      <main className={gridClass}>
+        <aside className="flex min-h-0 flex-col border-r border-charcoal-border bg-charcoal-sidebar p-3">
+          <PersonalAgentsSidebar
+            selectedAgentId={selectedAgentId}
+            onSelect={(agent) => {
+              editor.close();
+              setSelectedAgentId(agent.id);
+            }}
+            onEdit={editor.open}
+            onCreate={() => editor.open("new")}
+            onDelete={(agentId) => void editor.deleteAgent(agentId)}
+            onConnections={() => setConnectionsOpen(true)}
+          />
+        </aside>
+        {editing ? (
+          <AgentEditorPanel editor={editor} onManageConnections={() => setConnectionsOpen(true)} />
+        ) : selectedAgent && spaceId ? (
+          <AgentConversationPanel
+            agent={selectedAgent}
+            spaceId={spaceId}
+            spaces={spaces}
+            onSpaceChange={setSpaceId}
+            onEdit={() => editor.open(selectedAgent)}
+            controller={activity}
+          />
+        ) : (
+          <AgentEmptyState onCreate={() => editor.open("new")} />
+        )}
+      </main>
+      <McpConnectionsSheet
+        open={connectionsOpen}
+        onOpenChange={setConnectionsOpen}
+        agentId={selectedAgent?.id}
+      />
+    </>
   );
 }

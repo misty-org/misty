@@ -23,6 +23,16 @@ use uuid::Uuid;
 
 type RemoteConfig = Map<String, Value>;
 
+pub(super) fn configured_remote(name: String, provider_type: String, config: &Value) -> Value {
+    json!({
+        "name": name,
+        "type": provider_type,
+        "connection_id": config.get("misty_connection_id").and_then(Value::as_str),
+        "connection_source": config.get("misty_connection_source").and_then(Value::as_str),
+        "connected_account_id": config.get("misty_connected_account_id").and_then(Value::as_str)
+    })
+}
+
 #[derive(Clone)]
 pub struct DirectCloudEngine {
     inner: Arc<DirectCloudInner>,
@@ -1433,57 +1443,4 @@ fn local_tree_size(path: &Path) -> Result<(i64, i64), String> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn onedrive_paths_escape_each_segment() {
-        assert_eq!(
-            onedrive_item_url("Reports & Plans/Q3 #1.txt"),
-            "https://graph.microsoft.com/v1.0/me/drive/root:/Reports%20%26%20Plans/Q3%20%231%2Etxt"
-        );
-    }
-
-    #[test]
-    fn windows_paths_are_not_remote_names() {
-        assert!(is_windows_absolute_path(r"C:\Users\Misty\Backup"));
-    }
-
-    #[test]
-    fn persisted_connections_exclude_session_tokens() {
-        let root = std::env::temp_dir().join(format!("misty-cloud-test-{}", Uuid::new_v4()));
-        fs::create_dir_all(&root).unwrap();
-        let path = root.join("connections.json");
-        let mut config = RemoteConfig::new();
-        config.insert("type".to_owned(), Value::String("drive".to_owned()));
-        config.insert(
-            "access_token".to_owned(),
-            Value::String("temporary".to_owned()),
-        );
-        config.insert(
-            "misty_connection_id".to_owned(),
-            Value::String("cloud_123".to_owned()),
-        );
-        persist_connections(&path, &HashMap::from([("work".to_owned(), config)])).unwrap();
-        let persisted = read_connections(&path).unwrap();
-        assert!(persisted["work"].get("access_token").is_none());
-        assert_eq!(
-            persisted["work"]["misty_connection_id"],
-            Value::String("cloud_123".to_owned())
-        );
-        let _ = fs::remove_dir_all(root);
-    }
-
-    #[test]
-    fn token_envelope_is_read_when_access_token_is_absent() {
-        let config = json!({
-            "type": "drive",
-            "token": "{\"access_token\":\"leased-token\"}"
-        })
-        .as_object()
-        .cloned()
-        .expect("remote config");
-
-        assert_eq!(access_token(&config).as_deref(), Some("leased-token"));
-    }
-}
+mod tests;

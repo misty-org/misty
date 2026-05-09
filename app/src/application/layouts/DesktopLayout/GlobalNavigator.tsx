@@ -11,9 +11,15 @@ import {
   SpaceAvatar,
   SpaceRowActions,
   spaceDestination,
+  spaceLandingRoute,
   useSpacesStore,
 } from "@/features/spaces";
-import { dockLeaves, dockWidgetRegistry, useWorkspaceStore } from "@/features/workspace";
+import {
+  dockLeaves,
+  dockWidgetRegistry,
+  useWorkspaceStore,
+  workspaceSurfaceFromRoute,
+} from "@/features/workspace";
 import { isWebBuild } from "@/shared/platform/buildTarget";
 import { cn } from "@/shared/ui";
 import {
@@ -26,6 +32,7 @@ import {
   FolderOpen,
   Globe2,
   House,
+  Inbox,
   MessagesSquare,
   Notebook,
   Plus,
@@ -39,14 +46,23 @@ import { DeploymentMenu } from "./DeploymentMenu";
 import { NavigatorProfileBar } from "./NavigatorProfileBar";
 import { navigatorTitlebarStripClass } from "./styles";
 
-const toolItems: Array<{ id: string; label: string; path: string; icon: LucideIcon }> = [
+type NavigatorToolItem = {
+  id: string;
+  label: string;
+  path: string;
+  icon: LucideIcon;
+  disabled?: boolean;
+};
+type ToolGroupId = "work" | "explore" | "build";
+
+const toolItems: NavigatorToolItem[] = [
+  { id: "inbox", label: "Inbox", path: routes.inbox, icon: Inbox },
   { id: "browser", label: "Browser", path: routes.browser, icon: Globe2 },
   { id: "terminal", label: "Terminal", path: routes.terminal, icon: TerminalSquare },
   { id: "code", label: "Code", path: routes.code, icon: Code2 },
   { id: "files", label: "Files", path: routes.files, icon: FolderOpen },
   { id: "transfers", label: "Transfers", path: routes.transfers, icon: ArrowLeftRight },
   { id: "agents", label: "Agents", path: routes.agents, icon: Bot },
-  { id: "extensions", label: "Extensions", path: routes.extensions, icon: Blocks },
 ];
 
 export function GlobalNavigator(props: {
@@ -91,17 +107,31 @@ export function GlobalNavigator(props: {
   );
   const canAddSpace = !limits || limits.unlimited_spaces || spaces.length < limits.space_limit;
   const activeSpaceId = activeScopeKey.startsWith("space:") ? activeScopeKey.slice(6) : "";
-  // Tools are always listed. Before the scope has settled on a Space — the
-  // first frames after launch, or a scope pointing at a Space that is gone —
-  // they resolve against Misty rather than disappearing from the rail.
+  // Space-scoped tools keep their slots during the first frames after launch
+  // or while a Space is loading; they become active once a real context exists.
   const scopedSpace =
     spaces.find((space) => space.id === activeSpaceId) ?? preferredMistySpace(spaces);
-  const activeSpaceSection = spaceSectionFromRoute(activeTab?.route ?? location.pathname);
-  const contextualTools = scopedSpace
-    ? spaceToolItems(scopedSpace, user?.id ?? "").filter(({ id }) =>
-        canShowSpaceTool(scopedSpace, id),
-      )
-    : [];
+  const activeRoute = activeTab?.route ?? location.pathname;
+  const activeSpaceSection = spaceSectionFromRoute(activeRoute);
+  const routeSpaceId = spaceIdFromRoute(activeRoute);
+  const spaceToolContext = scopedSpace ?? (routeSpaceId ? { id: routeSpaceId } : undefined);
+  const contextualTools = spaceToolContext
+    ? spaceToolItems(spaceToolContext, user?.id ?? "")
+        .filter(({ id }) => !scopedSpace || canShowSpaceTool(scopedSpace, id))
+        .map((item) => ({ ...item, disabled: !scopedSpace }))
+    : spaceToolItems({ id: "pending" }, user?.id ?? "").map((item) => ({
+        ...item,
+        path: routes.spaces,
+        disabled: true,
+      }));
+  const toolsByGroup = toolGroups.map(({ id, label }) => ({
+    id,
+    label,
+    items: [
+      ...contextualTools.filter((item) => spaceToolGroup[item.id as SpaceToolId] === id),
+      ...toolItems.filter((item) => globalToolGroup[item.id] === id),
+    ],
+  }));
 
   const openHomeTab = () => {
     const tab = useWorkspaceStore.getState().openSurface({
@@ -126,6 +156,15 @@ export function GlobalNavigator(props: {
       >
         <House size={18} strokeWidth={1.75} />
       </button>
+      <NavLink
+        to={routes.extensions}
+        className={navigatorShortcutClass(activeGroupKey === "tool:extensions")}
+        aria-current={activeGroupKey === "tool:extensions" ? "page" : undefined}
+        aria-label="Extensions"
+        title="Extensions"
+      >
+        <Blocks size={18} strokeWidth={1.75} />
+      </NavLink>
       <button
         type="button"
         className={navigatorShortcutClass(false)}
@@ -150,7 +189,7 @@ export function GlobalNavigator(props: {
   return (
     <nav
       className={cn(
-        "relative z-20 flex h-full min-h-0 w-full flex-col overflow-hidden border-r border-charcoal-border bg-charcoal-workspace",
+        "relative z-20 flex h-full min-h-0 w-full select-none flex-col overflow-hidden border-r border-charcoal-border bg-charcoal-workspace",
         props.collapsed ? "items-center" : "items-stretch",
       )}
       aria-label="Primary"
@@ -182,7 +221,7 @@ export function GlobalNavigator(props: {
         />
         {props.collapsed ? null : (
           <div
-            className="ml-auto flex shrink-0 items-center gap-0.5"
+            className="ml-auto flex shrink-0 items-center gap-2"
             data-misty-window-drag-block="true"
           >
             {shortcuts}
@@ -192,7 +231,7 @@ export function GlobalNavigator(props: {
 
       {props.collapsed ? (
         <div
-          className="grid shrink-0 justify-items-center gap-0.5 px-2 pt-2"
+          className="grid shrink-0 justify-items-center gap-2 px-2 pt-2"
           data-misty-window-drag-block="true"
         >
           {shortcuts}
@@ -214,7 +253,10 @@ export function GlobalNavigator(props: {
             return (
               <div key={space.id} className="group/space-row relative min-w-0">
                 <Link
-                  to={spaceDestination(activeTab?.route ?? location.pathname, space.id)}
+                  to={spaceLandingRoute(space.id, user?.id)}
+                  onClick={() => {
+                    useWorkspaceStore.getState().setScope(`space:${space.id}`);
+                  }}
                   className={cn(
                     navigatorRowClass(active, props.collapsed),
                     // Room for the three hover actions. The name truncates
@@ -265,30 +307,40 @@ export function GlobalNavigator(props: {
           </GlobalCreateSpaceDialog>
         </NavigatorSection>
 
-        <NavigatorSection label="Tools" collapsed={props.collapsed} last className="min-h-0 flex-1">
-          {contextualTools.map((item) => (
-            <NavigatorLink
-              key={item.id}
+        <NavigatorSection
+          label="Navigation"
+          collapsed={props.collapsed}
+          showHeader={false}
+          last
+          className="min-h-0 flex-1"
+        >
+          {toolsByGroup.map((group, index) => (
+            <NavigatorToolGroup
+              key={group.id}
+              label={group.label}
               collapsed={props.collapsed}
-              icon={item.icon}
-              label={item.label}
-              path={item.path}
-              active={
-                activeTab?.surfaceId === "space" &&
-                activeTab.groupKey.startsWith(`space:${scopedSpace?.id ?? activeSpaceId}`) &&
-                spaceToolIsActive(item.id, activeSpaceSection)
-              }
-            />
-          ))}
-          {toolItems.map((item) => (
-            <NavigatorLink
-              key={item.id}
-              collapsed={props.collapsed}
-              icon={item.icon}
-              label={item.label}
-              path={item.path}
-              active={activeGroupKey === `tool:${item.id}`}
-            />
+              first={index === 0}
+            >
+              {group.items.map((item) => (
+                <NavigatorLink
+                  key={item.id}
+                  collapsed={props.collapsed}
+                  icon={item.icon}
+                  label={item.label}
+                  path={item.path}
+                  disabled={item.disabled}
+                  active={
+                    !item.disabled && item.id in spaceToolGroup
+                      ? activeTab?.surfaceId === "space" &&
+                        activeTab.groupKey.startsWith(
+                          `space:${scopedSpace?.id ?? activeSpaceId}`,
+                        ) &&
+                        spaceToolIsActive(item.id as SpaceToolId, activeSpaceSection)
+                      : activeGroupKey === `tool:${item.id}`
+                  }
+                />
+              ))}
+            </NavigatorToolGroup>
           ))}
         </NavigatorSection>
       </div>
@@ -306,6 +358,29 @@ export function GlobalNavigator(props: {
 }
 
 type SpaceToolId = "journal" | "planner" | "chat" | "library";
+
+const toolGroups: Array<{ id: ToolGroupId; label: string }> = [
+  { id: "work", label: "Work" },
+  { id: "explore", label: "Explore" },
+  { id: "build", label: "Build" },
+];
+
+const spaceToolGroup: Record<SpaceToolId, ToolGroupId> = {
+  journal: "work",
+  planner: "work",
+  chat: "work",
+  library: "explore",
+};
+
+const globalToolGroup: Record<string, ToolGroupId> = {
+  inbox: "work",
+  browser: "explore",
+  files: "explore",
+  transfers: "explore",
+  terminal: "build",
+  code: "build",
+  agents: "build",
+};
 
 function spaceToolItems(space: { id: string }, accountId: string) {
   const encodedSpaceId = encodeURIComponent(space.id);
@@ -357,8 +432,40 @@ function spaceSectionFromRoute(route: string): string {
   }
 }
 
+function spaceIdFromRoute(route: string): string {
+  try {
+    const segments = new URL(route, "https://misty.local").pathname.split("/").filter(Boolean);
+    return segments[0] === "spaces" && segments[1] ? decodeURIComponent(segments[1]) : "";
+  } catch {
+    return "";
+  }
+}
+
 function spaceToolIsActive(id: SpaceToolId, section: string): boolean {
   return id === "journal" ? section === "notes" || section === "drawings" : section === id;
+}
+
+function NavigatorToolGroup(props: {
+  label: string;
+  collapsed: boolean;
+  first: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      className={cn("grid gap-0.5", !props.first && "mt-3")}
+      role="group"
+      aria-label={props.label}
+      data-navigator-tool-group={props.label.toLowerCase()}
+    >
+      {props.collapsed ? null : (
+        <h3 className="px-2 pb-1 text-[13px] font-semibold tracking-[0.03em] text-cream-faint">
+          {props.label}
+        </h3>
+      )}
+      {props.children}
+    </div>
+  );
 }
 
 function NavigatorSection(props: {
@@ -367,6 +474,7 @@ function NavigatorSection(props: {
   children: ReactNode;
   actions?: ReactNode;
   className?: string;
+  showHeader?: boolean;
   /** The bottom-most section, which scrolls behind the floating account dock. */
   last?: boolean;
 }) {
@@ -379,12 +487,12 @@ function NavigatorSection(props: {
       )}
       aria-label={props.label}
     >
-      {props.collapsed ? null : (
+      {props.collapsed || props.showHeader === false ? null : (
         <div
           className="mb-1.5 flex h-8 shrink-0 items-center gap-2 px-2"
           data-navigator-section-header={props.label.toLowerCase()}
         >
-          <h2 className="min-w-0 flex-1 text-[11px] font-semibold tracking-[0.03em] text-cream-faint">
+          <h2 className="min-w-0 flex-1 text-[13px] font-semibold tracking-[0.03em] text-cream-faint">
             {props.label}
           </h2>
           {props.actions}
@@ -410,18 +518,45 @@ function NavigatorLink(props: {
   label: string;
   path: string;
   active: boolean;
+  disabled?: boolean;
 }) {
   const Icon = props.icon;
+  const content = (
+    <>
+      <Icon size={19} className="shrink-0" strokeWidth={1.75} />
+      {props.collapsed ? null : <span className="min-w-0 flex-1 truncate">{props.label}</span>}
+    </>
+  );
+  if (props.disabled) {
+    return (
+      <div
+        className={cn(
+          navigatorRowClass(false, props.collapsed),
+          "cursor-default opacity-60 hover:bg-transparent hover:text-cream-muted",
+        )}
+        aria-disabled="true"
+        aria-label={props.label}
+        title="Waiting for Spaces"
+      >
+        {content}
+      </div>
+    );
+  }
   return (
     <NavLink
       to={props.path}
+      onClick={() => {
+        const surface = workspaceSurfaceFromRoute(props.path);
+        if (surface) {
+          useWorkspaceStore.getState().openSurface(surface);
+        }
+      }}
       className={navigatorRowClass(props.active, props.collapsed)}
       aria-current={props.active ? "page" : undefined}
       aria-label={props.label}
       title={props.label}
     >
-      <Icon size={19} className="shrink-0" strokeWidth={1.75} />
-      {props.collapsed ? null : <span className="min-w-0 flex-1 truncate">{props.label}</span>}
+      {content}
     </NavLink>
   );
 }
@@ -440,7 +575,7 @@ function navigatorRowClass(active: boolean, collapsed: boolean): string {
     "relative flex items-center rounded-md border-0 bg-transparent text-sm text-cream-muted no-underline outline-none transition-colors",
     // Compact rows are square tiles centred in the rail rather than full-width
     // bars, so the selection background reads as an icon button.
-    collapsed ? "mx-auto size-10 justify-center px-0" : "h-10 w-full justify-start gap-2.5 px-2.5",
+    collapsed ? "mx-auto size-9 justify-center px-0" : "h-9 w-full justify-start gap-2.5 px-2.5",
     "hover:bg-charcoal-card hover:text-cream-bright focus-visible:ring-2 focus-visible:ring-charcoal-active",
     "disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-cream-muted",
     active && "bg-charcoal-card text-cream-bright",

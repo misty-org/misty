@@ -7,12 +7,15 @@ import {
   autosaveDelayValues,
   editorTabSizeOptions,
   editorTabSizeValues,
+  editorThemeOptions,
+  editorThemeValues,
 } from "../settingsConstants";
 import {
   booleanSetting,
   NumberControl,
   numberSetting,
   SelectControl,
+  SliderControl,
   stringSetting,
   SwitchControl,
   TextControl,
@@ -20,11 +23,25 @@ import {
 import type { SettingsContentProps } from "../settingsTypes";
 
 export function CodeSection(props: SettingsContentProps) {
+  const editorTheme = stringSetting(props.document, "editor", "theme", "gruvbox-dark");
   const autosaveDelay = numberSetting(props.document, "editor", "autosave_delay_ms", 1000);
   const tabSize = numberSetting(props.document, "editor", "tab_size", 2);
 
   return (
     <>
+      <SettingsSectionBlock title="Theme">
+        <SettingsRow label="Color theme" description="Syntax highlighting and editor palette." last>
+          <SelectControl
+            value={Math.max(0, editorThemeValues.indexOf(editorTheme))}
+            options={editorThemeOptions}
+            disabled={props.working}
+            onChange={(value) =>
+              props.onSettingChange("editor", "theme", editorThemeValues[value] ?? "gruvbox-dark")
+            }
+          />
+        </SettingsRow>
+      </SettingsSectionBlock>
+
       <SettingsSectionBlock title="Text">
         <SettingsRow label="Font family" description="Leave empty to use Misty's monospace stack.">
           <TextControl
@@ -37,13 +54,27 @@ export function CodeSection(props: SettingsContentProps) {
         </SettingsRow>
         <SettingsRow label="Font size" description="Editor text size in the Code workspace.">
           <NumberControl
-            value={numberSetting(props.document, "editor", "font_size", 12.5)}
+            value={numberSetting(props.document, "editor", "font_size", 14)}
             min={8}
             max={32}
             step={0.5}
             suffix="px"
             disabled={props.working}
             onCommit={(value) => props.onSettingChange("editor", "font_size", value)}
+          />
+        </SettingsRow>
+        <SettingsRow
+          label="Interface scale"
+          description="Size of Code tabs, explorer rows, toolbars, and status controls."
+        >
+          <SliderControl
+            value={numberSetting(props.document, "editor", "interface_scale", 1)}
+            min={0.8}
+            max={1.5}
+            step={0.1}
+            format={(value) => `${Math.round(value * 100)}%`}
+            disabled={props.working}
+            onCommit={(value) => props.onSettingChange("editor", "interface_scale", value)}
           />
         </SettingsRow>
         <SettingsRow label="Tab size" description="How far one indent level moves." last>

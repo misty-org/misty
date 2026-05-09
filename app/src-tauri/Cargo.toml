@@ -43,6 +43,7 @@ tokio = { version = "1", features = ["fs", "io-util", "macros", "net", "rt-multi
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "multipart", "rustls-tls", "stream"] }
 rusqlite = { version = "0.32", features = ["bundled"] }
 uuid = { version = "1", features = ["v4"] }
+zeroize = "1"
 url = "2"
 walkdir = "2.5"
 image = { version = "0.25.10", default-features = false, features = ["bmp", "gif", "hdr", "jpeg", "png", "pnm", "tga", "webp"] }

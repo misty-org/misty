@@ -9,6 +9,7 @@ import {
   cn,
 } from "@/shared/ui";
 import { MessagesSquare, Pencil, Plus, Trash2, Users } from "lucide-react";
+import { FaSlack } from "react-icons/fa6";
 import { SiDiscord } from "react-icons/si";
 import { Link } from "react-router-dom";
 import { SpaceSidebarSection } from "./SpaceSidebarSection";
@@ -35,12 +36,14 @@ export function SpaceChatConversationList({
   isMistySpace?: boolean;
 }) {
   const mistyConversations = conversations.filter(
-    (conversation) => conversation.origin !== "discord" && !conversation.direct_agent_id,
+    (conversation) => conversation.origin === "misty" && !conversation.direct_agent_id,
   );
-  const discord = conversations.filter(
+  const discordConversations = conversations.filter(
     (conversation) => conversation.origin === "discord" && !conversation.direct_agent_id,
   );
-
+  const slackConversations = conversations.filter(
+    (conversation) => conversation.origin === "slack" && !conversation.direct_agent_id,
+  );
   return (
     <div className="grid gap-3">
       <ConversationGroup
@@ -55,54 +58,29 @@ export function SpaceChatConversationList({
         isSpaceOwner={isSpaceOwner}
         showEveryone={!isMistySpace}
       />
-      {discord.length ? (
-        <DiscordConversationGroup
+      {discordConversations.length ? (
+        <ConversationGroup
+          title="Discord"
           activeSpaceId={activeSpaceId}
-          conversations={discord}
+          conversations={discordConversations}
           activeConversationId={activeConversationId}
+          currentUserId={currentUserId}
+          isSpaceOwner={isSpaceOwner}
+          provider="discord"
+        />
+      ) : null}
+      {slackConversations.length ? (
+        <ConversationGroup
+          title="Slack"
+          activeSpaceId={activeSpaceId}
+          conversations={slackConversations}
+          activeConversationId={activeConversationId}
+          currentUserId={currentUserId}
+          isSpaceOwner={isSpaceOwner}
+          provider="slack"
         />
       ) : null}
     </div>
-  );
-}
-
-function DiscordConversationGroup({
-  activeSpaceId,
-  conversations,
-  activeConversationId,
-}: {
-  activeSpaceId: string;
-  conversations: SpaceConversation[];
-  activeConversationId: string | null;
-}) {
-  return (
-    <SpaceSidebarSection
-      title="Discord"
-      count={conversations.length}
-      icon={<SiDiscord className="size-3.5" aria-hidden />}
-    >
-      <nav className="grid gap-1" aria-label="Discord conversations">
-        {conversations.map((conversation) => (
-          <Link
-            key={conversation.id}
-            className={conversationLinkClass(activeConversationId === conversation.id)}
-            to={`/spaces/${encodeURIComponent(activeSpaceId)}/chat?conversation=${encodeURIComponent(conversation.id)}`}
-          >
-            <span className="grid size-6 place-items-center text-sage-fg">
-              <SiDiscord className="size-4" aria-hidden />
-            </span>
-            <span className="min-w-0">
-              <span className="block truncate font-medium">
-                {conversation.external_display_name || conversation.title}
-              </span>
-              {conversation.integration_status === "disconnected" ? (
-                <span className="block truncate text-[11px] text-cream-muted">Disconnected</span>
-              ) : null}
-            </span>
-          </Link>
-        ))}
-      </nav>
-    </SpaceSidebarSection>
   );
 }
 
@@ -117,6 +95,7 @@ function ConversationGroup({
   onDelete,
   isSpaceOwner,
   showEveryone,
+  provider,
 }: {
   title: string;
   activeSpaceId: string;
@@ -128,6 +107,7 @@ function ConversationGroup({
   onDelete?: (conversation: SpaceConversation) => void;
   isSpaceOwner: boolean;
   showEveryone?: boolean;
+  provider?: "discord" | "slack";
 }) {
   return (
     <SpaceSidebarSection
@@ -178,9 +158,24 @@ function ConversationGroup({
               to={`/spaces/${encodeURIComponent(activeSpaceId)}/chat?conversation=${encodeURIComponent(conversation.id)}`}
             >
               <span className="grid size-6 place-items-center text-cream-muted">
-                <MessagesSquare size={17} strokeWidth={1.75} />
+                {provider === "discord" ? (
+                  <SiDiscord className="size-4" aria-hidden />
+                ) : provider === "slack" ? (
+                  <FaSlack className="size-4" aria-hidden />
+                ) : (
+                  <MessagesSquare size={17} strokeWidth={1.75} />
+                )}
               </span>
-              <span className="min-w-0 truncate font-medium">{conversation.title}</span>
+              <span className="min-w-0 truncate font-medium">
+                {provider ? "#" : ""}
+                {conversation.external_display_name || conversation.title}
+              </span>
+              {conversation.integration_status === "disconnected" ? (
+                <span
+                  className="absolute right-2 size-1.5 rounded-full bg-cream-muted"
+                  title="Disconnected"
+                />
+              ) : null}
             </Link>
           );
           if (!canRename && !canDelete) return <div key={conversation.id}>{link}</div>;

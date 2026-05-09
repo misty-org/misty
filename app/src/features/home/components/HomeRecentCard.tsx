@@ -69,11 +69,8 @@ export function HomeRecentCard({ items }: { items: HomeRecent[] }) {
             );
           })
         ) : (
-          <div className="grid min-h-[140px] place-items-center text-center">
-            <div>
-              <History className="mx-auto size-5 text-cream-muted" strokeWidth={1.7} />
-              <p className="mt-2 text-sm text-cream-muted">Nothing opened yet.</p>
-            </div>
+          <div className="grid min-h-[140px] place-items-center px-5 text-center">
+            <p className="text-sm text-cream-muted">Nothing opened yet.</p>
           </div>
         )}
       </CardContent>

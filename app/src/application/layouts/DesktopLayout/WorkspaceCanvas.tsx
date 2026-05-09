@@ -5,6 +5,7 @@ import {
   dockLeaves,
   dockWidgetRegistry,
   findDockLeaf,
+  parseCodeTabState,
   useWorkspaceStore,
   workspaceSurfaceFromRoute,
   type WorkspaceGroupKey,
@@ -50,8 +51,17 @@ export function WorkspaceCanvas(props: {
       if (tab.surfaceId === "terminal") killTerminalTab(tab.id);
       dockWidgetRegistry.get(tab.surfaceId).dispose?.(tab.state);
       closeTab(tab.id);
+      const state = useWorkspaceStore.getState();
+      const leaves = dockLeaves(state.layout.root);
+      const focusedPane =
+        leaves.find((pane) => pane.id === state.layout.focusedPaneId) ?? leaves[0];
+      const nextActive =
+        focusedPane?.tabs.find((t) => t.id === focusedPane.activeTabId) ?? focusedPane?.tabs[0];
+      if (nextActive && `${location.pathname}${location.search}` !== nextActive.route) {
+        navigate(nextActive.route);
+      }
     },
-    [closeTab],
+    [closeTab, location.pathname, location.search, navigate],
   );
 
   const openNewTab = useCallback(
@@ -70,6 +80,29 @@ export function WorkspaceCanvas(props: {
           );
           return;
         }
+      }
+      if (option.surfaceId === "code") {
+        const state = useWorkspaceStore.getState();
+        const focusedPane = findDockLeaf(state.layout.root, state.layout.focusedPaneId);
+        const currentCode = focusedPane?.tabs.find(
+          (tab) => tab.id === focusedPane.activeTabId && tab.surfaceId === "code",
+        );
+        const currentState = parseCodeTabState(currentCode?.state);
+        return openTab(
+          openSurface({
+            surfaceId: "code",
+            groupKey: "tool:code",
+            title: "Code",
+            route: option.route,
+            instancePolicy: "multiple",
+            forceNew: true,
+            paneId,
+            state: {
+              ...currentState,
+              activeFilePath: null,
+            },
+          }),
+        );
       }
       openTab(
         openSurface({

@@ -1,20 +1,19 @@
 import type { SpaceMessage } from "@/api/spaces/dto/interfaces/types";
 import { Button } from "@/shared/ui";
-import { Pencil, Reply, Trash2 } from "lucide-react";
-import { SiDiscord } from "react-icons/si";
+import { LoaderCircle, Pencil, Reply, Send, Trash2 } from "lucide-react";
 import { quickReactionEmojis } from "./messageHelpers";
 
 export interface MessageHoverActionsProps {
   message: SpaceMessage;
   currentUserId?: string;
   isOwner: boolean;
-  publishing: boolean;
-  canPublishToDiscord: boolean;
   onReply: (messageId: string) => void;
   onToggleReaction: (message: SpaceMessage, emoji: string, reacted: boolean) => void;
-  onPublishToDiscord?: (message: SpaceMessage) => void;
   onBeginEditing: (message: SpaceMessage) => void;
   onDelete: (message: SpaceMessage) => void;
+  onPublish?: () => void;
+  publishing?: boolean;
+  publishProvider?: "Discord" | "Slack";
 }
 
 /** The toolbar that appears on hover or focus: quick reactions, reply, edit, delete. */
@@ -22,8 +21,6 @@ export function MessageHoverActions(props: MessageHoverActionsProps) {
   const { message, currentUserId } = props;
   const canEdit = message.sender_kind === "person" && message.sender_user_id === currentUserId;
   const canDelete = message.sender_user_id === currentUserId || props.isOwner;
-  const discordLabel =
-    message.origin?.publish_state === "published" ? "Send to Discord again" : "Send to Discord";
 
   return (
     <div className="absolute right-3 top-1 z-10 flex max-w-[min(360px,calc(100%-72px))] items-center gap-0.5 rounded-md border border-charcoal-border/70 bg-charcoal-bg p-0.5 opacity-0 shadow-sm transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
@@ -51,12 +48,16 @@ export function MessageHoverActions(props: MessageHoverActionsProps) {
       <span className="mx-0.5 h-5 w-px bg-charcoal-border" aria-hidden="true" />
 
       <ActionButton icon={<Reply />} label="Reply" onClick={() => props.onReply(message.id)} />
-      {props.canPublishToDiscord ? (
+      {props.onPublish ? (
         <ActionButton
-          icon={<SiDiscord />}
-          label={discordLabel}
+          icon={props.publishing ? <LoaderCircle className="animate-spin" /> : <Send />}
+          label={
+            props.publishing
+              ? `Sending to ${props.publishProvider ?? "Discord"}`
+              : `Send to ${props.publishProvider ?? "Discord"}`
+          }
           disabled={props.publishing}
-          onClick={() => props.onPublishToDiscord?.(message)}
+          onClick={props.onPublish}
         />
       ) : null}
       {canEdit ? (

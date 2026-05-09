@@ -93,13 +93,20 @@ fn git_diff_blocking(root: String, path: String) -> Result<String, String> {
     if !is_git_repo(&root_path) {
         return Err("Not a git repository.".to_owned());
     }
-    let diff = run_git(
-        &root_path,
-        &["diff", "--no-color", "--unified=0", "--", &path],
-    )
+    let diff = if path.trim().is_empty() {
+        run_git(&root_path, &["diff", "--no-color", "--unified=0"])
+    } else {
+        run_git(
+            &root_path,
+            &["diff", "--no-color", "--unified=0", "--", &path],
+        )
+    }
     .unwrap_or_default();
     if !diff.is_empty() {
         return Ok(diff);
+    }
+    if path.trim().is_empty() {
+        return Ok(String::new());
     }
     // File may be new / untracked — diff against /dev/null
     run_git(
@@ -116,7 +123,7 @@ fn git_diff_blocking(root: String, path: String) -> Result<String, String> {
     .or_else(|_| Ok(String::new()))
 }
 
-fn is_git_repo(root: &Path) -> bool {
+pub(super) fn is_git_repo(root: &Path) -> bool {
     run_git(root, &["rev-parse", "--is-inside-work-tree"]).is_ok()
 }
 
@@ -172,7 +179,7 @@ fn parse_status_output(output: &str, root: &Path) -> Vec<GitFileEntry> {
     files
 }
 
-fn run_git(cwd: &Path, args: &[&str]) -> Result<String, String> {
+pub(super) fn run_git(cwd: &Path, args: &[&str]) -> Result<String, String> {
     let output = Command::new("git")
         .args(args)
         .current_dir(cwd)

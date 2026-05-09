@@ -8,11 +8,7 @@ import {
   DialogTitle,
 } from "@/shared/ui";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import {
-  CreateSpaceConnectionsStep,
-  CreateSpaceNameStep,
-  CreateSpaceTemplateStep,
-} from "./CreateSpaceSteps";
+import { CreateSpaceNameStep, CreateSpaceTemplateStep } from "./CreateSpaceSteps";
 import { CREATE_STEP_COUNT, type useCreateSpaceDialog } from "./useCreateSpaceDialog";
 
 export function CreateSpaceDialog({
@@ -61,20 +57,6 @@ export function CreateSpaceDialog({
               onTemplate={dialog.setTemplateId}
             />
           ) : null}
-          {dialog.step === 2 ? (
-            <CreateSpaceConnectionsStep
-              providers={dialog.providers}
-              availability={dialog.providerAvailability}
-              onToggle={(provider) =>
-                dialog.setProviders((current) =>
-                  current.includes(provider)
-                    ? current.filter((item) => item !== provider)
-                    : [...current, provider],
-                )
-              }
-            />
-          ) : null}
-
           {error ? (
             <p
               className="mb-0 mt-3 rounded-lg border border-charcoal-active/25 bg-charcoal-active px-3 py-2 text-xs leading-relaxed text-cream-bright"

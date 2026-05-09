@@ -1,7 +1,14 @@
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, Pencil, Trash2 } from "lucide-react";
 import { memo, useCallback, useEffect, useState } from "react";
 import type { FileEntry } from "@/native/contracts/app-explorer";
-import { cn } from "@/shared/ui";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+  cn,
+} from "@/shared/ui";
 import { FileIcon, FolderIcon } from "../icons/fileIcon";
 import type { GitFileStatus } from "../native";
 import { codeListDirectory } from "../native";
@@ -9,23 +16,25 @@ import { useCodingWorkspaceStore } from "../store/useCodingWorkspaceStore";
 
 interface CodeExplorerRowProps {
   entry: FileEntry;
+  rootPath: string;
   depth: number;
   activePath: string | null;
   dirtyPaths: Set<string>;
   gitStatuses: Map<string, GitFileStatus>;
   onOpenFile: (entry: FileEntry) => void;
-  onRequestRename: (path: string) => void;
-  onRequestDelete: (path: string, isDirectory: boolean) => void;
+  onOpenFileInNewTab: (entry: FileEntry) => void;
+  onRequestRename: (path: string, name: string) => void;
+  onRequestDelete: (path: string, name: string, isDirectory: boolean) => void;
 }
 
-const STATUS_COLOR: Record<GitFileStatus, string> = {
-  modified: "#d4b880",
-  added: "#a8c090",
-  deleted: "#d68b80",
-  renamed: "#a9c7e2",
-  untracked: "#a8c090",
-  ignored: "#5a5a5a",
-  conflicted: "#efab9f",
+const STATUS_CLASS: Record<GitFileStatus, string> = {
+  modified: "code-warning",
+  added: "code-success",
+  deleted: "code-danger",
+  renamed: "code-info",
+  untracked: "code-success",
+  ignored: "code-muted",
+  conflicted: "code-danger",
 };
 
 const STATUS_LETTER: Record<GitFileStatus, string> = {
@@ -40,17 +49,21 @@ const STATUS_LETTER: Record<GitFileStatus, string> = {
 
 export const CodeExplorerRow = memo(function CodeExplorerRow({
   entry,
+  rootPath,
   depth,
   activePath,
   dirtyPaths,
   gitStatuses,
   onOpenFile,
+  onOpenFileInNewTab,
   onRequestRename,
   onRequestDelete,
 }: CodeExplorerRowProps) {
   const isDirectory = entry.kind === "folder";
-  const expanded = useCodingWorkspaceStore((state) => state.expandedFolders.includes(entry.path));
-  const toggleFolder = useCodingWorkspaceStore((state) => state.toggleFolder);
+  const expanded = useCodingWorkspaceStore((state) =>
+    (state.projects[rootPath]?.expandedFolders ?? []).includes(entry.path),
+  );
+  const toggleFolder = useCodingWorkspaceStore((state) => state.toggleProjectFolder);
 
   const [children, setChildren] = useState<FileEntry[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -71,33 +84,9 @@ export const CodeExplorerRow = memo(function CodeExplorerRow({
   }, [entry.path, expanded, isDirectory, children, loading]);
 
   const handleClick = useCallback(() => {
-    if (isDirectory) toggleFolder(entry.path);
+    if (isDirectory) toggleFolder(rootPath, entry.path);
     else onOpenFile(entry);
-  }, [entry, isDirectory, onOpenFile, toggleFolder]);
-
-  const handleContextMenu = useCallback(
-    (event: React.MouseEvent) => {
-      event.preventDefault();
-      const action = window.prompt(
-        `Rename or delete "${entry.name}"?\nType "delete" to delete, or the new name to rename.`,
-        entry.name,
-      );
-      if (action == null) return;
-      if (action.trim() === "delete") {
-        if (window.confirm(`Really delete ${entry.name}?`)) {
-          onRequestDelete(entry.path, isDirectory);
-        }
-      } else if (action.trim() !== entry.name) {
-        onRequestRename(entry.path);
-        window.dispatchEvent(
-          new CustomEvent("misty:code-rename-request", {
-            detail: { path: entry.path, newName: action.trim() },
-          }),
-        );
-      }
-    },
-    [entry, isDirectory, onRequestDelete, onRequestRename],
-  );
+  }, [entry, isDirectory, onOpenFile, rootPath, toggleFolder]);
 
   const isActive = !isDirectory && activePath === entry.path;
   const isDirty = !isDirectory && dirtyPaths.has(entry.path);
@@ -106,39 +95,63 @@ export const CodeExplorerRow = memo(function CodeExplorerRow({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={handleClick}
-        onContextMenu={handleContextMenu}
-        className={cn(
-          "group flex w-full items-center gap-1.5 rounded-md py-1 pr-2 text-left text-[12px]",
-          "text-cream-muted hover:bg-charcoal-hover hover:text-cream",
-          isActive && "bg-charcoal-hover text-cream-bright",
-        )}
-        style={{ paddingLeft: indent, color: status ? STATUS_COLOR[status] : undefined }}
-      >
-        {isDirectory ? (
-          expanded ? (
-            <ChevronDown size={12} className="shrink-0 text-cream-muted/60" />
-          ) : (
-            <ChevronRight size={12} className="shrink-0 text-cream-muted/60" />
-          )
-        ) : (
-          <span className="inline-block w-3 shrink-0" />
-        )}
-        {isDirectory ? <FolderIcon open={expanded} /> : <FileIcon name={entry.name} />}
-        <span className="min-w-0 flex-1 truncate">{entry.name}</span>
-        {status ? (
-          <span
-            className="font-mono text-[10px]"
-            style={{ color: STATUS_COLOR[status] }}
-            title={status}
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <button
+            type="button"
+            onClick={handleClick}
+            className={cn(
+              "code-explorer-row group flex w-full items-center gap-2 rounded-md pr-2 text-left",
+              "text-cream-muted hover:bg-charcoal-hover hover:text-cream",
+              isActive && "bg-charcoal-hover font-medium text-cream-bright",
+              status && STATUS_CLASS[status],
+            )}
+            style={{ paddingLeft: indent }}
           >
-            {STATUS_LETTER[status]}
-          </span>
-        ) : null}
-        {isDirty ? <span className="text-[10px] text-[#e8d9c0]">●</span> : null}
-      </button>
+            {isDirectory ? (
+              expanded ? (
+                <ChevronDown className="code-explorer-chevron shrink-0 text-cream-muted/60" />
+              ) : (
+                <ChevronRight className="code-explorer-chevron shrink-0 text-cream-muted/60" />
+              )
+            ) : (
+              <span className="inline-block shrink-0 code-explorer-chevron" />
+            )}
+            {isDirectory ? (
+              <FolderIcon name={entry.name} open={expanded} />
+            ) : (
+              <FileIcon name={entry.name} />
+            )}
+            <span className="min-w-0 flex-1 truncate">{entry.name}</span>
+            {status ? (
+              <span className={cn("font-mono text-[11px]", STATUS_CLASS[status])} title={status}>
+                {STATUS_LETTER[status]}
+              </span>
+            ) : null}
+            {isDirty ? <span className="code-accent text-[13px]">●</span> : null}
+          </button>
+        </ContextMenuTrigger>
+        <ContextMenuContent className="code-theme-overlay w-44">
+          {!isDirectory ? (
+            <ContextMenuItem onSelect={() => onOpenFileInNewTab(entry)}>
+              Open in New Code Tab
+            </ContextMenuItem>
+          ) : null}
+          {!isDirectory ? <ContextMenuSeparator /> : null}
+          <ContextMenuItem onSelect={() => onRequestRename(entry.path, entry.name)}>
+            <Pencil />
+            Rename
+          </ContextMenuItem>
+          <ContextMenuSeparator />
+          <ContextMenuItem
+            className="code-danger"
+            onSelect={() => onRequestDelete(entry.path, entry.name, isDirectory)}
+          >
+            <Trash2 />
+            Delete
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
 
       {isDirectory && expanded ? (
         <div>
@@ -152,7 +165,7 @@ export const CodeExplorerRow = memo(function CodeExplorerRow({
           ) : null}
           {error ? (
             <div
-              className="py-1 text-[11px] italic text-[#d68b80]"
+              className="code-danger py-1 text-[11px] italic"
               style={{ paddingLeft: indent + 20 }}
             >
               {error}
@@ -162,11 +175,13 @@ export const CodeExplorerRow = memo(function CodeExplorerRow({
             <CodeExplorerRow
               key={child.id}
               entry={child}
+              rootPath={rootPath}
               depth={depth + 1}
               activePath={activePath}
               dirtyPaths={dirtyPaths}
               gitStatuses={gitStatuses}
               onOpenFile={onOpenFile}
+              onOpenFileInNewTab={onOpenFileInNewTab}
               onRequestRename={onRequestRename}
               onRequestDelete={onRequestDelete}
             />

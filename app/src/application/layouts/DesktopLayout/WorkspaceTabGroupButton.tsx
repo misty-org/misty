@@ -1,4 +1,3 @@
-import { setBrowserWebviewsSuspended } from "@/features/browser";
 import {
   parseBrowserTabState,
   type WorkspaceGroupKey,
@@ -15,7 +14,6 @@ import {
   cn,
 } from "@/shared/ui";
 import { ChevronDown, X, type LucideIcon } from "lucide-react";
-import { useEffect } from "react";
 
 let draggingWorkspaceTabId: string | null = null;
 
@@ -50,12 +48,6 @@ export function WorkspaceTabGroupButton({
   onClose,
   onMoveTab,
 }: Props) {
-  const popupSuspensionReason = `workspace-tab-menu:${group.key}`;
-  useEffect(
-    () => () => setBrowserWebviewsSuspended(false, popupSuspensionReason),
-    [popupSuspensionReason],
-  );
-
   const containsActive = group.tabs.some((tab) => tab.id === activeTabId);
   const preferredTabId = group.storeGroupKey ? lastUsedTabByGroup[group.storeGroupKey] : null;
   const preferredTab =
@@ -68,7 +60,7 @@ export function WorkspaceTabGroupButton({
   const browserState =
     displayTab?.surfaceId === "browser" ? parseBrowserTabState(displayTab.state) : null;
   const displayLabel =
-    group.surfaceId === "browser" && displayTab
+    (group.surfaceId === "browser" || group.surfaceId === "code") && displayTab
       ? displayTab.title
       : group.surfaceId === "space" && containsActive && displayTab
         ? displayTab.title
@@ -79,9 +71,8 @@ export function WorkspaceTabGroupButton({
     <div
       draggable={displayTab !== undefined}
       className={cn(
-        // Tabs take the width their label needs, down to a floor, so a short
-        // one never claims a browser tab's worth of the strip.
-        "group/tab flex h-7 min-w-[92px] max-w-[196px] items-center rounded-md border text-xs",
+        "group/tab flex h-7 min-w-[36px] max-w-[200px] flex-1 items-center",
+        "rounded-md border text-xs",
         "transition-all duration-150 select-none",
         containsActive
           ? "border-charcoal-border/70 bg-charcoal-card text-cream-bright shadow-sm"
@@ -111,7 +102,7 @@ export function WorkspaceTabGroupButton({
     >
       <button
         type="button"
-        className="flex h-full min-w-0 flex-1 items-center gap-2 overflow-hidden pl-2.5 pr-1 text-left"
+        className="flex h-full min-w-0 flex-1 items-center gap-1.5 overflow-hidden pl-2 pr-1 text-left outline-none focus:outline-none"
         onClick={(event) => {
           event.stopPropagation();
           if (displayTab) onOpen(displayTab);
@@ -140,23 +131,30 @@ export function WorkspaceTabGroupButton({
             strokeWidth={1.7}
           />
         )}
-        {/* Tabs are sized to their label, so the overflow cue has to be one
-            that only appears when the text really does not fit. */}
-        <span className="min-w-0 flex-1 truncate">{displayLabel}</span>
+        <span
+          className={cn(
+            "min-w-0 flex-1 overflow-hidden whitespace-nowrap",
+            "[mask-image:linear-gradient(to_right,black_calc(100%-12px),transparent)]",
+            "[-webkit-mask-image:linear-gradient(to_right,black_calc(100%-12px),transparent)]",
+          )}
+        >
+          {displayLabel}
+        </span>
         {group.tabs.length > 1 ? (
-          <span className="ml-1 shrink-0 rounded bg-charcoal-card px-1 text-[10px] leading-4 text-cream-muted">
+          <span className="ml-0.5 shrink-0 rounded bg-charcoal-card px-1 text-[10px] leading-4 text-cream-muted">
             {group.tabs.length}
           </span>
         ) : null}
       </button>
       {showChevron ? (
-        <DropdownMenu
-          onOpenChange={(open) => setBrowserWebviewsSuspended(open, popupSuspensionReason)}
-        >
+        <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              className="grid size-6 place-items-center rounded text-cream-muted hover:bg-charcoal-active hover:text-cream"
+              className={cn(
+                "mr-0.5 grid size-5 shrink-0 place-items-center rounded text-cream-muted outline-none",
+                "hover:bg-charcoal-active hover:text-cream focus:outline-none",
+              )}
               aria-label={`Show ${group.label} tabs`}
               onClick={(event) => event.stopPropagation()}
             >
@@ -216,8 +214,8 @@ export function WorkspaceTabGroupButton({
           type="button"
           aria-label={`Close ${displayTab?.title ?? group.label}`}
           className={cn(
-            "mr-1 grid size-5 shrink-0 place-items-center rounded text-cream-faint opacity-0",
-            "hover:bg-charcoal-active hover:text-cream group-hover/tab:opacity-100",
+            "mr-1 grid size-5 shrink-0 place-items-center rounded text-cream-faint opacity-0 outline-none",
+            "hover:bg-charcoal-active hover:text-cream focus:outline-none group-hover/tab:opacity-100",
           )}
           onClick={(event) => {
             event.stopPropagation();

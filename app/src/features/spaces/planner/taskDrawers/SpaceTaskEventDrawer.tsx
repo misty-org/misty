@@ -1,6 +1,5 @@
-import type { SpaceCalendarEvent, SpaceCalendarSource } from "@/api/spaces/dto/interfaces/types";
+import type { SpaceCalendarEvent } from "@/api/spaces/dto/interfaces/types";
 import {
-  Badge,
   Button,
   Sheet,
   SheetContent,
@@ -13,11 +12,9 @@ import { CalendarDays, Clock3, ExternalLink, UserRound } from "lucide-react";
 /** Read-only detail for an event published from an external calendar. */
 export function SpaceTaskEventDrawer({
   event,
-  source,
   onClose,
 }: {
   event: SpaceCalendarEvent;
-  source?: SpaceCalendarSource;
   onClose: () => void;
 }) {
   const organizer =
@@ -31,11 +28,8 @@ export function SpaceTaskEventDrawer({
     <Sheet open onOpenChange={(open) => !open && onClose()}>
       <SheetContent className="w-[min(460px,96vw)] bg-charcoal-bg sm:max-w-[460px]">
         <SheetHeader className="pr-8 text-left">
-          <Badge className="mb-1 w-fit" variant="secondary">
-            Google Calendar
-          </Badge>
           <SheetTitle>{event.title || "Busy"}</SheetTitle>
-          <SheetDescription>Published to this Space from an external calendar.</SheetDescription>
+          <SheetDescription>Event details shared with this Space.</SheetDescription>
         </SheetHeader>
         <div className="mt-6 grid gap-4">
           <EventFact
@@ -44,7 +38,6 @@ export function SpaceTaskEventDrawer({
           />
           {event.location ? <EventFact icon={CalendarDays} value={event.location} /> : null}
           {organizer ? <EventFact icon={UserRound} value={organizer} /> : null}
-          {source ? <EventFact icon={CalendarDays} value={source.display_name} /> : null}
           {event.description ? (
             <p className="m-0 whitespace-pre-wrap text-sm leading-6 text-cream-muted">
               {event.description}

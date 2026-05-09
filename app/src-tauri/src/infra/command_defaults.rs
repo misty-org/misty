@@ -38,6 +38,50 @@ pub(super) fn default_command_entries() -> &'static [DefaultCommandEntry] {
                 shortcut: "Cmd+P",
             },
             DefaultCommandEntry {
+                id: "code.quick_open",
+                shortcut: "Cmd+P",
+            },
+            DefaultCommandEntry {
+                id: "code.command_palette",
+                shortcut: "Cmd+Shift+P",
+            },
+            DefaultCommandEntry {
+                id: "code.search_project",
+                shortcut: "Cmd+Shift+F",
+            },
+            DefaultCommandEntry {
+                id: "code.harpoon",
+                shortcut: "Ctrl+E",
+            },
+            DefaultCommandEntry {
+                id: "code.previous_file",
+                shortcut: "Ctrl+O",
+            },
+            DefaultCommandEntry {
+                id: "code.toggle_explorer",
+                shortcut: "Cmd+B",
+            },
+            DefaultCommandEntry {
+                id: "code.toggle_terminal",
+                shortcut: "Cmd+J",
+            },
+            DefaultCommandEntry {
+                id: "code.mark_1",
+                shortcut: "Alt+1",
+            },
+            DefaultCommandEntry {
+                id: "code.mark_2",
+                shortcut: "Alt+2",
+            },
+            DefaultCommandEntry {
+                id: "code.mark_3",
+                shortcut: "Alt+3",
+            },
+            DefaultCommandEntry {
+                id: "code.mark_4",
+                shortcut: "Alt+4",
+            },
+            DefaultCommandEntry {
                 id: "explorer.copy",
                 shortcut: "Cmd+C",
             },
@@ -191,6 +235,50 @@ pub(super) fn default_command_entries() -> &'static [DefaultCommandEntry] {
             DefaultCommandEntry {
                 id: "explorer.open_palette",
                 shortcut: "Ctrl+P",
+            },
+            DefaultCommandEntry {
+                id: "code.quick_open",
+                shortcut: "Ctrl+P",
+            },
+            DefaultCommandEntry {
+                id: "code.command_palette",
+                shortcut: "Ctrl+Shift+P",
+            },
+            DefaultCommandEntry {
+                id: "code.search_project",
+                shortcut: "Ctrl+Shift+F",
+            },
+            DefaultCommandEntry {
+                id: "code.harpoon",
+                shortcut: "Ctrl+E",
+            },
+            DefaultCommandEntry {
+                id: "code.previous_file",
+                shortcut: "Ctrl+O",
+            },
+            DefaultCommandEntry {
+                id: "code.toggle_explorer",
+                shortcut: "Ctrl+B",
+            },
+            DefaultCommandEntry {
+                id: "code.toggle_terminal",
+                shortcut: "Ctrl+J",
+            },
+            DefaultCommandEntry {
+                id: "code.mark_1",
+                shortcut: "Alt+1",
+            },
+            DefaultCommandEntry {
+                id: "code.mark_2",
+                shortcut: "Alt+2",
+            },
+            DefaultCommandEntry {
+                id: "code.mark_3",
+                shortcut: "Alt+3",
+            },
+            DefaultCommandEntry {
+                id: "code.mark_4",
+                shortcut: "Alt+4",
             },
             DefaultCommandEntry {
                 id: "explorer.copy",

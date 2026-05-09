@@ -11,6 +11,8 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter};
 use uuid::Uuid;
 
+use super::ssh_terminal::ssh_command_for_environment;
+
 struct TerminalSession {
     writer: Arc<Mutex<Box<dyn Write + Send>>>,
     master: Arc<Mutex<Box<dyn MasterPty + Send>>>,
@@ -31,6 +33,14 @@ pub struct TerminalCreateRequest {
     pub rows: Option<u16>,
     #[serde(default)]
     pub env: HashMap<String, String>,
+    pub environment: Option<TerminalEnvironmentRequest>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum TerminalEnvironmentRequest {
+    Local,
+    Ssh { id: String },
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -71,23 +81,32 @@ fn terminal_create_blocking(
         })
         .map_err(|error| error.to_string())?;
 
-    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_owned());
-    let mut command = CommandBuilder::new(&shell);
-    // Interactive + login so both `.zprofile` and `.zshrc` run — matches the
-    // behavior of Terminal.app / iTerm2 / Kitty. Without `-i` many `.zshrc`
-    // paths short-circuit (aliases, powerlevel10k prompt, etc.).
-    command.arg("-il");
-    if let Some(cwd) = request
-        .cwd
-        .as_deref()
-        .map(str::trim)
-        .filter(|cwd| !cwd.is_empty())
-    {
-        let path = PathBuf::from(cwd);
-        if path.is_dir() {
-            command.cwd(path);
+    let is_ssh = matches!(
+        request.environment.as_ref(),
+        Some(TerminalEnvironmentRequest::Ssh { .. })
+    );
+    let mut command = match request.environment.as_ref() {
+        Some(TerminalEnvironmentRequest::Ssh { id }) => ssh_command_for_environment(id)?,
+        _ => {
+            let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_owned());
+            let mut local = CommandBuilder::new(&shell);
+            // Interactive + login so both `.zprofile` and `.zshrc` run — matches the
+            // behavior of Terminal.app / iTerm2 / Kitty.
+            local.arg("-il");
+            if let Some(cwd) = request
+                .cwd
+                .as_deref()
+                .map(str::trim)
+                .filter(|cwd| !cwd.is_empty())
+            {
+                let path = PathBuf::from(cwd);
+                if path.is_dir() {
+                    local.cwd(path);
+                }
+            }
+            local
         }
-    }
+    };
     // Baseline env for a modern xterm.js host — 256-color + true color paths
     // in shell prompts, git, less, bat, etc. rely on TERM and COLORTERM being
     // set. Overrides can still come in via `request.env`.
@@ -97,11 +116,16 @@ fn terminal_create_blocking(
         "LANG",
         std::env::var("LANG").unwrap_or_else(|_| "en_US.UTF-8".to_owned()),
     );
-    for (key, value) in request.env.iter() {
-        if key.is_empty() {
-            continue;
+    // Renderer-supplied environment overrides are local-shell only. SSH uses
+    // the device process environment so ssh-agent/keychain work, but renderer
+    // values can never become remote connection configuration.
+    if !is_ssh {
+        for (key, value) in request.env.iter() {
+            if key.is_empty() {
+                continue;
+            }
+            command.env(key, value);
         }
-        command.env(key, value);
     }
 
     let child = pair

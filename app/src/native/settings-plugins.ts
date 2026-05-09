@@ -102,7 +102,10 @@ export function providersImportCloudConnection(request: {
   name: string;
   providerType: string;
   connectionId: string;
-  accessToken: string;
+  connectionSource?: "connected_account" | "legacy_cloud";
+  connectedAccountId?: string;
+  handoff: string;
+  redeemUrl: string;
 }): Promise<ProvidersSnapshot> {
   return invoke("providers_import_cloud_connection", request);
 }

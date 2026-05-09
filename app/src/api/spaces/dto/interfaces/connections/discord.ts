@@ -101,6 +101,7 @@ export interface MessageOrigin {
   /** Discord message snowflake for inbound messages. */
   external_id?: string;
   external_channel_id?: string;
+  external_thread_id?: string;
   /** Display name as it appeared in the source system. */
   author_name?: string;
   author_handle?: string;

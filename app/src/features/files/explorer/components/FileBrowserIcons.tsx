@@ -41,6 +41,37 @@ export function FileIcon(props: { entry: FileEntry; size?: number; variant?: "ta
   return <File size={size} className={fileBrowserStyles.fileIcon} />;
 }
 
+export function FileNameIcon(props: {
+  name: string;
+  kind?: "file" | "folder";
+  open?: boolean;
+  size?: number;
+  className?: string;
+}) {
+  const kind = props.kind ?? "file";
+  const size = props.size ?? 18;
+  const iconUrl = materialIconUrlForName(props.name, kind, props.open ?? false);
+  if (iconUrl) {
+    return (
+      <img
+        alt=""
+        aria-hidden="true"
+        className={props.className ?? fileBrowserStyles.materialIcon}
+        draggable={false}
+        height={size}
+        src={iconUrl}
+        width={size}
+        style={{ width: size, height: size }}
+      />
+    );
+  }
+  return kind === "folder" ? (
+    <Folder size={size} className={props.className ?? fileBrowserStyles.folderIcon} />
+  ) : (
+    <File size={size} className={props.className ?? fileBrowserStyles.fileIcon} />
+  );
+}
+
 export function GenericFileIcon(props: { kind: "file" | "folder"; size?: number }) {
   const size = props.size ?? 18;
   const iconUrl = materialIconUrl(
@@ -68,11 +99,9 @@ export function GenericFileIcon(props: { kind: "file" | "folder"; size?: number 
 }
 
 function materialIconUrlForEntry(entry: FileEntry): string | null {
-  const name = entry.name.toLowerCase();
-  if (entry.kind === "folder") {
-    return materialIconUrl(materialTheme.folderNames[name] ?? materialTheme.folder);
-  }
+  if (entry.kind === "folder") return materialIconUrlForName(entry.name, "folder", false);
 
+  const name = entry.name.toLowerCase();
   const exactNameIcon = materialTheme.fileNames[name];
   if (exactNameIcon) return materialIconUrl(exactNameIcon);
 
@@ -82,6 +111,32 @@ function materialIconUrlForEntry(entry: FileEntry): string | null {
     if (extensionIcon) return materialIconUrl(extensionIcon);
   }
 
+  return materialIconUrl(materialTheme.file);
+}
+
+function materialIconUrlForName(
+  rawName: string,
+  kind: "file" | "folder",
+  open: boolean,
+): string | null {
+  const name = rawName.toLowerCase();
+  if (kind === "folder") {
+    const expandedName = open
+      ? (materialTheme.folderNamesExpanded?.[name] ?? materialTheme.folderNames[name])
+      : materialTheme.folderNames[name];
+    return materialIconUrl(
+      expandedName ?? (open ? materialTheme.folderExpanded : undefined) ?? materialTheme.folder,
+    );
+  }
+
+  const exactNameIcon = materialTheme.fileNames[name];
+  if (exactNameIcon) return materialIconUrl(exactNameIcon);
+  const index = name.lastIndexOf(".");
+  const extension = index > 0 && index < name.length - 1 ? name.slice(index + 1) : "";
+  if (extension) {
+    const extensionIcon = materialTheme.fileExtensions[extension];
+    if (extensionIcon) return materialIconUrl(extensionIcon);
+  }
   return materialIconUrl(materialTheme.file);
 }
 
@@ -107,6 +162,8 @@ export type MaterialIconTheme = {
   fileExtensions: Record<string, string>;
   fileNames: Record<string, string>;
   folderNames: Record<string, string>;
+  folderNamesExpanded?: Record<string, string>;
+  folderExpanded?: string;
   folder: string;
   file: string;
 };

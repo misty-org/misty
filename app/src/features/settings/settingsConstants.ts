@@ -10,9 +10,10 @@ export const terminalOptions = [
 ];
 export const terminalCursorStyleOptions = ["Block", "Bar", "Underline"];
 export const fileViewModeOptions = ["List", "Grid"];
-export const navigatorWidthOptions = ["Full", "Icons only"];
 export const editorTabSizeOptions = ["2 spaces", "4 spaces", "8 spaces"];
 export const editorTabSizeValues = [2, 4, 8];
+export const editorThemeOptions = ["Gruvbox Dark", "Gruvbox Light", "Misty Charcoal"];
+export const editorThemeValues = ["gruvbox-dark", "gruvbox-light", "misty-dark"];
 export const autosaveDelayOptions = ["Off", "After 500ms", "After 1s", "After 3s"];
 export const autosaveDelayValues = [0, 500, 1000, 3000];
 // The store already consumes and clamps this to 5-240; these are the values the

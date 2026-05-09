@@ -21,7 +21,7 @@ describe("SpaceChatConversationList", () => {
     container.remove();
   });
 
-  it("keeps Misty conversations together and Discord channels in their provider section", async () => {
+  it("keeps native conversations and groups linked Discord channels in Chat", async () => {
     await act(async () => {
       root.render(
         <MemoryRouter>
@@ -34,6 +34,7 @@ describe("SpaceChatConversationList", () => {
               conversation("group", "Launch", "misty", ["user-1", "user-2", "user-3"]),
               conversation("discord-art", "art", "discord", []),
               conversation("discord-builds", "builds", "discord", []),
+              conversation("slack-launch", "launch", "slack", []),
             ]}
             onCreateConversation={vi.fn()}
             onEditConversation={vi.fn()}
@@ -43,16 +44,18 @@ describe("SpaceChatConversationList", () => {
     });
 
     expect(container.textContent).toContain("Conversations - 2");
+    expect(container.textContent).toContain("Discord - 2");
+    expect(container.textContent).toContain("Slack - 1");
     expect(container.textContent).toContain("Everyone");
     expect(container.querySelector('a[href="/spaces/space-1/chat"]')).not.toBeNull();
     expect(container.textContent).not.toContain("Direct");
     expect(container.textContent).not.toContain("Group");
-    expect(container.textContent).toContain("Discord - 2");
     expect(
       container.querySelector('a[href="/spaces/space-1/chat?conversation=discord-art"]'),
     ).not.toBeNull();
-    expect(container.querySelectorAll('[aria-label="Discord conversations"] a')).toHaveLength(2);
-    expect(container.querySelector('[aria-label="Create a new discord conversation"]')).toBeNull();
+    expect(
+      container.querySelector('a[href="/spaces/space-1/chat?conversation=slack-launch"]'),
+    ).not.toBeNull();
   });
 
   it("keeps edit and delete inside the conversation context menu", async () => {
@@ -115,7 +118,7 @@ describe("SpaceChatConversationList", () => {
 function conversation(
   id: string,
   title: string,
-  origin: "misty" | "discord",
+  origin: "misty" | "discord" | "slack",
   memberIds: string[],
 ): SpaceConversation {
   return {
@@ -125,7 +128,7 @@ function conversation(
     created_by_user_id: "user-1",
     origin,
     integration_status: "active",
-    external_display_name: origin === "discord" ? title : undefined,
+    external_display_name: origin === "misty" ? undefined : title,
     participants: memberIds.map((userId) => ({
       kind: "person" as const,
       user_id: userId,

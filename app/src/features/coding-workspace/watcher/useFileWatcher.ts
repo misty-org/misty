@@ -11,66 +11,90 @@ interface FileEvent {
   kind: "create" | "modify" | "remove";
 }
 
-let refreshTimer: number | null = null;
+interface WatchRegistration {
+  refs: number;
+  watcherId: string | null;
+  unlisten: UnlistenFn | null;
+  startupHandle: number;
+  disposed: boolean;
+}
+
+const watchers = new Map<string, WatchRegistration>();
+const refreshTimers = new Map<string, number>();
 
 export function useFileWatcher(rootPath: string | null): void {
   useEffect(() => {
     if (!rootPath) return;
-    let cancelled = false;
-    let watcherId: string | null = null;
-    let unlisten: UnlistenFn | null = null;
-
-    // Defer the watcher spawn until the browser is idle so entering the Code
-    // tab paints before Rust registers the notify watcher.
-    const startupHandle = window.setTimeout(() => {
-      if (cancelled) return;
-      void (async () => {
-        try {
-          watcherId = await codeWatchDir(rootPath);
-        } catch {
-          return;
-        }
-        if (cancelled) {
-          if (watcherId) void codeStopWatch(watcherId);
-          return;
-        }
-        unlisten = await listen<FileEvent>("misty://code-file-event", ({ payload }) => {
-          if (payload.watcherId !== watcherId) return;
-          handleEvent(rootPath, payload);
-        });
-      })();
-    }, 1_500);
+    const existing = watchers.get(rootPath);
+    if (existing) existing.refs += 1;
+    else {
+      const registration: WatchRegistration = {
+        refs: 1,
+        watcherId: null,
+        unlisten: null,
+        disposed: false,
+        startupHandle: 0,
+      };
+      registration.startupHandle = window.setTimeout(() => {
+        if (registration.disposed) return;
+        void (async () => {
+          try {
+            registration.watcherId = await codeWatchDir(rootPath);
+          } catch {
+            return;
+          }
+          if (registration.disposed) {
+            if (registration.watcherId) void codeStopWatch(registration.watcherId);
+            return;
+          }
+          registration.unlisten = await listen<FileEvent>(
+            "misty://code-file-event",
+            ({ payload }) => {
+              if (payload.watcherId !== registration.watcherId) return;
+              handleEvent(rootPath, payload);
+            },
+          );
+        })();
+      }, 1_500);
+      watchers.set(rootPath, registration);
+    }
 
     return () => {
-      cancelled = true;
-      window.clearTimeout(startupHandle);
-      unlisten?.();
-      if (watcherId) void codeStopWatch(watcherId);
+      const registration = watchers.get(rootPath);
+      if (!registration) return;
+      registration.refs -= 1;
+      if (registration.refs > 0) return;
+      registration.disposed = true;
+      window.clearTimeout(registration.startupHandle);
+      registration.unlisten?.();
+      if (registration.watcherId) void codeStopWatch(registration.watcherId);
+      watchers.delete(rootPath);
     };
   }, [rootPath]);
 }
 
 function handleEvent(rootPath: string, event: FileEvent) {
+  window.dispatchEvent(new CustomEvent("misty:code-index-invalidated", { detail: { rootPath } }));
   const store = useCodingWorkspaceStore.getState();
-  const openTabs = store.groups.flatMap((group) => group.tabs);
+  const openBuffers = store.projectBuffers[rootPath] ?? {};
   for (const path of event.paths) {
-    const tab = openTabs.find((entry) => entry.path === path);
-    if (!tab) continue;
+    const buffer = openBuffers[path];
+    if (!buffer) continue;
     if (event.kind === "remove") {
-      store.patchTab(path, { error: "File was removed on disk.", loading: false });
+      store.patchBuffer(rootPath, path, { error: "File was removed on disk.", loading: false });
       continue;
     }
-    const isDirty = tab.contents !== tab.savedContents;
+    const isDirty = buffer.contents !== buffer.savedContents;
     if (isDirty) {
-      store.patchTab(path, {
+      store.patchBuffer(rootPath, path, {
         error: "This file changed on disk while you had unsaved changes.",
       });
       continue;
     }
     codeReadTextFile(path)
       .then((file) => {
-        if (file.contents === tab.contents) return;
-        store.patchTab(path, {
+        if (file.contents === buffer.contents) return;
+        store.patchBuffer(rootPath, path, {
           contents: file.contents,
           savedContents: file.contents,
           lineEnding: file.lineEnding,
@@ -81,9 +105,13 @@ function handleEvent(rootPath: string, event: FileEvent) {
       .catch(() => undefined);
   }
 
-  if (refreshTimer !== null) window.clearTimeout(refreshTimer);
-  refreshTimer = window.setTimeout(() => {
-    refreshTimer = null;
-    void useGitStore.getState().refresh(rootPath);
-  }, 400);
+  const refreshTimer = refreshTimers.get(rootPath);
+  if (refreshTimer !== undefined) window.clearTimeout(refreshTimer);
+  refreshTimers.set(
+    rootPath,
+    window.setTimeout(() => {
+      refreshTimers.delete(rootPath);
+      void useGitStore.getState().refresh(rootPath);
+    }, 400),
+  );
 }

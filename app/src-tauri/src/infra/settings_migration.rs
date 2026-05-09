@@ -8,7 +8,30 @@ use serde_json::{json, Map, Value};
 
 /// Bumped whenever a key is retired, so the prune below runs exactly once per
 /// user rather than on every launch.
-pub(super) const SETTINGS_SCHEMA_VERSION: i64 = 3;
+pub(super) const SETTINGS_SCHEMA_VERSION: i64 = 4;
+
+/// Upgrades values whose old defaults would otherwise make the redesigned
+/// Code workspace look unchanged after installing the new interface.
+pub(super) fn migrate_code_workspace_settings(
+    root: &mut Map<String, Value>,
+    stored_version: i64,
+) -> bool {
+    if stored_version >= 4 {
+        return false;
+    }
+    let Some(font_size) = root
+        .get_mut("editor")
+        .and_then(Value::as_object_mut)
+        .and_then(|editor| editor.get_mut("font_size"))
+    else {
+        return false;
+    };
+    if font_size.as_f64() != Some(12.5) {
+        return false;
+    }
+    *font_size = json!(14);
+    true
+}
 
 /// Whole sections that no longer exist. `account` and `ai` were never read;
 /// `transfer_profiles` keeps its presets but no longer stores a user-edited

@@ -9,7 +9,6 @@ import type { SpaceTaskStatus } from "@/api/spaces/dto/types/types";
 import { Button, Card, CardContent, CardHeader, CardTitle, Input } from "@/shared/ui";
 import { GripVertical, LoaderCircle, Plus } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent, type PointerEvent } from "react";
-import { TaskSyncBadge } from "./components/TaskSyncBadge";
 import {
   dueTone,
   shortDue,
@@ -330,7 +329,6 @@ function TaskCard({
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[10px] font-medium text-cream-muted">{task.task_key}</span>
           <TaskPriorityBadge priority={task.priority} />
-          <TaskSyncBadge task={task} />
           {task.due_at ? (
             <span className={`text-[10px] font-medium ${dueTone(task)}`}>
               {shortDue(task.due_at)}

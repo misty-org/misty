@@ -1,6 +1,6 @@
 import type { AccountMeResponse } from "@/features/auth";
 import { accountFetchMe } from "@/features/auth";
-import { cloudConnectionsSnapshot, cloudConnectionToken } from "@/api/cloud/api";
+import { cloudConnectionHandoff, cloudConnectionsSnapshot } from "@/api/cloud/api";
 import type { CurrentLicense } from "@/features/installer";
 import { useSetupStore } from "@/features/installer";
 import { providersImportCloudConnection } from "@/native";
@@ -100,12 +100,15 @@ export async function refreshCloudConnectionLeases(): Promise<void> {
     const snapshot = await cloudConnectionsSnapshot();
     await Promise.all(
       snapshot.connections.map(async (connection) => {
-        const lease = await cloudConnectionToken(connection.id);
+        const lease = await cloudConnectionHandoff(connection.id);
         await providersImportCloudConnection({
           name: connection.name,
           providerType: connection.provider,
           connectionId: connection.id,
-          accessToken: lease.access_token,
+          connectionSource: connection.connection_source,
+          connectedAccountId: connection.connected_account_id,
+          handoff: lease.handoff,
+          redeemUrl: lease.redeem_url,
         });
       }),
     );

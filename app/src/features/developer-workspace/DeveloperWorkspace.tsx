@@ -1,4 +1,5 @@
 import { lazy, Suspense } from "react";
+import type { WorkspaceTab } from "@/features/workspace";
 
 const CodingWorkspace = lazy(() =>
   import("@/features/coding-workspace/CodingWorkspace").then((module) => ({
@@ -6,7 +7,7 @@ const CodingWorkspace = lazy(() =>
   })),
 );
 
-export function DeveloperWorkspace() {
+export function DeveloperWorkspace({ tab }: { tab?: WorkspaceTab }) {
   return (
     <Suspense
       fallback={
@@ -15,7 +16,7 @@ export function DeveloperWorkspace() {
         </div>
       }
     >
-      <CodingWorkspace />
+      <CodingWorkspace tab={tab} />
     </Suspense>
   );
 }

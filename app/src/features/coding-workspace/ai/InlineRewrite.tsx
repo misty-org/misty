@@ -125,11 +125,11 @@ export function InlineRewrite({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-x-0 top-16 z-40 mx-auto flex justify-center px-4">
+    <div className="code-theme-overlay fixed inset-x-0 top-16 z-40 mx-auto flex justify-center bg-transparent px-4">
       <div className="w-full max-w-2xl rounded-xl border border-charcoal-border bg-charcoal-card shadow-2xl">
         <form onSubmit={submit} className="border-b border-charcoal-border px-4 py-3">
           <div className="flex items-start gap-3">
-            <Sparkles size={16} className="mt-1 text-[#e8d9c0]" />
+            <Sparkles size={16} className="code-accent mt-1" />
             <textarea
               ref={inputRef}
               value={instruction}
@@ -180,7 +180,7 @@ export function InlineRewrite({
         ) : null}
 
         {error ? (
-          <p className="border-t border-charcoal-border px-4 py-2 text-[12px] text-[#d68b80]">
+          <p className="code-danger border-t border-charcoal-border px-4 py-2 text-[12px]">
             {error}
           </p>
         ) : null}

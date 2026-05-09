@@ -55,11 +55,8 @@ export function ImportantCard(props: {
             />
           ))
         ) : (
-          <div className="grid min-h-[220px] place-items-center text-center">
-            <div>
-              <Bell className="mx-auto size-5 text-cream-muted" strokeWidth={1.7} />
-              <p className="mt-2 text-sm text-cream-muted">You’re all caught up.</p>
-            </div>
+          <div className="grid min-h-[220px] place-items-center px-5 text-center">
+            <p className="text-sm text-cream-muted">You’re all caught up.</p>
           </div>
         )}
       </CardContent>

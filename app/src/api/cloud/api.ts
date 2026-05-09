@@ -10,6 +10,10 @@ export interface CloudConnection {
   account_display: string;
   uses_custom_oauth_client: boolean;
   expires_at: string | null;
+  connected_account_id?: string;
+  connection_source?: "connected_account" | "legacy_cloud";
+  status?: "active" | "needs_attention" | "revoked";
+  last_error_code?: string;
 }
 
 export interface CloudConnectionsSnapshot {
@@ -17,13 +21,12 @@ export interface CloudConnectionsSnapshot {
   limit: { used: number; maximum: number | null };
 }
 
-export interface CloudTokenLease {
+export interface CloudCredentialHandoff {
   connection_id: string;
   provider: CloudProvider;
-  access_token: string;
-  token_type: string;
-  expires_at: string | null;
-  api_base: string;
+  handoff: string;
+  redeem_url: string;
+  expires_at: string;
 }
 
 export function cloudConnectionsSnapshot(): Promise<CloudConnectionsSnapshot> {
@@ -47,9 +50,19 @@ export function beginCloudAuthorization(request: {
   });
 }
 
-export function cloudConnectionToken(connectionId: string): Promise<CloudTokenLease> {
-  return apiRequest(`/cloud/connections/${encodeURIComponent(connectionId)}/token`, {
+export function cloudConnectionHandoff(connectionId: string): Promise<CloudCredentialHandoff> {
+  return apiRequest(`/cloud/connections/${encodeURIComponent(connectionId)}/handoff`, {
     method: "POST",
+  });
+}
+
+export function bindCloudConnection(request: {
+  connectionId: string;
+  name: string;
+}): Promise<CloudConnection> {
+  return apiRequest("/cloud/connections/bind", {
+    method: "POST",
+    body: JSON.stringify({ connection_id: request.connectionId, name: request.name }),
   });
 }
 

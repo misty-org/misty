@@ -17,7 +17,6 @@ export interface SpaceChatThreadProps {
   editing: MessageEditingState;
   actions: ReturnType<typeof useSpaceChatMessageActions>;
   suggestions: ChatSuggestionsState;
-  discord: { publishingMessageId: string; publish: (message: SpaceMessage) => void };
   currentUserId: string | undefined;
   error: string;
   setError: (message: string) => void;
@@ -32,6 +31,12 @@ export interface SpaceChatThreadProps {
   pendingAgentRuns: PendingAgentRun[];
   actionSuggestions: SpaceActionSuggestionBatch[];
   onActionSuggestionsChanged: () => void;
+  onPublishToDiscord: (message: SpaceMessage) => void;
+  canPublishToDiscord: (message: SpaceMessage) => boolean;
+  publishingMessageId: string;
+  onPublishToSlack: (message: SpaceMessage) => void;
+  canPublishToSlack: (message: SpaceMessage) => boolean;
+  publishingSlackMessageId: string;
 }
 
 /** The scrolling message list, wired to the Space's data and message actions. */
@@ -75,8 +80,6 @@ export function SpaceChatThread(props: SpaceChatThreadProps) {
       }
       onBeginEditing={editing.begin}
       onDelete={props.onDelete}
-      publishingMessageId={props.discord.publishingMessageId}
-      onPublishToDiscord={(message) => props.discord.publish(message)}
       onOpenNode={(nodeId) => {
         void store.openNode(spaceId, nodeId).catch((error: unknown) => {
           props.setError(error instanceof Error ? error.message : "This file could not be opened.");
@@ -90,6 +93,12 @@ export function SpaceChatThread(props: SpaceChatThreadProps) {
         ])
       }
       onReload={() => void store.loadMessages(spaceId)}
+      onPublishToDiscord={props.onPublishToDiscord}
+      canPublishToDiscord={props.canPublishToDiscord}
+      publishingMessageId={props.publishingMessageId}
+      onPublishToSlack={props.onPublishToSlack}
+      canPublishToSlack={props.canPublishToSlack}
+      publishingSlackMessageId={props.publishingSlackMessageId}
     />
   );
 }

@@ -13,11 +13,11 @@ import {
   Skeleton,
   cn,
 } from "@/shared/ui";
-import { Check, PenLine, Star, Trash2, X } from "lucide-react";
+import { Check, ExternalLink, LoaderCircle, PenLine, Send, Star, Trash2, X } from "lucide-react";
 import { Suspense, lazy, useEffect, useState } from "react";
 import type { NoteBodyFormat, UnifiedNote } from "../model/types/types";
 import { relativeTime } from "../noteFilters";
-import { NoteSyncIndicator } from "./NoteSourceBadge";
+import { NoteSourceBadge, NoteSyncIndicator } from "./NoteSourceBadge";
 
 const NoteBlockEditor = lazy(() => import("./NoteBlockEditor"));
 
@@ -86,11 +86,42 @@ export function NoteReadingPane(props: NoteReadingPaneProps) {
             <span>{note.spaceName}</span>
             <span aria-hidden="true">·</span>
             <span>Updated {relativeTime(note.updatedAt)}</span>
+            <NoteSourceBadge source={note.source} />
             <NoteSyncIndicator status={note.syncStatus} className="ml-0.5" />
+            {props.publishError ? <span className="text-sage-fg">{props.publishError}</span> : null}
           </div>
         </div>
 
         <div className="ml-auto flex items-center gap-2">
+          {note.source === "notion" && props.onOpenInSource ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 gap-1.5"
+              onClick={() => props.onOpenInSource?.(note.id)}
+            >
+              <ExternalLink size={13} />
+              Open in Notion
+            </Button>
+          ) : null}
+          {note.source === "misty" && props.onPublish ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1.5"
+              disabled={props.publishing}
+              onClick={() => props.onPublish?.(note.id)}
+            >
+              {props.publishing ? (
+                <LoaderCircle size={13} className="animate-spin" />
+              ) : (
+                <Send size={13} />
+              )}
+              {props.publishing ? "Publishing…" : "Publish to Notion"}
+            </Button>
+          ) : null}
           {props.onToggleFavorite ? (
             <Button
               type="button"
@@ -315,6 +346,10 @@ export interface NoteReadingPaneProps {
   onDelete?: (noteId: string) => Promise<void>;
   onToggleFavorite?: (noteId: string) => void;
   onNewNote: () => void;
+  onOpenInSource?: (noteId: string) => void;
+  onPublish?: (noteId: string) => void;
+  publishing?: boolean;
+  publishError?: string;
 }
 
 export interface NoteConflictNoticeProps {
