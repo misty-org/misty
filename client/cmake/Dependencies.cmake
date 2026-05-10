@@ -20,4 +20,4 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInf
     add_subdirectory("${CMAKE_SOURCE_DIR}/vendor/googletest" EXCLUDE_FROM_ALL)
 endif()
 
-message(STATUS "SDK fully loaded. No more compiler checks needed!")
+message(STATUS "Plugin toolchain fully loaded. No more compiler checks needed!")
