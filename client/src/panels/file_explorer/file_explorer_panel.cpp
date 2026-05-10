@@ -317,169 +317,6 @@ namespace misty::panel {
         }
     }
 
-    void FileExplorerPanel::render_search_overlay(FileExplorerState& state,
-                                                  SearchState& search_state,
-                                                  const ImVec2& list_start,
-                                                  float list_height) {
-        if (!search_state.is_open) return;
-
-        float overlay_h = std::min(350.0f, list_height);
-        ImGui::SetCursorPos(list_start);
-        ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.14f, 0.14f, 0.14f, 0.97f));
-        if (ImGui::BeginChild("##search_overlay", {0, overlay_h}, false, ImGuiWindowFlags_NoScrollbar)) {
-            if (search_state.focus_query) {
-                ImGui::SetKeyboardFocusHere();
-                search_state.focus_query = false;
-            }
-
-            ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.21f, 0.21f, 0.21f, 1.0f));
-            ImGui::SetNextItemWidth(-1.0f);
-            const bool changed = ImGui::InputTextWithHint(
-                "##overlay_search_query",
-                "Find in folder...  (:pdf)",
-                search_state.query_buf,
-                sizeof(search_state.query_buf),
-                ImGuiInputTextFlags_EnterReturnsTrue
-            );
-            const bool submitted = ImGui::IsItemDeactivatedAfterEdit();
-            const bool input_active = ImGui::IsItemActive();
-            ImGui::PopStyleColor();
-
-            std::string query(search_state.query_buf);
-            if (changed) {
-                std::lock_guard<std::mutex> lock(search_state.mu);
-                search_state.selected_index = 0;
-                search_state.search_pending = false;
-                if (query.empty()) {
-                    search_state.results.clear();
-                    search_state.last_submitted_query.clear();
-                    search_state.last_err.clear();
-                }
-            }
-
-            if (submitted && ((!query.empty() && query[0] == ':' && query.size() > 1) || query.size() >= 2)) {
-                std::lock_guard<std::mutex> lock(search_state.mu);
-                if (query != search_state.last_submitted_query) {
-                    search_state.search_pending = true;
-                }
-            } else if (!query.empty()) {
-                static auto last_change = std::chrono::steady_clock::now();
-                if (changed) {
-                    last_change = std::chrono::steady_clock::now();
-                }
-                const auto elapsed = std::chrono::steady_clock::now() - last_change;
-                const bool type_filter = query[0] == ':' && query.size() > 1;
-                std::lock_guard<std::mutex> lock(search_state.mu);
-                if ((type_filter || query.size() >= 2) &&
-                    query != search_state.last_submitted_query &&
-                    !search_state.search_pending &&
-                    elapsed >= std::chrono::milliseconds(type_filter ? 0 : 180)) {
-                    search_state.search_pending = true;
-                }
-            } else if (!input_active) {
-                std::lock_guard<std::mutex> lock(search_state.mu);
-                search_state.results.clear();
-                search_state.last_submitted_query.clear();
-                search_state.last_err.clear();
-            }
-
-            if (CommandManager::get().matches("search.cancel")) {
-                std::memset(search_state.query_buf, 0, sizeof(search_state.query_buf));
-                {
-                    std::lock_guard<std::mutex> lock(search_state.mu);
-                    search_state.is_open = false;
-                    search_state.focus_query = false;
-                    search_state.selected_index = 0;
-                    search_state.results.clear();
-                    search_state.search_pending = false;
-                    search_state.search_in_flight = false;
-                    ++search_state.request_generation;
-                    search_state.last_submitted_query.clear();
-                    search_state.last_err.clear();
-                }
-                ImGui::EndChild();
-                ImGui::PopStyleColor();
-                return;
-            }
-
-            if (CommandManager::get().matches("search.prev", true) && search_state.selected_index > 0) {
-                --search_state.selected_index;
-            }
-            if (CommandManager::get().matches("search.next", true)) {
-                ++search_state.selected_index;
-            }
-            if (CommandManager::get().matches("search.confirm") && search_panel_) {
-                SearchResult selected;
-                bool has_selection = false;
-                {
-                    std::lock_guard<std::mutex> lk(search_state.mu);
-                    if (search_state.selected_index >= 0 &&
-                        search_state.selected_index < static_cast<int>(search_state.results.size())) {
-                        selected = search_state.results[search_state.selected_index];
-                        has_selection = true;
-                    }
-                }
-                if (has_selection) {
-                    search_panel_->navigate_to_result(selected);
-                    search_state.is_open = false;
-                }
-            }
-
-            ImGui::Spacing();
-
-            bool has_results = false;
-            std::string error_message;
-            bool pending = false;
-            {
-                std::lock_guard<std::mutex> lk(search_state.mu);
-                has_results = !search_state.results.empty();
-                error_message = search_state.last_err;
-                pending = search_state.search_in_flight;
-            }
-
-            if (has_results) {
-                if (pending) {
-                    float t = static_cast<float>(ImGui::GetTime());
-                    const char* frames[] = { "|", "/", "-", "\\" };
-                    ImGui::TextDisabled("Searching... %s", frames[static_cast<int>(t * 8.0f) % 4]);
-                }
-                if (search_panel_) search_panel_->render_results(search_state, state.current_path);
-            } else if (search_state.query_buf[0] != '\0') {
-                if (pending) {
-                    float t = static_cast<float>(ImGui::GetTime());
-                    const char* frames[] = { "|", "/", "-", "\\" };
-                    ImGui::TextDisabled("Searching... %s", frames[static_cast<int>(t * 8.0f) % 4]);
-                } else if (!error_message.empty()) {
-                    ImGui::TextColored(ImVec4(0.92f, 0.45f, 0.45f, 1.0f), "Search failed");
-                    ImGui::Spacing();
-                    ImGui::PushTextWrapPos();
-                    ImGui::TextDisabled("%s", error_message.c_str());
-                    ImGui::PopTextWrapPos();
-                } else {
-                    ImGui::TextDisabled("No files found");
-                }
-            }
-        }
-        ImGui::EndChild();
-        ImGui::PopStyleColor();
-    }
-
-    void FileExplorerPanel::process_deferred_search_actions(SearchState& search_state) {
-        std::string q;
-        bool should_submit = false;
-        {
-            std::lock_guard<std::mutex> lock(search_state.mu);
-            if (search_state.search_pending && !search_state.search_in_flight && search_panel_) {
-                search_state.search_pending = false;
-                q = search_state.query_buf;
-                should_submit = ((!q.empty() && q[0] == ':' && q.size() > 1) || q.size() >= 2);
-            }
-        }
-        if (should_submit) {
-            search_panel_->submit_search(q);
-        }
-    }
-
     void FileExplorerPanel::update_periodic_save(FileExplorerState& state) {
         static double last_save_check = 0.0;
         double now = ImGui::GetTime();
@@ -1014,7 +851,10 @@ namespace misty::panel {
 
                     show_directory_contents(state);
                     show_error_modal(state.error_msg, "FileExplorerError");
-                    render_search_overlay(state, search_state, list_start, list_height);
+                    ImGui::SetCursorPos(list_start);
+                    if (search_panel_) {
+                        search_panel_->render(state.current_path, list_height);
+                    }
 
                     if (state.chat_overlay_open && list_region_size.x > 0.0f && list_region_size.y > 0.0f) {
                         const float overlay_top_y = list_screen_min.y + list_region_size.y - chat_h;
@@ -1101,7 +941,6 @@ namespace misty::panel {
                                      ImGui::IsMouseClicked(ImGuiMouseButton_Left));
 
             lock.unlock();
-            process_deferred_search_actions(search_state);
             update_periodic_watched_sync(state);
             update_periodic_save(state);
         }

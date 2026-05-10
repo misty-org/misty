@@ -52,11 +52,6 @@ namespace misty::panel {
 
     private:
         void handle_pending_navigation(panel::FileExplorerState& state);
-        void render_search_overlay(panel::FileExplorerState& state,
-                                   panel::SearchState& search_state,
-                                   const ImVec2& list_start,
-                                   float list_height);
-        void process_deferred_search_actions(panel::SearchState& search_state);
         void update_periodic_save(panel::FileExplorerState& state);
         void update_periodic_watched_sync(panel::FileExplorerState& state);
         void render_chat_overlay(panel::FileExplorerState& state,
