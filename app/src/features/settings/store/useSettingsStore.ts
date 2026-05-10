@@ -6,14 +6,18 @@ import {
   settingsSave,
   settingsSnapshot,
   shortcutsReset,
-  shortcutsSave,
+  shortcutsReassign,
   shortcutsSnapshot,
+  shortcutsUpdate,
 } from "@/native";
 import type {
   LaunchOnLoginSnapshot,
   OpenWithAssociation,
+  ReassignShortcutRequest,
+  ResetShortcutRequest,
   SettingsSnapshot,
   ShortcutsSnapshot,
+  UpdateShortcutRequest,
 } from "@/native/contracts";
 import { configureStartupPreference } from "@/features/app-shell";
 import { configureBrowserHomeUrl, configureBrowserSearchEngine } from "@/features/workspace";
@@ -133,47 +137,93 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     }
   },
 
-  setShortcut: (commandId, shortcut) => {
-    set((state) => {
-      if (!state.shortcuts) return state;
-      return {
-        shortcuts: {
-          ...state.shortcuts,
-          bindings: state.shortcuts.bindings.map((binding) =>
-            binding.commandId === commandId ? { ...binding, shortcut, source: "user" } : binding,
-          ),
-        },
-      };
-    });
-  },
-
-  resetShortcuts: async () => {
-    set({ working: true, error: null, message: null });
+  updateShortcut: async (request) => {
+    const previous = get().shortcuts;
+    if (!previous) return;
+    set({ shortcuts: optimisticShortcutUpdate(previous, request), error: null, message: null });
     try {
-      set({ shortcuts: await shortcutsReset(), message: "Shortcuts restored to defaults." });
+      set({
+        shortcuts: await shortcutsUpdate(request),
+        message: "Shortcut updated.",
+      });
+      window.dispatchEvent(new CustomEvent("misty://shortcuts-changed"));
     } catch (error) {
-      set({ error: errorText(error) });
-    } finally {
-      set({ working: false });
+      set({ shortcuts: previous, error: errorText(error) });
     }
   },
 
-  saveShortcuts: async () => {
-    const { shortcuts } = get();
-    if (!shortcuts) return;
-    set({ working: true, error: null, message: null });
+  reassignShortcut: async (request) => {
+    const previous = get().shortcuts;
+    if (!previous) return;
+    set({ shortcuts: optimisticShortcutReassign(previous, request), error: null, message: null });
     try {
       set({
-        shortcuts: await shortcutsSave({ bindings: shortcuts.bindings }),
-        message: "Shortcuts saved.",
+        shortcuts: await shortcutsReassign(request),
+        message: "Shortcut reassigned.",
       });
+      window.dispatchEvent(new CustomEvent("misty://shortcuts-changed"));
     } catch (error) {
-      set({ error: errorText(error) });
+      set({ shortcuts: previous, error: errorText(error) });
+    }
+  },
+
+  resetShortcuts: async (request = {}) => {
+    const previous = get().shortcuts;
+    set({ working: true, error: null, message: null });
+    try {
+      set({ shortcuts: await shortcutsReset(request), message: "Shortcuts restored to defaults." });
+      window.dispatchEvent(new CustomEvent("misty://shortcuts-changed"));
+    } catch (error) {
+      set({ shortcuts: previous, error: errorText(error) });
     } finally {
       set({ working: false });
     }
   },
 }));
+
+function optimisticShortcutUpdate(
+  snapshot: ShortcutsSnapshot,
+  request: UpdateShortcutRequest,
+): ShortcutsSnapshot {
+  const effectiveBindings = snapshot.effectiveBindings.map((binding) =>
+    binding.commandId === request.commandId
+      ? {
+          ...binding,
+          [request.slot]: request.value,
+          [`${request.slot}Source`]: "user",
+        }
+      : binding,
+  );
+  return {
+    ...snapshot,
+    effectiveBindings,
+    bindings: effectiveBindings.flatMap((binding) =>
+      binding.primary
+        ? [
+            {
+              commandId: binding.commandId,
+              shortcut: binding.primary,
+              source: binding.primarySource,
+            },
+          ]
+        : [],
+    ),
+  };
+}
+
+function optimisticShortcutReassign(
+  snapshot: ShortcutsSnapshot,
+  request: ReassignShortcutRequest,
+): ShortcutsSnapshot {
+  return optimisticShortcutUpdate(
+    optimisticShortcutUpdate(snapshot, {
+      commandId: request.conflictingCommandId,
+      slot: request.conflictingSlot,
+      value: null,
+    }),
+    request,
+  );
+}
 
 function cloneDocument(document: Record<string, unknown>): Record<string, unknown> {
   return JSON.parse(JSON.stringify(document)) as Record<string, unknown>;
@@ -227,9 +277,9 @@ export interface SettingsStore {
   load: () => Promise<void>;
   updateSetting: (section: string, key: string, value: SettingValue) => void;
   removeOpenWithAssociation: (key: string) => Promise<void>;
-  setShortcut: (commandId: string, shortcut: string) => void;
-  resetShortcuts: () => Promise<void>;
-  saveShortcuts: () => Promise<void>;
+  updateShortcut: (request: UpdateShortcutRequest) => Promise<void>;
+  reassignShortcut: (request: ReassignShortcutRequest) => Promise<void>;
+  resetShortcuts: (request?: ResetShortcutRequest) => Promise<void>;
 }
 
 configureExternalLinkPreference(

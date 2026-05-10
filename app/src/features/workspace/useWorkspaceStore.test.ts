@@ -30,7 +30,7 @@ describe("desktop dock store", () => {
     useWorkspaceStore.getState().reset();
   });
 
-  it("keeps a Home tab instead of ever emptying the workspace", () => {
+  it("does not close the final tab in the final virtual window", () => {
     const store = useWorkspaceStore.getState();
     store.openSurface({
       surfaceId: "terminal",
@@ -39,15 +39,12 @@ describe("desktop dock store", () => {
       route: "/terminal",
       instancePolicy: "single",
     });
-    for (const tab of dockTabs(useWorkspaceStore.getState().layout.root)) {
-      useWorkspaceStore.getState().closeTab(tab.id);
-    }
+    const onlyTab = dockTabs(useWorkspaceStore.getState().layout.root)[0];
+    expect(useWorkspaceStore.getState().closeTab(onlyTab.id)).toBe(false);
 
-    // Closing everything leaves Home behind, so no part of the app has to
-    // handle a zero-tab workspace.
     const remaining = dockTabs(useWorkspaceStore.getState().layout.root);
     expect(remaining).toHaveLength(1);
-    expect(remaining[0]).toMatchObject({ surfaceId: "home", route: "/home" });
+    expect(remaining[0].id).toBe(onlyTab.id);
   });
 
   it("stacks Home tabs on request but never from a route", () => {
@@ -435,7 +432,7 @@ describe("desktop dock store", () => {
     const tab = useWorkspaceStore.getState().openSurface(browserRequest);
     useWorkspaceStore.getState().toggleSidebar(tab.id);
     const snapshot = useWorkspaceStore.getState().createSnapshot("account-1", "device-1");
-    expect(snapshot.version).toBe(2);
+    expect(snapshot.version).toBe(3);
     expect(
       findDockLeaf(snapshot.layout.root, snapshot.layout.focusedPaneId)?.tabs[0]?.sidebarVisible,
     ).toBe(false);

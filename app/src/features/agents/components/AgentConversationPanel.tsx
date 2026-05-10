@@ -52,6 +52,8 @@ export function AgentConversationPanel({
   onSpaceChange,
   onEdit,
   controller,
+  compact = false,
+  contextNoteId,
 }: {
   agent: PersonalAgent;
   spaceId: string;
@@ -59,6 +61,8 @@ export function AgentConversationPanel({
   onSpaceChange: (spaceId: string) => void;
   onEdit: () => void;
   controller: AgentActivityController;
+  compact?: boolean;
+  contextNoteId?: string;
 }) {
   const initial = cachedAgentConversation(spaceId, agent.id);
   const [conversation, setConversation] = useState<SpaceConversation | null>(
@@ -283,6 +287,7 @@ export function AgentConversationPanel({
         {
           agentId: agent.id,
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+          contextNoteId,
           contextReferences,
         },
       );
@@ -310,49 +315,51 @@ export function AgentConversationPanel({
       className="flex min-h-0 min-w-0 flex-1 flex-col bg-charcoal-bg"
       aria-label={`Chat with ${agent.name}`}
     >
-      <header className="flex h-14 shrink-0 items-center gap-3 border-b border-charcoal-border px-4">
-        <AgentAvatar
-          agentId={agent.id}
-          avatar={agent.avatar}
-          legacyIcon={agent.icon}
-          name={agent.name}
-        />
-        <div className="min-w-0 flex-1">
-          <h1 className="m-0 truncate text-sm font-semibold text-cream-bright">{agent.name}</h1>
-          <p className="m-0 text-[11px] text-cream-muted">{working ? "Working…" : "Ready"}</p>
-        </div>
-        <Select value={spaceId} onValueChange={onSpaceChange}>
-          <SelectTrigger className="h-8 w-auto min-w-28 max-w-48 rounded-full border-charcoal-border bg-charcoal-card px-3 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {spaces.map((space) => (
-              <SelectItem key={space.id} value={space.id}>
-                {space.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Button
-          size="icon"
-          variant="ghost"
-          className="size-8"
-          onClick={() => setActivityOpen(true)}
-          aria-label="Open activity"
-        >
-          <Activity className="size-4" />
-        </Button>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button size="icon" variant="ghost" className="size-8" aria-label="Agent menu">
-              <MoreHorizontal className="size-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onSelect={onEdit}>Preferences</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </header>
+      {!compact ? (
+        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-charcoal-border px-4">
+          <AgentAvatar
+            agentId={agent.id}
+            avatar={agent.avatar}
+            legacyIcon={agent.icon}
+            name={agent.name}
+          />
+          <div className="min-w-0 flex-1">
+            <h1 className="m-0 truncate text-sm font-semibold text-cream-bright">{agent.name}</h1>
+            <p className="m-0 text-[11px] text-cream-muted">{working ? "Working…" : "Ready"}</p>
+          </div>
+          <Select value={spaceId} onValueChange={onSpaceChange}>
+            <SelectTrigger className="h-8 w-auto min-w-28 max-w-48 rounded-full border-charcoal-border bg-charcoal-card px-3 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {spaces.map((space) => (
+                <SelectItem key={space.id} value={space.id}>
+                  {space.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="size-8"
+            onClick={() => setActivityOpen(true)}
+            aria-label="Open activity"
+          >
+            <Activity className="size-4" />
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="icon" variant="ghost" className="size-8" aria-label="Agent menu">
+                <MoreHorizontal className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={onEdit}>Preferences</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </header>
+      ) : null}
 
       <div className="misty-transient-scrollbar min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex min-h-full max-w-3xl flex-col justify-end gap-5 px-5 py-6">

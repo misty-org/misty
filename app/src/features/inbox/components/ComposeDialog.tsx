@@ -23,6 +23,7 @@ export function ComposeDialog(props: {
   open: boolean;
   accounts: MailAccount[];
   replyTo: InboxThread | null;
+  initialDraft?: { to?: string; subject?: string; text?: string };
   onOpenChange: (open: boolean) => void;
   onSave: (draft: MailDraftInput, draftId?: string) => Promise<MailDraft>;
   onSend: (draftId: string, connectionId: string) => Promise<void>;
@@ -41,18 +42,19 @@ export function ComposeDialog(props: {
     const replyMessages = props.replyTo?.messages ?? [];
     const replyMessage = replyMessages[replyMessages.length - 1];
     setConnectionId(props.replyTo?.connectionId || props.accounts[0]?.connection_id || "");
-    setTo(replyMessage?.from.email ?? "");
+    setTo(props.initialDraft?.to ?? replyMessage?.from.email ?? "");
     setSubject(
-      props.replyTo
-        ? props.replyTo.subject.toLowerCase().startsWith("re:")
-          ? props.replyTo.subject
-          : `Re: ${props.replyTo.subject}`
-        : "",
+      props.initialDraft?.subject ??
+        (props.replyTo
+          ? props.replyTo.subject.toLowerCase().startsWith("re:")
+            ? props.replyTo.subject
+            : `Re: ${props.replyTo.subject}`
+          : ""),
     );
-    setText("");
+    setText(props.initialDraft?.text ?? "");
     setDraft(null);
     setError("");
-  }, [props.accounts, props.open, props.replyTo]);
+  }, [props.accounts, props.initialDraft, props.open, props.replyTo]);
 
   const payload = (): MailDraftInput => ({
     connection_id: connectionId,

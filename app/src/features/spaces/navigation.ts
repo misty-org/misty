@@ -1,5 +1,4 @@
 import { dockLeaves, useWorkspaceStore } from "@/features/workspace";
-import { rememberedJournalRoute } from "./spacesShell/spaceSubpageMemory";
 
 const validSpaceSections = new Set(["chat", "planner", "notes", "drawings", "library"]);
 

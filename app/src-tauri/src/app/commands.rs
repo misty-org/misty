@@ -35,7 +35,6 @@ use crate::infra::agents::{
 };
 use crate::infra::autostart::LaunchOnLoginSnapshot;
 use crate::infra::claude::{ClaudeSendRequest, ClaudeStatus, ClaudeStreamEvent};
-use crate::infra::commands::{SaveShortcutsRequest, ShortcutsSnapshot};
 #[cfg(desktop)]
 use crate::infra::connected_devices::{
     ConnectPeerRequest, ConnectedDevicesService, ConnectedDevicesSnapshot,
@@ -1450,24 +1449,6 @@ pub fn coding_ai_write_api_key(provider_id: String, key: String) -> ApiResult<()
 #[tauri::command]
 pub fn coding_ai_clear_api_key(provider_id: String) -> ApiResult<()> {
     crate::infra::keychain::clear_coding_ai_key(&provider_id)
-}
-
-#[tauri::command]
-pub async fn shortcuts_snapshot(state: State<'_, MistyRuntime>) -> ApiResult<ShortcutsSnapshot> {
-    state.commands.snapshot().await
-}
-
-#[tauri::command]
-pub async fn shortcuts_save(
-    request: SaveShortcutsRequest,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<ShortcutsSnapshot> {
-    state.commands.save(request).await
-}
-
-#[tauri::command]
-pub async fn shortcuts_reset(state: State<'_, MistyRuntime>) -> ApiResult<ShortcutsSnapshot> {
-    state.commands.reset().await
 }
 
 #[cfg(desktop)]

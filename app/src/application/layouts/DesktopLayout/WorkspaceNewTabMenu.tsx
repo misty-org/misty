@@ -24,7 +24,7 @@ import {
   SquareTerminal,
   type LucideIcon,
 } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 export interface NewTabOption {
   surfaceId: WorkspaceSurfaceId;
@@ -87,6 +87,15 @@ export function WorkspaceNewTabMenu({ paneId, onOpenNewTab }: Props) {
   const { user } = useAuth();
   const spaces = useSpacesStore((state) => state.spaces);
   const activeScopeKey = useWorkspaceStore((state) => state.activeScopeKey);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    const openPicker = (event: Event) => {
+      if ((event as CustomEvent<{ paneId?: string }>).detail?.paneId === paneId) setOpen(true);
+    };
+    window.addEventListener("misty:open-new-tab-picker", openPicker);
+    return () => window.removeEventListener("misty:open-new-tab-picker", openPicker);
+  }, [paneId]);
 
   const activeSpace = useMemo(() => {
     const activeSpaceId = activeScopeKey.startsWith("space:") ? activeScopeKey.slice(6) : "";
@@ -133,7 +142,7 @@ export function WorkspaceNewTabMenu({ paneId, onOpenNewTab }: Props) {
   }, [activeSpace, user?.id]);
 
   return (
-    <DropdownMenu>
+    <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
         <button
           type="button"

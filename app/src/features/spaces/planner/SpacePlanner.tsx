@@ -1,9 +1,14 @@
 export type { DueFilter, TaskViewMode } from "@/api/spaces/dto/types/SpacePlanner";
 import { useAuth } from "@/features/auth";
+import {
+  useAiSurfaceAdapter,
+  type AiContextReference,
+  type AiSurfaceAdapter,
+} from "@/features/ai-surface/AiPaneHost";
 import { SpaceRoadmapItemsWorkspace, SpaceRoadmapWorkspace } from "@/features/spaces/roadmap";
 import { useSpacePanelRoute, useSpacesStore } from "@/features/spaces";
 import type { SpaceAgentMembership, SpaceMember } from "@/api/spaces/dto/interfaces/types";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { SpaceAgenda } from "./SpaceAgenda";
 import { SpaceTaskDrawer } from "./SpacePlannerViews";
@@ -60,6 +65,90 @@ function SpaceTasksPlanner({ spaceId, canManage }: { spaceId: string; canManage:
   const filters = useTaskFilterParams({ view, currentUserId: user?.id });
   const data = useSpaceTasksData({ spaceId, view, filters });
   const actions = useSpaceTaskActions({ spaceId, canManage, data });
+  const reloadTasks = data.load;
+  const aiAdapter = useMemo<AiSurfaceAdapter>(() => {
+    const metadata: Record<string, string> = { sort: filters.sort };
+    if (filters.status !== "all") metadata.status = filters.status;
+    if (filters.priority !== "all") metadata.priority = filters.priority;
+    if (filters.query.trim()) metadata.search = filters.query.trim();
+    if (filters.effectiveAssignee.startsWith("person:"))
+      metadata.assignee_user_id = filters.effectiveAssignee.slice(7);
+    if (filters.effectiveAssignee.startsWith("agent:"))
+      metadata.assignee_agent_id = filters.effectiveAssignee.slice(6);
+    if (filters.dueRange?.from) metadata.due_from = filters.dueRange.from;
+    if (filters.dueRange?.to) metadata.due_to = filters.dueRange.to;
+    const visible: AiContextReference = {
+      kind: "planner.query",
+      id: spaceId,
+      title: filters.activeFilterCount
+        ? `Visible tasks (${filters.activeFilterCount} filters)`
+        : "Visible tasks",
+      privacy: "shared",
+      spaceId,
+      metadata,
+    };
+    const selected = actions.editing
+      ? ({
+          kind: "task",
+          id: actions.editing.id,
+          title: actions.editing.title,
+          privacy: "shared",
+          spaceId,
+          revision: actions.editing.version,
+        } satisfies AiContextReference)
+      : null;
+    return {
+      surfaceId: "planner.tasks",
+      label: selected?.title ?? "visible tasks",
+      getContext: () => (selected ? [selected, visible] : [visible]),
+      getSuggestedActions: () => [
+        {
+          id: "planner.status",
+          label: "Summarize status",
+          prompt: "Summarize status, progress, risks, and blockers across these visible tasks.",
+          trigger: "object",
+        },
+        {
+          id: "planner.risks",
+          label: "Identify risks",
+          prompt:
+            "Identify delivery risks, bottlenecks, and tasks that need attention in this visible plan.",
+          trigger: "object",
+        },
+        ...(canManage
+          ? [
+              {
+                id: "planner.breakdown",
+                label: "Draft task breakdown",
+                prompt:
+                  "Draft a concrete, non-duplicative task breakdown that complements the visible plan.",
+                trigger: "object" as const,
+                requestedArtifactKind: "task_set" as const,
+              },
+            ]
+          : []),
+      ],
+      onArtifactApplied: (artifact) => {
+        if (artifact.kind === "task_set") void reloadTasks(false);
+      },
+      openCitation: (citation) =>
+        window.dispatchEvent(new CustomEvent("misty:open-ai-citation", { detail: citation })),
+    };
+  }, [
+    actions.editing,
+    canManage,
+    reloadTasks,
+    filters.activeFilterCount,
+    filters.dueRange?.from,
+    filters.dueRange?.to,
+    filters.effectiveAssignee,
+    filters.priority,
+    filters.query,
+    filters.sort,
+    filters.status,
+    spaceId,
+  ]);
+  useAiSurfaceAdapter(aiAdapter);
   const createQueryConsumedRef = useRef(false);
 
   const openCreate = actions.openCreate;

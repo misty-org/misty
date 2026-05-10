@@ -1,16 +1,9 @@
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { FolderOpen } from "lucide-react";
 import { useCallback, useState } from "react";
-import { FaGithub } from "react-icons/fa6";
 import { Button } from "@/shared/ui";
 
-export function OpenFolderCard({
-  onOpenGitHub,
-  onOpenRoot,
-}: {
-  onOpenGitHub?: () => void;
-  onOpenRoot: (path: string) => void;
-}) {
+export function OpenFolderCard({ onOpenRoot }: { onOpenRoot: (path: string) => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,15 +35,10 @@ export function OpenFolderCard({
           <span className="font-mono text-[12px] text-cream">codex</span>, or any other CLI from the
           built-in terminal.
         </p>
-        <div className="mt-6 flex flex-wrap justify-center gap-2">
+        <div className="mt-6 flex justify-center">
           <Button type="button" disabled={busy} onClick={() => void pick()} variant="default">
             {busy ? "Opening…" : "Choose folder"}
           </Button>
-          {onOpenGitHub ? (
-            <Button type="button" onClick={onOpenGitHub} variant="outline">
-              <FaGithub className="size-4" /> Clone from GitHub
-            </Button>
-          ) : null}
         </div>
         {error ? <p className="code-danger mt-3 text-xs">{error}</p> : null}
       </div>

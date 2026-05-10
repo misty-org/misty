@@ -10,6 +10,7 @@ export {
 } from "./contextMenu/fileActions";
 export { compareSeedForPane, openCompareWith } from "./contextMenu/remoteVerification";
 import { selectShortcutPreferences, useSettingsStore } from "@/features/settings";
+import { effectiveShortcut, formatShortcutLabel } from "@/features/shortcuts";
 import { AddFilesToSpaceDialog } from "@/features/spaces/library";
 import {
   DropdownMenu,
@@ -55,7 +56,7 @@ import {
   openCompareWith,
   verifyExplorerRemotePath,
 } from "./contextMenu/remoteVerification";
-import { calculateSelectedFolderSizes, primaryShortcutLabel } from "./contextMenu/selectionHelpers";
+import { calculateSelectedFolderSizes } from "./contextMenu/selectionHelpers";
 import { useContextMenuState } from "./contextMenu/useContextMenuState";
 import { clearSelectionsAcrossPanes } from "./ExplorerAgentPanels";
 
@@ -64,6 +65,10 @@ export const ExplorerContextMenu = memo(function ExplorerContextMenu() {
   const shortcutHintsEnabled = useSettingsStore(
     (state) => selectShortcutPreferences(state.settings?.document).shortcutHintsEnabled,
   );
+  const shortcutPlatform = useSettingsStore(
+    (state) => state.shortcuts?.detectedPlatform ?? "linux",
+  );
+  useSettingsStore((state) => state.shortcuts);
   const {
     canCalculateDirectorySizes,
     canCreateFile,
@@ -91,12 +96,14 @@ export const ExplorerContextMenu = memo(function ExplorerContextMenu() {
   } = useContextMenuState();
   if (!open && addToSpacePaths.length === 0) return null;
 
-  const primaryShortcut = shortcutHintsEnabled ? primaryShortcutLabel() : "";
   const selectionDisabledReason = hasSelection ? undefined : "Select a file or folder first.";
   const canAddCopiesToSpace =
     selectedLocalFilePaths.length > 0 && selectedLocalFilePaths.length === selectedCount;
   const createDisabledReason = "New items are only available in writable folders.";
-  const shortcut = (value: string) => (shortcutHintsEnabled ? value : undefined);
+  const shortcutFor = (commandId: string) =>
+    shortcutHintsEnabled
+      ? formatShortcutLabel(effectiveShortcut(commandId).primary, shortcutPlatform) || undefined
+      : undefined;
 
   const run = (action: () => void) => {
     useExplorerStore.getState().closeContextMenu();
@@ -108,7 +115,7 @@ export const ExplorerContextMenu = memo(function ExplorerContextMenu() {
       id: "new-folder",
       icon: <FolderPlus size={17} />,
       label: "New Folder",
-      shortcut: shortcut(`${primaryShortcut}+Shift+N`),
+      shortcut: shortcutFor("explorer.new_folder"),
       disabled: !canCreateFolder,
       disabledReason: createDisabledReason,
       onRun: () => run(() => void useExplorerStore.getState().createItem(paneId, "folder")),
@@ -128,7 +135,7 @@ export const ExplorerContextMenu = memo(function ExplorerContextMenu() {
       id: "copy",
       icon: <Copy size={17} />,
       label: "Copy",
-      shortcut: shortcut(`${primaryShortcut}+C`),
+      shortcut: shortcutFor("explorer.copy"),
       disabled: !hasSelection,
       disabledReason: selectionDisabledReason,
       onRun: () => run(() => useExplorerStore.getState().copySelected(paneId)),
@@ -137,7 +144,7 @@ export const ExplorerContextMenu = memo(function ExplorerContextMenu() {
       id: "cut",
       icon: <Scissors size={17} />,
       label: "Cut",
-      shortcut: shortcut(`${primaryShortcut}+X`),
+      shortcut: shortcutFor("explorer.cut"),
       disabled: !hasSelection,
       disabledReason: selectionDisabledReason,
       onRun: () => run(() => useExplorerStore.getState().cutSelected(paneId)),
@@ -146,7 +153,7 @@ export const ExplorerContextMenu = memo(function ExplorerContextMenu() {
       id: "paste",
       icon: <Clipboard size={17} />,
       label: "Paste",
-      shortcut: shortcut(`${primaryShortcut}+V`),
+      shortcut: shortcutFor("explorer.paste"),
       disabled: !hasClipboard,
       disabledReason: hasClipboard ? undefined : "Copy or cut something first.",
       onRun: () => run(() => void useExplorerStore.getState().pasteIntoPane(paneId)),
@@ -168,7 +175,7 @@ export const ExplorerContextMenu = memo(function ExplorerContextMenu() {
             id: "trash",
             icon: <Trash2 size={17} />,
             label: "Trash",
-            shortcut: shortcut("Del"),
+            shortcut: shortcutFor("explorer.delete"),
             disabled: !canTrashSelection,
             disabledReason: hasSelection
               ? "Trash is only available for local files and folders."
@@ -217,10 +224,9 @@ export const ExplorerContextMenu = memo(function ExplorerContextMenu() {
     hasRemoteSelection,
     hasSelection,
     paneId,
-    primaryShortcut,
     targetEntry,
     run,
-    shortcut,
+    shortcutFor,
   };
   const archiveItems = buildArchiveItems(archiveToolsContext);
   const fileToolsItems = buildFileToolsItems(archiveToolsContext);
@@ -229,7 +235,7 @@ export const ExplorerContextMenu = memo(function ExplorerContextMenu() {
       id: "rename-inline",
       icon: <Pencil size={17} />,
       label: "Rename",
-      shortcut: shortcut("Enter"),
+      shortcut: shortcutFor("explorer.rename"),
       disabled: !hasSelection,
       disabledReason: selectionDisabledReason,
       onRun: () => run(() => void useExplorerStore.getState().renameSelected(paneId)),
@@ -271,7 +277,7 @@ export const ExplorerContextMenu = memo(function ExplorerContextMenu() {
           id: "hidden-files",
           icon: <Eye size={17} />,
           label: showHidden ? "Hide Hidden Files" : "Show Hidden Files",
-          shortcut: shortcut(`${primaryShortcut}+Shift+.`),
+          shortcut: shortcutFor("explorer.toggle_hidden"),
           onRun: () => run(() => void useExplorerStore.getState().toggleHidden(paneId)),
         },
       ];
@@ -332,7 +338,7 @@ export const ExplorerContextMenu = memo(function ExplorerContextMenu() {
       id: "refresh",
       icon: <RefreshCcw size={17} />,
       label: "Refresh",
-      shortcut: shortcut(`${primaryShortcut}+R`),
+      shortcut: shortcutFor("explorer.refresh"),
       onRun: () => run(() => void useExplorerStore.getState().refreshPane(paneId)),
     },
   ];

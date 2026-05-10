@@ -336,11 +336,11 @@ fn normalize_settings_document(document: &mut Value) -> bool {
     changed |= ensure_section_defaults(
         root,
         "shortcuts",
-        &[
-            ("custom_shortcuts_enabled", json!(false)),
-            ("shortcut_hints_enabled", json!(true)),
-        ],
+        &[("shortcut_hints_enabled", json!(true))],
     );
+    if let Some(shortcuts) = root.get_mut("shortcuts").and_then(Value::as_object_mut) {
+        changed |= shortcuts.remove("custom_shortcuts_enabled").is_some();
+    }
     changed |= ensure_section_defaults(
         root,
         "advanced",

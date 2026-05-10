@@ -1,8 +1,13 @@
-import { pluginCommandsSnapshot, shortcutsSnapshot } from "@/features/files/native";
+import { pluginCommandsSnapshot } from "@/features/files/native";
 import type { PluginCommandEntry, PluginPanelEntry } from "@/native/contracts";
-import { shortcutMapFromBindings } from "@/shared/lib/shortcuts";
+import {
+  defaultBindingsFor,
+  registerShortcutCommandDefinition,
+  type ShortcutCommandDefinition,
+} from "@/features/shortcuts";
+import { useSettingsStore } from "@/features/settings";
 import { useEffect, useRef, useState } from "react";
-import { defaultExplorerShortcutMap, executableShortcutCommands } from "../ExplorerCommands";
+import { executableShortcutCommands } from "../ExplorerCommands";
 import { emptyPluginCommands, emptyPluginPanels } from "../ExplorerWorkspaceConstants";
 import { pluginCommandsEqual, pluginPanelsEqual } from "../ExplorerWorkspaceUtils";
 
@@ -13,20 +18,16 @@ import { pluginCommandsEqual, pluginPanelsEqual } from "../ExplorerWorkspaceUtil
  * focus. A plugin's `defaultShortcut` only applies where the user has not bound
  * that command themselves.
  */
-export function usePluginRegistry(options: {
-  extensionsEnabled: boolean;
-  shortcutPreferences: { customShortcutsEnabled: boolean };
-}) {
-  const { extensionsEnabled, shortcutPreferences } = options;
+export function usePluginRegistry(options: { extensionsEnabled: boolean }) {
+  const { extensionsEnabled } = options;
   const [pluginCommands, setPluginCommands] = useState<PluginCommandEntry[]>(emptyPluginCommands);
   const [pluginPanels, setPluginPanels] = useState<PluginPanelEntry[]>(emptyPluginPanels);
-  const shortcutMapRef = useRef(defaultExplorerShortcutMap());
   const executableCommandIdsRef = useRef<readonly string[]>(executableShortcutCommands);
   const pluginCommandsRef = useRef<PluginCommandEntry[]>(emptyPluginCommands);
+  const unregisterPluginDefinitionsRef = useRef<Array<() => void>>([]);
 
   useEffect(() => {
     if (!extensionsEnabled) {
-      shortcutMapRef.current = defaultExplorerShortcutMap();
       executableCommandIdsRef.current = executableShortcutCommands;
       pluginCommandsRef.current = emptyPluginCommands;
       setPluginCommands(emptyPluginCommands);
@@ -36,21 +37,14 @@ export function usePluginRegistry(options: {
     let disposed = false;
     const loadCommandMetadata = async () => {
       try {
-        const [shortcutSnapshot, pluginSnapshot] = await Promise.all([
-          shortcutsSnapshot(),
-          pluginCommandsSnapshot(),
-        ]);
+        const pluginSnapshot = await pluginCommandsSnapshot();
         if (!disposed) {
-          const fallbackShortcuts = defaultExplorerShortcutMap();
-          const shortcutMap = shortcutPreferences.customShortcutsEnabled
-            ? shortcutMapFromBindings(shortcutSnapshot.bindings, fallbackShortcuts)
-            : fallbackShortcuts;
-          for (const command of pluginSnapshot.commands) {
-            if (command.defaultShortcut && !shortcutMap[command.id]) {
-              shortcutMap[command.id] = command.defaultShortcut;
-            }
-          }
-          shortcutMapRef.current = shortcutMap;
+          unregisterPluginDefinitionsRef.current.forEach((remove) => remove());
+          const pluginDefinitions = pluginSnapshot.commands.map(pluginShortcutDefinition);
+          unregisterPluginDefinitionsRef.current = pluginDefinitions.map(
+            registerShortcutCommandDefinition,
+          );
+          appendPluginDefinitionsToSettings(pluginDefinitions);
           executableCommandIdsRef.current = [
             ...executableShortcutCommands,
             ...pluginSnapshot.commands.map((command) => command.id),
@@ -67,7 +61,6 @@ export function usePluginRegistry(options: {
         }
       } catch {
         if (!disposed) {
-          shortcutMapRef.current = defaultExplorerShortcutMap();
           executableCommandIdsRef.current = executableShortcutCommands;
           pluginCommandsRef.current = emptyPluginCommands;
           setPluginCommands((current) => (current.length === 0 ? current : emptyPluginCommands));
@@ -80,14 +73,72 @@ export function usePluginRegistry(options: {
     return () => {
       disposed = true;
       window.removeEventListener("focus", loadCommandMetadata);
+      unregisterPluginDefinitionsRef.current.forEach((remove) => remove());
+      unregisterPluginDefinitionsRef.current = [];
     };
-  }, [extensionsEnabled, shortcutPreferences.customShortcutsEnabled]);
+  }, [extensionsEnabled]);
 
   return {
     pluginCommands,
     pluginPanels,
-    shortcutMapRef,
     executableCommandIdsRef,
     pluginCommandsRef,
   };
+}
+
+function pluginShortcutDefinition(pluginCommand: PluginCommandEntry): ShortcutCommandDefinition {
+  const defaultShortcut = pluginCommand.defaultShortcut || null;
+  return {
+    id: pluginCommand.id,
+    label: pluginCommand.label,
+    description: pluginCommand.hint || `Run ${pluginCommand.label}.`,
+    category: pluginCommand.pluginName || "Extensions",
+    scope: "tool:files",
+    aliases: [pluginCommand.pluginName, pluginCommand.pluginId],
+    defaults: {
+      macos: { primary: defaultShortcut, alternate: null },
+      windows: { primary: nonMacPluginShortcut(defaultShortcut), alternate: null },
+      linux: { primary: nonMacPluginShortcut(defaultShortcut), alternate: null },
+    },
+    allowInEditable: false,
+    repeatable: false,
+    nativeMenu: false,
+    allowShadowing: false,
+  };
+}
+
+function nonMacPluginShortcut(shortcut: string | null): string | null {
+  return (
+    shortcut?.replace(/\b(?:command|cmd|meta)\b/gi, "Ctrl").replace(/\boption\b/gi, "Alt") ?? null
+  );
+}
+
+function appendPluginDefinitionsToSettings(definitions: ShortcutCommandDefinition[]) {
+  useSettingsStore.setState((state) => {
+    const snapshot = state.shortcuts;
+    if (!snapshot) return state;
+    const existingIds = new Set(snapshot.commandDefinitions.map((definition) => definition.id));
+    const additions = definitions.filter((definition) => !existingIds.has(definition.id));
+    if (!additions.length) return state;
+    const overrides = new Map(snapshot.overrides.map((entry) => [entry.commandId, entry]));
+    const effectiveBindings = additions.map((definition) => {
+      const defaults = defaultBindingsFor(definition, snapshot.detectedPlatform);
+      const override = overrides.get(definition.id);
+      return {
+        commandId: definition.id,
+        primary: override?.primary !== undefined ? override.primary : defaults.primary,
+        alternate: override?.alternate !== undefined ? override.alternate : defaults.alternate,
+        primarySource: override?.primary !== undefined ? ("user" as const) : ("default" as const),
+        alternateSource:
+          override?.alternate !== undefined ? ("user" as const) : ("default" as const),
+      };
+    });
+    return {
+      shortcuts: {
+        ...snapshot,
+        commandDefinitions: [...snapshot.commandDefinitions, ...additions],
+        effectiveBindings: [...snapshot.effectiveBindings, ...effectiveBindings],
+      },
+    };
+  });
 }

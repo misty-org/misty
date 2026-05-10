@@ -1,10 +1,8 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { createCodeTabState, type WorkspaceTab } from "@/features/workspace";
 import { CodingWorkspace } from "./CodingWorkspace";
-
-vi.mock("./github/GitHubCodeSheet", () => ({ GitHubCodeSheet: () => null }));
 
 describe("CodingWorkspace", () => {
   afterEach(cleanup);

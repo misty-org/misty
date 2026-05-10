@@ -13,6 +13,9 @@ export interface NoteCollaborationSession {
   ticket: NoteCollaborationTicket;
   doc: Y.Doc;
   fragment: Y.XmlFragment;
+  title: Y.Text;
+  markdown: Y.Text;
+  metadata: Y.Map<unknown>;
   provider: YProvider;
 }
 
@@ -105,7 +108,10 @@ async function createSession(
     noteId,
     ticket: firstTicket,
     doc,
-    fragment: doc.getXmlFragment("doc"),
+    fragment: doc.getXmlFragment("tiptap"),
+    title: doc.getText("misty:title"),
+    markdown: doc.getText("misty:markdown"),
+    metadata: doc.getMap("misty:document"),
     provider,
   };
 }

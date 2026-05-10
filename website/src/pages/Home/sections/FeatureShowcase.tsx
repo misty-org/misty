@@ -1,35 +1,84 @@
 import type { ReactNode } from "react";
 
+import { MistyAppMockup, type MockupView } from "@/components/marketing/appchrome";
 import { useReveal } from "@/hooks/useReveal";
+import { cn } from "@/lib/utils";
 
-type ShowcaseCardProps = {
+type ShowcaseCard = {
+  index: string;
   title: string;
-  className?: string;
-  children?: ReactNode;
+  description: string;
+  view: MockupView;
+  className: string;
 };
 
-function ScreenshotPlaceholder({ title }: { title: string }) {
-  return (
-    <div
-      aria-label={`${title} screenshot placeholder`}
-      className="flex h-full min-h-64 items-center justify-center p-5"
-    >
-      <div className="w-full max-w-sm rounded-lg border border-dashed border-[var(--marketing-border-strong)] px-5 py-4 text-center text-sm text-[var(--marketing-muted)]">
-        Screenshot placeholder
-      </div>
-    </div>
-  );
-}
+/*
+ * Every card shows the surface it is describing. The showcase used to render
+ * five dashed "Screenshot placeholder" boxes; each one is now the real
+ * window, drawn in DOM, so the grid argues for the product instead of
+ * promising that a picture of it will arrive later.
+ */
+const cards: ShowcaseCard[] = [
+  {
+    index: "01",
+    title: "One Space per group",
+    description:
+      "People, conversations, tasks, a shared Library, and Agents — all in the same place, all seeing the same state of the work.",
+    view: "space",
+    className: "lg:col-span-2",
+  },
+  {
+    index: "02",
+    title: "Your files stay yours",
+    description:
+      "Browse local and connected files privately. Nothing reaches the Space until you put it there.",
+    view: "files",
+    className: "",
+  },
+  {
+    index: "03",
+    title: "Agents that read the Space",
+    description:
+      "Custom Agents work from permitted context only, with model routing handled for you.",
+    view: "agent",
+    className: "",
+  },
+  {
+    index: "04",
+    title: "A Library the group builds",
+    description:
+      "Collect the files, links, and notes the work depends on, without exposing everything on your device.",
+    view: "library",
+    className: "lg:col-span-2",
+  },
+];
 
-function ShowcaseCard({ title, className = "", children }: ShowcaseCardProps) {
+function ShowcaseCard({
+  card,
+  children,
+}: {
+  card: ShowcaseCard;
+  children: ReactNode;
+}) {
   return (
     <article
-      className={`relative min-h-0 overflow-hidden rounded-xl border border-[var(--marketing-border)] bg-[var(--marketing-surface)] ${className}`}
+      className={cn(
+        "flex min-h-0 flex-col overflow-hidden rounded-xl border border-[var(--marketing-border)] bg-[var(--marketing-surface)] p-5 sm:p-6",
+        card.className,
+      )}
     >
-      <div className="h-full min-h-0">{children ?? <ScreenshotPlaceholder title={title} />}</div>
-      <h2 className="absolute inset-x-0 bottom-0 px-5 pb-5 text-[clamp(0.875rem,1.3vw,1.25rem)] font-medium leading-none tracking-[-0.025em] text-[var(--marketing-foreground)] lg:whitespace-nowrap sm:px-6 sm:pb-6">
-        {title}
-      </h2>
+      <p className="text-[11px] font-medium tracking-[0.08em] text-[var(--marketing-muted)]">
+        {card.index}
+      </p>
+      <h3 className="mt-3 text-lg font-medium tracking-[-0.025em] text-[var(--marketing-foreground)] sm:text-xl">
+        {card.title}
+      </h3>
+      <p className="mt-2 max-w-lg text-sm leading-relaxed text-[var(--marketing-muted)]">
+        {card.description}
+      </p>
+      {/* The window fills whatever height the row leaves it, so a row of
+          cards lines up even when their copy runs to different lengths. */}
+      <div className="mt-6 flex min-h-0 flex-1 flex-col">{children}</div>
     </article>
   );
 }
@@ -38,17 +87,18 @@ export function FeatureShowcase() {
   const ref = useReveal<HTMLElement>();
 
   return (
-    <section ref={ref} aria-label="Misty product showcase" className="reveal py-3 sm:py-4">
+    <section
+      ref={ref}
+      aria-label="Misty product showcase"
+      className="reveal py-3 sm:py-4"
+    >
       <div className="mx-auto max-w-[1440px] px-5 sm:px-8 lg:px-12">
-        <div className="grid gap-3 lg:grid-cols-3 lg:grid-rows-[minmax(26rem,1fr)_minmax(20rem,0.7fr)]">
-          <ShowcaseCard
-            title="Agent-native platform"
-            className="lg:col-span-2"
-          />
-          <ShowcaseCard title="Self-updating knowledge" />
-          <ShowcaseCard title="Control who has access" />
-          <ShowcaseCard title="Connect with your systems" />
-          <ShowcaseCard title="Collaborate with your team & agents" />
+        <div className="grid gap-3 lg:grid-cols-3 lg:grid-rows-[30rem_28rem]">
+          {cards.map((card) => (
+            <ShowcaseCard key={card.title} card={card}>
+              <MistyAppMockup view={card.view} fill shadow={false} />
+            </ShowcaseCard>
+          ))}
         </div>
       </div>
     </section>

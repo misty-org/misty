@@ -1,0 +1,248 @@
+.misty-tiptap-editor {
+  --tt-toolbar-height: 48px;
+  min-height: 100%;
+  color: var(--color-cream);
+}
+
+.misty-tiptap-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  min-height: var(--tt-toolbar-height);
+  align-items: center;
+  overflow-x: auto;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--color-charcoal-border);
+  background: color-mix(in srgb, var(--color-charcoal-bg) 96%, transparent);
+  scrollbar-width: none;
+  backdrop-filter: blur(12px);
+}
+
+.misty-tiptap-toolbar::-webkit-scrollbar {
+  display: none;
+}
+.misty-tiptap-tool {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  color: var(--color-cream-muted);
+}
+.misty-tiptap-tool:hover,
+.misty-tiptap-tool.is-active,
+.misty-tiptap-tool[aria-pressed="true"] {
+  color: var(--color-cream-bright);
+  background: var(--color-charcoal-active);
+}
+
+.misty-tiptap-search {
+  position: absolute;
+  z-index: 45;
+  top: 54px;
+  right: 14px;
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(120px, 1fr) repeat(5, auto);
+  gap: 6px;
+  width: min(780px, calc(100% - 28px));
+  padding: 8px;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: 10px;
+  background: var(--color-charcoal-card);
+  box-shadow: 0 16px 48px rgb(0 0 0 / 0.3);
+}
+
+.misty-tiptap-canvas {
+  position: relative;
+  max-width: 980px;
+  min-height: 520px;
+  margin: 0 auto;
+  padding: 42px 72px 160px;
+}
+.misty-tiptap-prosemirror {
+  min-height: 460px;
+  outline: none;
+  font-size: 16px;
+  line-height: 1.72;
+  color: var(--color-cream);
+  caret-color: #8b7cf6;
+}
+.misty-tiptap-prosemirror > * {
+  position: relative;
+  margin: 0 0 0.8em;
+}
+.misty-tiptap-prosemirror h1 {
+  margin-top: 1.2em;
+  font-size: 2em;
+  line-height: 1.2;
+}
+.misty-tiptap-prosemirror h2 {
+  margin-top: 1.1em;
+  font-size: 1.55em;
+  line-height: 1.3;
+}
+.misty-tiptap-prosemirror h3 {
+  margin-top: 1em;
+  font-size: 1.25em;
+}
+.misty-tiptap-prosemirror blockquote {
+  border-left: 3px solid #7255d9;
+  padding-left: 1rem;
+  color: var(--color-cream-muted);
+}
+.misty-tiptap-prosemirror pre {
+  overflow-x: auto;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: 10px;
+  background: var(--color-charcoal-card);
+  padding: 14px 16px;
+}
+.misty-tiptap-prosemirror code {
+  border-radius: 4px;
+  background: var(--color-charcoal-card);
+  padding: 0.15em 0.35em;
+}
+.misty-tiptap-prosemirror pre code {
+  padding: 0;
+  background: transparent;
+}
+.misty-tiptap-prosemirror ul,
+.misty-tiptap-prosemirror ol {
+  padding-left: 1.5rem;
+}
+.misty-tiptap-prosemirror ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0;
+}
+.misty-tiptap-prosemirror ul[data-type="taskList"] li {
+  display: flex;
+  gap: 0.55rem;
+}
+.misty-tiptap-prosemirror a {
+  color: #a99bf8;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.misty-tiptap-prosemirror img {
+  max-width: 100%;
+  border-radius: 10px;
+}
+.misty-tiptap-prosemirror hr {
+  margin: 2rem 0;
+  border: 0;
+  border-top: 1px solid var(--color-charcoal-border);
+}
+.misty-tiptap-prosemirror p.is-editor-empty:first-child::before {
+  content: "Start writing, or type / for commands…";
+  float: left;
+  height: 0;
+  color: color-mix(in srgb, var(--color-cream-muted) 65%, transparent);
+  pointer-events: none;
+}
+.misty-tiptap-editor.is-readonly .misty-tiptap-canvas {
+  padding-top: 32px;
+}
+
+.misty-tiptap-block-handle {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  border-radius: 7px;
+  background: var(--color-charcoal-bg);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-cream) 8%, transparent);
+}
+.misty-tiptap-block-handle button {
+  display: grid;
+  width: 27px;
+  height: 30px;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-cream-muted);
+  cursor: pointer;
+}
+.misty-tiptap-block-handle button:hover {
+  background: var(--color-charcoal-active);
+  color: var(--color-cream-bright);
+}
+
+.misty-tiptap-suggestion {
+  position: fixed;
+  z-index: 2147483400;
+  display: grid;
+  min-width: 250px;
+  max-height: 360px;
+  overflow: auto;
+  padding: 7px;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: 12px;
+  background: var(--color-charcoal-card);
+  box-shadow: 0 18px 55px rgb(0 0 0 / 0.38);
+}
+.misty-tiptap-suggestion p {
+  margin: 4px 8px 7px;
+  color: var(--color-cream-muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.misty-tiptap-suggestion button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 9px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--color-cream);
+  text-align: left;
+}
+.misty-tiptap-suggestion button:hover {
+  background: var(--color-charcoal-active);
+}
+.misty-tiptap-suggestion span {
+  padding: 8px;
+  color: var(--color-cream-muted);
+  font-size: 12px;
+}
+.misty-tiptap-ai-selection {
+  position: fixed;
+  z-index: 2147483401;
+}
+.find-and-replace-result {
+  background: color-mix(in srgb, #d7a928 35%, transparent);
+}
+.find-and-replace-result-current {
+  background: color-mix(in srgb, #7255d9 55%, transparent);
+}
+.collaboration-cursor__caret {
+  position: relative;
+  border-left: 2px solid;
+  margin-left: -1px;
+  pointer-events: none;
+}
+.collaboration-cursor__label {
+  position: absolute;
+  top: -1.4em;
+  left: -1px;
+  border-radius: 4px 4px 4px 0;
+  padding: 2px 5px;
+  color: white;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .misty-tiptap-canvas {
+    padding: 30px 26px 120px 42px;
+  }
+  .misty-tiptap-search {
+    grid-template-columns: 1fr auto auto;
+  }
+  .misty-tiptap-search input:nth-child(2),
+  .misty-tiptap-search button:nth-of-type(n + 3) {
+    display: none;
+  }
+}

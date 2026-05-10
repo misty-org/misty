@@ -7,13 +7,16 @@ export interface ServerSpaceNote {
   space_id: string;
   creator_user_id: string;
   title: string;
+  markdown?: string;
   plain_text?: string;
   lifecycle_state: string;
   collaboration_revision: number;
   acl_version: number;
   role: "creator" | "editor" | "viewer";
+  can_delete?: boolean;
   created_at?: string;
   updated_at?: string;
+  backlink_count?: number;
 }
 
 export type NoteCollaborationRole = "creator" | "editor" | "viewer";
@@ -43,10 +46,19 @@ export const notesApi = {
     }),
   remove: (spaceId: string, noteId: string) =>
     spaceRequest(`/spaces/${part(spaceId)}/notes/${part(noteId)}`, { method: "DELETE" }),
+  archive: (spaceId: string, noteId: string, archived = true) =>
+    spaceRequest(`/spaces/${part(spaceId)}/notes/${part(noteId)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ archived }),
+    }),
   collaborationTicket: (spaceId: string, noteId: string) =>
     spaceRequest<NoteCollaborationTicket>(
       `/spaces/${part(spaceId)}/notes/${part(noteId)}/collaboration-ticket`,
       { method: "POST" },
+    ),
+  backlinks: (spaceId: string, noteId: string) =>
+    spaceRequest<{ backlinks: Array<{ id: string; title: string; updated_at: string }> }>(
+      `/spaces/${part(spaceId)}/notes/${part(noteId)}/backlinks`,
     ),
 };
 

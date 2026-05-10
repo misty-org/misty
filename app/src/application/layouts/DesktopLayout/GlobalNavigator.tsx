@@ -2,6 +2,7 @@ import { unreadActivityCountForSpace, useActivityStore } from "@/features/activi
 import { routes } from "@/features/app-shell";
 import { useAuth } from "@/features/auth";
 import { useGlobalSearchStore } from "@/features/global-search";
+import { useShortcutTitle } from "@/features/shortcuts";
 import {
   canOpenMistySpaceSection,
   preferredMistySpace,
@@ -10,7 +11,6 @@ import {
   rememberedPlannerRoute,
   SpaceAvatar,
   SpaceRowActions,
-  spaceDestination,
   spaceLandingRoute,
   useSpacesStore,
 } from "@/features/spaces";
@@ -77,6 +77,7 @@ export function GlobalNavigator(props: {
   /** Present on desktop: drags (and double-click zooms) from the top band. */
   onTitlebarPointerDown?: (event: React.PointerEvent<HTMLElement>) => void;
 }) {
+  const searchShortcutTitle = useShortcutTitle("Search", "search.toggle");
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -179,7 +180,7 @@ export function GlobalNavigator(props: {
           );
         }}
         aria-label="Search"
-        title="Search (⌘K)"
+        title={searchShortcutTitle}
       >
         <Search size={18} strokeWidth={1.75} />
       </button>

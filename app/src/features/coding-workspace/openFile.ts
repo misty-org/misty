@@ -58,3 +58,38 @@ export function openFileInWorkspace(
       });
     });
 }
+
+export async function ensureProjectBuffer(rootPath: string, path: string, name: string) {
+  const store = useCodingWorkspaceStore.getState();
+  const existing = store.projectBuffers[rootPath]?.[path];
+  if (existing && !existing.loading) return existing;
+  if (!existing) {
+    store.ensureBuffer(rootPath, {
+      path,
+      name,
+      contents: "",
+      savedContents: "",
+      lineEnding: "lf",
+      readonly: false,
+      loading: true,
+      error: null,
+    });
+  }
+  try {
+    const file = await codeReadTextFile(path);
+    store.patchBuffer(rootPath, path, {
+      contents: file.contents,
+      savedContents: file.contents,
+      lineEnding: file.lineEnding,
+      readonly: file.readonly,
+      loading: false,
+      error: null,
+    });
+  } catch (error) {
+    store.patchBuffer(rootPath, path, {
+      loading: false,
+      error: error instanceof Error ? error.message : "Could not open this file.",
+    });
+  }
+  return useCodingWorkspaceStore.getState().projectBuffers[rootPath]?.[path] ?? null;
+}

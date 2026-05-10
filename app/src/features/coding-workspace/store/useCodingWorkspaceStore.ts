@@ -23,6 +23,8 @@ export interface ProjectState {
 export interface CodeViewport {
   rootPath: string;
   activeFilePath: string | null;
+  history: string[];
+  historyIndex: number;
 }
 
 interface PersistedState {
@@ -43,7 +45,9 @@ interface WorkspaceState extends PersistedState {
   setFilesPaneOpen: (open: boolean) => void;
   toggleFolder: (path: string) => void;
   openFile: (rootPath: string, viewId: string, buffer: OpenTab) => void;
+  ensureBuffer: (rootPath: string, buffer: OpenTab) => void;
   setActiveFile: (rootPath: string, viewId: string, path: string) => void;
+  navigateViewHistory: (viewId: string, direction: -1 | 1) => string | null;
   removeBuffer: (rootPath: string, path: string) => void;
   updateBufferContents: (rootPath: string, path: string, contents: string) => void;
   patchBuffer: (rootPath: string, path: string, patch: Partial<OpenTab>) => void;
@@ -71,7 +75,12 @@ export const useCodingWorkspaceStore = create<WorkspaceState>()(
             : {
                 views: {
                   ...state.views,
-                  [viewId]: { rootPath: rootPath ?? "", activeFilePath: null },
+                  [viewId]: {
+                    rootPath: rootPath ?? "",
+                    activeFilePath: null,
+                    history: [],
+                    historyIndex: -1,
+                  },
                 },
               },
         ),
@@ -81,7 +90,10 @@ export const useCodingWorkspaceStore = create<WorkspaceState>()(
           const current = state.views[viewId];
           if (!current) return state;
           return {
-            views: { ...state.views, [viewId]: { ...current, activeFilePath: null } },
+            views: {
+              ...state.views,
+              [viewId]: { ...current, activeFilePath: null, history: [], historyIndex: -1 },
+            },
           };
         }),
 
@@ -106,7 +118,19 @@ export const useCodingWorkspaceStore = create<WorkspaceState>()(
             },
             views: {
               ...state.views,
-              [viewId]: { rootPath, activeFilePath: buffer.path },
+              [viewId]: activateViewport(state.views[viewId], rootPath, buffer.path),
+            },
+          };
+        }),
+
+      ensureBuffer: (rootPath, buffer) =>
+        set((state) => {
+          const buffers = state.projectBuffers[rootPath] ?? {};
+          if (buffers[buffer.path]) return state;
+          return {
+            projectBuffers: {
+              ...state.projectBuffers,
+              [rootPath]: { ...buffers, [buffer.path]: buffer },
             },
           };
         }),
@@ -117,11 +141,30 @@ export const useCodingWorkspaceStore = create<WorkspaceState>()(
             ? {
                 views: {
                   ...state.views,
-                  [viewId]: { rootPath, activeFilePath: path },
+                  [viewId]: activateViewport(state.views[viewId], rootPath, path),
                 },
               }
             : state,
         ),
+
+      navigateViewHistory: (viewId, direction) => {
+        let target: string | null = null;
+        set((state) => {
+          const view = state.views[viewId];
+          if (!view) return state;
+          const history = view.history ?? [];
+          const historyIndex = (view.historyIndex ?? history.length - 1) + direction;
+          if (historyIndex < 0 || historyIndex >= history.length) return state;
+          target = history[historyIndex] ?? null;
+          return {
+            views: {
+              ...state.views,
+              [viewId]: { ...view, historyIndex, activeFilePath: target },
+            },
+          };
+        });
+        return target;
+      },
 
       removeBuffer: (rootPath, path) =>
         set((state) => {
@@ -224,6 +267,25 @@ function patchProjectBuffer(
       ...state.projectBuffers,
       [rootPath]: { ...buffers, [path]: { ...buffer, ...patch } },
     },
+  };
+}
+
+function activateViewport(
+  current: CodeViewport | undefined,
+  rootPath: string,
+  path: string,
+): CodeViewport {
+  if (current?.rootPath === rootPath && current.activeFilePath === path) return current;
+  const currentHistory = current?.history ?? [];
+  const currentIndex = current?.historyIndex ?? currentHistory.length - 1;
+  const history = current?.rootPath === rootPath ? currentHistory.slice(0, currentIndex + 1) : [];
+  if (history[history.length - 1] !== path) history.push(path);
+  const capped = history.slice(-50);
+  return {
+    rootPath,
+    activeFilePath: path,
+    history: capped,
+    historyIndex: capped.length - 1,
   };
 }
 

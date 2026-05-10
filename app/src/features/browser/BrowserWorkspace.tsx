@@ -9,13 +9,21 @@ import {
   useWorkspaceStore,
 } from "@/features/workspace";
 import { hasTauriInternals } from "@/shared/platform/tauri";
+import {
+  AiSurfaceButton,
+  useAiSurfaceAdapter,
+  type AiArtifact,
+  type AiSurfaceAdapter,
+} from "@/features/ai-surface/AiPaneHost";
+import { useShortcutHandler } from "@/features/shortcuts";
 import { cn, Popover, PopoverContent, PopoverTrigger } from "@/shared/ui";
 import { invoke } from "@tauri-apps/api/core";
 import { ArrowLeft, ArrowRight, MessageCirclePlus, Pencil, RotateCw, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   browserRuntimeCreated,
   browserRuntimeId,
+  browserScopeId,
   setBrowserWebviewsSuspended,
   useBrowserRuntimeStore,
 } from "./browserRuntime";
@@ -75,6 +83,8 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
   const [browserTheme, setBrowserTheme] = useState<BrowserTheme>(browserThemeFromDocument);
   const [annotationsActive, setAnnotationsActive] = useState(false);
   const [viewport, setViewport] = useState<BrowserViewport>("responsive");
+  const [mistyPage, setMistyPage] = useState<BrowserMistyPage | null>(null);
+  const [mistyPageLoading, setMistyPageLoading] = useState(false);
   const storedGrants = useBrowserRuntimeStore((runtime) => runtime.grants[tab.id]);
   const storedHistory = useBrowserRuntimeStore((runtime) => runtime.histories[tab.id]);
   const grants = storedGrants ?? [];
@@ -92,6 +102,161 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
   const viewportMenuSuspensionReason = `browser-viewport-menu:${browserRuntimeId(tab)}`;
   const viewportWidth = browserViewportWidths[viewport];
   const agentMenuOverlay = useBrowserOverlayControl(agentMenuSuspensionReason);
+  const aiAdapter = useMemo<AiSurfaceAdapter>(() => {
+    const scopeId = browserScopeId(tab);
+    const content = mistyPage
+      ? [
+          mistyPage.text.slice(0, 28 << 10),
+          `Visible interactive controls (opaque references):\n${JSON.stringify(mistyPage.interactive)}`,
+        ]
+          .join("\n\n")
+          .slice(0, 32 << 10)
+      : "";
+    const applicableAction = (artifact: AiArtifact) => {
+      if (
+        artifact.kind !== "browser_action" ||
+        !nativeRuntime ||
+        !browserRuntimeCreated(tab) ||
+        !mistyPage ||
+        artifact.baseRevision !== mistyPage.urlFingerprint
+      )
+        return null;
+      const operations = artifact.operations as {
+        tab_scope_id?: string;
+        steps?: Array<{ action?: string; target?: string; value?: string; effect?: string }>;
+      };
+      if (operations.tab_scope_id !== scopeId || operations.steps?.length !== 1) return null;
+      const step = operations.steps[0];
+      if (step.action === "navigate" && typeof step.value === "string") {
+        try {
+          const url = new URL(step.value);
+          return url.protocol === "https:" || url.protocol === "http:"
+            ? { operation: "browser.navigate", input: { url: url.toString() } }
+            : null;
+        } catch {
+          return null;
+        }
+      }
+      if (
+        step.action === "click" &&
+        typeof step.target === "string" &&
+        mistyPage.interactive.some((control) => control.ref === step.target)
+      ) {
+        return {
+          operation: "browser.click",
+          input: { elementRef: step.target, expectDownload: false },
+        };
+      }
+      return null;
+    };
+    return {
+      surfaceId: "browser",
+      label: mistyPage?.title || tab.title || "this browser tab",
+      getContext: () => [
+        {
+          kind: "browser-tab",
+          id: tab.id,
+          title: mistyPage?.title || tab.title || "Browser tab",
+          privacy: "device",
+          opaqueScopeId: scopeId,
+          revision: mistyPage?.urlFingerprint,
+          attached: Boolean(mistyPage),
+        },
+      ],
+      getSelection: () =>
+        mistyPage
+          ? {
+              kind: "blocks",
+              content,
+              object: {
+                kind: "browser-page",
+                id: scopeId,
+                revision: mistyPage.urlFingerprint,
+              },
+              anchors: { capture: "visible-page-text", truncated: mistyPage.truncated },
+              contentHash: browserContentHash(content),
+            }
+          : null,
+      getSuggestedActions: () =>
+        mistyPage
+          ? [
+              {
+                id: "browser.summary",
+                label: "Summarize page",
+                prompt: "Summarize this page and cite the page context for the key claims.",
+                trigger: "object",
+              },
+              {
+                id: "browser.explain",
+                label: "Explain page",
+                prompt:
+                  "Explain this page in plain language, including its main argument and caveats.",
+                trigger: "object",
+              },
+              {
+                id: "browser.extract",
+                label: "Extract key facts",
+                prompt:
+                  "Extract the most important facts from this page. Separate page claims from your inference.",
+                trigger: "object",
+              },
+              {
+                id: "browser.next-action",
+                label: "Review next action",
+                prompt:
+                  "Propose exactly one navigation or click using the current opaque tab scope and an explicitly listed control " +
+                  "reference or URL. Explain the visible effect. Do not execute it.",
+                trigger: "object",
+                requestedArtifactKind: "browser_action",
+              },
+            ]
+          : [],
+      canApply: (artifact) => Boolean(applicableAction(artifact)),
+      applyArtifact: async (artifact) => {
+        const action = applicableAction(artifact);
+        if (!action)
+          throw new Error(
+            "The page or browser scope changed. Ask Misty to regenerate this action.",
+          );
+        const grantId = `misty-action-${crypto.randomUUID()}`;
+        const agentId = "misty-contextual-copilot";
+        try {
+          await invoke("browser_agent_grant_register", {
+            request: {
+              id: browserRuntimeId(tab),
+              scopeId,
+              grantId,
+              agentId,
+              capabilities: [action.operation],
+              expiresAt: new Date(Date.now() + 30_000).toISOString(),
+            },
+          });
+          await invoke("browser_agent_execute", {
+            request: {
+              scopeId,
+              grantId,
+              agentId,
+              operation: action.operation,
+              input: action.input,
+            },
+          });
+          if (action.operation === "browser.navigate") {
+            const url = String((action.input as { url: string }).url);
+            useWorkspaceStore.getState().updateBrowserTab(tab.id, {
+              ...createBrowserTabState(url),
+              title: browserTabTitle(url),
+            });
+            useBrowserRuntimeStore.getState().pushHistory(tab.id, url);
+          }
+        } finally {
+          await invoke("browser_agent_grant_revoke", {
+            request: { id: browserRuntimeId(tab), grantId },
+          }).catch(() => undefined);
+        }
+      },
+    };
+  }, [mistyPage, nativeRuntime, tab]);
+  useAiSurfaceAdapter(aiAdapter);
 
   useBrowserWebviewGeometry({
     hostRef: pageHostRef,
@@ -105,6 +270,8 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
   useEffect(() => {
     useBrowserRuntimeStore.getState().ensureHistory(tab.id, state.url);
   }, [state.url, tab.id]);
+
+  useEffect(() => setMistyPage(null), [state.url]);
 
   useEffect(() => {
     if (!runtimeError && !downloadNotice) return;
@@ -160,6 +327,57 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
     }
   };
 
+  const attachPageToMisty = async () => {
+    if (!nativeRuntime || !browserRuntimeCreated(tab)) {
+      setBrowserError(
+        tab.id,
+        "Page context is unavailable on this platform or before the page opens.",
+      );
+      return;
+    }
+    setMistyPageLoading(true);
+    const grantId = `misty-page-${crypto.randomUUID()}`;
+    const agentId = "misty-contextual-copilot";
+    const scopeId = browserScopeId(tab);
+    try {
+      await invoke("browser_agent_grant_register", {
+        request: {
+          id: browserRuntimeId(tab),
+          scopeId,
+          grantId,
+          agentId,
+          capabilities: ["browser.inspect"],
+          expiresAt: new Date(Date.now() + 2 * 60_000).toISOString(),
+        },
+      });
+      const snapshot = await invoke<BrowserInspection>("browser_agent_execute", {
+        request: {
+          scopeId,
+          grantId,
+          agentId,
+          operation: "browser.inspect",
+          input: {},
+        },
+      });
+      const text = String(snapshot.text ?? "").slice(0, 32 * 1024);
+      if (!text.trim()) throw new Error("The page did not expose readable text.");
+      setMistyPage({
+        title: String(snapshot.title || tab.title || "Browser page"),
+        text,
+        truncated: Boolean(snapshot.truncated) || String(snapshot.text ?? "").length > text.length,
+        urlFingerprint: browserContentHash(String(snapshot.url || state.url)),
+        interactive: (snapshot.interactive ?? []).slice(0, 100),
+      });
+    } catch (error) {
+      setBrowserError(tab.id, error);
+    } finally {
+      await invoke("browser_agent_grant_revoke", {
+        request: { id: browserRuntimeId(tab), grantId },
+      }).catch(() => undefined);
+      setMistyPageLoading(false);
+    }
+  };
+
   const travel = (direction: -1 | 1) => {
     const url = useBrowserRuntimeStore.getState().moveHistory(tab.id, direction);
     if (!url) return;
@@ -173,6 +391,25 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
       }).catch((error: unknown) => setBrowserError(tab.id, error));
     }
   };
+  const focused = () => {
+    const workspace = useWorkspaceStore.getState();
+    const pane = dockLeaves(workspace.layout.root).find(
+      (candidate) => candidate.id === workspace.layout.focusedPaneId,
+    );
+    return pane?.activeTabId === tab.id;
+  };
+  useShortcutHandler("navigation.back", () => travel(-1), focused);
+  useShortcutHandler("navigation.forward", () => travel(1), focused);
+  useShortcutHandler(
+    "navigation.refresh",
+    () => {
+      if (!nativeRuntime) return;
+      void invoke("browser_webview_reload", {
+        request: { id: browserRuntimeId(tab) },
+      }).catch((error: unknown) => setBrowserError(tab.id, error));
+    },
+    focused,
+  );
 
   return (
     <section
@@ -239,6 +476,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
         />
 
         <div className="ml-auto flex items-center gap-1">
+          <AiSurfaceButton className={iconButtonClass} />
           <button
             type="button"
             className={cn(
@@ -291,6 +529,31 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
                   ? "This tab is attached to active Agent work."
                   : "No active Agent run is attached to this tab."}
               </p>
+              <div className="mt-3 border-t border-charcoal-border pt-3">
+                <p className="m-0 text-xs font-medium">Misty page context</p>
+                <p className="mb-2 mt-1 text-[11px] text-cream-muted">
+                  A one-time inspection captures bounded page text. The temporary read grant is
+                  revoked immediately after capture.
+                </p>
+                <button
+                  type="button"
+                  className="w-full rounded-md border border-charcoal-border bg-charcoal-card px-3 py-2 text-xs hover:bg-charcoal-hover disabled:opacity-50"
+                  disabled={mistyPageLoading || !nativeRuntime}
+                  onClick={() => void attachPageToMisty()}
+                >
+                  {mistyPageLoading
+                    ? "Reading page…"
+                    : mistyPage
+                      ? "Refresh page context"
+                      : "Allow one-time page read"}
+                </button>
+                {mistyPage ? (
+                  <p className="mb-0 mt-2 text-[10px] text-cream-muted">
+                    Attached: {mistyPage.title}
+                    {mistyPage.truncated ? " (bounded extract)" : ""}
+                  </p>
+                ) : null}
+              </div>
             </PopoverContent>
           </Popover>
           <BrowserMenu
@@ -371,6 +634,38 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
       </div>
     </section>
   );
+}
+
+interface BrowserInspection {
+  url?: string;
+  title?: string;
+  text?: string;
+  truncated?: boolean;
+  interactive?: BrowserInteractiveControl[];
+}
+
+interface BrowserInteractiveControl {
+  ref: string;
+  tag: string;
+  role: string;
+  name: string;
+}
+
+interface BrowserMistyPage {
+  title: string;
+  text: string;
+  truncated: boolean;
+  urlFingerprint: string;
+  interactive: BrowserInteractiveControl[];
+}
+
+function browserContentHash(value: string) {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return `fnv1a32:${(hash >>> 0).toString(16).padStart(8, "0")}`;
 }
 
 function setBrowserError(tabId: string, error: unknown) {

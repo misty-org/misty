@@ -1,4 +1,10 @@
 import { useProvidersStore } from "@/features/providers";
+import {
+  AiSurfaceButton,
+  useAiSurfaceAdapter,
+  type AiArtifact,
+  type AiSurfaceAdapter,
+} from "@/features/ai-surface/AiPaneHost";
 import type { TransferRecord } from "@/native/contracts";
 import { prettyLabel } from "@/shared/lib/format";
 import { Input, Toolbar, ToolbarGroup } from "@/shared/ui";
@@ -174,6 +180,132 @@ export const TransferWorkspacePane = memo(function TransferWorkspacePane(props: 
   }, [activePageIndex, pageIndex, props.workspaceId, setPageIndex]);
   const focusedTransfer =
     treeInputRows.find((row) => row.id === focusedTransferId) ?? treeInputRows[0] ?? null;
+  const aiAdapter = useMemo<AiSurfaceAdapter>(() => {
+    const selected = rows.filter((row) => selectedIds.has(row.id));
+    const relevant = (selected.length ? selected : focusedTransfer ? [focusedTransfer] : []).slice(
+      0,
+      50,
+    );
+    const scopeFor = (row: TransferRecord) =>
+      `transfer-${transferAiHash(`${props.workspaceId}:${row.id}`)}`;
+    const byScope = new Map<string, TransferRecord>(relevant.map((row) => [scopeFor(row), row]));
+    const content = JSON.stringify(
+      relevant.map((row) => ({
+        transfer_id: scopeFor(row),
+        in_batch: Boolean(row.batchId),
+        type: row.transferType,
+        item_type: row.itemType,
+        status: row.status,
+        conflict_policy: row.conflictPolicy,
+        display_name: row.fileName,
+        total_bytes: row.totalBytes,
+        transferred_bytes: row.transferredBytes,
+        error: row.errorMessage,
+        detail: row.detailMessage,
+        retryable: row.retryable,
+        cancelable: row.cancelable,
+        paused: row.paused,
+        attempt: row.attempt,
+      })),
+    ).slice(0, 32 << 10);
+    const applicablePlan = (artifact: AiArtifact) => {
+      if (artifact.kind !== "transfer_plan" || queueWorking || relevant.length === 0) return null;
+      const operations = artifact.operations as {
+        transfers?: Array<{ transfer_id?: string; action?: string; effect?: string }>;
+      };
+      const proposals = operations.transfers;
+      if (!proposals?.length || proposals.length > 50) return null;
+      const seen = new Set<string>();
+      const steps: Array<{ row: TransferRecord; action: "retry" | "resume" }> = [];
+      for (const proposal of proposals) {
+        const scope = proposal.transfer_id ?? "";
+        const row = byScope.get(scope);
+        if (!row || seen.has(scope)) return null;
+        seen.add(scope);
+        if (proposal.action === "retry" && row.retryable && row.status === "failed") {
+          steps.push({ row, action: "retry" });
+        } else if (proposal.action === "resume" && row.operationId && isTransferPaused(row)) {
+          steps.push({ row, action: "resume" });
+        } else {
+          return null;
+        }
+      }
+      return steps;
+    };
+    return {
+      surfaceId: "transfers",
+      label: relevant.length
+        ? `${relevant.length} transfer${relevant.length === 1 ? "" : "s"}`
+        : "Transfers",
+      getContext: () => [
+        {
+          kind: "transfers.scope",
+          id: props.workspaceId,
+          title: "Transfer history",
+          privacy: "device",
+          opaqueScopeId: props.workspaceId,
+          metadata: { selected_count: relevant.length },
+        },
+      ],
+      getSelection: () =>
+        relevant.length
+          ? {
+              kind: "rows",
+              content,
+              object: { kind: "transfer.selection", id: props.workspaceId },
+              anchors: { count: relevant.length },
+              contentHash: transferAiHash(content),
+            }
+          : null,
+      getSuggestedActions: () => [
+        {
+          id: "diagnose-transfer",
+          label: "Diagnose",
+          prompt:
+            "Diagnose the selected transfer failures or stalls from the visible metadata. Explain uncertainty.",
+        },
+        {
+          id: "recovery-plan",
+          label: "Recovery plan",
+          prompt:
+            "Propose only retry or resume operations that are currently valid. Use the exact opaque transfer IDs. " +
+            "Do not retry, resume, cancel, or change conflicts yet.",
+          requestedArtifactKind: "transfer_plan",
+        },
+        {
+          id: "conflict-explain",
+          label: "Explain conflicts",
+          prompt:
+            "Explain the selected transfer conflict policy and likely consequences of each available choice.",
+        },
+        {
+          id: "transfer-summary",
+          label: "Summarize",
+          prompt: "Summarize progress, failures, and next actions for the selected transfers.",
+        },
+      ],
+      canApply: (artifact) => Boolean(applicablePlan(artifact)),
+      applyArtifact: async (artifact) => {
+        const steps = applicablePlan(artifact);
+        if (!steps)
+          throw new Error("The transfer state changed. Ask Misty to regenerate the recovery plan.");
+        for (const step of steps) {
+          if (step.action === "retry") await handleRetryTransfer(step.row);
+          else await handlePauseResumeTransfer(step.row);
+        }
+      },
+    };
+  }, [
+    focusedTransfer,
+    handlePauseResumeTransfer,
+    handleRetryTransfer,
+    isTransferPaused,
+    props.workspaceId,
+    queueWorking,
+    rows,
+    selectedIds,
+  ]);
+  useAiSurfaceAdapter(aiAdapter);
   const activeFilterCount = activeTransferFilterCount({
     providerFilters,
     typeFilters,
@@ -411,6 +543,7 @@ export const TransferWorkspacePane = memo(function TransferWorkspacePane(props: 
                 </span>
               ) : null}
               <ToolbarGroup align="end">
+                <AiSurfaceButton />
                 <label className={transferStyles.searchBox}>
                   <span className="sr-only">Search transfers</span>
                   <Search aria-hidden="true" className="size-4" />
@@ -492,3 +625,12 @@ export const TransferWorkspacePane = memo(function TransferWorkspacePane(props: 
     </div>
   );
 });
+
+function transferAiHash(value: string) {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index++) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16);
+}

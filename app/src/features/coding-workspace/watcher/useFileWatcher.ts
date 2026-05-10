@@ -2,7 +2,6 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { useEffect } from "react";
 import { codeReadTextFile, codeStopWatch, codeWatchDir } from "../native";
 import { useCodingWorkspaceStore } from "../store/useCodingWorkspaceStore";
-import { useGitStore } from "../git/useGitStore";
 
 interface FileEvent {
   watcherId: string;
@@ -20,7 +19,6 @@ interface WatchRegistration {
 }
 
 const watchers = new Map<string, WatchRegistration>();
-const refreshTimers = new Map<string, number>();
 
 export function useFileWatcher(rootPath: string | null): void {
   useEffect(() => {
@@ -104,14 +102,4 @@ function handleEvent(rootPath: string, event: FileEvent) {
       })
       .catch(() => undefined);
   }
-
-  const refreshTimer = refreshTimers.get(rootPath);
-  if (refreshTimer !== undefined) window.clearTimeout(refreshTimer);
-  refreshTimers.set(
-    rootPath,
-    window.setTimeout(() => {
-      refreshTimers.delete(rootPath);
-      void useGitStore.getState().refresh(rootPath);
-    }, 400),
-  );
 }
