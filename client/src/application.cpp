@@ -1,6 +1,6 @@
 #include "application.h"
 #include "core/commands/command_manager.h"
-#include "core/plugins/plugin_host.h"
+#include "core/manager/plugin_manager.h"
 #include "core/manager/proxy_manager.h"
 #include "core/manager/session_manager.h"
 #include "core/manager/env_manager.h"
@@ -91,9 +91,9 @@ namespace misty {
             append_startup_log("startup: env reloaded");
             init_client();
             append_startup_log("startup: init_client ok");
-            core::PluginHost::get().set_ui_registry(&ui_registry_);
+            core::PluginManager::get().set_ui_registry(&ui_registry_);
             append_startup_log("startup: plugin host ui registry set");
-            core::PluginHost::get().discover_and_load();
+            core::PluginManager::get().discover_and_load();
             append_startup_log("startup: plugins discovered");
             core::CommandManager::get().load();
             append_startup_log("startup: commands loaded");
@@ -130,9 +130,9 @@ namespace misty {
 
             view::render_current_view();
             errors_panel_.render();
-            core::PluginHost::get().process_shortcuts();
-            core::PluginHost::get().render_open_panels();
-            core::PluginHost::get().render_active_preview_scene();
+            core::PluginManager::get().process_shortcuts();
+            core::PluginManager::get().render_open_panels();
+            core::PluginManager::get().render_active_preview_scene();
             if (transfer_window_panel_) {
                 transfer_window_panel_->render();
             }
@@ -150,7 +150,7 @@ namespace misty {
             explorer.save_state();
         }
 
-        core::PluginHost::get().shutdown();
+        core::PluginManager::get().shutdown();
         worker_pool_.shutdown();
         view::clear_views();
         cleanup();

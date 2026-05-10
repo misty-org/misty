@@ -7,17 +7,24 @@
 #include <optional>
 #include <string>
 #include <thread>
+#include <unordered_map>
+
+#include <nlohmann/json.hpp>
 
 #include "core/cache/listing_cache.h"
+#include "core/commands/command_manager.h"
 #include "core/manager/env_manager.h"
+#include "core/manager/asset_manager.h"
 #include "core/net/http_client.h"
 #include "core/threading/worker_pool.h"
+#include "core/ui/ui_layout.h"
 #include "panels/activity/download_state.h"
 #include "panels/activity/activity_state.h"
 #include "panels/activity/upload_state.h"
 #include "panels/file_sidebar/file_sidebar_state.h"
 #include "panels/file_sidebar/remote_mount_state.h"
 #include "panels/notification/notification_state.h"
+#include "panels/search/search_panel.h"
 #include "panels/services/services_state.h"
 
 #include "panels/file_explorer/file_explorer_panel.h"
@@ -93,6 +100,15 @@ struct FolderTransferCall {
     std::string dest_path;
 } g_folder_transfer;
 std::string g_last_delete_url;
+struct SearchCall {
+    std::string remote;
+    std::string query;
+    std::string path;
+};
+std::vector<SearchCall> g_search_calls;
+std::unordered_map<std::string, std::string> g_search_responses;
+std::string g_search_post_body;
+std::string g_search_post_response = R"({"items":[]})";
 
 } // namespace
 
@@ -135,7 +151,24 @@ HTTPClient& HTTPClient::get() {
 
 HttpResponse HTTPClient::get(const std::string&, const std::map<std::string, std::string>&) { return {200, "", {}}; }
 HttpResponse HTTPClient::get_with_timeouts(const std::string&, long, long, const std::map<std::string, std::string>&) { return {200, "", {}}; }
-HttpResponse HTTPClient::post(const std::string&, const std::string&, const std::map<std::string, std::string>&) { return {200, "", {}}; }
+HttpResponse HTTPClient::post(const std::string& url, const std::string& body, const std::map<std::string, std::string>&) {
+    if (url.find("/api/search") != std::string::npos) {
+        g_search_post_body = body;
+        return {200, g_search_post_response, {}};
+    }
+    return {200, "", {}};
+}
+HttpResponse HTTPClient::post_with_timeouts(const std::string& url,
+                                            const std::string& body,
+                                            long,
+                                            long,
+                                            const std::map<std::string, std::string>&) {
+    if (url.find("/api/search") != std::string::npos) {
+        g_search_post_body = body;
+        return {200, g_search_post_response, {}};
+    }
+    return {200, "", {}};
+}
 HttpResponse HTTPClient::put(const std::string&, const std::string&, const std::map<std::string, std::string>&) { return {200, "", {}}; }
 HttpResponse HTTPClient::del(const std::string& url, const std::map<std::string, std::string>&) {
     g_last_delete_url = url;
@@ -155,6 +188,114 @@ bool delete_path_with_user_approval(const std::filesystem::path&) { return false
 std::filesystem::path get_executable_path() { return {}; }
 bool launch_detached_process(const std::string&, const std::vector<std::string>&, const std::string&) { return false; }
 bool launch_detached_process(const std::string&, const std::vector<std::string>&, const std::string&, const std::string&, const std::string&) { return false; }
+
+AssetManager& AssetManager::get() {
+    static AssetManager instance;
+    return instance;
+}
+
+SVGTexture& AssetManager::get_svg_texture(const std::string&, int) {
+    static SVGTexture texture{0, 0, 0};
+    return texture;
+}
+
+SVGTexture& AssetManager::get_svg_texture(const std::string&, int, int) {
+    static SVGTexture texture{0, 0, 0};
+    return texture;
+}
+
+} // namespace misty::core
+
+namespace ImGui {
+
+bool BeginChild(const char*, const ImVec2&, ImGuiChildFlags, ImGuiWindowFlags) { return true; }
+void EndChild() {}
+ImDrawList* GetWindowDrawList() { return nullptr; }
+void PushStyleColor(ImGuiCol, const ImVec4&) {}
+void PopStyleColor(int) {}
+ImVec2 GetCursorScreenPos() { return ImVec2(); }
+ImVec2 GetContentRegionAvail() { return ImVec2(); }
+float GetCursorPosY() { return 0.0f; }
+void SetCursorPosY(float) {}
+void SameLine(float, float) {}
+void Dummy(const ImVec2&) {}
+void PushID(int) {}
+void PopID() {}
+void TextUnformatted(const char*, const char*) {}
+void TextDisabled(const char*, ...) {}
+void TextColored(const ImVec4&, const char*, ...) {}
+bool Selectable(const char*, bool, ImGuiSelectableFlags, const ImVec2&) { return false; }
+bool IsItemHovered(ImGuiHoveredFlags) { return false; }
+bool IsItemActive() { return false; }
+bool IsItemDeactivatedAfterEdit() { return false; }
+ImVec2 CalcTextSize(const char*, const char*, bool, float) { return ImVec2(); }
+void PushTextWrapPos(float) {}
+void PopTextWrapPos() {}
+void SetKeyboardFocusHere(int) {}
+double GetTime() { return 0.0; }
+void Spacing() {}
+
+} // namespace ImGui
+
+void ImDrawList::AddRectFilled(const ImVec2&, const ImVec2&, ImU32, float, ImDrawFlags) {}
+void ImDrawList::AddImage(ImTextureRef, const ImVec2&, const ImVec2&, const ImVec2&, const ImVec2&, ImU32) {}
+
+namespace misty::UI {
+
+bool div(const char*, const BoxStyle&, const std::function<void()>& content) {
+    if (content) content();
+    return true;
+}
+
+bool row(const char*, const BoxStyle&, const std::function<void()>& content) {
+    if (content) content();
+    return true;
+}
+
+bool column(const char*, const BoxStyle&, const std::function<void()>& content) {
+    if (content) content();
+    return true;
+}
+
+bool grid(const char*, int, const BoxStyle&, const std::function<void()>& content) {
+    if (content) content();
+    return true;
+}
+
+void raw(const std::function<void()>& content) {
+    if (content) content();
+}
+
+void spacer(float, float) {}
+void divider(const DividerProps&) {}
+void text(const TextProps&) {}
+void image(const ImageProps&) {}
+bool button(const char*, const ButtonProps&, const std::function<void()>& content) {
+    if (content) content();
+    return false;
+}
+bool image_button(const char*, const ImageButtonProps&) { return false; }
+bool input_text(const InputTextProps&) { return false; }
+bool select(const SelectProps&) { return false; }
+
+} // namespace misty::UI
+
+namespace misty::core {
+
+CommandManager& CommandManager::get() {
+    static CommandManager instance;
+    return instance;
+}
+
+void CommandManager::load() {}
+void CommandManager::clear_runtime_commands() {}
+void CommandManager::register_runtime_command(const std::string&, const std::string&) {}
+bool CommandManager::matches(const std::string&, bool) const {
+    return false;
+}
+std::string CommandManager::label(const std::string&) const { return {}; }
+std::vector<std::pair<std::string, std::string>> CommandManager::list_shortcuts() const { return {}; }
+bool CommandManager::save_shortcuts(const std::vector<std::pair<std::string, std::string>>&, std::string*) { return true; }
 
 } // namespace misty::core
 
@@ -203,7 +344,17 @@ void ServicesState::transfer_folder(const std::string& source_remote,
     }
 }
 void ServicesState::create_folder(const std::string&, const std::string&, CreateFolderCallback) {}
-void ServicesState::search_files(const std::string&, const std::string&, const std::string&, FilesCallback) {}
+void ServicesState::search_files(const std::string& remote,
+                                 const std::string& query,
+                                 const std::string& path,
+                                 FilesCallback callback) {
+    g_search_calls.push_back({remote, query, path});
+    const auto it = g_search_responses.find(remote);
+    const std::string body = it == g_search_responses.end() ? R"({"items":[]})" : it->second;
+    if (callback) {
+        callback(true, body, "");
+    }
+}
 void ServicesState::reconcile_fs_watchers(const std::vector<RemoteWatchInfo>&) {}
 void ServicesState::suppress_fs_path(const std::string&) {}
 void ServicesState::unsuppress_fs_path(const std::string&) {}
@@ -346,6 +497,8 @@ void FileExplorerPanel::notify_shared_path_refresh(const std::string& path) {
 
 } // namespace misty::panel
 
+#include "panels/search/search_panel.cpp"
+#include "panels/search/search_impl.cpp"
 #include "panels/file_explorer/actions.cpp"
 
 namespace {
@@ -360,6 +513,10 @@ protected:
         g_last_navigate_path.clear();
         g_last_refresh_path.clear();
         g_last_delete_url.clear();
+        g_search_calls.clear();
+        g_search_responses.clear();
+        g_search_post_body.clear();
+        g_search_post_response = R"({"items":[]})";
         g_download_behavior = {};
         g_folder_transfer = {};
 
@@ -378,6 +535,69 @@ protected:
     misty::core::WorkerPool worker_pool_;
     misty::panel::FileExplorerPanel panel_;
 };
+
+TEST(SearchPanelTest, LocalSearchUsesProxyResults) {
+    TempHome home;
+
+    misty::core::UIRegistry registry;
+    misty::core::WorkerPool worker_pool(1);
+    misty::panel::SearchPanel panel(registry, worker_pool, "Files", "Search");
+
+    auto& file_state = registry.get_state<misty::panel::FileExplorerState>("Files");
+    std::snprintf(file_state.current_path, sizeof(file_state.current_path), "%s", home.path().c_str());
+
+    g_search_post_body.clear();
+    g_search_post_response = nlohmann::json{
+        {"items", {
+            {
+                {"id", "local:" + (home.path() / "Docs" / "report.pdf").string()},
+                {"name", "report.pdf"},
+                {"path", (home.path() / "Docs" / "report.pdf").string()},
+                {"source", "LOCAL"},
+                {"is_dir", false},
+                {"score", 42},
+            },
+            {
+                {"id", "local:" + (home.path() / "Notes" / "report-notes").string()},
+                {"name", "report-notes"},
+                {"path", (home.path() / "Notes" / "report-notes").string()},
+                {"source", "LOCAL"},
+                {"is_dir", true},
+                {"score", 30},
+            },
+        }},
+    }.dump();
+
+    panel.submit_search("report", home.path().string());
+
+    auto& search_state = registry.get_state<misty::panel::SearchState>("Search");
+    ASSERT_TRUE(wait_for([&]() {
+        std::lock_guard<std::mutex> lock(search_state.mu);
+        return !search_state.search_in_flight && search_state.results.size() == 2;
+    }));
+
+    ASSERT_FALSE(g_search_post_body.empty());
+    const auto request = nlohmann::json::parse(g_search_post_body);
+    EXPECT_EQ(request.value("query", std::string{}), "report");
+    EXPECT_EQ(request.value("path", std::string{}), home.path().string());
+    EXPECT_EQ(request.value("source", std::string{}), "LOCAL");
+    ASSERT_TRUE(request.contains("depth"));
+    EXPECT_EQ(request["depth"].value("scope", std::string{}), "CWD");
+    EXPECT_EQ(request["depth"].value("depth", -1), 0);
+
+    std::vector<std::string> names;
+    std::vector<bool> is_dir;
+    {
+        std::lock_guard<std::mutex> lock(search_state.mu);
+        for (const auto& result : search_state.results) {
+            names.push_back(result.name);
+            is_dir.push_back(result.is_dir);
+        }
+    }
+
+    EXPECT_EQ(names, (std::vector<std::string>{"report.pdf", "report-notes"}));
+    EXPECT_EQ(is_dir, (std::vector<bool>{false, true}));
+}
 
 TEST_F(FileExplorerActionsTest, LocalPasteLocalToLocalCopiesAndMoves) {
     const fs::path base = home_.path() / "work";

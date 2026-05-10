@@ -4,7 +4,6 @@
 #include <string>
 #include <vector>
 
-#include "core/plugins/misty_plugin_sdk.h"
 #include "core/ui/ui_registry.h"
 
 namespace misty::core {
@@ -41,9 +40,9 @@ struct PluginInfo {
     std::vector<std::string> diagnostics;
 };
 
-class PluginHost {
+class PluginManager {
 public:
-    static PluginHost& get();
+    static PluginManager& get();
 
     void set_ui_registry(UIRegistry* registry);
     void discover_and_load();
@@ -64,10 +63,10 @@ public:
     std::vector<PluginInfo> loaded_plugins() const;
 
 private:
-    PluginHost();
-    ~PluginHost();
-    PluginHost(const PluginHost&) = delete;
-    PluginHost& operator=(const PluginHost&) = delete;
+    PluginManager();
+    ~PluginManager();
+    PluginManager(const PluginManager&) = delete;
+    PluginManager& operator=(const PluginManager&) = delete;
 
     struct Impl;
     Impl* impl_;

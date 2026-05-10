@@ -15,8 +15,8 @@
 #include "core/commands/command_manager.h"
 #include "core/manager/asset_manager.h"
 #include "core/manager/font_manager.h"
-#include "core/plugins/plugin_host.h"
-#include "core/plugins/plugin_signing.h"
+#include "core/manager/plugin_manager.h"
+#include "plugin_signing.h"
 #include "core/system/util.h"
 
 namespace fs = std::filesystem;
@@ -127,7 +127,7 @@ int main(int argc, char** argv) {
             return 1;
         }
 
-        auto& host = misty::core::PluginHost::get();
+        auto& host = misty::core::PluginManager::get();
         const bool loaded = host.load_plugin_directory(plugin_dir, false);
         std::cout << "requires_signed=" << (misty::core::plugin_requires_signature() ? "true" : "false") << '\n';
         for (const auto& plugin : host.loaded_plugins()) {
@@ -192,7 +192,7 @@ int main(int argc, char** argv) {
     misty::core::AssetManager::get().load_themes();
     misty::core::FontManager::get().load_fonts();
 
-    auto& host = misty::core::PluginHost::get();
+    auto& host = misty::core::PluginManager::get();
     if (!plugin_dir.empty()) {
         host.load_plugin_directory(plugin_dir, false);
     } else {

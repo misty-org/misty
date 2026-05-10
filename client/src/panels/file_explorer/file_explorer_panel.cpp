@@ -5,6 +5,7 @@
 #include "panels/search/search_state.h"
 #include "panels/search/search_panel.h"
 #include "panels/transfers/transfer_window_state.h"
+#include "core/commands/command_manager.h"
 #include "core/cache/listing_cache.h"
 #include "core/manager/asset_manager.h"
 #include <glad/glad.h>
@@ -313,64 +314,6 @@ namespace misty::panel {
         navigate_to_path(path);
         if (notify_shared_refresh) {
             notify_shared_path_refresh(path);
-        }
-    }
-
-    void FileExplorerPanel::render_search_overlay(SearchState& search_state, const ImVec2& list_start, float list_height) {
-        if (!search_state.is_open) return;
-
-        float overlay_h = std::min(350.0f, list_height);
-        ImGui::SetCursorPos(list_start);
-        ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.14f, 0.14f, 0.14f, 0.97f));
-        if (ImGui::BeginChild("##search_overlay", {0, overlay_h}, false, ImGuiWindowFlags_NoScrollbar)) {
-            bool has_results = false;
-            {
-                std::lock_guard<std::mutex> lk(search_state.mu);
-                has_results = !search_state.cache_results.empty() || !search_state.api_results.empty();
-            }
-
-            int pending = search_state.pending_api_tasks.load();
-            if (has_results) {
-                if (pending > 0) {
-                    float t = static_cast<float>(ImGui::GetTime());
-                    const char* frames[] = { "|", "/", "-", "\\" };
-                    ImGui::TextDisabled("Searching... %s", frames[static_cast<int>(t * 8.0f) % 4]);
-                }
-                if (search_panel_) search_panel_->render_results(search_state);
-            } else if (!search_state.last_submitted_query.empty()) {
-                if (pending > 0) {
-                    float t = static_cast<float>(ImGui::GetTime());
-                    const char* frames[] = { "|", "/", "-", "\\" };
-                    ImGui::TextDisabled("Searching... %s", frames[static_cast<int>(t * 8.0f) % 4]);
-                } else {
-                    ImGui::TextDisabled("No files found");
-                }
-            }
-        }
-        ImGui::EndChild();
-        ImGui::PopStyleColor();
-    }
-
-    void FileExplorerPanel::process_deferred_search_actions(SearchState& search_state) {
-        if (search_state.pending_submit && search_panel_) {
-            search_state.pending_submit = false;
-            std::string q(search_state.query_buf);
-            if ((!q.empty() && q[0] == ':' && q.size() > 1) || q.size() >= 2) {
-                search_panel_->submit_search(q);
-            }
-        }
-
-        if (search_state.pending_navigate_index < 0 || !search_panel_) return;
-
-        int idx = search_state.pending_navigate_index;
-        search_state.pending_navigate_index = -1;
-        std::lock_guard<std::mutex> lk(search_state.mu);
-        std::vector<const SearchResult*> all;
-        for (auto& r : search_state.cache_results) all.push_back(&r);
-        for (auto& r : search_state.api_results) all.push_back(&r);
-        if (idx < static_cast<int>(all.size())) {
-            search_panel_->navigate_to_result(*all[idx]);
-            search_state.is_open = false;
         }
     }
 
@@ -908,7 +851,10 @@ namespace misty::panel {
 
                     show_directory_contents(state);
                     show_error_modal(state.error_msg, "FileExplorerError");
-                    render_search_overlay(search_state, list_start, list_height);
+                    ImGui::SetCursorPos(list_start);
+                    if (search_panel_) {
+                        search_panel_->render(state.current_path, list_height);
+                    }
 
                     if (state.chat_overlay_open && list_region_size.x > 0.0f && list_region_size.y > 0.0f) {
                         const float overlay_top_y = list_screen_min.y + list_region_size.y - chat_h;
@@ -995,7 +941,6 @@ namespace misty::panel {
                                      ImGui::IsMouseClicked(ImGuiMouseButton_Left));
 
             lock.unlock();
-            process_deferred_search_actions(search_state);
             update_periodic_watched_sync(state);
             update_periodic_save(state);
         }

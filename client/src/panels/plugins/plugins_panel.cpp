@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <sstream>
 
-#include "core/plugins/plugin_host.h"
+#include "core/manager/plugin_manager.h"
 #include "core/manager/asset_manager.h"
 #include "core/manager/font_manager.h"
 #include "core/ui/ui_style.h"
@@ -68,7 +68,7 @@ PluginsPanel::PluginsPanel(core::UIRegistry& ui_registry)
 }
 
 void PluginsPanel::render() {
-    auto& plugin_host = core::PluginHost::get();
+    auto& plugin_host = core::PluginManager::get();
     const auto plugins = plugin_host.loaded_plugins();
     const auto plugin_roots = plugin_host.discovery_roots();
 
@@ -128,7 +128,7 @@ void PluginsPanel::render_header(std::size_t plugin_count) {
         ImGui::TableSetColumnIndex(1);
         ImGui::SetCursorPosX(std::max(0.0f, ImGui::GetContentRegionAvail().x - 96.0f));
         if (styled_button("Reload", ImVec2(96.0f, 0.0f), primary_button_style())) {
-            core::PluginHost::get().reload();
+            core::PluginManager::get().reload();
         }
 
         ImGui::EndTable();
@@ -214,7 +214,7 @@ void PluginsPanel::render_plugin_card(const core::PluginInfo& plugin) {
         ImGui::Spacing();
         if (styled_button(("Sandbox##" + plugin.id).c_str(), ImVec2(130.0f, 0.0f), primary_button_style())) {
             std::string error;
-            if (!core::PluginHost::get().open_plugin_sandbox(plugin.plugin_dir, &error)) {
+            if (!core::PluginManager::get().open_plugin_sandbox(plugin.plugin_dir, &error)) {
                 auto& activity = ui_registry_.get_state<ActivityState>("Activity");
                 activity.add_entry("System",
                     error.empty() ? "Could not open plugin sandbox." : error,
@@ -232,7 +232,7 @@ void PluginsPanel::render_plugin_card(const core::PluginInfo& plugin) {
         } else {
             for (const auto& command : plugin.commands) {
                 if (ImGui::Button((command.title + "##invoke_" + command.id).c_str())) {
-                    core::PluginHost::get().invoke_command(command.id);
+                    core::PluginManager::get().invoke_command(command.id);
                 }
                 ImGui::SameLine();
                 ImGui::TextDisabled("%s", command.default_shortcut.empty() ? command.id.c_str() : command.default_shortcut.c_str());
@@ -248,7 +248,7 @@ void PluginsPanel::render_plugin_card(const core::PluginInfo& plugin) {
                 const std::string label = std::string(panel.is_open ? "Focus " : "Open ") +
                     panel.title + "##panel_" + panel.id;
                 if (ImGui::Button(label.c_str())) {
-                    core::PluginHost::get().open_panel(panel.id);
+                    core::PluginManager::get().open_panel(panel.id);
                 }
             }
         }
