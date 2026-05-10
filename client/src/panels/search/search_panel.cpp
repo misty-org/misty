@@ -1,10 +1,12 @@
 #include "panels/search/search_panel.h"
 
+#include "core/commands/command_manager.h"
 #include "core/manager/asset_manager.h"
 #include "core/ui/ui_layout.h"
 
 #include <algorithm>
 #include <cctype>
+#include <chrono>
 #include <cstring>
 #include <filesystem>
 
@@ -15,6 +17,21 @@ namespace fs = std::filesystem;
 namespace misty::panel {
 
 namespace {
+
+struct QueryInputState {
+    bool changed = false;
+    bool submitted = false;
+    bool input_active = false;
+    std::string query;
+};
+
+struct OverlaySnapshot {
+    bool has_results = false;
+    bool pending = false;
+    std::string error_message;
+};
+
+constexpr auto kSearchDebounceDelay = std::chrono::milliseconds(450);
 
 std::string lowercase_copy(std::string value) {
     std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
@@ -141,6 +158,164 @@ void result_row(const SearchResult& result,
     });
 }
 
+bool submittable_query(const std::string& query) {
+    return (!query.empty() && query[0] == ':' && query.size() > 1) || query.size() >= 2;
+}
+
+void clear_results(SearchState& state) {
+    std::lock_guard<std::mutex> lock(state.mu);
+    state.results.clear();
+    state.search_pending = false;
+    state.search_in_flight = false;
+    state.last_submitted_query.clear();
+    state.last_err.clear();
+}
+
+void close_overlay(SearchState& state) {
+    std::memset(state.query_buf, 0, sizeof(state.query_buf));
+    std::lock_guard<std::mutex> lock(state.mu);
+    state.is_open = false;
+    state.focus_query = false;
+    state.selected_index = 0;
+    state.results.clear();
+    state.search_pending = false;
+    state.search_in_flight = false;
+    ++state.request_generation;
+    state.last_input_change_at = {};
+    state.last_submitted_query.clear();
+    state.last_err.clear();
+}
+
+QueryInputState query_input(SearchState& state) {
+    QueryInputState input;
+    UI::div("##search_query_input_shell", {
+        .width = UI::Size::fill(),
+        .height = UI::Size::px(36.0f),
+    }, [&]() {
+        input.changed = UI::input_text({
+            .label = "##overlay_search_query",
+            .buffer = state.query_buf,
+            .buffer_size = sizeof(state.query_buf),
+            .hint = "Find in folder...  (:pdf)",
+            .width = UI::Size::fill(),
+            .height = UI::Size::px(36.0f),
+            .padding = UI::Spacing::xy(10.0f, 8.0f),
+            .rounding = 6.0f,
+            .bg_color = ImVec4(0.21f, 0.21f, 0.21f, 1.0f),
+            .border_color = ImVec4(0.21f, 0.21f, 0.21f, 1.0f),
+            .text_color = ImVec4(0.92f, 0.92f, 0.92f, 1.0f),
+            .flags = ImGuiInputTextFlags_EnterReturnsTrue,
+        });
+    });
+    input.submitted = ImGui::IsItemDeactivatedAfterEdit();
+    input.input_active = ImGui::IsItemActive();
+    input.query = state.query_buf;
+    return input;
+}
+
+void update_query_state(SearchState& state, const QueryInputState& input) {
+    if (input.changed) {
+        std::lock_guard<std::mutex> lock(state.mu);
+        state.selected_index = 0;
+        state.search_pending = false;
+        state.last_input_change_at = std::chrono::steady_clock::now();
+        if (input.query.empty()) {
+            state.results.clear();
+            state.last_submitted_query.clear();
+            state.last_err.clear();
+        }
+    }
+
+    if (input.submitted && submittable_query(input.query)) {
+        std::lock_guard<std::mutex> lock(state.mu);
+        if (input.query != state.last_submitted_query) {
+            state.search_pending = true;
+        }
+        return;
+    }
+
+    if (!input.query.empty()) {
+        const bool type_filter = input.query[0] == ':' && input.query.size() > 1;
+        std::lock_guard<std::mutex> lock(state.mu);
+        const auto since_last_change = state.last_input_change_at.time_since_epoch().count() == 0
+            ? kSearchDebounceDelay
+            : std::chrono::steady_clock::now() - state.last_input_change_at;
+        if ((type_filter || input.query.size() >= 2) &&
+            input.query != state.last_submitted_query &&
+            !state.search_pending &&
+            since_last_change >= (type_filter ? std::chrono::milliseconds(0) : kSearchDebounceDelay)) {
+            state.search_pending = true;
+        }
+        return;
+    }
+
+    if (!input.input_active) {
+        clear_results(state);
+    }
+}
+
+void move_selection(SearchState& state) {
+    std::lock_guard<std::mutex> lock(state.mu);
+    if (core::CommandManager::get().matches("search.prev", true) && state.selected_index > 0) {
+        --state.selected_index;
+    }
+    if (core::CommandManager::get().matches("search.next", true)) {
+        ++state.selected_index;
+    }
+}
+
+bool selected_result(SearchState& state, SearchResult& out) {
+    std::lock_guard<std::mutex> lock(state.mu);
+    if (state.selected_index < 0 ||
+        state.selected_index >= static_cast<int>(state.results.size())) {
+        return false;
+    }
+    out = state.results[state.selected_index];
+    return true;
+}
+
+bool take_pending_query(SearchState& state, std::string& query) {
+    std::lock_guard<std::mutex> lock(state.mu);
+    if (!state.search_pending || state.search_in_flight) {
+        return false;
+    }
+    state.search_pending = false;
+    query = state.query_buf;
+    return submittable_query(query);
+}
+
+OverlaySnapshot overlay_snapshot(SearchState& state) {
+    OverlaySnapshot snapshot;
+    std::lock_guard<std::mutex> lock(state.mu);
+    snapshot.has_results = !state.results.empty();
+    snapshot.pending = state.search_in_flight;
+    snapshot.error_message = state.last_err;
+    return snapshot;
+}
+
+void pending_indicator() {
+    const float t = static_cast<float>(ImGui::GetTime());
+    const char* frames[] = { "|", "/", "-", "\\" };
+    ImGui::TextDisabled("Searching... %s", frames[static_cast<int>(t * 8.0f) % 4]);
+}
+
+void overlay_status(const OverlaySnapshot& snapshot, bool has_query) {
+    if (!has_query) {
+        return;
+    }
+    if (snapshot.pending) {
+        pending_indicator();
+    } else if (!snapshot.error_message.empty()) {
+        ImGui::TextColored(ImVec4(0.92f, 0.45f, 0.45f, 1.0f), "Search failed");
+        ImGui::Spacing();
+        ImGui::PushTextWrapPos();
+        ImGui::TextDisabled("%s", snapshot.error_message.c_str());
+        ImGui::PopTextWrapPos();
+    } else {
+        ImGui::TextDisabled("No files found");
+    }
+}
+
 } // namespace
 
 SearchPanel::SearchPanel(core::UIRegistry& ui_registry,
@@ -174,21 +349,19 @@ void SearchPanel::toggle() {
     state.focus_query = true;
 }
 
-SearchQuery SearchPanel::build_query(const std::string& query_text) const {
+SearchQuery SearchPanel::build_query(const std::string& query_text,
+                                     const std::string& current_path) const {
     SearchQuery query;
     query.query = query_text;
-
-    auto& fe_state = ui_registry_.get_state<FileExplorerState>(explorer_state_key_);
-    std::lock_guard<std::mutex> lock(fe_state.mu);
-    query.path = fe_state.current_path;
+    query.path = current_path;
     query.depth = SearchScope::cwd();
     query.source = SearchSource::LOCAL;
     return query;
 }
 
-void SearchPanel::submit_search(const std::string& query_text) {
+void SearchPanel::submit_search(const std::string& query_text, const std::string& current_path) {
     auto& state = ui_registry_.get_state<SearchState>(search_state_key_);
-    SearchQuery query = build_query(query_text);
+    SearchQuery query = build_query(query_text, current_path);
     std::uint64_t request_generation = 0;
 
     {
@@ -289,11 +462,62 @@ void SearchPanel::render_results(SearchState& state, const std::string& current_
     ImGui::EndChild();
 }
 
-void SearchPanel::render() {
-    //
+void SearchPanel::render(const std::string& current_path, float available_height) {
+    auto& state = ui_registry_.get_state<SearchState>(search_state_key_);
+    if (!state.is_open) {
+        return;
+    }
 
+    const float overlay_h = std::min(350.0f, available_height);
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.14f, 0.14f, 0.14f, 0.97f));
+    if (ImGui::BeginChild("##search_overlay", {0, overlay_h}, false, ImGuiWindowFlags_NoScrollbar)) {
+        if (state.focus_query) {
+            ImGui::SetKeyboardFocusHere();
+            state.focus_query = false;
+        }
+        UI::column("##search_overlay_content", {
+            .mode = UI::Mode::LayoutOnly,
+            .width = UI::Size::fill(),
+            .height = UI::Size::fill(),
+            .gap = UI::Spacing::xy(0.0f, 8.0f),
+        }, [&]() {
+            const QueryInputState input = query_input(state);
+            update_query_state(state, input);
 
+            if (core::CommandManager::get().matches("search.cancel")) {
+                close_overlay(state);
+                return;
+            }
 
+            move_selection(state);
+
+            if (core::CommandManager::get().matches("search.confirm")) {
+                SearchResult selected;
+                if (selected_result(state, selected)) {
+                    navigate_to_result(selected);
+                    state.is_open = false;
+                }
+            }
+
+            std::string pending_query;
+            if (take_pending_query(state, pending_query)) {
+                submit_search(pending_query, current_path);
+            }
+
+            const OverlaySnapshot snapshot = overlay_snapshot(state);
+            if (snapshot.has_results) {
+                if (snapshot.pending) {
+                    pending_indicator();
+                }
+                render_results(state, current_path);
+                return;
+            }
+
+            overlay_status(snapshot, state.query_buf[0] != '\0');
+        });
+    }
+    ImGui::EndChild();
+    ImGui::PopStyleColor();
 }
 
 } // namespace misty::panel

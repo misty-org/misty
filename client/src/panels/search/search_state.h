@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <cstdint>
 #include <mutex>
 #include <string>
@@ -21,6 +22,7 @@ struct SearchState : public core::UIState {
     bool search_pending = false;
     bool search_in_flight = false;
     std::uint64_t request_generation = 0;
+    std::chrono::steady_clock::time_point last_input_change_at{};
     std::string last_submitted_query;
     std::string last_err;
     std::mutex mu;

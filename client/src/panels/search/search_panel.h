@@ -15,14 +15,14 @@ public:
                 std::string search_state_key = "Search");
     ~SearchPanel() = default;
 
-    void render();
+    void render(const std::string& current_path, float available_height);
     void toggle();
-    void submit_search(const std::string& query);
+    void submit_search(const std::string& query, const std::string& current_path);
     void navigate_to_result(const SearchResult& result);
-    void render_results(SearchState& state, const std::string& current_path);
 
 private:
-    SearchQuery build_query(const std::string& query_text) const;
+    SearchQuery build_query(const std::string& query_text, const std::string& current_path) const;
+    void render_results(SearchState& state, const std::string& current_path);
 
     core::UIRegistry& ui_registry_;
     core::WorkerPool& worker_pool_;

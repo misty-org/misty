@@ -12,6 +12,7 @@
 #include <nlohmann/json.hpp>
 
 #include "core/cache/listing_cache.h"
+#include "core/commands/command_manager.h"
 #include "core/manager/env_manager.h"
 #include "core/manager/asset_manager.h"
 #include "core/net/http_client.h"
@@ -222,9 +223,17 @@ void PushID(int) {}
 void PopID() {}
 void TextUnformatted(const char*, const char*) {}
 void TextDisabled(const char*, ...) {}
+void TextColored(const ImVec4&, const char*, ...) {}
 bool Selectable(const char*, bool, ImGuiSelectableFlags, const ImVec2&) { return false; }
 bool IsItemHovered(ImGuiHoveredFlags) { return false; }
+bool IsItemActive() { return false; }
+bool IsItemDeactivatedAfterEdit() { return false; }
 ImVec2 CalcTextSize(const char*, const char*, bool, float) { return ImVec2(); }
+void PushTextWrapPos(float) {}
+void PopTextWrapPos() {}
+void SetKeyboardFocusHere(int) {}
+double GetTime() { return 0.0; }
+void Spacing() {}
 
 } // namespace ImGui
 
@@ -270,6 +279,25 @@ bool input_text(const InputTextProps&) { return false; }
 bool select(const SelectProps&) { return false; }
 
 } // namespace misty::UI
+
+namespace misty::core {
+
+CommandManager& CommandManager::get() {
+    static CommandManager instance;
+    return instance;
+}
+
+void CommandManager::load() {}
+void CommandManager::clear_runtime_commands() {}
+void CommandManager::register_runtime_command(const std::string&, const std::string&) {}
+bool CommandManager::matches(const std::string&, bool) const {
+    return false;
+}
+std::string CommandManager::label(const std::string&) const { return {}; }
+std::vector<std::pair<std::string, std::string>> CommandManager::list_shortcuts() const { return {}; }
+bool CommandManager::save_shortcuts(const std::vector<std::pair<std::string, std::string>>&, std::string*) { return true; }
+
+} // namespace misty::core
 
 namespace misty::panel {
 
@@ -540,7 +568,7 @@ TEST(SearchPanelTest, LocalSearchUsesProxyResults) {
         }},
     }.dump();
 
-    panel.submit_search("report");
+    panel.submit_search("report", home.path().string());
 
     auto& search_state = registry.get_state<misty::panel::SearchState>("Search");
     ASSERT_TRUE(wait_for([&]() {
