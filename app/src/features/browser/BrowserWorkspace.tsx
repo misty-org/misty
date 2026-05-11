@@ -9,8 +9,8 @@ import {
   useWorkspaceStore,
 } from "@/features/workspace";
 import { hasTauriInternals } from "@/shared/platform/tauri";
+import { openSystemExternalLink } from "@/shared/platform/openExternalLink";
 import {
-  AiSurfaceButton,
   useAiSurfaceAdapter,
   type AiArtifact,
   type AiSurfaceAdapter,
@@ -91,10 +91,12 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
   const history = storedHistory ?? { entries: [state.url], index: 0 };
   const runtimeError = useBrowserRuntimeStore((runtime) => runtime.errors[tab.id] ?? null);
   const downloadNotice = useBrowserRuntimeStore((runtime) => runtime.notices[tab.id] ?? null);
-  const mirroredCursor = useBrowserRuntimeStore((runtime) => runtime.cursors[tab.id] ?? "default");
+  const compatibilityIssue = useBrowserRuntimeStore(
+    (runtime) => runtime.compatibilityIssues[tab.id] ?? null,
+  );
   const lightChrome = false;
   const browserChromeBackground = "#18191c";
-  const browserMessageVisible = Boolean(runtimeError || downloadNotice);
+  const browserMessageVisible = Boolean(runtimeError || downloadNotice || compatibilityIssue);
   const iconButtonClass = codexIconButtonClass(lightChrome);
   const agentAccess = grants.length > 0;
   const annotationSuspensionReason = `browser-annotations:${browserRuntimeId(tab)}`;
@@ -426,13 +428,13 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
     >
       <div
         className={cn(
-          "relative flex items-center border-b px-4",
+          "relative z-10 flex items-center gap-2 border-b px-4",
           lightChrome ? "border-black/[0.08]" : "border-white/[0.055]",
         )}
         style={{ backgroundColor: browserChromeBackground }}
         data-browser-toolbar
       >
-        <div className="flex items-center gap-1">
+        <div className="flex shrink-0 items-center gap-1">
           <button
             type="button"
             className={iconButtonClass}
@@ -475,8 +477,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
           onNavigate={navigateActiveTab}
         />
 
-        <div className="ml-auto flex items-center gap-1">
-          <AiSurfaceButton className={iconButtonClass} />
+        <div className="flex shrink-0 items-center gap-1">
           <button
             type="button"
             className={cn(
@@ -565,18 +566,37 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
         </div>
       </div>
 
-      {runtimeError || downloadNotice ? (
+      {runtimeError || downloadNotice || compatibilityIssue ? (
         <div
           className={cn(
             "border-b px-4 py-1.5 text-xs",
             runtimeError
               ? "border-notification-red/25 bg-notification-red/10 text-cream"
-              : "border-emerald-500/20 bg-emerald-500/10 text-cream",
+              : compatibilityIssue
+                ? "border-amber-400/20 bg-amber-400/10 text-cream"
+                : "border-emerald-500/20 bg-emerald-500/10 text-cream",
           )}
           role={runtimeError ? "alert" : "status"}
         >
           <div className="flex items-center gap-2">
-            <span className="min-w-0 flex-1 truncate">{runtimeError ?? downloadNotice}</span>
+            <span className="min-w-0 flex-1 truncate">
+              {runtimeError ??
+                downloadNotice ??
+                "This site rejected Misty’s embedded browser verification."}
+            </span>
+            {compatibilityIssue ? (
+              <button
+                type="button"
+                className="shrink-0 rounded-md bg-white/10 px-2 py-1 font-medium hover:bg-white/15"
+                onClick={() => {
+                  void openSystemExternalLink(compatibilityIssue.url).catch((error: unknown) =>
+                    setBrowserError(tab.id, error),
+                  );
+                }}
+              >
+                Open in browser
+              </button>
+            ) : null}
             <button
               type="button"
               className="grid size-5 shrink-0 place-items-center rounded hover:bg-white/10"
@@ -584,6 +604,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
               onClick={() => {
                 useBrowserRuntimeStore.getState().setError(tab.id, null);
                 useBrowserRuntimeStore.getState().setNotice(tab.id, null);
+                useBrowserRuntimeStore.getState().setCompatibilityIssue(tab.id, null);
               }}
             >
               <X size={13} />
@@ -612,7 +633,6 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
           )}
           style={{
             width: viewportWidth ? `min(100%, ${viewportWidth}px)` : "100%",
-            cursor: nativeRuntime ? mirroredCursor : undefined,
             backgroundColor: annotationsActive ? "transparent" : browserChromeBackground,
           }}
           data-browser-page-host

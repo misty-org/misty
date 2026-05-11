@@ -37,7 +37,7 @@ export function BrowserOmnibox(props: {
 
   return (
     <form
-      className="absolute left-1/2 top-1/2 z-50 w-[min(54vw,720px)] -translate-x-1/2 -translate-y-1/2"
+      className="relative z-50 min-w-0 flex-1"
       onSubmit={(event) => {
         event.preventDefault();
         choose(suggestions[selectedIndex]);
@@ -89,7 +89,7 @@ export function BrowserOmnibox(props: {
         autoComplete="off"
         spellCheck={false}
         className={cn(
-          "h-9 w-full rounded-lg border bg-transparent px-3 text-center text-[16px] outline-none transition-colors",
+          "h-9 w-full max-w-[720px] mx-auto rounded-lg border bg-transparent px-3 text-center text-[16px] outline-none transition-colors",
           props.lightChrome
             ? "border-black/[0.06] text-[#252525] hover:bg-black/[0.025] focus:border-black/[0.11] focus:bg-[#ededed] focus:text-left"
             : "border-white/[0.07] text-[#e7e7e7] hover:bg-white/[0.025] focus:border-white/[0.12] focus:bg-[#222] focus:text-left",
