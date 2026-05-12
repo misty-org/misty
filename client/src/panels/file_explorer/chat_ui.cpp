@@ -271,7 +271,7 @@ void FileExplorerPanel::submit_chat_message(FileExplorerState& state) {
             const core::HttpResponse response = core::HTTPClient::get().post(
                 url,
                 request,
-                {{"Content-Type", "application/json"}}
+                {.headers = {{"Content-Type", "application/json"}}}
             );
 
             std::lock_guard<std::mutex> lock(state.mu);

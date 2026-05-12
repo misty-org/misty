@@ -1,5 +1,6 @@
 #include "activity_panel.h"
 #include "imgui.h"
+#include "imgui_internal.h"
 #include "panels/transfers/transfer_window_state.h"
 #include <ctime>
 #include <sstream>
@@ -40,17 +41,22 @@ namespace misty::panel {
         ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.25f, 0.25f, 0.25f, 1.0f));
 
         if (ImGui::Begin("##ActivityPopup", nullptr, flags)) {
-            // Close on click outside (exclude navbar region)
+            if (ImGuiWindow* window = ImGui::FindWindowByName("##ActivityPopup")) {
+                ImGui::BringWindowToDisplayFront(window);
+            }
+
             if (!ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem) &&
                 ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-                ImVec2 mouse = ImGui::GetMousePos();
-                float navbar_right = viewport->WorkPos.x + 77.0f;
-                if (mouse.x > navbar_right) {
+                const ImVec2 mouse = ImGui::GetMousePos();
+                const bool clicked_toggle =
+                    state.has_button_rect &&
+                    mouse.x >= state.button_min.x && mouse.x <= state.button_max.x &&
+                    mouse.y >= state.button_min.y && mouse.y <= state.button_max.y;
+                if (!clicked_toggle) {
                     state.is_open = false;
                 }
             }
 
-            // Header row
             ImGui::SetWindowFontScale(1.1f);
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
             ImGui::Text("Activity");
@@ -67,6 +73,7 @@ namespace misty::panel {
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.3f, 0.3f, 0.5f));
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.45f, 0.45f, 0.45f, 1.0f));
             if (ImGui::Button("Transfers##activity", ImVec2(transfers_w, 0))) {
+                state.is_open = false;
                 registry_.get_state<TransferWindowState>(kTransferWindowStateKey).open();
             }
             ImGui::SameLine(0, button_gap);

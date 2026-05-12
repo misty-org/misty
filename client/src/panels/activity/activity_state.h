@@ -5,6 +5,7 @@
 #include <mutex>
 #include <chrono>
 #include <atomic>
+#include "imgui.h"
 #include "core/ui/ui_registry.h"
 
 namespace misty::panel {
@@ -28,6 +29,9 @@ namespace misty::panel {
         ActivityState();
 
         bool is_open = false;
+        ImVec2 button_min{0.0f, 0.0f};
+        ImVec2 button_max{0.0f, 0.0f};
+        bool has_button_rect = false;
 
         void add_entry(const std::string& sender, const std::string& message,
                        ActivityEntryType type = ActivityEntryType::INFO);

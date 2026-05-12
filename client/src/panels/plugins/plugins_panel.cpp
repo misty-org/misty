@@ -1,285 +1,282 @@
 #include "panels/plugins/plugins_panel.h"
 
 #include <algorithm>
-#include <sstream>
 
-#include "core/manager/plugin_manager.h"
-#include "core/manager/asset_manager.h"
-#include "core/manager/font_manager.h"
+#include "core/ui/ui_layout.h"
 #include "core/ui/ui_style.h"
 #include "imgui.h"
-#include "panels/activity/activity_state.h"
-#include "panels/notification/notification_state.h"
+#include "panels/settings/settings_components.h"
 
 namespace misty::panel {
 
 namespace {
-struct ButtonStyle {
-    ImVec4 button;
-    ImVec4 hovered;
-    ImVec4 active;
-    ImVec4 text;
-    float rounding;
+
+constexpr float kSidebarMinWidth = 220.0f;
+constexpr float kSidebarMaxWidth = 360.0f;
+constexpr float kSidebarDefaultWidth = 180.0f;
+constexpr float kContentMinWidth = 320.0f;
+constexpr float kSplitterWidth = 8.0f;
+
+constexpr PluginsContentProps kPluginsContentProps{
+    .title = "Plugins",
+    .body = "Use the search bar and sections on the left to shape the plugin list once cards are wired up.",
 };
 
-ButtonStyle primary_button_style() {
-    return {
-        ImVec4(0.957f, 0.957f, 0.961f, 1.0f),
-        ImVec4(0.898f, 0.906f, 0.922f, 1.0f),
-        ImVec4(0.820f, 0.835f, 0.859f, 1.0f),
-        ImVec4(0.07f, 0.07f, 0.07f, 1.0f),
-        8.0f,
-    };
-}
-
-bool styled_button(const char* label, const ImVec2& size, const ButtonStyle& style) {
-    bool pressed = false;
-    misty::UI::WithStyle([&](misty::UI::StyleScope& scoped) {
-        scoped.var(ImGuiStyleVar_FrameRounding, style.rounding);
-        scoped.color(ImGuiCol_Button, style.button);
-        scoped.color(ImGuiCol_ButtonHovered, style.hovered);
-        scoped.color(ImGuiCol_ButtonActive, style.active);
-        scoped.color(ImGuiCol_Text, style.text);
-        pressed = ImGui::Button(label, size);
+void page(const PluginsContentProps& props, const std::function<void()>& content) {
+    UI::div("plugins_content_page", {
+        .mode = UI::Mode::LayoutOnly,
+        .width = UI::Size::fill(),
+        .height = UI::Size::auto_size(),
+    }, [&]() {
+        UI::column("plugins_content_page_body", {
+            .width = UI::Size::fill(),
+            .height = UI::Size::auto_size(),
+            .gap = kSettingsPageGap,
+        }, [&]() {
+            UI::text({
+                .text = props.title,
+                .width = UI::Size::fill(),
+                .color = kSettingsHeaderTextColor,
+                .font = UI::TextFont::BoldXLarge,
+            });
+            if (content) {
+                content();
+            }
+        });
     });
-    return pressed;
 }
 
-ImVec4 badge_color(bool accent) {
-    return accent ? ImVec4(0.24f, 0.52f, 0.35f, 1.0f) : ImVec4(0.22f, 0.22f, 0.24f, 1.0f);
-}
+bool SectionHeader(const char* id, const char* label, bool collapsed, float width) {
+    const ImVec2 cursor = ImGui::GetCursorScreenPos();
+    const float height = ImGui::GetTextLineHeight() + 4.0f;
 
-void render_badge(const std::string& text, const ImVec4& color) {
-    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 999.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10.0f, 5.0f));
-    ImGui::PushStyleColor(ImGuiCol_Button, color);
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color);
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive, color);
-    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.94f, 0.94f, 0.96f, 1.0f));
-    ImGui::Button(text.c_str());
-    ImGui::PopStyleColor(4);
-    ImGui::PopStyleVar(2);
+    const bool clicked = ImGui::InvisibleButton(id, ImVec2(width, height));
+    const bool hovered = ImGui::IsItemHovered();
+
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    draw_list->AddText(
+        ImVec2(cursor.x + 4.0f, cursor.y + 2.0f),
+        IM_COL32(178, 178, 178, 255),
+        label
+    );
+
+    if (hovered) {
+        const float text_width = ImGui::CalcTextSize(label).x;
+        const float triangle_x = cursor.x + 4.0f + text_width + 6.0f;
+        const float mid_y = cursor.y + height * 0.5f;
+        const ImU32 triangle_color = IM_COL32(160, 160, 160, 220);
+
+        if (collapsed) {
+            draw_list->AddTriangleFilled(
+                ImVec2(triangle_x, mid_y - 4.0f),
+                ImVec2(triangle_x, mid_y + 4.0f),
+                ImVec2(triangle_x + 7.0f, mid_y),
+                triangle_color
+            );
+        } else {
+            draw_list->AddTriangleFilled(
+                ImVec2(triangle_x - 4.0f, mid_y - 2.0f),
+                ImVec2(triangle_x + 4.0f, mid_y - 2.0f),
+                ImVec2(triangle_x, mid_y + 4.0f),
+                triangle_color
+            );
+        }
+    }
+
+    return clicked;
 }
 
 } // namespace
 
-PluginsPanel::PluginsPanel(core::UIRegistry& ui_registry)
-    : ui_registry_(ui_registry) {
+PluginsPanel::PluginsPanel(core::UIRegistry&) {
+    sidebar_width_ = kSidebarDefaultWidth;
+    sidebar_drag_start_width_ = kSidebarDefaultWidth;
+}
+
+float PluginsPanel::sidebarMaxWidth(float shell_width) const {
+    return std::max(
+        kSidebarMinWidth,
+        std::min(kSidebarMaxWidth, shell_width - kContentMinWidth - kSplitterWidth)
+    );
+}
+
+void PluginsPanel::updateSidebarWidth(float max_sidebar_width) {
+    sidebar_width_ = std::clamp(sidebar_width_, kSidebarMinWidth, max_sidebar_width);
+    if (!sidebar_resizing_) {
+        return;
+    }
+
+    if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+        const float dragged_width = sidebar_drag_start_width_ +
+            (ImGui::GetIO().MousePos.x - sidebar_drag_start_mouse_x_);
+        sidebar_width_ = std::clamp(dragged_width, kSidebarMinWidth, max_sidebar_width);
+        return;
+    }
+
+    sidebar_resizing_ = false;
+}
+
+void PluginsPanel::shell() {
+    UI::row("##plugins_shell", {
+        .mode = UI::Mode::LayoutOnly,
+        .width = UI::Size::fill(),
+        .height = UI::Size::fill(),
+    }, [&]() {
+        sidebar();
+        splitter();
+        content(kPluginsContentProps);
+    });
+}
+
+void PluginsPanel::sidebar() {
+    UI::div("##plugins_sidebar", {
+        .mode = UI::Mode::ChildWindow,
+        .width = UI::Size::px(sidebar_width_),
+        .height = UI::Size::fill(),
+        .padding = kSettingsSidebarPadding,
+        .gap = UI::Spacing::xy(0.0f, 12.0f),
+    }, [&]() {
+        UI::input_text({
+            .label = "##plugins_search",
+            .buffer = search_query_,
+            .buffer_size = sizeof(search_query_),
+            .hint = "Search plugins...",
+            .width = UI::Size::fill(),
+            .height = UI::Size::px(kSettingsControlHeight),
+            .padding = UI::Spacing::xy(10.0f, 8.0f),
+            .rounding = 6.0f,
+            .bg_color = kSettingsControlBgColor,
+            .border_color = kSettingsControlBorderColor,
+            .text_color = kSettingsControlTextColor,
+        });
+        section({
+            .id = "marketplace_hdr",
+            .label = "Marketplace",
+            .collapsed = &marketplace_collapsed_,
+        });
+
+        UI::divider({
+            .color = kSettingsDividerColor,
+        });
+        section({
+            .id = "installed_hdr",
+            .label = "Installed",
+            .collapsed = &installed_collapsed_,
+        });
+    });
+}
+
+void PluginsPanel::section(const PluginsSectionProps& props) {
+    if (!props.collapsed) {
+        return;
+    }
+
+    UI::div((std::string(props.id) + "_header").c_str(), {
+        .mode = UI::Mode::LayoutOnly,
+        .width = UI::Size::fill(),
+        .height = UI::Size::px(ImGui::GetTextLineHeight() + 4.0f),
+    }, [&]() {
+        UI::raw([&]() {
+            const float section_width = ImGui::GetContentRegionAvail().x;
+            if (SectionHeader(props.id, props.label, *props.collapsed, section_width)) {
+                *props.collapsed = !*props.collapsed;
+            }
+        });
+    });
+
+    if (*props.collapsed) {
+        return;
+    }
+
+    UI::div((std::string(props.id) + "_body").c_str(), {
+        .width = UI::Size::fill(),
+        .height = UI::Size::auto_size(),
+        .padding = UI::Spacing::xy(4.0f, 2.0f),
+    }, [&]() {
+        UI::text({
+            .text = props.placeholder,
+            .width = UI::Size::fill(),
+            .color = kSettingsMutedTextColor,
+        });
+    });
+}
+
+void PluginsPanel::splitter() {
+    UI::div("##plugins_divider", {
+        .mode = UI::Mode::LayoutOnly,
+        .width = UI::Size::px(kSplitterWidth),
+        .height = UI::Size::fill(),
+    }, [&]() {
+        const ImVec2 splitter_pos = ImGui::GetCursorScreenPos();
+        const ImVec2 splitter_size(
+            kSplitterWidth,
+            std::max(1.0f, ImGui::GetContentRegionAvail().y)
+        );
+        ImGui::InvisibleButton("##plugins_splitter_hit", splitter_size);
+
+        const bool hovered = ImGui::IsItemHovered();
+        if (hovered || sidebar_resizing_) {
+            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+        }
+        if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+            sidebar_resizing_ = true;
+            sidebar_drag_start_width_ = sidebar_width_;
+            sidebar_drag_start_mouse_x_ = ImGui::GetIO().MousePos.x;
+        }
+
+        ImDrawList* draw_list = ImGui::GetWindowDrawList();
+        const float line_width = hovered || sidebar_resizing_ ? 2.0f : 1.0f;
+        const float line_x = splitter_pos.x + (kSplitterWidth - line_width) * 0.5f;
+        const ImU32 line_color = hovered || sidebar_resizing_
+            ? ImGui::ColorConvertFloat4ToU32(ImVec4(0.72f, 0.72f, 0.74f, 0.85f))
+            : ImGui::ColorConvertFloat4ToU32(ImVec4(0.22f, 0.22f, 0.24f, 1.0f));
+        draw_list->AddRectFilled(
+            ImVec2(line_x, splitter_pos.y),
+            ImVec2(line_x + line_width, splitter_pos.y + splitter_size.y),
+            line_color
+        );
+    });
+}
+
+void PluginsPanel::content(const PluginsContentProps& props) {
+    UI::WithStyle([&](UI::StyleScope& style) {
+        style.var(ImGuiStyleVar_ScrollbarSize, 8.0f);
+
+        UI::div("##plugins_content", {
+            .mode = UI::Mode::ChildWindow,
+            .width = UI::Size::fill(),
+            .height = UI::Size::fill(),
+            .window_flags = ImGuiWindowFlags_AlwaysVerticalScrollbar,
+            .padding = kSettingsShellPadding,
+        }, [&]() {
+            page(props, [&]() {
+                UI::text({
+                    .text = props.body,
+                    .width = UI::Size::px(520.0f),
+                    .overflow = UI::TextOverflow::Wrap,
+                    .color = kSettingsBodyTextColor,
+                });
+            });
+        });
+    });
 }
 
 void PluginsPanel::render() {
-    auto& plugin_host = core::PluginManager::get();
-    const auto plugins = plugin_host.loaded_plugins();
-    const auto plugin_roots = plugin_host.discovery_roots();
+    constexpr ImGuiWindowFlags flags =
+        ImGuiWindowFlags_NoTitleBar |
+        ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoCollapse;
 
-    ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar |
-                             ImGuiWindowFlags_NoMove |
-                             ImGuiWindowFlags_NoCollapse |
-                             ImGuiWindowFlags_NoResize;
-
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.12f, 0.12f, 0.12f, 1.0f));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(24.0f, 24.0f));
-
-    if (ImGui::Begin("Plugins", nullptr, flags)) {
-        render_header(plugins.size());
-        ImGui::Spacing();
-        render_plugin_roots(plugin_roots);
-        ImGui::Spacing();
-        if (ImGui::BeginChild("PluginsList", ImVec2(0, 0), false)) {
-            if (!plugins.empty()) {
-                {
-                    misty::UI::WithFont(core::FontManager::get().get_font(core::FontID::ROBOTO_BOLD), [&]() {
-                        ImGui::Text("Plugins");
-                    });
-                }
-                ImGui::Spacing();
-                for (const auto& plugin : plugins) {
-                    render_plugin_card(plugin);
-                    ImGui::Spacing();
-                }
-            }
-
-            if (plugins.empty()) {
-                render_empty_state(plugin_roots);
-            }
-            ImGui::EndChild();
+    UI::WithWindowStyle({
+        .bg_color = ImVec4(0.12f, 0.12f, 0.12f, 1.0f),
+    }, [&]() {
+        if (ImGui::Begin("Plugins", nullptr, flags)) {
+            updateSidebarWidth(sidebarMaxWidth(ImGui::GetContentRegionAvail().x));
+            shell();
         }
-    }
-
-    ImGui::End();
-    ImGui::PopStyleVar();
-    ImGui::PopStyleColor();
-}
-
-void PluginsPanel::render_header(std::size_t plugin_count) {
-    if (ImGui::BeginTable("PluginsHeader", 2, ImGuiTableFlags_SizingStretchProp)) {
-        ImGui::TableSetupColumn("Title", ImGuiTableColumnFlags_WidthStretch, 1.0f);
-        ImGui::TableSetupColumn("Action", ImGuiTableColumnFlags_WidthFixed, 96.0f);
-        ImGui::TableNextRow();
-
-        ImGui::TableSetColumnIndex(0);
-        {
-            misty::UI::WithFont(core::FontManager::get().get_font(core::FontID::ROBOTO_BOLD_LARGE), [&]() {
-                ImGui::Text("Plugins");
-            });
-        }
-        ImGui::TextDisabled("%zu plugin", plugin_count);
-
-        ImGui::TableSetColumnIndex(1);
-        ImGui::SetCursorPosX(std::max(0.0f, ImGui::GetContentRegionAvail().x - 96.0f));
-        if (styled_button("Reload", ImVec2(96.0f, 0.0f), primary_button_style())) {
-            core::PluginManager::get().reload();
-        }
-
-        ImGui::EndTable();
-    }
-}
-
-void PluginsPanel::render_plugin_roots(const std::vector<std::string>& roots) {
-    ImGui::TextDisabled("Plugin roots");
-    for (const auto& root : roots) {
-        ImGui::BulletText("%s", root.c_str());
-    }
-}
-
-void PluginsPanel::render_empty_state(const std::vector<std::string>& roots) {
-    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 12.0f);
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.16f, 0.16f, 0.18f, 1.0f));
-
-    if (ImGui::BeginChild("PluginsEmpty", ImVec2(0, 180.0f), true)) {
-        misty::UI::WithFont(core::FontManager::get().get_font(core::FontID::ROBOTO_BOLD), [&]() {
-            ImGui::Text("No plugins discovered");
-        });
-        ImGui::Spacing();
-        ImGui::TextWrapped("Drop a plugin folder with a manifest into one of the discovery roots to make it available here.");
-        if (!roots.empty()) {
-            ImGui::Spacing();
-            ImGui::TextDisabled("Suggested location");
-            ImGui::TextWrapped("%s", roots.back().c_str());
-        }
-    }
-    ImGui::EndChild();
-
-    ImGui::PopStyleColor();
-    ImGui::PopStyleVar();
-}
-
-void PluginsPanel::render_plugin_card(const core::PluginInfo& plugin) {
-    const float base_height = 180.0f + (plugin.commands.empty() ? 0.0f : 24.0f * plugin.commands.size()) +
-        (plugin.panels.empty() ? 0.0f : 24.0f * plugin.panels.size()) +
-        (plugin.diagnostics.empty() ? 0.0f : 20.0f * plugin.diagnostics.size());
-    const std::string card_id = "plugin_card_" + plugin.id;
-
-    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 12.0f);
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.14f, 0.16f, 0.19f, 1.0f));
-
-    if (ImGui::BeginChild(card_id.c_str(), ImVec2(0, base_height), true)) {
-        {
-            misty::UI::WithFont(core::FontManager::get().get_font(core::FontID::ROBOTO_BOLD), [&]() {
-                ImGui::Text("%s", plugin.name.c_str());
-            });
-        }
-        ImGui::SameLine();
-        ImGui::TextDisabled("v%s", plugin.version.c_str());
-        render_badge(plugin.bundled ? "Bundled" : "User", badge_color(plugin.bundled));
-        ImGui::SameLine();
-        if (plugin.verified) {
-            render_badge("Verified", ImVec4(0.18f, 0.42f, 0.28f, 1.0f));
-            ImGui::SameLine();
-        } else if (plugin.loaded) {
-            render_badge("Unsigned", ImVec4(0.28f, 0.28f, 0.18f, 1.0f));
-            ImGui::SameLine();
-        }
-        if (plugin.faulted) {
-            render_badge("Faulted", ImVec4(0.54f, 0.22f, 0.18f, 1.0f));
-        } else {
-            render_badge(plugin.loaded ? "Loaded" : "Rejected", badge_color(plugin.loaded));
-        }
-
-        if (!plugin.author.empty()) {
-            ImGui::TextDisabled("By %s", plugin.author.c_str());
-        } else {
-            ImGui::TextDisabled("%s", plugin.id.c_str());
-        }
-        if (!plugin.signer.empty()) {
-            ImGui::SameLine();
-            ImGui::TextDisabled("Signer: %s", plugin.signer.c_str());
-        }
-
-        if (!plugin.description.empty()) {
-            ImGui::Spacing();
-            ImGui::TextWrapped("%s", plugin.description.c_str());
-        }
-
-        ImGui::Spacing();
-        if (styled_button(("Sandbox##" + plugin.id).c_str(), ImVec2(130.0f, 0.0f), primary_button_style())) {
-            std::string error;
-            if (!core::PluginManager::get().open_plugin_sandbox(plugin.plugin_dir, &error)) {
-                auto& activity = ui_registry_.get_state<ActivityState>("Activity");
-                activity.add_entry("System",
-                    error.empty() ? "Could not open plugin sandbox." : error,
-                    ActivityEntryType::ERROR);
-            }
-        }
-
-        ImGui::Spacing();
-        ImGui::Separator();
-        ImGui::Spacing();
-
-        ImGui::TextDisabled("Commands");
-        if (plugin.commands.empty()) {
-            ImGui::TextWrapped("No commands registered.");
-        } else {
-            for (const auto& command : plugin.commands) {
-                if (ImGui::Button((command.title + "##invoke_" + command.id).c_str())) {
-                    core::PluginManager::get().invoke_command(command.id);
-                }
-                ImGui::SameLine();
-                ImGui::TextDisabled("%s", command.default_shortcut.empty() ? command.id.c_str() : command.default_shortcut.c_str());
-            }
-        }
-
-        ImGui::Spacing();
-        ImGui::TextDisabled("Panels");
-        if (plugin.panels.empty()) {
-            ImGui::TextWrapped("No panels registered.");
-        } else {
-            for (const auto& panel : plugin.panels) {
-                const std::string label = std::string(panel.is_open ? "Focus " : "Open ") +
-                    panel.title + "##panel_" + panel.id;
-                if (ImGui::Button(label.c_str())) {
-                    core::PluginManager::get().open_panel(panel.id);
-                }
-            }
-        }
-
-        if (!plugin.diagnostics.empty()) {
-            ImGui::Spacing();
-            ImGui::TextDisabled("Diagnostics");
-            for (const auto& diagnostic : plugin.diagnostics) {
-                ImGui::BulletText("%s", diagnostic.c_str());
-            }
-        }
-
-        ImGui::Spacing();
-        ImGui::TextDisabled("Library");
-        ImGui::TextWrapped("%s", plugin.library_path.empty() ? "(not loaded)" : plugin.library_path.c_str());
-    }
-    ImGui::EndChild();
-
-    ImGui::PopStyleColor();
-    ImGui::PopStyleVar();
-}
-
-std::string PluginsPanel::join_strings(const std::vector<std::string>& values) {
-    std::ostringstream joined;
-    for (std::size_t i = 0; i < values.size(); ++i) {
-        if (i > 0) {
-            joined << ", ";
-        }
-        joined << values[i];
-    }
-    return joined.str();
+        ImGui::End();
+    });
 }
 
 } // namespace misty::panel

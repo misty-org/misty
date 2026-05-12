@@ -129,6 +129,11 @@ namespace {
 }
 
 namespace misty::panel {
+    namespace {
+        constexpr ImVec4 kFileSidebarBg = ImVec4(0.12f, 0.12f, 0.13f, 1.0f);
+        constexpr ImVec4 kFileSidebarSeparator = ImVec4(0.22f, 0.22f, 0.24f, 1.0f);
+    }
+
     FileSidebarPanel::FileSidebarPanel(core::UIRegistry& registry, core::WorkerPool& worker_pool, std::shared_ptr<MistyClient> client)
         : registry_(registry), worker_pool_(worker_pool), client_(client) {
     }
@@ -147,7 +152,7 @@ namespace misty::panel {
             ImGuiWindowFlags_NoCollapse |
             ImGuiWindowFlags_NoScrollbar;
 
-        ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.15f, 0.15f, 0.15f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_WindowBg, kFileSidebarBg);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16.0f, 16.0f));
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 12.0f));
 
@@ -156,7 +161,7 @@ namespace misty::panel {
             float padding = width * 0.08f;
             
             
-            ImGui::PushStyleColor(ImGuiCol_Separator, ImVec4(0.30f, 0.30f, 0.32f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Separator, kFileSidebarSeparator);
             show_quick_access(width, padding);
             ImGui::Separator();
             show_local_section(width, padding);

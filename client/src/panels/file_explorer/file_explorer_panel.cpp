@@ -33,6 +33,7 @@ namespace misty::panel {
         constexpr float kPreviewZoomMin = 0.1f;
         constexpr float kPreviewZoomMax = 3.0f;
         constexpr float kPreviewSplitterWidth = 8.0f;
+        constexpr auto kMinRefreshButtonAnimation = std::chrono::milliseconds(1400);
         bool accumulate_sync_list_stream_chunk(const std::string& chunk,
                                                nlohmann::json& aggregate,
                                                std::string* error_out) {
@@ -465,6 +466,7 @@ namespace misty::panel {
         }
 
         state.sync_request_in_flight = true;
+        state.sync_button_anim_until = std::chrono::steady_clock::now() + kMinRefreshButtonAnimation;
         const uint64_t request_generation = ++state.sync_request_generation;
         const uint64_t navigation_generation = state.navigation_generation.load(std::memory_order_relaxed);
         auto& services = registry_.get_state<ServicesState>("Services");
@@ -785,7 +787,7 @@ namespace misty::panel {
 
         auto& search_state = registry_.get_state<SearchState>(search_state_key_);
 
-        ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.18f, 0.18f, 0.18f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.12f, 0.12f, 0.13f, 1.0f));
 
         if (ImGui::Begin(window_name_.c_str(), nullptr, file_explorer_flags)) {
             std::unique_lock<std::mutex> lock(state.mu);

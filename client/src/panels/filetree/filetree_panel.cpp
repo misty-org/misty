@@ -11,8 +11,10 @@
 #include <nlohmann/json.hpp>
 
 #include "core/commands/command_manager.h"
+#include "panels/activity/activity_state.h"
 #include "panels/file_explorer/file_explorer_state.h"
 #include "panels/notification/notification_state.h"
+#include "panels/profile/profile_state.h"
 #include "panels/search/search_state.h"
 #include "panels/transfers/transfer_window_state.h"
 
@@ -419,13 +421,18 @@ namespace misty::panel {
             render_drag_overlay(pane_id, ImVec2(pos.x, explorer_y), ImVec2(size.x, explorer_h));
         }
 
-        if (!transfer_modal_open && active_pane_id_ == pane_id && drag_payload == nullptr) {
-            ImDrawList* fg = ImGui::GetForegroundDrawList();
+        const bool activity_panel_open =
+            ui_registry_.get_state<ActivityState>("Activity").is_open;
+        const bool profile_panel_open =
+            ui_registry_.get_state<ProfileState>("Profile").is_open;
+        if (!transfer_modal_open && !activity_panel_open && !profile_panel_open &&
+            active_pane_id_ == pane_id && drag_payload == nullptr) {
+            ImDrawList* draw_list = ImGui::GetForegroundDrawList();
             const ImVec2 border_max(std::max(pos.x, pos.x + size.x - 1.0f),
                                     std::max(pos.y, pos.y + size.y - 1.0f));
-            fg->PushClipRect(pos, ImVec2(pos.x + size.x, pos.y + size.y), true);
-            fg->AddRect(pos, border_max, IM_COL32(255, 255, 255, 220), 0.0f, 0, 2.0f);
-            fg->PopClipRect();
+            draw_list->PushClipRect(pos, ImVec2(pos.x + size.x, pos.y + size.y), true);
+            draw_list->AddRect(pos, border_max, IM_COL32(255, 255, 255, 220), 0.0f, 0, 2.0f);
+            draw_list->PopClipRect();
         }
     }
 

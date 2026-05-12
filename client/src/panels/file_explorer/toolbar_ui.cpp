@@ -16,6 +16,13 @@ using namespace misty::core;
 namespace misty::panel {
 namespace {
 constexpr float kPathFieldTrim = 96.0f;
+constexpr ImVec4 kExplorerChromeBg = ImVec4(0.14f, 0.14f, 0.15f, 1.0f);
+constexpr ImVec4 kExplorerChromeBgHover = ImVec4(0.18f, 0.18f, 0.20f, 1.0f);
+constexpr ImVec4 kExplorerChromeBgActive = ImVec4(0.11f, 0.11f, 0.12f, 1.0f);
+
+int oversampled_icon_size(float display_size) {
+    return std::max(16, static_cast<int>(std::ceil(display_size * 2.0f)));
+}
 
 struct BreadcrumbSegment {
     std::string label;
@@ -182,15 +189,21 @@ void FileExplorerPanel::show_nav_history(FileExplorerState& state, float button_
     }
 
     ImGui::SameLine(0, spacing);
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.21f, 0.21f, 0.21f, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.28f, 0.28f, 0.28f, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.16f, 0.16f, 0.16f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_Button, kExplorerChromeBg);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, kExplorerChromeBgHover);
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, kExplorerChromeBgActive);
     const bool sync_in_flight = state.sync_request_in_flight;
+    const bool sync_animating = sync_in_flight || std::chrono::steady_clock::now() < state.sync_button_anim_until;
     const char* refresh_icon_name = "sync-16";
-    const ImVec4 refresh_tint(0.7f, 0.7f, 0.7f, 1.0f);
+    const float pulse = sync_animating
+        ? (0.55f + 0.45f * std::sin(static_cast<float>(ImGui::GetTime()) * 8.0f))
+        : 0.0f;
+    const ImVec4 refresh_tint = sync_animating
+        ? ImVec4(0.45f + pulse * 0.35f, 0.70f + pulse * 0.20f, 0.95f, 1.0f)
+        : ImVec4(0.7f, 0.7f, 0.7f, 1.0f);
 
     if (sync_in_flight) ImGui::BeginDisabled();
-    auto& sync_tex = AssetManager::get().get_svg_texture(refresh_icon_name, 16);
+    auto& sync_tex = AssetManager::get().get_svg_texture(refresh_icon_name, oversampled_icon_size(16.0f));
     if (sync_tex.id != 0) {
         if (ImGui::ImageButton("##refresh", sync_tex.id, ImVec2(16, 16), ImVec2(0, 0), ImVec2(1, 1),
                 ImVec4(0, 0, 0, 0), refresh_tint)) {
@@ -201,7 +214,7 @@ void FileExplorerPanel::show_nav_history(FileExplorerState& state, float button_
     }
     if (sync_in_flight) ImGui::EndDisabled();
     if (ImGui::IsItemHovered()) {
-        if (sync_in_flight) {
+        if (sync_animating) {
             ImGui::SetTooltip("Syncing remote changes...");
         } else if (path_utils::is_remote_path(state.current_path)) {
             ImGui::SetTooltip("Sync Now (%s)", CommandManager::get().label("explorer.refresh").c_str());
@@ -236,7 +249,7 @@ void FileExplorerPanel::show_search_bar(FileExplorerState& state, SearchState& s
         search_state.focus_query = true;
     }
 
-    ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.21f, 0.21f, 0.21f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, kExplorerChromeBg);
     ImGui::SetNextItemWidth(path_width);
     const bool path_submitted = ImGui::InputTextWithHint("##path_input", "Jump to path", state.search_path,
                                                          sizeof(state.search_path), ImGuiInputTextFlags_EnterReturnsTrue);
@@ -249,13 +262,13 @@ void FileExplorerPanel::show_search_bar(FileExplorerState& state, SearchState& s
     }
 
     ImGui::SameLine(0, spacing);
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.21f, 0.21f, 0.21f, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.28f, 0.28f, 0.28f, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.16f, 0.16f, 0.16f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_Button, kExplorerChromeBg);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, kExplorerChromeBgHover);
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, kExplorerChromeBgActive);
     const ImVec4 search_tint = search_state.is_open
         ? ImVec4(0.95f, 0.95f, 0.95f, 1.0f)
         : ImVec4(0.7f, 0.7f, 0.7f, 1.0f);
-    auto& search_tex = AssetManager::get().get_svg_texture("search-16", 16);
+    auto& search_tex = AssetManager::get().get_svg_texture("search-16", oversampled_icon_size(action_btn_size));
     if (search_tex.id != 0) {
         if (ImGui::ImageButton("##togglesearch", search_tex.id, ImVec2(action_btn_size, action_btn_size),
                 ImVec2(0, 0), ImVec2(1, 1), ImVec4(0, 0, 0, 0), search_tint)) {
@@ -273,9 +286,9 @@ void FileExplorerPanel::show_search_bar(FileExplorerState& state, SearchState& s
     }
     ImGui::PopStyleColor(3);
 
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.21f, 0.21f, 0.21f, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.28f, 0.28f, 0.28f, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.16f, 0.16f, 0.16f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_Button, kExplorerChromeBg);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, kExplorerChromeBgHover);
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, kExplorerChromeBgActive);
 
     const ImVec4 inactive_tint(0.7f, 0.7f, 0.7f, 1.0f);
     const ImVec4 active_tint(0.95f, 0.95f, 0.95f, 1.0f);
@@ -285,7 +298,7 @@ void FileExplorerPanel::show_search_bar(FileExplorerState& state, SearchState& s
         const bool watched = state.current_dir_watched;
         const char* watch_icon_name = watched ? "git-branch-check-16" : "git-branch-16";
         const ImVec4 watch_tint = watched ? ImVec4(0.96f, 0.83f, 0.29f, 1.0f) : inactive_tint;
-        auto& watch_tex = AssetManager::get().get_svg_texture(watch_icon_name, 16);
+        auto& watch_tex = AssetManager::get().get_svg_texture(watch_icon_name, oversampled_icon_size(action_btn_size));
         if (watch_busy) ImGui::BeginDisabled();
         if (watch_tex.id != 0) {
             if (ImGui::ImageButton("##togglewatchdir", watch_tex.id, ImVec2(action_btn_size, action_btn_size),
@@ -305,7 +318,7 @@ void FileExplorerPanel::show_search_bar(FileExplorerState& state, SearchState& s
     ImVec4 icon_tint = state.grid_view
         ? active_tint
         : inactive_tint;
-    auto& grid_tex = AssetManager::get().get_svg_texture("apps-16", 16);
+    auto& grid_tex = AssetManager::get().get_svg_texture("apps-16", oversampled_icon_size(action_btn_size));
     if (grid_tex.id != 0) {
         if (ImGui::ImageButton("##gridview", grid_tex.id, ImVec2(action_btn_size, action_btn_size), ImVec2(0, 0), ImVec2(1, 1),
                 ImVec4(0, 0, 0, 0), icon_tint)) {
@@ -322,7 +335,7 @@ void FileExplorerPanel::show_search_bar(FileExplorerState& state, SearchState& s
     icon_tint = !state.grid_view
         ? active_tint
         : inactive_tint;
-    auto& list_tex = AssetManager::get().get_svg_texture("rows-16", 16);
+    auto& list_tex = AssetManager::get().get_svg_texture("rows-16", oversampled_icon_size(action_btn_size));
     if (list_tex.id != 0) {
         if (ImGui::ImageButton("##listview", list_tex.id, ImVec2(action_btn_size, action_btn_size), ImVec2(0, 0), ImVec2(1, 1),
                 ImVec4(0, 0, 0, 0), icon_tint)) {
@@ -339,7 +352,7 @@ void FileExplorerPanel::show_search_bar(FileExplorerState& state, SearchState& s
     ImVec4 preview_tint = preview_pane_open_
         ? active_tint
         : inactive_tint;
-    auto& preview_tex = AssetManager::get().get_svg_texture("file-media-16", 16);
+    auto& preview_tex = AssetManager::get().get_svg_texture("file-media-16", oversampled_icon_size(action_btn_size));
     if (preview_tex.id != 0) {
         if (ImGui::ImageButton("##togglepreview", preview_tex.id, ImVec2(action_btn_size, action_btn_size),
                 ImVec2(0, 0), ImVec2(1, 1), ImVec4(0, 0, 0, 0), preview_tint)) {
@@ -357,7 +370,9 @@ void FileExplorerPanel::show_search_bar(FileExplorerState& state, SearchState& s
         icon_tint = state.show_hidden
             ? active_tint
             : inactive_tint;
-        auto& hidden_tex = AssetManager::get().get_svg_texture(state.show_hidden ? "eye-16" : "eye-closed-16", 16);
+        auto& hidden_tex = AssetManager::get().get_svg_texture(
+            state.show_hidden ? "eye-16" : "eye-closed-16",
+            oversampled_icon_size(action_btn_size));
         if (hidden_tex.id != 0) {
             if (ImGui::ImageButton("##togglehidden", hidden_tex.id, ImVec2(action_btn_size, action_btn_size), ImVec2(0, 0), ImVec2(1, 1),
                     ImVec4(0, 0, 0, 0), icon_tint)) {
