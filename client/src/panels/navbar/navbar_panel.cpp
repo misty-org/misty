@@ -8,6 +8,23 @@
 using namespace misty::view;
 
 namespace misty::panel {
+    namespace {
+        float content_width() {
+            const float content_min_x = ImGui::GetWindowContentRegionMin().x;
+            const float content_max_x = ImGui::GetWindowContentRegionMax().x;
+            return std::max(0.0f, content_max_x - content_min_x);
+        }
+
+        float centered_cursor_x(float item_width) {
+            const float content_min_x = ImGui::GetWindowContentRegionMin().x;
+            return std::floor(content_min_x + std::max(0.0f, (content_width() - item_width) * 0.5f));
+        }
+
+        float image_button_outer_width(float image_width, float frame_padding_x) {
+            return image_width + frame_padding_x * 2.0f + ImGui::GetStyle().FrameBorderSize * 2.0f;
+        }
+    }
+
     NavbarPanel::NavbarPanel(UIRegistry& ui_registry) : ui_registry_(ui_registry),
         profile_panel_(ui_registry),
         activity_panel_(ui_registry) {
@@ -20,10 +37,12 @@ namespace misty::panel {
             ImGuiWindowFlags_NoMove |
             ImGuiWindowFlags_NoCollapse |
             ImGuiWindowFlags_NoResize |
-            ImGuiWindowFlags_NoScrollbar;
+            ImGuiWindowFlags_NoScrollbar |
+            ImGuiWindowFlags_NoScrollWithMouse;
 
         ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.10f, 0.10f, 0.12f, 1.0f)); // dark charcoal
         ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(6.0f, 12.0f));
 
         if (ImGui::Begin("Navbar", nullptr, navbar_flags)) {
             show_logo_icon();
@@ -52,6 +71,7 @@ namespace misty::panel {
         ImGui::End();
 
         ImGui::PopStyleVar(); 
+        ImGui::PopStyleVar();
         ImGui::PopStyleColor(); 
 
         // Render popups on top (outside navbar window)
@@ -65,12 +85,17 @@ namespace misty::panel {
 
         auto& logo_image = core::AssetManager::get().get_image_texture(path);
 
-        float logo_size = 62.0f;
-        ImVec2 padding(2.0f, 2.0f);
-        float button_size = logo_size + padding.x * 2.0f;
+        const ImVec2 padding(2.0f, 2.0f);
+        const float max_logo_size = 62.0f;
+        const float min_logo_size = 48.0f;
+        const float available_width = content_width();
+        const float logo_size = std::clamp(
+            available_width - padding.x * 2.0f - ImGui::GetStyle().FrameBorderSize * 2.0f,
+            min_logo_size,
+            max_logo_size);
+        const float button_size = image_button_outer_width(logo_size, padding.x);
 
-        float current_width = ImGui::GetWindowWidth();
-        ImGui::SetCursorPosX((current_width - button_size) * 0.5f);
+        ImGui::SetCursorPosX(centered_cursor_x(button_size));
 
         ImGui::PushID("nav_logo");
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, padding);   
@@ -93,11 +118,8 @@ namespace misty::panel {
         bool is_selected = (state.selected_item == view_id);
         auto& icon = core::AssetManager::get().get_svg_texture(icon_name, size * 2);
 
-        float navbar_width = ImGui::GetWindowWidth();
-
-        float padding_x = 8.0f;
-        float button_total_width = (float)size + (padding_x * 2.0f);
-        float centered_x = (navbar_width - button_total_width) * 0.5f;
+        const float padding_x = 6.0f;
+        const float button_total_width = image_button_outer_width(static_cast<float>(size), padding_x);
 
         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(padding_x, 8.0f));
@@ -112,7 +134,7 @@ namespace misty::panel {
         }
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.18f, 0.18f, 0.18f, 1.0f));
 
-        ImGui::SetCursorPosX(std::floor(centered_x));
+        ImGui::SetCursorPosX(centered_cursor_x(button_total_width));
 
         ImGuiID id = ImGui::GetID(label);
         if (ImGui::ImageButton(label, icon.id, ImVec2((float)size, (float)size))) {
@@ -123,10 +145,7 @@ namespace misty::panel {
         ImGui::PopStyleColor(3);
         ImGui::PopStyleVar(2);
 
-        float text_width = ImGui::CalcTextSize(label).x;
-        float text_centered_x = (navbar_width - text_width) * 0.5f;
-
-        ImGui::SetCursorPosX(std::floor(text_centered_x));
+        ImGui::SetCursorPosX(centered_cursor_x(ImGui::CalcTextSize(label).x));
 
         ImVec4 textColor = is_selected ? ImVec4(1, 1, 1, 1) : ImVec4(0.6f, 0.6f, 0.6f, 1.0f);
         ImGui::PushStyleColor(ImGuiCol_Text, textColor);
@@ -138,13 +157,12 @@ namespace misty::panel {
 
     void NavbarPanel::show_profile_button() {
         auto& profile_state = ui_registry_.get_state<ProfileState>("Profile");
+        auto& activity_state = ui_registry_.get_state<ActivityState>("Activity");
         auto& icon = core::AssetManager::get().get_svg_texture("person-24", 48);
 
-        float navbar_width = ImGui::GetWindowWidth();
         int size = 24;
-        float padding_x = 8.0f;
-        float button_total_width = (float)size + (padding_x * 2.0f);
-        float centered_x = (navbar_width - button_total_width) * 0.5f;
+        const float padding_x = 6.0f;
+        const float button_total_width = image_button_outer_width(static_cast<float>(size), padding_x);
 
         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(padding_x, 8.0f));
@@ -153,18 +171,24 @@ namespace misty::panel {
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.6f, 0.6f, 0.6f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.18f, 0.18f, 0.18f, 1.0f));
 
-        ImGui::SetCursorPosX(std::floor(centered_x));
+        ImGui::SetCursorPosX(centered_cursor_x(button_total_width));
 
         if (ImGui::ImageButton("Profile", icon.id, ImVec2((float)size, (float)size))) {
-            profile_state.is_open = !profile_state.is_open;
+            if (profile_state.is_open) {
+                profile_state.is_open = false;
+            } else {
+                profile_state.is_open = true;
+                activity_state.is_open = false;
+            }
         }
+        profile_state.button_min = ImGui::GetItemRectMin();
+        profile_state.button_max = ImGui::GetItemRectMax();
+        profile_state.has_button_rect = true;
 
         ImGui::PopStyleColor(3);
         ImGui::PopStyleVar(2);
 
-        float text_width = ImGui::CalcTextSize("Profile").x;
-        float text_centered_x = (navbar_width - text_width) * 0.5f;
-        ImGui::SetCursorPosX(std::floor(text_centered_x));
+        ImGui::SetCursorPosX(centered_cursor_x(ImGui::CalcTextSize("Profile").x));
 
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.6f, 0.6f, 0.6f, 1.0f));
         ImGui::Text("Profile");
@@ -178,11 +202,9 @@ namespace misty::panel {
         auto& icon = core::AssetManager::get().get_svg_texture("bell-24", 48);
         const size_t unread_count = activity_state.unread_count();
 
-        float navbar_w = ImGui::GetWindowWidth();
         int size = 24;
-        float padding_x = 8.0f;
-        float button_total_width = (float)size + (padding_x * 2.0f);
-        float centered_x = (navbar_w - button_total_width) * 0.5f;
+        const float padding_x = 6.0f;
+        const float button_total_width = image_button_outer_width(static_cast<float>(size), padding_x);
 
         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(padding_x, 8.0f));
@@ -191,11 +213,20 @@ namespace misty::panel {
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.6f, 0.6f, 0.6f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.18f, 0.18f, 0.18f, 1.0f));
 
-        ImGui::SetCursorPosX(std::floor(centered_x));
+        ImGui::SetCursorPosX(centered_cursor_x(button_total_width));
 
         if (ImGui::ImageButton("Activity", icon.id, ImVec2((float)size, (float)size))) {
-            activity_state.is_open = !activity_state.is_open;
+            auto& profile_state = ui_registry_.get_state<ProfileState>("Profile");
+            if (activity_state.is_open) {
+                activity_state.is_open = false;
+            } else {
+                activity_state.is_open = true;
+                profile_state.is_open = false;
+            }
         }
+        activity_state.button_min = ImGui::GetItemRectMin();
+        activity_state.button_max = ImGui::GetItemRectMax();
+        activity_state.has_button_rect = true;
 
         if (unread_count > 0) {
             const std::string badge_text = unread_count > 99 ? "99+" : std::to_string(unread_count);
@@ -235,8 +266,7 @@ namespace misty::panel {
         ImGui::PopStyleColor(3);
         ImGui::PopStyleVar(2);
 
-        float text_w = ImGui::CalcTextSize("Activity").x;
-        ImGui::SetCursorPosX(std::floor((navbar_w - text_w) * 0.5f));
+        ImGui::SetCursorPosX(centered_cursor_x(ImGui::CalcTextSize("Activity").x));
         ImVec4 text_color = activity_state.is_open ? ImVec4(1, 1, 1, 1) : ImVec4(0.6f, 0.6f, 0.6f, 1.0f);
         ImGui::PushStyleColor(ImGuiCol_Text, text_color);
         ImGui::Text("Activity");

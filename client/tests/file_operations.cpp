@@ -149,28 +149,19 @@ HTTPClient& HTTPClient::get() {
     return client;
 }
 
-HttpResponse HTTPClient::get(const std::string&, const std::map<std::string, std::string>&) { return {200, "", {}}; }
-HttpResponse HTTPClient::get_with_timeouts(const std::string&, long, long, const std::map<std::string, std::string>&) { return {200, "", {}}; }
-HttpResponse HTTPClient::post(const std::string& url, const std::string& body, const std::map<std::string, std::string>&) {
+HttpResponse HTTPClient::get(const std::string&, const HttpRequestOptions&) { return {200, "", {}}; }
+HttpResponse HTTPClient::get_stream(const std::string&, StreamLineCallback, const HttpRequestOptions&) { return {200, "", {}}; }
+HttpResponse HTTPClient::post(const std::string& url,
+                              const std::string& body,
+                              const HttpRequestOptions&) {
     if (url.find("/api/search") != std::string::npos) {
         g_search_post_body = body;
         return {200, g_search_post_response, {}};
     }
     return {200, "", {}};
 }
-HttpResponse HTTPClient::post_with_timeouts(const std::string& url,
-                                            const std::string& body,
-                                            long,
-                                            long,
-                                            const std::map<std::string, std::string>&) {
-    if (url.find("/api/search") != std::string::npos) {
-        g_search_post_body = body;
-        return {200, g_search_post_response, {}};
-    }
-    return {200, "", {}};
-}
-HttpResponse HTTPClient::put(const std::string&, const std::string&, const std::map<std::string, std::string>&) { return {200, "", {}}; }
-HttpResponse HTTPClient::del(const std::string& url, const std::map<std::string, std::string>&) {
+HttpResponse HTTPClient::put(const std::string&, const std::string&, const HttpRequestOptions&) { return {200, "", {}}; }
+HttpResponse HTTPClient::del(const std::string& url, const HttpRequestOptions&) {
     g_last_delete_url = url;
     return {200, "", {}};
 }
