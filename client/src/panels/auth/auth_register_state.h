@@ -80,7 +80,7 @@ namespace misty::panel {
             auto response = core::HTTPClient::get().post(
                 server_url + "/register",
                 json_body,
-                headers
+                {.headers = headers}
             );
             
             is_submitting = false;

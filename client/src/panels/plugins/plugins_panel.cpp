@@ -1,285 +1,665 @@
 #include "panels/plugins/plugins_panel.h"
 
 #include <algorithm>
-#include <sstream>
+#include <cctype>
+#include <filesystem>
+#include <fstream>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
+
+#include <nlohmann/json.hpp>
 
 #include "core/manager/plugin_manager.h"
-#include "core/manager/asset_manager.h"
-#include "core/manager/font_manager.h"
+#include "core/ui/ui_layout.h"
 #include "core/ui/ui_style.h"
 #include "imgui.h"
-#include "panels/activity/activity_state.h"
-#include "panels/notification/notification_state.h"
+#include "panels/plugins/plugins_components.h"
+#include "panels/settings/settings_components.h"
 
 namespace misty::panel {
 
 namespace {
-struct ButtonStyle {
-    ImVec4 button;
-    ImVec4 hovered;
-    ImVec4 active;
-    ImVec4 text;
-    float rounding;
-};
 
-ButtonStyle primary_button_style() {
-    return {
-        ImVec4(0.957f, 0.957f, 0.961f, 1.0f),
-        ImVec4(0.898f, 0.906f, 0.922f, 1.0f),
-        ImVec4(0.820f, 0.835f, 0.859f, 1.0f),
-        ImVec4(0.07f, 0.07f, 0.07f, 1.0f),
-        8.0f,
-    };
+constexpr float kSidebarMinWidth = 220.0f;
+constexpr float kSidebarMaxWidth = 360.0f;
+constexpr float kContentMinWidth = 320.0f;
+constexpr float kDividerWidth = 1.0f;
+namespace fs = std::filesystem;
+
+std::string trim_copy(std::string value) {
+    auto not_space = [](unsigned char ch) { return !std::isspace(ch); };
+    value.erase(value.begin(), std::find_if(value.begin(), value.end(), not_space));
+    value.erase(std::find_if(value.rbegin(), value.rend(), not_space).base(), value.end());
+    return value;
 }
 
-bool styled_button(const char* label, const ImVec2& size, const ButtonStyle& style) {
-    bool pressed = false;
-    misty::UI::WithStyle([&](misty::UI::StyleScope& scoped) {
-        scoped.var(ImGuiStyleVar_FrameRounding, style.rounding);
-        scoped.color(ImGuiCol_Button, style.button);
-        scoped.color(ImGuiCol_ButtonHovered, style.hovered);
-        scoped.color(ImGuiCol_ButtonActive, style.active);
-        scoped.color(ImGuiCol_Text, style.text);
-        pressed = ImGui::Button(label, size);
+std::vector<std::string> json_string_array(const nlohmann::json& value) {
+    std::vector<std::string> out;
+    if (!value.is_array()) {
+        return out;
+    }
+
+    out.reserve(value.size());
+    for (const auto& entry : value) {
+        if (entry.is_string()) {
+            out.push_back(trim_copy(entry.get<std::string>()));
+        }
+    }
+    return out;
+}
+
+PluginsDetailProps detail_from_json(const nlohmann::json& json) {
+    PluginsDetailProps detail;
+    detail.id = trim_copy(json.value("id", std::string()));
+    detail.name = trim_copy(json.value("name", std::string()));
+    detail.version = trim_copy(json.value("version", std::string()));
+    detail.author = trim_copy(json.value("author", std::string()));
+    detail.status = trim_copy(json.value("status", std::string()));
+    detail.overview = trim_copy(json.value("overview", std::string()));
+    detail.capabilities = json_string_array(json.value("capabilities", nlohmann::json::array()));
+    detail.where_it_appears = json_string_array(json.value("where_it_appears", nlohmann::json::array()));
+    detail.permissions = json_string_array(json.value("permissions", nlohmann::json::array()));
+    detail.getting_started = json_string_array(json.value("getting_started", nlohmann::json::array()));
+    detail.changelog = json_string_array(json.value("changelog", nlohmann::json::array()));
+
+    const auto links_json = json.value("links", nlohmann::json::array());
+    if (links_json.is_array()) {
+        detail.links.reserve(links_json.size());
+        for (const auto& entry : links_json) {
+            if (!entry.is_object()) {
+                continue;
+            }
+            detail.links.push_back({
+                .label = trim_copy(entry.value("label", std::string())),
+                .url = trim_copy(entry.value("url", std::string())),
+            });
+        }
+    }
+
+    const auto actions_json = json.value("actions", nlohmann::json::array());
+    if (actions_json.is_array()) {
+        detail.actions.reserve(actions_json.size());
+        for (const auto& entry : actions_json) {
+            if (!entry.is_object()) {
+                continue;
+            }
+            detail.actions.push_back({
+                .label = trim_copy(entry.value("label", std::string())),
+                .kind = trim_copy(entry.value("kind", std::string())),
+            });
+        }
+    }
+
+    return detail;
+}
+
+std::optional<PluginsDetailProps> load_plugin_detail(const fs::path& path) {
+    std::error_code ec;
+    if (!fs::exists(path, ec) || ec) {
+        return std::nullopt;
+    }
+
+    try {
+        std::ifstream file(path);
+        nlohmann::json json;
+        file >> json;
+        return detail_from_json(json);
+    } catch (...) {
+        return std::nullopt;
+    }
+}
+
+std::optional<fs::path> public_plugins_root() {
+    const char* home = std::getenv("HOME");
+    if (!home || !*home) {
+        return std::nullopt;
+    }
+    return fs::path(home) / "misty" / "public" / "plugins";
+}
+
+std::string plugin_logo_path(const std::string& plugin_id) {
+    const auto root = public_plugins_root();
+    if (!root) {
+        return {};
+    }
+    return (*root / plugin_id / "assets" / "logo.svg").string();
+}
+
+std::string lowercase_copy(std::string value) {
+    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
+        return static_cast<char>(std::tolower(ch));
     });
-    return pressed;
+    return value;
 }
 
-ImVec4 badge_color(bool accent) {
-    return accent ? ImVec4(0.24f, 0.52f, 0.35f, 1.0f) : ImVec4(0.22f, 0.22f, 0.24f, 1.0f);
+bool matches_query(const PluginsDetailProps& detail, const std::string& query) {
+    if (query.empty()) {
+        return true;
+    }
+
+    const std::string haystack = lowercase_copy(
+        detail.name + "\n" + detail.author + "\n" + detail.overview + "\n" + detail.id
+    );
+    return haystack.find(query) != std::string::npos;
 }
 
-void render_badge(const std::string& text, const ImVec4& color) {
-    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 999.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10.0f, 5.0f));
-    ImGui::PushStyleColor(ImGuiCol_Button, color);
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color);
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive, color);
-    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.94f, 0.94f, 0.96f, 1.0f));
-    ImGui::Button(text.c_str());
-    ImGui::PopStyleColor(4);
-    ImGui::PopStyleVar(2);
+bool is_installed_status(const std::string& status) {
+    const std::string normalized = lowercase_copy(status);
+    return normalized == "installed" || normalized == "enabled" || normalized == "active";
+}
+
+std::string plugin_monogram(const PluginsDetailProps& detail) {
+    std::string monogram;
+    bool take_next = true;
+
+    for (char ch : detail.name) {
+        if (std::isspace(static_cast<unsigned char>(ch)) || ch == '_' || ch == '-') {
+            take_next = true;
+            continue;
+        }
+
+        if (take_next) {
+            monogram.push_back(static_cast<char>(std::toupper(static_cast<unsigned char>(ch))));
+            if (monogram.size() == 2) {
+                return monogram;
+            }
+            take_next = false;
+        }
+    }
+
+    if (monogram.empty()) {
+        for (char ch : detail.id) {
+            if (std::isalnum(static_cast<unsigned char>(ch))) {
+                monogram.push_back(static_cast<char>(std::toupper(static_cast<unsigned char>(ch))));
+                if (monogram.size() == 2) {
+                    break;
+                }
+            }
+        }
+    }
+
+    return monogram.empty() ? "?" : monogram;
+}
+
+std::string plugin_card_description(const PluginsDetailProps& detail) {
+    if (!detail.capabilities.empty()) {
+        return detail.capabilities.front();
+    }
+    return detail.overview;
+}
+
+std::optional<PluginsDetailProps> resolve_plugin_detail(const std::string& plugin_id) {
+    const auto root = public_plugins_root();
+    if (root) {
+        if (auto detail = load_plugin_detail(*root / plugin_id / "plugin.json")) {
+            return detail;
+        }
+        if (auto detail = load_plugin_detail(*root / plugin_id / "detail.json")) {
+            return detail;
+        }
+    }
+
+    return std::nullopt;
+}
+
+void bullet_list(const char* id, const std::vector<std::string>& items) {
+    if (items.empty()) {
+        return;
+    }
+
+    UI::column(id, {
+        .width = UI::Size::fill(),
+        .height = UI::Size::auto_size(),
+        .gap = UI::Spacing::xy(0.0f, 6.0f),
+    }, [&]() {
+        for (const auto& item : items) {
+            UI::text({
+                .text = item.c_str(),
+                .width = UI::Size::fill(),
+                .overflow = UI::TextOverflow::Wrap,
+                .color = kSettingsBodyTextColor,
+            });
+        }
+    });
+}
+
+void action_list(const char* id, const std::vector<PluginsActionProps>& actions) {
+    if (actions.empty()) {
+        return;
+    }
+
+    UI::row(id, {
+        .width = UI::Size::fill(),
+        .height = UI::Size::auto_size(),
+        .gap = UI::Spacing::xy(10.0f, 0.0f),
+    }, [&]() {
+        for (size_t index = 0; index < actions.size(); ++index) {
+            const auto& action = actions[index];
+            const bool primary = action.kind == "primary";
+            UI::button(
+                (std::string(id) + "_" + std::to_string(index)).c_str(),
+                {
+                    .label = action.label.c_str(),
+                    .height = UI::Size::px(34.0f),
+                    .padding = UI::Spacing::xy(14.0f, 8.0f),
+                    .variant = primary ? UI::ButtonVariant::Primary : UI::ButtonVariant::Subtle,
+                }
+            );
+        }
+    });
+}
+
+void link_list(const char* id, const std::vector<PluginsLinkProps>& links) {
+    if (links.empty()) {
+        return;
+    }
+
+    UI::column(id, {
+        .width = UI::Size::fill(),
+        .height = UI::Size::auto_size(),
+        .gap = UI::Spacing::xy(0.0f, 8.0f),
+    }, [&]() {
+        for (size_t index = 0; index < links.size(); ++index) {
+            const auto& link = links[index];
+            UI::column((std::string(id) + "_" + std::to_string(index)).c_str(), {
+                .width = UI::Size::fill(),
+                .height = UI::Size::auto_size(),
+                .gap = UI::Spacing::xy(0.0f, 2.0f),
+            }, [&]() {
+                if (!link.label.empty()) {
+                    UI::text({
+                        .text = link.label.c_str(),
+                        .width = UI::Size::fill(),
+                        .font = UI::TextFont::Bold,
+                        .color = kSettingsHeaderTextColor,
+                    });
+                }
+                if (!link.url.empty()) {
+                    UI::text({
+                        .text = link.url.c_str(),
+                        .width = UI::Size::px(720.0f),
+                        .overflow = UI::TextOverflow::Wrap,
+                        .color = kSettingsMutedTextColor,
+                    });
+                }
+            });
+        }
+    });
+}
+
+void detail_section(
+    const char* id,
+    const char* title,
+    const std::function<void()>& content) {
+    if (!content) {
+        return;
+    }
+
+    UI::column(id, {
+        .width = UI::Size::fill(),
+        .height = UI::Size::auto_size(),
+        .gap = UI::Spacing::xy(0.0f, 10.0f),
+    }, [&]() {
+        UI::text({
+            .text = title,
+            .width = UI::Size::fill(),
+            .font = UI::TextFont::BoldLarge,
+            .color = kSettingsHeaderTextColor,
+        });
+        content();
+    });
 }
 
 } // namespace
 
-PluginsPanel::PluginsPanel(core::UIRegistry& ui_registry)
-    : ui_registry_(ui_registry) {
+PluginsPanel::PluginsPanel(core::UIRegistry&) {
+}
+
+float PluginsPanel::sidebar_max_width(float shell_width) const {
+    return std::max(
+        kSidebarMinWidth,
+        std::min(kSidebarMaxWidth, shell_width - kContentMinWidth - kDividerWidth)
+    );
+}
+
+void PluginsPanel::refresh_plugins() {
+    plugins_.clear();
+
+    const auto root = public_plugins_root();
+    if (!root) {
+        return;
+    }
+
+    std::error_code ec;
+    if (!fs::exists(*root, ec) || ec) {
+        return;
+    }
+
+    for (const auto& entry : fs::directory_iterator(*root, ec)) {
+        if (ec || !entry.is_directory()) {
+            continue;
+        }
+
+        const fs::path plugin_dir = entry.path();
+        std::optional<PluginsDetailProps> detail = load_plugin_detail(plugin_dir / "plugin.json");
+        if (!detail) {
+            detail = load_plugin_detail(plugin_dir / "detail.json");
+        }
+        if (!detail) {
+            continue;
+        }
+
+        if (detail->id.empty()) {
+            detail->id = plugin_dir.filename().string();
+        }
+        if (detail->name.empty()) {
+            detail->name = detail->id;
+        }
+
+        plugins_.push_back({
+            .detail = std::move(*detail),
+            .logo_path = (plugin_dir / "assets" / "logo.svg").string(),
+        });
+    }
+
+    std::sort(plugins_.begin(), plugins_.end(), [](const PluginListEntry& lhs, const PluginListEntry& rhs) {
+        return lowercase_copy(lhs.detail.name) < lowercase_copy(rhs.detail.name);
+    });
+}
+
+void PluginsPanel::ensure_selected_plugin() {
+    if (plugins_.empty()) {
+        selected_plugin_id_.clear();
+        return;
+    }
+
+    const auto selected = std::find_if(plugins_.begin(), plugins_.end(), [&](const PluginListEntry& entry) {
+        return entry.detail.id == selected_plugin_id_;
+    });
+    if (selected != plugins_.end()) {
+        return;
+    }
+
+    selected_plugin_id_ = plugins_.front().detail.id;
+}
+
+void PluginsPanel::shell() {
+    const float sidebar_width = sidebar_max_width(ImGui::GetContentRegionAvail().x);
+
+    UI::row("##plugins_shell", {
+        .mode = UI::Mode::LayoutOnly,
+        .width = UI::Size::fill(),
+        .height = UI::Size::fill(),
+    }, [&]() {
+        sidebar(sidebar_width);
+        splitter();
+        content();
+    });
+}
+
+void PluginsPanel::sidebar(float sidebar_width) {
+    UI::div("##plugins_sidebar", {
+        .mode = UI::Mode::ChildWindow,
+        .width = UI::Size::px(sidebar_width),
+        .height = UI::Size::fill(),
+        .padding = kSettingsSidebarPadding,
+        .gap = UI::Spacing::xy(0.0f, 12.0f),
+    }, [&]() {
+        UI::input_text({
+            .label = "##plugins_search",
+            .buffer = search_query_,
+            .buffer_size = sizeof(search_query_),
+            .hint = "Search plugins...",
+            .width = UI::Size::fill(),
+            .height = UI::Size::px(kSettingsControlHeight),
+            .padding = UI::Spacing::xy(10.0f, 8.0f),
+            .rounding = 6.0f,
+            .bg_color = kSettingsControlBgColor,
+            .border_color = kSettingsControlBorderColor,
+            .text_color = kSettingsControlTextColor,
+        });
+        section({
+            .id = "marketplace_hdr",
+            .label = "Marketplace",
+            .collapsed = &marketplace_collapsed_,
+        });
+
+        UI::divider({
+            .color = kSettingsDividerColor,
+        });
+        section({
+            .id = "installed_hdr",
+            .label = "Installed",
+            .collapsed = &installed_collapsed_,
+        });
+    });
+}
+
+void PluginsPanel::section(const PluginsSectionProps& props) {
+    if (!props.collapsed) {
+        return;
+    }
+
+    UI::div((std::string(props.id) + "_header").c_str(), {
+            .mode = UI::Mode::LayoutOnly,
+            .width = UI::Size::fill(),
+            .height = UI::Size::px(ImGui::GetTextLineHeight() + 4.0f),
+    }, [&]() {
+        UI::raw([&]() {
+            if (plugins_section_header({
+                .id = props.id,
+                .label = props.label,
+                .collapsed = *props.collapsed,
+                .width = ImGui::GetContentRegionAvail().x,
+            })) {
+                *props.collapsed = !*props.collapsed;
+            }
+        });
+    });
+
+    if (*props.collapsed) {
+        return;
+    }
+
+    UI::div((std::string(props.id) + "_body").c_str(), {
+        .mode = UI::Mode::LayoutOnly,
+        .width = UI::Size::fill(),
+        .height = UI::Size::auto_size(),
+        .padding = UI::Spacing::xy(4.0f, 6.0f),
+        .gap = UI::Spacing::xy(0.0f, 10.0f),
+    }, [&]() {
+        cards(props.id, std::string_view(props.id) != "marketplace_hdr");
+    });
+}
+
+void PluginsPanel::cards(const char* id, bool installed_only) {
+    const std::string query = lowercase_copy(trim_copy(search_query_));
+    bool showed_any = false;
+
+    for (const auto& plugin : plugins_) {
+        if (installed_only && !is_installed_status(plugin.detail.status)) {
+            continue;
+        }
+        if (!matches_query(plugin.detail, query)) {
+            continue;
+        }
+
+        const std::string card_id = std::string(id) + "_" + plugin.detail.id + "_card";
+        const std::string monogram = plugin_monogram(plugin.detail);
+        const std::string description = plugin_card_description(plugin.detail);
+        if (plugins_card({
+            .id = card_id.c_str(),
+            .icon_path = plugin.logo_path.c_str(),
+            .monogram = monogram.c_str(),
+            .title = plugin.detail.name.c_str(),
+            .author = plugin.detail.author.c_str(),
+            .description = description.c_str(),
+            .selected = selected_plugin_id_ == plugin.detail.id,
+        })) {
+            selected_plugin_id_ = plugin.detail.id;
+        }
+        showed_any = true;
+    }
+
+    if (showed_any) {
+        return;
+    }
+
+    UI::text({
+        .text = installed_only ? "No installed plugins yet." : "No plugins found.",
+        .width = UI::Size::fill(),
+        .overflow = UI::TextOverflow::Wrap,
+        .color = kSettingsMutedTextColor,
+    });
+}
+
+void PluginsPanel::splitter() {
+    UI::div("##plugins_divider", {
+        .mode = UI::Mode::LayoutOnly,
+        .width = UI::Size::px(kDividerWidth),
+        .height = UI::Size::fill(),
+        .bg_color = ImVec4(0.22f, 0.22f, 0.24f, 1.0f),
+        .margin = UI::Spacing::xy(12.0f, 0.0f),
+    }, []() {});
+}
+
+void PluginsPanel::content() {
+    const auto selected = std::find_if(plugins_.begin(), plugins_.end(), [&](const PluginListEntry& entry) {
+        return entry.detail.id == selected_plugin_id_;
+    });
+
+    UI::WithStyle([&](UI::StyleScope& style) {
+        style.var(ImGuiStyleVar_ScrollbarSize, 8.0f);
+
+        UI::div("##plugins_content", {
+            .mode = UI::Mode::ChildWindow,
+            .width = UI::Size::fill(),
+            .height = UI::Size::fill(),
+            .window_flags = ImGuiWindowFlags_AlwaysVerticalScrollbar,
+            .padding = kSettingsShellPadding,
+        }, [&]() {
+            if (selected == plugins_.end()) {
+                plugins_page({
+                    .title = "Plugins",
+                }, [&]() {
+                    UI::text({
+                        .text = "No plugin metadata found in ~/misty/public/plugins yet.",
+                        .width = UI::Size::px(720.0f),
+                        .overflow = UI::TextOverflow::Wrap,
+                        .color = kSettingsMutedTextColor,
+                    });
+                });
+                return;
+            }
+
+            const PluginsDetailProps& detail = selected->detail;
+            plugins_page({
+                .title = detail.name.c_str(),
+            }, [&]() {
+                UI::column("plugins_detail_body", {
+                    .width = UI::Size::fill(),
+                    .height = UI::Size::auto_size(),
+                    .gap = UI::Spacing::xy(0.0f, 20.0f),
+                }, [&]() {
+                    if (!detail.version.empty()) {
+                        UI::text({
+                            .text = detail.version.c_str(),
+                            .width = UI::Size::fill(),
+                            .color = kSettingsBodyTextColor,
+                        });
+                    }
+                    if (!detail.author.empty()) {
+                        UI::text({
+                            .text = detail.author.c_str(),
+                            .width = UI::Size::fill(),
+                            .color = kSettingsMutedTextColor,
+                        });
+                    }
+                    if (!detail.status.empty()) {
+                        UI::text({
+                            .text = detail.status.c_str(),
+                            .width = UI::Size::fill(),
+                            .color = kSettingsMutedTextColor,
+                        });
+                    }
+
+                    if (!detail.overview.empty()) {
+                        detail_section("plugins_overview", "Overview", [&]() {
+                            UI::text({
+                                .text = detail.overview.c_str(),
+                                .width = UI::Size::px(720.0f),
+                                .overflow = UI::TextOverflow::Wrap,
+                                .color = kSettingsBodyTextColor,
+                            });
+                        });
+                    }
+
+                    if (!detail.capabilities.empty()) {
+                        detail_section("plugins_capabilities", "Capabilities", [&]() {
+                            bullet_list("plugins_capabilities_list", detail.capabilities);
+                        });
+                    }
+
+                    if (!detail.where_it_appears.empty()) {
+                        detail_section("plugins_appears", "Where It Appears", [&]() {
+                            bullet_list("plugins_appears_list", detail.where_it_appears);
+                        });
+                    }
+
+                    if (!detail.permissions.empty()) {
+                        detail_section("plugins_permissions", "Permissions", [&]() {
+                            bullet_list("plugins_permissions_list", detail.permissions);
+                        });
+                    }
+
+                    if (!detail.getting_started.empty()) {
+                        detail_section("plugins_getting_started", "Getting Started", [&]() {
+                            bullet_list("plugins_getting_started_list", detail.getting_started);
+                        });
+                    }
+
+                    if (!detail.changelog.empty()) {
+                        detail_section("plugins_changelog", "Changelog", [&]() {
+                            bullet_list("plugins_changelog_list", detail.changelog);
+                        });
+                    }
+
+                    if (!detail.actions.empty()) {
+                        detail_section("plugins_actions", "Actions", [&]() {
+                            action_list("plugins_actions_list", detail.actions);
+                        });
+                    }
+
+                    if (!detail.links.empty()) {
+                        detail_section("plugins_links", "Links", [&]() {
+                            link_list("plugins_links_list", detail.links);
+                        });
+                    }
+                });
+            });
+        });
+    });
 }
 
 void PluginsPanel::render() {
-    auto& plugin_host = core::PluginManager::get();
-    const auto plugins = plugin_host.loaded_plugins();
-    const auto plugin_roots = plugin_host.discovery_roots();
+    constexpr ImGuiWindowFlags flags =
+        ImGuiWindowFlags_NoTitleBar |
+        ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoCollapse;
 
-    ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar |
-                             ImGuiWindowFlags_NoMove |
-                             ImGuiWindowFlags_NoCollapse |
-                             ImGuiWindowFlags_NoResize;
-
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.12f, 0.12f, 0.12f, 1.0f));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(24.0f, 24.0f));
-
-    if (ImGui::Begin("Plugins", nullptr, flags)) {
-        render_header(plugins.size());
-        ImGui::Spacing();
-        render_plugin_roots(plugin_roots);
-        ImGui::Spacing();
-        if (ImGui::BeginChild("PluginsList", ImVec2(0, 0), false)) {
-            if (!plugins.empty()) {
-                {
-                    misty::UI::WithFont(core::FontManager::get().get_font(core::FontID::ROBOTO_BOLD), [&]() {
-                        ImGui::Text("Plugins");
-                    });
-                }
-                ImGui::Spacing();
-                for (const auto& plugin : plugins) {
-                    render_plugin_card(plugin);
-                    ImGui::Spacing();
-                }
-            }
-
-            if (plugins.empty()) {
-                render_empty_state(plugin_roots);
-            }
-            ImGui::EndChild();
+    UI::WithWindowStyle({
+        .bg_color = ImVec4(0.12f, 0.12f, 0.12f, 1.0f),
+    }, [&]() {
+        if (ImGui::Begin("Plugins", nullptr, flags)) {
+            refresh_plugins();
+            ensure_selected_plugin();
+            shell();
         }
-    }
-
-    ImGui::End();
-    ImGui::PopStyleVar();
-    ImGui::PopStyleColor();
-}
-
-void PluginsPanel::render_header(std::size_t plugin_count) {
-    if (ImGui::BeginTable("PluginsHeader", 2, ImGuiTableFlags_SizingStretchProp)) {
-        ImGui::TableSetupColumn("Title", ImGuiTableColumnFlags_WidthStretch, 1.0f);
-        ImGui::TableSetupColumn("Action", ImGuiTableColumnFlags_WidthFixed, 96.0f);
-        ImGui::TableNextRow();
-
-        ImGui::TableSetColumnIndex(0);
-        {
-            misty::UI::WithFont(core::FontManager::get().get_font(core::FontID::ROBOTO_BOLD_LARGE), [&]() {
-                ImGui::Text("Plugins");
-            });
-        }
-        ImGui::TextDisabled("%zu plugin", plugin_count);
-
-        ImGui::TableSetColumnIndex(1);
-        ImGui::SetCursorPosX(std::max(0.0f, ImGui::GetContentRegionAvail().x - 96.0f));
-        if (styled_button("Reload", ImVec2(96.0f, 0.0f), primary_button_style())) {
-            core::PluginManager::get().reload();
-        }
-
-        ImGui::EndTable();
-    }
-}
-
-void PluginsPanel::render_plugin_roots(const std::vector<std::string>& roots) {
-    ImGui::TextDisabled("Plugin roots");
-    for (const auto& root : roots) {
-        ImGui::BulletText("%s", root.c_str());
-    }
-}
-
-void PluginsPanel::render_empty_state(const std::vector<std::string>& roots) {
-    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 12.0f);
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.16f, 0.16f, 0.18f, 1.0f));
-
-    if (ImGui::BeginChild("PluginsEmpty", ImVec2(0, 180.0f), true)) {
-        misty::UI::WithFont(core::FontManager::get().get_font(core::FontID::ROBOTO_BOLD), [&]() {
-            ImGui::Text("No plugins discovered");
-        });
-        ImGui::Spacing();
-        ImGui::TextWrapped("Drop a plugin folder with a manifest into one of the discovery roots to make it available here.");
-        if (!roots.empty()) {
-            ImGui::Spacing();
-            ImGui::TextDisabled("Suggested location");
-            ImGui::TextWrapped("%s", roots.back().c_str());
-        }
-    }
-    ImGui::EndChild();
-
-    ImGui::PopStyleColor();
-    ImGui::PopStyleVar();
-}
-
-void PluginsPanel::render_plugin_card(const core::PluginInfo& plugin) {
-    const float base_height = 180.0f + (plugin.commands.empty() ? 0.0f : 24.0f * plugin.commands.size()) +
-        (plugin.panels.empty() ? 0.0f : 24.0f * plugin.panels.size()) +
-        (plugin.diagnostics.empty() ? 0.0f : 20.0f * plugin.diagnostics.size());
-    const std::string card_id = "plugin_card_" + plugin.id;
-
-    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 12.0f);
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.14f, 0.16f, 0.19f, 1.0f));
-
-    if (ImGui::BeginChild(card_id.c_str(), ImVec2(0, base_height), true)) {
-        {
-            misty::UI::WithFont(core::FontManager::get().get_font(core::FontID::ROBOTO_BOLD), [&]() {
-                ImGui::Text("%s", plugin.name.c_str());
-            });
-        }
-        ImGui::SameLine();
-        ImGui::TextDisabled("v%s", plugin.version.c_str());
-        render_badge(plugin.bundled ? "Bundled" : "User", badge_color(plugin.bundled));
-        ImGui::SameLine();
-        if (plugin.verified) {
-            render_badge("Verified", ImVec4(0.18f, 0.42f, 0.28f, 1.0f));
-            ImGui::SameLine();
-        } else if (plugin.loaded) {
-            render_badge("Unsigned", ImVec4(0.28f, 0.28f, 0.18f, 1.0f));
-            ImGui::SameLine();
-        }
-        if (plugin.faulted) {
-            render_badge("Faulted", ImVec4(0.54f, 0.22f, 0.18f, 1.0f));
-        } else {
-            render_badge(plugin.loaded ? "Loaded" : "Rejected", badge_color(plugin.loaded));
-        }
-
-        if (!plugin.author.empty()) {
-            ImGui::TextDisabled("By %s", plugin.author.c_str());
-        } else {
-            ImGui::TextDisabled("%s", plugin.id.c_str());
-        }
-        if (!plugin.signer.empty()) {
-            ImGui::SameLine();
-            ImGui::TextDisabled("Signer: %s", plugin.signer.c_str());
-        }
-
-        if (!plugin.description.empty()) {
-            ImGui::Spacing();
-            ImGui::TextWrapped("%s", plugin.description.c_str());
-        }
-
-        ImGui::Spacing();
-        if (styled_button(("Sandbox##" + plugin.id).c_str(), ImVec2(130.0f, 0.0f), primary_button_style())) {
-            std::string error;
-            if (!core::PluginManager::get().open_plugin_sandbox(plugin.plugin_dir, &error)) {
-                auto& activity = ui_registry_.get_state<ActivityState>("Activity");
-                activity.add_entry("System",
-                    error.empty() ? "Could not open plugin sandbox." : error,
-                    ActivityEntryType::ERROR);
-            }
-        }
-
-        ImGui::Spacing();
-        ImGui::Separator();
-        ImGui::Spacing();
-
-        ImGui::TextDisabled("Commands");
-        if (plugin.commands.empty()) {
-            ImGui::TextWrapped("No commands registered.");
-        } else {
-            for (const auto& command : plugin.commands) {
-                if (ImGui::Button((command.title + "##invoke_" + command.id).c_str())) {
-                    core::PluginManager::get().invoke_command(command.id);
-                }
-                ImGui::SameLine();
-                ImGui::TextDisabled("%s", command.default_shortcut.empty() ? command.id.c_str() : command.default_shortcut.c_str());
-            }
-        }
-
-        ImGui::Spacing();
-        ImGui::TextDisabled("Panels");
-        if (plugin.panels.empty()) {
-            ImGui::TextWrapped("No panels registered.");
-        } else {
-            for (const auto& panel : plugin.panels) {
-                const std::string label = std::string(panel.is_open ? "Focus " : "Open ") +
-                    panel.title + "##panel_" + panel.id;
-                if (ImGui::Button(label.c_str())) {
-                    core::PluginManager::get().open_panel(panel.id);
-                }
-            }
-        }
-
-        if (!plugin.diagnostics.empty()) {
-            ImGui::Spacing();
-            ImGui::TextDisabled("Diagnostics");
-            for (const auto& diagnostic : plugin.diagnostics) {
-                ImGui::BulletText("%s", diagnostic.c_str());
-            }
-        }
-
-        ImGui::Spacing();
-        ImGui::TextDisabled("Library");
-        ImGui::TextWrapped("%s", plugin.library_path.empty() ? "(not loaded)" : plugin.library_path.c_str());
-    }
-    ImGui::EndChild();
-
-    ImGui::PopStyleColor();
-    ImGui::PopStyleVar();
-}
-
-std::string PluginsPanel::join_strings(const std::vector<std::string>& values) {
-    std::ostringstream joined;
-    for (std::size_t i = 0; i < values.size(); ++i) {
-        if (i > 0) {
-            joined << ", ";
-        }
-        joined << values[i];
-    }
-    return joined.str();
+        ImGui::End();
+    });
 }
 
 } // namespace misty::panel

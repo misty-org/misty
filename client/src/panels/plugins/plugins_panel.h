@@ -3,9 +3,10 @@
 #include <string>
 #include <vector>
 
-#include "core/manager/plugin_manager.h"
 #include "core/ui/ui_registry.h"
 #include "panels/panel.h"
+#include "panels/plugins/plugins_components.h"
+#include "panels/plugins/plugins_detail.h"
 
 namespace misty::panel {
 
@@ -17,14 +18,26 @@ public:
     void render() override;
 
 private:
-    void render_header(std::size_t plugin_count);
-    void render_plugin_roots(const std::vector<std::string>& roots);
-    void render_empty_state(const std::vector<std::string>& roots);
-    void render_plugin_card(const core::PluginInfo& plugin);
+    struct PluginListEntry {
+        PluginsDetailProps detail;
+        std::string logo_path;
+    };
 
-    static std::string join_strings(const std::vector<std::string>& values);
+    float sidebar_max_width(float shell_width) const;
+    void refresh_plugins();
+    void ensure_selected_plugin();
+    void shell();
+    void sidebar(float sidebar_width);
+    void section(const PluginsSectionProps& props);
+    void cards(const char* id, bool installed_only);
+    void splitter();
+    void content();
 
-    core::UIRegistry& ui_registry_;
+    bool marketplace_collapsed_ = false;
+    bool installed_collapsed_ = false;
+    char search_query_[128] = {};
+    std::string selected_plugin_id_ = "preview_manager";
+    std::vector<PluginListEntry> plugins_;
 };
 
 } // namespace misty::panel

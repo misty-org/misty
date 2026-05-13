@@ -17,6 +17,7 @@ namespace misty::panel {
 
     namespace {
         constexpr float kRemoteCardHeight = 124.0f;
+        constexpr float kRefreshPulseRate = 7.0f;
         struct ButtonStyle {
             ImVec4 button;
             ImVec4 hovered;
@@ -155,6 +156,38 @@ namespace misty::panel {
             return pressed;
         }
 
+        bool refresh_indicator_active(bool is_refreshing,
+                                      const std::chrono::steady_clock::time_point& refresh_indicator_until) {
+            return is_refreshing || std::chrono::steady_clock::now() < refresh_indicator_until;
+        }
+
+        ButtonStyle refresh_button_style(bool refresh_active) {
+            if (!refresh_active) {
+                return primary_button_style();
+            }
+
+            const float pulse = 0.5f + 0.5f * std::sin(static_cast<float>(ImGui::GetTime()) * kRefreshPulseRate);
+            return {
+                ImVec4(0.84f + pulse * 0.10f, 0.90f + pulse * 0.06f, 0.98f, 1.0f),
+                ImVec4(0.88f + pulse * 0.08f, 0.93f + pulse * 0.05f, 0.99f, 1.0f),
+                ImVec4(0.79f + pulse * 0.06f, 0.85f + pulse * 0.04f, 0.94f, 1.0f),
+                ImVec4(0.07f, 0.07f, 0.07f, 1.0f),
+                8.0f,
+            };
+        }
+
+        const char* refresh_button_label(bool refresh_active) {
+            if (!refresh_active) {
+                return "Refresh";
+            }
+
+            switch ((static_cast<int>(ImGui::GetTime() * 3.0) % 3 + 3) % 3) {
+                case 0: return "Refreshing.";
+                case 1: return "Refreshing..";
+                default: return "Refreshing...";
+            }
+        }
+
         void text_colored(const ImVec4& color, const char* fmt, ...) {
             char buffer[1024];
             va_list args;
@@ -222,7 +255,12 @@ namespace misty::panel {
             ImGui::Spacing();
             show_cloud_section(state);
 
-            if (state.is_refreshing) {
+            bool refresh_active = false;
+            {
+                std::lock_guard<std::mutex> lock(state.mu);
+                refresh_active = refresh_indicator_active(state.is_refreshing, state.refresh_indicator_until);
+            }
+            if (refresh_active) {
                 show_loading_overlay();
             }
             show_disconnect_confirm_modal(state);
@@ -237,11 +275,14 @@ namespace misty::panel {
     void ServicesPanel::show_header(ServicesState& state) {
         size_t connection_count = 0;
         bool is_refreshing = false;
+        std::chrono::steady_clock::time_point refresh_indicator_until{};
         {
             std::lock_guard<std::mutex> lock(state.mu);
             connection_count = state.connections.size();
             is_refreshing = state.is_refreshing;
+            refresh_indicator_until = state.refresh_indicator_until;
         }
+        const bool refresh_active = refresh_indicator_active(is_refreshing, refresh_indicator_until);
 
         ImGui::BeginGroup();
         misty::UI::WithFontScale(1.8f, []() {
@@ -255,18 +296,20 @@ namespace misty::panel {
         text_colored(ImVec4(0.58f, 0.58f, 0.62f, 1.0f), "%zu providers", provider_snapshot(state).size());
         ImGui::SameLine(0.0f, 18.0f);
         text_colored(ImVec4(0.66f, 0.66f, 0.69f, 1.0f),
-                          "%s", is_refreshing ? "Refreshing remotes" : "Ready");
+                          "%s", refresh_active ? "Refreshing remotes" : "Ready");
         ImGui::EndGroup();
 
         ImGui::SameLine();
         const float refresh_width = 112.0f;
         ImGui::Dummy(ImVec2(std::max(0.0f, ImGui::GetContentRegionAvail().x - refresh_width), 0.0f));
         ImGui::SameLine();
-        if (is_refreshing) ImGui::BeginDisabled();
-        if (styled_button("Refresh", ImVec2(refresh_width, 30.0f), primary_button_style())) {
+        if (refresh_active) ImGui::BeginDisabled();
+        if (styled_button(refresh_button_label(refresh_active),
+                          ImVec2(refresh_width, 30.0f),
+                          refresh_button_style(refresh_active))) {
             state.refresh_connections();
         }
-        if (is_refreshing) ImGui::EndDisabled();
+        if (refresh_active) ImGui::EndDisabled();
     }
 
     void ServicesPanel::show_cloud_section(ServicesState& state) {

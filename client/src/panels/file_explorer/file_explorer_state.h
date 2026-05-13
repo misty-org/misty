@@ -270,6 +270,7 @@ namespace misty::panel {
         // Transient per-tab sync state for manual "run now" refreshes.
         bool sync_request_in_flight = false;
         uint64_t sync_request_generation = 0;
+        std::chrono::steady_clock::time_point sync_button_anim_until{};
         bool current_dir_watched = false;
         bool sync_watch_request_in_flight = false;
         bool watched_refresh_in_flight = false;
