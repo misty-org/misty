@@ -100,7 +100,6 @@ void SettingsPanel::sidebar(SettingsState& state) {
         .padding = kSettingsSidebarPadding,
         .gap = UI::Spacing::xy(0.0f, 5.0f),
     }, [&]() {
-        sidebar_header(state);
         sidebar_tabs(state);
     });
 }

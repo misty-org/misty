@@ -22,6 +22,7 @@ namespace misty::panel {
     using json = nlohmann::json;
 
     namespace {
+        constexpr auto kMinRefreshIndicatorDuration = std::chrono::milliseconds(1400);
         constexpr int kInitialRemotesFetchMaxAttempts = 8;
         constexpr auto kInitialRemotesFetchRetryInterval = std::chrono::seconds(2);
         constexpr long kSyncListConnectTimeoutSeconds = 10L;
@@ -331,6 +332,7 @@ namespace misty::panel {
             }
             error_msg.clear();
             is_refreshing = true;
+            refresh_indicator_until = std::chrono::steady_clock::now() + kMinRefreshIndicatorDuration;
         }
 
         worker_pool_->add(
@@ -354,7 +356,7 @@ namespace misty::panel {
                         std::map<std::string, std::string> headers;
                         headers["Accept"] = "application/json";
 
-                        auto response = core::HTTPClient::get().get(base + "/api/remotes", headers);
+                        auto response = core::HTTPClient::get().get(base + "/api/remotes", {.headers = headers});
                         if (response.status_code >= 200 && response.status_code < 300) {
                             try {
                                 auto parsed = nlohmann::json::parse(response.body);
@@ -461,7 +463,7 @@ namespace misty::panel {
 
                 std::map<std::string, std::string> headers;
                 headers["Accept"] = "application/json";
-                auto response = core::HTTPClient::get().get(base + "/api/remotes/types", headers);
+                auto response = core::HTTPClient::get().get(base + "/api/remotes/types", {.headers = headers});
 
                 std::vector<ProviderType> loaded;
                 if (response.status_code >= 200 && response.status_code < 300) {
@@ -526,7 +528,7 @@ namespace misty::panel {
 
                 std::map<std::string, std::string> headers;
                 headers["Accept"] = "application/json";
-                auto response = core::HTTPClient::get().get(base + "/api/remotes/health", headers);
+                auto response = core::HTTPClient::get().get(base + "/api/remotes/health", {.headers = headers});
 
                 RcloneHealth loaded;
                 loaded.loaded = true;
@@ -707,7 +709,7 @@ namespace misty::panel {
                 headers["Content-Type"] = "application/json";
 
                 auto response = core::HTTPClient::get().post(
-                    base + "/api/remotes", body.dump(), headers);
+                    base + "/api/remotes", body.dump(), {.headers = headers});
 
                 std::lock_guard<std::mutex> lock(mu);
                 if (response.status_code == 202 || (response.status_code >= 200 && response.status_code < 300)) {
@@ -763,7 +765,7 @@ namespace misty::panel {
                 std::string url = base + "/api/remotes?name=" + core::url_encode(remote_name);
                 std::map<std::string, std::string> headers;
                 headers["Accept"] = "application/json";
-                core::HTTPClient::get().del(url, headers);
+                core::HTTPClient::get().del(url, {.headers = headers});
             },
             []() {},
             [](const std::string& err) {
@@ -791,7 +793,7 @@ namespace misty::panel {
                 std::map<std::string, std::string> headers;
                 headers["Accept"] = "application/json";
 
-                auto response = core::HTTPClient::get().get(url, headers);
+                auto response = core::HTTPClient::get().get(url, {.headers = headers});
 
                 if (response.status_code >= 200 && response.status_code < 300) {
                     callback(true, response.body, "");
@@ -832,12 +834,10 @@ namespace misty::panel {
                 headers["Accept"] = "application/json";
                 headers["Content-Type"] = "application/json";
 
-                auto response = core::HTTPClient::get().post_with_timeouts(
+                auto response = core::HTTPClient::get().post(
                     url,
                     body,
-                    kSyncRefetchConnectTimeoutSeconds,
-                    kSyncRefetchTotalTimeoutSeconds,
-                    headers);
+                    {.headers = headers, .timeouts = {kSyncRefetchConnectTimeoutSeconds, kSyncRefetchTotalTimeoutSeconds}});
                 if (response.status_code >= 200 && response.status_code < 300) {
                     callback(true, response.body, "");
                 } else {
@@ -877,7 +877,7 @@ namespace misty::panel {
                 headers["Accept"] = "application/json";
                 headers["Content-Type"] = "application/json";
 
-                auto response = core::HTTPClient::get().put(url, body, headers);
+                auto response = core::HTTPClient::get().put(url, body, {.headers = headers});
                 if (response.status_code >= 200 && response.status_code < 300) {
                     callback(true, response.body, "");
                 } else {
@@ -913,7 +913,7 @@ namespace misty::panel {
                 std::map<std::string, std::string> headers;
                 headers["Accept"] = "application/json";
 
-                auto response = core::HTTPClient::get().del(url, headers);
+                auto response = core::HTTPClient::get().del(url, {.headers = headers});
                 if (response.status_code >= 200 && response.status_code < 300) {
                     callback(true, response.body, "");
                 } else {
@@ -955,12 +955,10 @@ namespace misty::panel {
                 headers["Accept"] = "application/json";
                 headers["Content-Type"] = "application/json";
 
-                auto response = core::HTTPClient::get().post_with_timeouts(
+                auto response = core::HTTPClient::get().post(
                     url,
                     body,
-                    kSyncRunNowConnectTimeoutSeconds,
-                    kSyncRunNowTotalTimeoutSeconds,
-                    headers);
+                    {.headers = headers, .timeouts = {kSyncRunNowConnectTimeoutSeconds, kSyncRunNowTotalTimeoutSeconds}});
                 if (response.status_code >= 200 && response.status_code < 300) {
                     callback(true, response.body, "");
                 } else {
@@ -1106,7 +1104,8 @@ namespace misty::panel {
                 headers["Accept"] = "application/json";
                 headers["Content-Type"] = "application/json";
 
-                auto response = core::HTTPClient::get().post(base + "/api/sync/dirty", body.dump(), headers);
+                auto response = core::HTTPClient::get().post(
+                    base + "/api/sync/dirty", body.dump(), {.headers = headers});
                 if (response.status_code >= 200 && response.status_code < 300) {
                     if (callback) callback(true, response.body, "");
                 } else {
@@ -1149,7 +1148,7 @@ namespace misty::panel {
                 headers["Accept"] = "application/json";
                 headers["Content-Type"] = "application/json";
 
-                auto response = core::HTTPClient::get().post(url, body, headers);
+                auto response = core::HTTPClient::get().post(url, body, {.headers = headers});
                 if (response.status_code >= 200 && response.status_code < 300) {
                     if (callback) callback(true, response.body, "");
                 } else {
@@ -1216,12 +1215,10 @@ namespace misty::panel {
                 std::map<std::string, std::string> headers;
                 headers["Accept"] = "application/json";
 
-                auto response = core::HTTPClient::get().get_stream_with_timeouts(
+                auto response = core::HTTPClient::get().get_stream(
                     url,
-                    kSyncListConnectTimeoutSeconds,
-                    kSyncListTotalTimeoutSeconds,
                     chunk_callback,
-                    headers);
+                    {.headers = headers, .timeouts = {kSyncListConnectTimeoutSeconds, kSyncListTotalTimeoutSeconds}});
                 if (response.status_code >= 200 && response.status_code < 300) {
                     callback(true, "", "");
                 } else {
@@ -1327,7 +1324,8 @@ namespace misty::panel {
                 headers["Accept"] = "application/json";
                 headers["Content-Type"] = "application/json";
 
-                auto response = core::HTTPClient::get().post(base + "/api/folder/download", body.dump(), headers);
+                auto response = core::HTTPClient::get().post(
+                    base + "/api/folder/download", body.dump(), {.headers = headers});
                 if (response.status_code >= 200 && response.status_code < 300) {
                     try {
                         json payload = json::parse(response.body);
@@ -1383,8 +1381,8 @@ namespace misty::panel {
                 headers["X-File-Name"] = file_name;
                 headers["Content-Type"] = "application/octet-stream";
 
-                auto response = core::HTTPClient::get().post_with_timeouts(
-                    url, file_content, 10L, 0L, headers);
+                auto response = core::HTTPClient::get().post(
+                    url, file_content, {.headers = headers, .timeouts = {10L, 0L}});
 
                 if (response.status_code >= 200 && response.status_code < 300) {
                     if (progress_cb) {
@@ -1431,7 +1429,8 @@ namespace misty::panel {
                 headers["Accept"] = "application/json";
                 headers["Content-Type"] = "application/json";
 
-                auto response = core::HTTPClient::get().post(base + "/api/folder/transfer", body.dump(), headers);
+                auto response = core::HTTPClient::get().post(
+                    base + "/api/folder/transfer", body.dump(), {.headers = headers});
                 if (response.status_code >= 200 && response.status_code < 300) {
                     callback(true, response.body, "");
                 } else {
@@ -1468,7 +1467,7 @@ namespace misty::panel {
                 headers["Content-Type"] = "application/json";
 
                 auto response = core::HTTPClient::get().post(
-                    base + "/api/mkdir", body.dump(), headers);
+                    base + "/api/mkdir", body.dump(), {.headers = headers});
 
                 if (response.status_code >= 200 && response.status_code < 300) {
                     callback(true, response.body, "");
@@ -1595,7 +1594,7 @@ namespace misty::panel {
                 headers["Content-Type"] = "application/json";
 
                 auto response = core::HTTPClient::get().post(
-                    base + "/api/remotes/config/start", body.dump(), headers);
+                    base + "/api/remotes/config/start", body.dump(), {.headers = headers});
 
                 std::lock_guard<std::mutex> lock(mu);
                 config_in_flight = false;
@@ -1665,7 +1664,7 @@ namespace misty::panel {
                 headers["Content-Type"] = "application/json";
 
                 auto response = core::HTTPClient::get().post(
-                    base + "/api/remotes/config/continue", body.dump(), headers);
+                    base + "/api/remotes/config/continue", body.dump(), {.headers = headers});
 
                 std::lock_guard<std::mutex> lock(mu);
                 config_in_flight = false;
@@ -1714,7 +1713,7 @@ namespace misty::panel {
                 if (base.empty()) return;
                 std::string url = base + "/api/remotes/config?name=" + core::url_encode(name);
                 std::map<std::string, std::string> headers;
-                core::HTTPClient::get().del(url, headers);
+                core::HTTPClient::get().del(url, {.headers = headers});
             },
             []() {},
             [](const std::string&) {}
@@ -1742,7 +1741,7 @@ namespace misty::panel {
                 std::map<std::string, std::string> headers;
                 headers["Accept"] = "application/json";
 
-                auto response = core::HTTPClient::get().get(url, headers);
+                auto response = core::HTTPClient::get().get(url, {.headers = headers});
 
                 if (response.status_code >= 200 && response.status_code < 300) {
                     callback(true, response.body, "");

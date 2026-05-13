@@ -5,6 +5,7 @@
 #include "core/manager/session_manager.h"
 #include "views/app_view.h"
 #include "imgui.h"
+#include "imgui_internal.h"
 
 namespace misty::panel {
 
@@ -45,18 +46,18 @@ namespace misty::panel {
         ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.25f, 0.25f, 0.25f, 1.0f));
 
         if (ImGui::Begin("##ProfilePopup", nullptr, flags)) {
+            if (ImGuiWindow* window = ImGui::FindWindowByName("##ProfilePopup")) {
+                ImGui::BringWindowToDisplayFront(window);
+            }
 
-            // --- Close if user clicks outside ---
-            // Exclude clicks within the navbar region (x < 77px) since the Profile
-            // toggle button lives there. IsMouseClicked fires on mouse-down while
-            // ImageButton fires on mouse-up, so without this guard the popup would
-            // close and immediately reopen.
             if (!ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem) &&
                 ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-                ImVec2 mouse = ImGui::GetMousePos();
-                ImGuiViewport* vp = ImGui::GetMainViewport();
-                float navbar_right = vp->WorkPos.x + 77.0f;
-                if (mouse.x > navbar_right) {
+                const ImVec2 mouse = ImGui::GetMousePos();
+                const bool clicked_toggle =
+                    state.has_button_rect &&
+                    mouse.x >= state.button_min.x && mouse.x <= state.button_max.x &&
+                    mouse.y >= state.button_min.y && mouse.y <= state.button_max.y;
+                if (!clicked_toggle) {
                     state.is_open = false;
                 }
             }

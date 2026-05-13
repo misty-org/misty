@@ -27,6 +27,8 @@ namespace misty::core {
 
         SVGTexture& get_svg_texture(const std::string& name, int size = 24);
         SVGTexture& get_svg_texture(const std::string& name, int width, int height);
+        SVGTexture& get_svg_texture_path(const std::string& path, int size = 24, bool apply_theme = true);
+        SVGTexture& get_svg_texture_path(const std::string& path, int width, int height, bool apply_theme = true);
 
         ImageTexture& get_image_texture(const std::string& path);
 

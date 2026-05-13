@@ -79,7 +79,9 @@ namespace misty::panel {
                     initial_load_done = true;
                     return;
                 }
-                auto resp = core::HTTPClient::get().get(url, core::SessionManager::get().get_auth_headers());
+                auto resp = core::HTTPClient::get().get(
+                    url,
+                    {.headers = core::SessionManager::get().get_auth_headers()});
 
                 std::lock_guard<std::mutex> lock(mu);
                 is_refreshing = false;
@@ -135,7 +137,10 @@ namespace misty::panel {
                     post_error("PROXY_SERVICE_URL not set");
                     return;
                 }
-                auto resp = core::HTTPClient::get().post(endpoint, body_str, json_headers());
+                auto resp = core::HTTPClient::get().post(
+                    endpoint,
+                    body_str,
+                    {.headers = json_headers()});
                 if (resp.status_code != 201) {
                     std::lock_guard<std::mutex> lock(mu);
                     post_error("create_repo: HTTP " + std::to_string(resp.status_code) + " " + resp.body);
@@ -165,7 +170,9 @@ namespace misty::panel {
                     post_error("PROXY_SERVICE_URL not set");
                     return;
                 }
-                auto resp = core::HTTPClient::get().del(endpoint, core::SessionManager::get().get_auth_headers());
+                auto resp = core::HTTPClient::get().del(
+                    endpoint,
+                    {.headers = core::SessionManager::get().get_auth_headers()});
                 if (resp.status_code < 200 || resp.status_code >= 300) {
                     std::lock_guard<std::mutex> lock(mu);
                     post_error("delete_repo: HTTP " + std::to_string(resp.status_code) + " " + resp.body);
@@ -193,7 +200,9 @@ namespace misty::panel {
                     post_error("PROXY_SERVICE_URL not set");
                     return;
                 }
-                auto resp = core::HTTPClient::get().get(endpoint, core::SessionManager::get().get_auth_headers());
+                auto resp = core::HTTPClient::get().get(
+                    endpoint,
+                    {.headers = core::SessionManager::get().get_auth_headers()});
                 if (resp.status_code < 200 || resp.status_code >= 300) {
                     std::lock_guard<std::mutex> lock(mu);
                     post_error("refresh_snapshots: HTTP " + std::to_string(resp.status_code) + " " + resp.body);
@@ -252,7 +261,10 @@ namespace misty::panel {
                     post_error("PROXY_SERVICE_URL not set");
                     return;
                 }
-                auto resp = core::HTTPClient::get().post(endpoint, body_str, json_headers());
+                auto resp = core::HTTPClient::get().post(
+                    endpoint,
+                    body_str,
+                    {.headers = json_headers()});
                 if (resp.status_code != 202) {
                     std::lock_guard<std::mutex> lock(mu);
                     post_error("start_backup: HTTP " + std::to_string(resp.status_code) + " " + resp.body);
@@ -295,7 +307,10 @@ namespace misty::panel {
                     post_error("PROXY_SERVICE_URL not set");
                     return;
                 }
-                auto resp = core::HTTPClient::get().post(endpoint, body_str, json_headers());
+                auto resp = core::HTTPClient::get().post(
+                    endpoint,
+                    body_str,
+                    {.headers = json_headers()});
                 if (resp.status_code != 202) {
                     std::lock_guard<std::mutex> lock(mu);
                     post_error("start_restore: HTTP " + std::to_string(resp.status_code) + " " + resp.body);
@@ -329,7 +344,10 @@ namespace misty::panel {
             [this, job_id]() {
                 std::string endpoint = proxy_url("/api/vault/jobs/" + job_id + "/cancel");
                 if (endpoint.empty()) return;
-                auto resp = core::HTTPClient::get().post(endpoint, "", json_headers());
+                auto resp = core::HTTPClient::get().post(
+                    endpoint,
+                    "",
+                    {.headers = json_headers()});
                 if (resp.status_code < 200 || resp.status_code >= 300) {
                     std::lock_guard<std::mutex> lock(mu);
                     post_error("cancel_job: HTTP " + std::to_string(resp.status_code) + " " + resp.body);

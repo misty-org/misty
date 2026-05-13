@@ -368,8 +368,9 @@ void BootLoader::begin_probe(const std::string& base_url) {
 
     worker_pool_.add(
         [base_url, shared]() {
-            auto ready = misty::core::HTTPClient::get().get_with_timeouts(
-                base_url + "/api/health", 1L, 2L);
+            auto ready = misty::core::HTTPClient::get().get(
+                base_url + "/api/health",
+                {.timeouts = {1L, 2L}});
             shared->status = ready.status_code;
             shared->body   = std::move(ready.body);
         },
