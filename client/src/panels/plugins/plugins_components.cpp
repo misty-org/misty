@@ -70,41 +70,32 @@ void plugins_page(const PluginsContentProps& props, const std::function<void()>&
 }
 
 void plugins_icon(const char* id, const PluginsIconProps& props) {
-    UI::div(id, {
-        .width = UI::Size::px(props.tile_size),
-        .height = UI::Size::px(props.tile_size),
-        .bg_color = props.tile_color,
-        .rounding = 10.0f,
-        .align = UI::Align::Center,
-        .justify = UI::Justify::Start,
-    }, [&]() {
-        if (props.icon_path && props.icon_path[0] != '\0') {
-            auto& icon = core::AssetManager::get().get_svg_texture_path(
-                props.icon_path,
-                static_cast<int>(props.size * 2.0f),
-                props.apply_theme
-            );
-            if (icon.id) {
-                UI::image({
-                    .texture_id = icon.id,
-                    .width = UI::Size::px(props.size),
-                    .height = UI::Size::px(props.size),
-                    .align = UI::Align::Center,
-                    .justify = UI::Justify::Center,
-                    .tint_color = props.tint_color,
-                });
-                return;
-            }
+    if (props.icon_path && props.icon_path[0] != '\0') {
+        auto& icon = core::AssetManager::get().get_svg_texture_path(
+            props.icon_path,
+            static_cast<int>(props.size * 2.0f),
+            props.apply_theme
+        );
+        if (icon.id) {
+            UI::image({
+                .texture_id = icon.id,
+                .width = UI::Size::px(props.size),
+                .height = UI::Size::px(props.size),
+                .align = UI::Align::Center,
+                .justify = UI::Justify::Center,
+                .tint_color = props.tint_color,
+            });
+            return;
         }
+    }
 
-        UI::text({
-            .text = "?",
-            .width = UI::Size::fill(),
-            .align = UI::Align::Center,
-            .justify = UI::Justify::Center,
-            .font = UI::TextFont::BoldLarge,
-            .color = kSettingsHeaderTextColor,
-        });
+    UI::text({
+        .text = "?",
+        .width = UI::Size::px(props.size),
+        .align = UI::Align::Center,
+        .justify = UI::Justify::Center,
+        .font = UI::TextFont::BoldLarge,
+        .color = kSettingsHeaderTextColor,
     });
 }
 
@@ -173,12 +164,18 @@ bool plugins_card(const PluginsCardProps& props) {
                 .justify = UI::Justify::Start,
             }, [&]() {
                 if (props.icon_path && props.icon_path[0] != '\0') {
-                    PluginsIconProps icon_props;
-                    icon_props.icon_path = props.icon_path;
-                    icon_props.apply_theme = false;
-                    icon_props.size = 28.0f;
-                    icon_props.tile_size = kPluginCardIconSize;
-                    plugins_icon((std::string(props.id) + "_icon").c_str(), icon_props);
+                    UI::div((std::string(props.id) + "_icon").c_str(), {
+                        .width = UI::Size::px(kPluginCardIconSize),
+                        .height = UI::Size::px(kPluginCardIconSize),
+                        .align = UI::Align::Center,
+                        .justify = UI::Justify::Start,
+                    }, [&]() {
+                        PluginsIconProps icon_props;
+                        icon_props.icon_path = props.icon_path;
+                        icon_props.apply_theme = false;
+                        icon_props.size = 48.0f;
+                        plugins_icon((std::string(props.id) + "_icon_svg").c_str(), icon_props);
+                    });
                 } else {
                     UI::div((std::string(props.id) + "_icon").c_str(), {
                         .width = UI::Size::px(kPluginCardIconSize),

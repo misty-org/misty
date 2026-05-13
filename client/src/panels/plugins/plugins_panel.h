@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 #include "core/ui/ui_registry.h"
 #include "panels/panel.h"
@@ -17,10 +18,18 @@ public:
     void render() override;
 
 private:
+    struct PluginListEntry {
+        PluginsDetailProps detail;
+        std::string logo_path;
+    };
+
     float sidebar_max_width(float shell_width) const;
+    void refresh_plugins();
+    void ensure_selected_plugin();
     void shell();
     void sidebar(float sidebar_width);
     void section(const PluginsSectionProps& props);
+    void cards(const char* id, bool installed_only);
     void splitter();
     void content();
 
@@ -28,6 +37,7 @@ private:
     bool installed_collapsed_ = false;
     char search_query_[128] = {};
     std::string selected_plugin_id_ = "preview_manager";
+    std::vector<PluginListEntry> plugins_;
 };
 
 } // namespace misty::panel

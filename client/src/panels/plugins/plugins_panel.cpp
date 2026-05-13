@@ -1,6 +1,7 @@
 #include "panels/plugins/plugins_panel.h"
 
 #include <algorithm>
+#include <cctype>
 #include <filesystem>
 #include <fstream>
 #include <optional>
@@ -126,6 +127,69 @@ std::string plugin_logo_path(const std::string& plugin_id) {
     return (*root / plugin_id / "assets" / "logo.svg").string();
 }
 
+std::string lowercase_copy(std::string value) {
+    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
+        return static_cast<char>(std::tolower(ch));
+    });
+    return value;
+}
+
+bool matches_query(const PluginsDetailProps& detail, const std::string& query) {
+    if (query.empty()) {
+        return true;
+    }
+
+    const std::string haystack = lowercase_copy(
+        detail.name + "\n" + detail.author + "\n" + detail.overview + "\n" + detail.id
+    );
+    return haystack.find(query) != std::string::npos;
+}
+
+bool is_installed_status(const std::string& status) {
+    const std::string normalized = lowercase_copy(status);
+    return normalized == "installed" || normalized == "enabled" || normalized == "active";
+}
+
+std::string plugin_monogram(const PluginsDetailProps& detail) {
+    std::string monogram;
+    bool take_next = true;
+
+    for (char ch : detail.name) {
+        if (std::isspace(static_cast<unsigned char>(ch)) || ch == '_' || ch == '-') {
+            take_next = true;
+            continue;
+        }
+
+        if (take_next) {
+            monogram.push_back(static_cast<char>(std::toupper(static_cast<unsigned char>(ch))));
+            if (monogram.size() == 2) {
+                return monogram;
+            }
+            take_next = false;
+        }
+    }
+
+    if (monogram.empty()) {
+        for (char ch : detail.id) {
+            if (std::isalnum(static_cast<unsigned char>(ch))) {
+                monogram.push_back(static_cast<char>(std::toupper(static_cast<unsigned char>(ch))));
+                if (monogram.size() == 2) {
+                    break;
+                }
+            }
+        }
+    }
+
+    return monogram.empty() ? "?" : monogram;
+}
+
+std::string plugin_card_description(const PluginsDetailProps& detail) {
+    if (!detail.capabilities.empty()) {
+        return detail.capabilities.front();
+    }
+    return detail.overview;
+}
+
 std::optional<PluginsDetailProps> resolve_plugin_detail(const std::string& plugin_id) {
     const auto root = public_plugins_root();
     if (root) {
@@ -138,89 +202,6 @@ std::optional<PluginsDetailProps> resolve_plugin_detail(const std::string& plugi
     }
 
     return std::nullopt;
-}
-
-PluginsDetailProps sample_plugin_detail(const std::string& plugin_id) {
-    if (plugin_id == "git") {
-        return {
-            .id = "git",
-            .name = "Git Integration",
-            .version = "1.2.0",
-            .author = "OpenSource",
-            .status = "available",
-            .overview = "Seamlessly integrate Git version control into Misty so users can inspect repo state and work with changes in context.",
-            .capabilities = {
-                "Direct commit and push functionality",
-                "Branch management and merging",
-                "Visual file diff viewer",
-                "Repository status indicators",
-            },
-            .where_it_appears = {
-                "Files panel",
-                "Repository actions",
-                "Source control workflows",
-            },
-            .permissions = {
-                "Read access to workspace repositories",
-                "Write access to git metadata and tracked files",
-                "Shell access for git operations",
-            },
-            .getting_started = {
-                "Install the Git Integration plugin.",
-                "Open a git repository in Misty.",
-                "Use repository actions to inspect changes and commit work.",
-            },
-            .changelog = {
-                "v1.2.0 - Added SSH key support and improved diff performance.",
-                "v1.1.0 - Initial release.",
-            },
-            .links = {
-                { .label = "Documentation", .url = "https://misty.local/plugins/git_integration/docs" },
-            },
-            .actions = {
-                { .label = "Install", .kind = "primary" },
-            },
-        };
-    }
-
-    return {
-        .id = "preview_manager",
-        .name = "Preview Manager",
-        .version = "1.0.0",
-        .author = "Misty",
-        .status = "available",
-        .overview = "Preview Manager lets users inspect screenshots, illustrations, and other image assets directly inside Misty while keeping the current workspace context intact.",
-        .capabilities = {
-            "Inline image preview for common asset formats",
-            "Fast inspection flow for screenshots and design files",
-            "Stays inside the current browser context while previewing",
-        },
-        .where_it_appears = {
-            "Files panel",
-            "Preview workflow",
-            "Selected file actions",
-        },
-        .permissions = {
-            "Read access to workspace files",
-            "Read access to mounted files",
-            "No network access required",
-        },
-        .getting_started = {
-            "Install or enable Preview Manager.",
-            "Select an image file in Files.",
-            "Open the preview action to inspect the selected asset.",
-        },
-        .changelog = {
-            "v1.0.0 - Added image preview support for local and mounted files.",
-            "v0.9.0 - Initial internal prototype.",
-        },
-        .links = {
-            { .label = "Documentation", .url = "https://misty.local/plugins/preview_manager/docs" },
-        },
-        .actions = {
-            { .label = "Open", .kind = "primary" },
-        },
-    };
 }
 
 void bullet_list(const char* id, const std::vector<std::string>& items) {
@@ -343,6 +324,67 @@ float PluginsPanel::sidebar_max_width(float shell_width) const {
     );
 }
 
+void PluginsPanel::refresh_plugins() {
+    plugins_.clear();
+
+    const auto root = public_plugins_root();
+    if (!root) {
+        return;
+    }
+
+    std::error_code ec;
+    if (!fs::exists(*root, ec) || ec) {
+        return;
+    }
+
+    for (const auto& entry : fs::directory_iterator(*root, ec)) {
+        if (ec || !entry.is_directory()) {
+            continue;
+        }
+
+        const fs::path plugin_dir = entry.path();
+        std::optional<PluginsDetailProps> detail = load_plugin_detail(plugin_dir / "plugin.json");
+        if (!detail) {
+            detail = load_plugin_detail(plugin_dir / "detail.json");
+        }
+        if (!detail) {
+            continue;
+        }
+
+        if (detail->id.empty()) {
+            detail->id = plugin_dir.filename().string();
+        }
+        if (detail->name.empty()) {
+            detail->name = detail->id;
+        }
+
+        plugins_.push_back({
+            .detail = std::move(*detail),
+            .logo_path = (plugin_dir / "assets" / "logo.svg").string(),
+        });
+    }
+
+    std::sort(plugins_.begin(), plugins_.end(), [](const PluginListEntry& lhs, const PluginListEntry& rhs) {
+        return lowercase_copy(lhs.detail.name) < lowercase_copy(rhs.detail.name);
+    });
+}
+
+void PluginsPanel::ensure_selected_plugin() {
+    if (plugins_.empty()) {
+        selected_plugin_id_.clear();
+        return;
+    }
+
+    const auto selected = std::find_if(plugins_.begin(), plugins_.end(), [&](const PluginListEntry& entry) {
+        return entry.detail.id == selected_plugin_id_;
+    });
+    if (selected != plugins_.end()) {
+        return;
+    }
+
+    selected_plugin_id_ = plugins_.front().detail.id;
+}
+
 void PluginsPanel::shell() {
     const float sidebar_width = sidebar_max_width(ImGui::GetContentRegionAvail().x);
 
@@ -428,47 +470,48 @@ void PluginsPanel::section(const PluginsSectionProps& props) {
         .padding = UI::Spacing::xy(4.0f, 6.0f),
         .gap = UI::Spacing::xy(0.0f, 10.0f),
     }, [&]() {
-        if (std::string_view(props.id) == "marketplace_hdr") {
-            const std::string preview_logo = plugin_logo_path("preview_manager");
-            if (plugins_card({
-                .id = "preview_manager_card",
-                .icon_path = preview_logo.c_str(),
-                .monogram = "PM",
-                .title = "Preview Manager",
-                .author = "Misty",
-                .description = "Preview images and screenshots.",
-                .selected = selected_plugin_id_ == "preview_manager",
-            })) {
-                selected_plugin_id_ = "preview_manager";
-            }
+        cards(props.id, std::string_view(props.id) != "marketplace_hdr");
+    });
+}
 
-            const std::string git_logo = plugin_logo_path("git");
-            if (plugins_card({
-                .id = "git_integration_card",
-                .icon_path = git_logo.c_str(),
-                .monogram = "GI",
-                .title = "Git Integration",
-                .author = "OpenSource",
-                .description = "Track changes and commit quickly.",
-                .selected = selected_plugin_id_ == "git",
-            })) {
-                selected_plugin_id_ = "git";
-            }
-            return;
+void PluginsPanel::cards(const char* id, bool installed_only) {
+    const std::string query = lowercase_copy(trim_copy(search_query_));
+    bool showed_any = false;
+
+    for (const auto& plugin : plugins_) {
+        if (installed_only && !is_installed_status(plugin.detail.status)) {
+            continue;
+        }
+        if (!matches_query(plugin.detail, query)) {
+            continue;
         }
 
-        const std::string preview_logo = plugin_logo_path("preview_manager");
+        const std::string card_id = std::string(id) + "_" + plugin.detail.id + "_card";
+        const std::string monogram = plugin_monogram(plugin.detail);
+        const std::string description = plugin_card_description(plugin.detail);
         if (plugins_card({
-            .id = "installed_preview_card",
-            .icon_path = preview_logo.c_str(),
-            .monogram = "PM",
-            .title = "Preview Manager",
-            .author = "Misty",
-            .description = "Preview images and screenshots.",
-            .selected = selected_plugin_id_ == "preview_manager",
+            .id = card_id.c_str(),
+            .icon_path = plugin.logo_path.c_str(),
+            .monogram = monogram.c_str(),
+            .title = plugin.detail.name.c_str(),
+            .author = plugin.detail.author.c_str(),
+            .description = description.c_str(),
+            .selected = selected_plugin_id_ == plugin.detail.id,
         })) {
-            selected_plugin_id_ = "preview_manager";
+            selected_plugin_id_ = plugin.detail.id;
         }
+        showed_any = true;
+    }
+
+    if (showed_any) {
+        return;
+    }
+
+    UI::text({
+        .text = installed_only ? "No installed plugins yet." : "No plugins found.",
+        .width = UI::Size::fill(),
+        .overflow = UI::TextOverflow::Wrap,
+        .color = kSettingsMutedTextColor,
     });
 }
 
@@ -483,9 +526,9 @@ void PluginsPanel::splitter() {
 }
 
 void PluginsPanel::content() {
-    const PluginsDetailProps detail = resolve_plugin_detail(selected_plugin_id_).value_or(
-        sample_plugin_detail(selected_plugin_id_)
-    );
+    const auto selected = std::find_if(plugins_.begin(), plugins_.end(), [&](const PluginListEntry& entry) {
+        return entry.detail.id == selected_plugin_id_;
+    });
 
     UI::WithStyle([&](UI::StyleScope& style) {
         style.var(ImGuiStyleVar_ScrollbarSize, 8.0f);
@@ -497,6 +540,21 @@ void PluginsPanel::content() {
             .window_flags = ImGuiWindowFlags_AlwaysVerticalScrollbar,
             .padding = kSettingsShellPadding,
         }, [&]() {
+            if (selected == plugins_.end()) {
+                plugins_page({
+                    .title = "Plugins",
+                }, [&]() {
+                    UI::text({
+                        .text = "No plugin metadata found in ~/misty/public/plugins yet.",
+                        .width = UI::Size::px(720.0f),
+                        .overflow = UI::TextOverflow::Wrap,
+                        .color = kSettingsMutedTextColor,
+                    });
+                });
+                return;
+            }
+
+            const PluginsDetailProps& detail = selected->detail;
             plugins_page({
                 .title = detail.name.c_str(),
             }, [&]() {
@@ -596,6 +654,8 @@ void PluginsPanel::render() {
         .bg_color = ImVec4(0.12f, 0.12f, 0.12f, 1.0f),
     }, [&]() {
         if (ImGui::Begin("Plugins", nullptr, flags)) {
+            refresh_plugins();
+            ensure_selected_plugin();
             shell();
         }
         ImGui::End();
