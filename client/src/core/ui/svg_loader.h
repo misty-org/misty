@@ -9,6 +9,6 @@ namespace misty::core {
     };
 
     // Only the declaration here. No GLAD needed!
-    SVGTexture load_svg(const std::string& path, int width, int height);
+    SVGTexture load_svg(const std::string& path, int width, int height, bool apply_theme = true);
 	void unload_svg(SVGTexture& texture);
 }
