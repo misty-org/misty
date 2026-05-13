@@ -62,19 +62,19 @@ describe("useWorkspaceStore - space scoping", () => {
     ]);
   });
 
-  it("preserves a Home tab in a space when switching back and forth", () => {
+  it("preserves an Inbox tab in a space when switching back and forth", () => {
     const store = useWorkspaceStore.getState();
 
-    // 1. Space A has only a Home tab
+    // 1. Space A has only an Inbox tab
     store.setScope("space:space-a");
-    const homeTab = store.openSurface({
-      surfaceId: "home",
-      groupKey: "tool:home",
-      title: "Home",
-      route: "/home",
+    const inboxTab = store.openSurface({
+      surfaceId: "inbox",
+      groupKey: "tool:inbox",
+      title: "Inbox",
+      route: "/inbox",
     });
     expect(dockTabs(useWorkspaceStore.getState().layout.root).map((t) => t.surfaceId)).toEqual([
-      "home",
+      "inbox",
     ]);
 
     // 2. Switch to Space B and open Journal
@@ -90,7 +90,7 @@ describe("useWorkspaceStore - space scoping", () => {
     // 3. Switch back to Space A
     useWorkspaceStore.getState().setScope("space:space-a");
     const tabsInA = dockTabs(useWorkspaceStore.getState().layout.root);
-    expect(tabsInA.map((t) => t.surfaceId)).toEqual(["home"]);
-    expect(tabsInA[0].id).toBe(homeTab.id);
+    expect(tabsInA.map((t) => t.surfaceId)).toEqual(["inbox"]);
+    expect(tabsInA[0].id).toBe(inboxTab.id);
   });
 });
