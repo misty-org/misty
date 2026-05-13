@@ -1,21 +1,13 @@
 #pragma once
 
+#include <string>
+
 #include "core/ui/ui_registry.h"
 #include "panels/panel.h"
+#include "panels/plugins/plugins_components.h"
+#include "panels/plugins/plugins_detail.h"
 
 namespace misty::panel {
-
-struct PluginsSectionProps {
-    const char* id = "";
-    const char* label = "";
-    bool* collapsed = nullptr;
-    const char* placeholder = "Cards coming next.";
-};
-
-struct PluginsContentProps {
-    const char* title = "Plugins";
-    const char* body = "";
-};
 
 class PluginsPanel : public Panel {
 public:
@@ -25,21 +17,17 @@ public:
     void render() override;
 
 private:
-    float sidebarMaxWidth(float shell_width) const;
-    void updateSidebarWidth(float max_sidebar_width);
+    float sidebar_max_width(float shell_width) const;
     void shell();
-    void sidebar();
+    void sidebar(float sidebar_width);
     void section(const PluginsSectionProps& props);
     void splitter();
-    void content(const PluginsContentProps& props);
+    void content();
 
-    float sidebar_width_ = 180.0f;
-    bool sidebar_resizing_ = false;
-    float sidebar_drag_start_width_ = 180.0f;
-    float sidebar_drag_start_mouse_x_ = 0.0f;
     bool marketplace_collapsed_ = false;
     bool installed_collapsed_ = false;
     char search_query_[128] = {};
+    std::string selected_plugin_id_ = "preview_manager";
 };
 
 } // namespace misty::panel
