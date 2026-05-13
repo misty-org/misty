@@ -29,8 +29,6 @@ struct PluginsIconProps {
     const char* icon_path = "";
     bool apply_theme = false;
     float size = 24.0f;
-    float tile_size = 52.0f;
-    ImVec4 tile_color = ImVec4(0.20f, 0.20f, 0.22f, 1.0f);
     ImVec4 tint_color = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
 };
 
