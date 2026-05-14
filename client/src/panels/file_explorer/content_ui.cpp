@@ -633,16 +633,6 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state) {
     ImGuiIO& io = ImGui::GetIO();
     const bool active_text_edit = io.WantTextInput && ImGui::IsAnyItemActive();
     if (!loading && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && !active_text_edit) {
-        if (CommandManager::get().matches("explorer.copy")) perform_copy(state);
-        if (CommandManager::get().matches("explorer.cut")) perform_cut(state);
-        if (CommandManager::get().matches("explorer.paste")) {
-            auto& clipboard = registry_.get_state<ClipboardState>("Clipboard");
-            if (clipboard.has_content()) perform_paste(state);
-        }
-        if (CommandManager::get().matches("explorer.undo")) perform_undo(state);
-        if (CommandManager::get().matches("explorer.redo")) perform_redo(state);
-        if (CommandManager::get().matches("explorer.delete") && !state.selected_files.empty()) perform_delete_selected(state);
-        if (CommandManager::get().matches("explorer.rename") && !state.selected_files.empty()) initiate_rename(state);
         if (CommandManager::get().matches("explorer.refresh")) {
             std::string current(state.current_path);
             if (!current.empty()) {
@@ -866,22 +856,6 @@ void FileExplorerPanel::show_file_item(FileExplorerState& state, int i) {
             navigate_to_path(nav_path);
             return;
         }
-
-        if (file.source == FileSource::LOCAL) {
-            state.add_recent(file);
-            open_file(file.path);
-        } else if (file.source == FileSource::REMOTE) {
-            if (state.is_deleting(file.path)) {
-                return;
-            }
-            if (fs::exists(file.path)) {
-                state.add_recent(file);
-                open_file(file.path);
-            } else if (!state.is_downloading(file.path)) {
-                state.add_recent(file);
-                download_remote_file(file);
-            }
-        }
     }
 
     float content_padding_y = (row_height - 16.0f) / 2.0f;
@@ -1031,22 +1005,6 @@ void FileExplorerPanel::show_grid_item(FileExplorerState& state, int i, float ce
             std::string nav_path = file.path;
             navigate_to_path(nav_path);
             return;
-        }
-
-        if (file.source == FileSource::LOCAL) {
-            state.add_recent(file);
-            open_file(file.path);
-        } else if (file.source == FileSource::REMOTE) {
-            if (state.is_deleting(file.path)) {
-                return;
-            }
-            if (fs::exists(file.path)) {
-                state.add_recent(file);
-                open_file(file.path);
-            } else if (!state.is_downloading(file.path)) {
-                state.add_recent(file);
-                download_remote_file(file);
-            }
         }
     }
 

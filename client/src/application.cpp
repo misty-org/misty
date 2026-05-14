@@ -11,13 +11,14 @@
 #include "views/onboarding_view.h"
 #include "views/services_view.h"
 #include "views/extensions_view.h"
+#include "views/transfers_view.h"
 #include "views/vault_view.h"
 #include "views/activity_view.h"
 #include "views/settings_view.h"
-#include "views/edit_profile_view.h"
 #include "panels/file_explorer/file_explorer_state.h"
 #include "panels/onboarding/onboarding_state.h"
 #include "panels/onboarding/boot_loader.h"
+#include "panels/settings/settings_state.h"
 #include "panels/transfers/transfer_window_state.h"
 
 #include <cstdlib>
@@ -25,6 +26,25 @@
 #include <fstream>
 
 namespace {
+std::string view_name(misty::view::ViewID id) {
+    using misty::view::ViewID;
+    switch (id) {
+        case ViewID::Auth: return "Auth";
+        case ViewID::Login: return "Login";
+        case ViewID::Onboarding: return "Onboarding";
+        case ViewID::Files: return "Files";
+        case ViewID::Settings: return "Settings";
+        case ViewID::Workspace: return "Workspace";
+        case ViewID::Activity: return "Activity";
+        case ViewID::Services: return "Services";
+        case ViewID::Extensions: return "Extensions";
+        case ViewID::Vault: return "Vault";
+        case ViewID::Transfers: return "Transfers";
+        case ViewID::Default: return "Default";
+    }
+    return "Unknown";
+}
+
 void append_startup_log(const std::string& line) {
     const char* home = std::getenv("HOME");
     if (!home || *home == '\0') return;
@@ -55,10 +75,19 @@ bool should_run_boot_loader() {
 
 
 namespace misty {
+    core::FramePacer& Application::frame_pacer() {
+        return frame_pacer_;
+    }
+
+    const core::FramePacer& Application::frame_pacer() const {
+        return frame_pacer_;
+    }
+
     void Application::run() {
         try {
             append_startup_log("startup: begin");
             init_platform();
+            frame_pacer_.activate();
             append_startup_log("startup: platform initialized");
             if (should_run_boot_loader()) {
                 const auto saved_size = window_size();
@@ -107,6 +136,7 @@ namespace misty {
             init_views();
             append_startup_log("startup: views initialized");
             transfer_window_panel_ = std::make_unique<panel::TransferWindowPanel>(ui_registry_);
+            ui_registry_.get_state<panel::SettingsState>("Settings").ensure_app_settings_loaded();
 
             
         } catch (const std::exception& e) {
@@ -118,7 +148,7 @@ namespace misty {
             return;
         }
         std::cout << "Entering main loop." << std::endl;
-        append_startup_log("startup: entering main loop");
+            append_startup_log("startup: entering main loop");
         while (is_running()) {
             core::FontManager::get().apply_pending_reload();
             prepare_frame();
@@ -127,14 +157,28 @@ namespace misty {
                 ui_registry_.get_state<panel::TransferWindowState>(
                     panel::kTransferWindowStateKey).toggle();
             }
+            if (core::CommandManager::get().matches("app.toggle_plugin_launcher")) {
+                core::PluginManager::get().toggle_launcher();
+            }
 
             view::render_current_view();
             errors_panel_.render();
             core::PluginManager::get().process_shortcuts();
             core::PluginManager::get().render_open_panels();
+            core::PluginManager::get().render_launcher_overlay();
             core::PluginManager::get().render_active_preview_scene();
-            if (transfer_window_panel_) {
+            const bool transfers_view_active = view::get_current_view_id() == view::ViewID::Transfers;
+            if (!transfers_view_active && transfers_view_active_last_frame_) {
+                ui_registry_.get_state<panel::TransferWindowState>(
+                    panel::kTransferWindowStateKey).close();
+            }
+            transfers_view_active_last_frame_ = transfers_view_active;
+            if (transfer_window_panel_ && !transfers_view_active) {
                 transfer_window_panel_->render();
+            }
+            auto& settings_state = ui_registry_.get_state<panel::SettingsState>("Settings");
+            if (settings_state.frame_pacing_overlay_enabled) {
+                frame_pacer_.render_debug_overlay();
             }
             render_frame();
         }
@@ -166,6 +210,8 @@ namespace misty {
     }
 
     void Application::init_views() {
+        ui_registry_.get_state<panel::ServicesState>("Services").init(worker_pool_);
+        append_startup_log("startup: services state initialized");
 
         view::register_view(view::ViewID::Files,
             std::make_unique<view::FilesView>(ui_registry_, worker_pool_, client_));
@@ -177,11 +223,12 @@ namespace misty {
         view::register_view(view::ViewID::Extensions, std::make_unique<view::ExtensionsView>(ui_registry_));
         view::register_view(view::ViewID::Vault,
             std::make_unique<view::VaultView>(ui_registry_, worker_pool_));
+        view::register_view(view::ViewID::Transfers, std::make_unique<view::TransfersView>(ui_registry_));
         // ActivityView removed — Activity is now a modal panel in the navbar
         view::register_view(view::ViewID::Settings, std::make_unique<view::SettingsView>(ui_registry_));
-        view::register_view(view::ViewID::EditProfile, std::make_unique<view::EditProfileView>(ui_registry_));
 
         // Auth is guaranteed by the BootLoader — always start in FilesView.
         view::switch_view(view::ViewID::Files);
+        append_startup_log("startup: initial view set to " + view_name(view::ViewID::Files));
     }
 };

@@ -12,6 +12,7 @@
 #include "core/ui/ui_layout.h"
 #include "core/ui/ui_style.h"
 #include "imgui.h"
+#include "views/app_view.h"
 
 namespace misty::panel {
 
@@ -28,6 +29,8 @@ void SettingsPanel::render() {
         .bg_color = ImVec4(0.12f, 0.12f, 0.12f, 1.0f),
     }, [&]() {
         if (ImGui::Begin("SettingsPanel", nullptr, flags)) {
+            misty::view::debug_log_view_event(
+                std::string("settings_panel: section=") + std::to_string(static_cast<int>(state.active_section)));
             UI::row("##settings_shell", {
                 .mode = UI::Mode::LayoutOnly,
                 .width = UI::Size::fill(),
@@ -56,9 +59,15 @@ void SettingsPanel::settings_content(SettingsState& state) {
             .mode = UI::Mode::ChildWindow,
             .width = UI::Size::fill(),
             .height = UI::Size::fill(),
-            .window_flags = ImGuiWindowFlags_AlwaysVerticalScrollbar,
+            .window_flags = ImGuiWindowFlags_AlwaysVerticalScrollbar | ImGuiWindowFlags_NoScrollWithMouse,
             .padding = kSettingsShellPadding,
         }, [&]() {
+            ImGuiIO& io = ImGui::GetIO();
+            if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup) && io.MouseWheel != 0.0f) {
+                constexpr float kSettingsWheelStep = 8.0f;
+                ImGui::SetScrollY(ImGui::GetScrollY() - io.MouseWheel * kSettingsWheelStep);
+            }
+
             switch (state.active_section) {
                 case SettingsSection::General:
                     general_content(state);
