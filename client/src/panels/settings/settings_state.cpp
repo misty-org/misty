@@ -80,7 +80,6 @@ void SettingsState::ensure_app_settings_loaded() {
 
     const json account = settings.value("account", json::object());
     copy_string(account_email, account.value("email", std::string(account_email)));
-    copy_string(account_display_name, account.value("display_name", std::string(account_display_name)));
     copy_string(subscription_plan_label, account.value("subscription_plan_label", std::string(subscription_plan_label)));
     connected_provider_count = account.value("connected_provider_count", connected_provider_count);
 
@@ -171,7 +170,6 @@ bool SettingsState::save_app_settings(std::string* error) {
 
         settings["account"] = {
             {"email", std::string(account_email)},
-            {"display_name", std::string(account_display_name)},
             {"subscription_plan_label", std::string(subscription_plan_label)},
             {"connected_provider_count", connected_provider_count},
         };

@@ -46,6 +46,7 @@ namespace misty {
         panel::ErrorsPanel errors_panel_;
         std::unique_ptr<panel::TransferWindowPanel> transfer_window_panel_;
         core::FramePacer frame_pacer_;
+        bool transfers_view_active_last_frame_ = false;
 
     };  
 };

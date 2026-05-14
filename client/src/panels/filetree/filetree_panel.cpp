@@ -14,7 +14,6 @@
 #include "panels/activity/activity_state.h"
 #include "panels/file_explorer/file_explorer_state.h"
 #include "panels/notification/notification_state.h"
-#include "panels/profile/profile_state.h"
 #include "panels/search/search_state.h"
 #include "panels/transfers/transfer_window_state.h"
 
@@ -553,9 +552,7 @@ namespace misty::panel {
 
         const bool activity_panel_open =
             ui_registry_.get_state<ActivityState>("Activity").is_open;
-        const bool profile_panel_open =
-            ui_registry_.get_state<ProfileState>("Profile").is_open;
-        if (!transfer_modal_open && !activity_panel_open && !profile_panel_open &&
+        if (!transfer_modal_open && !activity_panel_open &&
             active_pane_id_ == pane_id && drag_payload == nullptr) {
             ImDrawList* draw_list = ImGui::GetForegroundDrawList();
             const ImVec2 border_max(std::max(pos.x, pos.x + size.x - 1.0f),

@@ -34,7 +34,7 @@ namespace misty::view {
         Services,
         Extensions,
         Vault,
-        EditProfile,
+        Transfers,
         Default
     };
 

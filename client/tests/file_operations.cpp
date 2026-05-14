@@ -490,7 +490,7 @@ void FileExplorerPanel::notify_shared_path_refresh(const std::string& path) {
 
 #include "panels/search/search_panel.cpp"
 #include "panels/search/search_impl.cpp"
-#include "panels/file_explorer/actions.cpp"
+#include "panels/file_explorer/actions/actions.cpp"
 
 namespace {
 
