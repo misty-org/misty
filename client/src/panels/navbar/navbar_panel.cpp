@@ -61,7 +61,7 @@ namespace misty::panel {
             float text_height = ImGui::CalcTextSize("Settings").y;
             float item_spacing = ImGui::GetStyle().ItemSpacing.y;
             float nav_item_height = icon_size + (button_padding_y * 2.0f) + text_height + item_spacing;
-            
+
             float footer_y = ImGui::GetWindowHeight() - 80.0f;
             ImGui::SetCursorPosY(footer_y - nav_item_height);
             show_nav_item("gear-24", "Settings", 24, ViewID::Settings, state);
@@ -70,9 +70,9 @@ namespace misty::panel {
         }
         ImGui::End();
 
-        ImGui::PopStyleVar(); 
         ImGui::PopStyleVar();
-        ImGui::PopStyleColor(); 
+        ImGui::PopStyleVar();
+        ImGui::PopStyleColor();
 
         // Render popups on top (outside navbar window)
         profile_panel_.render();
@@ -98,7 +98,7 @@ namespace misty::panel {
         ImGui::SetCursorPosX(centered_cursor_x(button_size));
 
         ImGui::PushID("nav_logo");
-        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, padding);   
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, padding);
         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 16.0f);
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.18f, 0.18f, 0.18f, 1));

@@ -5,6 +5,7 @@
 #include "core/manager/asset_manager.h"
 #include "core/manager/env_manager.h"
 #include "core/manager/font_manager.h"
+#include "core/manager/theme_manager.h"
 #include <cstdio>
 #include <iostream>
 #include <filesystem>
@@ -86,8 +87,13 @@ namespace misty {
         );
         glfwMakeContextCurrent(window_); //VERY IMPORTANT
         glfwSetWindowUserPointer(window_, this);
+        frame_pacer().set_wake_callback([]() { glfwPostEmptyEvent(); });
         glfwSetWindowSizeCallback(window_, glfw_window_size_callback);
         glfwSetWindowFocusCallback(window_, glfw_window_focus_callback);
+        glfwSetCursorPosCallback(window_, glfw_cursor_pos_callback);
+        glfwSetMouseButtonCallback(window_, glfw_mouse_button_callback);
+        glfwSetKeyCallback(window_, glfw_key_callback);
+        glfwSetCharCallback(window_, glfw_char_callback);
     }
 
     void WindowsApp::init_opengl() {
@@ -157,6 +163,7 @@ namespace misty {
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
         io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // Enable Docking
+        io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;       // Enable multi-viewport windows
 
         // Experimental DPI features (GLFW 3.3+)
         if (GLFW_VERSION_MAJOR >= 3 && GLFW_VERSION_MINOR >= 3) {
@@ -181,50 +188,31 @@ namespace misty {
     }
 
     void WindowsApp::configure_imgui_style() {
-        ImGui::StyleColorsDark();
-        ImGuiStyle& style = ImGui::GetStyle();
-
-        style.FrameRounding    = 8.0f;
-        style.GrabRounding     = 8.0f;
-        style.ScrollbarRounding = 6.0f;
-        style.WindowRounding   = 0.0f;
-        style.PopupRounding    = 0.0f;
-        style.ScrollbarSize    = 12.0f;
-        style.ScrollbarPadding = 0.0f;
-
-        style.Colors[ImGuiCol_Text]                 = ImVec4(0.831f, 0.831f, 0.847f, 1.0f);
-        style.Colors[ImGuiCol_TextDisabled]         = ImVec4(0.443f, 0.443f, 0.478f, 1.0f);
-        style.Colors[ImGuiCol_WindowBg]             = ImVec4(0.067f, 0.067f, 0.075f, 1.0f);
-        style.Colors[ImGuiCol_PopupBg]              = ImVec4(0.067f, 0.067f, 0.075f, 1.0f);
-        style.Colors[ImGuiCol_Border]               = ImVec4(0.153f, 0.153f, 0.165f, 1.0f);
-        style.Colors[ImGuiCol_FrameBg]              = ImVec4(0.094f, 0.094f, 0.106f, 1.0f);
-        style.Colors[ImGuiCol_FrameBgHovered]       = ImVec4(0.153f, 0.153f, 0.165f, 1.0f);
-        style.Colors[ImGuiCol_FrameBgActive]        = ImVec4(0.153f, 0.153f, 0.165f, 1.0f);
-        style.Colors[ImGuiCol_TitleBg]              = ImVec4(0.035f, 0.035f, 0.043f, 1.0f);
-        style.Colors[ImGuiCol_TitleBgActive]        = ImVec4(0.094f, 0.094f, 0.106f, 1.0f);
-        style.Colors[ImGuiCol_MenuBarBg]            = ImVec4(0.067f, 0.067f, 0.075f, 1.0f);
-        style.Colors[ImGuiCol_ScrollbarBg]          = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
-        style.Colors[ImGuiCol_ScrollbarGrab]        = ImVec4(0.153f, 0.153f, 0.165f, 1.0f);
-        style.Colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(0.22f, 0.22f, 0.24f, 1.0f);
-        style.Colors[ImGuiCol_ScrollbarGrabActive]  = ImVec4(0.443f, 0.443f, 0.478f, 1.0f);
-        style.Colors[ImGuiCol_CheckMark]            = ImVec4(0.231f, 0.510f, 0.965f, 1.0f);
-        style.Colors[ImGuiCol_SliderGrab]           = ImVec4(0.231f, 0.510f, 0.965f, 1.0f);
-        style.Colors[ImGuiCol_SliderGrabActive]     = ImVec4(0.145f, 0.388f, 0.922f, 1.0f);
-        style.Colors[ImGuiCol_Button]               = ImVec4(0.153f, 0.153f, 0.165f, 1.0f);
-        style.Colors[ImGuiCol_ButtonHovered]        = ImVec4(0.22f, 0.22f, 0.24f, 1.0f);
-        style.Colors[ImGuiCol_ButtonActive]         = ImVec4(0.10f, 0.10f, 0.11f, 1.0f);
-        style.Colors[ImGuiCol_Header]               = ImVec4(0.094f, 0.094f, 0.106f, 1.0f);
-        style.Colors[ImGuiCol_HeaderHovered]        = ImVec4(0.153f, 0.153f, 0.165f, 1.0f);
-        style.Colors[ImGuiCol_HeaderActive]         = ImVec4(0.153f, 0.153f, 0.165f, 1.0f);
-        style.Colors[ImGuiCol_Separator]            = ImVec4(0.153f, 0.153f, 0.165f, 1.0f);
-        style.Colors[ImGuiCol_Tab]                  = ImVec4(0.094f, 0.094f, 0.106f, 1.0f);
-        style.Colors[ImGuiCol_TabHovered]           = ImVec4(0.153f, 0.153f, 0.165f, 1.0f);
-        style.Colors[ImGuiCol_TabSelected]          = ImVec4(0.153f, 0.153f, 0.165f, 1.0f);
-        style.Colors[ImGuiCol_NavHighlight]         = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
+        core::ThemeManager::get().initialize_from_settings();
+        core::ThemeManager::get().apply_current_style(ImGui::GetStyle());
 	}
 
     void WindowsApp::prepare_frame() {
-        glfwPollEvents();
+        const core::FramePacer::WaitDecision wait_decision = frame_pacer().next_wait_decision();
+        if (wait_decision.should_wait) {
+            glfwWaitEventsTimeout(wait_decision.timeout_seconds);
+        } else {
+            glfwPollEvents();
+        }
+
+        bool pointer_button_down = false;
+        for (int button = GLFW_MOUSE_BUTTON_1; button <= GLFW_MOUSE_BUTTON_LAST; ++button) {
+            if (glfwGetMouseButton(window_, button) == GLFW_PRESS) {
+                pointer_button_down = true;
+                break;
+            }
+        }
+        bool item_active = false;
+        if (ImGui::GetCurrentContext()) {
+            item_active = ImGui::IsAnyItemActive();
+        }
+        frame_pacer().note_continuous_activity(pointer_button_down, item_active);
+
         int display_w, display_h;
         glfwGetFramebufferSize(window_, &display_w, &display_h);
         glViewport(0, 0, display_w, display_h);
@@ -243,10 +231,18 @@ namespace misty {
 
         glfwMakeContextCurrent(window_);
         glViewport(0, 0, w, h);
-        glClearColor(0.11f, 0.11f, 0.11f, 1.0f);
+        const ImVec4 clear = core::ThemeManager::get().clear_color();
+        glClearColor(clear.x, clear.y, clear.z, clear.w);
         glClear(GL_COLOR_BUFFER_BIT);
 
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+        if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+            GLFWwindow* backup_context = glfwGetCurrentContext();
+            ImGui::UpdatePlatformWindows();
+            ImGui::RenderPlatformWindowsDefault();
+            glfwMakeContextCurrent(backup_context);
+        }
 
         glfwSwapBuffers(window_);
     }
@@ -289,11 +285,36 @@ namespace misty {
     }
 
     void WindowsApp::glfw_window_focus_callback(GLFWwindow* window, int focused) {
-        if (!focused)
-            static_cast<Application*>(glfwGetWindowUserPointer(window))->on_focus_lost();
+        auto* app = static_cast<Application*>(glfwGetWindowUserPointer(window));
+        if (focused) {
+            app->frame_pacer().note_focus();
+        } else {
+            app->on_focus_lost();
+        }
+    }
+
+    void WindowsApp::glfw_cursor_pos_callback(GLFWwindow* window, double, double) {
+        static_cast<Application*>(glfwGetWindowUserPointer(window))->frame_pacer().note_cursor_move();
+    }
+
+    void WindowsApp::glfw_mouse_button_callback(GLFWwindow* window, int, int action, int) {
+        if (action == GLFW_PRESS || action == GLFW_REPEAT || action == GLFW_RELEASE) {
+            static_cast<Application*>(glfwGetWindowUserPointer(window))->frame_pacer().note_pointer_press();
+        }
+    }
+
+    void WindowsApp::glfw_key_callback(GLFWwindow* window, int, int, int action, int) {
+        if (action == GLFW_PRESS || action == GLFW_REPEAT) {
+            static_cast<Application*>(glfwGetWindowUserPointer(window))->frame_pacer().note_key_press();
+        }
+    }
+
+    void WindowsApp::glfw_char_callback(GLFWwindow* window, unsigned int) {
+        static_cast<Application*>(glfwGetWindowUserPointer(window))->frame_pacer().note_text_input();
     }
 
     void WindowsApp::glfw_scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
+        static_cast<Application*>(glfwGetWindowUserPointer(window))->frame_pacer().note_scroll();
         constexpr double kScrollWheelScale = 0.10;
         ImGui_ImplGlfw_ScrollCallback(window, xoffset * kScrollWheelScale, yoffset * kScrollWheelScale);
     }

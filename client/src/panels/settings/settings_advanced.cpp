@@ -32,12 +32,23 @@ void diagnostics_section(SettingsState& state) {
 
         settings_row("##advanced_experimental", {
             .start_width_pct = 0.52f,
-            .show_divider = false,
             .divider_color = kSettingsDividerColor,
         }, [&]() {
             settings_row_text("Experimental features", "Allow in-progress features to surface before they are fully settled.");
         }, [&]() {
             if (settings_toggle_switch("##advanced_experimental_toggle", &state.experimental_features_enabled)) {
+                state.save_app_settings();
+            }
+        });
+
+        settings_row("##advanced_frame_pacing_overlay", {
+            .start_width_pct = 0.52f,
+            .show_divider = false,
+            .divider_color = kSettingsDividerColor,
+        }, [&]() {
+            settings_row_text("Frame pacing overlay", "Show the live idle, light, and heavy pacing state in the top-right corner.");
+        }, [&]() {
+            if (settings_toggle_switch("##advanced_frame_pacing_overlay_toggle", &state.frame_pacing_overlay_enabled)) {
                 state.save_app_settings();
             }
         });

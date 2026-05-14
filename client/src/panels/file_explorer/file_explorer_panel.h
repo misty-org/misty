@@ -43,6 +43,7 @@ namespace misty::panel {
         bool consume_activation_request();
         void toggle_chat_overlay();
         bool toggle_preview_pane();
+        bool ensure_preview_pane_open();
         bool zoom_preview_in();
         bool zoom_preview_out();
         bool reset_preview_zoom();

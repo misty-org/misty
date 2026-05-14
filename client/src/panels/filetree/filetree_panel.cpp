@@ -180,11 +180,14 @@ namespace misty::panel {
 
     std::string FileTreePanel::active_explorer_state_key() const {
         const ExplorerTab* tab = get_active_tab(active_pane_id_);
-        return tab ? tab->explorer_state_key : "Files";
+        return tab ? tab_context_state_key(*tab) : "Files";
     }
 
     bool FileTreePanel::invoke_command(const std::string& command_id) {
         if (ExplorerTab* tab = get_active_tab(active_pane_id_)) {
+            if (tab->kind != TabKind::Explorer || !tab->explorer_panel) {
+                return false;
+            }
             if (command_id == "explorer.preview.toggle") {
                 return tab->explorer_panel->toggle_preview_pane();
             }
@@ -234,6 +237,108 @@ namespace misty::panel {
         auto& target_state = ui_registry_.get_state<FileExplorerState>(active_tab->explorer_state_key);
         active_tab->explorer_panel->perform_drop_items(target_state, items, dest_path, op);
         return true;
+    }
+
+    bool FileTreePanel::ensure_preview_open_for_active_context() {
+        ExplorerTab* active_tab = get_active_tab(active_pane_id_);
+        if (!active_tab) {
+            return false;
+        }
+
+        const std::string context_state_key = tab_context_state_key(*active_tab);
+        if (context_state_key.empty()) {
+            return false;
+        }
+
+        ExplorerTab* target_tab = find_explorer_tab_by_state_key(context_state_key);
+        if (!target_tab || !target_tab->explorer_panel) {
+            return false;
+        }
+
+        for (auto& [pane_id, pane] : explorer_panes_) {
+            if (std::find(pane.tab_order.begin(), pane.tab_order.end(), target_tab->tab_id) != pane.tab_order.end()) {
+                activate_tab(pane_id, target_tab->tab_id);
+                return target_tab->explorer_panel->ensure_preview_pane_open();
+            }
+        }
+
+        return false;
+    }
+
+    bool FileTreePanel::open_hosted_tab(const std::string& hosted_id,
+                                        const std::string& title,
+                                        HostedTabRenderFn render_fn,
+                                        const std::string& source_explorer_state_key,
+                                        bool prefer_split,
+                                        bool* opened_in_split) {
+        if (opened_in_split) {
+            *opened_in_split = false;
+        }
+        if (hosted_id.empty() || title.empty() || !render_fn) {
+            return false;
+        }
+
+        for (auto& [pane_id, pane] : explorer_panes_) {
+            for (int tab_id : pane.tab_order) {
+                ExplorerTab* existing_tab = get_tab(tab_id);
+                if (!existing_tab || existing_tab->kind != TabKind::Hosted ||
+                    existing_tab->hosted_id != hosted_id) {
+                    continue;
+                }
+                existing_tab->hosted_title = title;
+                existing_tab->hosted_render_fn = render_fn;
+                if (!source_explorer_state_key.empty()) {
+                    existing_tab->source_explorer_state_key = source_explorer_state_key;
+                }
+                activate_tab(pane_id, tab_id);
+                return true;
+            }
+        }
+
+        auto add_to_pane = [&](int pane_id) {
+            const int tab_id = create_hosted_tab_instance(
+                pane_id, hosted_id, title, render_fn, source_explorer_state_key);
+            if (tab_id < 0) {
+                return false;
+            }
+            activate_tab(pane_id, tab_id);
+            return true;
+        };
+
+        if (prefer_split) {
+            const PaneLocation location = find_pane(active_pane_id_);
+            if (location.column_index >= 0) {
+                Column& column = columns_[static_cast<size_t>(location.column_index)];
+                if (column.pane_ids.size() < 2 && can_split_horizontal(active_pane_id_)) {
+                    const int new_pane_id = create_pane_instance();
+                    column.pane_ids.push_back(new_pane_id);
+                    column_split_ratios_[static_cast<size_t>(std::clamp(location.column_index, 0, 1))] = 0.5f;
+                    if (add_to_pane(new_pane_id)) {
+                        if (opened_in_split) {
+                            *opened_in_split = true;
+                        }
+                        return true;
+                    }
+                    destroy_pane_instance(new_pane_id);
+                    column.pane_ids.erase(std::remove(column.pane_ids.begin(), column.pane_ids.end(), new_pane_id),
+                                          column.pane_ids.end());
+                } else if (columns_.size() < 2 && can_split_vertical()) {
+                    const int new_pane_id = create_pane_instance();
+                    columns_.push_back({std::vector<int>{new_pane_id}});
+                    vertical_split_ratio_ = 0.5f;
+                    if (add_to_pane(new_pane_id)) {
+                        if (opened_in_split) {
+                            *opened_in_split = true;
+                        }
+                        return true;
+                    }
+                    destroy_pane_instance(new_pane_id);
+                    columns_.pop_back();
+                }
+            }
+        }
+
+        return add_to_pane(active_pane_id_);
     }
 
     void FileTreePanel::render(const ImVec2& pos, const ImVec2& size) {
@@ -402,18 +507,43 @@ namespace misty::panel {
 
         ImGui::SetNextWindowPos(ImVec2(pos.x, explorer_y));
         ImGui::SetNextWindowSize(ImVec2(size.x, explorer_h));
-        active_tab->explorer_panel->set_body_drag_source_callback([this, pane_id, active_tab]() {
-            if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID)) {
-                const PanePayload payload{pane_id};
-                ImGui::SetDragDropPayload(kPanePayloadType, &payload, sizeof(payload));
-                ImGui::Text("Move %s", make_tab_title(*active_tab).c_str());
-                ImGui::EndDragDropSource();
+        if (active_tab->kind == TabKind::Explorer && active_tab->explorer_panel) {
+            active_tab->explorer_panel->set_body_drag_source_callback([this, pane_id, active_tab]() {
+                if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID)) {
+                    const PanePayload payload{pane_id};
+                    ImGui::SetDragDropPayload(kPanePayloadType, &payload, sizeof(payload));
+                    ImGui::Text("Move %s", make_tab_title(*active_tab).c_str());
+                    ImGui::EndDragDropSource();
+                }
+            });
+            active_tab->explorer_panel->render();
+            if (active_tab->explorer_panel->consume_activation_request()) {
+                active_pane_id_ = pane_id;
+                pane->active_tab_id = active_tab->tab_id;
             }
-        });
-        active_tab->explorer_panel->render();
-        if (active_tab->explorer_panel->consume_activation_request()) {
-            active_pane_id_ = pane_id;
-            pane->active_tab_id = active_tab->tab_id;
+        } else if (active_tab->kind == TabKind::Hosted) {
+            const std::string window_name = "##hosted_tab_" + std::to_string(active_tab->tab_id);
+            const ImGuiWindowFlags flags =
+                ImGuiWindowFlags_NoTitleBar |
+                ImGuiWindowFlags_NoResize |
+                ImGuiWindowFlags_NoMove |
+                ImGuiWindowFlags_NoCollapse |
+                ImGuiWindowFlags_NoScrollbar |
+                ImGuiWindowFlags_NoSavedSettings;
+
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16.0f, 16.0f));
+            if (ImGui::Begin(window_name.c_str(), nullptr, flags)) {
+                if (ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) &&
+                    ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+                    active_pane_id_ = pane_id;
+                    pane->active_tab_id = active_tab->tab_id;
+                }
+                if (active_tab->hosted_render_fn) {
+                    active_tab->hosted_render_fn();
+                }
+            }
+            ImGui::End();
+            ImGui::PopStyleVar();
         }
 
         const ImGuiPayload* drag_payload = ImGui::GetDragDropPayload();
@@ -960,6 +1090,38 @@ namespace misty::panel {
         return tab_id;
     }
 
+    int FileTreePanel::create_hosted_tab_instance(int pane_id,
+                                                  const std::string& hosted_id,
+                                                  const std::string& title,
+                                                  HostedTabRenderFn render_fn,
+                                                  const std::string& source_explorer_state_key,
+                                                  int preferred_tab_id) {
+        ExplorerPane* pane = get_pane(pane_id);
+        if (!pane) {
+            return -1;
+        }
+
+        const int tab_id = preferred_tab_id >= 0 ? preferred_tab_id : next_tab_id_++;
+        next_tab_id_ = std::max(next_tab_id_, tab_id + 1);
+
+        ExplorerTab tab;
+        tab.tab_id = tab_id;
+        tab.kind = TabKind::Hosted;
+        tab.panel_id = "hosted_" + std::to_string(tab_id);
+        tab.hosted_id = hosted_id;
+        tab.hosted_title = title;
+        tab.hosted_render_fn = std::move(render_fn);
+        tab.source_explorer_state_key = source_explorer_state_key;
+
+        explorer_tabs_.emplace(tab_id, std::move(tab));
+        pane->tab_order.push_back(tab_id);
+        if (pane->active_tab_id < 0) {
+            pane->active_tab_id = tab_id;
+        }
+        normalize_tab_order(*pane);
+        return tab_id;
+    }
+
     int FileTreePanel::restore_pane_instance(const PaneSnapshot& snapshot) {
         const int pane_id = create_pane_instance();
         for (const TabSnapshot& tab_snapshot : snapshot.tabs) {
@@ -1017,6 +1179,11 @@ namespace misty::panel {
             return;
         }
 
+        if (source_tab->kind != TabKind::Explorer) {
+            notify_layout_error("Split Unavailable", "Open a files tab to duplicate it into a new pane.");
+            return;
+        }
+
         const TabSnapshot source_snapshot = capture_tab_snapshot(*source_tab);
         const int new_pane_id = create_pane_instance();
         const int new_tab_id = create_tab_instance(new_pane_id, false, source_snapshot.current_path);
@@ -1052,6 +1219,11 @@ namespace misty::panel {
 
         ExplorerTab* source_tab = get_active_tab(active_pane_id_);
         if (!source_tab) {
+            return;
+        }
+
+        if (source_tab->kind != TabKind::Explorer) {
+            notify_layout_error("Split Unavailable", "Open a files tab to duplicate it into a new pane.");
             return;
         }
 
@@ -1232,6 +1404,14 @@ namespace misty::panel {
             return;
         }
 
+        if (active_tab->kind != TabKind::Explorer) {
+            const int new_tab_id = create_tab_instance(pane_id, false, "", false);
+            if (new_tab_id >= 0) {
+                activate_tab(pane_id, new_tab_id);
+            }
+            return;
+        }
+
         TabSnapshot snapshot = capture_tab_snapshot(*active_tab);
         snapshot.pinned = false;
         snapshot.search_open = false;
@@ -1251,9 +1431,11 @@ namespace misty::panel {
             return;
         }
 
-        pane->closed_tabs.push_back(capture_tab_snapshot(*tab));
-        if (pane->closed_tabs.size() > 12) {
-            pane->closed_tabs.erase(pane->closed_tabs.begin());
+        if (tab->kind == TabKind::Explorer) {
+            pane->closed_tabs.push_back(capture_tab_snapshot(*tab));
+            if (pane->closed_tabs.size() > 12) {
+                pane->closed_tabs.erase(pane->closed_tabs.begin());
+            }
         }
 
         const auto current_it = std::find(pane->tab_order.begin(), pane->tab_order.end(), tab_id);
@@ -1646,6 +1828,10 @@ namespace misty::panel {
     }
 
     FileTreePanel::TabSnapshot FileTreePanel::capture_tab_snapshot(const ExplorerTab& tab) const {
+        if (tab.kind == TabKind::Hosted) {
+            return snapshot_from_state_key(tab_context_state_key(tab));
+        }
+
         TabSnapshot snapshot;
         snapshot.pinned = tab.pinned;
 
@@ -1735,11 +1921,58 @@ namespace misty::panel {
 
     SearchPanel* FileTreePanel::active_search_panel() const {
         const ExplorerTab* tab = get_active_tab(active_pane_id_);
-        return tab ? tab->search_panel.get() : nullptr;
+        return tab && tab->kind == TabKind::Explorer ? tab->search_panel.get() : nullptr;
+    }
+
+    FileTreePanel::ExplorerTab* FileTreePanel::find_explorer_tab_by_state_key(const std::string& explorer_state_key) {
+        for (auto& [_, tab] : explorer_tabs_) {
+            if (tab.kind == TabKind::Explorer && tab.explorer_state_key == explorer_state_key) {
+                return &tab;
+            }
+        }
+        return nullptr;
+    }
+
+    const FileTreePanel::ExplorerTab* FileTreePanel::find_explorer_tab_by_state_key(const std::string& explorer_state_key) const {
+        for (const auto& [_, tab] : explorer_tabs_) {
+            if (tab.kind == TabKind::Explorer && tab.explorer_state_key == explorer_state_key) {
+                return &tab;
+            }
+        }
+        return nullptr;
+    }
+
+    std::string FileTreePanel::tab_context_state_key(const ExplorerTab& tab) const {
+        if (tab.kind == TabKind::Hosted && !tab.source_explorer_state_key.empty()) {
+            return tab.source_explorer_state_key;
+        }
+        return tab.explorer_state_key;
+    }
+
+    FileTreePanel::TabSnapshot FileTreePanel::snapshot_from_state_key(const std::string& explorer_state_key) const {
+        TabSnapshot snapshot;
+        if (explorer_state_key.empty()) {
+            return snapshot;
+        }
+
+        auto& state = ui_registry_.get_state<FileExplorerState>(explorer_state_key);
+        std::lock_guard<std::mutex> lock(state.mu);
+        snapshot.current_path = !state.pending_navigation_path.empty()
+            ? state.pending_navigation_path
+            : std::string(state.current_path);
+        snapshot.show_hidden = state.show_hidden;
+        snapshot.grid_view = state.grid_view;
+        snapshot.back_history = stack_to_vector(state.back_history);
+        snapshot.forward_history = stack_to_vector(state.forward_history);
+        return snapshot;
     }
 
     std::string FileTreePanel::current_tab_path(const ExplorerTab& tab) const {
-        auto& state = ui_registry_.get_state<FileExplorerState>(tab.explorer_state_key);
+        const std::string explorer_state_key = tab_context_state_key(tab);
+        if (explorer_state_key.empty()) {
+            return {};
+        }
+        auto& state = ui_registry_.get_state<FileExplorerState>(explorer_state_key);
         std::lock_guard<std::mutex> lock(state.mu);
         if (!state.pending_navigation_path.empty()) {
             return state.pending_navigation_path;
@@ -1748,6 +1981,9 @@ namespace misty::panel {
     }
 
     std::string FileTreePanel::make_tab_title(const ExplorerTab& tab) const {
+        if (tab.kind == TabKind::Hosted && !tab.hosted_title.empty()) {
+            return tab.hosted_title;
+        }
         return title_for_path(current_tab_path(tab));
     }
 

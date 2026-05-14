@@ -112,6 +112,7 @@ namespace misty::panel {
 
         // Advanced
         bool debug_logging_enabled = false;
+        bool frame_pacing_overlay_enabled = false;
         bool experimental_features_enabled = false;
 
         // Status messages

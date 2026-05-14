@@ -783,9 +783,14 @@ namespace misty::panel {
             ImGuiWindowFlags_NoCollapse |
             ImGuiWindowFlags_NoResize |
             ImGuiWindowFlags_NoScrollbar |
-            ImGuiWindowFlags_NoScrollWithMouse;
+            ImGuiWindowFlags_NoScrollWithMouse |
+            ImGuiWindowFlags_NoSavedSettings;
 
         auto& search_state = registry_.get_state<SearchState>(search_state_key_);
+
+        if (ImGuiViewport* main_viewport = ImGui::GetMainViewport()) {
+            ImGui::SetNextWindowViewport(main_viewport->ID);
+        }
 
         ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.12f, 0.12f, 0.13f, 1.0f));
 
@@ -843,7 +848,14 @@ namespace misty::panel {
                 }
 
                 ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, 8.0f);
-                if (ImGui::BeginChild("##explorer_list", ImVec2(list_width, content_avail.y), false)) {
+                if (ImGui::BeginChild("##explorer_list", ImVec2(list_width, content_avail.y), false,
+                                      ImGuiWindowFlags_NoScrollWithMouse)) {
+                    ImGuiIO& io = ImGui::GetIO();
+                    if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup) && io.MouseWheel != 0.0f) {
+                        constexpr float kExplorerWheelStep = 22.0f;
+                        ImGui::SetScrollY(ImGui::GetScrollY() - io.MouseWheel * kExplorerWheelStep);
+                    }
+
                     // Save window-relative position of the list area before rendering it.
                     // We'll reuse this to position the overlay child on top.
                     ImVec2 list_start = ImGui::GetCursorPos();
@@ -1215,6 +1227,13 @@ namespace misty::panel {
         preview_pane_open_ = !preview_pane_open_;
         if (!preview_pane_open_) {
             preview_pane_resizing_ = false;
+        }
+        return true;
+    }
+
+    bool FileExplorerPanel::ensure_preview_pane_open() {
+        if (!preview_pane_open_) {
+            preview_pane_open_ = true;
         }
         return true;
     }

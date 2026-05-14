@@ -8,6 +8,7 @@
 
 #include "core/system/util.h"
 #include "core/ui/ui_style.h"
+#include "views/app_view.h"
 
 namespace misty::panel {
 
@@ -98,6 +99,14 @@ namespace misty::panel {
             .padding = ImVec2(32.0f, 24.0f),
         }, [&]() {
             if (ImGui::Begin("VaultPanel", nullptr, flags)) {
+                {
+                    const auto repo_snapshot = state.repos_snapshot();
+                    std::lock_guard<std::mutex> lock(state.mu);
+                    misty::view::debug_log_view_event(
+                        std::string("vault_panel: repos=") + std::to_string(repo_snapshot.size()) +
+                        " refreshing=" + (state.is_refreshing ? "true" : "false") +
+                        " selected=" + (state.selected_repo.empty() ? "<none>" : state.selected_repo));
+                }
                 show_header(state);
                 ImGui::Spacing();
 
