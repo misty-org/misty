@@ -140,6 +140,7 @@ const std::vector<DefaultCommandEntry>& default_command_entries() {
         {"explorer.tab_8", MISTY_PRIMARY_SHORTCUT "+8"},
         {"explorer.tab_9", MISTY_PRIMARY_SHORTCUT "+9"},
         {"app.open_settings", MISTY_PRIMARY_SHORTCUT "+Comma"},
+        {"app.toggle_plugin_launcher", MISTY_PRIMARY_SHORTCUT "+Shift+P"},
         {"app.toggle_transfers", MISTY_PRIMARY_SHORTCUT "+Shift+Y"},
         {"auth.submit", "Enter"},
         {"modal.confirm", "Enter"},

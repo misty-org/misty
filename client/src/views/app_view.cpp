@@ -1,7 +1,70 @@
 #include "app_view.h"
+#include "core/system/frame_pacer.h"
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
 #include <mutex>
 
 namespace misty::view {
+    namespace {
+        void append_view_log(const std::string& line) {
+            const char* home = std::getenv("HOME");
+            if (!home || *home == '\0') return;
+            namespace fs = std::filesystem;
+            const fs::path path = fs::path(home) / "misty" / ".cache" / "misty-view.log";
+            std::error_code ec;
+            fs::create_directories(path.parent_path(), ec);
+            std::ofstream f(path, std::ios::app);
+            if (!f.is_open()) return;
+            f << line << "\n";
+        }
+
+        const char* view_name(ViewID id) {
+            switch (id) {
+                case ViewID::Auth: return "Auth";
+                case ViewID::Login: return "Login";
+                case ViewID::Onboarding: return "Onboarding";
+                case ViewID::Files: return "Files";
+                case ViewID::Settings: return "Settings";
+                case ViewID::Workspace: return "Workspace";
+                case ViewID::Activity: return "Activity";
+                case ViewID::Services: return "Services";
+                case ViewID::Extensions: return "Extensions";
+                case ViewID::Vault: return "Vault";
+                case ViewID::EditProfile: return "EditProfile";
+                case ViewID::Default: return "Default";
+            }
+            return "Unknown";
+        }
+    }
+
+    bool ViewRegistry::apply_view_locked(ViewID id) {
+        auto it = views_.find(id);
+        if (it != views_.end()) {
+            append_view_log(std::string("apply_view: ") + view_name(id));
+            current_view_id_ = id;
+            current_view_ = it->second.get();
+            return true;
+        }
+        return false;
+    }
+
+    void ViewRegistry::restore_fallback_view_locked() {
+        if (current_view_ != nullptr) {
+            return;
+        }
+
+        if (apply_view_locked(ViewID::Files)) {
+            append_view_log("fallback_view: Files");
+            return;
+        }
+
+        if (!views_.empty()) {
+            current_view_id_ = views_.begin()->first;
+            current_view_ = views_.begin()->second.get();
+            append_view_log(std::string("fallback_view: ") + view_name(current_view_id_));
+        }
+    }
 
     // ViewRegistry implementation
     void ViewRegistry::init_default_view() {
@@ -15,12 +78,23 @@ namespace misty::view {
 
     void ViewRegistry::switch_view(ViewID id) {
         std::lock_guard<std::mutex> lock(mutex_);
-        
-        // Set new current view (must have been registered)
+        if (current_view_ != nullptr && current_view_id_ == id && !has_pending_view_) {
+            append_view_log(std::string("ignored_view_same: ") + view_name(id));
+            return;
+        }
         auto it = views_.find(id);
         if (it != views_.end()) {
-            current_view_id_ = id;
-            current_view_ = it->second.get();
+            append_view_log(std::string("request_view: ") + view_name(id) +
+                            (is_rendering_ ? " (deferred)" : " (immediate)"));
+            if (is_rendering_) {
+                pending_view_id_ = id;
+                has_pending_view_ = true;
+            } else {
+                apply_view_locked(id);
+            }
+            core::FramePacer::request_immediate_frame();
+        } else {
+            append_view_log(std::string("ignored_view: ") + view_name(id));
         }
         // If view not registered, keep current view to avoid rendering nothing
     }
@@ -31,12 +105,28 @@ namespace misty::view {
         AppView* view_to_render = nullptr;
         {
             std::lock_guard<std::mutex> lock(mutex_);
+            if (has_pending_view_) {
+                apply_view_locked(pending_view_id_);
+                has_pending_view_ = false;
+            }
+            restore_fallback_view_locked();
             view_to_render = current_view_;
+            is_rendering_ = true;
         }
         
         // Render without holding the lock to avoid deadlocks
         if (view_to_render) {
+            append_view_log(std::string("render_view: ") + view_name(view_to_render->get_view_id()));
             view_to_render->render();
+        }
+
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            is_rendering_ = false;
+            if (has_pending_view_) {
+                apply_view_locked(pending_view_id_);
+                has_pending_view_ = false;
+            }
         }
     }
 
@@ -50,12 +140,50 @@ namespace misty::view {
         return current_view_;
     }
 
+    AppView* ViewRegistry::get_view(ViewID id) const {
+        std::lock_guard<std::mutex> lock(mutex_);
+        auto it = views_.find(id);
+        return it == views_.end() ? nullptr : it->second.get();
+    }
+
+    bool ViewRegistry::get_view_capabilities(ViewID id, ViewCapabilities* out) const {
+        if (!out) {
+            return false;
+        }
+        std::lock_guard<std::mutex> lock(mutex_);
+        auto it = views_.find(id);
+        if (it == views_.end() || !it->second) {
+            *out = {};
+            return false;
+        }
+        *out = it->second->capabilities();
+        return true;
+    }
+
+    PluginOpenResult ViewRegistry::open_plugin_in_view(ViewID id,
+                                                       const std::string& panel_id,
+                                                       PluginOpenMode mode) {
+        AppView* target_view = nullptr;
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            auto it = views_.find(id);
+            if (it == views_.end() || !it->second) {
+                return PluginOpenResult::Failed;
+            }
+            target_view = it->second.get();
+        }
+        return target_view->open_plugin_panel(panel_id, mode);
+    }
+
     void ViewRegistry::clear() {
         std::unordered_map<ViewID, std::unique_ptr<AppView>> views;
         {
             std::lock_guard<std::mutex> lock(mutex_);
             current_view_ = nullptr;
             current_view_id_ = ViewID::Default;
+            pending_view_id_ = ViewID::Default;
+            has_pending_view_ = false;
+            is_rendering_ = false;
             views.swap(views_);
         }
     }
@@ -82,7 +210,19 @@ namespace misty::view {
         return ViewRegistry::get().get_current_view_id();
     }
 
+    bool get_view_capabilities(ViewID id, ViewCapabilities* out) {
+        return ViewRegistry::get().get_view_capabilities(id, out);
+    }
+
+    PluginOpenResult open_plugin_in_view(ViewID id, const std::string& panel_id, PluginOpenMode mode) {
+        return ViewRegistry::get().open_plugin_in_view(id, panel_id, mode);
+    }
+
     void clear_views() {
         ViewRegistry::get().clear();
+    }
+
+    void debug_log_view_event(const std::string& line) {
+        append_view_log(line);
     }
 }

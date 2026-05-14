@@ -3,12 +3,14 @@
 #include <algorithm>
 
 #include "core/commands/command_manager.h"
+#include "core/manager/plugin_manager.h"
 #include "core/manager/asset_manager.h"
 #include "core/manager/font_manager.h"
 #include "core/manager/proxy_manager.h"
 #include "core/manager/session_manager.h"
 #include "core/ui/ui_style.h"
 #include "panels/file_explorer/file_explorer_state.h"
+#include "panels/notification/notification_state.h"
 #include "panels/transfers/transfer_window_state.h"
 
 namespace misty::view {
@@ -53,6 +55,65 @@ namespace misty::view {
 
     bool FilesView::invoke_command(const std::string& command_id) {
         return filetree_panel_ ? filetree_panel_->invoke_command(command_id) : false;
+    }
+
+    ViewCapabilities FilesView::capabilities() const {
+        return ViewCapabilities{
+            .tabs = true,
+            .split = true,
+        };
+    }
+
+    PluginOpenResult FilesView::open_plugin_panel(const std::string& panel_id, PluginOpenMode mode) {
+        if (!filetree_panel_ || panel_id.empty()) {
+            return PluginOpenResult::Failed;
+        }
+
+        if (mode == PluginOpenMode::Inline) {
+            if (panel_id == "preview-manager.panel") {
+                return filetree_panel_->ensure_preview_open_for_active_context()
+                    ? PluginOpenResult::Opened
+                    : PluginOpenResult::Failed;
+            }
+            return PluginOpenResult::Unsupported;
+        }
+
+        const auto plugins = core::PluginManager::get().loaded_plugins();
+        const auto plugin_it = std::find_if(plugins.begin(), plugins.end(), [&](const core::PluginInfo& plugin) {
+            return std::any_of(plugin.panels.begin(), plugin.panels.end(), [&](const core::PluginPanelInfo& panel) {
+                return panel.id == panel_id;
+            });
+        });
+        if (plugin_it == plugins.end()) {
+            return PluginOpenResult::Failed;
+        }
+
+        const auto panel_it = std::find_if(plugin_it->panels.begin(), plugin_it->panels.end(),
+            [&](const core::PluginPanelInfo& panel) { return panel.id == panel_id; });
+        if (panel_it == plugin_it->panels.end()) {
+            return PluginOpenResult::Failed;
+        }
+
+        bool opened_in_split = false;
+        const bool prefer_split = mode == PluginOpenMode::Split;
+        const bool opened = filetree_panel_->open_hosted_tab(
+            panel_id,
+            panel_it->title.empty() ? plugin_it->name : panel_it->title,
+            [panel_id]() {
+                core::PluginManager::get().render_panel_content(panel_id);
+            },
+            active_explorer_state_key(),
+            prefer_split,
+            &opened_in_split);
+        if (!opened) {
+            return PluginOpenResult::Failed;
+        }
+
+        if (prefer_split && !opened_in_split) {
+            auto& notifications = ui_registry_.get_state<panel::NotificationState>("Notifications");
+            notifications.add_notification("Plugin opened in a tab because no split was available.", 2.5f);
+        }
+        return PluginOpenResult::Opened;
     }
 
     void FilesView::render() {

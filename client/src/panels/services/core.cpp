@@ -5,6 +5,7 @@
 #include "core/manager/font_manager.h"
 #include "core/ui/ui_animate.h"
 #include "core/ui/ui_style.h"
+#include "views/app_view.h"
 
 #include <algorithm>
 #include <cctype>
@@ -218,6 +219,7 @@ namespace misty::panel {
 
     void ServicesPanel::render() {
         auto& state = registry_.get_state<ServicesState>("Services");
+        size_t connection_count = 0;
 
         ImGuiWindowFlags flags =
             ImGuiWindowFlags_NoTitleBar |
@@ -258,8 +260,14 @@ namespace misty::panel {
             bool refresh_active = false;
             {
                 std::lock_guard<std::mutex> lock(state.mu);
+                connection_count = state.connections.size();
                 refresh_active = refresh_indicator_active(state.is_refreshing, state.refresh_indicator_until);
             }
+            misty::view::debug_log_view_event(
+                std::string("services_panel: connections=") + std::to_string(connection_count) +
+                " refresh_active=" + (refresh_active ? "true" : "false") +
+                " error=" + (error_msg.empty() ? "false" : "true") +
+                " success=" + (success_msg.empty() ? "false" : "true"));
             if (refresh_active) {
                 show_loading_overlay();
             }

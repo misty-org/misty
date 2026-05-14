@@ -118,6 +118,7 @@ void SettingsState::ensure_app_settings_loaded() {
     confirm_empty_trash = advanced.value("confirm_empty_trash", confirm_empty_trash);
     confirm_clear_cache = advanced.value("confirm_clear_cache", confirm_clear_cache);
     debug_logging_enabled = advanced.value("debug_logging_enabled", debug_logging_enabled);
+    frame_pacing_overlay_enabled = advanced.value("frame_pacing_overlay_enabled", frame_pacing_overlay_enabled);
     experimental_features_enabled = advanced.value("experimental_features_enabled", experimental_features_enabled);
 
     const json ai = settings.value("ai", json::object());
@@ -137,6 +138,8 @@ void SettingsState::ensure_app_settings_loaded() {
 bool SettingsState::save_app_settings(std::string* error) {
     return core::update_settings_document([&](json& settings) {
         settings["schema_version"] = 1;
+        const json existing_appearance = settings.value("appearance", json::object());
+        const json existing_custom_theme = existing_appearance.value("custom_theme", json::object());
         settings["general"] = {
             {"startup_view_index", startup_view_index},
             {"reopen_last_session", reopen_last_session},
@@ -162,6 +165,9 @@ bool SettingsState::save_app_settings(std::string* error) {
             {"font_size_index", font_size_index},
             {"custom_fonts", make_font_array(custom_fonts)},
         };
+        if (existing_custom_theme.is_object() && !existing_custom_theme.empty()) {
+            settings["appearance"]["custom_theme"] = existing_custom_theme;
+        }
 
         settings["account"] = {
             {"email", std::string(account_email)},
@@ -209,6 +215,7 @@ bool SettingsState::save_app_settings(std::string* error) {
             {"confirm_empty_trash", confirm_empty_trash},
             {"confirm_clear_cache", confirm_clear_cache},
             {"debug_logging_enabled", debug_logging_enabled},
+            {"frame_pacing_overlay_enabled", frame_pacing_overlay_enabled},
             {"experimental_features_enabled", experimental_features_enabled},
         };
 

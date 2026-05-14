@@ -7,16 +7,19 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <unordered_set>
 #include <utility>
 
 #include <nlohmann/json.hpp>
 
 #include "core/manager/plugin_manager.h"
+#include "core/commands/command_manager.h"
 #include "core/ui/ui_layout.h"
 #include "core/ui/ui_style.h"
 #include "imgui.h"
 #include "panels/plugins/plugins_components.h"
 #include "panels/settings/settings_components.h"
+#include "views/app_view.h"
 
 namespace misty::panel {
 
@@ -116,15 +119,26 @@ std::optional<fs::path> public_plugins_root() {
     if (!home || !*home) {
         return std::nullopt;
     }
-    return fs::path(home) / "misty" / "public" / "plugins";
+    return fs::path(home) / "misty" / "plugins" / "public";
 }
 
-std::string plugin_logo_path(const std::string& plugin_id) {
-    const auto root = public_plugins_root();
-    if (!root) {
-        return {};
+std::optional<fs::path> private_plugins_root() {
+    const char* home = std::getenv("HOME");
+    if (!home || !*home) {
+        return std::nullopt;
     }
-    return (*root / plugin_id / "assets" / "logo.svg").string();
+    return fs::path(home) / "misty" / "plugins" / "private";
+}
+
+std::vector<fs::path> plugin_roots() {
+    std::vector<fs::path> roots;
+    if (const auto root = private_plugins_root()) {
+        roots.push_back(*root);
+    }
+    if (const auto root = public_plugins_root()) {
+        roots.push_back(*root);
+    }
+    return roots;
 }
 
 std::string lowercase_copy(std::string value) {
@@ -191,12 +205,11 @@ std::string plugin_card_description(const PluginsDetailProps& detail) {
 }
 
 std::optional<PluginsDetailProps> resolve_plugin_detail(const std::string& plugin_id) {
-    const auto root = public_plugins_root();
-    if (root) {
-        if (auto detail = load_plugin_detail(*root / plugin_id / "plugin.json")) {
+    for (const auto& root : plugin_roots()) {
+        if (auto detail = load_plugin_detail(root / plugin_id / "plugin.json")) {
             return detail;
         }
-        if (auto detail = load_plugin_detail(*root / plugin_id / "detail.json")) {
+        if (auto detail = load_plugin_detail(root / plugin_id / "detail.json")) {
             return detail;
         }
     }
@@ -328,40 +341,45 @@ void PluginsPanel::refresh_plugins() {
     plugins_.clear();
 
     const auto root = public_plugins_root();
-    if (!root) {
-        return;
-    }
-
+    std::unordered_set<std::string> seen_ids;
     std::error_code ec;
-    if (!fs::exists(*root, ec) || ec) {
-        return;
-    }
 
-    for (const auto& entry : fs::directory_iterator(*root, ec)) {
-        if (ec || !entry.is_directory()) {
+    for (const auto& root_path : plugin_roots()) {
+        if (!fs::exists(root_path, ec) || ec) {
+            ec.clear();
             continue;
         }
 
-        const fs::path plugin_dir = entry.path();
-        std::optional<PluginsDetailProps> detail = load_plugin_detail(plugin_dir / "plugin.json");
-        if (!detail) {
-            detail = load_plugin_detail(plugin_dir / "detail.json");
-        }
-        if (!detail) {
-            continue;
-        }
+        for (const auto& entry : fs::directory_iterator(root_path, ec)) {
+            if (ec || !entry.is_directory()) {
+                continue;
+            }
 
-        if (detail->id.empty()) {
-            detail->id = plugin_dir.filename().string();
-        }
-        if (detail->name.empty()) {
-            detail->name = detail->id;
-        }
+            const fs::path plugin_dir = entry.path();
+            std::optional<PluginsDetailProps> detail = load_plugin_detail(plugin_dir / "plugin.json");
+            if (!detail) {
+                detail = load_plugin_detail(plugin_dir / "detail.json");
+            }
+            if (!detail) {
+                continue;
+            }
 
-        plugins_.push_back({
-            .detail = std::move(*detail),
-            .logo_path = (plugin_dir / "assets" / "logo.svg").string(),
-        });
+            if (detail->id.empty()) {
+                detail->id = plugin_dir.filename().string();
+            }
+            if (detail->name.empty()) {
+                detail->name = detail->id;
+            }
+            if (!seen_ids.insert(detail->id).second) {
+                continue;
+            }
+
+            plugins_.push_back({
+                .detail = std::move(*detail),
+                .logo_path = (plugin_dir / "assets" / "logo.svg").string(),
+            });
+        }
+        ec.clear();
     }
 
     std::sort(plugins_.begin(), plugins_.end(), [](const PluginListEntry& lhs, const PluginListEntry& rhs) {
@@ -407,6 +425,25 @@ void PluginsPanel::sidebar(float sidebar_width) {
         .padding = kSettingsSidebarPadding,
         .gap = UI::Spacing::xy(0.0f, 12.0f),
     }, [&]() {
+        const std::string launcher_shortcut =
+            core::CommandManager::get().label("app.toggle_plugin_launcher");
+        const std::string launcher_label = launcher_shortcut.empty()
+            ? "Open Plugin Launcher"
+            : "Open Plugin Launcher (" + launcher_shortcut + ")";
+        if (UI::button("##plugins_open_launcher", {
+            .label = launcher_label.c_str(),
+            .width = UI::Size::fill(),
+            .height = UI::Size::px(kSettingsControlHeight),
+            .padding = UI::Spacing::xy(12.0f, 8.0f),
+            .rounding = 6.0f,
+            .button_color = kSettingsControlBgColor,
+            .hover_color = ImVec4(0.22f, 0.22f, 0.24f, 1.0f),
+            .active_color = ImVec4(0.26f, 0.26f, 0.28f, 1.0f),
+            .text_color = kSettingsControlTextColor,
+        })) {
+            core::PluginManager::get().open_launcher();
+        }
+
         UI::input_text({
             .label = "##plugins_search",
             .buffer = search_query_,
@@ -545,7 +582,7 @@ void PluginsPanel::content() {
                     .title = "Plugins",
                 }, [&]() {
                     UI::text({
-                        .text = "No plugin metadata found in ~/misty/public/plugins yet.",
+                        .text = "No plugin metadata found in ~/misty/plugins/public or ~/misty/plugins/private yet.",
                         .width = UI::Size::px(720.0f),
                         .overflow = UI::TextOverflow::Wrap,
                         .color = kSettingsMutedTextColor,
@@ -656,6 +693,9 @@ void PluginsPanel::render() {
         if (ImGui::Begin("Plugins", nullptr, flags)) {
             refresh_plugins();
             ensure_selected_plugin();
+            misty::view::debug_log_view_event(
+                std::string("plugins_panel: count=") + std::to_string(plugins_.size()) +
+                " selected=" + selected_plugin_id_);
             shell();
         }
         ImGui::End();

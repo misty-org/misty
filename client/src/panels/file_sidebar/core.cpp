@@ -150,7 +150,12 @@ namespace misty::panel {
             ImGuiWindowFlags_NoResize |
             ImGuiWindowFlags_NoMove |
             ImGuiWindowFlags_NoCollapse |
-            ImGuiWindowFlags_NoScrollbar;
+            ImGuiWindowFlags_NoScrollbar |
+            ImGuiWindowFlags_NoSavedSettings;
+
+        if (ImGuiViewport* main_viewport = ImGui::GetMainViewport()) {
+            ImGui::SetNextWindowViewport(main_viewport->ID);
+        }
 
         ImGui::PushStyleColor(ImGuiCol_WindowBg, kFileSidebarBg);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16.0f, 16.0f));
