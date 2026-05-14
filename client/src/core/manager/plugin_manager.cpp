@@ -110,7 +110,7 @@ std::string view_id_to_string(view::ViewID view_id) {
         case view::ViewID::Services: return "Services";
         case view::ViewID::Extensions: return "Extensions";
         case view::ViewID::Vault: return "Vault";
-        case view::ViewID::EditProfile: return "EditProfile";
+        case view::ViewID::Transfers: return "Transfers";
         case view::ViewID::Default: return "Default";
     }
     return "Unknown";
@@ -131,7 +131,7 @@ std::optional<view::ViewID> view_id_from_string(const char* raw) {
     if (value == "services") return view::ViewID::Services;
     if (value == "extensions" || value == "plugins") return view::ViewID::Extensions;
     if (value == "vault") return view::ViewID::Vault;
-    if (value == "editprofile" || value == "edit_profile") return view::ViewID::EditProfile;
+    if (value == "transfers" || value == "transfer") return view::ViewID::Transfers;
     return std::nullopt;
 }
 
@@ -141,12 +141,14 @@ constexpr LauncherViewMask kLauncherViewSettings = 1u << 1;
 constexpr LauncherViewMask kLauncherViewServices = 1u << 2;
 constexpr LauncherViewMask kLauncherViewExtensions = 1u << 3;
 constexpr LauncherViewMask kLauncherViewVault = 1u << 4;
+constexpr LauncherViewMask kLauncherViewTransfers = 1u << 5;
 constexpr LauncherViewMask kLauncherViewAll =
     kLauncherViewFiles |
     kLauncherViewSettings |
     kLauncherViewServices |
     kLauncherViewExtensions |
-    kLauncherViewVault;
+    kLauncherViewVault |
+    kLauncherViewTransfers;
 
 struct PluginLauncherMetadata {
     LauncherViewMask allowed_views = kLauncherViewExtensions;
@@ -165,6 +167,7 @@ LauncherViewMask launcher_mask_for_view(view::ViewID view_id) {
         case view::ViewID::Services: return kLauncherViewServices;
         case view::ViewID::Extensions: return kLauncherViewExtensions;
         case view::ViewID::Vault: return kLauncherViewVault;
+        case view::ViewID::Transfers: return kLauncherViewTransfers;
         default: return 0;
     }
 }

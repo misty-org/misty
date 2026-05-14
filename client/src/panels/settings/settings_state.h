@@ -34,7 +34,6 @@ namespace misty::panel {
 
         // Account
         char account_email[256] = "";
-        char account_display_name[128] = "";
         char subscription_plan_label[64] = "Free";
         int connected_provider_count = 0;
 

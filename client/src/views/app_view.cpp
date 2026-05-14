@@ -31,7 +31,7 @@ namespace misty::view {
                 case ViewID::Services: return "Services";
                 case ViewID::Extensions: return "Extensions";
                 case ViewID::Vault: return "Vault";
-                case ViewID::EditProfile: return "EditProfile";
+                case ViewID::Transfers: return "Transfers";
                 case ViewID::Default: return "Default";
             }
             return "Unknown";
