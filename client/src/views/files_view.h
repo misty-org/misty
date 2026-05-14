@@ -27,6 +27,8 @@ namespace misty::view {
         view::ViewID get_view_id() override;
         std::string active_explorer_state_key() const override;
         bool invoke_command(const std::string& command_id) override;
+        ViewCapabilities capabilities() const override;
+        PluginOpenResult open_plugin_panel(const std::string& panel_id, PluginOpenMode mode) override;
 
     private:
         void init_panels();

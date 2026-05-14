@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -18,6 +19,8 @@ class MistyClient;
 namespace misty::panel {
     class FileTreePanel {
     public:
+        using HostedTabRenderFn = std::function<void()>;
+
         FileTreePanel(core::UIRegistry& ui_registry,
                       core::WorkerPool& worker_pool,
                       std::shared_ptr<MistyClient> client);
@@ -31,8 +34,20 @@ namespace misty::panel {
         bool drop_selected_items_to_path(const std::string& source_state_key,
                                          const std::string& dest_path,
                                          ClipboardOp op);
+        bool ensure_preview_open_for_active_context();
+        bool open_hosted_tab(const std::string& hosted_id,
+                             const std::string& title,
+                             HostedTabRenderFn render_fn,
+                             const std::string& source_explorer_state_key,
+                             bool prefer_split,
+                             bool* opened_in_split = nullptr);
 
     private:
+        enum class TabKind {
+            Explorer,
+            Hosted,
+        };
+
         enum class RestoreMode {
             Column,
             Row,
@@ -52,11 +67,16 @@ namespace misty::panel {
         struct ExplorerTab {
             int tab_id = -1;
             bool pinned = false;
+            TabKind kind = TabKind::Explorer;
             std::string explorer_state_key;
             std::string search_state_key;
             std::string panel_id;
             std::shared_ptr<FileExplorerPanel> explorer_panel;
             std::shared_ptr<SearchPanel> search_panel;
+            std::string hosted_id;
+            std::string hosted_title;
+            HostedTabRenderFn hosted_render_fn;
+            std::string source_explorer_state_key;
         };
 
         struct ExplorerPane {
@@ -125,6 +145,12 @@ namespace misty::panel {
                                 const std::string& preferred_search_state_key = "",
                                 const std::string& preferred_panel_id = "",
                                 int preferred_tab_id = -1);
+        int create_hosted_tab_instance(int pane_id,
+                                       const std::string& hosted_id,
+                                       const std::string& title,
+                                       HostedTabRenderFn render_fn,
+                                       const std::string& source_explorer_state_key,
+                                       int preferred_tab_id = -1);
         int restore_pane_instance(const PaneSnapshot& snapshot);
         void destroy_pane_instance(int pane_id);
 
@@ -165,6 +191,10 @@ namespace misty::panel {
         ExplorerTab* get_active_tab(int pane_id);
         const ExplorerTab* get_active_tab(int pane_id) const;
         SearchPanel* active_search_panel() const;
+        ExplorerTab* find_explorer_tab_by_state_key(const std::string& explorer_state_key);
+        const ExplorerTab* find_explorer_tab_by_state_key(const std::string& explorer_state_key) const;
+        std::string tab_context_state_key(const ExplorerTab& tab) const;
+        TabSnapshot snapshot_from_state_key(const std::string& explorer_state_key) const;
         std::string current_tab_path(const ExplorerTab& tab) const;
         std::string make_tab_title(const ExplorerTab& tab) const;
         std::string make_tab_button_label(const ExplorerTab& tab) const;

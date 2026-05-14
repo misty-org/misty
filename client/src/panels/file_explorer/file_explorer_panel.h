@@ -43,6 +43,7 @@ namespace misty::panel {
         bool consume_activation_request();
         void toggle_chat_overlay();
         bool toggle_preview_pane();
+        bool ensure_preview_pane_open();
         bool zoom_preview_in();
         bool zoom_preview_out();
         bool reset_preview_zoom();
@@ -110,10 +111,10 @@ namespace misty::panel {
         void show_permanent_delete_modal(panel::FileExplorerState& state);
         void show_permission_delete_modal(panel::FileExplorerState& state);
 
+        // File operation helpers
 #ifdef MISTY_TESTING
     public:
 #endif
-        // File operation helpers
         void perform_copy(panel::FileExplorerState& state);
         void perform_cut(panel::FileExplorerState& state);
         void perform_paste(panel::FileExplorerState& state);
@@ -158,10 +159,7 @@ namespace misty::panel {
         // Async local filesystem navigation
         void navigate_to_local_path_async(const std::string& path, bool update_history, uint64_t navigation_generation);
 
-        // Sync account mappings from services state
         void sync_account_mappings();
-
-        // Unified remote navigation (replaces per-provider methods)
         void navigate_to_remote_mount_root(bool update_history);
         void navigate_to_provider_folder(const std::string& provider_folder, bool update_history);
         void navigate_to_remote(const std::string& remote_name, const std::string& path,

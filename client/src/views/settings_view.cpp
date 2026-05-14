@@ -17,6 +17,22 @@ namespace misty::view {
         return ViewID::Settings;
     }
 
+    ViewCapabilities SettingsView::capabilities() const {
+        return {
+            .tabs = true,
+            .split = false,
+        };
+    }
+
+    PluginOpenResult SettingsView::open_plugin_panel(const std::string& panel_id, PluginOpenMode mode) {
+        if (mode == PluginOpenMode::Split) {
+            return PluginOpenResult::Unsupported;
+        }
+        return core::PluginManager::get().open_panel(panel_id)
+            ? PluginOpenResult::Opened
+            : PluginOpenResult::Failed;
+    }
+
     void SettingsView::render() {
         ImGuiViewport* viewport = ImGui::GetMainViewport();
         float navbar_width = 77.0f;

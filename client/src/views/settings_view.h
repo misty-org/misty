@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "views/app_view.h"
+#include "core/manager/plugin_manager.h"
 #include "panels/settings/settings_panel.h"
 #include "panels/navbar/navbar_panel.h"
 #include "panels/notification/notification_panel.h"
@@ -16,6 +17,8 @@ namespace misty::view {
 
         void render() override;
         ViewID get_view_id() override;
+        ViewCapabilities capabilities() const override;
+        PluginOpenResult open_plugin_panel(const std::string& panel_id, PluginOpenMode mode) override;
 
     private:
         void init_panels();

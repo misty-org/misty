@@ -9,8 +9,6 @@
 #include "core/manager/asset_manager.h"
 #include "panels/search/search_panel.h"
 #include "panels/search/search_state.h"
-#include "panels/services/services_state.h"
-
 using namespace misty::core;
 
 namespace misty::panel {
@@ -43,28 +41,6 @@ std::vector<BreadcrumbSegment> build_breadcrumb_segments(const std::string& curr
     }
     if (current_path == FileExplorerState::VIRTUAL_PATH_TRASH) {
         return {{"Trash", current_path}};
-    }
-
-    if (path_utils::is_remote_path(current_path) || current_path == path_utils::get_mount_root() || current_path == path_utils::get_mount_root() + "/") {
-        const std::string mount_root = path_utils::get_mount_root();
-        segments.push_back({"Cloud", mount_root});
-        const auto info = path_utils::parse_remote_path(current_path);
-        if (!info.provider_folder.empty()) {
-            const std::string provider_path = mount_root + "/" + info.provider_folder;
-            segments.push_back({info.provider_folder, provider_path});
-            if (!info.remote_name.empty()) {
-                std::string remote_path = provider_path + "/" + info.remote_name;
-                segments.push_back({info.remote_name, remote_path});
-                if (!info.relative_path.empty()) {
-                    std::string cumulative = remote_path;
-                    for (const auto& part : path_utils::split_path(info.relative_path)) {
-                        cumulative += "/" + part;
-                        segments.push_back({part, cumulative});
-                    }
-                }
-            }
-        }
-        return segments;
     }
 
     const char* home = std::getenv("HOME");
@@ -192,17 +168,9 @@ void FileExplorerPanel::show_nav_history(FileExplorerState& state, float button_
     ImGui::PushStyleColor(ImGuiCol_Button, kExplorerChromeBg);
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, kExplorerChromeBgHover);
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, kExplorerChromeBgActive);
-    const bool sync_in_flight = state.sync_request_in_flight;
-    const bool sync_animating = sync_in_flight || std::chrono::steady_clock::now() < state.sync_button_anim_until;
     const char* refresh_icon_name = "sync-16";
-    const float pulse = sync_animating
-        ? (0.55f + 0.45f * std::sin(static_cast<float>(ImGui::GetTime()) * 8.0f))
-        : 0.0f;
-    const ImVec4 refresh_tint = sync_animating
-        ? ImVec4(0.45f + pulse * 0.35f, 0.70f + pulse * 0.20f, 0.95f, 1.0f)
-        : ImVec4(0.7f, 0.7f, 0.7f, 1.0f);
+    const ImVec4 refresh_tint(0.7f, 0.7f, 0.7f, 1.0f);
 
-    if (sync_in_flight) ImGui::BeginDisabled();
     auto& sync_tex = AssetManager::get().get_svg_texture(refresh_icon_name, oversampled_icon_size(16.0f));
     if (sync_tex.id != 0) {
         if (ImGui::ImageButton("##refresh", sync_tex.id, ImVec2(16, 16), ImVec2(0, 0), ImVec2(1, 1),
@@ -212,15 +180,8 @@ void FileExplorerPanel::show_nav_history(FileExplorerState& state, float button_
     } else if (ImGui::Button("R", ImVec2(button_width, 0))) {
         request_manual_refresh(state);
     }
-    if (sync_in_flight) ImGui::EndDisabled();
     if (ImGui::IsItemHovered()) {
-        if (sync_animating) {
-            ImGui::SetTooltip("Syncing remote changes...");
-        } else if (path_utils::is_remote_path(state.current_path)) {
-            ImGui::SetTooltip("Sync Now (%s)", CommandManager::get().label("explorer.refresh").c_str());
-        } else {
-            ImGui::SetTooltip("Refresh (%s)", CommandManager::get().label("explorer.refresh").c_str());
-        }
+        ImGui::SetTooltip("Refresh (%s)", CommandManager::get().label("explorer.refresh").c_str());
     }
     ImGui::PopStyleColor(3);
     ImGui::PopStyleVar(2);
@@ -233,10 +194,8 @@ void FileExplorerPanel::show_search_bar(FileExplorerState& state, SearchState& s
     const float control_height = ImGui::GetFrameHeight();
     const float action_btn_size = std::max(16.0f, control_height - 10.0f);
     const float spacing = 3.0f;
-    const bool is_local = !path_utils::is_remote_path(state.current_path);
-    const auto remote_info = path_utils::parse_remote_path(state.current_path);
-    const bool can_toggle_watch = !is_local && !remote_info.provider_folder.empty() && !remote_info.remote_name.empty();
-    const int action_button_count = is_local ? 4 : (can_toggle_watch ? 4 : 3);
+    const bool is_local = true;
+    const int action_button_count = 4;
     const float total_available = ImGui::GetContentRegionAvail().x;
     const float action_width = action_btn_size * action_button_count +
                                spacing * static_cast<float>(std::max(0, action_button_count - 1));
@@ -292,28 +251,6 @@ void FileExplorerPanel::show_search_bar(FileExplorerState& state, SearchState& s
 
     const ImVec4 inactive_tint(0.7f, 0.7f, 0.7f, 1.0f);
     const ImVec4 active_tint(0.95f, 0.95f, 0.95f, 1.0f);
-    if (can_toggle_watch) {
-        ImGui::SameLine(0, spacing);
-        const bool watch_busy = state.sync_watch_request_in_flight;
-        const bool watched = state.current_dir_watched;
-        const char* watch_icon_name = watched ? "git-branch-check-16" : "git-branch-16";
-        const ImVec4 watch_tint = watched ? ImVec4(0.96f, 0.83f, 0.29f, 1.0f) : inactive_tint;
-        auto& watch_tex = AssetManager::get().get_svg_texture(watch_icon_name, oversampled_icon_size(action_btn_size));
-        if (watch_busy) ImGui::BeginDisabled();
-        if (watch_tex.id != 0) {
-            if (ImGui::ImageButton("##togglewatchdir", watch_tex.id, ImVec2(action_btn_size, action_btn_size),
-                    ImVec2(0, 0), ImVec2(1, 1), ImVec4(0, 0, 0, 0), watch_tint)) {
-                toggle_current_sync_watch(state);
-            }
-        } else if (ImGui::Button(watched ? "B*" : "B", ImVec2(action_btn_size, action_btn_size))) {
-            toggle_current_sync_watch(state);
-        }
-        if (watch_busy) ImGui::EndDisabled();
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip(watched ? "Unwatch Sync Directory" : "Watch Sync Directory");
-        }
-    }
-
     ImGui::SameLine(0, spacing);
     ImVec4 icon_tint = state.grid_view
         ? active_tint
