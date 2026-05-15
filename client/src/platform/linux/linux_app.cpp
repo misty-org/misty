@@ -106,6 +106,8 @@ void LinuxApp::init_window() {
     glfwSetWindowUserPointer(window_, this);
     frame_pacer().set_wake_callback([]() { glfwPostEmptyEvent(); });
     glfwSetWindowSizeCallback(window_, glfw_window_size_callback);
+    glfwSetWindowPosCallback(window_, glfw_window_pos_callback);
+    glfwSetWindowRefreshCallback(window_, glfw_window_refresh_callback);
     glfwSetWindowFocusCallback(window_, glfw_window_focus_callback);
     glfwSetCursorPosCallback(window_, glfw_cursor_pos_callback);
     glfwSetMouseButtonCallback(window_, glfw_mouse_button_callback);
@@ -265,7 +267,15 @@ void LinuxApp::glfw_error_callback(int error, const char* description) {
 }
 
 void LinuxApp::glfw_window_size_callback(GLFWwindow*, int, int) {
-    // intentionally empty
+    core::FramePacer::request_immediate_frame();
+}
+
+void LinuxApp::glfw_window_pos_callback(GLFWwindow*, int, int) {
+    core::FramePacer::request_immediate_frame();
+}
+
+void LinuxApp::glfw_window_refresh_callback(GLFWwindow*) {
+    core::FramePacer::request_immediate_frame();
 }
 
 void LinuxApp::glfw_window_focus_callback(GLFWwindow* window, int focused) {

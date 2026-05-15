@@ -29,6 +29,9 @@ namespace misty::panel {
 
         core::UIRegistry& registry_;
         std::string state_key_;
+        float last_scroll_x_ = 0.0f;
+        float last_scroll_y_ = 0.0f;
+        bool has_scroll_snapshot_ = false;
     };
 
 }

@@ -5,6 +5,21 @@
 #include "imgui.h"
 
 namespace misty::panel {
+    std::string TabController::Tab::display_title() const {
+        if (panel) {
+            const std::string dynamic_title = panel->tab_title();
+            if (!dynamic_title.empty()) {
+                return dynamic_title;
+            }
+        }
+
+        if (!title.empty()) {
+            return title;
+        }
+
+        return "Untitled";
+    }
+
     const TabController::Tab* TabController::get_active_tab() const {
         return get_tab(active_tab_idx);
     }
@@ -36,7 +51,7 @@ namespace misty::panel {
                 continue;
             }
 
-            const std::string label = tab->title + "###tab_" + scope_id + "_" + std::to_string(tab_id);
+            const std::string label = tab->display_title() + "###tab_" + scope_id + "_" + std::to_string(tab_id);
             bool is_open = true;
             if (ImGui::BeginTabItem(label.c_str(), &is_open)) {
                 set_active_tab(tab_id);
@@ -89,6 +104,19 @@ namespace misty::panel {
         if (!tab_order.empty()) {
             active_tab_idx = tab_order.back();
         }
+    }
+
+    void TabController::set_tab_title(std::int16_t idx, std::string title) {
+        auto it = tabs.find(idx);
+        if (it == tabs.end()) {
+            return;
+        }
+
+        it->second.title = std::move(title);
+    }
+
+    void TabController::set_active_tab_title(std::string title) {
+        set_tab_title(active_tab_idx, std::move(title));
     }
 
     void TabController::restore_tab() {

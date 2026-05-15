@@ -1,5 +1,7 @@
 #include "panels/file_explorer/file_explorer_panel.h"
 
+#include "panels/context_menu/context_menu_state.h"
+
 namespace misty::panel {
 
 const UnifiedFileItem* FileExplorerPanel::find_context_menu_target(const FileExplorerState& state) const {
@@ -11,33 +13,32 @@ const UnifiedFileItem* FileExplorerPanel::find_context_menu_target(const FileExp
     return nullptr;
 }
 
-bool FileExplorerPanel::open_context_menu_target(FileExplorerState& state) {
-    (void)state;
-    return false;
-}
-
-void FileExplorerPanel::show_context_menu(FileExplorerState& state) {
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 8.0f));
-    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(10.0f, 6.0f));
-    ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 6.0f);
-    ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.15f, 0.15f, 0.15f, 0.95f));
-    ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.3f, 0.3f, 0.3f, 0.6f));
-
-    if (ImGui::BeginPopup("FileContextMenu")) {
-        if (find_context_menu_target(state) != nullptr) {
-            ImGui::TextDisabled("Read-only view");
-            ImGui::Separator();
-            if (ImGui::MenuItem("Copy Path")) {
-                ImGui::SetClipboardText(state.context_menu_target_path.c_str());
-            }
-        } else if (ImGui::MenuItem("Copy Path")) {
-            ImGui::SetClipboardText(state.context_menu_target_path.c_str());
-        }
-        ImGui::EndPopup();
+void FileExplorerPanel::open_context_menu(FileExplorerState& state) {
+    ContextMenuRequest request;
+    request.source_key = state_key_;
+    request.anchor_pos = ImGui::GetMousePos();
+    if (ImGuiViewport* viewport = ImGui::GetWindowViewport()) {
+        request.viewport_id = viewport->ID;
     }
 
-    ImGui::PopStyleColor(2);
-    ImGui::PopStyleVar(3);
+    if (find_context_menu_target(state) != nullptr) {
+        ContextMenuEntry readonly_entry;
+        readonly_entry.id = "readonly";
+        readonly_entry.label = "Read-only view";
+        readonly_entry.disabled = true;
+        request.entries.push_back(std::move(readonly_entry));
+        request.entries.push_back(ContextMenuEntry::separator());
+    }
+
+    ContextMenuEntry copy_path_entry;
+    copy_path_entry.id = "copy_path";
+    copy_path_entry.label = "Copy Path";
+    copy_path_entry.on_select = [path = state.context_menu_target_path]() {
+        ImGui::SetClipboardText(path.c_str());
+    };
+    request.entries.push_back(std::move(copy_path_entry));
+
+    registry_.get_state<ContextMenuState>(kContextMenuStateKey).open(std::move(request));
 }
 
 void FileExplorerPanel::show_rename_modal(FileExplorerState& state) {
@@ -50,27 +51,33 @@ void FileExplorerPanel::show_rename_modal(FileExplorerState& state) {
     state.show_rename_modal = false;
 }
 
-void FileExplorerPanel::show_background_context_menu(FileExplorerState& state) {
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 8.0f));
-    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(10.0f, 6.0f));
-    ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 6.0f);
-    ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.15f, 0.15f, 0.15f, 0.95f));
-    ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.3f, 0.3f, 0.3f, 0.6f));
-
-    if (ImGui::BeginPopup("BackgroundContextMenu")) {
-        ImGui::TextDisabled("Read-only view");
-
-        ImGui::Separator();
-        if (ImGui::MenuItem("Show Hidden Files", nullptr, state.show_hidden)) {
-            state.show_hidden = !state.show_hidden;
-            navigate_to_path(std::string(state.current_path), false);
-        }
-
-        ImGui::EndPopup();
+void FileExplorerPanel::open_background_context_menu(FileExplorerState& state) {
+    ContextMenuRequest request;
+    request.source_key = state_key_;
+    request.anchor_pos = ImGui::GetMousePos();
+    if (ImGuiViewport* viewport = ImGui::GetWindowViewport()) {
+        request.viewport_id = viewport->ID;
     }
 
-    ImGui::PopStyleColor(2);
-    ImGui::PopStyleVar(3);
+    ContextMenuEntry readonly_entry;
+    readonly_entry.id = "readonly";
+    readonly_entry.label = "Read-only view";
+    readonly_entry.disabled = true;
+    request.entries.push_back(std::move(readonly_entry));
+    request.entries.push_back(ContextMenuEntry::separator());
+
+    ContextMenuEntry show_hidden_entry;
+    show_hidden_entry.id = "show_hidden";
+    show_hidden_entry.label = "Show Hidden Files";
+    show_hidden_entry.secondary_label = state.show_hidden ? "On" : "Off";
+    show_hidden_entry.on_select = [registry = &registry_, state_key = state_key_]() {
+        auto& current_state = registry->get_state<FileExplorerState>(state_key);
+        current_state.show_hidden = !current_state.show_hidden;
+        current_state.pending_navigation_path = std::string(current_state.current_path);
+    };
+    request.entries.push_back(std::move(show_hidden_entry));
+
+    registry_.get_state<ContextMenuState>(kContextMenuStateKey).open(std::move(request));
 }
 
 void FileExplorerPanel::show_new_entry_modal(FileExplorerState& state) {

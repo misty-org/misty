@@ -13,7 +13,6 @@
 #include "core/system/util.h"
 #include "core/ui/ui_registry.h"
 #include "core/threading/worker_pool.h"
-#include "panels/file_sidebar/remote_mount_state.h"
 
 namespace fs = std::filesystem;
 
@@ -41,123 +40,30 @@ namespace misty::panel {
         return path_utf8_string(path.filename());
     }
 
-    // File source type - local filesystem or cloud remote
-    enum class FileSource {
-        LOCAL,
-        REMOTE
-    };
-
-    // Context for cloud folder fetch - carries remote parameters
-    struct CloudFolderContext {
-        std::string remote_name;   // rclone remote name, e.g. "onedrive-john"
-        std::string remote_path;   // path within the remote
-    };
-
     struct ChatMessage {
         std::string role;
         std::string content;
     };
 
-    // File synchronization status
+    // Explorer-local lifecycle state.
     enum class SyncStatus {
-        LOCAL,      // Not a cloud file (Gray)
-        SYNCED,     // Cloud file, fully downloaded and matches cloud (Green)
-        MODIFIED,   // Cloud file, downloaded but modified locally (Yellow)
-        NOT_SYNCED,  // Cloud file, not downloaded (Red)
-        DELETED     // Soft deleted (Black)
+        LOCAL,
+        DELETED
     };
 
-    // Unified file item that works for both local and cloud remotes
-    inline std::string make_file_id(const std::string& path, bool is_remote) {
-        if (!is_remote) return path;
-        static std::atomic<uint64_t> counter{0};
-        return "r:" + std::to_string(counter.fetch_add(1, std::memory_order_relaxed));
-    }
-
     struct UnifiedFileItem {
-        std::string name;              // Display name
-        std::string path;              // Full virtual path
-        std::string id;                // Unique selection key (== path for local, generated for remote)
+        std::string name;
+        std::string path;
+        std::string id;                // Selection key; local files use their path.
         bool is_dir = false;
         int64_t size = 0;
         std::string last_modified;
         std::string mime_type;
-        FileSource source = FileSource::LOCAL;
-        SyncStatus status = SyncStatus::LOCAL;  // Default to local (Gray)
-        std::string state_code = "LOC";         // UI-facing state: LOC, REM, MOD
-        bool sync_dirty = false;                // UI-facing sync bit for icon column
-        std::string sync_direction;             // Internal hint: none, pull, push, conflict
-
-        // Remote metadata (empty for local files)
-        std::string remote_name;       // rclone remote name, e.g. "onedrive-john"
-        std::string remote_path;       // path within the remote, e.g. "/Documents/report.pdf"
-        std::string remote_mod_time;   // RFC3339Nano mod time from sync index
-        std::string dirty_reason;      // sync-index explanation for MOD / dirty state
+        SyncStatus status = SyncStatus::LOCAL;
     };
 
     // Path utilities for file explorer navigation
     namespace path_utils {
-        inline std::string get_mount_root() {
-            return mount_utils::get_mount_root();
-        }
-
-        // Check if path is under the remote mount root (~/misty/mnt/*)
-        inline bool is_remote_path(const std::string& path) {
-            std::string root = get_mount_root();
-            if (path.rfind(root, 0) != 0) return false;
-            // Must have content beyond the mount root itself
-            std::string after = path.substr(root.length());
-            return !after.empty() && after != "/";
-        }
-
-        // Structure: ~/misty/mnt/{ProviderFolder}/{folder_name}/{relative_path}
-        //
-        // Returns (provider_folder, folder_name, relative_path).
-        // Examples:
-        //   ~/misty/mnt/OneDrive                     → ("OneDrive", "", "")
-        //   ~/misty/mnt/OneDrive/mattdev727          → ("OneDrive", "mattdev727", "")
-        //   ~/misty/mnt/OneDrive/mattdev727/Docs     → ("OneDrive", "mattdev727", "Docs")
-        struct RemotePathInfo {
-            std::string provider_folder;  // "OneDrive", "Google Drive", etc.
-            std::string remote_name;      // mount folder segment; resolve via WorkspaceState when needed
-            std::string relative_path;    // path within the remote
-        };
-
-        inline RemotePathInfo parse_remote_path(const std::string& path) {
-            std::string root = get_mount_root();
-            if (path.rfind(root, 0) != 0) return {};
-
-            std::string relative = path.substr(root.length());
-            if (relative.empty() || relative == "/") return {};
-
-            if (!relative.empty() && relative[0] == '/')
-                relative = relative.substr(1);
-
-            // First component: provider folder
-            size_t slash1 = relative.find('/');
-            if (slash1 == std::string::npos) {
-                return { relative, "", "" };  // Just provider folder
-            }
-
-            std::string provider = relative.substr(0, slash1);
-            std::string rest = relative.substr(slash1 + 1);
-
-            // Second component: remote name
-            size_t slash2 = rest.find('/');
-            if (slash2 == std::string::npos) {
-                return { provider, rest, "" };  // Provider + remote, no subpath
-            }
-
-            return { provider, rest.substr(0, slash2), rest.substr(slash2 + 1) };
-        }
-
-        // Legacy 2-arg variant for code that just needs (remote_name, relative_path)
-        // and doesn't care about the provider folder.
-        inline std::pair<std::string, std::string> parse_remote_name_and_path(const std::string& path) {
-            auto info = parse_remote_path(path);
-            return { info.remote_name, info.relative_path };
-        }
-
         inline std::string strip_trailing_separators(std::string path) {
             while (path.size() > 1 && (path.back() == '/' || path.back() == '\\')) {
                 if (path.size() == 3 && path[1] == ':') {
@@ -267,29 +173,12 @@ namespace misty::panel {
         std::string pending_navigation_path;
         std::string pending_shared_refresh_path;
 
-        // Transient per-tab sync state for manual "run now" refreshes.
-        bool sync_request_in_flight = false;
-        uint64_t sync_request_generation = 0;
-        std::chrono::steady_clock::time_point sync_button_anim_until{};
-        bool current_dir_watched = false;
-        bool sync_watch_request_in_flight = false;
-        bool watched_refresh_in_flight = false;
-        std::chrono::steady_clock::time_point next_watched_refresh_at{};
-
-        // Download tracking - paths currently being downloaded
-        std::unordered_set<std::string> downloading_files;
+        // Delete tracking keeps rows visually stable while destructive work completes.
         std::unordered_set<std::string> deleting_files;
-
-        bool is_downloading(const std::string& path) const {
-            return downloading_files.count(path) > 0;
-        }
 
         bool is_deleting(const std::string& path) const {
             return deleting_files.count(path) > 0;
         }
-
-        // Track last disconnected account notification to prevent spam
-        std::string last_disconnected_notification_folder;
 
         // Rename state
         bool show_rename_modal = false;
@@ -332,7 +221,7 @@ namespace misty::panel {
         std::deque<UnifiedFileItem> recent_files;
         std::vector<UnifiedFileItem> starred_files;
         std::vector<UnifiedFileItem> trash_files;
-        
+
         // Helper to check if a file is starred
         bool is_starred(const std::string& path) const;
 
@@ -341,7 +230,7 @@ namespace misty::panel {
 
         // Helper to add recent file
         void add_recent(const UnifiedFileItem& item);
-        
+
         // Helper to move to trash
         void move_to_trash(const UnifiedFileItem& item);
 
@@ -386,7 +275,6 @@ namespace misty::panel {
                 item.id = item.path;
                 item.name = fname;
                 item.is_dir = entry.is_directory();
-                item.source = FileSource::LOCAL;
                 item.status = SyncStatus::LOCAL;
 
                 if (!item.is_dir) {
@@ -443,15 +331,4 @@ namespace misty::panel {
         }
     }
 
-    // Legacy function for compatibility - calls navigate_to_local_path
-    inline void get_files(FileExplorerState& state, std::string path, bool update_history = true) {
-        navigate_to_local_path(state, path, update_history);
-    }
-
-    inline bool can_go_back(FileExplorerState& state) { return !state.back_history.empty(); }
-    inline bool can_go_forward(FileExplorerState& state) { return !state.forward_history.empty(); }
-
-    inline void open_file(const std::string& path) {
-        core::open_path_default(path);
-    }
 }

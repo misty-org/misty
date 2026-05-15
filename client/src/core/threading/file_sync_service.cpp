@@ -55,15 +55,7 @@ namespace misty::core {
                     panel::SyncStatus old_status = file.status;
                     panel::SyncStatus new_status = old_status;
 
-                    if (file.source == panel::FileSource::REMOTE) {
-                        continue;
-                    }
-
-                    if (file.is_dir) {
-                        new_status = panel::SyncStatus::LOCAL;
-                    } else if (file.source == panel::FileSource::LOCAL) {
-                        new_status = panel::SyncStatus::LOCAL;
-                    }
+                    new_status = panel::SyncStatus::LOCAL;
 
                     // Check for trash (Global Override)
                     const char* home = std::getenv("HOME");

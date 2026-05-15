@@ -24,6 +24,8 @@ namespace misty::panel {
             std::string title;
             std::int16_t idx = -1;
             std::shared_ptr<Panel> panel;
+
+            std::string display_title() const;
         };
 
         TabController() = default;
@@ -40,6 +42,8 @@ namespace misty::panel {
                             const std::function<void(const Tab&)>& render_tab_content);
         void add_tab(const Tab& tab);
         void remove_tab(std::int16_t idx);
+        void set_tab_title(std::int16_t idx, std::string title);
+        void set_active_tab_title(std::string title);
 
         void restore_tab();
         int tab_count() const;

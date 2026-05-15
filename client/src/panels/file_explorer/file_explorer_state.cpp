@@ -5,9 +5,7 @@
 #include <filesystem>
 #include <nlohmann/json.hpp>
 
-namespace misty {
-namespace panel {
-
+namespace misty::panel {
     namespace fs = std::filesystem;
     using json = nlohmann::json;
 
@@ -26,9 +24,7 @@ namespace panel {
             {"name", item.name},
             {"is_dir", item.is_dir},
             {"size", item.size},
-            {"last_modified", item.last_modified},
-            {"source", (int)item.source}
-            // Add other fields as needed
+            {"last_modified", item.last_modified}
         };
     }
 
@@ -40,7 +36,6 @@ namespace panel {
         item.is_dir = j.value("is_dir", false);
         item.size = j.value("size", (int64_t)0);
         item.last_modified = j.value("last_modified", "");
-        item.source = (FileSource)j.value("source", (int)FileSource::LOCAL);
         item.id = item.path;
 
         // Infer status based on path (e.g. if in trash)
@@ -256,5 +251,4 @@ namespace panel {
         );
     }
 
-} // namespace panel
-} // namespace misty
+} // namespace misty::panel

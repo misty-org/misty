@@ -1,5 +1,4 @@
 #include "panels/file_explorer/file_explorer_panel.h"
-#include "panels/transfers/transfer_window_state.h"
 #include <algorithm>
 #include <cctype>
 #include <chrono>
@@ -12,6 +11,40 @@ namespace fs = std::filesystem;
 using namespace misty::core;
 
 namespace misty::panel {
+    namespace {
+        std::string file_explorer_tab_title_for_path(const std::string& path) {
+            if (path.empty()) {
+                return "Files";
+            }
+
+            if (path == FileExplorerState::VIRTUAL_PATH_RECENT) {
+                return "Recent";
+            }
+            if (path == FileExplorerState::VIRTUAL_PATH_STARRED) {
+                return "Starred";
+            }
+            if (path == FileExplorerState::VIRTUAL_PATH_TRASH) {
+                return "Trash";
+            }
+
+            const fs::path normalized = fs::path(path).lexically_normal();
+            const std::string leaf = normalized.filename().string();
+            if (!leaf.empty() && leaf != ".") {
+                return leaf;
+            }
+
+            const std::string normalized_path = normalized.string();
+            return normalized_path.empty() ? path : normalized_path;
+        }
+
+        std::string default_local_start_path() {
+            if (const char* home = std::getenv("HOME")) {
+                return home;
+            }
+            return fs::current_path().string();
+        }
+    }
+
     FileExplorerPanel::FileExplorerPanel(UIRegistry& registry, WorkerPool& worker_pool, FileExplorerPanelProps props)
         : MultiPanel(props.panel_id),
           registry_(registry),
@@ -25,7 +58,7 @@ namespace misty::panel {
             file_explorer_state.load_state();
         }
 
-        std::string start_path = path_utils::get_mount_root();
+        std::string start_path = default_local_start_path();
 
         if (!props.initial_path_override.empty()) {
             start_path = std::move(props.initial_path_override);
@@ -69,13 +102,24 @@ namespace misty::panel {
 
     FileExplorerPanel::~FileExplorerPanel() {}
 
+    std::string FileExplorerPanel::tab_title() const {
+        const auto& state = registry_.get_state<FileExplorerState>(state_key_);
+        if (state.current_path[0] != '\0') {
+            return file_explorer_tab_title_for_path(state.current_path);
+        }
+        if (!state.pending_navigation_path.empty()) {
+            return file_explorer_tab_title_for_path(state.pending_navigation_path);
+        }
+        return "Files";
+    }
+
     TabController::Tab FileExplorerPanel::create_default_tab(std::int16_t tab_idx) const {
         FileExplorerPanelProps props;
         props.state_key = state_key_ + "_tab_" + std::to_string(tab_idx);
         props.panel_id = panel_id() + "_tab_" + std::to_string(tab_idx);
         props.restore_persistent_state = false;
 
-        std::string initial_path = path_utils::get_mount_root();
+        std::string initial_path = default_local_start_path();
         if (const auto* active_explorer = dynamic_cast<const FileExplorerPanel*>(active_panel())) {
             const auto& active_state = registry_.get_state<FileExplorerState>(active_explorer->state_key_);
             if (active_state.current_path[0] != '\0') {
@@ -166,10 +210,6 @@ namespace misty::panel {
         state.current_path[sizeof(state.current_path) - 1] = '\0';
         strncpy(state.search_path, path.c_str(), sizeof(state.search_path) - 1);
         state.search_path[sizeof(state.search_path) - 1] = '\0';
-        state.current_dir_watched = false;
-        state.sync_watch_request_in_flight = false;
-        state.watched_refresh_in_flight = false;
-        state.next_watched_refresh_at = {};
     }
 
     void FileExplorerPanel::reset_selection(FileExplorerState& state) {
@@ -267,10 +307,6 @@ namespace misty::panel {
         reset_selection(state);
         state.files.clear();
         state.sort_dirty = true;
-        state.current_dir_watched = false;
-        state.sync_watch_request_in_flight = false;
-        state.watched_refresh_in_flight = false;
-        state.next_watched_refresh_at = {};
 
         fs::path normalized_path = fs::path(path).lexically_normal();
         std::string display_path = normalized_path.generic_string();
@@ -333,7 +369,6 @@ namespace misty::panel {
                         item.name   = fname;
                         std::error_code ec;
                         item.is_dir = entry.is_directory(ec);
-                        item.source = FileSource::LOCAL;
                         item.status = SyncStatus::LOCAL;
 
                         if (!item.is_dir) {
@@ -410,7 +445,7 @@ namespace misty::panel {
                 auto it = std::remove_if(state.recent_files.begin(), state.recent_files.end(),
                     [](const UnifiedFileItem& f) {
                         if (f.status == SyncStatus::DELETED) return true;
-                        if (f.source == FileSource::LOCAL && !fs::exists(f.path)) return true;
+                        if (!fs::exists(f.path)) return true;
                         return false;
                     });
                 if (it != state.recent_files.end()) {
@@ -434,7 +469,6 @@ namespace misty::panel {
                         item.id = item.path;
                         item.name = path_utf8_filename(entry.path());
                         item.is_dir = entry.is_directory();
-                        item.source = FileSource::LOCAL; // It's local now
                         item.status = SyncStatus::DELETED;
 
                          try {

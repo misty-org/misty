@@ -8,8 +8,8 @@
 #include "core/ui/ui_registry.h"
 #include "core/threading/worker_pool.h"
 #include "panels/claude/claude_panel.h"
-#include "panels/file_sidebar/file_sidebar_panel.h"
-#include "panels/filetree/filetree_panel.h"
+#include "panels/context_menu/context_menu_panel.h"
+#include "panels/explorer/explorer_panel.h"
 #include "panels/navbar/navbar_panel.h"
 #include "panels/notification/notification_panel.h"
 
@@ -41,10 +41,10 @@ namespace misty::view {
         std::shared_ptr<MistyClient> client_;
 
         std::shared_ptr<panel::NavbarPanel> navbar_panel_;
-        std::shared_ptr<panel::FileSidebarPanel> file_sidebar_panel_;
         std::shared_ptr<panel::NotificationPanel> notification_panel_;
+        std::shared_ptr<panel::ContextMenuPanel> context_menu_panel_;
         std::shared_ptr<panel::ClaudePanel> claude_panel_;
-        std::shared_ptr<panel::FileTreePanel> filetree_panel_;
+        std::shared_ptr<panel::ExplorerPanel> explorer_panel_;
 
         float sidebar_width_ = 260.0f;
         bool is_resizing_sidebar_ = false;

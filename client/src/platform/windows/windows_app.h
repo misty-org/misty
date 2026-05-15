@@ -45,6 +45,8 @@ namespace misty {
     private:
         static void glfw_error_callback(int error, const char* description);
         static void glfw_window_size_callback(GLFWwindow* window, int width, int height);
+        static void glfw_window_pos_callback(GLFWwindow* window, int xpos, int ypos);
+        static void glfw_window_refresh_callback(GLFWwindow* window);
         static void glfw_window_focus_callback(GLFWwindow* window, int focused);
         static void glfw_cursor_pos_callback(GLFWwindow* window, double xpos, double ypos);
         static void glfw_mouse_button_callback(GLFWwindow* window, int button, int action, int mods);

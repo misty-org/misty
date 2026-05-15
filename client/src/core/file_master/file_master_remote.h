@@ -7,9 +7,9 @@
 
 namespace misty::core {
 
-class file_master_remote : public IFileMaster {
+class FileMasterRemote : public IFileMaster {
 public:
-    explicit file_master_remote(WorkerPool& worker_pool);
+    explicit FileMasterRemote(WorkerPool& worker_pool);
 
     void rename(const FileMasterProps& props, FileMasterCompletion callback) override;
     void remove(const FileMasterProps& props, FileMasterCompletion callback) override;

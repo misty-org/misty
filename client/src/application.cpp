@@ -11,15 +11,14 @@
 #include "views/onboarding_view.h"
 #include "views/services_view.h"
 #include "views/extensions_view.h"
-#include "views/transfers_view.h"
 #include "views/vault_view.h"
 #include "views/activity_view.h"
 #include "views/settings_view.h"
+#include "panels/explorer/explorer_transfer_ui_state.h"
 #include "panels/file_explorer/file_explorer_state.h"
 #include "panels/onboarding/onboarding_state.h"
 #include "panels/onboarding/boot_loader.h"
 #include "panels/settings/settings_state.h"
-#include "panels/transfers/transfer_window_state.h"
 
 #include <cstdlib>
 #include <filesystem>
@@ -135,7 +134,6 @@ namespace misty {
 
             init_views();
             append_startup_log("startup: views initialized");
-            transfer_window_panel_ = std::make_unique<panel::TransferWindowPanel>(ui_registry_);
             ui_registry_.get_state<panel::SettingsState>("Settings").ensure_app_settings_loaded();
 
             
@@ -154,8 +152,9 @@ namespace misty {
             prepare_frame();
 
             if (core::CommandManager::get().matches("app.toggle_transfers")) {
-                ui_registry_.get_state<panel::TransferWindowState>(
-                    panel::kTransferWindowStateKey).toggle();
+                view::switch_view(view::ViewID::Files);
+                ui_registry_.get_state<panel::ExplorerTransferUiState>(
+                    panel::kExplorerTransferUiStateKey).toggle();
             }
             if (core::CommandManager::get().matches("app.toggle_plugin_launcher")) {
                 core::PluginManager::get().toggle_launcher();
@@ -167,15 +166,6 @@ namespace misty {
             core::PluginManager::get().render_open_panels();
             core::PluginManager::get().render_launcher_overlay();
             core::PluginManager::get().render_active_preview_scene();
-            const bool transfers_view_active = view::get_current_view_id() == view::ViewID::Transfers;
-            if (!transfers_view_active && transfers_view_active_last_frame_) {
-                ui_registry_.get_state<panel::TransferWindowState>(
-                    panel::kTransferWindowStateKey).close();
-            }
-            transfers_view_active_last_frame_ = transfers_view_active;
-            if (transfer_window_panel_ && !transfers_view_active) {
-                transfer_window_panel_->render();
-            }
             auto& settings_state = ui_registry_.get_state<panel::SettingsState>("Settings");
             if (settings_state.frame_pacing_overlay_enabled) {
                 frame_pacer_.render_debug_overlay();
@@ -223,7 +213,6 @@ namespace misty {
         view::register_view(view::ViewID::Extensions, std::make_unique<view::ExtensionsView>(ui_registry_));
         view::register_view(view::ViewID::Vault,
             std::make_unique<view::VaultView>(ui_registry_, worker_pool_));
-        view::register_view(view::ViewID::Transfers, std::make_unique<view::TransfersView>(ui_registry_));
         // ActivityView removed — Activity is now a modal panel in the navbar
         view::register_view(view::ViewID::Settings, std::make_unique<view::SettingsView>(ui_registry_));
 

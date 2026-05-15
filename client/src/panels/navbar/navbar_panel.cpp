@@ -4,6 +4,7 @@
 #include "core/manager/asset_manager.h"
 #include "core/manager/font_manager.h"
 #include "core/ui/ui_style.h"
+#include "panels/explorer/explorer_transfer_ui_state.h"
 
 #include <cmath>
 
@@ -112,7 +113,12 @@ namespace misty::panel {
             ImGuiWindowFlags_NoCollapse |
             ImGuiWindowFlags_NoResize |
             ImGuiWindowFlags_NoScrollbar |
-            ImGuiWindowFlags_NoScrollWithMouse;
+            ImGuiWindowFlags_NoScrollWithMouse |
+            ImGuiWindowFlags_NoSavedSettings;
+
+        if (ImGuiViewport* main_viewport = ImGui::GetMainViewport()) {
+            ImGui::SetNextWindowViewport(main_viewport->ID);
+        }
 
         UI::WithStyle([&](UI::StyleScope& style) {
             style.color(ImGuiCol_WindowBg, ImVec4(0.10f, 0.10f, 0.12f, 1.0f)); // dark charcoal
@@ -178,8 +184,14 @@ namespace misty::panel {
         const ImVec4 text_color = is_selected ? ImVec4(1, 1, 1, 1) : ImVec4(0.6f, 0.6f, 0.6f, 1.0f);
 
         if (centered_icon_button(label, icon, size, is_selected)) {
-            state.selected_item = view_id;
-            state.handle_nav_item(view_id);
+            if (view_id == ViewID::Transfers) {
+                state.selected_item = ViewID::Files;
+                view::switch_view(ViewID::Files);
+                ui_registry_.get_state<ExplorerTransferUiState>(kExplorerTransferUiStateKey).open();
+            } else {
+                state.selected_item = view_id;
+                state.handle_nav_item(view_id);
+            }
         }
         centered_label(label, text_color);
     }
