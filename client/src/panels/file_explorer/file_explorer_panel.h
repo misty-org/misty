@@ -27,6 +27,7 @@ namespace misty::panel {
                           FileExplorerPanelProps props = {});
         ~FileExplorerPanel() override;
         void render() override;
+        std::string tab_title() const override;
 
         void toggle_chat_overlay();
         std::string active_explorer_state_key() const;
@@ -34,7 +35,6 @@ namespace misty::panel {
                                          const std::string& dest_path,
                                          ClipboardOp op);
 
-        // Unified navigation - routes to local or remote based on path
         void navigate_to_path(const std::string& path, bool update_history = true, bool create_if_missing = true);
 
     private:
@@ -55,14 +55,10 @@ namespace misty::panel {
         void update_navigation_history(panel::FileExplorerState& state, const std::string& target_path, bool update_history);
         void set_active_path(panel::FileExplorerState& state, const std::string& path);
         void reset_selection(panel::FileExplorerState& state);
-        bool resolve_remote_path_context(const std::string& path,
-                                         std::string& remote_name,
-                                         std::string& remote_path) const;
         bool resolve_drop_destination_path(const std::string& path,
                                            std::string& resolved_path,
                                            std::string* error_message = nullptr) const;
         void request_manual_refresh(panel::FileExplorerState& state);
-        void toggle_current_sync_watch(panel::FileExplorerState& state);
 
         void show_nav_history(panel::FileExplorerState& state, float button_width, float spacing);
         void show_breadcrumb_bar(panel::FileExplorerState& state);
@@ -85,8 +81,8 @@ namespace misty::panel {
                                            bool prominent,
                                            std::function<void()> navigate_callback = {});
 
-        void show_context_menu(panel::FileExplorerState& state);
-        void show_background_context_menu(panel::FileExplorerState& state);
+        void open_context_menu(panel::FileExplorerState& state);
+        void open_background_context_menu(panel::FileExplorerState& state);
         void show_new_entry_modal(panel::FileExplorerState& state);
         void show_rename_modal(panel::FileExplorerState& state);
         void show_permanent_delete_modal(panel::FileExplorerState& state);
@@ -105,9 +101,6 @@ namespace misty::panel {
                                 const std::string& dest_dir,
                                 panel::ClipboardOp op);
         void perform_paste_local_to_local(panel::FileExplorerState& state, const panel::UnifiedFileItem& item, const std::string& dest_dir, panel::ClipboardOp op);
-        bool perform_paste_to_cloud(panel::FileExplorerState& state, const panel::UnifiedFileItem& item, const std::string& dest_dir, panel::ClipboardOp op);
-        bool perform_paste_cloud_to_cloud(panel::FileExplorerState& state, const panel::UnifiedFileItem& item, const std::string& dest_dir, panel::ClipboardOp op);
-        void perform_paste_cloud_to_local(panel::FileExplorerState& state, const panel::UnifiedFileItem& item, const std::string& dest_dir, panel::ClipboardOp op);
         void queue_cross_device_move(const panel::UnifiedFileItem& item,
                                      const std::string& source_dir,
                                      const std::string& dest_dir,
@@ -116,14 +109,12 @@ namespace misty::panel {
                                      std::function<void()> on_success = {});
         void request_background_move_refresh(const std::string& source_dir,
                                              const std::string& dest_dir);
-        void trigger_upload(const std::string& local_path, const std::string& dest_dir);
         void perform_delete_selected(panel::FileExplorerState& state);
         void perform_delete_local_selected(panel::FileExplorerState& state);
         bool perform_delete(panel::FileExplorerState& state, const std::string& path, bool* requires_permission = nullptr);
         void initiate_rename(panel::FileExplorerState& state);
         void confirm_permanent_delete(panel::FileExplorerState& state);
         void retry_permission_delete(panel::FileExplorerState& state);
-        bool open_context_menu_target(panel::FileExplorerState& state);
         const UnifiedFileItem* find_context_menu_target(const panel::FileExplorerState& state) const;
         void record_file_operation(panel::FileOperationRecord record);
         bool undo_file_operation(panel::FileExplorerState& state,
@@ -137,30 +128,6 @@ namespace misty::panel {
     private:
 #endif
         void navigate_to_local_path_async(const std::string& path, bool update_history, uint64_t navigation_generation);
-
-        void sync_account_mappings();
-        void navigate_to_remote_mount_root(bool update_history);
-        void navigate_to_provider_folder(const std::string& provider_folder, bool update_history);
-        void navigate_to_remote(const std::string& remote_name, const std::string& path,
-                                bool update_history, bool create_if_missing, uint64_t navigation_generation);
-        void fetch_remote_folder(const std::string& remote_name, const std::string& remote_path,
-                                 const std::string& target_path, uint64_t navigation_generation);
-        void handle_remote_folder_fetch(const std::string& remote_name, const std::string& target_path,
-                                        uint64_t navigation_generation,
-                                        bool success, const std::string& body, const std::string& error,
-                                        bool preserve_selection = false);
-        void download_remote_file(const UnifiedFileItem& file);
-        bool delete_remote_file(const UnifiedFileItem& file, std::string* error_message = nullptr);
-        static void apply_remote_folder_fetch(core::UIRegistry& registry,
-                                              const std::string& state_key,
-                                              const std::string& remote_name,
-                                              const std::string& target_path,
-                                              uint64_t navigation_generation,
-                                              bool success,
-                                              const std::string& body,
-                                              const std::string& error,
-                                              bool preserve_selection = false);
-        static bool delete_remote_file_impl(const UnifiedFileItem& file, std::string* error_message);
 
     private:
         core::UIRegistry& registry_;

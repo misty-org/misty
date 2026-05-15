@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "core/ui/ui_registry.h"
+#include "panels/context_menu/context_menu_panel.h"
 #include "panels/navbar/navbar_panel.h"
 #include "panels/notification/notification_panel.h"
 #include "panels/transfers/transfer_window_panel.h"
@@ -24,6 +25,7 @@ private:
     core::UIRegistry& ui_registry_;
     std::shared_ptr<panel::NavbarPanel> navbar_panel_;
     std::shared_ptr<panel::NotificationPanel> notification_panel_;
+    std::shared_ptr<panel::ContextMenuPanel> context_menu_panel_;
     std::shared_ptr<panel::TransferWindowPanel> transfer_window_panel_;
 };
 

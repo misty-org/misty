@@ -50,6 +50,7 @@ namespace misty::panel {
     public:
         virtual ~Panel() = default;
         virtual void render() = 0;
+        virtual std::string tab_title() const { return {}; }
 
     protected:
         void show_error_modal(std::string& error_msg, const char* modal_id = "Error");

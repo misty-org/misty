@@ -9,6 +9,11 @@
 
 namespace misty::panel {
 
+    enum class FileSource {
+        LOCAL,
+        REMOTE
+    };
+
     enum SearchSource {
         LOCAL,
         REMOTE,

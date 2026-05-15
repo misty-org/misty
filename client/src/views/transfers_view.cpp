@@ -13,6 +13,7 @@ TransfersView::TransfersView(core::UIRegistry& ui_registry)
 void TransfersView::init_panels() {
     navbar_panel_ = std::make_shared<panel::NavbarPanel>(ui_registry_);
     notification_panel_ = std::make_shared<panel::NotificationPanel>(ui_registry_);
+    context_menu_panel_ = std::make_shared<panel::ContextMenuPanel>(ui_registry_);
     transfer_window_panel_ = std::make_shared<panel::TransferWindowPanel>(ui_registry_);
 }
 
@@ -41,7 +42,9 @@ void TransfersView::render() {
         ImGuiWindowFlags_NoCollapse |
         ImGuiWindowFlags_NoResize |
         ImGuiWindowFlags_NoScrollbar |
-        ImGuiWindowFlags_NoScrollWithMouse;
+        ImGuiWindowFlags_NoScrollWithMouse |
+        ImGuiWindowFlags_NoSavedSettings;
+    ImGui::SetNextWindowViewport(viewport->ID);
     if (ImGui::Begin("Transfers View Host", nullptr, host_flags)) {
         ImGui::Spacing();
         ImGui::TextDisabled("Transfers");
@@ -51,6 +54,7 @@ void TransfersView::render() {
     auto& transfer_state = ui_registry_.get_state<panel::TransferWindowState>(panel::kTransferWindowStateKey);
     transfer_state.open(false);
     transfer_window_panel_->render();
+    context_menu_panel_->render();
     notification_panel_->render();
 }
 

@@ -1,9 +1,9 @@
 #include "file_sidebar_panel.h"
 
+#include "core/file_master/file_master_transfers.h"
 #include "core/file_picker/file_picker.h"
 #include "panels/file_explorer/file_explorer_state.h"
 #include "panels/notification/notification_state.h"
-#include "panels/activity/upload_state.h"
 
 #include <cstdio>
 #include <system_error>
@@ -109,25 +109,22 @@ namespace misty::panel {
             cleanup_path = state.upload_queue[index].cleanup_path;
         }
 
-        // Register this upload in UploadState for activity tracking
-        auto& upload_state = registry_.get_state<UploadState>("Uploads");
-        uint64_t upload_id = upload_state.start_upload(file_name, file_path, remote_name, file_size);
-        upload_state.set_retry_context(upload_id, remote_name, remote_path);
+        auto& transfers = registry_.get_state<core::FileMasterTransfers>("FileMasterTransfers");
 
         // Progress callback
-        auto progress_cb = [&state, &upload_state, index, upload_id](size_t bytes_uploaded, size_t total_bytes) -> bool {
+        auto progress_cb = [&state, index](size_t bytes_uploaded, size_t total_bytes) -> bool {
+            (void)total_bytes;
             {
                 std::lock_guard<std::mutex> lock(state.upload_mutex);
                 if (index < state.upload_queue.size()) {
                     state.upload_queue[index].bytes_uploaded = bytes_uploaded;
                 }
             }
-            upload_state.update_progress(upload_id, static_cast<int64_t>(bytes_uploaded));
             return !state.cancel_upload.load();
         };
 
         // Completion callback
-        auto completion_cb = [this, &state, &upload_state, index, upload_id, cleanup_after_upload, cleanup_path](bool success, const std::string& error_msg) {
+        auto completion_cb = [this, &state, index, cleanup_after_upload, cleanup_path](bool success, const std::string& error_msg) {
             {
                 std::lock_guard<std::mutex> lock(state.upload_mutex);
                 if (index < state.upload_queue.size()) {
@@ -138,11 +135,6 @@ namespace misty::panel {
                 state.current_upload_index++;
             }
 
-            if (success) {
-                upload_state.complete_upload(upload_id);
-            } else {
-                upload_state.fail_upload(upload_id, error_msg);
-            }
             cleanup_upload_artifact(cleanup_after_upload, cleanup_path);
 
             if (!state.cancel_upload.load()) {
@@ -152,9 +144,14 @@ namespace misty::panel {
             }
         };
 
-        // Upload via unified services
         auto& services = registry_.get_state<ServicesState>("Services");
-        services.upload_file(remote_name, remote_path, file_path, progress_cb, completion_cb);
+        core::FileMasterUploadRequest request;
+        request.file_path = file_path;
+        request.file_name = file_name;
+        request.remote_name = remote_name;
+        request.remote_path = remote_path;
+        request.file_size = file_size;
+        transfers.upload_file(services, request, completion_cb, progress_cb);
     }
 
     void FileSidebarPanel::show_upload_progress_modal(FileSidebarState& state) {

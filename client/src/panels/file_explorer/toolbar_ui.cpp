@@ -1,13 +1,11 @@
 #include "panels/file_explorer/file_explorer_panel.h"
 
 #include <algorithm>
-#include <chrono>
 #include <cstdio>
 #include <cstring>
 
 #include "core/commands/command_manager.h"
 #include "core/manager/asset_manager.h"
-#include "panels/search/search_panel.h"
 #include "panels/search/search_state.h"
 using namespace misty::core;
 

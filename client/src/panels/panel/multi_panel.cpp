@@ -20,6 +20,7 @@ namespace misty::panel {
 
             return std::clamp(ratio * total, effective_min, total - effective_min);
         }
+
     }
 
     // initialize the panel with a default pane and grid lane
@@ -368,24 +369,24 @@ namespace misty::panel {
         ImGui::SetCursorScreenPos(pos);
         const std::string child_id = "##pane_" + pane_id;
         UI::WithStyle([&](UI::StyleScope& style) {
+            style.var(ImGuiStyleVar_ChildBorderSize, 1.0f);
             if (is_active_pane) {
-                style.color(ImGuiCol_Border, ImVec4(0.38f, 0.62f, 0.98f, 0.95f));
-                style.color(ImGuiCol_ChildBg, ImVec4(0.15f, 0.17f, 0.21f, 1.0f));
-                style.var(ImGuiStyleVar_ChildBorderSize, 2.0f);
+                style.color(ImGuiCol_Border, ImVec4(1.0f, 1.0f, 1.0f, 0.95f));
             } else {
                 style.color(ImGuiCol_Border, ImVec4(0.24f, 0.24f, 0.26f, 1.0f));
                 style.color(ImGuiCol_ChildBg, ImVec4(0.12f, 0.12f, 0.12f, 1.0f));
-                style.var(ImGuiStyleVar_ChildBorderSize, 1.0f);
             }
 
-            if (ImGui::BeginChild(child_id.c_str(), size, ImGuiChildFlags_Borders)) {
-                if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup) && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+            constexpr ImGuiWindowFlags pane_flags =
+                ImGuiWindowFlags_NoScrollbar |
+                ImGuiWindowFlags_NoScrollWithMouse;
+            if (ImGui::BeginChild(child_id.c_str(), size, ImGuiChildFlags_Borders, pane_flags)) {
+                const bool pane_clicked =
+                    ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup | ImGuiHoveredFlags_ChildWindows) &&
+                    ImGui::IsMouseClicked(ImGuiMouseButton_Left);
+                const bool pane_focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows);
+                if (pane_clicked || pane_focused) {
                     active_pane_id = pane_id;
-                }
-
-                if (is_active_pane) {
-                    ImGui::TextColored(ImVec4(0.55f, 0.75f, 1.0f, 1.0f), "Active Pane");
-                    ImGui::Separator();
                 }
 
                 bool create_new_tab_requested = false;
@@ -425,9 +426,15 @@ namespace misty::panel {
             ImGuiWindowFlags_NoTitleBar |
             ImGuiWindowFlags_NoResize |
             ImGuiWindowFlags_NoMove |
-            ImGuiWindowFlags_NoCollapse;
+            ImGuiWindowFlags_NoCollapse |
+            ImGuiWindowFlags_NoSavedSettings;
+
+        if (ImGuiViewport* main_viewport = ImGui::GetMainViewport()) {
+            ImGui::SetNextWindowViewport(main_viewport->ID);
+        }
 
         const std::string window_name = "##multi_panel_" + panel_id_;
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
         const bool is_open = ImGui::Begin(window_name.c_str(), nullptr, flags);
 
         if (is_open) {
@@ -465,5 +472,6 @@ namespace misty::panel {
 
         show_error_modal(error_msg_, "MultiPanelError");
         ImGui::End();
+        ImGui::PopStyleVar();
     }
 }

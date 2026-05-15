@@ -1,6 +1,7 @@
 #include "views/files_view.h"
 
 #include <algorithm>
+#include <cstdlib>
 
 #include "core/commands/command_manager.h"
 #include "core/manager/plugin_manager.h"
@@ -9,9 +10,9 @@
 #include "core/manager/proxy_manager.h"
 #include "core/manager/session_manager.h"
 #include "core/ui/ui_style.h"
+#include "panels/explorer/explorer_transfer_ui_state.h"
 #include "panels/file_explorer/file_explorer_state.h"
 #include "panels/notification/notification_state.h"
-#include "panels/transfers/transfer_window_state.h"
 
 namespace misty::view {
     FilesView::FilesView(core::UIRegistry& ui_registry,
@@ -26,23 +27,11 @@ namespace misty::view {
     FilesView::~FilesView() = default;
 
     void FilesView::init_panels() {
-        file_sidebar_panel_ = std::make_shared<panel::FileSidebarPanel>(ui_registry_, worker_pool_, client_);
-        file_sidebar_panel_->set_mount_path_provider([this]() -> std::string {
-            return panel::path_utils::get_mount_root();
-        });
-        file_sidebar_panel_->set_active_explorer_state_key_provider([this]() -> std::string {
-            return active_explorer_state_key();
-        });
         navbar_panel_ = std::make_shared<panel::NavbarPanel>(ui_registry_);
         notification_panel_ = std::make_shared<panel::NotificationPanel>(ui_registry_);
+        context_menu_panel_ = std::make_shared<panel::ContextMenuPanel>(ui_registry_);
         claude_panel_ = std::make_shared<panel::ClaudePanel>(ui_registry_, worker_pool_);
-        filetree_panel_ = std::make_shared<panel::FileTreePanel>(ui_registry_, worker_pool_, client_);
-        file_sidebar_panel_->set_file_drop_handler(
-            [this](const std::string& source_state_key, const std::string& dest_path, panel::ClipboardOp op) {
-                if (filetree_panel_) {
-                    filetree_panel_->drop_selected_items_to_path(source_state_key, dest_path, op);
-                }
-            });
+        explorer_panel_ = std::make_shared<panel::ExplorerPanel>(ui_registry_, worker_pool_, client_);
     }
 
     view::ViewID FilesView::get_view_id() {
@@ -50,11 +39,12 @@ namespace misty::view {
     }
 
     std::string FilesView::active_explorer_state_key() const {
-        return filetree_panel_ ? filetree_panel_->active_explorer_state_key() : "Files";
+        return explorer_panel_ ? explorer_panel_->active_explorer_state_key() : "Files";
     }
 
     bool FilesView::invoke_command(const std::string& command_id) {
-        return filetree_panel_ ? filetree_panel_->invoke_command(command_id) : false;
+        (void)command_id;
+        return false;
     }
 
     ViewCapabilities FilesView::capabilities() const {
@@ -65,16 +55,11 @@ namespace misty::view {
     }
 
     PluginOpenResult FilesView::open_plugin_panel(const std::string& panel_id, PluginOpenMode mode) {
-        if (!filetree_panel_ || panel_id.empty()) {
+        if (!explorer_panel_ || panel_id.empty()) {
             return PluginOpenResult::Failed;
         }
 
         if (mode == PluginOpenMode::Inline) {
-            if (panel_id == "preview-manager.panel") {
-                return filetree_panel_->ensure_preview_open_for_active_context()
-                    ? PluginOpenResult::Opened
-                    : PluginOpenResult::Failed;
-            }
             return PluginOpenResult::Unsupported;
         }
 
@@ -94,32 +79,15 @@ namespace misty::view {
             return PluginOpenResult::Failed;
         }
 
-        bool opened_in_split = false;
-        const bool prefer_split = mode == PluginOpenMode::Split;
-        const bool opened = filetree_panel_->open_hosted_tab(
-            panel_id,
-            panel_it->title.empty() ? plugin_it->name : panel_it->title,
-            [panel_id]() {
-                core::PluginManager::get().render_panel_content(panel_id);
-            },
-            active_explorer_state_key(),
-            prefer_split,
-            &opened_in_split);
-        if (!opened) {
-            return PluginOpenResult::Failed;
-        }
-
-        if (prefer_split && !opened_in_split) {
-            auto& notifications = ui_registry_.get_state<panel::NotificationState>("Notifications");
-            notifications.add_notification("Plugin opened in a tab because no split was available.", 2.5f);
-        }
-        return PluginOpenResult::Opened;
+        (void)plugin_it;
+        (void)panel_it;
+        return PluginOpenResult::Unsupported;
     }
 
     void FilesView::render() {
         ImGuiViewport* viewport = ImGui::GetMainViewport();
         const bool transfer_modal_open =
-            ui_registry_.get_state<panel::TransferWindowState>(panel::kTransferWindowStateKey).is_open();
+            ui_registry_.get_state<panel::ExplorerTransferUiState>(panel::kExplorerTransferUiStateKey).is_open();
 
         const float navbar_width = 77.0f;
         const float content_x = viewport->WorkPos.x + navbar_width;
@@ -147,18 +115,14 @@ namespace misty::view {
         const float handle_y1 = viewport->WorkPos.y + viewport->WorkSize.y;
 
         ImGuiIO& io = ImGui::GetIO();
-
-        if (!transfer_modal_open && core::CommandManager::get().matches("search.toggle")) {
-            filetree_panel_->toggle_active_search();
-        }
         if (!transfer_modal_open && core::CommandManager::get().matches("app.open_settings")) {
             view::switch_view(view::ViewID::Settings);
         }
         if (!transfer_modal_open && core::CommandManager::get().matches("explorer.toggle_claude")) {
             claude_panel_->toggle();
         }
-        if (!transfer_modal_open) {
-            filetree_panel_->handle_commands();
+        if (!transfer_modal_open && explorer_panel_) {
+            explorer_panel_->handle_commands();
         }
 
         if (claude_panel_->is_open()) {
@@ -249,9 +213,11 @@ namespace misty::view {
 
         ImGui::SetNextWindowPos(sidebar_pos);
         ImGui::SetNextWindowSize(ImVec2(sidebar_w, sidebar_h));
-        file_sidebar_panel_->render();
+        explorer_panel_->render_sidebar();
 
-        filetree_panel_->render(explorer_pos, ImVec2(explorer_w, explorer_h));
+        ImGui::SetNextWindowPos(explorer_pos);
+        ImGui::SetNextWindowSize(ImVec2(explorer_w, explorer_h));
+        explorer_panel_->render_content();
 
         if (claude_panel_->is_open()) {
             const float claude_x = explorer_pos.x + explorer_w;
@@ -262,7 +228,9 @@ namespace misty::view {
             ImGui::SetNextWindowSize(ImVec2(claude_w, claude_h));
             ImGuiWindowFlags claude_flags =
                 ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove |
-                ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse;
+                ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse |
+                ImGuiWindowFlags_NoSavedSettings;
+            ImGui::SetNextWindowViewport(viewport->ID);
             ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
             if (ImGui::Begin("##claude_window", nullptr, claude_flags)) {
                 claude_panel_->render();
@@ -271,6 +239,8 @@ namespace misty::view {
             ImGui::PopStyleVar();
         }
 
+        explorer_panel_->render_overlays();
+        context_menu_panel_->render();
         notification_panel_->render();
     }
 
@@ -311,6 +281,10 @@ namespace misty::view {
             ImGuiWindowFlags_NoMove |
             ImGuiWindowFlags_NoScrollbar |
             ImGuiWindowFlags_NoSavedSettings;
+
+        if (ImGuiViewport* main_viewport = ImGui::GetMainViewport()) {
+            ImGui::SetNextWindowViewport(main_viewport->ID);
+        }
 
         ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.20f, 0.13f, 0.09f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.48f, 0.31f, 0.15f, 1.0f));

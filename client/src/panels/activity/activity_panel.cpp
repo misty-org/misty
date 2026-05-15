@@ -1,7 +1,9 @@
 #include "activity_panel.h"
+#include "core/ui/ui_helper.h"
 #include "imgui.h"
 #include "imgui_internal.h"
-#include "panels/transfers/transfer_window_state.h"
+#include "panels/explorer/explorer_transfer_ui_state.h"
+#include "views/app_view.h"
 #include <ctime>
 #include <sstream>
 #include <iomanip>
@@ -19,12 +21,17 @@ namespace misty::panel {
         ImGuiViewport* viewport = ImGui::GetMainViewport();
         float navbar_width = 77.0f;
 
-        float px = viewport->WorkPos.x + navbar_width + 6.0f;
-        float py = viewport->WorkPos.y + (viewport->WorkSize.y - POPUP_H) * 0.5f;
-        py = std::max(viewport->WorkPos.y + 8.0f, py);
-        py = std::min(viewport->WorkPos.y + viewport->WorkSize.y - POPUP_H - 8.0f, py);
+        const ImVec2 desired_pos(
+            viewport->WorkPos.x + navbar_width + 6.0f,
+            viewport->WorkPos.y + (viewport->WorkSize.y - POPUP_H) * 0.5f
+        );
+        const ImVec2 clamped_pos = UI::clamp_window_pos_to_viewport(
+            desired_pos,
+            ImVec2(POPUP_W, POPUP_H),
+            *viewport
+        );
 
-        ImGui::SetNextWindowPos(ImVec2(px, py), ImGuiCond_Always);
+        ImGui::SetNextWindowPos(clamped_pos, ImGuiCond_Always);
         ImGui::SetNextWindowSize(ImVec2(POPUP_W, POPUP_H), ImGuiCond_Always);
 
         ImGuiWindowFlags flags =
@@ -33,6 +40,8 @@ namespace misty::panel {
             ImGuiWindowFlags_NoMove |
             ImGuiWindowFlags_NoCollapse |
             ImGuiWindowFlags_NoSavedSettings;
+
+        ImGui::SetNextWindowViewport(viewport->ID);
 
         ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.14f, 0.14f, 0.14f, 0.98f));
         ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 12.0f);
@@ -74,7 +83,8 @@ namespace misty::panel {
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.45f, 0.45f, 0.45f, 1.0f));
             if (ImGui::Button("Transfers##activity", ImVec2(transfers_w, 0))) {
                 state.is_open = false;
-                registry_.get_state<TransferWindowState>(kTransferWindowStateKey).open();
+                view::switch_view(view::ViewID::Files);
+                registry_.get_state<ExplorerTransferUiState>(kExplorerTransferUiStateKey).open();
             }
             ImGui::SameLine(0, button_gap);
             if (ImGui::Button("Mark all read##activity", ImVec2(read_w, 0))) {
