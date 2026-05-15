@@ -11,6 +11,8 @@ export interface MeResponse {
   allows_use: boolean;
   expires_at: string | null;
   trial_started_at: string | null;
+  /** Server-authoritative eligibility for the one-time Pro trial. */
+  trial_eligible?: boolean;
   license_device: string;
   /** Bumped by the server on every avatar upload; used to bust the image cache. */
   avatar_version?: number;
