@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "panels/panel.h"
+#include "panels/panel/panel.h"
 
 namespace misty::core {
 class UIRegistry;

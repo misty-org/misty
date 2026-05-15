@@ -2,56 +2,44 @@
 
 #include <cstdint>
 #include <functional>
-#include <memory>
 
 #include "core/ui/ui_registry.h"
-#include "panels/panel.h"
 #include "core/threading/worker_pool.h"
 #include "panels/file_explorer/file_explorer_state.h"
-#include "panels/file_sidebar/remote_mount_state.h"
 #include "panels/file_explorer/operation_journal.h"
-#include "panels/activity/upload_state.h"
-#include "panels/search/search_state.h"
-
-class MistyClient;
+#include "panels/panel/multi_panel.h"
 
 namespace misty::panel {
-    class SearchPanel;  // forward declaration
-    class FileTreePanel;
+    class FileTreeMultiPanel;
 
-    class FileExplorerPanel : public panel::Panel {
-        friend class FileTreePanel;
+    struct FileExplorerPanelProps {
+        std::string state_key = "Files";
+        std::string panel_id = "primary";
+        bool restore_persistent_state = true;
+        std::string initial_path_override;
+    };
+
+    class FileExplorerPanel : public panel::MultiPanel {
+        friend class FileTreeMultiPanel;
     public:
         FileExplorerPanel(core::UIRegistry& registry,
                           core::WorkerPool& worker_pool,
-                          std::shared_ptr<MistyClient> client,
-                          std::string state_key = "Files",
-                          std::string search_state_key = "Search",
-                          std::string panel_id = "primary",
-                          bool restore_persistent_state = true,
-                          std::string initial_path_override = "");
+                          FileExplorerPanelProps props = {});
         ~FileExplorerPanel() override;
         void render() override;
 
-        void set_search_panel(SearchPanel* panel) { search_panel_ = panel; }
-        void set_body_drag_source_callback(std::function<void()> callback) {
-            body_drag_source_callback_ = std::move(callback);
-        }
-        void set_shared_path_refresh_callback(std::function<void(const std::string&)> callback) {
-            shared_path_refresh_callback_ = std::move(callback);
-        }
-        bool consume_activation_request();
         void toggle_chat_overlay();
-        bool toggle_preview_pane();
-        bool ensure_preview_pane_open();
-        bool zoom_preview_in();
-        bool zoom_preview_out();
-        bool reset_preview_zoom();
+        std::string active_explorer_state_key() const;
+        void drop_selected_items_to_path(const std::string& source_state_key,
+                                         const std::string& dest_path,
+                                         ClipboardOp op);
 
         // Unified navigation - routes to local or remote based on path
         void navigate_to_path(const std::string& path, bool update_history = true, bool create_if_missing = true);
 
     private:
+        TabController::Tab create_default_tab(std::int16_t tab_idx) const override;
+        void render_panel_contents() override;
         void handle_pending_navigation(panel::FileExplorerState& state);
         void update_periodic_save(panel::FileExplorerState& state);
         void update_periodic_watched_sync(panel::FileExplorerState& state);
@@ -73,18 +61,12 @@ namespace misty::panel {
         bool resolve_drop_destination_path(const std::string& path,
                                            std::string& resolved_path,
                                            std::string* error_message = nullptr) const;
-        void notify_shared_path_refresh(const std::string& path);
         void request_manual_refresh(panel::FileExplorerState& state);
         void toggle_current_sync_watch(panel::FileExplorerState& state);
 
         void show_nav_history(panel::FileExplorerState& state, float button_width, float spacing);
-        void show_search_bar(panel::FileExplorerState& state, SearchState& search_state);
         void show_breadcrumb_bar(panel::FileExplorerState& state);
         void show_directory_contents(panel::FileExplorerState& state);
-        void render_preview_pane(const std::string& selected_path, float preview_width);
-        bool load_preview_texture(const std::string& path, std::string* error_message);
-        void clear_preview_texture();
-        std::string selected_preview_path(panel::FileExplorerState& state) const;
         void apply_table_sort(panel::FileExplorerState& state, const ImGuiTableSortSpecs& sort_specs);
         void show_file_item(panel::FileExplorerState& state, int i);
         void show_grid_item(panel::FileExplorerState& state, int i, float cell_w, float cell_h);
@@ -103,7 +85,6 @@ namespace misty::panel {
                                            bool prominent,
                                            std::function<void()> navigate_callback = {});
 
-        // Context menu + file operations
         void show_context_menu(panel::FileExplorerState& state);
         void show_background_context_menu(panel::FileExplorerState& state);
         void show_new_entry_modal(panel::FileExplorerState& state);
@@ -111,7 +92,6 @@ namespace misty::panel {
         void show_permanent_delete_modal(panel::FileExplorerState& state);
         void show_permission_delete_modal(panel::FileExplorerState& state);
 
-        // File operation helpers
 #ifdef MISTY_TESTING
     public:
 #endif
@@ -156,7 +136,6 @@ namespace misty::panel {
 #ifdef MISTY_TESTING
     private:
 #endif
-        // Async local filesystem navigation
         void navigate_to_local_path_async(const std::string& path, bool update_history, uint64_t navigation_generation);
 
         void sync_account_mappings();
@@ -186,28 +165,6 @@ namespace misty::panel {
     private:
         core::UIRegistry& registry_;
         core::WorkerPool& worker_pool_;
-        std::shared_ptr<MistyClient> client_;
         std::string state_key_;
-        std::string search_state_key_;
-        std::string window_name_;
-
-        std::string initial_start_path_;
-        SearchPanel* search_panel_ = nullptr;
-        std::function<void()> body_drag_source_callback_;
-        std::function<void(const std::string&)> shared_path_refresh_callback_;
-        bool activation_requested_ = false;
-        bool preview_pane_open_ = false;
-        bool preview_pane_resizing_ = false;
-        float preview_pane_width_ = 360.0f;
-        float preview_pane_drag_start_width_ = 360.0f;
-        float preview_pane_drag_start_mouse_x_ = 0.0f;
-        std::uint32_t preview_texture_id_ = 0;
-        int preview_texture_width_ = 0;
-        int preview_texture_height_ = 0;
-        float preview_zoom_ = 1.0f;
-        std::string preview_selected_path_;
-        std::string preview_source_path_;
-        std::string preview_error_;
-
     };
-};
+}

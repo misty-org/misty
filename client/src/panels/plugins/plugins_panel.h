@@ -4,7 +4,7 @@
 #include <vector>
 
 #include "core/ui/ui_registry.h"
-#include "panels/panel.h"
+#include "panels/panel/panel.h"
 #include "panels/plugins/plugins_components.h"
 #include "panels/plugins/plugins_detail.h"
 

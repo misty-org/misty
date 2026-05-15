@@ -9,7 +9,7 @@
 #include "core/claude/claude_process.h"
 #include "core/threading/worker_pool.h"
 #include "core/ui/ui_registry.h"
-#include "panels/panel.h"
+#include "panels/panel/panel.h"
 
 namespace misty::panel {
 
