@@ -1,4 +1,5 @@
 #include "settings_view.h"
+#include "core/commands/command_manager.h"
 #include "imgui.h"
 
 namespace misty::view {
@@ -20,7 +21,7 @@ namespace misty::view {
     ViewCapabilities SettingsView::capabilities() const {
         return {
             .tabs = true,
-            .split = false,
+            .split = true,
         };
     }
 
@@ -50,6 +51,8 @@ namespace misty::view {
         float sy = viewport->WorkPos.y;
         float sw = viewport->WorkSize.x - navbar_width;
         float sh = viewport->WorkSize.y;
+
+        settings_panel_->handle_commands();
 
         ImGui::SetNextWindowPos(ImVec2(sx, sy), ImGuiCond_Always);
         ImGui::SetNextWindowSize(ImVec2(sw, sh), ImGuiCond_Always);

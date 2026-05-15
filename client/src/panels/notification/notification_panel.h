@@ -1,7 +1,7 @@
 #pragma once
 
 #include "core/ui/ui_registry.h"
-#include "panels/panel.h"
+#include "panels/panel/panel.h"
 #include "notification_state.h"
 
 namespace misty::panel {

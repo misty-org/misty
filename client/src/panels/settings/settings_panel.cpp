@@ -16,56 +16,79 @@
 
 namespace misty::panel {
 
-void SettingsPanel::render() {
-    constexpr ImGuiWindowFlags flags =
-        ImGuiWindowFlags_NoTitleBar |
-        ImGuiWindowFlags_NoResize |
-        ImGuiWindowFlags_NoMove |
-        ImGuiWindowFlags_NoCollapse;
+SettingsPanel::SettingsPanel(core::UIRegistry& registry, SettingsPanelProps props)
+    : MultiPanel(std::move(props.panel_id)),
+      registry_(registry),
+      state_key_(std::move(props.state_key)) {}
 
-    auto& state = registry_.get_state<SettingsState>("Settings");
+TabController::Tab SettingsPanel::create_default_tab(std::int16_t tab_idx) const {
+    SettingsPanelProps props;
+    props.panel_id = panel_id() + "_tab_" + std::to_string(tab_idx);
+    props.state_key = state_key_ + "_tab_" + std::to_string(tab_idx);
+
+    auto panel = std::make_shared<SettingsPanel>(registry_, std::move(props));
+
+    TabController::Tab tab;
+    tab.context_key = panel->state_key_;
+    tab.state_key = panel->state_key_;
+    tab.title = "Settings";
+    tab.idx = tab_idx;
+    tab.panel = std::move(panel);
+    return tab;
+}
+
+void SettingsPanel::render_panel_contents() {
+    auto& state = registry_.get_state<SettingsState>(state_key_);
     state.ensure_app_settings_loaded();
     misty::UI::WithWindowStyle({
         .bg_color = ImVec4(0.12f, 0.12f, 0.12f, 1.0f),
     }, [&]() {
-        if (ImGui::Begin("SettingsPanel", nullptr, flags)) {
-            misty::view::debug_log_view_event(
-                std::string("settings_panel: section=") + std::to_string(static_cast<int>(state.active_section)));
-            UI::row("##settings_shell", {
+        misty::view::debug_log_view_event(
+            std::string("settings_panel: section=") + std::to_string(static_cast<int>(state.active_section)));
+        UI::row("##settings_shell", {
+            .mode = UI::Mode::LayoutOnly,
+            .width = UI::Size::fill(),
+            .height = UI::Size::fill(),
+        }, [&]() {
+            sidebar(state);
+            UI::div("##settings_divider", {
                 .mode = UI::Mode::LayoutOnly,
-                .width = UI::Size::fill(),
+                .width = UI::Size::px(1.0f),
                 .height = UI::Size::fill(),
-            }, [&]() {
-                sidebar(state);
-                UI::div("##settings_divider", {
-                    .mode = UI::Mode::LayoutOnly,
-                    .width = UI::Size::px(1.0f),
-                    .height = UI::Size::fill(),
-                    .bg_color = ImVec4(0.22f, 0.22f, 0.24f, 1.0f),
-                    .margin = UI::Spacing::xy(12.0f, 0.0f),
-                }, []() {});
-                settings_content(state);
-            });
-        }
-        ImGui::End();
+                .bg_color = ImVec4(0.22f, 0.22f, 0.24f, 1.0f),
+                .margin = UI::Spacing::xy(12.0f, 0.0f),
+            }, []() {});
+            settings_content(state);
+        });
     });
 }
 
 void SettingsPanel::settings_content(SettingsState& state) {
     UI::WithStyle([&](UI::StyleScope& style) {
         style.var(ImGuiStyleVar_ScrollbarSize, 8.0f);
+        ImGui::SetNextWindowContentSize(ImVec2(720.0f, 0.0f));
 
         UI::div("##settings_content", {
             .mode = UI::Mode::ChildWindow,
             .width = UI::Size::fill(),
             .height = UI::Size::fill(),
-            .window_flags = ImGuiWindowFlags_AlwaysVerticalScrollbar | ImGuiWindowFlags_NoScrollWithMouse,
+            .window_flags = ImGuiWindowFlags_AlwaysVerticalScrollbar |
+                            ImGuiWindowFlags_HorizontalScrollbar |
+                            ImGuiWindowFlags_NoScrollWithMouse,
             .padding = kSettingsShellPadding,
         }, [&]() {
             ImGuiIO& io = ImGui::GetIO();
-            if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup) && io.MouseWheel != 0.0f) {
-                constexpr float kSettingsWheelStep = 8.0f;
-                ImGui::SetScrollY(ImGui::GetScrollY() - io.MouseWheel * kSettingsWheelStep);
+            if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup)) {
+                constexpr float kSettingsWheelStep = 4.0f;
+                constexpr float kSettingsWheelHStep = 12.0f;
+
+                if (io.MouseWheelH != 0.0f) {
+                    ImGui::SetScrollX(ImGui::GetScrollX() - io.MouseWheelH * kSettingsWheelHStep);
+                }
+
+                if (io.MouseWheel != 0.0f) {
+                    ImGui::SetScrollY(ImGui::GetScrollY() - io.MouseWheel * kSettingsWheelStep);
+                }
             }
 
             switch (state.active_section) {

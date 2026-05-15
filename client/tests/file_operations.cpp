@@ -388,18 +388,11 @@ void ServicesState::download_folder(const std::string&,
 
 FileExplorerPanel::FileExplorerPanel(core::UIRegistry& registry,
                                      core::WorkerPool& worker_pool,
-                                     std::shared_ptr<MistyClient> client,
-                                     std::string state_key,
-                                     std::string search_state_key,
-                                     std::string panel_id,
-                                     bool,
-                                     std::string)
+                                     FileExplorerPanelProps props)
     : registry_(registry),
       worker_pool_(worker_pool),
-      client_(std::move(client)),
-      state_key_(std::move(state_key)),
-      search_state_key_(std::move(search_state_key)),
-      window_name_("File Explorer##" + panel_id) {}
+      state_key_(std::move(props.state_key)),
+      panel_id_(std::move(props.panel_id)) {}
 
 FileExplorerPanel::~FileExplorerPanel() = default;
 
@@ -482,10 +475,6 @@ bool FileExplorerPanel::resolve_drop_destination_path(const std::string& path,
     return true;
 }
 
-void FileExplorerPanel::notify_shared_path_refresh(const std::string& path) {
-    g_last_refresh_path = path;
-}
-
 } // namespace misty::panel
 
 #include "panels/search/search_panel.cpp"
@@ -498,7 +487,13 @@ class FileExplorerActionsTest : public ::testing::Test {
 protected:
     FileExplorerActionsTest()
         : worker_pool_(1),
-          panel_(registry_, worker_pool_, nullptr, "Files", "Search", "test", false, "") {}
+          panel_(registry_, worker_pool_, [] {
+              misty::panel::FileExplorerPanelProps props;
+              props.state_key = "Files";
+              props.panel_id = "test";
+              props.restore_persistent_state = false;
+              return props;
+          }()) {}
 
     void SetUp() override {
         g_last_navigate_path.clear();

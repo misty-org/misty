@@ -1,4 +1,4 @@
-#include "panel.h"
+#include "panels/panel/panel.h"
 
 #include "core/manager/asset_manager.h"
 #include "core/commands/command_manager.h"
