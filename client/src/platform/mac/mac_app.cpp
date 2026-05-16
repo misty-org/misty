@@ -89,6 +89,8 @@ namespace misty {
         glfwSetWindowUserPointer(window_, this);
         frame_pacer().set_wake_callback([]() { glfwPostEmptyEvent(); });
         glfwSetWindowSizeCallback(window_, glfw_window_size_callback);
+        glfwSetWindowPosCallback(window_, glfw_window_pos_callback);
+        glfwSetWindowRefreshCallback(window_, glfw_window_refresh_callback);
         glfwSetWindowFocusCallback(window_, glfw_window_focus_callback);
         glfwSetCursorPosCallback(window_, glfw_cursor_pos_callback);
         glfwSetMouseButtonCallback(window_, glfw_mouse_button_callback);
@@ -228,8 +230,16 @@ namespace misty {
         fprintf(stderr, "GLFW Error %d: %s\n", error, description);
     }
 
-    void MacApp::glfw_window_size_callback(GLFWwindow* window, int width, int height) {
+    void MacApp::glfw_window_size_callback(GLFWwindow*, int, int) {
+        core::FramePacer::request_immediate_frame();
+    }
 
+    void MacApp::glfw_window_pos_callback(GLFWwindow*, int, int) {
+        core::FramePacer::request_immediate_frame();
+    }
+
+    void MacApp::glfw_window_refresh_callback(GLFWwindow*) {
+        core::FramePacer::request_immediate_frame();
     }
 
     void MacApp::glfw_window_focus_callback(GLFWwindow* window, int focused) {

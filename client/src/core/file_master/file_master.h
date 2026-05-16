@@ -1,7 +1,6 @@
 #pragma once
 
 #include <functional>
-#include <string>
 
 namespace misty::core {
 
@@ -11,6 +10,7 @@ struct FileMasterResult {
 };
 
 struct FileMasterProps {
+    std::string file_name;
     std::string local_source_path;
     std::string local_dest_path;
     std::string remote_source_name;
@@ -18,6 +18,7 @@ struct FileMasterProps {
     std::string remote_dest_name;
     std::string remote_dest_path;
 };
+
 
 using FileMasterCompletion = std::function<void(FileMasterResult)>;
 

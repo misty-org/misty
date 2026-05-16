@@ -232,6 +232,7 @@ bool column(const char* id, const BoxStyle& style, const std::function<void()>& 
 
 bool grid(const char* id, int columns, const BoxStyle& style, const std::function<void()>& content = {});
 
+ImVec2 available_size();
 void raw(const std::function<void()>& content);
 void spacer(float width, float height = 0.0f);
 void divider(const DividerProps& props = {});

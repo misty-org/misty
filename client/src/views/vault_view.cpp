@@ -12,6 +12,7 @@ namespace misty::view {
         navbar_panel_       = std::make_shared<panel::NavbarPanel>(ui_registry_);
         vault_panel_        = std::make_shared<panel::VaultPanel>(ui_registry_);
         notification_panel_ = std::make_shared<panel::NotificationPanel>(ui_registry_);
+        context_menu_panel_ = std::make_shared<panel::ContextMenuPanel>(ui_registry_);
 
         // Wire the worker pool into the vault state on first construction so
         // refreshes / SSE consumers have a thread to run on. Subsequent calls
@@ -39,6 +40,7 @@ namespace misty::view {
         ImGui::SetNextWindowSize(ImVec2(sw, sh), ImGuiCond_Always);
         vault_panel_->render();
 
+        context_menu_panel_->render();
         notification_panel_->render();
     }
 }

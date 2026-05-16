@@ -1,7 +1,7 @@
 #pragma once
 #include "core/ui/ui_registry.h"
 #include "navbar_state.h"
-#include "panels/panel.h"
+#include "panels/panel/panel.h"
 #include "panels/activity/activity_panel.h"
 #include "core/ui/svg_loader.h"
 

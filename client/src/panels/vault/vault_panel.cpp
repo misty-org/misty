@@ -92,7 +92,12 @@ namespace misty::panel {
             ImGuiWindowFlags_NoTitleBar |
             ImGuiWindowFlags_NoResize |
             ImGuiWindowFlags_NoMove |
-            ImGuiWindowFlags_NoCollapse;
+            ImGuiWindowFlags_NoCollapse |
+            ImGuiWindowFlags_NoSavedSettings;
+
+        if (ImGuiViewport* main_viewport = ImGui::GetMainViewport()) {
+            ImGui::SetNextWindowViewport(main_viewport->ID);
+        }
 
         misty::UI::WithWindowStyle({
             .bg_color = ImVec4(0.12f, 0.12f, 0.12f, 1.0f),

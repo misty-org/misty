@@ -1,7 +1,7 @@
 #pragma once
 
 #include <string>
-#include "panels/panel.h"
+#include "panels/panel/panel.h"
 #include "core/ui/ui_registry.h"
 #include "services_state.h"
 
