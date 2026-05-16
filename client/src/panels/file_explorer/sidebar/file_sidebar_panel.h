@@ -10,20 +10,18 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#include "file_sidebar_state.h"
+#include "panels/file_explorer/state/file_sidebar_state.h"
 
 #include "panels/services/services_state.h"
 #include "panels/services/remote/remote_state.h"
 #include "panels/devices/device_state.h"
 #include "panels/devices/device_watcher.h"
-#include "panels/file_explorer/file_explorer_state.h"
-
-class MistyClient;
+#include "panels/file_explorer/state/file_explorer_state.h"
 
 namespace misty::panel {
     class FileSidebarPanel : public Panel {
     public:
-        FileSidebarPanel(core::UIRegistry& registry, core::WorkerPool& worker_pool, std::shared_ptr<MistyClient> client);
+        FileSidebarPanel(core::UIRegistry& registry, core::WorkerPool& worker_pool);
         void render();
 
         void set_mount_path_provider(std::function<std::string()> provider) {
@@ -58,7 +56,6 @@ namespace misty::panel {
     private:
         core::UIRegistry& registry_;
         core::WorkerPool& worker_pool_;
-        std::shared_ptr<MistyClient> client_;
         std::function<std::string()> mount_path_provider_;
         std::function<std::string()> active_explorer_state_key_provider_;
         std::function<void(const std::string&, const std::string&, ClipboardOp)> file_drop_handler_;

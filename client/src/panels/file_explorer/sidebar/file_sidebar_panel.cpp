@@ -1,8 +1,8 @@
 #include "file_sidebar_panel.h"
 
-#include "panels/file_explorer/file_explorer_state.h"
+#include "panels/file_explorer/state/file_explorer_state.h"
 #include "panels/services/services_state.h"
-#include "panels/file_sidebar/remote_mount_state.h"
+#include "panels/file_explorer/state/remote_mount_state.h"
 
 #include <cmath>
 #include <cstdlib>
@@ -134,8 +134,8 @@ namespace misty::panel {
         constexpr ImVec4 kFileSidebarSeparator = ImVec4(0.22f, 0.22f, 0.24f, 1.0f);
     }
 
-    FileSidebarPanel::FileSidebarPanel(core::UIRegistry& registry, core::WorkerPool& worker_pool, std::shared_ptr<MistyClient> client)
-        : registry_(registry), worker_pool_(worker_pool), client_(client) {
+    FileSidebarPanel::FileSidebarPanel(core::UIRegistry& registry, core::WorkerPool& worker_pool)
+        : registry_(registry), worker_pool_(worker_pool) {
     }
 
     void FileSidebarPanel::render() {

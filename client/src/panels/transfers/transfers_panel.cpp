@@ -1,4 +1,4 @@
-#include "panels/explorer/explorer_transfer_panel.h"
+#include "panels/transfers/transfers_panel.h"
 
 #include <algorithm>
 #include <array>
@@ -6,16 +6,17 @@
 #include <iomanip>
 #include <sstream>
 
-#include "panels/explorer/explorer_transfer_ui_state.h"
+#include "imgui.h"
+#include "panels/transfers/transfers_state.h"
 
 namespace misty::panel {
 namespace {
 
-using misty::core::FileMasterTransfers;
-using misty::core::FileTransferDirection;
+using misty::core::FileTransfer;
 using misty::core::FileTransferFilter;
 using misty::core::FileTransferRecord;
 using misty::core::FileTransferStatus;
+using misty::core::FileTransferType;
 
 std::string format_bytes(int64_t bytes) {
     if (bytes < 0) {
@@ -52,7 +53,7 @@ const char* filter_label(FileTransferFilter filter) {
 bool matches_filter(const FileTransferRecord& row, FileTransferFilter filter) {
     switch (filter) {
         case FileTransferFilter::Active:
-            return row.is_active();
+            return row.is_alive();
         case FileTransferFilter::Failed:
             return row.status == FileTransferStatus::Failed;
         case FileTransferFilter::Completed:
@@ -75,12 +76,58 @@ std::string progress_text(const FileTransferRecord& row) {
 
 float progress_fraction(const FileTransferRecord& row) {
     if (row.total_bytes <= 0) {
-        return row.is_active() ? 0.0f : 1.0f;
+        return row.is_alive() ? 0.0f : 1.0f;
     }
     return std::clamp(
         static_cast<float>(row.transferred_bytes) / static_cast<float>(row.total_bytes),
         0.0f,
         1.0f);
+}
+
+std::string transfer_endpoint(const FileTransferRecord& row) {
+    if (!row.remote_dest_name.empty() || !row.remote_dest_path.empty()) {
+        return row.remote_dest_name + ":" + row.remote_dest_path;
+    }
+    if (!row.remote_source_name.empty() || !row.remote_source_path.empty()) {
+        return row.remote_source_name + ":" + row.remote_source_path;
+    }
+    if (!row.local_dest_path.empty()) {
+        return row.local_dest_path;
+    }
+    if (!row.local_source_path.empty()) {
+        return row.local_source_path;
+    }
+    return "";
+}
+
+const char* type_label(FileTransferType type) {
+    switch (type) {
+        case FileTransferType::Upload: return "Upload";
+        case FileTransferType::Download: return "Download";
+        case FileTransferType::Copy: return "Copy";
+        case FileTransferType::Move: return "Move";
+        case FileTransferType::Rename: return "Rename";
+        case FileTransferType::Delete: return "Delete";
+    }
+    return "Transfer";
+}
+
+const char* status_label(const FileTransferRecord& row) {
+    switch (row.status) {
+        case FileTransferStatus::Failed: return "Failed";
+        case FileTransferStatus::Completed: return "Completed";
+        case FileTransferStatus::Pending:
+        case FileTransferStatus::InProgress:
+            switch (row.transfer_type) {
+                case FileTransferType::Upload: return "Uploading";
+                case FileTransferType::Download: return "Downloading";
+                case FileTransferType::Copy: return "Copying";
+                case FileTransferType::Move: return "Moving";
+                case FileTransferType::Rename: return "Renaming";
+                case FileTransferType::Delete: return "Deleting";
+            }
+    }
+    return "Pending";
 }
 
 bool render_filter_button(const char* label, bool selected) {
@@ -103,67 +150,69 @@ bool render_filter_button(const char* label, bool selected) {
 
 }  // namespace
 
-ExplorerTransferPanel::ExplorerTransferPanel(core::UIRegistry& registry)
+TransfersPanel::TransfersPanel(core::UIRegistry& registry)
     : registry_(registry) {}
 
-void ExplorerTransferPanel::render() {
-    auto& ui_state = registry_.get_state<ExplorerTransferUiState>(kExplorerTransferUiStateKey);
-    if (!ui_state.is_open()) {
-        return;
+void TransfersPanel::render() {
+    auto& ui_state = registry_.get_state<TransfersState>(kTransfersStateKey);
+    auto& tracker = registry_.get_state<FileTransfer>("FileMasterTransfers");
+    auto rows = tracker.get_all_transfers();
+
+    size_t active = 0;
+    size_t completed = 0;
+    size_t failed = 0;
+    for (const auto& row : rows) {
+        if (row.is_alive()) {
+            ++active;
+        } else if (row.status == FileTransferStatus::Failed) {
+            ++failed;
+        } else {
+            ++completed;
+        }
     }
 
-    auto& tracker = registry_.get_state<FileMasterTransfers>("FileMasterTransfers");
-    auto rows = tracker.get_all_transfers();
-    const auto summary = tracker.get_summary();
-    const FileTransferFilter current_filter = ui_state.filter();
-
     std::sort(rows.begin(), rows.end(), [](const FileTransferRecord& lhs, const FileTransferRecord& rhs) {
-        if (lhs.is_active() != rhs.is_active()) {
-            return lhs.is_active() > rhs.is_active();
+        if (lhs.is_alive() != rhs.is_alive()) {
+            return lhs.is_alive() > rhs.is_alive();
         }
         if ((lhs.status == FileTransferStatus::Failed) != (rhs.status == FileTransferStatus::Failed)) {
             return (lhs.status == FileTransferStatus::Failed) > (rhs.status == FileTransferStatus::Failed);
         }
-        const auto lhs_time = lhs.is_active() ? lhs.started_at : lhs.completed_at;
-        const auto rhs_time = rhs.is_active() ? rhs.started_at : rhs.completed_at;
+        const auto lhs_time = lhs.is_alive() ? lhs.started_at : lhs.completed_at;
+        const auto rhs_time = rhs.is_alive() ? rhs.started_at : rhs.completed_at;
         if (lhs_time != rhs_time) {
             return lhs_time > rhs_time;
         }
         return lhs.id > rhs.id;
     });
 
-    ImGuiViewport* viewport = ImGui::GetMainViewport();
-    ImGui::SetNextWindowViewport(viewport->ID);
-    ImGui::SetNextWindowSize(ImVec2(860.0f, 520.0f), ImGuiCond_FirstUseEver);
+    const ImGuiWindowFlags window_flags =
+        ImGuiWindowFlags_NoTitleBar |
+        ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoCollapse |
+        ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoScrollbar |
+        ImGuiWindowFlags_NoScrollWithMouse |
+        ImGuiWindowFlags_NoSavedSettings;
 
-    bool open = true;
-    ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoDocking;
-    if (!ImGui::Begin("Explorer Transfers", &open, flags)) {
+    if (!ImGui::Begin("Transfers", nullptr, window_flags)) {
         ImGui::End();
-        if (!open) {
-            ui_state.close();
-        }
         return;
     }
 
-    if (!open) {
-        ui_state.close();
-    }
-
     ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.08f, 0.08f, 0.10f, 1.0f));
-    ImGui::BeginChild("##explorer_transfer_header", ImVec2(0.0f, 92.0f), true, ImGuiWindowFlags_NoScrollbar);
+    ImGui::BeginChild("##transfers_header", ImVec2(0.0f, 92.0f), true, ImGuiWindowFlags_NoScrollbar);
     ImGui::TextUnformatted("File Transfers");
-    ImGui::TextDisabled("Explorer-owned transfer monitor backed by FileMaster.");
+    ImGui::TextDisabled("Unified transfer monitor powered by FileTransfer.");
     ImGui::Spacing();
-    ImGui::Text("Active %zu", summary.active);
+    ImGui::Text("Active %zu", active);
     ImGui::SameLine(0.0f, 16.0f);
-    ImGui::Text("Completed %zu", summary.completed);
+    ImGui::Text("Completed %zu", completed);
     ImGui::SameLine(0.0f, 16.0f);
-    ImGui::Text("Failed %zu", summary.failed);
+    ImGui::Text("Failed %zu", failed);
     ImGui::SameLine();
     const float clear_width = 112.0f;
-    const float total_width = clear_width + 12.0f;
-    const float right_x = std::max(ImGui::GetCursorPosX(), ImGui::GetWindowContentRegionMax().x - total_width);
+    const float right_x = std::max(ImGui::GetCursorPosX(), ImGui::GetWindowContentRegionMax().x - clear_width);
     ImGui::SetCursorPosX(right_x);
     if (ImGui::Button("Clear Finished", ImVec2(clear_width, 0.0f))) {
         tracker.clear_completed();
@@ -172,6 +221,7 @@ void ExplorerTransferPanel::render() {
     ImGui::EndChild();
     ImGui::PopStyleColor();
 
+    const auto current_filter = ui_state.filter();
     if (render_filter_button("Active", current_filter == FileTransferFilter::Active)) {
         ui_state.set_filter(FileTransferFilter::Active);
     }
@@ -190,7 +240,7 @@ void ExplorerTransferPanel::render() {
 
     ImGui::Spacing();
     const float table_height = std::max(120.0f, ImGui::GetContentRegionAvail().y);
-    ImGuiTableFlags table_flags =
+    const ImGuiTableFlags table_flags =
         ImGuiTableFlags_RowBg |
         ImGuiTableFlags_BordersInnerH |
         ImGuiTableFlags_BordersOuter |
@@ -198,7 +248,7 @@ void ExplorerTransferPanel::render() {
         ImGuiTableFlags_Resizable |
         ImGuiTableFlags_SizingStretchProp;
 
-    if (ImGui::BeginTable("##explorer_transfers_table", 5, table_flags, ImVec2(0.0f, table_height))) {
+    if (ImGui::BeginTable("##transfers_table", 5, table_flags, ImVec2(0.0f, table_height))) {
         ImGui::TableSetupScrollFreeze(0, 1);
         ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 80.0f);
         ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch, 0.30f);
@@ -215,8 +265,10 @@ void ExplorerTransferPanel::render() {
 
             ++visible_rows;
             ImGui::TableNextRow();
+
             ImGui::TableSetColumnIndex(0);
-            ImGui::TextUnformatted(row.direction == FileTransferDirection::Upload ? "Upload" : "Download");
+            ImGui::TextUnformatted(type_label(row.transfer_type));
+
             ImGui::TableSetColumnIndex(1);
             ImGui::TextUnformatted(row.file_name.empty() ? "(unnamed)" : row.file_name.c_str());
             if (!row.error_message.empty()) {
@@ -224,22 +276,24 @@ void ExplorerTransferPanel::render() {
                 ImGui::TextWrapped("%s", row.error_message.c_str());
                 ImGui::PopStyleColor();
             }
+
             ImGui::TableSetColumnIndex(2);
-            ImGui::TextWrapped("%s", row.endpoint.empty() ? "--" : row.endpoint.c_str());
+            const std::string endpoint = transfer_endpoint(row);
+            ImGui::TextWrapped("%s", endpoint.empty() ? "--" : endpoint.c_str());
+
             ImGui::TableSetColumnIndex(3);
             ImGui::ProgressBar(progress_fraction(row), ImVec2(-FLT_MIN, 0.0f));
             ImGui::TextUnformatted(progress_text(row).c_str());
+
             ImGui::TableSetColumnIndex(4);
             if (row.status == FileTransferStatus::Failed) {
                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.83f, 0.42f, 0.42f, 1.0f));
-                ImGui::TextUnformatted("Failed");
             } else if (row.status == FileTransferStatus::Completed) {
                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.50f, 0.82f, 0.54f, 1.0f));
-                ImGui::TextUnformatted("Completed");
             } else {
                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.82f, 0.82f, 0.86f, 1.0f));
-                ImGui::TextUnformatted("In Progress");
             }
+            ImGui::TextUnformatted(status_label(row));
             ImGui::PopStyleColor();
         }
 

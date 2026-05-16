@@ -27,7 +27,7 @@ constexpr float kNameColumnWidth = 320.0f;
 constexpr float kSizeColumnWidth = 96.0f;
 constexpr float kTypeColumnWidth = 120.0f;
 constexpr float kModifiedColumnWidth = 180.0f;
-constexpr float kStateColumnWidth = 72.0f;
+constexpr float kStateColumnWidth = 96.0f;
 constexpr float kTableMinInnerWidth =
     kNameColumnWidth +
     kSizeColumnWidth +

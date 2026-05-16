@@ -2,8 +2,9 @@
 
 namespace misty::core {
 
-FileMasterRemote::FileMasterRemote(WorkerPool& worker_pool)
-    : worker_pool_(worker_pool) {}
+FileMasterRemote::FileMasterRemote(WorkerPool& worker_pool, FileTransfer& transfers)
+    : worker_pool_(worker_pool),
+      transfers_(transfers) {}
 
 void FileMasterRemote::rename(const FileMasterProps&, FileMasterCompletion callback) {
     if (callback) {
