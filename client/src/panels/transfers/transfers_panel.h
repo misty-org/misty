@@ -1,15 +1,14 @@
 #pragma once
 
-#include "core/file_master/file_master_transfers.h"
 #include "core/ui/ui_registry.h"
 #include "panels/panel/panel.h"
 
 namespace misty::panel {
 
-class ExplorerTransferPanel : public Panel {
+class TransfersPanel : public Panel {
 public:
-    explicit ExplorerTransferPanel(core::UIRegistry& registry);
-    ~ExplorerTransferPanel() override = default;
+    explicit TransfersPanel(core::UIRegistry& registry);
+    ~TransfersPanel() override = default;
 
     void render() override;
 

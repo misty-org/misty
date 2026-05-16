@@ -1,7 +1,7 @@
 #include "file_sidebar_panel.h"
 
 #include "core/system/util.h"
-#include "panels/file_explorer/file_explorer_state.h"
+#include "panels/file_explorer/state/file_explorer_state.h"
 
 #include <algorithm>
 

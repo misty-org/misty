@@ -1,8 +1,14 @@
 #pragma once
 
 #include <atomic>
+#include <chrono>
+#include <cstdint>
 #include <mutex>
+#include <string>
+#include <unordered_map>
 #include <vector>
+
+#include "core/ui/ui_registry.h"
 
 namespace misty::core {
 
@@ -14,6 +20,10 @@ enum class FileTransferItemType {
 enum class FileTransferType {
     Upload,
     Download,
+    Copy,
+    Move,
+    Rename,
+    Delete,
 };
 
 enum class FileTransferStatus {
@@ -30,30 +40,17 @@ enum class FileTransferFilter {
     Completed,
 };
 
-//we should only split local/remote logic
-struct FileTransferLocalItem {
-    std::string file_name;
-    std::string local_source_path;
-    std::string local_dest_path;
-};
-
-struct FileTransferRemoteItem {
-    std::string file_name;
-    std::string remote_source_name;
-    std::string remote_source_path;
-    std::string remote_dest_name;
-    std::string remote_dest_path;
-};
-
 struct FileTransferRecord {
     uint64_t id = 0;
     FileTransferType transfer_type = FileTransferType::Upload;
     FileTransferItemType item_type = FileTransferItemType::Local;
     std::string file_name;
-    std::string local_path;
-    std::string endpoint;
-    std::string remote_name;
-    std::string remote_path;
+    std::string local_source_path;
+    std::string local_dest_path;
+    std::string remote_source_name;
+    std::string remote_source_path;
+    std::string remote_dest_name;
+    std::string remote_dest_path;
     int64_t total_bytes = 0;
     int64_t transferred_bytes = 0;
     FileTransferStatus status = FileTransferStatus::Pending;
@@ -71,7 +68,7 @@ struct FileTransferRecord {
     }
 };
 
-class FileMasterTransfer {
+class FileTransfer : public UIState {
 public:
     static constexpr size_t kMaxHistory = 50;
 
@@ -87,10 +84,11 @@ public:
     std::vector<FileTransferRecord> get_all_transfers() const;
 
 private:
-    void trim_history_locked();
+    void trim_history();
 
     mutable std::mutex mu_;
-    std::vector<FileTransferRecord> transfers_;
+    std::unordered_map<uint64_t, FileTransferRecord> transfers_;
+    std::vector<uint64_t> transfer_order_;
     std::atomic<uint64_t> next_id_{1};
 };
 

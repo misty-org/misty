@@ -1,15 +1,14 @@
 #pragma once
 
-#include <string>
-
-#include "core/file_master/file_master.h"
+#include "file_master.h"
+#include "core/file_transfer/file_transfer.h"
 #include "core/threading/worker_pool.h"
 
 namespace misty::core {
 
 class FileMasterRemote : public IFileMaster {
 public:
-    explicit FileMasterRemote(WorkerPool& worker_pool);
+    FileMasterRemote(WorkerPool& worker_pool, FileTransfer& transfers);
 
     void rename(const FileMasterProps& props, FileMasterCompletion callback) override;
     void remove(const FileMasterProps& props, FileMasterCompletion callback) override;
@@ -18,6 +17,7 @@ public:
 
 private:
     WorkerPool& worker_pool_;
+    FileTransfer& transfers_;
 };
 
 } // namespace misty::core

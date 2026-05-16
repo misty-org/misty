@@ -1,5 +1,5 @@
 #include "core/threading/file_sync_service.h"
-#include "panels/file_explorer/file_explorer_state.h"
+#include "panels/file_explorer/state/file_explorer_state.h"
 #include <chrono>
 #include <filesystem>
 #include <iostream>

@@ -4,8 +4,6 @@
 #include "core/manager/asset_manager.h"
 #include "core/manager/font_manager.h"
 #include "core/ui/ui_style.h"
-#include "panels/explorer/explorer_transfer_ui_state.h"
-
 #include <cmath>
 
 using namespace misty::view;
@@ -184,14 +182,8 @@ namespace misty::panel {
         const ImVec4 text_color = is_selected ? ImVec4(1, 1, 1, 1) : ImVec4(0.6f, 0.6f, 0.6f, 1.0f);
 
         if (centered_icon_button(label, icon, size, is_selected)) {
-            if (view_id == ViewID::Transfers) {
-                state.selected_item = ViewID::Files;
-                view::switch_view(ViewID::Files);
-                ui_registry_.get_state<ExplorerTransferUiState>(kExplorerTransferUiStateKey).open();
-            } else {
-                state.selected_item = view_id;
-                state.handle_nav_item(view_id);
-            }
+            state.selected_item = view_id;
+            state.handle_nav_item(view_id);
         }
         centered_label(label, text_color);
     }

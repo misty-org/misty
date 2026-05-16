@@ -6,7 +6,7 @@
 #include "panels/context_menu/context_menu_panel.h"
 #include "panels/navbar/navbar_panel.h"
 #include "panels/notification/notification_panel.h"
-#include "panels/transfers/transfer_window_panel.h"
+#include "panels/transfers/transfers_panel.h"
 #include "views/app_view.h"
 
 namespace misty::view {
@@ -26,7 +26,7 @@ private:
     std::shared_ptr<panel::NavbarPanel> navbar_panel_;
     std::shared_ptr<panel::NotificationPanel> notification_panel_;
     std::shared_ptr<panel::ContextMenuPanel> context_menu_panel_;
-    std::shared_ptr<panel::TransferWindowPanel> transfer_window_panel_;
+    std::shared_ptr<panel::TransfersPanel> transfers_panel_;
 };
 
 } // namespace misty::view

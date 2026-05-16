@@ -1,8 +1,8 @@
 #include "file_sidebar_panel.h"
 
-#include "core/file_master/file_master_transfers.h"
+#include "core/file_transfer/file_transfer.h"
 #include "core/file_picker/file_picker.h"
-#include "panels/file_explorer/file_explorer_state.h"
+#include "panels/file_explorer/state/file_explorer_state.h"
 #include "panels/notification/notification_state.h"
 
 #include <cstdio>
@@ -109,7 +109,7 @@ namespace misty::panel {
             cleanup_path = state.upload_queue[index].cleanup_path;
         }
 
-        auto& transfers = registry_.get_state<core::FileMasterTransfers>("FileMasterTransfers");
+        auto& transfers = registry_.get_state<core::FileTransfer>("FileMasterTransfers");
 
         // Progress callback
         auto progress_cb = [&state, index](size_t bytes_uploaded, size_t total_bytes) -> bool {
@@ -145,13 +145,33 @@ namespace misty::panel {
         };
 
         auto& services = registry_.get_state<ServicesState>("Services");
-        core::FileMasterUploadRequest request;
-        request.file_path = file_path;
-        request.file_name = file_name;
-        request.remote_name = remote_name;
-        request.remote_path = remote_path;
-        request.file_size = file_size;
-        transfers.upload_file(services, request, completion_cb, progress_cb);
+        core::FileTransferRecord snapshot;
+        snapshot.transfer_type = core::FileTransferType::Upload;
+        snapshot.item_type = core::FileTransferItemType::Remote;
+        snapshot.file_name = file_name;
+        snapshot.local_source_path = file_path;
+        snapshot.remote_dest_name = remote_name;
+        snapshot.remote_dest_path = remote_path;
+        snapshot.total_bytes = file_size;
+        const uint64_t transfer_id = transfers.start_transfer(std::move(snapshot));
+
+        services.upload_file(
+            remote_name,
+            remote_path,
+            file_path,
+            [transfer_id, &transfers, progress_cb](size_t bytes_uploaded, size_t total_bytes) -> bool {
+                (void)total_bytes;
+                transfers.update_progress(transfer_id, static_cast<int64_t>(bytes_uploaded));
+                return progress_cb(bytes_uploaded, total_bytes);
+            },
+            [transfer_id, &transfers, completion_cb](bool success, const std::string& error_msg) {
+                if (success) {
+                    transfers.complete_transfer(transfer_id);
+                } else {
+                    transfers.fail_transfer(transfer_id, error_msg);
+                }
+                completion_cb(success, error_msg);
+            });
     }
 
     void FileSidebarPanel::show_upload_progress_modal(FileSidebarState& state) {

@@ -2,7 +2,7 @@
 #include "core/ui/ui_helper.h"
 #include "imgui.h"
 #include "imgui_internal.h"
-#include "panels/explorer/explorer_transfer_ui_state.h"
+#include "panels/navbar/navbar_state.h"
 #include "views/app_view.h"
 #include <ctime>
 #include <sstream>
@@ -83,8 +83,8 @@ namespace misty::panel {
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.45f, 0.45f, 0.45f, 1.0f));
             if (ImGui::Button("Transfers##activity", ImVec2(transfers_w, 0))) {
                 state.is_open = false;
-                view::switch_view(view::ViewID::Files);
-                registry_.get_state<ExplorerTransferUiState>(kExplorerTransferUiStateKey).open();
+                registry_.get_state<NavbarState>("Navbar").selected_item = view::ViewID::Transfers;
+                view::switch_view(view::ViewID::Transfers);
             }
             ImGui::SameLine(0, button_gap);
             if (ImGui::Button("Mark all read##activity", ImVec2(read_w, 0))) {

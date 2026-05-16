@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "panels/file_explorer/file_explorer_state.h"
+#include "panels/file_explorer/state/file_explorer_state.h"
 
 namespace misty::panel {
 
