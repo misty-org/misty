@@ -1,5 +1,6 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { roadmaps, roadmap, tasks } = vi.hoisted(() => ({
@@ -78,7 +79,11 @@ describe("SpaceRoadmapItemsWorkspace", () => {
     ["milestone", "Milestones", "Beta ready"],
   ] as const)("lists collective %s configuration", async (kind, heading, item) => {
     await act(async () => {
-      root.render(<SpaceRoadmapItemsWorkspace spaceId="space-1" kind={kind} canManage />);
+      root.render(
+        <MemoryRouter>
+          <SpaceRoadmapItemsWorkspace spaceId="space-1" kind={kind} canManage />
+        </MemoryRouter>,
+      );
       await Promise.resolve();
       await Promise.resolve();
     });

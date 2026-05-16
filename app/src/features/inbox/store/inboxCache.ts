@@ -31,11 +31,45 @@ interface EncryptedInboxCache {
 
 let writeQueue = Promise.resolve();
 
+async function mailCacheReadAdapter(key: string): Promise<string | null> {
+  if (hasTauriInternals()) return mailCacheRead(key);
+  try {
+    if (typeof window !== "undefined" && window.localStorage) {
+      return window.localStorage.getItem(`misty_inbox_cache_${key}`);
+    }
+  } catch {
+    // Ignore storage errors
+  }
+  return null;
+}
+
+async function mailCacheWriteAdapter(key: string, value: string): Promise<void> {
+  if (hasTauriInternals()) return mailCacheWrite(key, value);
+  try {
+    if (typeof window !== "undefined" && window.localStorage) {
+      window.localStorage.setItem(`misty_inbox_cache_${key}`, value);
+    }
+  } catch {
+    // Ignore storage quota errors
+  }
+}
+
+async function mailCacheRemoveAdapter(key: string): Promise<void> {
+  if (hasTauriInternals()) return mailCacheRemove(key);
+  try {
+    if (typeof window !== "undefined" && window.localStorage) {
+      window.localStorage.removeItem(`misty_inbox_cache_${key}`);
+    }
+  } catch {
+    // Ignore storage errors
+  }
+}
+
 export async function readInboxCache(accountId: string): Promise<InboxCacheSnapshot | null> {
   const normalized = accountId.trim();
-  if (!normalized || !hasTauriInternals()) return null;
+  if (!normalized) return null;
   try {
-    const encoded = await mailCacheRead(normalized);
+    const encoded = await mailCacheReadAdapter(normalized);
     if (!encoded) return null;
     const encrypted = JSON.parse(encoded) as EncryptedInboxCache;
     if (encrypted.version !== cacheVersion || encrypted.accountId !== normalized) return null;
@@ -48,7 +82,7 @@ export async function readInboxCache(accountId: string): Promise<InboxCacheSnaps
     );
     const snapshot = JSON.parse(decoder.decode(plaintext)) as InboxCacheSnapshot;
     if (!validSnapshot(snapshot, normalized) || !cacheIsFresh(snapshot)) {
-      await mailCacheRemove(normalized);
+      await mailCacheRemoveAdapter(normalized);
       return null;
     }
     return snapshot;
@@ -62,7 +96,7 @@ export function persistInboxCache(
   state: Omit<InboxCacheSnapshot, "version" | "accountId" | "savedAt">,
 ): void {
   const normalized = accountId.trim();
-  if (!normalized || !hasTauriInternals()) return;
+  if (!normalized) return;
   const snapshot: InboxCacheSnapshot = {
     version: cacheVersion,
     accountId: normalized,
@@ -96,7 +130,7 @@ export function persistInboxCache(
         iv: toBase64(iv),
         ciphertext: toBase64(new Uint8Array(ciphertext)),
       };
-      await mailCacheWrite(normalized, JSON.stringify(encrypted));
+      await mailCacheWriteAdapter(normalized, JSON.stringify(encrypted));
     });
 }
 

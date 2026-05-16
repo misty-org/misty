@@ -116,6 +116,11 @@ export interface MailThreadAction {
   read?: boolean;
   archived?: boolean;
   starred?: boolean;
+  deleted?: boolean;
+  trashed?: boolean;
+  spam?: boolean;
+  snooze_until?: string;
+  move_to_folder?: string;
 }
 
 export interface MailAccountsResponse {

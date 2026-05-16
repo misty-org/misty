@@ -9,6 +9,9 @@ describe("API base URL contract", () => {
     expect(withDefaultApiPath(normalizeApiBaseUrl("https://mistysys.com/api/v2"))).toBe(
       "https://mistysys.com/api/v2",
     );
+    expect(withDefaultApiPath(normalizeApiBaseUrl("https://api.mistysys.com/v1"))).toBe(
+      "https://api.mistysys.com/v1",
+    );
   });
 
   it("keeps origin-only legacy settings compatible", () => {
