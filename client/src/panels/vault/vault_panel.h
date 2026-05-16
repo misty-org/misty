@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "panels/panel.h"
+#include "panels/panel/panel.h"
 #include "core/ui/ui_registry.h"
 #include "vault_state.h"
 

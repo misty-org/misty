@@ -1,6 +1,6 @@
 #pragma once
 
-#include "panels/panel.h"
+#include "panels/panel/panel.h"
 #include "core/ui/ui_registry.h"
 #include "auth_login_state.h"
 #include "core/ui/svg_loader.h"

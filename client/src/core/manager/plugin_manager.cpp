@@ -21,8 +21,8 @@
 #include <glad/glad.h>
 #include "imgui.h"
 #include "imgui_internal.h"
-#include "panels/panel.h"
-#include "panels/file_explorer/file_explorer_state.h"
+#include "panels/panel/panel.h"
+#include "panels/file_explorer/state/file_explorer_state.h"
 #include "panels/activity/activity_state.h"
 #include "panels/notification/notification_state.h"
 #include "views/app_view.h"
