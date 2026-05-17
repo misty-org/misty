@@ -111,18 +111,6 @@ namespace misty::panel {
 
         auto& transfers = registry_.get_state<core::FileTransfer>("FileMasterTransfers");
 
-        // Progress callback
-        auto progress_cb = [&state, index](size_t bytes_uploaded, size_t total_bytes) -> bool {
-            (void)total_bytes;
-            {
-                std::lock_guard<std::mutex> lock(state.upload_mutex);
-                if (index < state.upload_queue.size()) {
-                    state.upload_queue[index].bytes_uploaded = bytes_uploaded;
-                }
-            }
-            return !state.cancel_upload.load();
-        };
-
         // Completion callback
         auto completion_cb = [this, &state, index, cleanup_after_upload, cleanup_path](bool success, const std::string& error_msg) {
             {
@@ -144,7 +132,6 @@ namespace misty::panel {
             }
         };
 
-        auto& services = registry_.get_state<ServicesState>("Services");
         core::FileTransferRecord snapshot;
         snapshot.transfer_type = core::FileTransferType::Upload;
         snapshot.item_type = core::FileTransferItemType::Remote;
@@ -154,24 +141,9 @@ namespace misty::panel {
         snapshot.remote_dest_path = remote_path;
         snapshot.total_bytes = file_size;
         const uint64_t transfer_id = transfers.start_transfer(std::move(snapshot));
-
-        services.upload_file(
-            remote_name,
-            remote_path,
-            file_path,
-            [transfer_id, &transfers, progress_cb](size_t bytes_uploaded, size_t total_bytes) -> bool {
-                (void)total_bytes;
-                transfers.update_progress(transfer_id, static_cast<int64_t>(bytes_uploaded));
-                return progress_cb(bytes_uploaded, total_bytes);
-            },
-            [transfer_id, &transfers, completion_cb](bool success, const std::string& error_msg) {
-                if (success) {
-                    transfers.complete_transfer(transfer_id);
-                } else {
-                    transfers.fail_transfer(transfer_id, error_msg);
-                }
-                completion_cb(success, error_msg);
-            });
+        const std::string error_msg = "Remote uploads are disabled until the new Services proxy flow is implemented.";
+        transfers.fail_transfer(transfer_id, error_msg);
+        completion_cb(false, error_msg);
     }
 
     void FileSidebarPanel::show_upload_progress_modal(FileSidebarState& state) {

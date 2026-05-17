@@ -39,6 +39,7 @@ namespace misty::view {
     }
 
     bool ViewRegistry::apply_view_locked(ViewID id) {
+        ensure_view_locked(id);
         auto it = views_.find(id);
         if (it != views_.end()) {
             append_view_log(std::string("apply_view: ") + view_name(id));
@@ -71,9 +72,28 @@ namespace misty::view {
         // Default view initialization - no-op since AppView is abstract
         // The default view will be set when a view is registered and switched to
     }
+
+    bool ViewRegistry::ensure_view_locked(ViewID id) {
+        if (views_.find(id) != views_.end()) {
+            return true;
+        }
+        const auto factory_it = view_factories_.find(id);
+        if (factory_it == view_factories_.end() || !factory_it->second) {
+            return false;
+        }
+        views_[id] = factory_it->second();
+        append_view_log(std::string("instantiate_view: ") + view_name(id));
+        return views_[id] != nullptr;
+    }
+
     void ViewRegistry::register_view(ViewID id, std::unique_ptr<AppView> view) {
         std::lock_guard<std::mutex> lock(mutex_);
         views_[id] = std::move(view);
+    }
+
+    void ViewRegistry::register_view_factory(ViewID id, std::function<std::unique_ptr<AppView>()> factory) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        view_factories_[id] = std::move(factory);
     }
 
     void ViewRegistry::switch_view(ViewID id) {
@@ -82,8 +102,7 @@ namespace misty::view {
             append_view_log(std::string("ignored_view_same: ") + view_name(id));
             return;
         }
-        auto it = views_.find(id);
-        if (it != views_.end()) {
+        if (ensure_view_locked(id)) {
             append_view_log(std::string("request_view: ") + view_name(id) +
                             (is_rendering_ ? " (deferred)" : " (immediate)"));
             if (is_rendering_) {
@@ -142,6 +161,7 @@ namespace misty::view {
 
     AppView* ViewRegistry::get_view(ViewID id) const {
         std::lock_guard<std::mutex> lock(mutex_);
+        const_cast<ViewRegistry*>(this)->ensure_view_locked(id);
         auto it = views_.find(id);
         return it == views_.end() ? nullptr : it->second.get();
     }
@@ -151,6 +171,7 @@ namespace misty::view {
             return false;
         }
         std::lock_guard<std::mutex> lock(mutex_);
+        const_cast<ViewRegistry*>(this)->ensure_view_locked(id);
         auto it = views_.find(id);
         if (it == views_.end() || !it->second) {
             *out = {};
@@ -166,6 +187,7 @@ namespace misty::view {
         AppView* target_view = nullptr;
         {
             std::lock_guard<std::mutex> lock(mutex_);
+            ensure_view_locked(id);
             auto it = views_.find(id);
             if (it == views_.end() || !it->second) {
                 return PluginOpenResult::Failed;
@@ -173,6 +195,11 @@ namespace misty::view {
             target_view = it->second.get();
         }
         return target_view->open_plugin_panel(panel_id, mode);
+    }
+
+    std::size_t ViewRegistry::loaded_view_count() const {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return views_.size();
     }
 
     void ViewRegistry::clear() {
@@ -185,6 +212,7 @@ namespace misty::view {
             has_pending_view_ = false;
             is_rendering_ = false;
             views.swap(views_);
+            view_factories_.clear();
         }
     }
 
@@ -196,6 +224,10 @@ namespace misty::view {
     // Public API functions
     void register_view(ViewID id, std::unique_ptr<AppView> view) {
         ViewRegistry::get().register_view(id, std::move(view));
+    }
+
+    void register_view_factory(ViewID id, std::function<std::unique_ptr<AppView>()> factory) {
+        ViewRegistry::get().register_view_factory(id, std::move(factory));
     }
 
     void switch_view(ViewID id) {
@@ -216,6 +248,10 @@ namespace misty::view {
 
     PluginOpenResult open_plugin_in_view(ViewID id, const std::string& panel_id, PluginOpenMode mode) {
         return ViewRegistry::get().open_plugin_in_view(id, panel_id, mode);
+    }
+
+    std::size_t loaded_view_count() {
+        return ViewRegistry::get().loaded_view_count();
     }
 
     void clear_views() {

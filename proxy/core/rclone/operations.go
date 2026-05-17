@@ -2,365 +2,155 @@ package rclone
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
-	"os"
 	"path"
-	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 )
 
-type lsjsonItem struct {
-	Path     string            `json:"Path"`
-	Name     string            `json:"Name"`
-	Size     int64             `json:"Size"`
-	MimeType string            `json:"MimeType"`
-	ModTime  string            `json:"ModTime"`
-	IsDir    bool              `json:"IsDir"`
-	Hashes   map[string]string `json:"Hashes"`
+type FileItem struct {
+	Name     string    `json:"name"`
+	Path     string    `json:"path"`
+	IsDir    bool      `json:"is_dir"`
+	Size     int64     `json:"size"`
+	ModTime  time.Time `json:"mod_time"`
+	MimeType string    `json:"mime_type,omitempty"`
+	HashAlgo string    `json:"hash_algo,omitempty"`
+	Hash     string    `json:"hash,omitempty"`
 }
 
-func ListDir(ctx context.Context, remote, dirPath string) ([]FileItem, error) {
-	out, err := runRclone(ctx, "lsjson", remoteSpec(remote, dirPath), "--hash")
-	if err != nil {
-		return nil, fmt.Errorf("list directory: %w", err)
-	}
-
-	var raw []lsjsonItem
-	if err := json.Unmarshal(out, &raw); err != nil {
-		return nil, fmt.Errorf("parse lsjson: %w", err)
-	}
-
-	items := make([]FileItem, 0, len(raw))
-	for _, entry := range raw {
-		items = append(items, fileItemFromLsjson(dirPath, entry))
-	}
-	return items, nil
+type rcloneListResponse struct {
+	List []FileItem `json:"list"`
 }
 
-func ListDirStream(ctx context.Context, remote, dirPath string, onItem func(FileItem) error) error {
-	cmd, err := rcloneCmd(ctx, "lsjson", remoteSpec(remote, dirPath), "--hash")
-	if err != nil {
-		return err
-	}
-
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return fmt.Errorf("list directory: %w", err)
-	}
-
-	var stderr limitedBuffer
-	cmd.Stderr = &stderr
-
-	if err := cmd.Start(); err != nil {
-		return commandError([]string{"lsjson", remoteSpec(remote, dirPath)}, err, stderr.String())
-	}
-
-	decoder := json.NewDecoder(stdout)
-	tok, err := decoder.Token()
-	if err != nil {
-		_ = cmd.Wait()
-		return fmt.Errorf("parse lsjson: %w", err)
-	}
-	delim, ok := tok.(json.Delim)
-	if !ok || delim != '[' {
-		_ = cmd.Wait()
-		return fmt.Errorf("parse lsjson: expected array")
-	}
-
-	for decoder.More() {
-		var entry lsjsonItem
-		if err := decoder.Decode(&entry); err != nil {
-			_ = cmd.Wait()
-			return fmt.Errorf("parse lsjson: %w", err)
-		}
-		if onItem != nil {
-			if err := onItem(fileItemFromLsjson(dirPath, entry)); err != nil {
-				_ = cmd.Process.Kill()
-				_ = cmd.Wait()
-				return err
-			}
-		}
-	}
-
-	if _, err := decoder.Token(); err != nil {
-		_ = cmd.Wait()
-		return fmt.Errorf("parse lsjson: %w", err)
-	}
-	if err := cmd.Wait(); err != nil {
-		return commandError([]string{"lsjson", remoteSpec(remote, dirPath)}, err, stderr.String())
-	}
-	return nil
+type rcloneStatResponse struct {
+	Item *FileItem `json:"item"`
 }
 
-func DownloadFile(ctx context.Context, remote, filePath string, w io.Writer) (int64, error) {
-	written, err := streamRclone(ctx, w, nil, "cat", remoteSpec(remote, filePath))
-	if err != nil {
-		return written, fmt.Errorf("download file: %w", err)
+func ListDir(ctx context.Context, remoteName, dirPath string) ([]FileItem, error) {
+	if err := startRcloneOperations(ctx); err != nil {
+		return nil, err
 	}
-	return written, nil
+
+	var response rcloneListResponse
+	if err := defaultRcloneRCD.Call(ctx, "operations/list", map[string]any{
+		"fs":     remoteFS(remoteName),
+		"remote": cleanRemotePath(dirPath),
+	}, &response); err != nil {
+		return nil, err
+	}
+
+	if response.List == nil {
+		return []FileItem{}, nil
+	}
+	return response.List, nil
 }
 
-func UploadFile(ctx context.Context, remote, dirPath, fileName string, _ int64, reader io.Reader) error {
-	if err := EnsureRemoteDefaults(remote); err != nil {
-		return fmt.Errorf("apply remote defaults: %w", err)
-	}
-	target := remoteSpec(remote, path.Join(dirPath, fileName))
-	if _, err := streamRclone(ctx, io.Discard, reader, "rcat", target); err != nil {
-		return fmt.Errorf("upload file: %w", err)
-	}
-	return nil
-}
-
-func DownloadFolder(ctx context.Context, remote, remotePath, localPath string) error {
-	if strings.TrimSpace(localPath) == "" {
-		return fmt.Errorf("local path is required")
-	}
-	if err := os.MkdirAll(localPath, 0o700); err != nil {
-		return fmt.Errorf("create local folder: %w", err)
-	}
-	if _, err := runRclone(ctx, "copy", remoteSpec(remote, remotePath), localPath, "--create-empty-src-dirs"); err != nil {
-		return fmt.Errorf("download folder: %w", err)
-	}
-	return nil
-}
-
-func UploadFolder(ctx context.Context, remote, remotePath, localPath string) error {
-	if err := EnsureRemoteDefaults(remote); err != nil {
-		return fmt.Errorf("apply remote defaults: %w", err)
-	}
-	info, err := os.Stat(localPath)
-	if err != nil {
-		return fmt.Errorf("stat local folder: %w", err)
-	}
-	if !info.IsDir() {
-		return fmt.Errorf("local path is not a folder")
-	}
-	if _, err := runRclone(ctx, "copy", localPath, remoteSpec(remote, remotePath), "--create-empty-src-dirs"); err != nil {
-		return fmt.Errorf("upload folder: %w", err)
-	}
-	return nil
-}
-
-func TransferFolder(ctx context.Context, sourceRemote, sourcePath, destRemote, destPath string) error {
-	stagingRoot, err := NewMistyTmpDir("folder-transfer-")
+func ListDirStream(ctx context.Context, remoteName, dirPath string, emit func(FileItem) error) error {
+	items, err := ListDir(ctx, remoteName, dirPath)
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(stagingRoot)
-
-	folderName := path.Base(path.Clean(sourcePath))
-	if folderName == "." || folderName == "/" {
-		folderName = "folder"
+	for _, item := range items {
+		if err := emit(item); err != nil {
+			return err
+		}
 	}
-	stagingFolder := filepath.Join(stagingRoot, folderName)
+	return nil
+}
 
-	if err := DownloadFolder(ctx, sourceRemote, sourcePath, stagingFolder); err != nil {
+func DeletePath(ctx context.Context, remoteName, remotePath string) error {
+	if err := startRcloneOperations(ctx); err != nil {
 		return err
 	}
-	if err := UploadFolder(ctx, destRemote, destPath, stagingFolder); err != nil {
+
+	item, err := statPath(ctx, remoteName, remotePath)
+	if err != nil {
 		return err
 	}
-	return nil
+	if item == nil {
+		return fmt.Errorf("remote path %q not found", remotePath)
+	}
+
+	method := "operations/deletefile"
+	if item.IsDir {
+		method = "operations/purge"
+	}
+
+	return defaultRcloneRCD.Call(ctx, method, map[string]any{
+		"fs":     remoteFS(remoteName),
+		"remote": cleanRemotePath(remotePath),
+	}, nil)
 }
 
-func MistyTmpRoot() (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil || home == "" {
-		return "", fmt.Errorf("resolve user home directory: %w", err)
+func RenameFile(ctx context.Context, remoteName, oldPath, newPath string) error {
+	if err := startRcloneOperations(ctx); err != nil {
+		return err
 	}
-	root := filepath.Join(home, "misty", "tmp")
-	if err := os.MkdirAll(root, 0o700); err != nil {
-		return "", fmt.Errorf("create misty tmp: %w", err)
-	}
-	return root, nil
+
+	return defaultRcloneRCD.Call(ctx, "operations/movefile", map[string]any{
+		"srcFs":     remoteFS(remoteName),
+		"srcRemote": cleanRemotePath(oldPath),
+		"dstFs":     remoteFS(remoteName),
+		"dstRemote": cleanRemotePath(newPath),
+	}, nil)
 }
 
-func NewMistyTmpDir(pattern string) (string, error) {
-	root, err := MistyTmpRoot()
-	if err != nil {
-		return "", err
+func UploadFile(ctx context.Context, remoteName, dirPath, fileName string, _ int64, in io.Reader) error {
+	if err := startRcloneOperations(ctx); err != nil {
+		return err
 	}
-	dir, err := os.MkdirTemp(root, pattern)
-	if err != nil {
-		return "", fmt.Errorf("create misty temp folder: %w", err)
-	}
-	return dir, nil
+
+	return defaultRcloneRCD.UploadFile(
+		ctx,
+		remoteFS(remoteName),
+		cleanRemotePath(dirPath),
+		fileName,
+		in,
+	)
 }
 
-func IsMistyTmpPath(candidate string) (bool, error) {
-	root, err := MistyTmpRoot()
-	if err != nil {
-		return false, err
+func DownloadFile(ctx context.Context, remoteName, remotePath string, out io.Writer) (int64, error) {
+	if err := startRcloneOperations(ctx); err != nil {
+		return 0, err
 	}
-	absRoot, err := filepath.Abs(root)
-	if err != nil {
-		return false, err
-	}
-	absCandidate, err := filepath.Abs(candidate)
-	if err != nil {
-		return false, err
-	}
-	rel, err := filepath.Rel(absRoot, absCandidate)
-	if err != nil {
-		return false, err
-	}
-	return rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))), nil
+	return defaultRcloneRCD.StreamCommand(ctx, out, "cat", remoteName+":"+remotePath)
 }
 
-func MkDir(ctx context.Context, remote, dirPath string) error {
-	if _, err := runRclone(ctx, "mkdir", remoteSpec(remote, dirPath)); err != nil {
-		return fmt.Errorf("mkdir: %w", err)
+func DownloadFileName(remotePath string) string {
+	name := path.Base(remotePath)
+	if name == "." || name == "/" || name == "" {
+		return "download"
 	}
-	return nil
+	return name
 }
 
-func DeletePath(ctx context.Context, remote, filePath string) error {
-	if _, err := runRclone(ctx, "deletefile", remoteSpec(remote, filePath)); err == nil {
-		return nil
+func startRcloneOperations(ctx context.Context) error {
+	if err := Init(); err != nil {
+		return err
 	}
-	if _, err := runRclone(ctx, "purge", remoteSpec(remote, filePath)); err != nil {
-		return fmt.Errorf("delete path: %w", err)
-	}
-	return nil
+	return defaultRcloneRCD.Start()
 }
 
-func About(ctx context.Context, remote string) (*AboutInfo, error) {
-	out, err := runRclone(ctx, "about", remoteSpec(remote, ""), "--json")
-	if err != nil {
-		return nil, fmt.Errorf("about: %w", err)
+func statPath(ctx context.Context, remoteName, remotePath string) (*FileItem, error) {
+	var response rcloneStatResponse
+	if err := defaultRcloneRCD.Call(ctx, "operations/stat", map[string]any{
+		"fs":     remoteFS(remoteName),
+		"remote": cleanRemotePath(remotePath),
+		"opt": map[string]any{
+			"filesOnly": false,
+		},
+	}, &response); err != nil {
+		return nil, err
 	}
-	var raw struct {
-		Total   int64 `json:"total"`
-		Used    int64 `json:"used"`
-		Free    int64 `json:"free"`
-		Trashed int64 `json:"trashed"`
-	}
-	if err := json.Unmarshal(out, &raw); err != nil {
-		return nil, fmt.Errorf("parse about: %w", err)
-	}
-	return &AboutInfo{
-		Remote:  remote,
-		Total:   raw.Total,
-		Used:    raw.Used,
-		Free:    raw.Free,
-		Trashed: raw.Trashed,
-	}, nil
+	return response.Item, nil
 }
 
-func Search(ctx context.Context, remote, basePath, query string, maxResults int) ([]FileItem, error) {
-	if maxResults <= 0 {
-		maxResults = 50
-	}
-
-	out, err := runRclone(ctx, "lsjson", remoteSpec(remote, basePath), "--recursive", "--hash")
-	if err != nil {
-		return nil, fmt.Errorf("search list: %w", err)
-	}
-
-	var raw []lsjsonItem
-	if err := json.Unmarshal(out, &raw); err != nil {
-		return nil, fmt.Errorf("parse search lsjson: %w", err)
-	}
-
-	query = strings.ToLower(query)
-	results := make([]FileItem, 0, min(maxResults, len(raw)))
-	for _, entry := range raw {
-		name := entry.Name
-		if name == "" {
-			name = path.Base(entry.Path)
-		}
-		if !strings.Contains(strings.ToLower(name), query) &&
-			!strings.Contains(strings.ToLower(entry.Path), query) {
-			continue
-		}
-		results = append(results, fileItemFromLsjson(basePath, entry))
-		if len(results) >= maxResults {
-			break
-		}
-	}
-	return results, nil
+func remoteFS(remoteName string) string {
+	return strings.TrimSpace(remoteName) + ":"
 }
 
-func remoteSpec(remote, remotePath string) string {
-	if remotePath == "." {
-		remotePath = ""
-	}
-	return remote + ":" + remotePath
-}
-
-func fileItemFromLsjson(basePath string, entry lsjsonItem) FileItem {
-	name := entry.Name
-	if name == "" {
-		name = path.Base(entry.Path)
-	}
-	itemPath := entry.Path
-	if itemPath == "" {
-		itemPath = name
-	}
-	if basePath != "" {
-		itemPath = path.Join(basePath, itemPath)
-	}
-
-	hashAlgo, hashValue := preferredRemoteHash(entry.Hashes)
-	return FileItem{
-		Name:     name,
-		Path:     itemPath,
-		IsDir:    entry.IsDir,
-		Size:     entry.Size,
-		ModTime:  parseRcloneTime(entry.ModTime),
-		MimeType: entry.MimeType,
-		HashAlgo: hashAlgo,
-		Hash:     hashValue,
-	}
-}
-
-func preferredRemoteHash(hashes map[string]string) (string, string) {
-	if len(hashes) == 0 {
-		return "", ""
-	}
-	for _, key := range []string{"CRC-32", "CRC32", "MD5", "SHA-1", "SHA1"} {
-		if value := strings.TrimSpace(hashes[key]); value != "" {
-			return normalizeHashAlgorithm(key), strings.ToLower(value)
-		}
-	}
-	keys := make([]string, 0, len(hashes))
-	for key := range hashes {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	for _, key := range keys {
-		if value := strings.TrimSpace(hashes[key]); value != "" {
-			return normalizeHashAlgorithm(key), strings.ToLower(value)
-		}
-	}
-	return "", ""
-}
-
-func normalizeHashAlgorithm(value string) string {
-	switch strings.ToUpper(strings.ReplaceAll(value, "-", "")) {
-	case "CRC32":
-		return "CRC-32"
-	case "SHA1":
-		return "SHA-1"
-	case "MD5":
-		return "MD5"
-	default:
-		return value
-	}
-}
-
-func parseRcloneTime(value string) time.Time {
-	if value == "" {
-		return time.Time{}
-	}
-	for _, layout := range []string{time.RFC3339Nano, time.RFC3339} {
-		if parsed, err := time.Parse(layout, value); err == nil {
-			return parsed
-		}
-	}
-	return time.Time{}
+func cleanRemotePath(remotePath string) string {
+	return strings.TrimPrefix(strings.TrimSpace(remotePath), "/")
 }

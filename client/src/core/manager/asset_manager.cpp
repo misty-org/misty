@@ -4,6 +4,7 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <vector>
 
 namespace misty::core {
     namespace {
@@ -16,16 +17,42 @@ namespace misty::core {
                                      static_cast<std::size_t>(height) * 4;
             return with_mipmaps ? (base * 4) / 3 : base;
         }
+
+        bool is_pinned_svg_key(const std::string& key) {
+            static const std::vector<std::string> pinned = {
+                "assets/icons/file-directory-24.svg",
+                "assets/icons/devices-24.svg",
+                "assets/icons/apps-16.svg",
+                "assets/icons/shield-lock-24.svg",
+                "assets/icons/transfer-24.svg",
+                "assets/icons/gear-24.svg",
+                "assets/icons/bell-24.svg",
+                "assets/icons/file-directory-fill-16.svg",
+                "assets/icons/file-directory-open-fill-24.svg",
+                "assets/icons/file-16.svg",
+            };
+            for (const std::string& prefix : pinned) {
+                if (key.find(prefix) != std::string::npos) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        bool is_pinned_image_key(const std::string& key) {
+            return key == "assets/logos/misty.png" ||
+                   key == "assets/animations/misty_sprite.png";
+        }
     }
 
     void AssetManager::shutdown() {
-        for (auto& [name, texture] : svg_textures_) {
-            unload_svg(texture);
+        for (auto& [name, entry] : svg_textures_) {
+            unload_svg(entry.texture);
         }
         svg_textures_.clear();
-        for (auto& [name, texture] : image_textures_) {
-            if (texture.id != 0) {
-                glDeleteTextures(1, &texture.id);
+        for (auto& [name, entry] : image_textures_) {
+            if (entry.texture.id != 0) {
+                glDeleteTextures(1, &entry.texture.id);
             }
         }
         image_textures_.clear();
@@ -44,8 +71,8 @@ namespace misty::core {
             current_theme_ = buffer.str();
 
             // If theme changes, release old textures before clearing the cache.
-            for (auto& [_, texture] : svg_textures_) {
-                unload_svg(texture);
+            for (auto& [_, entry] : svg_textures_) {
+                unload_svg(entry.texture);
             }
             svg_textures_.clear();
         }
@@ -60,11 +87,11 @@ namespace misty::core {
         stats.svg_texture_count = svg_textures_.size();
         stats.image_texture_count = image_textures_.size();
 
-        for (const auto& [_, texture] : svg_textures_) {
-            stats.svg_texture_bytes += rgba_texture_bytes(texture.width, texture.height, false);
+        for (const auto& [_, entry] : svg_textures_) {
+            stats.svg_texture_bytes += entry.approx_bytes;
         }
-        for (const auto& [_, texture] : image_textures_) {
-            stats.image_texture_bytes += rgba_texture_bytes(texture.width, texture.height, true);
+        for (const auto& [_, entry] : image_textures_) {
+            stats.image_texture_bytes += entry.approx_bytes;
         }
 
         return stats;
@@ -90,19 +117,26 @@ namespace misty::core {
 
         auto it = svg_textures_.find(key);
         if (it != svg_textures_.end()) {
-            return it->second;
+            touch_svg(key);
+            return it->second.texture;
         }
 
         SVGTexture tex = load_svg(path, width, height, apply_theme);
-
-        svg_textures_[key] = tex;
-        return svg_textures_[key];
+        svg_textures_[key] = SvgCacheEntry{
+            .texture = tex,
+            .approx_bytes = rgba_texture_bytes(width, height, false),
+            .last_used = ++use_tick_,
+            .pinned = is_pinned_svg_key(key),
+        };
+        prune_svg_cache();
+        return svg_textures_[key].texture;
     }
 
     ImageTexture& AssetManager::get_image_texture(const std::string& path) {
         auto it = image_textures_.find(path);
         if (it != image_textures_.end()) {
-            return it->second;
+            touch_image(path);
+            return it->second.texture;
         }
 
         int width, height, channels;
@@ -112,8 +146,13 @@ namespace misty::core {
 
         if (image_data == nullptr) {
 			std::cout << "Failed to load image: " << path << std::endl;
-            image_textures_[path] = tex;
-            return image_textures_[path];
+            image_textures_[path] = ImageCacheEntry{
+                .texture = tex,
+                .approx_bytes = 0,
+                .last_used = ++use_tick_,
+                .pinned = is_pinned_image_key(path),
+            };
+            return image_textures_[path].texture;
         }
 
         GLuint texture;
@@ -134,9 +173,80 @@ namespace misty::core {
         tex.width = width;
         tex.height = height;
 
-        image_textures_[path] = tex;
-        return image_textures_[path];
+        image_textures_[path] = ImageCacheEntry{
+            .texture = tex,
+            .approx_bytes = rgba_texture_bytes(width, height, true),
+            .last_used = ++use_tick_,
+            .pinned = is_pinned_image_key(path),
+        };
+        prune_image_cache();
+        return image_textures_[path].texture;
     }
 
+    void AssetManager::touch_svg(const std::string& key) {
+        auto it = svg_textures_.find(key);
+        if (it != svg_textures_.end()) {
+            it->second.last_used = ++use_tick_;
+        }
+    }
+
+    void AssetManager::touch_image(const std::string& key) {
+        auto it = image_textures_.find(key);
+        if (it != image_textures_.end()) {
+            it->second.last_used = ++use_tick_;
+        }
+    }
+
+    void AssetManager::prune_svg_cache() {
+        while (svg_textures_.size() > kMaxSvgTextures) {
+            auto evict_it = svg_textures_.end();
+            for (auto it = svg_textures_.begin(); it != svg_textures_.end(); ++it) {
+                if (it->second.pinned) {
+                    continue;
+                }
+                if (evict_it == svg_textures_.end() ||
+                    it->second.last_used < evict_it->second.last_used) {
+                    evict_it = it;
+                }
+            }
+            if (evict_it == svg_textures_.end()) {
+                return;
+            }
+            unload_svg(evict_it->second.texture);
+            svg_textures_.erase(evict_it);
+        }
+    }
+
+    void AssetManager::prune_image_cache() {
+        auto current_bytes = [this]() {
+            std::size_t total = 0;
+            for (const auto& [_, entry] : image_textures_) {
+                total += entry.approx_bytes;
+            }
+            return total;
+        };
+
+        std::size_t total_bytes = current_bytes();
+        while (total_bytes > kMaxImageBytes) {
+            auto evict_it = image_textures_.end();
+            for (auto it = image_textures_.begin(); it != image_textures_.end(); ++it) {
+                if (it->second.pinned) {
+                    continue;
+                }
+                if (evict_it == image_textures_.end() ||
+                    it->second.last_used < evict_it->second.last_used) {
+                    evict_it = it;
+                }
+            }
+            if (evict_it == image_textures_.end()) {
+                return;
+            }
+            total_bytes -= evict_it->second.approx_bytes;
+            if (evict_it->second.texture.id != 0) {
+                glDeleteTextures(1, &evict_it->second.texture.id);
+            }
+            image_textures_.erase(evict_it);
+        }
+    }
 
 }
