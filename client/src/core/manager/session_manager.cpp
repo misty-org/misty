@@ -258,9 +258,17 @@ namespace misty::core {
         headers["Content-Type"] = "application/json";
         const std::string json_body = build_json_object({{"refresh_token", refresh_token}});
 
-        HttpResponse response = execute_raw_http_request("POST", proxy_url + "/api/refresh", json_body, headers);
+        HttpResponse response = execute_raw_http_request(
+            "POST",
+            proxy_url + "/api/refresh",
+            json_body,
+            {.headers = headers});
         if (response.status_code == 0 && ProxyManager::get().ensure_running()) {
-            response = execute_raw_http_request("POST", proxy_url + "/api/refresh", json_body, headers);
+            response = execute_raw_http_request(
+                "POST",
+                proxy_url + "/api/refresh",
+                json_body,
+                {.headers = headers});
         }
 
         if (response.status_code == 0) {

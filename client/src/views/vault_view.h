@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "views/app_view.h"
+#include "panels/context_menu/context_menu_panel.h"
 #include "panels/vault/vault_panel.h"
 #include "panels/navbar/navbar_panel.h"
 #include "panels/notification/notification_panel.h"
@@ -11,7 +12,7 @@
 
 namespace misty::view {
     // VaultView is the MVault top-level screen: navbar + vault panel + the
-    // shared notification overlay. It mirrors ServicesView so the navbar
+        // shared notification overlay. It mirrors ProvidersView so the navbar
     // chrome is identical across the two side-by-side feature surfaces.
     class VaultView : public AppView {
     public:
@@ -29,5 +30,6 @@ namespace misty::view {
         std::shared_ptr<panel::NavbarPanel> navbar_panel_;
         std::shared_ptr<panel::VaultPanel> vault_panel_;
         std::shared_ptr<panel::NotificationPanel> notification_panel_;
+        std::shared_ptr<panel::ContextMenuPanel> context_menu_panel_;
     };
 }

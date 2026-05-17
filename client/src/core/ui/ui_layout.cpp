@@ -359,8 +359,15 @@ BoxScope begin_scope(const char* id, const Layout::BoxStyle& style) {
             child_flags |= ImGuiChildFlags_AutoResizeY;
         }
 
+        const bool use_native_child_padding =
+            (child_flags & ImGuiChildFlags_AlwaysUseWindowPadding) != 0 &&
+            style.padding.left == style.padding.right &&
+            style.padding.top == style.padding.bottom;
+        const ImVec2 child_window_padding =
+            use_native_child_padding ? spacing_to_imgui_padding(style.padding) : ImVec2(0.0f, 0.0f);
+
         ImGui::SetCursorScreenPos(scope.placement.pos);
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, child_window_padding);
         ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, style.rounding);
         ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, style.border ? 1.0f : 0.0f);
         int pushed_colors = 0;
@@ -374,20 +381,30 @@ BoxScope begin_scope(const char* id, const Layout::BoxStyle& style) {
         }
         ImGui::BeginChild(id, scope.placement.size, child_flags, style.window_flags);
         const ImVec2 child_origin = ImGui::GetCursorScreenPos();
-        scope.content_min = ImVec2(
-            child_origin.x + style.padding.left,
-            child_origin.y + style.padding.top
-        );
+        const ImVec2 child_origin_local = ImGui::GetCursorPos();
         const ImVec2 content_avail = ImGui::GetContentRegionAvail();
-        scope.content_max = ImVec2(
-            child_origin.x + std::max(0.0f, content_avail.x - style.padding.right),
-            child_origin.y + std::max(0.0f, content_avail.y - style.padding.bottom)
-        );
+        if (use_native_child_padding) {
+            scope.content_min = child_origin;
+            scope.content_max = ImVec2(
+                scope.content_min.x + std::max(0.0f, content_avail.x),
+                scope.content_min.y + std::max(0.0f, content_avail.y)
+            );
+        } else {
+            const ImVec2 padded_cursor_local(
+                child_origin_local.x + style.padding.left,
+                child_origin_local.y + style.padding.top
+            );
+            ImGui::SetCursorPos(padded_cursor_local);
+            scope.content_min = ImGui::GetCursorScreenPos();
+            scope.content_max = ImVec2(
+                scope.content_min.x + std::max(0.0f, content_avail.x - spacing_total_x(style.padding)),
+                scope.content_min.y + std::max(0.0f, content_avail.y - spacing_total_y(style.padding))
+            );
+        }
         if (pushed_colors > 0) {
             ImGui::PopStyleColor(pushed_colors);
         }
         ImGui::PopStyleVar(3);
-        ImGui::SetCursorScreenPos(scope.content_min);
         return scope;
     }
 
@@ -679,6 +696,10 @@ bool grid(const char* id, int columns, const BoxStyle& style, const std::functio
     return begin_box(FrameKind::Grid, Layout::Axis::Row, columns, id, style, content);
 }
 
+ImVec2 available_size() {
+    return current_available_size();
+}
+
 void raw(const std::function<void()>& content) {
     auto& frames = frame_stack();
     std::vector<Frame> saved_frames = std::move(frames);
@@ -763,6 +784,8 @@ void text(const TextProps& props) {
     const ImVec2 size = resolve_widget_size(props.width, props.height, avail, natural_width, natural_height);
     position_widget_cursor(size, props.align, props.justify);
     const ImVec2 origin = ImGui::GetCursorScreenPos();
+    const float wrap_local_pos_x =
+        ImGui::GetCursorPosX() + (size.x > 0.0f ? size.x : avail.x);
     const float inner_offset_x = [&]() {
         if (props.width.mode == Layout::SizeMode::Auto || overflow == TextOverflow::Wrap) {
             return 0.0f;
@@ -782,7 +805,7 @@ void text(const TextProps& props) {
     if (props.color.w > 0.0f) {
         CustomStyleColor text_color(ImGuiCol_Text, props.color);
         if (overflow == TextOverflow::Wrap) {
-            ImGui::PushTextWrapPos(origin.x + (size.x > 0.0f ? size.x : avail.x));
+            ImGui::PushTextWrapPos(wrap_local_pos_x);
             ImGui::TextUnformatted(props.text);
             ImGui::PopTextWrapPos();
         } else if (overflow == TextOverflow::Clip) {
@@ -799,7 +822,7 @@ void text(const TextProps& props) {
             ImGui::Dummy(size);
         }
     } else if (overflow == TextOverflow::Wrap) {
-        ImGui::PushTextWrapPos(origin.x + (size.x > 0.0f ? size.x : avail.x));
+        ImGui::PushTextWrapPos(wrap_local_pos_x);
         ImGui::TextUnformatted(props.text);
         ImGui::PopTextWrapPos();
     } else if (overflow == TextOverflow::Clip) {

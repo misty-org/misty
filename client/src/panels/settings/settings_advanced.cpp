@@ -4,9 +4,11 @@
 
 #include "core/manager/asset_manager.h"
 #include "core/manager/font_manager.h"
+#include "core/system/util.h"
 #include "core/ui/ui_layout.h"
 #include "imgui.h"
 #include "panels/settings/settings_components.h"
+#include "views/app_view.h"
 
 namespace misty::panel {
 namespace {
@@ -18,7 +20,39 @@ std::string format_mb(std::size_t bytes) {
 }
 
 void diagnostics_section(SettingsState& state) {
+    const auto process_memory = core::get_process_memory_usage();
+    const auto loaded_views = misty::view::loaded_view_count();
+
     settings_section("##advanced_diagnostics", "Diagnostics", {}, [&]() {
+        if (process_memory.available) {
+            settings_row("##advanced_process_resident", {
+                .start_width_pct = 0.52f,
+                .divider_color = kSettingsDividerColor,
+            }, [&]() {
+                settings_row_text("Process resident", "Current resident memory for the Misty client process.");
+            }, [&]() {
+                settings_value_text(core::format_bytes(process_memory.resident_bytes).c_str(), true);
+            });
+
+            settings_row("##advanced_process_footprint", {
+                .start_width_pct = 0.52f,
+                .divider_color = kSettingsDividerColor,
+            }, [&]() {
+                settings_row_text("Process footprint", "Approximate physical footprint reported by the operating system.");
+            }, [&]() {
+                settings_value_text(core::format_bytes(process_memory.footprint_bytes).c_str(), true);
+            });
+        }
+
+        settings_row("##advanced_loaded_views", {
+            .start_width_pct = 0.52f,
+            .divider_color = kSettingsDividerColor,
+        }, [&]() {
+            settings_row_text("Loaded views", "Top-level views currently instantiated in memory.");
+        }, [&]() {
+            settings_value_text(std::to_string(loaded_views).c_str(), true);
+        });
+
         settings_row("##advanced_debug_logging", {
             .start_width_pct = 0.52f,
             .divider_color = kSettingsDividerColor,
@@ -32,12 +66,23 @@ void diagnostics_section(SettingsState& state) {
 
         settings_row("##advanced_experimental", {
             .start_width_pct = 0.52f,
-            .show_divider = false,
             .divider_color = kSettingsDividerColor,
         }, [&]() {
             settings_row_text("Experimental features", "Allow in-progress features to surface before they are fully settled.");
         }, [&]() {
             if (settings_toggle_switch("##advanced_experimental_toggle", &state.experimental_features_enabled)) {
+                state.save_app_settings();
+            }
+        });
+
+        settings_row("##advanced_frame_pacing_overlay", {
+            .start_width_pct = 0.52f,
+            .show_divider = false,
+            .divider_color = kSettingsDividerColor,
+        }, [&]() {
+            settings_row_text("Frame pacing overlay", "Show the live idle, light, and heavy pacing state in the top-right corner.");
+        }, [&]() {
+            if (settings_toggle_switch("##advanced_frame_pacing_overlay_toggle", &state.frame_pacing_overlay_enabled)) {
                 state.save_app_settings();
             }
         });

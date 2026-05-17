@@ -31,7 +31,7 @@ const (
 
 type SearchScope struct {
 	Scope SearchDepth `json:"scope"`
-	Depth int         `json:"depth"`
+	Depth *int        `json:"depth,omitempty"`
 }
 
 type SearchQuery struct {
@@ -63,7 +63,11 @@ func Search() http.HandlerFunc {
 		}
 
 		maxResults := 100
-		depth := normalizeDepth(req.Depth)
+		depth, err := normalizeDepth(req.Depth)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusNotImplemented)
+			return
+		}
 		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 		defer cancel()
 
@@ -93,20 +97,23 @@ func Search() http.HandlerFunc {
 	}
 }
 
-func normalizeDepth(scope SearchScope) int {
+func normalizeDepth(scope SearchScope) (int, error) {
 	switch scope.Scope {
 	case "", SearchDepthCWD:
-		return 0
+		return 0, nil
 	case SearchDepthDepth:
-		if scope.Depth < 0 {
-			return 0
+		if scope.Depth == nil {
+			return 0, nil
 		}
-		return scope.Depth
+		if *scope.Depth < 0 {
+			return 0, nil
+		}
+		return *scope.Depth, nil
 	case SearchDepthSystem:
-		return 64
+		return 0, errors.New("SYSTEM scope is not implemented for LOCAL search")
 	case SearchDepthWorkspace:
-		return 8
+		return 0, errors.New("WORKSPACE scope is not implemented for LOCAL search")
 	default:
-		return 0
+		return 0, nil
 	}
 }

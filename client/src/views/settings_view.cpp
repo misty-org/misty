@@ -1,4 +1,5 @@
 #include "settings_view.h"
+#include "core/commands/command_manager.h"
 #include "imgui.h"
 
 namespace misty::view {
@@ -11,10 +12,27 @@ namespace misty::view {
         navbar_panel_ = std::make_shared<panel::NavbarPanel>(ui_registry_);
         settings_panel_ = std::make_shared<panel::SettingsPanel>(ui_registry_);
         notification_panel_ = std::make_shared<panel::NotificationPanel>(ui_registry_);
+        context_menu_panel_ = std::make_shared<panel::ContextMenuPanel>(ui_registry_);
     }
 
     ViewID SettingsView::get_view_id() {
         return ViewID::Settings;
+    }
+
+    ViewCapabilities SettingsView::capabilities() const {
+        return {
+            .tabs = true,
+            .split = true,
+        };
+    }
+
+    PluginOpenResult SettingsView::open_plugin_panel(const std::string& panel_id, PluginOpenMode mode) {
+        if (mode == PluginOpenMode::Split) {
+            return PluginOpenResult::Unsupported;
+        }
+        return core::PluginManager::get().open_panel(panel_id)
+            ? PluginOpenResult::Opened
+            : PluginOpenResult::Failed;
     }
 
     void SettingsView::render() {
@@ -35,11 +53,14 @@ namespace misty::view {
         float sw = viewport->WorkSize.x - navbar_width;
         float sh = viewport->WorkSize.y;
 
+        settings_panel_->handle_commands();
+
         ImGui::SetNextWindowPos(ImVec2(sx, sy), ImGuiCond_Always);
         ImGui::SetNextWindowSize(ImVec2(sw, sh), ImGuiCond_Always);
         settings_panel_->render();
 
         // Render notifications on top
+        context_menu_panel_->render();
         notification_panel_->render();
     }
 }

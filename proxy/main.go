@@ -1,10 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/kannachi323/misty/proxy/core/rclone"
@@ -14,11 +17,20 @@ import (
 )
 
 func main() {
+	loadProxyEnv()
+
 	proxy, listener := startProxy()
 	defer cleanup(proxy, listener)
 
-	rclone.Init()
-	_ = rclone.EnsureAllRemoteDefaults()
+	if err := rclone.Init(); err != nil {
+		log.Printf("PROXY: rclone init failed: %v", err)
+	} else {
+		if err := rclone.StartManagedDaemon(context.Background()); err != nil {
+			log.Printf("PROXY: rclone rcd failed to start: %v", err)
+		} else if err := rclone.EnsureAllRemoteDefaults(); err != nil {
+			log.Printf("PROXY: ensure remote defaults failed: %v", err)
+		}
+	}
 	_ = restic.Init()
 
 	proxy.MountHandlers()
@@ -27,6 +39,17 @@ func main() {
 		panic(err)
 	}
 
+}
+
+func loadProxyEnv() {
+	home, _ := os.UserHomeDir()
+	paths := []string{
+		filepath.Join(home, "misty", "proxy", ".env"),
+		filepath.Join(".", ".env"),
+	}
+	if err := setup.LoadDotEnv(paths...); err != nil {
+		log.Printf("PROXY: failed to load .env: %v", err)
+	}
 }
 
 func startProxy() (*Proxy, net.Listener) {
@@ -119,4 +142,5 @@ func cleanup(proxy *Proxy, listener net.Listener) {
 	listener.Close()
 	proxy.SyncPoller.Stop()
 	proxy.SyncManager.Stop()
+	rclone.StopManagedDaemon()
 }

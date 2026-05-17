@@ -28,8 +28,10 @@ struct QueryInputState {
 struct OverlaySnapshot {
     bool has_results = false;
     bool pending = false;
+    bool waiting = false;
     std::string error_message;
 };
+
 
 constexpr auto kSearchDebounceDelay = std::chrono::milliseconds(450);
 
@@ -289,6 +291,15 @@ OverlaySnapshot overlay_snapshot(SearchState& state) {
     std::lock_guard<std::mutex> lock(state.mu);
     snapshot.has_results = !state.results.empty();
     snapshot.pending = state.search_in_flight;
+    const std::string query = state.query_buf;
+    if (submittable_query(query) &&
+        query != state.last_submitted_query &&
+        !state.search_in_flight) {
+        const auto since_last_change = state.last_input_change_at.time_since_epoch().count() == 0
+            ? kSearchDebounceDelay
+            : std::chrono::steady_clock::now() - state.last_input_change_at;
+        snapshot.waiting = state.search_pending || since_last_change < kSearchDebounceDelay;
+    }
     snapshot.error_message = state.last_err;
     return snapshot;
 }
@@ -303,7 +314,7 @@ void overlay_status(const OverlaySnapshot& snapshot, bool has_query) {
     if (!has_query) {
         return;
     }
-    if (snapshot.pending) {
+    if (snapshot.pending || snapshot.waiting) {
         pending_indicator();
     } else if (!snapshot.error_message.empty()) {
         ImGui::TextColored(ImVec4(0.92f, 0.45f, 0.45f, 1.0f), "Search failed");
@@ -349,8 +360,7 @@ void SearchPanel::toggle() {
     state.focus_query = true;
 }
 
-SearchQuery SearchPanel::build_query(const std::string& query_text,
-                                     const std::string& current_path) const {
+SearchQuery SearchPanel::build_query(const std::string& query_text, const std::string& current_path) const {
     SearchQuery query;
     query.query = query_text;
     query.path = current_path;

@@ -13,10 +13,27 @@ void ExtensionsView::init_panels() {
     navbar_panel_ = std::make_shared<panel::NavbarPanel>(ui_registry_);
     plugins_panel_ = std::make_shared<panel::PluginsPanel>(ui_registry_);
     notification_panel_ = std::make_shared<panel::NotificationPanel>(ui_registry_);
+    context_menu_panel_ = std::make_shared<panel::ContextMenuPanel>(ui_registry_);
 }
 
 ViewID ExtensionsView::get_view_id() {
     return ViewID::Extensions;
+}
+
+ViewCapabilities ExtensionsView::capabilities() const {
+    return {
+        .tabs = true,
+        .split = false,
+    };
+}
+
+PluginOpenResult ExtensionsView::open_plugin_panel(const std::string& panel_id, PluginOpenMode mode) {
+    if (mode == PluginOpenMode::Split) {
+        return PluginOpenResult::Unsupported;
+    }
+    return core::PluginManager::get().open_panel(panel_id)
+        ? PluginOpenResult::Opened
+        : PluginOpenResult::Failed;
 }
 
 void ExtensionsView::render() {
@@ -38,6 +55,7 @@ void ExtensionsView::render() {
     ImGui::SetNextWindowSize(ImVec2(sw, sh), ImGuiCond_Always);
     plugins_panel_->render();
 
+    context_menu_panel_->render();
     notification_panel_->render();
 }
 

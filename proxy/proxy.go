@@ -14,7 +14,10 @@ import (
 	"github.com/kannachi323/misty/proxy/core/setup"
 	"github.com/kannachi323/misty/proxy/core/syncindex"
 	"github.com/kannachi323/misty/proxy/db"
+	_ "github.com/kannachi323/misty/proxy/docs"
 	authmw "github.com/kannachi323/misty/proxy/middleware"
+	"github.com/kannachi323/misty/proxy/routes"
+	httpSwagger "github.com/swaggo/http-swagger/v2"
 )
 
 type Proxy struct {
@@ -42,6 +45,9 @@ func CreateProxy(cfg setup.Config) (*Proxy, error) {
 	workDir, _ := os.Getwd()
 	staticDir := filepath.Join(workDir, "static")
 	proxy.Router.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.Dir(staticDir))))
+	proxy.Router.Get("/docs/*", httpSwagger.Handler(
+		httpSwagger.URL("/docs/doc.json"),
+	))
 	proxy.Database = &db.Database{}
 	proxy.VaultService = vault.NewService()
 
@@ -60,7 +66,8 @@ func (proxy *Proxy) MountHandlers() {
 
 	//////--------------------------
 	// DO NOT REMOVE THIS
-	proxy.APIRouter.Get("/remotes/health", remote.Health())
+	proxy.APIRouter.Get(routes.RemoteBasePath+"/health", remote.Health())
+	proxy.APIRouter.Get(routes.LegacyRemoteBasePath+"/health", remote.Health())
 	//////--------------------------
 
 	// Public routes (no auth required)
@@ -75,30 +82,9 @@ func (proxy *Proxy) MountHandlers() {
 	proxy.APIRouter.Group(func(r chi.Router) {
 		r.Use(authmw.JWTMiddleware(proxy.Database))
 
-		// ---- rclone unified endpoints ----
-		r.Get("/remotes", remote.ListRemotes())
-		r.Delete("/remotes", remote.DeleteRemote())
-		r.Get("/remotes/types", remote.ListTypes())
-		r.Post("/remotes/config/continue", remote.ConfigContinue())
-		r.Delete("/remotes/config", remote.ConfigCancel())
-		r.Get("/files", remote.ListFiles())
-		r.Post("/sync/refetch", remote.SyncRefetch(proxy.SyncManager))
-		r.Get("/sync/list", remote.SyncList(proxy.SyncIndex))
-		r.Post("/sync/dirty", remote.SyncDirty(proxy.SyncManager))
-		r.Post("/sync/mark-synced", remote.SyncMarkSynced(proxy.SyncManager))
-		r.Post("/sync/run-now", remote.SyncRunNow(proxy.SyncPoller))
-		r.Put("/sync/watch-dir", remote.SyncWatchDir(proxy.SyncManager))
-		r.Delete("/sync/watch-dir", remote.SyncUnwatchDir(proxy.SyncManager))
-		r.Get("/file/download", remote.DownloadFile())
-		r.Post("/file/upload", remote.UploadFile())
-		r.Post("/folder/download", remote.DownloadFolder())
-		r.Post("/folder/upload", remote.UploadFolder())
-		r.Post("/folder/transfer", remote.TransferFolder())
-		r.Post("/mkdir", remote.MkDir())
-		r.Delete("/file", remote.DeleteFile())
-		r.Get("/about", remote.AboutRemote())
-		r.Post("/remotes", remote.CreateRemote())
-		r.Post("/remotes/config/start", remote.ConfigStart())
+		// ---- rclone provider endpoints ----
+		mountRemoteRoutes(r, routes.RemoteBasePath)
+		mountRemoteRoutes(r, routes.LegacyRemoteBasePath)
 
 		// vault
 		v := proxy.VaultService
@@ -124,4 +110,20 @@ func (proxy *Proxy) MountHandlers() {
 		r.Post("/vault/jobs/{id}/cancel", v.CancelJob())
 
 	})
+}
+
+func mountRemoteRoutes(r chi.Router, base string) {
+	r.Get(base, remote.ListRemotes())
+	r.Delete(base, remote.DeleteRemote())
+	r.Get(base+"/types", remote.ListTypes())
+	r.Get(base+"/workflows", remote.ListProviderWorkflows())
+	r.Get(base+"/workflow", remote.GetProviderWorkflow())
+	r.Post(base+"/config/start", remote.ConfigStart())
+	r.Post(base+"/config/continue", remote.ConfigContinue())
+	r.Get(base+"/health", remote.Health())
+	r.Get(base+"/file/list", remote.ListFiles())
+	r.Get(base+"/file/download", remote.DownloadFile())
+	r.Post(base+"/file/upload", remote.UploadFile())
+	r.Delete(base+"/file", remote.DeleteFile())
+	r.Post(base+"/file/rename", remote.RenameFile())
 }

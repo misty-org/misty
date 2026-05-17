@@ -1,12 +1,18 @@
 #pragma once
 
 #include <functional>
+#include <optional>
 #include <string>
 #include <vector>
 
-#include "panels/file_explorer/file_explorer_state.h"
+#include "panels/file_explorer/state/file_explorer_state.h"
 
 namespace misty::panel {
+
+    enum class FileSource {
+        LOCAL,
+        REMOTE
+    };
 
     enum SearchSource {
         LOCAL,
@@ -37,6 +43,11 @@ namespace misty::panel {
         static SearchScope workspace() {
             return { SearchDepth::WORKSPACE, 0 };
         }
+    };
+
+    struct SearchScopeValue {
+        SearchDepth scope_ = SearchDepth::CWD;
+        std::optional<int> depth_limit;
     };
 
     struct SearchResult {

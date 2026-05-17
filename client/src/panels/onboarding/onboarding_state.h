@@ -73,7 +73,10 @@ namespace misty::panel {
                 return;
             }
 
-            auto resp = core::HTTPClient::get().post(server_url + "/api/register", body, headers);
+            auto resp = core::HTTPClient::get().post(
+                server_url + "/api/register",
+                body,
+                {.headers = headers});
             is_submitting = false;
 
             if (resp.status_code == 200 || resp.status_code == 201) {
