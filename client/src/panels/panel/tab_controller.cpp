@@ -5,6 +5,20 @@
 #include "imgui.h"
 
 namespace misty::panel {
+    namespace {
+        TabController::ClosedTabSnapshot make_snapshot(const TabController::Tab& tab) {
+            TabController::ClosedTabSnapshot snapshot;
+            snapshot.context_key = tab.context_key;
+            snapshot.state_key = tab.state_key;
+            snapshot.title = tab.title;
+            snapshot.idx = tab.idx;
+            if (tab.panel) {
+                snapshot.restore_state = tab.panel->save_restore_state();
+            }
+            return snapshot;
+        }
+    }
+
     std::string TabController::Tab::display_title() const {
         if (panel) {
             const std::string dynamic_title = panel->tab_title();
@@ -92,7 +106,13 @@ namespace misty::panel {
             return;
         }
 
-        closed_tabs.push_back(it->second);
+        closed_tabs.push_back(make_snapshot(it->second));
+        if (closed_tabs.size() > kMaxClosedTabs) {
+            closed_tabs.erase(closed_tabs.begin());
+        }
+        if (it->second.panel) {
+            it->second.panel->release_state();
+        }
         tabs.erase(it);
         tab_order.erase(std::remove(tab_order.begin(), tab_order.end(), idx), tab_order.end());
 
@@ -124,8 +144,21 @@ namespace misty::panel {
             return;
         }
 
-        const Tab tab = closed_tabs.back();
+        const ClosedTabSnapshot snapshot = closed_tabs.back();
         closed_tabs.pop_back();
+        if (snapshot.idx < 0) {
+            return;
+        }
+
+        Tab tab = restore_tab_factory_ ? restore_tab_factory_(snapshot.idx) : Tab{};
+        tab.context_key = snapshot.context_key;
+        tab.state_key = snapshot.state_key;
+        tab.title = snapshot.title;
+        tab.idx = snapshot.idx;
+        if (tab.panel) {
+            tab.panel->load_restore_state(snapshot.restore_state);
+        }
+
         const bool already_present = tabs.find(tab.idx) != tabs.end();
         tabs.insert_or_assign(tab.idx, tab);
         if (!already_present) {
@@ -136,5 +169,74 @@ namespace misty::panel {
 
     int TabController::tab_count() const {
         return static_cast<int>(tabs.size());
+    }
+
+    std::vector<TabController::ClosedTabSnapshot> TabController::take_closed_tab_snapshots() {
+        std::vector<ClosedTabSnapshot> snapshots;
+        snapshots.swap(closed_tabs);
+        return snapshots;
+    }
+
+    std::vector<TabController::ClosedTabSnapshot> TabController::export_tab_snapshots() const {
+        std::vector<ClosedTabSnapshot> snapshots;
+        snapshots.reserve(tab_order.size());
+        for (const std::int16_t tab_id : tab_order) {
+            const Tab* tab = get_tab(tab_id);
+            if (!tab) {
+                continue;
+            }
+            snapshots.push_back(make_snapshot(*tab));
+        }
+        return snapshots;
+    }
+
+    void TabController::restore_tabs_from_snapshots(
+        const std::vector<ClosedTabSnapshot>& snapshots,
+        const std::function<Tab(std::int16_t)>& create_tab,
+        std::int16_t restored_active_tab_idx) {
+        tabs.clear();
+        tab_order.clear();
+        active_tab_idx = -1;
+
+        for (const ClosedTabSnapshot& snapshot : snapshots) {
+            if (snapshot.idx < 0) {
+                continue;
+            }
+
+            Tab tab = create_tab(snapshot.idx);
+            tab.context_key = snapshot.context_key;
+            tab.state_key = snapshot.state_key;
+            tab.title = snapshot.title;
+            tab.idx = snapshot.idx;
+            if (tab.panel) {
+                tab.panel->load_restore_state(snapshot.restore_state);
+            }
+            add_tab(tab);
+        }
+
+        if (tabs.find(restored_active_tab_idx) != tabs.end()) {
+            active_tab_idx = restored_active_tab_idx;
+        } else if (!tab_order.empty()) {
+            active_tab_idx = tab_order.front();
+        }
+    }
+
+    void TabController::release_all_tabs() {
+        for (auto& [_, tab] : tabs) {
+            if (tab.panel) {
+                tab.panel->release_state();
+            }
+        }
+        tabs.clear();
+        tab_order.clear();
+        active_tab_idx = -1;
+        closed_tabs.clear();
+    }
+
+    void TabController::restore_closed_tab_snapshots(const std::vector<ClosedTabSnapshot>& snapshots) {
+        closed_tabs = snapshots;
+        if (closed_tabs.size() > kMaxClosedTabs) {
+            closed_tabs.erase(closed_tabs.begin(), closed_tabs.end() - static_cast<std::ptrdiff_t>(kMaxClosedTabs));
+        }
     }
 }

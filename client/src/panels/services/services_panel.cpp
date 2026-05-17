@@ -2,6 +2,8 @@
 
 namespace misty::panel {
 
-// ServicesPanel implementation is in core.cpp
+    ServicesPanel::ServicesPanel(UIRegistry& registry)
+        : registry_(registry) {
+    }
 
 }

@@ -201,22 +201,33 @@ namespace misty {
     }
 
     void Application::init_views() {
-        ui_registry_.get_state<panel::ServicesState>("Services").init(worker_pool_);
-        append_startup_log("startup: services state initialized");
-
         view::register_view(view::ViewID::Files,
             std::make_unique<view::FilesView>(ui_registry_, worker_pool_));
         view::register_view(view::ViewID::Auth, std::make_unique<view::RegisterView>(ui_registry_));
         view::register_view(view::ViewID::Login, std::make_unique<view::LoginView>(ui_registry_));
         view::register_view(view::ViewID::Onboarding,
             std::make_unique<view::OnboardingView>(ui_registry_, worker_pool_));
-        view::register_view(view::ViewID::Services, std::make_unique<view::ServicesView>(ui_registry_));
-        view::register_view(view::ViewID::Extensions, std::make_unique<view::ExtensionsView>(ui_registry_));
-        view::register_view(view::ViewID::Vault,
-            std::make_unique<view::VaultView>(ui_registry_, worker_pool_));
-        view::register_view(view::ViewID::Transfers, std::make_unique<view::TransfersView>(ui_registry_));
+        view::register_view_factory(view::ViewID::Services, [this]() {
+            append_startup_log("startup: services view instantiated");
+            return std::make_unique<view::ServicesView>(ui_registry_);
+        });
+        view::register_view_factory(view::ViewID::Extensions, [this]() {
+            append_startup_log("startup: extensions view instantiated");
+            return std::make_unique<view::ExtensionsView>(ui_registry_);
+        });
+        view::register_view_factory(view::ViewID::Vault, [this]() {
+            append_startup_log("startup: vault view instantiated");
+            return std::make_unique<view::VaultView>(ui_registry_, worker_pool_);
+        });
+        view::register_view_factory(view::ViewID::Transfers, [this]() {
+            append_startup_log("startup: transfers view instantiated");
+            return std::make_unique<view::TransfersView>(ui_registry_);
+        });
         // ActivityView removed — Activity is now a modal panel in the navbar
-        view::register_view(view::ViewID::Settings, std::make_unique<view::SettingsView>(ui_registry_));
+        view::register_view_factory(view::ViewID::Settings, [this]() {
+            append_startup_log("startup: settings view instantiated");
+            return std::make_unique<view::SettingsView>(ui_registry_);
+        });
 
         // Auth is guaranteed by the BootLoader — always start in FilesView.
         view::switch_view(view::ViewID::Files);

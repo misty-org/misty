@@ -10,21 +10,64 @@
 #include "panels/settings/settings_components.h"
 
 #include <cmath>
+#include <nlohmann/json.hpp>
 #include "core/ui/ui_layout.h"
 #include "core/ui/ui_style.h"
 #include "imgui.h"
 #include "views/app_view.h"
 
 namespace misty::panel {
+namespace {
+using json = nlohmann::json;
+}
+
 SettingsPanel::SettingsPanel(core::UIRegistry& registry, SettingsPanelProps props)
     : MultiPanel(std::move(props.panel_id)),
       registry_(registry),
-      state_key_(std::move(props.state_key)) {}
+      state_key_(std::move(props.state_key)),
+      owns_state_cleanup_(props.owns_state_cleanup) {}
+
+std::string SettingsPanel::save_restore_state() const {
+    const auto& state = const_cast<core::UIRegistry&>(registry_).get_state<SettingsState>(state_key_);
+    json data;
+    data["active_section"] = static_cast<int>(state.active_section);
+    data["prev_section"] = static_cast<int>(state.prev_section);
+    data["scroll_x"] = last_scroll_x_;
+    data["scroll_y"] = last_scroll_y_;
+    data["has_scroll_snapshot"] = has_scroll_snapshot_;
+    return data.dump();
+}
+
+void SettingsPanel::load_restore_state(const std::string& encoded_state) {
+    if (encoded_state.empty()) {
+        return;
+    }
+    json data = json::parse(encoded_state, nullptr, false);
+    if (data.is_discarded()) {
+        return;
+    }
+    auto& state = registry_.get_state<SettingsState>(state_key_);
+    state.active_section = static_cast<SettingsSection>(
+        data.value("active_section", static_cast<int>(state.active_section)));
+    state.prev_section = static_cast<SettingsSection>(
+        data.value("prev_section", static_cast<int>(state.prev_section)));
+    last_scroll_x_ = data.value("scroll_x", 0.0f);
+    last_scroll_y_ = data.value("scroll_y", 0.0f);
+    has_scroll_snapshot_ = data.value("has_scroll_snapshot", false);
+}
+
+void SettingsPanel::release_state() {
+    if (!owns_state_cleanup_) {
+        return;
+    }
+    registry_.erase_state(state_key_);
+}
 
 TabController::Tab SettingsPanel::create_default_tab(std::int16_t tab_idx) const {
     SettingsPanelProps props;
     props.panel_id = panel_id() + "_tab_" + std::to_string(tab_idx);
     props.state_key = state_key_ + "_tab_" + std::to_string(tab_idx);
+    props.owns_state_cleanup = true;
 
     auto panel = std::make_shared<SettingsPanel>(registry_, std::move(props));
 

@@ -2,6 +2,7 @@
 #include <string>
 #include <glad/glad.h>
 #include <unordered_map>
+#include <cstdint>
 
 #include "core/ui/svg_loader.h"
 
@@ -38,11 +39,34 @@ namespace misty::core {
         void shutdown();
 
     private:
+        struct SvgCacheEntry {
+            SVGTexture texture{};
+            std::size_t approx_bytes = 0;
+            std::uint64_t last_used = 0;
+            bool pinned = false;
+        };
+
+        struct ImageCacheEntry {
+            ImageTexture texture{0, 0, 0};
+            std::size_t approx_bytes = 0;
+            std::uint64_t last_used = 0;
+            bool pinned = false;
+        };
+
+        void touch_svg(const std::string& key);
+        void touch_image(const std::string& key);
+        void prune_svg_cache();
+        void prune_image_cache();
+
         AssetManager() = default;
         ~AssetManager() = default;
 
         std::string current_theme_;
-        std::unordered_map<std::string, SVGTexture> svg_textures_;
-        std::unordered_map<std::string, ImageTexture> image_textures_;
+        std::unordered_map<std::string, SvgCacheEntry> svg_textures_;
+        std::unordered_map<std::string, ImageCacheEntry> image_textures_;
+        std::uint64_t use_tick_ = 0;
+
+        static constexpr std::size_t kMaxSvgTextures = 96;
+        static constexpr std::size_t kMaxImageBytes = 16 * 1024 * 1024;
     };
 }

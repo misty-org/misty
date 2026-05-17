@@ -15,7 +15,7 @@ namespace misty::panel {
         std::string file_explorer_tab_title_for_path(const std::string& path) {
             if (path.empty()) {
                 return "Files";
-            }
+            }   
 
             if (path == FileExplorerState::VIRTUAL_PATH_RECENT) {
                 return "Recent";
@@ -62,6 +62,7 @@ namespace misty::panel {
         props.state_key = state_key_ + "_tab_" + std::to_string(tab_idx);
         props.panel_id = panel_id() + "_tab_" + std::to_string(tab_idx);
         props.restore_persistent_state = false;
+        props.owns_state_cleanup = true;
 
         std::string initial_path = default_local_start_path();
         if (const auto* active_explorer = dynamic_cast<const FileExplorerPanel*>(active_panel())) {
@@ -197,6 +198,11 @@ namespace misty::panel {
         state.chat_overlay_open = !state.chat_overlay_open;
         state.chat_focus_input = state.chat_overlay_open;
         state.chat_resizing = false;
+        if (!state.chat_overlay_open) {
+            state.chat_input_buffer[0] = '\0';
+            state.chat_messages.clear();
+            state.chat_error_msg.clear();
+        }
     }
 
     void FileExplorerPanel::render_chat_overlay(FileExplorerState& state,
@@ -248,7 +254,7 @@ namespace misty::panel {
         state.is_loading = true;
         state.show_loading_animation = false;
         state.error_msg  = "";
-        reset_selection(state);
+        state.clear_transient_ui_state();
         state.files.clear();
         state.sort_dirty = true;
 
@@ -297,6 +303,7 @@ namespace misty::panel {
                         state.is_loading = false;
                         state.show_loading_animation = false;
                         state.sort_dirty = true;
+                        state.note_listing_changed();
                     }
                     return true;
                 };
@@ -352,6 +359,7 @@ namespace misty::panel {
                     state.is_loading = false;
                     state.show_loading_animation = false;
                     state.sort_dirty = true;
+                    state.note_listing_changed();
                     return;
                 }
 
@@ -368,6 +376,7 @@ namespace misty::panel {
                 state.is_loading = false;
                 state.show_loading_animation = false;
                 state.sort_dirty = true;
+                state.note_listing_changed();
             }
         );
     }
@@ -444,6 +453,7 @@ namespace misty::panel {
             state.is_loading = false;
             state.show_loading_animation = false;
             state.sort_dirty = true;
+            state.note_listing_changed();
             printf("Explorer: Virtual path loaded. File count: %zu\n", state.files.size());
             return;
         }
