@@ -31,6 +31,7 @@ inline constexpr ImVec4 kSettingsControlTextColor = ImVec4(0.92f, 0.92f, 0.94f, 
 inline constexpr float kSettingsControlWidth = 220.0f;
 inline constexpr float kSettingsControlHeight = 36.0f;
 inline constexpr float kSettingsSelectControlHeight = 32.0f;
+inline constexpr float kSettingsContentWidth = 720.0f;
 inline constexpr misty::UI::Spacing kSettingsShellPadding = misty::UI::Spacing::xy(28.0f, 20.0f);
 inline constexpr misty::UI::Spacing kSettingsSidebarPadding = misty::UI::Spacing::xy(20.0f, 20.0f);
 inline constexpr misty::UI::Spacing kSettingsPagePadding = misty::UI::Spacing::xy(0.0f, 0.0f);

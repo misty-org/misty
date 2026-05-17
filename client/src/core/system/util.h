@@ -7,8 +7,15 @@
 #include <vector>
 
 namespace misty::core {
+    struct ProcessMemoryUsage {
+        uint64_t resident_bytes = 0;
+        uint64_t footprint_bytes = 0;
+        bool available = false;
+    };
+
     std::string format_bytes(uint64_t bytes);
     std::string format_bytes(int64_t bytes);
+    ProcessMemoryUsage get_process_memory_usage();
     bool open_file_in_browser(const std::string& path);
     bool open_path_default(const std::string& path);
     bool open_path_with_application(const std::string& application_path, const std::string& target_path);

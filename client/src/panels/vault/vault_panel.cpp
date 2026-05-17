@@ -8,6 +8,7 @@
 
 #include "core/system/util.h"
 #include "core/ui/ui_style.h"
+#include "views/app_view.h"
 
 namespace misty::panel {
 
@@ -91,13 +92,26 @@ namespace misty::panel {
             ImGuiWindowFlags_NoTitleBar |
             ImGuiWindowFlags_NoResize |
             ImGuiWindowFlags_NoMove |
-            ImGuiWindowFlags_NoCollapse;
+            ImGuiWindowFlags_NoCollapse |
+            ImGuiWindowFlags_NoSavedSettings;
+
+        if (ImGuiViewport* main_viewport = ImGui::GetMainViewport()) {
+            ImGui::SetNextWindowViewport(main_viewport->ID);
+        }
 
         misty::UI::WithWindowStyle({
             .bg_color = ImVec4(0.12f, 0.12f, 0.12f, 1.0f),
             .padding = ImVec2(32.0f, 24.0f),
         }, [&]() {
             if (ImGui::Begin("VaultPanel", nullptr, flags)) {
+                {
+                    const auto repo_snapshot = state.repos_snapshot();
+                    std::lock_guard<std::mutex> lock(state.mu);
+                    misty::view::debug_log_view_event(
+                        std::string("vault_panel: repos=") + std::to_string(repo_snapshot.size()) +
+                        " refreshing=" + (state.is_refreshing ? "true" : "false") +
+                        " selected=" + (state.selected_repo.empty() ? "<none>" : state.selected_repo));
+                }
                 show_header(state);
                 ImGui::Spacing();
 
@@ -265,7 +279,7 @@ namespace misty::panel {
         }
 
         // Confirm-delete popup, scoped to this card's PushID stack so the
-        // popup ID resolves correctly (same trick ServicesPanel uses).
+        // popup ID resolves correctly (same trick ProvidersPanel uses).
         ImVec2 vp_center = ImGui::GetMainViewport()->GetCenter();
         ImGui::SetNextWindowPos(vp_center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
         if (ImGui::BeginPopupModal("##vault_confirm_delete", nullptr,

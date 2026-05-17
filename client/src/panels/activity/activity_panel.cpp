@@ -1,6 +1,9 @@
 #include "activity_panel.h"
+#include "core/ui/ui_helper.h"
 #include "imgui.h"
-#include "panels/transfers/transfer_window_state.h"
+#include "imgui_internal.h"
+#include "panels/navbar/navbar_state.h"
+#include "views/app_view.h"
 #include <ctime>
 #include <sstream>
 #include <iomanip>
@@ -18,12 +21,17 @@ namespace misty::panel {
         ImGuiViewport* viewport = ImGui::GetMainViewport();
         float navbar_width = 77.0f;
 
-        float px = viewport->WorkPos.x + navbar_width + 6.0f;
-        float py = viewport->WorkPos.y + (viewport->WorkSize.y - POPUP_H) * 0.5f;
-        py = std::max(viewport->WorkPos.y + 8.0f, py);
-        py = std::min(viewport->WorkPos.y + viewport->WorkSize.y - POPUP_H - 8.0f, py);
+        const ImVec2 desired_pos(
+            viewport->WorkPos.x + navbar_width + 6.0f,
+            viewport->WorkPos.y + (viewport->WorkSize.y - POPUP_H) * 0.5f
+        );
+        const ImVec2 clamped_pos = UI::clamp_window_pos_to_viewport(
+            desired_pos,
+            ImVec2(POPUP_W, POPUP_H),
+            *viewport
+        );
 
-        ImGui::SetNextWindowPos(ImVec2(px, py), ImGuiCond_Always);
+        ImGui::SetNextWindowPos(clamped_pos, ImGuiCond_Always);
         ImGui::SetNextWindowSize(ImVec2(POPUP_W, POPUP_H), ImGuiCond_Always);
 
         ImGuiWindowFlags flags =
@@ -33,6 +41,8 @@ namespace misty::panel {
             ImGuiWindowFlags_NoCollapse |
             ImGuiWindowFlags_NoSavedSettings;
 
+        ImGui::SetNextWindowViewport(viewport->ID);
+
         ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.14f, 0.14f, 0.14f, 0.98f));
         ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 12.0f);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16.0f, 16.0f));
@@ -40,17 +50,22 @@ namespace misty::panel {
         ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.25f, 0.25f, 0.25f, 1.0f));
 
         if (ImGui::Begin("##ActivityPopup", nullptr, flags)) {
-            // Close on click outside (exclude navbar region)
+            if (ImGuiWindow* window = ImGui::FindWindowByName("##ActivityPopup")) {
+                ImGui::BringWindowToDisplayFront(window);
+            }
+
             if (!ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem) &&
                 ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-                ImVec2 mouse = ImGui::GetMousePos();
-                float navbar_right = viewport->WorkPos.x + 77.0f;
-                if (mouse.x > navbar_right) {
+                const ImVec2 mouse = ImGui::GetMousePos();
+                const bool clicked_toggle =
+                    state.has_button_rect &&
+                    mouse.x >= state.button_min.x && mouse.x <= state.button_max.x &&
+                    mouse.y >= state.button_min.y && mouse.y <= state.button_max.y;
+                if (!clicked_toggle) {
                     state.is_open = false;
                 }
             }
 
-            // Header row
             ImGui::SetWindowFontScale(1.1f);
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
             ImGui::Text("Activity");
@@ -67,7 +82,9 @@ namespace misty::panel {
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.3f, 0.3f, 0.5f));
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.45f, 0.45f, 0.45f, 1.0f));
             if (ImGui::Button("Transfers##activity", ImVec2(transfers_w, 0))) {
-                registry_.get_state<TransferWindowState>(kTransferWindowStateKey).open();
+                state.is_open = false;
+                registry_.get_state<NavbarState>("Navbar").selected_item = view::ViewID::Transfers;
+                view::switch_view(view::ViewID::Transfers);
             }
             ImGui::SameLine(0, button_gap);
             if (ImGui::Button("Mark all read##activity", ImVec2(read_w, 0))) {

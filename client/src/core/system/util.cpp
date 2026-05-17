@@ -10,6 +10,7 @@
 
 #ifdef _WIN32
 #include <windows.h>
+#include <psapi.h>
 #include <shellapi.h>
 #include <shlobj.h>
 #include <processthreadsapi.h>
@@ -17,6 +18,7 @@
 #elif __APPLE__
 #include <errno.h>
 #include <fcntl.h>
+#include <mach/mach.h>
 #include <mach-o/dyld.h>
 #include <pwd.h>
 #include <sys/wait.h>
@@ -139,6 +141,59 @@ namespace misty::core {
             return "0 B";
         }
         return format_bytes(static_cast<uint64_t>(bytes));
+    }
+
+    ProcessMemoryUsage get_process_memory_usage() {
+        ProcessMemoryUsage usage;
+#ifdef _WIN32
+        PROCESS_MEMORY_COUNTERS_EX counters{};
+        if (GetProcessMemoryInfo(GetCurrentProcess(),
+                                 reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&counters),
+                                 sizeof(counters))) {
+            usage.resident_bytes = static_cast<uint64_t>(counters.WorkingSetSize);
+            usage.footprint_bytes = static_cast<uint64_t>(counters.PrivateUsage);
+            usage.available = true;
+        }
+#elif __APPLE__
+        mach_task_basic_info basic_info{};
+        mach_msg_type_number_t basic_count = MACH_TASK_BASIC_INFO_COUNT;
+        if (task_info(mach_task_self(),
+                      MACH_TASK_BASIC_INFO,
+                      reinterpret_cast<task_info_t>(&basic_info),
+                      &basic_count) == KERN_SUCCESS) {
+            usage.resident_bytes = static_cast<uint64_t>(basic_info.resident_size);
+            usage.available = true;
+        }
+
+#ifdef TASK_VM_INFO
+        task_vm_info_data_t vm_info{};
+        mach_msg_type_number_t vm_count = TASK_VM_INFO_COUNT;
+        if (task_info(mach_task_self(),
+                      TASK_VM_INFO,
+                      reinterpret_cast<task_info_t>(&vm_info),
+                      &vm_count) == KERN_SUCCESS) {
+            usage.footprint_bytes = static_cast<uint64_t>(vm_info.phys_footprint);
+            usage.available = true;
+        }
+#endif
+#elif __linux__
+        std::FILE* file = std::fopen("/proc/self/statm", "r");
+        if (file != nullptr) {
+            long total_pages = 0;
+            long resident_pages = 0;
+            if (std::fscanf(file, "%ld %ld", &total_pages, &resident_pages) == 2) {
+                const long page_size = sysconf(_SC_PAGESIZE);
+                usage.resident_bytes = static_cast<uint64_t>(resident_pages) * static_cast<uint64_t>(page_size);
+                usage.footprint_bytes = static_cast<uint64_t>(total_pages) * static_cast<uint64_t>(page_size);
+                usage.available = true;
+            }
+            std::fclose(file);
+        }
+#endif
+        if (usage.footprint_bytes == 0) {
+            usage.footprint_bytes = usage.resident_bytes;
+        }
+        return usage;
     }
 
     bool open_path_default(const std::string& path) {

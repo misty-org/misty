@@ -1,5 +1,5 @@
 #pragma once
-#include "panels/panel.h"
+#include "panels/panel/panel.h"
 #include "core/ui/ui_registry.h"
 #include "core/threading/worker_pool.h"
 #include "panels/onboarding/onboarding_state.h"

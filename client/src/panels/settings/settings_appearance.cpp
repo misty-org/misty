@@ -1,10 +1,15 @@
 #include "panels/settings/settings_appearance.h"
 
+#include <algorithm>
+#include <array>
+#include <cctype>
 #include <cstring>
 #include <filesystem>
+#include <string>
 
 #include "core/file_picker/file_picker.h"
 #include "core/manager/font_manager.h"
+#include "core/manager/theme_manager.h"
 #include "core/ui/ui_layout.h"
 #include "imgui.h"
 #include "panels/settings/settings_components.h"
@@ -17,6 +22,153 @@ namespace fs = std::filesystem;
 constexpr const char* kThemeOptions[] = {"System", "Dark", "Light"};
 constexpr const char* kScaleOptions[] = {"Small", "Default", "Large"};
 constexpr const char* kFontSizeOptions[] = {"Small", "Default", "Large"};
+
+struct InlineThemeField {
+    const char* token;
+    const char* label;
+    char hex[16];
+};
+
+struct InlineThemeBuilderState {
+    std::array<InlineThemeField, 12> fields = {{
+        {"window_bg", "Window background", "#111113"},
+        {"panel_bg", "Panel background", "#18181B"},
+        {"panel_alt_bg", "Elevated panel", "#27272A"},
+        {"border", "Border", "#27272A"},
+        {"text", "Primary text", "#D4D4D8"},
+        {"text_muted", "Muted text", "#71717A"},
+        {"accent", "Accent", "#3B82F6"},
+        {"accent_hover", "Accent hover", "#2563EB"},
+        {"selection", "Selection", "#3B82F659"},
+        {"success", "Success", "#29BB88"},
+        {"warning", "Warning", "#F7A134"},
+        {"error", "Error", "#EF4444"},
+    }};
+    std::string status_message = "Pick a preset or edit token values below.";
+    bool status_is_error = false;
+    bool synced_from_host = false;
+};
+
+InlineThemeBuilderState g_theme_builder_state;
+
+char hex_digit(unsigned int value) {
+    return static_cast<char>(value < 10 ? ('0' + value) : ('A' + (value - 10)));
+}
+
+void encode_hex(const float rgba[4], char out[16]) {
+    const auto to_byte = [](float value) -> unsigned int {
+        const float clamped = std::clamp(value, 0.0f, 1.0f);
+        return static_cast<unsigned int>(clamped * 255.0f + 0.5f);
+    };
+
+    const unsigned int r = to_byte(rgba[0]);
+    const unsigned int g = to_byte(rgba[1]);
+    const unsigned int b = to_byte(rgba[2]);
+    const unsigned int a = to_byte(rgba[3]);
+
+    out[0] = '#';
+    out[1] = hex_digit((r >> 4) & 0xF);
+    out[2] = hex_digit(r & 0xF);
+    out[3] = hex_digit((g >> 4) & 0xF);
+    out[4] = hex_digit(g & 0xF);
+    out[5] = hex_digit((b >> 4) & 0xF);
+    out[6] = hex_digit(b & 0xF);
+    if (a < 255) {
+        out[7] = hex_digit((a >> 4) & 0xF);
+        out[8] = hex_digit(a & 0xF);
+        out[9] = '\0';
+    } else {
+        out[7] = '\0';
+    }
+}
+
+int hex_value(char ch) {
+    if (ch >= '0' && ch <= '9') return ch - '0';
+    if (ch >= 'a' && ch <= 'f') return 10 + (ch - 'a');
+    if (ch >= 'A' && ch <= 'F') return 10 + (ch - 'A');
+    return -1;
+}
+
+bool parse_hex_color(const char* input, float rgba[4]) {
+    if (!input || !rgba) {
+        return false;
+    }
+
+    std::string value(input);
+    value.erase(std::remove_if(value.begin(), value.end(), [](unsigned char ch) {
+        return std::isspace(ch) != 0;
+    }), value.end());
+    if (!value.empty() && value.front() == '#') {
+        value.erase(value.begin());
+    }
+
+    if (value.size() != 6 && value.size() != 8) {
+        return false;
+    }
+
+    auto parse_byte = [&](std::size_t index) -> int {
+        const int hi = hex_value(value[index]);
+        const int lo = hex_value(value[index + 1]);
+        return (hi < 0 || lo < 0) ? -1 : ((hi << 4) | lo);
+    };
+
+    const int r = parse_byte(0);
+    const int g = parse_byte(2);
+    const int b = parse_byte(4);
+    const int a = value.size() == 8 ? parse_byte(6) : 255;
+    if (r < 0 || g < 0 || b < 0 || a < 0) {
+        return false;
+    }
+
+    rgba[0] = static_cast<float>(r) / 255.0f;
+    rgba[1] = static_cast<float>(g) / 255.0f;
+    rgba[2] = static_cast<float>(b) / 255.0f;
+    rgba[3] = static_cast<float>(a) / 255.0f;
+    return true;
+}
+
+void theme_builder_status(const std::string& message, bool is_error) {
+    g_theme_builder_state.status_message = message;
+    g_theme_builder_state.status_is_error = is_error;
+}
+
+void sync_theme_builder_from_host() {
+    auto& manager = core::ThemeManager::get();
+    for (auto& field : g_theme_builder_state.fields) {
+        float rgba[4] = {0.0f, 0.0f, 0.0f, 1.0f};
+        if (manager.get_color(field.token, rgba)) {
+            encode_hex(rgba, field.hex);
+        }
+    }
+    g_theme_builder_state.synced_from_host = true;
+}
+
+void apply_theme_preset(const char* preset_name, const char* label) {
+    if (!core::ThemeManager::get().apply_preset(preset_name)) {
+        theme_builder_status("Could not apply the requested preset.", true);
+        return;
+    }
+
+    sync_theme_builder_from_host();
+    theme_builder_status(std::string("Applied ") + label + ".", false);
+}
+
+void apply_theme_edits() {
+    auto& manager = core::ThemeManager::get();
+    for (const auto& field : g_theme_builder_state.fields) {
+        float rgba[4] = {};
+        if (!parse_hex_color(field.hex, rgba)) {
+            theme_builder_status(std::string("Invalid color for ") + field.label + ".", true);
+            return;
+        }
+        if (!manager.set_color(field.token, rgba)) {
+            theme_builder_status(std::string("Could not apply token ") + field.label + ".", true);
+            return;
+        }
+    }
+
+    theme_builder_status("Applied custom theme edits.", false);
+}
 
 void ensure_custom_fonts_loaded(SettingsState& state) {
     if (state.custom_fonts_loaded) {
@@ -165,6 +317,122 @@ void theme_section(SettingsState& state) {
                 state.save_app_settings();
             }
         });
+    });
+}
+
+void theme_builder_section() {
+    if (!g_theme_builder_state.synced_from_host) {
+        sync_theme_builder_from_host();
+    }
+
+    settings_section("##appearance_theme_builder", "Theme Builder", {}, [&]() {
+        UI::text({
+            .text = "Adjust Misty theme tokens inline or start from a preset like Gruvbox, Tokyo Night, or Catppuccin.",
+            .width = UI::Size::px(560.0f),
+            .overflow = UI::TextOverflow::Wrap,
+            .color = ImVec4(0.76f, 0.78f, 0.82f, 1.0f),
+        });
+
+        UI::row("##appearance_theme_builder_presets_row_1", {
+            .width = UI::Size::fill(),
+            .height = UI::Size::auto_size(),
+            .gap = UI::Spacing::xy(10.0f, 0.0f),
+        }, [&]() {
+            if (UI::button("##appearance_theme_gruvbox", {
+                .label = "Apply Gruvbox",
+                .width = UI::Size::px(140.0f),
+                .height = UI::Size::px(34.0f),
+                .variant = UI::ButtonVariant::Subtle,
+                .rounding = 6.0f,
+            })) {
+                apply_theme_preset("gruvbox-dark", "Gruvbox Dark");
+            }
+            if (UI::button("##appearance_theme_tokyo_night", {
+                .label = "Apply Tokyo Night",
+                .width = UI::Size::px(160.0f),
+                .height = UI::Size::px(34.0f),
+                .variant = UI::ButtonVariant::Subtle,
+                .rounding = 6.0f,
+            })) {
+                apply_theme_preset("tokyo-night", "Tokyo Night");
+            }
+            if (UI::button("##appearance_theme_catppuccin", {
+                .label = "Apply Catppuccin",
+                .width = UI::Size::px(160.0f),
+                .height = UI::Size::px(34.0f),
+                .variant = UI::ButtonVariant::Subtle,
+                .rounding = 6.0f,
+            })) {
+                apply_theme_preset("catppuccin-mocha", "Catppuccin Mocha");
+            }
+        });
+
+        UI::row("##appearance_theme_builder_presets_row_2", {
+            .width = UI::Size::fill(),
+            .height = UI::Size::auto_size(),
+            .gap = UI::Spacing::xy(10.0f, 0.0f),
+        }, [&]() {
+            if (UI::button("##appearance_theme_reset_default", {
+                .label = "Reset Misty Dark",
+                .width = UI::Size::px(160.0f),
+                .height = UI::Size::px(34.0f),
+                .variant = UI::ButtonVariant::Subtle,
+                .rounding = 6.0f,
+            })) {
+                apply_theme_preset("misty-dark", "Misty Dark");
+            }
+            if (UI::button("##appearance_theme_reload_current", {
+                .label = "Reload Current",
+                .width = UI::Size::px(140.0f),
+                .height = UI::Size::px(34.0f),
+                .variant = UI::ButtonVariant::Subtle,
+                .rounding = 6.0f,
+            })) {
+                sync_theme_builder_from_host();
+                theme_builder_status("Reloaded theme tokens from the current theme.", false);
+            }
+        });
+
+        for (auto& field : g_theme_builder_state.fields) {
+            settings_row((std::string("##appearance_theme_token_") + field.token).c_str(), {
+                .start_width_pct = 0.52f,
+                .show_divider = false,
+                .divider_color = kSettingsDividerColor,
+            }, [&]() {
+                settings_row_text(field.label, field.token);
+            }, [&]() {
+                settings_input_control((std::string("##appearance_theme_token_input_") + field.token).c_str(),
+                    field.hex, sizeof(field.hex), false);
+            });
+        }
+
+        UI::row("##appearance_theme_builder_actions", {
+            .width = UI::Size::fill(),
+            .height = UI::Size::auto_size(),
+            .gap = UI::Spacing::xy(12.0f, 0.0f),
+            .align = UI::Align::Center,
+        }, [&]() {
+            if (UI::button("##appearance_theme_apply_edits", {
+                .label = "Apply Edits",
+                .width = UI::Size::px(120.0f),
+                .height = UI::Size::px(34.0f),
+                .variant = UI::ButtonVariant::Primary,
+                .rounding = 6.0f,
+            })) {
+                apply_theme_edits();
+            }
+
+            UI::text({
+                .text = "Hex accepts #RRGGBB or #RRGGBBAA.",
+                .width = UI::Size::fill(),
+                .overflow = UI::TextOverflow::Wrap,
+                .color = kSettingsMutedTextColor,
+            });
+        });
+
+        if (!g_theme_builder_state.status_message.empty()) {
+            settings_status_text(g_theme_builder_state.status_message, g_theme_builder_state.status_is_error);
+        }
     });
 }
 
@@ -318,6 +586,7 @@ bool appearance_tab(SettingsState& state) {
 void appearance_content(SettingsState& state) {
     settings_page("appearance_content", "Appearance", [&]() {
         theme_section(state);
+        theme_builder_section();
         layout_section(state);
         typography_section(state);
         fonts_section(state);

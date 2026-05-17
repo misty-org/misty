@@ -19,6 +19,14 @@ namespace misty::core {
     namespace fs = std::filesystem;
 
     namespace {
+        std::map<std::string, std::string> merge_auth_headers(const HttpRequestOptions& options) {
+            auto merged_headers = SessionManager::get().get_auth_headers();
+            for (const auto& [key, value] : options.headers) {
+                merged_headers[key] = value;
+            }
+            return merged_headers;
+        }
+
         fs::path staging_download_path_for(const fs::path& final_path) {
             static std::atomic<uint64_t> counter{0};
 
@@ -176,12 +184,12 @@ namespace misty::core {
         return data->progress_cb(now, total) ? 0 : 1;
     }
 
-    static HttpResponse execute_curl_request_with_timeouts(const std::string& method,
-                                                           const std::string& url,
-                                                           const std::string& body,
-                                                           const std::map<std::string, std::string>& headers,
-                                                           long connect_timeout_seconds,
-                                                           long total_timeout_seconds);
+    static HttpResponse execute_curl_request(const std::string& method,
+                                             const std::string& url,
+                                             const std::string& body,
+                                             const std::map<std::string, std::string>& headers,
+                                             long connect_timeout_seconds,
+                                             long total_timeout_seconds);
 
     HTTPClient& HTTPClient::get() {
         static HTTPClient instance;
@@ -203,54 +211,14 @@ namespace misty::core {
         }
     }
 
-    HttpResponse HTTPClient::get(const std::string& url, const std::map<std::string, std::string>& headers) {
-        return perform_request("GET", url, "", headers);
+    HttpResponse HTTPClient::get(const std::string& url, const HttpRequestOptions& options) {
+        return perform_request("GET", url, "", options);
     }
 
-    HttpResponse HTTPClient::get_with_timeouts(const std::string& url,
-                                               long connect_timeout_seconds,
-                                               long total_timeout_seconds,
-                                               const std::map<std::string, std::string>& headers) {
-        auto merged_headers = SessionManager::get().get_auth_headers();
-        for (const auto& [key, value] : headers) {
-            merged_headers[key] = value;
-        }
-
-        HttpResponse response = execute_curl_request_with_timeouts("GET", url, "", merged_headers, connect_timeout_seconds, total_timeout_seconds);
-        if (response.status_code == 0 && is_proxy_url(url) && ProxyManager::get().ensure_running()) {
-            response = execute_curl_request_with_timeouts("GET", url, "", merged_headers, connect_timeout_seconds, total_timeout_seconds);
-        }
-        update_proxy_status(url, response.status_code);
-
-        if (response.status_code == 401 &&
-            !SessionManager::get().is_session_expired() &&
-            !is_refreshing_.exchange(true)) {
-            SessionManager::RefreshResult refresh_result = SessionManager::get().attempt_token_refresh();
-            if (refresh_result == SessionManager::RefreshResult::Success) {
-                auto retry_headers = SessionManager::get().get_auth_headers();
-                for (const auto& [key, value] : headers) {
-                    retry_headers[key] = value;
-                }
-                response = execute_curl_request_with_timeouts("GET", url, "", retry_headers, connect_timeout_seconds, total_timeout_seconds);
-                update_proxy_status(url, response.status_code);
-            } else if (refresh_result == SessionManager::RefreshResult::Failed) {
-                SessionManager::get().mark_session_expired();
-            }
-            is_refreshing_.store(false);
-        }
-
-        return response;
-    }
-
-    HttpResponse HTTPClient::get_stream_with_timeouts(const std::string& url,
-                                                      long connect_timeout_seconds,
-                                                      long total_timeout_seconds,
-                                                      StreamLineCallback line_callback,
-                                                      const std::map<std::string, std::string>& headers) {
-        auto merged_headers = SessionManager::get().get_auth_headers();
-        for (const auto& [key, value] : headers) {
-            merged_headers[key] = value;
-        }
+    HttpResponse HTTPClient::get_stream(const std::string& url,
+                                        StreamLineCallback line_callback,
+                                        const HttpRequestOptions& options) {
+        auto merged_headers = merge_auth_headers(options);
 
         auto execute_stream_request = [&](const std::map<std::string, std::string>& request_headers) {
             HttpResponse response;
@@ -271,8 +239,8 @@ namespace misty::core {
             curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, StreamHeaderCallback);
             curl_easy_setopt(curl, CURLOPT_HEADERDATA, &data);
             curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-            curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, connect_timeout_seconds);
-            curl_easy_setopt(curl, CURLOPT_TIMEOUT, total_timeout_seconds);
+            curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, options.timeouts.connect_timeout_seconds);
+            curl_easy_setopt(curl, CURLOPT_TIMEOUT, options.timeouts.total_timeout_seconds);
 
             struct curl_slist* header_list = nullptr;
             for (const auto& [key, value] : request_headers) {
@@ -313,7 +281,7 @@ namespace misty::core {
             SessionManager::RefreshResult refresh_result = SessionManager::get().attempt_token_refresh();
             if (refresh_result == SessionManager::RefreshResult::Success) {
                 auto retry_headers = SessionManager::get().get_auth_headers();
-                for (const auto& [key, value] : headers) {
+                for (const auto& [key, value] : options.headers) {
                     retry_headers[key] = value;
                 }
                 response = execute_stream_request(retry_headers);
@@ -327,61 +295,29 @@ namespace misty::core {
         return response;
     }
 
-    HttpResponse HTTPClient::post_with_timeouts(const std::string& url,
-                                                const std::string& body,
-                                                long connect_timeout_seconds,
-                                                long total_timeout_seconds,
-                                                const std::map<std::string, std::string>& headers) {
-        auto merged_headers = SessionManager::get().get_auth_headers();
-        for (const auto& [key, value] : headers) {
-            merged_headers[key] = value;
-        }
-
-        HttpResponse response = execute_curl_request_with_timeouts("POST", url, body, merged_headers, connect_timeout_seconds, total_timeout_seconds);
-        if (response.status_code == 0 && is_proxy_url(url) && ProxyManager::get().ensure_running()) {
-            response = execute_curl_request_with_timeouts("POST", url, body, merged_headers, connect_timeout_seconds, total_timeout_seconds);
-        }
-        update_proxy_status(url, response.status_code);
-
-        if (response.status_code == 401 &&
-            !SessionManager::get().is_session_expired() &&
-            !is_refreshing_.exchange(true)) {
-            SessionManager::RefreshResult refresh_result = SessionManager::get().attempt_token_refresh();
-            if (refresh_result == SessionManager::RefreshResult::Success) {
-                auto retry_headers = SessionManager::get().get_auth_headers();
-                for (const auto& [key, value] : headers) {
-                    retry_headers[key] = value;
-                }
-                response = execute_curl_request_with_timeouts("POST", url, body, retry_headers, connect_timeout_seconds, total_timeout_seconds);
-                update_proxy_status(url, response.status_code);
-            } else if (refresh_result == SessionManager::RefreshResult::Failed) {
-                SessionManager::get().mark_session_expired();
-            }
-            is_refreshing_.store(false);
-        }
-
-        return response;
+    HttpResponse HTTPClient::post(const std::string& url,
+                                  const std::string& body,
+                                  const HttpRequestOptions& options) {
+        return perform_request("POST", url, body, options);
     }
 
-    HttpResponse HTTPClient::post(const std::string& url, const std::string& body, const std::map<std::string, std::string>& headers) {
-        return perform_request("POST", url, body, headers);
+    HttpResponse HTTPClient::put(const std::string& url,
+                                 const std::string& body,
+                                 const HttpRequestOptions& options) {
+        return perform_request("PUT", url, body, options);
     }
 
-    HttpResponse HTTPClient::put(const std::string& url, const std::string& body, const std::map<std::string, std::string>& headers) {
-        return perform_request("PUT", url, body, headers);
-    }
-
-    HttpResponse HTTPClient::del(const std::string& url, const std::map<std::string, std::string>& headers) {
-        return perform_request("DELETE", url, "", headers);
+    HttpResponse HTTPClient::del(const std::string& url, const HttpRequestOptions& options) {
+        return perform_request("DELETE", url, "", options);
     }
 
     // Makes a single HTTP request (no retry logic)
-    static HttpResponse execute_curl_request_with_timeouts(const std::string& method,
-                                                           const std::string& url,
-                                                           const std::string& body,
-                                                           const std::map<std::string, std::string>& headers,
-                                                           long connect_timeout_seconds,
-                                                           long total_timeout_seconds) {
+    static HttpResponse execute_curl_request(const std::string& method,
+                                             const std::string& url,
+                                             const std::string& body,
+                                             const std::map<std::string, std::string>& headers,
+                                             long connect_timeout_seconds,
+                                             long total_timeout_seconds) {
         HttpResponse response;
         response.status_code = 0;
         response.body = "";
@@ -452,13 +388,6 @@ namespace misty::core {
         curl_easy_cleanup(curl);
 
         return response;
-    }
-
-    static HttpResponse execute_curl_request(const std::string& method,
-                                            const std::string& url,
-                                            const std::string& body,
-                                            const std::map<std::string, std::string>& headers) {
-        return execute_curl_request_with_timeouts(method, url, body, headers, 10L, 30L);
     }
 
     static DownloadResult execute_curl_download(const std::string& url,
@@ -561,16 +490,21 @@ namespace misty::core {
         return result;
     }
 
-    HttpResponse HTTPClient::perform_request(const std::string& method, const std::string& url, const std::string& body, const std::map<std::string, std::string>& headers) {
-        // Merge auth headers (caller-provided headers take priority)
-        auto merged_headers = SessionManager::get().get_auth_headers();
-        for (const auto& [key, value] : headers) {
-            merged_headers[key] = value;
-        }
+    HttpResponse HTTPClient::perform_request(const std::string& method,
+                                             const std::string& url,
+                                             const std::string& body,
+                                             const HttpRequestOptions& options) {
+        auto merged_headers = merge_auth_headers(options);
 
-        HttpResponse response = execute_curl_request(method, url, body, merged_headers);
+        HttpResponse response = execute_curl_request(
+            method, url, body, merged_headers,
+            options.timeouts.connect_timeout_seconds,
+            options.timeouts.total_timeout_seconds);
         if (response.status_code == 0 && is_proxy_url(url) && ProxyManager::get().ensure_running()) {
-            response = execute_curl_request(method, url, body, merged_headers);
+            response = execute_curl_request(
+                method, url, body, merged_headers,
+                options.timeouts.connect_timeout_seconds,
+                options.timeouts.total_timeout_seconds);
         }
         update_proxy_status(url, response.status_code);
 
@@ -583,10 +517,13 @@ namespace misty::core {
             if (refresh_result == SessionManager::RefreshResult::Success) {
                 // Retry with new auth headers
                 auto retry_headers = SessionManager::get().get_auth_headers();
-                for (const auto& [key, value] : headers) {
+                for (const auto& [key, value] : options.headers) {
                     retry_headers[key] = value;
                 }
-                response = execute_curl_request(method, url, body, retry_headers);
+                response = execute_curl_request(
+                    method, url, body, retry_headers,
+                    options.timeouts.connect_timeout_seconds,
+                    options.timeouts.total_timeout_seconds);
                 update_proxy_status(url, response.status_code);
             } else if (refresh_result == SessionManager::RefreshResult::Failed) {
                 // Refresh failed — mark session as expired so UI can prompt reconnect
@@ -790,7 +727,7 @@ namespace misty::core {
             return false;
         }
 
-        HttpResponse response = execute_curl_request("GET", proxy_url + "/api/hello", "", {});
+        HttpResponse response = execute_curl_request("GET", proxy_url + "/api/hello", "", {}, 10L, 30L);
         update_proxy_status(proxy_url + "/api/hello", response.status_code);
         return response.status_code != 0;
     }
@@ -798,11 +735,14 @@ namespace misty::core {
     HttpResponse execute_raw_http_request(const std::string& method,
                                           const std::string& url,
                                           const std::string& body,
-                                          const std::map<std::string, std::string>& headers,
-                                          long connect_timeout_seconds,
-                                          long total_timeout_seconds) {
-        return execute_curl_request_with_timeouts(
-            method, url, body, headers, connect_timeout_seconds, total_timeout_seconds);
+                                          const HttpRequestOptions& options) {
+        return execute_curl_request(
+            method,
+            url,
+            body,
+            options.headers,
+            options.timeouts.connect_timeout_seconds,
+            options.timeouts.total_timeout_seconds);
     }
 
     std::string build_json_object(const std::map<std::string, std::string>& fields) {

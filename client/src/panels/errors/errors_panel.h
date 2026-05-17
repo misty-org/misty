@@ -1,6 +1,6 @@
 #pragma once
 
-#include "panels/panel.h"
+#include "panels/panel/panel.h"
 
 namespace misty::panel {
 

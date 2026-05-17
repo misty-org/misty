@@ -34,13 +34,12 @@ namespace misty::panel {
 
         // Account
         char account_email[256] = "";
-        char account_display_name[128] = "";
         char subscription_plan_label[64] = "Free";
         int connected_provider_count = 0;
 
         // General
         int theme_index = 0; // 0=System, 1=Dark, 2=Light
-        int startup_view_index = 0; // 0=Files, 1=Services, 2=Activity
+        int startup_view_index = 0; // 0=Files, 1=Providers, 2=Activity
         bool reopen_last_session = true;
         bool launch_on_login = false;
         bool auto_update_enabled = true;
@@ -112,6 +111,7 @@ namespace misty::panel {
 
         // Advanced
         bool debug_logging_enabled = false;
+        bool frame_pacing_overlay_enabled = false;
         bool experimental_features_enabled = false;
 
         // Status messages
