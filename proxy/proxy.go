@@ -14,7 +14,9 @@ import (
 	"github.com/kannachi323/misty/proxy/core/setup"
 	"github.com/kannachi323/misty/proxy/core/syncindex"
 	"github.com/kannachi323/misty/proxy/db"
+	_ "github.com/kannachi323/misty/proxy/docs"
 	authmw "github.com/kannachi323/misty/proxy/middleware"
+	httpSwagger "github.com/swaggo/http-swagger/v2"
 )
 
 type Proxy struct {
@@ -42,6 +44,9 @@ func CreateProxy(cfg setup.Config) (*Proxy, error) {
 	workDir, _ := os.Getwd()
 	staticDir := filepath.Join(workDir, "static")
 	proxy.Router.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.Dir(staticDir))))
+	proxy.Router.Get("/docs/*", httpSwagger.Handler(
+		httpSwagger.URL("/docs/doc.json"),
+	))
 	proxy.Database = &db.Database{}
 	proxy.VaultService = vault.NewService()
 
@@ -75,30 +80,19 @@ func (proxy *Proxy) MountHandlers() {
 	proxy.APIRouter.Group(func(r chi.Router) {
 		r.Use(authmw.JWTMiddleware(proxy.Database))
 
-		// ---- rclone unified endpoints ----
+		// ---- rclone provider endpoints ----
 		r.Get("/remotes", remote.ListRemotes())
-		r.Delete("/remotes", remote.DeleteRemote())
 		r.Get("/remotes/types", remote.ListTypes())
-		r.Post("/remotes/config/continue", remote.ConfigContinue())
-		r.Delete("/remotes/config", remote.ConfigCancel())
-		r.Get("/files", remote.ListFiles())
-		r.Post("/sync/refetch", remote.SyncRefetch(proxy.SyncManager))
-		r.Get("/sync/list", remote.SyncList(proxy.SyncIndex))
-		r.Post("/sync/dirty", remote.SyncDirty(proxy.SyncManager))
-		r.Post("/sync/mark-synced", remote.SyncMarkSynced(proxy.SyncManager))
-		r.Post("/sync/run-now", remote.SyncRunNow(proxy.SyncPoller))
-		r.Put("/sync/watch-dir", remote.SyncWatchDir(proxy.SyncManager))
-		r.Delete("/sync/watch-dir", remote.SyncUnwatchDir(proxy.SyncManager))
-		r.Get("/file/download", remote.DownloadFile())
-		r.Post("/file/upload", remote.UploadFile())
-		r.Post("/folder/download", remote.DownloadFolder())
-		r.Post("/folder/upload", remote.UploadFolder())
-		r.Post("/folder/transfer", remote.TransferFolder())
-		r.Post("/mkdir", remote.MkDir())
-		r.Delete("/file", remote.DeleteFile())
-		r.Get("/about", remote.AboutRemote())
-		r.Post("/remotes", remote.CreateRemote())
+		r.Get("/remotes/workflows", remote.ListProviderWorkflows())
+		r.Get("/remotes/workflow", remote.GetProviderWorkflow())
 		r.Post("/remotes/config/start", remote.ConfigStart())
+		r.Post("/remotes/config/continue", remote.ConfigContinue())
+		r.Get("/remotes/health", remote.Health())
+		r.Get("/remotes/file/list", remote.ListFiles())
+		r.Get("/remotes/file/download", remote.DownloadFile())
+		r.Post("/remotes/file/upload", remote.UploadFile())
+		r.Delete("/remotes/file", remote.DeleteFile())
+		r.Post("/remotes/file/rename", remote.RenameFile())
 
 		// vault
 		v := proxy.VaultService

@@ -31,6 +31,8 @@ namespace misty::panel {
     MultiPanel::Pane MultiPanel::create_default_pane(std::int16_t pane_idx, std::int16_t tab_idx) const {
         Pane pane;
         pane.pane_id = panel_id_ + "_pane_" + std::to_string(pane_idx);
+        pane.tab_controller.set_restore_tab_factory(
+            [this](std::int16_t restore_tab_idx) { return create_default_tab(restore_tab_idx); });
         pane.tab_controller.add_tab(create_default_tab(tab_idx));
         return pane;
     }
@@ -194,13 +196,19 @@ namespace misty::panel {
         }
 
         ClosedPaneSnapshot snapshot;
-        snapshot.pane = *active_pane;
+        snapshot.pane_id = active_pane->pane_id;
+        snapshot.tabs = active_pane->tab_controller.export_tab_snapshots();
+        snapshot.closed_tabs = active_pane->tab_controller.take_closed_tab_snapshots();
+        snapshot.active_tab_idx = active_pane->tab_controller.active_tab_index();
         snapshot.lane_index = location.lane_index;
         snapshot.row_index = location.row_index;
         snapshot.restore_mode = grid_.lanes[location.lane_index].pane_ids.size() == 1
             ? PaneRestoreMode::NewLane
             : PaneRestoreMode::SameLane;
         closed_pane_snapshots_.push_back(std::move(snapshot));
+        if (closed_pane_snapshots_.size() > kMaxClosedPanes) {
+            closed_pane_snapshots_.erase(closed_pane_snapshots_.begin());
+        }
 
         auto& lane = grid_.lanes[location.lane_index].pane_ids;
         lane.erase(lane.begin() + location.row_index);
@@ -222,12 +230,21 @@ namespace misty::panel {
         ClosedPaneSnapshot snapshot = std::move(closed_pane_snapshots_.back());
         closed_pane_snapshots_.pop_back();
 
-        add_pane(snapshot.pane);
+        Pane pane;
+        pane.pane_id = snapshot.pane_id;
+        pane.tab_controller.set_restore_tab_factory(
+            [this](std::int16_t restore_tab_idx) { return create_default_tab(restore_tab_idx); });
+        pane.tab_controller.restore_tabs_from_snapshots(
+            snapshot.tabs,
+            [this](std::int16_t tab_idx) { return create_default_tab(tab_idx); },
+            snapshot.active_tab_idx);
+        pane.tab_controller.restore_closed_tab_snapshots(snapshot.closed_tabs);
+        add_pane(pane);
 
         bool placed = false;
         if (snapshot.restore_mode == PaneRestoreMode::NewLane && grid_.lanes.size() < 2) {
             const int lane_index = std::clamp(snapshot.lane_index, 0, static_cast<int>(grid_.lanes.size()));
-            grid_.lanes.insert(grid_.lanes.begin() + lane_index, MultiPanelGrid::GridLane{.pane_ids = {snapshot.pane.pane_id}});
+            grid_.lanes.insert(grid_.lanes.begin() + lane_index, MultiPanelGrid::GridLane{.pane_ids = {snapshot.pane_id}});
             placed = true;
         }
 
@@ -235,20 +252,20 @@ namespace misty::panel {
             auto& pane_ids = grid_.lanes[snapshot.lane_index].pane_ids;
             if (pane_ids.size() < 2) {
                 const int row_index = std::clamp(snapshot.row_index, 0, static_cast<int>(pane_ids.size()));
-                pane_ids.insert(pane_ids.begin() + row_index, snapshot.pane.pane_id);
+                pane_ids.insert(pane_ids.begin() + row_index, snapshot.pane_id);
                 placed = true;
             }
         }
 
         if (!placed && grid_.lanes.size() < 2) {
-            grid_.lanes.push_back(MultiPanelGrid::GridLane{.pane_ids = {snapshot.pane.pane_id}});
+            grid_.lanes.push_back(MultiPanelGrid::GridLane{.pane_ids = {snapshot.pane_id}});
             placed = true;
         }
 
         if (!placed) {
             for (auto& lane : grid_.lanes) {
                 if (lane.pane_ids.size() < 2) {
-                    lane.pane_ids.push_back(snapshot.pane.pane_id);
+                    lane.pane_ids.push_back(snapshot.pane_id);
                     placed = true;
                     break;
                 }
@@ -256,13 +273,13 @@ namespace misty::panel {
         }
 
         if (!placed) {
-            remove_pane(snapshot.pane.pane_id);
+            remove_pane(snapshot.pane_id);
             error_msg_ = "No valid grid slot is available to restore the pane.";
             return;
         }
 
         normalize_grid();
-        active_pane_id = snapshot.pane.pane_id;
+        active_pane_id = snapshot.pane_id;
     }
 
     void MultiPanel::normalize_grid() {

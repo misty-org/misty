@@ -9,6 +9,13 @@ namespace fs = std::filesystem;
 
 namespace misty::core {
 
+    namespace {
+        struct FileStatusSnapshot {
+            std::string path;
+            panel::SyncStatus status = panel::SyncStatus::LOCAL;
+        };
+    }
+
     FileSyncService::FileSyncService(UIRegistry& registry)
         : registry_(registry) {}
 
@@ -30,19 +37,33 @@ namespace misty::core {
     }
 
     void FileSyncService::update_loop() {
+        uint64_t last_processed_revision = 0;
         while (running_) {
             try {
                 // 1. Snapshot state (hold lock briefly)
-                std::vector<panel::UnifiedFileItem> snapshot_files;
+                std::vector<FileStatusSnapshot> snapshot_files;
                 std::string snapshot_path;
+                uint64_t snapshot_revision = 0;
+                bool snapshot_loading = false;
                 {
                     auto& state = registry_.get_state<panel::FileExplorerState>("Files");
                     std::lock_guard<std::mutex> lock(state.mu);
-                    snapshot_files = state.files;
+                    snapshot_loading = state.is_loading;
+                    snapshot_revision = state.listing_revision.load(std::memory_order_relaxed);
+                    snapshot_files.reserve(state.files.size());
+                    for (const auto& file : state.files) {
+                        snapshot_files.push_back(FileStatusSnapshot{
+                            .path = file.path,
+                            .status = file.status,
+                        });
+                    }
                     snapshot_path = state.current_path;
                 }
 
-                if (snapshot_files.empty()) {
+                if (snapshot_loading ||
+                    snapshot_files.empty() ||
+                    snapshot_revision == 0 ||
+                    snapshot_revision == last_processed_revision) {
                     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
                     continue;
                 }
@@ -52,8 +73,7 @@ namespace misty::core {
                 bool any_update = false;
 
                 for (const auto& file : snapshot_files) {
-                    panel::SyncStatus old_status = file.status;
-                    panel::SyncStatus new_status = old_status;
+                    panel::SyncStatus new_status = file.status;
 
                     new_status = panel::SyncStatus::LOCAL;
 
@@ -65,7 +85,7 @@ namespace misty::core {
                         }
                     }
 
-                    if (new_status != old_status) {
+                    if (new_status != file.status) {
                         updates.push_back({file.path, new_status});
                         any_update = true;
                     }
@@ -91,6 +111,8 @@ namespace misty::core {
                         }
                     }
                 }
+
+                last_processed_revision = snapshot_revision;
                 
                 // Sleep for 1 second
                 std::this_thread::sleep_for(std::chrono::milliseconds(1000));

@@ -12,7 +12,7 @@
 
 #include "panels/file_explorer/state/file_sidebar_state.h"
 
-#include "panels/services/services_state.h"
+#include "panels/services/state/services_state.h"
 #include "panels/services/remote/remote_state.h"
 #include "panels/devices/device_state.h"
 #include "panels/devices/device_watcher.h"

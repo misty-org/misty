@@ -1,5 +1,6 @@
 #include "services_view.h"
 #include "imgui.h"
+#include "panels/services/state/services_state.h"
 
 namespace misty::view {
     ServicesView::ServicesView(UIRegistry& ui_registry)
@@ -8,6 +9,7 @@ namespace misty::view {
     }
 
     void ServicesView::init_panels() {
+        ui_registry_.get_state<panel::ServicesState>("Services");
         navbar_panel_ = std::make_shared<panel::NavbarPanel>(ui_registry_);
         services_panel_ = std::make_shared<panel::ServicesPanel>(ui_registry_);
         notification_panel_ = std::make_shared<panel::NotificationPanel>(ui_registry_);

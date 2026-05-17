@@ -1,5 +1,4 @@
 #include "panels/onboarding/onboarding_panel.h"
-#include "panels/services/services_state.h"
 #include "core/manager/asset_manager.h"
 #include "core/manager/font_manager.h"
 #include "core/ui/ui_style.h"
@@ -355,10 +354,6 @@ namespace misty::panel {
     void OnboardingPanel::show_step_3_connect(OnboardingState& state) {
         float w = ImGui::GetContentRegionAvail().x;
 
-        // Ensure services state is ready
-        auto& svc = registry_.get_state<ServicesState>("Services");
-        svc.init(worker_pool_);
-
         show_progress_dots(3, 4);
         ImGui::Spacing();
 
@@ -367,90 +362,33 @@ namespace misty::panel {
         ImGui::PopFont();
 
         ImGui::Spacing();
-        centered_text("Connect an account, or skip for now.", IM_COL32(120, 120, 120, 255));
+        centered_text("Service wiring is moving into the new Services page.", IM_COL32(120, 120, 120, 255));
         ImGui::Spacing();
         ImGui::Spacing();
 
-        // ── Success banner ────────────────────────────────────────────────────
-        // Check if any connection was established (after a refresh)
-        if (!state.cloud_connected) {
-            std::lock_guard<std::mutex> lock(svc.mu);
-            if (!svc.connections.empty()) {
-                state.cloud_connected    = true;
-                state.connected_provider = svc.connections.begin()->display_name.empty()
-                    ? svc.connections.begin()->name
-                    : svc.connections.begin()->display_name;
-            }
-        }
-
-        if (state.cloud_connected) {
-            ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.10f, 0.28f, 0.14f, 1.0f));
-            if (ImGui::BeginChild("##conn_ok", ImVec2(w, 48.0f), false,
-                                  ImGuiWindowFlags_NoScrollbar)) {
-                std::string msg = "Connected to " + state.connected_provider + "!";
-                float tw = ImGui::CalcTextSize(msg.c_str()).x;
-                ImGui::SetCursorPos(ImVec2((w - tw) * 0.5f,
-                                          (48.0f - ImGui::GetTextLineHeight()) * 0.5f));
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55f, 0.92f, 0.60f, 1.0f));
-                ImGui::TextUnformatted(msg.c_str());
-                ImGui::PopStyleColor();
-            }
-            ImGui::EndChild();
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.14f, 0.14f, 0.16f, 1.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 12.0f);
+        if (ImGui::BeginChild("##services_template_notice", ImVec2(w, 188.0f), true,
+                              ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse)) {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.90f, 0.90f, 0.92f, 1.0f));
+            ImGui::TextWrapped("The legacy cloud-connect onboarding step has been retired.");
             ImGui::PopStyleColor();
             ImGui::Spacing();
-        }
-
-        // ── Provider buttons ──────────────────────────────────────────────────
-        struct Provider { const char* name; const char* type; const char* icon; };
-        static constexpr Provider providers[] = {
-            { "OneDrive",     "onedrive", "cloud-24" },
-            { "Google Drive", "drive",    "cloud-24" },
-            { "Dropbox",      "dropbox",  "cloud-24" },
-        };
-
-        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
-        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,   ImVec2(0.0f, 8.0f));
-        ImGui::PushStyleColor(ImGuiCol_Button,        ImVec4(0.14f, 0.14f, 0.16f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.20f, 0.20f, 0.23f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.11f, 0.11f, 0.13f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_Text,          ImVec4(0.85f, 0.85f, 0.85f, 1.0f));
-
-        for (int i = 0; i < 3; ++i) {
-            ImGui::PushID(i);
-            if (ImGui::Button(providers[i].name, ImVec2(w, 42.0f))) {
-                auto now = std::chrono::system_clock::now();
-                auto epoch = std::chrono::duration_cast<std::chrono::seconds>(
-                    now.time_since_epoch()).count();
-                std::string remote_name = std::string(providers[i].type) + "-" + std::to_string(epoch);
-                svc.initiate_login(providers[i].type, remote_name);
-                state.awaiting_check = true;
-            }
-            ImGui::PopID();
-        }
-
-        ImGui::PopStyleColor(4);
-        ImGui::PopStyleVar(2);
-
-        // "Check connection" — appears after user interacts with a provider
-        if (state.awaiting_check) {
-            ImGui::Spacing();
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55f, 0.55f, 0.55f, 1.0f));
-            ImGui::TextWrapped("Finish signing in via the browser, then click below.");
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.62f, 0.62f, 0.66f, 1.0f));
+            ImGui::TextWrapped(
+                "Finish account setup later from the redesigned Services page. "
+                "This onboarding step is now just a placeholder while the new proxy-backed flow is being implemented.");
             ImGui::PopStyleColor();
-            ImGui::Spacing();
-            if (show_primary_button("Check connection", w)) {
-                state.cloud_connected    = false;  // reset so we re-evaluate above
-                state.connected_provider = "";
-                svc.refresh_connections();
-            }
         }
+        ImGui::EndChild();
+        ImGui::PopStyleVar();
+        ImGui::PopStyleColor();
 
         ImGui::Spacing();
         ImGui::Separator();
         ImGui::Spacing();
 
-        // Next / Skip
-        if (show_primary_button("Next", w, state.cloud_connected)) {
+        if (show_primary_button("Next", w)) {
             state.advance();
         }
 

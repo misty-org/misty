@@ -163,6 +163,60 @@ namespace misty::panel {
         // So no save_state() needed here for now.
     }
 
+    void FileExplorerState::note_listing_changed() {
+        listing_revision.fetch_add(1, std::memory_order_relaxed);
+    }
+
+    void FileExplorerState::clear_transient_ui_state() {
+        selected_files.clear();
+        last_selected_index = -1;
+        deleting_files.clear();
+        error_msg.clear();
+        context_menu_target_path.clear();
+        rename_target_path.clear();
+        show_rename_modal = false;
+        rename_buffer[0] = '\0';
+        show_new_entry_modal = false;
+        new_entry_is_dir = false;
+        new_entry_name_buffer[0] = '\0';
+        show_permission_delete_modal = false;
+        permission_delete_permanent = false;
+        permission_delete_paths.clear();
+        show_permanent_delete_modal = false;
+        permanent_delete_paths.clear();
+        chat_overlay_open = false;
+        chat_request_in_flight = false;
+        chat_focus_input = false;
+        chat_resizing = false;
+        chat_resize_just_finished = false;
+        chat_overlay_height = 0.0f;
+        chat_input_buffer[0] = '\0';
+        chat_messages.clear();
+        chat_error_msg.clear();
+    }
+
+    void FileExplorerState::clear_for_state_release() {
+        clear_transient_ui_state();
+        pending_navigation_path.clear();
+        pending_shared_refresh_path.clear();
+        while (!back_history.empty()) {
+            back_history.pop();
+        }
+        while (!forward_history.empty()) {
+            forward_history.pop();
+        }
+        files.clear();
+        recent_files.clear();
+        starred_files.clear();
+        trash_files.clear();
+        current_path[0] = '\0';
+        search_path[0] = '\0';
+        is_loading = false;
+        show_loading_animation = false;
+        sort_dirty = true;
+        note_listing_changed();
+    }
+
     void FileExplorerState::track_move(const std::string& old_path, const UnifiedFileItem& new_item) {
         if (new_item.status == SyncStatus::DELETED) {
             // File moved to trash — pull it out of recent entirely
