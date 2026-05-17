@@ -7,20 +7,17 @@ export function proposeAction(prompt: string): GlobalAiActionProposal {
     prompt.toLocaleLowerCase().includes(space.name.toLocaleLowerCase()),
   );
   const space = requestedSpace ?? spacesState.spaces[0];
-  const agents = space ? (spacesState.agentsBySpace[space.id] ?? []) : [];
-  const agent = agents.find((item) => item.enabled && item.status !== "disabled");
   const readOnly = /^(find|search|show|list|summari[sz]e|explain|review|check)\b/i.test(prompt);
   return {
     id: `proposal-${globalMistyId()}`,
     title: readOnly ? "Run with Misty" : "Review this action",
     summary: readOnly
-      ? `Misty will use ${agent?.name ?? "the best available Agent"} to ${lowerFirst(prompt)}.`
-      : `Misty will ask ${agent?.name ?? "the best available Agent"} to ${lowerFirst(prompt)} after you confirm.`,
+      ? `Misty will ${lowerFirst(prompt)}.`
+      : `Misty will ${lowerFirst(prompt)} after you confirm.`,
     prompt,
     risk: readOnly ? "read" : "write",
     state: "proposed",
     requiresConfirmation: !readOnly,
-    ...(agent ? { agentId: agent.id, agentName: agent.name } : {}),
     ...(space ? { spaceId: space.id, spaceName: space.name } : {}),
   };
 }
