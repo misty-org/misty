@@ -1,6 +1,5 @@
 #pragma once
 
-#include <algorithm>
 #include <vector>
 #include <string>
 #include <stack>
@@ -10,7 +9,7 @@
 #include <chrono>
 #include <filesystem>
 #include <cstring>
-#include "core/system/util.h"
+#include <cstdint>
 #include "core/ui/ui_registry.h"
 #include "core/threading/worker_pool.h"
 
@@ -168,6 +167,7 @@ namespace misty::panel {
         std::stack<std::string> forward_history;
         std::mutex mu;
         std::atomic<uint64_t> navigation_generation{0};
+        std::atomic<uint64_t> listing_revision{0};
 
         // Pending navigation - set by external code, processed by panel
         std::string pending_navigation_path;
@@ -248,6 +248,9 @@ namespace misty::panel {
 
         // Set whenever in-memory state diverges from what is on disk.
         std::atomic<bool> dirty_{false};
+        void note_listing_changed();
+        void clear_transient_ui_state();
+        void clear_for_state_release();
 
     private:
         // Prevents queuing more than one concurrent background write.

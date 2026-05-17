@@ -9,13 +9,18 @@ namespace misty::panel {
     struct SettingsPanelProps {
         std::string state_key = "Settings";
         std::string panel_id = "settings_primary";
+        bool owns_state_cleanup = false;
     };
 
     class SettingsPanel : public MultiPanel {
     public:
         explicit SettingsPanel(core::UIRegistry& registry,
                                SettingsPanelProps props = {});
-        ~SettingsPanel() = default;
+        ~SettingsPanel() override = default;
+
+        std::string save_restore_state() const override;
+        void load_restore_state(const std::string& state) override;
+        void release_state() override;
 
         TabController::Tab create_default_tab(std::int16_t tab_idx) const override;
 
@@ -29,6 +34,7 @@ namespace misty::panel {
 
         core::UIRegistry& registry_;
         std::string state_key_;
+        bool owns_state_cleanup_ = false;
         float last_scroll_x_ = 0.0f;
         float last_scroll_y_ = 0.0f;
         bool has_scroll_snapshot_ = false;

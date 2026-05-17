@@ -1,7 +1,7 @@
 #include "file_sidebar_panel.h"
 
 #include "panels/file_explorer/state/file_explorer_state.h"
-#include "panels/services/services_state.h"
+#include "panels/services/state/services_state.h"
 #include "panels/file_explorer/state/remote_mount_state.h"
 
 #include <cmath>
@@ -142,8 +142,6 @@ namespace misty::panel {
         auto& state = registry_.get_state<FileSidebarState>("FileSidebar");
         auto& workspace_state = registry_.get_state<RemoteMountState>("RemoteMounts");
         auto& services_state = registry_.get_state<ServicesState>("Services");
-        services_state.init(worker_pool_);
-
 
         ImGuiWindowFlags flags =
             ImGuiWindowFlags_NoTitleBar |
@@ -214,29 +212,13 @@ namespace misty::panel {
         if (!services_collapsed_) {
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 2.0f));
 
-            auto& services = registry_.get_state<ServicesState>("Services");
-            std::vector<RemoteConnection> remotes;
-            {
-                std::lock_guard<std::mutex> lock(services.mu);
-                remotes.assign(services.connections.begin(), services.connections.end());
-            }
-
-            if (remotes.empty()) {
-                ImGui::TextDisabled("  No services connected");
+            const std::vector<ServiceCard> cards = services_state.service_cards_snapshot();
+            if (cards.empty()) {
+                ImGui::TextDisabled("  No services configured");
             } else {
-                // Show one entry per provider type (e.g. "OneDrive", "Google Drive")
-                std::set<std::string> seen_providers;
-                for (auto& remote : remotes) {
-                    std::string provider = remote.display_name.empty() ? remote.name : remote.display_name;
-                    if (seen_providers.count(provider)) continue;
-                    seen_providers.insert(provider);
-
-                    if (HoverListItem(provider.c_str(), content_width)) {
-                        const std::string explorer_state_key =
-                            active_explorer_state_key_provider_ ? active_explorer_state_key_provider_() : "Files";
-                        auto& file_explorer_state = registry_.get_state<FileExplorerState>(explorer_state_key);
-                        file_explorer_state.pending_navigation_path = mount_utils::get_mount_root() + "/" + provider;
-                    }
+                for (const auto& card : cards) {
+                    const std::string label = card.provider_label.empty() ? card.id : card.provider_label;
+                    ImGui::TextDisabled("  %s", label.c_str());
                 }
             }
 
