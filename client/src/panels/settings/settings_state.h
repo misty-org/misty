@@ -39,7 +39,7 @@ namespace misty::panel {
 
         // General
         int theme_index = 0; // 0=System, 1=Dark, 2=Light
-        int startup_view_index = 0; // 0=Files, 1=Services, 2=Activity
+        int startup_view_index = 0; // 0=Files, 1=Providers, 2=Activity
         bool reopen_last_session = true;
         bool launch_on_login = false;
         bool auto_update_enabled = true;

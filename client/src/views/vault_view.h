@@ -12,7 +12,7 @@
 
 namespace misty::view {
     // VaultView is the MVault top-level screen: navbar + vault panel + the
-    // shared notification overlay. It mirrors ServicesView so the navbar
+        // shared notification overlay. It mirrors ProvidersView so the navbar
     // chrome is identical across the two side-by-side feature surfaces.
     class VaultView : public AppView {
     public:

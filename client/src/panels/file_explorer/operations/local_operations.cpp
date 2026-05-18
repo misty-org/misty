@@ -35,8 +35,8 @@ core::FileMasterProps FileExplorerPanel::make_local_props(const UnifiedFileItem&
                                                           const std::string& dest_path) const {
     core::FileMasterProps props;
     props.file_name = item.name;
-    props.local_source_path = item.path;
-    props.local_dest_path = dest_path;
+    props.local_source.path = item.path;
+    props.local_dest.path = dest_path;
     return props;
 }
 
@@ -108,8 +108,7 @@ void FileExplorerPanel::perform_paste_local_to_local(FileExplorerState& state,
         return;
     }
 
-    auto& transfers = registry_.get_state<core::FileTransfer>("FileMasterTransfers");
-    core::FileMasterLocal file_master(worker_pool_, transfers);
+    core::FileMasterLocal file_master(worker_pool_);
     const auto props = make_local_props(item, resolved_dest.string());
     if (op == ClipboardOp::CUT) {
         file_master.cut(props, {});
@@ -120,8 +119,7 @@ void FileExplorerPanel::perform_paste_local_to_local(FileExplorerState& state,
 
 void FileExplorerPanel::perform_delete_selected(FileExplorerState& state) {
     auto items = selected_items(state);
-    auto& transfers = registry_.get_state<core::FileTransfer>("FileMasterTransfers");
-    core::FileMasterLocal file_master(worker_pool_, transfers);
+    core::FileMasterLocal file_master(worker_pool_);
     for (const auto& item : items) {
         if (is_remote_path(item.path)) {
             continue;

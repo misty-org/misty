@@ -1,26 +1,27 @@
-#include "services_view.h"
+#include "providers_view.h"
 #include "imgui.h"
-#include "panels/services/state/services_state.h"
+#include "panels/providers/state/providers_state.h"
 
 namespace misty::view {
-    ServicesView::ServicesView(UIRegistry& ui_registry)
-        : ui_registry_(ui_registry) {
+    ProvidersView::ProvidersView(UIRegistry& ui_registry, core::WorkerPool& worker_pool)
+        : ui_registry_(ui_registry),
+          worker_pool_(worker_pool) {
         init_panels();
     }
 
-    void ServicesView::init_panels() {
-        ui_registry_.get_state<panel::ServicesState>("Services");
+    void ProvidersView::init_panels() {
+        ui_registry_.get_state<panel::ProvidersState>("Providers").init(worker_pool_);
         navbar_panel_ = std::make_shared<panel::NavbarPanel>(ui_registry_);
-        services_panel_ = std::make_shared<panel::ServicesPanel>(ui_registry_);
+        providers_panel_ = std::make_shared<panel::ProvidersPanel>(ui_registry_);
         notification_panel_ = std::make_shared<panel::NotificationPanel>(ui_registry_);
         context_menu_panel_ = std::make_shared<panel::ContextMenuPanel>(ui_registry_);
     }
 
-    ViewID ServicesView::get_view_id() {
-        return ViewID::Services;
+    ViewID ProvidersView::get_view_id() {
+        return ViewID::Providers;
     }
 
-    void ServicesView::render() {
+    void ProvidersView::render() {
         ImGuiViewport* viewport = ImGui::GetMainViewport();
         float navbar_width = 77.0f;
         ImVec2 navbar_pos = viewport->WorkPos;
@@ -36,7 +37,7 @@ namespace misty::view {
         float sh = viewport->WorkSize.y;
         ImGui::SetNextWindowPos(ImVec2(sx, sy), ImGuiCond_Always);
         ImGui::SetNextWindowSize(ImVec2(sw, sh), ImGuiCond_Always);
-        services_panel_->render();
+        providers_panel_->render();
 
         // Render notifications on top
         context_menu_panel_->render();

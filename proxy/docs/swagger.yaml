@@ -1,4 +1,24 @@
+basePath: /api
 definitions:
+  rclone.FileItem:
+    properties:
+      hash:
+        type: string
+      hash_algo:
+        type: string
+      is_dir:
+        type: boolean
+      mime_type:
+        type: string
+      mod_time:
+        type: string
+      name:
+        type: string
+      path:
+        type: string
+      size:
+        type: integer
+    type: object
   rclone.ProviderChoice:
     properties:
       help:
@@ -25,9 +45,13 @@ definitions:
     type: object
   rclone.ProviderStep:
     properties:
+      authorize_url:
+        type: string
       done:
         type: boolean
       error:
+        type: string
+      instructions:
         type: string
       kind:
         type: string
@@ -35,6 +59,8 @@ definitions:
         type: string
       option:
         $ref: '#/definitions/rclone.ProviderOption'
+      poll_after_ms:
+        type: integer
       result:
         type: string
       state:
@@ -82,10 +108,161 @@ definitions:
       type:
         type: string
     type: object
+  remote.renameFileRequest:
+    properties:
+      new_path:
+        type: string
+      old_path:
+        type: string
+      remote:
+        type: string
+    type: object
 info:
   contact: {}
+  description: Misty proxy API for remote provider workflows and remote file operations.
+  title: Misty Proxy API
+  version: "1.0"
 paths:
-  /file/download:
+  /remote:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/rclone.RemoteInfo'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "502":
+          description: Bad Gateway
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List configured remotes
+      tags:
+      - remotes
+  /remote/config/continue:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Provider config continue request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/remote.providerConfigRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/rclone.ProviderStep'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "502":
+          description: Bad Gateway
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Continue provider config flow
+      tags:
+      - remotes
+  /remote/config/start:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Provider config start request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/remote.providerConfigRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/rclone.ProviderStep'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "502":
+          description: Bad Gateway
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Start provider config flow
+      tags:
+      - remotes
+  /remote/file:
+    delete:
+      parameters:
+      - description: Remote name
+        in: query
+        name: remote
+        required: true
+        type: string
+      - description: Remote file or directory path
+        in: query
+        name: path
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "502":
+          description: Bad Gateway
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete a file or directory from a configured remote
+      tags:
+      - files
+  /remote/file/download:
     get:
       parameters:
       - description: Remote name
@@ -124,8 +301,19 @@ paths:
       summary: Download a file from a configured remote
       tags:
       - files
-  /remotes:
+  /remote/file/list:
     get:
+      parameters:
+      - description: Remote name
+        in: query
+        name: remote
+        required: true
+        type: string
+      - description: Remote directory path
+        in: query
+        name: path
+        required: false
+        type: string
       produces:
       - application/json
       responses:
@@ -133,7 +321,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/rclone.RemoteInfo'
+              $ref: '#/definitions/rclone.FileItem'
             type: array
         "401":
           description: Unauthorized
@@ -146,27 +334,28 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      summary: List configured remotes
+      summary: List files in a configured remote directory
       tags:
-      - remotes
-  /remotes/config/continue:
+      - files
+  /remote/file/rename:
     post:
       consumes:
       - application/json
       parameters:
-      - description: Provider config continue request
+      - description: Rename file request
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/remote.providerConfigRequest'
+          $ref: '#/definitions/remote.renameFileRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/rclone.ProviderStep'
+            additionalProperties: true
+            type: object
         "400":
           description: Bad Request
           schema:
@@ -183,27 +372,37 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      summary: Continue provider config flow
+      summary: Rename or move a file within a configured remote
       tags:
-      - remotes
-  /remotes/config/start:
+      - files
+  /remote/file/upload:
     post:
       consumes:
-      - application/json
+      - multipart/form-data
       parameters:
-      - description: Provider config start request
-        in: body
-        name: request
+      - description: Remote name
+        in: formData
+        name: remote
         required: true
-        schema:
-          $ref: '#/definitions/remote.providerConfigRequest'
+        type: string
+      - description: Remote directory path
+        in: formData
+        name: path
+        required: false
+        type: string
+      - description: File to upload
+        in: formData
+        name: file
+        required: true
+        type: file
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/rclone.ProviderStep'
+            additionalProperties: true
+            type: object
         "400":
           description: Bad Request
           schema:
@@ -220,10 +419,10 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      summary: Start provider config flow
+      summary: Upload a file to a configured remote directory
       tags:
-      - remotes
-  /remotes/health:
+      - files
+  /remote/health:
     get:
       produces:
       - application/json
@@ -241,7 +440,7 @@ paths:
       summary: Check rclone remote subsystem health
       tags:
       - remotes
-  /remotes/types:
+  /remote/types:
     get:
       produces:
       - application/json
@@ -261,7 +460,7 @@ paths:
       summary: List supported provider types
       tags:
       - remotes
-  /remotes/workflow:
+  /remote/workflow:
     get:
       parameters:
       - description: Provider type
@@ -294,7 +493,7 @@ paths:
       summary: Get one provider workflow
       tags:
       - remotes
-  /remotes/workflows:
+  /remote/workflows:
     get:
       produces:
       - application/json
@@ -319,4 +518,9 @@ paths:
       summary: List provider workflows
       tags:
       - remotes
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"
