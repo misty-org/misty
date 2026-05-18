@@ -6,6 +6,8 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/kannachi323/misty/proxy/core/rclone"
@@ -15,6 +17,8 @@ import (
 )
 
 func main() {
+	loadProxyEnv()
+
 	proxy, listener := startProxy()
 	defer cleanup(proxy, listener)
 
@@ -35,6 +39,17 @@ func main() {
 		panic(err)
 	}
 
+}
+
+func loadProxyEnv() {
+	home, _ := os.UserHomeDir()
+	paths := []string{
+		filepath.Join(home, "misty", "proxy", ".env"),
+		filepath.Join(".", ".env"),
+	}
+	if err := setup.LoadDotEnv(paths...); err != nil {
+		log.Printf("PROXY: failed to load .env: %v", err)
+	}
 }
 
 func startProxy() (*Proxy, net.Listener) {

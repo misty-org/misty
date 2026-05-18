@@ -107,7 +107,7 @@ std::string view_id_to_string(view::ViewID view_id) {
         case view::ViewID::Settings: return "Settings";
         case view::ViewID::Workspace: return "Workspace";
         case view::ViewID::Activity: return "Activity";
-        case view::ViewID::Services: return "Services";
+        case view::ViewID::Providers: return "Providers";
         case view::ViewID::Extensions: return "Extensions";
         case view::ViewID::Vault: return "Vault";
         case view::ViewID::Transfers: return "Transfers";
@@ -128,7 +128,7 @@ std::optional<view::ViewID> view_id_from_string(const char* raw) {
     if (value == "settings") return view::ViewID::Settings;
     if (value == "workspace") return view::ViewID::Workspace;
     if (value == "activity") return view::ViewID::Activity;
-    if (value == "services") return view::ViewID::Services;
+    if (value == "providers") return view::ViewID::Providers;
     if (value == "extensions" || value == "plugins") return view::ViewID::Extensions;
     if (value == "vault") return view::ViewID::Vault;
     if (value == "transfers" || value == "transfer") return view::ViewID::Transfers;
@@ -138,14 +138,14 @@ std::optional<view::ViewID> view_id_from_string(const char* raw) {
 using LauncherViewMask = std::uint32_t;
 constexpr LauncherViewMask kLauncherViewFiles = 1u << 0;
 constexpr LauncherViewMask kLauncherViewSettings = 1u << 1;
-constexpr LauncherViewMask kLauncherViewServices = 1u << 2;
+constexpr LauncherViewMask kLauncherViewProviders = 1u << 2;
 constexpr LauncherViewMask kLauncherViewExtensions = 1u << 3;
 constexpr LauncherViewMask kLauncherViewVault = 1u << 4;
 constexpr LauncherViewMask kLauncherViewTransfers = 1u << 5;
 constexpr LauncherViewMask kLauncherViewAll =
     kLauncherViewFiles |
     kLauncherViewSettings |
-    kLauncherViewServices |
+    kLauncherViewProviders |
     kLauncherViewExtensions |
     kLauncherViewVault |
     kLauncherViewTransfers;
@@ -164,7 +164,7 @@ LauncherViewMask launcher_mask_for_view(view::ViewID view_id) {
     switch (view_id) {
         case view::ViewID::Files: return kLauncherViewFiles;
         case view::ViewID::Settings: return kLauncherViewSettings;
-        case view::ViewID::Services: return kLauncherViewServices;
+        case view::ViewID::Providers: return kLauncherViewProviders;
         case view::ViewID::Extensions: return kLauncherViewExtensions;
         case view::ViewID::Vault: return kLauncherViewVault;
         case view::ViewID::Transfers: return kLauncherViewTransfers;
@@ -193,8 +193,8 @@ void add_launcher_view_token(LauncherViewMask& mask, const std::string& token) {
         mask |= kLauncherViewSettings;
         return;
     }
-    if (normalized == "services" || normalized == "services_view" || normalized == "services panel") {
-        mask |= kLauncherViewServices;
+    if (normalized == "providers" || normalized == "providers_view" || normalized == "providers panel") {
+        mask |= kLauncherViewProviders;
         return;
     }
     if (normalized == "plugins" || normalized == "extensions" || normalized == "plugins view" || normalized == "extensions view") {
@@ -269,7 +269,7 @@ std::string launcher_view_label(LauncherViewMask mask) {
     std::vector<std::string> labels;
     if ((mask & kLauncherViewFiles) != 0) labels.push_back("Files");
     if ((mask & kLauncherViewSettings) != 0) labels.push_back("Settings");
-    if ((mask & kLauncherViewServices) != 0) labels.push_back("Services");
+    if ((mask & kLauncherViewProviders) != 0) labels.push_back("Providers");
     if ((mask & kLauncherViewExtensions) != 0) labels.push_back("Plugins");
     if ((mask & kLauncherViewVault) != 0) labels.push_back("Vault");
 

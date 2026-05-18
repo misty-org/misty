@@ -32,7 +32,7 @@ namespace {
     constexpr float kCopyValueGap = 10.0f;
     constexpr float kCopyValueTextWidth = kDetailValueWidth - kIconButtonSize - kCopyValueGap;
 
-    constexpr const char* kStartupViewOptions[] = {"Files", "Services", "Activity"};
+    constexpr const char* kStartupViewOptions[] = {"Files", "Providers", "Activity"};
     constexpr const char* kReleaseChannelOptions[] = {"Stable"};
     constexpr const char* kDefaultFileActionOptions[] = {"Open", "Preview", "Show Details"};
     constexpr const char* kTransferBehaviorOptions[] = {"Ask Every Time", "Use Default Location"};

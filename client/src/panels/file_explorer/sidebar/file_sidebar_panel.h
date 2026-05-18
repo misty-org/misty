@@ -12,8 +12,8 @@
 
 #include "panels/file_explorer/state/file_sidebar_state.h"
 
-#include "panels/services/state/services_state.h"
-#include "panels/services/remote/remote_state.h"
+#include "panels/providers/state/providers_state.h"
+#include "panels/providers/remote/remote_state.h"
 #include "panels/devices/device_state.h"
 #include "panels/devices/device_watcher.h"
 #include "panels/file_explorer/state/file_explorer_state.h"
@@ -40,7 +40,7 @@ namespace misty::panel {
         }
 
     private:
-        void show_services_section(ServicesState& services_state, float width, float padding);
+        void show_providers_section(ProvidersState& providers_state, float width, float padding);
         void show_local_section(float width, float padding);
         void show_devices_section(float width, float padding);
         void show_create_new(FileSidebarState& state, float width, float padding);
@@ -66,7 +66,7 @@ namespace misty::panel {
 
         // Sidebar section collapse state
         bool local_collapsed_        = false;
-        bool services_collapsed_     = false;
+        bool providers_collapsed_    = false;
         bool devices_collapsed_      = false;
         bool quick_access_collapsed_ = false;
 

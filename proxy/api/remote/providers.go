@@ -14,7 +14,7 @@ import (
 // @Security BearerAuth
 // @Success 200 {array} rclone.ProviderType
 // @Failure 401 {string} string
-// @Router /remotes/types [get]
+// @Router /remote/types [get]
 func ListTypes() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -30,7 +30,7 @@ func ListTypes() http.HandlerFunc {
 // @Success 200 {array} rclone.ProviderWorkflow
 // @Failure 401 {string} string
 // @Failure 502 {object} map[string]any
-// @Router /remotes/workflows [get]
+// @Router /remote/workflows [get]
 func ListProviderWorkflows() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		workflows, err := rclone.ListProviderWorkflows(r.Context())
@@ -52,7 +52,7 @@ func ListProviderWorkflows() http.HandlerFunc {
 // @Success 200 {object} rclone.ProviderWorkflow
 // @Failure 401 {string} string
 // @Failure 404 {object} map[string]any
-// @Router /remotes/workflow [get]
+// @Router /remote/workflow [get]
 func GetProviderWorkflow() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		providerType := r.URL.Query().Get("type")
@@ -74,7 +74,7 @@ func GetProviderWorkflow() http.HandlerFunc {
 // @Success 200 {array} rclone.RemoteInfo
 // @Failure 401 {string} string
 // @Failure 502 {object} map[string]any
-// @Router /remotes [get]
+// @Router /remote [get]
 func ListRemotes() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		remotes, err := rclone.ListRemotes(r.Context())
@@ -84,5 +84,32 @@ func ListRemotes() http.HandlerFunc {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(remotes)
+	}
+}
+
+// DeleteRemote godoc
+// @Summary Delete a configured remote
+// @Tags remotes
+// @Produce json
+// @Security BearerAuth
+// @Param name query string true "Remote name"
+// @Success 200 {object} map[string]any
+// @Failure 400 {object} map[string]any
+// @Failure 401 {string} string
+// @Failure 502 {object} map[string]any
+// @Router /remote [delete]
+func DeleteRemote() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		name := r.URL.Query().Get("name")
+		if name == "" {
+			writeError(w, http.StatusBadRequest, errBadRequest("name is required"))
+			return
+		}
+		if err := rclone.DeleteRemote(name); err != nil {
+			writeError(w, http.StatusBadGateway, err)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"ok": true})
 	}
 }

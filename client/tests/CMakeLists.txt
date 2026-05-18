@@ -6,8 +6,16 @@ if(BUILD_TESTING AND (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STRE
 
     if(MISTY_TEST_SOURCES)
         set(MISTY_TEST_SUPPORT_SOURCES
+            "${CMAKE_SOURCE_DIR}/src/core/file_master/file_master_api.cpp"
             "${CMAKE_SOURCE_DIR}/src/core/file_master/file_master_local.cpp"
+            "${CMAKE_SOURCE_DIR}/src/core/file_master/file_master_remote.cpp"
+            "${CMAKE_SOURCE_DIR}/src/core/file_master/file_master_util.cpp"
             "${CMAKE_SOURCE_DIR}/src/core/file_transfer/file_transfer.cpp"
+            "${CMAKE_SOURCE_DIR}/src/core/manager/env_manager.cpp"
+            "${CMAKE_SOURCE_DIR}/src/core/manager/proxy_manager.cpp"
+            "${CMAKE_SOURCE_DIR}/src/core/manager/session_manager.cpp"
+            "${CMAKE_SOURCE_DIR}/src/core/net/http_client.cpp"
+            "${CMAKE_SOURCE_DIR}/src/core/system/util.cpp"
             "${CMAKE_SOURCE_DIR}/src/core/sync/fs_watcher.h"
             "${CMAKE_SOURCE_DIR}/src/core/threading/worker_pool.cpp"
             "${CMAKE_SOURCE_DIR}/src/panels/file_explorer/state/file_explorer_state.cpp"
@@ -38,11 +46,18 @@ if(BUILD_TESTING AND (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STRE
             "${CMAKE_SOURCE_DIR}/vendor/json/single_include"
         )
         target_compile_definitions(misty_tests PRIVATE MISTY_TESTING)
-        target_link_libraries(misty_tests PRIVATE gtest_main misty_proto)
+        target_link_libraries(misty_tests PRIVATE
+            gtest_main
+            misty_proto
+            CURL::libcurl
+        )
 
         if(APPLE)
             target_link_libraries(misty_tests PRIVATE
+                "-framework CoreGraphics"
                 "-framework CoreServices"
+                "-framework Cocoa"
+                "-framework Security"
             )
         endif()
 
