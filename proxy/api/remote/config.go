@@ -18,7 +18,7 @@ import (
 // @Failure 400 {object} map[string]any
 // @Failure 401 {string} string
 // @Failure 502 {object} map[string]any
-// @Router /remotes/config/start [post]
+// @Router /remote/config/start [post]
 func ConfigStart() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req providerConfigRequest
@@ -47,7 +47,7 @@ func ConfigStart() http.HandlerFunc {
 // @Failure 400 {object} map[string]any
 // @Failure 401 {string} string
 // @Failure 502 {object} map[string]any
-// @Router /remotes/config/continue [post]
+// @Router /remote/config/continue [post]
 func ConfigContinue() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req providerConfigRequest

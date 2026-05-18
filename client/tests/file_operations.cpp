@@ -8,7 +8,7 @@
 #include <thread>
 
 #include "core/file_master/file_master_local.h"
-#include "core/file_transfer/file_transfer.h"
+#include "core/file_master/file_master_remote.h"
 #include "core/threading/worker_pool.h"
 
 namespace fs = std::filesystem;
@@ -70,23 +70,32 @@ class FileMasterLocalTest : public ::testing::Test {
 protected:
     FileMasterLocalTest()
         : worker_pool_(1),
-          file_master_(worker_pool_, transfers_) {}
+          file_master_(worker_pool_) {}
 
     void TearDown() override {
         worker_pool_.shutdown();
     }
 
-    std::vector<misty::core::FileTransferRecord> transfers() const {
-        return transfers_.get_all_transfers();
-    }
-
     TempHome home_;
     misty::core::WorkerPool worker_pool_;
-    misty::core::FileTransfer transfers_;
     misty::core::FileMasterLocal file_master_;
 };
 
-TEST_F(FileMasterLocalTest, RenameCreatesCompletedTransferRecord) {
+class FileMasterRemoteTest : public ::testing::Test {
+protected:
+    FileMasterRemoteTest()
+        : worker_pool_(1),
+          file_master_(worker_pool_) {}
+
+    void TearDown() override {
+        worker_pool_.shutdown();
+    }
+
+    misty::core::WorkerPool worker_pool_;
+    misty::core::FileMasterRemote file_master_;
+};
+
+TEST_F(FileMasterLocalTest, RenameRenamesFile) {
     const fs::path src = home_.path() / "rename-me.txt";
     const fs::path dest = home_.path() / "renamed.txt";
     write_file(src, "payload");
@@ -94,8 +103,8 @@ TEST_F(FileMasterLocalTest, RenameCreatesCompletedTransferRecord) {
     std::optional<misty::core::FileMasterResult> result;
     misty::core::FileMasterProps props;
     props.file_name = src.filename().string();
-    props.local_source_path = src.string();
-    props.local_dest_path = dest.string();
+    props.local_source.path = src.string();
+    props.local_dest.path = dest.string();
     file_master_.rename(props, [&](misty::core::FileMasterResult value) {
         result = std::move(value);
     });
@@ -104,24 +113,16 @@ TEST_F(FileMasterLocalTest, RenameCreatesCompletedTransferRecord) {
     ASSERT_TRUE(result->success);
     EXPECT_FALSE(fs::exists(src));
     EXPECT_TRUE(fs::exists(dest));
-
-    const auto all = transfers();
-    ASSERT_EQ(all.size(), 1u);
-    EXPECT_EQ(all[0].transfer_type, misty::core::FileTransferType::Rename);
-    EXPECT_EQ(all[0].status, misty::core::FileTransferStatus::Completed);
-    EXPECT_EQ(all[0].file_name, "rename-me.txt");
-    EXPECT_EQ(all[0].local_source_path, src.string());
-    EXPECT_EQ(all[0].local_dest_path, dest.string());
 }
 
-TEST_F(FileMasterLocalTest, RemoveCreatesCompletedTransferRecord) {
+TEST_F(FileMasterLocalTest, RemoveDeletesFile) {
     const fs::path src = home_.path() / "delete-me.txt";
     write_file(src, "payload");
 
     std::optional<misty::core::FileMasterResult> result;
     misty::core::FileMasterProps props;
     props.file_name = src.filename().string();
-    props.local_source_path = src.string();
+    props.local_source.path = src.string();
     file_master_.remove(props, [&](misty::core::FileMasterResult value) {
         result = std::move(value);
     });
@@ -129,16 +130,9 @@ TEST_F(FileMasterLocalTest, RemoveCreatesCompletedTransferRecord) {
     ASSERT_TRUE(wait_for([&]() { return result.has_value(); }));
     ASSERT_TRUE(result->success);
     EXPECT_FALSE(fs::exists(src));
-
-    const auto all = transfers();
-    ASSERT_EQ(all.size(), 1u);
-    EXPECT_EQ(all[0].transfer_type, misty::core::FileTransferType::Delete);
-    EXPECT_EQ(all[0].status, misty::core::FileTransferStatus::Completed);
-    EXPECT_EQ(all[0].local_source_path, src.string());
-    EXPECT_TRUE(all[0].local_dest_path.empty());
 }
 
-TEST_F(FileMasterLocalTest, CopyCreatesCompletedTransferRecord) {
+TEST_F(FileMasterLocalTest, CopyCopiesFile) {
     const fs::path src = home_.path() / "copy-me.txt";
     const fs::path dest = home_.path() / "dest" / "copy-me.txt";
     fs::create_directories(dest.parent_path());
@@ -147,8 +141,8 @@ TEST_F(FileMasterLocalTest, CopyCreatesCompletedTransferRecord) {
     std::optional<misty::core::FileMasterResult> result;
     misty::core::FileMasterProps props;
     props.file_name = src.filename().string();
-    props.local_source_path = src.string();
-    props.local_dest_path = dest.string();
+    props.local_source.path = src.string();
+    props.local_dest.path = dest.string();
     file_master_.copy(props, [&](misty::core::FileMasterResult value) {
         result = std::move(value);
     });
@@ -157,16 +151,9 @@ TEST_F(FileMasterLocalTest, CopyCreatesCompletedTransferRecord) {
     ASSERT_TRUE(result->success);
     EXPECT_TRUE(fs::exists(src));
     EXPECT_TRUE(fs::exists(dest));
-
-    const auto all = transfers();
-    ASSERT_EQ(all.size(), 1u);
-    EXPECT_EQ(all[0].transfer_type, misty::core::FileTransferType::Copy);
-    EXPECT_EQ(all[0].status, misty::core::FileTransferStatus::Completed);
-    EXPECT_EQ(all[0].local_source_path, src.string());
-    EXPECT_EQ(all[0].local_dest_path, dest.string());
 }
 
-TEST_F(FileMasterLocalTest, CutCreatesCompletedMoveTransferRecord) {
+TEST_F(FileMasterLocalTest, CutMovesFile) {
     const fs::path src = home_.path() / "move-me.txt";
     const fs::path dest = home_.path() / "dest" / "move-me.txt";
     fs::create_directories(dest.parent_path());
@@ -175,8 +162,8 @@ TEST_F(FileMasterLocalTest, CutCreatesCompletedMoveTransferRecord) {
     std::optional<misty::core::FileMasterResult> result;
     misty::core::FileMasterProps props;
     props.file_name = src.filename().string();
-    props.local_source_path = src.string();
-    props.local_dest_path = dest.string();
+    props.local_source.path = src.string();
+    props.local_dest.path = dest.string();
     file_master_.cut(props, [&](misty::core::FileMasterResult value) {
         result = std::move(value);
     });
@@ -185,51 +172,71 @@ TEST_F(FileMasterLocalTest, CutCreatesCompletedMoveTransferRecord) {
     ASSERT_TRUE(result->success);
     EXPECT_FALSE(fs::exists(src));
     EXPECT_TRUE(fs::exists(dest));
-
-    const auto all = transfers();
-    ASSERT_EQ(all.size(), 1u);
-    EXPECT_EQ(all[0].transfer_type, misty::core::FileTransferType::Move);
-    EXPECT_EQ(all[0].status, misty::core::FileTransferStatus::Completed);
-    EXPECT_EQ(all[0].local_source_path, src.string());
-    EXPECT_EQ(all[0].local_dest_path, dest.string());
 }
 
-TEST_F(FileMasterLocalTest, ValidationFailureDoesNotCreateTransferRecord) {
+TEST_F(FileMasterLocalTest, ValidationFailureReturnsError) {
     std::optional<misty::core::FileMasterResult> result;
     misty::core::FileMasterProps props;
     props.file_name = "broken.txt";
-    props.local_dest_path = (home_.path() / "dest" / "broken.txt").string();
+    props.local_dest.path = (home_.path() / "dest" / "broken.txt").string();
     file_master_.copy(props, [&](misty::core::FileMasterResult value) {
         result = std::move(value);
     });
 
     ASSERT_TRUE(result.has_value());
     EXPECT_FALSE(result->success);
-    EXPECT_EQ(result->error_message, "local_source_path is required");
-    EXPECT_TRUE(transfers().empty());
+    EXPECT_EQ(result->error_message, "local_source.path is required");
 }
 
-TEST_F(FileMasterLocalTest, RuntimeFailureCreatesFailedTransferRecord) {
+TEST_F(FileMasterLocalTest, RuntimeFailureReturnsError) {
     const fs::path src = home_.path() / "missing.txt";
     const fs::path dest = home_.path() / "dest" / "missing.txt";
 
     std::optional<misty::core::FileMasterResult> result;
     misty::core::FileMasterProps props;
     props.file_name = src.filename().string();
-    props.local_source_path = src.string();
-    props.local_dest_path = dest.string();
+    props.local_source.path = src.string();
+    props.local_dest.path = dest.string();
     file_master_.copy(props, [&](misty::core::FileMasterResult value) {
         result = std::move(value);
     });
 
     ASSERT_TRUE(wait_for([&]() { return result.has_value(); }));
     ASSERT_FALSE(result->success);
+    EXPECT_FALSE(result->error_message.empty());
+}
 
-    const auto all = transfers();
-    ASSERT_EQ(all.size(), 1u);
-    EXPECT_EQ(all[0].transfer_type, misty::core::FileTransferType::Copy);
-    EXPECT_EQ(all[0].status, misty::core::FileTransferStatus::Failed);
-    EXPECT_FALSE(all[0].error_message.empty());
+TEST_F(FileMasterRemoteTest, RenameAcceptsStructuredRemoteContextAndReturnsStubError) {
+    std::optional<misty::core::FileMasterResult> result;
+    misty::core::FileMasterProps props;
+    props.file_name = "report.txt";
+    props.remote_source.remote_name = "drive-work";
+    props.remote_source.provider_type = "drive";
+    props.remote_source.remote_path = "Documents/report.txt";
+    props.remote_dest.remote_name = "drive-work";
+    props.remote_dest.provider_type = "drive";
+    props.remote_dest.remote_path = "Archive/report.txt";
+
+    file_master_.rename(props, [&](misty::core::FileMasterResult value) {
+        result = std::move(value);
+    });
+
+    ASSERT_TRUE(result.has_value());
+    EXPECT_FALSE(result->success);
+    EXPECT_EQ(result->error_message, "Remote rename is not implemented yet.");
+}
+
+TEST_F(FileMasterRemoteTest, ListRequiresRemoteContext) {
+    std::optional<misty::core::FileMasterResult> result;
+    misty::core::FileMasterProps props;
+
+    file_master_.list(props, [&](misty::core::FileMasterResult value) {
+        result = std::move(value);
+    });
+
+    ASSERT_TRUE(result.has_value());
+    EXPECT_FALSE(result->success);
+    EXPECT_EQ(result->error_message, "remote_source or remote_dest with remote_name is required");
 }
 
 }  // namespace

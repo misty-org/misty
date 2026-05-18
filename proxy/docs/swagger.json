@@ -1,10 +1,238 @@
 {
     "swagger": "2.0",
     "info": {
-        "contact": {}
+        "description": "Misty proxy API for remote provider workflows and remote file operations.",
+        "title": "Misty Proxy API",
+        "contact": {},
+        "version": "1.0"
+    },
+    "basePath": "/api",
+    "securityDefinitions": {
+        "BearerAuth": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
     },
     "paths": {
-        "/file/download": {
+        "/remote": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "remotes"
+                ],
+                "summary": "List configured remotes",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/rclone.RemoteInfo"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/remote/config/continue": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "remotes"
+                ],
+                "summary": "Continue provider config flow",
+                "parameters": [
+                    {
+                        "description": "Provider config continue request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/remote.providerConfigRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/rclone.ProviderStep"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/remote/config/start": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "remotes"
+                ],
+                "summary": "Start provider config flow",
+                "parameters": [
+                    {
+                        "description": "Provider config start request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/remote.providerConfigRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/rclone.ProviderStep"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/remote/file": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "files"
+                ],
+                "summary": "Delete a file or directory from a configured remote",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Remote name",
+                        "name": "remote",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Remote file or directory path",
+                        "name": "path",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/remote/file/download": {
             "get": {
                 "security": [
                     {
@@ -64,7 +292,7 @@
                 }
             }
         },
-        "/remotes": {
+        "/remote/file/list": {
             "get": {
                 "security": [
                     {
@@ -75,16 +303,32 @@
                     "application/json"
                 ],
                 "tags": [
-                    "remotes"
+                    "files"
                 ],
-                "summary": "List configured remotes",
+                "summary": "List files in a configured remote directory",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Remote name",
+                        "name": "remote",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Remote directory path",
+                        "name": "path",
+                        "in": "query",
+                        "required": false
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/rclone.RemoteInfo"
+                                "$ref": "#/definitions/rclone.FileItem"
                             }
                         }
                     },
@@ -104,7 +348,7 @@
                 }
             }
         },
-        "/remotes/config/continue": {
+        "/remote/file/rename": {
             "post": {
                 "security": [
                     {
@@ -118,17 +362,17 @@
                     "application/json"
                 ],
                 "tags": [
-                    "remotes"
+                    "files"
                 ],
-                "summary": "Continue provider config flow",
+                "summary": "Rename or move a file within a configured remote",
                 "parameters": [
                     {
-                        "description": "Provider config continue request",
+                        "description": "Rename file request",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/remote.providerConfigRequest"
+                            "$ref": "#/definitions/remote.renameFileRequest"
                         }
                     }
                 ],
@@ -136,7 +380,8 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/rclone.ProviderStep"
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     },
                     "400": {
@@ -162,7 +407,7 @@
                 }
             }
         },
-        "/remotes/config/start": {
+        "/remote/file/upload": {
             "post": {
                 "security": [
                     {
@@ -170,31 +415,44 @@
                     }
                 ],
                 "consumes": [
-                    "application/json"
+                    "multipart/form-data"
                 ],
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "remotes"
+                    "files"
                 ],
-                "summary": "Start provider config flow",
+                "summary": "Upload a file to a configured remote directory",
                 "parameters": [
                     {
-                        "description": "Provider config start request",
-                        "name": "request",
-                        "in": "body",
+                        "description": "Remote name",
+                        "name": "remote",
+                        "in": "formData",
                         "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/remote.providerConfigRequest"
-                        }
+                        "type": "string"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Remote directory path",
+                        "name": "path",
+                        "in": "formData",
+                        "required": false
+                    },
+                    {
+                        "type": "file",
+                        "description": "File to upload",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/rclone.ProviderStep"
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     },
                     "400": {
@@ -220,7 +478,7 @@
                 }
             }
         },
-        "/remotes/health": {
+        "/remote/health": {
             "get": {
                 "produces": [
                     "application/json"
@@ -247,7 +505,7 @@
                 }
             }
         },
-        "/remotes/types": {
+        "/remote/types": {
             "get": {
                 "security": [
                     {
@@ -280,7 +538,7 @@
                 }
             }
         },
-        "/remotes/workflow": {
+        "/remote/workflow": {
             "get": {
                 "security": [
                     {
@@ -331,7 +589,7 @@
                 }
             }
         },
-        "/remotes/workflows": {
+        "/remote/workflows": {
             "get": {
                 "security": [
                     {
@@ -373,6 +631,35 @@
         }
     },
     "definitions": {
+        "rclone.FileItem": {
+            "type": "object",
+            "properties": {
+                "hash": {
+                    "type": "string"
+                },
+                "hash_algo": {
+                    "type": "string"
+                },
+                "is_dir": {
+                    "type": "boolean"
+                },
+                "mime_type": {
+                    "type": "string"
+                },
+                "mod_time": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "size": {
+                    "type": "integer"
+                }
+            }
+        },
         "rclone.ProviderChoice": {
             "type": "object",
             "properties": {
@@ -413,10 +700,16 @@
         "rclone.ProviderStep": {
             "type": "object",
             "properties": {
+                "authorize_url": {
+                    "type": "string"
+                },
                 "done": {
                     "type": "boolean"
                 },
                 "error": {
+                    "type": "string"
+                },
+                "instructions": {
                     "type": "string"
                 },
                 "kind": {
@@ -427,6 +720,9 @@
                 },
                 "option": {
                     "$ref": "#/definitions/rclone.ProviderOption"
+                },
+                "poll_after_ms": {
+                    "type": "integer"
                 },
                 "result": {
                     "type": "string"
@@ -497,6 +793,20 @@
                     "type": "string"
                 },
                 "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "remote.renameFileRequest": {
+            "type": "object",
+            "properties": {
+                "new_path": {
+                    "type": "string"
+                },
+                "old_path": {
+                    "type": "string"
+                },
+                "remote": {
                     "type": "string"
                 }
             }

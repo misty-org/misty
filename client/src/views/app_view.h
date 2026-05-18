@@ -32,7 +32,7 @@ namespace misty::view {
         Settings,
         Workspace,
         Activity,
-        Services,
+        Providers,
         Extensions,
         Vault,
         Transfers,

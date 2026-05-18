@@ -1,4 +1,4 @@
-#include "panels/services/services_panel.h"
+#include "panels/providers/providers_panel.h"
 
 #include "core/manager/asset_manager.h"
 #include "imgui.h"
@@ -45,8 +45,8 @@ namespace misty::panel {
         }
     }
 
-    void ServicesPanel::render() {
-        auto& state = registry_.get_state<ServicesState>("Services");
+    void ProvidersPanel::render() {
+        auto& state = registry_.get_state<ProvidersState>("Providers");
         sync_search_buffer(state);
 
         ImGuiWindowFlags flags =
@@ -64,13 +64,14 @@ namespace misty::panel {
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(32.0f, 28.0f));
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 18.0f));
 
-        if (ImGui::Begin("ServicesPanel", nullptr, flags)) {
+        if (ImGui::Begin("ProvidersPanel", nullptr, flags)) {
             const float content_width = ImGui::GetContentRegionAvail().x;
             show_top_bar(state, content_width);
             ImGui::Separator();
+            show_status_messages(state);
             show_health_card(state.health_card_snapshot());
-            show_connected_services(state);
-            show_placeholder_dialogs(state);
+            show_connected_providers(state);
+            show_provider_dialogs(state);
         }
 
         ImGui::End();
@@ -78,17 +79,38 @@ namespace misty::panel {
         ImGui::PopStyleColor();
     }
 
-    void ServicesPanel::sync_search_buffer(ServicesState& state) {
-        const std::string& query = state.search_query();
+    void ProvidersPanel::sync_search_buffer(ProvidersState& state) {
+        const std::string query = state.search_query();
         if (std::strncmp(search_buf_, query.c_str(), sizeof(search_buf_)) != 0) {
             std::snprintf(search_buf_, sizeof(search_buf_), "%s", query.c_str());
         }
     }
 
-    void ServicesPanel::show_top_bar(ServicesState& state, float content_width) {
+    void ProvidersPanel::show_status_messages(ProvidersState& state) {
+        std::string error_message;
+        std::string success_message;
+        {
+            std::lock_guard<std::mutex> lock(state.mu);
+            error_message = state.error_message;
+            success_message = state.success_message;
+        }
+
+        if (!error_message.empty()) {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.96f, 0.48f, 0.48f, 1.0f));
+            ImGui::TextWrapped("%s", error_message.c_str());
+            ImGui::PopStyleColor();
+        }
+        if (!success_message.empty()) {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.48f, 0.86f, 0.59f, 1.0f));
+            ImGui::TextWrapped("%s", success_message.c_str());
+            ImGui::PopStyleColor();
+        }
+    }
+
+    void ProvidersPanel::show_top_bar(ProvidersState& state, float content_width) {
         ImGui::PushStyleColor(ImGuiCol_Text, kText);
         ImGui::SetWindowFontScale(1.55f);
-        ImGui::TextUnformatted("Services");
+        ImGui::TextUnformatted("Providers");
         ImGui::SetWindowFontScale(1.0f);
         ImGui::PopStyleColor();
 
@@ -110,7 +132,7 @@ namespace misty::panel {
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(42.0f, 12.0f));
 
         ImGui::SetNextItemWidth(search_width);
-        if (ImGui::InputTextWithHint("##services_search", "Search connected services...", search_buf_, sizeof(search_buf_))) {
+        if (ImGui::InputTextWithHint("##providers_search", "Search connected providers...", search_buf_, sizeof(search_buf_))) {
             state.set_search_query(search_buf_);
         }
 
@@ -130,20 +152,20 @@ namespace misty::panel {
         ImGui::PopStyleColor(4);
 
         ImGui::SameLine(0.0f, 16.0f);
-        if (teal_button("Add Service", ImVec2(button_width, input_max.y - input_min.y))) {
-            state.on_add_service();
+        if (teal_button("Add Provider", ImVec2(button_width, input_max.y - input_min.y))) {
+            state.on_add_provider();
         }
         ImGui::EndGroup();
     }
 
-    void ServicesPanel::show_connected_services(ServicesState& state) {
-        const auto all_cards = state.service_cards_snapshot();
-        const auto filtered_cards = state.filtered_service_cards();
+    void ProvidersPanel::show_connected_providers(ProvidersState& state) {
+        const auto all_cards = state.provider_cards_snapshot();
+        const auto filtered_cards = state.filtered_provider_cards();
         const bool has_query = !state.search_query().empty();
 
         ImGui::PushStyleColor(ImGuiCol_Text, kText);
         ImGui::SetWindowFontScale(1.25f);
-        ImGui::TextUnformatted("Connected Services");
+        ImGui::TextUnformatted("Connected Providers");
         ImGui::SetWindowFontScale(1.0f);
         ImGui::PopStyleColor();
 
@@ -160,7 +182,7 @@ namespace misty::panel {
             if (index > 0 && (index % static_cast<size_t>(columns)) != 0) {
                 ImGui::SameLine(0.0f, kCardSpacing);
             }
-            show_service_card(state, filtered_cards[index], card_width);
+            show_provider_card(state, filtered_cards[index], card_width);
         }
     }
 }

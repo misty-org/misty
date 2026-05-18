@@ -7,7 +7,6 @@ import (
 	"strings"
 )
 
-
 type RemoteInfo struct {
 	Name string `json:"name"`
 	Type string `json:"type"`
@@ -21,22 +20,20 @@ func ListRemotes(ctx context.Context) ([]RemoteInfo, error) {
 		return nil, err
 	}
 
-	var response struct {
-		Remotes []struct {
-			Name string `json:"name"`
-			Type string `json:"type"`
-		} `json:"remotes"`
-	}
-
-	if err := defaultRcloneRCD.Call(ctx, "config/listremotes", map[string]any{}, &response); err != nil {
+	var response map[string]map[string]string
+	if err := defaultRcloneRCD.Call(ctx, "config/dump", map[string]any{}, &response); err != nil {
 		return nil, err
 	}
 
-	remotes := make([]RemoteInfo, 0, len(response.Remotes))
-	for _, remote := range response.Remotes {
+	remotes := make([]RemoteInfo, 0, len(response))
+	for name, remote := range response {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
 		remotes = append(remotes, RemoteInfo{
-			Name: remote.Name,
-			Type: remote.Type,
+			Name: name,
+			Type: strings.TrimSpace(remote["type"]),
 		})
 	}
 
@@ -98,6 +95,18 @@ func CreateRemote(context.Context, string, string, map[string]string) error {
 	return fmt.Errorf("rclone create remote not implemented")
 }
 
-func DeleteRemote(string) error {
-	return fmt.Errorf("rclone delete remote not implemented")
+func DeleteRemote(name string) error {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return fmt.Errorf("remote name is required")
+	}
+	if err := Init(); err != nil {
+		return err
+	}
+	if err := defaultRcloneRCD.Start(); err != nil {
+		return err
+	}
+	return defaultRcloneRCD.Call(context.Background(), "config/delete", map[string]any{
+		"name": name,
+	}, nil)
 }

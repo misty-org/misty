@@ -13,28 +13,16 @@ import (
 // @Produce json
 // @Success 200 {object} map[string]any
 // @Failure 503 {object} map[string]any
-// @Router /remotes/health [get]
+// @Router /remote/health [get]
 func Health() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-
-		if err := rclone.Init(); err != nil {
+		status := rclone.GetHealthStatus(r.Context())
+		if !status.Ready {
 			w.WriteHeader(http.StatusServiceUnavailable)
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"ready": false,
-				"error": err.Error(),
-			})
+			_ = json.NewEncoder(w).Encode(status)
 			return
 		}
-		if err := rclone.StartManagedDaemon(r.Context()); err != nil {
-			w.WriteHeader(http.StatusServiceUnavailable)
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"ready": false,
-				"error": err.Error(),
-			})
-			return
-		}
-
-		_ = json.NewEncoder(w).Encode(map[string]any{"ready": true})
+		_ = json.NewEncoder(w).Encode(status)
 	}
 }

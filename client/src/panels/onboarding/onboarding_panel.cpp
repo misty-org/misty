@@ -362,13 +362,13 @@ namespace misty::panel {
         ImGui::PopFont();
 
         ImGui::Spacing();
-        centered_text("Service wiring is moving into the new Services page.", IM_COL32(120, 120, 120, 255));
+        centered_text("Provider wiring is moving into the new Providers page.", IM_COL32(120, 120, 120, 255));
         ImGui::Spacing();
         ImGui::Spacing();
 
         ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.14f, 0.14f, 0.16f, 1.0f));
         ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 12.0f);
-        if (ImGui::BeginChild("##services_template_notice", ImVec2(w, 188.0f), true,
+        if (ImGui::BeginChild("##providers_template_notice", ImVec2(w, 188.0f), true,
                               ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse)) {
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.90f, 0.90f, 0.92f, 1.0f));
             ImGui::TextWrapped("The legacy cloud-connect onboarding step has been retired.");
@@ -376,7 +376,7 @@ namespace misty::panel {
             ImGui::Spacing();
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.62f, 0.62f, 0.66f, 1.0f));
             ImGui::TextWrapped(
-                "Finish account setup later from the redesigned Services page. "
+                "Finish account setup later from the redesigned Providers page. "
                 "This onboarding step is now just a placeholder while the new proxy-backed flow is being implemented.");
             ImGui::PopStyleColor();
         }
@@ -418,7 +418,7 @@ namespace misty::panel {
         struct Slide { const char* title; const char* caption; };
         static constexpr Slide slides[OnboardingState::TOUR_SLIDE_COUNT] = {
             { "Browse all your files",
-              "The sidebar gives you quick access to local folders, cloud services, "
+              "The sidebar gives you quick access to local folders, cloud providers, "
               "and connected devices — all in one place." },
             { "Upload from anywhere",
               "Drag files into any cloud folder or use the New button to upload "

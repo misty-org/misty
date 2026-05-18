@@ -9,7 +9,7 @@
 #include "views/register_view.h"
 #include "views/login_view.h"
 #include "views/onboarding_view.h"
-#include "views/services_view.h"
+#include "views/providers_view.h"
 #include "views/extensions_view.h"
 #include "views/vault_view.h"
 #include "views/transfers_view.h"
@@ -37,7 +37,7 @@ std::string view_name(misty::view::ViewID id) {
         case ViewID::Settings: return "Settings";
         case ViewID::Workspace: return "Workspace";
         case ViewID::Activity: return "Activity";
-        case ViewID::Services: return "Services";
+        case ViewID::Providers: return "Providers";
         case ViewID::Extensions: return "Extensions";
         case ViewID::Vault: return "Vault";
         case ViewID::Transfers: return "Transfers";
@@ -207,9 +207,9 @@ namespace misty {
         view::register_view(view::ViewID::Login, std::make_unique<view::LoginView>(ui_registry_));
         view::register_view(view::ViewID::Onboarding,
             std::make_unique<view::OnboardingView>(ui_registry_, worker_pool_));
-        view::register_view_factory(view::ViewID::Services, [this]() {
-            append_startup_log("startup: services view instantiated");
-            return std::make_unique<view::ServicesView>(ui_registry_);
+        view::register_view_factory(view::ViewID::Providers, [this]() {
+            append_startup_log("startup: providers view instantiated");
+            return std::make_unique<view::ProvidersView>(ui_registry_, worker_pool_);
         });
         view::register_view_factory(view::ViewID::Extensions, [this]() {
             append_startup_log("startup: extensions view instantiated");

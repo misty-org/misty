@@ -28,7 +28,7 @@ namespace misty::view {
                 case ViewID::Settings: return "Settings";
                 case ViewID::Workspace: return "Workspace";
                 case ViewID::Activity: return "Activity";
-                case ViewID::Services: return "Services";
+                case ViewID::Providers: return "Providers";
                 case ViewID::Extensions: return "Extensions";
                 case ViewID::Vault: return "Vault";
                 case ViewID::Transfers: return "Transfers";

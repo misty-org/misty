@@ -138,7 +138,7 @@ namespace misty::panel {
 
     void NavbarPanel::content(NavbarState& state) {
         nav_item("file-directory-24", "Files", 24, ViewID::Files, state);
-        nav_item("devices-24", "Services", 24, ViewID::Services, state);
+        nav_item("devices-24", "Providers", 24, ViewID::Providers, state);
         nav_item("apps-16", "Plugins", 24, ViewID::Extensions, state);
         nav_item("shield-lock-24", "Vault", 24, ViewID::Vault, state);
         nav_item("transfer-24", "Transfers", 24, ViewID::Transfers, state);
