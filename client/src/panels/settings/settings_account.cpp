@@ -93,7 +93,7 @@ void providers_section(misty::panel::SettingsState& state) {
             .show_divider = false,
             .divider_color = misty::panel::kSettingsDividerColor,
         }, [&]() {
-            misty::panel::settings_row_text("Connected services", "Cloud providers currently linked through Misty.");
+            misty::panel::settings_row_text("Connected providers", "Cloud providers currently linked through Misty.");
         }, [&]() {
             misty::panel::settings_value_text(std::to_string(state.connected_provider_count).c_str(), true);
         });

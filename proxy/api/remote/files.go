@@ -20,7 +20,7 @@ import (
 // @Failure 400 {object} map[string]any
 // @Failure 401 {string} string
 // @Failure 502 {object} map[string]any
-// @Router /remotes/file/download [get]
+// @Router /remote/file/download [get]
 func DownloadFile() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		req := downloadFileRequest{
@@ -54,7 +54,7 @@ func DownloadFile() http.HandlerFunc {
 // @Failure 400 {object} map[string]any
 // @Failure 401 {string} string
 // @Failure 502 {object} map[string]any
-// @Router /remotes/file/list [get]
+// @Router /remote/file/list [get]
 func ListFiles() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		req := listFilesRequest{
@@ -90,7 +90,7 @@ func ListFiles() http.HandlerFunc {
 // @Failure 400 {object} map[string]any
 // @Failure 401 {string} string
 // @Failure 502 {object} map[string]any
-// @Router /remotes/file/upload [post]
+// @Router /remote/file/upload [post]
 func UploadFile() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		req := uploadFileRequest{
@@ -139,7 +139,7 @@ func UploadFile() http.HandlerFunc {
 // @Failure 400 {object} map[string]any
 // @Failure 401 {string} string
 // @Failure 502 {object} map[string]any
-// @Router /remotes/file [delete]
+// @Router /remote/file [delete]
 func DeleteFile() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		req := deleteFileRequest{
@@ -172,7 +172,7 @@ func DeleteFile() http.HandlerFunc {
 // @Failure 400 {object} map[string]any
 // @Failure 401 {string} string
 // @Failure 502 {object} map[string]any
-// @Router /remotes/file/rename [post]
+// @Router /remote/file/rename [post]
 func RenameFile() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req renameFileRequest

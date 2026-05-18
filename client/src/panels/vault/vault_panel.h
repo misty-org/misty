@@ -32,7 +32,7 @@ namespace misty::panel {
         void show_restore_modal(VaultState& state);
 
         // Pending delete confirmation, set from the repo card and consumed
-        // by the disconnect modal (same pattern as ServicesPanel).
+        // by the disconnect modal (same pattern as ProvidersPanel).
         std::string pending_delete_repo_;
 
         static constexpr float kCardWidth   = 300.0f;

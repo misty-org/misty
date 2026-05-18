@@ -16,6 +16,15 @@ import (
 	"time"
 )
 
+type RuntimeInfo struct {
+	Addr          string    `json:"addr"`
+	ConfigPath    string    `json:"config_path"`
+	Ready         bool      `json:"ready"`
+	StartedAt     time.Time `json:"started_at,omitempty"`
+	UptimeSeconds int64     `json:"uptime_seconds,omitempty"`
+	LastError     string    `json:"error,omitempty"`
+}
+
 type RcloneRCD struct {
 	BinaryPath string
 	ConfigPath string
@@ -26,6 +35,7 @@ type RcloneRCD struct {
 	err error
 	mu  sync.Mutex
 	cmd *exec.Cmd
+	startedAt time.Time
 }
 
 func (rcd *RcloneRCD) Call(ctx context.Context, path string, input any, output any) error {
@@ -60,6 +70,7 @@ func (rcd *RcloneRCD) Start() error {
 
 	rcd.cmd = cmd
 	rcd.err = nil
+	rcd.startedAt = time.Now()
 	rcd.Running.Store(true)
 
 	rcd.watchCommand(cmd) // background watcher to monitor command termination
@@ -78,8 +89,28 @@ func (rcd *RcloneRCD) Stop() error {
 
 	err := rcd.cmd.Process.Kill()
 	rcd.cmd = nil
+	rcd.startedAt = time.Time{}
 	rcd.Running.Store(false)
 	return err
+}
+
+func (rcd *RcloneRCD) RuntimeInfo() RuntimeInfo {
+	rcd.mu.Lock()
+	defer rcd.mu.Unlock()
+
+	info := RuntimeInfo{
+		Addr:       rcd.Addr,
+		ConfigPath: rcd.ConfigPath,
+		Ready:      rcd.Running.Load(),
+	}
+	if rcd.err != nil {
+		info.LastError = rcd.err.Error()
+	}
+	if !rcd.startedAt.IsZero() {
+		info.StartedAt = rcd.startedAt
+		info.UptimeSeconds = int64(time.Since(rcd.startedAt).Seconds())
+	}
+	return info
 }
 
 func (rcd *RcloneRCD) rcdRequirements() error {
@@ -119,6 +150,7 @@ func (rcd *RcloneRCD) watchCommand(cmd *exec.Cmd) {
 		if rcd.cmd == cmd {
 			rcd.cmd = nil
 			rcd.err = err
+			rcd.startedAt = time.Time{}
 			rcd.Running.Store(false)
 		}
 	}()

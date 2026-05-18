@@ -141,7 +141,7 @@ namespace misty::panel {
         snapshot.remote_dest_path = remote_path;
         snapshot.total_bytes = file_size;
         const uint64_t transfer_id = transfers.start_transfer(std::move(snapshot));
-        const std::string error_msg = "Remote uploads are disabled until the new Services proxy flow is implemented.";
+        const std::string error_msg = "Remote uploads are disabled until the new Providers proxy flow is implemented.";
         transfers.fail_transfer(transfer_id, error_msg);
         completion_cb(false, error_msg);
     }

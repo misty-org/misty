@@ -1,11 +1,14 @@
-#include "panels/services/services_panel.h"
+#include "panels/providers/providers_panel.h"
 
 #include "core/manager/asset_manager.h"
+#include "core/ui/ui_layout.h"
 #include "imgui.h"
 
 #include <string>
 
 namespace misty::panel {
+    namespace UI = misty::UI;
+
     namespace {
         constexpr ImVec4 kCardBg = ImVec4(0.16f, 0.18f, 0.20f, 1.0f);
         constexpr ImVec4 kBorder = ImVec4(0.24f, 0.27f, 0.30f, 1.0f);
@@ -14,7 +17,7 @@ namespace misty::panel {
         constexpr ImVec4 kBadgeBg = ImVec4(0.77f, 0.94f, 0.79f, 1.0f);
         constexpr ImVec4 kBadgeText = ImVec4(0.18f, 0.49f, 0.23f, 1.0f);
 
-        std::string provider_logo_path(const ServiceCard& card) {
+        std::string provider_logo_path(const ProviderCard& card) {
             if (!card.logo_asset_path.empty()) {
                 return card.logo_asset_path;
             }
@@ -26,7 +29,7 @@ namespace misty::panel {
             return "";
         }
 
-        void draw_provider_logo(const ServiceCard& card, float size) {
+        void draw_provider_logo(const ProviderCard& card, float size) {
             const std::string path = provider_logo_path(card);
             if (!path.empty()) {
                 auto& logo = core::AssetManager::get().get_svg_texture_path(path, static_cast<int>(size), false);
@@ -72,82 +75,94 @@ namespace misty::panel {
         void draw_health_status_icon(bool ready) {
             const ImVec2 pos = ImGui::GetCursorScreenPos();
             ImDrawList* draw_list = ImGui::GetWindowDrawList();
-            const float radius = 20.0f;
+            const float radius = 8.0f;
             const ImVec2 center(pos.x + radius, pos.y + radius);
             const ImU32 fill = ready ? IM_COL32(52, 191, 102, 255) : IM_COL32(119, 127, 137, 255);
             draw_list->AddCircleFilled(center, radius, fill);
             draw_list->AddCircle(center, radius, IM_COL32(22, 26, 31, 45), 0, 1.5f);
 
             if (ready) {
-                draw_list->PathLineTo(ImVec2(center.x - 8.0f, center.y + 0.5f));
-                draw_list->PathLineTo(ImVec2(center.x - 2.0f, center.y + 7.0f));
-                draw_list->PathLineTo(ImVec2(center.x + 9.0f, center.y - 7.0f));
-                draw_list->PathStroke(IM_COL32(255, 255, 255, 255), false, 3.0f);
+                draw_list->PathLineTo(ImVec2(center.x - 3.5f, center.y + 0.5f));
+                draw_list->PathLineTo(ImVec2(center.x - 0.8f, center.y + 3.5f));
+                draw_list->PathLineTo(ImVec2(center.x + 4.5f, center.y - 4.0f));
+                draw_list->PathStroke(IM_COL32(255, 255, 255, 255), false, 2.0f);
             } else {
-                draw_list->AddLine(ImVec2(center.x - 7.0f, center.y - 7.0f),
-                                   ImVec2(center.x + 7.0f, center.y + 7.0f),
-                                   IM_COL32(255, 255, 255, 255), 3.0f);
-                draw_list->AddLine(ImVec2(center.x + 7.0f, center.y - 7.0f),
-                                   ImVec2(center.x - 7.0f, center.y + 7.0f),
-                                   IM_COL32(255, 255, 255, 255), 3.0f);
+                draw_list->AddLine(ImVec2(center.x - 3.5f, center.y - 3.5f),
+                                   ImVec2(center.x + 3.5f, center.y + 3.5f),
+                                   IM_COL32(255, 255, 255, 255), 2.0f);
+                draw_list->AddLine(ImVec2(center.x + 3.5f, center.y - 3.5f),
+                                   ImVec2(center.x - 3.5f, center.y + 3.5f),
+                                   IM_COL32(255, 255, 255, 255), 2.0f);
             }
 
             ImGui::Dummy(ImVec2(radius * 2.0f, radius * 2.0f));
         }
     }
 
-    void ServicesPanel::show_health_card(const ServicesHealthCard& health) {
-        ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 14.0f);
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(22.0f, 22.0f));
-        ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.98f, 0.98f, 0.99f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.88f, 0.90f, 0.92f, 1.0f));
+    void ProvidersPanel::show_health_card(const ProvidersHealthCard& health) {
+        UI::row("providers_status_row", {
+            .width = UI::Size::fill(),
+            .height = UI::Size::auto_size(),
+            .align = UI::Align::Center,
+            .gap = UI::Spacing::xy(12.0f, 0.0f),
+        }, [&]() {
+            UI::text({
+                .text = "Status",
+                .width = UI::Size::auto_size(),
+                .color = kMuted,
+            });
 
-        if (ImGui::BeginChild("##services_health_card", ImVec2(0.0f, 160.0f), true,
-                              ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse)) {
-            draw_health_status_icon(health.is_ready);
-            ImGui::SameLine(0.0f, 18.0f);
+            UI::raw([&]() {
+                draw_health_status_icon(health.is_ready);
+            });
 
-            if (ImGui::BeginTable("##services_health_table", 2, ImGuiTableFlags_SizingStretchProp)) {
-                ImGui::TableSetupColumn("left", ImGuiTableColumnFlags_WidthStretch, 0.62f);
-                ImGui::TableSetupColumn("right", ImGuiTableColumnFlags_WidthStretch, 0.38f);
-                ImGui::TableNextRow();
+            UI::text({
+                .text = health.status_value.c_str(),
+                .width = UI::Size::auto_size(),
+                .color = health.is_ready ? ImVec4(0.48f, 0.86f, 0.59f, 1.0f) : ImVec4(0.96f, 0.48f, 0.48f, 1.0f),
+            });
+        });
 
-                ImGui::TableNextColumn();
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.10f, 0.12f, 0.16f, 1.0f));
-                ImGui::SetWindowFontScale(1.35f);
-                ImGui::TextUnformatted(health.title.c_str());
-                ImGui::SetWindowFontScale(1.0f);
-                if (!health.version_text.empty()) ImGui::TextUnformatted(health.version_text.c_str());
-                if (!health.path_text.empty()) ImGui::TextWrapped("%s", health.path_text.c_str());
-                if (!health.remote_count_text.empty()) ImGui::TextUnformatted(health.remote_count_text.c_str());
-                if (!health.provider_count_text.empty()) ImGui::TextUnformatted(health.provider_count_text.c_str());
-                ImGui::PopStyleColor();
-
-                ImGui::TableNextColumn();
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.20f, 0.22f, 0.26f, 1.0f));
-                ImGui::TextUnformatted(health.status_heading.c_str());
-                ImGui::TextUnformatted("");
-                ImGui::TextUnformatted("Status");
-                ImGui::TextUnformatted(health.status_value.c_str());
-                ImGui::PopStyleColor();
-
-                ImGui::EndTable();
+        std::string details;
+        auto append_detail = [&](const std::string& value) {
+            if (value.empty()) {
+                return;
             }
+            if (!details.empty()) {
+                details += "  •  ";
+            }
+            details += value;
+        };
+        append_detail(health.port_text);
+        append_detail(health.uptime_text);
+        append_detail(health.provider_count_text);
+        append_detail(health.remote_count_text);
+
+        if (!details.empty()) {
+            UI::text({
+                .text = details.c_str(),
+                .width = UI::Size::fill(),
+                .color = kMuted,
+                .overflow = UI::TextOverflow::Wrap,
+            });
         }
 
-        ImGui::EndChild();
-        ImGui::PopStyleColor(2);
-        ImGui::PopStyleVar(2);
+        UI::divider({
+            .width = UI::Size::fill(),
+            .height = UI::Size::px(1.0f),
+            .margin = UI::Spacing::top_bottom(18.0f, 0.0f),
+            .color = kBorder,
+        });
     }
 
-    void ServicesPanel::show_service_card(ServicesState& state, const ServiceCard& card, float card_width) {
+    void ProvidersPanel::show_provider_card(ProvidersState& state, const ProviderCard& card, float card_width) {
         ImGui::PushID(card.id.c_str());
         ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 14.0f);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(20.0f, 18.0f));
         ImGui::PushStyleColor(ImGuiCol_ChildBg, kCardBg);
         ImGui::PushStyleColor(ImGuiCol_Border, kBorder);
 
-        if (ImGui::BeginChild("##service_card", ImVec2(card_width, 286.0f), true,
+        if (ImGui::BeginChild("##provider_card", ImVec2(card_width, 286.0f), true,
                               ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse)) {
             draw_provider_logo(card, 46.0f);
             ImGui::Spacing();
@@ -189,25 +204,25 @@ namespace misty::panel {
         ImGui::PopID();
     }
 
-    void ServicesPanel::show_empty_state(bool filtered) {
+    void ProvidersPanel::show_empty_state(bool filtered) {
         ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 14.0f);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(24.0f, 24.0f));
         ImGui::PushStyleColor(ImGuiCol_ChildBg, kCardBg);
         ImGui::PushStyleColor(ImGuiCol_Border, kBorder);
 
-        if (ImGui::BeginChild("##services_empty_state", ImVec2(0.0f, 180.0f), true,
+        if (ImGui::BeginChild("##providers_empty_state", ImVec2(0.0f, 180.0f), true,
                               ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse)) {
             ImGui::PushStyleColor(ImGuiCol_Text, kText);
             ImGui::SetWindowFontScale(1.1f);
-            ImGui::TextUnformatted(filtered ? "No matching services" : "No services connected yet");
+            ImGui::TextUnformatted(filtered ? "No matching providers" : "No providers connected yet");
             ImGui::SetWindowFontScale(1.0f);
             ImGui::PopStyleColor();
 
             ImGui::PushStyleColor(ImGuiCol_Text, kMuted);
             if (filtered) {
-                ImGui::TextWrapped("Try a different search term or clear the filter to see all placeholder services once they are added.");
+                ImGui::TextWrapped("Try a different search term or clear the filter to see all connected providers.");
             } else {
-                ImGui::TextWrapped("This screen is ready for the new proxy-backed Services flow. Add Service currently opens a placeholder template hook.");
+                ImGui::TextWrapped("No providers are connected yet. Use Add Provider to start an rclone-backed setup flow.");
             }
             ImGui::PopStyleColor();
         }
