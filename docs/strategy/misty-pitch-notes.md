@@ -2,6 +2,8 @@
 
 Working founder notes for explaining Misty clearly, creating urgency, and keeping the product grounded in a distinctive thesis.
 
+> **Scope note:** These notes emphasize collaborative human-and-agent teams. The canonical broader product and market model—including solo use, informal groups, the initial student wedge, and product–market fit signals—is [Misty Product–Market Fit Thesis](product-market-fit-thesis.md).
+
 Last updated: August 18, 2026
 
 ## The core idea
