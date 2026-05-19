@@ -25,6 +25,12 @@ namespace misty::panel {
         std::string cleanup_path;
     };
 
+    struct SidebarProviderEntry {
+        std::string provider_folder;
+        std::string remote_name;
+        std::string label;
+    };
+
     struct FileSidebarState : public core::UIState {
         // Input Buffers: For "New File" or "New Folder" modals
         char name_buffer[256] = "";
@@ -45,6 +51,15 @@ namespace misty::panel {
         std::vector<FileUploadProgress> upload_queue;
         size_t current_upload_index = 0;
         std::mutex upload_mutex;
+
+        // Lightweight provider navigation state. This is intentionally separate
+        // from ProvidersState so the file sidebar can hydrate without opening
+        // or initializing the full Providers view.
+        bool providers_loaded = false;
+        bool providers_loading = false;
+        std::string providers_error;
+        std::vector<SidebarProviderEntry> provider_entries;
+        std::mutex providers_mutex;
 
         // Helper to get current upload progress (thread-safe)
         FileUploadProgress get_current_upload() {

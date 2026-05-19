@@ -68,16 +68,67 @@ func RegisterUser(db *dbpkg.Database, serverURL string) http.HandlerFunc {
 			return
 		}
 
-		w.WriteHeader(http.StatusOK)
+		token, err := auth.GenerateToken(result.UserID, req.Email)
+		if err != nil {
+			http.Error(w, "Failed to generate token", http.StatusInternalServerError)
+			return
+		}
+
+		refreshToken, err := auth.GenerateRefreshToken()
+		if err != nil {
+			http.Error(w, "Failed to generate refresh token", http.StatusInternalServerError)
+			return
+		}
+
+		expiresAt := time.Now().Add(auth.RefreshTokenExpiry)
+		if err := db.StoreRefreshToken(result.UserID, refreshToken, expiresAt); err != nil {
+			http.Error(w, "Failed to store refresh token", http.StatusInternalServerError)
+			return
+		}
+
+		writeSessionResponse(w, result.UserID, req.Name, req.Email, token)
 	}
 }
 
 type UserLoginResponse struct {
-	ID           string `json:"id"`
-	Name         string `json:"name"`
-	Email        string `json:"email"`
-	Token        string `json:"token"`
-	RefreshToken string `json:"refresh_token"`
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Email string `json:"email"`
+	Token string `json:"token"`
+}
+
+type SessionResponse = UserLoginResponse
+
+func writeSessionResponse(w http.ResponseWriter, userID, name, email, token string) {
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(SessionResponse{
+		ID:    userID,
+		Name:  name,
+		Email: email,
+		Token: token,
+	})
+}
+
+func issueCurrentSessionToken(db *dbpkg.Database, w http.ResponseWriter) {
+	user, rawRefreshToken, err := db.CurrentSessionRefreshToken()
+	if err != nil || user == nil || rawRefreshToken == "" {
+		http.Error(w, "No active local session", http.StatusUnauthorized)
+		return
+	}
+
+	userID, err := db.ValidateRefreshToken(rawRefreshToken)
+	if err != nil || userID != user.ID {
+		http.Error(w, "Invalid or expired local session", http.StatusUnauthorized)
+		return
+	}
+
+	token, err := auth.GenerateToken(user.ID, user.Email)
+	if err != nil {
+		http.Error(w, "Failed to generate access token", http.StatusInternalServerError)
+		return
+	}
+
+	writeSessionResponse(w, user.ID, user.Name, user.Email, token)
 }
 
 func LoginUser(db *dbpkg.Database, serverURL string) http.HandlerFunc {
@@ -147,11 +198,10 @@ func LoginUser(db *dbpkg.Database, serverURL string) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(UserLoginResponse{
-			ID:           userID,
-			Name:         userName,
-			Email:        req.Email,
-			Token:        token,
-			RefreshToken: refreshToken,
+			ID:    userID,
+			Name:  userName,
+			Email: req.Email,
+			Token: token,
 		})
 	}
 }
@@ -161,16 +211,19 @@ type RefreshRequest struct {
 }
 
 type RefreshResponse struct {
-	Token        string `json:"token"`
-	RefreshToken string `json:"refresh_token"`
+	Token string `json:"token"`
 }
 
 func RefreshToken(db *dbpkg.Database) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req RefreshRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.RefreshToken == "" {
-			http.Error(w, "Missing refresh_token", http.StatusBadRequest)
-			return
+			user, rawRefreshToken, err := db.CurrentSessionRefreshToken()
+			if err != nil || user == nil || rawRefreshToken == "" {
+				http.Error(w, "No active local session", http.StatusUnauthorized)
+				return
+			}
+			req.RefreshToken = rawRefreshToken
 		}
 		defer r.Body.Close()
 
@@ -210,9 +263,20 @@ func RefreshToken(db *dbpkg.Database) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(RefreshResponse{
-			Token:        newAccessToken,
-			RefreshToken: req.RefreshToken,
+			Token: newAccessToken,
 		})
+	}
+}
+
+func CurrentSession(db *dbpkg.Database) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		issueCurrentSessionToken(db, w)
+	}
+}
+
+func RefreshSession(db *dbpkg.Database) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		issueCurrentSessionToken(db, w)
 	}
 }
 
