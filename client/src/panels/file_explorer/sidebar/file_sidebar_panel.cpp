@@ -233,7 +233,7 @@ namespace misty::panel {
                 if (!fetch.success) {
                     std::lock_guard<std::mutex> lock(state.providers_mutex);
                     state.providers_loading = false;
-                    state.providers_loaded = true;
+                    state.providers_loaded = fetch.response.status_code != 401;
                     state.providers_error = fetch.last_error;
                     return;
                 }

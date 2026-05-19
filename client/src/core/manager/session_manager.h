@@ -1,5 +1,6 @@
 #pragma once
 
+#include <condition_variable>
 #include <functional>
 #include <map>
 #include <mutex>
@@ -34,6 +35,7 @@ namespace misty::core {
         std::string get_refresh_token() const;
 
         bool bootstrap_session();
+        bool ensure_session_ready();
 
         // User ID from the proxy — used to scope cloud provider API calls
         void set_user_id(const std::string& user_id);
@@ -80,6 +82,10 @@ namespace misty::core {
         bool session_expired_ = false;
         bool proxy_available_ = true;
         std::string proxy_status_message_;
+
+        mutable std::mutex bootstrap_mu_;
+        std::condition_variable bootstrap_cv_;
+        bool bootstrap_in_flight_ = false;
     };
 
 }

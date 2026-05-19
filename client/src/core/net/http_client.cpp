@@ -20,12 +20,70 @@ namespace misty::core {
     namespace fs = std::filesystem;
 
     namespace {
-        std::map<std::string, std::string> merge_auth_headers(const HttpRequestOptions& options) {
+        bool is_proxy_request(const std::string& url) {
+            const std::string proxy_url = EnvManager::get().get("PROXY_SERVICE_URL", "");
+            return !proxy_url.empty() && url.rfind(proxy_url, 0) == 0;
+        }
+
+        std::string proxy_request_path(const std::string& url) {
+            const std::string proxy_url = EnvManager::get().get("PROXY_SERVICE_URL", "");
+            if (proxy_url.empty() || url.rfind(proxy_url, 0) != 0) {
+                return "";
+            }
+
+            std::string path = url.substr(proxy_url.size());
+            if (path.empty()) {
+                path = "/";
+            } else if (path.front() != '/') {
+                path.insert(path.begin(), '/');
+            }
+
+            const std::size_t query_pos = path.find('?');
+            if (query_pos != std::string::npos) {
+                path = path.substr(0, query_pos);
+            }
+            return path;
+        }
+
+        bool is_public_proxy_endpoint(const std::string& path) {
+            return path == "/api/hello" ||
+                   path == "/api/health" ||
+                   path == "/api/login" ||
+                   path == "/api/register" ||
+                   path == "/api/refresh" ||
+                   path == "/api/session" ||
+                   path == "/api/session/refresh";
+        }
+
+        bool should_ensure_session(const std::string& url) {
+            if (!is_proxy_request(url)) {
+                return false;
+            }
+            return !is_public_proxy_endpoint(proxy_request_path(url));
+        }
+
+        std::map<std::string, std::string> merge_auth_headers(
+            const std::string& url,
+            const std::map<std::string, std::string>& headers) {
+            const bool protected_proxy_request = should_ensure_session(url);
+            if (protected_proxy_request) {
+                SessionManager::get().ensure_session_ready();
+            }
+
             auto merged_headers = SessionManager::get().get_auth_headers();
-            for (const auto& [key, value] : options.headers) {
+            for (const auto& [key, value] : headers) {
+                if (protected_proxy_request && key == "Authorization") {
+                    continue;
+                }
                 merged_headers[key] = value;
             }
             return merged_headers;
+        }
+
+        std::map<std::string, std::string> merge_auth_headers(
+            const std::string& url,
+            const HttpRequestOptions& options) {
+            return merge_auth_headers(url, options.headers);
         }
 
         fs::path staging_download_path_for(const fs::path& final_path) {
@@ -219,7 +277,7 @@ namespace misty::core {
     HttpResponse HTTPClient::get_stream(const std::string& url,
                                         StreamLineCallback line_callback,
                                         const HttpRequestOptions& options) {
-        auto merged_headers = merge_auth_headers(options);
+        auto merged_headers = merge_auth_headers(url, options);
 
         auto execute_stream_request = [&](const std::map<std::string, std::string>& request_headers) {
             HttpResponse response;
@@ -513,7 +571,7 @@ namespace misty::core {
                                              const std::string& url,
                                              const std::string& body,
                                              const HttpRequestOptions& options) {
-        auto merged_headers = merge_auth_headers(options);
+        auto merged_headers = merge_auth_headers(url, options);
 
         HttpResponse response = execute_curl_request(
             method, url, body, merged_headers,
@@ -728,10 +786,7 @@ namespace misty::core {
         const std::map<std::string, std::string>& headers,
         DownloadProgressCallback progress_cb
     ) {
-        auto merged_headers = SessionManager::get().get_auth_headers();
-        for (const auto& [key, value] : headers) {
-            merged_headers[key] = value;
-        }
+        auto merged_headers = merge_auth_headers(url, headers);
 
         DownloadResult result = execute_curl_download(url, local_path, merged_headers, progress_cb);
         if (result.final_status_code == 0 && is_proxy_url(url) && ProxyManager::get().ensure_running()) {
