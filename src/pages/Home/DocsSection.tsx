@@ -2,7 +2,7 @@ const docs = [
   {
     title: "Getting Started",
     description: "Install Misty and connect your first cloud provider in minutes.",
-    href: "/docs/getting-started",
+    href: "/docs/introduction",
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
         <path d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -12,7 +12,7 @@ const docs = [
   {
     title: "Cloud Providers",
     description: "Configure Google Drive, OneDrive, and other storage backends.",
-    href: "/docs/providers",
+    href: "/docs/providers-overview",
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
         <path d="M2.25 15a4.5 4.5 0 004.5 4.5H18a3.75 3.75 0 001.332-7.257 3 3 0 00-3.758-3.848 5.25 5.25 0 00-10.233 2.33A4.502 4.502 0 002.25 15z" />
@@ -20,9 +20,9 @@ const docs = [
     ),
   },
   {
-    title: "Self-Hosting",
-    description: "Deploy the backend proxy on your own infrastructure with Tailscale.",
-    href: "/docs/self-hosting",
+    title: "Backups",
+    description: "Create snapshots and restore files with encrypted Vault backups.",
+    href: "/docs/backups-overview",
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
         <path d="M5.25 14.25h13.5m-13.5 0a3 3 0 01-3-3m3 3a3 3 0 100 6h13.5a3 3 0 100-6m-16.5-3a3 3 0 013-3h13.5a3 3 0 013 3m-19.5 0a4.5 4.5 0 01.9-2.7L5.737 5.1a3.375 3.375 0 012.7-1.35h7.126c1.062 0 2.062.5 2.7 1.35l2.587 3.45a4.5 4.5 0 01.9 2.7m0 0a3 3 0 01-3 3m0 3h.008v.008h-.008v-.008zm0-6h.008v.008h-.008v-.008zm-3 6h.008v.008h-.008v-.008zm0-6h.008v.008h-.008v-.008z" />

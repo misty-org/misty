@@ -132,29 +132,19 @@ const platformMeta: Record<PlatformName, { icon: React.ReactNode; arch: string }
 type ReleaseBuild = {
   platform: PlatformName;
   tag: string;
-  href: string;
+  platformKey: "windows" | "macos" | "linux";
 };
 
-const MACOS_DMG_DOWNLOAD_URL =
-  import.meta.env.VITE_MACOS_DMG_URL ||
-  "https://github.com/kannachi323/misty/releases/download/v0.1.0/Misty-1.0-arm64.dmg";
-
-const WINDOWS_DOWNLOAD_URL =
-  import.meta.env.VITE_WINDOWS_URL ||
-  "https://github.com/kannachi323/misty/releases/tag/v0.1.0";
-
-const LINUX_DOWNLOAD_URL =
-  import.meta.env.VITE_LINUX_URL ||
-  "https://github.com/kannachi323/misty/releases/tag/v0.1.0";
+const apiBase = (import.meta.env.VITE_API_BASE ?? "").replace(/\/+$/, "");
 
 const releases = [
   {
     version: "v0.1.0",
     date: "December 2025",
     builds: [
-      { platform: "Windows", tag: "Installer", href: WINDOWS_DOWNLOAD_URL },
-      { platform: "macOS", tag: "DMG", href: MACOS_DMG_DOWNLOAD_URL },
-      { platform: "Linux", tag: "AppImage", href: LINUX_DOWNLOAD_URL },
+      { platform: "Windows", tag: "Installer", platformKey: "windows" },
+      { platform: "macOS", tag: "DMG", platformKey: "macos" },
+      { platform: "Linux", tag: "AppImage", platformKey: "linux" },
     ] satisfies ReleaseBuild[],
     notes: [
       "Initial release with Windows, macOS, and Linux support",
@@ -172,6 +162,8 @@ function ReleaseItem({
   open,
   onToggle,
   isLatest,
+  pendingBuildKey,
+  onDownload,
 }: {
   version: string;
   builds: ReleaseBuild[];
@@ -179,6 +171,8 @@ function ReleaseItem({
   open: boolean;
   onToggle: () => void;
   isLatest: boolean;
+  pendingBuildKey: string | null;
+  onDownload: (build: ReleaseBuild) => void;
 }) {
   return (
     <div className="border-b border-border last:border-none">
@@ -209,12 +203,14 @@ function ReleaseItem({
                   </span>
                 </div>
                 <p className="text-xs text-text-muted mb-1">{platformMeta[build.platform].arch}</p>
-                <a
-                  href={build.href}
+                <button
+                  type="button"
+                  onClick={() => onDownload(build)}
+                  disabled={pendingBuildKey === `${version}-${build.platformKey}`}
                   className="inline-flex w-full items-center justify-center rounded-xl bg-white px-4 py-2.5 text-sm font-medium text-black transition-colors duration-300 hover:bg-zinc-200"
                 >
-                  Download
-                </a>
+                  {pendingBuildKey === `${version}-${build.platformKey}` ? "Preparing..." : "Download"}
+                </button>
               </div>
             ))}
           </div>
@@ -241,6 +237,56 @@ export default function Download() {
       releases.map((release, index) => [release.version, index === 0]),
     ),
   );
+  const [pendingBuildKey, setPendingBuildKey] = useState<string | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+
+  async function requestDownload(build: ReleaseBuild, version: string) {
+    const buildKey = `${version}-${build.platformKey}`;
+    setPendingBuildKey(buildKey);
+    setDownloadError(null);
+
+    try {
+      const response = await fetch(`${apiBase}/download-url?platform=${encodeURIComponent(build.platformKey)}`, {
+        credentials: "include",
+      });
+
+      const contentType = response.headers.get("Content-Type") ?? "";
+      const payload = contentType.includes("application/json")
+        ? await response.json()
+        : await response.text();
+
+      if (!response.ok) {
+        const message =
+          typeof payload === "string"
+            ? payload.trim()
+            : typeof payload?.message === "string"
+              ? payload.message
+              : "Unable to prepare this download.";
+        throw Object.assign(new Error(message || "Unable to prepare this download."), {
+          status: response.status,
+        });
+      }
+
+      if (typeof payload?.url !== "string") {
+        throw new Error("The download server returned an invalid URL.");
+      }
+
+      window.location.assign(payload.url);
+    } catch (error) {
+      const status = typeof error === "object" && error !== null && "status" in error
+        ? Number(error.status)
+        : 0;
+
+      if (status === 401) {
+        window.location.assign("/signin");
+        return;
+      }
+
+      setDownloadError(error instanceof Error ? error.message : "Unable to prepare this download.");
+    } finally {
+      setPendingBuildKey(null);
+    }
+  }
 
   return (
     <div className="max-w-5xl mx-auto px-3 sm:px-4 pt-32 pb-20">
@@ -254,6 +300,11 @@ export default function Download() {
       {/* Releases */}
       <div className="mb-20">
         <h2 className="text-lg font-semibold text-text">Releases</h2>
+        {downloadError && (
+          <p className="mt-3 rounded-lg border border-red-400/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+            {downloadError}
+          </p>
+        )}
         <div>
           {releases.map((release) => (
             <ReleaseItem
@@ -262,6 +313,7 @@ export default function Download() {
               builds={release.builds}
               notes={release.notes}
               isLatest={release.version === releases[0].version}
+              pendingBuildKey={pendingBuildKey}
               open={openVersions[release.version] ?? false}
               onToggle={() =>
                 setOpenVersions((current) => ({
@@ -269,6 +321,7 @@ export default function Download() {
                   [release.version]: !current[release.version],
                 }))
               }
+              onDownload={(build) => requestDownload(build, release.version)}
             />
           ))}
         </div>

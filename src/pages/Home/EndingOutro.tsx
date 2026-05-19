@@ -10,7 +10,7 @@ export default function MoreSocials() {
       </h2>
 
       <a
-        href="/docs/getting-started"
+        href="/docs/introduction"
         className="px-5 py-2 rounded-full bg-white text-black font-semibold text-sm hover:bg-zinc-200 transition-colors shadow-lg"
       >
         Download Now

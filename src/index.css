@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@source "../../misty-docs/src";
 
 @theme {
   --color-bg: #07090b;
