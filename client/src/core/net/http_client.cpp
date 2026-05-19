@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <chrono>
 #include <atomic>
+#include <thread>
 
 #include "core/net/http_client.h"
 #include "core/manager/session_manager.h"
@@ -276,20 +277,38 @@ namespace misty::core {
         update_proxy_status(url, response.status_code);
 
         if (response.status_code == 401 &&
-            !SessionManager::get().is_session_expired() &&
-            !is_refreshing_.exchange(true)) {
-            SessionManager::RefreshResult refresh_result = SessionManager::get().attempt_token_refresh();
-            if (refresh_result == SessionManager::RefreshResult::Success) {
-                auto retry_headers = SessionManager::get().get_auth_headers();
-                for (const auto& [key, value] : options.headers) {
-                    retry_headers[key] = value;
+            !SessionManager::get().is_session_expired()) {
+            if (!is_refreshing_.exchange(true)) {
+                SessionManager::RefreshResult refresh_result = SessionManager::get().attempt_token_refresh();
+                if (refresh_result == SessionManager::RefreshResult::Success) {
+                    auto retry_headers = SessionManager::get().get_auth_headers();
+                    for (const auto& [key, value] : options.headers) {
+                        if (key == "Authorization") continue;
+                        retry_headers[key] = value;
+                    }
+                    response = execute_stream_request(retry_headers);
+                    update_proxy_status(url, response.status_code);
+                } else if (refresh_result == SessionManager::RefreshResult::Failed) {
+                    SessionManager::get().mark_session_expired();
                 }
-                response = execute_stream_request(retry_headers);
-                update_proxy_status(url, response.status_code);
-            } else if (refresh_result == SessionManager::RefreshResult::Failed) {
-                SessionManager::get().mark_session_expired();
+                is_refreshing_.store(false);
+            } else {
+                while (is_refreshing_.load() && !SessionManager::get().is_session_expired()) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+                }
+                if (!SessionManager::get().is_session_expired()) {
+                    auto retry_headers = SessionManager::get().get_auth_headers();
+                    for (const auto& [key, value] : options.headers) {
+                        if (key == "Authorization") continue;
+                        retry_headers[key] = value;
+                    }
+                    response = execute_stream_request(retry_headers);
+                    update_proxy_status(url, response.status_code);
+                    if (response.status_code == 401) {
+                        SessionManager::get().mark_session_expired();
+                    }
+                }
             }
-            is_refreshing_.store(false);
         }
 
         return response;
@@ -511,26 +530,46 @@ namespace misty::core {
         // Auto-refresh on 401 if we're not already in a refresh call
         // Guard: skip if session already expired or another thread is refreshing
         if (response.status_code == 401 &&
-            !SessionManager::get().is_session_expired() &&
-            !is_refreshing_.exchange(true)) {
-            SessionManager::RefreshResult refresh_result = SessionManager::get().attempt_token_refresh();
-            if (refresh_result == SessionManager::RefreshResult::Success) {
-                // Retry with new auth headers
-                auto retry_headers = SessionManager::get().get_auth_headers();
-                for (const auto& [key, value] : options.headers) {
-                    retry_headers[key] = value;
+            !SessionManager::get().is_session_expired()) {
+            if (!is_refreshing_.exchange(true)) {
+                SessionManager::RefreshResult refresh_result = SessionManager::get().attempt_token_refresh();
+                if (refresh_result == SessionManager::RefreshResult::Success) {
+                    // Retry with new auth headers
+                    auto retry_headers = SessionManager::get().get_auth_headers();
+                    for (const auto& [key, value] : options.headers) {
+                        if (key == "Authorization") continue;
+                        retry_headers[key] = value;
+                    }
+                    response = execute_curl_request(
+                        method, url, body, retry_headers,
+                        options.timeouts.connect_timeout_seconds,
+                        options.timeouts.total_timeout_seconds);
+                    update_proxy_status(url, response.status_code);
+                } else if (refresh_result == SessionManager::RefreshResult::Failed) {
+                    // Refresh failed — mark session as expired so UI can prompt reconnect
+                    SessionManager::get().mark_session_expired();
                 }
-                response = execute_curl_request(
-                    method, url, body, retry_headers,
-                    options.timeouts.connect_timeout_seconds,
-                    options.timeouts.total_timeout_seconds);
-                update_proxy_status(url, response.status_code);
-            } else if (refresh_result == SessionManager::RefreshResult::Failed) {
-                // Refresh failed — mark session as expired so UI can prompt reconnect
-                // Tokens are preserved so the user can re-authenticate without re-entering credentials
-                SessionManager::get().mark_session_expired();
+                is_refreshing_.store(false);
+            } else {
+                while (is_refreshing_.load() && !SessionManager::get().is_session_expired()) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+                }
+                if (!SessionManager::get().is_session_expired()) {
+                    auto retry_headers = SessionManager::get().get_auth_headers();
+                    for (const auto& [key, value] : options.headers) {
+                        if (key == "Authorization") continue;
+                        retry_headers[key] = value;
+                    }
+                    response = execute_curl_request(
+                        method, url, body, retry_headers,
+                        options.timeouts.connect_timeout_seconds,
+                        options.timeouts.total_timeout_seconds);
+                    update_proxy_status(url, response.status_code);
+                    if (response.status_code == 401) {
+                        SessionManager::get().mark_session_expired();
+                    }
+                }
             }
-            is_refreshing_.store(false);
         }
 
         return response;
@@ -701,20 +740,38 @@ namespace misty::core {
         update_proxy_status(url, result.final_status_code);
 
         if (result.final_status_code == 401 &&
-            !SessionManager::get().is_session_expired() &&
-            !is_refreshing_.exchange(true)) {
-            SessionManager::RefreshResult refresh_result = SessionManager::get().attempt_token_refresh();
-            if (refresh_result == SessionManager::RefreshResult::Success) {
-                auto retry_headers = SessionManager::get().get_auth_headers();
-                for (const auto& [key, value] : headers) {
-                    retry_headers[key] = value;
+            !SessionManager::get().is_session_expired()) {
+            if (!is_refreshing_.exchange(true)) {
+                SessionManager::RefreshResult refresh_result = SessionManager::get().attempt_token_refresh();
+                if (refresh_result == SessionManager::RefreshResult::Success) {
+                    auto retry_headers = SessionManager::get().get_auth_headers();
+                    for (const auto& [key, value] : headers) {
+                        if (key == "Authorization") continue;
+                        retry_headers[key] = value;
+                    }
+                    result = execute_curl_download(url, local_path, retry_headers, progress_cb);
+                    update_proxy_status(url, result.final_status_code);
+                } else if (refresh_result == SessionManager::RefreshResult::Failed) {
+                    SessionManager::get().mark_session_expired();
                 }
-                result = execute_curl_download(url, local_path, retry_headers, progress_cb);
-                update_proxy_status(url, result.final_status_code);
-            } else if (refresh_result == SessionManager::RefreshResult::Failed) {
-                SessionManager::get().mark_session_expired();
+                is_refreshing_.store(false);
+            } else {
+                while (is_refreshing_.load() && !SessionManager::get().is_session_expired()) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+                }
+                if (!SessionManager::get().is_session_expired()) {
+                    auto retry_headers = SessionManager::get().get_auth_headers();
+                    for (const auto& [key, value] : headers) {
+                        if (key == "Authorization") continue;
+                        retry_headers[key] = value;
+                    }
+                    result = execute_curl_download(url, local_path, retry_headers, progress_cb);
+                    update_proxy_status(url, result.final_status_code);
+                    if (result.final_status_code == 401) {
+                        SessionManager::get().mark_session_expired();
+                    }
+                }
             }
-            is_refreshing_.store(false);
         }
 
         return result;

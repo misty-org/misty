@@ -1,11 +1,11 @@
 #include "panels/file_explorer/file_explorer_panel.h"
 
-#include <algorithm>
 #include <cstdio>
 #include <cstring>
 
 #include "core/commands/command_manager.h"
 #include "core/manager/asset_manager.h"
+#include "panels/file_explorer/navigation/toolbar_util.h"
 #include "panels/search/search_state.h"
 using namespace misty::core;
 
@@ -15,93 +15,6 @@ constexpr float kPathFieldTrim = 96.0f;
 constexpr ImVec4 kExplorerChromeBg = ImVec4(0.14f, 0.14f, 0.15f, 1.0f);
 constexpr ImVec4 kExplorerChromeBgHover = ImVec4(0.18f, 0.18f, 0.20f, 1.0f);
 constexpr ImVec4 kExplorerChromeBgActive = ImVec4(0.11f, 0.11f, 0.12f, 1.0f);
-
-int oversampled_icon_size(float display_size) {
-    return std::max(16, static_cast<int>(std::ceil(display_size * 2.0f)));
-}
-
-struct BreadcrumbSegment {
-    std::string label;
-    std::string target_path;
-};
-
-std::vector<BreadcrumbSegment> build_breadcrumb_segments(const std::string& current_path) {
-    std::vector<BreadcrumbSegment> segments;
-    if (current_path.empty()) {
-        return segments;
-    }
-
-    if (current_path == FileExplorerState::VIRTUAL_PATH_RECENT) {
-        return {{"Recent", current_path}};
-    }
-    if (current_path == FileExplorerState::VIRTUAL_PATH_STARRED) {
-        return {{"Starred", current_path}};
-    }
-    if (current_path == FileExplorerState::VIRTUAL_PATH_TRASH) {
-        return {{"Trash", current_path}};
-    }
-
-    const char* home = std::getenv("HOME");
-    const std::string home_path = home ? home : "";
-    fs::path path(current_path);
-    fs::path cumulative;
-
-    if (!home_path.empty() && current_path.rfind(home_path, 0) == 0) {
-        cumulative = fs::path(home_path);
-        segments.push_back({"~", cumulative.string()});
-        std::error_code ec;
-        fs::path relative = fs::relative(path, cumulative, ec);
-        if (!ec) {
-            for (const auto& part : relative) {
-                cumulative /= part;
-                segments.push_back({part.string(), cumulative.string()});
-            }
-            return segments;
-        }
-    }
-
-    if (path.is_absolute()) {
-        cumulative = path.root_path();
-        segments.push_back({cumulative.string().empty() ? "/" : cumulative.string(), cumulative.string().empty() ? "/" : cumulative.string()});
-    }
-    for (const auto& part : path.relative_path()) {
-        cumulative /= part;
-        segments.push_back({part.string(), cumulative.string()});
-    }
-    if (segments.empty()) {
-        segments.push_back({current_path, current_path});
-    }
-    return segments;
-}
-
-void clear_scoped_search(SearchState& search_state) {
-    std::lock_guard<std::mutex> lock(search_state.mu);
-    search_state.is_open = false;
-    search_state.focus_query = false;
-    search_state.selected_index = 0;
-    search_state.results.clear();
-    search_state.search_pending = false;
-    search_state.search_in_flight = false;
-    ++search_state.request_generation;
-    search_state.last_submitted_query.clear();
-    search_state.last_err.clear();
-}
-
-void discard_current_history_entries(std::stack<std::string>& history, const std::string& current_path) {
-    while (!history.empty() && path_utils::same_history_path(history.top(), current_path)) {
-        history.pop();
-    }
-}
-
-void push_history_entry_if_distinct(std::stack<std::string>& history, const std::string& path) {
-    if (path.empty()) {
-        return;
-    }
-    if (!history.empty() && path_utils::same_history_path(history.top(), path)) {
-        return;
-    }
-    history.push(path);
-}
 } // namespace
 
 void FileExplorerPanel::show_nav_history(FileExplorerState& state, float button_width, float spacing) {
@@ -181,6 +94,104 @@ void FileExplorerPanel::show_nav_history(FileExplorerState& state, float button_
     if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("Refresh (%s)", CommandManager::get().label("explorer.refresh").c_str());
     }
+    ImGui::PopStyleColor(3);
+    ImGui::PopStyleVar(2);
+}
+
+void FileExplorerPanel::show_search_bar(FileExplorerState& state, SearchState& search_state) {
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8, 6));
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
+
+    const float control_height = ImGui::GetFrameHeight();
+    const float action_btn_size = std::max(16.0f, control_height - 10.0f);
+    const float spacing = 3.0f;
+    const int action_button_count = 2;
+    const float total_available = ImGui::GetContentRegionAvail().x;
+    const float action_width = action_btn_size * action_button_count +
+                               spacing * static_cast<float>(std::max(0, action_button_count - 1));
+    const float search_button_width = action_btn_size;
+    const float reserved_trailing_width = action_width + search_button_width + spacing;
+    const float path_width = std::max(120.0f, total_available - reserved_trailing_width - spacing - kPathFieldTrim);
+
+    if (CommandManager::get().matches("search.toggle")) {
+        search_state.is_open = true;
+        search_state.focus_query = true;
+    }
+
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, kExplorerChromeBg);
+    ImGui::SetNextItemWidth(path_width);
+    const bool path_submitted = ImGui::InputTextWithHint("##path_input", "Jump to path", state.search_path,
+                                                         sizeof(state.search_path), ImGuiInputTextFlags_EnterReturnsTrue);
+    ImGui::PopStyleColor();
+    if (path_submitted) {
+        std::string target(state.search_path);
+        if (!target.empty()) {
+            navigate_to_path(target, true, false);
+        }
+    }
+
+    ImGui::SameLine(0, spacing);
+    ImGui::PushStyleColor(ImGuiCol_Button, kExplorerChromeBg);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, kExplorerChromeBgHover);
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, kExplorerChromeBgActive);
+    const ImVec4 search_tint = search_state.is_open
+        ? ImVec4(0.95f, 0.95f, 0.95f, 1.0f)
+        : ImVec4(0.7f, 0.7f, 0.7f, 1.0f);
+    auto& search_tex = AssetManager::get().get_svg_texture("search-16", oversampled_icon_size(action_btn_size));
+    if (search_tex.id != 0) {
+        if (ImGui::ImageButton("##togglesearch", search_tex.id, ImVec2(action_btn_size, action_btn_size),
+                ImVec2(0, 0), ImVec2(1, 1), ImVec4(0, 0, 0, 0), search_tint)) {
+            if (search_panel_) {
+                search_panel_->toggle();
+            }
+        }
+    } else if (ImGui::Button("S", ImVec2(action_btn_size, action_btn_size))) {
+        if (search_panel_) {
+            search_panel_->toggle();
+        }
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Search in folder (%s)", CommandManager::get().label("search.toggle").c_str());
+    }
+    ImGui::PopStyleColor(3);
+
+    ImGui::PushStyleColor(ImGuiCol_Button, kExplorerChromeBg);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, kExplorerChromeBgHover);
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, kExplorerChromeBgActive);
+
+    const ImVec4 inactive_tint(0.7f, 0.7f, 0.7f, 1.0f);
+    const ImVec4 active_tint(0.95f, 0.95f, 0.95f, 1.0f);
+
+    ImGui::SameLine(0, spacing);
+    ImVec4 icon_tint = state.grid_view ? active_tint : inactive_tint;
+    auto& grid_tex = AssetManager::get().get_svg_texture("apps-16", oversampled_icon_size(action_btn_size));
+    if (grid_tex.id != 0) {
+        if (ImGui::ImageButton("##gridview", grid_tex.id, ImVec2(action_btn_size, action_btn_size), ImVec2(0, 0), ImVec2(1, 1),
+                ImVec4(0, 0, 0, 0), icon_tint)) {
+            state.grid_view = true;
+        }
+    } else if (ImGui::Button("G", ImVec2(action_btn_size, action_btn_size))) {
+        state.grid_view = true;
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Grid View");
+    }
+
+    ImGui::SameLine(0, spacing);
+    icon_tint = !state.grid_view ? active_tint : inactive_tint;
+    auto& list_tex = AssetManager::get().get_svg_texture("rows-16", oversampled_icon_size(action_btn_size));
+    if (list_tex.id != 0) {
+        if (ImGui::ImageButton("##listview", list_tex.id, ImVec2(action_btn_size, action_btn_size), ImVec2(0, 0), ImVec2(1, 1),
+                ImVec4(0, 0, 0, 0), icon_tint)) {
+            state.grid_view = false;
+        }
+    } else if (ImGui::Button("L", ImVec2(action_btn_size, action_btn_size))) {
+        state.grid_view = false;
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("List View");
+    }
+
     ImGui::PopStyleColor(3);
     ImGui::PopStyleVar(2);
 }

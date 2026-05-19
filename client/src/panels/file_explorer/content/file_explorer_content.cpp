@@ -1,11 +1,12 @@
 #include "panels/file_explorer/file_explorer_panel.h"
 #include <algorithm>
-#include <cctype>
 #include <chrono>
 #include <cstdio>
 #include <cstring>
 
 #include "core/file_master/file_master_util.h"
+#include "core/ui/ui_animate.h"
+#include "panels/file_explorer/content/file_explorer_content_util.h"
 #include "panels/file_explorer/state/remote_mount_state.h"
 #include "panels/providers/state/providers_state.h"
 
@@ -14,98 +15,6 @@ namespace fs = std::filesystem;
 using namespace misty::core;
 
 namespace misty::panel {
-    namespace {
-        struct RemoteBrowseTarget {
-            std::string provider_folder;
-            std::string remote_name;
-            std::string remote_path;
-        };
-
-        std::string file_explorer_tab_title_for_path(const std::string& path) {
-            if (path.empty()) {
-                return "Files";
-            }   
-
-            if (path == FileExplorerState::VIRTUAL_PATH_RECENT) {
-                return "Recent";
-            }
-            if (path == FileExplorerState::VIRTUAL_PATH_STARRED) {
-                return "Starred";
-            }
-            if (path == FileExplorerState::VIRTUAL_PATH_TRASH) {
-                return "Trash";
-            }
-
-            const fs::path normalized = fs::path(path).lexically_normal();
-            const std::string leaf = normalized.filename().string();
-            if (!leaf.empty() && leaf != ".") {
-                return leaf;
-            }
-
-            const std::string normalized_path = normalized.string();
-            return normalized_path.empty() ? path : normalized_path;
-        }
-
-        std::string default_local_start_path() {
-            if (const char* home = std::getenv("HOME")) {
-                return home;
-            }
-            return fs::current_path().string();
-        }
-
-        bool is_remote_mount_path(const std::string& path) {
-            const std::string mount_root = mount_utils::get_mount_root();
-            return !path.empty() && path.rfind(mount_root, 0) == 0;
-        }
-
-        bool is_provider_mount_root(const std::string& path) {
-            if (!is_remote_mount_path(path)) {
-                return false;
-            }
-
-            const fs::path relative = fs::path(path).lexically_relative(mount_utils::get_mount_root());
-            std::size_t components = 0;
-            for (const auto& part : relative) {
-                if (!part.empty() && part != ".") {
-                    ++components;
-                }
-            }
-            return components == 1;
-        }
-
-        std::optional<RemoteBrowseTarget> remote_browse_target_for(const std::string& path) {
-            if (!is_remote_mount_path(path)) {
-                return std::nullopt;
-            }
-
-            const fs::path relative = fs::path(path).lexically_relative(mount_utils::get_mount_root());
-            std::vector<std::string> parts;
-            for (const auto& part : relative) {
-                const std::string value = part.string();
-                if (!value.empty() && value != ".") {
-                    parts.push_back(value);
-                }
-            }
-
-            if (parts.size() < 2) {
-                return std::nullopt;
-            }
-
-            RemoteBrowseTarget target;
-            target.provider_folder = parts[0];
-            target.remote_name = parts[1];
-            if (parts.size() > 2) {
-                fs::path remote_path;
-                for (std::size_t i = 2; i < parts.size(); ++i) {
-                    remote_path /= parts[i];
-                }
-                target.remote_path = "/" + remote_path.generic_string();
-            }
-            return target;
-        }
-
-    }
-
     std::string FileExplorerPanel::tab_title() const {
         const auto& state = registry_.get_state<FileExplorerState>(state_key_);
         if (state.current_path[0] != '\0') {
@@ -290,10 +199,56 @@ namespace misty::panel {
 
     void FileExplorerPanel::render_panel_contents() {
         auto& state = registry_.get_state<FileExplorerState>(state_key_);
+        auto& search_state = registry_.get_state<SearchState>(search_state_key_);
         handle_pending_navigation(state);
         std::unique_lock<std::mutex> lock(state.mu);
-        show_directory_contents(state);
-        show_error_modal(state.error_msg, "FileExplorerError");
+
+        if (ImGui::BeginChild("TopBar", ImVec2(0.0f, 42.0f), false, ImGuiWindowFlags_NoScrollbar)) {
+            ImGui::SetCursorPosY(6.0f);
+            show_nav_history(state, 30.0f, 8.0f);
+            ImGui::SameLine(0.0f, 8.0f);
+            ImGui::SetCursorPosY(6.0f);
+            show_search_bar(state, search_state);
+        }
+        ImGui::EndChild();
+
+        ImGui::Separator();
+
+        const float available_h = ImGui::GetContentRegionAvail().y;
+        const float breadcrumb_bar_height = 26.0f;
+        const float content_height = std::max(0.0f, available_h - breadcrumb_bar_height - 4.0f);
+
+        if (ImGui::BeginChild("##explorer_content_region", ImVec2(0.0f, content_height), false,
+                              ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse)) {
+            ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, 8.0f);
+            if (ImGui::BeginChild("##explorer_list", ImVec2(0.0f, ImGui::GetContentRegionAvail().y), false,
+                                  ImGuiWindowFlags_NoScrollWithMouse)) {
+                ImGuiIO& io = ImGui::GetIO();
+                if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup) && io.MouseWheel != 0.0f) {
+                    constexpr float kExplorerWheelStep = 22.0f;
+                    ImGui::SetScrollY(ImGui::GetScrollY() - io.MouseWheel * kExplorerWheelStep);
+                }
+
+                ImVec2 list_start = ImGui::GetCursorPos();
+                float list_height = ImGui::GetContentRegionAvail().y;
+
+                show_directory_contents(state);
+                show_error_modal(state.error_msg, "FileExplorerError");
+                ImGui::SetCursorPos(list_start);
+                if (search_panel_) {
+                    search_panel_->render(state.current_path, list_height);
+                }
+            }
+            ImGui::EndChild();
+            ImGui::PopStyleVar();
+        }
+        ImGui::EndChild();
+
+        ImGui::Separator();
+        if (ImGui::BeginChild("BottomBreadcrumbBar", ImVec2(0.0f, breadcrumb_bar_height), false, ImGuiWindowFlags_NoScrollbar)) {
+            show_breadcrumb_bar(state);
+        }
+        ImGui::EndChild();
 
         lock.unlock();
         update_periodic_save(state);
@@ -307,12 +262,20 @@ namespace misty::panel {
                                                          bool update_history,
                                                          uint64_t navigation_generation) {
         auto& state = registry_.get_state<FileExplorerState>(state_key_);
+        const bool is_remote_listing = remote_browse_target_for(path).has_value();
+        const auto now = std::chrono::steady_clock::now();
+        const auto minimum_animation_duration = std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+            std::chrono::duration<float>(misty::UI::MistyLoadingAnimationLoopSeconds()));
 
         // Local-volume scans can be slow, especially under /Volumes. Keep the
         // UI interactive and stream rows in batches instead of blocking until
         // the whole directory has been stat'ed.
         state.is_loading = true;
-        state.show_loading_animation = false;
+        if (is_remote_listing) {
+            state.begin_loading_animation_cycle(navigation_generation, now, minimum_animation_duration);
+        } else {
+            state.cancel_loading_animation_cycle();
+        }
         state.error_msg  = "";
         state.clear_transient_ui_state();
         state.files.clear();
@@ -336,13 +299,13 @@ namespace misty::panel {
         update_navigation_history(state, path, update_history);
 
         worker_pool_.add(
-            [registry = &registry_, state_key = state_key_, path, show_hidden, navigation_generation]() {
+            [registry = &registry_,
+             state_key = state_key_,
+             path,
+             show_hidden,
+             navigation_generation,
+             is_remote_listing]() {
                 auto& state = registry->get_state<FileExplorerState>(state_key);
-                std::string new_path = path_utf8_generic_string(fs::path(path).lexically_normal());
-                if (new_path.empty()) {
-                    new_path = path;
-                }
-
                 constexpr std::size_t kLocalListBatchSize = 64;
                 std::vector<UnifiedFileItem> batch;
                 batch.reserve(kLocalListBatchSize);
@@ -361,7 +324,13 @@ namespace misty::panel {
                     }
                     if (final_flush) {
                         state.is_loading = false;
-                        state.show_loading_animation = false;
+                        if (is_remote_listing) {
+                            state.complete_loading_animation_cycle(
+                                navigation_generation,
+                                std::chrono::steady_clock::now());
+                        } else {
+                            state.cancel_loading_animation_cycle();
+                        }
                         state.sort_dirty = true;
                         state.note_listing_changed();
                     }
@@ -372,35 +341,15 @@ namespace misty::panel {
                     const fs::path relative = fs::path(path).lexically_relative(mount_utils::get_mount_root());
                     const std::string provider_folder = relative.filename().string();
                     const auto cards = registry->get_state<ProvidersState>("Providers").provider_cards_snapshot();
-
-                    for (const auto& card : cards) {
-                        if (card.provider_id != provider_folder) {
-                            continue;
-                        }
-
-                        UnifiedFileItem item;
-                        item.name = card.account_label.empty() ? card.id : card.account_label;
-                        item.path = (fs::path(mount_utils::get_mount_root()) / provider_folder / item.name).string();
-                        item.id = item.path;
-                        item.is_dir = true;
-                        item.size = 0;
-                        item.mime_type = card.provider_label;
-                        item.status = SyncStatus::LOCAL;
-                        batch.push_back(std::move(item));
-                    }
+                    batch = provider_mount_items_for(provider_folder, cards);
 
                     flush_batch(true);
                     return;
                 }
 
                 if (auto remote_target = remote_browse_target_for(path); remote_target.has_value()) {
-                    FileMasterProps props;
-                    props.remote_source.remote_name = remote_target->remote_name;
-                    props.remote_source.provider_type = remote_target->provider_folder;
-                    props.remote_source.remote_path = remote_target->remote_path;
-
                     std::vector<FileMasterListItem> remote_items;
-                    FileMasterResult remote_result = list_remote_path(props, remote_items);
+                    FileMasterResult remote_result = list_remote_path(remote_list_props_for(*remote_target), remote_items);
                     if (!remote_result.success) {
                         std::lock_guard<std::mutex> lk(state.mu);
                         if (state.navigation_generation.load(std::memory_order_relaxed) != navigation_generation) {
@@ -408,32 +357,15 @@ namespace misty::panel {
                         }
                         state.error_msg = remote_result.error_message;
                         state.is_loading = false;
-                        state.show_loading_animation = false;
+                        state.complete_loading_animation_cycle(
+                            navigation_generation,
+                            std::chrono::steady_clock::now());
                         state.sort_dirty = true;
                         state.note_listing_changed();
                         return;
                     }
 
-                    const fs::path remote_root =
-                        fs::path(mount_utils::get_mount_root()) /
-                        remote_target->provider_folder /
-                        remote_target->remote_name;
-
-                    for (auto& remote_item : remote_items) {
-                        UnifiedFileItem item;
-                        item.name = remote_item.name.empty()
-                            ? fs::path(remote_item.path).filename().string()
-                            : remote_item.name;
-                        fs::path remote_item_path = fs::path(remote_item.path).relative_path();
-                        item.path = (remote_root / remote_item_path).string();
-                        item.id = item.path;
-                        item.is_dir = remote_item.is_dir;
-                        item.size = remote_item.size;
-                        item.last_modified = remote_item.last_modified;
-                        item.mime_type = remote_item.mime_type;
-                        item.status = SyncStatus::LOCAL;
-                        batch.push_back(std::move(item));
-                    }
+                    batch = remote_mount_items_for(*remote_target, remote_items);
 
                     flush_batch(true);
                     return;
@@ -442,39 +374,8 @@ namespace misty::panel {
                 try {
                     for (const auto& entry : fs::directory_iterator(
                              path, fs::directory_options::skip_permission_denied)) {
-                        std::string fname = path_utf8_filename(entry.path());
-                        if (!show_hidden && !fname.empty() && fname[0] == '.') continue;
-
-                        UnifiedFileItem item;
-                        item.path   = path_utf8_generic_string(entry.path());
-                        item.id     = item.path;
-                        item.name   = fname;
-                        std::error_code ec;
-                        item.is_dir = entry.is_directory(ec);
-                        item.status = SyncStatus::LOCAL;
-
-                        if (!item.is_dir) {
-                            item.size = static_cast<int64_t>(entry.file_size(ec));
-                            if (ec) {
-                                ec.clear();
-                                item.size = 0;
-                            }
-                        }
-                        try {
-                            auto ftime = entry.last_write_time(ec);
-                            if (ec) {
-                                ec.clear();
-                            } else {
-                            auto sctp  = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
-                                ftime - fs::file_time_type::clock::now() + std::chrono::system_clock::now());
-                            auto t = std::chrono::system_clock::to_time_t(sctp);
-                            char buf[32];
-                            std::strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M", std::localtime(&t));
-                            item.last_modified = buf;
-                            }
-                        } catch (...) {}
-
-                        batch.push_back(std::move(item));
+                        if (should_skip_local_entry(entry, show_hidden)) continue;
+                        batch.push_back(make_local_file_item(entry));
                         if (batch.size() >= kLocalListBatchSize) {
                             if (!flush_batch(false)) {
                                 return;
@@ -488,24 +389,32 @@ namespace misty::panel {
                     }
                     state.error_msg  = e.what();
                     state.is_loading = false;
-                    state.show_loading_animation = false;
+                    state.cancel_loading_animation_cycle();
                     state.sort_dirty = true;
                     state.note_listing_changed();
                     return;
                 }
 
-                (void)new_path;
                 flush_batch(true);
             },
             []() {},
-            [registry = &registry_, state_key = state_key_, navigation_generation](const std::string& err) {
+            [registry = &registry_,
+             state_key = state_key_,
+             navigation_generation,
+             is_remote_listing](const std::string& err) {
                 auto& state = registry->get_state<FileExplorerState>(state_key);
                 if (state.navigation_generation.load(std::memory_order_relaxed) != navigation_generation) {
                     return;
                 }
                 state.error_msg  = err;
                 state.is_loading = false;
-                state.show_loading_animation = false;
+                if (is_remote_listing) {
+                    state.complete_loading_animation_cycle(
+                        navigation_generation,
+                        std::chrono::steady_clock::now());
+                } else {
+                    state.cancel_loading_animation_cycle();
+                }
                 state.sort_dirty = true;
                 state.note_listing_changed();
             }
@@ -518,71 +427,18 @@ namespace misty::panel {
         uint64_t navigation_generation = state.navigation_generation.fetch_add(1, std::memory_order_relaxed) + 1;
 
         // Virtual Paths Logic
-        if (path.rfind("misty://", 0) == 0) {
+        VirtualListingResult virtual_listing;
+        if (populate_virtual_listing(state, path, virtual_listing)) {
             printf("Explorer: Handling virtual path: %s\n", path.c_str());
-            std::vector<UnifiedFileItem> new_files;
-            std::vector<UnifiedFileItem> new_trash_files;
-
-            if (path == FileExplorerState::VIRTUAL_PATH_RECENT) {
-                // Filter out deleted entries and local files that no longer exist on disk
-                // (covers external deletions and stale entries from previous sessions).
-                auto it = std::remove_if(state.recent_files.begin(), state.recent_files.end(),
-                    [](const UnifiedFileItem& f) {
-                        if (f.status == SyncStatus::DELETED) return true;
-                        if (!fs::exists(f.path)) return true;
-                        return false;
-                    });
-                if (it != state.recent_files.end()) {
-                    state.recent_files.erase(it, state.recent_files.end());
-                    state.dirty_ = true;
-                }
-                printf("Explorer: Loading Recent Files (count: %zu)\n", state.recent_files.size());
-                new_files.assign(state.recent_files.begin(), state.recent_files.end());
-            } else if (path == FileExplorerState::VIRTUAL_PATH_STARRED) {
-                printf("Explorer: Loading Starred Files (count: %zu)\n", state.starred_files.size());
-                new_files = state.starred_files;
-            } else if (path == FileExplorerState::VIRTUAL_PATH_TRASH) {
-                printf("Explorer: Loading Trash Files\n");
-                // Read from disk to ensure persistence
-                std::string trash_dir = std::string(std::getenv("HOME")) + "/misty/.cache/trash";
-                if (fs::exists(trash_dir)) {
-                    printf("Explorer: Reading trash dir: %s\n", trash_dir.c_str());
-                    for (const auto& entry : fs::directory_iterator(trash_dir)) {
-                        UnifiedFileItem item;
-                        item.path = path_utf8_string(entry.path());
-                        item.id = item.path;
-                        item.name = path_utf8_filename(entry.path());
-                        item.is_dir = entry.is_directory();
-                        item.status = SyncStatus::DELETED;
-
-                         try {
-                            if (!item.is_dir) item.size = fs::file_size(entry.path());
-
-                            auto ftime = fs::last_write_time(entry.path());
-                            auto sctp = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
-                                ftime - fs::file_time_type::clock::now() + std::chrono::system_clock::now()
-                            );
-                            auto time_t_val = std::chrono::system_clock::to_time_t(sctp);
-                            char buf[32];
-                            std::strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M", std::localtime(&time_t_val));
-                            item.last_modified = buf;
-                        } catch (...) {}
-
-                        new_files.push_back(item);
-                        new_trash_files.push_back(std::move(item));
-                    }
-                }
-            }
-
             update_navigation_history(state, path, update_history);
-            state.files = std::move(new_files);
+            state.files = std::move(virtual_listing.files);
             if (path == FileExplorerState::VIRTUAL_PATH_TRASH) {
-                state.trash_files = std::move(new_trash_files);
+                state.trash_files = std::move(virtual_listing.trash_files);
             }
             set_active_path(state, path);
             reset_selection(state);
             state.is_loading = false;
-            state.show_loading_animation = false;
+            state.cancel_loading_animation_cycle();
             state.sort_dirty = true;
             state.note_listing_changed();
             printf("Explorer: Virtual path loaded. File count: %zu\n", state.files.size());

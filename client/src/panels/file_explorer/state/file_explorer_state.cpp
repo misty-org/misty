@@ -167,6 +167,50 @@ namespace misty::panel {
         listing_revision.fetch_add(1, std::memory_order_relaxed);
     }
 
+    void FileExplorerState::begin_loading_animation_cycle(
+        uint64_t navigation_generation,
+        std::chrono::steady_clock::time_point now,
+        std::chrono::steady_clock::duration minimum_duration
+    ) {
+        loading_animation_phase = LoadingAnimationPhase::Active;
+        loading_animation_started_at = now;
+        loading_animation_visible_until = now + minimum_duration;
+        loading_animation_generation = navigation_generation;
+    }
+
+    void FileExplorerState::complete_loading_animation_cycle(
+        uint64_t navigation_generation,
+        std::chrono::steady_clock::time_point now
+    ) {
+        if (loading_animation_phase == LoadingAnimationPhase::Idle ||
+            loading_animation_generation != navigation_generation) {
+            return;
+        }
+
+        if (now >= loading_animation_visible_until) {
+            cancel_loading_animation_cycle();
+            return;
+        }
+
+        loading_animation_phase = LoadingAnimationPhase::Completing;
+    }
+
+    void FileExplorerState::cancel_loading_animation_cycle() {
+        loading_animation_phase = LoadingAnimationPhase::Idle;
+        loading_animation_started_at = {};
+        loading_animation_visible_until = {};
+        loading_animation_generation = 0;
+    }
+
+    bool FileExplorerState::should_render_loading_animation(std::chrono::steady_clock::time_point now) {
+        if (loading_animation_phase == LoadingAnimationPhase::Completing &&
+            now >= loading_animation_visible_until) {
+            cancel_loading_animation_cycle();
+        }
+
+        return loading_animation_phase != LoadingAnimationPhase::Idle;
+    }
+
     void FileExplorerState::clear_transient_ui_state() {
         selected_files.clear();
         last_selected_index = -1;
@@ -212,7 +256,7 @@ namespace misty::panel {
         current_path[0] = '\0';
         search_path[0] = '\0';
         is_loading = false;
-        show_loading_animation = false;
+        cancel_loading_animation_cycle();
         sort_dirty = true;
         note_listing_changed();
     }
