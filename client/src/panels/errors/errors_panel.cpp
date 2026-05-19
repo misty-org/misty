@@ -11,7 +11,14 @@ void ErrorsPanel::render() {
 
 void ErrorsPanel::session_expired() {
     if (!core::SessionManager::get().is_session_expired()) {
+        handled_session_expired_ = false;
         return;
+    }
+
+    if (!handled_session_expired_) {
+        handled_session_expired_ = true;
+        core::SessionManager::get().clear_token();
+        view::switch_view(view::ViewID::Login);
     }
 
     show_error_modal({
@@ -24,7 +31,6 @@ void ErrorsPanel::session_expired() {
         .icon_size = 32.0f,
         .dismissible = false,
         .on_confirm = []() {
-            core::SessionManager::get().clear_token();
             core::SessionManager::get().clear_session_expired();
             view::switch_view(view::ViewID::Login);
         },

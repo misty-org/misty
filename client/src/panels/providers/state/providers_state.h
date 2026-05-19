@@ -20,6 +20,8 @@ namespace misty::panel {
         std::string status_label = "Connected";
         std::string logo_asset_path;
         bool connected = true;
+        bool needs_reconnect = false;
+        bool unavailable = false;
     };
 
     struct ProvidersHealthCard {
@@ -61,6 +63,14 @@ namespace misty::panel {
         std::string type;
     };
 
+    struct ProviderRemoteStatus {
+        std::string name;
+        std::string type;
+        std::string status_label = "Connected";
+        bool needs_reconnect = false;
+        std::string error;
+    };
+
     struct ProviderStep {
         std::string kind;
         std::string name;
@@ -78,6 +88,8 @@ namespace misty::panel {
         bool show_modal = false;
         bool submit_in_flight = false;
         bool poll_in_flight = false;
+        bool reconnect_mode = false;
+        bool repair_mode = false;
         std::string selected_provider_type;
         std::string remote_name;
         std::map<std::string, std::string> parameters;
@@ -115,8 +127,11 @@ namespace misty::panel {
         void refresh_health();
         void refresh_workflows();
         void refresh_remotes();
+        void refresh_remote_statuses();
 
         void on_add_provider();
+        void on_request_reconnect(const std::string& provider_id);
+        void on_request_repair(const std::string& provider_id);
         void select_provider_type(const std::string& provider_type);
         void set_remote_name(const std::string& remote_name);
         void set_parameter_value(const std::string& key, const std::string& value);
@@ -140,6 +155,7 @@ namespace misty::panel {
         bool is_loading_health = false;
         bool is_loading_workflows = false;
         bool is_loading_remotes = false;
+        bool is_loading_remote_statuses = false;
         bool disconnect_in_flight = false;
 
     private:
@@ -155,6 +171,7 @@ namespace misty::panel {
         std::vector<ProviderCard> provider_cards;
         std::vector<ProviderWorkflow> workflows_;
         std::vector<ProviderRemote> remotes_;
+        std::map<std::string, ProviderRemoteStatus> remote_statuses_;
         ActiveProviderConfigSession add_provider_session_;
         bool proxy_ready_ = false;
         std::string proxy_error_;

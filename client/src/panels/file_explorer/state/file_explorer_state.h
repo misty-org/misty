@@ -114,6 +114,12 @@ namespace misty::panel {
     // Clipboard operation type for copy/cut
     enum class ClipboardOp { NONE, COPY, CUT };
 
+    enum class LoadingAnimationPhase {
+        Idle,
+        Active,
+        Completing,
+    };
+
     // Shared across all file-explorer panes and tabs. Registered once under
     // "Clipboard" in UIRegistry so copying in pane A / tab 1 is pasteable from
     // pane B / tab 2.
@@ -156,8 +162,10 @@ namespace misty::panel {
         }
         int last_selected_index = -1;
         bool is_loading = false;
-        bool show_loading_animation = false;
-        std::chrono::steady_clock::time_point loading_animation_ready_at{};
+        LoadingAnimationPhase loading_animation_phase = LoadingAnimationPhase::Idle;
+        std::chrono::steady_clock::time_point loading_animation_started_at{};
+        std::chrono::steady_clock::time_point loading_animation_visible_until{};
+        uint64_t loading_animation_generation = 0;
         bool sort_dirty = true;
         bool is_hidden = false;
         bool show_hidden = false;  // toggle dotfiles/hidden entries
@@ -249,6 +257,15 @@ namespace misty::panel {
         // Set whenever in-memory state diverges from what is on disk.
         std::atomic<bool> dirty_{false};
         void note_listing_changed();
+        void begin_loading_animation_cycle(
+            uint64_t navigation_generation,
+            std::chrono::steady_clock::time_point now,
+            std::chrono::steady_clock::duration minimum_duration);
+        void complete_loading_animation_cycle(
+            uint64_t navigation_generation,
+            std::chrono::steady_clock::time_point now);
+        void cancel_loading_animation_cycle();
+        bool should_render_loading_animation(std::chrono::steady_clock::time_point now);
         void clear_transient_ui_state();
         void clear_for_state_release();
 
@@ -260,7 +277,7 @@ namespace misty::panel {
     // Navigate to local filesystem path
     inline void navigate_to_local_path(FileExplorerState& state, const std::string& path, bool update_history = true) {
         state.is_loading = true;
-        state.show_loading_animation = false;
+        state.cancel_loading_animation_cycle();
 
         try {
             std::string new_path = path_utf8_generic_string(fs::canonical(fs::path(path)));
@@ -320,7 +337,7 @@ namespace misty::panel {
             strncpy(state.search_path, new_path.c_str(), sizeof(state.search_path) - 1);
 
             state.is_loading = false;
-            state.show_loading_animation = false;
+            state.cancel_loading_animation_cycle();
             state.sort_dirty = true;
             state.selected_files.clear();
             state.last_selected_index = -1;
@@ -329,7 +346,7 @@ namespace misty::panel {
         catch (const std::exception& e) {
             state.error_msg = e.what();
             state.is_loading = false;
-            state.show_loading_animation = false;
+            state.cancel_loading_animation_cycle();
             state.sort_dirty = true;
         }
     }

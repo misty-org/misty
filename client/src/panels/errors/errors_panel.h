@@ -12,6 +12,7 @@ public:
 
 private:
     void session_expired();
+    bool handled_session_expired_ = false;
 };
 
 } // namespace misty::panel

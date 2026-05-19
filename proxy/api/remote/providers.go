@@ -87,6 +87,27 @@ func ListRemotes() http.HandlerFunc {
 	}
 }
 
+// ListRemoteStatuses godoc
+// @Summary List configured remotes with connection status
+// @Tags remotes
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {array} rclone.RemoteStatus
+// @Failure 401 {string} string
+// @Failure 502 {object} map[string]any
+// @Router /remote/status [get]
+func ListRemoteStatuses() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		statuses, err := rclone.ListRemoteStatuses(r.Context())
+		if err != nil {
+			writeError(w, http.StatusBadGateway, err)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(statuses)
+	}
+}
+
 // DeleteRemote godoc
 // @Summary Delete a configured remote
 // @Tags remotes

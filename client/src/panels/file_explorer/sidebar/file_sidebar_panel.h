@@ -12,7 +12,6 @@
 
 #include "panels/file_explorer/state/file_sidebar_state.h"
 
-#include "panels/providers/state/providers_state.h"
 #include "panels/providers/remote/remote_state.h"
 #include "panels/devices/device_state.h"
 #include "panels/devices/device_watcher.h"
@@ -40,7 +39,8 @@ namespace misty::panel {
         }
 
     private:
-        void show_providers_section(ProvidersState& providers_state, float width, float padding);
+        void ensure_provider_entries_loaded(FileSidebarState& state);
+        void show_providers_section(FileSidebarState& state, float width, float padding);
         void show_local_section(float width, float padding);
         void show_devices_section(float width, float padding);
         void show_create_new(FileSidebarState& state, float width, float padding);

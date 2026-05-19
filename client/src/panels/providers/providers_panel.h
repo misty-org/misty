@@ -25,7 +25,7 @@ namespace misty::panel {
         void show_health_card(const ProvidersHealthCard& health);
         void show_connected_providers(ProvidersState& state);
         void show_provider_card(ProvidersState& state, const ProviderCard& card, float card_width);
-        void show_empty_state(bool filtered);
+        void show_empty_state(bool filtered, bool loading);
         void show_provider_dialogs(ProvidersState& state);
 
         UIRegistry& registry_;

@@ -1,9 +1,9 @@
 #include "panels/providers/providers_panel.h"
 
 #include "core/manager/asset_manager.h"
+#include "panels/providers/layout/providers_layout_util.h"
 #include "imgui.h"
 
-#include <algorithm>
 #include <cstdio>
 #include <cstring>
 
@@ -14,35 +14,6 @@ namespace misty::panel {
         constexpr ImVec4 kMuted = ImVec4(0.62f, 0.66f, 0.70f, 1.0f);
         constexpr ImVec4 kSearchBg = ImVec4(0.15f, 0.17f, 0.19f, 1.0f);
         constexpr ImVec4 kBorder = ImVec4(0.24f, 0.27f, 0.30f, 1.0f);
-        constexpr ImVec4 kTeal = ImVec4(0.02f, 0.71f, 0.74f, 1.0f);
-        constexpr ImVec4 kTealHover = ImVec4(0.06f, 0.77f, 0.80f, 1.0f);
-        constexpr ImVec4 kTealActive = ImVec4(0.01f, 0.60f, 0.63f, 1.0f);
-
-        int compute_columns(float available_width, float min_item_width, float spacing) {
-            if (available_width <= min_item_width) {
-                return 1;
-            }
-            return std::max(1, static_cast<int>((available_width + spacing) / (min_item_width + spacing)));
-        }
-
-        float compute_item_width(float available_width, int columns, float spacing) {
-            if (columns <= 1) {
-                return available_width;
-            }
-            return (available_width - spacing * static_cast<float>(columns - 1)) / static_cast<float>(columns);
-        }
-
-        bool teal_button(const char* label, const ImVec2& size) {
-            ImGui::PushStyleColor(ImGuiCol_Button, kTeal);
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, kTealHover);
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, kTealActive);
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.98f, 0.99f, 1.0f, 1.0f));
-            ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
-            bool pressed = ImGui::Button(label, size);
-            ImGui::PopStyleVar();
-            ImGui::PopStyleColor(4);
-            return pressed;
-        }
     }
 
     void ProvidersPanel::render() {
@@ -115,8 +86,8 @@ namespace misty::panel {
         ImGui::PopStyleColor();
 
         const float button_width = 150.0f;
-        const float search_width = std::min(420.0f, std::max(220.0f, content_width * 0.42f));
-        const float right_block = search_width + button_width + 20.0f;
+        const float search_width = compute_provider_search_width(content_width);
+        const float right_block = compute_provider_right_block_width(content_width, button_width);
 
         ImGui::SameLine();
         ImGui::Dummy(ImVec2(std::max(0.0f, content_width - right_block), 0.0f));
@@ -152,7 +123,7 @@ namespace misty::panel {
         ImGui::PopStyleColor(4);
 
         ImGui::SameLine(0.0f, 16.0f);
-        if (teal_button("Add Provider", ImVec2(button_width, input_max.y - input_min.y))) {
+        if (provider_teal_button("Add Provider", ImVec2(button_width, input_max.y - input_min.y))) {
             state.on_add_provider();
         }
         ImGui::EndGroup();
@@ -162,6 +133,11 @@ namespace misty::panel {
         const auto all_cards = state.provider_cards_snapshot();
         const auto filtered_cards = state.filtered_provider_cards();
         const bool has_query = !state.search_query().empty();
+        bool loading = false;
+        {
+            std::lock_guard<std::mutex> lock(state.mu);
+            loading = state.is_loading_workflows || state.is_loading_remotes || state.is_loading_remote_statuses;
+        }
 
         ImGui::PushStyleColor(ImGuiCol_Text, kText);
         ImGui::SetWindowFontScale(1.25f);
@@ -170,13 +146,13 @@ namespace misty::panel {
         ImGui::PopStyleColor();
 
         if (filtered_cards.empty()) {
-            show_empty_state(has_query && !all_cards.empty());
+            show_empty_state(has_query && !all_cards.empty(), loading && all_cards.empty());
             return;
         }
 
         const float available_width = ImGui::GetContentRegionAvail().x;
-        const int columns = compute_columns(available_width, kMinCardWidth, kCardSpacing);
-        const float card_width = compute_item_width(available_width, columns, kCardSpacing);
+        const int columns = compute_provider_columns(available_width, kMinCardWidth, kCardSpacing);
+        const float card_width = compute_provider_item_width(available_width, columns, kCardSpacing);
 
         for (size_t index = 0; index < filtered_cards.size(); ++index) {
             if (index > 0 && (index % static_cast<size_t>(columns)) != 0) {
