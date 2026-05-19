@@ -126,6 +126,30 @@ namespace misty::core {
         return response.status_code == 200 && apply_session_response(response.body);
     }
 
+    bool SessionManager::ensure_session_ready() {
+        if (is_authenticated()) {
+            return true;
+        }
+
+        std::unique_lock<std::mutex> lock(bootstrap_mu_);
+        if (bootstrap_in_flight_) {
+            bootstrap_cv_.wait(lock, [this]() { return !bootstrap_in_flight_; });
+            return is_authenticated();
+        }
+
+        bootstrap_in_flight_ = true;
+        lock.unlock();
+
+        const bool ready = bootstrap_session();
+
+        lock.lock();
+        bootstrap_in_flight_ = false;
+        lock.unlock();
+        bootstrap_cv_.notify_all();
+
+        return ready;
+    }
+
     bool SessionManager::is_authenticated() const {
         std::lock_guard<std::mutex> lock(mu_);
         return !token_.empty();

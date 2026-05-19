@@ -123,6 +123,7 @@ bool plugins_section_header(const PluginsSectionHeaderProps& props) {
 
 bool plugins_card(const PluginsCardProps& props) {
     bool clicked = false;
+    const float card_width = UI::available_size().x;
 
     UI::div((std::string(props.id) + "_shell").c_str(), {
         .mode = UI::Mode::LayoutOnly,
@@ -131,7 +132,7 @@ bool plugins_card(const PluginsCardProps& props) {
     }, [&]() {
         UI::raw([&]() {
             const ImVec2 origin = ImGui::GetCursorScreenPos();
-            const ImVec2 size(ImGui::GetContentRegionAvail().x, kPluginCardHeight);
+            const ImVec2 size(card_width, kPluginCardHeight);
             clicked = ImGui::InvisibleButton(props.id, size);
 
             ImVec4 bg_color = props.selected ? kPluginCardSelectedBg : kPluginCardBg;
