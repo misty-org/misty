@@ -77,20 +77,19 @@ namespace misty::panel {
                 try {
                     auto json_resp = nlohmann::json::parse(response.body);
 
-                    if (!json_resp.contains("token") || !json_resp.contains("refresh_token")) {
-                        error_msg = "Login response is missing session tokens";
+                    if (!json_resp.contains("token")) {
+                        error_msg = "Login response is missing a session token";
                         return;
                     }
 
                     const std::string token = json_resp["token"].get<std::string>();
-                    const std::string refresh_token = json_resp["refresh_token"].get<std::string>();
-                    if (token.empty() || refresh_token.empty()) {
+                    if (token.empty()) {
                         error_msg = "Login response included an empty session token";
                         return;
                     }
 
-                    if (!core::SessionManager::get().set_tokens(token, refresh_token)) {
-                        error_msg = "Login succeeded but the session could not be saved locally";
+                    if (!core::SessionManager::get().set_tokens(token, "")) {
+                        error_msg = "Login succeeded but the session could not be activated";
                         return;
                     }
 

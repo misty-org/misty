@@ -1,13 +1,13 @@
 #include "file_sidebar_panel.h"
 
+#include "core/manager/session_manager.h"
 #include "panels/file_explorer/state/file_explorer_state.h"
-#include "panels/providers/state/providers_state.h"
 #include "panels/file_explorer/state/remote_mount_state.h"
+#include "panels/providers/state/providers_state_util.h"
 
+#include <chrono>
 #include <cmath>
 #include <cstdlib>
-#include <map>
-#include <set>
 
 namespace fs = std::filesystem;
 
@@ -133,6 +133,8 @@ namespace misty::panel {
     namespace {
         constexpr ImVec4 kFileSidebarBg = ImVec4(0.12f, 0.12f, 0.13f, 1.0f);
         constexpr ImVec4 kFileSidebarSeparator = ImVec4(0.22f, 0.22f, 0.24f, 1.0f);
+        constexpr int kSidebarProviderFetchAttempts = 4;
+        constexpr auto kSidebarProviderFetchRetryDelay = std::chrono::milliseconds(500);
     }
 
     FileSidebarPanel::FileSidebarPanel(core::UIRegistry& registry, core::WorkerPool& worker_pool)
@@ -141,8 +143,7 @@ namespace misty::panel {
 
     void FileSidebarPanel::render() {
         auto& state = registry_.get_state<FileSidebarState>("FileSidebar");
-        auto& workspace_state = registry_.get_state<RemoteMountState>("RemoteMounts");
-        auto& providers_state = registry_.get_state<ProvidersState>("Providers");
+        ensure_provider_entries_loaded(state);
 
         ImGuiWindowFlags flags =
             ImGuiWindowFlags_NoTitleBar |
@@ -170,7 +171,7 @@ namespace misty::panel {
             ImGui::Separator();
             show_local_section(width, padding);
             ImGui::Separator();
-            show_providers_section(providers_state, width, padding);
+            show_providers_section(state, width, padding);
             ImGui::Separator();
             show_devices_section(width, padding);
             ImGui::Separator();
@@ -200,8 +201,69 @@ namespace misty::panel {
         ImGui::PopStyleVar(2);
         ImGui::PopStyleColor();
     }
+
+    void FileSidebarPanel::ensure_provider_entries_loaded(FileSidebarState& state) {
+        {
+            std::lock_guard<std::mutex> lock(state.providers_mutex);
+            if (state.providers_loaded || state.providers_loading) {
+                return;
+            }
+            state.providers_loading = true;
+            state.providers_error.clear();
+        }
+
+        worker_pool_.add(
+            [&state]() {
+                const std::string url = providers_proxy_url("/api/remote");
+                if (url.empty()) {
+                    std::lock_guard<std::mutex> lock(state.providers_mutex);
+                    state.providers_loading = false;
+                    state.providers_loaded = true;
+                    state.providers_error = "PROXY_SERVICE_URL not set";
+                    return;
+                }
+
+                const auto fetch = fetch_providers_with_retries(
+                    url,
+                    kSidebarProviderFetchAttempts,
+                    kSidebarProviderFetchRetryDelay,
+                    core::SessionManager::get().get_auth_headers()
+                );
+
+                if (!fetch.success) {
+                    std::lock_guard<std::mutex> lock(state.providers_mutex);
+                    state.providers_loading = false;
+                    state.providers_loaded = true;
+                    state.providers_error = fetch.last_error;
+                    return;
+                }
+
+                std::vector<SidebarProviderEntry> entries;
+                for (const auto& remote : parse_provider_remotes(fetch.response.body)) {
+                    SidebarProviderEntry entry;
+                    entry.provider_folder = remote.type.empty() ? "remote" : remote.type;
+                    entry.remote_name = remote.name;
+                    entry.label = remote.name.empty() ? entry.provider_folder : remote.name;
+                    entries.push_back(std::move(entry));
+                }
+
+                std::lock_guard<std::mutex> lock(state.providers_mutex);
+                state.provider_entries = std::move(entries);
+                state.providers_loading = false;
+                state.providers_loaded = true;
+                state.providers_error.clear();
+            },
+            []() {},
+            [&state](const std::string& err) {
+                std::lock_guard<std::mutex> lock(state.providers_mutex);
+                state.providers_loading = false;
+                state.providers_loaded = true;
+                state.providers_error = err;
+            }
+        );
+    }
     
-    void FileSidebarPanel::show_providers_section(ProvidersState& providers_state, float width, float padding) {
+    void FileSidebarPanel::show_providers_section(FileSidebarState& state, float width, float padding) {
         float content_width = width - (padding * 2);
         ImGui::SetCursorPosX(padding);
 
@@ -213,24 +275,25 @@ namespace misty::panel {
         if (!providers_collapsed_) {
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 2.0f));
 
-            const std::vector<ProviderCard> cards = providers_state.provider_cards_snapshot();
-            if (cards.empty()) {
-                ImGui::TextDisabled("  No providers configured");
-            } else {
-                std::map<std::string, std::string> providers;
-                for (const auto& card : cards) {
-                    const std::string provider_folder = card.provider_id.empty() ? "remote" : card.provider_id;
-                    const std::string provider_label = card.provider_label.empty() ? provider_folder : card.provider_label;
-                    providers.emplace(provider_folder, provider_label);
-                }
+            std::vector<SidebarProviderEntry> entries;
+            bool loading = false;
+            {
+                std::lock_guard<std::mutex> lock(state.providers_mutex);
+                entries = state.provider_entries;
+                loading = state.providers_loading;
+            }
 
-                for (const auto& [provider_folder, provider_label] : providers) {
+            if (entries.empty()) {
+                ImGui::TextDisabled(loading ? "  Loading providers..." : "  No providers configured");
+            } else {
+                for (const auto& entry : entries) {
                     const std::filesystem::path mount_path =
                         std::filesystem::path(mount_utils::get_mount_root()) /
-                        provider_folder;
+                        entry.provider_folder /
+                        entry.remote_name;
 
-                    if (HoverListItem(provider_label.c_str(), content_width)) {
-                        mount_utils::ensure_provider_directory(provider_folder);
+                    if (HoverListItem(entry.label.c_str(), content_width)) {
+                        mount_utils::ensure_remote_directory(entry.provider_folder, entry.remote_name);
 
                         const std::string explorer_state_key =
                             active_explorer_state_key_provider_ ? active_explorer_state_key_provider_() : "Files";

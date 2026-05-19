@@ -53,6 +53,7 @@ FileExplorerPanel::FileExplorerPanel(UIRegistry& registry,
       registry_(registry),
       worker_pool_(worker_pool),
       state_key_(std::move(props.state_key)),
+      search_state_key_(state_key_ + "_Search"),
       owns_state_cleanup_(props.owns_state_cleanup) {
     auto& file_explorer_state = registry_.get_state<FileExplorerState>(state_key_);
 
@@ -85,6 +86,7 @@ FileExplorerPanel::FileExplorerPanel(UIRegistry& registry,
     }
 
     file_explorer_state.pending_navigation_path = start_path;
+    search_panel_ = std::make_unique<SearchPanel>(registry_, worker_pool_, state_key_, search_state_key_);
 
     sidebar_panel_ = std::make_shared<FileSidebarPanel>(registry, worker_pool);
     sidebar_panel_->set_mount_path_provider([]() -> std::string {
@@ -144,7 +146,7 @@ void FileExplorerPanel::load_restore_state(const std::string& encoded_state) {
     std::strncpy(state.search_path, current_path.c_str(), sizeof(state.search_path) - 1);
     state.search_path[sizeof(state.search_path) - 1] = '\0';
     state.is_loading = false;
-    state.show_loading_animation = false;
+    state.cancel_loading_animation_cycle();
     state.sort_dirty = true;
     state.note_listing_changed();
 }

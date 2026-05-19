@@ -109,6 +109,7 @@ type providerSession struct {
 	ProviderType string
 	CreatedAt    time.Time
 	FinishedAt   time.Time
+	Reconnect    bool
 
 	mu           sync.Mutex
 	kind         string
@@ -258,7 +259,7 @@ var defaultProviderSessions = &providerSessionStore{
 	sessions: map[string]*providerSession{},
 }
 
-func (s *providerSessionStore) create(name, providerType string, parameters map[string]string) *providerSession {
+func (s *providerSessionStore) create(name, providerType string, parameters map[string]string, reconnect bool) *providerSession {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -269,6 +270,7 @@ func (s *providerSessionStore) create(name, providerType string, parameters map[
 		Name:         name,
 		ProviderType: providerType,
 		CreatedAt:    time.Now(),
+		Reconnect:    reconnect,
 		kind:         providerStepBrowserAuth,
 		instructions: "Complete sign-in in the browser window opened by rclone. Misty will keep checking until the remote is ready.",
 		pollAfterMS:  defaultProviderPollAfterMS,
@@ -394,9 +396,48 @@ func StartProviderConfig(_ context.Context, name, providerType string, parameter
 		sessionParameters["config_is_local"] = "true"
 	}
 
-	session := defaultProviderSessions.create(name, providerType, sessionParameters)
+	session := defaultProviderSessions.create(name, providerType, sessionParameters, false)
 	go runProviderStartSession(session)
 	return session.snapshot(), nil
+}
+
+func StartProviderReconnect(_ context.Context, name string) (*ProviderStep, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, fmt.Errorf("remote name is required")
+	}
+	if !RemoteExists(name) {
+		return nil, fmt.Errorf("remote %q not found", name)
+	}
+
+	providerType := GetRemoteType(name)
+	if providerType == "" {
+		return nil, fmt.Errorf("remote %q has no provider type", name)
+	}
+	if !isSupportedProviderType(providerType) {
+		return nil, fmt.Errorf("provider %q is not supported", providerType)
+	}
+
+	if err := Init(); err != nil {
+		return nil, err
+	}
+	if err := defaultRcloneRCD.Start(); err != nil {
+		return nil, err
+	}
+
+	session := defaultProviderSessions.create(name, providerType, map[string]string{}, true)
+	session.instructions = "Misty is reopening the provider sign-in flow to refresh this account."
+	go runProviderStartSession(session)
+	return session.snapshot(), nil
+}
+
+func StartProviderRepair(ctx context.Context, name string) (*ProviderStep, error) {
+	step, err := StartProviderReconnect(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	step.Instructions = "Misty is re-running the provider setup flow to repair this account."
+	return step, nil
 }
 
 func ContinueProviderConfig(ctx context.Context, _, _ string, parameters map[string]string, state, _ string) (*ProviderStep, error) {
@@ -414,9 +455,17 @@ func ContinueProviderConfig(ctx context.Context, _, _ string, parameters map[str
 		return session.snapshot(), nil
 	}
 
-	response, err := runProviderConfigRequest(ctx, remoteName, session.ProviderType, requestParameters, configState, answer, true)
-	if err != nil {
-		session.markError(err)
+	var (
+		response *rcloneConfigStepResponse
+		requestErr error
+	)
+	if session.Reconnect {
+		response, requestErr = runProviderReconnectRequest(ctx, remoteName, requestParameters, configState, answer, true)
+	} else {
+		response, requestErr = runProviderConfigRequest(ctx, remoteName, session.ProviderType, requestParameters, configState, answer, true)
+	}
+	if requestErr != nil {
+		session.markError(requestErr)
 		return session.snapshot(), nil
 	}
 
@@ -425,20 +474,86 @@ func ContinueProviderConfig(ctx context.Context, _, _ string, parameters map[str
 }
 
 func runProviderStartSession(session *providerSession) {
-	response, err := runProviderConfigRequest(
-		context.Background(),
-		session.Name,
-		session.ProviderType,
-		cloneStringMap(session.parameters),
-		"",
-		"",
-		false,
+	var (
+		response *rcloneConfigStepResponse
+		err error
 	)
+	if session.Reconnect {
+		response, err = runProviderReconnectRequest(
+			context.Background(),
+			session.Name,
+			cloneStringMap(session.parameters),
+			"",
+			"",
+			false,
+		)
+	} else {
+		response, err = runProviderConfigRequest(
+			context.Background(),
+			session.Name,
+			session.ProviderType,
+			cloneStringMap(session.parameters),
+			"",
+			"",
+			false,
+		)
+	}
 	if err != nil {
 		session.markError(err)
 		return
 	}
 	session.applyConfigResponse(response)
+}
+
+func runProviderReconnectRequest(
+	ctx context.Context,
+	name string,
+	parameters map[string]string,
+	state, result string,
+	isContinue bool,
+) (*rcloneConfigStepResponse, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, fmt.Errorf("remote name is required")
+	}
+
+	if err := Init(); err != nil {
+		return nil, err
+	}
+	if err := defaultRcloneRCD.Start(); err != nil {
+		return nil, err
+	}
+
+	rcParameters := make(map[string]any, len(parameters))
+	for key, value := range parameters {
+		rcParameters[key] = value
+	}
+
+	opt := map[string]any{
+		"nonInteractive": true,
+	}
+	if isContinue {
+		opt["continue"] = true
+		opt["state"] = state
+		opt["result"] = result
+	}
+
+	var response rcloneConfigStepResponse
+	rcd := defaultRcloneRCD
+	rcd.mu.Lock()
+	addr := rcd.Addr
+	rcd.mu.Unlock()
+
+	client := &http.Client{Timeout: 10 * time.Minute}
+	if err := rcd.post(ctx, client, addr, "config/update", map[string]any{
+		"name":       name,
+		"parameters": rcParameters,
+		"opt":        opt,
+	}, &response); err != nil {
+		return nil, err
+	}
+
+	return &response, nil
 }
 
 func newProviderWorkflow(provider rcloneProvider) ProviderWorkflow {
