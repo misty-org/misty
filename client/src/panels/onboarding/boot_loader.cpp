@@ -8,7 +8,6 @@
 
 #include <nlohmann/json.hpp>
 
-#include "core/manager/asset_manager.h"
 #include "core/manager/font_manager.h"
 
 #ifdef _WIN32
@@ -130,46 +129,28 @@ float ease_out_cubic(float t) {
 }
 
 void draw_sprite_frame(ImDrawList* draw_list, const ImVec2& center, float sprite_size) {
-    static constexpr int   kCols = 10;
-    static constexpr int   kRows = 5;
-    static constexpr int   kFrames = kCols * kRows;
-    static constexpr float kFrameRate = 18.0f;
-
-    auto& sprite = core::AssetManager::get().get_image_texture(
-        "assets/animations/misty_sprite.png");
-    if (sprite.id == 0) return;
-
+    static constexpr float kLoopSeconds = 1.35f;
+    static constexpr int kDotCount = 3;
     const float time = static_cast<float>(ImGui::GetTime());
-    const int frame = static_cast<int>(time * kFrameRate) % kFrames;
-    const int col = frame % kCols;
-    const int row = frame / kCols;
+    const float radius = std::clamp(sprite_size * 0.055f, 4.0f, 8.0f);
+    const float gap = radius * 3.1f;
+    const float start_x = center.x - gap;
 
-    const float uv_w = 1.0f / static_cast<float>(kCols);
-    const float uv_h = 1.0f / static_cast<float>(kRows);
-    const ImVec2 uv0(col * uv_w, row * uv_h);
-    const ImVec2 uv1((col + 1) * uv_w, (row + 1) * uv_h);
+    for (int i = 0; i < kDotCount; ++i) {
+        const float phase = std::fmod(time / kLoopSeconds + static_cast<float>(i) / kDotCount, 1.0f);
+        const float wave = ease_out_cubic(0.5f + 0.5f * std::sin((phase * 2.0f - 0.5f) * 3.14159265f));
+        const float scale = 0.76f + wave * 0.34f;
+        const int alpha = static_cast<int>(120.0f + wave * 120.0f);
+        const ImVec2 dot_center(
+            start_x + static_cast<float>(i) * gap,
+            center.y - wave * radius * 0.42f);
 
-    const float bob = std::sin(time * 2.6f) * 5.0f;
-    const float pulse = 0.55f + 0.45f * std::sin(time * 2.2f);
-    const float half = sprite_size * 0.5f;
-    const ImVec2 sprite_center(center.x, center.y + bob);
-
-    draw_list->AddCircleFilled(
-        sprite_center,
-        sprite_size * 0.45f,
-        IM_COL32(31, 111, 235, static_cast<int>(28.0f + pulse * 42.0f)),
-        72);
-    draw_list->AddCircleFilled(
-        ImVec2(sprite_center.x, sprite_center.y + 10.0f),
-        sprite_size * 0.32f,
-        IM_COL32(255, 255, 255, 12),
-        64);
-    draw_list->AddImage(
-        static_cast<ImTextureID>(static_cast<intptr_t>(sprite.id)),
-        ImVec2(sprite_center.x - half, sprite_center.y - half),
-        ImVec2(sprite_center.x + half, sprite_center.y + half),
-        uv0,
-        uv1);
+        draw_list->AddCircleFilled(
+            dot_center,
+            radius * scale,
+            IM_COL32(232, 234, 238, alpha),
+            32);
+    }
 }
 
 void draw_progress_bar(ImDrawList* draw_list,
@@ -409,7 +390,8 @@ void BootLoader::mark_proxy_ready() {
 }
 
 void BootLoader::transition_after_proxy_ready() {
-    if (core::SessionManager::get().is_authenticated()) {
+    auto& session = core::SessionManager::get();
+    if (session.is_authenticated() || session.bootstrap_session()) {
         success_  = true;
         phase_    = Phase::Done;
         ready_at_ = std::chrono::steady_clock::now();

@@ -4,6 +4,8 @@
 
 namespace misty::UI {
 
+float MistyLoadingAnimationLoopSeconds();
+
 void DrawMistyLoadingAnimation(
     const ImVec2& min,
     const ImVec2& max,

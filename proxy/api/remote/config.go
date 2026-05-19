@@ -64,3 +64,61 @@ func ConfigContinue() http.HandlerFunc {
 		_ = json.NewEncoder(w).Encode(step)
 	}
 }
+
+// ConfigReconnect godoc
+// @Summary Start provider reconnect flow
+// @Tags remotes
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body providerConfigRequest true "Provider reconnect request"
+// @Success 200 {object} rclone.ProviderStep
+// @Failure 400 {object} map[string]any
+// @Failure 401 {string} string
+// @Failure 502 {object} map[string]any
+// @Router /remote/config/reconnect [post]
+func ConfigReconnect() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req providerConfigRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, errBadRequest("invalid request body"))
+			return
+		}
+		step, err := rclone.StartProviderReconnect(r.Context(), req.Name)
+		if err != nil {
+			writeError(w, http.StatusBadGateway, err)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(step)
+	}
+}
+
+// ConfigRepair godoc
+// @Summary Start provider repair flow
+// @Tags remotes
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body providerConfigRequest true "Provider repair request"
+// @Success 200 {object} rclone.ProviderStep
+// @Failure 400 {object} map[string]any
+// @Failure 401 {string} string
+// @Failure 502 {object} map[string]any
+// @Router /remote/config/repair [post]
+func ConfigRepair() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req providerConfigRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, errBadRequest("invalid request body"))
+			return
+		}
+		step, err := rclone.StartProviderRepair(r.Context(), req.Name)
+		if err != nil {
+			writeError(w, http.StatusBadGateway, err)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(step)
+	}
+}

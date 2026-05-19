@@ -1,166 +1,21 @@
 #include "panels/providers/state/providers_state.h"
 
-#include <algorithm>
-#include <cctype>
 #include <chrono>
-#include <thread>
 #include <utility>
 
 #include <nlohmann/json.hpp>
 
-#include "core/manager/env_manager.h"
 #include "core/manager/session_manager.h"
 #include "core/net/http_client.h"
 #include "core/system/util.h"
+#include "panels/providers/state/providers_state_util.h"
 
 namespace misty::panel {
     using nlohmann::json;
 
     namespace {
-        std::string format_uptime_text(int64_t uptime_seconds) {
-            if (uptime_seconds <= 0) {
-                return "Just started";
-            }
-
-            const int64_t days = uptime_seconds / 86400;
-            uptime_seconds %= 86400;
-            const int64_t hours = uptime_seconds / 3600;
-            uptime_seconds %= 3600;
-            const int64_t minutes = uptime_seconds / 60;
-
-            if (days > 0) {
-                return "Up " + std::to_string(days) + "d " + std::to_string(hours) + "h";
-            }
-            if (hours > 0) {
-                return "Up " + std::to_string(hours) + "h " + std::to_string(minutes) + "m";
-            }
-            if (minutes > 0) {
-                return "Up " + std::to_string(minutes) + "m";
-            }
-            return "Up " + std::to_string(uptime_seconds) + "s";
-        }
-
-        std::string lowercase_copy(const std::string& value) {
-            std::string lowered = value;
-            std::transform(lowered.begin(), lowered.end(), lowered.begin(), [](unsigned char c) {
-                return static_cast<char>(std::tolower(c));
-            });
-            return lowered;
-        }
-
-        std::string proxy_url(const std::string& path) {
-            const std::string base = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
-            if (base.empty()) {
-                return "";
-            }
-            return base + path;
-        }
-
-        std::map<std::string, std::string> json_headers() {
-            auto headers = core::SessionManager::get().get_auth_headers();
-            headers["Content-Type"] = "application/json";
-            headers["Accept"] = "application/json";
-            return headers;
-        }
-
-        std::string response_error_message(const core::HttpResponse& response, const std::string& fallback) {
-            if (!response.body.empty()) {
-                return response.body;
-            }
-            if (response.status_code > 0) {
-                return fallback + " (HTTP " + std::to_string(response.status_code) + ")";
-            }
-            return fallback;
-        }
-
-        ProviderOption parse_provider_option(const json& option_json) {
-            ProviderOption option;
-            option.name = option_json.value("name", std::string{});
-            option.help = option_json.value("help", std::string{});
-            option.default_value = option_json.value("default", std::string{});
-            option.required = option_json.value("required", false);
-            option.password = option_json.value("password", false);
-
-            const auto choices_json = option_json.value("choices", json::array());
-            if (choices_json.is_array()) {
-                for (const auto& choice_json : choices_json) {
-                    ProviderChoice choice;
-                    choice.value = choice_json.value("value", std::string{});
-                    choice.help = choice_json.value("help", std::string{});
-                    option.choices.push_back(std::move(choice));
-                }
-            }
-            return option;
-        }
-
-        std::vector<ProviderWorkflow> parse_workflows(const std::string& body) {
-            const json parsed = json::parse(body);
-            std::vector<ProviderWorkflow> workflows;
-            if (!parsed.is_array()) {
-                return workflows;
-            }
-
-            workflows.reserve(parsed.size());
-            for (const auto& workflow_json : parsed) {
-                ProviderWorkflow workflow;
-                workflow.type = workflow_json.value("type", std::string{});
-                workflow.name = workflow_json.value("name", std::string{});
-                workflow.description = workflow_json.value("description", std::string{});
-
-                const auto options_json = workflow_json.value("options", json::array());
-                if (options_json.is_array()) {
-                    workflow.options.reserve(options_json.size());
-                    for (const auto& option_json : options_json) {
-                        workflow.options.push_back(parse_provider_option(option_json));
-                    }
-                }
-
-                if (!workflow.type.empty()) {
-                    workflows.push_back(std::move(workflow));
-                }
-            }
-            return workflows;
-        }
-
-        std::vector<ProviderRemote> parse_remotes(const std::string& body) {
-            const json parsed = json::parse(body);
-            std::vector<ProviderRemote> remotes;
-            if (!parsed.is_array()) {
-                return remotes;
-            }
-
-            remotes.reserve(parsed.size());
-            for (const auto& remote_json : parsed) {
-                ProviderRemote remote;
-                remote.name = remote_json.value("name", std::string{});
-                remote.type = remote_json.value("type", std::string{});
-                if (!remote.name.empty()) {
-                    remotes.push_back(std::move(remote));
-                }
-            }
-            return remotes;
-        }
-
-        ProviderStep parse_provider_step(const std::string& body) {
-            const json parsed = json::parse(body);
-            ProviderStep step;
-            step.kind = parsed.value("kind", std::string{});
-            step.name = parsed.value("name", std::string{});
-            step.state = parsed.value("state", std::string{});
-            step.result = parsed.value("result", std::string{});
-            step.done = parsed.value("done", false);
-            step.error = parsed.value("error", std::string{});
-            step.authorize_url = parsed.value("authorize_url", std::string{});
-            step.instructions = parsed.value("instructions", std::string{});
-            step.poll_after_ms = parsed.value("poll_after_ms", 1000);
-            if (step.poll_after_ms <= 0) {
-                step.poll_after_ms = 1000;
-            }
-            if (parsed.contains("option") && parsed["option"].is_object()) {
-                step.option = parse_provider_option(parsed["option"]);
-            }
-            return step;
-        }
+        constexpr int kProviderFetchAttempts = 12;
+        constexpr auto kProviderFetchRetryDelay = std::chrono::milliseconds(750);
     }
 
     ProvidersState::ProvidersState() {
@@ -241,7 +96,7 @@ namespace misty::panel {
 
         worker_pool_->add(
             [this]() {
-                const std::string url = proxy_url("/api/remote/health");
+                const std::string url = providers_proxy_url("/api/remote/health");
                 if (url.empty()) {
                     std::lock_guard<std::mutex> lock(mu);
                     proxy_ready_ = false;
@@ -270,17 +125,17 @@ namespace misty::panel {
                         port_text = "Port " + port;
                     }
                     if (ready) {
-                        uptime_text = format_uptime_text(uptime_seconds);
+                        uptime_text = format_provider_uptime_text(uptime_seconds);
                     }
                     remote_count_text = std::to_string(connected_providers) + " connected";
                     provider_count_text = std::to_string(available_providers) + " available";
                 } catch (const std::exception&) {
                     if (!ready && error.empty()) {
-                        error = response_error_message(response, "Failed to check provider health");
+                        error = provider_response_error_message(response, "Failed to check provider health");
                     }
                 }
                 if (!ready && error.empty()) {
-                    error = response_error_message(response, "Provider service unavailable");
+                    error = provider_response_error_message(response, "Provider service unavailable");
                 }
 
                 std::lock_guard<std::mutex> lock(mu);
@@ -316,7 +171,7 @@ namespace misty::panel {
 
         worker_pool_->add(
             [this]() {
-                const std::string url = proxy_url("/api/remote/workflows");
+                const std::string url = providers_proxy_url("/api/remote/workflows");
                 if (url.empty()) {
                     std::lock_guard<std::mutex> lock(mu);
                     error_message = "PROXY_SERVICE_URL not set";
@@ -324,19 +179,20 @@ namespace misty::panel {
                     return;
                 }
 
-                const auto response = core::HTTPClient::get().get(
+                const auto fetch = fetch_providers_with_retries(
                     url,
-                    {.headers = core::SessionManager::get().get_auth_headers()}
+                    kProviderFetchAttempts,
+                    kProviderFetchRetryDelay,
+                    core::SessionManager::get().get_auth_headers()
                 );
-                if (response.status_code < 200 || response.status_code >= 300) {
+                if (!fetch.success) {
                     std::lock_guard<std::mutex> lock(mu);
-                    error_message = "Failed to load provider workflows: " +
-                                    response_error_message(response, "request failed");
+                    error_message = "Failed to load provider workflows: " + fetch.last_error;
                     is_loading_workflows = false;
                     return;
                 }
 
-                std::vector<ProviderWorkflow> workflows = parse_workflows(response.body);
+                std::vector<ProviderWorkflow> workflows = parse_provider_workflows(fetch.response.body);
                 std::lock_guard<std::mutex> lock(mu);
                 workflows_ = std::move(workflows);
                 is_loading_workflows = false;
@@ -369,7 +225,7 @@ namespace misty::panel {
 
         worker_pool_->add(
             [this]() {
-                const std::string url = proxy_url("/api/remote");
+                const std::string url = providers_proxy_url("/api/remote");
                 if (url.empty()) {
                     std::lock_guard<std::mutex> lock(mu);
                     error_message = "PROXY_SERVICE_URL not set";
@@ -377,30 +233,111 @@ namespace misty::panel {
                     return;
                 }
 
-                const auto response = core::HTTPClient::get().get(
+                const auto fetch = fetch_providers_with_retries(
                     url,
-                    {.headers = core::SessionManager::get().get_auth_headers()}
+                    kProviderFetchAttempts,
+                    kProviderFetchRetryDelay,
+                    core::SessionManager::get().get_auth_headers()
                 );
-                if (response.status_code < 200 || response.status_code >= 300) {
+                if (!fetch.success) {
                     std::lock_guard<std::mutex> lock(mu);
-                    error_message = "Failed to load connected providers: " +
-                                    response_error_message(response, "request failed");
+                    error_message = "Failed to load connected providers: " + fetch.last_error;
                     is_loading_remotes = false;
                     return;
                 }
 
-                std::vector<ProviderRemote> remotes = parse_remotes(response.body);
-                std::lock_guard<std::mutex> lock(mu);
-                remotes_ = std::move(remotes);
-                is_loading_remotes = false;
-                rebuild_provider_cards_locked();
-                rebuild_health_card_locked();
+                std::vector<ProviderRemote> remotes = parse_provider_remotes(fetch.response.body);
+                bool refresh_statuses_after = false;
+                {
+                    std::lock_guard<std::mutex> lock(mu);
+                    remotes_ = std::move(remotes);
+                    is_loading_remotes = false;
+                    if (remotes_.empty()) {
+                        remote_statuses_.clear();
+                    } else {
+                        refresh_statuses_after = true;
+                    }
+                    rebuild_provider_cards_locked();
+                    rebuild_health_card_locked();
+                }
+
+                if (refresh_statuses_after) {
+                    refresh_remote_statuses();
+                }
             },
             []() {},
             [this](const std::string& err) {
                 std::lock_guard<std::mutex> lock(mu);
                 error_message = "refresh_remotes: " + err;
                 is_loading_remotes = false;
+            }
+        );
+    }
+
+    void ProvidersState::refresh_remote_statuses() {
+        if (!worker_pool_) {
+            return;
+        }
+        {
+            std::lock_guard<std::mutex> lock(mu);
+            if (remotes_.empty()) {
+                remote_statuses_.clear();
+                is_loading_remote_statuses = false;
+                rebuild_provider_cards_locked();
+                return;
+            }
+            is_loading_remote_statuses = true;
+            error_message.clear();
+            rebuild_provider_cards_locked();
+        }
+
+        worker_pool_->add(
+            [this]() {
+                const std::string url = providers_proxy_url("/api/remote/status");
+                if (url.empty()) {
+                    std::lock_guard<std::mutex> lock(mu);
+                    is_loading_remote_statuses = false;
+                    error_message = "PROXY_SERVICE_URL not set";
+                    rebuild_provider_cards_locked();
+                    return;
+                }
+
+                const auto fetch = fetch_providers_with_retries(
+                    url,
+                    kProviderFetchAttempts,
+                    kProviderFetchRetryDelay,
+                    core::SessionManager::get().get_auth_headers()
+                );
+                if (!fetch.success) {
+                    std::lock_guard<std::mutex> lock(mu);
+                    is_loading_remote_statuses = false;
+                    error_message = "Failed to validate connected providers: " + fetch.last_error;
+                    rebuild_provider_cards_locked();
+                    return;
+                }
+
+                std::map<std::string, ProviderRemoteStatus> statuses;
+                try {
+                    statuses = parse_provider_remote_statuses(fetch.response.body);
+                } catch (const std::exception& ex) {
+                    std::lock_guard<std::mutex> lock(mu);
+                    is_loading_remote_statuses = false;
+                    error_message = std::string("Failed to parse provider status response: ") + ex.what();
+                    rebuild_provider_cards_locked();
+                    return;
+                }
+
+                std::lock_guard<std::mutex> lock(mu);
+                remote_statuses_ = std::move(statuses);
+                is_loading_remote_statuses = false;
+                rebuild_provider_cards_locked();
+            },
+            []() {},
+            [this](const std::string& err) {
+                std::lock_guard<std::mutex> lock(mu);
+                error_message = "refresh_remote_statuses: " + err;
+                is_loading_remote_statuses = false;
+                rebuild_provider_cards_locked();
             }
         );
     }
@@ -426,8 +363,76 @@ namespace misty::panel {
         }
     }
 
+    void ProvidersState::on_request_reconnect(const std::string& provider_id) {
+        bool should_submit = false;
+        {
+            std::lock_guard<std::mutex> lock(mu);
+            auto remote_it = std::find_if(remotes_.begin(), remotes_.end(), [&](const ProviderRemote& remote) {
+                return remote.name == provider_id;
+            });
+            if (remote_it == remotes_.end()) {
+                error_message = "Provider \"" + provider_id + "\" was not found.";
+                return;
+            }
+
+            reset_add_provider_session_locked();
+            add_provider_session_.show_modal = true;
+            add_provider_session_.reconnect_mode = true;
+            add_provider_session_.repair_mode = false;
+            add_provider_session_.selected_provider_type = remote_it->type;
+            add_provider_session_.remote_name = remote_it->name;
+            add_provider_session_.status_message = "Starting provider reconnect flow...";
+            show_rename_modal = false;
+            show_disconnect_modal = false;
+            pending_provider_id.clear();
+            dialog_message.clear();
+            error_message.clear();
+            success_message.clear();
+            should_submit = true;
+        }
+
+        if (should_submit) {
+            submit_add_provider();
+        }
+    }
+
+    void ProvidersState::on_request_repair(const std::string& provider_id) {
+        bool should_submit = false;
+        {
+            std::lock_guard<std::mutex> lock(mu);
+            auto remote_it = std::find_if(remotes_.begin(), remotes_.end(), [&](const ProviderRemote& remote) {
+                return remote.name == provider_id;
+            });
+            if (remote_it == remotes_.end()) {
+                error_message = "Provider \"" + provider_id + "\" was not found.";
+                return;
+            }
+
+            reset_add_provider_session_locked();
+            add_provider_session_.show_modal = true;
+            add_provider_session_.reconnect_mode = false;
+            add_provider_session_.repair_mode = true;
+            add_provider_session_.selected_provider_type = remote_it->type;
+            add_provider_session_.remote_name = remote_it->name;
+            add_provider_session_.status_message = "Starting provider configure flow...";
+            show_rename_modal = false;
+            show_disconnect_modal = false;
+            pending_provider_id.clear();
+            dialog_message.clear();
+            error_message.clear();
+            success_message.clear();
+            should_submit = true;
+        }
+
+        if (should_submit) {
+            submit_add_provider();
+        }
+    }
+
     void ProvidersState::select_provider_type(const std::string& provider_type) {
         std::lock_guard<std::mutex> lock(mu);
+        add_provider_session_.reconnect_mode = false;
+        add_provider_session_.repair_mode = false;
         add_provider_session_.selected_provider_type = provider_type;
         add_provider_session_.parameters.clear();
         add_provider_session_.current_step_kind.clear();
@@ -467,6 +472,8 @@ namespace misty::panel {
         std::optional<ProviderOption> current_option;
         std::string step_state;
         std::string step_result;
+        bool reconnect_mode = false;
+        bool repair_mode = false;
         std::uint64_t generation = 0;
         {
             std::lock_guard<std::mutex> lock(mu);
@@ -479,6 +486,8 @@ namespace misty::panel {
             current_option = add_provider_session_.current_option;
             step_state = add_provider_session_.step_state;
             step_result = add_provider_session_.step_result;
+            reconnect_mode = add_provider_session_.reconnect_mode;
+            repair_mode = add_provider_session_.repair_mode;
             generation = add_provider_session_.generation;
 
             if (selected_provider_type.empty()) {
@@ -505,9 +514,11 @@ namespace misty::panel {
             }
 
             add_provider_session_.submit_in_flight = true;
-            add_provider_session_.status_message = current_step_kind == "post_auth_config"
-                ? "Applying provider settings..."
-                : "Starting browser sign-in...";
+            add_provider_session_.status_message = provider_flow_start_message(
+                current_step_kind,
+                reconnect_mode,
+                repair_mode
+            );
         }
 
         const bool is_continue = current_step_kind == "post_auth_config";
@@ -521,12 +532,16 @@ namespace misty::panel {
             body["state"] = step_state;
             body["result"] = step_result;
             endpoint = "/api/remote/config/continue";
+        } else if (repair_mode) {
+            endpoint = "/api/remote/config/repair";
+        } else if (reconnect_mode) {
+            endpoint = "/api/remote/config/reconnect";
         }
         const std::string body_str = body.dump();
 
         worker_pool_->add(
-            [this, endpoint, body_str, remote_name, generation]() {
-                const std::string url = proxy_url(endpoint);
+            [this, endpoint, body_str, remote_name, reconnect_mode, repair_mode, generation]() {
+                const std::string url = providers_proxy_url(endpoint);
                 if (url.empty()) {
                     std::lock_guard<std::mutex> lock(mu);
                     add_provider_session_.submit_in_flight = false;
@@ -537,12 +552,12 @@ namespace misty::panel {
                 const auto response = core::HTTPClient::get().post(
                     url,
                     body_str,
-                    {.headers = json_headers()}
+                    {.headers = provider_json_headers()}
                 );
                 if (response.status_code < 200 || response.status_code >= 300) {
                     std::lock_guard<std::mutex> lock(mu);
                     add_provider_session_.submit_in_flight = false;
-                    add_provider_session_.inline_error = response_error_message(
+                    add_provider_session_.inline_error = provider_response_error_message(
                         response,
                         "Provider configuration request failed"
                     );
@@ -588,7 +603,8 @@ namespace misty::panel {
                     }
 
                     if (step.done || step.kind == "done") {
-                        success_message = "Provider \"" + remote_name + "\" connected.";
+                        success_message = "Provider \"" + remote_name + "\" " +
+                            provider_flow_success_suffix(reconnect_mode, repair_mode);
                         error_message.clear();
                         reset_add_provider_session_locked();
                         refresh_remotes_after = true;
@@ -603,22 +619,8 @@ namespace misty::panel {
                         add_provider_session_.browser_launch_attempted = browser_launch_attempted;
                         add_provider_session_.browser_launch_succeeded = browser_launch_succeeded;
                         add_provider_session_.poll_in_flight = step.kind == "browser_auth";
-                        add_provider_session_.status_message = step.instructions.empty()
-                            ? (step.kind == "post_auth_config"
-                                ? "Choose the provider settings to finish setup."
-                                : "Waiting for browser sign-in to finish...")
-                            : step.instructions;
-                        if (step.option.has_value()) {
-                            const auto& option = *step.option;
-                            auto it = add_provider_session_.parameters.find(option.name);
-                            if (it == add_provider_session_.parameters.end() || it->second.empty()) {
-                                std::string value = option.default_value;
-                                if (value.empty() && !option.choices.empty()) {
-                                    value = option.choices.front().value;
-                                }
-                                add_provider_session_.parameters[option.name] = value;
-                            }
-                        }
+                        add_provider_session_.status_message = provider_step_status_message(step);
+                        seed_provider_option_default(add_provider_session_, step);
                         start_polling = step.kind == "browser_auth";
                     }
                 }
@@ -708,7 +710,7 @@ namespace misty::panel {
                         {"result", step_result},
                     };
 
-                    const std::string url = proxy_url("/api/remote/config/continue");
+                    const std::string url = providers_proxy_url("/api/remote/config/continue");
                     if (url.empty()) {
                         std::lock_guard<std::mutex> lock(mu);
                         if (generation == add_provider_session_.generation) {
@@ -722,13 +724,13 @@ namespace misty::panel {
                     const auto response = core::HTTPClient::get().post(
                         url,
                         body.dump(),
-                        {.headers = json_headers()}
+                        {.headers = provider_json_headers()}
                     );
                     if (response.status_code < 200 || response.status_code >= 300) {
                         std::lock_guard<std::mutex> lock(mu);
                         if (generation == add_provider_session_.generation) {
                             add_provider_session_.poll_in_flight = false;
-                            add_provider_session_.inline_error = response_error_message(
+                            add_provider_session_.inline_error = provider_response_error_message(
                                 response,
                                 "Provider authentication polling failed"
                             );
@@ -784,7 +786,11 @@ namespace misty::panel {
 
                         if (step.done || step.kind == "done") {
                             add_provider_session_.poll_in_flight = false;
-                            success_message = "Provider \"" + remote_name + "\" connected.";
+                            success_message = "Provider \"" + remote_name + "\" " +
+                                provider_flow_success_suffix(
+                                    add_provider_session_.reconnect_mode,
+                                    add_provider_session_.repair_mode
+                                );
                             error_message.clear();
                             reset_add_provider_session_locked();
                             refresh_remotes_after = true;
@@ -801,22 +807,8 @@ namespace misty::panel {
                                 add_provider_session_.browser_launch_attempted = true;
                                 add_provider_session_.browser_launch_succeeded = browser_launch_succeeded;
                             }
-                            add_provider_session_.status_message = step.instructions.empty()
-                                ? (step.kind == "post_auth_config"
-                                    ? "Choose the provider settings to finish setup."
-                                    : "Waiting for browser sign-in to finish...")
-                                : step.instructions;
-                            if (step.option.has_value()) {
-                                const auto& option = *step.option;
-                                auto it = add_provider_session_.parameters.find(option.name);
-                                if (it == add_provider_session_.parameters.end() || it->second.empty()) {
-                                    std::string value = option.default_value;
-                                    if (value.empty() && !option.choices.empty()) {
-                                        value = option.choices.front().value;
-                                    }
-                                    add_provider_session_.parameters[option.name] = value;
-                                }
-                            }
+                            add_provider_session_.status_message = provider_step_status_message(step);
+                            seed_provider_option_default(add_provider_session_, step);
                         }
                     }
 
@@ -878,7 +870,7 @@ namespace misty::panel {
 
         worker_pool_->add(
             [this, provider_id]() {
-                const std::string base = proxy_url("/api/remote");
+                const std::string base = providers_proxy_url("/api/remote");
                 if (base.empty()) {
                     std::lock_guard<std::mutex> lock(mu);
                     disconnect_in_flight = false;
@@ -895,7 +887,7 @@ namespace misty::panel {
                     std::lock_guard<std::mutex> lock(mu);
                     disconnect_in_flight = false;
                     error_message = "Failed to disconnect provider: " +
-                        response_error_message(response, "request failed");
+                        provider_response_error_message(response, "request failed");
                     return;
                 }
 
@@ -941,10 +933,7 @@ namespace misty::panel {
             return true;
         }
 
-        const std::string lowered_query = lowercase_copy(query);
-        const std::string haystack = lowercase_copy(
-            card.provider_label + " " + card.account_label + " " + card.status_label + " " + card.id);
-        return haystack.find(lowered_query) != std::string::npos;
+        return provider_card_matches_query(card, query);
     }
 
     void ProvidersState::rebuild_provider_cards_locked() {
@@ -956,14 +945,12 @@ namespace misty::panel {
         provider_cards.clear();
         provider_cards.reserve(remotes_.size());
         for (const auto& remote : remotes_) {
-            ProviderCard card;
-            card.id = remote.name;
-            card.provider_id = remote.type;
-            auto it = workflow_labels.find(remote.type);
-            card.provider_label = it == workflow_labels.end() ? remote.type : it->second;
-            card.account_label = remote.name;
-            card.status_label = "Connected";
-            provider_cards.push_back(std::move(card));
+            provider_cards.push_back(build_provider_card(
+                remote,
+                workflow_labels,
+                remote_statuses_,
+                is_loading_remote_statuses
+            ));
         }
     }
 

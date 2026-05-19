@@ -88,6 +88,9 @@ func ensureAuthSchema(conn *sql.DB) error {
 	if err := addColumnIfMissing(conn, "users", "token_valid_after", "TEXT"); err != nil {
 		return err
 	}
+	if err := addColumnIfMissing(conn, "refresh_tokens", "encrypted_token", "TEXT NOT NULL DEFAULT ''"); err != nil {
+		return err
+	}
 
 	// If the users table was created by an older migration that included a
 	// password column, the column is harmless for reads but INSERT will fail
