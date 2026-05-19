@@ -3,10 +3,12 @@
 #include <mutex>
 #include <cstring>
 #include <map>
+#include <nlohmann/json.hpp>
 #include "core/ui/ui_registry.h"
 #include "views/app_view.h"
 #include "core/net/http_client.h"
 #include "core/manager/env_manager.h"
+#include "core/manager/session_manager.h"
 #include "core/system/util.h"
 
 namespace misty::panel {
@@ -70,15 +72,14 @@ namespace misty::panel {
             std::map<std::string, std::string> headers;
             headers["Content-Type"] = "application/json";
             
-            // Register directly with the server (no proxy hop needed)
-            std::string server_url = core::EnvManager::get().get("MISTY_SERVER_URL", "");
-            if (server_url.empty()) {
-                error_msg = "MISTY_SERVER_URL is not set";
+            std::string proxy_url = core::EnvManager::get().get("PROXY_SERVICE_URL", "");
+            if (proxy_url.empty()) {
+                error_msg = "PROXY_SERVICE_URL is not set";
                 is_submitting = false;
                 return;
             }
             auto response = core::HTTPClient::get().post(
-                server_url + "/register",
+                proxy_url + "/api/register",
                 json_body,
                 {.headers = headers}
             );
@@ -87,16 +88,35 @@ namespace misty::panel {
             
             // Handle response
             if (response.status_code == 200 || response.status_code == 201) {
+                try {
+                    auto json_resp = nlohmann::json::parse(response.body);
+                    const std::string token = json_resp.value("token", std::string{});
+                    if (token.empty()) {
+                        error_msg = "Registration response is missing a session token";
+                        return;
+                    }
+                    if (!core::SessionManager::get().set_tokens(token, "")) {
+                        error_msg = "Account created but the session could not be activated";
+                        return;
+                    }
+                    if (json_resp.contains("id") && !json_resp["id"].get<std::string>().empty()) {
+                        core::SessionManager::get().set_user_id(json_resp["id"].get<std::string>());
+                    }
+                    core::SessionManager::get().set_email(std::string(email));
+                } catch (const std::exception& e) {
+                    error_msg = std::string("Registration response could not be processed: ") + e.what();
+                    return;
+                }
                 success_msg = "Account created successfully!";
                 clear_inputs();
                 // Switch view after successful registration
-                view::switch_view(view::ViewID::Providers);
+                view::switch_view(view::ViewID::Files);
             } else if (response.status_code == 400) {
                 error_msg = "Invalid registration data: " + response.body;
             } else if (response.status_code == 500) {
                 error_msg = "Server error: Failed to create user";
             } else if (response.status_code == 0) {
-                error_msg = "Failed to connect to server. Is MISTY_SERVER_URL reachable?";
+                error_msg = "Failed to connect to server. Is the proxy running?";
             } else {
                 error_msg = "Registration failed (Status: " + std::to_string(response.status_code) + "): " + response.body;
             }

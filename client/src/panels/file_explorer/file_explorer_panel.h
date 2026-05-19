@@ -11,6 +11,8 @@
 #include "panels/file_explorer/sidebar/file_sidebar_panel.h"
 #include "panels/file_explorer/state/file_explorer_state.h"
 #include "panels/panel/multi_panel.h"
+#include "panels/search/search_panel.h"
+#include "panels/search/search_state.h"
 
 namespace misty::panel {
 
@@ -71,6 +73,7 @@ private:
     void request_manual_refresh(panel::FileExplorerState& state);
 
     void show_nav_history(panel::FileExplorerState& state, float button_width, float spacing);
+    void show_search_bar(panel::FileExplorerState& state, SearchState& search_state);
     void show_breadcrumb_bar(panel::FileExplorerState& state);
     void show_directory_contents(panel::FileExplorerState& state);
     void apply_table_sort(panel::FileExplorerState& state, const ImGuiTableSortSpecs& sort_specs);
@@ -130,6 +133,8 @@ private:
     core::WorkerPool& worker_pool_;
     std::shared_ptr<FileSidebarPanel> sidebar_panel_;
     std::string state_key_;
+    std::string search_state_key_;
+    std::unique_ptr<SearchPanel> search_panel_;
     bool owns_state_cleanup_ = false;
 };
 
