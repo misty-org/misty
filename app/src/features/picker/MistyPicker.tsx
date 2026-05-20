@@ -16,8 +16,9 @@ import {
 import { MistyFilePicker } from "./FilePicker";
 
 const sharedPickerDialogClassName = [
-  "grid h-[min(640px,calc(100vh-64px))] w-[min(760px,calc(100vw-32px))] max-w-none",
-  "grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0",
+  "grid h-[min(720px,calc(100vh-48px))] w-[min(1060px,calc(100vw-32px))] max-w-none",
+  "grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden p-0",
+  "rounded-xl bg-charcoal-workspace border border-charcoal-border shadow-2xl",
   "max-[560px]:size-full max-[560px]:rounded-none",
 ].join(" ");
 

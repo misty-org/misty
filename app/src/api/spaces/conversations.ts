@@ -28,11 +28,6 @@ export function createSpaceConversationsApi(request: SpaceRequest) {
         `/spaces/${encodeURIComponent(spaceId)}/conversations/${encodeURIComponent(conversationId)}`,
         { method: "PATCH", body: JSON.stringify({ title, participants }) },
       ),
-    directAgentConversation: (spaceId: string, agentId: string) =>
-      request<SpaceConversation>(`/spaces/${encodeURIComponent(spaceId)}/conversations/direct`, {
-        method: "POST",
-        body: JSON.stringify({ agent_id: agentId }),
-      }),
     deleteDisconnectedConversation: (spaceId: string, conversationId: string) =>
       deleteConversation(request, spaceId, conversationId),
     deleteOrClearConversation: (spaceId: string, conversationId: string) =>

@@ -78,7 +78,10 @@ export function resolveHostedApiBase(): string {
     normalizeApiBaseUrl(import.meta.env.VITE_MISTY_PUBLIC_API_URL) ??
     normalizeApiBaseUrl(import.meta.env.VITE_MISTY_SERVER_URL) ??
     normalizeApiBaseUrl(import.meta.env.VITE_API_BASE) ??
-    (import.meta.env.DEV ? "http://localhost:8080/api" : null);
+    // compose.dev.yml publishes the Go API on loopback port 8081. Desktop
+    // development should not depend on the public Cloudflare tunnel, which is
+    // still used by remote callbacks and the collaboration Worker.
+    (import.meta.env.DEV ? "http://127.0.0.1:8081/v1" : null);
   return withDefaultApiPath(base);
 }
 
