@@ -272,10 +272,13 @@ void FileSyncMaster::handle_remote_event(const FileSyncRemoteEvent& event) {
     final_event.pending_event.key = event.entry.entry_id;
     final_event.pending_event.new_path = event.entry.remote_path;
     final_event.pending_event.old_path = event.old_remote_path;
+    final_event.remote_name = event.entry.remote_name;
     final_event.data.is_dir = event.entry.is_dir;
     final_event.data.size = event.entry.size;
     final_event.data.mtime = event.entry.last_modified;
     final_event.data.content_hash = event.entry.checksum;
+    final_event.data.created = event.entry.created;
+    final_event.data.provider_file_id = event.entry.provider_file_id;
     append_final_event(std::move(final_event));
 }
 

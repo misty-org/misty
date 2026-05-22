@@ -16,15 +16,13 @@ namespace {
 
 constexpr float kFileRowContentPaddingX = 8.0f;
 constexpr float kFirstHeaderTextPaddingX = 8.0f;
-constexpr float kNameColumnWidth = 240.0f;
+constexpr float kNameColumnWidth = 360.0f;
+constexpr float kModifiedColumnWidth = 220.0f;
 constexpr float kSizeColumnWidth = 120.0f;
-constexpr float kTypeColumnWidth = 120.0f;
-constexpr float kModifiedColumnWidth = 120.0f;
-constexpr float kStateColumnWidth = 120.0f;
+constexpr float kTypeColumnWidth = 140.0f;
 constexpr ImVec2 kTableCellPadding = ImVec2(8.0f, 6.0f);
 constexpr float kTableMinInnerWidth =
-    kNameColumnWidth + kSizeColumnWidth + kTypeColumnWidth +
-    kModifiedColumnWidth + kStateColumnWidth;
+    kNameColumnWidth + kModifiedColumnWidth + kSizeColumnWidth + kTypeColumnWidth;
 
 
 constexpr UI::Spacing kGridCardPadding = UI::Spacing::sides(5.0f, 5.0f, 10.0f, 0.0f);
@@ -32,6 +30,10 @@ constexpr float kGridCardRounding = 6.0f;
 constexpr float kGridIconSize = 32.0f;
 constexpr float kGridLabelGap = 6.0f;
 constexpr float kGridLabelWrapInset = 10.0f;
+
+bool is_downloadable_remote_file(const FileItem& file) {
+    return file.type == FileType::REMOTE && !file.is_dir;
+}
 
 } // namespace
 
@@ -89,6 +91,7 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state, FileLi
                 !ImGui::IsAnyItemHovered()) {
                 ui.context_menu_target_path.clear();
                 ui.selected_files.clear();
+                state.selected_files.clear();
                 open_background_context_menu(state, ui);
             }
         }
@@ -100,10 +103,9 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state, FileLi
                 {"Name", kNameColumnWidth,
                  ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_DefaultSort,
                  kFirstHeaderTextPaddingX},
+                {"Modified", kModifiedColumnWidth, ImGuiTableColumnFlags_WidthFixed},
                 {"Size", kSizeColumnWidth, ImGuiTableColumnFlags_WidthFixed},
-                {"Type", kTypeColumnWidth, ImGuiTableColumnFlags_WidthFixed},
-                {"Last Modified", kModifiedColumnWidth, ImGuiTableColumnFlags_WidthFixed},
-                {"State", kStateColumnWidth, ImGuiTableColumnFlags_WidthFixed},
+                {"Kind", kTypeColumnWidth, ImGuiTableColumnFlags_WidthFixed},
             },
             .width = UI::Size::px(content_width),
             .inner_width = table_inner_width,
@@ -137,6 +139,7 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state, FileLi
                 !ImGui::IsAnyItemHovered()) {
                 ui.context_menu_target_path.clear();
                 ui.selected_files.clear();
+                state.selected_files.clear();
                 open_background_context_menu(state, ui);
             }
         });
@@ -177,7 +180,9 @@ void FileExplorerPanel::show_file_item(FileExplorerState& state, FileListing& li
     std::string label_id = "##row_" + file.id;
 
     ImVec2 p = ImGui::GetCursorScreenPos();
-    if (ImGui::Selectable(label_id.c_str(), is_selected, ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowDoubleClick, ImVec2(0, row_height))) {
+    const bool row_pressed = ImGui::Selectable(label_id.c_str(), is_selected, ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowDoubleClick, ImVec2(0, row_height));
+    const bool row_double_clicked = ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
+    if (row_pressed) {
         select_item(state, ui, listing, file, i, is_selected, io);
     }
     const ImVec2 row_min = ImGui::GetItemRectMin();
@@ -208,10 +213,13 @@ void FileExplorerPanel::show_file_item(FileExplorerState& state, FileListing& li
     }
     const bool show_open_folder_icon = selection_detail::show_open_folder_for_drag_hover(file, row_min, row_max);
 
-    if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)) {
+    if (row_double_clicked) {
         if (file.is_dir) {
             std::string nav_path = file.path;
             navigate_to_path(nav_path);
+            return;
+        } else if (is_downloadable_remote_file(file)) {
+            download_remote_item(state, file);
             return;
         }
     }
@@ -242,20 +250,38 @@ void FileExplorerPanel::show_file_item(FileExplorerState& state, FileListing& li
 
     ImGui::TableNextColumn();
     ImGui::SetCursorPosY(ImGui::GetCursorPosY() + text_y_offset);
-    render_file_size_cell(file);
-
-    ImGui::TableNextColumn();
-    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + text_y_offset);
-    ImGui::Text("%s", file.is_dir ? "Folder" : "File");
-
-    ImGui::TableNextColumn();
-    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + text_y_offset);
     if (!file.last_modified.empty()) ImGui::Text("%s", file.last_modified.c_str());
     else ImGui::Text("-");
 
     ImGui::TableNextColumn();
     ImGui::SetCursorPosY(ImGui::GetCursorPosY() + text_y_offset);
-    ImGui::TextUnformatted(state_label_for_item(listing, file).c_str());
+    render_file_size_cell(file);
+
+    ImGui::TableNextColumn();
+    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + text_y_offset);
+    ImGui::Text("%s", file.is_dir ? "Folder" : "File");
+    if (is_downloadable_remote_file(file)) {
+        ImGui::SameLine(0.0f, 8.0f);
+        auto& download_icon = AssetManager::get().get_svg_texture("download-16", 16);
+        if (download_icon.id != 0) {
+            const ImVec2 button_pos = ImGui::GetCursorScreenPos();
+            if (ImGui::InvisibleButton(("##download_" + file.id).c_str(), ImVec2(18.0f, 18.0f))) {
+                download_remote_item(state, file);
+            }
+            const ImU32 tint = ImGui::IsItemHovered()
+                ? IM_COL32(235, 235, 238, 255)
+                : IM_COL32(170, 175, 184, 255);
+            ImGui::GetWindowDrawList()->AddImage(download_icon.id,
+                                                  button_pos,
+                                                  ImVec2(button_pos.x + 16.0f, button_pos.y + 16.0f),
+                                                  ImVec2(0, 0),
+                                                  ImVec2(1, 1),
+                                                  tint);
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("Download");
+            }
+        }
+    }
 
 }
 
@@ -294,6 +320,9 @@ void FileExplorerPanel::show_grid_item(FileExplorerState& state, FileListing& li
         if (file.is_dir) {
             std::string nav_path = file.path;
             navigate_to_path(nav_path);
+            return;
+        } else if (file.type == FileType::REMOTE) {
+            download_remote_item(state, file);
             return;
         }
     }

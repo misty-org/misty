@@ -44,6 +44,7 @@ namespace misty::view {
 
         float sidebar_width_ = 260.0f;
         bool is_resizing_sidebar_ = false;
+        float inspector_width_ = 300.0f;
         float claude_panel_width_ = 380.0f;
         bool is_resizing_claude_panel_ = false;
         std::shared_ptr<std::atomic_bool> proxy_probe_in_flight_ =
@@ -51,6 +52,9 @@ namespace misty::view {
 
         static constexpr float kSidebarMinWidth = 180.0f;
         static constexpr float kSidebarMaxWidth = 400.0f;
+        static constexpr float kInspectorMinWidth = 260.0f;
+        static constexpr float kInspectorMaxWidth = 340.0f;
+        static constexpr float kExplorerMinWidth = 360.0f;
         static constexpr float kResizeHandleWidth = 6.0f;
         static constexpr float kClaudePanelMinWidth = 280.0f;
         static constexpr float kClaudePanelMaxWidth = 600.0f;

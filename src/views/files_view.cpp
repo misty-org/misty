@@ -40,7 +40,12 @@ namespace misty::view {
     }
 
     bool FilesView::invoke_command(const std::string& command_id) {
-        (void)command_id;
+        if (command_id == "explorer.preview.toggle" ||
+            command_id == "explorer.preview.zoom_in" ||
+            command_id == "explorer.preview.zoom_out" ||
+            command_id == "explorer.preview.zoom_reset") {
+            return true;
+        }
         return false;
     }
 
@@ -99,9 +104,15 @@ namespace misty::view {
         const ImVec2 sidebar_pos(content_x, viewport->WorkPos.y + proxy_banner_height);
 
         float claude_w = claude_panel_->is_open() ? claude_panel_width_ : 0.0f;
-        float explorer_w = viewport->WorkSize.x - navbar_width - sidebar_w - claude_w;
+        const float shell_w = viewport->WorkSize.x - navbar_width;
+        const float inspector_max_for_window =
+            std::max(220.0f, shell_w - sidebar_w - claude_w - kExplorerMinWidth);
+        float inspector_w = std::min(std::clamp(inspector_width_, kInspectorMinWidth, kInspectorMaxWidth),
+                                     inspector_max_for_window);
+        float explorer_w = std::max(kExplorerMinWidth, shell_w - sidebar_w - inspector_w - claude_w);
         const float explorer_h = viewport->WorkSize.y - proxy_banner_height;
         ImVec2 explorer_pos(sidebar_pos.x + sidebar_w, viewport->WorkPos.y + proxy_banner_height);
+        ImVec2 inspector_pos(explorer_pos.x + explorer_w, viewport->WorkPos.y + proxy_banner_height);
 
         const float handle_x0 = explorer_pos.x - kResizeHandleWidth * 0.5f;
         const float handle_x1 = handle_x0 + kResizeHandleWidth;
@@ -145,15 +156,16 @@ namespace misty::view {
                 const float new_width = io.MousePos.x - sidebar_pos.x;
                 sidebar_width_ = std::clamp(new_width, kSidebarMinWidth, kSidebarMaxWidth);
                 sidebar_w = sidebar_width_;
-                explorer_w = viewport->WorkSize.x - navbar_width - sidebar_w - claude_w;
+                explorer_w = std::max(kExplorerMinWidth, shell_w - sidebar_w - inspector_w - claude_w);
                 explorer_pos.x = sidebar_pos.x + sidebar_w;
+                inspector_pos.x = explorer_pos.x + explorer_w;
             } else {
                 is_resizing_sidebar_ = false;
             }
         }
 
         if (claude_panel_->is_open()) {
-            const float claude_handle_x = explorer_pos.x + explorer_w;
+            const float claude_handle_x = inspector_pos.x + inspector_w;
             const float ch_x0 = claude_handle_x - kResizeHandleWidth * 0.5f;
             const float ch_x1 = ch_x0 + kResizeHandleWidth;
 
@@ -173,7 +185,8 @@ namespace misty::view {
                     const float new_w = right_edge - io.MousePos.x;
                     claude_panel_width_ = std::clamp(new_w, kClaudePanelMinWidth, kClaudePanelMaxWidth);
                     claude_w = claude_panel_width_;
-                    explorer_w = viewport->WorkSize.x - navbar_width - sidebar_w - claude_w;
+                    explorer_w = std::max(kExplorerMinWidth, shell_w - sidebar_w - inspector_w - claude_w);
+                    inspector_pos.x = explorer_pos.x + explorer_w;
                 } else {
                     is_resizing_claude_panel_ = false;
                 }
@@ -201,8 +214,12 @@ namespace misty::view {
         explorer_panel_->render_content();
         ImGui::PopStyleVar();
 
+        ImGui::SetNextWindowPos(inspector_pos);
+        ImGui::SetNextWindowSize(ImVec2(inspector_w, explorer_h));
+        explorer_panel_->render_inspector();
+
         if (claude_panel_->is_open()) {
-            const float claude_x = explorer_pos.x + explorer_w;
+            const float claude_x = inspector_pos.x + inspector_w;
             const float claude_y = viewport->WorkPos.y + proxy_banner_height;
             const float claude_h = viewport->WorkSize.y - proxy_banner_height;
 
