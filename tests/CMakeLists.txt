@@ -16,9 +16,12 @@ if(BUILD_TESTING AND (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STRE
             "${CMAKE_SOURCE_DIR}/src/core/manager/session_manager.cpp"
             "${CMAKE_SOURCE_DIR}/src/core/net/http_client.cpp"
             "${CMAKE_SOURCE_DIR}/src/core/system/util.cpp"
-            "${CMAKE_SOURCE_DIR}/src/core/file_sync/file_sync.cpp"
-            "${CMAKE_SOURCE_DIR}/src/core/file_sync/fs_watcher.cpp"
-            "${CMAKE_SOURCE_DIR}/src/core/file_sync/fs_watcher.h"
+            "${CMAKE_SOURCE_DIR}/src/core/file_sync/file_sync_gate.cpp"
+            "${CMAKE_SOURCE_DIR}/src/core/file_sync/file_sync_master.cpp"
+            "${CMAKE_SOURCE_DIR}/src/core/file_sync/file_sync_poller.cpp"
+            "${CMAKE_SOURCE_DIR}/src/core/file_sync/file_sync_runner.cpp"
+            "${CMAKE_SOURCE_DIR}/src/core/file_sync/file_sync_watcher.cpp"
+            "${CMAKE_SOURCE_DIR}/src/core/file_sync/file_sync_watcher.h"
             "${CMAKE_SOURCE_DIR}/src/core/threading/worker_pool.cpp"
             "${CMAKE_SOURCE_DIR}/src/panels/file_explorer/state/file_explorer_state.cpp"
             "${CMAKE_SOURCE_DIR}/src/panels/search/search_state.cpp"
@@ -41,7 +44,6 @@ if(BUILD_TESTING AND (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STRE
             "${CMAKE_SOURCE_DIR}/vendor/watcher/include"
             "${CMAKE_SOURCE_DIR}/vendor/xxhash"
         )
-        target_compile_definitions(misty_tests PRIVATE MISTY_TESTING)
         target_link_libraries(misty_tests PRIVATE
             gtest_main
             misty_proto
