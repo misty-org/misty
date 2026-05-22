@@ -46,15 +46,15 @@ proxy/dist/
 **/cmake_install.cmake
 **/compile_commands.json
 **/Testing/
-/client/Makefile
-/client/proto/Makefile
-/client/src/Makefile
-/client/tests/Makefile
-/client/vendor/glfw/Makefile
-/client/vendor/glfw/src/Makefile
-/client/vendor/lunasvg/Makefile
-/client/vendor/lunasvg/examples/Makefile
-/client/vendor/lunasvg/plutovg/Makefile
+/Makefile
+/proto/Makefile
+/src/Makefile
+/tests/Makefile
+/vendor/glfw/Makefile
+/vendor/glfw/src/Makefile
+/vendor/lunasvg/Makefile
+/vendor/lunasvg/examples/Makefile
+/vendor/lunasvg/plutovg/Makefile
 
 # Large binary blobs under asset folders
 **/assets/**/*.png
