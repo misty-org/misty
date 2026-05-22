@@ -4,6 +4,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <functional>
+#include <unordered_map>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -57,6 +58,7 @@ private:
     std::vector<FileSyncRemoteTarget> targets_;
     FileSyncRemoteCallback callback_;
     std::chrono::milliseconds interval_{std::chrono::seconds(5)};
+    std::unordered_map<std::string, std::unordered_map<std::string, FileSyncRemoteEntry>> last_seen_;
 };
 
 } // namespace misty::core

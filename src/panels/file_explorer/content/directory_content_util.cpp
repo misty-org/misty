@@ -31,9 +31,25 @@ std::string type_label_for_item(const FileItem& file) {
     return fs::path(file.name).extension().string();
 }
 
+std::string label_for_sync_state(core::FileSyncEntryState state) {
+    switch (state) {
+        case core::FileSyncEntryState::REM:
+            return "REM";
+        case core::FileSyncEntryState::SYNC:
+            return "SYNC";
+        case core::FileSyncEntryState::CONFLICT:
+            return "CONFLICT";
+        case core::FileSyncEntryState::LOC:
+            return "LOC";
+    }
+    return "LOC";
+}
+
 std::string state_label_for_item(const FileListing& listing, const FileItem& file) {
     if (listing.is_deleting(file.path)) return "DEL";
-    return file.type == FileType::DELETED ? "DEL" : "LOC";
+    if (file.type == FileType::DELETED) return "DEL";
+    if (file.sync_state.has_value()) return label_for_sync_state(*file.sync_state);
+    return file.type == FileType::REMOTE ? "REM" : "LOC";
 }
 
 std::string icon_name_for_file(const FileListing& listing, const FileItem& file, bool open_directory) {
@@ -177,7 +193,7 @@ void select_item(FileExplorerState& state,
         ui.selected_files.insert(file.id);
     }
     ui.last_selected_index = index;
-    (void)state;
+    state.selected_files = ui.selected_files;
 }
 
 void sort_files(FileListing& listing, const ImGuiTableSortSpecs& sort_specs) {
@@ -205,9 +221,6 @@ void sort_files(FileListing& listing, const ImGuiTableSortSpecs& sort_specs) {
                     break;
                 case FileTableColumn::LastModified:
                     delta = compare_strings(lhs.last_modified, rhs.last_modified);
-                    break;
-                case FileTableColumn::State:
-                    delta = compare_strings(state_label_for_item(listing, lhs), state_label_for_item(listing, rhs));
                     break;
             }
         }
@@ -243,6 +256,32 @@ void render_file_size_cell(const FileItem& file) {
     } else {
         ImGui::Text("-");
     }
+}
+
+void render_file_state_cell(const FileListing& listing, const FileItem& file) {
+    const std::string label = state_label_for_item(listing, file);
+    if (label == "SYNC" || label == "CONFLICT") {
+        const char* icon_name = label == "SYNC" ? "cloud-16" : "cloud-offline-16";
+        auto& icon = core::AssetManager::get().get_svg_texture(icon_name, 16);
+        if (icon.id != 0) {
+            const ImVec2 pos = ImGui::GetCursorScreenPos();
+            const ImU32 tint = label == "SYNC"
+                ? IM_COL32(82, 190, 150, 255)
+                : IM_COL32(245, 166, 35, 255);
+            ImGui::GetWindowDrawList()->AddImage(icon.id,
+                                                  pos,
+                                                  ImVec2(pos.x + 16.0f, pos.y + 16.0f),
+                                                  ImVec2(0, 0),
+                                                  ImVec2(1, 1),
+                                                  tint);
+            ImGui::Dummy(ImVec2(16.0f, 16.0f));
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("%s", label.c_str());
+            }
+            return;
+        }
+    }
+    ImGui::TextUnformatted(label.c_str());
 }
 
 }  // namespace misty::panel

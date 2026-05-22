@@ -56,6 +56,7 @@ FileExplorerPanel::FileExplorerPanel(UIRegistry& registry,
       worker_pool_(worker_pool),
       state_key_(std::move(props.state_key)),
       search_state_key_(state_key_ + "_Search"),
+      preview_panel_(std::make_unique<PreviewPanel>()),
       owns_state_cleanup_(props.owns_state_cleanup) {
     registry_.get_state<FileExplorerState>(state_key_);
     auto& library = registry_.get_state<LibraryState>(kLibraryStateKey);
@@ -126,21 +127,19 @@ FileExplorerPanel::FileExplorerPanel(UIRegistry& registry,
         navigate_to_path(path, true, false);
     });
 
-    if (state_key_ == "Files" && props.panel_id == "primary") {
-        file_sync_ = std::make_unique<core::FileSyncMaster>(get_mount_root());
-        file_sync_->start();
-    }
-
     if (!start_path.empty()) {
         navigate_to_path(start_path, false);
     }
 }
 
 FileExplorerPanel::~FileExplorerPanel() {
-    if (file_sync_) {
-        file_sync_->stop();
-        file_sync_.reset();
+    for (auto& sync : file_sync_objects_) {
+        if (sync) {
+            sync->sync_stop();
+        }
     }
+    file_sync_objects_.clear();
+    file_sync_roots_.clear();
 
     if (!registry_.has_state(state_key_)) {
         return;
@@ -187,6 +186,7 @@ void FileExplorerPanel::load_restore_state(const std::string& encoded_state) {
     auto& listing = registry_.get_state<FileListingsState>(kFileListingsStateKey).get_or_create(state_key_);
     std::lock_guard<std::mutex> lock(state.mu);
     ui_.clear_transient();
+    state.selected_files.clear();
     listing.clear();
     ui_.show_hidden = data.value("show_hidden", ui_.show_hidden);
     ui_.grid_view = data.value("grid_view", ui_.grid_view);

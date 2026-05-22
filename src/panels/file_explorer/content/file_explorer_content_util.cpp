@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdlib>
+#include <fstream>
 #include <mutex>
 
 #include "core/system/util.h"
@@ -16,6 +17,40 @@ namespace {
 bool is_remote_mount_path(const std::string& path) {
     const std::string mount_root = get_mount_root();
     return !path.empty() && path.rfind(mount_root, 0) == 0;
+}
+
+std::string trim_leading_slash(std::string value) {
+    while (!value.empty() && value.front() == '/') {
+        value.erase(value.begin());
+    }
+    return value;
+}
+
+std::string remote_sync_path_for_item(const RemoteBrowseTarget& target,
+                                      const core::FileMasterListItem& remote_item,
+                                      const std::string& item_name) {
+    if (!remote_item.path.empty()) {
+        return trim_leading_slash(remote_item.path);
+    }
+    fs::path base = trim_leading_slash(target.remote_path);
+    if (!item_name.empty()) {
+        base /= item_name;
+    }
+    return base.generic_string();
+}
+
+void materialize_remote_cache_item(const fs::path& path, bool is_dir) {
+    std::error_code ec;
+    if (is_dir) {
+        fs::create_directories(path, ec);
+        return;
+    }
+
+    fs::create_directories(path.parent_path(), ec);
+    if (ec || fs::exists(path, ec)) {
+        return;
+    }
+    std::ofstream placeholder(path, std::ios::binary);
 }
 
 void assign_formatted_last_write_time(const fs::directory_entry& entry, FileItem& item) {
@@ -158,8 +193,11 @@ std::vector<FileItem> remote_mount_items_for(
         item.name = remote_item.name.empty()
             ? fs::path(remote_item.path).filename().string()
             : remote_item.name;
-        const fs::path remote_item_path = fs::path(remote_item.path).relative_path();
+        item.sync_remote_name = target.remote_name;
+        item.sync_remote_path = remote_sync_path_for_item(target, remote_item, item.name);
+        const fs::path remote_item_path = fs::path(item.sync_remote_path).relative_path();
         item.path = (remote_root / remote_item_path).string();
+        materialize_remote_cache_item(item.path, remote_item.is_dir);
         item.id = item.path;
         item.is_dir = remote_item.is_dir;
         item.size = remote_item.size;

@@ -2,10 +2,12 @@
 
 #include <atomic>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <unordered_set>
 #include <vector>
 
+#include "core/file_sync/file_sync_types.h"
 #include "core/ui/ui_registry.h"
 #include "panels/file_explorer/state/loading_state.h"
 
@@ -38,6 +40,9 @@ struct FileItem {
     std::string last_modified;
     std::string mime_type;
     FileType type = FileType::LOCAL;
+    std::optional<core::FileSyncEntryState> sync_state;
+    std::string sync_remote_name;
+    std::string sync_remote_path;
 };
 
 /**

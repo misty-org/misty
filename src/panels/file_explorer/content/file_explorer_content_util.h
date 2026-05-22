@@ -62,7 +62,7 @@ std::vector<FileItem> provider_mount_items_for(const std::string& provider_folde
 core::FileMasterProps remote_list_props_for(const RemoteBrowseTarget& target);
 
 /**
- * @brief Converts remote list results into file explorer rows under the mount root.
+ * @brief Materializes remote list results under the mount root and returns cached explorer rows.
  */
 std::vector<FileItem> remote_mount_items_for(
     const RemoteBrowseTarget& target,

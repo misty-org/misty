@@ -16,6 +16,7 @@ void FileExplorerState::clear_state() {
     }
     current_path[0] = '\0';
     search_path[0] = '\0';
+    selected_files.clear();
 }
 
 }  // namespace misty::panel

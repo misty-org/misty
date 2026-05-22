@@ -4,6 +4,7 @@
 #include <mutex>
 #include <stack>
 #include <string>
+#include <unordered_set>
 
 #include "core/ui/ui_registry.h"
 
@@ -37,6 +38,7 @@ struct FileExplorerState : public core::UIState {
     char search_path[512] = "";
     std::stack<std::string> back_history;
     std::stack<std::string> forward_history;
+    std::unordered_set<std::string> selected_files;
     std::mutex mu;
 
     /**

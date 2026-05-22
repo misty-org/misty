@@ -19,6 +19,7 @@
 #include "panels/file_explorer/state/library_state.h"
 #include "panels/file_explorer/navigation/toolbar_util.h"
 #include "panels/panel/multi_panel.h"
+#include "panels/preview/preview_panel.h"
 #include "panels/search/search_panel.h"
 #include "panels/search/search_state.h"
 
@@ -85,6 +86,8 @@ public:
         std::string chat_error_msg;
         std::string breadcrumb_path;
         std::vector<BreadcrumbSegment> breadcrumb_segments;
+        bool path_bar_editing = false;
+        bool path_bar_focus = false;
 
         void clear_transient();
     };
@@ -127,6 +130,10 @@ public:
      * @brief Renders the active content section of the file explorer.
      */
     void render_content();
+    /**
+     * @brief Renders the persistent details/preview inspector for the active explorer.
+     */
+    void render_inspector();
     /**
      * @brief Opens or closes the ephemeral chat overlay.
      */
@@ -210,6 +217,10 @@ private:
      */
     void show_nav_history(panel::FileExplorerState& state, float button_width, float spacing);
     /**
+     * @brief Renders the breadcrumb path control, switching to an editable path field when activated.
+     */
+    void show_path_control(panel::FileExplorerState& state, float width);
+    /**
      * @brief Renders the search input and binds it to the current explorer path.
      */
     void show_search_bar(panel::FileExplorerState& state, SearchState& search_state);
@@ -217,6 +228,14 @@ private:
      * @brief Renders breadcrumb navigation for the current path.
      */
     void show_breadcrumb_bar(panel::FileExplorerState& state);
+    /**
+     * @brief Renders the Finder-style command toolbar.
+     */
+    void show_command_toolbar(panel::FileExplorerState& state, SearchState& search_state);
+    /**
+     * @brief Returns the primary selected item, if exactly one selected item is loaded.
+     */
+    const FileItem* primary_selected_item(const panel::FileListing& listing) const;
     /**
      * @brief Renders the active directory listing in grid or table mode.
      */
@@ -327,6 +346,15 @@ private:
                                       const std::string& dest_dir,
                                       panel::ClipboardOp op);
     /**
+     * @brief Downloads a remote row into its mounted local destination path.
+     */
+    void download_remote_item(panel::FileExplorerState& state,
+                              const panel::FileItem& item);
+    /**
+     * @brief Starts a sync watcher rooted at the current local directory.
+     */
+    void create_sync_object_for_current_directory(panel::FileExplorerState& state);
+    /**
      * @brief Begins delete handling for the current selection.
      */
     void perform_delete_selected(panel::FileExplorerState& state);
@@ -352,7 +380,10 @@ private:
     /**
      * @brief Asynchronously lists a local or remote path and streams results into state.
      */
-    void navigate_to_local_path_async(const std::string& path, bool update_history, uint64_t load_generation);
+    void navigate_to_local_path_async(const std::string& path,
+                                      bool update_history,
+                                      uint64_t load_generation,
+                                      bool force_remote_refresh = false);
     /**
      * @brief Builds FileMaster properties for local operations involving an item.
      */
@@ -383,10 +414,12 @@ private:
     core::UIRegistry& registry_;
     core::WorkerPool& worker_pool_;
     std::shared_ptr<FileSidebarPanel> sidebar_panel_;
-    std::unique_ptr<core::FileSyncMaster> file_sync_;
+    std::vector<std::unique_ptr<core::FileSyncMaster>> file_sync_objects_;
+    std::unordered_set<std::string> file_sync_roots_;
     std::string state_key_;
     std::string search_state_key_;
     std::unique_ptr<SearchPanel> search_panel_;
+    std::unique_ptr<PreviewPanel> preview_panel_;
     TransientUiState ui_;
     bool owns_state_cleanup_ = false;
 };
