@@ -9,7 +9,7 @@
 #include <vector>
 
 #include "core/file_master/file_master.h"
-#include "core/file_sync/file_sync.h"
+#include "core/file_sync/file_sync_master.h"
 #include "core/threading/worker_pool.h"
 #include "core/ui/ui_registry.h"
 #include "panels/file_explorer/sidebar/file_sidebar_panel.h"
@@ -300,9 +300,6 @@ private:
      */
     void show_permission_delete_modal(TransientUiState& ui);
 
-#ifdef MISTY_TESTING
-public:
-#endif
     /**
      * @brief Copies the selected files into the shared explorer clipboard.
      */
@@ -352,9 +349,6 @@ public:
                                              const panel::FileListing& listing,
                                              const TransientUiState& ui) const;
 
-#ifdef MISTY_TESTING
-private:
-#endif
     /**
      * @brief Asynchronously lists a local or remote path and streams results into state.
      */
@@ -389,7 +383,7 @@ private:
     core::UIRegistry& registry_;
     core::WorkerPool& worker_pool_;
     std::shared_ptr<FileSidebarPanel> sidebar_panel_;
-    std::unique_ptr<core::FileSync> file_sync_;
+    std::unique_ptr<core::FileSyncMaster> file_sync_;
     std::string state_key_;
     std::string search_state_key_;
     std::unique_ptr<SearchPanel> search_panel_;
