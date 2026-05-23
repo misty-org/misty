@@ -113,11 +113,13 @@ namespace misty::panel {
                 std::string uptime_text;
                 std::string remote_count_text;
                 std::string provider_count_text;
+                std::string version_text;
                 try {
                     const json parsed = json::parse(response.body);
                     ready = parsed.value("ready", ready);
                     error = parsed.value("error", std::string{});
                     const std::string port = parsed.value("port", std::string{});
+                    version_text = parsed.value("version", std::string{});
                     const int64_t uptime_seconds = parsed.value("uptime_seconds", static_cast<int64_t>(0));
                     const int connected_providers = parsed.value("connected_providers", 0);
                     const int available_providers = parsed.value("available_providers", 0);
@@ -143,6 +145,7 @@ namespace misty::panel {
                 proxy_error_ = std::move(error);
                 health_card.port_text = std::move(port_text);
                 health_card.uptime_text = std::move(uptime_text);
+                health_card.version_text = std::move(version_text);
                 health_card.remote_count_text = std::move(remote_count_text);
                 health_card.provider_count_text = std::move(provider_count_text);
                 is_loading_health = false;
@@ -956,7 +959,6 @@ namespace misty::panel {
 
     void ProvidersState::rebuild_health_card_locked() {
         health_card.title = proxy_ready_ ? "rclone provider service ready" : "rclone provider service unavailable";
-        health_card.version_text.clear();
         health_card.path_text = proxy_error_.empty()
             ? "Provider workflows are served through the local Misty proxy."
             : proxy_error_;

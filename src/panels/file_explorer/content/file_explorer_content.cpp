@@ -4,9 +4,11 @@
 #include <cctype>
 #include <cstdio>
 #include <cstring>
+#include <ctime>
 #include <iomanip>
 #include <optional>
 #include <sstream>
+#include <sys/stat.h>
 
 #include "core/file_master/file_master_util.h"
 #include "core/file_sync/file_sync_store.h"
@@ -110,6 +112,64 @@ namespace misty::panel {
             return ec ? 0 : info.available;
         }
 
+        std::string display_name_for_path(const std::string& path) {
+            if (path.empty()) {
+                return "Current Folder";
+            }
+            const fs::path normalized = fs::path(path).lexically_normal();
+            const std::string leaf = normalized.filename().string();
+            if (!leaf.empty() && leaf != ".") {
+                return leaf;
+            }
+            return normalized.root_path().empty() ? path : normalized.root_path().string();
+        }
+
+        std::string format_inspector_time(std::time_t value) {
+            char buffer[64];
+            if (std::strftime(buffer, sizeof(buffer), "%b %d, %Y at %I:%M %p", std::localtime(&value)) == 0) {
+                return {};
+            }
+            std::string out(buffer);
+            const std::size_t day_zero = out.find(" 0");
+            if (day_zero != std::string::npos) {
+                out.erase(day_zero + 1, 1);
+            }
+            const std::size_t hour_zero = out.find(" at 0");
+            if (hour_zero != std::string::npos) {
+                out.erase(hour_zero + 4, 1);
+            }
+            return out;
+        }
+
+        std::string modified_time_for_path(const std::string& path) {
+            if (path.empty() || path.rfind("misty://", 0) == 0) {
+                return {};
+            }
+            std::error_code ec;
+            const auto ftime = fs::last_write_time(fs::path(path), ec);
+            if (ec) {
+                return {};
+            }
+            const auto sctp = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
+                ftime - fs::file_time_type::clock::now() + std::chrono::system_clock::now());
+            return format_inspector_time(std::chrono::system_clock::to_time_t(sctp));
+        }
+
+        std::string created_time_for_path(const std::string& path) {
+            if (path.empty() || path.rfind("misty://", 0) == 0) {
+                return {};
+            }
+            struct stat info {};
+            if (stat(path.c_str(), &info) != 0) {
+                return {};
+            }
+#if defined(__APPLE__)
+            return format_inspector_time(info.st_birthtimespec.tv_sec);
+#else
+            return format_inspector_time(info.st_ctime);
+#endif
+        }
+
         std::string kind_label_for_item(const FileItem& item) {
             if (item.is_dir) {
                 return "Folder";
@@ -149,6 +209,59 @@ namespace misty::panel {
             ImGui::PopStyleVar(2);
             ImGui::PopStyleColor(2);
         }
+
+        bool inspector_action_tile(const char* id,
+                                   const char* icon_name,
+                                   const char* label,
+                                   float width,
+                                   bool enabled = true) {
+            constexpr float kTileHeight = 42.0f;
+            constexpr float kIconSize = 20.0f;
+            constexpr float kIconLabelGap = 3.0f;
+            auto& icon = core::AssetManager::get().get_svg_texture(icon_name, 20);
+            ImGui::PushID(id);
+            if (!enabled) {
+                ImGui::BeginDisabled();
+            }
+            const bool pressed = ImGui::InvisibleButton("##tile", ImVec2(width, kTileHeight));
+            const bool hovered = enabled && ImGui::IsItemHovered();
+            if (!enabled) {
+                ImGui::EndDisabled();
+            }
+
+            const ImVec2 min = ImGui::GetItemRectMin();
+            const ImVec2 max = ImGui::GetItemRectMax();
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            if (hovered || ImGui::IsItemActive()) {
+                dl->AddRectFilled(min,
+                                  max,
+                                  ImGui::IsItemActive() ? IM_COL32(255, 255, 255, 26)
+                                                        : IM_COL32(255, 255, 255, 17),
+                                  6.0f);
+            }
+
+            const ImVec2 label_size = ImGui::CalcTextSize(label);
+            const float group_h = kIconSize + kIconLabelGap + label_size.y;
+            const float group_y = min.y + std::max(0.0f, (kTileHeight - group_h) * 0.5f);
+            const float center_x = min.x + width * 0.5f;
+            const ImU32 icon_tint = enabled ? IM_COL32(222, 228, 238, 235) : IM_COL32(112, 122, 142, 170);
+            const ImU32 text_tint = enabled ? IM_COL32(204, 211, 224, 235) : IM_COL32(112, 122, 142, 170);
+
+            if (icon.id != 0) {
+                const ImVec2 icon_min(center_x - kIconSize * 0.5f, group_y);
+                dl->AddImage(icon.id,
+                             icon_min,
+                             ImVec2(icon_min.x + kIconSize, icon_min.y + kIconSize),
+                             ImVec2(0, 0),
+                             ImVec2(1, 1),
+                             icon_tint);
+            }
+            dl->AddText(ImVec2(center_x - label_size.x * 0.5f, group_y + kIconSize + kIconLabelGap),
+                        text_tint,
+                        label);
+            ImGui::PopID();
+            return enabled && pressed;
+        }
     }
 
     void FileExplorerPanel::TransientUiState::clear_transient() {
@@ -178,6 +291,8 @@ namespace misty::panel {
         chat_error_msg.clear();
         path_bar_editing = false;
         path_bar_focus = false;
+        path_bar_scroll_x = 0.0f;
+        path_bar_scroll_to_end = false;
     }
 
     std::string FileExplorerPanel::tab_title() const {
@@ -386,10 +501,10 @@ namespace misty::panel {
         auto& search_state = registry_.get_state<SearchState>(search_state_key_);
         std::unique_lock<std::mutex> lock(state.mu);
 
-        if (ImGui::BeginChild("TopBar", ImVec2(0.0f, 54.0f), false, ImGuiWindowFlags_NoScrollbar)) {
+        if (ImGui::BeginChild("TopBar", ImVec2(0.0f, 62.0f), false, ImGuiWindowFlags_NoScrollbar)) {
             ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.075f, 0.085f, 0.10f, 1.0f));
             ImGui::SetCursorPosX(ImGui::GetCursorPosX() + kExplorerLeftInset);
-            ImGui::SetCursorPosY(11.0f);
+            ImGui::SetCursorPosY(9.0f);
             show_command_toolbar(state, search_state);
             ImGui::PopStyleColor();
         }
@@ -401,6 +516,11 @@ namespace misty::panel {
         const float status_bar_height = 30.0f;
         const float content_height = std::max(0.0f, available_h - status_bar_height - 4.0f);
 
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, kInspectorBg);
+        ImGui::PushStyleColor(ImGuiCol_WindowBg, kInspectorBg);
+        ImGui::PushStyleColor(ImGuiCol_TableRowBg, kInspectorBg);
+        ImGui::PushStyleColor(ImGuiCol_TableRowBgAlt, kInspectorBg);
+        ImGui::PushStyleColor(ImGuiCol_TableHeaderBg, kInspectorBg);
         if (ImGui::BeginChild("##explorer_content_region", ImVec2(0.0f, content_height), false,
                               ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse)) {
             ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, 8.0f);
@@ -429,12 +549,10 @@ namespace misty::panel {
 
         ImGui::Separator();
         if (ImGui::BeginChild("BottomStatusBar", ImVec2(0.0f, status_bar_height), false, ImGuiWindowFlags_NoScrollbar)) {
-            const std::uintmax_t available_space = available_space_for_path(state.current_path);
-            ImGui::SetCursorPosY(7.0f);
-            ImGui::SetCursorPosX(16.0f);
-            ImGui::TextDisabled("%zu items, %s available", listing.files.size(), format_bytes(static_cast<std::int64_t>(available_space)).c_str());
+            ImGui::Dummy(ImVec2(1.0f, 1.0f));
         }
         ImGui::EndChild();
+        ImGui::PopStyleColor(5);
 
         lock.unlock();
         update_periodic_save(state);
@@ -452,9 +570,6 @@ namespace misty::panel {
             }
         }
 
-        auto& state = registry_.get_state<FileExplorerState>(state_key_);
-        auto& listing = active_listing();
-
         ImGuiWindowFlags flags =
             ImGuiWindowFlags_NoTitleBar |
             ImGuiWindowFlags_NoResize |
@@ -471,107 +586,119 @@ namespace misty::panel {
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16.0f, 18.0f));
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8.0f, 10.0f));
         if (ImGui::Begin("FileInspector", nullptr, flags)) {
-            std::optional<FileItem> selected_item;
-            bool multiple = false;
-            std::string current_path;
-            std::size_t item_count = 0;
-            {
-                std::lock_guard<std::mutex> lock(state.mu);
-                if (const FileItem* item = primary_selected_item(listing)) {
-                    selected_item = *item;
-                }
-                multiple = ui_.selected_files.size() > 1;
-                current_path = state.current_path;
-                item_count = listing.files.size();
-            }
-            const FileItem* selected = selected_item ? &*selected_item : nullptr;
-            const std::string title = selected ? selected->name : (multiple ? "Multiple Items" : "Current Folder");
-            const std::string kind = selected ? kind_label_for_item(*selected) : (multiple ? "Selection" : "Folder");
-
-            const bool can_preview = selected && preview_panel_ && preview_panel_->supports(*selected);
-            const float icon_size = can_preview ? 148.0f : 92.0f;
-            if (selected && can_preview) {
-                begin_inspector_card("##preview_panel_card", 180.0f);
-                preview_panel_->render(*selected, ImGui::GetContentRegionAvail());
-                end_inspector_card();
-            } else {
-                const float avail = ImGui::GetContentRegionAvail().x;
-                auto& icon = core::AssetManager::get().get_svg_texture(
-                    selected ? icon_name_for_file(listing, *selected) : "file-directory-open-fill-24",
-                    static_cast<int>(icon_size));
-                ImGui::SetCursorPosX(ImGui::GetCursorPosX() + std::max(0.0f, (avail - icon_size) * 0.5f));
-                if (icon.id != 0) {
-                    const ImU32 tint = selected ? grid_item_icon_color(listing, *selected) : IM_COL32(230, 191, 76, 255);
-                    ImGui::Image(icon.id,
-                                 ImVec2(icon_size, icon_size),
-                                 ImVec2(0, 0),
-                                 ImVec2(1, 1),
-                                 ImGui::ColorConvertU32ToFloat4(tint),
-                                 ImVec4(0, 0, 0, 0));
-                } else {
-                    ImGui::Dummy(ImVec2(icon_size, icon_size));
-                }
-            }
-
-            ImGui::Spacing();
-            const float title_w = ImGui::CalcTextSize(title.c_str()).x;
-            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + std::max(0.0f, (ImGui::GetContentRegionAvail().x - title_w) * 0.5f));
-            ImGui::TextWrapped("%s", title.c_str());
-            const float kind_w = ImGui::CalcTextSize(kind.c_str()).x;
-            ImGui::PushStyleColor(ImGuiCol_Text, kInspectorMuted);
-            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + std::max(0.0f, (ImGui::GetContentRegionAvail().x - kind_w) * 0.5f));
-            ImGui::TextUnformatted(kind.c_str());
-            ImGui::PopStyleColor();
-
-            begin_inspector_card("##inspector_actions", 74.0f);
-            const float action_width = (ImGui::GetContentRegionAvail().x - 14.0f) / 3.0f;
-            if (ImGui::Button("Open", ImVec2(action_width, 36.0f)) && selected) {
-                if (selected->is_dir) {
-                    navigate_to_path(selected->path, true, false);
-                }
-            }
-            ImGui::SameLine(0.0f, 7.0f);
-            if (ImGui::Button("New Folder", ImVec2(action_width, 36.0f))) {
-                ui_.show_new_entry_modal = true;
-                ui_.new_entry_is_dir = true;
-                ui_.new_entry_name_buffer[0] = '\0';
-            }
-            ImGui::SameLine(0.0f, 7.0f);
-            if (ImGui::Button("More", ImVec2(action_width, 36.0f))) {
-                ui_.context_menu_target_path = selected ? selected->path : "";
-                if (selected) {
-                    open_context_menu(state, ui_);
-                } else {
-                    open_background_context_menu(state, ui_);
-                }
-            }
-            end_inspector_card();
-
-            begin_inspector_card("##inspector_details", 0.0f);
-            ImGui::TextUnformatted("Details");
-            ImGui::Separator();
-            if (selected) {
-                inspector_label_value("Path", selected->path);
-                inspector_label_value("Modified", selected->last_modified);
-                inspector_label_value("Size", selected->is_dir ? "-" : format_bytes(selected->size));
-                inspector_label_value("Kind", kind);
-            } else {
-                inspector_label_value("Path", current_path);
-                inspector_label_value("Items", std::to_string(item_count));
-                inspector_label_value("Available", current_path.empty() ? "-" : format_bytes(static_cast<std::int64_t>(available_space_for_path(current_path))));
-            }
-            ImGui::Spacing();
-            ImGui::TextUnformatted("Tags");
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.11f, 0.14f, 0.20f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.16f, 0.21f, 0.30f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_Text, kMistyAccent);
-            ImGui::Button("+ Add Tag", ImVec2(92.0f, 28.0f));
-            ImGui::PopStyleColor(3);
-            end_inspector_card();
+            render_inspector_contents();
         }
         ImGui::End();
         ImGui::PopStyleVar(2);
         ImGui::PopStyleColor(2);
+    }
+
+    void FileExplorerPanel::render_inspector_contents() {
+        auto& state = registry_.get_state<FileExplorerState>(state_key_);
+        auto& listing = active_listing();
+
+        std::optional<FileItem> selected_item;
+        bool multiple = false;
+        std::string current_path;
+        std::size_t item_count = 0;
+        {
+            std::lock_guard<std::mutex> lock(state.mu);
+            if (const FileItem* item = primary_selected_item(listing)) {
+                selected_item = *item;
+            }
+            multiple = ui_.selected_files.size() > 1;
+            current_path = state.current_path;
+            item_count = listing.files.size();
+        }
+        const FileItem* selected = selected_item ? &*selected_item : nullptr;
+        const std::string title = selected ? selected->name : (multiple ? "Multiple Items" : display_name_for_path(current_path));
+        const std::string kind = selected ? kind_label_for_item(*selected) : (multiple ? "Selection" : "Folder");
+        const std::string detail_path = selected ? selected->path : current_path;
+        const std::string modified = selected && !selected->last_modified.empty()
+            ? selected->last_modified
+            : modified_time_for_path(detail_path);
+        const std::string created = created_time_for_path(detail_path);
+
+        const bool can_preview = selected && preview_panel_ && preview_panel_->supports(*selected);
+        const float icon_size = can_preview ? 148.0f : 92.0f;
+        if (selected && can_preview) {
+            begin_inspector_card("##preview_panel_card", 180.0f);
+            preview_panel_->render(*selected, ImGui::GetContentRegionAvail());
+            end_inspector_card();
+        } else {
+            const float avail = ImGui::GetContentRegionAvail().x;
+            auto& icon = core::AssetManager::get().get_svg_texture(
+                selected ? icon_name_for_file(listing, *selected) : "file-directory-open-fill-24",
+                static_cast<int>(icon_size));
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + std::max(0.0f, (avail - icon_size) * 0.5f));
+            if (icon.id != 0) {
+                const ImU32 tint = selected ? grid_item_icon_color(listing, *selected) : IM_COL32(230, 191, 76, 255);
+                ImGui::Image(icon.id,
+                             ImVec2(icon_size, icon_size),
+                             ImVec2(0, 0),
+                             ImVec2(1, 1),
+                             ImGui::ColorConvertU32ToFloat4(tint),
+                             ImVec4(0, 0, 0, 0));
+            } else {
+                ImGui::Dummy(ImVec2(icon_size, icon_size));
+            }
+        }
+
+        ImGui::Spacing();
+        const float title_w = ImGui::CalcTextSize(title.c_str()).x;
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + std::max(0.0f, (ImGui::GetContentRegionAvail().x - title_w) * 0.5f));
+        ImGui::TextWrapped("%s", title.c_str());
+        const float kind_w = ImGui::CalcTextSize(kind.c_str()).x;
+        ImGui::PushStyleColor(ImGuiCol_Text, kInspectorMuted);
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + std::max(0.0f, (ImGui::GetContentRegionAvail().x - kind_w) * 0.5f));
+        ImGui::TextUnformatted(kind.c_str());
+        ImGui::PopStyleColor();
+
+        begin_inspector_card("##inspector_actions", 62.0f);
+        const float action_width = (ImGui::GetContentRegionAvail().x - 8.0f) / 2.0f;
+        const float tile_y = ImGui::GetCursorPosY() + std::max(0.0f, (ImGui::GetContentRegionAvail().y - 42.0f) * 0.5f);
+        ImGui::SetCursorPosY(tile_y);
+        if (inspector_action_tile("open", "file-directory-24", "Open", action_width, selected != nullptr) && selected) {
+            if (selected->is_dir) {
+                navigate_to_path(selected->path, true, false);
+            }
+        }
+        ImGui::SameLine(0.0f, 8.0f);
+        ImGui::SetCursorPosY(tile_y);
+        if (inspector_action_tile("more", "kebab-horizontal-24", "More", action_width)) {
+            ui_.context_menu_target_path = selected ? selected->path : "";
+            if (selected) {
+                open_context_menu(state, ui_);
+            } else {
+                open_background_context_menu(state, ui_);
+            }
+        }
+        end_inspector_card();
+
+        begin_inspector_card("##inspector_details", 0.0f);
+        ImGui::TextUnformatted("Details");
+        ImGui::Separator();
+        if (selected) {
+            inspector_label_value("Path", selected->path);
+            inspector_label_value("Modified", modified);
+            inspector_label_value("Created", created);
+            inspector_label_value("Size", selected->is_dir ? "-" : format_bytes(selected->size));
+            inspector_label_value("Kind", kind);
+        } else {
+            inspector_label_value("Path", current_path);
+            inspector_label_value("Modified", modified);
+            inspector_label_value("Created", created);
+            inspector_label_value("Items", std::to_string(item_count));
+            inspector_label_value("Available", current_path.empty() ? "-" : format_bytes(static_cast<std::int64_t>(available_space_for_path(current_path))));
+        }
+        ImGui::Spacing();
+        ImGui::TextUnformatted("Tags");
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.11f, 0.14f, 0.20f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.16f, 0.21f, 0.30f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_Text, kMistyAccent);
+        ImGui::Button("+ Add Tag", ImVec2(92.0f, 28.0f));
+        ImGui::PopStyleColor(3);
+        end_inspector_card();
     }
 
     void FileExplorerPanel::navigate_to_local_path_async(const std::string& path,

@@ -14,6 +14,69 @@
 #include "panels/notification/notification_state.h"
 
 namespace misty::view {
+    namespace {
+        constexpr float kPanelToggleSize = 22.0f;
+        constexpr float kFilesBottomBarHeight = 22.0f;
+
+        bool bottom_bar_toggle_button(ImDrawList* dl, ImVec2 min, const char* icon_name, const char* tooltip) {
+            const ImVec2 max(min.x + kPanelToggleSize, min.y + kPanelToggleSize);
+            const bool hovered = ImGui::IsMouseHoveringRect(min, max, false);
+            const bool active = hovered && ImGui::IsMouseDown(ImGuiMouseButton_Left);
+            const bool clicked = hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left);
+            if (hovered || active) {
+                const ImU32 hover_bg = active ? IM_COL32(42, 48, 60, 150)
+                                              : IM_COL32(42, 48, 60, 95);
+                dl->AddRectFilled(min, max, hover_bg, 5.0f);
+            }
+
+            auto& icon = core::AssetManager::get().get_svg_texture(icon_name, 16);
+            if (icon.id != 0) {
+                const ImVec2 icon_min(min.x + 3.0f, min.y + 3.0f);
+                dl->AddImage(icon.id,
+                             icon_min,
+                             ImVec2(icon_min.x + 16.0f, icon_min.y + 16.0f),
+                             ImVec2(0, 0),
+                             ImVec2(1, 1),
+                             hovered ? IM_COL32(220, 228, 242, 245)
+                                     : IM_COL32(152, 161, 178, 220));
+            }
+            if (hovered) {
+                ImGui::SetTooltip("%s", tooltip);
+                ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+            }
+            return clicked;
+        }
+
+        void render_files_bottom_bar(ImVec2 pos,
+                                     float width,
+                                     bool& sidebar_visible,
+                                     bool& inspector_visible) {
+            if (width <= 0.0f) {
+                return;
+            }
+
+            ImDrawList* dl = ImGui::GetForegroundDrawList(ImGui::GetMainViewport());
+            const ImVec2 max(pos.x + width, pos.y + kFilesBottomBarHeight);
+            dl->AddRectFilled(pos, max, IM_COL32(18, 21, 26, 238));
+            dl->AddLine(pos, ImVec2(max.x, pos.y), IM_COL32(82, 88, 100, 130), 1.0f);
+
+            const float button_y = pos.y + (kFilesBottomBarHeight - kPanelToggleSize) * 0.5f;
+            if (bottom_bar_toggle_button(dl,
+                                         ImVec2(pos.x + 8.0f, button_y),
+                                         "file-sidebar-toggle-24",
+                                         sidebar_visible ? "Hide files sidebar" : "Show files sidebar")) {
+                sidebar_visible = !sidebar_visible;
+            }
+
+            if (bottom_bar_toggle_button(dl,
+                                         ImVec2(max.x - kPanelToggleSize - 8.0f, button_y),
+                                         "preview-panel-toggle-24",
+                                         inspector_visible ? "Hide preview panel" : "Show preview panel")) {
+                inspector_visible = !inspector_visible;
+            }
+        }
+    }
+
     FilesView::FilesView(core::UIRegistry& ui_registry,
                          core::WorkerPool& worker_pool)
         : ui_registry_(ui_registry)
@@ -99,25 +162,29 @@ namespace misty::view {
         const ImVec2 navbar_pos = viewport->WorkPos;
         const ImVec2 navbar_size(navbar_width, viewport->WorkSize.y);
 
-        float sidebar_w = sidebar_width_;
-        const float sidebar_h = viewport->WorkSize.y - proxy_banner_height;
+        float sidebar_w = sidebar_visible_ ? sidebar_width_ : 0.0f;
+        const float shell_content_h = std::max(0.0f, viewport->WorkSize.y - proxy_banner_height - kFilesBottomBarHeight);
+        const float bottom_bar_y = viewport->WorkPos.y + proxy_banner_height + shell_content_h;
+        const float sidebar_h = shell_content_h;
         const ImVec2 sidebar_pos(content_x, viewport->WorkPos.y + proxy_banner_height);
 
         float claude_w = claude_panel_->is_open() ? claude_panel_width_ : 0.0f;
         const float shell_w = viewport->WorkSize.x - navbar_width;
         const float inspector_max_for_window =
             std::max(220.0f, shell_w - sidebar_w - claude_w - kExplorerMinWidth);
-        float inspector_w = std::min(std::clamp(inspector_width_, kInspectorMinWidth, kInspectorMaxWidth),
-                                     inspector_max_for_window);
+        float inspector_w = inspector_visible_
+            ? std::min(std::clamp(inspector_width_, kInspectorMinWidth, kInspectorMaxWidth),
+                       inspector_max_for_window)
+            : 0.0f;
         float explorer_w = std::max(kExplorerMinWidth, shell_w - sidebar_w - inspector_w - claude_w);
-        const float explorer_h = viewport->WorkSize.y - proxy_banner_height;
+        const float explorer_h = shell_content_h;
         ImVec2 explorer_pos(sidebar_pos.x + sidebar_w, viewport->WorkPos.y + proxy_banner_height);
         ImVec2 inspector_pos(explorer_pos.x + explorer_w, viewport->WorkPos.y + proxy_banner_height);
 
         const float handle_x0 = explorer_pos.x - kResizeHandleWidth * 0.5f;
         const float handle_x1 = handle_x0 + kResizeHandleWidth;
         const float handle_y0 = sidebar_pos.y;
-        const float handle_y1 = viewport->WorkPos.y + viewport->WorkSize.y;
+        const float handle_y1 = bottom_bar_y;
 
         ImGuiIO& io = ImGui::GetIO();
         if (core::CommandManager::get().matches("app.open_settings")) {
@@ -125,6 +192,9 @@ namespace misty::view {
         }
         if (core::CommandManager::get().matches("explorer.toggle_claude")) {
             claude_panel_->toggle();
+        }
+        if (core::CommandManager::get().matches("explorer.preview.toggle")) {
+            inspector_visible_ = !inspector_visible_;
         }
         if (explorer_panel_) {
             explorer_panel_->handle_commands();
@@ -141,7 +211,7 @@ namespace misty::view {
             }
         }
 
-        const bool hovered =
+        const bool hovered = sidebar_visible_ &&
                              io.MousePos.x >= handle_x0 && io.MousePos.x <= handle_x1 &&
                              io.MousePos.y >= handle_y0 && io.MousePos.y <= handle_y1;
 
@@ -161,6 +231,35 @@ namespace misty::view {
                 inspector_pos.x = explorer_pos.x + explorer_w;
             } else {
                 is_resizing_sidebar_ = false;
+            }
+        }
+
+        const float inspector_handle_x = inspector_pos.x;
+        const float ih_x0 = inspector_handle_x - kResizeHandleWidth * 0.5f;
+        const float ih_x1 = ih_x0 + kResizeHandleWidth;
+        const bool ih_hovered = inspector_visible_ &&
+                                io.MousePos.x >= ih_x0 && io.MousePos.x <= ih_x1 &&
+                                io.MousePos.y >= handle_y0 && io.MousePos.y <= handle_y1;
+
+        if (ih_hovered || is_resizing_inspector_) {
+            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+        }
+        if (ih_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+            is_resizing_inspector_ = true;
+        }
+        if (is_resizing_inspector_) {
+            if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+                const float inspector_right_edge = viewport->WorkPos.x + viewport->WorkSize.x - claude_w;
+                const float max_for_current_window =
+                    std::max(kInspectorMinWidth, inspector_right_edge - explorer_pos.x - kExplorerMinWidth);
+                inspector_width_ = std::clamp(inspector_right_edge - io.MousePos.x,
+                                              kInspectorMinWidth,
+                                              std::min(kInspectorMaxWidth, max_for_current_window));
+                inspector_w = inspector_visible_ ? inspector_width_ : 0.0f;
+                explorer_w = std::max(kExplorerMinWidth, shell_w - sidebar_w - inspector_w - claude_w);
+                inspector_pos.x = explorer_pos.x + explorer_w;
+            } else {
+                is_resizing_inspector_ = false;
             }
         }
 
@@ -200,13 +299,23 @@ namespace misty::view {
             }
         }
 
+        if (ih_hovered || is_resizing_inspector_) {
+            ImDrawList* fg = ImGui::GetForegroundDrawList();
+            fg->AddLine(
+                ImVec2(inspector_pos.x, handle_y0),
+                ImVec2(inspector_pos.x, handle_y1),
+                IM_COL32(116, 152, 220, 200), 2.0f);
+        }
+
         ImGui::SetNextWindowPos(navbar_pos);
         ImGui::SetNextWindowSize(navbar_size);
         navbar_panel_->render();
 
-        ImGui::SetNextWindowPos(sidebar_pos);
-        ImGui::SetNextWindowSize(ImVec2(sidebar_w, sidebar_h));
-        explorer_panel_->render_sidebar();
+        if (sidebar_visible_) {
+            ImGui::SetNextWindowPos(sidebar_pos);
+            ImGui::SetNextWindowSize(ImVec2(sidebar_w, sidebar_h));
+            explorer_panel_->render_sidebar();
+        }
 
         ImGui::SetNextWindowPos(explorer_pos);
         ImGui::SetNextWindowSize(ImVec2(explorer_w, explorer_h));
@@ -214,14 +323,16 @@ namespace misty::view {
         explorer_panel_->render_content();
         ImGui::PopStyleVar();
 
-        ImGui::SetNextWindowPos(inspector_pos);
-        ImGui::SetNextWindowSize(ImVec2(inspector_w, explorer_h));
-        explorer_panel_->render_inspector();
+        if (inspector_visible_) {
+            ImGui::SetNextWindowPos(inspector_pos);
+            ImGui::SetNextWindowSize(ImVec2(inspector_w, explorer_h));
+            explorer_panel_->render_inspector();
+        }
 
         if (claude_panel_->is_open()) {
             const float claude_x = inspector_pos.x + inspector_w;
             const float claude_y = viewport->WorkPos.y + proxy_banner_height;
-            const float claude_h = viewport->WorkSize.y - proxy_banner_height;
+            const float claude_h = shell_content_h;
 
             ImGui::SetNextWindowPos(ImVec2(claude_x, claude_y));
             ImGui::SetNextWindowSize(ImVec2(claude_w, claude_h));
@@ -237,6 +348,13 @@ namespace misty::view {
             ImGui::End();
             ImGui::PopStyleVar();
         }
+
+        const float bottom_bar_width = viewport->WorkSize.x - navbar_width - claude_w;
+        render_files_bottom_bar(
+            ImVec2(content_x, bottom_bar_y),
+            bottom_bar_width,
+            sidebar_visible_,
+            inspector_visible_);
 
         context_menu_panel_->render();
         notification_panel_->render();

@@ -6,6 +6,7 @@
 #include "panels/providers/state/providers_state.h"
 
 namespace misty::panel {
+    std::string provider_logo_path_for_id(const std::string& provider_id);
     std::string provider_logo_path(const ProviderCard& card);
     void draw_provider_logo(const ProviderCard& card, float size);
     void draw_provider_status_badge(const ProviderCard& card);
