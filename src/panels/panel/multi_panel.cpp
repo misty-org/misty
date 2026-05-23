@@ -385,10 +385,13 @@ namespace misty::panel {
         const bool is_active_pane = pane_id == active_pane_id;
         ImGui::SetCursorScreenPos(pos);
         const std::string child_id = "##pane_" + pane_id;
+        const bool is_split_layout = pane_count() > 1;
         UI::WithStyle([&](UI::StyleScope& style) {
             style.var(ImGuiStyleVar_ChildBorderSize, 1.0f);
             if (is_active_pane) {
-                style.color(ImGuiCol_Border, ImVec4(1.0f, 1.0f, 1.0f, 0.95f));
+                style.color(ImGuiCol_Border, is_split_layout
+                    ? ImVec4(0.46f, 0.48f, 0.52f, 0.70f)
+                    : ImVec4(1.0f, 1.0f, 1.0f, 0.95f));
             } else {
                 style.color(ImGuiCol_Border, ImVec4(0.24f, 0.24f, 0.26f, 1.0f));
                 style.color(ImGuiCol_ChildBg, ImVec4(0.12f, 0.12f, 0.12f, 1.0f));

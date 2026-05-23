@@ -1,14 +1,10 @@
-#include "core/ui/ui_style.h"
 #include "panels/file_explorer/file_explorer_panel.h"
 
 #include <algorithm>
 #include <chrono>
-#include <cstdio>
-#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 
-#include "core/commands/command_manager.h"
 #include "core/manager/asset_manager.h"
 #include "panels/file_explorer/navigation/history_util.h"
 #include "panels/file_explorer/navigation/toolbar_util.h"
@@ -23,24 +19,10 @@ namespace fs = std::filesystem;
 constexpr ImVec4 kExplorerChromeBg = ImVec4(0.14f, 0.14f, 0.15f, 1.0f);
 constexpr ImVec4 kExplorerChromeBgHover = ImVec4(0.18f, 0.18f, 0.20f, 1.0f);
 constexpr ImVec4 kExplorerChromeBgActive = ImVec4(0.11f, 0.11f, 0.12f, 1.0f);
-constexpr ImVec4 kTextEnabled(0.88f, 0.88f, 0.88f, 1.0f);
 constexpr ImVec4 kTextDisabled(0.42f, 0.42f, 0.42f, 1.0f);
-constexpr float kSearchShortcutButtonWidth = 42.0f;
-
-bool nav_button(const char* label, const char* tooltip, bool enabled, const ImVec2& size) {
-    bool pressed = false;
-    UI::WithStyle([&](UI::StyleScope& style) {
-        style.color(ImGuiCol_Button, kExplorerChromeBg);
-        style.color(ImGuiCol_ButtonHovered, kExplorerChromeBgHover);
-        style.color(ImGuiCol_ButtonActive, kExplorerChromeBgActive);
-        style.color(ImGuiCol_Text, enabled ? kTextEnabled : kTextDisabled);
-        pressed = ImGui::Button(label, size);
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("%s", tooltip);
-        }
-    });
-    return enabled && pressed;
-}
+constexpr float kToolbarButtonSize = 34.0f;
+constexpr float kToolbarIconSize = 18.0f;
+constexpr float kToolbarGap = 8.0f;
 
 bool can_create_sync_object_for_path(const std::string& path) {
     if (path.empty() || path.rfind("misty://", 0) == 0) {
@@ -55,25 +37,75 @@ bool can_create_sync_object_for_path(const std::string& path) {
 }
 
 void draw_toolbar_button_frame(const ImVec2& min, const ImVec2& max, bool hovered, bool active) {
-    const ImU32 fill = active ? IM_COL32(28, 30, 35, 255)
-                     : hovered ? IM_COL32(44, 48, 56, 255)
-                               : IM_COL32(35, 38, 45, 255);
+    const ImU32 fill = active ? IM_COL32(29, 32, 38, 255)
+                     : hovered ? IM_COL32(41, 45, 54, 255)
+                               : IM_COL32(31, 34, 40, 255);
     ImDrawList* dl = ImGui::GetWindowDrawList();
-    dl->AddRectFilled(min, max, fill, 7.0f);
-    dl->AddRect(min, max, IM_COL32(62, 66, 76, 210), 7.0f);
+    dl->AddRectFilled(min, max, fill, 8.0f);
+    dl->AddRect(min, max, hovered ? IM_COL32(72, 82, 104, 230) : IM_COL32(46, 50, 60, 190), 8.0f);
+}
+
+bool toolbar_icon_button(const char* id,
+                         const char* icon_path,
+                         const char* tooltip,
+                         bool enabled,
+                         const ImVec2& size,
+                         float icon_size = 20.0f,
+                         ImVec4 active_tint = ImVec4(0.88f, 0.88f, 0.88f, 1.0f)) {
+    ImGui::PushID(id);
+    const bool pressed = ImGui::InvisibleButton("##toolbar_icon", size);
+    const bool hovered = enabled && ImGui::IsItemHovered();
+    const bool active = enabled && ImGui::IsItemActive();
+    const ImVec2 min = ImGui::GetItemRectMin();
+    const ImVec2 max = ImGui::GetItemRectMax();
+    ImGui::PopID();
+
+    draw_toolbar_button_frame(min, max, hovered, active);
+    auto& tex = AssetManager::get().get_svg_texture_path(icon_path, oversampled_icon_size(icon_size));
+    if (tex.id != 0) {
+        const ImVec2 icon_min(min.x + (size.x - icon_size) * 0.5f,
+                              min.y + (size.y - icon_size) * 0.5f);
+        const ImVec4 tint = enabled ? active_tint : kTextDisabled;
+        ImGui::GetWindowDrawList()->AddImage(tex.id,
+                                             icon_min,
+                                             ImVec2(icon_min.x + icon_size, icon_min.y + icon_size),
+                                             ImVec2(0, 0),
+                                             ImVec2(1, 1),
+                                             ImGui::ColorConvertFloat4ToU32(tint));
+    }
+    if (hovered && tooltip) {
+        ImGui::SetTooltip("%s", tooltip);
+    }
+    return enabled && pressed;
+}
+
+void draw_icon_at(const char* icon_path, const ImVec2& center, float icon_size, ImU32 tint) {
+    auto& tex = AssetManager::get().get_svg_texture_path(icon_path, oversampled_icon_size(icon_size));
+    if (tex.id == 0) {
+        return;
+    }
+    const ImVec2 min(center.x - icon_size * 0.5f, center.y - icon_size * 0.5f);
+    ImGui::GetWindowDrawList()->AddImage(tex.id,
+                                         min,
+                                         ImVec2(min.x + icon_size, min.y + icon_size),
+                                         ImVec2(0, 0),
+                                         ImVec2(1, 1),
+                                         tint);
 }
 } // namespace
 
 void FileExplorerPanel::show_nav_history(FileExplorerState& state, float button_width, float spacing) {
-    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6.0f, 6.0f));
-    const ImVec2 button_size(button_width, ImGui::GetFrameHeight());
+    const ImVec2 button_size(button_width, button_width);
 
     const std::string current_path(state.current_path);
     bool can_back = !state.back_history.empty();
     std::string back_target;
     if (can_back) back_target = state.back_history.top();
-    if (nav_button("<##history_back", can_back ? "Back" : "No previous folder", can_back, button_size)) {
+    if (toolbar_icon_button("history_back",
+                            "assets/icons/arrow-left-24.svg",
+                            can_back ? "Back" : "No previous folder",
+                            can_back,
+                            button_size)) {
         push_history_path(state.forward_history, current_path);
         std::string target = state.back_history.top();
         state.back_history.pop();
@@ -97,7 +129,11 @@ void FileExplorerPanel::show_nav_history(FileExplorerState& state, float button_
     bool can_fwd = !state.forward_history.empty();
     std::string forward_target;
     if (can_fwd) forward_target = state.forward_history.top();
-    if (nav_button(">##history_forward", can_fwd ? "Forward" : "No next folder", can_fwd, button_size)) {
+    if (toolbar_icon_button("history_forward",
+                            "assets/icons/arrow-right-24.svg",
+                            can_fwd ? "Forward" : "No next folder",
+                            can_fwd,
+                            button_size)) {
         push_history_path(state.back_history, current_path);
         std::string target = state.forward_history.top();
         state.forward_history.pop();
@@ -116,139 +152,24 @@ void FileExplorerPanel::show_nav_history(FileExplorerState& state, float button_
         });
     }
 
-    ImGui::SameLine(0, spacing);
-    ImGui::PushStyleColor(ImGuiCol_Button, kExplorerChromeBg);
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, kExplorerChromeBgHover);
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive, kExplorerChromeBgActive);
-    const char* refresh_icon_name = "sync-16";
-    const ImVec4 refresh_tint(0.7f, 0.7f, 0.7f, 1.0f);
-
-    auto& sync_tex = AssetManager::get().get_svg_texture(refresh_icon_name, oversampled_icon_size(16.0f));
-    if (sync_tex.id != 0) {
-        if (ImGui::ImageButton("##refresh", sync_tex.id, ImVec2(16, 16), ImVec2(0, 0), ImVec2(1, 1),
-                ImVec4(0, 0, 0, 0), refresh_tint)) {
-            request_manual_refresh(state);
-        }
-    } else if (ImGui::Button("R", ImVec2(button_width, 0))) {
-        request_manual_refresh(state);
-    }
-    if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Refresh (%s)", CommandManager::get().label("explorer.refresh").c_str());
-    }
-    ImGui::PopStyleColor(3);
-    ImGui::PopStyleVar(2);
 }
 
-void FileExplorerPanel::show_search_bar(FileExplorerState& state, SearchState& search_state) {
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8, 6));
-    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
-
-    const float control_height = ImGui::GetFrameHeight();
-    const float action_btn_size = std::max(16.0f, control_height - 10.0f);
-    const float spacing = 3.0f;
-    const float total_available = ImGui::GetContentRegionAvail().x;
-    const float action_width = action_btn_size * 3.0f + kSearchShortcutButtonWidth + spacing * 3.0f;
-    const float reserved_trailing_width = action_width + spacing;
-    const float search_width = std::clamp(total_available - reserved_trailing_width - spacing, 96.0f, 360.0f);
-
-    if (CommandManager::get().matches("search.toggle")) {
-        search_state.is_open = true;
-        search_state.focus_query = true;
-    }
-
-    ImGui::PushStyleColor(ImGuiCol_FrameBg, kExplorerChromeBg);
-    ImGui::SetNextItemWidth(search_width);
-    const bool search_submitted = ImGui::InputTextWithHint("##toolbar_search", "Search", search_state.query_buf,
-                                                           sizeof(search_state.query_buf),
-                                                           ImGuiInputTextFlags_EnterReturnsTrue);
-    ImGui::PopStyleColor();
-    if (ImGui::IsItemActivated()) {
-        search_state.is_open = true;
-        search_state.focus_query = true;
-    }
-    if (search_submitted || ImGui::IsItemEdited()) {
-        search_state.is_open = true;
-        search_state.search_pending = true;
-        search_state.last_input_change_at = std::chrono::steady_clock::now();
-    }
-
-    ImGui::SameLine(0, spacing);
-    ImGui::PushStyleColor(ImGuiCol_Button, kExplorerChromeBg);
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, kExplorerChromeBgHover);
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive, kExplorerChromeBgActive);
-    if (ImGui::Button("CmdF##togglesearch", ImVec2(kSearchShortcutButtonWidth, action_btn_size))) {
-        if (search_panel_) {
-            search_panel_->toggle();
-        }
-    }
-    if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Search in folder (%s)", CommandManager::get().label("search.toggle").c_str());
-    }
-    ImGui::PopStyleColor(3);
-
-    ImGui::PushStyleColor(ImGuiCol_Button, kExplorerChromeBg);
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, kExplorerChromeBgHover);
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive, kExplorerChromeBgActive);
-
+void FileExplorerPanel::show_toolbar_actions(FileExplorerState& state) {
     const ImVec4 inactive_tint(0.7f, 0.7f, 0.7f, 1.0f);
-    const ImVec4 active_tint(0.95f, 0.95f, 0.95f, 1.0f);
+    const ImVec2 button_size(kToolbarButtonSize, kToolbarButtonSize);
 
-    ImGui::SameLine(0, spacing);
     const std::string current_path(state.current_path);
     const bool sync_enabled = can_create_sync_object_for_path(current_path);
-    if (!sync_enabled) {
-        ImGui::BeginDisabled();
-    }
-    auto& sync_object_tex = AssetManager::get().get_svg_texture("settings-sync-16", oversampled_icon_size(action_btn_size));
-    if (sync_object_tex.id != 0) {
-        if (ImGui::ImageButton("##createsyncobject", sync_object_tex.id, ImVec2(action_btn_size, action_btn_size),
-                ImVec2(0, 0), ImVec2(1, 1), ImVec4(0, 0, 0, 0), inactive_tint)) {
-            create_sync_object_for_current_directory(state);
-        }
-    } else if (ImGui::Button("+", ImVec2(action_btn_size, action_btn_size))) {
-        create_sync_object_for_current_directory(state);
-    }
-    if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("%s", sync_enabled
-            ? "Create sync object for current folder"
-            : "Open a local folder to create a sync object");
-    }
-    if (!sync_enabled) {
-        ImGui::EndDisabled();
-    }
+    show_view_mode_toggle();
 
-    ImGui::SameLine(0, spacing);
-    ImVec4 icon_tint = ui_.grid_view ? active_tint : inactive_tint;
-    auto& grid_tex = AssetManager::get().get_svg_texture("apps-16", oversampled_icon_size(action_btn_size));
-    if (grid_tex.id != 0) {
-        if (ImGui::ImageButton("##gridview", grid_tex.id, ImVec2(action_btn_size, action_btn_size), ImVec2(0, 0), ImVec2(1, 1),
-                ImVec4(0, 0, 0, 0), icon_tint)) {
-            ui_.grid_view = true;
-        }
-    } else if (ImGui::Button("G", ImVec2(action_btn_size, action_btn_size))) {
-        ui_.grid_view = true;
-    }
-    if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Grid View");
-    }
-
-    ImGui::SameLine(0, spacing);
-    icon_tint = !ui_.grid_view ? active_tint : inactive_tint;
-    auto& list_tex = AssetManager::get().get_svg_texture("rows-16", oversampled_icon_size(action_btn_size));
-    if (list_tex.id != 0) {
-        if (ImGui::ImageButton("##listview", list_tex.id, ImVec2(action_btn_size, action_btn_size), ImVec2(0, 0), ImVec2(1, 1),
-                ImVec4(0, 0, 0, 0), icon_tint)) {
-            ui_.grid_view = false;
-        }
-    } else if (ImGui::Button("L", ImVec2(action_btn_size, action_btn_size))) {
-        ui_.grid_view = false;
-    }
-    if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("List View");
-    }
-
-    ImGui::SameLine(0, spacing);
-    if (ImGui::Button("...##more_actions", ImVec2(action_btn_size, action_btn_size))) {
+    ImGui::SameLine(0, kToolbarGap);
+    if (toolbar_icon_button("more_actions",
+                            "assets/icons/kebab-horizontal-24.svg",
+                            "More",
+                            true,
+                            button_size,
+                            kToolbarIconSize,
+                            inactive_tint)) {
         ImGui::OpenPopup("##toolbar_more_actions");
     }
     if (ImGui::BeginPopup("##toolbar_more_actions")) {
@@ -260,9 +181,6 @@ void FileExplorerPanel::show_search_bar(FileExplorerState& state, SearchState& s
         }
         ImGui::EndPopup();
     }
-
-    ImGui::PopStyleColor(3);
-    ImGui::PopStyleVar(2);
 }
 
 void FileExplorerPanel::show_path_control(FileExplorerState& state, float width) {
@@ -271,6 +189,7 @@ void FileExplorerPanel::show_path_control(FileExplorerState& state, float width)
     if (ui_.breadcrumb_path != current_path) {
         ui_.breadcrumb_path = current_path;
         ui_.breadcrumb_segments = build_breadcrumb_segments(current_path);
+        ui_.path_bar_scroll_to_end = true;
     }
 
     if (ui_.path_bar_editing) {
@@ -307,56 +226,207 @@ void FileExplorerPanel::show_path_control(FileExplorerState& state, float width)
     ImGui::InvisibleButton("##toolbar_path_breadcrumbs", ImVec2(width, height));
     const bool hovered = ImGui::IsItemHovered();
     const bool active = ImGui::IsItemActive();
-    if (ImGui::IsItemClicked()) {
-        std::strncpy(state.search_path, current_path.c_str(), sizeof(state.search_path) - 1);
-        state.search_path[sizeof(state.search_path) - 1] = '\0';
-        ui_.path_bar_editing = true;
-        ui_.path_bar_focus = true;
-    }
+    const bool bar_clicked = ImGui::IsItemClicked();
     draw_toolbar_button_frame(cursor, ImVec2(cursor.x + width, cursor.y + height), hovered, active);
 
     ImDrawList* dl = ImGui::GetWindowDrawList();
-    const float icon_size = 18.0f;
-    auto& home_tex = AssetManager::get().get_svg_texture("file-directory-open-fill-24", oversampled_icon_size(icon_size));
     const ImU32 text_col = IM_COL32(232, 236, 244, 255);
     const ImU32 muted_col = IM_COL32(142, 149, 162, 255);
-    float x = cursor.x + 12.0f;
-    const float y = cursor.y + (height - ImGui::GetTextLineHeight()) * 0.5f;
-    if (home_tex.id != 0) {
-        const ImVec2 icon_min(x, cursor.y + (height - icon_size) * 0.5f);
-        dl->AddImage(home_tex.id, icon_min, ImVec2(icon_min.x + icon_size, icon_min.y + icon_size),
-                     ImVec2(0, 0), ImVec2(1, 1), text_col);
-        x += icon_size + 10.0f;
+    const ImU32 hover_col = IM_COL32(255, 255, 255, 20);
+    const ImU32 chip_active_col = IM_COL32(255, 255, 255, 32);
+    const float content_origin_x = cursor.x + 12.0f;
+    float content_width = 26.0f;
+    const auto& segments = ui_.breadcrumb_segments;
+    for (size_t index = 0; index < segments.size(); ++index) {
+        if (index > 0) {
+            content_width += ImGui::CalcTextSize(">").x + 11.0f;
+        }
+        content_width += ImGui::CalcTextSize(segments[index].label.c_str()).x + 13.0f;
     }
+    content_width += 12.0f;
+
+    const float viewport_width = std::max(1.0f, width - 16.0f);
+    const float max_scroll = std::max(0.0f, content_width - viewport_width);
+    if (ui_.path_bar_scroll_to_end) {
+        ui_.path_bar_scroll_x = max_scroll;
+        ui_.path_bar_scroll_to_end = false;
+    }
+    if (hovered) {
+        ImGuiIO& io = ImGui::GetIO();
+        float scroll_delta = io.MouseWheelH;
+        if (scroll_delta == 0.0f && io.KeyShift) {
+            scroll_delta = io.MouseWheel;
+        }
+        if (scroll_delta != 0.0f) {
+            ui_.path_bar_scroll_x = std::clamp(ui_.path_bar_scroll_x - scroll_delta * 38.0f, 0.0f, max_scroll);
+        }
+    }
+    ui_.path_bar_scroll_x = std::clamp(ui_.path_bar_scroll_x, 0.0f, max_scroll);
+
+    float x = content_origin_x - ui_.path_bar_scroll_x;
+    const float y = cursor.y + (height - ImGui::GetTextLineHeight()) * 0.5f;
 
     const ImVec2 clip_min(cursor.x + 8.0f, cursor.y);
     const ImVec2 clip_max(cursor.x + width - 8.0f, cursor.y + height);
     ImGui::PushClipRect(clip_min, clip_max, true);
-    const auto& segments = ui_.breadcrumb_segments;
-    const size_t start = segments.size() > 4 ? segments.size() - 4 : 0;
-    if (start > 0) {
-        dl->AddText(ImVec2(x, y), muted_col, "...");
-        x += ImGui::CalcTextSize("...").x + 9.0f;
-        dl->AddText(ImVec2(x, y), muted_col, "/");
-        x += ImGui::CalcTextSize("/").x + 9.0f;
-    }
-    for (size_t index = start; index < segments.size(); ++index) {
-        if (index > start) {
-            dl->AddText(ImVec2(x, y), muted_col, "/");
-            x += ImGui::CalcTextSize("/").x + 9.0f;
+    bool segment_clicked = false;
+    bool segment_hovered = false;
+
+    const float dots_x = x + 5.0f;
+    const float dots_y = cursor.y + height * 0.5f;
+    dl->AddCircleFilled(ImVec2(dots_x, dots_y - 7.0f), 1.7f, muted_col);
+    dl->AddCircleFilled(ImVec2(dots_x, dots_y), 1.7f, muted_col);
+    dl->AddCircleFilled(ImVec2(dots_x, dots_y + 7.0f), 1.7f, muted_col);
+    x += 26.0f;
+
+    for (size_t index = 0; index < segments.size(); ++index) {
+        if (index > 0) {
+            dl->AddText(ImVec2(x, y), muted_col, ">");
+            x += ImGui::CalcTextSize(">").x + 11.0f;
         }
         const bool last = index + 1 == segments.size();
+        const ImVec2 label_size = ImGui::CalcTextSize(segments[index].label.c_str());
+        const ImVec2 chip_min(x - 8.0f, cursor.y + 5.0f);
+        const ImVec2 chip_max(x + label_size.x + 8.0f, cursor.y + height - 5.0f);
+        const ImVec2 visible_chip_min(std::max(chip_min.x, clip_min.x), chip_min.y);
+        const ImVec2 visible_chip_max(std::min(chip_max.x, clip_max.x), chip_max.y);
+        const bool chip_visible = visible_chip_max.x > visible_chip_min.x;
+        const bool chip_hovered = chip_visible && ImGui::IsMouseHoveringRect(visible_chip_min, visible_chip_max);
+        if (chip_hovered) {
+            segment_hovered = true;
+            dl->AddRectFilled(chip_min, chip_max, active && bar_clicked ? chip_active_col : hover_col, 5.0f);
+            if (bar_clicked) {
+                segment_clicked = true;
+                navigate_to_path(segments[index].target_path, true, false);
+            }
+        }
         dl->AddText(ImVec2(x, y), last ? text_col : IM_COL32(200, 206, 218, 255),
                     segments[index].label.c_str());
-        x += ImGui::CalcTextSize(segments[index].label.c_str()).x + 9.0f;
+        x += label_size.x + 13.0f;
     }
     if (segments.empty()) {
         dl->AddText(ImVec2(x, y), muted_col, "Enter file path");
     }
     ImGui::PopClipRect();
-    if (hovered) {
-        ImGui::SetTooltip("Click to edit path");
+
+    if (max_scroll > 0.0f) {
+        const float track_x = cursor.x + 12.0f;
+        const float track_y = cursor.y + height - 4.0f;
+        const float track_w = width - 24.0f;
+        const float thumb_w = std::clamp((viewport_width / content_width) * track_w, 28.0f, track_w);
+        const float thumb_x = track_x + (max_scroll <= 0.0f ? 0.0f : (ui_.path_bar_scroll_x / max_scroll) * (track_w - thumb_w));
+        dl->AddRectFilled(ImVec2(track_x, track_y), ImVec2(track_x + track_w, track_y + 2.0f),
+                          IM_COL32(255, 255, 255, 24), 1.0f);
+        dl->AddRectFilled(ImVec2(thumb_x, track_y), ImVec2(thumb_x + thumb_w, track_y + 2.0f),
+                          IM_COL32(145, 190, 255, 145), 1.0f);
     }
+
+    if (bar_clicked && !segment_clicked) {
+        std::strncpy(state.search_path, current_path.c_str(), sizeof(state.search_path) - 1);
+        state.search_path[sizeof(state.search_path) - 1] = '\0';
+        ui_.path_bar_editing = true;
+        ui_.path_bar_focus = true;
+    }
+    if (hovered) {
+        ImGui::SetTooltip("%s", segment_hovered ? "Open folder" : "Edit path");
+    }
+}
+
+void FileExplorerPanel::show_search_field(FileExplorerState& state, SearchState& search_state, float width) {
+    (void)state;
+    const float height = ImGui::GetFrameHeight();
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, kExplorerChromeBg);
+    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, kExplorerChromeBgHover);
+    ImGui::PushStyleColor(ImGuiCol_FrameBgActive, kExplorerChromeBgActive);
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.90f, 0.92f, 0.96f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_TextDisabled, ImVec4(0.58f, 0.61f, 0.68f, 1.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(34.0f, 8.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
+    ImGui::SetNextItemWidth(width);
+    const bool submitted = ImGui::InputTextWithHint("##toolbar_search", "Search",
+                                                    search_state.query_buf,
+                                                    sizeof(search_state.query_buf),
+                                                    ImGuiInputTextFlags_EnterReturnsTrue);
+    const bool activated = ImGui::IsItemActivated();
+    const bool edited = ImGui::IsItemEdited();
+    const ImVec2 min = ImGui::GetItemRectMin();
+    const ImVec2 max = ImGui::GetItemRectMax();
+    ImGui::PopStyleVar(2);
+    ImGui::PopStyleColor(5);
+
+    ImGui::GetWindowDrawList()->AddRect(min, max,
+                                        ImGui::IsItemHovered() ? IM_COL32(72, 82, 104, 230)
+                                                               : IM_COL32(46, 50, 60, 190),
+                                        8.0f);
+    draw_icon_at("assets/icons/search-16.svg",
+                 ImVec2(min.x + 17.0f, min.y + height * 0.5f),
+                 16.0f,
+                 IM_COL32(180, 186, 198, 235));
+
+    if (activated) {
+        search_state.is_open = true;
+        search_state.focus_query = false;
+    }
+    if (submitted || edited) {
+        search_state.is_open = true;
+        search_state.search_pending = true;
+        search_state.last_input_change_at = std::chrono::steady_clock::now();
+    }
+}
+
+void FileExplorerPanel::show_view_mode_toggle() {
+    constexpr float kToggleWidth = 76.0f;
+    constexpr float kHalfWidth = kToggleWidth * 0.5f;
+    const ImVec2 cursor = ImGui::GetCursorScreenPos();
+    const ImVec2 total_size(kToggleWidth, kToolbarButtonSize);
+
+    ImGui::PushID("view_mode_toggle");
+    ImGui::InvisibleButton("##grid", ImVec2(kHalfWidth, kToolbarButtonSize));
+    const bool grid_pressed = ImGui::IsItemClicked();
+    const bool grid_hovered = ImGui::IsItemHovered();
+    if (grid_hovered) {
+        ImGui::SetTooltip("Grid View");
+    }
+    ImGui::SameLine(0.0f, 0.0f);
+    ImGui::InvisibleButton("##list", ImVec2(kHalfWidth, kToolbarButtonSize));
+    const bool list_pressed = ImGui::IsItemClicked();
+    const bool list_hovered = ImGui::IsItemHovered();
+    if (list_hovered) {
+        ImGui::SetTooltip("List View");
+    }
+    ImGui::PopID();
+
+    if (grid_pressed) {
+        ui_.grid_view = true;
+    }
+    if (list_pressed) {
+        ui_.grid_view = false;
+    }
+
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    const ImVec2 max(cursor.x + total_size.x, cursor.y + total_size.y);
+    dl->AddRectFilled(cursor, max, IM_COL32(31, 34, 40, 255), 8.0f);
+    dl->AddRect(cursor, max,
+                (grid_hovered || list_hovered) ? IM_COL32(72, 82, 104, 230) : IM_COL32(46, 50, 60, 190),
+                8.0f);
+
+    const bool grid_active = ui_.grid_view;
+    const ImVec2 active_min = grid_active ? cursor : ImVec2(cursor.x + kHalfWidth, cursor.y);
+    const ImVec2 active_max = ImVec2(active_min.x + kHalfWidth, cursor.y + kToolbarButtonSize);
+    dl->AddRectFilled(active_min, active_max, IM_COL32(48, 55, 69, 245), 7.0f,
+                      grid_active ? ImDrawFlags_RoundCornersLeft : ImDrawFlags_RoundCornersRight);
+    dl->AddLine(ImVec2(cursor.x + kHalfWidth, cursor.y + 7.0f),
+                ImVec2(cursor.x + kHalfWidth, cursor.y + kToolbarButtonSize - 7.0f),
+                IM_COL32(60, 66, 78, 190), 1.0f);
+
+    draw_icon_at("assets/icons/apps-16.svg",
+                 ImVec2(cursor.x + kHalfWidth * 0.5f, cursor.y + kToolbarButtonSize * 0.5f),
+                 18.0f,
+                 grid_active ? IM_COL32(240, 244, 250, 255) : IM_COL32(170, 176, 188, 235));
+    draw_icon_at("assets/icons/rows-16.svg",
+                 ImVec2(cursor.x + kHalfWidth + kHalfWidth * 0.5f, cursor.y + kToolbarButtonSize * 0.5f),
+                 18.0f,
+                 !grid_active ? IM_COL32(240, 244, 250, 255) : IM_COL32(170, 176, 188, 235));
 }
 
 void FileExplorerPanel::show_breadcrumb_bar(FileExplorerState& state) {
@@ -413,39 +483,69 @@ void FileExplorerPanel::show_breadcrumb_bar(FileExplorerState& state) {
 }
 
 void FileExplorerPanel::show_command_toolbar(FileExplorerState& state, SearchState& search_state) {
-    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8.0f, 0.0f));
+    constexpr float kToolbarOuterPadX = 0.0f;
+    constexpr float kToolbarRightSafetyPad = 14.0f;
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(kToolbarGap, 0.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 7.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f, 8.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, 6.0f);
 
-    show_nav_history(state, 30.0f, 2.0f);
+    const float viewport_width = std::max(0.0f, ImGui::GetContentRegionAvail().x - kToolbarOuterPadX * 2.0f);
+    constexpr float kSearchMinWidth = 118.0f;
+    constexpr float kSearchPreferredWidth = 190.0f;
+    constexpr float kPathMinWidth = 170.0f;
+    constexpr float kPathPreferredWidth = 500.0f;
+    constexpr float kActionClusterWidth = 76.0f + kToolbarGap + 34.0f;
+    constexpr float kStaticWidth = 74.0f + 34.0f + kActionClusterWidth + kToolbarGap * 4.0f;
 
-    ImGui::SameLine(0.0f, 8.0f);
-    UI::WithStyle([&](UI::StyleScope& style) {
-        style.color(ImGuiCol_Button, kExplorerChromeBg);
-        style.color(ImGuiCol_ButtonHovered, kExplorerChromeBgHover);
-        style.color(ImGuiCol_ButtonActive, kExplorerChromeBgActive);
-        if (ImGui::Button("^##path_up", ImVec2(34.0f, 0.0f))) {
-            const std::string current(state.current_path);
-            if (!current.empty() && current.rfind("misty://", 0) != 0) {
-                fs::path parent = fs::path(current).parent_path();
-                if (!parent.empty() && parent != fs::path(current)) {
-                    navigate_to_path(parent.string(), true, false);
-                }
-            }
+    const float preferred_width = kStaticWidth + kSearchPreferredWidth + kPathPreferredWidth;
+    const float minimum_width = kStaticWidth + kSearchMinWidth + kPathMinWidth;
+    const float content_width = std::max(viewport_width, minimum_width);
+    const float overflow_budget = std::max(0.0f, content_width - preferred_width);
+    const float squeeze = std::max(0.0f, preferred_width - content_width);
+    const float search_width = std::clamp(kSearchPreferredWidth - squeeze * 0.35f,
+                                          kSearchMinWidth,
+                                          kSearchPreferredWidth + overflow_budget * 0.20f);
+    const float remaining_for_path = content_width - kStaticWidth - search_width;
+    const float path_width = std::max(72.0f,
+                                      std::clamp(remaining_for_path,
+                                                 kPathMinWidth,
+                                                 kPathPreferredWidth + overflow_budget * 0.80f));
+
+    ImGui::SetNextWindowContentSize(ImVec2(content_width + kToolbarOuterPadX * 2.0f + kToolbarRightSafetyPad, 0.0f));
+    if (ImGui::BeginChild("##toolbar_scroll_region",
+                          ImVec2(0.0f, kToolbarButtonSize + 10.0f),
+                          false,
+                          ImGuiWindowFlags_HorizontalScrollbar |
+                              ImGuiWindowFlags_NoBackground)) {
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + kToolbarOuterPadX);
+        ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 1.0f);
+        show_nav_history(state, kToolbarButtonSize, 6.0f);
+
+        ImGui::SameLine(0.0f, kToolbarGap);
+        if (toolbar_icon_button("refresh",
+                                "assets/icons/sync-16.svg",
+                                "Refresh",
+                                true,
+                                ImVec2(kToolbarButtonSize, kToolbarButtonSize),
+                                kToolbarIconSize)) {
+            request_manual_refresh(state);
         }
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Up one folder");
-        }
-    });
 
-    ImGui::SameLine(0.0f, 8.0f);
-    const float available_after_nav = ImGui::GetContentRegionAvail().x;
-    const float path_width = std::clamp(available_after_nav * 0.36f, 140.0f, 420.0f);
-    show_path_control(state, path_width);
+        ImGui::SameLine(0.0f, kToolbarGap);
+        show_path_control(state, path_width);
 
-    ImGui::SameLine(0.0f, 14.0f);
-    show_search_bar(state, search_state);
+        ImGui::SameLine(0.0f, kToolbarGap);
+        show_search_field(state, search_state, search_width);
 
-    ImGui::PopStyleVar(2);
+        ImGui::SameLine(0.0f, kToolbarGap);
+        show_toolbar_actions(state);
+
+        ImGui::Dummy(ImVec2(kToolbarOuterPadX + kToolbarRightSafetyPad, 1.0f));
+    }
+    ImGui::EndChild();
+
+    ImGui::PopStyleVar(4);
 }
 
 } // namespace misty::panel

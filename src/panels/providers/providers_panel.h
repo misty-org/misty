@@ -23,7 +23,7 @@ namespace misty::panel {
         void show_top_bar(ProvidersState& state, float content_width);
         void show_status_messages(ProvidersState& state);
         void show_health_card(const ProvidersHealthCard& health);
-        void show_connected_providers(ProvidersState& state);
+        void show_connected_accounts(ProvidersState& state, float max_list_height);
         void show_provider_card(ProvidersState& state, const ProviderCard& card, float card_width);
         void show_empty_state(bool filtered, bool loading);
         void show_provider_dialogs(ProvidersState& state);

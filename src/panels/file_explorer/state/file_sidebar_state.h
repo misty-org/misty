@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/ui/ui_registry.h"
+#include <chrono>
 #include <string>
 #include <vector>
 #include <mutex>
@@ -37,6 +38,7 @@ namespace misty::panel {
         // or initializing the full Providers view.
         bool providers_loaded = false;
         bool providers_loading = false;
+        std::chrono::steady_clock::time_point providers_last_refresh_at{};
         std::string providers_error;
         std::vector<SidebarProviderEntry> provider_entries;
         std::mutex providers_mutex;

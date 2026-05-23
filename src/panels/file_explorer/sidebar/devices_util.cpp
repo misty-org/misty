@@ -1,9 +1,12 @@
 #include "panels/file_explorer/sidebar/devices_util.h"
 
+#include "core/manager/asset_manager.h"
+
 #include <algorithm>
 #include <cstdio>
 #include <cmath>
 #include <filesystem>
+#include <string>
 
 namespace fs = std::filesystem;
 
@@ -30,25 +33,28 @@ std::string format_sidebar_bytes(uint64_t bytes) {
     return buf;
 }
 
-void draw_drive_icon(ImDrawList* draw_list, ImVec2 center, bool removable, ImU32 color) {
-    if (removable) {
-        const ImVec2 p1(center.x - 10.0f, center.y + 8.0f);
-        const ImVec2 p2(center.x + 10.0f, center.y + 8.0f);
-        const ImVec2 p3(center.x + 7.0f, center.y - 8.0f);
-        const ImVec2 p4(center.x - 7.0f, center.y - 8.0f);
-        draw_list->AddQuad(p1, p2, p3, p4, color, 2.0f);
-        draw_list->AddLine(ImVec2(center.x - 7.0f, center.y + 4.0f),
-                           ImVec2(center.x + 7.0f, center.y + 4.0f),
-                           color, 2.0f);
+void draw_svg_icon(ImDrawList* draw_list,
+                   const char* icon_name,
+                   ImVec2 center,
+                   float size,
+                   ImU32 tint,
+                   bool apply_theme = true) {
+    auto& icon = apply_theme
+        ? misty::core::AssetManager::get().get_svg_texture(icon_name, static_cast<int>(size))
+        : misty::core::AssetManager::get().get_svg_texture_path(
+            std::string("assets/icons/") + icon_name + ".svg",
+            static_cast<int>(size),
+            false);
+    if (icon.id == 0) {
         return;
     }
-
-    draw_list->AddRect(ImVec2(center.x - 11.0f, center.y - 8.0f),
-                       ImVec2(center.x + 11.0f, center.y + 8.0f),
-                       color, 3.0f, 0, 2.0f);
-    draw_list->AddLine(ImVec2(center.x - 7.0f, center.y + 4.0f),
-                       ImVec2(center.x + 7.0f, center.y + 4.0f),
-                       color, 2.0f);
+    const ImVec2 min(center.x - size * 0.5f, center.y - size * 0.5f);
+    draw_list->AddImage(icon.id,
+                        min,
+                        ImVec2(min.x + size, min.y + size),
+                        ImVec2(0, 0),
+                        ImVec2(1, 1),
+                        tint);
 }
 }
 
@@ -97,7 +103,7 @@ DeviceHeaderResult render_devices_header(bool collapsed, float content_width) {
     DeviceHeaderResult result;
 
     const ImVec2 hdr_cursor = ImGui::GetCursorScreenPos();
-    const float height = ImGui::GetTextLineHeight() + 8.0f;
+    const float height = ImGui::GetTextLineHeight() + 5.0f;
 
     ImGui::PushID("dev_hdr");
     if (ImGui::InvisibleButton("##hdr", ImVec2(content_width, height))) {
@@ -106,23 +112,16 @@ DeviceHeaderResult render_devices_header(bool collapsed, float content_width) {
     ImGui::PopID();
 
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
-    draw_list->AddText(ImVec2(hdr_cursor.x + 4.0f, hdr_cursor.y + 2.0f),
+    draw_list->AddText(ImVec2(hdr_cursor.x + 2.0f, hdr_cursor.y + 1.0f),
                        IM_COL32(210, 214, 222, 255), "Devices");
 
-    const float tri_x  = hdr_cursor.x + content_width - 18.0f;
-    const float mid_y  = hdr_cursor.y + height * 0.5f;
-    const ImU32 tri_col = IM_COL32(225, 229, 238, 235);
-    if (collapsed) {
-        draw_list->AddTriangleFilled(
-            ImVec2(tri_x,        mid_y - 4.0f),
-            ImVec2(tri_x,        mid_y + 4.0f),
-            ImVec2(tri_x + 7.0f, mid_y), tri_col);
-    } else {
-        draw_list->AddTriangleFilled(
-            ImVec2(tri_x - 4.0f, mid_y - 2.0f),
-            ImVec2(tri_x + 4.0f, mid_y - 2.0f),
-            ImVec2(tri_x,        mid_y + 4.0f), tri_col);
-    }
+    constexpr float kChevronSize = 14.0f;
+    draw_svg_icon(draw_list,
+                  collapsed ? "chevron-right-16" : "chevron-down-16",
+                  ImVec2(hdr_cursor.x + content_width - kChevronSize * 0.5f - 2.0f,
+                         hdr_cursor.y + height * 0.5f),
+                  kChevronSize,
+                  IM_COL32(225, 229, 238, 235));
 
     return result;
 }
@@ -178,8 +177,8 @@ DeviceRowResult render_device_row(
     DeviceRowResult result;
     const MountedDevice& device = entry.device;
 
-    constexpr float kItemHeight = 72.0f;
-    constexpr float kDotsWidth = 24.0f;
+    constexpr float kItemHeight = 58.0f;
+    constexpr float kDotsWidth = 18.0f;
     const ImVec2 cursor = ImGui::GetCursorScreenPos();
 
     ImGui::PushID(device.mount_path.c_str());
@@ -214,9 +213,9 @@ DeviceRowResult render_device_row(
         const ImU32 dot_col = dots_hovered
             ? IM_COL32(220, 220, 220, 255)
             : IM_COL32(160, 160, 160, 200);
-        draw_list->AddCircleFilled(ImVec2(cx, cy - 5.0f), 1.8f, dot_col);
-        draw_list->AddCircleFilled(ImVec2(cx, cy), 1.8f, dot_col);
-        draw_list->AddCircleFilled(ImVec2(cx, cy + 5.0f), 1.8f, dot_col);
+        draw_list->AddCircleFilled(ImVec2(cx, cy - 4.0f), 1.5f, dot_col);
+        draw_list->AddCircleFilled(ImVec2(cx, cy), 1.5f, dot_col);
+        draw_list->AddCircleFilled(ImVec2(cx, cy + 4.0f), 1.5f, dot_col);
     }
 
     if (dots_clicked) {
@@ -234,19 +233,21 @@ DeviceRowResult render_device_row(
 
     if (main_hovered || main_active || rect_hovered) {
         ImDrawList* draw_list = ImGui::GetWindowDrawList();
-        const ImU32 col_l = main_active ? IM_COL32(255,255,255,30) : IM_COL32(255,255,255,18);
-        draw_list->AddRectFilledMultiColor(
-            cursor, ImVec2(cursor.x + content_width, cursor.y + kItemHeight),
-            col_l, IM_COL32(255,255,255,0), IM_COL32(255,255,255,0), col_l);
+        const ImU32 row_col = main_active ? IM_COL32(255,255,255,32) : IM_COL32(255,255,255,18);
+        draw_list->AddRectFilled(cursor, ImVec2(cursor.x + content_width, cursor.y + kItemHeight),
+                                 row_col, 7.0f);
     }
 
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
-    const float icon_center_y = cursor.y + 31.0f;
-    draw_drive_icon(draw_list, ImVec2(cursor.x + 22.0f, icon_center_y),
-                    device.is_removable, IM_COL32(232, 236, 244, 245));
+    const float icon_center_y = cursor.y + 26.0f;
+    draw_svg_icon(draw_list,
+                  "ssd-square-24",
+                  ImVec2(cursor.x + 15.0f, icon_center_y),
+                  20.0f,
+                  IM_COL32(232, 236, 244, 245));
 
-    const float text_x = cursor.x + 50.0f;
-    draw_list->AddText(ImVec2(text_x, cursor.y + 7.0f),
+    const float text_x = cursor.x + 34.0f;
+    draw_list->AddText(ImVec2(text_x, cursor.y + 6.0f),
                        IM_COL32(236, 239, 246, 255), device.name.c_str());
 
     std::string info;
@@ -258,23 +259,23 @@ DeviceRowResult render_device_row(
         info = device.mount_path;
     }
     draw_list->AddText(ImGui::GetFont(), ImGui::GetFontSize() * 0.85f,
-                       ImVec2(text_x, cursor.y + 28.0f),
+                       ImVec2(text_x, cursor.y + 25.0f),
                        IM_COL32(164, 169, 181, 255), info.c_str());
 
     if (device.total_bytes > 0) {
         const float fill = std::clamp(static_cast<float>(device.free_bytes) /
                                       static_cast<float>(device.total_bytes), 0.0f, 1.0f);
         const float bar_x = text_x;
-        const float bar_y = cursor.y + 52.0f;
-        const float bar_w = std::max(20.0f, content_width - text_x + cursor.x - 18.0f);
+        const float bar_y = cursor.y + 46.0f;
+        const float bar_w = std::max(20.0f, content_width - text_x + cursor.x - 12.0f);
         draw_list->AddRectFilled(ImVec2(bar_x, bar_y),
-                                 ImVec2(bar_x + bar_w, bar_y + 5.0f),
-                                 IM_COL32(47, 51, 59, 255), 2.5f);
+                                 ImVec2(bar_x + bar_w, bar_y + 4.0f),
+                                 IM_COL32(47, 51, 59, 255), 2.0f);
         const ImU32 fill_col = fill < 0.10f ? IM_COL32(210, 70, 70, 255)
                                             : IM_COL32(95, 154, 233, 255);
         draw_list->AddRectFilled(ImVec2(bar_x, bar_y),
-                                 ImVec2(bar_x + bar_w * fill, bar_y + 5.0f),
-                                 fill_col, 2.5f);
+                                 ImVec2(bar_x + bar_w * fill, bar_y + 4.0f),
+                                 fill_col, 2.0f);
     }
 
     ImGui::PopID();

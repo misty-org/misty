@@ -88,6 +88,8 @@ public:
         std::vector<BreadcrumbSegment> breadcrumb_segments;
         bool path_bar_editing = false;
         bool path_bar_focus = false;
+        float path_bar_scroll_x = 0.0f;
+        bool path_bar_scroll_to_end = false;
 
         void clear_transient();
     };
@@ -164,6 +166,10 @@ private:
      */
     void render_panel_contents() override;
     /**
+     * @brief Renders the inspector body inside either a window or embedded child.
+     */
+    void render_inspector_contents();
+    /**
      * @brief Periodically persists dirty explorer state through the worker pool.
      */
     void update_periodic_save(panel::FileExplorerState& state);
@@ -221,9 +227,17 @@ private:
      */
     void show_path_control(panel::FileExplorerState& state, float width);
     /**
-     * @brief Renders the search input and binds it to the current explorer path.
+     * @brief Renders the scoped search field in the file explorer toolbar.
      */
-    void show_search_bar(panel::FileExplorerState& state, SearchState& search_state);
+    void show_search_field(panel::FileExplorerState& state, SearchState& search_state, float width);
+    /**
+     * @brief Renders the combined grid/list view segmented control.
+     */
+    void show_view_mode_toggle();
+    /**
+     * @brief Renders toolbar actions that sit to the right of the path control.
+     */
+    void show_toolbar_actions(panel::FileExplorerState& state);
     /**
      * @brief Renders breadcrumb navigation for the current path.
      */

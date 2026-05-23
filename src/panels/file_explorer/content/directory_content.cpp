@@ -16,6 +16,7 @@ namespace {
 
 constexpr float kFileRowContentPaddingX = 8.0f;
 constexpr float kFirstHeaderTextPaddingX = 8.0f;
+constexpr float kDirectoryTablePaddingX = 10.0f;
 constexpr float kNameColumnWidth = 360.0f;
 constexpr float kModifiedColumnWidth = 220.0f;
 constexpr float kSizeColumnWidth = 120.0f;
@@ -97,7 +98,9 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state, FileLi
         }
         ImGui::PopStyleVar();
     } else {
-        const float table_inner_width = std::max(content_width, kTableMinInnerWidth);
+        const float table_width = std::max(0.0f, content_width - kDirectoryTablePaddingX * 2.0f);
+        const float table_inner_width = std::max(table_width, kTableMinInnerWidth);
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + kDirectoryTablePaddingX);
         UI::table("FileTable", {
             .columns = {
                 {"Name", kNameColumnWidth,
@@ -107,7 +110,7 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state, FileLi
                 {"Size", kSizeColumnWidth, ImGuiTableColumnFlags_WidthFixed},
                 {"Kind", kTypeColumnWidth, ImGuiTableColumnFlags_WidthFixed},
             },
-            .width = UI::Size::px(content_width),
+            .width = UI::Size::px(table_width),
             .inner_width = table_inner_width,
             .cell_padding = kTableCellPadding,
             .freeze_rows = 1,
