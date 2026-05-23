@@ -40,8 +40,8 @@ export function useDesktopBootstrap(params: { getRouteId: (pathname: string) => 
   useEffect(() => {
     if (appLoadStarted.current) return;
     appLoadStarted.current = true;
-    void preloadDesktopFilesPage()?.catch(() => undefined);
     if (!hasTauriInternals()) return;
+    void preloadDesktopFilesPage()?.catch(() => undefined);
     void loadApp();
     void settingsLoad();
   }, [loadApp, settingsLoad]);
@@ -100,6 +100,7 @@ export function useDesktopBootstrap(params: { getRouteId: (pathname: string) => 
   useEffect(() => {
     if (loadedRoutes.current.has(routeId)) return;
     loadedRoutes.current.add(routeId);
+    if (!hasTauriInternals()) return;
     if (routeId === "files" || routeId === "providers" || routeId === "diagnostics") {
       void providerLoad(routeId === "providers");
     }
