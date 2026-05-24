@@ -6,14 +6,14 @@
 #include <string>
 #include <unordered_set>
 
-#include "core/ui/ui_registry.h"
+#include "core/ui/state_registry.h"
 
 namespace misty::panel {
 
 /**
  * @brief Per-pane state for file explorer navigation only.
  */
-struct FileExplorerState : public core::UIState {
+struct FileExplorerState : public core::StateEntry {
     /**
      * @brief Virtual path for the Recent listing.
      */

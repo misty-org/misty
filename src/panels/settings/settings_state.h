@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "core/manager/font_manager.h"
-#include "core/ui/ui_registry.h"
+#include "core/ui/state_registry.h"
 
 namespace misty::panel {
 
@@ -27,7 +27,7 @@ namespace misty::panel {
         Advanced
     };
 
-    struct SettingsState : public core::UIState {
+    struct SettingsState : public core::StateEntry {
         SettingsSection active_section = SettingsSection::General;
         SettingsSection prev_section   = SettingsSection::General;
         bool app_settings_loaded = false;

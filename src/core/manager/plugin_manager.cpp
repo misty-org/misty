@@ -470,7 +470,7 @@ struct PluginManager::Impl {
         std::size_t plugin_index;
     };
 
-    UIRegistry* ui_registry = nullptr;
+    StateRegistry* state_registry = nullptr;
     std::vector<LoadedPlugin> plugins;
     std::vector<PluginCommand> commands;
     std::vector<PluginPanel> panels;
@@ -517,14 +517,14 @@ struct PluginManager::Impl {
     static void c_notify(void* h, int level, const char* title, const char* message) {
         if (!h) return;
         auto* self = as_impl(h);
-        if (!self->ui_registry) return;
+        if (!self->state_registry) return;
         const std::string sender = title ? title : "Extension";
         const std::string msg = message ? message : "";
         if (level == MISTY_NOTIFICATION_ERROR) {
-            auto& activity = self->ui_registry->get_state<panel::ActivityState>("Activity");
+            auto& activity = self->state_registry->get_state<panel::ActivityState>("Activity");
             activity.add_entry(sender, msg, panel::ActivityEntryType::ERROR);
         } else {
-            auto& notifications = self->ui_registry->get_state<panel::NotificationState>("Notifications");
+            auto& notifications = self->state_registry->get_state<panel::NotificationState>("Notifications");
             notifications.add_notification(sender + ": " + msg);
         }
     }
@@ -554,7 +554,7 @@ struct PluginManager::Impl {
     static int c_copy_selected_file_path(void* h, char* buffer, std::size_t size) {
         if (!h || !buffer || size == 0) return 0;
         auto* self = as_impl(h);
-        if (!self->ui_registry) return 0;
+        if (!self->state_registry) return 0;
         std::string explorer_state_key = "Files";
         if (auto* current_view = view::ViewRegistry::get().get_current_view()) {
             explorer_state_key = current_view->active_explorer_state_key();
@@ -829,8 +829,8 @@ struct PluginManager::Impl {
         plugins[plugin_index].info.faulted = true;
         append_diagnostic(plugin_index, std::move(message));
 
-        if (ui_registry && !plugins[plugin_index].info.diagnostics.empty()) {
-            auto& activity = ui_registry->get_state<panel::ActivityState>("Activity");
+        if (state_registry && !plugins[plugin_index].info.diagnostics.empty()) {
+            auto& activity = state_registry->get_state<panel::ActivityState>("Activity");
             activity.add_entry("System",
                                plugins[plugin_index].info.name + " faulted and was disabled.",
                                panel::ActivityEntryType::ERROR);
@@ -948,7 +948,7 @@ struct PluginManager::Impl {
     }
 
     bool current_view_has_selected_file() const {
-        if (!ui_registry) {
+        if (!state_registry) {
             return false;
         }
         std::string explorer_state_key = "Files";
@@ -1084,8 +1084,8 @@ PluginManager::~PluginManager() {
     impl_ = nullptr;
 }
 
-void PluginManager::set_ui_registry(UIRegistry* registry) {
-    impl_->ui_registry = registry;
+void PluginManager::set_state_registry(StateRegistry* registry) {
+    impl_->state_registry = registry;
 }
 
 std::vector<std::string> PluginManager::discovery_roots() const {

@@ -101,12 +101,12 @@ namespace misty::panel {
         }
     }
 
-    NavbarPanel::NavbarPanel(UIRegistry& ui_registry) : ui_registry_(ui_registry),
-        activity_panel_(ui_registry) {
+    NavbarPanel::NavbarPanel(StateRegistry& state_registry) : state_registry_(state_registry),
+        activity_panel_(state_registry) {
     }
 
     void NavbarPanel::render() {
-        auto& state = ui_registry_.get_state<NavbarState>("Navbar");
+        auto& state = state_registry_.get_state<NavbarState>("Navbar");
         const ImGuiWindowFlags navbar_flags = ImGuiWindowFlags_NoTitleBar |
             ImGuiWindowFlags_NoMove |
             ImGuiWindowFlags_NoCollapse |
@@ -171,7 +171,7 @@ namespace misty::panel {
             if (ImGui::ImageButton(label,
                                    static_cast<ImTextureID>(logo_image.id),
                                    ImVec2(logo_size, logo_size))) {
-                auto& state = ui_registry_.get_state<NavbarState>("Navbar");
+                auto& state = state_registry_.get_state<NavbarState>("Navbar");
                 state.handle_logo_click();
             }
         });
@@ -190,7 +190,7 @@ namespace misty::panel {
     }
 
     void NavbarPanel::activity_button() {
-        auto& activity_state = ui_registry_.get_state<ActivityState>("Activity");
+        auto& activity_state = state_registry_.get_state<ActivityState>("Activity");
         auto& icon = core::AssetManager::get().get_svg_texture("bell-24", 48);
         const size_t unread_count = activity_state.unread_count();
         const ImVec4 text_color = activity_state.is_open ? ImVec4(1, 1, 1, 1) : ImVec4(0.6f, 0.6f, 0.6f, 1.0f);

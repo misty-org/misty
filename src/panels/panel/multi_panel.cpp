@@ -21,6 +21,46 @@ namespace misty::panel {
             return std::clamp(ratio * total, effective_min, total - effective_min);
         }
 
+        core::WorkspaceTabSnapshot to_workspace_tab(const TabController::ClosedTabSnapshot& snapshot) {
+            core::WorkspaceTabSnapshot out;
+            out.context_key = snapshot.context_key;
+            out.state_key = snapshot.state_key;
+            out.title = snapshot.title;
+            out.restore_state = snapshot.restore_state;
+            out.idx = snapshot.idx;
+            return out;
+        }
+
+        TabController::ClosedTabSnapshot from_workspace_tab(const core::WorkspaceTabSnapshot& snapshot) {
+            TabController::ClosedTabSnapshot out;
+            out.context_key = snapshot.context_key;
+            out.state_key = snapshot.state_key;
+            out.title = snapshot.title;
+            out.restore_state = snapshot.restore_state;
+            out.idx = snapshot.idx;
+            return out;
+        }
+
+        std::vector<core::WorkspaceTabSnapshot> to_workspace_tabs(
+            const std::vector<TabController::ClosedTabSnapshot>& snapshots) {
+            std::vector<core::WorkspaceTabSnapshot> out;
+            out.reserve(snapshots.size());
+            for (const auto& snapshot : snapshots) {
+                out.push_back(to_workspace_tab(snapshot));
+            }
+            return out;
+        }
+
+        std::vector<TabController::ClosedTabSnapshot> from_workspace_tabs(
+            const std::vector<core::WorkspaceTabSnapshot>& snapshots) {
+            std::vector<TabController::ClosedTabSnapshot> out;
+            out.reserve(snapshots.size());
+            for (const auto& snapshot : snapshots) {
+                out.push_back(from_workspace_tab(snapshot));
+            }
+            return out;
+        }
+
     }
 
     // initialize the panel with a default pane and grid lane
@@ -54,6 +94,150 @@ namespace misty::panel {
         return tab ? tab->panel.get() : nullptr;
     }
 
+    core::WorkspaceExplorerSnapshot MultiPanel::export_workspace_snapshot() const {
+        const_cast<MultiPanel*>(this)->default_multi_panel();
+
+        core::WorkspaceExplorerSnapshot snapshot;
+        snapshot.active_pane_id = active_pane_id;
+        snapshot.next_tab_idx = next_tab_idx_;
+        snapshot.next_pane_idx = next_pane_idx_;
+        snapshot.grid_pane_ids = grid_pane_ids();
+        snapshot.grid_split_ratio = grid_split_ratio_;
+        snapshot.lane_split_ratios = {lane_split_ratios_[0], lane_split_ratios_[1]};
+
+        for (const auto& lane : snapshot.grid_pane_ids) {
+            for (const auto& pane_id : lane) {
+                const Pane* pane = get_pane(pane_id);
+                if (!pane) {
+                    continue;
+                }
+                core::WorkspacePaneSnapshot pane_snapshot;
+                pane_snapshot.pane_id = pane->pane_id;
+                pane_snapshot.tabs = to_workspace_tabs(pane->tab_controller.export_tab_snapshots());
+                pane_snapshot.closed_tabs = to_workspace_tabs(pane->tab_controller.closed_tabs);
+                pane_snapshot.active_tab_idx = pane->tab_controller.active_tab_index();
+                snapshot.panes.push_back(std::move(pane_snapshot));
+            }
+        }
+
+        for (const auto& [pane_id, pane] : panes) {
+            const auto already_exported = std::any_of(snapshot.panes.begin(), snapshot.panes.end(),
+                [&](const core::WorkspacePaneSnapshot& exported) { return exported.pane_id == pane_id; });
+            if (already_exported) {
+                continue;
+            }
+            core::WorkspacePaneSnapshot pane_snapshot;
+            pane_snapshot.pane_id = pane.pane_id;
+            pane_snapshot.tabs = to_workspace_tabs(pane.tab_controller.export_tab_snapshots());
+            pane_snapshot.closed_tabs = to_workspace_tabs(pane.tab_controller.closed_tabs);
+            pane_snapshot.active_tab_idx = pane.tab_controller.active_tab_index();
+            snapshot.panes.push_back(std::move(pane_snapshot));
+        }
+
+        for (const auto& closed_pane : closed_pane_snapshots_) {
+            core::WorkspaceClosedPaneSnapshot pane_snapshot;
+            pane_snapshot.pane_id = closed_pane.pane_id;
+            pane_snapshot.tabs = to_workspace_tabs(closed_pane.tabs);
+            pane_snapshot.closed_tabs = to_workspace_tabs(closed_pane.closed_tabs);
+            pane_snapshot.active_tab_idx = closed_pane.active_tab_idx;
+            pane_snapshot.restore_mode = closed_pane.restore_mode == PaneRestoreMode::NewLane ? "new_lane" : "same_lane";
+            pane_snapshot.lane_index = closed_pane.lane_index;
+            pane_snapshot.row_index = closed_pane.row_index;
+            snapshot.closed_panes.push_back(std::move(pane_snapshot));
+        }
+
+        return snapshot;
+    }
+
+    void MultiPanel::restore_workspace_snapshot(const core::WorkspaceExplorerSnapshot& snapshot) {
+        if (snapshot.panes.empty()) {
+            initialized_ = false;
+            default_multi_panel();
+            return;
+        }
+
+        for (auto& [_, pane] : panes) {
+            pane.tab_controller.release_all_tabs();
+        }
+        panes.clear();
+        grid_.lanes.clear();
+        closed_pane_snapshots_.clear();
+
+        next_tab_idx_ = std::max<std::int16_t>(1, snapshot.next_tab_idx);
+        next_pane_idx_ = std::max<std::int16_t>(1, snapshot.next_pane_idx);
+        grid_split_ratio_ = std::clamp(snapshot.grid_split_ratio, 0.05f, 0.95f);
+        if (!snapshot.lane_split_ratios.empty()) {
+            lane_split_ratios_[0] = std::clamp(snapshot.lane_split_ratios[0], 0.05f, 0.95f);
+        }
+        if (snapshot.lane_split_ratios.size() > 1) {
+            lane_split_ratios_[1] = std::clamp(snapshot.lane_split_ratios[1], 0.05f, 0.95f);
+        }
+
+        for (const auto& pane_snapshot : snapshot.panes) {
+            if (pane_snapshot.pane_id.empty()) {
+                continue;
+            }
+
+            Pane pane;
+            pane.pane_id = pane_snapshot.pane_id;
+            pane.tab_controller.set_restore_tab_factory(
+                [this](std::int16_t restore_tab_idx) { return create_default_tab(restore_tab_idx); });
+            pane.tab_controller.restore_tabs_from_snapshots(
+                from_workspace_tabs(pane_snapshot.tabs),
+                [this](std::int16_t tab_idx) { return create_default_tab(tab_idx); },
+                pane_snapshot.active_tab_idx);
+            pane.tab_controller.restore_closed_tab_snapshots(from_workspace_tabs(pane_snapshot.closed_tabs));
+            if (pane.tab_controller.tab_count() == 0) {
+                pane.tab_controller.add_tab(create_default_tab(next_tab_idx_++));
+            }
+            add_pane(pane);
+        }
+
+        for (const auto& lane_snapshot : snapshot.grid_pane_ids) {
+            MultiPanelGrid::GridLane lane;
+            for (const auto& pane_id : lane_snapshot) {
+                if (panes.find(pane_id) != panes.end()) {
+                    lane.pane_ids.push_back(pane_id);
+                }
+            }
+            if (!lane.pane_ids.empty()) {
+                grid_.lanes.push_back(std::move(lane));
+            }
+        }
+
+        if (grid_.lanes.empty() && !panes.empty()) {
+            grid_.lanes.push_back(MultiPanelGrid::GridLane{.pane_ids = {panes.begin()->first}});
+        }
+
+        for (const auto& closed_snapshot : snapshot.closed_panes) {
+            ClosedPaneSnapshot closed_pane;
+            closed_pane.pane_id = closed_snapshot.pane_id;
+            closed_pane.tabs = from_workspace_tabs(closed_snapshot.tabs);
+            closed_pane.closed_tabs = from_workspace_tabs(closed_snapshot.closed_tabs);
+            closed_pane.active_tab_idx = closed_snapshot.active_tab_idx;
+            closed_pane.restore_mode =
+                closed_snapshot.restore_mode == "new_lane" ? PaneRestoreMode::NewLane : PaneRestoreMode::SameLane;
+            closed_pane.lane_index = closed_snapshot.lane_index;
+            closed_pane.row_index = closed_snapshot.row_index;
+            closed_pane_snapshots_.push_back(std::move(closed_pane));
+        }
+        if (closed_pane_snapshots_.size() > kMaxClosedPanes) {
+            closed_pane_snapshots_.erase(
+                closed_pane_snapshots_.begin(),
+                closed_pane_snapshots_.end() - static_cast<std::ptrdiff_t>(kMaxClosedPanes));
+        }
+
+        normalize_grid();
+        if (panes.find(snapshot.active_pane_id) != panes.end()) {
+            active_pane_id = snapshot.active_pane_id;
+        } else if (!grid_.lanes.empty() && !grid_.lanes.front().pane_ids.empty()) {
+            active_pane_id = grid_.lanes.front().pane_ids.front();
+        } else {
+            active_pane_id.clear();
+        }
+        initialized_ = true;
+    }
+
     void MultiPanel::default_multi_panel() {
         if (initialized_) {
             return;
@@ -83,12 +267,6 @@ namespace misty::panel {
             return;
         }
 
-        if (core::CommandManager::get().matches("explorer.new_tab")) {
-            create_new_tab(*active_pane);
-        }
-        if (core::CommandManager::get().matches("explorer.restore_tab")) {
-            active_pane->tab_controller.restore_tab();
-        }
         if (core::CommandManager::get().matches("explorer.split_vertical")) {
             split_active_vertical();
         }
@@ -101,16 +279,6 @@ namespace misty::panel {
         if (core::CommandManager::get().matches("explorer.restore_pane")) {
             restore_last_closed_pane();
         }
-    }
-
-    void MultiPanel::create_new_tab(Pane& pane) {
-        const std::int16_t tab_idx = next_tab_idx_++;
-        TabController::Tab tab = create_default_tab(tab_idx);
-        if (!tab.panel) {
-            error_msg_ = "Failed to create a default tab.";
-            return;
-        }
-        pane.tab_controller.add_tab(tab);
     }
 
     void MultiPanel::close_tab(Pane& pane, std::int16_t tab_idx) {
@@ -382,25 +550,14 @@ namespace misty::panel {
             return;
         }
 
-        const bool is_active_pane = pane_id == active_pane_id;
         ImGui::SetCursorScreenPos(pos);
         const std::string child_id = "##pane_" + pane_id;
-        const bool is_split_layout = pane_count() > 1;
         UI::WithStyle([&](UI::StyleScope& style) {
-            style.var(ImGuiStyleVar_ChildBorderSize, 1.0f);
-            if (is_active_pane) {
-                style.color(ImGuiCol_Border, is_split_layout
-                    ? ImVec4(0.46f, 0.48f, 0.52f, 0.70f)
-                    : ImVec4(1.0f, 1.0f, 1.0f, 0.95f));
-            } else {
-                style.color(ImGuiCol_Border, ImVec4(0.24f, 0.24f, 0.26f, 1.0f));
-                style.color(ImGuiCol_ChildBg, ImVec4(0.12f, 0.12f, 0.12f, 1.0f));
-            }
-
+            style.var(ImGuiStyleVar_ChildBorderSize, 0.0f);
             constexpr ImGuiWindowFlags pane_flags =
                 ImGuiWindowFlags_NoScrollbar |
                 ImGuiWindowFlags_NoScrollWithMouse;
-            if (ImGui::BeginChild(child_id.c_str(), size, ImGuiChildFlags_Borders, pane_flags)) {
+            if (ImGui::BeginChild(child_id.c_str(), size, ImGuiChildFlags_None, pane_flags)) {
                 const bool pane_clicked =
                     ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup | ImGuiHoveredFlags_ChildWindows) &&
                     ImGui::IsMouseClicked(ImGuiMouseButton_Left);
@@ -409,30 +566,13 @@ namespace misty::panel {
                     active_pane_id = pane_id;
                 }
 
-                bool create_new_tab_requested = false;
-                std::int16_t close_tab_idx = -1;
-                pane->tab_controller.render_tab_bar(
-                    pane_id,
-                    &create_new_tab_requested,
-                    &close_tab_idx,
-                    [this](const TabController::Tab& tab) {
-                        if (!tab.panel) {
-                            error_msg_ = "Active tab has no panel.";
-                            return;
-                        }
-
-                        if (auto* multi_panel = dynamic_cast<MultiPanel*>(tab.panel.get())) {
-                            multi_panel->render_panel_contents();
-                        } else {
-                            tab.panel->render();
-                        }
-                    });
-
-                if (close_tab_idx >= 0) {
-                    close_tab(*pane, close_tab_idx);
-                }
-                if (create_new_tab_requested) {
-                    create_new_tab(*pane);
+                const TabController::Tab* tab = pane->tab_controller.get_active_tab();
+                if (!tab || !tab->panel) {
+                    error_msg_ = "Active pane has no panel.";
+                } else if (auto* multi_panel = dynamic_cast<MultiPanel*>(tab->panel.get())) {
+                    multi_panel->render_panel_contents();
+                } else {
+                    tab->panel->render();
                 }
             }
             ImGui::EndChild();

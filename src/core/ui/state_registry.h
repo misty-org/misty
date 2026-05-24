@@ -6,11 +6,11 @@
 #include <memory>
 
 namespace misty::core {
-    struct UIState {
-        virtual ~UIState() = default;
+    struct StateEntry {
+        virtual ~StateEntry() = default;
     };
 
-class UIRegistry {
+class StateRegistry {
     public:
         template<typename T>
         T& get_state(const std::string& key) {
@@ -49,7 +49,7 @@ class UIRegistry {
         }
 
     private:
-        std::unordered_map<std::string, std::unique_ptr<UIState>> states_;
+        std::unordered_map<std::string, std::unique_ptr<StateEntry>> states_;
         mutable std::mutex mu_;
     };
 }

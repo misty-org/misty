@@ -9,8 +9,8 @@ namespace misty::panel {
     namespace {
         constexpr ImVec4 kBorder = ImVec4(0.24f, 0.27f, 0.30f, 1.0f);
         constexpr ImVec4 kText = ImVec4(0.94f, 0.95f, 0.97f, 1.0f);
-        constexpr ImVec4 kBadgeBg = ImVec4(0.77f, 0.94f, 0.79f, 1.0f);
-        constexpr ImVec4 kBadgeText = ImVec4(0.18f, 0.49f, 0.23f, 1.0f);
+        constexpr ImVec4 kBadgeBg = ImVec4(0.16f, 0.19f, 0.21f, 1.0f);
+        constexpr ImVec4 kBadgeText = ImVec4(0.94f, 0.95f, 0.97f, 1.0f);
         constexpr ImVec4 kWarningBadgeBg = ImVec4(0.96f, 0.88f, 0.66f, 1.0f);
         constexpr ImVec4 kWarningBadgeText = ImVec4(0.58f, 0.36f, 0.02f, 1.0f);
         constexpr ImVec4 kMutedBadgeBg = ImVec4(0.29f, 0.32f, 0.36f, 1.0f);

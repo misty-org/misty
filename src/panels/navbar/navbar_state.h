@@ -1,12 +1,12 @@
 #pragma once
 
-#include "core/ui/ui_registry.h"
+#include "core/ui/state_registry.h"
 #include "views/app_view.h"
 
 using namespace misty::core;
 
 namespace misty::panel {
-    struct NavbarState : public UIState {
+    struct NavbarState : public StateEntry {
         view::ViewID selected_item = view::ViewID::Files;
 
         void handle_logo_click() {

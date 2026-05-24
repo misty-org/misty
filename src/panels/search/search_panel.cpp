@@ -330,17 +330,17 @@ void overlay_status(const OverlaySnapshot& snapshot, bool has_query) {
 
 } // namespace
 
-SearchPanel::SearchPanel(core::UIRegistry& ui_registry,
+SearchPanel::SearchPanel(core::StateRegistry& state_registry,
     core::WorkerPool& worker_pool,
                          std::string explorer_state_key,
                          std::string search_state_key)
-    : ui_registry_(ui_registry),
+    : state_registry_(state_registry),
       worker_pool_(worker_pool),
       explorer_state_key_(std::move(explorer_state_key)),
       search_state_key_(std::move(search_state_key)) {}
 
 void SearchPanel::toggle() {
-    auto& state = ui_registry_.get_state<SearchState>(search_state_key_);
+    auto& state = state_registry_.get_state<SearchState>(search_state_key_);
     std::lock_guard<std::mutex> lock(state.mu);
 
     if (state.is_open) {
@@ -371,7 +371,7 @@ SearchQuery SearchPanel::build_query(const std::string& query_text, const std::s
 }
 
 void SearchPanel::submit_search(const std::string& query_text, const std::string& current_path) {
-    auto& state = ui_registry_.get_state<SearchState>(search_state_key_);
+    auto& state = state_registry_.get_state<SearchState>(search_state_key_);
     SearchQuery query = build_query(query_text, current_path);
     std::uint64_t request_generation = 0;
 
@@ -478,7 +478,7 @@ void SearchPanel::render_results(SearchState& state, const std::string& current_
 }
 
 void SearchPanel::render(const std::string& current_path, float available_height) {
-    auto& state = ui_registry_.get_state<SearchState>(search_state_key_);
+    auto& state = state_registry_.get_state<SearchState>(search_state_key_);
     if (!state.is_open) {
         return;
     }

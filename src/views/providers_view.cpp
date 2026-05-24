@@ -3,18 +3,18 @@
 #include "panels/providers/state/providers_state.h"
 
 namespace misty::view {
-    ProvidersView::ProvidersView(UIRegistry& ui_registry, core::WorkerPool& worker_pool)
-        : ui_registry_(ui_registry),
+    ProvidersView::ProvidersView(StateRegistry& state_registry, core::WorkerPool& worker_pool)
+        : state_registry_(state_registry),
           worker_pool_(worker_pool) {
         init_panels();
     }
 
     void ProvidersView::init_panels() {
-        ui_registry_.get_state<panel::ProvidersState>("Providers").init(worker_pool_);
-        navbar_panel_ = std::make_shared<panel::NavbarPanel>(ui_registry_);
-        providers_panel_ = std::make_shared<panel::ProvidersPanel>(ui_registry_);
-        notification_panel_ = std::make_shared<panel::NotificationPanel>(ui_registry_);
-        context_menu_panel_ = std::make_shared<panel::ContextMenuPanel>(ui_registry_);
+        state_registry_.get_state<panel::ProvidersState>("Providers").init(worker_pool_);
+        navbar_panel_ = std::make_shared<panel::NavbarPanel>(state_registry_);
+        providers_panel_ = std::make_shared<panel::ProvidersPanel>(state_registry_);
+        notification_panel_ = std::make_shared<panel::NotificationPanel>(state_registry_);
+        context_menu_panel_ = std::make_shared<panel::ContextMenuPanel>(state_registry_);
     }
 
     ViewID ProvidersView::get_view_id() {

@@ -3,7 +3,7 @@
 #include <string>
 
 #include "panels/panel/panel.h"
-#include "core/ui/ui_registry.h"
+#include "core/ui/state_registry.h"
 #include "vault_state.h"
 
 namespace misty::panel {
@@ -16,7 +16,7 @@ namespace misty::panel {
     //   - modals for create-repo, start-backup, restore
     class VaultPanel : public Panel {
     public:
-        explicit VaultPanel(core::UIRegistry& registry);
+        explicit VaultPanel(core::StateRegistry& registry);
         ~VaultPanel() override = default;
         void render() override;
 
@@ -39,6 +39,6 @@ namespace misty::panel {
         static constexpr float kCardHeight  = 140.0f;
         static constexpr float kCardSpacing = 12.0f;
 
-        core::UIRegistry& registry_;
+        core::StateRegistry& registry_;
     };
 }

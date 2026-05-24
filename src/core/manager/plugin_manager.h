@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-#include "core/ui/ui_registry.h"
+#include "core/ui/state_registry.h"
 
 namespace misty::core {
 
@@ -52,7 +52,7 @@ class PluginManager {
 public:
     static PluginManager& get();
 
-    void set_ui_registry(UIRegistry* registry);
+    void set_state_registry(StateRegistry* registry);
     void discover_and_load();
     void discover_and_load(const std::vector<std::filesystem::path>& roots);
     bool load_plugin_directory(const std::filesystem::path& plugin_dir, bool bundled);

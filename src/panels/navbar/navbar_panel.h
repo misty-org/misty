@@ -1,5 +1,5 @@
 #pragma once
-#include "core/ui/ui_registry.h"
+#include "core/ui/state_registry.h"
 #include "navbar_state.h"
 #include "panels/panel/panel.h"
 #include "panels/activity/activity_panel.h"
@@ -9,7 +9,7 @@
 namespace misty::panel {
     class NavbarPanel : public Panel {
     public:
-        NavbarPanel(UIRegistry& ui_registry);
+        NavbarPanel(StateRegistry& state_registry);
         ~NavbarPanel() override = default;
         void render() override;
 
@@ -25,7 +25,7 @@ namespace misty::panel {
 
     private:
 		float nav_width_ = 77.0f;
-        UIRegistry& ui_registry_;
+        StateRegistry& state_registry_;
         ActivityPanel activity_panel_;
     };
 }

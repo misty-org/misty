@@ -27,7 +27,7 @@ bool is_virtual_path(const std::string& path) {
     return path.rfind("misty://", 0) == 0;
 }
 
-void notify(core::UIRegistry& registry, const std::string& message, float duration = 4.0f) {
+void notify(core::StateRegistry& registry, const std::string& message, float duration = 4.0f) {
     registry.get_state<NotificationState>("Notifications").add_notification(message, duration);
 }
 

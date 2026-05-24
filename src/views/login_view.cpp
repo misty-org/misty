@@ -2,13 +2,13 @@
 #include "imgui.h"
 
 namespace misty::view {
-    LoginView::LoginView(UIRegistry& ui_registry)
-        : ui_registry_(ui_registry) {
+    LoginView::LoginView(StateRegistry& state_registry)
+        : state_registry_(state_registry) {
         init_panels();
     }
 
     void LoginView::init_panels() {
-        auth_login_panel_ = std::make_shared<AuthLoginPanel>(ui_registry_);
+        auth_login_panel_ = std::make_shared<AuthLoginPanel>(state_registry_);
     }
 
     ViewID LoginView::get_view_id() {

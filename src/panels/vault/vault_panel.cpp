@@ -83,7 +83,7 @@ namespace misty::panel {
 
     } // namespace
 
-    VaultPanel::VaultPanel(core::UIRegistry& registry) : registry_(registry) {}
+    VaultPanel::VaultPanel(core::StateRegistry& registry) : registry_(registry) {}
 
     void VaultPanel::render() {
         auto& state = registry_.get_state<VaultState>("Vault");

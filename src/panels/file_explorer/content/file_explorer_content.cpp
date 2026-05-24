@@ -29,12 +29,15 @@ namespace misty::panel {
     ImU32 grid_item_icon_color(const FileListing& listing, const FileItem& file);
 
     namespace {
-        constexpr float kExplorerLeftInset = 8.0f;
         constexpr ImVec4 kInspectorBg = ImVec4(0.075f, 0.085f, 0.10f, 1.0f);
         constexpr ImVec4 kInspectorCardBg = ImVec4(0.105f, 0.115f, 0.135f, 0.96f);
         constexpr ImVec4 kInspectorBorder = ImVec4(0.22f, 0.25f, 0.31f, 1.0f);
         constexpr ImVec4 kInspectorMuted = ImVec4(0.58f, 0.61f, 0.68f, 1.0f);
         constexpr ImVec4 kMistyAccent = ImVec4(0.36f, 0.58f, 0.95f, 1.0f);
+        constexpr float kToolbarPadX = 8.0f;
+        constexpr float kToolbarPadY = 4.0f;
+        constexpr float kToolbarButtonHeight = 34.0f;
+        constexpr float kToolbarHeight = kToolbarButtonHeight + kToolbarPadY * 2.0f;
 
         std::string remote_sync_key(const std::string& remote_name, const std::string& remote_path) {
             return remote_name + ":" + remote_path;
@@ -198,16 +201,15 @@ namespace misty::panel {
 
         void begin_inspector_card(const char* id, float height = 0.0f) {
             ImGui::PushStyleColor(ImGuiCol_ChildBg, kInspectorCardBg);
-            ImGui::PushStyleColor(ImGuiCol_Border, kInspectorBorder);
             ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 7.0f);
-            ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 1.0f);
-            ImGui::BeginChild(id, ImVec2(0.0f, height), true, ImGuiWindowFlags_NoScrollbar);
+            ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 0.0f);
+            ImGui::BeginChild(id, ImVec2(0.0f, height), false, ImGuiWindowFlags_NoScrollbar);
         }
 
         void end_inspector_card() {
             ImGui::EndChild();
             ImGui::PopStyleVar(2);
-            ImGui::PopStyleColor(2);
+            ImGui::PopStyleColor();
         }
 
         bool inspector_action_tile(const char* id,
@@ -296,6 +298,11 @@ namespace misty::panel {
     }
 
     std::string FileExplorerPanel::tab_title() const {
+        if (const auto* active_explorer = dynamic_cast<const FileExplorerPanel*>(active_panel())) {
+            if (active_explorer != this) {
+                return active_explorer->tab_title();
+            }
+        }
         const auto& state = registry_.get_state<FileExplorerState>(state_key_);
         if (state.current_path[0] != '\0') {
             return file_explorer_tab_title_for_path(state.current_path);
@@ -498,19 +505,7 @@ namespace misty::panel {
     void FileExplorerPanel::render_panel_contents() {
         auto& state = registry_.get_state<FileExplorerState>(state_key_);
         auto& listing = active_listing();
-        auto& search_state = registry_.get_state<SearchState>(search_state_key_);
         std::unique_lock<std::mutex> lock(state.mu);
-
-        if (ImGui::BeginChild("TopBar", ImVec2(0.0f, 62.0f), false, ImGuiWindowFlags_NoScrollbar)) {
-            ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.075f, 0.085f, 0.10f, 1.0f));
-            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + kExplorerLeftInset);
-            ImGui::SetCursorPosY(9.0f);
-            show_command_toolbar(state, search_state);
-            ImGui::PopStyleColor();
-        }
-        ImGui::EndChild();
-
-        ImGui::Separator();
 
         const float available_h = ImGui::GetContentRegionAvail().y;
         const float status_bar_height = 30.0f;
@@ -562,6 +557,31 @@ namespace misty::panel {
         MultiPanel::render();
     }
 
+    float FileExplorerPanel::toolbar_height() const {
+        return kToolbarHeight;
+    }
+
+    void FileExplorerPanel::render_active_toolbar() {
+        if (auto* active_explorer = dynamic_cast<FileExplorerPanel*>(active_panel())) {
+            if (active_explorer != this) {
+                active_explorer->render_active_toolbar();
+                return;
+            }
+        }
+
+        auto& state = registry_.get_state<FileExplorerState>(state_key_);
+        auto& search_state = registry_.get_state<SearchState>(search_state_key_);
+        std::unique_lock<std::mutex> lock(state.mu);
+
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.075f, 0.085f, 0.10f, 1.0f));
+        if (ImGui::BeginChild("TopBar", ImVec2(0.0f, kToolbarHeight), false, ImGuiWindowFlags_NoScrollbar)) {
+            ImGui::SetCursorPos(ImVec2(kToolbarPadX, kToolbarPadY));
+            show_command_toolbar(state, search_state);
+        }
+        ImGui::EndChild();
+        ImGui::PopStyleColor();
+    }
+
     void FileExplorerPanel::render_inspector() {
         if (auto* active_explorer = dynamic_cast<FileExplorerPanel*>(active_panel())) {
             if (active_explorer != this) {
@@ -585,11 +605,12 @@ namespace misty::panel {
         ImGui::PushStyleColor(ImGuiCol_Separator, kInspectorBorder);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16.0f, 18.0f));
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8.0f, 10.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
         if (ImGui::Begin("FileInspector", nullptr, flags)) {
             render_inspector_contents();
         }
         ImGui::End();
-        ImGui::PopStyleVar(2);
+        ImGui::PopStyleVar(3);
         ImGui::PopStyleColor(2);
     }
 
@@ -707,7 +728,13 @@ namespace misty::panel {
                                                          bool force_remote_refresh) {
         auto& state = registry_.get_state<FileExplorerState>(state_key_);
         auto& listing = active_listing();
-        const bool is_remote_listing = remote_browse_target_for(path).has_value();
+        const auto remote_target = remote_browse_target_for(path);
+        const bool is_remote_listing = remote_target.has_value();
+        bool use_cached_remote_listing = false;
+        if (remote_target.has_value() && !force_remote_refresh) {
+            std::vector<FileMasterListItem> cached_items;
+            use_cached_remote_listing = load_cached_remote_path(remote_list_props_for(*remote_target), cached_items);
+        }
         const auto now = std::chrono::steady_clock::now();
         const auto minimum_animation_duration = std::chrono::duration_cast<std::chrono::steady_clock::duration>(
             std::chrono::duration<float>(misty::UI::MistyLoadingAnimationLoopSeconds()));
@@ -716,7 +743,7 @@ namespace misty::panel {
         // UI interactive and stream rows in batches instead of blocking until
         // the whole directory has been stat'ed.
         listing.is_loading = true;
-        if (is_remote_listing) {
+        if (is_remote_listing && !use_cached_remote_listing) {
             listing.loading.begin(load_generation, now, minimum_animation_duration);
         } else {
             listing.loading.cancel();
@@ -752,6 +779,7 @@ namespace misty::panel {
              show_hidden,
              load_generation,
              is_remote_listing,
+             use_cached_remote_listing,
              force_remote_refresh]() {
                 auto& state = registry->get_state<FileExplorerState>(state_key);
                 auto& listing = registry->get_state<FileListingsState>(kFileListingsStateKey).get_or_create(state_key);
@@ -773,7 +801,7 @@ namespace misty::panel {
                     }
                     if (final_flush) {
                         listing.is_loading = false;
-                        if (is_remote_listing) {
+                        if (is_remote_listing && !use_cached_remote_listing) {
                             listing.loading.complete(
                                 load_generation,
                                 std::chrono::steady_clock::now());
@@ -797,31 +825,19 @@ namespace misty::panel {
                 }
 
                 if (auto remote_target = remote_browse_target_for(path); remote_target.has_value()) {
-                    const bool cache_has_entries =
-                        fs::exists(path) &&
-                        fs::is_directory(path) &&
-                        fs::directory_iterator(path) != fs::directory_iterator();
-                    if (!force_remote_refresh && cache_has_entries) {
-                        try {
-                            for (const auto& entry : fs::directory_iterator(
-                                     path, fs::directory_options::skip_permission_denied)) {
-                                if (should_skip_local_entry(entry, show_hidden)) continue;
-                                FileItem item = make_local_file_item(entry);
-                                item.type = FileType::REMOTE;
-                                item.sync_remote_name = remote_target->remote_name;
-                                const fs::path rel = fs::path(item.path).lexically_relative(
-                                    fs::path(get_mount_root()) / remote_target->provider_folder / remote_target->remote_name);
-                                item.sync_remote_path = rel.generic_string();
-                                batch.push_back(std::move(item));
-                            }
-                            hydrate_remote_sync_states(batch);
-                            flush_batch(true);
-                            return;
-                        } catch (const std::exception&) {
+                    std::vector<FileMasterListItem> remote_items;
+                    if (!force_remote_refresh &&
+                        load_cached_remote_path(remote_list_props_for(*remote_target), remote_items)) {
+                        {
+                            std::error_code ec;
+                            fs::create_directories(path, ec);
                         }
+                        batch = remote_mount_items_for(*remote_target, remote_items);
+                        hydrate_remote_sync_states(batch);
+                        flush_batch(true);
+                        return;
                     }
 
-                    std::vector<FileMasterListItem> remote_items;
                     FileMasterResult remote_result = list_remote_path(remote_list_props_for(*remote_target), remote_items);
                     if (!remote_result.success) {
                         std::lock_guard<std::mutex> lk(state.mu);
@@ -838,6 +854,10 @@ namespace misty::panel {
                         return;
                     }
 
+                    {
+                        std::error_code ec;
+                        fs::create_directories(path, ec);
+                    }
                     batch = remote_mount_items_for(*remote_target, remote_items);
                     hydrate_remote_sync_states(batch);
 

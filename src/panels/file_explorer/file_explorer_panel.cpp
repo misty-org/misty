@@ -48,7 +48,7 @@ std::string default_local_start_path() {
 }
 }  // namespace
 
-FileExplorerPanel::FileExplorerPanel(UIRegistry& registry,
+FileExplorerPanel::FileExplorerPanel(StateRegistry& registry,
                                      WorkerPool& worker_pool,
                                      FileExplorerPanelProps props)
     : MultiPanel(props.panel_id),
@@ -162,7 +162,7 @@ FileExplorerPanel::~FileExplorerPanel() {
 }
 
 std::string FileExplorerPanel::save_restore_state() const {
-    const auto& state = const_cast<core::UIRegistry&>(registry_).get_state<FileExplorerState>(state_key_);
+    const auto& state = const_cast<core::StateRegistry&>(registry_).get_state<FileExplorerState>(state_key_);
     json data;
     data["current_path"] = std::string(state.current_path);
     data["show_hidden"] = ui_.show_hidden;
@@ -220,6 +220,23 @@ void FileExplorerPanel::release_state() {
 
 void FileExplorerPanel::render_sidebar() {
     sidebar_panel_->render();
+}
+
+void FileExplorerPanel::set_workspace_controls(
+    std::function<std::vector<FileSidebarPanel::WorkspaceEntry>()> entries_provider,
+    std::function<void(std::int16_t)> select_handler,
+    std::function<void(std::string)> create_handler,
+    std::function<void(std::int16_t, std::string)> rename_handler,
+    std::function<void(std::int16_t)> delete_handler) {
+    sidebar_panel_->set_workspace_entries_provider(std::move(entries_provider));
+    sidebar_panel_->set_workspace_select_handler(std::move(select_handler));
+    sidebar_panel_->set_workspace_create_handler(std::move(create_handler));
+    sidebar_panel_->set_workspace_rename_handler(std::move(rename_handler));
+    sidebar_panel_->set_workspace_delete_handler(std::move(delete_handler));
+}
+
+bool FileExplorerPanel::workspace_dropdown_open() const {
+    return sidebar_panel_ && sidebar_panel_->workspace_dropdown_open();
 }
 
 void FileExplorerPanel::render_content() {
