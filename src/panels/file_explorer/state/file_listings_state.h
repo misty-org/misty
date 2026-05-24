@@ -8,7 +8,7 @@
 #include <vector>
 
 #include "core/file_sync/file_sync_types.h"
-#include "core/ui/ui_registry.h"
+#include "core/ui/state_registry.h"
 #include "panels/file_explorer/state/loading_state.h"
 
 namespace misty::panel {
@@ -85,7 +85,7 @@ struct FileListing {
 /**
  * @brief Shared UI registry state containing file listings for all explorer tabs.
  */
-struct FileListingsState : public core::UIState {
+struct FileListingsState : public core::StateEntry {
     std::vector<FileListing> listings;
 
     /**

@@ -46,6 +46,8 @@ FileMasterResult copy_remote_path(const FileMasterProps& props);
 
 FileMasterResult cut_remote_path(const FileMasterProps& props);
 
+bool load_cached_remote_path(const FileMasterProps& props, std::vector<FileMasterListItem>& items);
+
 FileMasterResult list_remote_path(const FileMasterProps& props, std::vector<FileMasterListItem>& items);
 
 

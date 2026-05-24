@@ -463,7 +463,7 @@ void detail_section(
 
 } // namespace
 
-PluginsPanel::PluginsPanel(core::UIRegistry&) {
+PluginsPanel::PluginsPanel(core::StateRegistry&) {
 }
 
 float PluginsPanel::sidebar_max_width(float shell_width) const {

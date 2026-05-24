@@ -11,7 +11,7 @@
 
 namespace misty::panel {
 
-    ActivityPanel::ActivityPanel(core::UIRegistry& registry)
+    ActivityPanel::ActivityPanel(core::StateRegistry& registry)
         : registry_(registry) {}
 
     void ActivityPanel::render() {

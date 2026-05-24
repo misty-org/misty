@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/ui/ui_registry.h"
+#include "core/ui/state_registry.h"
 #include "panels/panel/multi_panel.h"
 #include "panels/settings/settings_state.h"
 
@@ -14,7 +14,7 @@ namespace misty::panel {
 
     class SettingsPanel : public MultiPanel {
     public:
-        explicit SettingsPanel(core::UIRegistry& registry,
+        explicit SettingsPanel(core::StateRegistry& registry,
                                SettingsPanelProps props = {});
         ~SettingsPanel() override = default;
 
@@ -32,7 +32,7 @@ namespace misty::panel {
         void sidebar_tabs(SettingsState& state);
         void sidebar_header(SettingsState& state);
 
-        core::UIRegistry& registry_;
+        core::StateRegistry& registry_;
         std::string state_key_;
         bool owns_state_cleanup_ = false;
         float last_scroll_x_ = 0.0f;

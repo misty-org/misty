@@ -67,7 +67,9 @@ namespace misty::panel {
 
             const std::string label = tab->display_title() + "###tab_" + scope_id + "_" + std::to_string(tab_id);
             bool is_open = true;
-            if (ImGui::BeginTabItem(label.c_str(), &is_open)) {
+            const ImGuiTabItemFlags flags =
+                tab_id == active_tab_idx ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None;
+            if (ImGui::BeginTabItem(label.c_str(), &is_open, flags)) {
                 set_active_tab(tab_id);
                 if (render_tab_content) {
                     render_tab_content(*tab);

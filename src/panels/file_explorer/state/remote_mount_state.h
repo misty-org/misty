@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-#include "core/ui/ui_registry.h"
+#include "core/ui/state_registry.h"
 
 namespace misty::panel {
 
@@ -47,7 +47,7 @@ struct RemoteMountChild {
     /**
     * @brief UI state tracking remote mount mappings visible to the explorer.
     */
-    struct RemoteMountState : public core::UIState {
+    struct RemoteMountState : public core::StateEntry {
         std::vector<RemoteMountParent> parents;
 
         /**

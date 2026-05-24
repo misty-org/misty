@@ -3,16 +3,16 @@
 #include "imgui.h"
 
 namespace misty::view {
-    SettingsView::SettingsView(core::UIRegistry& ui_registry)
-        : ui_registry_(ui_registry) {
+    SettingsView::SettingsView(core::StateRegistry& state_registry)
+        : state_registry_(state_registry) {
         init_panels();
     }
 
     void SettingsView::init_panels() {
-        navbar_panel_ = std::make_shared<panel::NavbarPanel>(ui_registry_);
-        settings_panel_ = std::make_shared<panel::SettingsPanel>(ui_registry_);
-        notification_panel_ = std::make_shared<panel::NotificationPanel>(ui_registry_);
-        context_menu_panel_ = std::make_shared<panel::ContextMenuPanel>(ui_registry_);
+        navbar_panel_ = std::make_shared<panel::NavbarPanel>(state_registry_);
+        settings_panel_ = std::make_shared<panel::SettingsPanel>(state_registry_);
+        notification_panel_ = std::make_shared<panel::NotificationPanel>(state_registry_);
+        context_menu_panel_ = std::make_shared<panel::ContextMenuPanel>(state_registry_);
     }
 
     ViewID SettingsView::get_view_id() {

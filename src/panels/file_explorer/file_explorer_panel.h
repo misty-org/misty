@@ -11,7 +11,7 @@
 #include "core/file_master/file_master.h"
 #include "core/file_sync/file_sync_master.h"
 #include "core/threading/worker_pool.h"
-#include "core/ui/ui_registry.h"
+#include "core/ui/state_registry.h"
 #include "panels/file_explorer/sidebar/file_sidebar_panel.h"
 #include "panels/file_explorer/state/clipboard_state.h"
 #include "panels/file_explorer/state/file_explorer_state.h"
@@ -96,7 +96,7 @@ public:
     /**
      * @brief Creates a file explorer panel bound to registry state and the shared worker pool.
      */
-    FileExplorerPanel(core::UIRegistry& registry,
+    FileExplorerPanel(core::StateRegistry& registry,
                       core::WorkerPool& worker_pool,
                       FileExplorerPanelProps props = {});
     /**
@@ -129,9 +129,26 @@ public:
      */
     void render_sidebar();
     /**
+     * @brief Connects sidebar workspace switching UI to the owning Files view.
+     */
+    void set_workspace_controls(std::function<std::vector<FileSidebarPanel::WorkspaceEntry>()> entries_provider,
+                                std::function<void(std::int16_t)> select_handler,
+                                std::function<void(std::string)> create_handler,
+                                std::function<void(std::int16_t, std::string)> rename_handler,
+                                std::function<void(std::int16_t)> delete_handler);
+    bool workspace_dropdown_open() const;
+    /**
      * @brief Renders the active content section of the file explorer.
      */
     void render_content();
+    /**
+     * @brief Renders the shell-level toolbar for the currently active explorer pane.
+     */
+    void render_active_toolbar();
+    /**
+     * @brief Returns the fixed shell toolbar height.
+     */
+    float toolbar_height() const;
     /**
      * @brief Renders the persistent details/preview inspector for the active explorer.
      */
@@ -425,7 +442,7 @@ private:
     panel::LibraryState& library_state();
 
 private:
-    core::UIRegistry& registry_;
+    core::StateRegistry& registry_;
     core::WorkerPool& worker_pool_;
     std::shared_ptr<FileSidebarPanel> sidebar_panel_;
     std::vector<std::unique_ptr<core::FileSyncMaster>> file_sync_objects_;

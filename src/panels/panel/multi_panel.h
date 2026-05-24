@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "core/workspaces/workspace.h"
 #include "panels/panel/panel.h"
 #include "panels/panel/pane_controller.h"
 #include "panels/panel/tab_controller.h"
@@ -16,6 +17,8 @@ namespace misty::panel {
 
         void handle_commands();
         void render() override;
+        core::WorkspaceExplorerSnapshot export_workspace_snapshot() const;
+        void restore_workspace_snapshot(const core::WorkspaceExplorerSnapshot& snapshot);
 
     protected:
         virtual TabController::Tab create_default_tab(std::int16_t tab_idx) const = 0;
@@ -52,7 +55,6 @@ namespace misty::panel {
         };
 
         void default_multi_panel();
-        void create_new_tab(Pane& pane);
         void close_tab(Pane& pane, std::int16_t tab_idx);
         void split_active_vertical();
         void split_active_horizontal();

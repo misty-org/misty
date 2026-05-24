@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "core/ui/ui_registry.h"
+#include "core/ui/state_registry.h"
 #include "panels/context_menu/context_menu_panel.h"
 #include "panels/navbar/navbar_panel.h"
 #include "panels/notification/notification_panel.h"
@@ -13,7 +13,7 @@ namespace misty::view {
 
 class TransfersView : public AppView {
 public:
-    explicit TransfersView(core::UIRegistry& ui_registry);
+    explicit TransfersView(core::StateRegistry& state_registry);
     ~TransfersView() override = default;
 
     void render() override;
@@ -22,7 +22,7 @@ public:
 private:
     void init_panels();
 
-    core::UIRegistry& ui_registry_;
+    core::StateRegistry& state_registry_;
     std::shared_ptr<panel::NavbarPanel> navbar_panel_;
     std::shared_ptr<panel::NotificationPanel> notification_panel_;
     std::shared_ptr<panel::ContextMenuPanel> context_menu_panel_;

@@ -235,7 +235,7 @@ void FileExplorerPanel::show_path_control(FileExplorerState& state, float width)
     const ImU32 hover_col = IM_COL32(255, 255, 255, 20);
     const ImU32 chip_active_col = IM_COL32(255, 255, 255, 32);
     const float content_origin_x = cursor.x + 12.0f;
-    float content_width = 26.0f;
+    float content_width = 0.0f;
     const auto& segments = ui_.breadcrumb_segments;
     for (size_t index = 0; index < segments.size(); ++index) {
         if (index > 0) {
@@ -271,13 +271,6 @@ void FileExplorerPanel::show_path_control(FileExplorerState& state, float width)
     ImGui::PushClipRect(clip_min, clip_max, true);
     bool segment_clicked = false;
     bool segment_hovered = false;
-
-    const float dots_x = x + 5.0f;
-    const float dots_y = cursor.y + height * 0.5f;
-    dl->AddCircleFilled(ImVec2(dots_x, dots_y - 7.0f), 1.7f, muted_col);
-    dl->AddCircleFilled(ImVec2(dots_x, dots_y), 1.7f, muted_col);
-    dl->AddCircleFilled(ImVec2(dots_x, dots_y + 7.0f), 1.7f, muted_col);
-    x += 26.0f;
 
     for (size_t index = 0; index < segments.size(); ++index) {
         if (index > 0) {
@@ -484,42 +477,40 @@ void FileExplorerPanel::show_breadcrumb_bar(FileExplorerState& state) {
 
 void FileExplorerPanel::show_command_toolbar(FileExplorerState& state, SearchState& search_state) {
     constexpr float kToolbarOuterPadX = 0.0f;
-    constexpr float kToolbarRightSafetyPad = 14.0f;
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(kToolbarGap, 0.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 7.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f, 8.0f));
-    ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, 6.0f);
 
     const float viewport_width = std::max(0.0f, ImGui::GetContentRegionAvail().x - kToolbarOuterPadX * 2.0f);
-    constexpr float kSearchMinWidth = 118.0f;
+    constexpr float kSearchMinWidth = 96.0f;
     constexpr float kSearchPreferredWidth = 190.0f;
-    constexpr float kPathMinWidth = 170.0f;
+    constexpr float kSearchCompactWidth = 72.0f;
+    constexpr float kPathMinWidth = 80.0f;
     constexpr float kPathPreferredWidth = 500.0f;
     constexpr float kActionClusterWidth = 76.0f + kToolbarGap + 34.0f;
     constexpr float kStaticWidth = 74.0f + 34.0f + kActionClusterWidth + kToolbarGap * 4.0f;
 
-    const float preferred_width = kStaticWidth + kSearchPreferredWidth + kPathPreferredWidth;
-    const float minimum_width = kStaticWidth + kSearchMinWidth + kPathMinWidth;
-    const float content_width = std::max(viewport_width, minimum_width);
-    const float overflow_budget = std::max(0.0f, content_width - preferred_width);
-    const float squeeze = std::max(0.0f, preferred_width - content_width);
-    const float search_width = std::clamp(kSearchPreferredWidth - squeeze * 0.35f,
-                                          kSearchMinWidth,
-                                          kSearchPreferredWidth + overflow_budget * 0.20f);
-    const float remaining_for_path = content_width - kStaticWidth - search_width;
-    const float path_width = std::max(72.0f,
-                                      std::clamp(remaining_for_path,
-                                                 kPathMinWidth,
-                                                 kPathPreferredWidth + overflow_budget * 0.80f));
+    const float flexible_width = std::max(0.0f, viewport_width - kStaticWidth);
+    float search_width = kSearchPreferredWidth;
+    if (flexible_width < kSearchMinWidth + kPathMinWidth) {
+        search_width = std::clamp(flexible_width * 0.42f, kSearchCompactWidth, kSearchMinWidth);
+    } else {
+        const float overflow_budget = std::max(0.0f, flexible_width - kSearchPreferredWidth - kPathPreferredWidth);
+        const float squeeze = std::max(0.0f, kSearchPreferredWidth + kPathPreferredWidth - flexible_width);
+        search_width = std::clamp(kSearchPreferredWidth - squeeze * 0.35f,
+                                  kSearchMinWidth,
+                                  kSearchPreferredWidth + overflow_budget * 0.20f);
+    }
+    search_width = std::min(search_width, flexible_width);
+    const float path_width = std::max(1.0f, flexible_width - search_width);
 
-    ImGui::SetNextWindowContentSize(ImVec2(content_width + kToolbarOuterPadX * 2.0f + kToolbarRightSafetyPad, 0.0f));
     if (ImGui::BeginChild("##toolbar_scroll_region",
-                          ImVec2(0.0f, kToolbarButtonSize + 10.0f),
+                          ImVec2(0.0f, kToolbarButtonSize),
                           false,
-                          ImGuiWindowFlags_HorizontalScrollbar |
+                          ImGuiWindowFlags_NoScrollbar |
+                              ImGuiWindowFlags_NoScrollWithMouse |
                               ImGuiWindowFlags_NoBackground)) {
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + kToolbarOuterPadX);
-        ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 1.0f);
         show_nav_history(state, kToolbarButtonSize, 6.0f);
 
         ImGui::SameLine(0.0f, kToolbarGap);
@@ -540,12 +531,10 @@ void FileExplorerPanel::show_command_toolbar(FileExplorerState& state, SearchSta
 
         ImGui::SameLine(0.0f, kToolbarGap);
         show_toolbar_actions(state);
-
-        ImGui::Dummy(ImVec2(kToolbarOuterPadX + kToolbarRightSafetyPad, 1.0f));
     }
     ImGui::EndChild();
 
-    ImGui::PopStyleVar(4);
+    ImGui::PopStyleVar(3);
 }
 
 } // namespace misty::panel

@@ -150,7 +150,7 @@ bool render_filter_button(const char* label, bool selected) {
 
 }  // namespace
 
-TransfersPanel::TransfersPanel(core::UIRegistry& registry)
+TransfersPanel::TransfersPanel(core::StateRegistry& registry)
     : registry_(registry) {}
 
 void TransfersPanel::render() {

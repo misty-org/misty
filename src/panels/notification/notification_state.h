@@ -5,7 +5,7 @@
 #include <mutex>
 #include <chrono>
 #include <atomic>
-#include "core/ui/ui_registry.h"
+#include "core/ui/state_registry.h"
 
 namespace misty::panel {
 
@@ -38,7 +38,7 @@ namespace misty::panel {
         }
     };
 
-    class NotificationState : public core::UIState {
+    class NotificationState : public core::StateEntry {
     public:
         static constexpr size_t MAX_VISIBLE = 3;
         static constexpr float DEFAULT_DURATION = 2.5f;

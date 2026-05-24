@@ -8,12 +8,12 @@
 #include "panels/context_menu/context_menu_panel.h"
 #include "panels/navbar/navbar_panel.h"
 #include "panels/notification/notification_panel.h"
-#include "core/ui/ui_registry.h"
+#include "core/ui/state_registry.h"
 
 namespace misty::view {
     class SettingsView : public AppView {
     public:
-        SettingsView(core::UIRegistry& ui_registry);
+        SettingsView(core::StateRegistry& state_registry);
         ~SettingsView() override = default;
 
         void render() override;
@@ -25,7 +25,7 @@ namespace misty::view {
         void init_panels();
 
     private:
-        core::UIRegistry& ui_registry_;
+        core::StateRegistry& state_registry_;
         std::shared_ptr<panel::NavbarPanel> navbar_panel_;
         std::shared_ptr<panel::SettingsPanel> settings_panel_;
         std::shared_ptr<panel::NotificationPanel> notification_panel_;

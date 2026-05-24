@@ -1,7 +1,7 @@
 #pragma once
 
 #include "panels/panel/panel.h"
-#include "core/ui/ui_registry.h"
+#include "core/ui/state_registry.h"
 #include "auth_register_state.h"
 
 using namespace misty::core;
@@ -9,7 +9,7 @@ using namespace misty::core;
 namespace misty::panel {
     class AuthRegisterPanel : public panel::Panel {
     public:
-        AuthRegisterPanel(UIRegistry& registry);
+        AuthRegisterPanel(StateRegistry& registry);
         ~AuthRegisterPanel() override = default;
         void render() override;
 
@@ -21,6 +21,6 @@ namespace misty::panel {
         void show_login_button();
         void show_terms_in_browser();
     private:
-        UIRegistry& registry_;
+        StateRegistry& registry_;
     };
 }

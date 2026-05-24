@@ -3,21 +3,21 @@
 #include "imgui.h"
 
 namespace misty::view {
-    VaultView::VaultView(core::UIRegistry& ui_registry, core::WorkerPool& worker_pool)
-        : ui_registry_(ui_registry), worker_pool_(worker_pool) {
+    VaultView::VaultView(core::StateRegistry& state_registry, core::WorkerPool& worker_pool)
+        : state_registry_(state_registry), worker_pool_(worker_pool) {
         init_panels();
     }
 
     void VaultView::init_panels() {
-        navbar_panel_       = std::make_shared<panel::NavbarPanel>(ui_registry_);
-        vault_panel_        = std::make_shared<panel::VaultPanel>(ui_registry_);
-        notification_panel_ = std::make_shared<panel::NotificationPanel>(ui_registry_);
-        context_menu_panel_ = std::make_shared<panel::ContextMenuPanel>(ui_registry_);
+        navbar_panel_       = std::make_shared<panel::NavbarPanel>(state_registry_);
+        vault_panel_        = std::make_shared<panel::VaultPanel>(state_registry_);
+        notification_panel_ = std::make_shared<panel::NotificationPanel>(state_registry_);
+        context_menu_panel_ = std::make_shared<panel::ContextMenuPanel>(state_registry_);
 
         // Wire the worker pool into the vault state on first construction so
         // refreshes / SSE consumers have a thread to run on. Subsequent calls
         // are idempotent (init() short-circuits if a pool is already set).
-        ui_registry_.get_state<panel::VaultState>("Vault").init(worker_pool_);
+        state_registry_.get_state<panel::VaultState>("Vault").init(worker_pool_);
     }
 
     ViewID VaultView::get_view_id() {

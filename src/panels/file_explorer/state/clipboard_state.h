@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-#include "core/ui/ui_registry.h"
+#include "core/ui/state_registry.h"
 #include "panels/file_explorer/state/file_listings_state.h"
 
 namespace misty::panel {
@@ -16,7 +16,7 @@ enum class ClipboardOp { NONE, COPY, CUT };
 /**
  * @brief Shared clipboard state for all file-explorer panes and tabs.
  */
-struct ClipboardState : public core::UIState {
+struct ClipboardState : public core::StateEntry {
     ClipboardOp op = ClipboardOp::NONE;
     std::vector<std::string> paths;
     std::vector<FileItem> items;

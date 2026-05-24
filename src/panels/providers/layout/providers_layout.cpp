@@ -21,7 +21,7 @@ namespace misty::panel {
         constexpr ImVec4 kBorder = ImVec4(0.24f, 0.27f, 0.30f, 1.0f);
         constexpr ImVec4 kReadyBg = ImVec4(0.14f, 0.17f, 0.19f, 1.0f);
         constexpr ImVec4 kReadyText = ImVec4(0.42f, 0.86f, 0.55f, 1.0f);
-        constexpr float kSectionChromeHeight = 52.0f;
+        constexpr float kSectionChromeHeight = 88.0f;
 
         std::string lowercase_copy(std::string value) {
             std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {

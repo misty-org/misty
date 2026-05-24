@@ -93,6 +93,7 @@ namespace misty::panel {
         ImGui::SetNextWindowSizeConstraints(ImVec2(360.0f, 0.0f), ImVec2(520.0f, 10000.0f));
 
         bool confirmed = false;
+        ImGui::PushStyleColor(ImGuiCol_ModalWindowDimBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
         if (ImGui::BeginPopupModal(props.modal_id, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
             const bool confirm_shortcut = props.dismissible && core::CommandManager::get().matches("modal.confirm");
             const bool cancel_shortcut = props.dismissible && core::CommandManager::get().matches("modal.cancel");
@@ -167,6 +168,7 @@ namespace misty::panel {
 
             ImGui::EndPopup();
         }
+        ImGui::PopStyleColor();
 
         return confirmed;
     }

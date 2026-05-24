@@ -5,11 +5,45 @@
 
 #include <nlohmann/json.hpp>
 
+#include "core/cache/listing_cache.h"
 #include "core/file_master/file_master_api.h"
 
 namespace fs = std::filesystem;
 
 namespace misty::core {
+namespace {
+
+FileMasterResult parse_remote_list_body(const std::string& body, std::vector<FileMasterListItem>& items) {
+    try {
+        const nlohmann::json parsed = nlohmann::json::parse(body);
+        if (!parsed.is_array()) {
+            return make_success();
+        }
+
+        items.clear();
+        items.reserve(parsed.size());
+        for (const auto& item_json : parsed) {
+            FileMasterListItem item;
+            item.name = item_json.value("name", std::string{});
+            item.path = item_json.value("path", std::string{});
+            item.is_dir = item_json.value("is_dir", false);
+            item.size = item_json.value("size", static_cast<int64_t>(0));
+            item.last_modified = item_json.value("mod_time", std::string{});
+            item.mime_type = item_json.value("mime_type", std::string{});
+            items.emplace_back(std::move(item));
+        }
+    } catch (const std::exception& ex) {
+        return make_error(std::string("invalid remote list response: ") + ex.what());
+    }
+
+    return make_success();
+}
+
+const FileMasterRemoteContext& remote_context_for_props(const FileMasterProps& props) {
+    return !props.remote_source.empty() ? props.remote_source : props.remote_dest;
+}
+
+}  // namespace
 
 void complete(const std::shared_ptr<FileMasterCompletion>& callback, FileMasterResult result) {
     if (callback && *callback) {
@@ -184,6 +218,17 @@ FileMasterResult cut_remote_path(const FileMasterProps& props) {
     return make_error("Remote cut is not implemented yet.");
 }
 
+bool load_cached_remote_path(const FileMasterProps& props, std::vector<FileMasterListItem>& items) {
+    const FileMasterRemoteContext& context = remote_context_for_props(props);
+    std::string body;
+    if (!listing_cache::load(context.remote_name, context.remote_path, body)) {
+        return false;
+    }
+
+    FileMasterResult result = parse_remote_list_body(body, items);
+    return result.success;
+}
+
 FileMasterResult list_remote_path(const FileMasterProps& props, std::vector<FileMasterListItem>& items) {
     FileMasterResult result = make_success();
 
@@ -192,26 +237,10 @@ FileMasterResult list_remote_path(const FileMasterProps& props, std::vector<File
         return make_error("remote list request failed (HTTP " + std::to_string(response.status_code) + ")");
     }
 
-    try {
-        const nlohmann::json parsed = nlohmann::json::parse(response.body);
-        if (!parsed.is_array()) {
-            return result;
-        }
-
-        items.clear();
-        items.reserve(parsed.size());
-        for (const auto& item_json : parsed) {
-            FileMasterListItem item;
-            item.name = item_json.value("name", std::string{});
-            item.path = item_json.value("path", std::string{});
-            item.is_dir = item_json.value("is_dir", false);
-            item.size = item_json.value("size", static_cast<int64_t>(0));
-            item.last_modified = item_json.value("mod_time", std::string{});
-            item.mime_type = item_json.value("mime_type", std::string{});
-            items.emplace_back(std::move(item));
-        }
-    } catch (const std::exception& ex) {
-        return make_error(std::string("invalid remote list response: ") + ex.what());
+    result = parse_remote_list_body(response.body, items);
+    if (result.success) {
+        const FileMasterRemoteContext& context = remote_context_for_props(props);
+        listing_cache::save(context.remote_name, context.remote_path, response.body);
     }
 
     return result;

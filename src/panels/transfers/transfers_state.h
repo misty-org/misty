@@ -1,13 +1,13 @@
 #pragma once
 
 #include "core/file_transfer/file_transfer.h"
-#include "core/ui/ui_registry.h"
+#include "core/ui/state_registry.h"
 
 namespace misty::panel {
 
 inline constexpr const char* kTransfersStateKey = "Transfers";
 
-class TransfersState : public core::UIState {
+class TransfersState : public core::StateEntry {
 public:
     void set_filter(core::FileTransferFilter filter) { filter_ = filter; }
     core::FileTransferFilter filter() const { return filter_; }

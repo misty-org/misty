@@ -21,7 +21,7 @@ const ImVec4 kDividerColor = ImVec4(0.24f, 0.24f, 0.27f, 1.0f);
 
 } // namespace
 
-ContextMenuPanel::ContextMenuPanel(core::UIRegistry& registry)
+ContextMenuPanel::ContextMenuPanel(core::StateRegistry& registry)
     : registry_(registry) {
 }
 

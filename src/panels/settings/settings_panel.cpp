@@ -21,14 +21,14 @@ namespace {
 using json = nlohmann::json;
 }
 
-SettingsPanel::SettingsPanel(core::UIRegistry& registry, SettingsPanelProps props)
+SettingsPanel::SettingsPanel(core::StateRegistry& registry, SettingsPanelProps props)
     : MultiPanel(std::move(props.panel_id)),
       registry_(registry),
       state_key_(std::move(props.state_key)),
       owns_state_cleanup_(props.owns_state_cleanup) {}
 
 std::string SettingsPanel::save_restore_state() const {
-    const auto& state = const_cast<core::UIRegistry&>(registry_).get_state<SettingsState>(state_key_);
+    const auto& state = const_cast<core::StateRegistry&>(registry_).get_state<SettingsState>(state_key_);
     json data;
     data["active_section"] = static_cast<int>(state.active_section);
     data["prev_section"] = static_cast<int>(state.prev_section);

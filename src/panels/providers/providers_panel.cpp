@@ -2,7 +2,7 @@
 
 namespace misty::panel {
 
-    ProvidersPanel::ProvidersPanel(UIRegistry& registry)
+    ProvidersPanel::ProvidersPanel(StateRegistry& registry)
         : registry_(registry) {
     }
 

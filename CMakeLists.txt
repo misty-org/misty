@@ -30,6 +30,12 @@ if(MISTY_BUILD_BUNDLED_PLUGINS OR MISTY_BUILD_DEV_PLUGINS)
     set(MISTY_HOST_SOURCE_DIR "${CMAKE_SOURCE_DIR}" CACHE PATH "Path to the Misty host source tree")
     if(EXISTS "${MISTY_EXTERNAL_PLUGIN_DIR}/CMakeLists.txt")
         add_subdirectory("${MISTY_EXTERNAL_PLUGIN_DIR}" "${CMAKE_BINARY_DIR}/external_plugins")
+        if(TARGET misty_plugin_sandbox)
+            target_include_directories(misty_plugin_sandbox PRIVATE
+                "${CMAKE_SOURCE_DIR}/vendor/watcher/include"
+                "${CMAKE_SOURCE_DIR}/vendor/xxhash"
+            )
+        endif()
     else()
         message(FATAL_ERROR "Plugin source directory not found: ${MISTY_EXTERNAL_PLUGIN_DIR}")
     endif()

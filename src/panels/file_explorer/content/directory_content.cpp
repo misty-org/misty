@@ -16,12 +16,12 @@ namespace {
 
 constexpr float kFileRowContentPaddingX = 8.0f;
 constexpr float kFirstHeaderTextPaddingX = 8.0f;
-constexpr float kDirectoryTablePaddingX = 10.0f;
+constexpr float kDirectoryTablePaddingX = 2.0f;
 constexpr float kNameColumnWidth = 360.0f;
 constexpr float kModifiedColumnWidth = 220.0f;
 constexpr float kSizeColumnWidth = 120.0f;
 constexpr float kTypeColumnWidth = 140.0f;
-constexpr ImVec2 kTableCellPadding = ImVec2(8.0f, 6.0f);
+constexpr ImVec2 kTableCellPadding = ImVec2(8.0f, 2.0f);
 constexpr float kTableMinInnerWidth =
     kNameColumnWidth + kModifiedColumnWidth + kSizeColumnWidth + kTypeColumnWidth;
 

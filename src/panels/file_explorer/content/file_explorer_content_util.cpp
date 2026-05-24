@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdlib>
-#include <fstream>
 #include <mutex>
 
 #include "core/system/util.h"
@@ -40,17 +39,12 @@ std::string remote_sync_path_for_item(const RemoteBrowseTarget& target,
 }
 
 void materialize_remote_cache_item(const fs::path& path, bool is_dir) {
-    std::error_code ec;
-    if (is_dir) {
-        fs::create_directories(path, ec);
+    if (!is_dir) {
         return;
     }
 
-    fs::create_directories(path.parent_path(), ec);
-    if (ec || fs::exists(path, ec)) {
-        return;
-    }
-    std::ofstream placeholder(path, std::ios::binary);
+    std::error_code ec;
+    fs::create_directories(path, ec);
 }
 
 void assign_formatted_last_write_time(const fs::directory_entry& entry, FileItem& item) {

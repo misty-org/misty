@@ -10,7 +10,7 @@
 #include <vector>
 
 #include "core/threading/worker_pool.h"
-#include "core/ui/ui_registry.h"
+#include "core/ui/state_registry.h"
 
 namespace misty::panel {
 
@@ -65,7 +65,7 @@ namespace misty::panel {
     // job. All public methods are safe to call from the UI thread; HTTP work
     // happens on the worker pool, SSE consumers run on dedicated detached
     // threads.
-    class VaultState : public core::UIState {
+    class VaultState : public core::StateEntry {
     public:
         VaultState();
         ~VaultState() override;
