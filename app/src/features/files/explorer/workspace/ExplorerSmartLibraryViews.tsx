@@ -2,7 +2,15 @@ import type { useSmartLibraryStore } from "@/features/spaces/library";
 import type { SmartLibraryAsset } from "@/native/contracts";
 import { safeTauriAssetUrl } from "@/shared/platform/tauri";
 import { Badge, Button, Progress } from "@/shared/ui";
-import { AlertCircle, Cloud, File, Images, RefreshCw, ShieldAlert, Sparkles } from "lucide-react";
+import {
+  AlertCircle,
+  BrainCircuit,
+  Cloud,
+  File,
+  Images,
+  RefreshCw,
+  ShieldAlert,
+} from "lucide-react";
 import type { ReactNode } from "react";
 
 export function SmartLibraryFeature(props: { icon: ReactNode; title: string; text: string }) {
@@ -81,9 +89,7 @@ export function SmartLibraryPreflightView(props: {
       ) : null}
       <div className="grid gap-4 rounded-lg bg-charcoal-active p-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
         <div className="grid gap-2">
-          <span className="text-xs font-medium uppercase tracking-wide text-cream-bright">
-            25-file trial allowance
-          </span>
+          <span className="text-xs font-medium text-cream-bright">25-file trial allowance</span>
           <strong className="text-lg font-semibold">Try the sample before using hosted AI</strong>
           <span className="text-sm leading-relaxed text-cream-muted">
             {preflight.sampleAssetIds.length} files selected across subfolders, formats, and dates.{" "}
@@ -95,7 +101,7 @@ export function SmartLibraryPreflightView(props: {
           disabled={preflight.sampleAssetIds.length === 0}
           onClick={() => void props.onTrySample()}
         >
-          <Sparkles size={17} />
+          <BrainCircuit size={17} />
           Try Sample
         </Button>
       </div>

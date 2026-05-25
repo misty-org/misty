@@ -5,5 +5,16 @@
   "assets": {
     "directory": "./dist",
     "not_found_handling": "single-page-application"
+  },
+  "env": {
+    "dev": {
+      "name": "misty-web-app-dev",
+      "routes": [
+        {
+          "pattern": "dev-app.mistysys.com",
+          "custom_domain": true
+        }
+      ]
+    }
   }
 }

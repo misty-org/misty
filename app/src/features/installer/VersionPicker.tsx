@@ -22,12 +22,13 @@ export function VersionPicker() {
         value={release?.version ?? ""}
         onValueChange={setSelectedVersion}
       >
-        <SelectTrigger className="h-10">
+        <SelectTrigger aria-label="Runtime version" className="h-9">
           <span className="flex min-w-0 items-center gap-3">
             <span className="shrink-0 whitespace-nowrap tabular-nums">
               {release?.version ?? "Loading"}
             </span>
             <span className="min-w-0 truncate text-[11px] font-medium text-cream-muted">
+              ·{" "}
               {releasesLoading
                 ? "Fetching releases"
                 : release?.version === latestVersion

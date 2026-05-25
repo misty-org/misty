@@ -58,7 +58,6 @@ import { useEditorEphemeralStore } from "./store/useEditorEphemeralStore";
 import { useFileWatcher } from "./watcher/useFileWatcher";
 import { prepareWorkspaceEdit } from "./lsp/workspaceEdits";
 import type { DocumentSymbol, LspCodeAction } from "./lsp/codeMirrorLsp";
-import { AiSurfaceButton } from "@/features/ai-surface/AiPaneHost";
 import { useCodeAiAdapter } from "./ai/useCodeAiAdapter";
 import {
   basename,
@@ -422,11 +421,7 @@ export function CodingWorkspace({ tab }: { tab?: WorkspaceTab }) {
     [codeTab],
   );
 
-  const { commands, openExtensions, openModelsSettings } = useCodeCommands(
-    codeTab,
-    setCommandMode,
-    toggleTerminal,
-  );
+  const { commands, openModelsSettings } = useCodeCommands(codeTab, setCommandMode, toggleTerminal);
 
   const openReferences = useCallback(() => {
     const origin = codeTab ? editorLocation(codeTab.id) : null;
@@ -730,9 +725,6 @@ export function CodingWorkspace({ tab }: { tab?: WorkspaceTab }) {
       data-interface-scale={editorAppearance.interfaceScale}
       className="coding-workspace relative grid h-full min-h-0 bg-charcoal-workspace"
     >
-      <div className="absolute right-2 top-2 z-50 rounded bg-charcoal-workspace/90">
-        <AiSurfaceButton />
-      </div>
       <CodeCommandCenter
         viewId={codeTab.id}
         rootPath={rootPath}
@@ -823,7 +815,6 @@ export function CodingWorkspace({ tab }: { tab?: WorkspaceTab }) {
         onToggleTerminal={toggleTerminal}
         onOpenDiagnostics={openDiagnostics}
         onOpenAi={openModelsSettings}
-        onOpenExtensions={openExtensions}
       />
       <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
         <DialogContent className="code-theme-overlay max-w-sm">

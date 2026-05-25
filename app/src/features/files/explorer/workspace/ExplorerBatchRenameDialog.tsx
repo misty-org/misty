@@ -222,9 +222,9 @@ function BatchRenameDialog(props: {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Unchanged</SelectItem>
-                  <SelectItem value="lower">lowercase</SelectItem>
-                  <SelectItem value="upper">UPPERCASE</SelectItem>
-                  <SelectItem value="title">Title Case</SelectItem>
+                  <SelectItem value="lower">Lowercase</SelectItem>
+                  <SelectItem value="upper">Uppercase</SelectItem>
+                  <SelectItem value="title">Title case</SelectItem>
                 </SelectContent>
               </Select>
             </label>
@@ -270,7 +270,7 @@ function BatchRenameDialog(props: {
             </label>
           </div>
           <div
-            className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] gap-3 border-b border-charcoal-border px-4 py-2 text-[10px] font-semibold uppercase tracking-wide text-cream-muted"
+            className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] gap-3 border-b border-charcoal-border px-4 py-2 text-[10px] font-semibold text-cream-muted"
             aria-hidden="true"
           >
             <span>Before</span>
