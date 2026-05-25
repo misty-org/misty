@@ -87,11 +87,17 @@ void FileExplorerPanel::perform_paste(FileExplorerState& state) {
     }
 
     auto& clipboard = registry_.get_state<ClipboardState>("Clipboard");
+    bool dispatched_cut = false;
     for (const auto& item : clipboard.items) {
         if (is_remote_path(item.path)) {
             continue;
         }
-        perform_paste_local_to_local(state, item, dest_dir, clipboard.op);
+        const bool dispatched = perform_paste_local_to_local(state, item, dest_dir, clipboard.op);
+        dispatched_cut = dispatched_cut || (dispatched && clipboard.op == ClipboardOp::CUT);
+    }
+
+    if (dispatched_cut) {
+        clipboard.clear();
     }
 }
 
@@ -111,28 +117,32 @@ void FileExplorerPanel::perform_drop_items(FileExplorerState& state,
     }
 }
 
-void FileExplorerPanel::perform_paste_local_to_local(FileExplorerState& state,
+bool FileExplorerPanel::perform_paste_local_to_local(FileExplorerState& state,
                                                      const FileItem& item,
                                                      const std::string& dest_dir,
                                                      ClipboardOp op) {
     (void)state;
     if (dest_dir.empty() || op == ClipboardOp::NONE) {
-        return;
+        return false;
     }
 
     std::filesystem::path resolved_dest = std::filesystem::path(dest_dir) / item.name;
     std::error_code ec;
     if (std::filesystem::equivalent(std::filesystem::path(item.path), resolved_dest, ec) && !ec) {
-        return;
+        return false;
     }
 
-    core::FileMasterLocal file_master(worker_pool_);
+    auto& transfers = registry_.get_state<core::FileTransfer>("FileMasterTransfers");
+    core::FileMasterLocal file_master(worker_pool_, &transfers);
     const auto props = make_local_props(item, resolved_dest.string());
     if (op == ClipboardOp::CUT) {
         file_master.cut(props, {});
+        return true;
     } else if (op == ClipboardOp::COPY) {
         file_master.copy(props, {});
+        return true;
     }
+    return false;
 }
 
 void FileExplorerPanel::download_remote_item(FileExplorerState& state, const FileItem& item) {
@@ -213,7 +223,8 @@ void FileExplorerPanel::create_sync_object_for_current_directory(FileExplorerSta
 void FileExplorerPanel::perform_delete_selected(FileExplorerState& state) {
     (void)state;
     auto items = selected_items(ui_, active_listing());
-    core::FileMasterLocal file_master(worker_pool_);
+    auto& transfers = registry_.get_state<core::FileTransfer>("FileMasterTransfers");
+    core::FileMasterLocal file_master(worker_pool_, &transfers);
     for (const auto& item : items) {
         if (is_remote_path(item.path)) {
             continue;

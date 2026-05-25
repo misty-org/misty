@@ -229,6 +229,11 @@ bool load_cached_remote_path(const FileMasterProps& props, std::vector<FileMaste
     return result.success;
 }
 
+std::optional<std::chrono::system_clock::time_point> cached_remote_path_time(const FileMasterProps& props) {
+    const FileMasterRemoteContext& context = remote_context_for_props(props);
+    return listing_cache::last_write_time(context.remote_name, context.remote_path);
+}
+
 FileMasterResult list_remote_path(const FileMasterProps& props, std::vector<FileMasterListItem>& items) {
     FileMasterResult result = make_success();
 

@@ -12,6 +12,7 @@ namespace misty::panel {
         NavbarPanel(StateRegistry& state_registry);
         ~NavbarPanel() override = default;
         void render() override;
+        void render_activity_popup();
 
 
     private:

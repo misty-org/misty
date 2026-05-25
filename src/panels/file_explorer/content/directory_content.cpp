@@ -198,7 +198,10 @@ void FileExplorerPanel::show_file_item(FileExplorerState& state, FileListing& li
         dl->AddRectFilledMultiColor(row_min, row_max, col_left, col_right, col_right, col_left);
     }
 
-    if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
+    const bool row_right_clicked =
+        ImGui::IsMouseClicked(ImGuiMouseButton_Right) &&
+        ImGui::IsMouseHoveringRect(row_min, row_max, false);
+    if (row_right_clicked) {
         ui.context_menu_target_path = file.path;
         if (!is_selected) select_item(state, ui, listing, file, i, false, io);
         open_context_menu(state, ui);
@@ -298,6 +301,7 @@ void FileExplorerPanel::show_grid_item(FileExplorerState& state, FileListing& li
     const bool clicked = begin_grid_item_button(btn_id, cell_w, cell_h);
     bool hovered = ImGui::IsItemHovered();
     bool double_clicked = hovered && ImGui::IsMouseDoubleClicked(0);
+    const bool right_clicked = hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right);
 
     ImDrawList* dl = ImGui::GetWindowDrawList();
     ImVec2 cell_max = ImVec2(cell_pos.x + cell_w, cell_pos.y + cell_h);
@@ -330,7 +334,7 @@ void FileExplorerPanel::show_grid_item(FileExplorerState& state, FileListing& li
         }
     }
 
-    if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
+    if (right_clicked) {
         ui.context_menu_target_path = file.path;
         if (!is_selected) select_item(state, ui, listing, file, i, false, io);
         open_context_menu(state, ui);

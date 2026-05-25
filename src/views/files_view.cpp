@@ -13,6 +13,7 @@
 #include "core/manager/proxy_manager.h"
 #include "core/manager/session_manager.h"
 #include "core/ui/ui_style.h"
+#include "panels/activity/activity_state.h"
 #include "panels/file_explorer/state/file_explorer_state.h"
 #include "panels/notification/notification_state.h"
 
@@ -266,6 +267,21 @@ namespace misty::view {
             explorer_panel_ = tab->explorer_panel;
         }
         save_workspaces();
+    }
+
+    void FilesView::select_next_workspace() {
+        if (workspaces_.size() <= 1) {
+            return;
+        }
+
+        const auto it = std::find_if(workspaces_.begin(), workspaces_.end(), [&](const FileWorkspace& workspace) {
+            return workspace.idx == active_workspace_idx_;
+        });
+        const std::size_t current_index = it == workspaces_.end()
+            ? workspaces_.size() - 1
+            : static_cast<std::size_t>(std::distance(workspaces_.begin(), it));
+        const std::size_t next_index = (current_index + 1) % workspaces_.size();
+        select_workspace(workspaces_[next_index].idx);
     }
 
     void FilesView::rename_workspace(std::int16_t workspace_idx, std::string title) {
@@ -573,6 +589,10 @@ namespace misty::view {
             command_id == "explorer.preview.zoom_reset") {
             return true;
         }
+        if (command_id == "explorer.next_workspace") {
+            select_next_workspace();
+            return true;
+        }
         return false;
     }
 
@@ -633,6 +653,9 @@ namespace misty::view {
         if (core::CommandManager::get().matches("explorer.toggle_claude")) {
             claude_panel_->toggle();
         }
+        if (core::CommandManager::get().matches("explorer.next_workspace")) {
+            select_next_workspace();
+        }
         if (core::CommandManager::get().matches("explorer.new_tab")) {
             create_tab();
         }
@@ -682,6 +705,12 @@ namespace misty::view {
         const float sidebar_handle_x1 = sidebar_handle_x0 + kResizeHandleWidth;
         const float handle_y0 = sidebar_pos.y;
         const float handle_y1 = bottom_bar_y;
+        const bool activity_popup_open = state_registry_.get_state<panel::ActivityState>("Activity").is_open;
+        if (activity_popup_open) {
+            is_resizing_sidebar_ = false;
+            is_resizing_inspector_ = false;
+            is_resizing_claude_panel_ = false;
+        }
 
         if (core::CommandManager::get().matches("explorer.preview.toggle")) {
             workspace->inspector_visible = !workspace->inspector_visible;
@@ -701,7 +730,7 @@ namespace misty::view {
             }
         }
 
-        const bool sidebar_hovered = workspace->sidebar_visible &&
+        const bool sidebar_hovered = !activity_popup_open && workspace->sidebar_visible &&
                                      io.MousePos.x >= sidebar_handle_x0 && io.MousePos.x <= sidebar_handle_x1 &&
                                      io.MousePos.y >= handle_y0 && io.MousePos.y <= handle_y1;
 
@@ -733,7 +762,7 @@ namespace misty::view {
         const float inspector_handle_x = inspector_pos.x;
         const float inspector_handle_x0 = inspector_handle_x - kResizeHandleWidth * 0.5f;
         const float inspector_handle_x1 = inspector_handle_x0 + kResizeHandleWidth;
-        const bool inspector_hovered = workspace->inspector_visible &&
+        const bool inspector_hovered = !activity_popup_open && workspace->inspector_visible &&
                                        io.MousePos.x >= inspector_handle_x0 && io.MousePos.x <= inspector_handle_x1 &&
                                        io.MousePos.y >= handle_y0 && io.MousePos.y <= handle_y1;
 
@@ -765,6 +794,7 @@ namespace misty::view {
             const float ch_x1 = ch_x0 + kResizeHandleWidth;
 
             const bool ch_hovered =
+                                    !activity_popup_open &&
                                     io.MousePos.x >= ch_x0 && io.MousePos.x <= ch_x1 &&
                                     io.MousePos.y >= handle_y0 && io.MousePos.y <= handle_y1;
 
@@ -788,10 +818,10 @@ namespace misty::view {
             }
         }
 
-        if (workspace->inspector_visible) {
+        if (!activity_popup_open && workspace->inspector_visible) {
             render_shell_divider(inspector_pos.x, handle_y0, handle_y1);
         }
-        if (claude_panel_->is_open()) {
+        if (!activity_popup_open && claude_panel_->is_open()) {
             render_shell_divider(inspector_pos.x + inspector_w, handle_y0, handle_y1);
         }
 
@@ -823,7 +853,7 @@ namespace misty::view {
             ImGui::SetNextWindowPos(sidebar_pos);
             ImGui::SetNextWindowSize(ImVec2(sidebar_w, sidebar_h));
             explorer_panel_->render_sidebar();
-            if (!explorer_panel_->workspace_dropdown_open()) {
+            if (!activity_popup_open && !explorer_panel_->workspace_dropdown_open()) {
                 render_shell_divider(explorer_pos.x, handle_y0, handle_y1);
             }
         }
@@ -867,6 +897,7 @@ namespace misty::view {
             workspace->sidebar_visible,
             workspace->inspector_visible);
 
+        navbar_panel_->render_activity_popup();
         context_menu_panel_->render();
         notification_panel_->render();
 

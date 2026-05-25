@@ -40,6 +40,7 @@ namespace misty::view {
         void configure_workspace_sidebar(const std::shared_ptr<panel::FileExplorerPanel>& explorer_panel);
         void close_workspace(std::int16_t workspace_idx);
         void select_workspace(std::int16_t workspace_idx);
+        void select_next_workspace();
         void rename_workspace(std::int16_t workspace_idx, std::string title);
         void create_tab();
         void create_tab_from_snapshot(FileWorkspace& workspace, const core::WorkspaceFileTabSnapshot& snapshot);

@@ -61,6 +61,13 @@ namespace misty::panel {
             return out;
         }
 
+        void draw_split_divider(const ImVec2& min, const ImVec2& max, bool hovered, bool active) {
+            const ImU32 color = active ? IM_COL32(82, 92, 112, 210)
+                              : hovered ? IM_COL32(68, 76, 92, 185)
+                                        : IM_COL32(48, 52, 62, 150);
+            ImGui::GetWindowDrawList()->AddRectFilled(min, max, color);
+        }
+
     }
 
     // initialize the panel with a default pane and grid lane
@@ -92,6 +99,19 @@ namespace misty::panel {
     Panel* MultiPanel::active_panel() const {
         const TabController::Tab* tab = active_tab();
         return tab ? tab->panel.get() : nullptr;
+    }
+
+    float MultiPanel::pane_header_height(const Panel& panel, bool is_active, bool has_multiple_panes) const {
+        (void)panel;
+        (void)is_active;
+        (void)has_multiple_panes;
+        return 0.0f;
+    }
+
+    void MultiPanel::render_pane_header(Panel& panel, bool is_active, bool has_multiple_panes) {
+        (void)panel;
+        (void)is_active;
+        (void)has_multiple_panes;
     }
 
     core::WorkspaceExplorerSnapshot MultiPanel::export_workspace_snapshot() const {
@@ -524,23 +544,31 @@ namespace misty::panel {
             return;
         }
 
-        const float total_height = std::max(0.0f, size.y - kPaneHandleWidth);
+        const float total_height = std::max(0.0f, size.y - kPaneDividerThickness);
         const float top_height = split_size(lane_split_ratios_[lane_index], total_height, kPaneMinHeight);
         const float bottom_height = std::max(0.0f, total_height - top_height);
 
         render_pane(lane[0], pos, ImVec2(size.x, top_height));
+        render_pane(lane[1],
+                    ImVec2(pos.x, pos.y + top_height + kPaneDividerThickness),
+                    ImVec2(size.x, bottom_height));
 
-        const ImVec2 splitter_pos(pos.x, pos.y + top_height);
+        const ImVec2 divider_min(pos.x, pos.y + top_height);
+        const ImVec2 divider_max(pos.x + size.x, divider_min.y + kPaneDividerThickness);
+        const ImVec2 splitter_pos(pos.x, divider_min.y - (kPaneHandleWidth - kPaneDividerThickness) * 0.5f);
         ImGui::SetCursorScreenPos(splitter_pos);
         ImGui::InvisibleButton(("##pane_lane_splitter_" + std::to_string(lane_index)).c_str(), ImVec2(size.x, kPaneHandleWidth));
+        const bool splitter_hovered = ImGui::IsItemHovered();
         if (ImGui::IsItemActive()) {
             lane_split_ratios_[lane_index] = std::clamp(
                 lane_split_ratios_[lane_index] + ImGui::GetIO().MouseDelta.y / std::max(1.0f, total_height),
                 0.1f,
                 0.9f);
         }
-
-        render_pane(lane[1], ImVec2(pos.x, pos.y + top_height + kPaneHandleWidth), ImVec2(size.x, bottom_height));
+        if (splitter_hovered || ImGui::IsItemActive()) {
+            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
+        }
+        draw_split_divider(divider_min, divider_max, splitter_hovered, ImGui::IsItemActive());
     }
 
     void MultiPanel::render_pane(const std::string& pane_id, const ImVec2& pos, const ImVec2& size) {
@@ -570,6 +598,12 @@ namespace misty::panel {
                 if (!tab || !tab->panel) {
                     error_msg_ = "Active pane has no panel.";
                 } else if (auto* multi_panel = dynamic_cast<MultiPanel*>(tab->panel.get())) {
+                    const bool is_active_pane = pane_id == active_pane_id;
+                    const bool has_multiple_panes = pane_count() > 1;
+                    const float header_height = pane_header_height(*tab->panel, is_active_pane, has_multiple_panes);
+                    if (header_height > 0.0f && ImGui::GetContentRegionAvail().y > header_height) {
+                        render_pane_header(*tab->panel, is_active_pane, has_multiple_panes);
+                    }
                     multi_panel->render_panel_contents();
                 } else {
                     tab->panel->render();
@@ -608,25 +642,31 @@ namespace misty::panel {
             } else if (grid_.lanes.size() == 1) {
                 render_grid_lane(0, origin, avail);
             } else {
-                const float total_width = std::max(0.0f, avail.x - kPaneHandleWidth);
+                const float total_width = std::max(0.0f, avail.x - kPaneDividerThickness);
                 const float left_width = split_size(grid_split_ratio_, total_width, kPaneMinWidth);
                 const float right_width = std::max(0.0f, total_width - left_width);
 
                 render_grid_lane(0, origin, ImVec2(left_width, avail.y));
+                render_grid_lane(1,
+                                 ImVec2(origin.x + left_width + kPaneDividerThickness, origin.y),
+                                 ImVec2(right_width, avail.y));
 
-                const ImVec2 splitter_pos(origin.x + left_width, origin.y);
+                const ImVec2 divider_min(origin.x + left_width, origin.y);
+                const ImVec2 divider_max(divider_min.x + kPaneDividerThickness, origin.y + avail.y);
+                const ImVec2 splitter_pos(divider_min.x - (kPaneHandleWidth - kPaneDividerThickness) * 0.5f, origin.y);
                 ImGui::SetCursorScreenPos(splitter_pos);
                 ImGui::InvisibleButton("##multi_panel_grid_splitter", ImVec2(kPaneHandleWidth, avail.y));
+                const bool splitter_hovered = ImGui::IsItemHovered();
                 if (ImGui::IsItemActive()) {
                     grid_split_ratio_ = std::clamp(
                         grid_split_ratio_ + ImGui::GetIO().MouseDelta.x / std::max(1.0f, total_width),
                         0.1f,
                         0.9f);
                 }
-
-                render_grid_lane(1,
-                                 ImVec2(origin.x + left_width + kPaneHandleWidth, origin.y),
-                                 ImVec2(right_width, avail.y));
+                if (splitter_hovered || ImGui::IsItemActive()) {
+                    ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+                }
+                draw_split_divider(divider_min, divider_max, splitter_hovered, ImGui::IsItemActive());
             }
         }
 

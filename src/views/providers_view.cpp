@@ -40,6 +40,7 @@ namespace misty::view {
         providers_panel_->render();
 
         // Render notifications on top
+        navbar_panel_->render_activity_popup();
         context_menu_panel_->render();
         notification_panel_->render();
     }
