@@ -11,16 +11,55 @@ import type {
 
 export interface AiUserSettings {
   enabled: boolean;
+  active_companion_agent_id?: string;
+  memory_enabled: boolean;
   retention_days: number;
   purge_state: "none" | "queued" | "working" | "verified" | "failed";
   disabled_at?: string;
   updated_at?: string;
 }
 
+export interface AiMemoryRecord {
+  id: string;
+  space_id?: string;
+  kind: "fact" | "preference" | "instruction";
+  content: string;
+  reason?: string;
+  last_used_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AiConversationMessageRecord {
+  id: string;
+  role: "user" | "assistant";
+  mode: string;
+  content: string;
+  createdAt: string;
+}
+
+export interface AiConversationRecord {
+  id: string;
+  title: string;
+  agentId?: string;
+  spaceId?: string;
+  kind: "companion_task" | "misty";
+  originSurface?: string;
+  originHref?: string;
+  privacyBoundary?: string;
+  createdAt: string;
+  updatedAt: string;
+  messages: AiConversationMessageRecord[];
+}
+
 export interface AiSurfacePreferenceRecord {
   surface_id: string;
   pinned_agent_id?: string;
   proactive_enabled: boolean;
+  proactive_cooldown_minutes: number;
+  proactive_snoozed_until?: string;
+  proactive_last_shown_at?: string;
+  proactive_dismissed_at?: string;
   saved_actions: AiSavedAction[];
   updated_at?: string;
 }
@@ -76,11 +115,21 @@ export const aiSurfaceApi = {
     apiRequest<{ settings: AiUserSettings; preferences: AiSurfacePreferenceRecord[] }>(
       "/ai/settings",
     ),
-  updateSettings: (enabled: boolean, retentionDays: number) =>
+  updateSettings: (enabled: boolean, retentionDays: number, memoryEnabled?: boolean) =>
     apiRequest<{ settings: AiUserSettings }>("/ai/settings", {
       method: "PUT",
-      body: JSON.stringify({ enabled, retention_days: retentionDays }),
+      body: JSON.stringify({
+        enabled,
+        retention_days: retentionDays,
+        ...(memoryEnabled === undefined ? {} : { memory_enabled: memoryEnabled }),
+      }),
     }),
+  memories: () => apiRequest<{ memories: AiMemoryRecord[] }>("/ai/memories"),
+  forgetMemory: (memoryId: string) =>
+    apiRequest<void>(`/ai/memories/${encodeURIComponent(memoryId)}`, { method: "DELETE" }),
+  conversations: () => apiRequest<{ conversations: AiConversationRecord[] }>("/ai/conversations"),
+  conversation: (conversationId: string) =>
+    apiRequest<AiConversationRecord>(`/ai/conversations/${encodeURIComponent(conversationId)}`),
   updatePreference: (
     surfaceId: string,
     input: Pick<
@@ -91,6 +140,21 @@ export const aiSurfaceApi = {
     apiRequest<{ preference: AiSurfacePreferenceRecord }>(
       `/ai/preferences/${encodeURIComponent(surfaceId)}`,
       { method: "PUT", body: JSON.stringify(input) },
+    ),
+  recordProactiveEvent: (
+    surfaceId: string,
+    event: "shown" | "snoozed" | "dismissed",
+    snoozeMinutes?: number,
+  ) =>
+    apiRequest<{ preference: AiSurfacePreferenceRecord }>(
+      `/ai/preferences/${encodeURIComponent(surfaceId)}/proactive-events`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          event,
+          ...(snoozeMinutes === undefined ? {} : { snooze_minutes: snoozeMinutes }),
+        }),
+      },
     ),
   recaps: () => apiRequest<{ recaps: AiRecapRecord[] }>("/ai/recaps"),
   updateRecap: (
@@ -122,7 +186,7 @@ export const aiSurfaceApi = {
     surfaceId: string;
     paneId: string;
     invocationId?: string;
-    agentId?: string;
+    conversationId?: string;
     spaceId?: string;
     href?: string;
     title?: string;
@@ -134,9 +198,9 @@ export const aiSurfaceApi = {
       headers: { "Idempotency-Key": input.idempotencyKey },
       body: JSON.stringify({
         prompt: input.prompt,
-        agent_id: input.agentId,
         space_id: input.spaceId,
         invocation_id: input.invocationId,
+        conversation_id: input.conversationId,
         idempotency_key: input.idempotencyKey,
         origin: {
           surface_id: input.surfaceId,
@@ -250,10 +314,32 @@ function toServerInvocation(input: AiInvocationRequest) {
     prompt: input.prompt,
     context: input.context.map(toServerContextReference),
     selection: input.selection,
+    capture: input.capture
+      ? {
+          id: input.capture.id,
+          name: input.capture.name,
+          mime_type: input.capture.mimeType,
+          data_url: input.capture.dataUrl,
+          width: input.capture.width,
+          height: input.capture.height,
+          content_hash: input.capture.contentHash,
+        }
+      : undefined,
+    attachment_ids: input.attachmentIds,
+    device_contexts: input.deviceContexts?.map((context) => ({
+      device_id: context.deviceId,
+      kind: context.kind,
+      opaque_ref: context.opaqueRef,
+      display_name: context.displayName,
+      capabilities: context.capabilities,
+      metadata: context.metadata,
+    })),
+    model_id: input.modelId,
+    reasoning_effort: input.reasoningEffort,
     requested_artifact_kind: input.requestedArtifactKind,
     conversation_id: input.conversationId,
-    agent_id: input.agentId,
     idempotency_key: input.idempotencyKey,
+    timezone: input.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC",
   };
 }
 

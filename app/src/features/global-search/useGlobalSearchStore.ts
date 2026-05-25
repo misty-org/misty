@@ -1,9 +1,4 @@
-import {
-  queryIndexedExplorerSearch,
-  querySemanticExplorerSearch,
-  useExplorerStore,
-} from "@/features/files/explorer";
-import { useSpacesStore } from "@/features/spaces";
+import { agentsApi } from "@/api/agents/api";
 import { create } from "zustand";
 import {
   globalMistyError,
@@ -12,186 +7,38 @@ import {
   proposeAction,
 } from "./globalMistyActions";
 import { globalMistyApi } from "./globalMistyApi";
-import { mergeGlobalMistyContext, uniqueGlobalMistyContext } from "./globalMistyContext";
-import {
-  buildLocalIndex,
-  globalSearchContext,
-  mapFileResults,
-  mergeResults,
-  searchDocuments,
-  searchServerTasks,
-} from "./globalSearchDocuments";
-import type {
-  GlobalAiActionProposal,
-  GlobalAiContextRef,
-  GlobalAiConversation,
-  GlobalAiMessage,
-  GlobalAiMode,
-  GlobalSearchContextItem,
-  GlobalSearchDocument,
-  GlobalSearchResult,
-} from "./types";
+import { mistyIntent } from "./unifiedMistyCandidates";
+import { aiSurfaceApi, subscribeToAiInvocation } from "@/features/ai-surface";
+import type { GlobalAiActionProposal } from "./types";
+import { executeGlobalSearch, executeGlobalVisualSearch } from "./globalSearchExecution";
 export { globalSearchContext } from "./globalSearchDocuments";
-
-export interface GlobalSearchState {
-  accountId: string;
-  launcherOpen: boolean;
-  open: boolean;
-  mode: GlobalAiMode;
-  query: string;
-  results: GlobalSearchResult[];
-  searching: boolean;
-  enriched: boolean;
-  working: boolean;
-  conversationsLoading: boolean;
-  error: string | null;
-  requestId: number;
-  context: GlobalAiContextRef[];
-  conversations: GlobalAiConversation[];
-  activeConversationId: string;
-  setAccount: (accountId: string) => void;
-  activateLauncher: () => void;
-  openPanel: (context?: GlobalAiContextRef[]) => void;
-  closePanel: () => void;
-  setMode: (mode: GlobalAiMode) => void;
-  setQuery: (query: string) => void;
-  setContext: (context: GlobalAiContextRef[]) => void;
-  removeContext: (id: string) => void;
-  clear: () => void;
-  search: (query: string) => Promise<void>;
-  loadConversations: () => Promise<void>;
-  newConversation: () => Promise<string>;
-  selectConversation: (conversationId: string) => void;
-  deleteConversation: (conversationId: string) => Promise<void>;
-  submit: () => Promise<void>;
-  confirmAction: (proposalId: string) => Promise<void>;
-  rejectAction: (proposalId: string) => void;
-}
+import {
+  announceGlobalPanel,
+  applyGlobalInvocationEvent,
+  appendConversationMessage,
+  askMisty,
+  conversationMessage,
+  findProposal,
+  globalAiContext,
+  isTerminalAgentState,
+  localConversation,
+  normalizeConversation,
+  patchConversationMessage,
+  patchProposal,
+  replaceActiveGlobalInvocationStream,
+  resumeGlobalAgentPolls,
+  startGlobalAgentTaskPoll,
+  updateConversation,
+} from "./globalSearchStoreHelpers";
+import { createGlobalSearchPanelState } from "./globalSearchPanelState";
+import type { GlobalSearchState } from "./globalSearchState";
+import { conversationForGlobalPrompt } from "./globalMistyConversationScope";
+export type { GlobalSearchState, MistySubmissionPresentation } from "./globalSearchState";
 
 export const useGlobalSearchStore = create<GlobalSearchState>((set, get) => ({
-  accountId: "",
-  launcherOpen: false,
-  open: false,
-  mode: "search",
-  query: "",
-  results: [],
-  searching: false,
-  enriched: false,
-  working: false,
-  conversationsLoading: false,
-  error: null,
-  requestId: 0,
-  context: [],
-  conversations: [],
-  activeConversationId: "",
-  setAccount: (accountId) => {
-    const normalized = accountId.trim();
-    if (normalized === get().accountId) return;
-    set((state) => ({
-      accountId: normalized,
-      launcherOpen: false,
-      open: false,
-      mode: readLastMode(normalized),
-      query: "",
-      results: [],
-      searching: false,
-      enriched: false,
-      working: false,
-      conversationsLoading: false,
-      error: null,
-      context: [],
-      conversations: [],
-      activeConversationId: "",
-      requestId: state.requestId + 1,
-    }));
-  },
-  activateLauncher: () => set({ launcherOpen: true, open: false, error: null }),
-  openPanel: (context = []) => {
-    set({
-      launcherOpen: false,
-      open: true,
-      context: mergeGlobalMistyContext(get().context, context),
-      error: null,
-    });
-    if (!get().conversations.length && !get().conversationsLoading) void get().loadConversations();
-  },
-  closePanel: () => set({ launcherOpen: false, open: false }),
-  setMode: (mode) => {
-    writeLastMode(get().accountId, mode);
-    set({ mode, error: null });
-    if (mode === "search" && get().query.trim()) void get().search(get().query);
-  },
-  setQuery: (query) => set({ query }),
-  setContext: (context) => set({ context: uniqueGlobalMistyContext(context) }),
-  removeContext: (id) => set({ context: get().context.filter((item) => item.id !== id) }),
-  clear: () =>
-    set((state) => ({
-      query: "",
-      results: [],
-      searching: false,
-      enriched: false,
-      error: null,
-      requestId: state.requestId + 1,
-    })),
-  search: async (query) => {
-    const trimmed = query.trim();
-    const accountId = get().accountId;
-    const requestId = get().requestId + 1;
-    if (!trimmed || !accountId) {
-      set({
-        query: trimmed,
-        results: [],
-        searching: false,
-        enriched: false,
-        error: null,
-        requestId,
-      });
-      return;
-    }
-    const local = searchDocuments(buildLocalIndex(accountId), trimmed, 24);
-    set({
-      query: trimmed,
-      results: local,
-      searching: true,
-      enriched: false,
-      error: null,
-      requestId,
-    });
-    if (trimmed.length < 2) {
-      set({ searching: false });
-      return;
-    }
-
-    const spaces = useSpacesStore.getState().spaces;
-    const explorer = useExplorerStore.getState();
-    const options = { scope: "everything" as const, currentPath: "", limit: 30 };
-    const requests: Array<Promise<GlobalSearchDocument[]>> = [
-      queryIndexedExplorerSearch(trimmed, options, explorer.library).then((results) =>
-        mapFileResults(results, accountId),
-      ),
-      querySemanticExplorerSearch(trimmed, options).then((results) =>
-        mapFileResults(results, accountId),
-      ),
-      globalMistyApi
-        .search(trimmed)
-        .then((response) => response.hits)
-        .catch(() => searchServerTasks(accountId, trimmed, spaces)),
-    ];
-    const settled = await Promise.allSettled(requests);
-    if (get().requestId !== requestId || get().accountId !== accountId) return;
-    const remoteDocuments = settled.flatMap((result) =>
-      result.status === "fulfilled" ? result.value : [],
-    );
-    const merged = mergeResults(local, searchDocuments(remoteDocuments, trimmed, 36), 36);
-    const failures = settled.filter((result) => result.status === "rejected").length;
-    set({
-      results: merged,
-      searching: false,
-      enriched: settled.some((result) => result.status === "fulfilled"),
-      error:
-        failures === settled.length ? "Server search is unavailable. Showing local results." : null,
-    });
-  },
+  ...createGlobalSearchPanelState(set, get),
+  search: (query) => executeGlobalSearch(set, get, query),
+  visualSearch: (attachmentId, query) => executeGlobalVisualSearch(set, get, attachmentId, query),
   loadConversations: async () => {
     const accountId = get().accountId;
     if (!accountId) return;
@@ -205,16 +52,17 @@ export const useGlobalSearchStore = create<GlobalSearchState>((set, get) => ({
         activeConversationId: get().activeConversationId || conversations[0]?.id || "",
         conversationsLoading: false,
       });
+      resumeGlobalAgentPolls(set, get, conversations);
     } catch {
       if (get().accountId === accountId) set({ conversationsLoading: false });
     }
   },
-  newConversation: async () => {
-    const fallback = localConversation();
+  newConversation: async (spaceId) => {
+    const fallback = localConversation(spaceId);
     let conversation = fallback;
     try {
       conversation = normalizeConversation(
-        await globalMistyApi.createConversation("New conversation"),
+        await globalMistyApi.createConversation("New conversation", spaceId),
       );
     } catch {
       // Older servers keep the conversation in memory for this app session.
@@ -225,31 +73,110 @@ export const useGlobalSearchStore = create<GlobalSearchState>((set, get) => ({
         ...get().conversations.filter((item) => item.id !== conversation.id),
       ],
       activeConversationId: conversation.id,
+      mode: "ask",
+      panel: get().panel === "closed" ? "closed" : "answer",
+      query: "",
+      context: [],
       error: null,
     });
     return conversation.id;
   },
-  selectConversation: (activeConversationId) => set({ activeConversationId, error: null }),
+  bindConversationSpace: async (conversationId, spaceId) => {
+    const normalizedSpaceId = spaceId.trim();
+    const existing = get().conversations.find((item) => item.id === conversationId);
+    if (!existing || !normalizedSpaceId || existing.spaceId === normalizedSpaceId) return;
+    if (existing.spaceId && existing.spaceId !== normalizedSpaceId) {
+      set({ error: "Start a new conversation to work in a different Space." });
+      return;
+    }
+    if (!existing.remote) {
+      set({
+        conversations: get().conversations.map((item) =>
+          item.id === conversationId ? { ...item, spaceId: normalizedSpaceId } : item,
+        ),
+      });
+      return;
+    }
+    try {
+      const bound = await globalMistyApi.bindConversationSpace(conversationId, normalizedSpaceId);
+      set({
+        conversations: get().conversations.map((item) =>
+          item.id === conversationId ? { ...item, spaceId: bound.spaceId } : item,
+        ),
+        error: null,
+      });
+    } catch (error) {
+      set({ error: globalMistyError(error) });
+      throw error;
+    }
+  },
+  selectConversation: (activeConversationId) =>
+    set({
+      activeConversationId,
+      mode: "ask",
+      panel: get().panel === "closed" ? "closed" : "answer",
+      query: "",
+      context: [],
+      error: null,
+    }),
   deleteConversation: async (conversationId) => {
     const existing = get().conversations.find((item) => item.id === conversationId);
+    if (!existing) return;
+    const previousConversations = get().conversations;
+    const previousActiveId = get().activeConversationId;
     set({
-      conversations: get().conversations.filter((item) => item.id !== conversationId),
+      conversations: previousConversations.filter((item) => item.id !== conversationId),
       activeConversationId:
-        get().activeConversationId === conversationId
-          ? (get().conversations.find((item) => item.id !== conversationId)?.id ?? "")
-          : get().activeConversationId,
+        previousActiveId === conversationId
+          ? (previousConversations.find((item) => item.id !== conversationId)?.id ?? "")
+          : previousActiveId,
+      context: previousActiveId === conversationId ? [] : get().context,
     });
     if (!existing?.remote) return;
     try {
       await globalMistyApi.deleteConversation(conversationId);
     } catch (error) {
-      set({ error: globalMistyError(error) });
+      set({
+        conversations: previousConversations,
+        activeConversationId: previousActiveId,
+        error: globalMistyError(error),
+      });
+    }
+  },
+  renameConversation: async (conversationId, title) => {
+    const normalized = title.trim().slice(0, 120);
+    const existing = get().conversations.find((item) => item.id === conversationId);
+    if (!existing || !normalized || normalized === existing.title) return;
+    set({
+      conversations: get().conversations.map((item) =>
+        item.id === conversationId ? { ...item, title: normalized } : item,
+      ),
+      error: null,
+    });
+    if (!existing.remote) return;
+    try {
+      const renamed = await globalMistyApi.renameConversation(conversationId, normalized);
+      set({
+        conversations: get().conversations.map((item) =>
+          item.id === conversationId ? { ...item, title: renamed.title } : item,
+        ),
+      });
+    } catch (error) {
+      set({
+        conversations: get().conversations.map((item) =>
+          item.id === conversationId ? { ...item, title: existing.title } : item,
+        ),
+        error: globalMistyError(error),
+      });
     }
   },
   submit: async () => {
     const prompt = get().query.trim();
     const mode = get().mode;
     if (!prompt || mode === "search" || get().working) return;
+    if (mode === "ask" && mistyIntent(prompt) === "agent") {
+      return get().submitAgentTask(prompt);
+    }
     const accountId = get().accountId;
     const conversationId = get().activeConversationId || (await get().newConversation());
     const userMessage = conversationMessage("user", mode, prompt);
@@ -273,7 +200,6 @@ export const useGlobalSearchStore = create<GlobalSearchState>((set, get) => ({
             mode: "action",
             prompt,
             context: get().context.filter((item) => !item.localPath || item.attached),
-            agentId: localProposal.agentId,
           });
           if (response.action) proposal = { ...localProposal, ...response.action };
         } catch {
@@ -293,6 +219,218 @@ export const useGlobalSearchStore = create<GlobalSearchState>((set, get) => ({
       if (get().accountId === accountId) set({ working: false });
     }
   },
+  submitAnswer: async (
+    prompt,
+    attachments = [],
+    selection,
+    presentation = "panel",
+    deviceContexts = [],
+  ) => {
+    const normalized = prompt.trim();
+    if ((!normalized && !attachments.length) || get().working) return;
+    const accountId = get().accountId;
+    let conversationId: string;
+    try {
+      conversationId = await conversationForGlobalPrompt(get, normalized);
+    } catch (error) {
+      if (get().accountId === accountId) set({ error: globalMistyError(error) });
+      return;
+    }
+    if (get().accountId !== accountId) return;
+    const invocationContext = globalAiContext(get().context);
+    const userMessage = { ...conversationMessage("user", "ask", normalized), attachments };
+    const assistantMessage = conversationMessage("assistant", "ask", "");
+    updateConversation(set, get, conversationId, (conversation) => ({
+      ...conversation,
+      title: conversation.messages.length ? conversation.title : normalized.slice(0, 56),
+      updatedAt: userMessage.createdAt,
+      messages: [...conversation.messages, userMessage, assistantMessage],
+    }));
+    if (presentation === "workspace") announceGlobalPanel(false);
+    set({
+      panel: presentation === "workspace" ? "closed" : "answer",
+      working: true,
+      error: null,
+      query: "",
+      context: [],
+    });
+    replaceActiveGlobalInvocationStream();
+    try {
+      const created = await aiSurfaceApi.createInvocation({
+        mode: "drawer",
+        surfaceId: "global",
+        trigger: "message",
+        prompt: normalized,
+        context: invocationContext,
+        attachmentIds: attachments.map((attachment) => attachment.id),
+        deviceContexts,
+        modelId: get().conversations.find((item) => item.id === conversationId)?.modelId,
+        reasoningEffort: get().conversations.find((item) => item.id === conversationId)
+          ?.reasoningEffort,
+        selection,
+        ...(conversationId.startsWith("local-") ? {} : { conversationId }),
+        idempotencyKey: `global-answer-${globalMistyId()}`,
+      });
+      if (get().accountId !== accountId) return;
+      replaceActiveGlobalInvocationStream(
+        subscribeToAiInvocation(created.eventsUrl, {
+          onEvent: (event) =>
+            applyGlobalInvocationEvent(set, get, conversationId, assistantMessage.id, event),
+          onError: (streamError) => {
+            if (get().accountId !== accountId) return;
+            patchConversationMessage(set, get, conversationId, assistantMessage.id, {
+              content: "Misty lost the response stream. You can retry without affecting search.",
+              state: "failed",
+              retryable: true,
+              activity: undefined,
+            });
+            set({ working: false, error: streamError.message });
+          },
+        }),
+      );
+    } catch (error) {
+      if (get().accountId !== accountId) return;
+      patchConversationMessage(set, get, conversationId, assistantMessage.id, {
+        content: "Misty could not start this answer. Ordinary search is still available.",
+        state: "failed",
+        retryable: true,
+        activity: undefined,
+      });
+      set({ working: false, error: globalMistyError(error) });
+    }
+  },
+  submitAgentTask: async (prompt, paneId = "global", presentation = "panel") => {
+    const normalized = prompt.trim();
+    if (!normalized || get().working) return;
+    const accountId = get().accountId;
+    let conversationId: string;
+    try {
+      conversationId = await conversationForGlobalPrompt(get, normalized);
+    } catch (error) {
+      if (get().accountId === accountId) set({ error: globalMistyError(error) });
+      return;
+    }
+    if (get().accountId !== accountId) return;
+    const invocationContext = globalAiContext(get().context);
+    const userMessage = conversationMessage("user", "action", normalized);
+    const pending = proposeAction(normalized);
+    pending.state = "running";
+    const actionMessage = conversationMessage("assistant", "action", pending.summary, pending);
+    actionMessage.state = "pending";
+    updateConversation(set, get, conversationId, (conversation) => ({
+      ...conversation,
+      title: conversation.messages.length ? conversation.title : normalized.slice(0, 56),
+      updatedAt: userMessage.createdAt,
+      messages: [...conversation.messages, userMessage, actionMessage],
+    }));
+    if (presentation === "workspace") announceGlobalPanel(false);
+    set({
+      panel: presentation === "workspace" ? "closed" : "agent",
+      working: true,
+      error: null,
+      query: "",
+      context: [],
+    });
+    try {
+      let context = invocationContext;
+      let primary = context.find((item) => item.spaceId) ?? context[0];
+      if (!primary && pending.spaceId) {
+        context = [
+          {
+            kind: "space",
+            id: pending.spaceId,
+            title: pending.spaceName || "Current Space",
+            privacy: "shared",
+            spaceId: pending.spaceId,
+            href: `/spaces/${encodeURIComponent(pending.spaceId)}`,
+          },
+        ];
+        primary = context[0];
+      }
+      const created = await aiSurfaceApi.createRun({
+        prompt: normalized,
+        surfaceId: "global",
+        paneId,
+        ...(conversationId.startsWith("local-") ? {} : { conversationId }),
+        spaceId: primary?.spaceId ?? pending.spaceId,
+        href: primary?.href,
+        title: primary?.title,
+        context,
+        idempotencyKey: `global-agent-${globalMistyId()}`,
+      });
+      if (get().accountId !== accountId) return;
+      if (created.routing?.needs_clarification) {
+        patchConversationMessage(set, get, conversationId, actionMessage.id, {
+          content: created.routing.question || "Misty needs a little more context to continue.",
+          state: "completed",
+          action: { ...pending, state: "proposed" },
+        });
+      } else {
+        const state = normalizeActionState(created.run?.state ?? created.status);
+        patchConversationMessage(set, get, conversationId, actionMessage.id, {
+          content:
+            state === "completed"
+              ? "Misty finished the task. It remains available in your work history."
+              : "Misty started the work. You can close this window while it runs.",
+          action: {
+            ...pending,
+            state,
+            runId: created.run?.id,
+            resultHref: created.agents_href,
+            error: created.run?.error_message,
+          },
+          state: isTerminalAgentState(state)
+            ? state === "failed"
+              ? "failed"
+              : "completed"
+            : "pending",
+          retryable: state === "failed",
+        });
+        if (created.run?.id && !isTerminalAgentState(state)) {
+          startGlobalAgentTaskPoll(set, get, conversationId, actionMessage.id, created.run.id);
+        }
+      }
+    } catch (error) {
+      if (get().accountId !== accountId) return;
+      patchConversationMessage(set, get, conversationId, actionMessage.id, {
+        content: "Misty could not route this task.",
+        state: "failed",
+        retryable: true,
+        action: { ...pending, state: "failed", error: globalMistyError(error) },
+      });
+      set({ error: globalMistyError(error) });
+    } finally {
+      if (get().accountId === accountId) set({ working: false });
+    }
+  },
+  cancelAgentTask: async (proposalId) => {
+    const proposal = findProposal(get().conversations, proposalId);
+    if (!proposal?.runId) return;
+    try {
+      if (proposal.approvalId) {
+        await agentsApi.decideApproval(proposal.runId, proposal.approvalId, "deny");
+      } else {
+        await agentsApi.cancelRun(proposal.runId);
+      }
+      patchProposal(set, get, proposalId, { state: "rejected", error: undefined });
+    } catch (error) {
+      patchProposal(set, get, proposalId, { error: globalMistyError(error) });
+    }
+  },
+  approveAgentTask: async (proposalId) => {
+    const proposal = findProposal(get().conversations, proposalId);
+    if (!proposal?.runId || !proposal.approvalId) return;
+    try {
+      await agentsApi.decideApproval(proposal.runId, proposal.approvalId, "approve");
+      patchProposal(set, get, proposalId, {
+        state: "running",
+        approvalId: undefined,
+        error: undefined,
+      });
+    } catch (error) {
+      patchProposal(set, get, proposalId, { error: globalMistyError(error) });
+    }
+  },
   confirmAction: async (proposalId) => {
     const located = findProposal(get().conversations, proposalId);
     if (!located) return;
@@ -304,7 +442,16 @@ export const useGlobalSearchStore = create<GlobalSearchState>((set, get) => ({
         const remote = await globalMistyApi.decideProposal(proposalId, true);
         completed = remote;
       } catch {
-        const response = await globalMistyApi.delegate(located);
+        const conversationId = get().activeConversationId;
+        const response = await aiSurfaceApi.createRun({
+          prompt: located.prompt,
+          surfaceId: "global",
+          paneId: "misty",
+          ...(conversationId && !conversationId.startsWith("local-") ? { conversationId } : {}),
+          spaceId: located.spaceId,
+          context: globalAiContext(get().context),
+          idempotencyKey: `confirmed-${located.id}`,
+        });
         completed = {
           state: normalizeActionState(response.run?.state ?? response.status),
           runId: response.run?.id,
@@ -323,178 +470,3 @@ export const useGlobalSearchStore = create<GlobalSearchState>((set, get) => ({
     void globalMistyApi.decideProposal(proposalId, false).catch(() => undefined);
   },
 }));
-
-type GlobalSearchSet = (
-  partial: Partial<GlobalSearchState> | ((state: GlobalSearchState) => Partial<GlobalSearchState>),
-) => void;
-type GlobalSearchGet = () => GlobalSearchState;
-
-const lastModeKey = "misty:global-ai:last-mode:v1";
-
-function readLastMode(accountId: string): GlobalAiMode {
-  if (!accountId) return "search";
-  try {
-    const value = window.localStorage.getItem(`${lastModeKey}:${accountId}`);
-    return value === "ask" || value === "action" ? value : "search";
-  } catch {
-    return "search";
-  }
-}
-
-function writeLastMode(accountId: string, mode: GlobalAiMode) {
-  if (!accountId) return;
-  try {
-    window.localStorage.setItem(`${lastModeKey}:${accountId}`, mode);
-  } catch {
-    // This preference is optional; private browsing may reject storage.
-  }
-}
-
-function localConversation(): GlobalAiConversation {
-  const now = new Date().toISOString();
-  return {
-    id: `local-${globalMistyId()}`,
-    title: "New conversation",
-    createdAt: now,
-    updatedAt: now,
-    messages: [],
-    remote: false,
-  };
-}
-
-function normalizeConversation(conversation: GlobalAiConversation): GlobalAiConversation {
-  const now = new Date().toISOString();
-  return {
-    ...conversation,
-    title: conversation.title?.trim() || "New conversation",
-    createdAt: conversation.createdAt || now,
-    updatedAt: conversation.updatedAt || now,
-    messages: conversation.messages ?? [],
-    remote: conversation.remote !== false,
-  };
-}
-
-function conversationMessage(
-  role: GlobalAiMessage["role"],
-  mode: GlobalAiMessage["mode"],
-  content: string,
-  action?: GlobalAiActionProposal,
-): GlobalAiMessage {
-  return {
-    id: `message-${globalMistyId()}`,
-    role,
-    mode,
-    content,
-    createdAt: new Date().toISOString(),
-    ...(action ? { action } : {}),
-  };
-}
-
-function updateConversation(
-  set: GlobalSearchSet,
-  get: GlobalSearchGet,
-  conversationId: string,
-  update: (conversation: GlobalAiConversation) => GlobalAiConversation,
-) {
-  set({
-    conversations: get().conversations.map((conversation) =>
-      conversation.id === conversationId ? update(conversation) : conversation,
-    ),
-  });
-}
-
-function appendConversationMessage(
-  set: GlobalSearchSet,
-  get: GlobalSearchGet,
-  conversationId: string,
-  message: GlobalAiMessage,
-) {
-  updateConversation(set, get, conversationId, (conversation) => ({
-    ...conversation,
-    updatedAt: message.createdAt,
-    messages: [...conversation.messages, message],
-  }));
-}
-
-async function askMisty(
-  conversationId: string,
-  prompt: string,
-  context: GlobalAiContextRef[],
-  results: GlobalSearchResult[],
-): Promise<GlobalAiMessage> {
-  const safeContext = context.filter((item) => !item.localPath || item.attached);
-  try {
-    const response = await globalMistyApi.turn(conversationId, {
-      mode: "ask",
-      prompt,
-      context: safeContext,
-    });
-    if (response.message)
-      return {
-        ...response.message,
-        citations: response.citations ?? response.message.citations ?? [],
-      };
-    if (response.text)
-      return {
-        ...conversationMessage("assistant", "ask", response.text),
-        citations: response.citations ?? citationsForResults(results),
-      };
-  } catch {
-    // Compatibility path for servers that predate persistent Global Misty turns.
-  }
-  const retrieval = globalSearchContext(results, 10);
-  const response = await globalMistyApi.complete(buildGroundedPrompt(prompt, retrieval));
-  return {
-    ...conversationMessage("assistant", "ask", response.text),
-    citations: citationsForResults(results),
-  };
-}
-
-function buildGroundedPrompt(prompt: string, context: GlobalSearchContextItem[]): string {
-  const sources = context
-    .map(
-      (item, index) =>
-        `[${index + 1}] ${item.kind}: ${item.title}${item.space ? ` (${item.space})` : ""}\n${item.snippet}`,
-    )
-    .join("\n\n");
-  return [
-    "You are Misty, the account-wide AI inside the Misty app.",
-    "Answer concisely. Ground Misty-specific claims only in the supplied sources. If the sources are insufficient, say so plainly.",
-    `User request: ${prompt}`,
-    sources ? `Sources:\n${sources}` : "No Misty sources matched this request.",
-  ].join("\n\n");
-}
-
-function citationsForResults(results: GlobalSearchResult[]) {
-  return results.slice(0, 8).map((result) => ({
-    id: result.id,
-    title: result.title,
-    href: result.href,
-    kind: result.kind,
-  }));
-}
-
-function findProposal(conversations: GlobalAiConversation[], proposalId: string) {
-  for (const conversation of conversations)
-    for (const message of conversation.messages)
-      if (message.action?.id === proposalId) return message.action;
-  return null;
-}
-
-function patchProposal(
-  set: GlobalSearchSet,
-  get: GlobalSearchGet,
-  proposalId: string,
-  patch: Partial<GlobalAiActionProposal>,
-) {
-  set({
-    conversations: get().conversations.map((conversation) => ({
-      ...conversation,
-      messages: conversation.messages.map((message) =>
-        message.action?.id === proposalId
-          ? { ...message, action: { ...message.action, ...patch } }
-          : message,
-      ),
-    })),
-  });
-}

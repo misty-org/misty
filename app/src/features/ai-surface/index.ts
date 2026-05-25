@@ -1,10 +1,9 @@
-export {
-  AiPaneHost,
-  AiSurfaceButton,
-  useAiSurfaceActions,
-  useAiSurfaceAdapter,
-} from "./AiPaneHost";
+export { AiPaneHost, useAiSurfaceActions, useAiSurfaceAdapter } from "./AiPaneHost";
 export { AiSelectionMenu } from "./AiSelectionMenu";
+export { MistyRegionCapture } from "./MistyRegionCapture";
+export { useAiVoiceRecorder } from "./useAiVoiceRecorder";
+export { VoiceInputMenu } from "./VoiceInputMenu";
+export type { AiVoiceInputDevice } from "./useAiVoiceRecorder";
 export { aiSurfaceApi, subscribeToAiInvocation } from "./api";
 export type { AiSurfacePreferenceRecord, AiUserSettings } from "./api";
 export { useAiSurfaceStore, testingAiPaneSession } from "./store";
