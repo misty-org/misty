@@ -40,6 +40,7 @@ namespace misty::view {
         ImGui::SetNextWindowSize(ImVec2(sw, sh), ImGuiCond_Always);
         vault_panel_->render();
 
+        navbar_panel_->render_activity_popup();
         context_menu_panel_->render();
         notification_panel_->render();
     }

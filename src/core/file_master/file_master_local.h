@@ -12,9 +12,12 @@
 
 namespace misty::core {
 
+class FileTransfer;
+
 class FileMasterLocal : public IFileMaster {
 public:
     explicit FileMasterLocal(WorkerPool& worker_pool);
+    FileMasterLocal(WorkerPool& worker_pool, FileTransfer* transfers);
 
     void rename(const FileMasterProps& props, FileMasterCompletion callback) override;
     void remove(const FileMasterProps& props, FileMasterCompletion callback) override;
@@ -24,6 +27,7 @@ public:
 
 private:
     WorkerPool& worker_pool_;
+    FileTransfer* transfers_ = nullptr;
 };
 
 } // namespace misty::core

@@ -12,6 +12,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include "core/manager/font_manager.h"
+#include "core/manager/asset_manager.h"
 #include "core/manager/plugin_manager.h"
 #include "core/commands/command_manager.h"
 #include "core/ui/ui_layout.h"
@@ -25,12 +27,12 @@ namespace misty::panel {
 
 namespace {
 
-constexpr float kSidebarMinWidth = 310.0f;
-constexpr float kSidebarMaxWidth = 340.0f;
+constexpr float kSidebarMinWidth = 305.0f;
+constexpr float kSidebarMaxWidth = 330.0f;
 constexpr float kContentMinWidth = 320.0f;
 constexpr float kDividerWidth = 1.0f;
 constexpr float kPluginsSidebarScrollbarSize = 4.0f;
-constexpr UI::Spacing kPluginsSidebarPadding = UI::Spacing::sides(16.0f, 16.0f, 16.0f, 12.0f);
+constexpr UI::Spacing kPluginsSidebarPadding = UI::Spacing::sides(16.0f, 14.0f, 16.0f, 12.0f);
 constexpr UI::Spacing kPluginsSectionBodyPadding = UI::Spacing::sides(0.0f, 0.0f, 8.0f, 0.0f);
 constexpr ImVec4 kPluginsPanelBg = ImVec4(0.030f, 0.045f, 0.055f, 1.0f);
 constexpr ImVec4 kPluginsSurfaceBg = ImVec4(0.050f, 0.068f, 0.082f, 1.0f);
@@ -41,6 +43,12 @@ constexpr ImVec4 kPluginsSoftBorderColor = ImVec4(0.145f, 0.175f, 0.205f, 0.75f)
 constexpr ImVec4 kPluginsAccentColor = ImVec4(0.250f, 0.520f, 0.920f, 1.0f);
 constexpr ImVec4 kPluginsGreenColor = ImVec4(0.38f, 0.80f, 0.42f, 1.0f);
 namespace fs = std::filesystem;
+
+enum class DetailListMarker {
+    Check,
+    Dot,
+    Number,
+};
 
 std::string trim_copy(std::string value) {
     auto not_space = [](unsigned char ch) { return !std::isspace(ch); };
@@ -266,54 +274,374 @@ std::string plugin_access_level(const PluginsDetailProps& detail) {
     return "Read-only";
 }
 
-void icon_text_row(const char* id, const char* label, const char* value) {
-    UI::row(id, {
+ImFont* plugins_font(core::FontID id) {
+    return core::FontManager::get().get_font(id);
+}
+
+ImVec2 plugins_calc_text(const char* text, ImFont* font = nullptr, float wrap_width = 0.0f) {
+    if (font) {
+        ImGui::PushFont(font);
+    }
+    const ImVec2 size = ImGui::CalcTextSize(text ? text : "", nullptr, false, wrap_width);
+    if (font) {
+        ImGui::PopFont();
+    }
+    return size;
+}
+
+void plugins_draw_text(ImDrawList* draw_list,
+                       const ImVec2& pos,
+                       const ImVec4& color,
+                       const char* text,
+                       ImFont* font = nullptr,
+                       float wrap_width = 0.0f) {
+    if (!text || text[0] == '\0') {
+        return;
+    }
+
+    const ImU32 text_color = ImGui::ColorConvertFloat4ToU32(color);
+    if (font) {
+        draw_list->AddText(font, font->LegacySize, pos, text_color, text, nullptr, wrap_width);
+    } else if (wrap_width > 0.0f) {
+        draw_list->AddText(ImGui::GetFont(), ImGui::GetFontSize(), pos, text_color, text, nullptr, wrap_width);
+    } else {
+        draw_list->AddText(pos, text_color, text, nullptr);
+    }
+}
+
+void plugins_draw_icon(ImDrawList* draw_list,
+                       const char* icon_path,
+                       const ImVec2& pos,
+                       float size,
+                       const ImVec4& tint = ImVec4(1.0f, 1.0f, 1.0f, 1.0f),
+                       bool apply_theme = true) {
+    auto& icon = core::AssetManager::get().get_svg_texture_path(
+        icon_path,
+        static_cast<int>(size * 2.0f),
+        apply_theme
+    );
+    if (icon.id) {
+        draw_list->AddImage(icon.id, pos, ImVec2(pos.x + size, pos.y + size),
+                            ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f),
+                            ImGui::ColorConvertFloat4ToU32(tint));
+    }
+}
+
+void plugins_draw_pill(ImDrawList* draw_list,
+                       const ImVec2& pos,
+                       const char* label,
+                       const ImVec4& bg = ImVec4(0.18f, 0.19f, 0.22f, 1.0f),
+                       const ImVec4& fg = ImVec4(0.78f, 0.80f, 0.86f, 1.0f)) {
+    if (!label || label[0] == '\0') {
+        return;
+    }
+
+    const ImVec2 text_size = ImGui::CalcTextSize(label);
+    const ImVec2 size(text_size.x + 18.0f, 24.0f);
+    draw_list->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + size.y),
+                             ImGui::ColorConvertFloat4ToU32(bg), 12.0f);
+    draw_list->AddText(ImVec2(pos.x + 9.0f, pos.y + (size.y - text_size.y) * 0.5f),
+                       ImGui::ColorConvertFloat4ToU32(fg), label);
+}
+
+void plugins_draw_header_icon(const ImVec2& pos,
+                              const std::string& logo_path,
+                              const std::string& monogram) {
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    constexpr float kBoxSize = 104.0f;
+    constexpr float kIconSize = 76.0f;
+    draw_list->AddRectFilled(pos, ImVec2(pos.x + kBoxSize, pos.y + kBoxSize),
+                             ImGui::ColorConvertFloat4ToU32(kPluginsSurfaceAltBg), 8.0f);
+    draw_list->AddRect(pos, ImVec2(pos.x + kBoxSize, pos.y + kBoxSize),
+                       ImGui::ColorConvertFloat4ToU32(kPluginsSoftBorderColor), 8.0f);
+
+    if (!logo_path.empty()) {
+        auto& icon = core::AssetManager::get().get_svg_texture_path(logo_path, 152, false);
+        if (icon.id) {
+            const ImVec2 icon_pos(pos.x + (kBoxSize - kIconSize) * 0.5f,
+                                  pos.y + (kBoxSize - kIconSize) * 0.5f);
+            draw_list->AddImage(icon.id, icon_pos, ImVec2(icon_pos.x + kIconSize, icon_pos.y + kIconSize));
+            return;
+        }
+    }
+
+    const char* label = monogram.empty() ? "?" : monogram.c_str();
+    ImFont* font = plugins_font(core::FontID::ROBOTO_BOLD_XLARGE);
+    const ImVec2 text_size = plugins_calc_text(label, font);
+    plugins_draw_text(draw_list,
+                      ImVec2(pos.x + (kBoxSize - text_size.x) * 0.5f,
+                             pos.y + (kBoxSize - text_size.y) * 0.5f),
+                      kSettingsHeaderTextColor,
+                      label,
+                      font);
+}
+
+void plugins_draw_meta_row(ImDrawList* draw_list,
+                           float x,
+                           float y,
+                           float value_x,
+                           float width,
+                           const char* icon_path,
+                           const char* label,
+                           const char* value) {
+    plugins_draw_icon(draw_list, icon_path, ImVec2(x, y + 1.0f), 16.0f, kSettingsMutedTextColor);
+    plugins_draw_text(draw_list, ImVec2(x + 26.0f, y), kSettingsMutedTextColor, label);
+    const std::string display = value ? value : "";
+    const float max_width = std::max(1.0f, width - (value_x - x));
+    std::string clipped = display;
+    if (ImGui::CalcTextSize(clipped.c_str()).x > max_width) {
+        constexpr const char* kEllipsis = "...";
+        while (!clipped.empty() && ImGui::CalcTextSize((clipped + kEllipsis).c_str()).x > max_width) {
+            clipped.pop_back();
+        }
+        clipped += kEllipsis;
+    }
+    plugins_draw_text(draw_list, ImVec2(value_x, y), kSettingsHeaderTextColor, clipped.c_str());
+}
+
+void detail_header_block(const char* id,
+                         const PluginsDetailProps& detail,
+                         const std::string& logo_path,
+                         const std::string& monogram,
+                         const std::string& status_label,
+                         const std::string& action_label,
+                         const std::string& category,
+                         const std::string& access) {
+    const float available_width = UI::available_size().x;
+    const bool compact = available_width < 760.0f;
+    const float summary_width_for_measure = compact
+        ? std::max(220.0f, available_width - 136.0f)
+        : std::max(240.0f, available_width - 104.0f - 24.0f - 318.0f - 46.0f);
+    const float overview_height = detail.overview.empty()
+        ? 0.0f
+        : plugins_calc_text(detail.overview.c_str(), nullptr, summary_width_for_measure).y;
+    const float summary_bottom = 91.0f + overview_height;
+    const float header_height = compact
+        ? std::max(244.0f, std::max(132.0f, summary_bottom + 18.0f) + 98.0f)
+        : std::max(132.0f, summary_bottom + 6.0f);
+
+    UI::div(id, {
+        .mode = UI::Mode::LayoutOnly,
         .width = UI::Size::fill(),
-        .height = UI::Size::auto_size(),
-        .gap = UI::Spacing::xy(12.0f, 0.0f),
-        .align = UI::Align::Center,
+        .height = UI::Size::px(header_height),
     }, [&]() {
-        UI::div((std::string(id) + "_glyph").c_str(), {
-            .width = UI::Size::px(18.0f),
-            .height = UI::Size::px(18.0f),
-            .border = true,
-            .border_color = kSettingsMutedTextColor,
-            .rounding = 4.0f,
-        }, []() {});
-        UI::text({
-            .text = label,
-            .width = UI::Size::px(92.0f),
-            .color = kSettingsMutedTextColor,
-        });
-        UI::text({
-            .text = value,
-            .width = UI::Size::fill(),
-            .overflow = UI::TextOverflow::Ellipsis,
-            .color = kSettingsHeaderTextColor,
+        UI::raw([&]() {
+            const ImVec2 origin = ImGui::GetCursorScreenPos();
+            const float width = ImGui::GetContentRegionAvail().x;
+            constexpr float icon_size = 104.0f;
+            const bool compact_layout = width < 760.0f;
+            const float meta_width = compact_layout ? width : 318.0f;
+            const float meta_x = origin.x + width - meta_width;
+            const float summary_x = origin.x + icon_size + 24.0f;
+            const float summary_width = compact_layout
+                ? std::max(220.0f, width - icon_size - 32.0f)
+                : std::max(240.0f, meta_x - summary_x - 28.0f);
+            ImDrawList* draw_list = ImGui::GetWindowDrawList();
+
+            plugins_draw_header_icon(origin, logo_path, monogram);
+
+            ImFont* title_font = plugins_font(core::FontID::ROBOTO_BOLD_XLARGE);
+            ImFont* bold_font = plugins_font(core::FontID::ROBOTO_BOLD);
+            plugins_draw_text(draw_list, ImVec2(summary_x, origin.y + 2.0f),
+                              kSettingsHeaderTextColor, detail.name.c_str(), title_font);
+
+            float pill_x = summary_x;
+            if (!detail.version.empty()) {
+                plugins_draw_pill(draw_list, ImVec2(pill_x, origin.y + 36.0f), detail.version.c_str());
+                pill_x += ImGui::CalcTextSize(detail.version.c_str()).x + 26.0f;
+            }
+            if (!detail.author.empty()) {
+                plugins_draw_pill(draw_list, ImVec2(pill_x, origin.y + 36.0f), detail.author.c_str());
+                pill_x += ImGui::CalcTextSize(detail.author.c_str()).x + 26.0f;
+            }
+            if (detail.verified) {
+                plugins_draw_icon(draw_list, "assets/icons/verified-24.svg",
+                                  ImVec2(pill_x + 2.0f, origin.y + 41.0f), 13.0f,
+                                  ImVec4(1.0f, 1.0f, 1.0f, 1.0f), false);
+            }
+
+            draw_list->AddCircleFilled(ImVec2(summary_x + 5.0f, origin.y + 75.0f), 5.0f,
+                                       ImGui::ColorConvertFloat4ToU32(kPluginsGreenColor));
+            plugins_draw_text(draw_list, ImVec2(summary_x + 16.0f, origin.y + 66.0f),
+                              kPluginsGreenColor, status_label.c_str(), bold_font);
+            if (!detail.overview.empty()) {
+                plugins_draw_text(draw_list, ImVec2(summary_x, origin.y + 91.0f),
+                                  kSettingsBodyTextColor, detail.overview.c_str(),
+                                  nullptr, summary_width);
+            }
+
+            const float actions_x = compact_layout
+                ? origin.x + width - 132.0f
+                : meta_x + meta_width - 132.0f;
+            ImGui::SetCursorScreenPos(ImVec2(actions_x, origin.y + 5.0f));
+            ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 7.0f);
+            ImGui::PushStyleColor(ImGuiCol_Button, kPluginsAccentColor);
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.32f, 0.62f, 1.00f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.18f, 0.42f, 0.78f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.98f, 0.99f, 1.0f, 1.0f));
+            ImGui::Button(action_label.c_str(), ImVec2(88.0f, 36.0f));
+            ImGui::PopStyleColor(4);
+            ImGui::SameLine(0.0f, 8.0f);
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.18f, 0.18f, 0.20f, 0.55f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.22f, 0.22f, 0.24f, 0.80f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.16f, 0.16f, 0.18f, 1.0f));
+            ImGui::Button("...", ImVec2(34.0f, 36.0f));
+            ImGui::PopStyleColor(3);
+            ImGui::PopStyleVar();
+
+            if (compact_layout) {
+                const float meta_y = origin.y + std::max(132.0f, summary_bottom + 18.0f);
+                draw_list->AddLine(ImVec2(origin.x, meta_y - 12.0f),
+                                   ImVec2(origin.x + width, meta_y - 12.0f),
+                                   ImGui::ColorConvertFloat4ToU32(kPluginsSoftBorderColor));
+                const float row_x = origin.x;
+                const float value_x = origin.x + 118.0f;
+                plugins_draw_meta_row(draw_list, row_x, meta_y, value_x, width,
+                                      "assets/icons/sync-16.svg", "Version",
+                                      detail.version.empty() ? "1.0.0" : detail.version.c_str());
+                plugins_draw_meta_row(draw_list, row_x, meta_y + 24.0f, value_x, width,
+                                      "assets/icons/person-16.svg", "Author",
+                                      detail.author.empty() ? "Misty" : detail.author.c_str());
+                plugins_draw_meta_row(draw_list, row_x, meta_y + 48.0f, value_x, width,
+                                      "assets/icons/stack-16.svg", "Category", category.c_str());
+                plugins_draw_meta_row(draw_list, row_x, meta_y + 72.0f, value_x, width,
+                                      "assets/icons/lock-16.svg", "Permissions", access.c_str());
+            } else {
+                draw_list->AddLine(ImVec2(meta_x - 18.0f, origin.y),
+                                   ImVec2(meta_x - 18.0f, origin.y + std::max(122.0f, header_height - 8.0f)),
+                                   ImGui::ColorConvertFloat4ToU32(kPluginsSoftBorderColor));
+                const float row_x = meta_x;
+                const float value_x = meta_x + 118.0f;
+                plugins_draw_meta_row(draw_list, row_x, origin.y + 54.0f, value_x, meta_width,
+                                      "assets/icons/sync-16.svg", "Version",
+                                      detail.version.empty() ? "1.0.0" : detail.version.c_str());
+                plugins_draw_meta_row(draw_list, row_x, origin.y + 78.0f, value_x, meta_width,
+                                      "assets/icons/person-16.svg", "Author",
+                                      detail.author.empty() ? "Misty" : detail.author.c_str());
+                plugins_draw_meta_row(draw_list, row_x, origin.y + 102.0f, value_x, meta_width,
+                                      "assets/icons/stack-16.svg", "Category", category.c_str());
+                plugins_draw_meta_row(draw_list, row_x + 174.0f, origin.y + 102.0f,
+                                      value_x + 174.0f, meta_width - 174.0f,
+                                      "assets/icons/lock-16.svg", "Permissions", access.c_str());
+            }
         });
     });
 }
 
-void detail_card(const char* id, const char* title, const std::function<void()>& content) {
-    UI::column(id, {
-        .width = UI::Size::fill(),
-        .height = UI::Size::px(156.0f),
-        .padding = UI::Spacing::uniform(16.0f),
-        .gap = UI::Spacing::xy(0.0f, 12.0f),
-        .bg_color = ImVec4(0.040f, 0.054f, 0.066f, 1.0f),
-        .border = true,
-        .border_color = kPluginsSoftBorderColor,
-        .rounding = 8.0f,
-    }, [&]() {
-        UI::text({
-            .text = title,
-            .width = UI::Size::fill(),
-            .font = UI::TextFont::BoldLarge,
-            .color = kSettingsHeaderTextColor,
-        });
-        if (content) {
-            content();
+float detail_list_card_height(const std::vector<std::string>& items, float width) {
+    const float wrap_width_for_measure = std::max(1.0f, width - 56.0f);
+    float measured_height = 53.0f;
+    for (const auto& item : items) {
+        measured_height += std::max(25.0f, plugins_calc_text(item.c_str(), nullptr, wrap_width_for_measure).y + 9.0f);
+    }
+    measured_height += 52.0f;
+    return std::max(180.0f, measured_height);
+}
+
+void draw_detail_list_card(const ImVec2& origin,
+                           float width,
+                           float height,
+                           const char* title,
+                           const std::vector<std::string>& items,
+                           DetailListMarker marker) {
+    const ImVec2 size(width, height);
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    draw_list->AddRectFilled(origin, ImVec2(origin.x + size.x, origin.y + size.y),
+                             IM_COL32(10, 17, 21, 170), 8.0f);
+    draw_list->AddRect(origin, ImVec2(origin.x + size.x, origin.y + size.y),
+                       ImGui::ColorConvertFloat4ToU32(kPluginsSoftBorderColor), 8.0f);
+
+    ImFont* title_font = plugins_font(core::FontID::ROBOTO_BOLD_LARGE);
+    plugins_draw_text(draw_list, ImVec2(origin.x + 16.0f, origin.y + 16.0f),
+                      kSettingsHeaderTextColor, title, title_font);
+
+    const float text_x = origin.x + 39.0f;
+    const float marker_x = origin.x + 20.0f;
+    const float wrap_width = std::max(1.0f, size.x - 56.0f);
+    float y = origin.y + 53.0f;
+    draw_list->PushClipRect(origin, ImVec2(origin.x + size.x, origin.y + size.y), true);
+    for (size_t index = 0; index < items.size(); ++index) {
+        if (y > origin.y + size.y - 28.0f) {
+            break;
         }
+
+        if (marker == DetailListMarker::Number) {
+            draw_list->AddCircleFilled(ImVec2(marker_x + 7.0f, y + 8.0f), 10.0f,
+                                       ImGui::ColorConvertFloat4ToU32(kPluginsAccentColor));
+            const std::string number = std::to_string(index + 1);
+            const ImVec2 number_size = ImGui::CalcTextSize(number.c_str());
+            draw_list->AddText(ImVec2(marker_x + 7.0f - number_size.x * 0.5f,
+                                      y + 8.0f - number_size.y * 0.5f),
+                               IM_COL32(245, 248, 255, 255), number.c_str());
+        } else {
+            const ImVec4 color = marker == DetailListMarker::Check ? kPluginsGreenColor : kPluginsAccentColor;
+            draw_list->AddCircleFilled(ImVec2(marker_x + 7.0f, y + 8.0f), 4.0f,
+                                       ImGui::ColorConvertFloat4ToU32(color));
+            if (marker == DetailListMarker::Check) {
+                draw_list->AddLine(ImVec2(marker_x + 4.0f, y + 8.0f),
+                                   ImVec2(marker_x + 6.5f, y + 10.5f),
+                                   IM_COL32(8, 18, 12, 255), 1.4f);
+                draw_list->AddLine(ImVec2(marker_x + 6.5f, y + 10.5f),
+                                   ImVec2(marker_x + 11.0f, y + 5.5f),
+                                   IM_COL32(8, 18, 12, 255), 1.4f);
+            }
+        }
+
+        const char* text = items[index].c_str();
+        plugins_draw_text(draw_list, ImVec2(text_x, y), kSettingsBodyTextColor, text, nullptr, wrap_width);
+        y += std::max(25.0f, plugins_calc_text(text, nullptr, wrap_width).y + 9.0f);
+    }
+    draw_list->PopClipRect();
+}
+
+void detail_cards_block(const char* id, const PluginsDetailProps& detail) {
+    const float width = UI::available_size().x;
+    constexpr float gap = 14.0f;
+    const bool one_column = width < 640.0f;
+    const float card_width = one_column ? width : (width - gap) * 0.5f;
+    const float h0 = detail_list_card_height(detail.capabilities, card_width);
+    const float h1 = detail_list_card_height(detail.where_it_appears, card_width);
+    const float h2 = detail_list_card_height(detail.permissions, card_width);
+    const float h3 = detail_list_card_height(detail.getting_started, card_width);
+    const float total_height = one_column
+        ? h0 + h1 + h2 + h3 + gap * 3.0f + 32.0f
+        : std::max(h0, h1) + std::max(h2, h3) + gap + 76.0f;
+
+    UI::div(id, {
+        .mode = UI::Mode::LayoutOnly,
+        .width = UI::Size::fill(),
+        .height = UI::Size::px(total_height),
+    }, [&]() {
+        UI::raw([&]() {
+            const ImVec2 origin = ImGui::GetCursorScreenPos();
+            if (one_column) {
+                float y = origin.y;
+                draw_detail_list_card(ImVec2(origin.x, y), width, h0, "Capabilities",
+                                      detail.capabilities, DetailListMarker::Check);
+                y += h0 + gap;
+                draw_detail_list_card(ImVec2(origin.x, y), width, h1, "Where It Appears",
+                                      detail.where_it_appears, DetailListMarker::Dot);
+                y += h1 + gap;
+                draw_detail_list_card(ImVec2(origin.x, y), width, h2, "Permissions",
+                                      detail.permissions, DetailListMarker::Dot);
+                y += h2 + gap;
+                draw_detail_list_card(ImVec2(origin.x, y), width, h3, "Getting Started",
+                                      detail.getting_started, DetailListMarker::Number);
+                return;
+            }
+
+            const float second_x = origin.x + card_width + gap;
+            const float second_row_y = origin.y + std::max(h0, h1) + gap;
+            const float row1_height = std::max(h2, h3);
+            draw_detail_list_card(origin, card_width, h0, "Capabilities",
+                                  detail.capabilities, DetailListMarker::Check);
+            draw_detail_list_card(ImVec2(second_x, origin.y), card_width, h1, "Where It Appears",
+                                  detail.where_it_appears, DetailListMarker::Dot);
+            draw_detail_list_card(ImVec2(origin.x, second_row_y), card_width, row1_height, "Permissions",
+                                  detail.permissions, DetailListMarker::Dot);
+            draw_detail_list_card(ImVec2(second_x, second_row_y), card_width, row1_height, "Getting Started",
+                                  detail.getting_started, DetailListMarker::Number);
+        });
     });
 }
 
@@ -328,42 +656,6 @@ std::optional<PluginsDetailProps> resolve_plugin_detail(const std::string& plugi
     }
 
     return std::nullopt;
-}
-
-void bullet_list(const char* id, const std::vector<std::string>& items) {
-    if (items.empty()) {
-        return;
-    }
-
-    UI::column(id, {
-        .width = UI::Size::fill(),
-        .height = UI::Size::auto_size(),
-        .gap = UI::Spacing::xy(0.0f, 8.0f),
-    }, [&]() {
-        for (size_t index = 0; index < items.size(); ++index) {
-            const auto& item = items[index];
-            UI::row((std::string(id) + "_item_" + std::to_string(index)).c_str(), {
-                .width = UI::Size::fill(),
-                .height = UI::Size::auto_size(),
-                .gap = UI::Spacing::xy(10.0f, 0.0f),
-                .align = UI::Align::Start,
-            }, [&]() {
-                UI::div((std::string(id) + "_dot_" + std::to_string(index)).c_str(), {
-                    .width = UI::Size::px(6.0f),
-                    .height = UI::Size::px(6.0f),
-                    .margin = UI::Spacing::sides(0.0f, 0.0f, 6.0f, 0.0f),
-                    .bg_color = kPluginsAccentColor,
-                    .rounding = 3.0f,
-                }, []() {});
-                UI::text({
-                    .text = item.c_str(),
-                    .width = UI::Size::fill(),
-                    .overflow = UI::TextOverflow::Wrap,
-                    .color = kSettingsBodyTextColor,
-                });
-            });
-        }
-    });
 }
 
 void action_list(const char* id, const std::vector<PluginsActionProps>& actions) {
@@ -550,7 +842,7 @@ void PluginsPanel::shell() {
         .mode = UI::Mode::LayoutOnly,
         .width = UI::Size::fill(),
         .height = UI::Size::fill(),
-        .padding = UI::Spacing::sides(16.0f, 18.0f, 18.0f, 18.0f),
+        .padding = UI::Spacing::sides(16.0f, 16.0f, 14.0f, 14.0f),
         .gap = UI::Spacing::xy(8.0f, 0.0f),
     }, [&]() {
         sidebar(sidebar_width);
@@ -596,12 +888,13 @@ void PluginsPanel::sidebar(float sidebar_width) {
     UI::StyleScope style;
     style.var(ImGuiStyleVar_ScrollbarSize, kPluginsSidebarScrollbarSize);
 
-    UI::div("##plugins_sidebar", {
-        .mode = UI::Mode::ChildWindow,
-        .width = UI::Size::px(sidebar_width),
-        .height = UI::Size::fill(),
-        .padding = kPluginsSidebarPadding,
-        .gap = UI::Spacing::xy(0.0f, 12.0f),
+        UI::div("##plugins_sidebar", {
+            .mode = UI::Mode::ChildWindow,
+            .width = UI::Size::px(sidebar_width),
+            .height = UI::Size::fill(),
+            .window_flags = ImGuiWindowFlags_AlwaysVerticalScrollbar,
+            .padding = kPluginsSidebarPadding,
+            .gap = UI::Spacing::xy(0.0f, 12.0f),
         .bg_color = kPluginsSurfaceBg,
         .border = true,
         .border_color = kPluginsBorderColor,
@@ -663,30 +956,6 @@ void PluginsPanel::sidebar(float sidebar_width) {
             .gap = UI::Spacing::xy(0.0f, 8.0f),
         }, [&]() {
             cards("plugins_catalog", installed_filter_);
-        });
-
-        UI::row("##plugins_catalog_footer", {
-            .width = UI::Size::fill(),
-            .height = UI::Size::auto_size(),
-            .padding = UI::Spacing::sides(2.0f, 2.0f, 4.0f, 0.0f),
-            .align = UI::Align::Center,
-        }, [&]() {
-            const std::string count = std::to_string(plugins_.size()) + " plugins";
-            UI::text({
-                .text = count.c_str(),
-                .width = UI::Size::px(150.0f),
-                .color = kSettingsMutedTextColor,
-            });
-            const std::string launcher_shortcut =
-                core::CommandManager::get().label("app.toggle_plugin_launcher");
-            const std::string label = launcher_shortcut.empty() ? "Refresh" : launcher_shortcut;
-            UI::button("##plugins_launcher_shortcut", {
-                .label = label.c_str(),
-                .height = UI::Size::px(28.0f),
-                .padding = UI::Spacing::xy(10.0f, 5.0f),
-                .variant = UI::ButtonVariant::Subtle,
-                .rounding = 6.0f,
-            });
         });
     });
 }
@@ -789,270 +1058,141 @@ void PluginsPanel::content() {
     UI::WithStyle([&](UI::StyleScope& style) {
         style.var(ImGuiStyleVar_ScrollbarSize, 8.0f);
 
-        UI::div("##plugins_content", {
-            .mode = UI::Mode::ChildWindow,
+        const bool has_selection = selected != plugins_.end();
+        constexpr float kStickyFooterHeight = 54.0f;
+        const ImVec2 available = UI::available_size();
+        const float scroll_height = std::max(
+            120.0f,
+            available.y - (has_selection ? kStickyFooterHeight : 0.0f));
+
+        UI::column("##plugins_content_shell", {
+            .mode = UI::Mode::LayoutOnly,
             .width = UI::Size::fill(),
             .height = UI::Size::fill(),
-            .window_flags = ImGuiWindowFlags_AlwaysVerticalScrollbar,
-            .padding = UI::Spacing::uniform(0.0f),
         }, [&]() {
-            if (selected == plugins_.end()) {
-                plugins_page({
-                    .title = "Plugins",
-                }, [&]() {
-                    UI::text({
-                        .text = "No plugin metadata found in ~/.misty/plugins/public or ~/.misty/plugins/private yet.",
-                        .width = UI::Size::px(720.0f),
-                        .overflow = UI::TextOverflow::Wrap,
-                        .color = kSettingsMutedTextColor,
-                    });
-                });
-                return;
-            }
-
-            const PluginsDetailProps& detail = selected->detail;
-            const std::string monogram = plugin_monogram(detail);
-            const std::string status_label = plugin_status_label(detail);
-            const std::string action_label = plugin_action_label(detail);
-            const std::string category = plugin_category(detail);
-            const std::string access = plugin_access_level(detail);
-
-            UI::column("plugins_detail_surface", {
+            UI::div("##plugins_content_scroll", {
+                .mode = UI::Mode::ChildWindow,
                 .width = UI::Size::fill(),
-                .height = UI::Size::auto_size(),
-                .padding = UI::Spacing::sides(22.0f, 22.0f, 18.0f, 14.0f),
-                .gap = UI::Spacing::xy(0.0f, 18.0f),
-                .bg_color = kPluginsDetailBg,
-                .border = true,
-                .border_color = kPluginsBorderColor,
-                .rounding = 8.0f,
+                .height = UI::Size::px(scroll_height),
+                .window_flags = ImGuiWindowFlags_AlwaysVerticalScrollbar,
+                .padding = UI::Spacing::uniform(0.0f),
             }, [&]() {
-                UI::row("plugins_detail_header", {
-                    .width = UI::Size::fill(),
-                    .height = UI::Size::auto_size(),
-                    .gap = UI::Spacing::xy(20.0f, 0.0f),
-                    .align = UI::Align::Start,
-                }, [&]() {
-                    UI::div("plugins_detail_icon", {
-                        .width = UI::Size::px(104.0f),
-                        .height = UI::Size::px(104.0f),
-                        .padding = UI::Spacing::uniform(12.0f),
-                        .bg_color = kPluginsSurfaceAltBg,
-                        .border = true,
-                        .border_color = kPluginsSoftBorderColor,
-                        .rounding = 8.0f,
-                        .align = UI::Align::Center,
-                        .justify = UI::Justify::Start,
-                    }, [&]() {
-                        if (!selected->logo_path.empty()) {
-                            PluginsIconProps icon_props;
-                            icon_props.icon_path = selected->logo_path.c_str();
-                            icon_props.apply_theme = false;
-                            icon_props.size = 76.0f;
-                            plugins_icon("plugins_detail_icon_svg", icon_props);
-                        } else {
-                            UI::text({
-                                .text = monogram.c_str(),
-                                .width = UI::Size::fill(),
-                                .height = UI::Size::fill(),
-                                .align = UI::Align::Center,
-                                .justify = UI::Justify::Center,
-                                .font = UI::TextFont::BoldXLarge,
-                                .color = kSettingsHeaderTextColor,
-                            });
-                        }
-                    });
-
-                    UI::column("plugins_detail_summary", {
-                        .width = UI::Size::px(360.0f),
-                        .height = UI::Size::auto_size(),
-                        .gap = UI::Spacing::xy(0.0f, 10.0f),
+                if (!has_selection) {
+                    plugins_page({
+                        .title = "Plugins",
                     }, [&]() {
                         UI::text({
-                            .text = detail.name.c_str(),
-                            .width = UI::Size::fill(),
-                            .font = UI::TextFont::BoldXLarge,
-                            .color = kSettingsHeaderTextColor,
+                            .text = "No plugin metadata found in ~/.misty/plugins/public or ~/.misty/plugins/private yet.",
+                            .width = UI::Size::px(720.0f),
+                            .overflow = UI::TextOverflow::Wrap,
+                            .color = kSettingsMutedTextColor,
                         });
-                        UI::row("plugins_detail_title_pills", {
+                    });
+                    return;
+                }
+
+                const PluginsDetailProps& detail = selected->detail;
+                const std::string monogram = plugin_monogram(detail);
+                const std::string status_label = plugin_status_label(detail);
+                const std::string action_label = plugin_action_label(detail);
+                const std::string category = plugin_category(detail);
+                const std::string access = plugin_access_level(detail);
+
+                UI::column("plugins_detail_surface", {
+                    .mode = UI::Mode::LayoutOnly,
+                    .width = UI::Size::fill(),
+                    .height = UI::Size::auto_size(),
+                    .padding = UI::Spacing::sides(22.0f, 22.0f, 20.0f, 12.0f),
+                    .gap = UI::Spacing::xy(0.0f, 14.0f),
+                }, [&]() {
+                    detail_header_block("plugins_detail_header",
+                                        detail,
+                                        selected->logo_path,
+                                        monogram,
+                                        status_label,
+                                        action_label,
+                                        category,
+                                        access);
+
+                    UI::divider({
+                        .color = kPluginsSoftBorderColor,
+                    });
+
+                    UI::row("plugins_detail_tabs", {
+                        .width = UI::Size::fill(),
+                        .height = UI::Size::px(36.0f),
+                        .gap = UI::Spacing::xy(10.0f, 0.0f),
+                        .align = UI::Align::Center,
+                    }, [&]() {
+                        UI::button("plugins_tab_overview", {
+                            .label = "Overview",
+                            .height = UI::Size::px(32.0f),
+                            .padding = UI::Spacing::xy(12.0f, 6.0f),
+                            .variant = UI::ButtonVariant::Nav,
+                            .selected = true,
+                            .rounding = 6.0f,
+                        });
+                        UI::button("plugins_tab_changelog", {
+                            .label = "Changelog",
+                            .height = UI::Size::px(32.0f),
+                            .padding = UI::Spacing::xy(12.0f, 6.0f),
+                            .variant = UI::ButtonVariant::Nav,
+                            .rounding = 6.0f,
+                        });
+                        UI::button("plugins_tab_details", {
+                            .label = "Details",
+                            .height = UI::Size::px(32.0f),
+                            .padding = UI::Spacing::xy(12.0f, 6.0f),
+                            .variant = UI::ButtonVariant::Nav,
+                            .rounding = 6.0f,
+                        });
+                    });
+
+                    UI::divider({
+                        .color = kPluginsSoftBorderColor,
+                    });
+
+                    UI::column("plugins_detail_overview_body", {
+                        .width = UI::Size::fill(),
+                        .height = UI::Size::auto_size(),
+                        .gap = UI::Spacing::xy(0.0f, 16.0f),
+                    }, [&]() {
+                        UI::column("plugins_detail_overview_text", {
                             .width = UI::Size::fill(),
                             .height = UI::Size::auto_size(),
-                            .gap = UI::Spacing::xy(8.0f, 0.0f),
+                            .gap = UI::Spacing::xy(0.0f, 8.0f),
                         }, [&]() {
-                            if (!detail.version.empty()) {
-                                plugins_pill({
-                                    .id = "plugins_detail_version",
-                                    .label = detail.version.c_str(),
-                                });
-                            }
-                            if (!detail.author.empty()) {
-                                plugins_pill({
-                                    .id = "plugins_detail_author",
-                                    .label = detail.author.c_str(),
-                                });
-                            }
-                        });
-                        UI::row("plugins_detail_status", {
-                            .width = UI::Size::fill(),
-                            .height = UI::Size::auto_size(),
-                            .gap = UI::Spacing::xy(8.0f, 0.0f),
-                            .align = UI::Align::Center,
-                        }, [&]() {
-                            UI::div("plugins_detail_status_dot", {
-                                .width = UI::Size::px(10.0f),
-                                .height = UI::Size::px(10.0f),
-                                .bg_color = is_installed_status(detail.status) ? kPluginsGreenColor : kPluginsGreenColor,
-                                .rounding = 5.0f,
-                            }, []() {});
                             UI::text({
-                                .text = status_label.c_str(),
+                                .text = "Overview",
                                 .width = UI::Size::fill(),
-                                .font = UI::TextFont::Bold,
-                                .color = kPluginsGreenColor,
+                                .font = UI::TextFont::BoldLarge,
+                                .color = kSettingsHeaderTextColor,
                             });
-                        });
-                        if (!detail.overview.empty()) {
                             UI::text({
-                                .text = detail.overview.c_str(),
-                                .width = UI::Size::px(420.0f),
+                                .text = detail.overview.empty() ? "No overview provided." : detail.overview.c_str(),
+                                .width = UI::Size::fill(),
                                 .overflow = UI::TextOverflow::Wrap,
                                 .color = kSettingsBodyTextColor,
                             });
-                        }
-                    });
-
-                    UI::column("plugins_detail_meta", {
-                        .width = UI::Size::fill(),
-                        .height = UI::Size::auto_size(),
-                        .padding = UI::Spacing::sides(20.0f, 0.0f, 0.0f, 0.0f),
-                        .gap = UI::Spacing::xy(0.0f, 12.0f),
-                        .border_color = ImVec4(0.0f, 0.0f, 0.0f, 0.0f),
-                    }, [&]() {
-                        UI::row("plugins_detail_actions", {
-                            .width = UI::Size::fill(),
-                            .height = UI::Size::auto_size(),
-                            .justify = UI::Justify::End,
-                            .gap = UI::Spacing::xy(8.0f, 0.0f),
-                        }, [&]() {
-                            UI::button("plugins_detail_primary_action", {
-                                .label = action_label.c_str(),
-                                .width = UI::Size::px(96.0f),
-                                .height = UI::Size::px(36.0f),
-                                .padding = UI::Spacing::xy(22.0f, 8.0f),
-                                .button_color = kPluginsAccentColor,
-                                .hover_color = ImVec4(0.32f, 0.62f, 1.00f, 1.0f),
-                                .active_color = ImVec4(0.18f, 0.42f, 0.78f, 1.0f),
-                                .text_color = ImVec4(0.98f, 0.99f, 1.0f, 1.0f),
-                                .rounding = 7.0f,
-                            }, [&]() {
-                                UI::text({
-                                    .text = action_label.c_str(),
-                                    .width = UI::Size::fill(),
-                                    .height = UI::Size::fill(),
-                                    .align = UI::Align::Center,
-                                    .justify = UI::Justify::Center,
-                                    .color = ImVec4(0.98f, 0.99f, 1.0f, 1.0f),
-                                });
-                            });
-                            UI::button("plugins_detail_more", {
-                                .label = "...",
-                                .width = UI::Size::px(34.0f),
-                                .height = UI::Size::px(36.0f),
-                                .variant = UI::ButtonVariant::Subtle,
-                                .rounding = 7.0f,
-                            });
                         });
 
-                        icon_text_row("plugins_meta_version", "Version", detail.version.empty() ? "1.0.0" : detail.version.c_str());
-                        icon_text_row("plugins_meta_author", "Author", detail.author.empty() ? "Misty" : detail.author.c_str());
-                        icon_text_row("plugins_meta_status", "Status", status_label.c_str());
-                        icon_text_row("plugins_meta_category", "Category", category.c_str());
-                        icon_text_row("plugins_meta_permissions", "Permissions", access.c_str());
+                        detail_cards_block("plugins_detail_card_grid", detail);
+                        UI::spacer(0.0f, 20.0f);
                     });
                 });
+            });
 
-                UI::divider({
-                    .color = kPluginsSoftBorderColor,
-                });
+            if (!has_selection) {
+                return;
+            }
 
-                UI::row("plugins_detail_tabs", {
-                    .width = UI::Size::fill(),
-                    .height = UI::Size::px(36.0f),
-                    .gap = UI::Spacing::xy(10.0f, 0.0f),
-                    .align = UI::Align::Center,
-                }, [&]() {
-                    UI::button("plugins_tab_overview", {
-                        .label = "Overview",
-                        .height = UI::Size::px(32.0f),
-                        .padding = UI::Spacing::xy(12.0f, 6.0f),
-                        .variant = UI::ButtonVariant::Nav,
-                        .selected = true,
-                        .rounding = 6.0f,
-                    });
-                    UI::button("plugins_tab_changelog", {
-                        .label = "Changelog",
-                        .height = UI::Size::px(32.0f),
-                        .padding = UI::Spacing::xy(12.0f, 6.0f),
-                        .variant = UI::ButtonVariant::Nav,
-                        .rounding = 6.0f,
-                    });
-                    UI::button("plugins_tab_details", {
-                        .label = "Details",
-                        .height = UI::Size::px(32.0f),
-                        .padding = UI::Spacing::xy(12.0f, 6.0f),
-                        .variant = UI::ButtonVariant::Nav,
-                        .rounding = 6.0f,
-                    });
-                });
-
-                UI::divider({
-                    .color = kPluginsSoftBorderColor,
-                });
-
-                UI::column("plugins_detail_overview_body", {
-                    .width = UI::Size::fill(),
-                    .height = UI::Size::auto_size(),
-                    .gap = UI::Spacing::xy(0.0f, 16.0f),
-                }, [&]() {
-                    UI::column("plugins_detail_overview_text", {
-                        .width = UI::Size::fill(),
-                        .height = UI::Size::auto_size(),
-                        .gap = UI::Spacing::xy(0.0f, 8.0f),
-                    }, [&]() {
-                        UI::text({
-                            .text = "Overview",
-                            .width = UI::Size::fill(),
-                            .font = UI::TextFont::BoldLarge,
-                            .color = kSettingsHeaderTextColor,
-                        });
-                        UI::text({
-                            .text = detail.overview.empty() ? "No overview provided." : detail.overview.c_str(),
-                            .width = UI::Size::fill(),
-                            .overflow = UI::TextOverflow::Wrap,
-                            .color = kSettingsBodyTextColor,
-                        });
-                    });
-
-                    UI::grid("plugins_detail_card_grid", 2, {
-                        .width = UI::Size::fill(),
-                        .height = UI::Size::auto_size(),
-                        .gap = UI::Spacing::xy(14.0f, 14.0f),
-                    }, [&]() {
-                        detail_card("plugins_capabilities", "Capabilities", [&]() {
-                            bullet_list("plugins_capabilities_list", detail.capabilities);
-                        });
-                        detail_card("plugins_appears", "Where It Appears", [&]() {
-                            bullet_list("plugins_appears_list", detail.where_it_appears);
-                        });
-                        detail_card("plugins_permissions", "Permissions", [&]() {
-                            bullet_list("plugins_permissions_list", detail.permissions);
-                        });
-                        detail_card("plugins_getting_started", "Getting Started", [&]() {
-                            bullet_list("plugins_getting_started_list", detail.getting_started);
-                        });
-                    });
-                });
-
+            UI::div("plugins_detail_sticky_footer", {
+                .mode = UI::Mode::LayoutOnly,
+                .width = UI::Size::fill(),
+                .height = UI::Size::px(kStickyFooterHeight),
+                .padding = UI::Spacing::sides(22.0f, 22.0f, 8.0f, 8.0f),
+                .bg_color = kPluginsPanelBg,
+            }, [&]() {
                 UI::divider({
                     .color = kPluginsSoftBorderColor,
                 });

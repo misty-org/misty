@@ -182,6 +182,8 @@ private:
      * @brief Renders the top bar, directory content, search overlay, and breadcrumb bar.
      */
     void render_panel_contents() override;
+    float pane_header_height(const Panel& panel, bool is_active, bool has_multiple_panes) const override;
+    void render_pane_header(Panel& panel, bool is_active, bool has_multiple_panes) override;
     /**
      * @brief Renders the inspector body inside either a window or embedded child.
      */
@@ -372,7 +374,7 @@ private:
     /**
      * @brief Performs one local-to-local paste operation.
      */
-    void perform_paste_local_to_local(panel::FileExplorerState& state,
+    bool perform_paste_local_to_local(panel::FileExplorerState& state,
                                       const panel::FileItem& item,
                                       const std::string& dest_dir,
                                       panel::ClipboardOp op);

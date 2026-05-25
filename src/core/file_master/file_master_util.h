@@ -1,6 +1,8 @@
 #pragma once
 
+#include <chrono>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "file_master.h"
@@ -47,6 +49,8 @@ FileMasterResult copy_remote_path(const FileMasterProps& props);
 FileMasterResult cut_remote_path(const FileMasterProps& props);
 
 bool load_cached_remote_path(const FileMasterProps& props, std::vector<FileMasterListItem>& items);
+
+std::optional<std::chrono::system_clock::time_point> cached_remote_path_time(const FileMasterProps& props);
 
 FileMasterResult list_remote_path(const FileMasterProps& props, std::vector<FileMasterListItem>& items);
 

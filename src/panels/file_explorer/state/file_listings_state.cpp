@@ -13,6 +13,8 @@ FileListing::FileListing(const FileListing& other)
       trash_files(other.trash_files),
       is_loading(other.is_loading),
       sort_dirty(other.sort_dirty),
+      last_refreshed_at(other.last_refreshed_at),
+      last_synced_at(other.last_synced_at),
       deleting_files(other.deleting_files),
       loading(other.loading) {
     load_generation.store(other.load_generation.load(std::memory_order_relaxed),
@@ -31,6 +33,8 @@ FileListing& FileListing::operator=(const FileListing& other) {
     trash_files = other.trash_files;
     is_loading = other.is_loading;
     sort_dirty = other.sort_dirty;
+    last_refreshed_at = other.last_refreshed_at;
+    last_synced_at = other.last_synced_at;
     deleting_files = other.deleting_files;
     loading = other.loading;
     load_generation.store(other.load_generation.load(std::memory_order_relaxed),
@@ -46,6 +50,8 @@ FileListing::FileListing(FileListing&& other) noexcept
       trash_files(std::move(other.trash_files)),
       is_loading(other.is_loading),
       sort_dirty(other.sort_dirty),
+      last_refreshed_at(other.last_refreshed_at),
+      last_synced_at(other.last_synced_at),
       deleting_files(std::move(other.deleting_files)),
       loading(other.loading) {
     load_generation.store(other.load_generation.load(std::memory_order_relaxed),
@@ -64,6 +70,8 @@ FileListing& FileListing::operator=(FileListing&& other) noexcept {
     trash_files = std::move(other.trash_files);
     is_loading = other.is_loading;
     sort_dirty = other.sort_dirty;
+    last_refreshed_at = other.last_refreshed_at;
+    last_synced_at = other.last_synced_at;
     deleting_files = std::move(other.deleting_files);
     loading = other.loading;
     load_generation.store(other.load_generation.load(std::memory_order_relaxed),
@@ -87,6 +95,8 @@ void FileListing::clear() {
     deleting_files.clear();
     is_loading = false;
     sort_dirty = true;
+    last_refreshed_at = {};
+    last_synced_at = {};
     load_generation.fetch_add(1, std::memory_order_relaxed);
     loading.cancel();
     note_listing_changed();

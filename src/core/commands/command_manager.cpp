@@ -124,6 +124,7 @@ const std::vector<DefaultCommandEntry>& default_command_entries() {
         {"explorer.refresh", MISTY_PRIMARY_SHORTCUT "+R"},
         {"explorer.toggle_chat", MISTY_PRIMARY_SHORTCUT "+J"},
         {"explorer.toggle_claude", MISTY_PRIMARY_SHORTCUT "+Shift+A"},
+        {"explorer.next_workspace", MISTY_PRIMARY_SHORTCUT "+Shift+Grave"},
         {"explorer.new_tab", MISTY_PRIMARY_SHORTCUT "+T"},
         {"explorer.restore_tab", MISTY_PRIMARY_SHORTCUT "+Shift+T"},
         {"explorer.close_pane", MISTY_PRIMARY_SHORTCUT "+W"},
@@ -488,6 +489,7 @@ ImGuiKey CommandManager::parse_key_token(const std::string& token) {
     if (token == "LEFTBRACKET" || token == "[") return ImGuiKey_LeftBracket;
     if (token == "RIGHTBRACKET" || token == "]") return ImGuiKey_RightBracket;
     if (token == "BACKSLASH" || token == "\\") return ImGuiKey_Backslash;
+    if (token == "GRAVE" || token == "GRAVEACCENT" || token == "BACKTICK" || token == "TILDE" || token == "`" || token == "~") return ImGuiKey_GraveAccent;
     if (token == "F2") return ImGuiKey_F2;
     if (token.size() == 1) {
         char c = token[0];
@@ -552,6 +554,7 @@ std::string CommandManager::label_for_shortcut(const Shortcut& shortcut) {
         case ImGuiKey_LeftBracket: parts.emplace_back("["); break;
         case ImGuiKey_RightBracket: parts.emplace_back("]"); break;
         case ImGuiKey_Backslash: parts.emplace_back("\\"); break;
+        case ImGuiKey_GraveAccent: parts.emplace_back("`"); break;
         case ImGuiKey_F2: parts.emplace_back("F2"); break;
         default:
             if (shortcut.key >= ImGuiKey_A && shortcut.key <= ImGuiKey_Z) {

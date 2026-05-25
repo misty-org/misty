@@ -133,7 +133,9 @@ namespace misty::panel {
             ImGui::End();
         });
 
-        // Render popups on top (outside navbar window)
+    }
+
+    void NavbarPanel::render_activity_popup() {
         activity_panel_.render();
     }
 

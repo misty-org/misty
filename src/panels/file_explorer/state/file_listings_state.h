@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -56,6 +57,8 @@ struct FileListing {
     bool sort_dirty = true;
     std::atomic<uint64_t> load_generation{0};
     std::atomic<uint64_t> listing_revision{0};
+    std::chrono::system_clock::time_point last_refreshed_at{};
+    std::chrono::system_clock::time_point last_synced_at{};
     std::unordered_set<std::string> deleting_files;
     LoadingState loading;
 
