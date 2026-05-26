@@ -45,6 +45,7 @@ struct PluginInfo {
     std::string signer;
     std::vector<PluginCommandInfo> commands;
     std::vector<PluginPanelInfo> panels;
+    std::vector<std::string> launcher_views;
     std::vector<std::string> diagnostics;
 };
 

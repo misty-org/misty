@@ -25,9 +25,14 @@ typedef enum MistyNotificationLevel {
     MISTY_NOTIFICATION_ERROR = 2
 } MistyNotificationLevel;
 
+typedef enum MistyWindowType {
+    MISTY_WINDOW_TYPE_PANEL = 0,
+    MISTY_WINDOW_TYPE_EXTERNAL = 1
+} MistyWindowType;
+
 typedef enum MistyViewOpenMode {
-    MISTY_VIEW_OPEN_MODE_TAB = 0,
-    MISTY_VIEW_OPEN_MODE_INLINE = 1,
+    MISTY_VIEW_OPEN_MODE_INLINE = 0,
+    MISTY_VIEW_OPEN_MODE_TAB = 1,
     MISTY_VIEW_OPEN_MODE_SPLIT = 2
 } MistyViewOpenMode;
 
@@ -101,10 +106,11 @@ typedef struct MistyPanelReg {
     const char* id;
     const char* title;
     int default_open;
-    MistyPanelRenderFn render;
-    void* user_data;
+    int window_type;
     float default_width;
     float default_height;
+    MistyPanelRenderFn render;
+    void* user_data;
 } MistyPanelReg;
 
 typedef struct MistyRegistryApi {
@@ -122,10 +128,10 @@ typedef struct MistyPluginContext {
 } MistyPluginContext;
 
 MISTY_PLUGIN_EXPORT uint32_t misty_plugin_abi_version(void);
-MISTY_PLUGIN_EXPORT int misty_plugin_register(const MistyPluginContext* ctx);
+MISTY_PLUGIN_EXPORT int      misty_plugin_register(const MistyPluginContext* ctx);
 
 typedef uint32_t (*MistyPluginAbiVersionFn)(void);
-typedef int (*MistyPluginRegisterFn)(const MistyPluginContext*);
+typedef int      (*MistyPluginRegisterFn)(const MistyPluginContext*);
 
 #ifdef __cplusplus
 }

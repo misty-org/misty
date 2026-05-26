@@ -24,6 +24,7 @@ namespace misty::panel {
         virtual TabController::Tab create_default_tab(std::int16_t tab_idx) const = 0;
         virtual Pane create_default_pane(std::int16_t pane_idx, std::int16_t tab_idx) const;
         virtual void render_panel_contents() = 0;
+        virtual bool shows_tab_bar(const Pane& pane) const;
         virtual float pane_header_height(const Panel& panel, bool is_active, bool has_multiple_panes) const;
         virtual void render_pane_header(Panel& panel, bool is_active, bool has_multiple_panes);
 
@@ -31,6 +32,9 @@ namespace misty::panel {
         const Pane* active_pane() const;
         const TabController::Tab* active_tab() const;
         Panel* active_panel() const;
+        std::int16_t allocate_tab_idx();
+        bool add_tab_to_active_pane(const TabController::Tab& tab);
+        bool activate_tab_in_active_pane(const std::string& context_key);
 
     private:
         enum class PaneRestoreMode {
@@ -79,7 +83,7 @@ namespace misty::panel {
         std::array<float, 2> lane_split_ratios_ = {0.5f, 0.5f};
 
         static constexpr float kPaneHandleWidth = 8.0f;
-        static constexpr float kPaneDividerThickness = 1.0f;
+        static constexpr float kPaneDividerThickness = 3.0f;
         static constexpr float kPaneMinWidth = 280.0f;
         static constexpr float kPaneMinHeight = 220.0f;
         static constexpr int kMaxPaneCount = 4;

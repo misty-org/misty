@@ -9,8 +9,8 @@
 #include "views/register_view.h"
 #include "views/login_view.h"
 #include "views/providers_view.h"
-#include "views/extensions_view.h"
-#include "views/vault_view.h"
+#include "views/plugins_view.h"
+#include "views/dock_view.h"
 #include "views/transfers_view.h"
 #include "views/activity_view.h"
 #include "views/settings_view.h"
@@ -36,8 +36,8 @@ std::string view_name(misty::view::ViewID id) {
         case ViewID::Workspace: return "Workspace";
         case ViewID::Activity: return "Activity";
         case ViewID::Providers: return "Providers";
-        case ViewID::Extensions: return "Extensions";
-        case ViewID::Vault: return "Vault";
+        case ViewID::Plugins: return "Plugins";
+        case ViewID::Dock: return "Dock";
         case ViewID::Transfers: return "Transfers";
         case ViewID::Default: return "Default";
     }
@@ -174,13 +174,13 @@ namespace misty {
             append_startup_log("startup: providers view instantiated");
             return std::make_unique<view::ProvidersView>(state_registry_, worker_pool_);
         });
-        view::register_view_factory(view::ViewID::Extensions, [this]() {
-            append_startup_log("startup: extensions view instantiated");
-            return std::make_unique<view::ExtensionsView>(state_registry_);
+        view::register_view_factory(view::ViewID::Plugins, [this]() {
+            append_startup_log("startup: plugins view instantiated");
+            return std::make_unique<view::PluginsView>(state_registry_);
         });
-        view::register_view_factory(view::ViewID::Vault, [this]() {
-            append_startup_log("startup: vault view instantiated");
-            return std::make_unique<view::VaultView>(state_registry_, worker_pool_);
+        view::register_view_factory(view::ViewID::Dock, [this]() {
+            append_startup_log("startup: dock view instantiated");
+            return std::make_unique<view::DockView>(state_registry_);
         });
         view::register_view_factory(view::ViewID::Transfers, [this]() {
             append_startup_log("startup: transfers view instantiated");
