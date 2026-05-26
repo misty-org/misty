@@ -1,8 +1,35 @@
 #include "panels/file_explorer/file_explorer_panel.h"
 
+#include <algorithm>
+
+#include "core/commands/command_manager.h"
 #include "panels/context_menu/context_menu_state.h"
+#include "panels/file_explorer/state/clipboard_state.h"
 
 namespace misty::panel {
+namespace {
+
+bool is_local_item(const FileItem& item) {
+    return item.type == FileType::LOCAL;
+}
+
+bool selected_items_are_local(const FileExplorerPanel::TransientUiState& ui, const FileListing& listing) {
+    if (ui.selected_files.empty()) {
+        return false;
+    }
+
+    for (const auto& selected_id : ui.selected_files) {
+        const auto it = std::find_if(listing.files.begin(), listing.files.end(), [&](const FileItem& item) {
+            return item.id == selected_id;
+        });
+        if (it == listing.files.end() || !is_local_item(*it)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+}  // namespace
 
 const FileItem* FileExplorerPanel::find_context_menu_target(const FileExplorerState& state,
                                                             const FileListing& listing,
@@ -17,6 +44,11 @@ const FileItem* FileExplorerPanel::find_context_menu_target(const FileExplorerSt
 }
 
 void FileExplorerPanel::open_context_menu(FileExplorerState& state, FileExplorerPanel::TransientUiState& ui) {
+    const auto& listing = active_listing();
+    const FileItem* target = find_context_menu_target(state, listing, ui);
+    const bool has_local_selection = selected_items_are_local(ui, listing);
+    const bool has_clipboard = registry_.get_state<ClipboardState>("Clipboard").has_content();
+
     ContextMenuRequest request;
     request.source_key = state_key_;
     request.anchor_pos = ImGui::GetMousePos();
@@ -24,18 +56,55 @@ void FileExplorerPanel::open_context_menu(FileExplorerState& state, FileExplorer
         request.viewport_id = viewport->ID;
     }
 
-    if (find_context_menu_target(state, active_listing(), ui) != nullptr) {
-        ContextMenuEntry readonly_entry;
-        readonly_entry.id = "readonly";
-        readonly_entry.label = "Read-only view";
-        readonly_entry.disabled = true;
-        request.entries.push_back(std::move(readonly_entry));
-        request.entries.push_back(ContextMenuEntry::separator());
-    }
+    ContextMenuEntry copy_entry;
+    copy_entry.id = "copy";
+    copy_entry.label = "Copy";
+    copy_entry.secondary_label = core::CommandManager::get().label("explorer.copy");
+    copy_entry.disabled = !has_local_selection;
+    copy_entry.on_select = [this, &state]() {
+        perform_copy(state);
+    };
+    request.entries.push_back(std::move(copy_entry));
+
+    ContextMenuEntry cut_entry;
+    cut_entry.id = "cut";
+    cut_entry.label = "Cut";
+    cut_entry.secondary_label = core::CommandManager::get().label("explorer.cut");
+    cut_entry.disabled = !has_local_selection;
+    cut_entry.on_select = [this, &state]() {
+        perform_cut(state);
+    };
+    request.entries.push_back(std::move(cut_entry));
+
+    ContextMenuEntry paste_entry;
+    paste_entry.id = "paste";
+    paste_entry.label = "Paste";
+    paste_entry.secondary_label = core::CommandManager::get().label("explorer.paste");
+    paste_entry.disabled = !has_clipboard;
+    paste_entry.on_select = [this, &state]() {
+        perform_paste(state);
+    };
+    request.entries.push_back(std::move(paste_entry));
+
+    request.entries.push_back(ContextMenuEntry::separator());
+
+    ContextMenuEntry delete_entry;
+    delete_entry.id = "delete";
+    delete_entry.label = "Delete";
+    delete_entry.secondary_label = core::CommandManager::get().label("explorer.delete");
+    delete_entry.disabled = !has_local_selection;
+    delete_entry.destructive = true;
+    delete_entry.on_select = [this, &state]() {
+        perform_delete_selected(state);
+    };
+    request.entries.push_back(std::move(delete_entry));
+
+    request.entries.push_back(ContextMenuEntry::separator());
 
     ContextMenuEntry copy_path_entry;
     copy_path_entry.id = "copy_path";
     copy_path_entry.label = "Copy Path";
+    copy_path_entry.disabled = target == nullptr;
     copy_path_entry.on_select = [path = ui.context_menu_target_path]() {
         ImGui::SetClipboardText(path.c_str());
     };
@@ -62,11 +131,18 @@ void FileExplorerPanel::open_background_context_menu(FileExplorerState& state, F
         request.viewport_id = viewport->ID;
     }
 
-    ContextMenuEntry readonly_entry;
-    readonly_entry.id = "readonly";
-    readonly_entry.label = "Read-only view";
-    readonly_entry.disabled = true;
-    request.entries.push_back(std::move(readonly_entry));
+    const bool has_clipboard = registry_.get_state<ClipboardState>("Clipboard").has_content();
+
+    ContextMenuEntry paste_entry;
+    paste_entry.id = "paste";
+    paste_entry.label = "Paste";
+    paste_entry.secondary_label = core::CommandManager::get().label("explorer.paste");
+    paste_entry.disabled = !has_clipboard;
+    paste_entry.on_select = [this, &state]() {
+        perform_paste(state);
+    };
+    request.entries.push_back(std::move(paste_entry));
+
     request.entries.push_back(ContextMenuEntry::separator());
 
     ContextMenuEntry show_hidden_entry;

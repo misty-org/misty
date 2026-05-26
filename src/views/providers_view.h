@@ -8,12 +8,12 @@
 #include "panels/providers/providers_panel.h"
 #include "panels/navbar/navbar_panel.h"
 #include "panels/notification/notification_panel.h"
-#include "core/ui/ui_registry.h"
+#include "core/ui/state_registry.h"
 
 namespace misty::view {
     class ProvidersView : public AppView {
     public:
-        ProvidersView(UIRegistry& ui_registry, core::WorkerPool& worker_pool);
+        ProvidersView(StateRegistry& state_registry, core::WorkerPool& worker_pool);
         ~ProvidersView() override = default;
 
         void render() override;
@@ -23,7 +23,7 @@ namespace misty::view {
         void init_panels();
 
     private:
-        UIRegistry& ui_registry_;
+        StateRegistry& state_registry_;
         core::WorkerPool& worker_pool_;
         std::shared_ptr<panel::NavbarPanel> navbar_panel_;
         std::shared_ptr<panel::ProvidersPanel> providers_panel_;

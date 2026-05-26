@@ -4,7 +4,7 @@
 
 namespace misty::panel {
 
-    NotificationPanel::NotificationPanel(core::UIRegistry& registry)
+    NotificationPanel::NotificationPanel(core::StateRegistry& registry)
         : registry_(registry) {
     }
 

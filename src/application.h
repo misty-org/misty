@@ -1,5 +1,5 @@
 #pragma once
-#include "core/ui/ui_registry.h"
+#include "core/ui/state_registry.h"
 #include "core/system/frame_pacer.h"
 #include "core/threading/worker_pool.h"
 #include "panels/errors/errors_panel.h"
@@ -38,7 +38,7 @@ namespace misty {
         virtual void center_window() = 0;
 
     protected:
-        core::UIRegistry ui_registry_;
+        core::StateRegistry state_registry_;
         core::WorkerPool worker_pool_;
         std::shared_ptr<MistyClient> client_;
         panel::ErrorsPanel errors_panel_;

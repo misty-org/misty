@@ -8,7 +8,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "core/ui/ui_registry.h"
+#include "core/ui/state_registry.h"
 
 namespace misty::core {
 
@@ -68,7 +68,7 @@ struct FileTransferRecord {
     }
 };
 
-class FileTransfer : public UIState {
+class FileTransfer : public StateEntry {
 public:
     static constexpr size_t kMaxHistory = 50;
 

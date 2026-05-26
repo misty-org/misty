@@ -9,6 +9,7 @@
 
 #include "core/file_master/file_master_local.h"
 #include "core/file_master/file_master_remote.h"
+#include "core/file_transfer/file_transfer.h"
 #include "core/threading/worker_pool.h"
 
 namespace fs = std::filesystem;
@@ -204,6 +205,130 @@ TEST_F(FileMasterLocalTest, RuntimeFailureReturnsError) {
     ASSERT_TRUE(wait_for([&]() { return result.has_value(); }));
     ASSERT_FALSE(result->success);
     EXPECT_FALSE(result->error_message.empty());
+}
+
+TEST_F(FileMasterLocalTest, TrackedCopyCreatesCompletedTransfer) {
+    misty::core::FileTransfer transfers;
+    misty::core::FileMasterLocal tracked_file_master(worker_pool_, &transfers);
+    const fs::path src = home_.path() / "tracked-copy.txt";
+    const fs::path dest = home_.path() / "dest" / "tracked-copy.txt";
+    fs::create_directories(dest.parent_path());
+    write_file(src, "payload");
+
+    std::optional<misty::core::FileMasterResult> result;
+    misty::core::FileMasterProps props;
+    props.file_name = src.filename().string();
+    props.local_source.path = src.string();
+    props.local_dest.path = dest.string();
+    tracked_file_master.copy(props, [&](misty::core::FileMasterResult value) {
+        result = std::move(value);
+    });
+
+    ASSERT_TRUE(wait_for([&]() { return result.has_value(); }));
+    ASSERT_TRUE(result->success);
+    const auto rows = transfers.get_all_transfers();
+    ASSERT_EQ(rows.size(), 1u);
+    EXPECT_EQ(rows[0].transfer_type, misty::core::FileTransferType::Copy);
+    EXPECT_EQ(rows[0].item_type, misty::core::FileTransferItemType::Local);
+    EXPECT_EQ(rows[0].file_name, "tracked-copy.txt");
+    EXPECT_EQ(rows[0].local_source_path, src.string());
+    EXPECT_EQ(rows[0].local_dest_path, dest.string());
+    EXPECT_EQ(rows[0].total_bytes, 7);
+    EXPECT_EQ(rows[0].transferred_bytes, 7);
+    EXPECT_EQ(rows[0].status, misty::core::FileTransferStatus::Completed);
+}
+
+TEST_F(FileMasterLocalTest, TrackedCutCreatesCompletedMoveTransfer) {
+    misty::core::FileTransfer transfers;
+    misty::core::FileMasterLocal tracked_file_master(worker_pool_, &transfers);
+    const fs::path src = home_.path() / "tracked-move.txt";
+    const fs::path dest = home_.path() / "dest" / "tracked-move.txt";
+    fs::create_directories(dest.parent_path());
+    write_file(src, "payload");
+
+    std::optional<misty::core::FileMasterResult> result;
+    misty::core::FileMasterProps props;
+    props.file_name = src.filename().string();
+    props.local_source.path = src.string();
+    props.local_dest.path = dest.string();
+    tracked_file_master.cut(props, [&](misty::core::FileMasterResult value) {
+        result = std::move(value);
+    });
+
+    ASSERT_TRUE(wait_for([&]() { return result.has_value(); }));
+    ASSERT_TRUE(result->success);
+    const auto rows = transfers.get_all_transfers();
+    ASSERT_EQ(rows.size(), 1u);
+    EXPECT_EQ(rows[0].transfer_type, misty::core::FileTransferType::Move);
+    EXPECT_EQ(rows[0].status, misty::core::FileTransferStatus::Completed);
+    EXPECT_EQ(rows[0].local_source_path, src.string());
+    EXPECT_EQ(rows[0].local_dest_path, dest.string());
+}
+
+TEST_F(FileMasterLocalTest, TrackedRemoveCreatesCompletedDeleteTransfer) {
+    misty::core::FileTransfer transfers;
+    misty::core::FileMasterLocal tracked_file_master(worker_pool_, &transfers);
+    const fs::path src = home_.path() / "tracked-delete.txt";
+    write_file(src, "payload");
+
+    std::optional<misty::core::FileMasterResult> result;
+    misty::core::FileMasterProps props;
+    props.file_name = src.filename().string();
+    props.local_source.path = src.string();
+    tracked_file_master.remove(props, [&](misty::core::FileMasterResult value) {
+        result = std::move(value);
+    });
+
+    ASSERT_TRUE(wait_for([&]() { return result.has_value(); }));
+    ASSERT_TRUE(result->success);
+    EXPECT_FALSE(fs::exists(src));
+    const auto rows = transfers.get_all_transfers();
+    ASSERT_EQ(rows.size(), 1u);
+    EXPECT_EQ(rows[0].transfer_type, misty::core::FileTransferType::Delete);
+    EXPECT_EQ(rows[0].status, misty::core::FileTransferStatus::Completed);
+    EXPECT_EQ(rows[0].local_source_path, src.string());
+    EXPECT_TRUE(rows[0].local_dest_path.empty());
+}
+
+TEST_F(FileMasterLocalTest, TrackedRuntimeFailureCreatesFailedTransfer) {
+    misty::core::FileTransfer transfers;
+    misty::core::FileMasterLocal tracked_file_master(worker_pool_, &transfers);
+    const fs::path src = home_.path() / "missing-tracked.txt";
+    const fs::path dest = home_.path() / "dest" / "missing-tracked.txt";
+
+    std::optional<misty::core::FileMasterResult> result;
+    misty::core::FileMasterProps props;
+    props.file_name = src.filename().string();
+    props.local_source.path = src.string();
+    props.local_dest.path = dest.string();
+    tracked_file_master.copy(props, [&](misty::core::FileMasterResult value) {
+        result = std::move(value);
+    });
+
+    ASSERT_TRUE(wait_for([&]() { return result.has_value(); }));
+    ASSERT_FALSE(result->success);
+    const auto rows = transfers.get_all_transfers();
+    ASSERT_EQ(rows.size(), 1u);
+    EXPECT_EQ(rows[0].transfer_type, misty::core::FileTransferType::Copy);
+    EXPECT_EQ(rows[0].status, misty::core::FileTransferStatus::Failed);
+    EXPECT_FALSE(rows[0].error_message.empty());
+}
+
+TEST_F(FileMasterLocalTest, TrackedValidationFailureDoesNotCreateTransfer) {
+    misty::core::FileTransfer transfers;
+    misty::core::FileMasterLocal tracked_file_master(worker_pool_, &transfers);
+
+    std::optional<misty::core::FileMasterResult> result;
+    misty::core::FileMasterProps props;
+    props.file_name = "broken.txt";
+    props.local_dest.path = (home_.path() / "dest" / "broken.txt").string();
+    tracked_file_master.copy(props, [&](misty::core::FileMasterResult value) {
+        result = std::move(value);
+    });
+
+    ASSERT_TRUE(result.has_value());
+    EXPECT_FALSE(result->success);
+    EXPECT_TRUE(transfers.get_all_transfers().empty());
 }
 
 TEST_F(FileMasterRemoteTest, RenameAcceptsStructuredRemoteContextAndReturnsStubError) {

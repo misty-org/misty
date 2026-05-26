@@ -215,6 +215,7 @@ void FileExplorerPanel::begin_file_drag_source(FileExplorerState& state,
             ui.selected_files.clear();
             ui.selected_files.insert(file.id);
             ui.last_selected_index = index;
+            state.selected_files = ui.selected_files;
         }
 
         ImGui::SetDragDropPayload(kFileDragPayloadType, state_key_.c_str(), state_key_.size() + 1);
@@ -290,6 +291,7 @@ void FileExplorerPanel::handle_file_drop_target(FileExplorerState& state,
         if (g_active_file_drag.source_state_key == state_key_) {
             ui_.selected_files.clear();
             ui_.last_selected_index = -1;
+            state.selected_files.clear();
         }
     }
 

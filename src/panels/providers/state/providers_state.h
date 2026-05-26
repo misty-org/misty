@@ -8,7 +8,7 @@
 #include <vector>
 
 #include "core/threading/worker_pool.h"
-#include "core/ui/ui_registry.h"
+#include "core/ui/state_registry.h"
 
 namespace misty::panel {
 
@@ -44,6 +44,7 @@ namespace misty::panel {
 
     struct ProviderOption {
         std::string name;
+        std::string label;
         std::string help;
         std::string default_value;
         bool required = false;
@@ -102,12 +103,14 @@ namespace misty::panel {
         std::optional<ProviderOption> current_option;
         bool browser_launch_attempted = false;
         bool browser_launch_succeeded = false;
+        bool completed = false;
+        int ui_step = 1;
         std::uint64_t generation = 0;
         std::string status_message;
         std::string inline_error;
     };
 
-    class ProvidersState : public core::UIState {
+    class ProvidersState : public core::StateEntry {
     public:
         ProvidersState();
         ~ProvidersState() = default;
@@ -133,6 +136,8 @@ namespace misty::panel {
         void on_request_reconnect(const std::string& provider_id);
         void on_request_repair(const std::string& provider_id);
         void select_provider_type(const std::string& provider_type);
+        void continue_add_provider_dialog();
+        void back_to_configure_add_provider_dialog();
         void set_remote_name(const std::string& remote_name);
         void set_parameter_value(const std::string& key, const std::string& value);
         void submit_add_provider();
@@ -148,6 +153,7 @@ namespace misty::panel {
         ProvidersHealthCard health_card;
         bool show_rename_modal = false;
         bool show_disconnect_modal = false;
+        bool show_onedrive_repair_modal = false;
         std::string pending_provider_id;
         std::string dialog_message;
         std::string error_message;

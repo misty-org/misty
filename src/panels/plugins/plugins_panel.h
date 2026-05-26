@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-#include "core/ui/ui_registry.h"
+#include "core/ui/state_registry.h"
 #include "panels/panel/panel.h"
 #include "panels/plugins/plugins_components.h"
 #include "panels/plugins/plugins_detail.h"
@@ -12,7 +12,7 @@ namespace misty::panel {
 
 class PluginsPanel : public Panel {
 public:
-    explicit PluginsPanel(core::UIRegistry& ui_registry);
+    explicit PluginsPanel(core::StateRegistry& state_registry);
     ~PluginsPanel() override = default;
 
     void render() override;
@@ -30,11 +30,13 @@ private:
     void sidebar(float sidebar_width);
     void section(const PluginsSectionProps& props);
     void cards(const char* id, bool installed_only);
+    void segmented_filter();
     void splitter();
     void content();
 
     bool marketplace_collapsed_ = false;
     bool installed_collapsed_ = false;
+    bool installed_filter_ = false;
     char search_query_[128] = {};
     std::string selected_plugin_id_ = "preview_manager";
     std::vector<PluginListEntry> plugins_;

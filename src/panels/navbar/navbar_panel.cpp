@@ -41,14 +41,15 @@ namespace misty::panel {
         bool centered_icon_button(const char* id, const SVGTexture& icon, int size, bool is_selected) {
             const float button_total_width = image_button_outer_width(static_cast<float>(size), kNavButtonPaddingX);
             const ImVec4 button_color =
-                is_selected ? ImVec4(0.2f, 0.2f, 0.2f, 1.0f) : ImVec4(0.11f, 0.11f, 0.11f, 0.0f);
+                is_selected ? ImVec4(0.12f, 0.18f, 0.30f, 1.0f) : ImVec4(0.07f, 0.08f, 0.10f, 0.0f);
 
             bool pressed = false;
             UI::WithStyle([&](UI::StyleScope& style) {
                 style.var(ImGuiStyleVar_FrameRounding, 8.0f);
                 style.var(ImGuiStyleVar_FramePadding, ImVec2(kNavButtonPaddingX, kNavButtonPaddingY));
                 style.color(ImGuiCol_Button, button_color);
-                style.color(ImGuiCol_ButtonHovered, ImVec4(0.18f, 0.18f, 0.18f, 1.0f));
+                style.color(ImGuiCol_ButtonHovered, ImVec4(0.13f, 0.16f, 0.22f, 1.0f));
+                style.color(ImGuiCol_ButtonActive, ImVec4(0.10f, 0.24f, 0.48f, 1.0f));
                 ImGui::SetCursorPosX(centered_cursor_x(button_total_width));
                 pressed = ImGui::ImageButton(id, icon.id, ImVec2((float)size, (float)size));
             });
@@ -100,12 +101,12 @@ namespace misty::panel {
         }
     }
 
-    NavbarPanel::NavbarPanel(UIRegistry& ui_registry) : ui_registry_(ui_registry),
-        activity_panel_(ui_registry) {
+    NavbarPanel::NavbarPanel(StateRegistry& state_registry) : state_registry_(state_registry),
+        activity_panel_(state_registry) {
     }
 
     void NavbarPanel::render() {
-        auto& state = ui_registry_.get_state<NavbarState>("Navbar");
+        auto& state = state_registry_.get_state<NavbarState>("Navbar");
         const ImGuiWindowFlags navbar_flags = ImGuiWindowFlags_NoTitleBar |
             ImGuiWindowFlags_NoMove |
             ImGuiWindowFlags_NoCollapse |
@@ -119,7 +120,7 @@ namespace misty::panel {
         }
 
         UI::WithStyle([&](UI::StyleScope& style) {
-            style.color(ImGuiCol_WindowBg, ImVec4(0.10f, 0.10f, 0.12f, 1.0f)); // dark charcoal
+            style.color(ImGuiCol_WindowBg, ImVec4(0.055f, 0.065f, 0.080f, 1.0f));
             style.var(ImGuiStyleVar_WindowBorderSize, 0.0f);
             style.var(ImGuiStyleVar_WindowPadding, ImVec2(4.0f, 8.0f));
 
@@ -132,23 +133,26 @@ namespace misty::panel {
             ImGui::End();
         });
 
-        // Render popups on top (outside navbar window)
+    }
+
+    void NavbarPanel::render_activity_popup() {
         activity_panel_.render();
     }
 
     void NavbarPanel::content(NavbarState& state) {
         nav_item("file-directory-24", "Files", 24, ViewID::Files, state);
-        nav_item("devices-24", "Providers", 24, ViewID::Providers, state);
-        nav_item("apps-16", "Plugins", 24, ViewID::Extensions, state);
-        nav_item("shield-lock-24", "Vault", 24, ViewID::Vault, state);
         nav_item("transfer-24", "Transfers", 24, ViewID::Transfers, state);
-        activity_button();
+        nav_item("devices-24", "Providers", 24, ViewID::Providers, state);
+        nav_item("apps-24", "Plugins", 24, ViewID::Plugins, state);
+        nav_item("dock-24", "Dock", 24, ViewID::Dock, state);
     }
 
     void NavbarPanel::footer(NavbarState& state) {
         const float remaining_height = ImGui::GetContentRegionAvail().y;
-        const float spacer_height = std::max(0.0f, remaining_height - nav_item_height("Settings"));
+        const float footer_height = nav_item_height("Activity") + nav_item_height("Settings");
+        const float spacer_height = std::max(0.0f, remaining_height - footer_height);
         ImGui::Dummy(ImVec2(0.0f, spacer_height));
+        activity_button();
         nav_item("gear-24", "Settings", 24, ViewID::Settings, state);
     }
 
@@ -170,7 +174,7 @@ namespace misty::panel {
             if (ImGui::ImageButton(label,
                                    static_cast<ImTextureID>(logo_image.id),
                                    ImVec2(logo_size, logo_size))) {
-                auto& state = ui_registry_.get_state<NavbarState>("Navbar");
+                auto& state = state_registry_.get_state<NavbarState>("Navbar");
                 state.handle_logo_click();
             }
         });
@@ -179,7 +183,7 @@ namespace misty::panel {
     void NavbarPanel::nav_item(const char* icon_name, const char* label, int size, view::ViewID view_id, NavbarState& state) {
         const bool is_selected = (state.selected_item == view_id);
         auto& icon = core::AssetManager::get().get_svg_texture(icon_name, size * 2);
-        const ImVec4 text_color = is_selected ? ImVec4(1, 1, 1, 1) : ImVec4(0.6f, 0.6f, 0.6f, 1.0f);
+        const ImVec4 text_color = is_selected ? ImVec4(0.78f, 0.88f, 1.0f, 1.0f) : ImVec4(0.64f, 0.67f, 0.73f, 1.0f);
 
         if (centered_icon_button(label, icon, size, is_selected)) {
             state.selected_item = view_id;
@@ -189,7 +193,7 @@ namespace misty::panel {
     }
 
     void NavbarPanel::activity_button() {
-        auto& activity_state = ui_registry_.get_state<ActivityState>("Activity");
+        auto& activity_state = state_registry_.get_state<ActivityState>("Activity");
         auto& icon = core::AssetManager::get().get_svg_texture("bell-24", 48);
         const size_t unread_count = activity_state.unread_count();
         const ImVec4 text_color = activity_state.is_open ? ImVec4(1, 1, 1, 1) : ImVec4(0.6f, 0.6f, 0.6f, 1.0f);

@@ -1,12 +1,16 @@
 #pragma once
 
 #include <atomic>
+#include <chrono>
+#include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <unordered_set>
 #include <vector>
 
-#include "core/ui/ui_registry.h"
+#include "core/file_sync/file_sync_types.h"
+#include "core/ui/state_registry.h"
 #include "panels/file_explorer/state/loading_state.h"
 
 namespace misty::panel {
@@ -38,6 +42,9 @@ struct FileItem {
     std::string last_modified;
     std::string mime_type;
     FileType type = FileType::LOCAL;
+    std::optional<core::FileSyncEntryState> sync_state;
+    std::string sync_remote_name;
+    std::string sync_remote_path;
 };
 
 /**
@@ -47,10 +54,13 @@ struct FileListing {
     std::string owner_key;
     std::vector<FileItem> files;
     std::vector<FileItem> trash_files;
+    std::size_t hidden_item_count = 0;
     bool is_loading = false;
     bool sort_dirty = true;
     std::atomic<uint64_t> load_generation{0};
     std::atomic<uint64_t> listing_revision{0};
+    std::chrono::system_clock::time_point last_refreshed_at{};
+    std::chrono::system_clock::time_point last_synced_at{};
     std::unordered_set<std::string> deleting_files;
     LoadingState loading;
 
@@ -80,7 +90,7 @@ struct FileListing {
 /**
  * @brief Shared UI registry state containing file listings for all explorer tabs.
  */
-struct FileListingsState : public core::UIState {
+struct FileListingsState : public core::StateEntry {
     std::vector<FileListing> listings;
 
     /**

@@ -2,34 +2,59 @@
 
 #include "core/manager/asset_manager.h"
 
+#include <algorithm>
+#include <cctype>
+
 namespace misty::panel {
     namespace {
         constexpr ImVec4 kBorder = ImVec4(0.24f, 0.27f, 0.30f, 1.0f);
         constexpr ImVec4 kText = ImVec4(0.94f, 0.95f, 0.97f, 1.0f);
-        constexpr ImVec4 kBadgeBg = ImVec4(0.77f, 0.94f, 0.79f, 1.0f);
-        constexpr ImVec4 kBadgeText = ImVec4(0.18f, 0.49f, 0.23f, 1.0f);
+        constexpr ImVec4 kBadgeBg = ImVec4(0.16f, 0.19f, 0.21f, 1.0f);
+        constexpr ImVec4 kBadgeText = ImVec4(0.94f, 0.95f, 0.97f, 1.0f);
         constexpr ImVec4 kWarningBadgeBg = ImVec4(0.96f, 0.88f, 0.66f, 1.0f);
         constexpr ImVec4 kWarningBadgeText = ImVec4(0.58f, 0.36f, 0.02f, 1.0f);
         constexpr ImVec4 kMutedBadgeBg = ImVec4(0.29f, 0.32f, 0.36f, 1.0f);
         constexpr ImVec4 kMutedBadgeText = ImVec4(0.82f, 0.85f, 0.88f, 1.0f);
+
+        std::string lowercase_copy(std::string value) {
+            std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
+                return static_cast<char>(std::tolower(c));
+            });
+            return value;
+        }
+    }
+
+    std::string provider_logo_path_for_id(const std::string& provider_id) {
+        const std::string provider = lowercase_copy(provider_id);
+        if (provider.find("onedrive") != std::string::npos || provider.find("microsoft") != std::string::npos) {
+            return "assets/icons/onedrive-color.svg";
+        }
+        if (provider.find("google") != std::string::npos || provider.find("drive") != std::string::npos) {
+            return "assets/icons/google-drive-color.svg";
+        }
+        if (provider.find("dropbox") != std::string::npos) {
+            return "assets/icons/dropbox-color.svg";
+        }
+        if (provider.find("s3") != std::string::npos || provider.find("amazon") != std::string::npos) {
+            return "assets/icons/s3-color.svg";
+        }
+        if (provider.find("sftp") != std::string::npos || provider.find("ssh") != std::string::npos) {
+            return "assets/icons/sftp-color.svg";
+        }
+        return "";
     }
 
     std::string provider_logo_path(const ProviderCard& card) {
         if (!card.logo_asset_path.empty()) {
             return card.logo_asset_path;
         }
-        if (card.provider_id == "drive") return "assets/icons/google-drive-24.svg";
-        if (card.provider_id == "onedrive") return "assets/icons/onedrive-24.svg";
-        if (card.provider_id == "dropbox") return "assets/icons/dropbox-24.svg";
-        if (card.provider_id == "s3") return "assets/icons/s3-color.svg";
-        if (card.provider_id == "sftp") return "assets/icons/sftp-color.svg";
-        return "";
+        return provider_logo_path_for_id(card.provider_id);
     }
 
     void draw_provider_logo(const ProviderCard& card, float size) {
         const std::string path = provider_logo_path(card);
         if (!path.empty()) {
-            auto& logo = core::AssetManager::get().get_svg_texture_path(path, static_cast<int>(size), false);
+            auto& logo = core::AssetManager::get().get_svg_texture_path(path, static_cast<int>(size * 2.0f), false);
             if (logo.id != 0) {
                 ImGui::Image(logo.id, ImVec2(size, size));
                 return;

@@ -4,7 +4,7 @@
 #include <cstring>
 #include <map>
 #include <nlohmann/json.hpp>
-#include "core/ui/ui_registry.h"
+#include "core/ui/state_registry.h"
 #include "views/app_view.h"
 #include "core/net/http_client.h"
 #include "core/manager/env_manager.h"
@@ -13,7 +13,7 @@
 
 namespace misty::panel {
 
-    struct AuthRegisterState : public core::UIState {
+    struct AuthRegisterState : public core::StateEntry {
         std::mutex mu;
         
         char full_name[128] = "";

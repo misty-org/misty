@@ -1,6 +1,7 @@
 #pragma once
 
-#include "core/ui/ui_registry.h"
+#include "core/ui/state_registry.h"
+#include <chrono>
 #include <string>
 #include <vector>
 #include <mutex>
@@ -19,7 +20,7 @@ namespace misty::panel {
     /**
      * @brief UI and worker state owned by the file explorer sidebar.
      */
-    struct FileSidebarState : public core::UIState {
+    struct FileSidebarState : public core::StateEntry {
         // Input Buffers: For "New File" or "New Folder" modals
         char name_buffer[256] = "";
 
@@ -37,6 +38,7 @@ namespace misty::panel {
         // or initializing the full Providers view.
         bool providers_loaded = false;
         bool providers_loading = false;
+        std::chrono::steady_clock::time_point providers_last_refresh_at{};
         std::string providers_error;
         std::vector<SidebarProviderEntry> provider_entries;
         std::mutex providers_mutex;
