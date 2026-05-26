@@ -25,6 +25,13 @@ struct PluginsContentProps {
     const char* body = "";
 };
 
+struct PluginsPillProps {
+    const char* id = "";
+    const char* label = "";
+    ImVec4 bg_color = ImVec4(0.18f, 0.19f, 0.22f, 1.0f);
+    ImVec4 text_color = ImVec4(0.78f, 0.80f, 0.86f, 1.0f);
+};
+
 struct PluginsIconProps {
     const char* icon_path = "";
     bool apply_theme = false;
@@ -39,11 +46,13 @@ struct PluginsCardProps {
     const char* title = "";
     const char* author = "";
     const char* description = "";
+    const char* status = "";
     bool verified = false;
     bool selected = false;
 };
 
 void plugins_page(const PluginsContentProps& props, const std::function<void()>& content);
+void plugins_pill(const PluginsPillProps& props);
 void plugins_icon(const char* id, const PluginsIconProps& props);
 bool plugins_section_header(const PluginsSectionHeaderProps& props);
 bool plugins_card(const PluginsCardProps& props);

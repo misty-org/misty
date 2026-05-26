@@ -2,7 +2,7 @@
 
 namespace misty::panel {
 
-ClaudePanel::ClaudePanel(core::UIRegistry& registry, core::WorkerPool& worker_pool)
+ClaudePanel::ClaudePanel(core::StateRegistry& registry, core::WorkerPool& worker_pool)
     : registry_(registry), worker_pool_(worker_pool) {
     (void)registry_;
     (void)worker_pool_;

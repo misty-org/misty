@@ -6,12 +6,12 @@
 #include <string>
 #include <vector>
 
-#include "core/ui/ui_registry.h"
+#include "core/ui/state_registry.h"
 #include "panels/search/search_impl.h"
 
 namespace misty::panel {
 
-struct SearchState : public core::UIState {
+struct SearchState : public core::StateEntry {
     SearchState();
 
     char query_buf[2048] = "";

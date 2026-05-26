@@ -1,8 +1,10 @@
 #pragma once
 
+#include <chrono>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <optional>
 #include <sstream>
 #include <string>
 
@@ -84,6 +86,20 @@ namespace misty::core::listing_cache {
         fs::create_directories(remote_dir(remote), ec);
         std::ofstream f(file_for(remote, path), std::ios::binary | std::ios::trunc);
         if (f) f.write(body.data(), static_cast<std::streamsize>(body.size()));
+    }
+
+    inline std::optional<std::chrono::system_clock::time_point> last_write_time(const std::string& remote,
+                                                                               const std::string& path) {
+        if (remote.empty()) return std::nullopt;
+        std::error_code ec;
+        auto file_time = fs::last_write_time(file_for(remote, path), ec);
+        if (ec) {
+            ec.clear();
+            file_time = fs::last_write_time(legacy_file_for(remote, path), ec);
+        }
+        if (ec) return std::nullopt;
+        return std::chrono::time_point_cast<std::chrono::system_clock::duration>(
+            file_time - fs::file_time_type::clock::now() + std::chrono::system_clock::now());
     }
 
     // Best-effort: nuke a remote's entire cache (e.g. when the remote is

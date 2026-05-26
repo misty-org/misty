@@ -5,7 +5,7 @@
 #include <mutex>
 #include <chrono>
 #include <atomic>
-#include "core/ui/ui_registry.h"
+#include "core/ui/state_registry.h"
 
 namespace misty::panel {
 
@@ -46,7 +46,7 @@ namespace misty::panel {
         }
     };
 
-    class UploadState : public core::UIState {
+    class UploadState : public core::StateEntry {
     public:
         static constexpr size_t MAX_HISTORY = 50;
 

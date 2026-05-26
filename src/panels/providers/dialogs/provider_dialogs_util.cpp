@@ -1,7 +1,10 @@
 #include "panels/providers/dialogs/provider_dialogs_util.h"
 
 #include <array>
+#include <algorithm>
+#include <cctype>
 #include <cstdio>
+#include <string>
 
 #include "imgui.h"
 #include "panels/providers/cards/provider_cards_util.h"
@@ -13,23 +16,114 @@ namespace misty::panel {
         constexpr ImVec4 kText = ImVec4(0.94f, 0.95f, 0.97f, 1.0f);
         constexpr ImVec4 kMuted = ImVec4(0.62f, 0.66f, 0.70f, 1.0f);
 
+        std::string normalized_provider_key(std::string value) {
+            std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
+                return static_cast<char>(std::tolower(c));
+            });
+            value.erase(std::remove_if(value.begin(), value.end(), [](char c) {
+                return c == '-' || c == '_' || c == ' ';
+            }), value.end());
+            return value;
+        }
+
+        std::string trim_provider_text(std::string value) {
+            auto is_space = [](unsigned char c) {
+                return std::isspace(c) != 0;
+            };
+            value.erase(value.begin(), std::find_if(value.begin(), value.end(), [&](unsigned char c) {
+                return !is_space(c);
+            }));
+            value.erase(std::find_if(value.rbegin(), value.rend(), [&](unsigned char c) {
+                return !is_space(c);
+            }).base(), value.end());
+            return value;
+        }
+
+        std::string first_help_line(const std::string& help) {
+            const std::string trimmed = trim_provider_text(help);
+            const auto paragraph = trimmed.find("\n\n");
+            const std::string first_paragraph = paragraph == std::string::npos
+                ? trimmed
+                : trimmed.substr(0, paragraph);
+            const auto newline = first_paragraph.find('\n');
+            return trim_provider_text(newline == std::string::npos
+                ? first_paragraph
+                : first_paragraph.substr(0, newline));
+        }
+
+        std::string title_from_option_name(std::string value) {
+            std::replace(value.begin(), value.end(), '_', ' ');
+            std::replace(value.begin(), value.end(), '-', ' ');
+            bool capitalize = true;
+            for (char& c : value) {
+                if (std::isspace(static_cast<unsigned char>(c))) {
+                    capitalize = true;
+                    continue;
+                }
+                if (capitalize) {
+                    c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+                    capitalize = false;
+                }
+            }
+            return value;
+        }
+
+        std::string provider_option_prompt(const ProviderOption& option) {
+            if (!option.label.empty()) {
+                return option.label;
+            }
+            const std::string help_line = first_help_line(option.help);
+            if (!help_line.empty()) {
+                return help_line;
+            }
+            return title_from_option_name(option.name);
+        }
+
+        std::string provider_option_help(const ProviderOption& option, const std::string& prompt) {
+            const std::string help = trim_provider_text(option.help);
+            if (help.empty()) {
+                return {};
+            }
+            std::string normalized_prompt = trim_provider_text(prompt);
+            if (!normalized_prompt.empty() && normalized_prompt.back() == '.') {
+                normalized_prompt.pop_back();
+            }
+            std::string normalized_help = help;
+            if (!normalized_help.empty() && normalized_help.back() == '.') {
+                normalized_help.pop_back();
+            }
+            return normalized_help == normalized_prompt ? std::string{} : help;
+        }
+
+        void render_provider_option_prompt(const ProviderOption& option, const std::string& prompt) {
+            ImGui::PushStyleColor(ImGuiCol_Text, kText);
+            ImGui::TextWrapped("%s%s", prompt.c_str(), option.required ? " *" : "");
+            ImGui::PopStyleColor();
+            ImGui::Dummy(ImVec2(0.0f, 6.0f));
+        }
+
         void render_provider_text_option_editor(
             ProvidersState& state,
             const ProviderOption& option,
             const std::string& value
         ) {
+            const std::string prompt = provider_option_prompt(option);
+            render_provider_option_prompt(option, prompt);
+
             std::array<char, 512> buffer{};
             std::snprintf(buffer.data(), buffer.size(), "%s", value.c_str());
 
             const ImGuiInputTextFlags flags = option.password ? ImGuiInputTextFlags_Password : ImGuiInputTextFlags_None;
-            const std::string label = option.required ? option.name + " *" : option.name;
-            if (ImGui::InputText(label.c_str(), buffer.data(), buffer.size(), flags)) {
+            ImGui::SetNextItemWidth(-1.0f);
+            const std::string input_id = "##provider_option_" + option.name;
+            if (ImGui::InputText(input_id.c_str(), buffer.data(), buffer.size(), flags)) {
                 state.set_parameter_value(option.name, buffer.data());
             }
 
-            if (!option.help.empty()) {
+            const std::string help = provider_option_help(option, prompt);
+            if (!help.empty()) {
                 ImGui::PushStyleColor(ImGuiCol_Text, kMuted);
-                ImGui::TextWrapped("%s", option.help.c_str());
+                ImGui::TextWrapped("%s", help.c_str());
                 ImGui::PopStyleColor();
             }
         }
@@ -47,10 +141,14 @@ namespace misty::panel {
                 current_value = option.choices.front().value;
             }
 
+            const std::string prompt = provider_option_prompt(option);
+            render_provider_option_prompt(option, prompt);
+
             const std::string preview =
                 current_value.empty() ? "Select a value" : provider_preview_label(option, current_value);
-            const std::string label = option.required ? option.name + " *" : option.name;
-            if (ImGui::BeginCombo(label.c_str(), preview.c_str())) {
+            ImGui::SetNextItemWidth(-1.0f);
+            const std::string combo_id = "##provider_option_" + option.name;
+            if (ImGui::BeginCombo(combo_id.c_str(), preview.c_str())) {
                 for (const auto& choice : option.choices) {
                     const bool selected = choice.value == current_value;
                     const std::string choice_label = provider_choice_label(choice);
@@ -68,9 +166,10 @@ namespace misty::panel {
                 ImGui::EndCombo();
             }
 
-            if (!option.help.empty()) {
+            const std::string help = provider_option_help(option, prompt);
+            if (!help.empty()) {
                 ImGui::PushStyleColor(ImGuiCol_Text, kMuted);
-                ImGui::TextWrapped("%s", option.help.c_str());
+                ImGui::TextWrapped("%s", help.c_str());
                 ImGui::PopStyleColor();
             }
         }
@@ -80,8 +179,20 @@ namespace misty::panel {
         const std::vector<ProviderWorkflow>& workflows,
         const std::string& provider_type
     ) {
+        const std::string provider_key = normalized_provider_key(provider_type);
         for (const auto& workflow : workflows) {
             if (workflow.type == provider_type) {
+                return &workflow;
+            }
+        }
+        for (const auto& workflow : workflows) {
+            const std::string workflow_type_key = normalized_provider_key(workflow.type);
+            const std::string workflow_name_key = normalized_provider_key(workflow.name);
+            if (!provider_key.empty() &&
+                (workflow_type_key == provider_key ||
+                 workflow_name_key == provider_key ||
+                 workflow_type_key.find(provider_key) != std::string::npos ||
+                 provider_key.find(workflow_type_key) != std::string::npos)) {
                 return &workflow;
             }
         }

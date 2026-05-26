@@ -49,7 +49,7 @@ namespace misty::panel {
         }
     }
 
-    AuthRegisterPanel::AuthRegisterPanel(UIRegistry& registry)
+    AuthRegisterPanel::AuthRegisterPanel(StateRegistry& registry)
         : registry_(registry) {
     }
 

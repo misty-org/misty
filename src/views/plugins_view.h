@@ -3,7 +3,7 @@
 #include <memory>
 
 #include "core/manager/plugin_manager.h"
-#include "core/ui/ui_registry.h"
+#include "core/ui/state_registry.h"
 #include "panels/context_menu/context_menu_panel.h"
 #include "panels/plugins/plugins_panel.h"
 #include "panels/navbar/navbar_panel.h"
@@ -12,10 +12,10 @@
 
 namespace misty::view {
 
-class ExtensionsView : public AppView {
+class PluginsView : public AppView {
 public:
-    explicit ExtensionsView(core::UIRegistry& ui_registry);
-    ~ExtensionsView() override = default;
+    explicit PluginsView(core::StateRegistry& state_registry);
+    ~PluginsView() override = default;
 
     void render() override;
     ViewID get_view_id() override;
@@ -25,7 +25,7 @@ public:
 private:
     void init_panels();
 
-    core::UIRegistry& ui_registry_;
+    core::StateRegistry& state_registry_;
     std::shared_ptr<panel::NavbarPanel> navbar_panel_;
     std::shared_ptr<panel::PluginsPanel> plugins_panel_;
     std::shared_ptr<panel::NotificationPanel> notification_panel_;

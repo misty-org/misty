@@ -32,8 +32,8 @@ namespace misty::view {
         Workspace,
         Activity,
         Providers,
-        Extensions,
-        Vault,
+        Plugins,
+        Dock,
         Transfers,
         Default
     };

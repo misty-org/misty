@@ -42,6 +42,7 @@ namespace misty::panel {
     protected:
         const Tab* get_active_tab() const;
         void set_active_tab(std::int16_t idx);
+        void request_tab_selection(std::int16_t idx);
 
         const Tab* get_tab(std::int16_t idx) const;
         void render_tab_bar(const std::string& scope_id,
@@ -74,6 +75,7 @@ namespace misty::panel {
         std::vector<std::int16_t> tab_order;
         std::vector<ClosedTabSnapshot> closed_tabs;
         std::function<Tab(std::int16_t)> restore_tab_factory_;
+        std::int16_t pending_selected_tab_idx = -1;
 
         static constexpr std::size_t kMaxClosedTabs = 8;
     };

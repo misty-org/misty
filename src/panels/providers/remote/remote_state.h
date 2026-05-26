@@ -2,7 +2,7 @@
 
 #include <string>
 #include <mutex>
-#include "core/ui/ui_registry.h"
+#include "core/ui/state_registry.h"
 #include "core/threading/worker_pool.h"
 
 namespace misty::panel {
@@ -15,7 +15,7 @@ namespace misty::panel {
 
     // Unified remote state — replaces OneDriveState, GDriveState, DropboxState, ICloudState.
     // Tracks the current browsing context for uploads.
-    struct RemoteState : public core::UIState {
+    struct RemoteState : public core::StateEntry {
         std::mutex mu;
 
         // Current browsing context

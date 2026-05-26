@@ -61,6 +61,20 @@ namespace misty::panel {
 
     std::string provider_response_error_message(const core::HttpResponse& response, const std::string& fallback) {
         if (!response.body.empty()) {
+            try {
+                const json parsed = json::parse(response.body);
+                if (parsed.is_object()) {
+                    const std::string message = parsed.value("error", std::string{});
+                    if (!message.empty()) {
+                        return message;
+                    }
+                    const std::string detail = parsed.value("message", std::string{});
+                    if (!detail.empty()) {
+                        return detail;
+                    }
+                }
+            } catch (const std::exception&) {
+            }
             return response.body;
         }
         if (response.status_code > 0) {
@@ -72,18 +86,70 @@ namespace misty::panel {
     ProviderOption parse_provider_option(const json& option_json) {
         ProviderOption option;
         option.name = option_json.value("name", std::string{});
+        if (option.name.empty()) {
+            option.name = option_json.value("Name", std::string{});
+        }
+        option.label = option_json.value("label", std::string{});
+        if (option.label.empty()) {
+            option.label = option_json.value("title", std::string{});
+        }
+        if (option.label.empty()) {
+            option.label = option_json.value("question", std::string{});
+        }
+        if (option.label.empty()) {
+            option.label = option_json.value("display_name", std::string{});
+        }
+        if (option.label.empty()) {
+            option.label = option_json.value("displayName", std::string{});
+        }
+        if (option.label.empty()) {
+            option.label = option_json.value("FieldName", std::string{});
+        }
         option.help = option_json.value("help", std::string{});
+        if (option.help.empty()) {
+            option.help = option_json.value("Help", std::string{});
+        }
         option.default_value = option_json.value("default", std::string{});
+        if (option.default_value.empty()) {
+            option.default_value = option_json.value("DefaultStr", std::string{});
+        }
         option.required = option_json.value("required", false);
+        if (!option.required) {
+            option.required = option_json.value("Required", false);
+        }
         option.password = option_json.value("password", false);
+        if (!option.password) {
+            option.password = option_json.value("IsPassword", false);
+        }
 
         const auto choices_json = option_json.value("choices", json::array());
         if (choices_json.is_array()) {
             for (const auto& choice_json : choices_json) {
                 ProviderChoice choice;
-                choice.value = choice_json.value("value", std::string{});
-                choice.help = choice_json.value("help", std::string{});
+                if (choice_json.is_string()) {
+                    choice.value = choice_json.get<std::string>();
+                } else {
+                    choice.value = choice_json.value("value", std::string{});
+                    if (choice.value.empty()) {
+                        choice.value = choice_json.value("Value", std::string{});
+                    }
+                    choice.help = choice_json.value("help", std::string{});
+                    if (choice.help.empty()) {
+                        choice.help = choice_json.value("Help", std::string{});
+                    }
+                }
                 option.choices.push_back(std::move(choice));
+            }
+        }
+        const auto examples_json = option_json.value("Examples", json::array());
+        if (option.choices.empty() && examples_json.is_array()) {
+            for (const auto& choice_json : examples_json) {
+                ProviderChoice choice;
+                choice.value = choice_json.value("Value", std::string{});
+                choice.help = choice_json.value("Help", std::string{});
+                if (!choice.value.empty()) {
+                    option.choices.push_back(std::move(choice));
+                }
             }
         }
         return option;
@@ -176,6 +242,16 @@ namespace misty::panel {
         }
         if (parsed.contains("option") && parsed["option"].is_object()) {
             step.option = parse_provider_option(parsed["option"]);
+        } else if (parsed.contains("field") && parsed["field"].is_object()) {
+            step.option = parse_provider_option(parsed["field"]);
+        } else if (parsed.contains("prompt") && parsed["prompt"].is_object()) {
+            step.option = parse_provider_option(parsed["prompt"]);
+        } else if (parsed.contains("options") && parsed["options"].is_array() && !parsed["options"].empty() &&
+                   parsed["options"].front().is_object()) {
+            step.option = parse_provider_option(parsed["options"].front());
+        } else if (parsed.contains("name") &&
+                   (parsed.contains("choices") || parsed.contains("default") || parsed.contains("required"))) {
+            step.option = parse_provider_option(parsed);
         }
         return step;
     }
@@ -206,6 +282,9 @@ namespace misty::panel {
     ) {
         if (current_step_kind == "post_auth_config") {
             return "Applying provider settings...";
+        }
+        if (current_step_kind == "browser_auth") {
+            return "Checking browser sign-in...";
         }
         if (repair_mode) {
             return "Starting configure flow...";

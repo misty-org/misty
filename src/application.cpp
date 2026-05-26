@@ -9,8 +9,8 @@
 #include "views/register_view.h"
 #include "views/login_view.h"
 #include "views/providers_view.h"
-#include "views/extensions_view.h"
-#include "views/vault_view.h"
+#include "views/plugins_view.h"
+#include "views/dock_view.h"
 #include "views/transfers_view.h"
 #include "views/activity_view.h"
 #include "views/settings_view.h"
@@ -36,8 +36,8 @@ std::string view_name(misty::view::ViewID id) {
         case ViewID::Workspace: return "Workspace";
         case ViewID::Activity: return "Activity";
         case ViewID::Providers: return "Providers";
-        case ViewID::Extensions: return "Extensions";
-        case ViewID::Vault: return "Vault";
+        case ViewID::Plugins: return "Plugins";
+        case ViewID::Dock: return "Dock";
         case ViewID::Transfers: return "Transfers";
         case ViewID::Default: return "Default";
     }
@@ -78,7 +78,7 @@ namespace misty {
             append_startup_log("startup: env reloaded");
             init_client();
             append_startup_log("startup: init_client ok");
-            core::PluginManager::get().set_ui_registry(&ui_registry_);
+            core::PluginManager::get().set_state_registry(&state_registry_);
             append_startup_log("startup: plugin host ui registry set");
             core::PluginManager::get().discover_and_load();
             append_startup_log("startup: plugins discovered");
@@ -87,7 +87,7 @@ namespace misty {
 
             init_views();
             append_startup_log("startup: views initialized");
-            ui_registry_.get_state<panel::SettingsState>("Settings").ensure_app_settings_loaded();
+            state_registry_.get_state<panel::SettingsState>("Settings").ensure_app_settings_loaded();
 
             
         } catch (const std::exception& e) {
@@ -105,7 +105,7 @@ namespace misty {
             prepare_frame();
 
             if (core::CommandManager::get().matches("app.toggle_transfers")) {
-                ui_registry_.get_state<panel::NavbarState>("Navbar").selected_item = view::ViewID::Transfers;
+                state_registry_.get_state<panel::NavbarState>("Navbar").selected_item = view::ViewID::Transfers;
                 view::switch_view(view::ViewID::Transfers);
             }
             if (core::CommandManager::get().matches("app.toggle_plugin_launcher")) {
@@ -118,7 +118,7 @@ namespace misty {
             core::PluginManager::get().render_open_panels();
             core::PluginManager::get().render_launcher_overlay();
             core::PluginManager::get().render_active_preview_scene();
-            auto& settings_state = ui_registry_.get_state<panel::SettingsState>("Settings");
+            auto& settings_state = state_registry_.get_state<panel::SettingsState>("Settings");
             if (settings_state.frame_pacing_overlay_enabled) {
                 frame_pacer_.render_debug_overlay();
             }
@@ -141,12 +141,12 @@ namespace misty {
             explorer_state_key = current_view->active_explorer_state_key();
         }
 
-        if (!ui_registry_.has_state(explorer_state_key)) {
+        if (!state_registry_.has_state(explorer_state_key)) {
             return;
         }
 
-        auto& explorer = ui_registry_.get_state<panel::FileExplorerState>(explorer_state_key);
-        auto& library = ui_registry_.get_state<panel::LibraryState>(panel::kLibraryStateKey);
+        auto& explorer = state_registry_.get_state<panel::FileExplorerState>(explorer_state_key);
+        auto& library = state_registry_.get_state<panel::LibraryState>(panel::kLibraryStateKey);
         {
             std::lock_guard<std::mutex> explorer_lock(explorer.mu);
             std::lock_guard<std::mutex> library_lock(library.mu);
@@ -167,29 +167,29 @@ namespace misty {
 
     void Application::init_views() {
         view::register_view(view::ViewID::Files,
-            std::make_unique<view::FilesView>(ui_registry_, worker_pool_));
-        view::register_view(view::ViewID::Auth, std::make_unique<view::RegisterView>(ui_registry_));
-        view::register_view(view::ViewID::Login, std::make_unique<view::LoginView>(ui_registry_));
+            std::make_unique<view::FilesView>(state_registry_, worker_pool_));
+        view::register_view(view::ViewID::Auth, std::make_unique<view::RegisterView>(state_registry_));
+        view::register_view(view::ViewID::Login, std::make_unique<view::LoginView>(state_registry_));
         view::register_view_factory(view::ViewID::Providers, [this]() {
             append_startup_log("startup: providers view instantiated");
-            return std::make_unique<view::ProvidersView>(ui_registry_, worker_pool_);
+            return std::make_unique<view::ProvidersView>(state_registry_, worker_pool_);
         });
-        view::register_view_factory(view::ViewID::Extensions, [this]() {
-            append_startup_log("startup: extensions view instantiated");
-            return std::make_unique<view::ExtensionsView>(ui_registry_);
+        view::register_view_factory(view::ViewID::Plugins, [this]() {
+            append_startup_log("startup: plugins view instantiated");
+            return std::make_unique<view::PluginsView>(state_registry_);
         });
-        view::register_view_factory(view::ViewID::Vault, [this]() {
-            append_startup_log("startup: vault view instantiated");
-            return std::make_unique<view::VaultView>(ui_registry_, worker_pool_);
+        view::register_view_factory(view::ViewID::Dock, [this]() {
+            append_startup_log("startup: dock view instantiated");
+            return std::make_unique<view::DockView>(state_registry_);
         });
         view::register_view_factory(view::ViewID::Transfers, [this]() {
             append_startup_log("startup: transfers view instantiated");
-            return std::make_unique<view::TransfersView>(ui_registry_);
+            return std::make_unique<view::TransfersView>(state_registry_);
         });
         // ActivityView removed — Activity is now a modal panel in the navbar
         view::register_view_factory(view::ViewID::Settings, [this]() {
             append_startup_log("startup: settings view instantiated");
-            return std::make_unique<view::SettingsView>(ui_registry_);
+            return std::make_unique<view::SettingsView>(state_registry_);
         });
 
         view::switch_view(view::ViewID::Files);

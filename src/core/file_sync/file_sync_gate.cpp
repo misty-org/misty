@@ -1,41 +1,17 @@
 #include "core/file_sync/file_sync_gate.h"
 
-#include <algorithm>
-#include <array>
-#include <iomanip>
-#include <random>
-#include <sstream>
-#include <utility>
-
 namespace misty::core {
 namespace {
-
-std::string remote_key(const std::string& remote_name, const std::string& path) {
-    return remote_name + ":" + path;
-}
-
-FileSyncEntryId uuid() {
-    static thread_local std::mt19937_64 gen(std::random_device{}());
-    std::array<unsigned char, 16> bytes{};
-    for (std::size_t i = 0; i < bytes.size(); i += 8) {
-        uint64_t chunk = gen();
-        for (std::size_t j = 0; j < 8; ++j) {
-            bytes[i + j] = static_cast<unsigned char>((chunk >> (j * 8)) & 0xff);
-        }
+bool is_remote_change(FileSyncChange change) {
+    switch (change) {
+        case FileSyncChange::RemoteFile:
+        case FileSyncChange::RemoteFolder:
+        case FileSyncChange::RemoteDelete:
+        case FileSyncChange::RemoteRename:
+            return true;
+        default:
+            return false;
     }
-
-    bytes[6] = static_cast<unsigned char>((bytes[6] & 0x0f) | 0x40);
-    bytes[8] = static_cast<unsigned char>((bytes[8] & 0x3f) | 0x80);
-
-    std::ostringstream out;
-    out << std::hex << std::setfill('0');
-    for (std::size_t i = 0; i < bytes.size(); ++i) {
-        if (i == 4 || i == 6 || i == 8 || i == 10) {
-            out << '-';
-        }
-        out << std::setw(2) << static_cast<int>(bytes[i]);
-    }
-    return out.str();
 }
 
 bool has_local(const FileSyncContext& context) {
@@ -121,156 +97,11 @@ FileSyncResult make_result(FileSyncAction action, FileSyncConflict conflict = Fi
 
 } // namespace
 
-FileSyncEntryId FileSyncEntryStore::entry(const FileSyncFinalEvent& event) {
-    if (!event.pending_event.old_path.empty()) {
-        if (auto id = local_id(event.pending_event.old_path)) {
-            local_paths_.erase(event.pending_event.old_path);
-            return *id;
-        }
-    }
-    if (!event.pending_event.new_path.empty()) {
-        if (auto id = local_id(event.pending_event.new_path)) {
-            return *id;
-        }
-    }
-    return uuid();
-}
-
-void FileSyncEntryStore::local(const FileSyncLocalEntry& entry) {
-    auto old = local_entries_.find(entry.entry_id);
-    if (old != local_entries_.end() && !old->second.local_path.empty()) {
-        local_paths_.erase(old->second.local_path);
-    }
-    local_entries_[entry.entry_id] = entry;
-    if (!entry.local_path.empty()) {
-        local_paths_[entry.local_path] = entry.entry_id;
-    }
-}
-
-void FileSyncEntryStore::remote(const FileSyncRemoteEntry& entry) {
-    auto old = remote_entries_.find(entry.entry_id);
-    if (old != remote_entries_.end()) {
-        if (!old->second.remote_path.empty()) {
-            remote_paths_.erase(remote_key(old->second.remote_name, old->second.remote_path));
-        }
-        if (!old->second.provider_file_id.empty()) {
-            provider_ids_.erase(old->second.provider_file_id);
-        }
-    }
-    remote_entries_[entry.entry_id] = entry;
-    if (!entry.remote_path.empty()) {
-        remote_paths_[remote_key(entry.remote_name, entry.remote_path)] = entry.entry_id;
-    }
-    if (!entry.provider_file_id.empty()) {
-        provider_ids_[entry.provider_file_id] = entry.entry_id;
-    }
-}
-
-void FileSyncEntryStore::sync(const FileSyncEntry& entry) {
-    sync_entries_[entry.entry_id] = entry;
-}
-
-void FileSyncEntryStore::record(const FileSyncFinalEvent& event) {
-    const FileSyncEntryId id = entry(event);
-    auto local_entry = local(id).value_or(FileSyncLocalEntry{});
-    local_entry.entry_id = id;
-    local_entry.local_path = event.pending_event.new_path;
-    local_entry.exists = event.result.action != FileSyncAction::DeleteLocal &&
-                         event.change != FileSyncChange::LocalDelete;
-    local_entry.is_dir = event.data.is_dir;
-    local_entry.size = event.data.size;
-    local_entry.mtime = event.data.mtime;
-    local_entry.checksum = event.data.content_hash;
-    local(local_entry);
-
-    FileSyncEntry sync_entry = sync(id).value_or(FileSyncEntry{});
-    sync_entry.entry_id = id;
-    sync_entry.last_local_path = local_entry.local_path;
-    sync_entry.last_local_mtime = local_entry.mtime;
-    sync_entry.last_local_checksum = local_entry.checksum;
-
-    if (auto remote_entry = remote(id)) {
-        sync_entry.last_remote_path = remote_entry->remote_path;
-        sync_entry.last_remote_mtime = remote_entry->last_modified;
-        sync_entry.last_remote_checksum = remote_entry->checksum;
-    } else {
-        sync_entry.last_remote_path = event.pending_event.new_path;
-        sync_entry.last_remote_mtime = event.data.mtime;
-        sync_entry.last_remote_checksum = event.data.content_hash;
-    }
-
-    if (event.result.action == FileSyncAction::Conflict) {
-        sync_entry.state = FileSyncEntryState::CONFLICT;
-    } else if (local_entry.exists && remote(id).has_value()) {
-        sync_entry.state = FileSyncEntryState::SYNC;
-    } else if (local_entry.exists) {
-        sync_entry.state = FileSyncEntryState::LOC;
-    } else {
-        sync_entry.state = FileSyncEntryState::REM;
-    }
-    sync(sync_entry);
-}
-
-void FileSyncEntryStore::reset() {
-    local_entries_.clear();
-    remote_entries_.clear();
-    sync_entries_.clear();
-    local_paths_.clear();
-    remote_paths_.clear();
-    provider_ids_.clear();
-}
-
-std::optional<FileSyncLocalEntry> FileSyncEntryStore::local(FileSyncEntryId entry_id) const {
-    const auto it = local_entries_.find(entry_id);
-    if (it == local_entries_.end()) {
-        return std::nullopt;
-    }
-    return it->second;
-}
-
-std::optional<FileSyncRemoteEntry> FileSyncEntryStore::remote(FileSyncEntryId entry_id) const {
-    const auto it = remote_entries_.find(entry_id);
-    if (it == remote_entries_.end()) {
-        return std::nullopt;
-    }
-    return it->second;
-}
-
-std::optional<FileSyncEntry> FileSyncEntryStore::sync(FileSyncEntryId entry_id) const {
-    const auto it = sync_entries_.find(entry_id);
-    if (it == sync_entries_.end()) {
-        return std::nullopt;
-    }
-    return it->second;
-}
-
-std::optional<FileSyncEntryId> FileSyncEntryStore::local_id(const std::string& path) const {
-    const auto it = local_paths_.find(path);
-    if (it == local_paths_.end()) {
-        return std::nullopt;
-    }
-    return it->second;
-}
-
-std::optional<FileSyncEntryId> FileSyncEntryStore::remote_id(const std::string& remote_name,
-                                                             const std::string& path) const {
-    const auto it = remote_paths_.find(remote_key(remote_name, path));
-    if (it == remote_paths_.end()) {
-        return std::nullopt;
-    }
-    return it->second;
-}
-
-std::optional<FileSyncEntryId> FileSyncEntryStore::provider_id(const std::string& provider_file_id) const {
-    const auto it = provider_ids_.find(provider_file_id);
-    if (it == provider_ids_.end()) {
-        return std::nullopt;
-    }
-    return it->second;
-}
-
 FileSyncResult RemoteFirstPolicy::result(const FileSyncContext& context) const {
     if (context.event.change == FileSyncChange::Noop) {
+        return noop();
+    }
+    if (is_remote_change(context.event.change) && has_remote(context) && !has_local(context) && !context.sync_entry) {
         return noop();
     }
     if (has_remote(context)) {
@@ -304,6 +135,9 @@ FileSyncResult BiDirectionalPolicy::result(const FileSyncContext& context) const
 
     const bool local = local_changed(context);
     const bool remote = remote_changed(context);
+    if (remote && !local && !has_local(context) && !context.sync_entry) {
+        return noop();
+    }
     if (local && remote) {
         return make_result(FileSyncAction::Conflict);
     }
@@ -343,16 +177,32 @@ void FileSyncGate::reset() {
 
 FileSyncContext FileSyncGate::context(const FileSyncFinalEvent& event) {
     const FileSyncEntryId id = entries_.entry(event);
-    FileSyncLocalEntry local;
-    local.entry_id = id;
-    local.local_path = event.pending_event.new_path;
-    local.exists = event.change != FileSyncChange::LocalDelete &&
-                   event.change != FileSyncChange::Noop;
-    local.is_dir = event.data.is_dir;
-    local.size = event.data.size;
-    local.mtime = event.data.mtime;
-    local.checksum = event.data.content_hash;
-    entries_.local(local);
+    if (is_remote_change(event.change)) {
+        FileSyncRemoteEntry remote;
+        remote.entry_id = id;
+        remote.remote_name = event.remote_name;
+        remote.remote_path = event.pending_event.new_path;
+        remote.provider_file_id = event.data.provider_file_id;
+        remote.exists = event.change != FileSyncChange::RemoteDelete &&
+                        event.change != FileSyncChange::Noop;
+        remote.is_dir = event.data.is_dir;
+        remote.size = event.data.size;
+        remote.created = event.data.created;
+        remote.last_modified = event.data.mtime;
+        remote.checksum = event.data.content_hash;
+        entries_.remote(remote);
+    } else {
+        FileSyncLocalEntry local;
+        local.entry_id = id;
+        local.local_path = event.pending_event.new_path;
+        local.exists = event.change != FileSyncChange::LocalDelete &&
+                       event.change != FileSyncChange::Noop;
+        local.is_dir = event.data.is_dir;
+        local.size = event.data.size;
+        local.mtime = event.data.mtime;
+        local.checksum = event.data.content_hash;
+        entries_.local(local);
+    }
 
     return FileSyncContext{
         event,

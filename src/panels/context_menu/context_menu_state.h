@@ -6,7 +6,7 @@
 #include <utility>
 #include <vector>
 
-#include "core/ui/ui_registry.h"
+#include "core/ui/state_registry.h"
 #include "imgui.h"
 
 namespace misty::panel {
@@ -37,7 +37,7 @@ struct ContextMenuRequest {
     std::vector<ContextMenuEntry> entries;
 };
 
-struct ContextMenuState : public core::UIState {
+struct ContextMenuState : public core::StateEntry {
     bool is_open = false;
     ImVec2 anchor_pos = ImVec2(0.0f, 0.0f);
     ImVec2 menu_size = ImVec2(220.0f, 0.0f);
