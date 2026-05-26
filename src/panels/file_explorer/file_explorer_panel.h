@@ -258,6 +258,10 @@ private:
      */
     void show_toolbar_actions(panel::FileExplorerState& state);
     /**
+     * @brief Renders the file operation toolbar below the navigation row.
+     */
+    void show_file_action_toolbar(panel::FileExplorerState& state);
+    /**
      * @brief Renders breadcrumb navigation for the current path.
      */
     void show_breadcrumb_bar(panel::FileExplorerState& state);

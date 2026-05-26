@@ -11,6 +11,7 @@ FileListing::FileListing(const FileListing& other)
     : owner_key(other.owner_key),
       files(other.files),
       trash_files(other.trash_files),
+      hidden_item_count(other.hidden_item_count),
       is_loading(other.is_loading),
       sort_dirty(other.sort_dirty),
       last_refreshed_at(other.last_refreshed_at),
@@ -31,6 +32,7 @@ FileListing& FileListing::operator=(const FileListing& other) {
     owner_key = other.owner_key;
     files = other.files;
     trash_files = other.trash_files;
+    hidden_item_count = other.hidden_item_count;
     is_loading = other.is_loading;
     sort_dirty = other.sort_dirty;
     last_refreshed_at = other.last_refreshed_at;
@@ -48,6 +50,7 @@ FileListing::FileListing(FileListing&& other) noexcept
     : owner_key(std::move(other.owner_key)),
       files(std::move(other.files)),
       trash_files(std::move(other.trash_files)),
+      hidden_item_count(other.hidden_item_count),
       is_loading(other.is_loading),
       sort_dirty(other.sort_dirty),
       last_refreshed_at(other.last_refreshed_at),
@@ -68,6 +71,7 @@ FileListing& FileListing::operator=(FileListing&& other) noexcept {
     owner_key = std::move(other.owner_key);
     files = std::move(other.files);
     trash_files = std::move(other.trash_files);
+    hidden_item_count = other.hidden_item_count;
     is_loading = other.is_loading;
     sort_dirty = other.sort_dirty;
     last_refreshed_at = other.last_refreshed_at;
@@ -93,6 +97,7 @@ void FileListing::clear() {
     files.clear();
     trash_files.clear();
     deleting_files.clear();
+    hidden_item_count = 0;
     is_loading = false;
     sort_dirty = true;
     last_refreshed_at = {};

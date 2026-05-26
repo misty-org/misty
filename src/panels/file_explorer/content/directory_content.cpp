@@ -36,6 +36,13 @@ bool is_downloadable_remote_file(const FileItem& file) {
     return file.type == FileType::REMOTE && !file.is_dir;
 }
 
+void clear_directory_selection(FileExplorerState& state, FileExplorerPanel::TransientUiState& ui) {
+    ui.context_menu_target_path.clear();
+    ui.selected_files.clear();
+    ui.last_selected_index = -1;
+    state.selected_files.clear();
+}
+
 } // namespace
 
 void FileExplorerPanel::show_directory_contents(FileExplorerState& state, FileListing& listing, FileExplorerPanel::TransientUiState& ui) {
@@ -90,10 +97,12 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state, FileLi
             if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) &&
                 ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup) &&
                 !ImGui::IsAnyItemHovered()) {
-                ui.context_menu_target_path.clear();
-                ui.selected_files.clear();
-                state.selected_files.clear();
+                clear_directory_selection(state, ui);
                 open_background_context_menu(state, ui);
+            } else if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&
+                       ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup) &&
+                       !ImGui::IsAnyItemHovered()) {
+                clear_directory_selection(state, ui);
             }
         }
         ImGui::PopStyleVar();
@@ -140,10 +149,12 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state, FileLi
             if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) &&
                 ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup) &&
                 !ImGui::IsAnyItemHovered()) {
-                ui.context_menu_target_path.clear();
-                ui.selected_files.clear();
-                state.selected_files.clear();
+                clear_directory_selection(state, ui);
                 open_background_context_menu(state, ui);
+            } else if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&
+                       ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup) &&
+                       !ImGui::IsAnyItemHovered()) {
+                clear_directory_selection(state, ui);
             }
         });
     }

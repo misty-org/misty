@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -53,6 +54,7 @@ struct FileListing {
     std::string owner_key;
     std::vector<FileItem> files;
     std::vector<FileItem> trash_files;
+    std::size_t hidden_item_count = 0;
     bool is_loading = false;
     bool sort_dirty = true;
     std::atomic<uint64_t> load_generation{0};

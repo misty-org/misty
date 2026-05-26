@@ -8,6 +8,7 @@
 #include "core/manager/asset_manager.h"
 #include "panels/file_explorer/navigation/history_util.h"
 #include "panels/file_explorer/navigation/toolbar_util.h"
+#include "panels/file_explorer/state/clipboard_state.h"
 #include "panels/file_explorer/state/remote_mount_state.h"
 #include "panels/search/search_state.h"
 using namespace misty::core;
@@ -22,7 +23,9 @@ constexpr ImVec4 kExplorerChromeBgActive = ImVec4(0.11f, 0.11f, 0.12f, 1.0f);
 constexpr ImVec4 kTextDisabled(0.42f, 0.42f, 0.42f, 1.0f);
 constexpr float kToolbarButtonSize = 34.0f;
 constexpr float kToolbarIconSize = 18.0f;
-constexpr float kToolbarGap = 8.0f;
+constexpr float kToolbarGap = 12.0f;
+constexpr float kActionButtonWidth = 34.0f;
+constexpr float kNewButtonWidth = 88.0f;
 
 bool can_create_sync_object_for_path(const std::string& path) {
     if (path.empty() || path.rfind("misty://", 0) == 0) {
@@ -36,6 +39,42 @@ bool can_create_sync_object_for_path(const std::string& path) {
     return fs::is_directory(path, ec) && !ec;
 }
 
+bool is_local_item(const FileItem& item) {
+    return item.type == FileType::LOCAL;
+}
+
+bool selected_items_are_local(const FileExplorerPanel::TransientUiState& ui, const FileListing& listing) {
+    if (ui.selected_files.empty()) {
+        return false;
+    }
+
+    for (const auto& selected_id : ui.selected_files) {
+        const auto it = std::find_if(listing.files.begin(), listing.files.end(), [&](const FileItem& item) {
+            return item.id == selected_id;
+        });
+        if (it == listing.files.end() || !is_local_item(*it)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool exactly_one_local_selection(const FileExplorerPanel::TransientUiState& ui, const FileListing& listing) {
+    return ui.selected_files.size() == 1 && selected_items_are_local(ui, listing);
+}
+
+std::string parent_path_for(const std::string& path) {
+    if (path.empty()) {
+        return {};
+    }
+    fs::path current(path);
+    fs::path parent = current.parent_path();
+    if (parent.empty() || parent == current) {
+        return {};
+    }
+    return parent.string();
+}
+
 void draw_toolbar_button_frame(const ImVec2& min, const ImVec2& max, bool hovered, bool active) {
     const ImU32 fill = active ? IM_COL32(29, 32, 38, 255)
                      : hovered ? IM_COL32(41, 45, 54, 255)
@@ -44,6 +83,8 @@ void draw_toolbar_button_frame(const ImVec2& min, const ImVec2& max, bool hovere
     dl->AddRectFilled(min, max, fill, 8.0f);
     dl->AddRect(min, max, hovered ? IM_COL32(72, 82, 104, 230) : IM_COL32(46, 50, 60, 190), 8.0f);
 }
+
+void draw_icon_at(const char* icon_path, const ImVec2& center, float icon_size, ImU32 tint);
 
 bool toolbar_icon_button(const char* id,
                          const char* icon_path,
@@ -73,6 +114,44 @@ bool toolbar_icon_button(const char* id,
                                              ImVec2(1, 1),
                                              ImGui::ColorConvertFloat4ToU32(tint));
     }
+    if (hovered && tooltip) {
+        ImGui::SetTooltip("%s", tooltip);
+    }
+    return enabled && pressed;
+}
+
+bool toolbar_text_icon_button(const char* id,
+                              const char* icon_path,
+                              const char* label,
+                              const char* trailing_icon_path,
+                              const char* tooltip,
+                              bool enabled,
+                              const ImVec2& size) {
+    ImGui::PushID(id);
+    const bool pressed = ImGui::InvisibleButton("##toolbar_text_icon", size);
+    const bool hovered = enabled && ImGui::IsItemHovered();
+    const bool active = enabled && ImGui::IsItemActive();
+    const ImVec2 min = ImGui::GetItemRectMin();
+    const ImVec2 max = ImGui::GetItemRectMax();
+    ImGui::PopID();
+
+    draw_toolbar_button_frame(min, max, hovered, active);
+
+    const ImU32 tint = ImGui::ColorConvertFloat4ToU32(enabled ? ImVec4(0.88f, 0.88f, 0.88f, 1.0f) : kTextDisabled);
+    constexpr float icon_size = 16.0f;
+    float x = min.x + 10.0f;
+    const float center_y = min.y + size.y * 0.5f;
+
+    draw_icon_at(icon_path, ImVec2(x + icon_size * 0.5f, center_y), icon_size, tint);
+    x += icon_size + 7.0f;
+    ImGui::GetWindowDrawList()->AddText(ImVec2(x, min.y + (size.y - ImGui::GetTextLineHeight()) * 0.5f),
+                                        tint,
+                                        label ? label : "");
+
+    if (trailing_icon_path) {
+        draw_icon_at(trailing_icon_path, ImVec2(max.x - 13.0f, center_y), 14.0f, tint);
+    }
+
     if (hovered && tooltip) {
         ImGui::SetTooltip("%s", tooltip);
     }
@@ -152,6 +231,17 @@ void FileExplorerPanel::show_nav_history(FileExplorerState& state, float button_
         });
     }
 
+    ImGui::SameLine(0, spacing);
+
+    const std::string parent_path = parent_path_for(current_path);
+    const bool can_go_up = !parent_path.empty();
+    if (toolbar_icon_button("history_up",
+                            "assets/icons/arrow-up-24.svg",
+                            can_go_up ? "Up" : "No parent folder",
+                            can_go_up,
+                            button_size)) {
+        navigate_to_path(parent_path, true, false);
+    }
 }
 
 void FileExplorerPanel::show_toolbar_actions(FileExplorerState& state) {
@@ -181,6 +271,90 @@ void FileExplorerPanel::show_toolbar_actions(FileExplorerState& state) {
         }
         ImGui::EndPopup();
     }
+}
+
+void FileExplorerPanel::show_file_action_toolbar(FileExplorerState& state) {
+    const ImVec2 button_size(kActionButtonWidth, kToolbarButtonSize);
+    const auto& listing = active_listing();
+    const bool has_local_selection = selected_items_are_local(ui_, listing);
+    const bool has_single_local_selection = exactly_one_local_selection(ui_, listing);
+    const bool has_clipboard = registry_.get_state<ClipboardState>("Clipboard").has_content();
+    const bool can_create = !std::string(state.current_path).empty();
+
+    if (toolbar_text_icon_button("new_entry",
+                                 "assets/icons/plus-16.svg",
+                                 "New",
+                                 "assets/icons/chevron-down-16.svg",
+                                 "New",
+                                 can_create,
+                                 ImVec2(kNewButtonWidth, kToolbarButtonSize))) {
+        ImGui::OpenPopup("##file_action_new");
+    }
+    if (ImGui::BeginPopup("##file_action_new")) {
+        if (ImGui::MenuItem("Folder", nullptr, false, can_create)) {
+            ui_.new_entry_is_dir = true;
+            ui_.show_new_entry_modal = true;
+        }
+        if (ImGui::MenuItem("File", nullptr, false, can_create)) {
+            ui_.new_entry_is_dir = false;
+            ui_.show_new_entry_modal = true;
+        }
+        ImGui::EndPopup();
+    }
+
+    ImGui::SameLine(0.0f, kToolbarGap);
+    if (toolbar_icon_button("cut_selection",
+                            "assets/icons/scissors-16.svg",
+                            "Cut",
+                            has_local_selection,
+                            button_size,
+                            16.0f)) {
+        perform_cut(state);
+    }
+
+    ImGui::SameLine(0.0f, kToolbarGap);
+    if (toolbar_icon_button("copy_selection",
+                            "assets/icons/copy-16.svg",
+                            "Copy",
+                            has_local_selection,
+                            button_size,
+                            16.0f)) {
+        perform_copy(state);
+    }
+
+    ImGui::SameLine(0.0f, kToolbarGap);
+    if (toolbar_icon_button("paste_selection",
+                            "assets/icons/clipboard-16.svg",
+                            "Paste",
+                            has_clipboard,
+                            button_size,
+                            16.0f)) {
+        perform_paste(state);
+    }
+
+    ImGui::SameLine(0.0f, kToolbarGap);
+    if (toolbar_icon_button("rename_selection",
+                            "assets/icons/pencil-16.svg",
+                            "Rename",
+                            has_single_local_selection,
+                            button_size,
+                            16.0f)) {
+        initiate_rename(ui_);
+    }
+
+    ImGui::SameLine(0.0f, kToolbarGap);
+    if (toolbar_icon_button("delete_selection",
+                            "assets/icons/trash-24.svg",
+                            "Delete",
+                            has_local_selection,
+                            button_size,
+                            18.0f,
+                            ImVec4(0.95f, 0.54f, 0.54f, 1.0f))) {
+        perform_delete_selected(state);
+    }
+
+    ImGui::SameLine(0.0f, kToolbarGap);
+    show_toolbar_actions(state);
 }
 
 void FileExplorerPanel::show_path_control(FileExplorerState& state, float width) {
@@ -482,27 +656,33 @@ void FileExplorerPanel::show_command_toolbar(FileExplorerState& state, SearchSta
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f, 8.0f));
 
     const float viewport_width = std::max(0.0f, ImGui::GetContentRegionAvail().x - kToolbarOuterPadX * 2.0f);
-    constexpr float kSearchMinWidth = 96.0f;
-    constexpr float kSearchPreferredWidth = 190.0f;
+    constexpr float kSearchMinWidth = 88.0f;
+    constexpr float kSearchPreferredWidth = 160.0f;
     constexpr float kSearchCompactWidth = 72.0f;
-    constexpr float kPathMinWidth = 80.0f;
-    constexpr float kPathPreferredWidth = 500.0f;
-    constexpr float kActionClusterWidth = 76.0f + kToolbarGap + 34.0f;
-    constexpr float kStaticWidth = 74.0f + 34.0f + kActionClusterWidth + kToolbarGap * 4.0f;
+    constexpr float kPathMinWidth = 100.0f;
+    constexpr float kPathPreferredWidth = 420.0f;
+    constexpr float kStaticWidth = kToolbarButtonSize * 4.0f + kToolbarGap * 5.0f;
 
     const float flexible_width = std::max(0.0f, viewport_width - kStaticWidth);
+    const float preferred_flexible_width = kPathPreferredWidth + kSearchPreferredWidth;
+    float path_width = kPathPreferredWidth;
     float search_width = kSearchPreferredWidth;
-    if (flexible_width < kSearchMinWidth + kPathMinWidth) {
-        search_width = std::clamp(flexible_width * 0.42f, kSearchCompactWidth, kSearchMinWidth);
+    if (flexible_width < preferred_flexible_width) {
+        if (flexible_width < kPathMinWidth + kSearchCompactWidth) {
+            search_width = std::max(1.0f, std::min(kSearchCompactWidth, flexible_width * 0.38f));
+            path_width = std::max(1.0f, flexible_width - search_width);
+        } else {
+            search_width = std::clamp(flexible_width * 0.32f, kSearchCompactWidth, kSearchMinWidth);
+            path_width = std::max(1.0f, flexible_width - search_width);
+        }
+        if (path_width < kPathMinWidth && flexible_width > kPathMinWidth + 1.0f) {
+            path_width = kPathMinWidth;
+            search_width = std::max(1.0f, flexible_width - path_width);
+        }
     } else {
-        const float overflow_budget = std::max(0.0f, flexible_width - kSearchPreferredWidth - kPathPreferredWidth);
-        const float squeeze = std::max(0.0f, kSearchPreferredWidth + kPathPreferredWidth - flexible_width);
-        search_width = std::clamp(kSearchPreferredWidth - squeeze * 0.35f,
-                                  kSearchMinWidth,
-                                  kSearchPreferredWidth + overflow_budget * 0.20f);
+        path_width = kPathPreferredWidth;
+        search_width = kSearchPreferredWidth;
     }
-    search_width = std::min(search_width, flexible_width);
-    const float path_width = std::max(1.0f, flexible_width - search_width);
 
     if (ImGui::BeginChild("##toolbar_scroll_region",
                           ImVec2(0.0f, kToolbarButtonSize),
@@ -511,7 +691,7 @@ void FileExplorerPanel::show_command_toolbar(FileExplorerState& state, SearchSta
                               ImGuiWindowFlags_NoScrollWithMouse |
                               ImGuiWindowFlags_NoBackground)) {
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + kToolbarOuterPadX);
-        show_nav_history(state, kToolbarButtonSize, 6.0f);
+        show_nav_history(state, kToolbarButtonSize, kToolbarGap);
 
         ImGui::SameLine(0.0f, kToolbarGap);
         if (toolbar_icon_button("refresh",
@@ -528,9 +708,6 @@ void FileExplorerPanel::show_command_toolbar(FileExplorerState& state, SearchSta
 
         ImGui::SameLine(0.0f, kToolbarGap);
         show_search_field(state, search_state, search_width);
-
-        ImGui::SameLine(0.0f, kToolbarGap);
-        show_toolbar_actions(state);
     }
     ImGui::EndChild();
 

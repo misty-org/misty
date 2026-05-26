@@ -62,9 +62,9 @@ namespace misty::panel {
         }
 
         void draw_split_divider(const ImVec2& min, const ImVec2& max, bool hovered, bool active) {
-            const ImU32 color = active ? IM_COL32(82, 92, 112, 210)
-                              : hovered ? IM_COL32(68, 76, 92, 185)
-                                        : IM_COL32(48, 52, 62, 150);
+            const ImU32 color = active ? IM_COL32(255, 255, 255, 180)
+                              : hovered ? IM_COL32(255, 255, 255, 132)
+                                        : IM_COL32(255, 255, 255, 86);
             ImGui::GetWindowDrawList()->AddRectFilled(min, max, color);
         }
 
@@ -99,6 +99,47 @@ namespace misty::panel {
     Panel* MultiPanel::active_panel() const {
         const TabController::Tab* tab = active_tab();
         return tab ? tab->panel.get() : nullptr;
+    }
+
+    std::int16_t MultiPanel::allocate_tab_idx() {
+        return next_tab_idx_++;
+    }
+
+    bool MultiPanel::add_tab_to_active_pane(const TabController::Tab& tab) {
+        default_multi_panel();
+
+        Pane* pane = get_pane(active_pane_id);
+        if (!pane) {
+            error_msg_ = "Active pane not found.";
+            return false;
+        }
+
+        pane->tab_controller.add_tab(tab);
+        return true;
+    }
+
+    bool MultiPanel::activate_tab_in_active_pane(const std::string& context_key) {
+        default_multi_panel();
+
+        Pane* pane = get_pane(active_pane_id);
+        if (!pane) {
+            error_msg_ = "Active pane not found.";
+            return false;
+        }
+
+        for (std::int16_t tab_id : pane->tab_controller.tab_order) {
+            const TabController::Tab* tab = pane->tab_controller.get_tab(tab_id);
+            if (tab && tab->context_key == context_key) {
+                pane->tab_controller.request_tab_selection(tab_id);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool MultiPanel::shows_tab_bar(const Pane& pane) const {
+        (void)pane;
+        return false;
     }
 
     float MultiPanel::pane_header_height(const Panel& panel, bool is_active, bool has_multiple_panes) const {
@@ -594,23 +635,54 @@ namespace misty::panel {
                     active_pane_id = pane_id;
                 }
 
-                const TabController::Tab* tab = pane->tab_controller.get_active_tab();
-                if (!tab || !tab->panel) {
-                    error_msg_ = "Active pane has no panel.";
-                } else if (auto* multi_panel = dynamic_cast<MultiPanel*>(tab->panel.get())) {
+                auto render_tab = [&](const TabController::Tab& tab) {
+                    if (!tab.panel) {
+                        error_msg_ = "Active pane has no panel.";
+                        return;
+                    }
+
                     const bool is_active_pane = pane_id == active_pane_id;
                     const bool has_multiple_panes = pane_count() > 1;
-                    const float header_height = pane_header_height(*tab->panel, is_active_pane, has_multiple_panes);
+                    const float header_height = pane_header_height(*tab.panel, is_active_pane, has_multiple_panes);
                     if (header_height > 0.0f && ImGui::GetContentRegionAvail().y > header_height) {
-                        render_pane_header(*tab->panel, is_active_pane, has_multiple_panes);
+                        render_pane_header(*tab.panel, is_active_pane, has_multiple_panes);
                     }
-                    multi_panel->render_panel_contents();
+
+                    if (auto* multi_panel = dynamic_cast<MultiPanel*>(tab.panel.get())) {
+                        multi_panel->render_panel_contents();
+                    } else {
+                        tab.panel->render();
+                    }
+                };
+
+                bool create_new_tab_requested = false;
+                std::int16_t close_tab_idx = -1;
+                if (shows_tab_bar(*pane)) {
+                    pane->tab_controller.render_tab_bar(
+                        pane_id, &create_new_tab_requested, &close_tab_idx, render_tab);
+                    if (create_new_tab_requested) {
+                        pane->tab_controller.add_tab(create_default_tab(next_tab_idx_++));
+                    }
+                    if (close_tab_idx >= 0) {
+                        close_tab(*pane, close_tab_idx);
+                    }
+                } else if (const TabController::Tab* tab = pane->tab_controller.get_active_tab()) {
+                    render_tab(*tab);
                 } else {
-                    tab->panel->render();
+                    error_msg_ = "Active pane has no panel.";
                 }
             }
             ImGui::EndChild();
         });
+
+        if (pane_id == active_pane_id && pane_count() > 1) {
+            ImGui::GetWindowDrawList()->AddRect(pos,
+                                                ImVec2(pos.x + size.x, pos.y + size.y),
+                                                IM_COL32(255, 255, 255, 72),
+                                                0.0f,
+                                                0,
+                                                1.0f);
+        }
     }
 
     void MultiPanel::render() {

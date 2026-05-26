@@ -12,10 +12,10 @@
 
 namespace misty::view {
 
-class ExtensionsView : public AppView {
+class PluginsView : public AppView {
 public:
-    explicit ExtensionsView(core::StateRegistry& state_registry);
-    ~ExtensionsView() override = default;
+    explicit PluginsView(core::StateRegistry& state_registry);
+    ~PluginsView() override = default;
 
     void render() override;
     ViewID get_view_id() override;

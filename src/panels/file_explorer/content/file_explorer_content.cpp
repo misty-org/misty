@@ -1,7 +1,6 @@
 #include "panels/file_explorer/file_explorer_panel.h"
 #include <algorithm>
 #include <chrono>
-#include <cctype>
 #include <cstdio>
 #include <cstring>
 #include <ctime>
@@ -36,15 +35,16 @@ namespace misty::panel {
         constexpr ImVec4 kMistyAccent = ImVec4(0.36f, 0.58f, 0.95f, 1.0f);
         constexpr float kToolbarPadX = 8.0f;
         constexpr float kToolbarPadY = 4.0f;
+        constexpr float kToolbarRowGap = 6.0f;
         constexpr float kToolbarButtonHeight = 34.0f;
-        constexpr float kToolbarHeight = kToolbarButtonHeight + kToolbarPadY * 2.0f;
+        constexpr float kToolbarHeight = kToolbarButtonHeight * 2.0f + kToolbarRowGap + kToolbarPadY * 2.0f;
         constexpr float kPanePathHeaderHeight = 28.0f;
 
         std::string remote_sync_key(const std::string& remote_name, const std::string& remote_path) {
             return remote_name + ":" + remote_path;
         }
 
-        std::string fit_text_with_ellipsis(const std::string& text, float max_width) {
+        std::string fit_tail_text_with_ellipsis(const std::string& text, float max_width) {
             if (text.empty() || ImGui::CalcTextSize(text.c_str()).x <= max_width) {
                 return text;
             }
@@ -56,10 +56,10 @@ namespace misty::panel {
             }
 
             std::string clipped = text;
-            while (!clipped.empty() && ImGui::CalcTextSize((clipped + kEllipsis).c_str()).x > max_width) {
-                clipped.pop_back();
+            while (!clipped.empty() && ImGui::CalcTextSize((std::string(kEllipsis) + clipped).c_str()).x > max_width) {
+                clipped.erase(clipped.begin());
             }
-            return clipped + kEllipsis;
+            return std::string(kEllipsis) + clipped;
         }
 
         void hydrate_local_sync_states(std::vector<FileItem>& items) {
@@ -185,11 +185,6 @@ namespace misty::panel {
             return out;
         }
 
-        bool is_hidden_listing_item(const FileItem& item) {
-            const std::string name = item.name.empty() ? fs::path(item.path).filename().string() : item.name;
-            return !name.empty() && name.front() == '.';
-        }
-
         std::string item_count_label(std::size_t count) {
             std::ostringstream out;
             out << count << (count == 1 ? " item" : " items");
@@ -197,45 +192,52 @@ namespace misty::panel {
         }
 
         std::string build_directory_status_text(const FileListing& listing,
-                                                const FileExplorerPanel::TransientUiState& ui,
-                                                const std::string& current_path) {
-            const bool is_remote = remote_browse_target_for(current_path).has_value();
+                                                const FileExplorerPanel::TransientUiState& ui) {
             if (listing.is_loading) {
-                return is_remote ? "Syncing..." : "Loading...";
+                return "Loading...";
             }
 
-            std::ostringstream out;
             if (!ui.selected_files.empty()) {
-                out << ui.selected_files.size() << " selected";
-            } else {
-                out << item_count_label(listing.files.size());
-                if (ui.show_hidden) {
-                    const auto hidden_count = std::count_if(listing.files.begin(), listing.files.end(), is_hidden_listing_item);
-                    if (hidden_count > 0) {
-                        out << " (" << hidden_count << " hidden)";
-                    }
-                }
+                std::ostringstream out;
+                out << ui.selected_files.size() << (ui.selected_files.size() == 1 ? " item selected" : " items selected");
+                return out.str();
             }
 
+            const std::size_t total_count = listing.files.size() + (ui.show_hidden ? 0 : listing.hidden_item_count);
+            std::string out = item_count_label(total_count);
+            if (listing.hidden_item_count > 0) {
+                std::ostringstream suffix;
+                suffix << " (" << listing.hidden_item_count << " hidden)";
+                out += suffix.str();
+            }
+            return out;
+        }
+
+        std::string build_directory_freshness_tooltip(const FileListing& listing,
+                                                      const std::string& current_path) {
+            const bool is_remote = remote_browse_target_for(current_path).has_value();
             const auto freshness = is_remote
                 ? format_status_time(listing.last_synced_at)
                 : format_status_time(listing.last_refreshed_at);
-            if (!freshness.empty()) {
-                out << " - Last " << (is_remote ? "synced " : "refreshed ") << freshness;
+            if (freshness.empty()) {
+                return {};
             }
+
+            std::ostringstream out;
+            out << "Last " << (is_remote ? "synced " : "fetched ") << freshness;
             return out.str();
         }
 
-        void render_misty_ai_status_slot(float width, float height) {
+        void render_directory_info_status_slot(float width, float height, const std::string& tooltip) {
             constexpr float kIconSize = 16.0f;
             const ImVec2 cursor = ImGui::GetCursorScreenPos();
             const ImVec2 size(width, height);
-            ImGui::InvisibleButton("##misty_ai_status_placeholder", size);
+            ImGui::InvisibleButton("##directory_info_status", size);
             const bool hovered = ImGui::IsItemHovered();
 
             const ImVec2 center(cursor.x + width * 0.5f, cursor.y + height * 0.5f);
             auto& icon = core::AssetManager::get().get_svg_texture_path(
-                "assets/icons/cloud-24.svg",
+                "assets/icons/info-circle-svgrepo-com.svg",
                 static_cast<int>(kIconSize * 2.0f));
             if (icon.id != 0) {
                 const ImVec2 icon_min(center.x - kIconSize * 0.5f, center.y - kIconSize * 0.5f);
@@ -247,8 +249,8 @@ namespace misty::panel {
                                                      ImVec2(1, 1),
                                                      tint);
             }
-            if (hovered) {
-                ImGui::SetTooltip("Ask MistyAI about this folder");
+            if (hovered && !tooltip.empty()) {
+                ImGui::SetTooltip("%s", tooltip.c_str());
             }
         }
 
@@ -651,7 +653,8 @@ namespace misty::panel {
         ImGui::EndChild();
 
         ImGui::Separator();
-        const std::string status_text = build_directory_status_text(listing, ui_, state.current_path);
+        const std::string status_text = build_directory_status_text(listing, ui_);
+        const std::string freshness_tooltip = build_directory_freshness_tooltip(listing, state.current_path);
         if (ImGui::BeginChild("BottomStatusBar", ImVec2(0.0f, status_bar_height), false, ImGuiWindowFlags_NoScrollbar)) {
             constexpr float kStatusPadX = 10.0f;
             constexpr float kStatusPadY = 5.0f;
@@ -675,7 +678,7 @@ namespace misty::panel {
             ImGui::BeginChild("##status_right", ImVec2(right_width, content_height), false,
                               ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
             ImGui::SetCursorPosX(std::max(0.0f, right_width - kRightActionWidth));
-            render_misty_ai_status_slot(kRightActionWidth, content_height);
+            render_directory_info_status_slot(kRightActionWidth, content_height, freshness_tooltip);
             ImGui::EndChild();
         }
         ImGui::EndChild();
@@ -708,10 +711,8 @@ namespace misty::panel {
             current_path = state.current_path;
         }
 
-        const std::string title = current_path.empty() ? "Files" : file_explorer_tab_title_for_path(current_path);
-        ImGui::PushStyleColor(ImGuiCol_ChildBg,
-                              is_active ? ImVec4(0.088f, 0.102f, 0.126f, 1.0f)
-                                        : ImVec4(0.070f, 0.078f, 0.092f, 1.0f));
+        const std::string path_label = current_path.empty() ? "Files" : current_path;
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.070f, 0.078f, 0.092f, 1.0f));
         if (ImGui::BeginChild("##explorer_pane_path_header",
                               ImVec2(0.0f, kPanePathHeaderHeight),
                               false,
@@ -719,30 +720,23 @@ namespace misty::panel {
             ImDrawList* dl = ImGui::GetWindowDrawList();
             const ImVec2 min = ImGui::GetWindowPos();
             const ImVec2 max(min.x + ImGui::GetWindowWidth(), min.y + kPanePathHeaderHeight);
-            const ImU32 border = is_active ? IM_COL32(76, 122, 202, 210) : IM_COL32(46, 50, 60, 180);
-            const ImU32 title_col = is_active ? IM_COL32(238, 242, 249, 255) : IM_COL32(178, 185, 198, 255);
-            const ImU32 path_col = is_active ? IM_COL32(154, 164, 184, 255) : IM_COL32(112, 120, 136, 255);
-            dl->AddRectFilled(ImVec2(min.x, min.y), ImVec2(min.x + 3.0f, max.y),
-                              is_active ? ImGui::ColorConvertFloat4ToU32(kMistyAccent) : IM_COL32(70, 76, 90, 180));
+            const ImU32 border = IM_COL32(46, 50, 60, 180);
+            const ImU32 path_col = IM_COL32(176, 184, 198, 255);
             dl->AddLine(ImVec2(min.x, max.y - 1.0f), ImVec2(max.x, max.y - 1.0f), border, 1.0f);
 
             constexpr float kPadX = 10.0f;
             const float text_y = min.y + (kPanePathHeaderHeight - ImGui::GetTextLineHeight()) * 0.5f;
-            const float title_width = std::min(ImGui::CalcTextSize(title.c_str()).x, std::max(52.0f, ImGui::GetWindowWidth() * 0.34f));
-            const std::string visible_title = fit_text_with_ellipsis(title, title_width);
-            dl->AddText(ImVec2(min.x + kPadX, text_y), title_col, visible_title.c_str());
-
-            const float path_x = min.x + kPadX + title_width + 12.0f;
+            const float path_x = min.x + kPadX;
             const float path_width = std::max(0.0f, max.x - path_x - kPadX);
-            if (path_width > 24.0f && !current_path.empty()) {
-                const std::string visible_path = fit_text_with_ellipsis(current_path, path_width);
+            if (path_width > 24.0f) {
+                const std::string visible_path = fit_tail_text_with_ellipsis(path_label, path_width);
                 ImGui::PushClipRect(ImVec2(path_x, min.y), ImVec2(max.x - kPadX, max.y), true);
                 dl->AddText(ImVec2(path_x, text_y), path_col, visible_path.c_str());
                 ImGui::PopClipRect();
             }
 
             if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup)) {
-                ImGui::SetTooltip("%s", current_path.empty() ? title.c_str() : current_path.c_str());
+                ImGui::SetTooltip("%s", path_label.c_str());
             }
         }
         ImGui::EndChild();
@@ -773,6 +767,8 @@ namespace misty::panel {
         if (ImGui::BeginChild("TopBar", ImVec2(0.0f, kToolbarHeight), false, ImGuiWindowFlags_NoScrollbar)) {
             ImGui::SetCursorPos(ImVec2(kToolbarPadX, kToolbarPadY));
             show_command_toolbar(state, search_state);
+            ImGui::SetCursorPos(ImVec2(kToolbarPadX, kToolbarPadY + kToolbarButtonHeight + kToolbarRowGap));
+            show_file_action_toolbar(state);
         }
         ImGui::EndChild();
         ImGui::PopStyleColor();
@@ -948,6 +944,7 @@ namespace misty::panel {
         ui_.clear_transient();
         state.selected_files.clear();
         listing.files.clear();
+        listing.hidden_item_count = 0;
         listing.sort_dirty = true;
 
         fs::path normalized_path = fs::path(path).lexically_normal();
@@ -982,6 +979,7 @@ namespace misty::panel {
                 constexpr std::size_t kLocalListBatchSize = 64;
                 std::vector<FileItem> batch;
                 batch.reserve(kLocalListBatchSize);
+                std::size_t hidden_item_count = 0;
 
                 auto flush_batch = [&](bool final_flush) {
                     std::lock_guard<std::mutex> lk(state.mu);
@@ -995,6 +993,7 @@ namespace misty::panel {
                         batch.clear();
                         listing.sort_dirty = true;
                     }
+                    listing.hidden_item_count = hidden_item_count;
                     if (final_flush) {
                         listing.is_loading = false;
                         const auto status_time = std::chrono::system_clock::now();
@@ -1084,7 +1083,12 @@ namespace misty::panel {
                 try {
                     for (const auto& entry : fs::directory_iterator(
                              path, fs::directory_options::skip_permission_denied)) {
-                        if (should_skip_local_entry(entry, show_hidden)) continue;
+                        const std::string file_name = entry.path().filename().string();
+                        const bool is_hidden_entry = !file_name.empty() && file_name.front() == '.';
+                        if (is_hidden_entry) {
+                            ++hidden_item_count;
+                        }
+                        if (!show_hidden && is_hidden_entry) continue;
                         batch.push_back(make_local_file_item(entry));
                         if (batch.size() >= kLocalListBatchSize) {
                             hydrate_local_sync_states(batch);

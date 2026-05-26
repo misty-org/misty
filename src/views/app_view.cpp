@@ -28,8 +28,8 @@ namespace misty::view {
                 case ViewID::Workspace: return "Workspace";
                 case ViewID::Activity: return "Activity";
                 case ViewID::Providers: return "Providers";
-                case ViewID::Extensions: return "Extensions";
-                case ViewID::Vault: return "Vault";
+                case ViewID::Plugins: return "Plugins";
+                case ViewID::Dock: return "Dock";
                 case ViewID::Transfers: return "Transfers";
                 case ViewID::Default: return "Default";
             }

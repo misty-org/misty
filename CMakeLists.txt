@@ -28,6 +28,7 @@ add_subdirectory(tests)
 
 if(MISTY_BUILD_BUNDLED_PLUGINS OR MISTY_BUILD_DEV_PLUGINS)
     set(MISTY_HOST_SOURCE_DIR "${CMAKE_SOURCE_DIR}" CACHE PATH "Path to the Misty host source tree")
+    set(MISTY_PRIVATE_PLUGIN_DIR "$ENV{HOME}/.misty/plugins/private" CACHE PATH "Path to the user private plugin directory" FORCE)
     if(EXISTS "${MISTY_EXTERNAL_PLUGIN_DIR}/CMakeLists.txt")
         add_subdirectory("${MISTY_EXTERNAL_PLUGIN_DIR}" "${CMAKE_BINARY_DIR}/external_plugins")
         if(TARGET misty_plugin_sandbox)

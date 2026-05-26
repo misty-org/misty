@@ -141,17 +141,18 @@ namespace misty::panel {
 
     void NavbarPanel::content(NavbarState& state) {
         nav_item("file-directory-24", "Files", 24, ViewID::Files, state);
-        nav_item("devices-24", "Providers", 24, ViewID::Providers, state);
-        nav_item("apps-16", "Plugins", 24, ViewID::Extensions, state);
-        nav_item("shield-lock-24", "Vault", 24, ViewID::Vault, state);
         nav_item("transfer-24", "Transfers", 24, ViewID::Transfers, state);
-        activity_button();
+        nav_item("devices-24", "Providers", 24, ViewID::Providers, state);
+        nav_item("apps-24", "Plugins", 24, ViewID::Plugins, state);
+        nav_item("dock-24", "Dock", 24, ViewID::Dock, state);
     }
 
     void NavbarPanel::footer(NavbarState& state) {
         const float remaining_height = ImGui::GetContentRegionAvail().y;
-        const float spacer_height = std::max(0.0f, remaining_height - nav_item_height("Settings"));
+        const float footer_height = nav_item_height("Activity") + nav_item_height("Settings");
+        const float spacer_height = std::max(0.0f, remaining_height - footer_height);
         ImGui::Dummy(ImVec2(0.0f, spacer_height));
+        activity_button();
         nav_item("gear-24", "Settings", 24, ViewID::Settings, state);
     }
 

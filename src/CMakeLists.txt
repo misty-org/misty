@@ -150,11 +150,11 @@ if(EXISTS "${CMAKE_SOURCE_DIR}/commands.msy")
     )
 endif()
 
-if(EXISTS "${CMAKE_SOURCE_DIR}/extensions")
+if(EXISTS "${CMAKE_SOURCE_DIR}/plugins")
     list(APPEND MISTY_ASSET_COMMANDS
         COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${CMAKE_SOURCE_DIR}/extensions"
-            "$<TARGET_FILE_DIR:misty>/extensions"
+            "${CMAKE_SOURCE_DIR}/plugins"
+            "$<TARGET_FILE_DIR:misty>/plugins"
     )
 endif()
 
