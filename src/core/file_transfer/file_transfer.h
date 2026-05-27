@@ -74,7 +74,7 @@ public:
 
     void set_local_context(uint64_t id, const std::string& local_path);
     void set_remote_context(uint64_t id, const std::string& remote_name, const std::string& remote_path);
-    void update_progress(uint64_t id, int64_t transferred_bytes);
+    void update_progress(uint64_t id, int64_t transferred_bytes, int64_t total_bytes = -1);
 
     uint64_t start_transfer(FileTransferRecord snapshot);
     void complete_transfer(uint64_t id);

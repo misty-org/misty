@@ -80,6 +80,11 @@ TabController::Tab SettingsPanel::create_default_tab(std::int16_t tab_idx) const
     return tab;
 }
 
+bool SettingsPanel::shows_tab_bar(const Pane& pane) const {
+    (void)pane;
+    return true;
+}
+
 void SettingsPanel::render_panel_contents() {
     auto& state = registry_.get_state<SettingsState>(state_key_);
     state.ensure_app_settings_loaded();

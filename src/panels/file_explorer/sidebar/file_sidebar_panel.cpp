@@ -16,6 +16,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstdio>
+#include <nlohmann/json.hpp>
 #include <string>
 #include <utility>
 
@@ -71,16 +72,65 @@ namespace {
         ImGui::PopID();
 
         ImVec2 p0 = ImGui::GetItemRectMin();
-        const float cx = p0.x + size * 0.5f;
-        const float cy = p0.y + size * 0.5f;
         const ImU32 col = active ? IM_COL32(255, 255, 255, 255)
                          : hovered ? IM_COL32(230, 236, 248, 255)
                                    : IM_COL32(205, 211, 224, 245);
         ImDrawList* dl = ImGui::GetWindowDrawList();
-        dl->AddLine(ImVec2(cx - 4.0f, cy), ImVec2(cx + 4.0f, cy), col, 1.7f);
-        dl->AddLine(ImVec2(cx, cy - 4.0f), ImVec2(cx, cy + 4.0f), col, 1.7f);
+        dl->AddLine(ImVec2(p0.x + 6.0f, p0.y + size * 0.5f),
+                    ImVec2(p0.x + size - 6.0f, p0.y + size * 0.5f),
+                    col, 1.7f);
+        dl->AddLine(ImVec2(p0.x + size - 10.0f, p0.y + size * 0.5f - 4.0f),
+                    ImVec2(p0.x + size - 6.0f, p0.y + size * 0.5f),
+                    col, 1.7f);
+        dl->AddLine(ImVec2(p0.x + size - 10.0f, p0.y + size * 0.5f + 4.0f),
+                    ImVec2(p0.x + size - 6.0f, p0.y + size * 0.5f),
+                    col, 1.7f);
 
         return clicked;
+    }
+
+    std::string format_sidebar_bytes(std::uint64_t bytes) {
+        static constexpr const char* kUnits[] = {"B", "KB", "MB", "GB", "TB"};
+        double value = static_cast<double>(bytes);
+        int unit = 0;
+        while (value >= 1024.0 && unit < 4) {
+            value /= 1024.0;
+            ++unit;
+        }
+
+        char buf[32];
+        if (unit == 0) {
+            std::snprintf(buf, sizeof(buf), "%.0f %s", value, kUnits[unit]);
+        } else if (value >= 100.0 || std::fabs(value - std::round(value)) < 0.05) {
+            std::snprintf(buf, sizeof(buf), "%.0f %s", value, kUnits[unit]);
+        } else {
+            std::snprintf(buf, sizeof(buf), "%.1f %s", value, kUnits[unit]);
+        }
+        return buf;
+    }
+
+    std::vector<misty::panel::SidebarProviderEntry> parse_sidebar_provider_entries(const std::string& body) {
+        using nlohmann::json;
+        const json parsed = json::parse(body);
+        std::vector<misty::panel::SidebarProviderEntry> entries;
+        if (!parsed.is_array()) {
+            return entries;
+        }
+        entries.reserve(parsed.size());
+        for (const auto& item : parsed) {
+            misty::panel::SidebarProviderEntry entry;
+            entry.remote_name = item.value("name", std::string{});
+            entry.provider_folder = item.value("type", std::string{});
+            entry.label = entry.remote_name.empty() ? entry.provider_folder : entry.remote_name;
+            entry.total_bytes = static_cast<std::uint64_t>(std::max<int64_t>(0, item.value("total_bytes", static_cast<int64_t>(0))));
+            entry.free_bytes = static_cast<std::uint64_t>(std::max<int64_t>(0, item.value("free_bytes", static_cast<int64_t>(0))));
+            entry.used_bytes = static_cast<std::uint64_t>(std::max<int64_t>(0, item.value("used_bytes", static_cast<int64_t>(0))));
+            entry.capacity_known = item.value("capacity_known", false);
+            if (!entry.remote_name.empty()) {
+                entries.push_back(std::move(entry));
+            }
+        }
+        return entries;
     }
 
     bool SidebarIconItem(const char* id,
@@ -285,7 +335,7 @@ namespace misty::panel {
 
         worker_pool_.add(
             [&state]() {
-                const std::string url = providers_proxy_url("/api/remote");
+                const std::string url = providers_proxy_url("/api/remote/storage");
                 if (url.empty()) {
                     std::lock_guard<std::mutex> lock(state.providers_mutex);
                     state.providers_loading = false;
@@ -310,13 +360,11 @@ namespace misty::panel {
                     return;
                 }
 
-                std::vector<SidebarProviderEntry> entries;
-                for (const auto& remote : parse_provider_remotes(fetch.response.body)) {
-                    SidebarProviderEntry entry;
-                    entry.provider_folder = remote.type.empty() ? "remote" : remote.type;
-                    entry.remote_name = remote.name;
-                    entry.label = remote.name.empty() ? entry.provider_folder : remote.name;
-                    entries.push_back(std::move(entry));
+                std::vector<SidebarProviderEntry> entries = parse_sidebar_provider_entries(fetch.response.body);
+                for (auto& entry : entries) {
+                    if (entry.provider_folder.empty()) {
+                        entry.provider_folder = "remote";
+                    }
                 }
 
                 std::lock_guard<std::mutex> lock(state.providers_mutex);
@@ -645,13 +693,66 @@ namespace misty::panel {
                         entry.remote_name;
 
                     const std::string provider_icon = provider_logo_path_for_id(entry.provider_folder);
-                    if (SidebarIconItem(entry.remote_name.c_str(),
-                                        entry.label.c_str(),
-                                        provider_icon.empty() ? "cloud-24" : provider_icon.c_str(),
-                                        content_width,
-                                        false,
-                                        34.0f,
-                                        !provider_icon.empty())) {
+                    const ImVec2 cursor = ImGui::GetCursorScreenPos();
+                    constexpr float kRowHeight = 58.0f;
+                    ImGui::PushID(entry.remote_name.c_str());
+                    const bool pressed = ImGui::InvisibleButton("##remote", ImVec2(content_width, kRowHeight));
+                    const bool hovered = ImGui::IsItemHovered();
+                    const bool active = ImGui::IsItemActive();
+                    ImDrawList* dl = ImGui::GetWindowDrawList();
+                    if (hovered || active) {
+                        const ImU32 row_col = active ? IM_COL32(255, 255, 255, 34) : IM_COL32(255, 255, 255, 20);
+                        dl->AddRectFilled(cursor, ImVec2(cursor.x + content_width, cursor.y + kRowHeight), row_col, 7.0f);
+                    }
+
+                    constexpr float icon_size = 18.0f;
+                    const ImVec2 icon_min(cursor.x + 10.0f, cursor.y + 11.0f);
+                    auto& icon = provider_icon.empty()
+                        ? misty::core::AssetManager::get().get_svg_texture("cloud-24", static_cast<int>(icon_size))
+                        : misty::core::AssetManager::get().get_svg_texture_path(provider_icon, static_cast<int>(icon_size), false);
+                    dl->AddImage(icon.id,
+                                 icon_min,
+                                 ImVec2(icon_min.x + icon_size, icon_min.y + icon_size),
+                                 ImVec2(0, 0),
+                                 ImVec2(1, 1),
+                                 IM_COL32(255, 255, 255, 255));
+
+                    const float text_x = cursor.x + 36.0f;
+                    dl->AddText(ImVec2(text_x, cursor.y + 6.0f),
+                                hovered || active ? IM_COL32(246, 248, 252, 255) : IM_COL32(230, 233, 240, 245),
+                                entry.label.c_str());
+
+                    std::string info = entry.provider_folder;
+                    if (entry.capacity_known && entry.total_bytes > 0) {
+                        info = format_sidebar_bytes(entry.free_bytes) + " free of " + format_sidebar_bytes(entry.total_bytes);
+                    }
+                    dl->AddText(ImGui::GetFont(),
+                                ImGui::GetFontSize() * 0.85f,
+                                ImVec2(text_x, cursor.y + 25.0f),
+                                IM_COL32(164, 169, 181, 255),
+                                info.c_str());
+
+                    if (entry.capacity_known && entry.total_bytes > 0) {
+                        const std::uint64_t used = std::min(entry.used_bytes, entry.total_bytes);
+                        const float fill = std::clamp(
+                            static_cast<float>(used) / static_cast<float>(entry.total_bytes),
+                            0.0f,
+                            1.0f);
+                        const float bar_x = text_x;
+                        const float bar_y = cursor.y + 46.0f;
+                        const float bar_w = std::max(20.0f, content_width - text_x + cursor.x - 12.0f);
+                        dl->AddRectFilled(ImVec2(bar_x, bar_y),
+                                          ImVec2(bar_x + bar_w, bar_y + 4.0f),
+                                          IM_COL32(47, 51, 59, 255), 2.0f);
+                        const ImU32 fill_col = fill > 0.90f ? IM_COL32(210, 70, 70, 255)
+                                                            : IM_COL32(95, 154, 233, 255);
+                        dl->AddRectFilled(ImVec2(bar_x, bar_y),
+                                          ImVec2(bar_x + bar_w * fill, bar_y + 4.0f),
+                                          fill_col, 2.0f);
+                    }
+                    ImGui::PopID();
+
+                    if (pressed) {
                         ensure_child_directory(RemoteMountChild{
                             RemoteMountParent{entry.provider_folder, entry.provider_folder, ""},
                             entry.remote_name,

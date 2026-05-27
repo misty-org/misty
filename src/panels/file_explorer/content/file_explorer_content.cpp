@@ -35,7 +35,7 @@ namespace misty::panel {
         constexpr ImVec4 kMistyAccent = ImVec4(0.36f, 0.58f, 0.95f, 1.0f);
         constexpr float kToolbarPadX = 8.0f;
         constexpr float kToolbarPadY = 4.0f;
-        constexpr float kToolbarRowGap = 6.0f;
+        constexpr float kToolbarRowGap = 12.0f;
         constexpr float kToolbarButtonHeight = 34.0f;
         constexpr float kToolbarHeight = kToolbarButtonHeight * 2.0f + kToolbarRowGap + kToolbarPadY * 2.0f;
         constexpr float kPanePathHeaderHeight = 28.0f;

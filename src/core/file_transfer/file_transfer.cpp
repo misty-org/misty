@@ -36,7 +36,7 @@ void FileTransfer::set_remote_context(uint64_t id, const std::string& remote_nam
     }
 }
 
-void FileTransfer::update_progress(uint64_t id, int64_t transferred_bytes) {
+void FileTransfer::update_progress(uint64_t id, int64_t transferred_bytes, int64_t total_bytes) {
     std::lock_guard<std::mutex> lock(mu_);
 
     auto it = transfers_.find(id);
@@ -45,6 +45,9 @@ void FileTransfer::update_progress(uint64_t id, int64_t transferred_bytes) {
     }
 
     it->second.transferred_bytes = transferred_bytes;
+    if (total_bytes >= 0) {
+        it->second.total_bytes = total_bytes;
+    }
     if (it->second.status == FileTransferStatus::Pending) {
         it->second.status = FileTransferStatus::InProgress;
     }

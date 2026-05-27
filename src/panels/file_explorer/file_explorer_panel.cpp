@@ -115,10 +115,6 @@ FileExplorerPanel::FileExplorerPanel(StateRegistry& registry,
     sidebar_panel_->set_active_explorer_state_key_provider([this]() -> std::string {
         return active_explorer_state_key();
     });
-    sidebar_panel_->set_file_drop_handler(
-        [this](const std::string& source_state_key, const std::string& dest_path, ClipboardOp op) {
-            drop_selected_items_to_path(source_state_key, dest_path, op);
-        });
     sidebar_panel_->set_navigation_handler([this](const std::string& path) {
         if (auto* active_explorer = dynamic_cast<FileExplorerPanel*>(active_panel())) {
             active_explorer->navigate_to_path(path, true, false);

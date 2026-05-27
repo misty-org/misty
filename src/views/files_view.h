@@ -15,6 +15,7 @@
 #include "panels/file_explorer/file_explorer_panel.h"
 #include "panels/navbar/navbar_panel.h"
 #include "panels/notification/notification_panel.h"
+#include "panels/panel/tab_bar.h"
 
 namespace misty::view {
     class FilesView : public view::AppView {
@@ -105,7 +106,7 @@ namespace misty::view {
 
         static constexpr float kSidebarMinWidth = 180.0f;
         static constexpr float kSidebarMaxWidth = 400.0f;
-        static constexpr float kWorkspaceTabBarHeight = 32.0f;
+        static constexpr float kWorkspaceTabBarHeight = panel::kTabBarHeight;
         static constexpr float kInspectorMinWidth = 240.0f;
         static constexpr float kInspectorMaxWidth = 430.0f;
         static constexpr float kExplorerMinWidth = 360.0f;

@@ -17,7 +17,6 @@ struct TransferCounts {
 TransferCounts count_rows(const std::vector<core::FileTransferRecord>& rows);
 std::vector<core::FileTransferRecord> sorted_rows(std::vector<core::FileTransferRecord> rows);
 std::vector<core::FileTransferRecord> visible_rows(const std::vector<core::FileTransferRecord>& rows,
-                                                   core::FileTransferFilter filter,
                                                    const char* search_query);
 
 const char* filter_label(core::FileTransferFilter filter);
@@ -25,7 +24,8 @@ const char* type_label(core::FileTransferType type);
 const char* status_label(const core::FileTransferRecord& row);
 std::string progress_text(const core::FileTransferRecord& row);
 float progress_fraction(const core::FileTransferRecord& row);
-std::string transfer_endpoint(const core::FileTransferRecord& row);
+std::string source_endpoint(const core::FileTransferRecord& row);
+std::string target_endpoint(const core::FileTransferRecord& row);
 std::string started_text(const core::FileTransferRecord& row);
 
 }  // namespace misty::panel::transfers_content

@@ -16,8 +16,12 @@
 #include "panels/activity/activity_state.h"
 #include "panels/file_explorer/state/file_explorer_state.h"
 #include "panels/notification/notification_state.h"
+#include "panels/panel/tab_bar.h"
 
 namespace misty::view {
+    namespace {
+    }
+
     namespace {
         constexpr float kPanelToggleSize = 22.0f;
         constexpr float kFilesBottomBarHeight = 22.0f;
@@ -528,36 +532,42 @@ namespace misty::view {
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
         ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
         if (ImGui::Begin("##files_workspace_tabs", nullptr, flags)) {
-            if (ImGui::BeginTabBar("##files_workspace_tab_bar")) {
-                for (auto& tab : workspace->tabs) {
-                    std::string title = "Files";
-                    if (tab.explorer_panel) {
-                        title = tab.explorer_panel->tab_title();
-                        if (title.empty()) {
-                            title = "Files";
-                        }
-                    }
-                    const std::string label = title + "###files_workspace_tab_" + std::to_string(tab.idx);
-                    bool open = true;
-                    const ImGuiTabItemFlags tab_flags =
-                        tab.idx == workspace->pending_tab_select_idx ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None;
-                    if (ImGui::BeginTabItem(label.c_str(), workspace->tabs.size() > 1 ? &open : nullptr, tab_flags)) {
-                        workspace->active_tab_idx = tab.idx;
-                        explorer_panel_ = tab.explorer_panel;
-                        if (tab.idx == workspace->pending_tab_select_idx) {
-                            consumed_pending_selection = true;
-                        }
-                        ImGui::EndTabItem();
-                    }
-                    if (!open) {
-                        close_idx = tab.idx;
+            std::vector<panel::TabBarItem> items;
+            items.reserve(workspace->tabs.size());
+            for (std::size_t i = 0; i < workspace->tabs.size(); ++i) {
+                auto& tab = workspace->tabs[i];
+                std::string title = "Files";
+                if (tab.explorer_panel) {
+                    title = tab.explorer_panel->tab_title();
+                    if (title.empty()) {
+                        title = "Files";
                     }
                 }
-                if (ImGui::TabItemButton("+", ImGuiTabItemFlags_Trailing | ImGuiTabItemFlags_NoTooltip)) {
-                    create_requested = true;
+                items.push_back(panel::TabBarItem{
+                    .id = "files_workspace_tab_" + std::to_string(tab.idx),
+                    .title = std::move(title),
+                    .active = tab.idx == workspace->active_tab_idx,
+                    .closable = workspace->tabs.size() > 1,
+                });
+                if (tab.idx == workspace->pending_tab_select_idx) {
+                    workspace->active_tab_idx = tab.idx;
+                    explorer_panel_ = tab.explorer_panel;
+                    consumed_pending_selection = true;
                 }
-                ImGui::EndTabBar();
             }
+            const panel::TabBarResult strip_result = panel::render_tab_bar(items);
+            if (strip_result.pressed_index >= 0 &&
+                strip_result.pressed_index < static_cast<int>(workspace->tabs.size())) {
+                const auto& tab = workspace->tabs[strip_result.pressed_index];
+                workspace->active_tab_idx = tab.idx;
+                workspace->pending_tab_select_idx = tab.idx;
+                explorer_panel_ = tab.explorer_panel;
+            }
+            if (strip_result.close_index >= 0 &&
+                strip_result.close_index < static_cast<int>(workspace->tabs.size())) {
+                close_idx = workspace->tabs[strip_result.close_index].idx;
+            }
+            create_requested = strip_result.plus_pressed;
         }
         ImGui::End();
         ImGui::PopStyleVar(2);
