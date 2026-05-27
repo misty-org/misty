@@ -22,7 +22,7 @@ export type WorkspaceSurfaceId =
   | "files"
   | "transfers"
   | "agents"
-  | "extensions";
+  | "marketplace";
 
 export type WorkspaceGroupKey = `space:${string}` | `tool:${WorkspaceSurfaceId}`;
 export type WorkspaceInstancePolicy = "multiple" | "single";
@@ -35,6 +35,7 @@ export interface BrowserTabState {
   version: 1;
   url: string;
   faviconUrl: string | null;
+  agentOwned?: boolean;
 }
 
 export type CodeMultibufferKind =
@@ -208,7 +209,35 @@ export function parseBrowserTabState(value: unknown): BrowserTabState {
       typeof candidate.faviconUrl === "string" && candidate.faviconUrl
         ? candidate.faviconUrl
         : browserFaviconUrl(url),
+    agentOwned: candidate.agentOwned === true || undefined,
   };
+}
+
+export function isPlaceholderBrowserTitle(title?: string): boolean {
+  if (!title) return true;
+  const normalized = title.trim().toLowerCase();
+  if (!normalized) return true;
+  return (
+    normalized === "loading" ||
+    normalized.startsWith("loading...") ||
+    normalized.startsWith("loading…") ||
+    normalized.startsWith("loading -") ||
+    normalized.startsWith("loading —") ||
+    normalized === "please wait" ||
+    normalized.startsWith("please wait...") ||
+    normalized.startsWith("please wait…") ||
+    normalized === "untitled" ||
+    normalized === "untitled document" ||
+    normalized === "about:blank"
+  );
+}
+
+export function sanitizeBrowserTitle(title?: string, url?: string): string {
+  const trimmed = title?.trim();
+  if (trimmed && !isPlaceholderBrowserTitle(trimmed)) {
+    return trimmed;
+  }
+  return url ? browserTabTitle(url) : "New Tab";
 }
 
 export function browserTabTitle(url: string): string {

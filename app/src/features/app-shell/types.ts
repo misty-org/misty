@@ -8,7 +8,7 @@ export type AppTab =
   | "spaces"
   | "assistant"
   | "agents"
-  | "extensions"
+  | "marketplace"
   | "transfers"
   | "providers"
   | "settings"
