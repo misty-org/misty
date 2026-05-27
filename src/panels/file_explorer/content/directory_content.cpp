@@ -1,6 +1,5 @@
 #include "panels/file_explorer/file_explorer_panel.h"
 #include "panels/file_explorer/content/directory_content_util.h"
-#include "panels/file_explorer/selection/drag_and_drop.h"
 
 #include <chrono>
 
@@ -17,10 +16,10 @@ namespace {
 constexpr float kFileRowContentPaddingX = 8.0f;
 constexpr float kFirstHeaderTextPaddingX = 8.0f;
 constexpr float kDirectoryTablePaddingX = 2.0f;
-constexpr float kNameColumnWidth = 360.0f;
+constexpr float kNameColumnWidth = 220.0f;
 constexpr float kModifiedColumnWidth = 220.0f;
-constexpr float kSizeColumnWidth = 120.0f;
-constexpr float kTypeColumnWidth = 140.0f;
+constexpr float kSizeColumnWidth = 128.0f;
+constexpr float kTypeColumnWidth = 128.0f;
 constexpr ImVec2 kTableCellPadding = ImVec2(8.0f, 2.0f);
 constexpr float kTableMinInnerWidth =
     kNameColumnWidth + kModifiedColumnWidth + kSizeColumnWidth + kTypeColumnWidth;
@@ -117,7 +116,7 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state, FileLi
                  kFirstHeaderTextPaddingX},
                 {"Modified", kModifiedColumnWidth, ImGuiTableColumnFlags_WidthFixed},
                 {"Size", kSizeColumnWidth, ImGuiTableColumnFlags_WidthFixed},
-                {"Kind", kTypeColumnWidth, ImGuiTableColumnFlags_WidthFixed},
+                {"Type", kTypeColumnWidth, ImGuiTableColumnFlags_WidthFixed},
             },
             .width = UI::Size::px(table_width),
             .inner_width = table_inner_width,
@@ -158,13 +157,6 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state, FileLi
             }
         });
     }
-
-    if (!selection_detail::prominent_drag_target_hovered_this_frame() && !ImGui::IsAnyItemHovered()) {
-        handle_file_drop_target(state, std::string(state.current_path), overlay_min, overlay_max, false, false);
-    }
-    selection_detail::draw_file_drag_preview(state, [&](const FileItem& item) {
-        return icon_name_for_file(listing, item);
-    });
 
     if (show_loading_animation && overlay_size.x > 0.0f && overlay_size.y > 0.0f) {
         ImGui::SetCursorScreenPos(overlay_min);
@@ -218,17 +210,7 @@ void FileExplorerPanel::show_file_item(FileExplorerState& state, FileListing& li
         open_context_menu(state, ui);
     }
 
-    begin_file_drag_source(state, listing, ui, file, i, is_selected);
-    if (file.is_dir) {
-        handle_file_drop_target(state,
-                                file.path,
-                                row_min,
-                                row_max,
-                                true,
-                                true,
-                                false);
-    }
-    const bool show_open_folder_icon = selection_detail::show_open_folder_for_drag_hover(file, row_min, row_max);
+    const bool show_open_folder_icon = false;
 
     if (row_double_clicked) {
         if (file.is_dir) {
@@ -267,7 +249,7 @@ void FileExplorerPanel::show_file_item(FileExplorerState& state, FileListing& li
 
     ImGui::TableNextColumn();
     ImGui::SetCursorPosY(ImGui::GetCursorPosY() + text_y_offset);
-    if (!file.last_modified.empty()) ImGui::Text("%s", file.last_modified.c_str());
+    if (!file.last_modified.empty()) ImGui::Text("%s", display_last_modified(file.last_modified).c_str());
     else ImGui::Text("-");
 
     ImGui::TableNextColumn();
@@ -322,18 +304,13 @@ void FileExplorerPanel::show_grid_item(FileExplorerState& state, FileListing& li
     } else if (hovered) {
         dl->AddRectFilled(cell_pos, cell_max, IM_COL32(255, 255, 255, 20), kGridCardRounding);
     }
-    const bool show_open_folder_icon = selection_detail::show_open_folder_for_drag_hover(file, cell_pos, cell_max);
+    const bool show_open_folder_icon = false;
     grid_item_icon(dl, state, listing, file, show_open_folder_icon, cell_pos, cell_w, kGridIconSize, kGridCardPadding.top);
     grid_item_label(dl, state, listing, file, is_selected, cell_pos, cell_w, kGridIconSize, kGridCardPadding.top,
                     kGridLabelGap, kGridLabelWrapInset);
     dl->PopClipRect();
 
     if (clicked) select_item(state, ui, listing, file, i, is_selected, io);
-    begin_file_drag_source(state, listing, ui, file, i, is_selected);
-    if (file.is_dir) {
-        handle_file_drop_target(state, file.path, cell_pos, cell_max, true, true, false);
-    }
-
     if (double_clicked) {
         if (file.is_dir) {
             std::string nav_path = file.path;

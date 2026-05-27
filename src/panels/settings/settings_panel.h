@@ -25,6 +25,7 @@ namespace misty::panel {
         TabController::Tab create_default_tab(std::int16_t tab_idx) const override;
 
     private:
+        bool shows_tab_bar(const Pane& pane) const override;
         void render_panel_contents() override;
         void settings_content(SettingsState& state);
 

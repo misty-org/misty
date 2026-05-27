@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include "imgui.h"
+#include "panels/panel/tab_bar.h"
 
 namespace misty::panel {
     namespace {
@@ -62,45 +63,58 @@ namespace misty::panel {
                                        bool* create_new_tab_requested,
                                        std::int16_t* close_tab_idx,
                                        const std::function<void(const Tab&)>& render_tab_content) {
-        const std::string tab_bar_id = "##tab_bar_" + scope_id;
-        if (!ImGui::BeginTabBar(tab_bar_id.c_str())) {
+        const float avail_w = ImGui::GetContentRegionAvail().x;
+        if (avail_w <= 0.0f) {
             return;
         }
 
-        bool pending_selection_rendered = false;
-        for (std::int16_t tab_id : tab_order) {
+        ImGui::BeginChild(("##tab_strip_" + scope_id).c_str(),
+                          ImVec2(0.0f, kTabBarHeight),
+                          ImGuiChildFlags_None,
+                          ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoBackground);
+        std::vector<TabBarItem> items;
+        items.reserve(tab_order.size());
+        for (std::size_t tab_index = 0; tab_index < tab_order.size(); ++tab_index) {
+            const std::int16_t tab_id = tab_order[tab_index];
             const Tab* tab = get_tab(tab_id);
             if (!tab) {
                 continue;
             }
-
-            const std::string label = tab->display_title() + "###tab_" + scope_id + "_" + std::to_string(tab_id);
-            bool is_open = true;
-            const ImGuiTabItemFlags flags =
-                tab_id == pending_selected_tab_idx ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None;
-            if (tab_id == pending_selected_tab_idx) {
-                pending_selection_rendered = true;
-            }
-            if (ImGui::BeginTabItem(label.c_str(), &is_open, flags)) {
-                set_active_tab(tab_id);
-                if (render_tab_content) {
-                    render_tab_content(*tab);
-                }
-                ImGui::EndTabItem();
-            }
-            if (!is_open && close_tab_idx) {
-                *close_tab_idx = tab_id;
-            }
+            items.push_back(TabBarItem{
+                .id = "tab_" + scope_id + "_" + std::to_string(tab_id),
+                .title = tab->display_title(),
+                .active = tab_id == active_tab_idx,
+                .closable = tab_order.size() > 1,
+            });
         }
-
-        if (create_new_tab_requested &&
-            ImGui::TabItemButton("+", ImGuiTabItemFlags_Trailing | ImGuiTabItemFlags_NoTooltip)) {
+        const TabBarResult strip_result = ::misty::panel::render_tab_bar(items, create_new_tab_requested != nullptr);
+        if (strip_result.close_index >= 0 &&
+            close_tab_idx &&
+            strip_result.close_index < static_cast<int>(tab_order.size())) {
+            *close_tab_idx = tab_order[strip_result.close_index];
+        }
+        if (strip_result.pressed_index >= 0 &&
+            strip_result.pressed_index < static_cast<int>(tab_order.size())) {
+            request_tab_selection(tab_order[strip_result.pressed_index]);
+        }
+        if (create_new_tab_requested && strip_result.plus_pressed) {
             *create_new_tab_requested = true;
         }
+        ImGui::EndChild();
 
-        ImGui::EndTabBar();
-        if (pending_selection_rendered) {
+        if (pending_selected_tab_idx >= 0) {
+            set_active_tab(pending_selected_tab_idx);
             pending_selected_tab_idx = -1;
+        }
+
+        const Tab* active = get_active_tab();
+        if (active && render_tab_content) {
+            ImGui::BeginChild(("##tab_content_" + scope_id).c_str(),
+                              ImVec2(0.0f, 0.0f),
+                              ImGuiChildFlags_None,
+                              ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoBackground);
+            render_tab_content(*active);
+            ImGui::EndChild();
         }
     }
 

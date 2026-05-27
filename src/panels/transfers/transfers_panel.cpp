@@ -26,8 +26,6 @@ void TransfersPanel::render() {
 
     auto rows = transfers_content::sorted_rows(tracker.get_all_transfers());
     const auto counts = transfers_content::count_rows(rows);
-    const auto visible_rows = transfers_content::visible_rows(rows, ui_state.filter(), ui_state.search_query());
-
     const ImGuiWindowFlags window_flags =
         ImGuiWindowFlags_NoTitleBar |
         ImGuiWindowFlags_NoMove |
@@ -52,6 +50,7 @@ void TransfersPanel::render() {
         tracker.clear_completed();
         rows = transfers_content::sorted_rows(tracker.get_all_transfers());
     }
+    const auto visible_rows = transfers_content::visible_rows(rows, ui_state.search_query());
 
     ImGui::Dummy(ImVec2(0.0f, 26.0f));
 
@@ -66,7 +65,7 @@ void TransfersPanel::render() {
         ImGui::Dummy(ImVec2(0.0f, 14.0f));
         const float footer_h = 50.0f;
         const float table_h = std::max(180.0f, ImGui::GetContentRegionAvail().y - footer_h - 14.0f);
-        render_transfers_table(visible_rows, ui_state.filter(), table_h);
+        render_transfers_table(visible_rows, table_h);
         ImGui::Dummy(ImVec2(0.0f, 10.0f));
         render_transfers_footer(visible_rows.size());
     }

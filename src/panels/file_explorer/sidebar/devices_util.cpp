@@ -11,8 +11,6 @@
 namespace fs = std::filesystem;
 
 namespace {
-constexpr const char* kFileDragPayloadType = "MISTY_FILE_ITEMS";
-
 std::string format_sidebar_bytes(uint64_t bytes) {
     static constexpr const char* kUnits[] = {"B", "KB", "MB", "GB", "TB"};
     double value = static_cast<double>(bytes);
@@ -175,6 +173,7 @@ DeviceRowResult render_device_row(
     float content_width,
     const std::function<void(const std::string&, const std::string&, ClipboardOp)>& file_drop_handler) {
     DeviceRowResult result;
+    (void)file_drop_handler;
     const MountedDevice& device = entry.device;
 
     constexpr float kItemHeight = 58.0f;
@@ -185,20 +184,6 @@ DeviceRowResult render_device_row(
     const bool pressed = ImGui::InvisibleButton("##dev", ImVec2(content_width - kDotsWidth, kItemHeight));
     const bool main_hovered = ImGui::IsItemHovered();
     const bool main_active = ImGui::IsItemActive();
-    bool drop_delivered = false;
-    if (ImGui::BeginDragDropTarget()) {
-        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(
-                kFileDragPayloadType, ImGuiDragDropFlags_AcceptBeforeDelivery)) {
-            if (payload->Data != nullptr && payload->DataSize > 0 && payload->IsDelivery()) {
-                const char* data = static_cast<const char*>(payload->Data);
-                if (file_drop_handler) {
-                    file_drop_handler(std::string(data), device.mount_path, ClipboardOp::CUT);
-                }
-                drop_delivered = true;
-            }
-        }
-        ImGui::EndDragDropTarget();
-    }
 
     ImGui::SameLine(0, 0);
     const bool rect_hovered = ImGui::IsMouseHoveringRect(
@@ -280,7 +265,7 @@ DeviceRowResult render_device_row(
 
     ImGui::PopID();
 
-    if (pressed && !dots_hovered && !drop_delivered) {
+    if (pressed && !dots_hovered) {
         result.navigate_to_mount = true;
     }
 

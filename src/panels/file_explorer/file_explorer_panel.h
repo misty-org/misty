@@ -8,7 +8,6 @@
 #include <unordered_set>
 #include <vector>
 
-#include "core/file_master/file_master.h"
 #include "core/file_sync/file_sync_master.h"
 #include "core/threading/worker_pool.h"
 #include "core/ui/state_registry.h"
@@ -107,6 +106,10 @@ public:
      * @brief Renders the multi-panel shell and active explorer content.
      */
     void render() override;
+    /**
+     * @brief Handles file explorer keyboard shortcuts and pane commands.
+     */
+    void handle_commands();
     /**
      * @brief Returns the title to show for the current tab.
      */
@@ -376,12 +379,12 @@ private:
                             const std::string& dest_dir,
                             panel::ClipboardOp op);
     /**
-     * @brief Performs one local-to-local paste operation.
+     * @brief Performs one paste/drop operation through the local or remote file master.
      */
-    bool perform_paste_local_to_local(panel::FileExplorerState& state,
-                                      const panel::FileItem& item,
-                                      const std::string& dest_dir,
-                                      panel::ClipboardOp op);
+    bool perform_paste_item(panel::FileExplorerState& state,
+                            const panel::FileItem& item,
+                            const std::string& dest_dir,
+                            panel::ClipboardOp op);
     /**
      * @brief Downloads a remote row into its mounted local destination path.
      */
@@ -400,6 +403,10 @@ private:
      */
     void initiate_rename(TransientUiState& ui);
     /**
+     * @brief Dispatches the rename operation currently staged in the rename modal.
+     */
+    void perform_rename_from_modal(TransientUiState& ui);
+    /**
      * @brief Permanently deletes paths staged in the permanent delete modal.
      */
     void confirm_permanent_delete(TransientUiState& ui);
@@ -407,6 +414,10 @@ private:
      * @brief Retries a delete operation that previously required elevated permission.
      */
     void retry_permission_delete(TransientUiState& ui);
+    /**
+     * @brief Handles keyboard shortcuts for copy, cut, paste, rename, and delete.
+     */
+    void handle_file_operation_commands();
     /**
      * @brief Returns the item targeted by the context menu, if it is still loaded.
      */
@@ -421,12 +432,6 @@ private:
                                       bool update_history,
                                       uint64_t load_generation,
                                       bool force_remote_refresh = false);
-    /**
-     * @brief Builds FileMaster properties for local operations involving an item.
-     */
-    core::FileMasterProps make_local_props(const panel::FileItem& item,
-                                           const std::string& dest_path = {}) const;
-
     /**
      * @brief Returns the shared listing state registry entry.
      */

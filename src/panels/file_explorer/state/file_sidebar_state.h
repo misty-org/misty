@@ -15,6 +15,10 @@ namespace misty::panel {
         std::string provider_folder;
         std::string remote_name;
         std::string label;
+        std::uint64_t total_bytes = 0;
+        std::uint64_t free_bytes = 0;
+        std::uint64_t used_bytes = 0;
+        bool capacity_known = false;
     };
 
     /**
