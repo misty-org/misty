@@ -6,7 +6,7 @@ const sidebarRows = Array.from({ length: 7 }, (_, index) => index);
 export function ExplorerLoadingShell() {
   return (
     <section
-      className="grid h-full min-h-0 grid-rows-[46px_72px_minmax(0,1fr)_26px] overflow-hidden bg-charcoal-bg"
+      className="grid h-full min-h-0 grid-rows-[46px_72px_minmax(0,1fr)_26px] overflow-hidden bg-charcoal-sidebar"
       aria-busy="true"
       aria-label="Loading File Explorer"
     >

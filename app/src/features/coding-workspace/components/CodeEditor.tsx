@@ -1,5 +1,6 @@
 import { addCursorAbove, addCursorBelow, undoSelection } from "@codemirror/commands";
 import { forceLinting, forEachDiagnostic } from "@codemirror/lint";
+import { SystemErrorActivity } from "@/features/activity";
 import { selectNextOccurrence, selectSelectionMatches } from "@codemirror/search";
 import { Compartment, EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
@@ -214,9 +215,15 @@ export function CodeEditor({ tab, groupId, rootPath }: CodeEditorProps) {
   if (tab.error) {
     return (
       <div className="grid h-full place-items-center bg-charcoal-bg px-6 text-center">
+        <SystemErrorActivity
+          error={tab.error}
+          scope={`code:file:${tab.path}`}
+          title={`${tab.name} could not be opened`}
+          target={{ kind: "route", href: "/code" }}
+        />
         <div>
           <p className="text-sm text-[#d68b80]">Could not open {tab.name}</p>
-          <p className="mt-2 text-xs text-cream-muted">{tab.error}</p>
+          <p className="mt-2 text-xs text-cream-muted">Open Activity for details.</p>
         </div>
       </div>
     );

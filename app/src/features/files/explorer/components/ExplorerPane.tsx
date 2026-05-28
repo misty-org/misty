@@ -12,7 +12,7 @@ const paneStyles = {
   shellInactive: "opacity-65 transition-opacity hover:opacity-85",
   path: [
     "grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 overflow-hidden",
-    "border-b border-charcoal-border/60 bg-charcoal-bg",
+    "border-b border-charcoal-border/60 bg-charcoal-sidebar",
     "py-0 pl-3 pr-3 text-xs text-cream-muted",
     "max-[720px]:min-h-8 max-[720px]:pl-2.5 max-[720px]:pr-2.5 max-[720px]:text-[11px]",
   ].join(" "),

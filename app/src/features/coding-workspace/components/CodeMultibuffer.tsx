@@ -1,4 +1,5 @@
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
+import { SystemErrorActivity } from "@/features/activity";
 import { lineNumbers } from "@codemirror/view";
 import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
 import { EditorState, Transaction, type ChangeSet } from "@codemirror/state";
@@ -156,7 +157,18 @@ export function CodeMultibuffer(props: Props) {
 
   if (loading && document.excerpts.length === 0)
     return <ResultMessage>Building {props.spec.title}…</ResultMessage>;
-  if (error) return <ResultMessage danger>{error}</ResultMessage>;
+  if (error)
+    return (
+      <>
+        <SystemErrorActivity
+          error={error}
+          scope="code:multibuffer"
+          title="Code results could not be prepared"
+          target={{ kind: "route", href: "/code" }}
+        />
+        <ResultMessage>Open Activity for details.</ResultMessage>
+      </>
+    );
   if (document.excerpts.length === 0) {
     return <ResultMessage>{emptyMessage(props.spec)}</ResultMessage>;
   }

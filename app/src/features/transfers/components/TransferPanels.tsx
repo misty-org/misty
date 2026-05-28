@@ -1,4 +1,5 @@
 import type { TransferRecord } from "@/native/contracts";
+import { SystemErrorActivity } from "@/features/activity";
 import type { TransferType } from "@/native/contracts/primitives";
 import { prettyLabel } from "@/shared/lib/format";
 import {
@@ -236,7 +237,14 @@ export function TransferDetail(
       <DetailRow label="Completed" value={timestampLabel(row.completedAtMs)} />
       <DetailRow label="Job ID" value={`J-${row.jobId}`} />
       {row.detailMessage ? <DetailRow label="Detail" value={row.detailMessage} /> : null}
-      {row.errorMessage ? <DetailRow label="Error" value={row.errorMessage} danger /> : null}
+      {row.errorMessage ? (
+        <SystemErrorActivity
+          error={row.errorMessage}
+          scope={`transfers:${row.jobId}`}
+          title="Transfer could not be completed"
+          target={{ kind: "workspace-tool", tool: "transfers" }}
+        />
+      ) : null}
       <DetailActions {...props} row={row} />
     </div>
   );

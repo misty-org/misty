@@ -1,4 +1,5 @@
 import { PhotoEditor } from "@/features/editor";
+import { SystemErrorActivity } from "@/features/activity";
 import { explorerOpenPath, explorerSavePreviewItem } from "@/features/files/native";
 import { errorText } from "@/shared/lib/format";
 import { useShortcutHandler } from "@/features/shortcuts";
@@ -114,6 +115,22 @@ export function GlobalPreviewDialog(props: {
         if (!open && !saving) props.onClose();
       }}
     >
+      {loadError ? (
+        <SystemErrorActivity
+          error={loadError}
+          scope="files:preview:load"
+          title="File preview could not be loaded"
+          target={{ kind: "workspace-tool", tool: "files" }}
+        />
+      ) : null}
+      {saveError ? (
+        <SystemErrorActivity
+          error={saveError}
+          scope="files:preview:save"
+          title="File preview changes could not be saved"
+          target={{ kind: "workspace-tool", tool: "files" }}
+        />
+      ) : null}
       <DialogContent
         aria-describedby={undefined}
         className="left-0 top-0 block h-full w-full max-w-none translate-x-0 translate-y-0 rounded-none bg-charcoal-bg p-0 text-cream shadow-none ring-0 data-[state=closed]:zoom-out-100 data-[state=open]:zoom-in-100 [&>[data-slot=dialog-close]]:hidden"
@@ -194,7 +211,7 @@ export function GlobalPreviewDialog(props: {
                   <PreviewMessage
                     icon={<FileQuestion size={34} />}
                     title="Preview needs attention"
-                    detail={loadError}
+                    detail="Open Activity for details."
                     action={
                       <Button
                         variant="outline"
@@ -225,9 +242,7 @@ export function GlobalPreviewDialog(props: {
             <aside className="min-h-0 overflow-y-auto border-l border-charcoal-border bg-charcoal-card p-5 max-[820px]:hidden">
               <div className="grid gap-5">
                 <div>
-                  <span className="text-[11px] font-medium uppercase tracking-wider text-cream-muted">
-                    Inspector
-                  </span>
+                  <span className="text-[11px] font-medium text-cream-muted">Inspector</span>
                   <h2 className="m-0 mt-2 break-words text-lg font-semibold">
                     {props.source.name}
                   </h2>
@@ -251,20 +266,18 @@ export function GlobalPreviewDialog(props: {
                 </dl>
                 {props.source.description ? (
                   <div>
-                    <span className="text-[11px] font-medium uppercase tracking-wider text-cream-muted">
-                      Description
-                    </span>
+                    <span className="text-[11px] font-medium text-cream-muted">Description</span>
                     <p className="m-0 mt-2 text-sm leading-6 text-cream-muted">
                       {props.source.description}
                     </p>
                   </div>
                 ) : null}
-                {saveStatus || saveError ? (
+                {saveStatus ? (
                   <p
-                    className={`m-0 rounded-lg px-3 py-2 text-xs ${saveError ? "bg-charcoal-active text-cream-bright" : "bg-sage-bg text-sage-fg"}`}
+                    className="m-0 rounded-lg bg-sage-bg px-3 py-2 text-xs text-sage-fg"
                     role="status"
                   >
-                    {saveError ?? saveStatus}
+                    {saveStatus}
                   </p>
                 ) : null}
                 {props.source.remote ? (
