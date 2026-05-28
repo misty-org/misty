@@ -14,6 +14,7 @@ import Changelog from "./pages/Changelog";
 import Blog from "./pages/Blog";
 import Roadmap from "./pages/Roadmap";
 import Forum from "./pages/Forum";
+import Plugins from "./pages/Plugins";
 
 
 
@@ -31,6 +32,7 @@ export const router = createBrowserRouter([
       { path: "blog", element: <Blog />, handle: { title: "Misty - Blog" } },
       { path: "roadmap", element: <Roadmap />, handle: { title: "Misty - Roadmap" } },
       { path: "forum", element: <Forum />, handle: { title: "Misty - Forum" } },
+      { path: "plugins", element: <Plugins />, handle: { title: "Misty - Plugins" } },
       { path: "waitlist", element: <Waitlist />, handle: { title: "Misty - Waitlist" } },
       { path: "signin", element: <SignIn />, handle: { title: "Misty - Sign In" } },
       { path: "register", element: <Register />, handle: { title: "Misty - Register" } },
