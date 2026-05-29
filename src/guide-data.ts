@@ -1,4 +1,4 @@
-import { Section } from "./data";
+import type { Section } from "./data";
 
 export const guideSections: Section[] = [
   {
