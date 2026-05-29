@@ -29,7 +29,7 @@ export default function RightPanel({ section }: { section: Section }) {
   const anchors = getAnchors(section);
 
   return (
-    <aside className="sticky top-16 h-[calc(100vh-4rem)] self-start overflow-y-auto border-l border-border-subtle hidden lg:block scrollbar-hide">
+    <aside className="hidden h-full overflow-y-auto border-l border-border-subtle scrollbar-hide lg:block">
       <div className="py-6 px-5">
         <span className="text-[11px] font-semibold text-text-muted mb-3 block">
           Contents
