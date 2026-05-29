@@ -1,67 +1,20 @@
 import { useState } from "react";
 import { HiOutlineChevronDown } from "react-icons/hi2";
-
-const changelog = [
-  {
-    version: "v0.3.0",
-    date: "March 2026",
-    summary: "Linux support & drag-and-drop transfers",
-    changes: [
-      "Linux support for x86_64 and ARM64",
-      "New drag-and-drop transfer interface",
-      "Improved connection stability for Google Drive and OneDrive",
-      "Dark mode refinements and accessibility improvements",
-    ],
-  },
-  {
-    version: "v0.2.1",
-    date: "February 2026",
-    summary: "Stability & progress reporting",
-    changes: [
-      "Fixed crash when reconnecting expired Oauth sessions",
-      "Improved file upload progress reporting",
-      "Minor Ui polish and animation fixes",
-    ],
-  },
-  {
-    version: "v0.2.0",
-    date: "January 2026",
-    summary: "Multi-account & clipboard",
-    changes: [
-      "Multi-account support for all providers",
-      "Misty clipboard for cross-provider file operations",
-      "Batch rename and bulk actions",
-      "Performance improvements for large directories",
-    ],
-  },
-  {
-    version: "v0.1.0",
-    date: "December 2025",
-    summary: "Initial release",
-    changes: [
-      "ImGui-based desktop client with local file browsing",
-      "Go backend proxy with Grpc communication",
-      "Basic file operations (copy, move, delete)",
-      "Cross-platform builds for Windows and macOS",
-    ],
-  },
-];
+import { changelog } from "./data";
 
 export default function Changelog() {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   return (
-    <div className="max-w-5xl mx-auto px-3 sm:px-4 pt-32 pb-20">
-      <div className="mb-12">
-        <h1 className="text-3xl md:text-5xl font-bold text-text mb-4">
+    <div className="mx-auto flex h-[calc(100vh-4rem)] w-full max-w-[1440px] flex-col overflow-hidden px-5 py-4 sm:px-6 lg:h-screen lg:px-8 xl:px-10">
+      <div className="border-b border-white/[0.07] pb-4">
+        <h1 className="text-[34px] font-semibold tracking-[-0.03em] text-text">
           Changelog
         </h1>
-        <p className="text-text-muted leading-relaxed">
-          What's new, improved, and fixed in each release.
-        </p>
       </div>
 
-      <div className="space-y-3">
+      <div className="min-h-0 flex-1 overflow-y-auto pt-6">
+        <div className="mx-auto max-w-5xl space-y-3">
         {changelog.map((entry, index) => {
           const isOpen = openIndex === index;
           return (
@@ -109,6 +62,7 @@ export default function Changelog() {
             </div>
           );
         })}
+        </div>
       </div>
     </div>
   );

@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { HiOutlineChevronDown } from "react-icons/hi2";
-
-type PlatformName = "Windows" | "macOS" | "Linux";
+import { releases, type PlatformName, type ReleaseBuild } from "./data";
 
 type PlatformIconProps = {
   size?: number | string;
@@ -128,32 +127,7 @@ const platformMeta: Record<PlatformName, { icon: React.ReactNode; arch: string }
     arch: "x86_64 / ARM64",
   },
 };
-
-type ReleaseBuild = {
-  platform: PlatformName;
-  tag: string;
-  platformKey: "windows" | "macos" | "linux";
-};
-
 const apiBase = (import.meta.env.VITE_API_BASE ?? "").replace(/\/+$/, "");
-
-const releases = [
-  {
-    version: "v0.1.0",
-    date: "December 2025",
-    builds: [
-      { platform: "Windows", tag: "Installer", platformKey: "windows" },
-      { platform: "macOS", tag: "DMG", platformKey: "macos" },
-      { platform: "Linux", tag: "AppImage", platformKey: "linux" },
-    ] satisfies ReleaseBuild[],
-    notes: [
-      "Initial release with Windows, macOS, and Linux support",
-      "Google Drive, OneDrive, and iCloud integration",
-      "Unified file browser with search",
-      "Secure local-only proxy architecture",
-    ],
-  },
-];
 
 function ReleaseItem({
   version,

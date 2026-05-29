@@ -1,6 +1,6 @@
-import { useState, FormEvent, ChangeEvent } from 'react';
-
-const apiBase = (import.meta.env.VITE_API_BASE ?? "").replace(/\/+$/, "");
+import { useState, type FormEvent, type ChangeEvent } from "react";
+import { submitWaitlist } from "./api";
+import type { WaitlistFormProps, WaitlistFormState } from "./types";
 
 
 export default function Waitlist() {
@@ -22,18 +22,8 @@ export default function Waitlist() {
     )
 }
 
-interface WaitlistFormState {
-  email: string;
-  name: string;
-}
-
-interface WaitlistFormProps {
-  onSuccess?: () => void;
-  className?: string;
-}
-
 function WaitlistForm({ onSuccess, className }: WaitlistFormProps) {
-  const [formData, setFormData] = useState<WaitlistFormState>({ email: '', name: '' });
+  const [formData, setFormData] = useState<WaitlistFormState>({ email: "", name: "" });
   const [loading, setLoading] = useState<boolean>(false);
   const [success, setSuccess] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -48,22 +38,12 @@ function WaitlistForm({ onSuccess, className }: WaitlistFormProps) {
     setError(null);
 
     try {
-      const response = await fetch(`${apiBase}/waitlist`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
-
-      if (response.ok) {
-        setSuccess(true);
-        setFormData({ email: '', name: '' });
-        onSuccess?.();
-      } else {
-        const text = await response.text();
-        throw new Error(text || 'Submission failed');
-      }
+      await submitWaitlist(formData);
+      setSuccess(true);
+      setFormData({ email: "", name: "" });
+      onSuccess?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to join waitlist. Please try again.');
+      setError(err instanceof Error ? err.message : "Failed to join waitlist. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -119,7 +99,7 @@ function WaitlistForm({ onSuccess, className }: WaitlistFormProps) {
           disabled={loading}
           className="w-full px-4 py-2.5 bg-zinc-100 hover:bg-gray-200 disabled:opacity-50 text-black font-medium rounded-xl transition-all duration-200"
         >
-          {loading ? 'Joining...' : 'Join Waitlist'}
+          {loading ? "Joining..." : "Join Waitlist"}
         </button>
       </form>
     </div>

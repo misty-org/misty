@@ -1,8 +1,6 @@
-import { useState } from "react";
-import { PluginBrowser } from "../features/plugins/PluginBrowser";
-import type { PluginBrowserEntry } from "../features/plugins/types";
+import type { PluginBrowserEntry } from "./types";
 
-const SAMPLE_PLUGINS: PluginBrowserEntry[] = [
+export const SAMPLE_PLUGINS: PluginBrowserEntry[] = [
   {
     id: "preview_manager",
     name: "Preview Manager",
@@ -58,7 +56,7 @@ const SAMPLE_PLUGINS: PluginBrowserEntry[] = [
     capabilities: [
       "Convert files between common image, audio, and video formats",
       "Batch process selected assets in one pass",
-      "Choose output format, quality, and destination before exporting",
+      "Choose an output format, quality, and destination before exporting",
     ],
     whereItAppears: ["Files panel", "Selected file actions", "Batch actions"],
     permissions: [
@@ -90,7 +88,11 @@ const SAMPLE_PLUGINS: PluginBrowserEntry[] = [
     installed: false,
     enabled: false,
     verified: true,
-    capabilities: ["Apply curated presets instantly", "Edit named theme tokens", "Persist theme changes across restarts"],
+    capabilities: [
+      "Apply curated presets instantly",
+      "Edit named theme tokens",
+      "Persist theme changes across restarts",
+    ],
     whereItAppears: ["Settings view", "Plugins view", "Global plugin launcher"],
     permissions: ["Write access to Misty appearance settings", "No network access required"],
     gettingStarted: [
@@ -109,47 +111,3 @@ const SAMPLE_PLUGINS: PluginBrowserEntry[] = [
     rootLabel: "private",
   },
 ];
-
-export default function Plugins() {
-  const [plugins, setPlugins] = useState(SAMPLE_PLUGINS);
-  const [query, setQuery] = useState("");
-  const [selectedPluginId, setSelectedPluginId] = useState(SAMPLE_PLUGINS[0]?.id ?? "");
-  const [notice, setNotice] = useState("");
-
-  return (
-    <PluginBrowser
-      notice={notice}
-      onInstall={(plugin) => {
-        setPlugins((current) =>
-          current.map((entry) =>
-            entry.id === plugin.id ? { ...entry, installed: true, enabled: true } : entry,
-          ),
-        );
-        setNotice(`Installed ${plugin.name}.`);
-      }}
-      onOpenLink={(url) => window.open(url, "_blank", "noopener,noreferrer")}
-      onQueryChange={setQuery}
-      onRefresh={() => setNotice("Refreshed plugin catalog.")}
-      onSelect={setSelectedPluginId}
-      onToggle={(plugin, enabled) => {
-        setPlugins((current) =>
-          current.map((entry) => (entry.id === plugin.id ? { ...entry, enabled } : entry)),
-        );
-        setNotice(`${enabled ? "Enabled" : "Disabled"} ${plugin.name}.`);
-      }}
-      onUninstall={(plugin) => {
-        setPlugins((current) =>
-          current.map((entry) =>
-            entry.id === plugin.id ? { ...entry, installed: false, enabled: false } : entry,
-          ),
-        );
-        setNotice(`Removed ${plugin.name}.`);
-      }}
-      plugins={plugins}
-      query={query}
-      selectedPluginId={selectedPluginId}
-      subtitle="Browse what Misty can do, then install the pieces you want."
-      title="Plugins"
-    />
-  );
-}

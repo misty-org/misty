@@ -1,40 +1,6 @@
 import { HiOutlineCheck } from "react-icons/hi2";
 import { VscCircleFilled } from "react-icons/vsc";
-
-const phases = [
-  {
-    label: "Shipped",
-    status: "done" as const,
-    items: [
-      "Google Drive & OneDrive integration",
-      "Unified file browser",
-      "Multi-account support",
-      "Misty clipboard",
-      "Linux support",
-    ],
-  },
-  {
-    label: "In Progress",
-    status: "active" as const,
-    items: [
-      "Dropbox & Box integration",
-      "Encrypted transfers",
-      "File preview panel",
-      "Keyboard shortcut customization",
-    ],
-  },
-  {
-    label: "Planned",
-    status: "planned" as const,
-    items: [
-      "S3-compatible storage support",
-      "Shared workspaces & team accounts",
-      "Mobile companion app",
-      "Plugin / extension system",
-      "Offline mode with sync queue",
-    ],
-  },
-];
+import { phases } from "./data";
 
 const statusStyles = {
   done: {

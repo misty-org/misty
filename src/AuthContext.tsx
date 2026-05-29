@@ -21,7 +21,12 @@ const AuthContext = createContext<AuthContextType>({
   logout: () => {},
 });
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+interface AuthProviderProps {
+  children: React.ReactNode;
+  onLogout?: () => void | Promise<void>;
+}
+
+export function AuthProvider({ children, onLogout }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(() => {
     const stored = localStorage.getItem("misty_user");
     return stored ? JSON.parse(stored) : null;
@@ -40,9 +45,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(() => {
     logoutRequest().catch(() => {});
     useUserStore.getState().clear();
+    void onLogout?.();
     setUser(null);
     navigate("/");
-  }, [navigate]);
+  }, [navigate, onLogout]);
 
   return (
     <AuthContext.Provider value={{ user, setUser, logout }}>

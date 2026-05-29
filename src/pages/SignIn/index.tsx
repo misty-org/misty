@@ -9,7 +9,11 @@ import SignInForm from "./SignInForm";
 
 type SignInMode = "signin" | "forgot";
 
-export default function SignIn() {
+interface SignInProps {
+  onSignedIn?: (user: ReturnType<typeof useAuth>["user"] extends infer T ? Exclude<T, null> : never) => void | Promise<void>;
+}
+
+export default function SignIn({ onSignedIn }: SignInProps = {}) {
   const navigate = useNavigate();
   const location = useLocation();
   const { setUser } = useAuth();
@@ -48,6 +52,7 @@ export default function SignIn() {
 
     try {
       const user = await signInRequest(email, password);
+      await onSignedIn?.(user);
       setUser(user);
       navigate(from, { replace: true });
     } catch (err) {
