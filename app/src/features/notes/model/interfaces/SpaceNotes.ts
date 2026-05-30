@@ -1,9 +1,5 @@
 export interface SpaceNotesProps {
   spaceId: string;
   spaceName: string;
-}
-
-export interface NotesPanelSidebarProps {
-  spaceId: string;
-  spaceName: string;
+  workspaceTabId?: string;
 }

@@ -1,1 +1,2 @@
-export { default as ExtensionsPage } from "./ExtensionsPage";
+export type { PluginEntry } from "./model/types";
+export { currentPluginPlatform, usePluginsStore } from "./store/usePluginsStore";
