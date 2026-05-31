@@ -1,7 +1,7 @@
 import { formatDate } from "@/features/files/explorer";
+import { SystemErrorActivity } from "@/features/activity";
 import { useSearchStore } from "@/features/files/search";
 import type { SearchStatus } from "@/native/contracts";
-import { userFacingErrorText } from "@/shared/lib/format";
 import { Badge, Button, Spinner, cn } from "@/shared/ui";
 import { Cloud, FolderOpen, HardDrive, Search } from "lucide-react";
 import { useEffect, type ReactNode } from "react";
@@ -16,10 +16,6 @@ import {
   discoveryIntervalOptions,
   settingsControlButtonClass,
   settingsControlButtonCompactClass,
-  settingsReferenceHeaderClass,
-  settingsReferenceListClass,
-  settingsReferenceRowClass,
-  settingsReferenceSpanClass,
 } from "../settingsConstants";
 import {
   booleanSetting,
@@ -65,6 +61,7 @@ export function SearchSection(props: SettingsContentProps) {
     "automatic_file_discovery_enabled",
     true,
   );
+  const searchProblem = error || status?.lastScanError;
   return (
     <>
       <div className="mb-4 grid gap-3">
@@ -97,6 +94,7 @@ export function SearchSection(props: SettingsContentProps) {
         <SettingsRow
           label="Check for changes every"
           description="How often Misty looks for file changes while it is open."
+          muted={!automaticFileDiscovery}
           last
         >
           <SelectControl
@@ -162,10 +160,10 @@ export function SearchSection(props: SettingsContentProps) {
       </SettingsSectionBlock>
 
       <SettingsSectionBlock title="Files available to search">
-        <div className="grid gap-4 px-5 py-5">
+        <div className="grid gap-4 px-5 py-4">
           <div className="flex items-start justify-between gap-5">
             <div className="flex min-w-0 gap-3">
-              <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-charcoal-card text-cream-muted">
+              <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-charcoal-bg text-cream-muted">
                 {scanActive ? (
                   <Spinner label="Checking files" size="lg" />
                 ) : (
@@ -187,10 +185,12 @@ export function SearchSection(props: SettingsContentProps) {
                       ? `Last checked ${lastIndexed}. Misty found ${formatSearchChanges(status)}.`
                       : "Run the first check to make filenames and folders available from Spotlight."}
                 </span>
-                {error || status?.lastScanError ? (
-                  <span className="text-sm text-cream-bright">
-                    {userFacingErrorText(error || status?.lastScanError)}
-                  </span>
+                {searchProblem ? (
+                  <SystemErrorActivity
+                    error={searchProblem}
+                    scope="settings:search"
+                    title="Search indexing needs attention"
+                  />
                 ) : null}
               </div>
             </div>
@@ -209,13 +209,14 @@ export function SearchSection(props: SettingsContentProps) {
                 variant="outline"
                 className={settingsControlButtonClass}
                 type="button"
+                disabled={props.working}
                 onClick={() => void startScan("")}
               >
                 Check now
               </Button>
             )}
           </div>
-          <div className="grid grid-cols-3 gap-2 border-t border-charcoal-border/60 pt-4 max-[720px]:grid-cols-1">
+          <div className="grid grid-cols-3 overflow-hidden rounded-md border border-charcoal-border/70 max-[720px]:grid-cols-1">
             <SearchStatCard label="Searchable" value={indexedItems.toLocaleString()} compact />
             <SearchStatCard
               label="On this device"
@@ -250,25 +251,11 @@ export function SearchSection(props: SettingsContentProps) {
       </SettingsSectionBlock>
 
       {status?.scanErrors.length ? (
-        <SettingsSectionBlock title="Files Misty could not check">
-          <div className={settingsReferenceListClass}>
-            <div className={`${settingsReferenceRowClass} ${settingsReferenceHeaderClass}`}>
-              <span>Source</span>
-              <span>Error</span>
-            </div>
-            {status.scanErrors.map((scanError) => (
-              <div
-                className={settingsReferenceRowClass}
-                key={`${scanError.source}:${scanError.message}`}
-              >
-                <span className={settingsReferenceSpanClass}>{scanError.source}</span>
-                <span className="min-w-0 [overflow-wrap:anywhere] text-cream-bright">
-                  {userFacingErrorText(scanError.message)}
-                </span>
-              </div>
-            ))}
-          </div>
-        </SettingsSectionBlock>
+        <SystemErrorActivity
+          error={status.scanErrors[0]?.message}
+          scope="settings:search:scan"
+          title={`${status.scanErrors.length} search ${status.scanErrors.length === 1 ? "source needs" : "sources need"} attention`}
+        />
       ) : null}
     </>
   );
@@ -283,13 +270,13 @@ function SearchHealthCard(props: {
   attention?: boolean;
 }) {
   return (
-    <div className="grid min-h-28 grid-cols-[40px_minmax(0,1fr)] gap-3 rounded-xl bg-charcoal-card p-4 shadow-xs inset-ring-1 inset-ring-cream/10">
+    <div className="grid min-h-24 grid-cols-[40px_minmax(0,1fr)] gap-3 rounded-lg border border-charcoal-border/80 bg-charcoal-card p-4">
       <div
         className={cn(
           "grid size-10 place-items-center rounded-lg",
           props.attention
             ? "bg-charcoal-active text-cream-bright"
-            : "bg-charcoal-card text-cream-muted",
+            : "bg-charcoal-bg text-cream-muted",
         )}
       >
         {props.active ? <Spinner label="Updating file search" size="lg" /> : props.icon}
@@ -304,12 +291,19 @@ function SearchHealthCard(props: {
 }
 
 function SearchStatCard(props: { label: string; value: string; compact?: boolean }) {
+  const sizeClass = props.compact ? "min-h-[54px]" : "min-h-[76px]";
+  const valueSizeClass = props.compact ? "text-base" : "text-xl";
   return (
     <div
-      className={`${props.compact ? "min-h-[54px]" : "min-h-[76px]"} grid content-center gap-1 rounded-md bg-charcoal-card px-3`}
+      className={cn(
+        sizeClass,
+        "grid content-center gap-1 border-r border-charcoal-border/70 bg-charcoal-bg px-3",
+        "last:border-r-0 max-[720px]:border-b max-[720px]:border-r-0",
+        "max-[720px]:last:border-b-0",
+      )}
     >
       <strong
-        className={`min-w-0 overflow-hidden text-ellipsis whitespace-nowrap ${props.compact ? "text-base" : "text-xl"} font-semibold tabular-nums text-cream`}
+        className={`min-w-0 overflow-hidden text-ellipsis whitespace-nowrap ${valueSizeClass} font-semibold tabular-nums text-cream`}
       >
         {props.value}
       </strong>

@@ -49,28 +49,39 @@ impl Settings {
     }
 }
 
-pub fn load_workspace_environment(workspace: &Workspace) -> Result<()> {
-    let path = workspace.cli.join(".env");
-    if !path.is_file() {
-        return Ok(());
-    }
-    let contents =
-        fs::read_to_string(&path).with_context(|| format!("could not read {}", path.display()))?;
-    let dotenv = contents
-        .lines()
-        .filter(|line| {
-            let trimmed = line.trim();
-            trimmed.is_empty() || trimmed.starts_with('#') || trimmed.contains('=')
-        })
-        .collect::<Vec<_>>()
-        .join("\n");
-    for item in dotenvy::from_read_iter(dotenv.as_bytes()) {
-        let (name, value) = item?;
-        if env::var_os(&name).is_none() {
-            env::set_var(name, value);
+pub fn load_cli_environment(workspace: &Workspace, files: &[&str]) -> Result<()> {
+    for name in files {
+        let path = workspace.cli.join(".env").join(name);
+        if !path.is_file() {
+            continue;
+        }
+        require_private_file(&path)?;
+        let contents = fs::read_to_string(&path)
+            .with_context(|| format!("could not read {}", path.display()))?;
+        for item in dotenvy::from_read_iter(contents.as_bytes()) {
+            let (name, value) =
+                item.with_context(|| format!("could not parse {}", path.display()))?;
+            if env::var_os(&name).is_none() {
+                env::set_var(name, value);
+            }
         }
     }
     copy_legacy_value("MISTY_CODESIGN_IDENTITY", "APPLE_SIGNING_IDENTITY");
+    Ok(())
+}
+
+fn require_private_file(path: &Path) -> Result<()> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = fs::metadata(path)?.permissions().mode() & 0o077;
+        if mode != 0 {
+            anyhow::bail!(
+                "{} must not be accessible by group or others",
+                path.display()
+            );
+        }
+    }
     Ok(())
 }
 

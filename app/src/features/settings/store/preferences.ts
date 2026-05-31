@@ -1,4 +1,5 @@
 import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
+import { appZoomDefault, appZoomMax, appZoomMin } from "@/shared/hooks/useAppZoom";
 import { booleanSetting, numberSetting, sectionRecord, stringSetting } from "../settingsControls";
 
 export const settingsBoolean = booleanSetting;
@@ -16,7 +17,11 @@ export function selectAppearancePreferences(
 ): AppearancePreferences {
   const source = document ?? {};
   return {
-    appZoom: clampSettingsNumber(settingsNumber(source, "appearance", "app_zoom", 1), 0.5, 2),
+    appZoom: clampSettingsNumber(
+      settingsNumber(source, "appearance", "app_zoom", appZoomDefault),
+      appZoomMin,
+      appZoomMax,
+    ),
     compactModeEnabled: settingsBoolean(source, "appearance", "compact_mode_enabled", false),
     navigatorAutoHide: settingsBoolean(source, "appearance", "navigator_auto_hide", false),
     navigatorWidthIndex: settingsNumber(source, "appearance", "navigator_width_index", 0),
