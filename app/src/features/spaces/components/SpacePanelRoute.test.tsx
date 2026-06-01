@@ -35,8 +35,8 @@ describe("Space routing", () => {
   });
 
   it.each([
-    ["/spaces/space-1", "notes"],
-    ["/spaces/space-1/home", "notes"],
+    ["/spaces/space-1", "home"],
+    ["/spaces/space-1/home", "home"],
     ["/spaces/space-1/not-a-section", "notes"],
   ])("resolves %s to %s", async (entry, section) => {
     await act(async () => {
@@ -87,6 +87,21 @@ describe("Space routing", () => {
     expect(normalizeSpacesTabRoute("/spaces/space-1/planner/calendar")).toBe(
       "/spaces/space-1/planner/agenda/month",
     );
-    expect(normalizeSpacesTabRoute("/spaces/space-1/home")).toBe("/spaces/space-1/notes");
+    expect(normalizeSpacesTabRoute("/spaces/space-1/home")).toBe("/spaces/space-1/home");
   });
+
+  it.each(["misty", "instagram", "messenger", "x", "discord"] as const)(
+    "parses the %s Social provider page",
+    async (socialProvider) => {
+      await act(async () => {
+        root.render(
+          <MemoryRouter initialEntries={[`/spaces/space-1/social/${socialProvider}`]}>
+            <RouteProbe />
+          </MemoryRouter>,
+        );
+      });
+      const route = JSON.parse(container.textContent ?? "{}") as Record<string, string>;
+      expect(route).toMatchObject({ section: "social", socialProvider });
+    },
+  );
 });

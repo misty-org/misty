@@ -1,4 +1,5 @@
 import { useAuth } from "@/features/auth";
+import { SystemErrorActivity } from "@/features/activity";
 import { useSetupStore } from "./store/useSetupStore";
 import { useMinimumSpin } from "@/shared/hooks/useMinimumSpin";
 import { Button, Card } from "@/shared/ui";
@@ -129,6 +130,13 @@ export function InstallerCard({
           : "bg-charcoal-card shadow-2xl shadow-black/25"
       } ${className}`}
     >
+      {systemError ? (
+        <SystemErrorActivity
+          error={systemError}
+          scope="installer:readiness"
+          title="Install readiness could not be checked"
+        />
+      ) : null}
       <div
         className={`flex min-w-0 flex-col gap-2 border-b border-charcoal-border px-4 ${embedded ? "py-3" : "py-4"}`}
       >

@@ -1,4 +1,5 @@
 import type { LibraryEditVersion } from "@/api/spaces/dto/interfaces/types";
+import { SystemErrorActivity } from "@/features/activity";
 import { Button } from "@/shared/ui";
 import { Trash2 } from "lucide-react";
 import { formatTime } from "../libraryFormat";
@@ -38,7 +39,13 @@ export function LibraryVersionList(props: LibraryVersionListProps) {
           <span className="text-[10px] text-cream-muted">Original selected</span>
         ) : null}
       </div>
-      {props.error ? <p className="mb-0 mt-3 text-xs text-cream-bright">{props.error}</p> : null}
+      {props.error ? (
+        <SystemErrorActivity
+          error={props.error}
+          scope="library:versions"
+          title="Library version could not be updated"
+        />
+      ) : null}
 
       <div className="mt-3 grid gap-1">
         {props.versions.map((version) => (

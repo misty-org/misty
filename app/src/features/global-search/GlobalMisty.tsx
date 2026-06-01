@@ -1,46 +1,71 @@
-import {
-  revealSearchResultInPane,
-  searchResultNavigationTarget,
-  useExplorerStore,
-} from "@/features/files/explorer";
-import { Button, ScrollArea, ToggleGroup, ToggleGroupItem } from "@/shared/ui";
-import { useDismissableLayer } from "@/shared/hooks/useDismissableLayer";
-import { ArrowUp, CircleAlert, Loader2, X } from "lucide-react";
-import { AnimatePresence, MotionConfig, motion } from "motion/react";
-import { useEffect, useMemo, useRef } from "react";
-import { useNavigate } from "react-router-dom";
-import { useShallow } from "zustand/react/shallow";
-import { mergeGlobalMistyContext } from "./globalMistyContext";
-import { GlobalMistyLauncher } from "./GlobalMistyLauncher";
-import {
-  ConversationMenu,
-  ConversationView,
-  ModeIcon,
-  SearchResults,
-} from "./GlobalMistyPanelContent";
-import type { GlobalAiContextRef, GlobalAiMode, GlobalSearchResult } from "./types";
-import { useGlobalSearchStore } from "./useGlobalSearchStore";
 import { setBrowserWebviewsSuspended } from "@/features/browser";
+import { SystemErrorActivity } from "@/features/activity";
+import { MistyRegionCapture, useAiSurfaceStore, useAiVoiceRecorder } from "@/features/ai-surface";
+import { useExplorerStore } from "@/features/files/explorer";
+import { invokeShortcutCommand } from "@/features/shortcuts";
+import { useWorkspaceStore } from "@/features/workspace";
+import { ScrollArea, cn } from "@/shared/ui";
+import { AnimatePresence, MotionConfig, motion } from "motion/react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
+import { GlobalMistyComposerBar, GlobalMistyVoiceIsland } from "./GlobalMistyChrome";
+import { ConversationView } from "./GlobalMistyPanelContent";
+import { captureToFile } from "./mistyImageAttachments";
+import {
+  CandidateList,
+  ContextReceipt,
+  FilterBar,
+  contextForCurrentView,
+  removeLastFilter,
+} from "./GlobalMistySupport";
+import { mergeGlobalMistyContext } from "./globalMistyContext";
+import type { UnifiedMistyCandidate } from "./types";
+import { buildUnifiedMistyCandidates } from "./unifiedMistyCandidates";
+import { useGlobalMistyAttachments } from "./useGlobalMistyAttachments";
+import { useGlobalMistyResults } from "./useGlobalMistyResults";
+import { useGlobalSearchStore } from "./useGlobalSearchStore";
 
 const panelClass = [
-  "pointer-events-auto flex",
-  "w-[min(780px,calc(100dvw-112px))] flex-col overflow-hidden rounded-2xl will-change-transform",
-  "border border-charcoal-border bg-charcoal-card text-cream shadow-[0_28px_90px_rgba(0,0,0,0.62)]",
+  "pointer-events-auto flex max-h-[min(680px,calc(100dvh-120px))]",
+  "w-[min(820px,calc(100dvw-48px))] flex-col overflow-hidden rounded-2xl will-change-transform",
+  "border border-white/10 bg-charcoal-card/95 text-cream backdrop-blur-2xl",
 ].join(" ");
+const panelShadowClass = "shadow-[0_28px_90px_rgba(0,0,0,0.62)]";
 
 export function GlobalMisty(props: {
   accountId: string;
   currentPath: string;
   activePaneId: string;
   activePanePath: string;
+  includeCurrentContext?: boolean;
+  allowCapture?: boolean;
+  suspendBrowserWebviews?: boolean;
+  onNavigate?: (href: string) => void;
+  onCommand?: (commandId?: string, tabId?: string) => void;
+  onClosed?: () => void;
+  showShadow?: boolean;
+  onRequestDrag?: () => void;
+  onContentVisibilityChange?: (visible: boolean) => void;
+  onVoiceActivityChange?: (active: boolean) => void;
 }) {
-  const navigate = useNavigate();
-  const inputRef = useRef<HTMLInputElement | null>(null);
-  const launcherInputRef = useRef<HTMLInputElement | null>(null);
-  const launcherRef = useRef<HTMLDivElement | null>(null);
   const {
-    launcherOpen,
-    open,
+    includeCurrentContext = true,
+    allowCapture = true,
+    suspendBrowserWebviews = true,
+    onNavigate,
+    onCommand,
+    onClosed,
+    showShadow = true,
+    onRequestDrag,
+    onContentVisibilityChange,
+    onVoiceActivityChange,
+  } = props;
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const [capturingRegion, setCapturingRegion] = useState(false);
+  const [voiceError, setVoiceError] = useState("");
+  const {
+    panel,
     mode,
     query,
     results,
@@ -49,26 +74,33 @@ export function GlobalMisty(props: {
     error,
     context,
     conversations,
+    conversationsLoading,
     activeConversationId,
+    filters,
+    selectedCandidateId,
     setAccount,
-    activateLauncher,
-    openPanel,
     closePanel,
     setMode,
     setQuery,
+    setFilters,
+    setSelectedCandidateId,
     setContext,
     removeContext,
-    search,
-    submit,
+    loadConversations,
     newConversation,
     selectConversation,
     deleteConversation,
-    confirmAction,
+    renameConversation,
+    search,
+    visualSearch,
+    submitAnswer,
+    submitAgentTask,
     rejectAction,
+    cancelAgentTask,
+    approveAgentTask,
   } = useGlobalSearchStore(
     useShallow((state) => ({
-      launcherOpen: state.launcherOpen,
-      open: state.open,
+      panel: state.panel,
       mode: state.mode,
       query: state.query,
       results: state.results,
@@ -77,42 +109,123 @@ export function GlobalMisty(props: {
       error: state.error,
       context: state.context,
       conversations: state.conversations,
+      conversationsLoading: state.conversationsLoading,
       activeConversationId: state.activeConversationId,
+      filters: state.filters,
+      selectedCandidateId: state.selectedCandidateId,
       setAccount: state.setAccount,
-      activateLauncher: state.activateLauncher,
-      openPanel: state.openPanel,
       closePanel: state.closePanel,
       setMode: state.setMode,
       setQuery: state.setQuery,
+      setFilters: state.setFilters,
+      setSelectedCandidateId: state.setSelectedCandidateId,
       setContext: state.setContext,
       removeContext: state.removeContext,
-      search: state.search,
-      submit: state.submit,
+      loadConversations: state.loadConversations,
       newConversation: state.newConversation,
       selectConversation: state.selectConversation,
       deleteConversation: state.deleteConversation,
-      confirmAction: state.confirmAction,
+      renameConversation: state.renameConversation,
+      search: state.search,
+      visualSearch: state.visualSearch,
+      submitAnswer: state.submitAnswer,
+      submitAgentTask: state.submitAgentTask,
       rejectAction: state.rejectAction,
+      cancelAgentTask: state.cancelAgentTask,
+      approveAgentTask: state.approveAgentTask,
     })),
   );
   const pane = useExplorerStore((state) => state.panes[props.activePaneId]);
-  const activeConversation = conversations.find((item) => item.id === activeConversationId);
-  const currentContext = useMemo(
-    () => contextForCurrentView(props.currentPath, props.activePanePath, pane),
-    [pane, props.activePanePath, props.currentPath],
+  const aiRegistration = useAiSurfaceStore((state) =>
+    Object.values(state.registrations).find(
+      (registration) => registration.paneId === props.activePaneId,
+    ),
   );
+  const registeredAiContext = useMemo(
+    () => aiRegistration?.adapter.getContext() ?? [],
+    [aiRegistration],
+  );
+  const registeredAiSelection = aiRegistration?.adapter.getSelection?.() ?? null;
+  const currentContext = useMemo(
+    () =>
+      !includeCurrentContext
+        ? []
+        : contextForCurrentView(props.currentPath, props.activePanePath, pane, registeredAiContext),
+    [includeCurrentContext, pane, props.activePanePath, props.currentPath, registeredAiContext],
+  );
+  const activeMode = mode === "search" ? "search" : "ask";
+  const attachmentState = useGlobalMistyAttachments({
+    mode,
+    activeConversationId,
+    newConversation,
+    setMode,
+    onError: setVoiceError,
+  });
+  const { attachments } = attachmentState;
+  const hasQuery = Boolean(query.trim() || attachments.length);
+  const candidates = useMemo(() => {
+    if (!query.trim() && !attachments.length) return [];
+    return buildUnifiedMistyCandidates(query.trim() || "Visual search", results, filters).filter(
+      (candidate) =>
+        activeMode === "search"
+          ? candidate.type !== "answer" && candidate.type !== "agent_task"
+          : candidate.type === "answer" || candidate.type === "agent_task",
+    );
+  }, [activeMode, attachments.length, filters, query, results]);
+  const selectedIndex = Math.max(
+    0,
+    candidates.findIndex((candidate) => candidate.id === selectedCandidateId),
+  );
+  const conversation = conversations.find((item) => item.id === activeConversationId);
+  const open = panel !== "closed";
+  const conversationActive = panel === "answer" || panel === "agent";
+  const contentVisible = hasQuery || conversationActive;
+  const wasOpenRef = useRef(false);
+  const voice = useAiVoiceRecorder({
+    onTranscript: (transcript) => {
+      const current = useGlobalSearchStore.getState().query.trim();
+      useGlobalSearchStore.getState().setQuery(`${current}${current ? " " : ""}${transcript}`);
+      window.setTimeout(() => inputRef.current?.focus(), 0);
+    },
+    onError: setVoiceError,
+    onActivityChange: onVoiceActivityChange,
+  });
+  const resultActions = useGlobalMistyResults({
+    activePaneId: props.activePaneId,
+    context,
+    setContext,
+    closePanel,
+    onNavigate,
+  });
 
   useEffect(() => setAccount(props.accountId), [props.accountId, setAccount]);
   useEffect(() => {
     if (!open) return;
     setContext(mergeGlobalMistyContext(useGlobalSearchStore.getState().context, currentContext));
-    window.setTimeout(() => inputRef.current?.focus(), 0);
+    const focusTimer = window.setTimeout(() => inputRef.current?.focus(), 0);
+    return () => window.clearTimeout(focusTimer);
   }, [currentContext, open, setContext]);
   useEffect(() => {
-    if (!open || mode !== "search") return;
-    const timer = window.setTimeout(() => void search(query), 180);
+    if (!open || activeMode !== "ask") return;
+    const state = useGlobalSearchStore.getState();
+    if (!state.conversations.length && !state.conversationsLoading) void loadConversations();
+  }, [activeMode, loadConversations, open]);
+  useEffect(() => {
+    if (panel !== "results") return;
+    const visual =
+      activeMode === "search" ? attachments.find((item) => item.state === "ready") : undefined;
+    const timer = window.setTimeout(() => {
+      if (visual) void visualSearch(visual.id, query);
+      else void search(query);
+    }, 160);
     return () => window.clearTimeout(timer);
-  }, [mode, open, query, search]);
+  }, [activeMode, attachments, filters, panel, query, search, visualSearch]);
+  useEffect(() => {
+    const preferred = candidates.some((candidate) => candidate.id === selectedCandidateId)
+      ? selectedCandidateId
+      : (candidates[0]?.id ?? "");
+    if (preferred !== selectedCandidateId) setSelectedCandidateId(preferred);
+  }, [candidates, selectedCandidateId, setSelectedCandidateId]);
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -124,305 +237,234 @@ export function GlobalMisty(props: {
     return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [closePanel, open]);
   useEffect(() => {
-    if (!launcherOpen) return;
-    const focusTimer = window.setTimeout(() => launcherInputRef.current?.focus(), 0);
-    return () => {
-      window.clearTimeout(focusTimer);
-    };
-  }, [launcherOpen]);
-  useDismissableLayer({ active: launcherOpen, layerRef: launcherRef, onDismiss: closePanel });
-  useEffect(() => {
-    setBrowserWebviewsSuspended(open || launcherOpen, "global-misty");
+    if (!suspendBrowserWebviews) return;
+    setBrowserWebviewsSuspended(open, "global-misty");
     return () => setBrowserWebviewsSuspended(false, "global-misty");
-  }, [launcherOpen, open]);
+  }, [open, suspendBrowserWebviews]);
+  useEffect(() => {
+    if (wasOpenRef.current && !open) onClosed?.();
+    wasOpenRef.current = open;
+  }, [onClosed, open]);
+  useEffect(() => {
+    if (open) onContentVisibilityChange?.(contentVisible);
+  }, [contentVisible, onContentVisibilityChange, open]);
 
-  const openResult = async (result: GlobalSearchResult) => {
-    if (!result.fileResult || result.href !== "/files") {
+  const activateCandidate = (candidate?: UnifiedMistyCandidate) => {
+    if (!candidate || working) return;
+    if (candidate.type === "object" || candidate.type === "navigation") {
+      void resultActions.openResult(candidate.result);
+      return;
+    }
+    if (candidate.type === "answer") {
+      void submitAnswer(
+        candidate.prompt,
+        attachmentState.consume(),
+        registeredAiSelection ?? undefined,
+      );
+      return;
+    }
+    if (candidate.type === "agent_task") {
+      void submitAgentTask(candidate.prompt, props.activePaneId);
+      return;
+    }
+    if (candidate.type === "command") {
       closePanel();
-      navigate(result.href);
-      return;
+      if (onCommand) onCommand(candidate.commandId, candidate.tabId);
+      else if (candidate.tabId) useWorkspaceStore.getState().focusTab(candidate.tabId);
+      else if (candidate.commandId) invokeShortcutCommand(candidate.commandId);
     }
-    closePanel();
-    navigate("/files");
-    const reveal = async () => {
-      const paneId = props.activePaneId || Object.keys(useExplorerStore.getState().panes)[0];
-      if (!paneId) return false;
-      await revealSearchResultInPane(paneId, searchResultNavigationTarget(result.fileResult!));
-      return true;
-    };
-    if (await reveal()) return;
-    window.setTimeout(() => void reveal(), 120);
   };
 
-  const addResultContext = (result: GlobalSearchResult) => {
-    const localPath =
-      result.fileResult?.entry.location.kind === "local" ? result.fileResult.entry.path : undefined;
-    setContext([
-      ...context,
-      {
-        id: result.id,
-        kind: result.kind,
-        title: result.title,
-        href: result.href,
-        source: result.source,
-        spaceId: result.spaceId,
-        spaceName: result.spaceName,
-        ...(localPath ? { localPath, attached: false } : {}),
-      },
-    ]);
-  };
-
-  const submitPrompt = () => {
-    if (!query.trim()) return inputRef.current?.focus();
-    if (mode === "search") {
-      const first = results[0];
-      if (first) void openResult(first);
+  const onInputKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (!conversationActive && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+      event.preventDefault();
+      const direction = event.key === "ArrowDown" ? 1 : -1;
+      const index = candidates.length
+        ? (selectedIndex + direction + candidates.length) % candidates.length
+        : 0;
+      setSelectedCandidateId(candidates[index]?.id ?? "");
       return;
     }
-    void submit();
-  };
-
-  const updateExpandedQuery = (nextQuery: string) => {
-    if (!nextQuery.trim()) {
-      setQuery("");
-      activateLauncher();
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      if (activeMode === "ask") {
+        void submitAnswer(query, attachmentState.consume(), registeredAiSelection ?? undefined);
+      } else activateCandidate(candidates[selectedIndex] ?? candidates[0]);
       return;
     }
-    setQuery(nextQuery);
+    if (
+      !conversationActive &&
+      event.key === "Backspace" &&
+      !query &&
+      removeLastFilter(filters, setFilters)
+    ) {
+      event.preventDefault();
+    }
   };
+
+  const onHeaderPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!onRequestDrag || event.button !== 0) return;
+    const target = event.target as Element;
+    if (target.closest("input, textarea, button, a, [role='button']")) return;
+    event.preventDefault();
+    onRequestDrag();
+  };
+
+  const composer = (
+    <GlobalMistyComposerBar
+      query={query}
+      onQuery={setQuery}
+      mode={activeMode}
+      conversationActive={conversationActive}
+      textareaRef={inputRef}
+      attachments={attachments}
+      onModeChange={attachmentState.changeMode}
+      onAddFiles={attachmentState.addFiles}
+      onRemoveAttachment={attachmentState.remove}
+      onSubmit={() => {
+        if (activeMode === "ask") {
+          void submitAnswer(query, attachmentState.consume(), registeredAiSelection ?? undefined);
+        } else activateCandidate(candidates[selectedIndex] ?? candidates[0]);
+      }}
+      onKeyDown={onInputKeyDown}
+      onCapture={allowCapture ? () => setCapturingRegion(true) : undefined}
+      busy={searching || working}
+      working={working}
+      conversation={conversation}
+      activeConversationId={activeConversationId}
+      voice={voice}
+      onError={setVoiceError}
+      onClose={closePanel}
+      onRequestDrag={onRequestDrag}
+      onPointerDown={onHeaderPointerDown}
+      onModelChange={(settings) =>
+        useGlobalSearchStore.setState((state) => ({
+          conversations: state.conversations.map((item) =>
+            item.id === activeConversationId ? { ...item, ...settings } : item,
+          ),
+        }))
+      }
+    />
+  );
 
   return (
     <div
-      className="pointer-events-none fixed inset-0 z-[2147482500] flex items-start justify-center pt-[18vh]"
-      onClick={(event) => {
-        if (event.target === event.currentTarget && (open || launcherOpen)) closePanel();
-      }}
+      className="pointer-events-none fixed inset-0 z-[2147482500] flex flex-col items-center pt-[9vh]"
+      data-global-misty-root
     >
-      <MotionConfig reducedMotion="user" transition={{ duration: 0.14, ease: [0.16, 1, 0.3, 1] }}>
+      {error || voiceError ? (
+        <SystemErrorActivity
+          accountId={props.accountId}
+          error={error || voiceError}
+          scope={`misty:${mode}`}
+          title="Misty request could not be completed"
+          target={{ kind: "route", href: props.currentPath }}
+        />
+      ) : null}
+      <MotionConfig reducedMotion="user" transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}>
         <AnimatePresence initial={false}>
           {open ? (
-            <motion.section
-              key="expanded"
-              initial={{ opacity: 0, y: 6, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 4, scale: 0.98 }}
-              className={`${panelClass} ${
-                mode === "search"
-                  ? "h-[min(420px,calc(100dvh-32vh))]"
-                  : "h-[min(560px,calc(100dvh-32vh))]"
-              }`}
-              aria-label="Misty Search, Ask, and Action"
+            <motion.div
+              ref={panelRef}
+              key="unified-misty"
+              initial={{ opacity: 0, scale: 0.94 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.94 }}
+              className="pointer-events-none flex origin-center flex-col items-center gap-2"
+              data-html2canvas-ignore="true"
             >
-              <header className="flex items-center gap-2 border-b border-charcoal-border px-3 py-2">
-                <ToggleGroup
-                  type="single"
-                  value={mode}
-                  onValueChange={(value) => value && setMode(value as GlobalAiMode)}
-                  size="sm"
-                  spacing={1}
-                  className="gap-0.5 rounded-lg bg-charcoal-bg p-0.5"
-                  aria-label="Misty mode"
-                >
-                  {(["search", "ask", "action"] as const).map((item) => (
-                    <ToggleGroupItem
-                      key={item}
-                      value={item}
-                      className="h-8 rounded-md px-3 text-xs capitalize data-[state=on]:bg-charcoal-hover data-[state=on]:text-cream-bright"
-                    >
-                      {capitalize(item)}
-                    </ToggleGroupItem>
-                  ))}
-                </ToggleGroup>
-                <div className="ml-auto flex items-center gap-1">
-                  {mode !== "search" ? (
-                    <ConversationMenu
-                      conversations={conversations}
-                      activeId={activeConversationId}
-                      onSelect={selectConversation}
-                      onNew={() => void newConversation()}
-                      onDelete={(id) => void deleteConversation(id)}
-                    />
-                  ) : null}
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="size-8 text-cream-muted"
-                    aria-label="Close Misty"
-                    onClick={closePanel}
-                  >
-                    <X className="size-4" />
-                  </Button>
-                </div>
-              </header>
-
-              {context.length ? (
-                <div className="flex min-h-10 items-center gap-1.5 overflow-x-auto border-b border-charcoal-border/70 px-4 py-2 [scrollbar-width:none]">
-                  <span className="mr-1 shrink-0 text-[11px] font-medium text-cream-muted">
-                    Context
-                  </span>
-                  {context.map((item) => (
-                    <span
-                      key={`${item.kind}:${item.id}`}
-                      className="flex h-6 shrink-0 items-center gap-1.5 rounded-full border border-charcoal-border bg-charcoal-bg px-2 text-[11px] text-cream-muted"
-                    >
-                      {item.title}
-                      <button
-                        type="button"
-                        className="text-cream-muted hover:text-cream"
-                        aria-label={`Remove ${item.title} context`}
-                        onClick={() => removeContext(item.id)}
-                      >
-                        <X className="size-3" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
+              {conversationActive ? (
+                <GlobalMistyVoiceIsland
+                  voice={voice}
+                  conversations={conversations}
+                  activeConversationId={activeConversationId}
+                  loading={conversationsLoading}
+                  mode={mode}
+                  onModeChange={attachmentState.changeMode}
+                  onSelect={selectConversation}
+                  onNew={() => void newConversation()}
+                  onDelete={(id) => void deleteConversation(id)}
+                  onRename={(id, title) => void renameConversation(id, title)}
+                  onClose={closePanel}
+                  onRequestDrag={onRequestDrag}
+                  onPointerDown={onHeaderPointerDown}
+                />
               ) : null}
-
-              <ScrollArea className="min-h-0 flex-1">
-                {mode === "search" ? (
-                  <SearchResults
-                    results={results}
-                    query={query}
-                    searching={searching}
-                    onOpen={(result) => void openResult(result)}
-                    onAddContext={addResultContext}
-                  />
-                ) : (
-                  <ConversationView
-                    conversation={activeConversation}
-                    working={working}
-                    onConfirm={(id) => void confirmAction(id)}
-                    onReject={rejectAction}
-                  />
+              <section
+                className={cn(
+                  panelClass,
+                  conversationActive && "h-[min(640px,calc(100dvh-120px))]",
+                  showShadow && panelShadowClass,
                 )}
-              </ScrollArea>
-
-              {error ? (
-                <div className="flex items-center gap-2 border-t border-charcoal-border px-4 py-2 text-xs text-cream-muted">
-                  <CircleAlert className="size-3.5" /> {error}
-                </div>
-              ) : null}
-
-              <div className="border-t border-charcoal-border bg-charcoal-bg/75 p-3">
-                <div className="flex min-h-12 items-center gap-3 rounded-xl border border-charcoal-border bg-charcoal-card px-4">
-                  <ModeIcon mode={mode} />
-                  <input
-                    ref={inputRef}
-                    value={query}
-                    onChange={(event) => updateExpandedQuery(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" && !event.shiftKey) {
-                        event.preventDefault();
-                        submitPrompt();
-                      }
-                    }}
-                    className="min-w-0 flex-1 bg-transparent text-sm text-cream outline-none placeholder:text-cream-muted"
-                    placeholder={modePlaceholder(mode)}
-                    aria-label={`${capitalize(mode)} with Misty`}
-                  />
-                  <Button
-                    type="button"
-                    size="icon"
-                    className="size-8 rounded-lg bg-cream text-charcoal-bg hover:bg-cream-bright"
-                    disabled={working || !query.trim()}
-                    aria-label={mode === "search" ? "Open first result" : `Submit ${mode}`}
-                    onClick={submitPrompt}
-                  >
-                    {working ? (
-                      <Loader2 className="size-4 animate-spin" />
-                    ) : (
-                      <ArrowUp className="size-4" />
-                    )}
-                  </Button>
-                </div>
-              </div>
-            </motion.section>
-          ) : launcherOpen ? (
-            <GlobalMistyLauncher
-              key="launcher"
-              currentPath={props.currentPath}
-              mode={mode}
-              query={query}
-              working={working}
-              launcherRef={launcherRef}
-              inputRef={launcherInputRef}
-              onModeChange={setMode}
-              onQueryChange={setQuery}
-              onDismiss={closePanel}
-              onExpand={() => openPanel(currentContext)}
-            />
+                aria-label="Misty Search"
+                data-misty-conversation={conversationActive ? "true" : undefined}
+              >
+                {conversationActive ? (
+                  <>
+                    <ContextReceipt
+                      context={context.filter((item) => item.attached)}
+                      selection={registeredAiSelection ?? undefined}
+                      onRemove={removeContext}
+                    />
+                    <div className="min-h-0 flex-1 border-b border-white/10">
+                      <ScrollArea className="h-full" data-misty-conversation-scroll>
+                        <ConversationView
+                          conversation={conversation}
+                          working={working}
+                          onConfirm={(id) => void approveAgentTask(id)}
+                          onReject={rejectAction}
+                          onCancel={(id) => void cancelAgentTask(id)}
+                        />
+                      </ScrollArea>
+                    </div>
+                    {composer}
+                  </>
+                ) : (
+                  <>
+                    {composer}
+                    <ContextReceipt
+                      context={context}
+                      selection={registeredAiSelection ?? undefined}
+                      onRemove={removeContext}
+                    />
+                    {hasQuery ? (
+                      <FilterBar
+                        mode={mode}
+                        filters={filters}
+                        currentContext={currentContext}
+                        onChange={setFilters}
+                      />
+                    ) : null}
+                    {contentVisible ? (
+                      <div className="min-h-0 border-t border-charcoal-border/70">
+                        <ScrollArea className="h-[min(500px,calc(100dvh-270px))]">
+                          <CandidateList
+                            candidates={candidates}
+                            selectedId={selectedCandidateId}
+                            searching={searching}
+                            onSelect={setSelectedCandidateId}
+                            onActivate={activateCandidate}
+                            onAddContext={resultActions.addResultContext}
+                          />
+                        </ScrollArea>
+                      </div>
+                    ) : null}
+                  </>
+                )}
+              </section>
+            </motion.div>
           ) : null}
         </AnimatePresence>
       </MotionConfig>
+      {capturingRegion && allowCapture ? (
+        <MistyRegionCapture
+          onCancel={() => setCapturingRegion(false)}
+          onCapture={(nextCapture) => {
+            setCapturingRegion(false);
+            void attachmentState.addFiles([captureToFile(nextCapture)]);
+          }}
+        />
+      ) : null}
     </div>
   );
-}
-
-function contextForCurrentView(
-  currentPath: string,
-  activePanePath: string,
-  pane?: ReturnType<typeof useExplorerStore.getState>["panes"][string],
-): GlobalAiContextRef[] {
-  const context: GlobalAiContextRef[] = [];
-  const spaceMatch = currentPath.match(/^\/spaces\/([^/?]+)/);
-  if (spaceMatch?.[1]) {
-    const spaceId = decodeURIComponent(spaceMatch[1]);
-    context.push({
-      id: `route:${currentPath}`,
-      kind: "route",
-      title: "Current Space view",
-      href: currentPath,
-      source: "current",
-      spaceId,
-    });
-  } else {
-    context.push({
-      id: `route:${currentPath}`,
-      kind: "route",
-      title: routeTitle(currentPath),
-      href: currentPath,
-      source: "current",
-    });
-  }
-  if (currentPath.startsWith("/files") && activePanePath) {
-    context.push({
-      id: `folder:${activePanePath}`,
-      kind: "folder",
-      title: activePanePath.split(/[\\/]/).filter(Boolean).pop() || "Current folder",
-      source: "current",
-      localPath: activePanePath,
-    });
-    const entries = pane?.listing?.entries ?? [];
-    const selected = new Set(pane?.selectedIds ?? []);
-    for (const entry of entries.filter((item) => selected.has(item.id)).slice(0, 6)) {
-      context.push({
-        id: entry.id,
-        kind: entry.kind === "folder" ? "folder" : "file",
-        title: entry.name,
-        source: "current",
-        ...(entry.location.kind === "local" ? { localPath: entry.path } : {}),
-      });
-    }
-  }
-  return context;
-}
-
-function routeTitle(path: string): string {
-  if (path.startsWith("/home")) return "Home";
-  if (path.startsWith("/files")) return "Files";
-  if (path.startsWith("/agents")) return "Agents";
-  if (path.startsWith("/extensions")) return "Extensions";
-  return "Current view";
-}
-
-function modePlaceholder(mode: GlobalAiMode): string {
-  if (mode === "search") return "Search across Misty…";
-  if (mode === "ask") return "Ask Misty anything…";
-  return "Describe what you want Misty to do…";
-}
-
-function capitalize(value: string): string {
-  return `${value.charAt(0).toUpperCase()}${value.slice(1)}`;
 }

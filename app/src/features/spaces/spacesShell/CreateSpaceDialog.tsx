@@ -11,13 +11,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { CreateSpaceNameStep, CreateSpaceTemplateStep } from "./CreateSpaceSteps";
 import { CREATE_STEP_COUNT, type useCreateSpaceDialog } from "./useCreateSpaceDialog";
 
-export function CreateSpaceDialog({
-  dialog,
-  error,
-}: {
-  dialog: ReturnType<typeof useCreateSpaceDialog>;
-  error: string;
-}) {
+export function CreateSpaceDialog({ dialog }: { dialog: ReturnType<typeof useCreateSpaceDialog> }) {
   const lastStep = CREATE_STEP_COUNT - 1;
 
   return (
@@ -53,17 +47,8 @@ export function CreateSpaceDialog({
             <CreateSpaceTemplateStep
               templates={dialog.templates}
               templateId={dialog.templateId}
-              templateError={dialog.templateError}
               onTemplate={dialog.setTemplateId}
             />
-          ) : null}
-          {error ? (
-            <p
-              className="mb-0 mt-3 rounded-lg border border-charcoal-active/25 bg-charcoal-active px-3 py-2 text-xs leading-relaxed text-cream-bright"
-              role="alert"
-            >
-              {error}
-            </p>
           ) : null}
 
           <DialogFooter className="mt-5">

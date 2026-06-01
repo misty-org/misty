@@ -9,11 +9,28 @@ import {
 import { apiErrorMessage } from "@/api/client";
 import { create } from "zustand";
 import { mergeThreads, normalizeThread, unifiedThreads, type InboxThread } from "../model";
-import { prefetchThreadHtml } from "../components/EmailBody";
-import { withExponentialBackoff } from "./exponentialBackoff";
-import { persistInboxCache, readInboxCache } from "./inboxCache";
+import { readInboxCache } from "./inboxCache";
 
-interface InboxStore {
+import {
+  applyDetailedThread,
+  detailFreshMs,
+  detailRequests,
+  fetchThreadDetail,
+  prefetchAttempts,
+} from "./inboxPrefetch";
+import {
+  errorText,
+  folderIdForAccount,
+  mergeSummariesWithCached,
+  patchThreadState,
+  persistCurrentInbox,
+  reportAccountError,
+  retainConnectionRecords,
+  scopedAccounts,
+  threadHasDetail,
+} from "./inboxStoreHelpers";
+
+export interface InboxStore {
   accountId: string;
   accounts: MailAccount[];
   foldersByConnection: Record<string, MailFolder[]>;
@@ -22,6 +39,8 @@ interface InboxStore {
   estimatedTotalByConnection: Record<string, number>;
   detailFetchedAtByThread: Record<string, number>;
   accountErrors: Record<string, string>;
+  accountErrorCodes: Record<string, string>;
+  selectedProvider: string;
   selectedConnectionId: string;
   selectedFolderId: string;
   selectedFolderKind: string;
@@ -36,12 +55,12 @@ interface InboxStore {
   error: string | null;
   setAccount: (accountId: string) => void;
   load: (force?: boolean) => Promise<void>;
+  selectProvider: (provider: string) => Promise<void>;
   selectScope: (connectionId: string, folderId?: string) => Promise<void>;
   selectFolderKind: (kind: string) => Promise<void>;
   search: (query: string) => Promise<void>;
   loadMore: () => Promise<void>;
   openThread: (thread: InboxThread) => Promise<void>;
-  prefetchThread: (thread: InboxThread) => Promise<void>;
   actOnThread: (
     thread: InboxThread,
     action: Omit<MailThreadAction, "connection_id">,
@@ -50,17 +69,12 @@ interface InboxStore {
   sendDraft: (draftId: string, connectionId: string) => Promise<void>;
 }
 
-type InboxSet = (value: Partial<InboxStore> | ((state: InboxStore) => Partial<InboxStore>)) => void;
+export type InboxSet = (
+  value: Partial<InboxStore> | ((state: InboxStore) => Partial<InboxStore>),
+) => void;
 
 let accountGeneration = 0;
 let contentGeneration = 0;
-const detailRequests = new Map<string, Promise<InboxThread>>();
-
-const detailFreshMs = 5 * 60 * 1000;
-const prefetchConcurrency = 4;
-const prefetchAttempts = 5;
-const retryBaseDelayMs = 750;
-const retryMaxDelayMs = 12_000;
 
 const initial = {
   accountId: "",
@@ -71,6 +85,8 @@ const initial = {
   estimatedTotalByConnection: {} as Record<string, number>,
   detailFetchedAtByThread: {} as Record<string, number>,
   accountErrors: {} as Record<string, string>,
+  accountErrorCodes: {} as Record<string, string>,
+  selectedProvider: "",
   selectedConnectionId: "",
   selectedFolderId: "",
   selectedFolderKind: "",
@@ -89,9 +105,10 @@ export const useInboxStore = create<InboxStore>((set, get) => ({
   ...initial,
   setAccount: (accountId) => {
     if (get().accountId === accountId) return;
+    const selectedProvider = get().selectedProvider;
     accountGeneration += 1;
     contentGeneration += 1;
-    set({ ...initial, accountId });
+    set({ ...initial, accountId, selectedProvider });
   },
   load: async (force = false) => {
     const state = get();
@@ -102,6 +119,7 @@ export const useInboxStore = create<InboxStore>((set, get) => ({
       loading: true,
       error: null,
       accountErrors: {},
+      accountErrorCodes: {},
       selectedThread: null,
       selectedThreadKey: "",
     });
@@ -132,6 +150,11 @@ export const useInboxStore = create<InboxStore>((set, get) => ({
           ];
         }),
       );
+      const accountErrorCodes = Object.fromEntries(
+        accounts.flatMap((account) =>
+          account.error_code ? [[account.connection_id, account.error_code]] : [],
+        ),
+      );
       const connectedIds = new Set(accounts.map((account) => account.connection_id));
       set((current) => {
         const threadsByConnection = retainConnectionRecords(
@@ -146,6 +169,7 @@ export const useInboxStore = create<InboxStore>((set, get) => ({
         return {
           accounts,
           accountErrors,
+          accountErrorCodes,
           foldersByConnection: retainConnectionRecords(current.foldersByConnection, connectedIds),
           threadsByConnection,
           nextPageByConnection: retainConnectionRecords(current.nextPageByConnection, connectedIds),
@@ -164,12 +188,31 @@ export const useInboxStore = create<InboxStore>((set, get) => ({
       if (generation === accountGeneration) {
         set({ loading: false, loaded: true });
         persistCurrentInbox(get());
-        void prefetchVisibleThreads(set, get, generation);
       }
     } catch (error) {
       if (generation !== accountGeneration) return;
       set({ loading: false, loaded: true, error: errorText(error) });
     }
+  },
+  selectProvider: async (provider) => {
+    const normalizedProvider = provider === "microsoft" ? "microsoft" : "google";
+    if (
+      get().selectedProvider === normalizedProvider &&
+      !get().selectedConnectionId &&
+      !get().selectedFolderKind
+    ) {
+      return;
+    }
+    set({
+      selectedProvider: normalizedProvider,
+      selectedConnectionId: "",
+      selectedFolderId: "",
+      selectedFolderKind: "",
+      selectedThread: null,
+      selectedThreadKey: "",
+    });
+    if (!get().loaded) return;
+    await reloadThreads(set, get);
   },
   selectScope: async (connectionId, folderId = "") => {
     set({
@@ -252,7 +295,6 @@ export const useInboxStore = create<InboxStore>((set, get) => ({
     if (generation === accountGeneration) {
       set({ loadingMore: false });
       persistCurrentInbox(get());
-      void prefetchVisibleThreads(set, get, generation);
     }
   },
   openThread: async (thread) => {
@@ -280,20 +322,6 @@ export const useInboxStore = create<InboxStore>((set, get) => ({
       if (generation === accountGeneration) {
         set({ detailLoading: false, error: errorText(error) });
       }
-    }
-  },
-  prefetchThread: async (thread) => {
-    if (threadHasDetail(thread)) {
-      prefetchThreadHtml(thread);
-      return;
-    }
-    try {
-      const detailed = await fetchThreadDetail(thread, prefetchAttempts);
-      if (accountGeneration === accountGeneration) {
-        applyDetailedThread(set, detailed);
-      }
-    } catch {
-      // Best effort prefetch
     }
   },
   actOnThread: async (thread, action) => {
@@ -382,9 +410,7 @@ async function reloadThreads(set: InboxSet, get: () => InboxStore) {
   set({
     loading: true,
     accountErrors: {},
-    threadsByConnection: {},
-    nextPageByConnection: {},
-    estimatedTotalByConnection: {},
+    accountErrorCodes: {},
   });
   await Promise.all(
     targets.map(async (account) => {
@@ -403,10 +429,12 @@ async function reloadThreads(set: InboxSet, get: () => InboxStore) {
         set((state) => ({
           threadsByConnection: {
             ...state.threadsByConnection,
-            [account.connection_id]: mergeSummariesWithCached(
-              state.threadsByConnection[account.connection_id] ?? [],
-              normalized,
-            ),
+            [account.connection_id]: get().query
+              ? normalized
+              : mergeSummariesWithCached(
+                  state.threadsByConnection[account.connection_id] ?? [],
+                  normalized,
+                ),
           },
           nextPageByConnection: {
             ...state.nextPageByConnection,
@@ -426,194 +454,40 @@ async function reloadThreads(set: InboxSet, get: () => InboxStore) {
   if (generation === accountGeneration && request === contentGeneration) {
     set({ loading: false, loaded: true });
     persistCurrentInbox(get());
-    void prefetchVisibleThreads(set, get, generation);
   }
-}
-
-async function prefetchVisibleThreads(
-  set: InboxSet,
-  get: () => InboxStore,
-  generation: number,
-): Promise<void> {
-  const now = Date.now();
-  const allThreads = unifiedThreads(get().threadsByConnection);
-  for (const thread of allThreads.slice(0, 20)) {
-    if (threadHasDetail(thread)) prefetchThreadHtml(thread);
-  }
-  const queue = allThreads
-    .filter(
-      (thread) =>
-        !threadHasDetail(thread) ||
-        now - (get().detailFetchedAtByThread[thread.key] ?? 0) > detailFreshMs,
-    )
-    .slice(0, 80);
-  let cursor = 0;
-  const worker = async () => {
-    while (cursor < queue.length && generation === accountGeneration) {
-      const thread = queue[cursor];
-      cursor += 1;
-      try {
-        const detailed = await fetchThreadDetail(thread, prefetchAttempts);
-        if (generation !== accountGeneration) return;
-        applyDetailedThread(set, detailed);
-      } catch {
-        // Prefetching is best-effort.
-      }
-    }
-  };
-  await Promise.all(
-    Array.from({ length: Math.min(prefetchConcurrency, queue.length) }, () => worker()),
-  );
-  if (generation === accountGeneration && queue.length) persistCurrentInbox(get());
-}
-
-function fetchThreadDetail(thread: InboxThread, attempts: number): Promise<InboxThread> {
-  const existing = detailRequests.get(thread.key);
-  if (existing) return existing;
-  const request = withExponentialBackoff(
-    async () => {
-      const result = await mailApi.thread(thread.connectionId, thread.provider_id);
-      return normalizeThread(result.thread, thread.connectionId);
-    },
-    {
-      attempts,
-      baseDelayMs: retryBaseDelayMs,
-      maxDelayMs: retryMaxDelayMs,
-    },
-  ).finally(() => detailRequests.delete(thread.key));
-  detailRequests.set(thread.key, request);
-  return request;
-}
-
-function applyDetailedThread(set: InboxSet, detailed: InboxThread): void {
-  prefetchThreadHtml(detailed);
-  set((state) => {
-    const current = state.threadsByConnection[detailed.connectionId] ?? [];
-    const existing = current.find((thread) => thread.key === detailed.key);
-    const merged = existing
-      ? {
-          ...detailed,
-          unread: existing.unread,
-          starred: existing.starred,
-          labels: existing.labels,
-        }
-      : detailed;
-    return {
-      threadsByConnection: {
-        ...state.threadsByConnection,
-        [detailed.connectionId]: current.some((thread) => thread.key === detailed.key)
-          ? current.map((thread) => (thread.key === detailed.key ? merged : thread))
-          : current,
-      },
-      detailFetchedAtByThread: {
-        ...state.detailFetchedAtByThread,
-        [detailed.key]: Date.now(),
-      },
-      selectedThread: state.selectedThreadKey === detailed.key ? merged : state.selectedThread,
-      detailLoading: state.selectedThreadKey === detailed.key ? false : state.detailLoading,
-    };
-  });
-}
-
-function mergeSummariesWithCached(current: InboxThread[], incoming: InboxThread[]): InboxThread[] {
-  const cached = new Map(current.map((thread) => [thread.key, thread]));
-  return incoming.map((thread) => {
-    const existing = cached.get(thread.key);
-    if (!existing || threadHasDetail(thread) || !threadHasDetail(existing)) return thread;
-    return {
-      ...existing,
-      snippet: thread.snippet || existing.snippet,
-    };
-  });
-}
-
-function threadHasDetail(thread: InboxThread): boolean {
-  return thread.messages.some(
-    (message) =>
-      Boolean(message.body.html) ||
-      (Boolean(message.body.text) && !message.body.had_html) ||
-      message.body.truncated ||
-      message.attachments.length > 0,
-  );
-}
-
-function persistCurrentInbox(state: InboxStore): void {
-  if (!state.accountId) return;
-  persistInboxCache(state.accountId, {
-    accounts: state.accounts,
-    foldersByConnection: state.foldersByConnection,
-    threadsByConnection: state.threadsByConnection,
-    nextPageByConnection: state.nextPageByConnection,
-    estimatedTotalByConnection: state.estimatedTotalByConnection,
-    detailFetchedAtByThread: state.detailFetchedAtByThread,
-  });
-}
-
-function retainConnectionRecords<T>(
-  records: Record<string, T>,
-  connectedIds: Set<string>,
-): Record<string, T> {
-  return Object.fromEntries(
-    Object.entries(records).filter(([connectionId]) => connectedIds.has(connectionId)),
-  );
-}
-
-function scopedAccounts(state: InboxStore): MailAccount[] {
-  return state.selectedConnectionId
-    ? state.accounts.filter((account) => account.connection_id === state.selectedConnectionId)
-    : state.accounts;
-}
-
-function folderIdForAccount(state: InboxStore, connectionId: string): string | undefined | null {
-  if (state.selectedFolderId) return state.selectedFolderId;
-  if (!state.selectedFolderKind) return undefined;
-  return (
-    (state.foldersByConnection[connectionId] ?? []).find(
-      (folder) => folder.kind === state.selectedFolderKind,
-    )?.provider_id ?? null
-  );
-}
-
-function reportAccountError(set: InboxSet, connectionId: string, error: unknown) {
-  set((state) => ({ accountErrors: { ...state.accountErrors, [connectionId]: errorText(error) } }));
-}
-
-function patchThreadState(
-  state: InboxStore,
-  key: string,
-  action: Omit<MailThreadAction, "connection_id">,
-): Partial<InboxStore> {
-  const patch = (thread: InboxThread): InboxThread => ({
-    ...thread,
-    unread: action.read === undefined ? thread.unread : !action.read,
-    starred: action.starred ?? thread.starred,
-    labels:
-      action.archived === undefined
-        ? thread.labels
-        : action.archived
-          ? thread.labels.filter((label) => label.toLowerCase() !== "inbox")
-          : [...new Set([...thread.labels, "INBOX"])],
-  });
-  return {
-    threadsByConnection: Object.fromEntries(
-      Object.entries(state.threadsByConnection).map(([connectionId, threads]) => [
-        connectionId,
-        threads.map((thread) => (thread.key === key ? patch(thread) : thread)),
-      ]),
-    ),
-    selectedThread:
-      state.selectedThread?.key === key ? patch(state.selectedThread) : state.selectedThread,
-  };
-}
-
-function errorText(error: unknown): string {
-  return error instanceof Error ? error.message : "Misty could not load mail from this account.";
 }
 
 export function selectUnifiedThreads(
   state: Pick<InboxStore, "threadsByConnection">,
 ): InboxThread[] {
   return unifiedThreads(state.threadsByConnection);
+}
+
+export function selectVisibleInboxThreads(
+  state: Pick<
+    InboxStore,
+    "accounts" | "selectedConnectionId" | "selectedProvider" | "threadsByConnection"
+  >,
+): InboxThread[] {
+  if (!state.selectedProvider && !state.selectedConnectionId) {
+    return unifiedThreads(state.threadsByConnection);
+  }
+  const allowedConnections = new Set(
+    state.accounts
+      .filter(
+        (account) =>
+          (!state.selectedProvider || account.provider === state.selectedProvider) &&
+          (!state.selectedConnectionId || account.connection_id === state.selectedConnectionId),
+      )
+      .map((account) => account.connection_id),
+  );
+  return unifiedThreads(
+    Object.fromEntries(
+      Object.entries(state.threadsByConnection).filter(([connectionId]) =>
+        allowedConnections.has(connectionId),
+      ),
+    ),
+  );
 }
 
 export function resetInboxAccountState(): void {

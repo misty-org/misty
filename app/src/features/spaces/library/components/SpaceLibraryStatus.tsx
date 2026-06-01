@@ -1,7 +1,7 @@
 import { ClipboardCopy, Star, Trash2, X } from "lucide-react";
+import { SystemErrorActivity } from "@/features/activity";
 
 import { Button } from "@/shared/ui";
-import { AiSurfaceButton } from "@/features/ai-surface/AiPaneHost";
 
 import { useSpaceLibraryContext } from "../SpaceLibraryContext";
 import { LibraryFacetGroup } from "../SpaceLibraryPrimitives";
@@ -61,9 +61,6 @@ export function SpaceLibraryTopChrome() {
         onItemScale={setLibraryItemScale}
         visibleItemCount={visibleItems.length}
       />
-      <div className="absolute right-4 top-2 z-30 rounded bg-charcoal-bg/90">
-        <AiSurfaceButton />
-      </div>
       <SpaceLibraryInlineStatus />
     </>
   );
@@ -80,7 +77,6 @@ export function SpaceLibraryInlineStatus() {
     bulkSaving,
     collection,
     localError,
-    setLocalError,
   } = data;
   const { appendSearchFacet, copyItemsToClipboard, applyBulkAction } = itemActions;
   const { selectCollection } = collectionActions;
@@ -116,13 +112,11 @@ export function SpaceLibraryInlineStatus() {
         />
       ) : null}
       {localError ? (
-        <Button
-          className="mb-4 rounded-xl border border-charcoal-active/20 bg-charcoal-active px-3 py-2 text-left text-xs text-cream-bright"
-          type="button"
-          onClick={() => setLocalError("")}
-        >
-          {localError}
-        </Button>
+        <SystemErrorActivity
+          error={localError}
+          scope="library:bulk-action"
+          title="Library action could not be completed"
+        />
       ) : null}
     </>
   );

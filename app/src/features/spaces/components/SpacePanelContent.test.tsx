@@ -4,6 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SpacePanelContent } from "../components/SpacePanelContent";
+import { spacePanelSidebarAvailable } from "../components/spacePanel/SpacePanelSidebarContext";
 import { useSpacesStore } from "../store/useSpacesStore";
 
 describe("SpacePanelContent", () => {
@@ -23,6 +24,12 @@ describe("SpacePanelContent", () => {
     await act(async () => root.unmount());
     useSpacesStore.setState({ spaces: [] });
     container.remove();
+  });
+
+  it("reserves the contextual sidebar for Social, not Journal", () => {
+    expect(spacePanelSidebarAvailable("social")).toBe(true);
+    expect(spacePanelSidebarAvailable("notes")).toBe(false);
+    expect(spacePanelSidebarAvailable("drawings")).toBe(false);
   });
 
   it("does not repeat the selected Space in a sidebar header", async () => {
@@ -49,10 +56,10 @@ describe("SpacePanelContent", () => {
     expect(container.querySelector('[aria-label^="Space menu"]')).toBeNull();
     expect(container.querySelector("nav[aria-label='Space sections']")).toBeNull();
     expect(container.querySelector("nav[aria-label='Space management']")).toBeNull();
-    expect(container.querySelector("nav[aria-label='Library collections']")).not.toBeNull();
+    expect(container.querySelector("nav[aria-label='Library collections']")).toBeNull();
   });
 
-  it("shows only Chat in the canonical Misty Space", async () => {
+  it("shows only Social in the canonical Misty Space", async () => {
     const space = spaceFixture({
       id: "misty",
       kind: "misty",
@@ -63,7 +70,7 @@ describe("SpacePanelContent", () => {
 
     await act(async () => {
       root.render(
-        <MemoryRouter initialEntries={["/spaces/misty/chat"]}>
+        <MemoryRouter initialEntries={["/spaces/misty/social"]}>
           <Routes>
             <Route
               path="/spaces/:spaceId/:section"
@@ -74,7 +81,7 @@ describe("SpacePanelContent", () => {
       );
     });
 
-    expect(container.querySelector('[aria-label="Space conversations"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="Misty conversations"]')).not.toBeNull();
     expect(container.textContent).not.toContain("Journal");
     expect(container.textContent).not.toContain("Planner");
     expect(container.textContent).not.toContain("Library");
@@ -92,7 +99,7 @@ describe("SpacePanelContent", () => {
 
     await act(async () => {
       root.render(
-        <MemoryRouter initialEntries={["/spaces/misty/chat"]}>
+        <MemoryRouter initialEntries={["/spaces/misty/social"]}>
           <Routes>
             <Route
               path="/spaces/:spaceId/:section"
@@ -104,9 +111,9 @@ describe("SpacePanelContent", () => {
     });
 
     expect(container.querySelector('[aria-label="Misty support inbox"]')).toBeNull();
-    expect(container.querySelector('[aria-label="Space conversations"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="Misty conversations"]')).not.toBeNull();
     expect(
-      container.querySelector('[aria-label="Space conversations"]')?.textContent,
+      container.querySelector('[aria-label="Misty conversations"]')?.textContent,
     ).not.toContain("Everyone");
     expect(container.querySelector('[aria-label^="Create a new"]')).toBeNull();
   });
@@ -159,11 +166,11 @@ describe("SpacePanelContent", () => {
       vi.advanceTimersByTime(700);
     });
 
-    // Once spin timer finishes, only the selected tool's contextual branch
-    // replaces the skeleton in the sidebar. Top-level Space tools live globally.
+    // Once spin timer finishes, a destination-only Library panel stays empty;
+    // its stable collection hierarchy lives in the global navigator.
     expect(container.querySelector('[role="status"]')).toBeNull();
     expect(container.querySelector("nav[aria-label='Space sections']")).toBeNull();
-    expect(container.querySelector("nav[aria-label='Library collections']")).not.toBeNull();
+    expect(container.querySelector("nav[aria-label='Library collections']")).toBeNull();
     vi.useRealTimers();
   });
 });

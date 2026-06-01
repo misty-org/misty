@@ -8,13 +8,25 @@ const DropdownMenu = DropdownMenuPrimitive.Root;
 
 const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger;
 
-const DropdownMenuGroup = DropdownMenuPrimitive.Group;
+const DropdownMenuGroup = React.forwardRef<
+  React.ElementRef<typeof DropdownMenuPrimitive.Group>,
+  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Group>
+>(({ className, ...props }, ref) => (
+  <DropdownMenuPrimitive.Group ref={ref} className={cn("grid gap-1", className)} {...props} />
+));
+DropdownMenuGroup.displayName = DropdownMenuPrimitive.Group.displayName;
 
 const DropdownMenuPortal = DropdownMenuPrimitive.Portal;
 
 const DropdownMenuSub = DropdownMenuPrimitive.Sub;
 
-const DropdownMenuRadioGroup = DropdownMenuPrimitive.RadioGroup;
+const DropdownMenuRadioGroup = React.forwardRef<
+  React.ElementRef<typeof DropdownMenuPrimitive.RadioGroup>,
+  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.RadioGroup>
+>(({ className, ...props }, ref) => (
+  <DropdownMenuPrimitive.RadioGroup ref={ref} className={cn("grid gap-1", className)} {...props} />
+));
+DropdownMenuRadioGroup.displayName = DropdownMenuPrimitive.RadioGroup.displayName;
 
 const DropdownMenuSubTrigger = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.SubTrigger>,
@@ -29,7 +41,7 @@ const DropdownMenuSubTrigger = React.forwardRef<
     data-inset={inset}
     data-variant={variant}
     className={cn(
-      "flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none focus:bg-charcoal-hover focus:text-cream not-data-[variant=destructive]:focus:**:text-cream data-inset:pl-8 data-open:bg-charcoal-hover data-open:text-cream [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+      "flex cursor-default items-center gap-2 rounded-sm px-2 py-1 text-sm outline-hidden select-none focus:bg-charcoal-hover data-inset:pl-8 data-open:bg-charcoal-hover [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
       className,
     )}
     {...props}
@@ -48,7 +60,7 @@ const DropdownMenuSubContent = React.forwardRef<
     ref={ref}
     data-slot="dropdown-menu-sub-content"
     className={cn(
-      "relative z-[2147483400] min-w-[96px] origin-center overflow-hidden rounded-md bg-charcoal-card p-1 text-cream shadow-lg ring-1 ring-cream/10 duration-150 ease-out before:pointer-events-none before:absolute before:inset-0 before:-z-1 before:rounded-[inherit] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 **:data-[slot$=-item]:focus:bg-charcoal-hover **:data-[slot$=-item]:data-highlighted:bg-charcoal-hover **:data-[slot$=-separator]:bg-charcoal-hover **:data-[slot$=-trigger]:focus:bg-charcoal-hover **:data-[slot$=-trigger]:aria-expanded:bg-charcoal-hover! **:data-[variant=destructive]:focus:bg-charcoal-hover! **:data-[variant=destructive]:text-cream! **:data-[variant=destructive]:**:text-cream!",
+      "relative z-[2147483400] grid min-w-[96px] origin-center gap-1 overflow-hidden rounded-md bg-charcoal-card p-1 text-cream shadow-lg ring-1 ring-cream/10 duration-150 ease-out before:pointer-events-none before:absolute before:inset-0 before:-z-1 before:rounded-[inherit] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 **:data-[slot$=-item]:focus:bg-charcoal-hover **:data-[slot$=-item]:data-highlighted:bg-charcoal-hover **:data-[slot$=-separator]:bg-charcoal-hover **:data-[slot$=-trigger]:focus:bg-charcoal-hover **:data-[slot$=-trigger]:aria-expanded:bg-charcoal-hover! **:data-[variant=destructive]:focus:bg-charcoal-hover! **:data-[variant=destructive]:text-cream! **:data-[variant=destructive]:**:text-cream!",
       className,
     )}
     {...props}
@@ -67,7 +79,7 @@ const DropdownMenuContent = React.forwardRef<
       sideOffset={sideOffset}
       align={align}
       className={cn(
-        "relative z-[2147483400] max-h-[min(24rem,calc(100dvh-2rem))] w-auto min-w-32 origin-center overflow-x-hidden overflow-y-auto rounded-md bg-charcoal-card p-1 text-cream shadow-md ring-1 ring-cream/10 duration-150 ease-out before:pointer-events-none before:absolute before:inset-0 before:-z-1 before:rounded-[inherit] data-[state=closed]:overflow-hidden data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 **:data-[slot$=-item]:focus:bg-charcoal-hover **:data-[slot$=-item]:data-highlighted:bg-charcoal-hover **:data-[slot$=-separator]:bg-charcoal-hover **:data-[slot$=-trigger]:focus:bg-charcoal-hover **:data-[slot$=-trigger]:aria-expanded:bg-charcoal-hover! **:data-[variant=destructive]:focus:bg-charcoal-hover! **:data-[variant=destructive]:text-cream! **:data-[variant=destructive]:**:text-cream!",
+        "relative z-[2147483400] grid max-h-[min(24rem,calc(100dvh-2rem))] w-auto min-w-32 origin-center gap-1 overflow-x-hidden overflow-y-auto rounded-md bg-charcoal-card p-1 text-cream shadow-md ring-1 ring-cream/10 duration-150 ease-out before:pointer-events-none before:absolute before:inset-0 before:-z-1 before:rounded-[inherit] data-[state=closed]:overflow-hidden data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 **:data-[slot$=-item]:focus:bg-charcoal-hover **:data-[slot$=-item]:data-highlighted:bg-charcoal-hover **:data-[slot$=-separator]:bg-charcoal-hover **:data-[slot$=-trigger]:focus:bg-charcoal-hover **:data-[slot$=-trigger]:aria-expanded:bg-charcoal-hover! **:data-[variant=destructive]:focus:bg-charcoal-hover! **:data-[variant=destructive]:text-cream! **:data-[variant=destructive]:**:text-cream!",
         className,
       )}
       {...props}
@@ -89,7 +101,7 @@ const DropdownMenuItem = React.forwardRef<
     data-inset={inset}
     data-variant={variant}
     className={cn(
-      "group/dropdown-menu-item relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none focus:bg-charcoal-hover focus:text-cream not-data-[variant=destructive]:focus:**:text-cream data-inset:pl-8 data-[variant=destructive]:text-cream-bright data-[variant=destructive]:focus:bg-charcoal-active data-[variant=destructive]:focus:text-cream-bright data-[variant=destructive]:focus:bg-charcoal-active data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 data-[variant=destructive]:*:[svg]:text-cream-bright",
+      "group/dropdown-menu-item relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1 text-sm outline-hidden select-none focus:bg-charcoal-hover data-inset:pl-8 data-[variant=destructive]:text-cream-bright data-[variant=destructive]:focus:bg-charcoal-active data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 data-[variant=destructive]:*:[svg]:text-cream-bright",
       className,
     )}
     {...props}
@@ -108,7 +120,7 @@ const DropdownMenuCheckboxItem = React.forwardRef<
     data-slot="dropdown-menu-checkbox-item"
     data-inset={inset}
     className={cn(
-      "relative flex cursor-default items-center gap-2 rounded-sm py-1.5 pl-2 pr-8 text-sm outline-hidden select-none focus:bg-charcoal-hover focus:text-cream focus:**:text-cream data-inset:pl-8 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+      "relative flex cursor-default items-center gap-2 rounded-sm py-1 pl-2 pr-8 text-sm outline-hidden select-none focus:bg-charcoal-hover data-inset:pl-8 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
       className,
     )}
     checked={checked}
@@ -131,14 +143,15 @@ const DropdownMenuRadioItem = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.RadioItem>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.RadioItem> & {
     inset?: boolean;
+    indicator?: "dot" | "check";
   }
->(({ className, children, inset, ...props }, ref) => (
+>(({ className, children, inset, indicator = "dot", ...props }, ref) => (
   <DropdownMenuPrimitive.RadioItem
     ref={ref}
     data-slot="dropdown-menu-radio-item"
     data-inset={inset}
     className={cn(
-      "relative flex cursor-default items-center gap-2 rounded-sm py-1.5 pl-2 pr-8 text-sm outline-hidden select-none focus:bg-charcoal-hover focus:text-cream focus:**:text-cream data-inset:pl-8 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+      "relative flex cursor-default items-center gap-2 rounded-sm py-1 pl-2 pr-8 text-sm outline-hidden select-none focus:bg-charcoal-hover data-inset:pl-8 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
       className,
     )}
     {...props}
@@ -148,7 +161,7 @@ const DropdownMenuRadioItem = React.forwardRef<
       className="pointer-events-none absolute right-2 flex items-center justify-center"
     >
       <DropdownMenuPrimitive.ItemIndicator>
-        <Circle className="fill-current" />
+        {indicator === "check" ? <Check /> : <Circle className="fill-current" />}
       </DropdownMenuPrimitive.ItemIndicator>
     </span>
     {children}
@@ -166,7 +179,7 @@ const DropdownMenuLabel = React.forwardRef<
     ref={ref}
     data-slot="dropdown-menu-label"
     data-inset={inset}
-    className={cn("px-2 py-1.5 text-xs font-medium text-cream-muted data-inset:pl-8", className)}
+    className={cn("px-2 py-1 text-xs font-medium text-cream-muted data-inset:pl-8", className)}
     {...props}
   />
 ));
@@ -179,7 +192,7 @@ const DropdownMenuSeparator = React.forwardRef<
   <DropdownMenuPrimitive.Separator
     ref={ref}
     data-slot="dropdown-menu-separator"
-    className={cn("-mx-1 my-1 h-px bg-charcoal-border", className)}
+    className={cn("-mx-1 my-0 h-px bg-charcoal-border", className)}
     {...props}
   />
 ));
@@ -189,10 +202,7 @@ const DropdownMenuShortcut = ({ className, ...props }: React.HTMLAttributes<HTML
   return (
     <span
       data-slot="dropdown-menu-shortcut"
-      className={cn(
-        "ml-auto text-xs tracking-widest text-cream-muted group-focus/dropdown-menu-item:text-cream",
-        className,
-      )}
+      className={cn("ml-auto text-xs tracking-widest text-cream-muted", className)}
       {...props}
     />
   );

@@ -1,4 +1,5 @@
 import { spaceNotesEnabled } from "@/features/notes";
+import { reportSystemError } from "@/features/activity";
 import { spacesApi } from "@/api/spaces/api";
 import type { SpaceIntegrationProvider, SpaceTemplate } from "@/api/spaces/dto/interfaces/types";
 import { useEffect, useState, type FormEvent } from "react";
@@ -27,7 +28,6 @@ export function useCreateSpaceDialog(options: {
   const [step, setStep] = useState(0);
   const [templates, setTemplates] = useState<SpaceTemplate[]>([]);
   const [templateId, setTemplateId] = useState("blank");
-  const [templateError, setTemplateError] = useState("");
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
@@ -39,9 +39,14 @@ export function useCreateSpaceDialog(options: {
         if (!active) return;
         setTemplates(loaded);
       })
-      .catch(() => {
-        if (active)
-          setTemplateError("Templates could not be loaded. You can still create a Blank Space.");
+      .catch((error) => {
+        if (active) {
+          reportSystemError({
+            error,
+            scope: "spaces:create:templates",
+            title: "Space templates could not be loaded",
+          });
+        }
       });
     return () => {
       active = false;
@@ -60,7 +65,6 @@ export function useCreateSpaceDialog(options: {
     setOpen(false);
     restoreDocumentInteractivityAfterModalClose();
     resetDraft();
-    setTemplateError("");
   };
 
   const start = () => {
@@ -85,8 +89,12 @@ export function useCreateSpaceDialog(options: {
       navigate(
         `/spaces/${encodeURIComponent(created.space.id)}/${spaceNotesEnabled ? "notes" : "drawings"}`,
       );
-    } catch {
-      /* the dialog renders the store error */
+    } catch (error) {
+      reportSystemError({
+        error,
+        scope: "spaces:create",
+        title: "Space could not be created",
+      });
     } finally {
       setCreating(false);
     }
@@ -102,7 +110,6 @@ export function useCreateSpaceDialog(options: {
     templates,
     templateId,
     setTemplateId,
-    templateError,
     creating,
     close,
     start,

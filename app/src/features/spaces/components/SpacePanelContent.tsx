@@ -1,4 +1,5 @@
 import { useAuth } from "@/features/auth";
+import { useConnectionsStore } from "@/features/integrations";
 import { spacesApi } from "@/api/spaces/api";
 import type {
   Space,
@@ -6,11 +7,15 @@ import type {
   SpaceConversation,
   SpaceMember,
 } from "@/api/spaces/dto/interfaces/types";
+import type { SocialProviderId } from "@/api/social";
 import { useMinimumSpin } from "@/shared/hooks/useMinimumSpin";
+import { openProviderAuthorizationLink } from "@/shared/platform/openExternalLink";
+import { cn } from "@/shared/ui";
 import { useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { preferredMistySpace } from "../mistySpace";
+import { socialProvider, socialProviderPath } from "../social/socialRoute";
 import { useSpacesStore } from "../store/useSpacesStore";
 import { CreateEditConversationDialog } from "./CreateEditConversationDialog";
 import { SpacePanelSidebarContext } from "./spacePanel/SpacePanelSidebarContext";
@@ -24,6 +29,7 @@ import { useSpacePanelConversations } from "./spacePanel/useSpacePanelConversati
 
 const emptyMembers: SpaceMember[] = [];
 const emptyAgents: SpaceAgentMembership[] = [];
+let refreshSocialConnectionsAfterAuthorization = false;
 
 export function SpacePanelContent(props: {
   spaces: Space[];
@@ -53,14 +59,85 @@ export function SpacePanelContent(props: {
     snapshotReady,
     enabled: Boolean(user),
   });
+  const {
+    accountId: connectionsAccountId,
+    connections: accountConnections,
+    loading: connectionsLoading,
+    authorizingProvider,
+    setAccount: setConnectionsAccount,
+    load: loadConnections,
+    beginAuthorization,
+    clearError: clearConnectionsError,
+  } = useConnectionsStore(
+    useShallow((state) => ({
+      accountId: state.accountId,
+      connections: state.connections,
+      loading: state.loading,
+      authorizingProvider: state.authorizingProvider,
+      setAccount: state.setAccount,
+      load: state.load,
+      beginAuthorization: state.beginAuthorization,
+      clearError: state.clearError,
+    })),
+  );
+
+  useEffect(() => {
+    if (section !== "social" || !user?.id) return;
+    setConnectionsAccount(user.id);
+    const force = refreshSocialConnectionsAfterAuthorization;
+    refreshSocialConnectionsAfterAuthorization = false;
+    void loadConnections({ force });
+    const refresh = () => void loadConnections({ force: true });
+    window.addEventListener("focus", refresh);
+    return () => window.removeEventListener("focus", refresh);
+  }, [loadConnections, section, setConnectionsAccount, user?.id]);
+
+  const connectSocialAccount = async (provider: Exclude<SocialProviderId, "misty">) => {
+    clearConnectionsError();
+    try {
+      const authorizationUrl = await beginAuthorization(
+        provider,
+        ["social_read", "social_send", "social_automation"],
+        socialProviderPath(activeSpaceId, provider),
+      );
+      const openResult = await openProviderAuthorizationLink(authorizationUrl);
+      if (openResult?.strategy === "misty-browser") {
+        refreshSocialConnectionsAfterAuthorization = true;
+      }
+    } catch {
+      // The connections store retains a user-safe failure message.
+    }
+  };
+
+  const connectedSocialAccounts =
+    connectionsAccountId === user?.id
+      ? accountConnections.filter((connection) => {
+          const provider = socialProvider(connection.provider);
+          return provider !== null && provider !== "misty";
+        })
+      : [];
 
   // Land on the first Space when the route points at one that is not loaded.
   useEffect(() => {
     if (!activeSpaceId || props.loading || activeSpace || props.spaces.length === 0) return;
     const fallback = preferredMistySpace(props.spaces);
-    if (fallback)
-      navigate(spaceSectionPath(fallback.id, section, settingsSection), { replace: true });
-  }, [activeSpace, activeSpaceId, navigate, props.loading, props.spaces, section, settingsSection]);
+    if (fallback) {
+      const fallbackRoute =
+        section === "social"
+          ? socialProviderPath(fallback.id, route.socialProvider)
+          : spaceSectionPath(fallback.id, section, settingsSection);
+      navigate(fallbackRoute, { replace: true });
+    }
+  }, [
+    activeSpace,
+    activeSpaceId,
+    navigate,
+    props.loading,
+    props.spaces,
+    route.socialProvider,
+    section,
+    settingsSection,
+  ]);
 
   useEffect(() => {
     if (!user || !snapshotReady || !activeSpaceId || !activeSpace) return;
@@ -72,7 +149,9 @@ export function SpacePanelContent(props: {
 
   const handleConversationSaved = (saved: SpaceConversation) => {
     upsertConversation(saved);
-    navigate(spaceConversationPath(activeSpaceId, saved.id));
+    navigate(
+      spaceConversationPath(activeSpaceId, saved.id, socialProvider(saved.origin) ?? "misty"),
+    );
   };
 
   const handleConversationDeleted = async (conversation: SpaceConversation) => {
@@ -81,7 +160,7 @@ export function SpacePanelContent(props: {
       await spacesApi.deleteOrClearConversation(activeSpaceId, conversation.id);
       removeConversation(conversation.id);
       if (route.conversationId === conversation.id) {
-        navigate(spaceSectionPath(activeSpaceId, "chat", settingsSection), { replace: true });
+        navigate(socialProviderPath(activeSpaceId, route.socialProvider), { replace: true });
       }
     } catch (reason) {
       window.alert(
@@ -93,16 +172,11 @@ export function SpacePanelContent(props: {
   const activeSpaceNavigation = activeSpaceId ? (
     <SpacePanelSidebarContext
       section={section}
-      plannerSection={route.plannerSection}
-      roadmapId={route.roadmapId}
       activeSpaceId={activeSpaceId}
-      activeSpaceName={activeSpace?.name ?? "Journal"}
-      settingsSection={settingsSection}
-      libraryCollection={route.libraryCollection}
+      socialProvider={route.socialProvider}
       conversations={conversations}
       activeConversationId={route.conversationId}
       currentUserId={user?.id}
-      activeDrawingId={route.drawingId}
       onCreateConversation={
         activeSpace?.kind === "misty"
           ? undefined
@@ -118,6 +192,10 @@ export function SpacePanelContent(props: {
       onDeleteConversation={(conversation) => void handleConversationDeleted(conversation)}
       isSpaceOwner={activeSpace?.role === "owner"}
       isMistySpace={activeSpace?.kind === "misty"}
+      socialAccounts={connectedSocialAccounts}
+      socialAccountsLoading={connectionsLoading}
+      socialAuthorizingProvider={authorizingProvider}
+      onConnectSocialAccount={(provider) => void connectSocialAccount(provider)}
     />
   ) : null;
 
@@ -132,7 +210,14 @@ export function SpacePanelContent(props: {
       {spacesListSkeletonVisible ? (
         <SpacePanelSkeleton />
       ) : activeSpaceId ? (
-        <div className="misty-transient-scrollbar -mx-3 min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3 pb-2 [overscroll-behavior:contain]">
+        <div
+          className={cn(
+            "-mx-3 min-h-0 flex-1 px-3 pb-2",
+            section === "social"
+              ? "flex flex-col overflow-hidden"
+              : "misty-transient-scrollbar overflow-x-hidden overflow-y-auto [overscroll-behavior:contain]",
+          )}
+        >
           {activeSpaceNavigation}
         </div>
       ) : null}

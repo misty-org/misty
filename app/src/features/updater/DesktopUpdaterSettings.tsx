@@ -4,6 +4,7 @@ import { check, type Update } from "@tauri-apps/plugin-updater";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { DesktopSettingsRow, settingsBoolean, useSettingsStore } from "@/features/settings";
+import { SystemErrorActivity } from "@/features/activity";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { Button, Progress } from "@/shared/ui";
 import {
@@ -108,7 +109,7 @@ export function DesktopUpdaterSettings() {
               ? "Downloading update…"
               : `Downloading update… ${progress.percent}%`
             : state === "error"
-              ? error
+              ? "Open Activity for details"
               : "Not checked";
 
   return (
@@ -125,12 +126,14 @@ export function DesktopUpdaterSettings() {
       >
         <div className="grid w-full max-w-sm justify-items-end gap-2 max-[760px]:justify-items-start">
           <div className="flex flex-wrap items-center justify-end gap-2 max-[760px]:justify-start">
-            <span
-              className={
-                state === "error" ? "text-xs text-cream-bright" : "text-xs text-cream-muted"
-              }
-              role={state === "error" ? "alert" : "status"}
-            >
+            {state === "error" ? (
+              <SystemErrorActivity
+                error={error}
+                scope="settings:updates"
+                title="App update needs attention"
+              />
+            ) : null}
+            <span className="text-xs text-cream-muted" role="status">
               {supported ? status : "Available in packaged desktop builds"}
             </span>
             {state === "available" ? (

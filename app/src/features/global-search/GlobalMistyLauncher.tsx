@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState, type RefObject } from "react";
 import { ModeIcon } from "./GlobalMistyPanelContent";
 import type { GlobalAiMode } from "./types";
 
-const modes: GlobalAiMode[] = ["search", "ask", "action"];
+const modes: GlobalAiMode[] = ["search"];
 const launcherClass = [
   "pointer-events-auto mx-auto w-[min(760px,calc(100dvw-128px))] overflow-hidden rounded-2xl",
   "border border-charcoal-border bg-charcoal-card p-3 text-cream",
@@ -18,19 +18,13 @@ const coreToolCommandIds = [
   "tool.home",
   "tool.journal",
   "tool.planner",
-  "tool.chat",
+  "tool.social",
   "tool.inbox",
   "tool.library",
   "tool.browser",
   "tool.files",
   "tool.code",
 ];
-
-interface LauncherOption {
-  label: string;
-  prompt: string;
-  mode: GlobalAiMode;
-}
 
 interface CommandResult {
   id: string;
@@ -54,7 +48,6 @@ export function GlobalMistyLauncher(props: {
   onExpand: () => void;
 }) {
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const options = launcherOptions(props.currentPath);
   const commandOnly = props.query.trimStart().startsWith(">");
   const commandQuery = (commandOnly ? props.query.trimStart().slice(1) : props.query)
     .trim()
@@ -92,15 +85,15 @@ export function GlobalMistyLauncher(props: {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 4 }}
       className={launcherClass}
-      aria-label="Open Misty — Search, Ask, or Action"
+      aria-label="Open Misty Search"
       onClick={() => props.inputRef.current?.focus()}
     >
       <div className="flex min-h-12 items-center gap-3">
         <button
           type="button"
           className="grid size-10 shrink-0 place-items-center rounded-xl bg-charcoal-hover text-cream transition hover:bg-charcoal-active"
-          aria-label={`${capitalize(props.mode)} mode. Click or press Tab to switch.`}
-          title={`${capitalize(props.mode)} · Tab to switch`}
+          aria-label="Search"
+          title="Search"
           onClick={(event) => {
             event.stopPropagation();
             cycleMode();
@@ -147,8 +140,8 @@ export function GlobalMistyLauncher(props: {
             }
           }}
           className="min-w-0 flex-1 bg-transparent text-base text-cream outline-none placeholder:text-cream-muted"
-          placeholder={commandOnly ? "Type a command…" : "Search tools and commands, or ask Misty…"}
-          aria-label="Misty prompt"
+          placeholder={commandOnly ? "Type a command…" : "Search tools, files, and commands…"}
+          aria-label="Search Misty"
           role="combobox"
           aria-expanded={results.length > 0}
           aria-controls="misty-launcher-results"
@@ -161,7 +154,7 @@ export function GlobalMistyLauncher(props: {
           size="icon"
           className="size-10 shrink-0 rounded-xl bg-cream text-charcoal-bg hover:bg-cream-bright"
           disabled={!props.query.trim() || commandOnly}
-          aria-label="Ask Misty"
+          aria-label="Search"
           onClick={(event) => {
             event.stopPropagation();
             props.onExpand();
@@ -208,26 +201,6 @@ export function GlobalMistyLauncher(props: {
         <p className="border-t border-charcoal-border/70 px-2 py-5 text-center text-sm text-mist-gray">
           No matching commands.
         </p>
-      ) : null}
-      {!commandOnly ? (
-        <div className="mt-2 flex min-h-8 items-center gap-1 border-t border-charcoal-border/70 pt-2">
-          {options.map((option) => (
-            <button
-              key={option.label}
-              type="button"
-              className="flex h-8 items-center gap-2 rounded-lg px-2.5 text-xs font-medium text-cream-muted transition hover:bg-charcoal-hover hover:text-cream"
-              onClick={(event) => {
-                event.stopPropagation();
-                props.onModeChange(option.mode);
-                props.onQueryChange(option.prompt);
-                props.onExpand();
-              }}
-            >
-              <ModeIcon mode={option.mode} />
-              {option.label}
-            </button>
-          ))}
-        </div>
       ) : null}
     </motion.div>
   );
@@ -276,7 +249,6 @@ function recentTabs(): WorkspaceTab[] {
   const state = useWorkspaceStore.getState();
   return (state.virtualWindowsByScope[state.activeScopeKey] ?? [])
     .flatMap((window) => dockTabs(window.layout.root))
-    .filter((tab) => tab.surfaceId !== "home")
     .sort((left, right) => right.lastFocusedAt - left.lastFocusedAt);
 }
 
@@ -284,29 +256,4 @@ function scopeLabel(scope: string): string {
   if (scope === "global") return "Everywhere";
   if (scope === "workspace") return "Workspace";
   return scope.slice(5).replace(/^./, (character) => character.toUpperCase());
-}
-
-function launcherOptions(path: string): LauncherOption[] {
-  if (path.startsWith("/spaces/"))
-    return [
-      {
-        label: "Summarize this Space",
-        prompt: "Summarize recent updates in this Space",
-        mode: "ask",
-      },
-      { label: "Create task", prompt: "Create a task in this Space", mode: "action" },
-    ];
-  if (path.startsWith("/files"))
-    return [
-      { label: "Search current folder", prompt: "Search this folder", mode: "search" },
-      { label: "Summarize selection", prompt: "Summarize the selected files", mode: "ask" },
-    ];
-  return [
-    { label: "Summarize updates", prompt: "Summarize my recent updates", mode: "ask" },
-    { label: "Create task", prompt: "Create a task", mode: "action" },
-  ];
-}
-
-function capitalize(value: string): string {
-  return `${value.charAt(0).toUpperCase()}${value.slice(1)}`;
 }
