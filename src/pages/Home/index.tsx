@@ -8,7 +8,6 @@ import Docs from "./DocsSection";
 import BlogPreview from "./BlogPreview";
 import Changelog from "./Changelog";
 import EndingOutro from "./EndingOutro";
-import StatsSection from "./StatsSection";
 
 export default function Home() {
   return (
@@ -24,10 +23,6 @@ export default function Home() {
 
       <section>
         <ServiceProviders/>
-      </section>
-
-      <section>
-        <StatsSection/>
       </section>
 
       <section>

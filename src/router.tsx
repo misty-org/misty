@@ -8,7 +8,7 @@ import Register from "./pages/Register";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import Waitlist from "./pages/Waitlist";
-import Docs from "@misty/docs";
+import Docs from "./pages/Docs";
 import Settings from "./pages/Dashboard";
 import Changelog from "./pages/Changelog";
 import Blog from "./pages/Blog";

@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@source "../../misty-docs/src";
+@source "./pages/Docs";
 
 @theme {
   --color-bg: #07090b;
@@ -25,7 +25,7 @@
 html {
   font-size: 17px;
   scroll-behavior: auto;
-  overflow-y: scroll;
+  scrollbar-gutter: stable;
 }
 
 @media (max-width: 639px) {
@@ -40,6 +40,14 @@ body {
   color: var(--color-text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+.font-bold {
+  font-weight: 640;
+}
+
+.font-semibold {
+  font-weight: 560;
 }
 
 ::selection {

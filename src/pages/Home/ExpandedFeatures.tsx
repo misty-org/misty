@@ -1,59 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  HiOutlineArchiveBox,
-  HiOutlineSparkles,
-  HiOutlinePuzzlePiece,
-  HiOutlineClock,
-} from "react-icons/hi2";
-
-const snapshots = [
-  { id: "a1b2c3d", label: "Today, 9:41 AM", size: "2.3 GB" },
-  { id: "e4f5g6h", label: "Yesterday, 11:02 PM", size: "2.3 GB" },
-  { id: "i7j8k9l", label: "Apr 16, 8:15 AM", size: "2.1 GB" },
-];
-
-const SNAPSHOT_INTERVAL = 2200;
-
-function SnapshotCycler() {
-  const [active, setActive] = useState(0);
-
-  useEffect(() => {
-    const t = setInterval(() => setActive((i) => (i + 1) % snapshots.length), SNAPSHOT_INTERVAL);
-    return () => clearInterval(t);
-  }, []);
-
-  return (
-    <div className="grid grid-cols-3 gap-2 w-full">
-      {snapshots.map((snap, i) => {
-        const isActive = i === active;
-        return (
-          <div
-            key={snap.id}
-            className={`relative px-4 py-3 rounded-xl border overflow-hidden transition-all duration-500 ${
-              isActive ? "bg-surface border-zinc-700/60" : "bg-surface/40 border-border opacity-40"
-            }`}
-          >
-            {isActive && (
-              <div
-                key={active}
-                className="absolute inset-x-0 bottom-0 h-0.5 bg-zinc-500/60 origin-left animate-fill-bar"
-              />
-            )}
-            <div className="flex items-center gap-2 text-xs">
-              <HiOutlineClock className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-zinc-400" : "text-text-muted"}`} />
-              <span className={`flex-1 truncate ${isActive ? "text-text" : "text-text-muted"}`}>{snap.label}</span>
-              <span className={`px-1.5 py-0.5 rounded-full border text-[10px] shrink-0 ${
-                i === 0 ? "border-zinc-700 text-zinc-400" : "border-border text-text-muted"
-              }`}>
-                {i === 0 ? "latest" : snap.id.slice(0, 7)}
-              </span>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
+import { HiOutlineSparkles, HiOutlinePuzzlePiece } from "react-icons/hi2";
 
 const conversations = [
   {
@@ -88,6 +34,7 @@ function ChatCycler() {
     ];
     let step = 0;
     let t: number;
+
     function tick() {
       const [p, delay] = timings[step];
       setPhase(p);
@@ -97,74 +44,43 @@ function ChatCycler() {
         tick();
       }, delay);
     }
+
     tick();
     return () => clearTimeout(t);
   }, []);
 
   const conv = conversations[convIndex];
-
   const showResponse = phase === "answer" || phase === "thanks";
 
   return (
-    <div className="flex flex-col gap-2 text-xs mb-4">
-      {/* User question */}
-      <div className="self-end max-w-[80%] px-3 py-2 rounded-xl bg-elevated border border-border text-text">
+    <div className="mb-4 flex h-[210px] flex-col gap-2 text-xs">
+      <div className="self-end max-w-[80%] rounded-xl border border-border bg-elevated px-3 py-2 text-text">
         {conv.q}
       </div>
 
-      {/* AI slot — typing or answer, same vertical space */}
-      <div className="self-start max-w-[80%]">
+      <div className="self-start min-h-[52px] max-w-[80%]">
         {phase === "typing" && (
-          <div className="px-3 py-2 rounded-xl bg-surface border border-border animate-fade-in">
-            <div className="flex gap-1 items-center h-3">
-              <span className="w-1.5 h-1.5 rounded-full bg-text-muted animate-bounce [animation-delay:0ms]" />
-              <span className="w-1.5 h-1.5 rounded-full bg-text-muted animate-bounce [animation-delay:150ms]" />
-              <span className="w-1.5 h-1.5 rounded-full bg-text-muted animate-bounce [animation-delay:300ms]" />
+          <div className="animate-fade-in rounded-xl border border-border bg-surface px-3 py-2">
+            <div className="flex h-3 items-center gap-1">
+              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-text-muted [animation-delay:0ms]" />
+              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-text-muted [animation-delay:150ms]" />
+              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-text-muted [animation-delay:300ms]" />
             </div>
           </div>
         )}
         {showResponse && (
-          <div className="px-3 py-2 rounded-xl bg-surface border border-border text-text-muted animate-fade-in">
+          <div className="animate-fade-in rounded-xl border border-border bg-surface px-3 py-2 text-text-muted">
             {conv.a}
           </div>
         )}
-        {phase === "question" && <div className="h-[29px]" />}
+        {phase === "question" && <div className="h-[52px]" />}
       </div>
 
-      {/* Thanks — always takes space, opacity toggle so no layout shift */}
-      <div className={`self-end max-w-[80%] px-3 py-2 rounded-xl bg-elevated border border-border text-text transition-opacity duration-300 ${phase === "thanks" ? "opacity-100" : "opacity-0"}`}>
+      <div
+        className={`self-end mt-auto max-w-[80%] rounded-xl border border-border bg-elevated px-3 py-2 text-text transition-opacity duration-300 ${phase === "thanks" ? "opacity-100" : "opacity-0"}`}
+      >
         {conv.thanks}
       </div>
-    </div>
-  );
-}
-
-const extensions = ["Image optimizer", "Pdf converter", "Bulk renamer"];
-
-function ExtensionList() {
-  const [active, setActive] = useState(0);
-
-  useEffect(() => {
-    const t = setInterval(() => setActive((i) => (i + 1) % extensions.length), 1500);
-    return () => clearInterval(t);
-  }, []);
-
-  return (
-    <div className="flex flex-col gap-2 text-xs text-text-muted mb-4">
-      {extensions.map((ext, i) => (
-        <div
-          key={ext}
-          className={`flex items-center gap-3 px-3 py-2 rounded-lg border transition-all duration-300 ${
-            active === i ? "bg-elevated border-white/15 text-text" : "bg-surface border-border"
-          }`}
-        >
-          <span className={`w-1.5 h-1.5 rounded-full shrink-0 transition-colors duration-300 ${
-            active === i ? "bg-zinc-300" : "bg-zinc-600"
-          }`} />
-          <span className="flex-1">{ext}</span>
-          <span className="text-[10px] text-text-muted">extension</span>
-        </div>
-      ))}
     </div>
   );
 }
@@ -172,71 +88,83 @@ function ExtensionList() {
 export default function ExpandedFeatures() {
   return (
     <div className="flex flex-col gap-4">
-      {/* Vault — full width */}
-      <div className="glass-card rounded-2xl p-4 md:p-6 text-center">
-        <div className="flex justify-center mb-4">
-          <div className="w-10 h-10 rounded-lg bg-surface border border-border flex items-center justify-center">
-            <HiOutlineArchiveBox className="w-5 h-5 text-text-muted" />
+      <div className="glass-card grid grid-cols-1 overflow-hidden rounded-2xl md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+        <div className="border-t border-border/70 bg-[#0f0d0c] p-3 md:border-r md:border-t-0 md:p-4">
+          <div className="overflow-hidden rounded-xl border border-border/70 bg-[#120f0e] shadow-[0_22px_50px_rgba(0,0,0,0.28)]">
+            <img
+              src="/misty-plugins.png"
+              alt="Misty plugins browser screenshot"
+              className="block h-full w-full object-cover object-top"
+            />
           </div>
         </div>
-        <h2 className="text-2xl md:text-3xl font-bold text-text tracking-tight mb-3">
-          <span className="text-white">Encrypted backups</span>, built in.
-        </h2>
-        <p className="text-text-muted text-pretty max-w-2xl mx-auto mb-2">
-          Create restic-powered snapshots of any local or remote folder. Restore
-          to any point in time, check integrity, and prune old copies — all from
-          inside Misty. Passwords live in your Os keyring, never ours.
-        </p>
-        <p className="text-xs text-text-muted/60 mb-6">
-          Powered by{" "}
-          <a
-            href="https://restic.net"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-text-muted hover:text-white transition-colors"
-          >
-            restic
-          </a>
-        </p>
-        <SnapshotCycler />
+
+        <div className="p-5 md:p-8">
+          <div className="flex h-full flex-col justify-center rounded-xl bg-surface/20 p-5 text-left md:p-6">
+            <div className="mb-4 flex justify-start">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-surface">
+                <HiOutlinePuzzlePiece className="h-5 w-5 text-text-muted" />
+              </div>
+            </div>
+            <h2 className="mb-3 text-2xl font-bold tracking-tight text-text md:text-3xl">
+              Plugins, built in.
+            </h2>
+            <p className="mb-4 max-w-xl text-pretty text-text-muted">
+              Add tools and panels that fit the way you work.
+            </p>
+            <div className="mt-auto flex justify-start">
+              <a
+                href="/plugins"
+                className="text-xs text-text-muted underline underline-offset-4 transition-colors hover:text-white"
+              >
+                Explore plugins
+              </a>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* 2-col: AI panel + Extensions */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* AI panel */}
-        <div className="glass-card rounded-2xl p-4 md:p-6 flex flex-col">
-          <div className="w-10 h-10 rounded-lg bg-surface border border-border flex items-center justify-center mb-4">
-            <HiOutlineSparkles className="w-5 h-5 text-text-muted" />
-          </div>
-          <h3 className="text-xl font-bold text-text mb-3">Ask your files anything.</h3>
-          <p className="text-text-muted text-pretty mb-4">
-            An integrated AI panel that understands your working directory.
-            Query across your content, get answers, and take action — without
-            leaving Misty.
-          </p>
-          <ChatCycler />
-          <div className="flex justify-end mt-auto">
-            <a href="/docs" className="text-xs text-text-muted hover:text-white transition-colors underline underline-offset-4">
-              Learn more
-            </a>
+      <div className="glass-card grid grid-cols-1 overflow-hidden rounded-2xl md:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+        <div className="p-5 md:p-8">
+          <div className="flex h-full flex-col justify-center rounded-xl bg-surface/20 p-5 text-left md:p-6">
+            <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-surface">
+              <HiOutlineSparkles className="h-5 w-5 text-text-muted" />
+            </div>
+            <h2 className="mb-3 text-2xl font-bold tracking-tight text-text md:text-3xl">
+              Smart and context aware.
+            </h2>
+            <p className="mb-6 text-pretty text-text-muted">
+              Answers stay grounded in the files and workspace already in front of you.
+            </p>
+            <div className="divide-y divide-border/70 rounded-xl border border-border/60 bg-surface/10">
+              <div className="px-4 py-4 md:px-5">
+                <h3 className="mb-3 text-xl font-bold text-text">Ask your files anything.</h3>
+                <p className="text-pretty text-text-muted">
+                  Search, summarize, and act without leaving the current view.
+                </p>
+              </div>
+              <div className="px-4 py-4 md:px-5">
+                <ChatCycler />
+              </div>
+              <div className="flex justify-end px-4 py-4 md:px-5">
+                <a
+                  href="/docs"
+                  className="text-xs text-text-muted underline underline-offset-4 transition-colors hover:text-white"
+                >
+                  Learn more
+                </a>
+              </div>
+            </div>
           </div>
         </div>
-
-        {/* Extensions */}
-        <div className="glass-card rounded-2xl p-4 md:p-6 flex flex-col">
-          <div className="w-10 h-10 rounded-lg bg-surface border border-border flex items-center justify-center mb-4">
-            <HiOutlinePuzzlePiece className="w-5 h-5 text-text-muted" />
-          </div>
-          <h3 className="text-xl font-bold text-text mb-3">Built to be extended.</h3>
-          <p className="text-text-muted text-pretty mb-4">
-            Launch custom workflows as isolated processes, embed panels into the
-            Ui, and build tools that treat your files as first-class citizens.
-          </p>
-          <ExtensionList />
-          <div className="flex justify-end mt-auto">
-            <a href="/docs" className="text-xs text-text-muted hover:text-white transition-colors underline underline-offset-4">
-              Learn more
-            </a>
+        <div className="border-t border-border/70 bg-[#0f0d0c] p-5 md:border-l md:border-t-0 md:p-8">
+          <div className="flex min-h-[320px] items-center justify-center rounded-xl border border-dashed border-border bg-surface/15 p-5">
+            <div className="text-center">
+              <p className="mb-2 text-[11px] uppercase tracking-[0.18em] text-text-muted/70">
+                Screenshot Area
+              </p>
+              <p className="text-sm text-text-muted">Reserved for AI workspace preview</p>
+            </div>
           </div>
         </div>
       </div>

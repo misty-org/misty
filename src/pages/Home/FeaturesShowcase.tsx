@@ -21,45 +21,27 @@ function SearchDiagram() {
   }, []);
 
   return (
-    <div className="flex items-center gap-2 text-xs text-text-muted flex-wrap">
+    <div className="flex flex-wrap items-center gap-2 text-xs text-text-muted">
       {searchProviders.map((p, i) => (
         <span
           key={p}
-          className={`px-2.5 py-1.5 rounded-lg border transition-all duration-300 ${
-            step === i ? "border-white/25 text-white bg-elevated" : "border-border bg-surface"
+          className={`rounded-lg border px-2.5 py-1.5 transition-all duration-300 ${
+            step === i ? "border-white/25 bg-elevated text-white" : "border-border bg-surface"
           }`}
         >
           {p}
         </span>
       ))}
-      <span className={`transition-colors duration-300 ${step === 3 ? "text-white" : "text-text-muted"}`}>&rarr;</span>
+      <span className={`transition-colors duration-300 ${step === 3 ? "text-white" : "text-text-muted"}`}>
+        &rarr;
+      </span>
       <span
-        className={`px-2.5 py-1.5 rounded-lg border font-medium transition-all duration-300 ${
-          step === 3 ? "border-white/25 text-white bg-elevated" : "border-border text-text bg-elevated"
+        className={`rounded-lg border px-2.5 py-1.5 font-medium transition-all duration-300 ${
+          step === 3 ? "border-white/25 bg-elevated text-white" : "border-border bg-elevated text-text"
         }`}
       >
         One index
       </span>
-    </div>
-  );
-}
-
-function OAuthPacket() {
-  return (
-    <div className="flex items-center text-xs text-text-muted gap-2">
-      <div className="px-3 py-2 rounded-lg bg-surface border border-border shrink-0">
-        <span className="text-text font-medium">Your device</span>
-      </div>
-      <div className="flex-1 flex flex-col items-center gap-0.5 min-w-0">
-        <span className="text-[10px]">Oauth</span>
-        <div className="relative w-full h-3 flex items-center">
-          <div className="absolute inset-x-0 border-t border-dashed border-border" />
-          <div className="animate-oauth-packet w-1.5 h-1.5 rounded-full bg-zinc-400" />
-        </div>
-      </div>
-      <div className="px-3 py-2 rounded-lg bg-surface border border-border shrink-0">
-        <span>Cloud provider</span>
-      </div>
     </div>
   );
 }
@@ -69,7 +51,15 @@ const filePool = [
   "archive.tar", "assets/", "notes.docx", "data.csv", "exports/",
 ];
 
-function TransferTrack({ speed, initialProgress, initialIdx }: { speed: number; initialProgress: number; initialIdx: number }) {
+function TransferTrack({
+  speed,
+  initialProgress,
+  initialIdx,
+}: {
+  speed: number;
+  initialProgress: number;
+  initialIdx: number;
+}) {
   const [progress, setProgress] = useState(initialProgress);
   const [idx, setIdx] = useState(initialIdx);
   const progressRef = useRef(initialProgress);
@@ -88,8 +78,8 @@ function TransferTrack({ speed, initialProgress, initialIdx }: { speed: number; 
 
   return (
     <div className="flex items-center gap-3">
-      <span className="text-text-muted w-28 truncate">{filePool[idx]}</span>
-      <div className="flex-1 h-1.5 rounded-full bg-surface overflow-hidden">
+      <span className="w-28 truncate text-text-muted">{filePool[idx]}</span>
+      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface">
         <div
           className="h-full rounded-full bg-text-muted"
           style={{ width: `${progress}%`, transition: progress < speed * 2 ? "none" : "width 50ms linear" }}
@@ -99,34 +89,22 @@ function TransferTrack({ speed, initialProgress, initialIdx }: { speed: number; 
   );
 }
 
-function DirectConnections() {
-  const providers = ["Google Drive", "OneDrive", "Dropbox"];
-  const [active, setActive] = useState(0);
-
-  useEffect(() => {
-    const t = setInterval(() => setActive((i) => (i + 1) % providers.length), 1200);
-    return () => clearInterval(t);
-  }, []);
-
+function OAuthPacket() {
   return (
-    <div className="flex flex-col gap-2 text-xs text-text-muted">
-      {providers.map((provider, i) => (
-        <div
-          key={provider}
-          className={`flex items-center gap-3 transition-opacity duration-400 ${
-            active === i ? "opacity-100" : "opacity-35"
-          }`}
-        >
-          <span
-            className={`w-2 h-2 rounded-full shrink-0 transition-colors duration-300 ${
-              active === i ? "bg-zinc-300" : "bg-zinc-700"
-            }`}
-          />
-          <span className="w-24">{provider}</span>
-          <div className="flex-1 border-t border-border" />
-          <span className="text-[10px]">Connected</span>
+    <div className="flex items-center gap-2 text-xs text-text-muted">
+      <div className="shrink-0 rounded-lg border border-border bg-surface px-3 py-2">
+        <span className="font-medium text-text">Your device</span>
+      </div>
+      <div className="flex min-w-0 flex-1 flex-col items-center gap-0.5">
+        <span className="text-[10px]">Oauth</span>
+        <div className="relative flex h-3 w-full items-center">
+          <div className="absolute inset-x-0 border-t border-dashed border-border" />
+          <div className="animate-oauth-packet h-1.5 w-1.5 rounded-full bg-zinc-400" />
         </div>
-      ))}
+      </div>
+      <div className="shrink-0 rounded-lg border border-border bg-surface px-3 py-2">
+        <span>Cloud provider</span>
+      </div>
     </div>
   );
 }
@@ -134,70 +112,81 @@ function DirectConnections() {
 export default function FeaturesShowcase() {
   return (
     <div className="flex flex-col gap-4">
-      {/* Fast — full width */}
-      <div className="glass-card rounded-2xl p-4 md:p-6 text-center relative overflow-hidden">
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-[30%] left-0 w-20 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent animate-streak" />
-          <div className="absolute top-[50%] left-0 w-32 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent animate-streak-2" />
-          <div className="absolute top-[70%] left-0 w-16 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent animate-streak-3" />
+      <div className="glass-card grid grid-cols-1 overflow-hidden rounded-2xl md:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+        <div className="p-5 md:p-8">
+          <div className="flex h-full flex-col justify-center rounded-xl bg-surface/20 p-5 text-left md:p-6">
+            <h2 className="mb-4 text-2xl font-bold tracking-tight text-text md:text-3xl">
+              <span className="text-white">Fast</span>, zero bloat.
+            </h2>
+            <p className="mb-6 text-pretty text-text-muted">
+              Search, browse, and move files without the interface getting in your way.
+            </p>
+            <div className="divide-y divide-border/70 rounded-xl border border-border/60 bg-surface/10">
+              <div className="px-4 py-4 md:px-5">
+                <h3 className="mb-2 text-xl font-bold text-text">Unified search</h3>
+                <p className="mb-4 text-sm text-text-muted">One query across everything you connect.</p>
+                <SearchDiagram />
+              </div>
+              <div className="px-4 py-4 md:px-5">
+                <h3 className="mb-2 text-xl font-bold text-text">Background transfers</h3>
+                <p className="mb-4 text-sm text-text-muted">Transfers keep running while you keep working.</p>
+                <div className="flex flex-col gap-2 text-xs">
+                  <TransferTrack speed={1.4} initialProgress={20} initialIdx={0} />
+                  <TransferTrack speed={2.2} initialProgress={55} initialIdx={1} />
+                  <TransferTrack speed={0.8} initialProgress={8} initialIdx={2} />
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-        <div className="relative">
-          <h2 className="text-2xl md:text-3xl font-bold text-text tracking-tight mb-4">
-            <span className="text-white">Fast</span>, zero bloat.
-          </h2>
-          <p className="text-text-muted max-w-xl mx-auto text-pretty">
-            Misty is built for files streaming on demand. Files will sync in the backgro, no waiting. Search across every provider at once and never lose your place.
-          </p>
-        </div>
-      </div>
-
-      {/* 2-col row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="glass-card rounded-2xl p-4 md:p-6">
-          <h3 className="text-xl font-bold text-text mb-3">Unified search</h3>
-          <p className="text-text-muted text-pretty mb-5">
-            One query across every connected provider. No more switching between tabs to find a file.
-          </p>
-          <SearchDiagram />
-        </div>
-        <div className="glass-card rounded-2xl p-4 md:p-6">
-          <h3 className="text-xl font-bold text-text mb-3">Background transfers</h3>
-          <p className="text-text-muted text-pretty mb-5">
-            Moves and copies run quietly while you keep working. Large transfers don't block anything.
-          </p>
-          <div className="flex flex-col gap-2 text-xs">
-            <TransferTrack speed={1.4} initialProgress={20} initialIdx={0} />
-            <TransferTrack speed={2.2} initialProgress={55} initialIdx={1} />
-            <TransferTrack speed={0.8} initialProgress={8}  initialIdx={2} />
+        <div className="border-t border-border/70 bg-[#0f0d0c] p-5 md:border-l md:border-t-0 md:p-8">
+          <div className="flex min-h-[320px] items-center justify-center rounded-xl border border-dashed border-border bg-surface/15 p-5">
+            <div className="text-center">
+              <p className="mb-2 text-[11px] uppercase tracking-[0.18em] text-text-muted/70">
+                Screenshot Area
+              </p>
+              <p className="text-sm text-text-muted">Reserved for fast workflow preview</p>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Secure — full width */}
-      <div className="glass-card rounded-2xl p-4 md:p-6 text-center">
-        <h2 className="text-2xl md:text-3xl font-bold text-text tracking-tight mb-4">
-          <span className="text-white">Secure</span> by design.
-        </h2>
-        <p className="text-text-muted max-w-xl mx-auto text-pretty">
-          Your credentials never leave your machine. Direct connections over Oauth — no relay servers, no middlemen, no data we can see.
-        </p>
-      </div>
-
-      {/* 2-col: Local-only + Direct connections */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="glass-card rounded-2xl p-4 md:p-6">
-          <h3 className="text-xl font-bold text-text mb-3">Local-only</h3>
-          <p className="text-text-muted text-pretty mb-5">
-            All processing happens on your device. Nothing is routed through our servers.
-          </p>
-          <OAuthPacket />
+      <div className="glass-card grid grid-cols-1 overflow-hidden rounded-2xl md:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+        <div className="border-b border-border/70 bg-[#0f0d0c] p-5 md:border-b-0 md:border-r md:p-8">
+          <div className="flex min-h-[320px] items-center justify-center rounded-xl border border-dashed border-border bg-surface/15 p-5">
+            <div className="text-center">
+              <p className="mb-2 text-[11px] uppercase tracking-[0.18em] text-text-muted/70">
+                Screenshot Area
+              </p>
+              <p className="text-sm text-text-muted">Reserved for security and auth preview</p>
+            </div>
+          </div>
         </div>
-        <div className="glass-card rounded-2xl p-4 md:p-6">
-          <h3 className="text-xl font-bold text-text mb-3">Direct connections</h3>
-          <p className="text-text-muted text-pretty mb-5">
-            Every Api call goes straight from your machine to the provider. Optional Tailscale support for secure remote access.
-          </p>
-          <DirectConnections />
+        <div className="p-5 md:p-8">
+          <div className="flex h-full flex-col justify-center rounded-xl bg-surface/20 p-5 text-left md:p-6">
+            <h2 className="mb-4 text-2xl font-bold tracking-tight text-text md:text-3xl">
+              <span className="text-white">Secure</span> by design.
+            </h2>
+            <p className="mb-6 text-pretty text-text-muted">
+              Your accounts connect directly, and your file contents stay out of our hands.
+            </p>
+            <div className="divide-y divide-border/70 rounded-xl border border-border/60 bg-surface/10">
+              <div className="px-4 py-4 md:px-5">
+                <a
+                  href="/docs/introduction"
+                  className="text-xs text-text-muted underline underline-offset-4 transition-colors hover:text-white"
+                >
+                  Learn more about how Misty works
+                </a>
+              </div>
+              <div className="px-4 py-4 md:px-5">
+                <p className="mb-4 text-[11px] uppercase tracking-[0.18em] text-text-muted/70">
+                  Authentication flow
+                </p>
+                <OAuthPacket />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

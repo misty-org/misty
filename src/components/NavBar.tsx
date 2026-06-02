@@ -111,9 +111,7 @@ export default function Navbar() {
                     key={to}
                     to={to}
                     end
-                    className={({ isActive }) => `block px-4 py-2.5 text-sm transition-colors ${
-                      isActive ? "text-white bg-primary/10" : "text-text hover:text-white hover:bg-elevated"
-                    }`}
+                    className="block px-4 py-2.5 text-sm text-text transition-colors hover:text-white hover:bg-elevated"
                   >
                     {label}
                   </NavLink>
@@ -181,9 +179,7 @@ export default function Navbar() {
             ))}
             <span className="px-4 pt-3 pb-1 text-[11px] font-semibold tracking-[0.18em] text-text-muted">Resources</span>
             {resourcesLinks.map(({ to, label }) => (
-              <NavLink key={to} to={to} end className={({ isActive }) => `px-4 pl-6 py-2 rounded-lg text-sm font-medium transition-colors ${
-                isActive ? "text-primary bg-primary/10" : "text-text-muted hover:text-text hover:bg-elevated"
-              }`}>
+              <NavLink key={to} to={to} end className="px-4 pl-6 py-2 rounded-lg text-sm font-medium text-text-muted transition-colors hover:text-text hover:bg-elevated">
                 {label}
               </NavLink>
             ))}

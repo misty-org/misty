@@ -23,7 +23,6 @@ export default function Plugins() {
       }}
       onOpenLink={(url) => window.open(url, "_blank", "noopener,noreferrer")}
       onQueryChange={setQuery}
-      onRefresh={() => setNotice("Refreshed plugin catalog.")}
       onSelect={setSelectedPluginId}
       onToggle={(plugin, enabled) => {
         setPlugins((current) =>
@@ -41,7 +40,6 @@ export default function Plugins() {
       }}
       query={query}
       selectedPluginId={selectedPluginId}
-      subtitle="Browse what Misty can do, then install the pieces you want."
       title="Plugins"
     />
   );

@@ -2,28 +2,6 @@ import { useState } from "react";
 
 const changelog = [
   {
-    version: "v0.3.0",
-    date: "Feb 2026",
-    summary: "OneDrive integration & transfer queue",
-    changes: [
-      "Added OneDrive as a supported storage provider",
-      "New transfer queue Ui with real-time progress tracking",
-      "Grpc streaming for large file transfers",
-      "Bug fixes for Oauth token refresh flow",
-    ],
-  },
-  {
-    version: "v0.2.0",
-    date: "Jan 2026",
-    summary: "Google Drive support & unified browser",
-    changes: [
-      "Google Drive integration via proxy backend",
-      "Unified file browser combining local and cloud files",
-      "File indexing with PostgreSQL for fast search",
-      "Initial Tailscale networking support",
-    ],
-  },
-  {
     version: "v0.1.0",
     date: "Dec 2025",
     summary: "Initial release",

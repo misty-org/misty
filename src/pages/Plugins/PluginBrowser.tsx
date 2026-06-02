@@ -7,7 +7,6 @@ import type {
 
 type PluginBrowserProps = {
   title?: string;
-  subtitle?: string;
   marketplacePlugins: PluginBrowserEntry[];
   installedPlugins?: PluginBrowserEntry[];
   loading?: boolean;
@@ -17,7 +16,6 @@ type PluginBrowserProps = {
   selectedPluginId?: string;
   onQueryChange: (query: string) => void;
   onSelect: (pluginId: string) => void;
-  onRefresh?: () => void;
   onInstall?: (plugin: PluginBrowserEntry) => void;
   onToggle?: (plugin: PluginBrowserEntry, enabled: boolean) => void;
   onUninstall?: (plugin: PluginBrowserEntry) => void;
@@ -47,21 +45,6 @@ function pluginInitials(plugin: PluginBrowserEntry) {
     .join("")
     .slice(0, 2)
     .toUpperCase();
-}
-
-function prettyPermission(permission: string) {
-  const normalized = permission.toLowerCase();
-  if (normalized.includes("write") || normalized.includes("shell")) {
-    return "elevated";
-  }
-  if (normalized.includes("network")) {
-    return "network";
-  }
-  return "read-only";
-}
-
-function categoryLabel(plugin: PluginBrowserEntry) {
-  return plugin.whereItAppears[0] ?? "productivity";
 }
 
 function filterPlugins(
@@ -268,7 +251,6 @@ function PrimaryAction({
 
 export function PluginBrowser({
   title = "Plugins",
-  subtitle = "Extend Misty with powerful plugins.",
   marketplacePlugins,
   installedPlugins = [],
   loading = false,
@@ -278,7 +260,6 @@ export function PluginBrowser({
   selectedPluginId,
   onQueryChange,
   onSelect,
-  onRefresh,
   onInstall,
   onToggle,
   onUninstall,
