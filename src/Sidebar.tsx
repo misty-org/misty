@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+import { ChevronDown } from "lucide-react";
 import type { Section, Category } from "./data";
 
 export default function Sidebar({
@@ -15,37 +17,78 @@ export default function Sidebar({
   open: boolean;
   onClose: () => void;
 }) {
+  const [openCategories, setOpenCategories] = useState<Record<string, boolean>>(
+    {
+      "getting-started": true,
+    },
+  );
+
+  useEffect(() => {
+    const activeCategory = sections.find(
+      (section) => section.id === activeId,
+    )?.category;
+    if (!activeCategory) return;
+
+    setOpenCategories((current) =>
+      current[activeCategory]
+        ? current
+        : { ...current, [activeCategory]: true },
+    );
+  }, [activeId, sections]);
+
+  const toggleCategory = (key: string) => {
+    setOpenCategories((current) => ({ ...current, [key]: !current[key] }));
+  };
+
   const inner = (
-    <nav className="flex flex-col gap-6 py-6 px-4">
+    <nav className="flex flex-col gap-4 p-2">
       {categories.map((cat) => (
-        <div key={cat.key}>
-          <span className="text-[11px] font-semibold text-text-muted px-3 mb-2 block">
-            {cat.label}
-          </span>
-          <div className="flex flex-col gap-0.5">
-            {cat.ids.map((id) => {
-              const sec = sections.find((s) => s.id === id)!;
-              const active = activeId === id;
-              return (
-                <button
-                  key={id}
-                  onClick={() => { onSelect(id); onClose(); }}
-                  className={`flex w-full items-center gap-2 text-left px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer ${
-                    active
-                      ? "bg-primary/10 text-white font-medium"
-                      : "text-text hover:text-white hover:bg-elevated"
-                  }`}
-                >
-                  {sec.label}
-                  {"badge" in sec && sec.badge && (
-                    <span className="ml-auto px-1.5 py-0.5 rounded text-[10px] font-medium bg-primary/10 text-primary border border-primary/20">
-                      {sec.badge}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
+        <div key={cat.key} className="pb-1">
+          <button
+            type="button"
+            onClick={() => toggleCategory(cat.key)}
+            className="flex w-full items-center justify-between px-3 py-2 text-left"
+          >
+            <span className="text-[15.5px] font-medium text-white">
+              {cat.label}
+            </span>
+            <ChevronDown
+              size={16}
+              className={`text-xs text-text-muted transition-transform ${
+                openCategories[cat.key] ? "rotate-0" : "-rotate-90"
+              }`}
+              aria-hidden="true"
+            />
+          </button>
+          {openCategories[cat.key] && (
+            <div className="mt-1 flex flex-col gap-0.5">
+              {cat.ids.map((id) => {
+                const sec = sections.find((s) => s.id === id)!;
+                const active = activeId === id;
+                return (
+                  <button
+                    key={id}
+                    onClick={() => {
+                      onSelect(id);
+                      onClose();
+                    }}
+                    className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[15.5px] transition-colors cursor-pointer ${
+                      active
+                        ? "bg-primary/10 font-medium text-white"
+                        : "font-normal text-text-muted hover:bg-elevated hover:text-white"
+                    }`}
+                  >
+                    {sec.label}
+                    {"badge" in sec && sec.badge && (
+                      <span className="ml-auto rounded border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium text-primary">
+                        {sec.badge}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       ))}
     </nav>
@@ -53,11 +96,18 @@ export default function Sidebar({
 
   return (
     <>
-      <aside className="hidden h-full overflow-y-auto border-r border-border-subtle lg:block">{inner}</aside>
+      <aside className="hidden h-full overflow-y-auto border-r border-border-subtle lg:block">
+        {inner}
+      </aside>
       {open && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-          <aside className="fixed top-0 left-0 bottom-0 z-50 w-[280px] bg-surface border-r border-border overflow-y-auto">{inner}</aside>
+          <div
+            className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
+            onClick={onClose}
+          />
+          <aside className="fixed top-0 left-0 bottom-0 z-50 w-[280px] bg-surface border-r border-border overflow-y-auto">
+            {inner}
+          </aside>
         </>
       )}
     </>
