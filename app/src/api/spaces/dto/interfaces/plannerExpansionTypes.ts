@@ -23,6 +23,7 @@ export interface SpaceAgendaEntry {
   meeting_url?: string;
   location?: string;
   external_event_id?: string;
+  version?: number;
 }
 
 export interface SpaceAgendaSnapshot {
