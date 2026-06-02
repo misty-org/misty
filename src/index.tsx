@@ -62,12 +62,12 @@ export default function Docs({ basePath = "/docs", initialSectionId = "introduct
   const section = guideSections.find((s) => s.id === activeId) ?? guideSections[0];
 
   return (
-    <div className="mx-auto flex h-[calc(100vh-4rem)] w-full max-w-[1440px] flex-col overflow-hidden px-5 py-4 sm:px-6 lg:h-screen lg:px-8 xl:px-10">
+    <div className="mx-auto flex h-[calc(100vh-4rem)] w-full max-w-[1440px] flex-col overflow-auto px-5 py-4 sm:px-6 lg:h-screen lg:px-8 xl:px-10">
       <div className="border-b border-white/[0.07] pb-4">
         <h1 className="text-[34px] font-semibold tracking-[-0.03em] text-text">Docs</h1>
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden pt-0 lg:grid-cols-[240px_minmax(0,1fr)_200px]">
+      <div className="grid min-h-0 min-w-[1080px] flex-1 grid-cols-[240px_minmax(560px,1fr)_220px] pt-0">
         <Sidebar
           sections={guideSections}
           categories={guideCategories}
