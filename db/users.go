@@ -13,30 +13,50 @@ import (
 
 type User struct {
 	ID        string
+	LicenseID string
 	Name      string
 	Email     string
 	CreatedAt time.Time
 }
 
 func (db *Database) CreateUser(name, email, password string) (*User, error) {
-	id := uuid.New().String()
 	normalizedEmail := normalizeEmail(email)
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, err
 	}
 
+	id := uuid.New().String()
 	now := time.Now()
-	_, err = db.Conn.Exec(
-		`INSERT INTO users (id, name, email, password_hash) VALUES ($1, $2, $3, $4)`,
-		id, name, normalizedEmail, hash,
+	licenseID := uuid.New().String()
+	tx, err := db.Conn.Begin()
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = tx.Exec(
+		`INSERT INTO users (id, license_id, name, email, password_hash) VALUES ($1, $2, $3, $4, $5)`,
+		id, licenseID, name, normalizedEmail, hash,
 	)
 	if err != nil {
+		_ = tx.Rollback()
 		log.Println("Failed to create user:", err)
 		return nil, err
 	}
 
-	return &User{ID: id, Name: name, Email: normalizedEmail, CreatedAt: now}, nil
+	license, err := createLicenseTx(tx, licenseID, id, TierBasic, LicenseStatusActive, nil)
+	if err != nil {
+		_ = tx.Rollback()
+		log.Println("Failed to create license for user:", err)
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		log.Println("Failed to commit user creation:", err)
+		return nil, err
+	}
+
+	return &User{ID: id, LicenseID: license.ID, Name: name, Email: normalizedEmail, CreatedAt: now}, nil
 }
 
 func (db *Database) GetUserByEmail(email string) (*User, string, error) {
@@ -45,9 +65,9 @@ func (db *Database) GetUserByEmail(email string) (*User, string, error) {
 	normalizedEmail := normalizeEmail(email)
 
 	err := db.Conn.QueryRow(
-		`SELECT id, name, email, password_hash, created_at FROM users WHERE LOWER(email) = $1`,
+		`SELECT id, license_id, name, email, password_hash, created_at FROM users WHERE LOWER(email) = $1`,
 		normalizedEmail,
-	).Scan(&u.ID, &u.Name, &u.Email, &hash, &u.CreatedAt)
+	).Scan(&u.ID, &u.LicenseID, &u.Name, &u.Email, &hash, &u.CreatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, "", nil
@@ -70,9 +90,9 @@ func (db *Database) UpdateUserName(id, name string) error {
 func (db *Database) GetUserByID(id string) (*User, error) {
 	var u User
 	err := db.Conn.QueryRow(
-		`SELECT id, name, email, created_at FROM users WHERE id = $1`,
+		`SELECT id, license_id, name, email, created_at FROM users WHERE id = $1`,
 		id,
-	).Scan(&u.ID, &u.Name, &u.Email, &u.CreatedAt)
+	).Scan(&u.ID, &u.LicenseID, &u.Name, &u.Email, &u.CreatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil

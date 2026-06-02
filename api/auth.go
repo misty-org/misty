@@ -43,9 +43,9 @@ func Register(database *db.Database) http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(map[string]string{"user_id": user.ID})
+		writeJSON(w, http.StatusCreated, map[string]string{
+			"user_id": user.ID,
+		})
 	}
 }
 
@@ -97,8 +97,7 @@ func Login(database *db.Database) http.HandlerFunc {
 			MaxAge:   int(db.SessionTTL.Seconds()),
 		})
 
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{
+		writeJSON(w, http.StatusOK, map[string]string{
 			"user_id": user.ID,
 			"name":    user.Name,
 			"email":   user.Email,

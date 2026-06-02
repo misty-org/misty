@@ -1,0 +1,85 @@
+package main
+
+import (
+	"net/http"
+	"net/http/httptest"
+	"testing"
+)
+
+func TestIsLocalhostHostname(t *testing.T) {
+	tests := []struct {
+		host string
+		want bool
+	}{
+		{host: "localhost", want: true},
+		{host: "127.0.0.1", want: true},
+		{host: "::1", want: true},
+		{host: " example.com ", want: false},
+	}
+
+	for _, tt := range tests {
+		if got := isLocalhostHostname(tt.host); got != tt.want {
+			t.Fatalf("isLocalhostHostname(%q) = %v, want %v", tt.host, got, tt.want)
+		}
+	}
+}
+
+func TestPasswordResetURLsFromEnv(t *testing.T) {
+	t.Setenv("PASSWORD_RESET_URL", "https://app.example.com/reset")
+	t.Setenv("PASSWORD_RESET_START_URL", "https://api.example.com/auth/reset/start")
+
+	redirectURL, err := passwordResetRedirectURLFromEnv()
+	if err != nil {
+		t.Fatalf("passwordResetRedirectURLFromEnv() error = %v", err)
+	}
+	if redirectURL != "https://app.example.com/reset" {
+		t.Fatalf("redirect URL = %q, want %q", redirectURL, "https://app.example.com/reset")
+	}
+
+	startURL, err := passwordResetStartURLFromEnv()
+	if err != nil {
+		t.Fatalf("passwordResetStartURLFromEnv() error = %v", err)
+	}
+	if startURL != "https://api.example.com/auth/reset/start" {
+		t.Fatalf("start URL = %q, want %q", startURL, "https://api.example.com/auth/reset/start")
+	}
+}
+
+func TestPasswordResetURLsRejectNonLocalhostHTTP(t *testing.T) {
+	t.Setenv("PASSWORD_RESET_URL", "http://example.com/reset")
+	if _, err := passwordResetRedirectURLFromEnv(); err == nil {
+		t.Fatal("passwordResetRedirectURLFromEnv() succeeded for non-localhost http URL")
+	}
+
+	t.Setenv("PASSWORD_RESET_START_URL", "http://example.com/auth/reset/start")
+	if _, err := passwordResetStartURLFromEnv(); err == nil {
+		t.Fatal("passwordResetStartURLFromEnv() succeeded for non-localhost http URL")
+	}
+}
+
+func TestCreateServerAndMountHandlers(t *testing.T) {
+	t.Setenv("PASSWORD_RESET_URL", "http://localhost:5173/reset")
+	t.Setenv("PASSWORD_RESET_START_URL", "http://localhost:8080/auth/reset/start")
+	t.Setenv("MAILJET_API_KEY", "")
+	t.Setenv("MAILJET_SECRET_KEY", "")
+	t.Setenv("MAILJET_FROM_EMAIL", "")
+
+	server, err := CreateServer()
+	if err != nil {
+		t.Fatalf("CreateServer() error = %v", err)
+	}
+	if server.Router == nil || server.Database == nil || server.EmailSender == nil {
+		t.Fatalf("server not fully initialized: %#v", server)
+	}
+
+	if err := server.MountHandlers(); err != nil {
+		t.Fatalf("MountHandlers() error = %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/login", nil)
+	rec := httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("POST /api/login status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}

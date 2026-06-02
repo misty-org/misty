@@ -91,8 +91,8 @@ func (s *Server) MountHandlers() error {
 	s.Router.Get("/me", api.GetMe(s.Database))
 	s.Router.Put("/me/profile", api.UpdateProfile(s.Database))
 	s.Router.Put("/me/device", api.UpdateDevice(s.Database))
-	s.Router.Get("/download-url", api.DownloadURL(s.Database))
-	s.Router.Get("/download/{platform}", api.DownloadRedirect())
+	s.Router.Post("/billing/trial/start", api.StartPersonalTrial(s.Database))
+	s.Router.Post("/billing/checkout-session", api.CreateCheckoutSession(s.Database))
 
 	// Compatibility routes for clients configured with the /api prefix.
 	s.Router.Post("/api/register", registerHandler)
@@ -106,12 +106,8 @@ func (s *Server) MountHandlers() error {
 	s.Router.Get("/api/me", api.GetMe(s.Database))
 	s.Router.Put("/api/me/profile", api.UpdateProfile(s.Database))
 	s.Router.Put("/api/me/device", api.UpdateDevice(s.Database))
-	s.Router.Get("/api/download-url", api.DownloadURL(s.Database))
-	s.Router.Get("/api/download/{platform}", api.DownloadRedirect())
-
-	// License validation — called by the local proxy
-	s.Router.Post("/license/validate", api.ValidateLicense(s.Database))
-	s.Router.Get("/subscription", api.GetSubscription(s.Database))
+	s.Router.Post("/api/billing/trial/start", api.StartPersonalTrial(s.Database))
+	s.Router.Post("/api/billing/checkout-session", api.CreateCheckoutSession(s.Database))
 
 	// Stripe webhook — called by Stripe on payment events
 	s.Router.Post("/stripe/webhook", api.StripeWebhook(s.Database))
