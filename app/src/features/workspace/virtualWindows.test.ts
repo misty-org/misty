@@ -1,12 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import {
-  createDockLeaf,
-  createHomeDockTab,
-  dockLeaves,
-  dockTabs,
-  findDockLeaf,
-  insertDockSplit,
-} from "./dockTree";
+import { createDockLeaf, dockLeaves, dockTabs, findDockLeaf, insertDockSplit } from "./dockTree";
 import { useWorkspaceStore } from "./useWorkspaceStore";
 
 describe("workspace virtual windows", () => {
@@ -50,18 +43,14 @@ describe("workspace virtual windows", () => {
     expect(useWorkspaceStore.getState().activeVirtualWindowId).toBe(secondWindow.id);
   });
 
-  it("creates a Space-local window with Home as its initial tab", () => {
+  it("creates a Space-local window starting with no tabs", () => {
     const store = useWorkspaceStore.getState();
     store.setScope("space:family");
     const firstWindowId = useWorkspaceStore.getState().activeVirtualWindowId;
     const second = useWorkspaceStore.getState().createVirtualWindow();
 
     expect(useWorkspaceStore.getState().activeScopeKey).toBe("space:family");
-    expect(dockTabs(useWorkspaceStore.getState().layout.root)[0]).toMatchObject({
-      surfaceId: "home",
-      title: "Home",
-      route: "/home",
-    });
+    expect(dockTabs(useWorkspaceStore.getState().layout.root)).toHaveLength(0);
     expect(useWorkspaceStore.getState().switchVirtualWindow(firstWindowId)).toBe(true);
     expect(useWorkspaceStore.getState().switchVirtualWindow(second.id)).toBe(true);
   });
@@ -86,13 +75,48 @@ describe("workspace virtual windows", () => {
     store.setScope("space:work");
     const firstWindowId = useWorkspaceStore.getState().activeVirtualWindowId;
     const second = useWorkspaceStore.getState().createVirtualWindow("Second");
-    const onlyTab = dockTabs(useWorkspaceStore.getState().layout.root)[0];
+    const onlyTab = store.openSurface({
+      surfaceId: "code",
+      groupKey: "tool:code",
+      title: "Code",
+      route: "/code",
+    });
 
     expect(useWorkspaceStore.getState().closeTab(onlyTab.id)).toBe(true);
     expect(useWorkspaceStore.getState().activeVirtualWindowId).toBe(firstWindowId);
     expect(useWorkspaceStore.getState().virtualWindowsByScope["space:work"]).toHaveLength(1);
     expect(useWorkspaceStore.getState().closedVirtualWindowsByScope["space:work"]?.[0].id).toBe(
       second.id,
+    );
+  });
+
+  it("closes a virtual window containing Home when another window remains", () => {
+    const store = useWorkspaceStore.getState();
+    store.setScope("space:family");
+    const firstWindowId = useWorkspaceStore.getState().activeVirtualWindowId;
+    store.openSurface({
+      surfaceId: "space",
+      groupKey: "space:family",
+      scopeKey: "space:family",
+      instanceKey: "family",
+      title: "Home",
+      route: "/spaces/family/home",
+      forceNew: true,
+    });
+    const second = useWorkspaceStore.getState().createVirtualWindow("Research");
+    store.openSurface({
+      surfaceId: "code",
+      groupKey: "tool:code",
+      title: "Code",
+      route: "/code",
+      forceNew: true,
+    });
+
+    expect(useWorkspaceStore.getState().closeVirtualWindow(firstWindowId)).toBe(true);
+    expect(useWorkspaceStore.getState().activeVirtualWindowId).toBe(second.id);
+    expect(useWorkspaceStore.getState().virtualWindowsByScope["space:family"]).toHaveLength(1);
+    expect(useWorkspaceStore.getState().closedVirtualWindowsByScope["space:family"]?.[0].id).toBe(
+      firstWindowId,
     );
   });
 
@@ -149,11 +173,23 @@ describe("workspace virtual windows", () => {
   });
 
   it("migrates oversized saved layouts into four panels without dropping real tabs", () => {
-    const first = createDockLeaf([createHomeDockTab()]);
+    const createTestTab = (id: string) => ({
+      id,
+      surfaceId: "inbox" as const,
+      groupKey: "tool:inbox" as const,
+      instanceKey: "inbox",
+      title: "Inbox",
+      route: "/inbox",
+      sidebarVisible: false,
+      state: {},
+      createdAt: 1,
+      lastFocusedAt: 1,
+    });
+    const first = createDockLeaf([createTestTab("tab-0")]);
     let root = first as ReturnType<typeof insertDockSplit>;
     let target = first.id;
     for (let index = 0; index < 4; index += 1) {
-      const leaf = createDockLeaf([createHomeDockTab()]);
+      const leaf = createDockLeaf([createTestTab(`tab-${index + 1}`)]);
       root = insertDockSplit(root, target, leaf, "right");
       target = leaf.id;
     }
