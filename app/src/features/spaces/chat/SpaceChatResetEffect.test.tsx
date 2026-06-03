@@ -37,7 +37,30 @@ describe("SpaceChat reset effect", () => {
 
     expect(loadChatAgents).toHaveBeenCalledTimes(1);
   });
+
+  it("keeps the draft API stable across unrelated workspace renders", async () => {
+    await act(async () => root.render(<DraftIdentityProbe />));
+    const initialDraft = latestDraft;
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>("button")?.click();
+    });
+
+    expect(latestDraft).toBe(initialDraft);
+  });
 });
+
+let latestDraft: ReturnType<typeof useSpaceChatDraft>;
+
+function DraftIdentityProbe() {
+  latestDraft = useSpaceChatDraft("space-1");
+  const [renderCount, setRenderCount] = useState(0);
+  return (
+    <button type="button" onClick={() => setRenderCount((current) => current + 1)}>
+      Render {renderCount}
+    </button>
+  );
+}
 
 function ResetEffectProbe(props: { loadChatAgents: () => void }) {
   const { loadChatAgents } = props;
