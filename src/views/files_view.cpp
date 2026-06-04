@@ -11,13 +11,16 @@
 #include "core/manager/asset_manager.h"
 #include "core/manager/font_manager.h"
 #include "core/manager/proxy_manager.h"
-#include "core/manager/session_manager.h"
 #include "core/ui/ui_style.h"
 #include "panels/activity/activity_state.h"
 #include "panels/file_explorer/state/file_explorer_state.h"
 #include "panels/notification/notification_state.h"
+#include "panels/panel/tab_bar.h"
 
 namespace misty::view {
+    namespace {
+    }
+
     namespace {
         constexpr float kPanelToggleSize = 22.0f;
         constexpr float kFilesBottomBarHeight = 22.0f;
@@ -28,8 +31,8 @@ namespace misty::view {
             const bool active = hovered && ImGui::IsMouseDown(ImGuiMouseButton_Left);
             const bool clicked = hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left);
             if (hovered || active) {
-                const ImU32 hover_bg = active ? IM_COL32(42, 48, 60, 150)
-                                              : IM_COL32(42, 48, 60, 95);
+                const ImU32 hover_bg = active ? IM_COL32(39, 39, 42, 150)
+                                              : IM_COL32(39, 39, 42, 95);
                 dl->AddRectFilled(min, max, hover_bg, 5.0f);
             }
 
@@ -41,8 +44,8 @@ namespace misty::view {
                              ImVec2(icon_min.x + 16.0f, icon_min.y + 16.0f),
                              ImVec2(0, 0),
                              ImVec2(1, 1),
-                             hovered ? IM_COL32(220, 228, 242, 245)
-                                     : IM_COL32(152, 161, 178, 220));
+                             hovered ? IM_COL32(241, 238, 232, 245)
+                                     : IM_COL32(201, 196, 188, 220));
             }
             if (hovered) {
                 ImGui::SetTooltip("%s", tooltip);
@@ -61,7 +64,7 @@ namespace misty::view {
 
             ImDrawList* dl = ImGui::GetForegroundDrawList(ImGui::GetMainViewport());
             const ImVec2 max(pos.x + width, pos.y + kFilesBottomBarHeight);
-            dl->AddRectFilled(pos, max, IM_COL32(18, 21, 26, 238));
+            dl->AddRectFilled(pos, max, IM_COL32(7, 9, 11, 238));
 
             const float button_y = pos.y + (kFilesBottomBarHeight - kPanelToggleSize) * 0.5f;
             if (bottom_bar_toggle_button(dl,
@@ -83,7 +86,7 @@ namespace misty::view {
             ImGui::GetForegroundDrawList(ImGui::GetMainViewport())->AddLine(
                 ImVec2(x, y0),
                 ImVec2(x, y1),
-                IM_COL32(64, 70, 82, 150),
+                IM_COL32(39, 39, 42, 150),
                 1.0f);
         }
 
@@ -178,6 +181,7 @@ namespace misty::view {
             ? "Files"
             : "Files_workspace_" + std::to_string(workspace.idx) + "_tab_" + std::to_string(tab_idx);
         props.restore_persistent_state = workspace.idx == 0 && tab_idx == 0;
+        props.defer_initial_navigation = !snapshot.explorer.panes.empty();
         props.owns_state_cleanup = !(workspace.idx == 0 && tab_idx == 0);
 
         FileTab tab;
@@ -440,6 +444,15 @@ namespace misty::view {
         core::save_workspace_document(document, &error);
     }
 
+    void FilesView::autosave_workspaces_if_due() {
+        const double now = ImGui::GetTime();
+        if (now - last_workspace_autosave_at_ < 1.0) {
+            return;
+        }
+        last_workspace_autosave_at_ = now;
+        save_workspaces();
+    }
+
     std::string FilesView::workspace_id(std::int16_t workspace_idx) const {
         if (workspace_idx < 0) {
             return {};
@@ -528,36 +541,42 @@ namespace misty::view {
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
         ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
         if (ImGui::Begin("##files_workspace_tabs", nullptr, flags)) {
-            if (ImGui::BeginTabBar("##files_workspace_tab_bar")) {
-                for (auto& tab : workspace->tabs) {
-                    std::string title = "Files";
-                    if (tab.explorer_panel) {
-                        title = tab.explorer_panel->tab_title();
-                        if (title.empty()) {
-                            title = "Files";
-                        }
-                    }
-                    const std::string label = title + "###files_workspace_tab_" + std::to_string(tab.idx);
-                    bool open = true;
-                    const ImGuiTabItemFlags tab_flags =
-                        tab.idx == workspace->pending_tab_select_idx ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None;
-                    if (ImGui::BeginTabItem(label.c_str(), workspace->tabs.size() > 1 ? &open : nullptr, tab_flags)) {
-                        workspace->active_tab_idx = tab.idx;
-                        explorer_panel_ = tab.explorer_panel;
-                        if (tab.idx == workspace->pending_tab_select_idx) {
-                            consumed_pending_selection = true;
-                        }
-                        ImGui::EndTabItem();
-                    }
-                    if (!open) {
-                        close_idx = tab.idx;
+            std::vector<panel::TabBarItem> items;
+            items.reserve(workspace->tabs.size());
+            for (std::size_t i = 0; i < workspace->tabs.size(); ++i) {
+                auto& tab = workspace->tabs[i];
+                std::string title = "Files";
+                if (tab.explorer_panel) {
+                    title = tab.explorer_panel->tab_title();
+                    if (title.empty()) {
+                        title = "Files";
                     }
                 }
-                if (ImGui::TabItemButton("+", ImGuiTabItemFlags_Trailing | ImGuiTabItemFlags_NoTooltip)) {
-                    create_requested = true;
+                items.push_back(panel::TabBarItem{
+                    .id = "files_workspace_tab_" + std::to_string(tab.idx),
+                    .title = std::move(title),
+                    .active = tab.idx == workspace->active_tab_idx,
+                    .closable = workspace->tabs.size() > 1,
+                });
+                if (tab.idx == workspace->pending_tab_select_idx) {
+                    workspace->active_tab_idx = tab.idx;
+                    explorer_panel_ = tab.explorer_panel;
+                    consumed_pending_selection = true;
                 }
-                ImGui::EndTabBar();
             }
+            const panel::TabBarResult strip_result = panel::render_tab_bar(items);
+            if (strip_result.pressed_index >= 0 &&
+                strip_result.pressed_index < static_cast<int>(workspace->tabs.size())) {
+                const auto& tab = workspace->tabs[strip_result.pressed_index];
+                workspace->active_tab_idx = tab.idx;
+                workspace->pending_tab_select_idx = tab.idx;
+                explorer_panel_ = tab.explorer_panel;
+            }
+            if (strip_result.close_index >= 0 &&
+                strip_result.close_index < static_cast<int>(workspace->tabs.size())) {
+                close_idx = workspace->tabs[strip_result.close_index].idx;
+            }
+            create_requested = strip_result.plus_pressed;
         }
         ImGui::End();
         ImGui::PopStyleVar(2);
@@ -922,6 +941,8 @@ namespace misty::view {
             pending_sidebar_workspace_select_idx_ = -1;
             select_workspace(workspace_idx);
         }
+
+        autosave_workspaces_if_due();
     }
 
     void FilesView::schedule_proxy_probe(bool force) {
@@ -939,14 +960,14 @@ namespace misty::view {
                 probe_state->store(false);
             },
             [probe_state](const std::string&) {
-                core::SessionManager::get().mark_proxy_unavailable();
+                core::ProxyManager::get().record_proxy_request_result(false);
                 probe_state->store(false);
             }
         );
     }
 
     float FilesView::render_proxy_status_banner(const ImVec2& pos, float width) {
-        if (core::SessionManager::get().is_proxy_available()) {
+        if (core::ProxyManager::get().is_proxy_available()) {
             return 0.0f;
         }
 
@@ -977,7 +998,7 @@ namespace misty::view {
             ImGui::PopFont();
 
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.90f, 0.84f, 0.76f, 1.0f));
-            ImGui::TextWrapped("%s", core::SessionManager::get().get_proxy_status_message().c_str());
+            ImGui::TextWrapped("%s", core::ProxyManager::get().get_proxy_status_message().c_str());
             ImGui::PopStyleColor();
 
             ImGui::SetCursorPos(ImVec2(

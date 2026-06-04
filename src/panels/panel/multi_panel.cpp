@@ -68,6 +68,16 @@ namespace misty::panel {
             ImGui::GetWindowDrawList()->AddRectFilled(min, max, color);
         }
 
+        ImVec4 inactive_pane_text_color() {
+            const ImVec4 text = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+            const ImVec4 disabled = ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled);
+            return ImVec4(
+                text.x + (disabled.x - text.x) * 0.95f,
+                text.y + (disabled.y - text.y) * 0.95f,
+                text.z + (disabled.z - text.z) * 0.95f,
+                text.w);
+        }
+
     }
 
     // initialize the panel with a default pane and grid lane
@@ -153,6 +163,18 @@ namespace misty::panel {
         (void)panel;
         (void)is_active;
         (void)has_multiple_panes;
+    }
+
+    void MultiPanel::render_pane_drop_zone(Panel& panel,
+                                           bool is_active,
+                                           bool has_multiple_panes,
+                                           const ImVec2& min,
+                                           const ImVec2& max) {
+        (void)panel;
+        (void)is_active;
+        (void)has_multiple_panes;
+        (void)min;
+        (void)max;
     }
 
     core::WorkspaceExplorerSnapshot MultiPanel::export_workspace_snapshot() const {
@@ -644,8 +666,18 @@ namespace misty::panel {
                     const bool is_active_pane = pane_id == active_pane_id;
                     const bool has_multiple_panes = pane_count() > 1;
                     const float header_height = pane_header_height(*tab.panel, is_active_pane, has_multiple_panes);
+                    const ImVec2 drop_min = ImGui::GetCursorScreenPos();
                     if (header_height > 0.0f && ImGui::GetContentRegionAvail().y > header_height) {
                         render_pane_header(*tab.panel, is_active_pane, has_multiple_panes);
+                        ImGui::SetCursorPosY(ImGui::GetCursorPosY() - ImGui::GetStyle().ItemSpacing.y);
+                    }
+                    const ImVec2 content_min = ImGui::GetCursorScreenPos();
+                    const ImVec2 content_size = ImGui::GetContentRegionAvail();
+                    const ImVec2 drop_max(content_min.x + content_size.x, content_min.y + content_size.y);
+
+                    const bool tint_inactive_pane = has_multiple_panes && !is_active_pane;
+                    if (tint_inactive_pane) {
+                        ImGui::PushStyleColor(ImGuiCol_Text, inactive_pane_text_color());
                     }
 
                     if (auto* multi_panel = dynamic_cast<MultiPanel*>(tab.panel.get())) {
@@ -653,6 +685,19 @@ namespace misty::panel {
                     } else {
                         tab.panel->render();
                     }
+
+                    if (tint_inactive_pane) {
+                        ImGui::PopStyleColor();
+                    }
+
+                    if (tint_inactive_pane && drop_max.x > drop_min.x && drop_max.y > drop_min.y) {
+                        ImGui::GetWindowDrawList()->AddRectFilled(
+                            drop_min,
+                            drop_max,
+                            IM_COL32(7, 9, 11, 148));
+                    }
+
+                    render_pane_drop_zone(*tab.panel, is_active_pane, has_multiple_panes, drop_min, drop_max);
                 };
 
                 bool create_new_tab_requested = false;

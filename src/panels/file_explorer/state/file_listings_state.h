@@ -4,8 +4,11 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
+#include <mutex>
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -62,6 +65,7 @@ struct FileListing {
     std::chrono::system_clock::time_point last_refreshed_at{};
     std::chrono::system_clock::time_point last_synced_at{};
     std::unordered_set<std::string> deleting_files;
+    std::string error_message;
     LoadingState loading;
 
     FileListing() = default;
@@ -91,7 +95,8 @@ struct FileListing {
  * @brief Shared UI registry state containing file listings for all explorer tabs.
  */
 struct FileListingsState : public core::StateEntry {
-    std::vector<FileListing> listings;
+    std::unordered_map<std::string, std::unique_ptr<FileListing>> listings;
+    mutable std::mutex mu;
 
     /**
      * @brief Returns the listing for an owner key, creating it if needed.

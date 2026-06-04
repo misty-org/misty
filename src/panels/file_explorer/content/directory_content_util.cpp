@@ -2,7 +2,10 @@
 
 #include <algorithm>
 #include <cctype>
+#include <ctime>
 #include <filesystem>
+#include <iomanip>
+#include <sstream>
 
 #include "core/manager/asset_manager.h"
 #include "core/ui/ui_style.h"
@@ -25,10 +28,98 @@ int compare_strings(const std::string& lhs, const std::string& rhs) {
     return 0;
 }
 
+std::string format_human_time(std::time_t value) {
+    std::tm local_time {};
+#if defined(_WIN32)
+    localtime_s(&local_time, &value);
+#else
+    local_time = *std::localtime(&value);
+#endif
+
+    static constexpr const char* kMonths[] = {
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+    };
+    const int month_index = std::clamp(local_time.tm_mon, 0, 11);
+    const int hour24 = local_time.tm_hour;
+    const int hour12 = (hour24 % 12 == 0) ? 12 : (hour24 % 12);
+    const bool is_pm = hour24 >= 12;
+
+    std::ostringstream out;
+    out << kMonths[month_index]
+        << ' '
+        << local_time.tm_mday
+        << ", "
+        << (local_time.tm_year + 1900)
+        << " at "
+        << hour12
+        << ':'
+        << std::setw(2)
+        << std::setfill('0')
+        << local_time.tm_min
+        << (is_pm ? " pm" : " am");
+    return out.str();
+}
+
+bool try_parse_time(const std::string& raw_value, std::time_t& parsed) {
+    if (raw_value.empty()) {
+        return false;
+    }
+
+    const bool all_digits = std::all_of(raw_value.begin(), raw_value.end(), [](unsigned char ch) {
+        return std::isdigit(ch) != 0;
+    });
+    if (all_digits) {
+        try {
+            long long numeric = std::stoll(raw_value);
+            if (raw_value.size() > 10) {
+                numeric /= 1000;
+            }
+            parsed = static_cast<std::time_t>(numeric);
+            return true;
+        } catch (...) {
+            return false;
+        }
+    }
+
+    const char* formats[] = {
+        "%Y-%m-%d %H:%M",
+        "%Y-%m-%dT%H:%M:%S",
+        "%Y-%m-%d %H:%M:%S",
+    };
+    for (const char* format : formats) {
+        std::tm tm_value {};
+        std::istringstream input(raw_value);
+        input >> std::get_time(&tm_value, format);
+        if (!input.fail()) {
+            parsed = std::mktime(&tm_value);
+            return parsed != static_cast<std::time_t>(-1);
+        }
+    }
+
+    if (!raw_value.empty() && raw_value.back() == 'Z') {
+        std::time_t nested = 0;
+        if (try_parse_time(raw_value.substr(0, raw_value.size() - 1), nested)) {
+            parsed = nested;
+            return true;
+        }
+    }
+
+    return false;
+}
+
 std::string type_label_for_item(const FileItem& file) {
     if (file.is_dir) return "folder";
     if (!file.mime_type.empty()) return file.mime_type;
     return fs::path(file.name).extension().string();
+}
+
+std::string display_last_modified(const std::string& raw_value) {
+    std::time_t parsed = 0;
+    if (!try_parse_time(raw_value, parsed)) {
+        return raw_value;
+    }
+    return format_human_time(parsed);
 }
 
 std::string label_for_sync_state(core::FileSyncEntryState state) {
@@ -178,21 +269,26 @@ void select_item(FileExplorerState& state,
                  int index,
                  bool is_selected,
                  const ImGuiIO& io) {
-    if (io.KeyCtrl) {
+    if (io.KeyShift && ui.last_selected_index >= 0 && !listing.files.empty()) {
+        const int max_index = static_cast<int>(listing.files.size()) - 1;
+        const int anchor = std::clamp(ui.last_selected_index, 0, max_index);
+        const int target = std::clamp(index, 0, max_index);
+        const int start = std::min(anchor, target);
+        const int end = std::max(anchor, target);
+        ui.selected_files.clear();
+        for (int range_index = start; range_index <= end; ++range_index) {
+            ui.selected_files.insert(listing.files[range_index].id);
+        }
+    } else if (io.KeyCtrl || io.KeySuper) {
         if (is_selected) ui.selected_files.erase(file.id);
         else ui.selected_files.insert(file.id);
-    } else if (io.KeyShift && ui.last_selected_index != -1) {
-        ui.selected_files.clear();
-        const int start = std::min(ui.last_selected_index, index);
-        const int end = std::max(ui.last_selected_index, index);
-        for (int item_index = start; item_index <= end; ++item_index) {
-            ui.selected_files.insert(listing.files[item_index].id);
-        }
     } else {
         ui.selected_files.clear();
         ui.selected_files.insert(file.id);
     }
-    ui.last_selected_index = index;
+    if (!io.KeyShift || ui.last_selected_index < 0) {
+        ui.last_selected_index = index;
+    }
     state.selected_files = ui.selected_files;
 }
 

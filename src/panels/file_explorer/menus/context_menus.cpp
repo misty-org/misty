@@ -1,35 +1,28 @@
 #include "panels/file_explorer/file_explorer_panel.h"
 
 #include <algorithm>
+#include <filesystem>
 
 #include "core/commands/command_manager.h"
 #include "panels/context_menu/context_menu_state.h"
+#include "panels/file_explorer/content/file_explorer_content_util.h"
 #include "panels/file_explorer/state/clipboard_state.h"
 
 namespace misty::panel {
 namespace {
 
-bool is_local_item(const FileItem& item) {
-    return item.type == FileType::LOCAL;
+std::string delete_target_label(const std::vector<std::string>& paths) {
+    if (paths.empty()) {
+        return "selected item";
+    }
+    if (paths.size() == 1) {
+        const std::string filename = std::filesystem::path(paths.front()).filename().string();
+        return filename.empty() ? paths.front() : filename;
+    }
+    return std::to_string(paths.size()) + " items";
 }
 
-bool selected_items_are_local(const FileExplorerPanel::TransientUiState& ui, const FileListing& listing) {
-    if (ui.selected_files.empty()) {
-        return false;
-    }
-
-    for (const auto& selected_id : ui.selected_files) {
-        const auto it = std::find_if(listing.files.begin(), listing.files.end(), [&](const FileItem& item) {
-            return item.id == selected_id;
-        });
-        if (it == listing.files.end() || !is_local_item(*it)) {
-            return false;
-        }
-    }
-    return true;
-}
-
-}  // namespace
+} // namespace
 
 const FileItem* FileExplorerPanel::find_context_menu_target(const FileExplorerState& state,
                                                             const FileListing& listing,
@@ -46,7 +39,7 @@ const FileItem* FileExplorerPanel::find_context_menu_target(const FileExplorerSt
 void FileExplorerPanel::open_context_menu(FileExplorerState& state, FileExplorerPanel::TransientUiState& ui) {
     const auto& listing = active_listing();
     const FileItem* target = find_context_menu_target(state, listing, ui);
-    const bool has_local_selection = selected_items_are_local(ui, listing);
+    const bool has_file_master_selection = selected_items_are_file_master_items(ui.selected_files, listing);
     const bool has_clipboard = registry_.get_state<ClipboardState>("Clipboard").has_content();
 
     ContextMenuRequest request;
@@ -60,7 +53,7 @@ void FileExplorerPanel::open_context_menu(FileExplorerState& state, FileExplorer
     copy_entry.id = "copy";
     copy_entry.label = "Copy";
     copy_entry.secondary_label = core::CommandManager::get().label("explorer.copy");
-    copy_entry.disabled = !has_local_selection;
+    copy_entry.disabled = !has_file_master_selection;
     copy_entry.on_select = [this, &state]() {
         perform_copy(state);
     };
@@ -70,7 +63,7 @@ void FileExplorerPanel::open_context_menu(FileExplorerState& state, FileExplorer
     cut_entry.id = "cut";
     cut_entry.label = "Cut";
     cut_entry.secondary_label = core::CommandManager::get().label("explorer.cut");
-    cut_entry.disabled = !has_local_selection;
+    cut_entry.disabled = !has_file_master_selection;
     cut_entry.on_select = [this, &state]() {
         perform_cut(state);
     };
@@ -92,7 +85,7 @@ void FileExplorerPanel::open_context_menu(FileExplorerState& state, FileExplorer
     delete_entry.id = "delete";
     delete_entry.label = "Delete";
     delete_entry.secondary_label = core::CommandManager::get().label("explorer.delete");
-    delete_entry.disabled = !has_local_selection;
+    delete_entry.disabled = !has_file_master_selection;
     delete_entry.destructive = true;
     delete_entry.on_select = [this, &state]() {
         perform_delete_selected(state);
@@ -118,9 +111,34 @@ void FileExplorerPanel::show_rename_modal(FileExplorerPanel::TransientUiState& u
         return;
     }
 
-    ui.rename_buffer[0] = '\0';
-    ui.rename_target_path.clear();
-    ui.show_rename_modal = false;
+    ImGui::OpenPopup("Rename");
+    bool open = true;
+    if (ImGui::BeginPopupModal("Rename", &open, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::InputTextWithHint("##rename_name", "Name", ui.rename_buffer, IM_ARRAYSIZE(ui.rename_buffer));
+        const bool submitted = ImGui::IsItemDeactivatedAfterEdit() && ImGui::IsKeyPressed(ImGuiKey_Enter);
+
+        if (ImGui::Button("Cancel", ImVec2(90.0f, 0.0f))) {
+            ui.rename_buffer[0] = '\0';
+            ui.rename_target_path.clear();
+            ui.show_rename_modal = false;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Rename", ImVec2(90.0f, 0.0f)) || submitted) {
+            perform_rename_from_modal(ui);
+            ui.rename_buffer[0] = '\0';
+            ui.rename_target_path.clear();
+            ui.show_rename_modal = false;
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::EndPopup();
+    }
+    if (!open) {
+        ui.rename_buffer[0] = '\0';
+        ui.rename_target_path.clear();
+        ui.show_rename_modal = false;
+    }
 }
 
 void FileExplorerPanel::open_background_context_menu(FileExplorerState& state, FileExplorerPanel::TransientUiState& ui) {
@@ -178,12 +196,49 @@ void FileExplorerPanel::show_permission_delete_modal(FileExplorerPanel::Transien
 }
 
 void FileExplorerPanel::show_permanent_delete_modal(FileExplorerPanel::TransientUiState& ui) {
-    if (!ui.show_permanent_delete_modal) {
-        return;
+    if (ui.show_permanent_delete_modal || ImGui::IsPopupOpen("##file_delete_modal")) {
+        ImGui::GetIO().WantCaptureMouse = true;
+        ImGui::GetIO().WantCaptureKeyboard = true;
     }
 
-    ui.show_permanent_delete_modal = false;
-    ui.permanent_delete_paths.clear();
+    if (ui.show_permanent_delete_modal) {
+        ImGui::OpenPopup("##file_delete_modal");
+    }
+
+    ImGui::SetNextWindowSize(ImVec2(360.0f, 0.0f), ImGuiCond_Always);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 10.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(18.0f, 16.0f));
+    ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.075f, 0.085f, 0.105f, 1.0f));
+    if (ImGui::BeginPopupModal("##file_delete_modal",
+                               nullptr,
+                               ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar)) {
+        const std::string target = delete_target_label(ui.permanent_delete_paths);
+        ImGui::TextUnformatted("Delete File");
+        ImGui::Dummy(ImVec2(0.0f, 8.0f));
+        ImGui::TextWrapped("Delete \"%s\"? This cannot be undone.", target.c_str());
+        ImGui::Dummy(ImVec2(0.0f, 12.0f));
+
+        constexpr float button_w = 92.0f;
+        ImGui::SetCursorPosX(ImGui::GetWindowWidth() - button_w * 2.0f - 28.0f);
+        if (ImGui::Button("Cancel", ImVec2(button_w, 30.0f))) {
+            ui.show_permanent_delete_modal = false;
+            ui.permanent_delete_paths.clear();
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.48f, 0.16f, 0.14f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.62f, 0.20f, 0.17f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.42f, 0.12f, 0.11f, 1.0f));
+        if (ImGui::Button("Delete", ImVec2(button_w, 30.0f))) {
+            confirm_permanent_delete(ui);
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::PopStyleColor(3);
+
+        ImGui::EndPopup();
+    }
+    ImGui::PopStyleColor();
+    ImGui::PopStyleVar(2);
 }
 
 } // namespace misty::panel

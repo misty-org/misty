@@ -45,6 +45,7 @@ uint64_t start_local_transfer(FileTransfer* transfers,
     record.transfer_type = type;
     record.item_type = FileTransferItemType::Local;
     record.file_name = local_transfer_name(props);
+    record.job_id = props.job_id;
     record.local_source_path = props.local_source.path;
     record.local_dest_path = props.local_dest.path;
     record.total_bytes = local_transfer_size(props);

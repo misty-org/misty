@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstdlib>
 #include <filesystem>
 
 namespace fs = std::filesystem;
@@ -29,24 +28,17 @@ std::vector<BreadcrumbSegment> build_breadcrumb_segments(const std::string& curr
         return {{"Trash", current_path}};
     }
 
-    const char* home = std::getenv("HOME");
-    const std::string home_path = home ? home : "";
-    const fs::path path(current_path);
-    fs::path cumulative;
-
-    if (!home_path.empty() && current_path.rfind(home_path, 0) == 0) {
-        cumulative = fs::path(home_path);
-        segments.push_back({"~", cumulative.string()});
-        std::error_code ec;
-        const fs::path relative = fs::relative(path, cumulative, ec);
+    std::error_code ec;
+    fs::path path = fs::path(current_path).lexically_normal();
+    if (!path.is_absolute()) {
+        const fs::path absolute_path = fs::absolute(path, ec);
         if (!ec) {
-            for (const auto& part : relative) {
-                cumulative /= part;
-                segments.push_back({part.string(), cumulative.string()});
-            }
-            return segments;
+            path = absolute_path.lexically_normal();
+        } else {
+            ec.clear();
         }
     }
+    fs::path cumulative;
 
     if (path.is_absolute()) {
         cumulative = path.root_path();
@@ -54,11 +46,16 @@ std::vector<BreadcrumbSegment> build_breadcrumb_segments(const std::string& curr
         segments.push_back({root, root});
     }
     for (const auto& part : path.relative_path()) {
+        const std::string label = part.string();
+        if (label.empty() || label == ".") {
+            continue;
+        }
         cumulative /= part;
-        segments.push_back({part.string(), cumulative.string()});
+        segments.push_back({label, cumulative.string()});
     }
     if (segments.empty()) {
-        segments.push_back({current_path, current_path});
+        segments.push_back({path.string().empty() ? current_path : path.string(),
+                            path.string().empty() ? current_path : path.string()});
     }
     return segments;
 }

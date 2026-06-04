@@ -2,20 +2,17 @@
 #include "core/commands/command_manager.h"
 #include "core/manager/plugin_manager.h"
 #include "core/manager/proxy_manager.h"
-#include "core/manager/session_manager.h"
 #include "core/manager/env_manager.h"
 #include "core/manager/font_manager.h"
 #include "views/files_view.h"
-#include "views/register_view.h"
-#include "views/login_view.h"
 #include "views/providers_view.h"
-#include "views/plugins_view.h"
 #include "views/dock_view.h"
 #include "views/transfers_view.h"
 #include "views/activity_view.h"
 #include "views/settings_view.h"
 #include "panels/file_explorer/state/file_explorer_state.h"
 #include "panels/file_explorer/state/library_state.h"
+#include "panels/file_explorer/operations/file_master_operations.h"
 #include "panels/navbar/navbar_state.h"
 #include "panels/settings/settings_state.h"
 
@@ -29,15 +26,13 @@ namespace {
 std::string view_name(misty::view::ViewID id) {
     using misty::view::ViewID;
     switch (id) {
-        case ViewID::Auth: return "Auth";
-        case ViewID::Login: return "Login";
         case ViewID::Files: return "Files";
         case ViewID::Settings: return "Settings";
         case ViewID::Workspace: return "Workspace";
         case ViewID::Activity: return "Activity";
         case ViewID::Providers: return "Providers";
         case ViewID::Plugins: return "Plugins";
-        case ViewID::Dock: return "Dock";
+        case ViewID::Dock: return "Plugins";
         case ViewID::Transfers: return "Transfers";
         case ViewID::Default: return "Default";
     }
@@ -93,6 +88,7 @@ namespace misty {
         } catch (const std::exception& e) {
             std::cout << "Exception caught in Application::run: " << e.what() << std::endl;
             append_startup_log(std::string("startup: exception: ") + e.what());
+            panel::shutdown_file_transfer_worker_pool();
             worker_pool_.shutdown();
             view::clear_views();
             cleanup();
@@ -127,6 +123,7 @@ namespace misty {
         persist_file_explorer_state();
 
         core::PluginManager::get().shutdown();
+        panel::shutdown_file_transfer_worker_pool();
         worker_pool_.shutdown();
         view::clear_views();
         cleanup();
@@ -148,7 +145,7 @@ namespace misty {
         auto& explorer = state_registry_.get_state<panel::FileExplorerState>(explorer_state_key);
         auto& library = state_registry_.get_state<panel::LibraryState>(panel::kLibraryStateKey);
         {
-            std::lock_guard<std::mutex> explorer_lock(explorer.mu);
+            std::lock_guard<std::recursive_mutex> explorer_lock(explorer.mu);
             std::lock_guard<std::mutex> library_lock(library.mu);
             if (explorer.current_path[0] != '\0') {
                 library.last_opened_path = explorer.current_path;
@@ -168,18 +165,12 @@ namespace misty {
     void Application::init_views() {
         view::register_view(view::ViewID::Files,
             std::make_unique<view::FilesView>(state_registry_, worker_pool_));
-        view::register_view(view::ViewID::Auth, std::make_unique<view::RegisterView>(state_registry_));
-        view::register_view(view::ViewID::Login, std::make_unique<view::LoginView>(state_registry_));
         view::register_view_factory(view::ViewID::Providers, [this]() {
             append_startup_log("startup: providers view instantiated");
             return std::make_unique<view::ProvidersView>(state_registry_, worker_pool_);
         });
-        view::register_view_factory(view::ViewID::Plugins, [this]() {
-            append_startup_log("startup: plugins view instantiated");
-            return std::make_unique<view::PluginsView>(state_registry_);
-        });
         view::register_view_factory(view::ViewID::Dock, [this]() {
-            append_startup_log("startup: dock view instantiated");
+            append_startup_log("startup: plugins view instantiated");
             return std::make_unique<view::DockView>(state_registry_);
         });
         view::register_view_factory(view::ViewID::Transfers, [this]() {

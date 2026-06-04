@@ -6,7 +6,7 @@
 
 #include "core/manager/asset_manager.h"
 #include "core/manager/env_manager.h"
-#include "core/manager/session_manager.h"
+#include "core/manager/proxy_manager.h"
 #include "core/ui/ui_layout.h"
 #include "imgui.h"
 #include "panels/settings/settings_components.h"
@@ -16,14 +16,14 @@ namespace UI = misty::UI;
 namespace {
     namespace fs = std::filesystem;
 
-    constexpr ImVec4 kHeaderTextColor = ImVec4(0.96f, 0.96f, 0.98f, 1.0f);
-    constexpr ImVec4 kBodyTextColor = ImVec4(0.76f, 0.78f, 0.82f, 1.0f);
-    constexpr ImVec4 kMutedTextColor = ImVec4(0.58f, 0.60f, 0.64f, 1.0f);
-    constexpr ImVec4 kDividerColor = ImVec4(0.2f, 0.2f, 0.2f, 1.0f);
-    constexpr ImVec4 kSuccessTextColor = ImVec4(0.55f, 0.82f, 0.64f, 1.0f);
-    constexpr ImVec4 kControlBgColor = ImVec4(0.10f, 0.11f, 0.13f, 1.0f);
-    constexpr ImVec4 kControlBorderColor = ImVec4(0.18f, 0.19f, 0.22f, 1.0f);
-    constexpr ImVec4 kControlTextColor = ImVec4(0.92f, 0.92f, 0.94f, 1.0f);
+    constexpr ImVec4 kHeaderTextColor = ImVec4(0.945f, 0.933f, 0.910f, 1.0f);
+    constexpr ImVec4 kBodyTextColor = ImVec4(0.788f, 0.769f, 0.737f, 1.0f);
+    constexpr ImVec4 kMutedTextColor = ImVec4(0.620f, 0.596f, 0.561f, 1.0f);
+    constexpr ImVec4 kDividerColor = ImVec4(0.153f, 0.153f, 0.165f, 1.0f);
+    constexpr ImVec4 kSuccessTextColor = ImVec4(0.475f, 0.729f, 0.561f, 1.0f);
+    constexpr ImVec4 kControlBgColor = ImVec4(0.043f, 0.051f, 0.059f, 1.0f);
+    constexpr ImVec4 kControlBorderColor = ImVec4(0.153f, 0.153f, 0.165f, 1.0f);
+    constexpr ImVec4 kControlTextColor = ImVec4(0.945f, 0.933f, 0.910f, 1.0f);
     constexpr float kControlWidth = 220.0f;
     constexpr float kControlHeight = 36.0f;
     constexpr float kSelectControlHeight = 32.0f;
@@ -220,12 +220,12 @@ namespace {
     }
 
     std::string proxy_status_label() {
-        auto& session = misty::core::SessionManager::get();
-        if (session.is_proxy_available()) {
+        auto& proxy = misty::core::ProxyManager::get();
+        if (proxy.is_proxy_available()) {
             return "Running";
         }
 
-        const std::string message = session.get_proxy_status_message();
+        const std::string message = proxy.get_proxy_status_message();
         if (message.empty()) {
             return "Unavailable";
         }
@@ -462,7 +462,7 @@ namespace {
                     .text = status.c_str(),
                     .width = UI::Size::auto_size(),
                     .align = UI::Align::End,
-                    .color = misty::core::SessionManager::get().is_proxy_available()
+                    .color = misty::core::ProxyManager::get().is_proxy_available()
                         ? kSuccessTextColor
                         : kHeaderTextColor,
                 });

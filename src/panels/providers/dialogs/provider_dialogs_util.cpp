@@ -13,8 +13,8 @@
 namespace misty::panel {
     namespace {
         constexpr ImVec4 kBorder = ImVec4(0.24f, 0.27f, 0.30f, 1.0f);
-        constexpr ImVec4 kText = ImVec4(0.94f, 0.95f, 0.97f, 1.0f);
-        constexpr ImVec4 kMuted = ImVec4(0.62f, 0.66f, 0.70f, 1.0f);
+        constexpr ImVec4 kText = ImVec4(0.945f, 0.933f, 0.910f, 1.0f);
+        constexpr ImVec4 kMuted = ImVec4(0.788f, 0.769f, 0.737f, 1.0f);
 
         std::string normalized_provider_key(std::string value) {
             std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
