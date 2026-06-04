@@ -8,7 +8,6 @@
 #include <nlohmann/json.hpp>
 
 #include "core/manager/env_manager.h"
-#include "core/manager/session_manager.h"
 
 namespace misty::panel {
     using nlohmann::json;
@@ -53,7 +52,7 @@ namespace misty::panel {
     }
 
     std::map<std::string, std::string> provider_json_headers() {
-        auto headers = core::SessionManager::get().get_auth_headers();
+        std::map<std::string, std::string> headers;
         headers["Content-Type"] = "application/json";
         headers["Accept"] = "application/json";
         return headers;

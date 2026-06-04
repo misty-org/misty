@@ -39,7 +39,7 @@ struct FileExplorerState : public core::StateEntry {
     std::stack<std::string> back_history;
     std::stack<std::string> forward_history;
     std::unordered_set<std::string> selected_files;
-    std::mutex mu;
+    std::recursive_mutex mu;
 
     /**
      * @brief Clears all pane-owned navigation state before registry release.

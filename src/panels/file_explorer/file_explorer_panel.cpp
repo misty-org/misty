@@ -123,7 +123,7 @@ FileExplorerPanel::FileExplorerPanel(StateRegistry& registry,
         navigate_to_path(path, true, false);
     });
 
-    if (!start_path.empty()) {
+    if (!props.defer_initial_navigation && !start_path.empty()) {
         navigate_to_path(start_path, false);
     }
 }
@@ -144,7 +144,7 @@ FileExplorerPanel::~FileExplorerPanel() {
     auto& state = registry_.get_state<FileExplorerState>(state_key_);
     auto& library = registry_.get_state<LibraryState>(kLibraryStateKey);
     {
-        std::lock_guard<std::mutex> state_lock(state.mu);
+        std::lock_guard<std::recursive_mutex> state_lock(state.mu);
         std::lock_guard<std::mutex> library_lock(library.mu);
         if (state.current_path[0] != '\0') {
             library.last_opened_path = state.current_path;
@@ -168,6 +168,12 @@ std::string FileExplorerPanel::save_restore_state() const {
     return data.dump();
 }
 
+void FileExplorerPanel::restore_workspace_snapshot(const core::WorkspaceExplorerSnapshot& snapshot) {
+    suppress_child_initial_navigation_ = true;
+    MultiPanel::restore_workspace_snapshot(snapshot);
+    suppress_child_initial_navigation_ = false;
+}
+
 void FileExplorerPanel::load_restore_state(const std::string& encoded_state) {
     if (encoded_state.empty()) {
         return;
@@ -180,19 +186,21 @@ void FileExplorerPanel::load_restore_state(const std::string& encoded_state) {
 
     auto& state = registry_.get_state<FileExplorerState>(state_key_);
     auto& listing = registry_.get_state<FileListingsState>(kFileListingsStateKey).get_or_create(state_key_);
-    std::lock_guard<std::mutex> lock(state.mu);
-    ui_.clear_transient();
-    state.selected_files.clear();
-    listing.clear();
-    ui_.show_hidden = data.value("show_hidden", ui_.show_hidden);
-    ui_.grid_view = data.value("grid_view", ui_.grid_view);
-    state.back_history = vector_to_stack(data.value("back_history", json::array()));
-    state.forward_history = vector_to_stack(data.value("forward_history", json::array()));
     const std::string current_path = data.value("current_path", std::string());
-    std::strncpy(state.current_path, current_path.c_str(), sizeof(state.current_path) - 1);
-    state.current_path[sizeof(state.current_path) - 1] = '\0';
-    std::strncpy(state.search_path, current_path.c_str(), sizeof(state.search_path) - 1);
-    state.search_path[sizeof(state.search_path) - 1] = '\0';
+    {
+        std::lock_guard<std::recursive_mutex> lock(state.mu);
+        ui_.clear_transient();
+        state.selected_files.clear();
+        listing.clear();
+        ui_.show_hidden = data.value("show_hidden", ui_.show_hidden);
+        ui_.grid_view = data.value("grid_view", ui_.grid_view);
+        state.back_history = vector_to_stack(data.value("back_history", json::array()));
+        state.forward_history = vector_to_stack(data.value("forward_history", json::array()));
+        std::strncpy(state.current_path, current_path.c_str(), sizeof(state.current_path) - 1);
+        state.current_path[sizeof(state.current_path) - 1] = '\0';
+        std::strncpy(state.search_path, current_path.c_str(), sizeof(state.search_path) - 1);
+        state.search_path[sizeof(state.search_path) - 1] = '\0';
+    }
     if (!current_path.empty()) {
         navigate_to_path(current_path, false);
     }
@@ -207,7 +215,7 @@ void FileExplorerPanel::release_state() {
     }
     {
         auto& state = registry_.get_state<FileExplorerState>(state_key_);
-        std::lock_guard<std::mutex> lock(state.mu);
+        std::lock_guard<std::recursive_mutex> lock(state.mu);
         state.clear_state();
     }
     registry_.get_state<FileListingsState>(kFileListingsStateKey).erase(state_key_);

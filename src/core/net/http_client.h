@@ -94,7 +94,6 @@ namespace misty::core {
         bool is_proxy_url(const std::string& url) const;
         void update_proxy_status(const std::string& url, int status_code);
 
-        std::atomic<bool> is_refreshing_{false};
     };
 
     std::string build_json_object(const std::map<std::string, std::string>& fields);

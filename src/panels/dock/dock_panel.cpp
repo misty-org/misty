@@ -21,7 +21,7 @@ public:
     }
 
     std::string tab_title() const override {
-        return "Dock";
+        return "Plugins";
     }
 
 private:
@@ -75,7 +75,7 @@ TabController::Tab DockPanel::create_default_tab(std::int16_t tab_idx) const {
     TabController::Tab tab;
     tab.context_key = "dock.launcher";
     tab.state_key = "dock.launcher";
-    tab.title = "Dock";
+    tab.title = "Plugins";
     tab.idx = tab_idx;
     tab.panel = std::make_shared<DockLauncherPanel>(const_cast<DockPanel&>(*this));
     return tab;
@@ -100,7 +100,7 @@ void DockPanel::render_launcher() {
 
     ImGui::SetCursorPos(ImVec2(24.0f, 24.0f));
     if (ImGui::BeginChild("##dock_launcher", ImVec2(0.0f, 0.0f), false)) {
-        ImGui::TextUnformatted("Dock");
+        ImGui::TextUnformatted("Plugins");
         ImGui::Spacing();
 
         for (const auto& plugin : plugins) {
@@ -118,7 +118,7 @@ void DockPanel::render_launcher() {
         }
 
         if (!found) {
-            ImGui::TextWrapped("No Dock plugins are loaded.");
+            ImGui::TextWrapped("No installed plugins are loaded.");
         }
     }
     ImGui::EndChild();

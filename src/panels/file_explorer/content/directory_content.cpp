@@ -1,5 +1,6 @@
 #include "panels/file_explorer/file_explorer_panel.h"
 #include "panels/file_explorer/content/directory_content_util.h"
+#include "panels/file_explorer/selection/drag_and_drop.h"
 
 #include <chrono>
 
@@ -48,7 +49,7 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state, FileLi
     static ImGuiTableFlags flags = ImGuiTableFlags_Reorderable | ImGuiTableFlags_Sortable |
         ImGuiTableFlags_Hideable | ImGuiTableFlags_Resizable |
         ImGuiTableFlags_ScrollX |
-        ImGuiTableFlags_SizingFixedFit;
+        ImGuiTableFlags_SizingStretchProp;
 
     const bool loading = listing.is_loading;
     const bool show_loading_animation = listing.loading.should_render(std::chrono::steady_clock::now());
@@ -77,6 +78,9 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state, FileLi
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(padding, padding));
         if (show_empty_state) {
             render_empty_state(48.0f);
+            if (!ImGui::IsAnyItemHovered()) {
+                handle_file_drop_target(state, state.current_path, overlay_min, overlay_max, false, false, true);
+            }
         } else if (!listing.files.empty()) {
             float avail_w = content_width;
             int cols = std::max(1, static_cast<int>(avail_w / (cell_w + padding)));
@@ -94,6 +98,8 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state, FileLi
             }
 
             if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) &&
+                !io.KeyCtrl &&
+                !io.KeySuper &&
                 ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup) &&
                 !ImGui::IsAnyItemHovered()) {
                 clear_directory_selection(state, ui);
@@ -103,6 +109,9 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state, FileLi
                        !ImGui::IsAnyItemHovered()) {
                 clear_directory_selection(state, ui);
             }
+            if (!ImGui::IsAnyItemHovered() && !selection_detail::prominent_drag_target_hovered_this_frame()) {
+                handle_file_drop_target(state, state.current_path, overlay_min, overlay_max, false, false, true);
+            }
         }
         ImGui::PopStyleVar();
     } else {
@@ -111,8 +120,8 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state, FileLi
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + kDirectoryTablePaddingX);
         UI::table("FileTable", {
             .columns = {
-                {"Name", kNameColumnWidth,
-                 ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_DefaultSort,
+                {"Name", 1.0f,
+                 ImGuiTableColumnFlags_WidthStretch | ImGuiTableColumnFlags_DefaultSort,
                  kFirstHeaderTextPaddingX},
                 {"Modified", kModifiedColumnWidth, ImGuiTableColumnFlags_WidthFixed},
                 {"Size", kSizeColumnWidth, ImGuiTableColumnFlags_WidthFixed},
@@ -146,6 +155,8 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state, FileLi
             }
 
             if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) &&
+                !io.KeyCtrl &&
+                !io.KeySuper &&
                 ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup) &&
                 !ImGui::IsAnyItemHovered()) {
                 clear_directory_selection(state, ui);
@@ -154,6 +165,9 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state, FileLi
                        ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup) &&
                        !ImGui::IsAnyItemHovered()) {
                 clear_directory_selection(state, ui);
+            }
+            if (!ImGui::IsAnyItemHovered() && !selection_detail::prominent_drag_target_hovered_this_frame()) {
+                handle_file_drop_target(state, state.current_path, overlay_min, overlay_max, false, false, true);
             }
         });
     }
@@ -190,9 +204,11 @@ void FileExplorerPanel::show_file_item(FileExplorerState& state, FileListing& li
     const bool row_double_clicked = ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
     if (row_pressed) {
         select_item(state, ui, listing, file, i, is_selected, io);
+        is_selected = ui.selected_files.count(file.id) > 0;
     }
     const ImVec2 row_min = ImGui::GetItemRectMin();
     const ImVec2 row_max = ImGui::GetItemRectMax();
+    begin_file_drag_source(state, listing, ui, file, i, is_selected);
 
     if (ImGui::IsItemHovered() && !is_selected) {
         ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -203,6 +219,8 @@ void FileExplorerPanel::show_file_item(FileExplorerState& state, FileListing& li
 
     const bool row_right_clicked =
         ImGui::IsMouseClicked(ImGuiMouseButton_Right) &&
+        !io.KeyCtrl &&
+        !io.KeySuper &&
         ImGui::IsMouseHoveringRect(row_min, row_max, false);
     if (row_right_clicked) {
         ui.context_menu_target_path = file.path;
@@ -210,7 +228,14 @@ void FileExplorerPanel::show_file_item(FileExplorerState& state, FileListing& li
         open_context_menu(state, ui);
     }
 
-    const bool show_open_folder_icon = false;
+    const bool show_open_folder_icon =
+        file.is_dir && selection_detail::show_open_folder_for_drag_hover(file, row_min, row_max);
+
+    if (file.is_dir) {
+        handle_drag_navigation_target(state, file.path, row_min, row_max, true, [this, path = file.path]() {
+            navigate_to_path(path);
+        });
+    }
 
     if (row_double_clicked) {
         if (file.is_dir) {
@@ -294,7 +319,13 @@ void FileExplorerPanel::show_grid_item(FileExplorerState& state, FileListing& li
     const bool clicked = begin_grid_item_button(btn_id, cell_w, cell_h);
     bool hovered = ImGui::IsItemHovered();
     bool double_clicked = hovered && ImGui::IsMouseDoubleClicked(0);
-    const bool right_clicked = hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right);
+    const bool right_clicked =
+        hovered &&
+        ImGui::IsMouseClicked(ImGuiMouseButton_Right) &&
+        !io.KeyCtrl &&
+        !io.KeySuper;
+    begin_file_drag_source(state, listing, ui, file, i, is_selected);
+    is_selected = ui.selected_files.count(file.id) > 0;
 
     ImDrawList* dl = ImGui::GetWindowDrawList();
     ImVec2 cell_max = ImVec2(cell_pos.x + cell_w, cell_pos.y + cell_h);
@@ -304,7 +335,13 @@ void FileExplorerPanel::show_grid_item(FileExplorerState& state, FileListing& li
     } else if (hovered) {
         dl->AddRectFilled(cell_pos, cell_max, IM_COL32(255, 255, 255, 20), kGridCardRounding);
     }
-    const bool show_open_folder_icon = false;
+    const bool show_open_folder_icon =
+        file.is_dir && selection_detail::show_open_folder_for_drag_hover(file, cell_pos, cell_max);
+    if (file.is_dir) {
+        handle_drag_navigation_target(state, file.path, cell_pos, cell_max, true, [this, path = file.path]() {
+            navigate_to_path(path);
+        });
+    }
     grid_item_icon(dl, state, listing, file, show_open_folder_icon, cell_pos, cell_w, kGridIconSize, kGridCardPadding.top);
     grid_item_label(dl, state, listing, file, is_selected, cell_pos, cell_w, kGridIconSize, kGridCardPadding.top,
                     kGridLabelGap, kGridLabelWrapInset);

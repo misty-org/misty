@@ -5,9 +5,12 @@
 #include <cstring>
 #include <ctime>
 #include <iomanip>
+#include <memory>
+#include <mutex>
 #include <optional>
 #include <sstream>
 #include <sys/stat.h>
+#include <utility>
 
 #include "core/file_master/file_master_util.h"
 #include "core/file_sync/file_sync_store.h"
@@ -15,6 +18,7 @@
 #include "core/ui/ui_animate.h"
 #include "panels/file_explorer/content/file_explorer_content_util.h"
 #include "panels/file_explorer/navigation/history_util.h"
+#include "panels/file_explorer/selection/drag_and_drop.h"
 #include "panels/file_explorer/state/remote_mount_state.h"
 #include "panels/providers/state/providers_state.h"
 
@@ -132,6 +136,25 @@ namespace misty::panel {
             std::error_code ec;
             const auto info = fs::space(fs::path(path), ec);
             return ec ? 0 : info.available;
+        }
+
+        std::mutex& local_listing_worker_pool_mutex() {
+            static std::mutex mutex;
+            return mutex;
+        }
+
+        std::unique_ptr<core::WorkerPool>& local_listing_worker_pool_storage() {
+            static std::unique_ptr<core::WorkerPool> pool;
+            return pool;
+        }
+
+        core::WorkerPool& local_listing_worker_pool() {
+            std::lock_guard<std::mutex> lock(local_listing_worker_pool_mutex());
+            auto& pool = local_listing_worker_pool_storage();
+            if (!pool) {
+                pool = std::make_unique<core::WorkerPool>(2);
+            }
+            return *pool;
         }
 
         std::string display_name_for_path(const std::string& path) {
@@ -425,6 +448,7 @@ namespace misty::panel {
         props.state_key = state_key_ + "_tab_" + std::to_string(tab_idx);
         props.panel_id = panel_id() + "_tab_" + std::to_string(tab_idx);
         props.restore_persistent_state = false;
+        props.defer_initial_navigation = suppress_child_initial_navigation_;
         props.owns_state_cleanup = true;
 
         std::string initial_path = default_local_start_path();
@@ -475,19 +499,33 @@ namespace misty::panel {
     }
 
     void FileExplorerPanel::drop_selected_items_to_path(const std::string& source_state_key,
+                                                        const std::vector<std::string>& selected_ids,
                                                         const std::string& dest_path,
                                                         ClipboardOp op) {
-        auto& source_state = registry_.get_state<FileExplorerState>(source_state_key);
-        auto& source_listing = registry_.get_state<FileListingsState>(kFileListingsStateKey).get_or_create(source_state_key);
-        if (source_state_key != state_key_) {
+        if (source_state_key.empty()) {
             return;
         }
+        if (!registry_.has_state(source_state_key)) {
+            return;
+        }
+
+        auto& source_state = registry_.get_state<FileExplorerState>(source_state_key);
+        FileListing* source_listing = registry_.get_state<FileListingsState>(kFileListingsStateKey).find(source_state_key);
+        if (!source_listing) {
+            return;
+        }
+        std::vector<std::string> ids;
+        if (selected_ids.empty()) {
+            ids.assign(source_state.selected_files.begin(), source_state.selected_files.end());
+        } else {
+            ids = selected_ids;
+        }
         std::vector<FileItem> items;
-        items.reserve(ui_.selected_files.size());
-        for (const auto& selected_id : ui_.selected_files) {
-            auto it = std::find_if(source_listing.files.begin(), source_listing.files.end(),
+        items.reserve(ids.size());
+        for (const auto& selected_id : ids) {
+            auto it = std::find_if(source_listing->files.begin(), source_listing->files.end(),
                                    [&](const FileItem& candidate) { return candidate.id == selected_id; });
-            if (it != source_listing.files.end()) {
+            if (it != source_listing->files.end()) {
                 items.push_back(*it);
             }
         }
@@ -497,7 +535,7 @@ namespace misty::panel {
         }
 
         auto& active_state = registry_.get_state<FileExplorerState>(active_explorer_state_key());
-        perform_drop_items(active_state, items, dest_path, op);
+        perform_drop_items(active_state, items, dest_path, op, source_state_key);
     }
 
 
@@ -615,11 +653,11 @@ namespace misty::panel {
     void FileExplorerPanel::render_panel_contents() {
         auto& state = registry_.get_state<FileExplorerState>(state_key_);
         auto& listing = active_listing();
-        std::unique_lock<std::mutex> lock(state.mu);
+        std::unique_lock<std::recursive_mutex> lock(state.mu);
 
         const float available_h = ImGui::GetContentRegionAvail().y;
         const float status_bar_height = 30.0f;
-        const float content_height = std::max(0.0f, available_h - status_bar_height - 4.0f);
+        const float content_height = std::max(0.0f, available_h - status_bar_height);
 
         ImGui::PushStyleColor(ImGuiCol_ChildBg, kInspectorBg);
         ImGui::PushStyleColor(ImGuiCol_WindowBg, kInspectorBg);
@@ -641,7 +679,11 @@ namespace misty::panel {
                 float list_height = ImGui::GetContentRegionAvail().y;
 
                 show_directory_contents(state, listing, ui_);
-                show_error_modal(ui_.error_msg, "FileExplorerError");
+                if (!listing.error_message.empty()) {
+                    show_error_modal(listing.error_message, "FileExplorerError");
+                } else {
+                    show_error_modal(ui_.error_msg, "FileExplorerError");
+                }
                 ImGui::SetCursorPos(list_start);
                 if (search_panel_) {
                     search_panel_->render(state.current_path, list_height);
@@ -652,10 +694,12 @@ namespace misty::panel {
         }
         ImGui::EndChild();
 
-        ImGui::Separator();
+        ImGui::SetCursorPosY(ImGui::GetCursorPosY() - ImGui::GetStyle().ItemSpacing.y);
         const std::string status_text = build_directory_status_text(listing, ui_);
         const std::string freshness_tooltip = build_directory_freshness_tooltip(listing, state.current_path);
         if (ImGui::BeginChild("BottomStatusBar", ImVec2(0.0f, status_bar_height), false, ImGuiWindowFlags_NoScrollbar)) {
+            const ImVec2 status_min = ImGui::GetWindowPos();
+            const ImVec2 status_max(status_min.x + ImGui::GetWindowWidth(), status_min.y + status_bar_height);
             constexpr float kStatusPadX = 10.0f;
             constexpr float kStatusPadY = 5.0f;
             constexpr float kRightActionWidth = 34.0f;
@@ -680,11 +724,18 @@ namespace misty::panel {
             ImGui::SetCursorPosX(std::max(0.0f, right_width - kRightActionWidth));
             render_directory_info_status_slot(kRightActionWidth, content_height, freshness_tooltip);
             ImGui::EndChild();
+
+            handle_file_drop_target(state, state.current_path, status_min, status_max, false, false, true);
         }
         ImGui::EndChild();
         ImGui::PopStyleColor(5);
 
         lock.unlock();
+        if (!pending_drag_navigation_path_.empty()) {
+            std::string path = std::move(pending_drag_navigation_path_);
+            pending_drag_navigation_path_.clear();
+            navigate_to_path(path);
+        }
         update_periodic_save(state);
     }
 
@@ -707,7 +758,7 @@ namespace misty::panel {
         std::string current_path;
         {
             auto& state = registry_.get_state<FileExplorerState>(explorer->state_key_);
-            std::lock_guard<std::mutex> lock(state.mu);
+            std::lock_guard<std::recursive_mutex> lock(state.mu);
             current_path = state.current_path;
         }
 
@@ -721,7 +772,7 @@ namespace misty::panel {
             const ImVec2 min = ImGui::GetWindowPos();
             const ImVec2 max(min.x + ImGui::GetWindowWidth(), min.y + kPanePathHeaderHeight);
             const ImU32 border = IM_COL32(46, 50, 60, 180);
-            const ImU32 path_col = IM_COL32(176, 184, 198, 255);
+            const ImU32 path_col = is_active ? IM_COL32(176, 184, 198, 255) : IM_COL32(95, 100, 112, 255);
             dl->AddLine(ImVec2(min.x, max.y - 1.0f), ImVec2(max.x, max.y - 1.0f), border, 1.0f);
 
             constexpr float kPadX = 10.0f;
@@ -738,9 +789,26 @@ namespace misty::panel {
             if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup)) {
                 ImGui::SetTooltip("%s", path_label.c_str());
             }
+
+            if (!current_path.empty()) {
+                auto& state = registry_.get_state<FileExplorerState>(explorer->state_key_);
+                explorer->handle_file_drop_target(state, current_path, min, max, false, false, true);
+            }
         }
         ImGui::EndChild();
         ImGui::PopStyleColor();
+    }
+
+    void FileExplorerPanel::render_pane_drop_zone(Panel& panel,
+                                                  bool is_active,
+                                                  bool has_multiple_panes,
+                                                  const ImVec2& min,
+                                                  const ImVec2& max) {
+        (void)panel;
+        (void)is_active;
+        (void)has_multiple_panes;
+        (void)min;
+        (void)max;
     }
 
     void FileExplorerPanel::render() {
@@ -761,7 +829,7 @@ namespace misty::panel {
 
         auto& state = registry_.get_state<FileExplorerState>(state_key_);
         auto& search_state = registry_.get_state<SearchState>(search_state_key_);
-        std::unique_lock<std::mutex> lock(state.mu);
+        std::unique_lock<std::recursive_mutex> lock(state.mu);
 
         ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.075f, 0.085f, 0.10f, 1.0f));
         if (ImGui::BeginChild("TopBar", ImVec2(0.0f, kToolbarHeight), false, ImGuiWindowFlags_NoScrollbar)) {
@@ -815,7 +883,7 @@ namespace misty::panel {
         std::string current_path;
         std::size_t item_count = 0;
         {
-            std::lock_guard<std::mutex> lock(state.mu);
+            std::lock_guard<std::recursive_mutex> lock(state.mu);
             if (const FileItem* item = primary_selected_item(listing)) {
                 selected_item = *item;
             }
@@ -931,43 +999,47 @@ namespace misty::panel {
         const auto minimum_animation_duration = std::chrono::duration_cast<std::chrono::steady_clock::duration>(
             std::chrono::duration<float>(misty::UI::MistyLoadingAnimationLoopSeconds()));
 
-        // Local-volume scans can be slow, especially under /Volumes. Keep the
-        // UI interactive and stream rows in batches instead of blocking until
-        // the whole directory has been stat'ed.
-        listing.is_loading = true;
-        if (is_remote_listing && !use_cached_remote_listing) {
-            listing.loading.begin(load_generation, now, minimum_animation_duration);
-        } else {
-            listing.loading.cancel();
-        }
-        ui_.error_msg  = "";
-        ui_.clear_transient();
-        state.selected_files.clear();
-        listing.files.clear();
-        listing.hidden_item_count = 0;
-        listing.sort_dirty = true;
-
         fs::path normalized_path = fs::path(path).lexically_normal();
         std::string display_path = normalized_path.generic_string();
         if (display_path.empty()) {
             display_path = path;
         }
-        // History update is fast (no I/O) — do it synchronously now so
-        // back/forward buttons are correct even before the scan completes.
-        update_navigation_history(state, display_path, update_history);
+        {
+            std::lock_guard<std::recursive_mutex> lock(state.mu);
+            // Local-volume scans can be slow, especially under /Volumes. Keep the
+            // UI interactive and stream rows in batches instead of blocking until
+            // the whole directory has been stat'ed.
+            listing.is_loading = true;
+            if (is_remote_listing && !use_cached_remote_listing) {
+                listing.loading.begin(load_generation, now, minimum_animation_duration);
+            } else {
+                listing.loading.cancel();
+            }
+            ui_.error_msg  = "";
+            ui_.clear_transient();
+            state.selected_files.clear();
+            listing.files.clear();
+            listing.hidden_item_count = 0;
+            listing.error_message.clear();
+            listing.sort_dirty = true;
 
-        strncpy(state.current_path, display_path.c_str(), sizeof(state.current_path) - 1);
-        state.current_path[sizeof(state.current_path) - 1] = '\0';
-        strncpy(state.search_path, display_path.c_str(), sizeof(state.search_path) - 1);
-        state.search_path[sizeof(state.search_path) - 1] = '\0';
+            // History update is fast (no I/O) — do it synchronously now so
+            // back/forward buttons are correct even before the scan completes.
+            update_navigation_history(state, display_path, update_history);
+
+            strncpy(state.current_path, display_path.c_str(), sizeof(state.current_path) - 1);
+            state.current_path[sizeof(state.current_path) - 1] = '\0';
+            strncpy(state.search_path, display_path.c_str(), sizeof(state.search_path) - 1);
+            state.search_path[sizeof(state.search_path) - 1] = '\0';
+        }
 
         // Snapshot volatile UI state before leaving the UI thread
         const bool show_hidden = ui_.show_hidden;
 
-        worker_pool_.add(
+        core::WorkerPool& listing_pool = is_remote_listing ? worker_pool_ : local_listing_worker_pool();
+        listing_pool.add(
             [registry = &registry_,
              state_key = state_key_,
-             ui = &ui_,
              path,
              show_hidden,
              load_generation,
@@ -982,7 +1054,7 @@ namespace misty::panel {
                 std::size_t hidden_item_count = 0;
 
                 auto flush_batch = [&](bool final_flush) {
-                    std::lock_guard<std::mutex> lk(state.mu);
+                    std::lock_guard<std::recursive_mutex> lk(state.mu);
                     if (listing.load_generation.load(std::memory_order_relaxed) != load_generation) {
                         return false;
                     }
@@ -1035,7 +1107,7 @@ namespace misty::panel {
                         batch = remote_mount_items_for(*remote_target, remote_items);
                         hydrate_remote_sync_states(batch);
                         if (auto cached_time = cached_remote_path_time(remote_props)) {
-                            std::lock_guard<std::mutex> lk(state.mu);
+                            std::lock_guard<std::recursive_mutex> lk(state.mu);
                             if (listing.load_generation.load(std::memory_order_relaxed) != load_generation) {
                                 return;
                             }
@@ -1047,11 +1119,11 @@ namespace misty::panel {
 
                     FileMasterResult remote_result = list_remote_path(remote_props, remote_items);
                     if (!remote_result.success) {
-                        std::lock_guard<std::mutex> lk(state.mu);
+                        std::lock_guard<std::recursive_mutex> lk(state.mu);
                         if (listing.load_generation.load(std::memory_order_relaxed) != load_generation) {
                             return;
                         }
-                        ui->error_msg = remote_result.error_message;
+                        listing.error_message = remote_result.error_message;
                         listing.is_loading = false;
                         listing.loading.complete(
                             load_generation,
@@ -1069,7 +1141,7 @@ namespace misty::panel {
                     hydrate_remote_sync_states(batch);
                     const auto fetched_time = cached_remote_path_time(remote_props).value_or(std::chrono::system_clock::now());
                     {
-                        std::lock_guard<std::mutex> lk(state.mu);
+                        std::lock_guard<std::recursive_mutex> lk(state.mu);
                         if (listing.load_generation.load(std::memory_order_relaxed) != load_generation) {
                             return;
                         }
@@ -1091,18 +1163,17 @@ namespace misty::panel {
                         if (!show_hidden && is_hidden_entry) continue;
                         batch.push_back(make_local_file_item(entry));
                         if (batch.size() >= kLocalListBatchSize) {
-                            hydrate_local_sync_states(batch);
                             if (!flush_batch(false)) {
                                 return;
                             }
                         }
                     }
                 } catch (const std::exception& e) {
-                    std::lock_guard<std::mutex> lk(state.mu);
+                    std::lock_guard<std::recursive_mutex> lk(state.mu);
                     if (listing.load_generation.load(std::memory_order_relaxed) != load_generation) {
                         return;
                     }
-                    ui->error_msg  = e.what();
+                    listing.error_message = e.what();
                     listing.is_loading = false;
                     listing.loading.cancel();
                     listing.sort_dirty = true;
@@ -1110,13 +1181,11 @@ namespace misty::panel {
                     return;
                 }
 
-                hydrate_local_sync_states(batch);
                 flush_batch(true);
             },
             []() {},
             [registry = &registry_,
              state_key = state_key_,
-             ui = &ui_,
              load_generation,
              is_remote_listing](const std::string& err) {
                 auto& state = registry->get_state<FileExplorerState>(state_key);
@@ -1124,7 +1193,11 @@ namespace misty::panel {
                 if (listing.load_generation.load(std::memory_order_relaxed) != load_generation) {
                     return;
                 }
-                ui->error_msg  = err;
+                std::lock_guard<std::recursive_mutex> lk(state.mu);
+                if (listing.load_generation.load(std::memory_order_relaxed) != load_generation) {
+                    return;
+                }
+                listing.error_message = err;
                 listing.is_loading = false;
                 if (is_remote_listing) {
                     listing.loading.complete(
@@ -1140,16 +1213,30 @@ namespace misty::panel {
     }
 
     void FileExplorerPanel::navigate_to_path(const std::string& path, bool update_history, bool create_if_missing) {
-        printf("Explorer: navigate_to_path called with: %s\n", path.c_str());
         auto& state = registry_.get_state<FileExplorerState>(state_key_);
         auto& listing = active_listing();
         auto& library = library_state();
-        uint64_t load_generation = listing.load_generation.fetch_add(1, std::memory_order_relaxed) + 1;
+
+        std::string normalized_request = fs::path(path).lexically_normal().generic_string();
+        if (normalized_request.empty()) {
+            normalized_request = path;
+        }
+        uint64_t load_generation = 0;
+        {
+            std::lock_guard<std::recursive_mutex> lock(state.mu);
+            const std::string current_path(state.current_path);
+            const bool has_active_load_animation = listing.loading.phase != LoadingAnimationPhase::Idle;
+            if (listing.is_loading && has_active_load_animation && !current_path.empty() && current_path == normalized_request) {
+                return;
+            }
+            load_generation = listing.load_generation.fetch_add(1, std::memory_order_relaxed) + 1;
+        }
 
         // Virtual Paths Logic
         VirtualListingResult virtual_listing;
         if (populate_virtual_listing(library, path, virtual_listing)) {
             printf("Explorer: Handling virtual path: %s\n", path.c_str());
+            std::lock_guard<std::recursive_mutex> lock(state.mu);
             update_navigation_history(state, path, update_history);
             listing.files = std::move(virtual_listing.files);
             if (path == FileExplorerState::VIRTUAL_PATH_TRASH) {

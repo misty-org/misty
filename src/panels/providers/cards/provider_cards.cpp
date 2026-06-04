@@ -12,8 +12,8 @@ namespace misty::panel {
     namespace {
         constexpr ImVec4 kCardBg = ImVec4(0.16f, 0.18f, 0.20f, 1.0f);
         constexpr ImVec4 kBorder = ImVec4(0.24f, 0.27f, 0.30f, 1.0f);
-        constexpr ImVec4 kText = ImVec4(0.94f, 0.95f, 0.97f, 1.0f);
-        constexpr ImVec4 kMuted = ImVec4(0.62f, 0.66f, 0.70f, 1.0f);
+        constexpr ImVec4 kText = ImVec4(0.945f, 0.933f, 0.910f, 1.0f);
+        constexpr ImVec4 kMuted = ImVec4(0.788f, 0.769f, 0.737f, 1.0f);
         constexpr ImVec4 kAccent = ImVec4(0.48f, 0.86f, 0.59f, 1.0f);
         constexpr ImVec4 kWarning = ImVec4(0.96f, 0.68f, 0.28f, 1.0f);
         constexpr float kConnectedRowHeight = 72.0f;

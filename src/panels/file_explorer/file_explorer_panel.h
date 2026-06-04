@@ -34,6 +34,7 @@ struct FileExplorerPanelProps {
     std::string panel_id = "primary";
     bool restore_persistent_state = true;
     std::string initial_path_override;
+    bool defer_initial_navigation = false;
     bool owns_state_cleanup = false;
 };
 
@@ -119,6 +120,10 @@ public:
      */
     std::string save_restore_state() const override;
     /**
+     * @brief Restores the split-pane workspace snapshot without issuing throwaway startup navigation.
+     */
+    void restore_workspace_snapshot(const core::WorkspaceExplorerSnapshot& snapshot);
+    /**
      * @brief Restores panel navigation state from a serialized pane payload.
      */
     void load_restore_state(const std::string& state) override;
@@ -168,6 +173,7 @@ public:
      * @brief Drops the selected items from one explorer state onto a destination path.
      */
     void drop_selected_items_to_path(const std::string& source_state_key,
+                                     const std::vector<std::string>& selected_ids,
                                      const std::string& dest_path,
                                      ClipboardOp op);
 
@@ -187,6 +193,11 @@ private:
     void render_panel_contents() override;
     float pane_header_height(const Panel& panel, bool is_active, bool has_multiple_panes) const override;
     void render_pane_header(Panel& panel, bool is_active, bool has_multiple_panes) override;
+    void render_pane_drop_zone(Panel& panel,
+                               bool is_active,
+                               bool has_multiple_panes,
+                               const ImVec2& min,
+                               const ImVec2& max) override;
     /**
      * @brief Renders the inspector body inside either a window or embedded child.
      */
@@ -377,14 +388,17 @@ private:
     void perform_drop_items(panel::FileExplorerState& state,
                             const std::vector<panel::FileItem>& items,
                             const std::string& dest_dir,
-                            panel::ClipboardOp op);
+                            panel::ClipboardOp op,
+                            const std::string& source_state_key = {});
     /**
      * @brief Performs one paste/drop operation through the local or remote file master.
      */
     bool perform_paste_item(panel::FileExplorerState& state,
                             const panel::FileItem& item,
                             const std::string& dest_dir,
-                            panel::ClipboardOp op);
+                            panel::ClipboardOp op,
+                            uint64_t job_id,
+                            const std::string& source_state_key = {});
     /**
      * @brief Downloads a remote row into its mounted local destination path.
      */
@@ -463,6 +477,8 @@ private:
     std::unique_ptr<SearchPanel> search_panel_;
     std::unique_ptr<PreviewPanel> preview_panel_;
     TransientUiState ui_;
+    std::string pending_drag_navigation_path_;
+    mutable bool suppress_child_initial_navigation_ = false;
     bool owns_state_cleanup_ = false;
 };
 

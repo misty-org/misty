@@ -42,6 +42,8 @@ namespace misty::panel {
         // or initializing the full Providers view.
         bool providers_loaded = false;
         bool providers_loading = false;
+        bool providers_capacity_loaded = false;
+        bool providers_capacity_loading = false;
         std::chrono::steady_clock::time_point providers_last_refresh_at{};
         std::string providers_error;
         std::vector<SidebarProviderEntry> provider_entries;

@@ -24,7 +24,6 @@
 #include "panels/panel/panel.h"
 #include "panels/file_explorer/state/file_explorer_state.h"
 #include "panels/file_explorer/state/file_listings_state.h"
-#include "panels/activity/activity_state.h"
 #include "panels/notification/notification_state.h"
 #include "views/app_view.h"
 
@@ -101,15 +100,13 @@ bool matches_platforms(const std::vector<std::string>& platforms, const std::str
 
 std::string view_id_to_string(view::ViewID view_id) {
     switch (view_id) {
-        case view::ViewID::Auth: return "Auth";
-        case view::ViewID::Login: return "Login";
         case view::ViewID::Files: return "Files";
         case view::ViewID::Settings: return "Settings";
         case view::ViewID::Workspace: return "Workspace";
         case view::ViewID::Activity: return "Activity";
         case view::ViewID::Providers: return "Providers";
         case view::ViewID::Plugins: return "Plugins";
-        case view::ViewID::Dock: return "Dock";
+        case view::ViewID::Dock: return "Plugins";
         case view::ViewID::Transfers: return "Transfers";
         case view::ViewID::Default: return "Default";
     }
@@ -121,14 +118,12 @@ std::optional<view::ViewID> view_id_from_string(const char* raw) {
         return std::nullopt;
     }
     const std::string value = to_lower(trim_copy(raw));
-    if (value == "auth") return view::ViewID::Auth;
-    if (value == "login") return view::ViewID::Login;
     if (value == "files") return view::ViewID::Files;
     if (value == "settings") return view::ViewID::Settings;
     if (value == "workspace") return view::ViewID::Workspace;
     if (value == "activity") return view::ViewID::Activity;
     if (value == "providers") return view::ViewID::Providers;
-    if (value == "plugins") return view::ViewID::Plugins;
+    if (value == "plugins") return view::ViewID::Dock;
     if (value == "dock") return view::ViewID::Dock;
     if (value == "transfers" || value == "transfer") return view::ViewID::Transfers;
     return std::nullopt;
@@ -150,7 +145,7 @@ constexpr LauncherViewMask kLauncherViewAll =
     kLauncherViewDock;
 
 struct PluginLauncherMetadata {
-    LauncherViewMask allowed_views = kLauncherViewPlugins;
+    LauncherViewMask allowed_views = kLauncherViewPlugins | kLauncherViewDock;
     bool show_in_launcher = true;
     bool requires_selected_file = false;
     std::string subtitle;
@@ -164,8 +159,8 @@ LauncherViewMask launcher_mask_for_view(view::ViewID view_id) {
         case view::ViewID::Files: return kLauncherViewFiles;
         case view::ViewID::Settings: return kLauncherViewSettings;
         case view::ViewID::Providers: return kLauncherViewProviders;
-        case view::ViewID::Plugins: return kLauncherViewPlugins;
-        case view::ViewID::Dock: return kLauncherViewDock;
+        case view::ViewID::Plugins: return kLauncherViewPlugins | kLauncherViewDock;
+        case view::ViewID::Dock: return kLauncherViewPlugins | kLauncherViewDock;
         case view::ViewID::Transfers: return kLauncherViewTransfers;
         default: return 0;
     }
@@ -271,7 +266,10 @@ std::string launcher_view_label(LauncherViewMask mask) {
     if ((mask & kLauncherViewSettings) != 0) labels.push_back("Settings");
     if ((mask & kLauncherViewProviders) != 0) labels.push_back("Providers");
     if ((mask & kLauncherViewPlugins) != 0) labels.push_back("Plugins");
-    if ((mask & kLauncherViewDock) != 0) labels.push_back("Dock");
+    if ((mask & kLauncherViewDock) != 0 &&
+        std::find(labels.begin(), labels.end(), "Plugins") == labels.end()) {
+        labels.push_back("Plugins");
+    }
 
     std::string out;
     for (size_t i = 0; i < labels.size(); ++i) {
@@ -289,7 +287,10 @@ std::vector<std::string> launcher_view_tokens(LauncherViewMask mask) {
     if ((mask & kLauncherViewSettings) != 0) labels.push_back("Settings");
     if ((mask & kLauncherViewProviders) != 0) labels.push_back("Providers");
     if ((mask & kLauncherViewPlugins) != 0) labels.push_back("Plugins");
-    if ((mask & kLauncherViewDock) != 0) labels.push_back("Dock");
+    if ((mask & kLauncherViewDock) != 0 &&
+        std::find(labels.begin(), labels.end(), "Plugins") == labels.end()) {
+        labels.push_back("Plugins");
+    }
     if ((mask & kLauncherViewTransfers) != 0) labels.push_back("Transfers");
     return labels;
 }
@@ -336,7 +337,7 @@ PluginLauncherMetadata load_launcher_metadata(const fs::path& plugin_dir,
         }
     }
     if (allowed_views == 0) {
-        allowed_views = kLauncherViewPlugins;
+        allowed_views = kLauncherViewPlugins | kLauncherViewDock;
     }
     metadata.allowed_views = allowed_views;
     metadata.show_in_launcher = launcher_json.value("show_in_launcher", true);
@@ -532,13 +533,12 @@ struct PluginManager::Impl {
         if (!self->state_registry) return;
         const std::string sender = title ? title : "Extension";
         const std::string msg = message ? message : "";
-        if (level == MISTY_NOTIFICATION_ERROR) {
-            auto& activity = self->state_registry->get_state<panel::ActivityState>("Activity");
-            activity.add_entry(sender, msg, panel::ActivityEntryType::ERROR);
-        } else {
-            auto& notifications = self->state_registry->get_state<panel::NotificationState>("Notifications");
-            notifications.add_notification(sender + ": " + msg);
-        }
+        auto& notifications = self->state_registry->get_state<panel::NotificationState>("Notifications");
+        notifications.add_notification(
+            sender + ": " + msg,
+            panel::NotificationState::DEFAULT_DURATION,
+            level == MISTY_NOTIFICATION_ERROR ? panel::NotificationType::ERROR
+                                              : panel::NotificationType::INFO);
     }
     static std::uint32_t c_create_texture(void* h, int width, int height,
                                           const unsigned char* rgba_pixels) {
@@ -843,10 +843,11 @@ struct PluginManager::Impl {
         append_diagnostic(plugin_index, std::move(message));
 
         if (state_registry && !plugins[plugin_index].info.diagnostics.empty()) {
-            auto& activity = state_registry->get_state<panel::ActivityState>("Activity");
-            activity.add_entry("System",
-                               plugins[plugin_index].info.name + " faulted and was disabled.",
-                               panel::ActivityEntryType::ERROR);
+            auto& notifications = state_registry->get_state<panel::NotificationState>("Notifications");
+            notifications.add_notification(
+                "System: " + plugins[plugin_index].info.name + " faulted and was disabled.",
+                panel::NotificationState::DEFAULT_DURATION,
+                panel::NotificationType::ERROR);
         }
 
         for (auto& panel : panels) {

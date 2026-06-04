@@ -269,21 +269,26 @@ void select_item(FileExplorerState& state,
                  int index,
                  bool is_selected,
                  const ImGuiIO& io) {
-    if (io.KeyCtrl) {
+    if (io.KeyShift && ui.last_selected_index >= 0 && !listing.files.empty()) {
+        const int max_index = static_cast<int>(listing.files.size()) - 1;
+        const int anchor = std::clamp(ui.last_selected_index, 0, max_index);
+        const int target = std::clamp(index, 0, max_index);
+        const int start = std::min(anchor, target);
+        const int end = std::max(anchor, target);
+        ui.selected_files.clear();
+        for (int range_index = start; range_index <= end; ++range_index) {
+            ui.selected_files.insert(listing.files[range_index].id);
+        }
+    } else if (io.KeyCtrl || io.KeySuper) {
         if (is_selected) ui.selected_files.erase(file.id);
         else ui.selected_files.insert(file.id);
-    } else if (io.KeyShift && ui.last_selected_index != -1) {
-        ui.selected_files.clear();
-        const int start = std::min(ui.last_selected_index, index);
-        const int end = std::max(ui.last_selected_index, index);
-        for (int item_index = start; item_index <= end; ++item_index) {
-            ui.selected_files.insert(listing.files[item_index].id);
-        }
     } else {
         ui.selected_files.clear();
         ui.selected_files.insert(file.id);
     }
-    ui.last_selected_index = index;
+    if (!io.KeyShift || ui.last_selected_index < 0) {
+        ui.last_selected_index = index;
+    }
     state.selected_files = ui.selected_files;
 }
 

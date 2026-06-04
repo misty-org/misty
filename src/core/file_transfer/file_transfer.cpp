@@ -4,6 +4,15 @@
 
 namespace misty::core {
 
+bool FileTransferRecord::is_alive() const {
+    if (!error_message.empty() ||
+        status == FileTransferStatus::Failed ||
+        status == FileTransferStatus::Completed) {
+        return false;
+    }
+    return status == FileTransferStatus::Pending || status == FileTransferStatus::InProgress;
+}
+
 void FileTransfer::set_local_context(uint64_t id, const std::string& local_path) {
     std::lock_guard<std::mutex> lock(mu_);
 
