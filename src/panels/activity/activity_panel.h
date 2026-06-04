@@ -3,6 +3,7 @@
 #include "core/ui/state_registry.h"
 #include "panels/panel/panel.h"
 #include "activity_state.h"
+#include "panels/notification/notification_state.h"
 
 namespace misty::panel {
 
@@ -17,10 +18,9 @@ namespace misty::panel {
         enum class Filter {
             All,
             Unread,
-            Transfers,
         };
 
-        void render_entry(const ActivityEntry& entry);
+        void render_entry(const Notification& entry);
         void render_empty_state();
         std::string format_timestamp(std::chrono::system_clock::time_point tp);
 

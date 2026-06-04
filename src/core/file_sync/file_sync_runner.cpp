@@ -11,7 +11,7 @@
 #include <vector>
 
 #include "core/manager/env_manager.h"
-#include "core/manager/session_manager.h"
+#include "core/manager/proxy_token_store.h"
 #include "core/net/http_client.h"
 #include "core/system/util.h"
 
@@ -112,10 +112,8 @@ HttpResponse upload_multipart(const std::string& url,
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 0L);
 
     struct curl_slist* headers = nullptr;
-    SessionManager::get().ensure_session_ready();
-    auto auth_headers = SessionManager::get().get_auth_headers();
-    for (const auto& [key, value] : auth_headers) {
-        const std::string header = key + ": " + value;
+    if (auto token = ProxyTokenStore::get().current_access_token(); token && !token->empty()) {
+        const std::string header = "Authorization: Bearer " + *token;
         headers = curl_slist_append(headers, header.c_str());
     }
     if (headers) {

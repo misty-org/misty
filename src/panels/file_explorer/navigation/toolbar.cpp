@@ -64,6 +64,23 @@ void draw_toolbar_button_frame(const ImVec2& min, const ImVec2& max, bool hovere
     dl->AddRect(min, max, hovered ? IM_COL32(72, 82, 104, 230) : IM_COL32(46, 50, 60, 190), 8.0f);
 }
 
+void draw_grid_toggle_icon(const ImVec2& center, float icon_size, ImU32 tint) {
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    const float cell_size = std::max(3.0f, icon_size * 0.28f);
+    const float gap = std::max(2.0f, icon_size * 0.10f);
+    const float total = cell_size * 2.0f + gap;
+    const ImVec2 start(center.x - total * 0.5f, center.y - total * 0.5f);
+
+    for (int row = 0; row < 2; ++row) {
+        for (int col = 0; col < 2; ++col) {
+            const ImVec2 cell_min(start.x + col * (cell_size + gap),
+                                  start.y + row * (cell_size + gap));
+            const ImVec2 cell_max(cell_min.x + cell_size, cell_min.y + cell_size);
+            dl->AddRectFilled(cell_min, cell_max, tint, 2.0f);
+        }
+    }
+}
+
 void draw_icon_at(const char* icon_path, const ImVec2& center, float icon_size, ImU32 tint);
 
 bool toolbar_icon_button(const char* id,
@@ -555,10 +572,9 @@ void FileExplorerPanel::show_view_mode_toggle() {
     dl->AddRectFilled(active_min, active_max, IM_COL32(48, 55, 69, 245), 7.0f,
                       grid_active ? ImDrawFlags_RoundCornersLeft : ImDrawFlags_RoundCornersRight);
 
-    draw_icon_at("assets/icons/apps-24.svg",
-                 ImVec2(cursor.x + kHalfWidth * 0.5f, cursor.y + kToolbarButtonSize * 0.5f),
-                 18.0f,
-                 grid_active ? IM_COL32(240, 244, 250, 255) : IM_COL32(170, 176, 188, 235));
+    draw_grid_toggle_icon(ImVec2(cursor.x + kHalfWidth * 0.5f, cursor.y + kToolbarButtonSize * 0.5f),
+                          18.0f,
+                          grid_active ? IM_COL32(240, 244, 250, 255) : IM_COL32(170, 176, 188, 235));
     draw_icon_at("assets/icons/rows-24.svg",
                  ImVec2(cursor.x + kHalfWidth + kHalfWidth * 0.5f, cursor.y + kToolbarButtonSize * 0.5f),
                  18.0f,

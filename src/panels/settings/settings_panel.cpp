@@ -1,4 +1,3 @@
-#include "panels/settings/settings_account.h"
 #include "panels/settings/settings_advanced.h"
 #include "panels/settings/settings_appearance.h"
 #include "panels/settings/settings_general.h"
@@ -89,7 +88,7 @@ void SettingsPanel::render_panel_contents() {
     auto& state = registry_.get_state<SettingsState>(state_key_);
     state.ensure_app_settings_loaded();
     misty::UI::WithWindowStyle({
-        .bg_color = ImVec4(0.12f, 0.12f, 0.12f, 1.0f),
+        .bg_color = ImVec4(0.027f, 0.035f, 0.043f, 1.0f),
     }, [&]() {
         misty::view::debug_log_view_event(
             std::string("settings_panel: section=") + std::to_string(static_cast<int>(state.active_section)));
@@ -103,7 +102,7 @@ void SettingsPanel::render_panel_contents() {
                 .mode = UI::Mode::LayoutOnly,
                 .width = UI::Size::px(1.0f),
                 .height = UI::Size::fill(),
-                .bg_color = ImVec4(0.22f, 0.22f, 0.24f, 1.0f),
+                .bg_color = ImVec4(0.153f, 0.153f, 0.165f, 1.0f),
                 .margin = UI::Spacing::xy(12.0f, 0.0f),
             }, []() {});
             settings_content(state);
@@ -193,9 +192,6 @@ void SettingsPanel::settings_content(SettingsState& state) {
                     case SettingsSection::Appearance:
                         appearance_content(state);
                         break;
-                    case SettingsSection::Account:
-                        account_content(state);
-                        break;
                     case SettingsSection::Privacy:
                         privacy_content(state);
                         break;
@@ -247,7 +243,7 @@ void SettingsPanel::sidebar_header(SettingsState& state) {
             .text = "Settings",
             .width = UI::Size::fill(),
             .font = UI::TextFont::BoldXLarge,
-            .color = ImVec4(0.96f, 0.96f, 0.98f, 1.0f),
+            .color = ImVec4(0.945f, 0.933f, 0.910f, 1.0f),
             .align = UI::Align::Start,
         });
     });
@@ -257,7 +253,6 @@ void SettingsPanel::sidebar_header(SettingsState& state) {
 void SettingsPanel::sidebar_tabs(SettingsState& state) {
     general_tab(state);
     appearance_tab(state);
-    account_tab(state);
     privacy_tab(state);
     sync_tab(state);
     notifications_tab(state);

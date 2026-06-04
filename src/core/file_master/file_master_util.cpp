@@ -9,7 +9,6 @@
 #include "core/cache/listing_cache.h"
 #include "core/file_master/file_master_api.h"
 #include "core/manager/env_manager.h"
-#include "core/manager/session_manager.h"
 #include "core/net/http_client.h"
 
 namespace fs = std::filesystem;

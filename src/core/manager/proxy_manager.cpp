@@ -17,7 +17,6 @@ extern char** environ;
 #endif
 
 #include "core/manager/env_manager.h"
-#include "core/manager/session_manager.h"
 #include "core/net/http_client.h"
 #include "core/system/util.h"
 
@@ -129,7 +128,7 @@ void ProxyManager::record_proxy_request_result(bool available, const std::string
     if (available) {
         consecutive_probe_failures_ = 0;
         last_failure_recorded_at_ = std::chrono::steady_clock::time_point{};
-        SessionManager::get().mark_proxy_available();
+        proxy_status_message_.clear();
         return;
     }
 
@@ -144,11 +143,20 @@ void ProxyManager::record_proxy_request_result(bool available, const std::string
         return;
     }
 
-    SessionManager::get().mark_proxy_unavailable(
+    proxy_status_message_ =
         message.empty()
             ? "Misty background service is unavailable. Local files remain available, but cloud and sync features are paused."
-            : message
-    );
+            : message;
+}
+
+bool ProxyManager::is_proxy_available() const {
+    std::lock_guard<std::mutex> lock(mu_);
+    return last_known_available_;
+}
+
+std::string ProxyManager::get_proxy_status_message() const {
+    std::lock_guard<std::mutex> lock(mu_);
+    return proxy_status_message_;
 }
 
 bool ProxyManager::ensure_running(bool force) {

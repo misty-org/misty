@@ -21,8 +21,8 @@ namespace misty::panel {
         constexpr ImVec4 kCardBgAlt = ImVec4(0.08f, 0.12f, 0.15f, 1.0f);
         constexpr ImVec4 kBorder = ImVec4(0.24f, 0.27f, 0.30f, 1.0f);
         constexpr ImVec4 kBorderSoft = ImVec4(0.18f, 0.23f, 0.28f, 1.0f);
-        constexpr ImVec4 kText = ImVec4(0.94f, 0.95f, 0.97f, 1.0f);
-        constexpr ImVec4 kMuted = ImVec4(0.62f, 0.66f, 0.70f, 1.0f);
+        constexpr ImVec4 kText = ImVec4(0.945f, 0.933f, 0.910f, 1.0f);
+        constexpr ImVec4 kMuted = ImVec4(0.788f, 0.769f, 0.737f, 1.0f);
         constexpr ImVec4 kError = ImVec4(0.95f, 0.49f, 0.49f, 1.0f);
         constexpr ImVec4 kSuccess = ImVec4(0.33f, 0.82f, 0.47f, 1.0f);
         constexpr ImVec4 kAccent = ImVec4(0.18f, 0.54f, 0.95f, 1.0f);

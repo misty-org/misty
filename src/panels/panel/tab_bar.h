@@ -4,7 +4,7 @@
 #include <vector>
 
 namespace misty::panel {
-    inline constexpr float kTabBarHeight = 36.0f;
+    inline constexpr float kTabBarHeight = 38.0f;
 
     struct TabBarItem {
         std::string id;

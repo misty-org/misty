@@ -21,15 +21,13 @@ namespace misty::view {
 
         const char* view_name(ViewID id) {
             switch (id) {
-                case ViewID::Auth: return "Auth";
-                case ViewID::Login: return "Login";
                 case ViewID::Files: return "Files";
                 case ViewID::Settings: return "Settings";
                 case ViewID::Workspace: return "Workspace";
                 case ViewID::Activity: return "Activity";
                 case ViewID::Providers: return "Providers";
                 case ViewID::Plugins: return "Plugins";
-                case ViewID::Dock: return "Dock";
+                case ViewID::Dock: return "Plugins";
                 case ViewID::Transfers: return "Transfers";
                 case ViewID::Default: return "Default";
             }

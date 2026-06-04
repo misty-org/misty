@@ -99,6 +99,7 @@ target_link_libraries(misty
         OpenGL::GL
         CURL::libcurl
         OpenSSL::Crypto
+        SQLite::SQLite3
 )
 
 if(WIN32)
@@ -133,6 +134,23 @@ target_link_libraries(misty_server PRIVATE misty_proto OpenSSL::Crypto)
 set(MISTY_ASSET_COMMANDS
     COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:misty>"
 )
+
+set(MISTY_USER_HOME_DIR "")
+if(DEFINED ENV{HOME} AND NOT "$ENV{HOME}" STREQUAL "")
+    set(MISTY_USER_HOME_DIR "$ENV{HOME}")
+elseif(WIN32 AND DEFINED ENV{USERPROFILE} AND NOT "$ENV{USERPROFILE}" STREQUAL "")
+    set(MISTY_USER_HOME_DIR "$ENV{USERPROFILE}")
+endif()
+
+if(NOT MISTY_USER_HOME_DIR STREQUAL "")
+    set(MISTY_USER_ASSETS_DIR "${MISTY_USER_HOME_DIR}/.misty/assets")
+    list(APPEND MISTY_ASSET_COMMANDS
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${MISTY_USER_ASSETS_DIR}"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_SOURCE_DIR}/assets"
+            "${MISTY_USER_ASSETS_DIR}"
+    )
+endif()
 
 if(EXISTS "${CMAKE_SOURCE_DIR}/misty.conf")
     list(APPEND MISTY_ASSET_COMMANDS

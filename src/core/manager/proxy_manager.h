@@ -13,6 +13,8 @@ public:
     bool ensure_running(bool force = false);
     bool restart_proxy();
     void record_proxy_request_result(bool available, const std::string& message = "");
+    bool is_proxy_available() const;
+    std::string get_proxy_status_message() const;
 
 private:
     ProxyManager() = default;
@@ -33,6 +35,7 @@ private:
     std::chrono::steady_clock::time_point last_failure_recorded_at_{};
     int consecutive_probe_failures_ = 0;
     bool last_known_available_ = true;
+    std::string proxy_status_message_;
 };
 
 } // namespace misty::core

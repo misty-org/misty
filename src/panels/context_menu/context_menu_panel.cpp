@@ -1,35 +1,40 @@
 #include "panels/context_menu/context_menu_panel.h"
 
+#include <algorithm>
 #include <string>
 
 #include "core/ui/ui_helper.h"
-#include "core/ui/ui_layout.h"
 
 namespace misty::panel {
 
 namespace {
 
 constexpr float kMenuWidth = 220.0f;
-constexpr float kEntryHeight = 32.0f;
-constexpr float kMenuPadding = 6.0f;
-constexpr float kEntryGap = 4.0f;
-constexpr float kSeparatorHeight = 5.0f;
+constexpr float kMinEntryHeight = 32.0f;
+constexpr float kEntryVerticalPadding = 7.0f;
+constexpr float kMenuPaddingY = 6.0f;
+constexpr float kEntryGap = 0.0f;
+constexpr float kSeparatorHeight = 8.0f;
+constexpr float kEntryTextInsetX = 12.0f;
 const ImVec4 kMenuShellColor = ImVec4(0.12f, 0.12f, 0.14f, 0.98f);
 const ImVec4 kMenuBorderColor = ImVec4(0.28f, 0.28f, 0.31f, 1.0f);
 const ImVec4 kPrimaryTextColor = ImVec4(0.94f, 0.94f, 0.96f, 1.0f);
 const ImVec4 kSecondaryTextColor = ImVec4(0.60f, 0.60f, 0.65f, 1.0f);
 const ImVec4 kDisabledTextColor = ImVec4(0.50f, 0.50f, 0.54f, 1.0f);
 const ImVec4 kDangerTextColor = ImVec4(0.97f, 0.74f, 0.74f, 1.0f);
-const ImVec4 kDividerColor = ImVec4(0.24f, 0.24f, 0.27f, 1.0f);
+
+float entry_height() {
+    return std::max(kMinEntryHeight, ImGui::GetTextLineHeight() + kEntryVerticalPadding * 2.0f);
+}
 
 float menu_height(const std::vector<ContextMenuEntry>& entries) {
-    float height = kMenuPadding * 2.0f;
+    float height = kMenuPaddingY * 2.0f;
     bool first = true;
     for (const auto& entry : entries) {
         if (!first) {
             height += kEntryGap;
         }
-        height += entry.kind == ContextMenuEntry::Kind::Separator ? kSeparatorHeight : kEntryHeight;
+        height += entry.kind == ContextMenuEntry::Kind::Separator ? kSeparatorHeight : entry_height();
         first = false;
     }
     return std::max(1.0f, height);
@@ -64,10 +69,10 @@ void ContextMenuPanel::render() {
         ImGuiWindowFlags_NoTitleBar |
         ImGuiWindowFlags_NoResize |
         ImGuiWindowFlags_NoMove |
-        ImGuiWindowFlags_NoScrollbar |
         ImGuiWindowFlags_NoSavedSettings |
         ImGuiWindowFlags_NoCollapse |
-        ImGuiWindowFlags_NoDocking;
+        ImGuiWindowFlags_NoDocking |
+        ImGuiWindowFlags_NoScrollbar;
 
     ImGui::SetNextWindowPos(clamped_pos, ImGuiCond_Always);
     ImGui::SetNextWindowSize(estimated_size, ImGuiCond_Always);
@@ -75,9 +80,10 @@ void ContextMenuPanel::render() {
 
     ImGui::PushStyleColor(ImGuiCol_WindowBg, kMenuShellColor);
     ImGui::PushStyleColor(ImGuiCol_Border, kMenuBorderColor);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(kMenuPadding, kMenuPadding));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, kMenuPaddingY));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 8.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
     ImGui::SetNextWindowFocus();
 
     const std::uint64_t render_serial = state.request_serial;
@@ -96,7 +102,7 @@ void ContextMenuPanel::render() {
     const ImVec2 window_size = ImGui::GetWindowSize();
     ImGui::End();
 
-    ImGui::PopStyleVar(3);
+    ImGui::PopStyleVar(4);
     ImGui::PopStyleColor(2);
     state.menu_size = window_size;
 
@@ -124,14 +130,7 @@ void ContextMenuPanel::render_menu_contents(ContextMenuState& state, bool& close
 
 void ContextMenuPanel::render_entry(const ContextMenuEntry& entry, bool& close_requested, std::uint64_t render_serial) {
     if (entry.kind == ContextMenuEntry::Kind::Separator) {
-        const ImVec2 pos = ImGui::GetCursorScreenPos();
         const float width = ImGui::GetContentRegionAvail().x;
-        const float y = pos.y + kSeparatorHeight * 0.5f;
-        ImGui::GetWindowDrawList()->AddLine(
-            ImVec2(pos.x, y),
-            ImVec2(pos.x + width, y),
-            ImGui::ColorConvertFloat4ToU32(kDividerColor),
-            1.0f);
         ImGui::Dummy(ImVec2(width, kSeparatorHeight));
         return;
     }
@@ -146,7 +145,8 @@ void ContextMenuPanel::render_entry(const ContextMenuEntry& entry, bool& close_r
     }
 
     const ImVec2 pos = ImGui::GetCursorScreenPos();
-    const ImVec2 size(ImGui::GetContentRegionAvail().x, kEntryHeight);
+    const float row_height = entry_height();
+    const ImVec2 size(ImGui::GetContentRegionAvail().x, row_height);
     const bool pressed = ImGui::InvisibleButton(("##context_menu_" + entry.id).c_str(), size);
     const bool hovered = ImGui::IsItemHovered();
     const bool active = ImGui::IsItemActive();
@@ -157,18 +157,18 @@ void ContextMenuPanel::render_entry(const ContextMenuEntry& entry, bool& close_r
             pos,
             ImVec2(pos.x + size.x, pos.y + size.y),
             hover_color,
-            6.0f);
+            0.0f);
     }
 
-    const float text_y = pos.y + (kEntryHeight - ImGui::GetTextLineHeight()) * 0.5f;
+    const float text_y = pos.y + (row_height - ImGui::GetTextLineHeight()) * 0.5f;
     ImGui::GetWindowDrawList()->AddText(
-        ImVec2(pos.x + 10.0f, text_y),
+        ImVec2(pos.x + kEntryTextInsetX, text_y),
         ImGui::ColorConvertFloat4ToU32(label_color),
         entry.label.c_str());
     if (!entry.secondary_label.empty()) {
         const ImVec2 secondary_size = ImGui::CalcTextSize(entry.secondary_label.c_str());
         ImGui::GetWindowDrawList()->AddText(
-            ImVec2(pos.x + size.x - secondary_size.x - 10.0f, text_y),
+            ImVec2(pos.x + size.x - secondary_size.x - kEntryTextInsetX, text_y),
             ImGui::ColorConvertFloat4ToU32(secondary_color),
             entry.secondary_label.c_str());
     }

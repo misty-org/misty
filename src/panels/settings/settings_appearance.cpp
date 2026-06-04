@@ -264,14 +264,14 @@ void custom_font_row(SettingsState& state, int index) {
                 UI::text({
                     .text = font.label.c_str(),
                     .width = UI::Size::fill(),
-                    .color = ImVec4(0.94f, 0.95f, 0.97f, 1.0f),
+                    .color = ImVec4(0.945f, 0.933f, 0.910f, 1.0f),
                     .font = UI::TextFont::Bold,
                 });
                 UI::text({
                     .text = font.path.c_str(),
                     .width = UI::Size::fill(),
                     .overflow = UI::TextOverflow::Clip,
-                    .color = ImVec4(0.58f, 0.60f, 0.64f, 1.0f),
+                    .color = ImVec4(0.620f, 0.596f, 0.561f, 1.0f),
                 });
             });
 
@@ -330,7 +330,7 @@ void theme_builder_section() {
             .text = "Adjust Misty theme tokens inline or start from a preset like Gruvbox, Tokyo Night, or Catppuccin.",
             .width = UI::Size::px(560.0f),
             .overflow = UI::TextOverflow::Wrap,
-            .color = ImVec4(0.76f, 0.78f, 0.82f, 1.0f),
+            .color = ImVec4(0.788f, 0.769f, 0.737f, 1.0f),
         });
 
         UI::row("##appearance_theme_builder_presets_row_1", {
@@ -476,14 +476,14 @@ void fonts_section(SettingsState& state) {
             .text = "Add custom fallback fonts to support filenames and text in additional languages.",
             .width = UI::Size::px(520.0f),
             .overflow = UI::TextOverflow::Wrap,
-            .color = ImVec4(0.76f, 0.78f, 0.82f, 1.0f),
+            .color = ImVec4(0.788f, 0.769f, 0.737f, 1.0f),
         });
 
         if (state.custom_fonts.empty()) {
             UI::text({
                 .text = "No custom fonts added yet.",
                 .width = UI::Size::fill(),
-                .color = ImVec4(0.58f, 0.60f, 0.64f, 1.0f),
+                .color = ImVec4(0.620f, 0.596f, 0.561f, 1.0f),
             });
         } else {
             for (int i = 0; i < static_cast<int>(state.custom_fonts.size()); ++i) {

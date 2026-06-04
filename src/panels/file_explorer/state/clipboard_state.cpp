@@ -10,6 +10,9 @@ void ClipboardState::clear() {
     op = ClipboardOp::NONE;
     paths.clear();
     items.clear();
+    source_state_key.clear();
+    source_path.clear();
+    source_listing_revision = 0;
 }
 
 }  // namespace misty::panel

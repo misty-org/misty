@@ -9,7 +9,6 @@
 
 #include <nlohmann/json.hpp>
 
-#include "core/manager/session_manager.h"
 #include "core/net/http_client.h"
 #include "core/system/util.h"
 #include "panels/providers/dialogs/onedrive_dialogs.h"
@@ -397,7 +396,7 @@ namespace misty::panel {
                     url,
                     kProviderFetchAttempts,
                     kProviderFetchRetryDelay,
-                    core::SessionManager::get().get_auth_headers()
+                    {}
                 );
                 if (!fetch.success) {
                     std::lock_guard<std::mutex> lock(mu);
@@ -451,7 +450,7 @@ namespace misty::panel {
                     url,
                     kProviderFetchAttempts,
                     kProviderFetchRetryDelay,
-                    core::SessionManager::get().get_auth_headers()
+                    {}
                 );
                 if (!fetch.success) {
                     std::lock_guard<std::mutex> lock(mu);
@@ -525,7 +524,7 @@ namespace misty::panel {
                     url,
                     kProviderFetchAttempts,
                     kProviderFetchRetryDelay,
-                    core::SessionManager::get().get_auth_headers()
+                    {}
                 );
                 if (!fetch.success) {
                     std::lock_guard<std::mutex> lock(mu);
@@ -1283,10 +1282,7 @@ namespace misty::panel {
                 }
 
                 const std::string url = base + "?name=" + core::url_encode(provider_id);
-                const auto response = core::HTTPClient::get().del(
-                    url,
-                    {.headers = core::SessionManager::get().get_auth_headers()}
-                );
+                const auto response = core::HTTPClient::get().del(url);
                 if (response.status_code < 200 || response.status_code >= 300) {
                     std::lock_guard<std::mutex> lock(mu);
                     disconnect_in_flight = false;

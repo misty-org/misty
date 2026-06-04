@@ -21,7 +21,6 @@
 #include "core/file_master/file_master_remote.h"
 #include "core/file_transfer/file_transfer.h"
 #include "core/manager/env_manager.h"
-#include "core/manager/session_manager.h"
 #include "core/threading/worker_pool.h"
 
 namespace fs = std::filesystem;
@@ -149,7 +148,6 @@ public:
         write_file(config, "{\"proxy\":{\"port\":" + std::to_string(port_) + "}}");
         misty::core::EnvManager::get().set_env_file_path(config.string());
         misty::core::EnvManager::get().reload();
-        misty::core::SessionManager::get().set_tokens("test-token", "");
     }
 
     void set_download_body(std::string body) {

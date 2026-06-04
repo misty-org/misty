@@ -24,6 +24,7 @@ const char* type_label(core::FileTransferType type);
 const char* status_label(const core::FileTransferRecord& row);
 std::string progress_text(const core::FileTransferRecord& row);
 float progress_fraction(const core::FileTransferRecord& row);
+std::string job_id_text(const core::FileTransferRecord& row);
 std::string source_endpoint(const core::FileTransferRecord& row);
 std::string target_endpoint(const core::FileTransferRecord& row);
 std::string started_text(const core::FileTransferRecord& row);

@@ -73,6 +73,7 @@ bool matches_search(const core::FileTransferRecord& row, const char* search_quer
         row.remote_source_path + "\n" +
         row.remote_dest_name + "\n" +
         row.remote_dest_path + "\n" +
+        job_id_text(row) + "\n" +
         row.error_message;
     return contains_case_insensitive(haystack, query);
 }
@@ -154,6 +155,11 @@ const char* status_label(const core::FileTransferRecord& row) {
         case core::FileTransferStatus::Completed: return "Completed";
         case core::FileTransferStatus::Pending:
         case core::FileTransferStatus::InProgress:
+            if (row.transfer_type == core::FileTransferType::Upload &&
+                row.total_bytes > 0 &&
+                row.transferred_bytes >= row.total_bytes) {
+                return "Finalizing";
+            }
             switch (row.transfer_type) {
                 case core::FileTransferType::Upload: return "Uploading";
                 case core::FileTransferType::Download: return "Downloading";
@@ -184,6 +190,13 @@ float progress_fraction(const core::FileTransferRecord& row) {
         static_cast<float>(row.transferred_bytes) / static_cast<float>(row.total_bytes),
         0.0f,
         1.0f);
+}
+
+std::string job_id_text(const core::FileTransferRecord& row) {
+    if (row.job_id == 0) {
+        return "--";
+    }
+    return "#" + std::to_string(row.job_id);
 }
 
 std::string source_endpoint(const core::FileTransferRecord& row) {

@@ -1,6 +1,7 @@
 #include "panels/file_explorer/file_explorer_panel.h"
 
 #include <algorithm>
+#include <filesystem>
 
 #include "core/commands/command_manager.h"
 #include "panels/context_menu/context_menu_state.h"
@@ -8,6 +9,20 @@
 #include "panels/file_explorer/state/clipboard_state.h"
 
 namespace misty::panel {
+namespace {
+
+std::string delete_target_label(const std::vector<std::string>& paths) {
+    if (paths.empty()) {
+        return "selected item";
+    }
+    if (paths.size() == 1) {
+        const std::string filename = std::filesystem::path(paths.front()).filename().string();
+        return filename.empty() ? paths.front() : filename;
+    }
+    return std::to_string(paths.size()) + " items";
+}
+
+} // namespace
 
 const FileItem* FileExplorerPanel::find_context_menu_target(const FileExplorerState& state,
                                                             const FileListing& listing,
@@ -181,12 +196,49 @@ void FileExplorerPanel::show_permission_delete_modal(FileExplorerPanel::Transien
 }
 
 void FileExplorerPanel::show_permanent_delete_modal(FileExplorerPanel::TransientUiState& ui) {
-    if (!ui.show_permanent_delete_modal) {
-        return;
+    if (ui.show_permanent_delete_modal || ImGui::IsPopupOpen("##file_delete_modal")) {
+        ImGui::GetIO().WantCaptureMouse = true;
+        ImGui::GetIO().WantCaptureKeyboard = true;
     }
 
-    ui.show_permanent_delete_modal = false;
-    ui.permanent_delete_paths.clear();
+    if (ui.show_permanent_delete_modal) {
+        ImGui::OpenPopup("##file_delete_modal");
+    }
+
+    ImGui::SetNextWindowSize(ImVec2(360.0f, 0.0f), ImGuiCond_Always);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 10.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(18.0f, 16.0f));
+    ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.075f, 0.085f, 0.105f, 1.0f));
+    if (ImGui::BeginPopupModal("##file_delete_modal",
+                               nullptr,
+                               ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar)) {
+        const std::string target = delete_target_label(ui.permanent_delete_paths);
+        ImGui::TextUnformatted("Delete File");
+        ImGui::Dummy(ImVec2(0.0f, 8.0f));
+        ImGui::TextWrapped("Delete \"%s\"? This cannot be undone.", target.c_str());
+        ImGui::Dummy(ImVec2(0.0f, 12.0f));
+
+        constexpr float button_w = 92.0f;
+        ImGui::SetCursorPosX(ImGui::GetWindowWidth() - button_w * 2.0f - 28.0f);
+        if (ImGui::Button("Cancel", ImVec2(button_w, 30.0f))) {
+            ui.show_permanent_delete_modal = false;
+            ui.permanent_delete_paths.clear();
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.48f, 0.16f, 0.14f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.62f, 0.20f, 0.17f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.42f, 0.12f, 0.11f, 1.0f));
+        if (ImGui::Button("Delete", ImVec2(button_w, 30.0f))) {
+            confirm_permanent_delete(ui);
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::PopStyleColor(3);
+
+        ImGui::EndPopup();
+    }
+    ImGui::PopStyleColor();
+    ImGui::PopStyleVar(2);
 }
 
 } // namespace misty::panel

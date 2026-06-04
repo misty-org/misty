@@ -7,7 +7,7 @@
 #include <nlohmann/json.hpp>
 
 #include "core/manager/env_manager.h"
-#include "core/manager/session_manager.h"
+#include "core/manager/proxy_token_store.h"
 #include "core/net/http_client.h"
 
 namespace misty::core {
@@ -26,7 +26,7 @@ std::string proxy_url() {
 }
 
 std::map<std::string, std::string> json_headers() {
-    auto headers = SessionManager::get().get_auth_headers();
+    std::map<std::string, std::string> headers;
     headers["Accept"] = "application/json";
     headers["Content-Type"] = "application/json";
     return headers;
@@ -96,7 +96,7 @@ HttpResponse get_job_status_raw(const std::string& job_id) {
     const std::string proxy_service_url = proxy_url();
     if (proxy_service_url.empty()) return proxy_config_error();
 
-    auto headers = SessionManager::get().get_auth_headers();
+    std::map<std::string, std::string> headers;
     headers["Accept"] = "application/json";
     return HTTPClient::get().get(
         proxy_service_url + "/api/remote/file/jobs/" + url_encode(job_id),
@@ -107,7 +107,7 @@ HttpResponse stream_remote_job(const std::string& job_id, RemoteJobProgressCallb
     const std::string proxy_service_url = proxy_url();
     if (proxy_service_url.empty()) return proxy_config_error();
 
-    auto headers = SessionManager::get().get_auth_headers();
+    std::map<std::string, std::string> headers;
     headers["Accept"] = "text/event-stream";
 
     std::string current_event;
@@ -197,7 +197,7 @@ HttpResponse fetch_list_result(const std::string& job_id) {
     const std::string proxy_service_url = proxy_url();
     if (proxy_service_url.empty()) return proxy_config_error();
 
-    auto headers = SessionManager::get().get_auth_headers();
+    std::map<std::string, std::string> headers;
     headers["Accept"] = "application/json";
     return HTTPClient::get().get(
         proxy_service_url + "/api/remote/file/jobs/" + url_encode(job_id) + "/result/list",
@@ -211,7 +211,7 @@ DownloadResult fetch_download_result(const std::string& job_id,
         return DownloadResult{false, 500, "PROXY_SERVICE_URL not set"};
     }
 
-    auto headers = SessionManager::get().get_auth_headers();
+    std::map<std::string, std::string> headers;
     headers["Accept"] = "application/octet-stream";
     return HTTPClient::get().download_to_file(
         proxy_service_url + "/api/remote/file/jobs/" + url_encode(job_id) + "/result/download",
@@ -247,7 +247,7 @@ HttpResponse list_remote_call(const FileMasterProps& props, RemoteJobProgressCal
     const FileMasterRemoteContext& context =
         !props.remote_source.empty() ? props.remote_source : props.remote_dest;
 
-    auto headers = SessionManager::get().get_auth_headers();
+    std::map<std::string, std::string> headers;
     headers["Accept"] = "application/json";
     const HttpResponse start_response = HTTPClient::get().get(
         proxy_service_url + "/api/remote/file/list?remote=" + url_encode(context.remote_name) +
@@ -275,7 +275,7 @@ HttpResponse remove_remote_call(const FileMasterProps& props, RemoteJobProgressC
     if (proxy_service_url.empty()) return proxy_config_error();
 
     const auto& context = source_context(props);
-    auto headers = SessionManager::get().get_auth_headers();
+    std::map<std::string, std::string> headers;
     headers["Accept"] = "application/json";
     const HttpResponse start_response = HTTPClient::get().del(
         proxy_service_url + "/api/remote/file?remote=" + url_encode(context.remote_name) +
@@ -358,7 +358,7 @@ DownloadResult download_remote_call(const FileMasterProps& props,
     }
 
     const auto& context = source_context(props);
-    auto headers = SessionManager::get().get_auth_headers();
+    std::map<std::string, std::string> headers;
     headers["Accept"] = "application/json";
     const HttpResponse start_response = HTTPClient::get().get(
         proxy_service_url + "/api/remote/file/download?remote=" + url_encode(context.remote_name) +
@@ -403,9 +403,8 @@ HttpResponse upload_remote_call(const FileMasterProps& props,
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 0L);
 
     struct curl_slist* headers = nullptr;
-    SessionManager::get().ensure_session_ready();
-    for (const auto& [key, value] : SessionManager::get().get_auth_headers()) {
-        const std::string header = key + ": " + value;
+    if (auto token = ProxyTokenStore::get().current_access_token(); token && !token->empty()) {
+        const std::string header = "Authorization: Bearer " + *token;
         headers = curl_slist_append(headers, header.c_str());
     }
     if (headers) {

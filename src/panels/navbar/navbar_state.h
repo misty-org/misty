@@ -10,8 +10,8 @@ namespace misty::panel {
         view::ViewID selected_item = view::ViewID::Files;
 
         void handle_logo_click() {
-            // Switch back to Auth view
-            view::switch_view(view::ViewID::Auth);
+            selected_item = view::ViewID::Files;
+            view::switch_view(view::ViewID::Files);
         }
 
         void handle_nav_item(view::ViewID view_id) {

@@ -100,6 +100,7 @@ uint64_t start_remote_transfer(FileTransfer* transfers,
     record.transfer_type = type;
     record.item_type = FileTransferItemType::Remote;
     record.file_name = remote_transfer_name(props);
+    record.job_id = props.job_id;
     record.local_source_path = props.local_source.path;
     record.local_dest_path = props.local_dest.path;
     record.remote_source_name = props.remote_source.remote_name;

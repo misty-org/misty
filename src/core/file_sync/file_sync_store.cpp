@@ -518,6 +518,8 @@ bool FileSyncEntryStore::post_json(const std::string& path,
     HttpRequestOptions options;
     options.headers["Content-Type"] = "application/json";
     options.headers["Accept"] = "application/json";
+    options.timeouts.connect_timeout_seconds = 1L;
+    options.timeouts.total_timeout_seconds = 2L;
     HttpResponse response = HTTPClient::get().post(url, body, options);
     if (!response_ok(response)) {
         return false;

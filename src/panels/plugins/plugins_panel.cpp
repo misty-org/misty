@@ -330,8 +330,8 @@ void plugins_draw_icon(ImDrawList* draw_list,
 void plugins_draw_pill(ImDrawList* draw_list,
                        const ImVec2& pos,
                        const char* label,
-                       const ImVec4& bg = ImVec4(0.18f, 0.19f, 0.22f, 1.0f),
-                       const ImVec4& fg = ImVec4(0.78f, 0.80f, 0.86f, 1.0f)) {
+                       const ImVec4& bg = ImVec4(0.153f, 0.153f, 0.165f, 1.0f),
+                       const ImVec4& fg = ImVec4(0.788f, 0.769f, 0.737f, 1.0f)) {
     if (!label || label[0] == '\0') {
         return;
     }
