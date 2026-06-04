@@ -29,6 +29,11 @@ int compare_strings(const std::string& lhs, const std::string& rhs);
 std::string type_label_for_item(const FileItem& file);
 
 /**
+ * @brief Formats a stored modified-time string for user-facing display.
+ */
+std::string display_last_modified(const std::string& raw_value);
+
+/**
  * @brief Returns a human-readable lifecycle label for an explorer item.
  */
 std::string state_label_for_item(const FileListing& listing, const FileItem& file);

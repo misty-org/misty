@@ -27,6 +27,11 @@ namespace misty::panel {
         virtual bool shows_tab_bar(const Pane& pane) const;
         virtual float pane_header_height(const Panel& panel, bool is_active, bool has_multiple_panes) const;
         virtual void render_pane_header(Panel& panel, bool is_active, bool has_multiple_panes);
+        virtual void render_pane_drop_zone(Panel& panel,
+                                           bool is_active,
+                                           bool has_multiple_panes,
+                                           const ImVec2& min,
+                                           const ImVec2& max);
 
         const std::string& panel_id() const { return panel_id_; }
         const Pane* active_pane() const;

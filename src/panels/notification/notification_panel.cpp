@@ -1,91 +1,85 @@
 #include "notification_panel.h"
-#include "imgui.h"
+
 #include <algorithm>
 
+#include "imgui.h"
+
 namespace misty::panel {
+namespace {
 
-    NotificationPanel::NotificationPanel(core::StateRegistry& registry)
-        : registry_(registry) {
+ImU32 bg_color(NotificationType type) {
+    switch (type) {
+        case NotificationType::SUCCESS:
+            return IM_COL32(24, 58, 34, 236);
+        case NotificationType::ERROR:
+            return IM_COL32(74, 28, 30, 236);
+        case NotificationType::INFO:
+        default:
+            return IM_COL32(28, 30, 34, 236);
     }
-
-    void NotificationPanel::render() {
-        auto& state = registry_.get_state<NotificationState>("Notifications");
-        state.update();
-
-        auto notifications = state.get_notifications();
-        if (notifications.empty()) return;
-
-        ImGuiViewport* viewport = ImGui::GetMainViewport();
-        float center_x = viewport->WorkPos.x + viewport->WorkSize.x * 0.5f;
-        float base_y = viewport->WorkPos.y + viewport->WorkSize.y - CAPSULE_MARGIN_BOTTOM;
-
-        float y_offset = 0.0f;
-        for (int i = (int)notifications.size() - 1; i >= 0; --i) {
-            render_capsule(notifications[i]);
-            y_offset += CAPSULE_HEIGHT + CAPSULE_SPACING;
-        }
-        (void)center_x;
-        (void)base_y;
-        (void)y_offset;
-    }
-
-    void NotificationPanel::render_capsule(const Notification& notif) {
-        ImGuiViewport* viewport = ImGui::GetMainViewport();
-
-        // Calculate width from text content
-        float text_w = ImGui::CalcTextSize(notif.message.c_str()).x;
-        float capsule_w = std::min(text_w + CAPSULE_PAD_X * 2.0f, CAPSULE_MAX_WIDTH);
-        capsule_w = std::max(capsule_w, 80.0f);
-
-        float center_x = viewport->WorkPos.x + viewport->WorkSize.x * 0.5f;
-        float x = center_x - capsule_w * 0.5f;
-        float y = viewport->WorkPos.y + viewport->WorkSize.y - CAPSULE_HEIGHT - CAPSULE_MARGIN_BOTTOM;
-
-        ImGui::SetNextWindowPos(ImVec2(x, y), ImGuiCond_Always);
-        ImGui::SetNextWindowSize(ImVec2(capsule_w, CAPSULE_HEIGHT), ImGuiCond_Always);
-        ImGui::SetNextWindowBgAlpha(0.88f);
-
-        ImGuiWindowFlags flags =
-            ImGuiWindowFlags_NoTitleBar |
-            ImGuiWindowFlags_NoResize |
-            ImGuiWindowFlags_NoMove |
-            ImGuiWindowFlags_NoScrollbar |
-            ImGuiWindowFlags_NoCollapse |
-            ImGuiWindowFlags_NoFocusOnAppearing |
-            ImGuiWindowFlags_NoNav |
-            ImGuiWindowFlags_NoSavedSettings |
-            ImGuiWindowFlags_NoInputs;
-
-        ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.18f, 0.18f, 0.20f, 0.88f));
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, CAPSULE_HEIGHT * 0.5f);
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(CAPSULE_PAD_X, CAPSULE_PAD_Y));
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-
-        std::string window_name = "Capsule_" + std::to_string(notif.id);
-        if (ImGui::Begin(window_name.c_str(), nullptr, flags)) {
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.92f, 0.92f, 0.92f, 1.0f));
-            // Truncate message to fit capsule width
-            float avail = ImGui::GetContentRegionAvail().x;
-            const char* msg = notif.message.c_str();
-            ImVec2 text_sz = ImGui::CalcTextSize(msg);
-            if (text_sz.x > avail) {
-                // Render clipped
-                ImGui::PushClipRect(
-                    ImGui::GetCursorScreenPos(),
-                    ImVec2(ImGui::GetCursorScreenPos().x + avail, ImGui::GetCursorScreenPos().y + text_sz.y),
-                    true
-                );
-                ImGui::Text("%s", msg);
-                ImGui::PopClipRect();
-            } else {
-                ImGui::Text("%s", msg);
-            }
-            ImGui::PopStyleColor();
-        }
-        ImGui::End();
-
-        ImGui::PopStyleVar(3);
-        ImGui::PopStyleColor();
-    }
-
 }
+
+ImU32 border_color(NotificationType type) {
+    switch (type) {
+        case NotificationType::SUCCESS:
+            return IM_COL32(74, 137, 85, 230);
+        case NotificationType::ERROR:
+            return IM_COL32(172, 70, 72, 230);
+        case NotificationType::INFO:
+        default:
+            return IM_COL32(78, 82, 92, 230);
+    }
+}
+
+std::string compact_message(const std::string& message) {
+    constexpr size_t max_chars = 64;
+    if (message.size() <= max_chars) {
+        return message;
+    }
+    return message.substr(0, max_chars - 3) + "...";
+}
+
+}  // namespace
+
+NotificationPanel::NotificationPanel(core::StateRegistry& registry)
+    : registry_(registry) {}
+
+void NotificationPanel::render() {
+    auto& notifications = registry_.get_state<NotificationState>("Notifications");
+    notifications.update();
+    const auto items = notifications.get_notifications();
+    if (items.empty()) {
+        return;
+    }
+
+    ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImDrawList* draw_list = ImGui::GetForegroundDrawList(viewport);
+    constexpr float pad_x = 13.0f;
+    constexpr float pad_y = 7.0f;
+    constexpr float gap = 8.0f;
+    constexpr float rounding = 10.0f;
+    constexpr float max_width = 360.0f;
+    const float text_height = ImGui::GetTextLineHeight();
+    const float pill_height = text_height + pad_y * 2.0f;
+    float bottom_y = viewport->WorkPos.y + viewport->WorkSize.y - 28.0f;
+
+    for (auto it = items.rbegin(); it != items.rend(); ++it) {
+        const std::string text = compact_message(it->message);
+        const ImVec2 text_size = ImGui::CalcTextSize(text.c_str());
+        const float pill_width = std::min(max_width, text_size.x + pad_x * 2.0f);
+        const float x = viewport->WorkPos.x + (viewport->WorkSize.x - pill_width) * 0.5f;
+        const float y = bottom_y - pill_height;
+        const ImVec2 min(x, y);
+        const ImVec2 max(x + pill_width, y + pill_height);
+
+        draw_list->AddRectFilled(min, max, bg_color(it->type), rounding);
+        draw_list->AddRect(min, max, border_color(it->type), rounding, 0, 1.0f);
+        draw_list->AddText(ImVec2(x + pad_x, y + pad_y - 1.0f),
+                           IM_COL32(241, 238, 232, 255),
+                           text.c_str());
+
+        bottom_y = y - gap;
+    }
+}
+
+}  // namespace misty::panel

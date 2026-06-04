@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -20,6 +21,9 @@ struct ClipboardState : public core::StateEntry {
     ClipboardOp op = ClipboardOp::NONE;
     std::vector<std::string> paths;
     std::vector<FileItem> items;
+    std::string source_state_key;
+    std::string source_path;
+    uint64_t source_listing_revision = 0;
 
     /**
      * @brief Returns true when a copy or cut payload is available.

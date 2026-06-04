@@ -17,6 +17,7 @@ FileListing::FileListing(const FileListing& other)
       last_refreshed_at(other.last_refreshed_at),
       last_synced_at(other.last_synced_at),
       deleting_files(other.deleting_files),
+      error_message(other.error_message),
       loading(other.loading) {
     load_generation.store(other.load_generation.load(std::memory_order_relaxed),
                                 std::memory_order_relaxed);
@@ -38,6 +39,7 @@ FileListing& FileListing::operator=(const FileListing& other) {
     last_refreshed_at = other.last_refreshed_at;
     last_synced_at = other.last_synced_at;
     deleting_files = other.deleting_files;
+    error_message = other.error_message;
     loading = other.loading;
     load_generation.store(other.load_generation.load(std::memory_order_relaxed),
                                 std::memory_order_relaxed);
@@ -56,6 +58,7 @@ FileListing::FileListing(FileListing&& other) noexcept
       last_refreshed_at(other.last_refreshed_at),
       last_synced_at(other.last_synced_at),
       deleting_files(std::move(other.deleting_files)),
+      error_message(std::move(other.error_message)),
       loading(other.loading) {
     load_generation.store(other.load_generation.load(std::memory_order_relaxed),
                                 std::memory_order_relaxed);
@@ -77,6 +80,7 @@ FileListing& FileListing::operator=(FileListing&& other) noexcept {
     last_refreshed_at = other.last_refreshed_at;
     last_synced_at = other.last_synced_at;
     deleting_files = std::move(other.deleting_files);
+    error_message = std::move(other.error_message);
     loading = other.loading;
     load_generation.store(other.load_generation.load(std::memory_order_relaxed),
                                 std::memory_order_relaxed);
@@ -102,35 +106,39 @@ void FileListing::clear() {
     sort_dirty = true;
     last_refreshed_at = {};
     last_synced_at = {};
+    error_message.clear();
     load_generation.fetch_add(1, std::memory_order_relaxed);
     loading.cancel();
     note_listing_changed();
 }
 
 FileListing& FileListingsState::get_or_create(const std::string& owner_key) {
-    if (auto* listing = find(owner_key)) {
-        return *listing;
+    std::lock_guard<std::mutex> lock(mu);
+    auto it = listings.find(owner_key);
+    if (it != listings.end()) {
+        return *it->second;
     }
-    listings.emplace_back(owner_key);
-    return listings.back();
+    auto listing = std::make_unique<FileListing>(owner_key);
+    FileListing& ref = *listing;
+    listings.emplace(owner_key, std::move(listing));
+    return ref;
 }
 
 FileListing* FileListingsState::find(const std::string& owner_key) {
-    auto it = std::find_if(listings.begin(), listings.end(),
-        [&](const FileListing& listing) { return listing.owner_key == owner_key; });
-    return it == listings.end() ? nullptr : &*it;
+    std::lock_guard<std::mutex> lock(mu);
+    auto it = listings.find(owner_key);
+    return it == listings.end() ? nullptr : it->second.get();
 }
 
 const FileListing* FileListingsState::find(const std::string& owner_key) const {
-    auto it = std::find_if(listings.begin(), listings.end(),
-        [&](const FileListing& listing) { return listing.owner_key == owner_key; });
-    return it == listings.end() ? nullptr : &*it;
+    std::lock_guard<std::mutex> lock(mu);
+    auto it = listings.find(owner_key);
+    return it == listings.end() ? nullptr : it->second.get();
 }
 
 void FileListingsState::erase(const std::string& owner_key) {
-    listings.erase(std::remove_if(listings.begin(), listings.end(),
-        [&](const FileListing& listing) { return listing.owner_key == owner_key; }),
-        listings.end());
+    std::lock_guard<std::mutex> lock(mu);
+    listings.erase(owner_key);
 }
 
 void FileListingsState::clear(const std::string& owner_key) {

@@ -1,7 +1,7 @@
 #include "file_sidebar_panel.h"
 
 #include "core/manager/asset_manager.h"
-#include "core/manager/session_manager.h"
+#include "core/ui/ui_animate.h"
 #include "panels/file_explorer/state/file_explorer_state.h"
 #include "panels/file_explorer/state/remote_mount_state.h"
 #include "panels/providers/cards/provider_cards_util.h"
@@ -16,6 +16,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstdio>
+#include <nlohmann/json.hpp>
 #include <string>
 #include <utility>
 
@@ -63,7 +64,7 @@ namespace {
         return clicked;
     }
 
-    bool PlusButton(const char* id, float size = 18.0f) {
+    bool PlusButton(const char* id, bool expanded, float size = 18.0f) {
         ImGui::PushID(id);
         const bool clicked = ImGui::InvisibleButton("##plus", ImVec2(size, size));
         bool hovered = ImGui::IsItemHovered();
@@ -71,16 +72,103 @@ namespace {
         ImGui::PopID();
 
         ImVec2 p0 = ImGui::GetItemRectMin();
-        const float cx = p0.x + size * 0.5f;
-        const float cy = p0.y + size * 0.5f;
         const ImU32 col = active ? IM_COL32(255, 255, 255, 255)
                          : hovered ? IM_COL32(230, 236, 248, 255)
                                    : IM_COL32(205, 211, 224, 245);
         ImDrawList* dl = ImGui::GetWindowDrawList();
-        dl->AddLine(ImVec2(cx - 4.0f, cy), ImVec2(cx + 4.0f, cy), col, 1.7f);
-        dl->AddLine(ImVec2(cx, cy - 4.0f), ImVec2(cx, cy + 4.0f), col, 1.7f);
+        constexpr float icon_size = 14.0f;
+        const ImVec2 icon_min(p0.x + (size - icon_size) * 0.5f,
+                              p0.y + (size - icon_size) * 0.5f);
+        auto& icon = misty::core::AssetManager::get().get_svg_texture(
+            expanded ? "chevron-down-16" : "chevron-right-16",
+            static_cast<int>(icon_size));
+        if (icon.id != 0) {
+            dl->AddImage(icon.id,
+                         icon_min,
+                         ImVec2(icon_min.x + icon_size, icon_min.y + icon_size),
+                         ImVec2(0, 0),
+                         ImVec2(1, 1),
+                         col);
+        }
 
         return clicked;
+    }
+
+    std::string format_sidebar_bytes(std::uint64_t bytes) {
+        static constexpr const char* kUnits[] = {"B", "KB", "MB", "GB", "TB"};
+        double value = static_cast<double>(bytes);
+        int unit = 0;
+        while (value >= 1024.0 && unit < 4) {
+            value /= 1024.0;
+            ++unit;
+        }
+
+        char buf[32];
+        if (unit == 0) {
+            std::snprintf(buf, sizeof(buf), "%.0f %s", value, kUnits[unit]);
+        } else if (value >= 100.0 || std::fabs(value - std::round(value)) < 0.05) {
+            std::snprintf(buf, sizeof(buf), "%.0f %s", value, kUnits[unit]);
+        } else {
+            std::snprintf(buf, sizeof(buf), "%.1f %s", value, kUnits[unit]);
+        }
+        return buf;
+    }
+
+    std::vector<misty::panel::SidebarProviderEntry> parse_sidebar_provider_entries(const std::string& body) {
+        using nlohmann::json;
+        const json parsed = json::parse(body);
+        std::vector<misty::panel::SidebarProviderEntry> entries;
+        if (!parsed.is_array()) {
+            return entries;
+        }
+        entries.reserve(parsed.size());
+        for (const auto& item : parsed) {
+            misty::panel::SidebarProviderEntry entry;
+            entry.remote_name = item.value("name", std::string{});
+            entry.provider_folder = item.value("type", std::string{});
+            entry.label = entry.remote_name.empty() ? entry.provider_folder : entry.remote_name;
+            entry.total_bytes = static_cast<std::uint64_t>(std::max<int64_t>(0, item.value("total_bytes", static_cast<int64_t>(0))));
+            entry.free_bytes = static_cast<std::uint64_t>(std::max<int64_t>(0, item.value("free_bytes", static_cast<int64_t>(0))));
+            entry.used_bytes = static_cast<std::uint64_t>(std::max<int64_t>(0, item.value("used_bytes", static_cast<int64_t>(0))));
+            entry.capacity_known = item.value("capacity_known", false);
+            if (!entry.remote_name.empty()) {
+                entries.push_back(std::move(entry));
+            }
+        }
+        return entries;
+    }
+
+    std::vector<misty::panel::SidebarProviderEntry> build_sidebar_provider_entries(
+        const std::vector<misty::panel::ProviderRemote>& remotes) {
+        std::vector<misty::panel::SidebarProviderEntry> entries;
+        entries.reserve(remotes.size());
+        for (const auto& remote : remotes) {
+            misty::panel::SidebarProviderEntry entry;
+            entry.provider_folder = remote.type.empty() ? "remote" : remote.type;
+            entry.remote_name = remote.name;
+            entry.label = remote.name.empty() ? entry.provider_folder : remote.name;
+            if (!entry.remote_name.empty()) {
+                entries.push_back(std::move(entry));
+            }
+        }
+        return entries;
+    }
+
+    void merge_sidebar_provider_capacity(std::vector<misty::panel::SidebarProviderEntry>& entries,
+                                         const std::vector<misty::panel::SidebarProviderEntry>& capacity_entries) {
+        for (auto& entry : entries) {
+            const auto it = std::find_if(capacity_entries.begin(), capacity_entries.end(), [&](const auto& candidate) {
+                return candidate.remote_name == entry.remote_name &&
+                       candidate.provider_folder == entry.provider_folder;
+            });
+            if (it == capacity_entries.end()) {
+                continue;
+            }
+            entry.total_bytes = it->total_bytes;
+            entry.free_bytes = it->free_bytes;
+            entry.used_bytes = it->used_bytes;
+            entry.capacity_known = it->capacity_known;
+        }
     }
 
     bool SidebarIconItem(const char* id,
@@ -206,7 +294,6 @@ namespace misty::panel {
         constexpr ImVec4 kFileSidebarSeparator = ImVec4(0.20f, 0.23f, 0.28f, 1.0f);
         constexpr int kSidebarProviderFetchAttempts = 4;
         constexpr auto kSidebarProviderFetchRetryDelay = std::chrono::milliseconds(500);
-        constexpr auto kSidebarProviderRefreshInterval = std::chrono::seconds(5);
     }
 
     FileSidebarPanel::FileSidebarPanel(core::StateRegistry& registry, core::WorkerPool& worker_pool)
@@ -270,23 +357,19 @@ namespace misty::panel {
     }
 
     void FileSidebarPanel::ensure_provider_entries_loaded(FileSidebarState& state) {
-        const auto now = std::chrono::steady_clock::now();
         {
             std::lock_guard<std::mutex> lock(state.providers_mutex);
-            const bool stale = state.providers_last_refresh_at == std::chrono::steady_clock::time_point{} ||
-                               now - state.providers_last_refresh_at >= kSidebarProviderRefreshInterval;
-            if (state.providers_loading || !stale) {
+            if (state.providers_loading || state.providers_loaded) {
                 return;
             }
             state.providers_loading = true;
-            state.providers_last_refresh_at = now;
             state.providers_error.clear();
         }
 
         worker_pool_.add(
-            [&state]() {
-                const std::string url = providers_proxy_url("/api/remote");
-                if (url.empty()) {
+            [this, &state]() {
+                const std::string list_url = providers_proxy_url("/api/remote");
+                if (list_url.empty()) {
                     std::lock_guard<std::mutex> lock(state.providers_mutex);
                     state.providers_loading = false;
                     state.providers_loaded = true;
@@ -294,37 +377,33 @@ namespace misty::panel {
                     return;
                 }
 
-                const auto fetch = fetch_providers_with_retries(
-                    url,
+                const auto list_fetch = fetch_providers_with_retries(
+                    list_url,
                     kSidebarProviderFetchAttempts,
                     kSidebarProviderFetchRetryDelay,
-                    core::SessionManager::get().get_auth_headers()
+                    {}
                 );
 
-                if (!fetch.success) {
+                if (!list_fetch.success) {
                     std::lock_guard<std::mutex> lock(state.providers_mutex);
                     state.providers_loading = false;
-                    state.providers_loaded = fetch.response.status_code != 401;
+                    state.providers_loaded = list_fetch.response.status_code != 401;
                     state.providers_last_refresh_at = std::chrono::steady_clock::now();
-                    state.providers_error = fetch.last_error;
+                    state.providers_error = list_fetch.last_error;
                     return;
                 }
 
-                std::vector<SidebarProviderEntry> entries;
-                for (const auto& remote : parse_provider_remotes(fetch.response.body)) {
-                    SidebarProviderEntry entry;
-                    entry.provider_folder = remote.type.empty() ? "remote" : remote.type;
-                    entry.remote_name = remote.name;
-                    entry.label = remote.name.empty() ? entry.provider_folder : remote.name;
-                    entries.push_back(std::move(entry));
+                std::vector<SidebarProviderEntry> entries =
+                    build_sidebar_provider_entries(parse_provider_remotes(list_fetch.response.body));
+                {
+                    std::lock_guard<std::mutex> lock(state.providers_mutex);
+                    state.provider_entries = entries;
+                    state.providers_loaded = true;
+                    state.providers_last_refresh_at = std::chrono::steady_clock::now();
+                    state.providers_error.clear();
                 }
 
-                std::lock_guard<std::mutex> lock(state.providers_mutex);
-                state.provider_entries = std::move(entries);
-                state.providers_loading = false;
-                state.providers_loaded = true;
-                state.providers_last_refresh_at = std::chrono::steady_clock::now();
-                state.providers_error.clear();
+                refresh_provider_capacity(state);
             },
             []() {},
             [&state](const std::string& err) {
@@ -332,6 +411,61 @@ namespace misty::panel {
                 state.providers_loading = false;
                 state.providers_loaded = true;
                 state.providers_last_refresh_at = std::chrono::steady_clock::now();
+                state.providers_error = err;
+            }
+        );
+    }
+
+    void FileSidebarPanel::refresh_provider_capacity(FileSidebarState& state) {
+        {
+            std::lock_guard<std::mutex> lock(state.providers_mutex);
+            if (state.providers_capacity_loading) {
+                state.providers_loading = false;
+                return;
+            }
+            state.providers_capacity_loading = true;
+            state.providers_loading = false;
+        }
+
+        worker_pool_.add(
+            [this, &state]() {
+                const std::string storage_url = providers_proxy_url("/api/remote/storage");
+                if (storage_url.empty()) {
+                    std::lock_guard<std::mutex> lock(state.providers_mutex);
+                    state.providers_capacity_loading = false;
+                    state.providers_capacity_loaded = true;
+                    state.providers_error = "PROXY_SERVICE_URL not set";
+                    return;
+                }
+                const auto storage_fetch = fetch_providers_with_retries(
+                    storage_url,
+                    kSidebarProviderFetchAttempts,
+                    kSidebarProviderFetchRetryDelay,
+                    {}
+                );
+                if (!storage_fetch.success) {
+                    std::lock_guard<std::mutex> lock(state.providers_mutex);
+                    state.providers_capacity_loading = false;
+                    state.providers_capacity_loaded = true;
+                    state.providers_error = storage_fetch.last_error;
+                    return;
+                }
+
+                std::vector<SidebarProviderEntry> capacity_entries =
+                    parse_sidebar_provider_entries(storage_fetch.response.body);
+                {
+                    std::lock_guard<std::mutex> lock(state.providers_mutex);
+                    merge_sidebar_provider_capacity(state.provider_entries, capacity_entries);
+                    state.providers_capacity_loading = false;
+                    state.providers_capacity_loaded = true;
+                    state.providers_error.clear();
+                }
+            },
+            []() {},
+            [&state](const std::string& err) {
+                std::lock_guard<std::mutex> lock(state.providers_mutex);
+                state.providers_capacity_loading = false;
+                state.providers_capacity_loaded = true;
                 state.providers_error = err;
             }
         );
@@ -615,7 +749,7 @@ namespace misty::panel {
             providers_collapsed_ = !providers_collapsed_;
         ImGui::SameLine();
         ImGui::SetCursorScreenPos(ImVec2(header_pos.x + content_width - 21.0f, header_pos.y));
-        if (PlusButton("provider_add")) {
+        if (PlusButton("provider_add", !providers_collapsed_)) {
             registry_.get_state<NavbarState>("Navbar").selected_item = view::ViewID::Providers;
             auto& providers_state = registry_.get_state<ProvidersState>("Providers");
             providers_state.on_add_provider();
@@ -628,10 +762,12 @@ namespace misty::panel {
 
             std::vector<SidebarProviderEntry> entries;
             bool loading = false;
+            bool capacity_loading = false;
             {
                 std::lock_guard<std::mutex> lock(state.providers_mutex);
                 entries = state.provider_entries;
                 loading = state.providers_loading;
+                capacity_loading = state.providers_capacity_loading;
             }
 
             if (entries.empty()) {
@@ -645,13 +781,84 @@ namespace misty::panel {
                         entry.remote_name;
 
                     const std::string provider_icon = provider_logo_path_for_id(entry.provider_folder);
-                    if (SidebarIconItem(entry.remote_name.c_str(),
-                                        entry.label.c_str(),
-                                        provider_icon.empty() ? "cloud-24" : provider_icon.c_str(),
-                                        content_width,
-                                        false,
-                                        34.0f,
-                                        !provider_icon.empty())) {
+                    const ImVec2 cursor = ImGui::GetCursorScreenPos();
+                    constexpr float kRowHeight = 58.0f;
+                    ImGui::PushID(entry.remote_name.c_str());
+                    const bool pressed = ImGui::InvisibleButton("##remote", ImVec2(content_width, kRowHeight));
+                    const bool hovered = ImGui::IsItemHovered();
+                    const bool active = ImGui::IsItemActive();
+                    const bool context_requested = ImGui::IsItemClicked(ImGuiMouseButton_Right);
+                    ImDrawList* dl = ImGui::GetWindowDrawList();
+                    if (hovered || active) {
+                        const ImU32 row_col = active ? IM_COL32(255, 255, 255, 34) : IM_COL32(255, 255, 255, 20);
+                        dl->AddRectFilled(cursor, ImVec2(cursor.x + content_width, cursor.y + kRowHeight), row_col, 7.0f);
+                    }
+
+                    constexpr float icon_size = 18.0f;
+                    const ImVec2 icon_min(cursor.x + 10.0f, cursor.y + 11.0f);
+                    auto& icon = provider_icon.empty()
+                        ? misty::core::AssetManager::get().get_svg_texture("cloud-24", static_cast<int>(icon_size))
+                        : misty::core::AssetManager::get().get_svg_texture_path(provider_icon, static_cast<int>(icon_size), false);
+                    dl->AddImage(icon.id,
+                                 icon_min,
+                                 ImVec2(icon_min.x + icon_size, icon_min.y + icon_size),
+                                 ImVec2(0, 0),
+                                 ImVec2(1, 1),
+                                 IM_COL32(255, 255, 255, 255));
+
+                    const float text_x = cursor.x + 36.0f;
+                    dl->AddText(ImVec2(text_x, cursor.y + 6.0f),
+                                hovered || active ? IM_COL32(246, 248, 252, 255) : IM_COL32(230, 233, 240, 245),
+                                entry.label.c_str());
+
+                    std::string info = entry.provider_folder;
+                    if (entry.capacity_known && entry.total_bytes > 0) {
+                        const std::uint64_t used = std::min(entry.used_bytes, entry.total_bytes);
+                        info = format_sidebar_bytes(used) + " / " + format_sidebar_bytes(entry.total_bytes) + " used";
+                    }
+                    if (capacity_loading && !entry.capacity_known) {
+                        misty::UI::DrawMistyLoadingAnimation(
+                            ImVec2(text_x, cursor.y + 22.0f),
+                            ImVec2(text_x + 38.0f, cursor.y + 39.0f),
+                            64.0f,
+                            IM_COL32(0, 0, 0, 0));
+                    } else {
+                        dl->AddText(ImGui::GetFont(),
+                                    ImGui::GetFontSize() * 0.85f,
+                                    ImVec2(text_x, cursor.y + 25.0f),
+                                    IM_COL32(164, 169, 181, 255),
+                                    info.c_str());
+                    }
+
+                    if (entry.capacity_known && entry.total_bytes > 0) {
+                        const std::uint64_t used = std::min(entry.used_bytes, entry.total_bytes);
+                        const float fill = std::clamp(
+                            static_cast<float>(used) / static_cast<float>(entry.total_bytes),
+                            0.0f,
+                            1.0f);
+                        const float bar_x = text_x;
+                        const float bar_y = cursor.y + 46.0f;
+                        const float bar_w = std::max(20.0f, content_width - text_x + cursor.x - 12.0f);
+                        dl->AddRectFilled(ImVec2(bar_x, bar_y),
+                                          ImVec2(bar_x + bar_w, bar_y + 4.0f),
+                                          IM_COL32(47, 51, 59, 255), 2.0f);
+                        const ImU32 fill_col = IM_COL32(236, 239, 246, 245);
+                        dl->AddRectFilled(ImVec2(bar_x, bar_y),
+                                          ImVec2(bar_x + bar_w * fill, bar_y + 4.0f),
+                                          fill_col, 2.0f);
+                    }
+                    if (context_requested) {
+                        ImGui::OpenPopup("##remote_ctx");
+                    }
+                    if (ImGui::BeginPopup("##remote_ctx")) {
+                        if (ImGui::MenuItem("Refresh storage")) {
+                            refresh_provider_capacity(state);
+                        }
+                        ImGui::EndPopup();
+                    }
+                    ImGui::PopID();
+
+                    if (pressed) {
                         ensure_child_directory(RemoteMountChild{
                             RemoteMountParent{entry.provider_folder, entry.provider_folder, ""},
                             entry.remote_name,
@@ -779,7 +986,7 @@ namespace misty::panel {
             const std::string active_key = active_explorer_state_key_provider_ ? active_explorer_state_key_provider_() : "Files";
             auto& explorer_state = registry_.get_state<FileExplorerState>(active_key);
             {
-                std::lock_guard<std::mutex> lock(explorer_state.mu);
+                std::lock_guard<std::recursive_mutex> lock(explorer_state.mu);
                 current_path = explorer_state.current_path;
             }
 

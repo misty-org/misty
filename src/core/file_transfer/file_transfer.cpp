@@ -4,6 +4,15 @@
 
 namespace misty::core {
 
+bool FileTransferRecord::is_alive() const {
+    if (!error_message.empty() ||
+        status == FileTransferStatus::Failed ||
+        status == FileTransferStatus::Completed) {
+        return false;
+    }
+    return status == FileTransferStatus::Pending || status == FileTransferStatus::InProgress;
+}
+
 void FileTransfer::set_local_context(uint64_t id, const std::string& local_path) {
     std::lock_guard<std::mutex> lock(mu_);
 
@@ -36,7 +45,7 @@ void FileTransfer::set_remote_context(uint64_t id, const std::string& remote_nam
     }
 }
 
-void FileTransfer::update_progress(uint64_t id, int64_t transferred_bytes) {
+void FileTransfer::update_progress(uint64_t id, int64_t transferred_bytes, int64_t total_bytes) {
     std::lock_guard<std::mutex> lock(mu_);
 
     auto it = transfers_.find(id);
@@ -45,6 +54,9 @@ void FileTransfer::update_progress(uint64_t id, int64_t transferred_bytes) {
     }
 
     it->second.transferred_bytes = transferred_bytes;
+    if (total_bytes >= 0) {
+        it->second.total_bytes = total_bytes;
+    }
     if (it->second.status == FileTransferStatus::Pending) {
         it->second.status = FileTransferStatus::InProgress;
     }

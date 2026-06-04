@@ -13,7 +13,7 @@ if(BUILD_TESTING AND (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STRE
             "${CMAKE_SOURCE_DIR}/src/core/file_transfer/file_transfer.cpp"
             "${CMAKE_SOURCE_DIR}/src/core/manager/env_manager.cpp"
             "${CMAKE_SOURCE_DIR}/src/core/manager/proxy_manager.cpp"
-            "${CMAKE_SOURCE_DIR}/src/core/manager/session_manager.cpp"
+            "${CMAKE_SOURCE_DIR}/src/core/manager/proxy_token_store.cpp"
             "${CMAKE_SOURCE_DIR}/src/core/net/http_client.cpp"
             "${CMAKE_SOURCE_DIR}/src/core/system/util.cpp"
             "${CMAKE_SOURCE_DIR}/src/core/file_sync/file_sync_gate.cpp"
@@ -49,6 +49,7 @@ if(BUILD_TESTING AND (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STRE
             gtest_main
             misty_proto
             CURL::libcurl
+            SQLite::SQLite3
         )
 
         if(APPLE)
