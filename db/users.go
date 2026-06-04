@@ -12,11 +12,16 @@ import (
 )
 
 type User struct {
-	ID        string
-	LicenseID string
-	Name      string
-	Email     string
-	CreatedAt time.Time
+	ID                  string
+	LicenseID           string
+	Name                string
+	Email               string
+	EmailUpdatesEnabled bool
+	CreatedAt           time.Time
+}
+
+type UserSettings struct {
+	EmailUpdatesEnabled bool
 }
 
 func (db *Database) CreateUser(name, email, password string) (*User, error) {
@@ -90,9 +95,9 @@ func (db *Database) UpdateUserName(id, name string) error {
 func (db *Database) GetUserByID(id string) (*User, error) {
 	var u User
 	err := db.Conn.QueryRow(
-		`SELECT id, license_id, name, email, created_at FROM users WHERE id = $1`,
+		`SELECT id, license_id, name, email, email_updates_enabled, created_at FROM users WHERE id = $1`,
 		id,
-	).Scan(&u.ID, &u.LicenseID, &u.Name, &u.Email, &u.CreatedAt)
+	).Scan(&u.ID, &u.LicenseID, &u.Name, &u.Email, &u.EmailUpdatesEnabled, &u.CreatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
@@ -101,6 +106,34 @@ func (db *Database) GetUserByID(id string) (*User, error) {
 		return nil, err
 	}
 	return &u, nil
+}
+
+func (db *Database) GetUserSettingsByID(id string) (*UserSettings, error) {
+	var settings UserSettings
+	err := db.Conn.QueryRow(
+		`SELECT email_updates_enabled FROM users WHERE id = $1`,
+		id,
+	).Scan(&settings.EmailUpdatesEnabled)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		log.Println("Failed to get user settings:", err)
+		return nil, err
+	}
+	return &settings, nil
+}
+
+func (db *Database) UpdateUserSettings(id string, settings UserSettings) error {
+	_, err := db.Conn.Exec(
+		`UPDATE users SET email_updates_enabled = $1 WHERE id = $2`,
+		settings.EmailUpdatesEnabled,
+		id,
+	)
+	if err != nil {
+		log.Println("Failed to update user settings:", err)
+	}
+	return err
 }
 
 func normalizeEmail(email string) string {

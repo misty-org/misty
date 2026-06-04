@@ -91,6 +91,8 @@ func (s *Server) MountHandlers() error {
 	s.Router.Get("/me", api.GetMe(s.Database))
 	s.Router.Put("/me/profile", api.UpdateProfile(s.Database))
 	s.Router.Put("/me/device", api.UpdateDevice(s.Database))
+	s.Router.Get("/me/settings", api.GetSettings(s.Database))
+	s.Router.Put("/me/settings", api.UpdateSettings(s.Database))
 	s.Router.Post("/billing/trial/start", api.StartPersonalTrial(s.Database))
 	s.Router.Post("/billing/checkout-session", api.CreateCheckoutSession(s.Database))
 
@@ -106,6 +108,8 @@ func (s *Server) MountHandlers() error {
 	s.Router.Get("/api/me", api.GetMe(s.Database))
 	s.Router.Put("/api/me/profile", api.UpdateProfile(s.Database))
 	s.Router.Put("/api/me/device", api.UpdateDevice(s.Database))
+	s.Router.Get("/api/me/settings", api.GetSettings(s.Database))
+	s.Router.Put("/api/me/settings", api.UpdateSettings(s.Database))
 	s.Router.Post("/api/billing/trial/start", api.StartPersonalTrial(s.Database))
 	s.Router.Post("/api/billing/checkout-session", api.CreateCheckoutSession(s.Database))
 
