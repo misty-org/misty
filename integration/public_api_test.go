@@ -53,4 +53,10 @@ func TestPublicAccountResponsesHideLicenseID(t *testing.T) {
 	if _, ok := meBody["license_id"]; ok {
 		t.Fatalf("/me response unexpectedly exposed license_id: %#v", meBody)
 	}
+	if got, ok := meBody["allows_use"].(bool); !ok || !got {
+		t.Fatalf("/me allows_use = %#v, want true", meBody["allows_use"])
+	}
+	if got, ok := meBody["tier"].(string); !ok || got != "basic" {
+		t.Fatalf("/me tier = %#v, want basic", meBody["tier"])
+	}
 }
