@@ -4,6 +4,8 @@
 #include "panels/panel/panel.h"
 #include "notification_state.h"
 
+struct ImVec2;
+
 namespace misty::panel {
 
     class NotificationPanel : public Panel {
@@ -12,6 +14,7 @@ namespace misty::panel {
         ~NotificationPanel() override = default;
 
         void render() override;
+        void render_at(const ImVec2& anchor_min, const ImVec2& anchor_max);
 
     private:
         core::StateRegistry& registry_;

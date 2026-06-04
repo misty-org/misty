@@ -416,6 +416,20 @@ namespace misty::panel {
         );
     }
 
+    void FileSidebarPanel::refresh_provider_entries(FileSidebarState& state) {
+        {
+            std::lock_guard<std::mutex> lock(state.providers_mutex);
+            if (state.providers_loading) {
+                return;
+            }
+            state.providers_loaded = false;
+            state.providers_capacity_loaded = false;
+            state.providers_capacity_loading = false;
+            state.providers_error.clear();
+        }
+        ensure_provider_entries_loaded(state);
+    }
+
     void FileSidebarPanel::refresh_provider_capacity(FileSidebarState& state) {
         {
             std::lock_guard<std::mutex> lock(state.providers_mutex);
@@ -747,6 +761,7 @@ namespace misty::panel {
         const ImVec2 header_pos = ImGui::GetCursorScreenPos();
         if (SectionHeader("remote_hdr", "Remote", providers_collapsed_, content_width, false))
             providers_collapsed_ = !providers_collapsed_;
+        const bool header_context_requested = ImGui::IsItemClicked(ImGuiMouseButton_Right);
         ImGui::SameLine();
         ImGui::SetCursorScreenPos(ImVec2(header_pos.x + content_width - 21.0f, header_pos.y));
         if (PlusButton("provider_add", !providers_collapsed_)) {
@@ -754,6 +769,18 @@ namespace misty::panel {
             auto& providers_state = registry_.get_state<ProvidersState>("Providers");
             providers_state.on_add_provider();
             view::switch_view(view::ViewID::Providers);
+        }
+        if (header_context_requested) {
+            ImGui::OpenPopup("##remote_section_ctx");
+        }
+        if (ImGui::BeginPopup("##remote_section_ctx")) {
+            if (ImGui::MenuItem("Refresh providers")) {
+                refresh_provider_entries(state);
+            }
+            if (ImGui::MenuItem("Refresh storage")) {
+                refresh_provider_capacity(state);
+            }
+            ImGui::EndPopup();
         }
         ImGui::SetCursorScreenPos(ImVec2(header_pos.x, header_pos.y + ImGui::GetTextLineHeight() + 5.0f));
 

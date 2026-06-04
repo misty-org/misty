@@ -819,7 +819,22 @@ namespace misty::panel {
         return kToolbarHeight;
     }
 
+    bool FileExplorerPanel::notification_anchor_bounds(ImVec2& min, ImVec2& max) const {
+        if (auto* active_explorer = dynamic_cast<FileExplorerPanel*>(active_panel())) {
+            if (active_explorer != this) {
+                return active_explorer->notification_anchor_bounds(min, max);
+            }
+        }
+        if (!notification_anchor_valid_) {
+            return false;
+        }
+        min = notification_anchor_min_;
+        max = notification_anchor_max_;
+        return true;
+    }
+
     void FileExplorerPanel::render_active_toolbar() {
+        notification_anchor_valid_ = false;
         if (auto* active_explorer = dynamic_cast<FileExplorerPanel*>(active_panel())) {
             if (active_explorer != this) {
                 active_explorer->render_active_toolbar();
@@ -836,6 +851,11 @@ namespace misty::panel {
             ImGui::SetCursorPos(ImVec2(kToolbarPadX, kToolbarPadY));
             show_command_toolbar(state, search_state);
             ImGui::SetCursorPos(ImVec2(kToolbarPadX, kToolbarPadY + kToolbarButtonHeight + kToolbarRowGap));
+            notification_anchor_min_ = ImGui::GetCursorScreenPos();
+            notification_anchor_max_ = ImVec2(
+                ImGui::GetWindowPos().x + ImGui::GetWindowWidth() - kToolbarPadX,
+                notification_anchor_min_.y + kToolbarButtonHeight);
+            notification_anchor_valid_ = true;
             show_file_action_toolbar(state);
         }
         ImGui::EndChild();

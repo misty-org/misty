@@ -403,7 +403,7 @@ HttpResponse upload_remote_call(const FileMasterProps& props,
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 0L);
 
     struct curl_slist* headers = nullptr;
-    if (auto token = ProxyTokenStore::get().current_access_token(); token && !token->empty()) {
+    if (auto token = ProxyTokenStore::get().current_or_refresh_access_token(); token && !token->empty()) {
         const std::string header = "Authorization: Bearer " + *token;
         headers = curl_slist_append(headers, header.c_str());
     }

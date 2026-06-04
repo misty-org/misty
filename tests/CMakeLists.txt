@@ -6,6 +6,7 @@ if(BUILD_TESTING AND (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STRE
 
     if(MISTY_TEST_SOURCES)
         set(MISTY_TEST_SUPPORT_SOURCES
+            "${CMAKE_SOURCE_DIR}/src/core/file_master/file_master.cpp"
             "${CMAKE_SOURCE_DIR}/src/core/file_master/file_master_api.cpp"
             "${CMAKE_SOURCE_DIR}/src/core/file_master/file_master_local.cpp"
             "${CMAKE_SOURCE_DIR}/src/core/file_master/file_master_remote.cpp"

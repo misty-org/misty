@@ -1,5 +1,6 @@
 #include "panels/transfers/content/transfers_table.h"
 
+#include <algorithm>
 #include <cfloat>
 
 #include "imgui.h"
@@ -88,7 +89,9 @@ void render_row(const core::FileTransferRecord& row) {
     ImGui::TextWrapped("%s", target.empty() ? "--" : target.c_str());
 
     ImGui::TableSetColumnIndex(4);
+    ImGui::PushID(static_cast<int>(row.id));
     render_progress_cell(row);
+    ImGui::PopID();
 
     ImGui::TableSetColumnIndex(5);
     ImGui::PushStyleColor(ImGuiCol_Text,
@@ -119,7 +122,7 @@ void render_transfers_table(const std::vector<core::FileTransferRecord>& rows,
     const float table_shell_height = rows.empty() ? 54.0f : table_height;
     if (ImGui::BeginTable("##transfers_table", 7, flags, ImVec2(0.0f, table_shell_height))) {
         ImGui::TableSetupScrollFreeze(0, 1);
-        ImGui::TableSetupColumn("Job", ImGuiTableColumnFlags_WidthFixed, 58.0f);
+        ImGui::TableSetupColumn("Job ID", ImGuiTableColumnFlags_WidthFixed, 76.0f);
         ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 92.0f);
         ImGui::TableSetupColumn("Source", ImGuiTableColumnFlags_WidthStretch, 0.27f);
         ImGui::TableSetupColumn("Target", ImGuiTableColumnFlags_WidthStretch, 0.30f);

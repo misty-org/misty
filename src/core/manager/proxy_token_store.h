@@ -10,6 +10,8 @@ public:
     static ProxyTokenStore& get();
 
     std::optional<std::string> current_access_token() const;
+    std::optional<std::string> current_or_refresh_access_token() const;
+    bool refresh_access_token() const;
 
 private:
     ProxyTokenStore() = default;
