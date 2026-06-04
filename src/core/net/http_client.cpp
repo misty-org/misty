@@ -162,7 +162,7 @@ namespace misty::core {
             auto merged_headers = headers;
             const bool protected_proxy_request = should_attach_proxy_auth(url);
             if (protected_proxy_request) {
-                if (auto token = ProxyTokenStore::get().current_access_token(); token && !token->empty()) {
+                if (auto token = ProxyTokenStore::get().current_or_refresh_access_token(); token && !token->empty()) {
                     merged_headers["Authorization"] = "Bearer " + *token;
                 } else {
                     merged_headers.erase("Authorization");
@@ -420,7 +420,12 @@ namespace misty::core {
 
         HttpResponse response = execute_stream_request(merged_headers);
         if (response.status_code == 0 && is_proxy_url(url) && ProxyManager::get().ensure_running()) {
+            merged_headers = merge_auth_headers(url, options);
             response = execute_stream_request(merged_headers);
+        }
+        if (response.status_code == 401 && should_attach_proxy_auth(url) &&
+            ProxyTokenStore::get().refresh_access_token()) {
+            response = execute_stream_request(merge_auth_headers(url, options));
         }
         update_proxy_status(url, response.status_code);
 
@@ -633,8 +638,16 @@ namespace misty::core {
             options.timeouts.connect_timeout_seconds,
             options.timeouts.total_timeout_seconds);
         if (response.status_code == 0 && is_proxy_url(url) && ProxyManager::get().ensure_running()) {
+            merged_headers = merge_auth_headers(url, options);
             response = execute_curl_request(
                 method, url, body, merged_headers,
+                options.timeouts.connect_timeout_seconds,
+                options.timeouts.total_timeout_seconds);
+        }
+        if (response.status_code == 401 && should_attach_proxy_auth(url) &&
+            ProxyTokenStore::get().refresh_access_token()) {
+            response = execute_curl_request(
+                method, url, body, merge_auth_headers(url, options),
                 options.timeouts.connect_timeout_seconds,
                 options.timeouts.total_timeout_seconds);
         }
@@ -800,7 +813,12 @@ namespace misty::core {
 
         DownloadResult result = execute_curl_download(url, local_path, merged_headers, progress_cb);
         if (result.final_status_code == 0 && is_proxy_url(url) && ProxyManager::get().ensure_running()) {
+            merged_headers = merge_auth_headers(url, headers);
             result = execute_curl_download(url, local_path, merged_headers, progress_cb);
+        }
+        if (result.final_status_code == 401 && should_attach_proxy_auth(url) &&
+            ProxyTokenStore::get().refresh_access_token()) {
+            result = execute_curl_download(url, local_path, merge_auth_headers(url, headers), progress_cb);
         }
         update_proxy_status(url, result.final_status_code);
 

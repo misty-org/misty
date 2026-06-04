@@ -196,7 +196,7 @@ std::string job_id_text(const core::FileTransferRecord& row) {
     if (row.job_id == 0) {
         return "--";
     }
-    return "#" + std::to_string(row.job_id);
+    return "J-" + std::to_string(row.job_id);
 }
 
 std::string source_endpoint(const core::FileTransferRecord& row) {

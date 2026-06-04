@@ -43,7 +43,7 @@ void append_startup_log(const std::string& line) {
     const char* home = std::getenv("HOME");
     if (!home || *home == '\0') return;
     namespace fs = std::filesystem;
-    const fs::path path = fs::path(home) / ".misty" / ".cache" / "misty-client.log";
+    const fs::path path = fs::path(home) / ".misty" / "logs" / "misty.log";
     std::error_code ec;
     fs::create_directories(path.parent_path(), ec);
     std::ofstream f(path, std::ios::app);

@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cctype>
 #include <filesystem>
+#include <system_error>
 #include <thread>
 #include <string>
 #include <vector>
@@ -93,6 +94,20 @@ int run_blocking_process(const std::string& executable, const std::vector<std::s
     return WEXITSTATUS(status);
 }
 #endif
+
+fs::path misty_log_path(const std::string& filename) {
+    const std::string home_dir = EnvManager::get().get_user_home_dir();
+    if (home_dir.empty()) {
+        return {};
+    }
+    fs::path log_dir = fs::path(home_dir) / ".misty" / "logs";
+    std::error_code ec;
+    fs::create_directories(log_dir, ec);
+    if (ec) {
+        return {};
+    }
+    return log_dir / filename;
+}
 
 } // namespace
 
@@ -264,7 +279,13 @@ bool ProxyManager::launch_proxy_process() {
     }
 
     const fs::path proxy_path(proxy_executable);
-    return launch_detached_process(proxy_path.string(), {}, proxy_path.parent_path().string());
+    const fs::path proxy_log_path = misty_log_path("misty-proxy.log");
+    return launch_detached_process(
+        proxy_path.string(),
+        {},
+        proxy_path.parent_path().string(),
+        proxy_log_path.empty() ? std::string() : proxy_log_path.string(),
+        proxy_log_path.empty() ? std::string() : proxy_log_path.string());
 }
 
 bool ProxyManager::terminate_existing_proxies(const std::string& proxy_executable) const {

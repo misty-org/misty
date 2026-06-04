@@ -158,6 +158,10 @@ public:
      */
     float toolbar_height() const;
     /**
+     * @brief Returns the second toolbar row bounds used for centered transient notifications.
+     */
+    bool notification_anchor_bounds(ImVec2& min, ImVec2& max) const;
+    /**
      * @brief Renders the persistent details/preview inspector for the active explorer.
      */
     void render_inspector();
@@ -478,6 +482,9 @@ private:
     std::unique_ptr<PreviewPanel> preview_panel_;
     TransientUiState ui_;
     std::string pending_drag_navigation_path_;
+    bool notification_anchor_valid_ = false;
+    ImVec2 notification_anchor_min_{};
+    ImVec2 notification_anchor_max_{};
     mutable bool suppress_child_initial_navigation_ = false;
     bool owns_state_cleanup_ = false;
 };

@@ -918,7 +918,13 @@ namespace misty::view {
 
         navbar_panel_->render_activity_popup();
         context_menu_panel_->render();
-        notification_panel_->render();
+        ImVec2 notification_anchor_min{};
+        ImVec2 notification_anchor_max{};
+        if (explorer_panel_->notification_anchor_bounds(notification_anchor_min, notification_anchor_max)) {
+            notification_panel_->render_at(notification_anchor_min, notification_anchor_max);
+        } else {
+            notification_panel_->render();
+        }
 
         if (pending_sidebar_workspace_create_) {
             pending_sidebar_workspace_create_ = false;
