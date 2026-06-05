@@ -4,6 +4,7 @@
 #include "core/manager/proxy_manager.h"
 #include "core/manager/env_manager.h"
 #include "core/manager/font_manager.h"
+#include "core/file_transfer/file_transfer.h"
 #include "views/files_view.h"
 #include "views/providers_view.h"
 #include "views/dock_view.h"
@@ -71,6 +72,14 @@ namespace misty {
             append_startup_log("startup: platform initialized");
             core::EnvManager::get().reload();
             append_startup_log("startup: env reloaded");
+            std::string transfer_persistence_error;
+            if (!state_registry_.get_state<core::FileTransfer>("FileMasterTransfers").initialize_persistence(
+                    &transfer_persistence_error) &&
+                !transfer_persistence_error.empty()) {
+                append_startup_log("startup: transfer persistence init failed: " + transfer_persistence_error);
+            } else {
+                append_startup_log("startup: transfer persistence initialized");
+            }
             init_client();
             append_startup_log("startup: init_client ok");
             core::PluginManager::get().set_state_registry(&state_registry_);
@@ -175,7 +184,7 @@ namespace misty {
         });
         view::register_view_factory(view::ViewID::Transfers, [this]() {
             append_startup_log("startup: transfers view instantiated");
-            return std::make_unique<view::TransfersView>(state_registry_);
+            return std::make_unique<view::TransfersView>(state_registry_, worker_pool_);
         });
         // ActivityView removed — Activity is now a modal panel in the navbar
         view::register_view_factory(view::ViewID::Settings, [this]() {

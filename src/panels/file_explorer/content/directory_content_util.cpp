@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <iomanip>
 #include <sstream>
+#include <vector>
 
 #include "core/manager/asset_manager.h"
 #include "core/ui/ui_style.h"
@@ -13,7 +14,6 @@
 namespace fs = std::filesystem;
 
 namespace misty::panel {
-
 int compare_strings(const std::string& lhs, const std::string& rhs) {
     std::string a = lhs;
     std::string b = rhs;
@@ -290,6 +290,11 @@ void select_item(FileExplorerState& state,
         ui.last_selected_index = index;
     }
     state.selected_files = ui.selected_files;
+    const std::string current_path(state.current_path);
+    if (!current_path.empty()) {
+        state.selected_files_by_path[current_path] = state.selected_files;
+        state.last_selected_index_by_path[current_path] = ui.last_selected_index;
+    }
 }
 
 void sort_files(FileListing& listing, const ImGuiTableSortSpecs& sort_specs) {
@@ -378,6 +383,35 @@ void render_file_state_cell(const FileListing& listing, const FileItem& file) {
         }
     }
     ImGui::TextUnformatted(label.c_str());
+}
+
+bool input_text_string(const char* id,
+                       std::string& value,
+                       ImGuiInputTextFlags flags,
+                       const char* hint,
+                       float width) {
+    std::vector<char> buffer;
+    const std::size_t buffer_size = std::max<std::size_t>(value.size() + 256, 512);
+    buffer.assign(buffer_size, '\0');
+    std::copy(value.begin(), value.end(), buffer.begin());
+    if (width > 0.0f) {
+        ImGui::SetNextItemWidth(width);
+    }
+    bool changed = false;
+    if (hint && *hint) {
+        changed = ImGui::InputTextWithHint(id,
+                                           hint,
+                                           buffer.data(),
+                                           buffer.size(),
+                                           flags);
+    } else {
+        changed = ImGui::InputText(id,
+                                   buffer.data(),
+                                   buffer.size(),
+                                   flags);
+    }
+    value.assign(buffer.data());
+    return changed;
 }
 
 }  // namespace misty::panel

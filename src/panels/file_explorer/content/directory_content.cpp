@@ -8,6 +8,7 @@
 #include "core/manager/asset_manager.h"
 #include "core/ui/ui_animate.h"
 #include "core/ui/ui_layout.h"
+#include "imgui_internal.h"
 
 using namespace misty::core;
 
@@ -32,8 +33,53 @@ constexpr float kGridIconSize = 32.0f;
 constexpr float kGridLabelGap = 6.0f;
 constexpr float kGridLabelWrapInset = 10.0f;
 
+struct PendingRenameCaret {
+    ImVec2 min;
+    ImVec2 max;
+    std::string text;
+    ImU32 color = IM_COL32_WHITE;
+};
+
+std::vector<PendingRenameCaret>& pending_rename_carets() {
+    static thread_local std::vector<PendingRenameCaret> pending;
+    return pending;
+}
+
 bool is_downloadable_remote_file(const FileItem& file) {
     return file.type == FileType::REMOTE && !file.is_dir;
+}
+
+int rename_selection_end(const std::string& name, bool is_dir) {
+    (void)is_dir;
+    return static_cast<int>(name.size());
+}
+
+bool rename_caret_visible() {
+    ImGuiIO& io = ImGui::GetIO();
+    if (!io.ConfigInputTextCursorBlink) {
+        return true;
+    }
+    return std::fmod(static_cast<float>(ImGui::GetTime()), 1.20f) <= 0.80f;
+}
+
+void draw_passive_rename_caret(const ImVec2& min,
+                               const ImVec2& max,
+                               const std::string& text,
+                               int cursor_pos,
+                               ImU32 color) {
+    if (!rename_caret_visible()) {
+        return;
+    }
+    const int clamped_cursor_pos = std::clamp(cursor_pos, 0, static_cast<int>(text.size()));
+    const std::string before_cursor = text.substr(0, static_cast<std::size_t>(clamped_cursor_pos));
+    const float text_width = ImGui::CalcTextSize(before_cursor.c_str()).x;
+    const float caret_x = std::min(max.x - 6.0f, min.x + 5.0f + text_width);
+    const float caret_top = min.y + 4.0f;
+    const float caret_bottom = max.y - 4.0f;
+    ImGui::GetForegroundDrawList()->AddLine(ImVec2(caret_x, caret_top),
+                                            ImVec2(caret_x, caret_bottom),
+                                            color,
+                                            1.5f);
 }
 
 void clear_directory_selection(FileExplorerState& state, FileExplorerPanel::TransientUiState& ui) {
@@ -41,6 +87,11 @@ void clear_directory_selection(FileExplorerState& state, FileExplorerPanel::Tran
     ui.selected_files.clear();
     ui.last_selected_index = -1;
     state.selected_files.clear();
+    const std::string current_path(state.current_path);
+    if (!current_path.empty()) {
+        state.selected_files_by_path.erase(current_path);
+        state.last_selected_index_by_path.erase(current_path);
+    }
 }
 
 } // namespace
@@ -60,6 +111,7 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state, FileLi
     const ImVec2 overlay_max(overlay_min.x + overlay_size.x, overlay_min.y + overlay_size.y);
 
     ImGuiIO& io = ImGui::GetIO();
+    pending_rename_carets().clear();
     const bool active_text_edit = io.WantTextInput && ImGui::IsAnyItemActive();
     if (!loading && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && !active_text_edit) {
         if (CommandManager::get().matches("explorer.refresh")) {
@@ -69,6 +121,10 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state, FileLi
             }
         }
     }
+
+    // Scope per-pane widget IDs so split views can render identical rows without
+    // cross-panel hover/selection collisions.
+    ImGui::PushID(state_key_.c_str());
 
     if (ui.grid_view) {
         const float cell_w = 100.0f;
@@ -103,11 +159,17 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state, FileLi
                 ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup) &&
                 !ImGui::IsAnyItemHovered()) {
                 clear_directory_selection(state, ui);
+                if (rename_mode_active()) {
+                    sync_rename_session_selection(state, listing, true);
+                }
                 open_background_context_menu(state, ui);
             } else if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&
                        ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup) &&
                        !ImGui::IsAnyItemHovered()) {
                 clear_directory_selection(state, ui);
+                if (rename_mode_active()) {
+                    sync_rename_session_selection(state, listing, true);
+                }
             }
             if (!ImGui::IsAnyItemHovered() && !selection_detail::prominent_drag_target_hovered_this_frame()) {
                 handle_file_drop_target(state, state.current_path, overlay_min, overlay_max, false, false, true);
@@ -160,11 +222,17 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state, FileLi
                 ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup) &&
                 !ImGui::IsAnyItemHovered()) {
                 clear_directory_selection(state, ui);
+                if (rename_mode_active()) {
+                    sync_rename_session_selection(state, listing, true);
+                }
                 open_background_context_menu(state, ui);
             } else if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&
                        ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup) &&
                        !ImGui::IsAnyItemHovered()) {
                 clear_directory_selection(state, ui);
+                if (rename_mode_active()) {
+                    sync_rename_session_selection(state, listing, true);
+                }
             }
             if (!ImGui::IsAnyItemHovered() && !selection_detail::prominent_drag_target_hovered_this_frame()) {
                 handle_file_drop_target(state, state.current_path, overlay_min, overlay_max, false, false, true);
@@ -178,7 +246,29 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state, FileLi
         misty::UI::DrawMistyLoadingAnimation(overlay_min, overlay_max);
     }
 
-    show_rename_modal(ui);
+    {
+        auto& session = rename_session_state();
+        int shared_cursor_pos = 0;
+        bool review_modal_open = false;
+        {
+            std::lock_guard<std::mutex> lock(session.mu);
+            shared_cursor_pos = session.shared_cursor_pos;
+            review_modal_open = session.review_modal_open;
+        }
+        if (!review_modal_open) {
+            for (const auto& caret : pending_rename_carets()) {
+                draw_passive_rename_caret(caret.min,
+                                          caret.max,
+                                          caret.text,
+                                          shared_cursor_pos,
+                                          caret.color);
+            }
+        }
+        pending_rename_carets().clear();
+    }
+
+    ImGui::PopID();
+
     show_new_entry_modal(ui);
     show_permanent_delete_modal(ui);
     show_permission_delete_modal(ui);
@@ -205,6 +295,9 @@ void FileExplorerPanel::show_file_item(FileExplorerState& state, FileListing& li
     if (row_pressed) {
         select_item(state, ui, listing, file, i, is_selected, io);
         is_selected = ui.selected_files.count(file.id) > 0;
+        if (rename_mode_active()) {
+            sync_rename_session_selection(state, listing);
+        }
     }
     const ImVec2 row_min = ImGui::GetItemRectMin();
     const ImVec2 row_max = ImGui::GetItemRectMax();
@@ -218,13 +311,18 @@ void FileExplorerPanel::show_file_item(FileExplorerState& state, FileListing& li
     }
 
     const bool row_right_clicked =
+        ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup) &&
         ImGui::IsMouseClicked(ImGuiMouseButton_Right) &&
         !io.KeyCtrl &&
-        !io.KeySuper &&
-        ImGui::IsMouseHoveringRect(row_min, row_max, false);
+        !io.KeySuper;
     if (row_right_clicked) {
         ui.context_menu_target_path = file.path;
-        if (!is_selected) select_item(state, ui, listing, file, i, false, io);
+        if (!is_selected) {
+            select_item(state, ui, listing, file, i, false, io);
+            if (rename_mode_active()) {
+                sync_rename_session_selection(state, listing);
+            }
+        }
         open_context_menu(state, ui);
     }
 
@@ -264,7 +362,72 @@ void FileExplorerPanel::show_file_item(FileExplorerState& state, FileListing& li
     ImGui::SameLine(0, 8.0f);
     float text_y_offset = (row_height - ImGui::GetTextLineHeight()) / 2.0f;
     ImGui::SetCursorScreenPos(ImVec2(ImGui::GetCursorScreenPos().x, p.y + text_y_offset));
-    if (listing.is_deleting(file.path)) {
+    RenameParticipant rename_participant;
+    const bool in_rename_mode = rename_participant_snapshot_for_file(state, file, &rename_participant);
+    if (in_rename_mode) {
+        auto& session = rename_session_state();
+        bool focus_requested = false;
+        {
+            std::lock_guard<std::mutex> lock(session.mu);
+            if (session.focus_requested && session.focus_key == rename_participant.key) {
+                focus_requested = true;
+                session.focus_requested = false;
+            }
+        }
+        const float extension_width = rename_participant.locked_extension.empty()
+            ? 0.0f
+            : ImGui::CalcTextSize(rename_participant.locked_extension.c_str()).x + 8.0f;
+        const float input_width = std::max(80.0f, ImGui::GetContentRegionAvail().x - extension_width - 6.0f);
+        if (rename_participant.validation.is_invalid()) {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.92f, 0.42f, 0.42f, 1.0f));
+        } else if (listing.is_deleting(file.path)) {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.72f, 0.72f, 0.72f, 1.0f));
+        }
+        if (focus_requested) {
+            ImGui::SetKeyboardFocusHere();
+        }
+        std::string editable_name = rename_participant.editable_name;
+        ImGui::PushStyleColor(ImGuiCol_InputTextCursor, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+        const bool changed = input_text_string(
+            ("##rename_inline_row_" + rename_participant.key).c_str(),
+            editable_name,
+            ImGuiInputTextFlags_AutoSelectAll,
+            nullptr,
+            input_width);
+        ImGui::PopStyleColor();
+        const ImVec2 input_min = ImGui::GetItemRectMin();
+        const ImVec2 input_max = ImGui::GetItemRectMax();
+        const bool input_active = ImGui::IsItemActive();
+        if (focus_requested) {
+            if (ImGuiInputTextState* input_state = ImGui::GetInputTextState(ImGui::GetItemID())) {
+                input_state->SetSelection(0, rename_selection_end(editable_name, file.is_dir));
+            }
+        }
+        if (input_active) {
+            if (ImGuiInputTextState* input_state = ImGui::GetInputTextState(ImGui::GetItemID())) {
+                std::lock_guard<std::mutex> lock(session.mu);
+                session.shared_cursor_pos = std::clamp(input_state->GetCursorPos(),
+                                                       0,
+                                                       static_cast<int>(editable_name.size()));
+            }
+        }
+        pending_rename_carets().push_back(PendingRenameCaret{
+            .min = input_min,
+            .max = input_max,
+            .text = editable_name,
+            .color = IM_COL32(248, 248, 250, 255),
+        });
+        if (!rename_participant.locked_extension.empty()) {
+            ImGui::SameLine(0.0f, 6.0f);
+            ImGui::TextDisabled("%s", rename_participant.locked_extension.c_str());
+        }
+        if (changed || editable_name != rename_participant.editable_name) {
+            update_rename_participant_draft(rename_participant.key, editable_name, true);
+        }
+        if (rename_participant.validation.is_invalid() || listing.is_deleting(file.path)) {
+            ImGui::PopStyleColor();
+        }
+    } else if (listing.is_deleting(file.path)) {
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.72f, 0.72f, 0.72f, 1.0f));
         ImGui::TextUnformatted(file.name.c_str());
         ImGui::PopStyleColor();
@@ -342,12 +505,22 @@ void FileExplorerPanel::show_grid_item(FileExplorerState& state, FileListing& li
             navigate_to_path(path);
         });
     }
+    RenameParticipant grid_rename_participant;
+    const bool grid_rename_active =
+        rename_participant_snapshot_for_file(state, file, &grid_rename_participant);
     grid_item_icon(dl, state, listing, file, show_open_folder_icon, cell_pos, cell_w, kGridIconSize, kGridCardPadding.top);
-    grid_item_label(dl, state, listing, file, is_selected, cell_pos, cell_w, kGridIconSize, kGridCardPadding.top,
-                    kGridLabelGap, kGridLabelWrapInset);
+    if (!grid_rename_active) {
+        grid_item_label(dl, state, listing, file, is_selected, cell_pos, cell_w, kGridIconSize, kGridCardPadding.top,
+                        kGridLabelGap, kGridLabelWrapInset);
+    }
     dl->PopClipRect();
 
-    if (clicked) select_item(state, ui, listing, file, i, is_selected, io);
+    if (clicked) {
+        select_item(state, ui, listing, file, i, is_selected, io);
+        if (rename_mode_active()) {
+            sync_rename_session_selection(state, listing);
+        }
+    }
     if (double_clicked) {
         if (file.is_dir) {
             std::string nav_path = file.path;
@@ -361,8 +534,78 @@ void FileExplorerPanel::show_grid_item(FileExplorerState& state, FileListing& li
 
     if (right_clicked) {
         ui.context_menu_target_path = file.path;
-        if (!is_selected) select_item(state, ui, listing, file, i, false, io);
+        if (!is_selected) {
+            select_item(state, ui, listing, file, i, false, io);
+            if (rename_mode_active()) {
+                sync_rename_session_selection(state, listing);
+            }
+        }
         open_context_menu(state, ui);
+    }
+
+    if (grid_rename_active) {
+        const float extension_width = grid_rename_participant.locked_extension.empty()
+            ? 0.0f
+            : ImGui::CalcTextSize(grid_rename_participant.locked_extension.c_str()).x + 8.0f;
+        const float input_width = std::max(44.0f, cell_w - 14.0f - extension_width);
+        const float input_y = cell_pos.y + kGridCardPadding.top + kGridIconSize + kGridLabelGap - 2.0f;
+        ImGui::SetCursorScreenPos(ImVec2(cell_pos.x + 7.0f, input_y));
+        auto& session = rename_session_state();
+        bool focus_requested = false;
+        {
+            std::lock_guard<std::mutex> lock(session.mu);
+            if (session.focus_requested && session.focus_key == grid_rename_participant.key) {
+                focus_requested = true;
+                session.focus_requested = false;
+            }
+        }
+        if (grid_rename_participant.validation.is_invalid()) {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.92f, 0.42f, 0.42f, 1.0f));
+        }
+        if (focus_requested) {
+            ImGui::SetKeyboardFocusHere();
+        }
+        std::string editable_name = grid_rename_participant.editable_name;
+        ImGui::PushStyleColor(ImGuiCol_InputTextCursor, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+        const bool changed = input_text_string(
+            ("##rename_inline_grid_" + grid_rename_participant.key).c_str(),
+            editable_name,
+            ImGuiInputTextFlags_AutoSelectAll,
+            nullptr,
+            input_width);
+        ImGui::PopStyleColor();
+        const ImVec2 input_min = ImGui::GetItemRectMin();
+        const ImVec2 input_max = ImGui::GetItemRectMax();
+        const bool input_active = ImGui::IsItemActive();
+        if (focus_requested) {
+            if (ImGuiInputTextState* input_state = ImGui::GetInputTextState(ImGui::GetItemID())) {
+                input_state->SetSelection(0, rename_selection_end(editable_name, file.is_dir));
+            }
+        }
+        if (input_active) {
+            if (ImGuiInputTextState* input_state = ImGui::GetInputTextState(ImGui::GetItemID())) {
+                std::lock_guard<std::mutex> lock(session.mu);
+                session.shared_cursor_pos = std::clamp(input_state->GetCursorPos(),
+                                                       0,
+                                                       static_cast<int>(editable_name.size()));
+            }
+        }
+        pending_rename_carets().push_back(PendingRenameCaret{
+            .min = input_min,
+            .max = input_max,
+            .text = editable_name,
+            .color = IM_COL32(248, 248, 250, 255),
+        });
+        if (!grid_rename_participant.locked_extension.empty()) {
+            ImGui::SameLine(0.0f, 4.0f);
+            ImGui::TextDisabled("%s", grid_rename_participant.locked_extension.c_str());
+        }
+        if (grid_rename_participant.validation.is_invalid()) {
+            ImGui::PopStyleColor();
+        }
+        if (changed || editable_name != grid_rename_participant.editable_name) {
+            update_rename_participant_draft(grid_rename_participant.key, editable_name, true);
+        }
     }
 }
 

@@ -1,4 +1,4 @@
-if(BUILD_TESTING AND (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo"))
+if(BUILD_TESTING)
     file(GLOB_RECURSE MISTY_TEST_SOURCES CONFIGURE_DEPENDS
         "${CMAKE_SOURCE_DIR}/tests/*.cpp"
         "${CMAKE_SOURCE_DIR}/tests/*.h"
@@ -11,7 +11,9 @@ if(BUILD_TESTING AND (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STRE
             "${CMAKE_SOURCE_DIR}/src/core/file_master/file_master_local.cpp"
             "${CMAKE_SOURCE_DIR}/src/core/file_master/file_master_remote.cpp"
             "${CMAKE_SOURCE_DIR}/src/core/file_master/file_master_util.cpp"
+            "${CMAKE_SOURCE_DIR}/src/core/db.cpp"
             "${CMAKE_SOURCE_DIR}/src/core/file_transfer/file_transfer.cpp"
+            "${CMAKE_SOURCE_DIR}/src/core/file_transfer/file_transfer_store.cpp"
             "${CMAKE_SOURCE_DIR}/src/core/manager/env_manager.cpp"
             "${CMAKE_SOURCE_DIR}/src/core/manager/proxy_manager.cpp"
             "${CMAKE_SOURCE_DIR}/src/core/manager/proxy_token_store.cpp"
@@ -26,10 +28,24 @@ if(BUILD_TESTING AND (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STRE
             "${CMAKE_SOURCE_DIR}/src/core/file_sync/file_sync_watcher.h"
             "${CMAKE_SOURCE_DIR}/src/core/threading/worker_pool.cpp"
             "${CMAKE_SOURCE_DIR}/src/panels/file_explorer/state/file_explorer_state.cpp"
+            "${CMAKE_SOURCE_DIR}/src/panels/file_explorer/state/file_listings_state.cpp"
+            "${CMAKE_SOURCE_DIR}/src/panels/file_explorer/state/library_state.cpp"
+            "${CMAKE_SOURCE_DIR}/src/panels/file_explorer/state/loading_state.cpp"
+            "${CMAKE_SOURCE_DIR}/src/panels/file_explorer/state/remote_mount_state.cpp"
+            "${CMAKE_SOURCE_DIR}/src/panels/file_explorer/state/rename_session_state.cpp"
+            "${CMAKE_SOURCE_DIR}/src/panels/file_explorer/content/file_explorer_content_util.cpp"
+            "${CMAKE_SOURCE_DIR}/src/panels/file_explorer/operations/file_operation_jobs.cpp"
+            "${CMAKE_SOURCE_DIR}/src/panels/file_explorer/operations/file_master_operations.cpp"
+            "${CMAKE_SOURCE_DIR}/src/panels/file_explorer/operations/operation_queue_state.cpp"
             "${CMAKE_SOURCE_DIR}/src/panels/search/search_state.cpp"
             "${CMAKE_SOURCE_DIR}/src/panels/activity/activity_state.cpp"
             "${CMAKE_SOURCE_DIR}/src/panels/activity/upload_state.cpp"
             "${CMAKE_SOURCE_DIR}/src/panels/activity/download_state.cpp"
+            "${CMAKE_SOURCE_DIR}/src/panels/notification/notification_state.cpp"
+            "${CMAKE_SOURCE_DIR}/vendor/imgui/imgui.cpp"
+            "${CMAKE_SOURCE_DIR}/vendor/imgui/imgui_draw.cpp"
+            "${CMAKE_SOURCE_DIR}/vendor/imgui/imgui_tables.cpp"
+            "${CMAKE_SOURCE_DIR}/vendor/imgui/imgui_widgets.cpp"
         )
 
         add_executable(misty_tests

@@ -6,6 +6,7 @@
 #include "core/commands/command_manager.h"
 #include "core/ui/ui_style.h"
 #include "imgui.h"
+#include "imgui_internal.h"
 
 namespace misty::panel {
     namespace {
@@ -649,9 +650,13 @@ namespace misty::panel {
                 ImGuiWindowFlags_NoScrollbar |
                 ImGuiWindowFlags_NoScrollWithMouse;
             if (ImGui::BeginChild(child_id.c_str(), size, ImGuiChildFlags_None, pane_flags)) {
+                const bool any_popup_open =
+                    ImGui::IsPopupOpen((ImGuiID)0, ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel);
                 const bool pane_clicked =
-                    ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup | ImGuiHoveredFlags_ChildWindows) &&
-                    ImGui::IsMouseClicked(ImGuiMouseButton_Left);
+                    !any_popup_open &&
+                    ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) &&
+                    (ImGui::IsMouseClicked(ImGuiMouseButton_Left) ||
+                     ImGui::IsMouseClicked(ImGuiMouseButton_Right));
                 const bool pane_focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows);
                 if (pane_clicked || pane_focused) {
                     active_pane_id = pane_id;

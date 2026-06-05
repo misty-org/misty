@@ -4,6 +4,7 @@
 #include <cfloat>
 
 #include "imgui.h"
+#include "panels/file_explorer/operations/operation_queue_state.h"
 #include "panels/transfers/content/transfers_content_util.h"
 
 namespace misty::panel {
@@ -64,7 +65,33 @@ void render_progress_cell(const core::FileTransferRecord& row) {
     ImGui::PopStyleColor();
 }
 
-void render_row(const core::FileTransferRecord& row) {
+void render_row_actions(core::StateRegistry& registry,
+                        core::WorkerPool& worker_pool,
+                        const core::FileTransferRecord& row) {
+    ImGui::PushID(static_cast<int>(row.id));
+    if (row.cancelable) {
+        if (ImGui::SmallButton("Cancel")) {
+            cancel_queued_operation(registry, row.id);
+        }
+    } else if (row.retryable &&
+               (row.status == core::FileTransferStatus::Failed ||
+                row.status == core::FileTransferStatus::Interrupted)) {
+        if (ImGui::SmallButton("Retry")) {
+            retry_operation(registry, worker_pool, row.id);
+        }
+    } else if (row.undoable && row.undo_token_id != 0) {
+        if (ImGui::SmallButton("Undo")) {
+            undo_operation(registry, worker_pool, row.undo_token_id);
+        }
+    } else {
+        ImGui::TextDisabled("--");
+    }
+    ImGui::PopID();
+}
+
+void render_row(core::StateRegistry& registry,
+                core::WorkerPool& worker_pool,
+                const core::FileTransferRecord& row) {
     ImGui::TableNextRow(ImGuiTableRowFlags_None, 62.0f);
 
     ImGui::TableSetColumnIndex(0);
@@ -95,20 +122,32 @@ void render_row(const core::FileTransferRecord& row) {
 
     ImGui::TableSetColumnIndex(5);
     ImGui::PushStyleColor(ImGuiCol_Text,
-                          row.status == core::FileTransferStatus::Failed ? kRed :
-                          row.status == core::FileTransferStatus::Completed ? kGreen : kText);
+                          (row.status == core::FileTransferStatus::Failed ||
+                           row.status == core::FileTransferStatus::Interrupted) ? kRed :
+                          row.status == core::FileTransferStatus::Completed ? kGreen :
+                          row.status == core::FileTransferStatus::Canceled ? kMuted : kText);
     ImGui::TextUnformatted(transfers_content::status_label(row));
+    if (!row.detail_message.empty()) {
+        ImGui::PushStyleColor(ImGuiCol_Text, kMuted);
+        ImGui::TextWrapped("%s", row.detail_message.c_str());
+        ImGui::PopStyleColor();
+    }
     ImGui::PopStyleColor();
 
     ImGui::TableSetColumnIndex(6);
     ImGui::PushStyleColor(ImGuiCol_Text, kMuted);
     ImGui::TextUnformatted(transfers_content::started_text(row).c_str());
     ImGui::PopStyleColor();
+
+    ImGui::TableSetColumnIndex(7);
+    render_row_actions(registry, worker_pool, row);
 }
 
 }  // namespace
 
-void render_transfers_table(const std::vector<core::FileTransferRecord>& rows,
+void render_transfers_table(core::StateRegistry& registry,
+                            core::WorkerPool& worker_pool,
+                            const std::vector<core::FileTransferRecord>& rows,
                             float height) {
     const float table_height = std::max(180.0f, height);
     const ImGuiTableFlags flags =
@@ -120,7 +159,7 @@ void render_transfers_table(const std::vector<core::FileTransferRecord>& rows,
         ImGuiTableFlags_SizingStretchProp;
 
     const float table_shell_height = rows.empty() ? 54.0f : table_height;
-    if (ImGui::BeginTable("##transfers_table", 7, flags, ImVec2(0.0f, table_shell_height))) {
+    if (ImGui::BeginTable("##transfers_table", 8, flags, ImVec2(0.0f, table_shell_height))) {
         ImGui::TableSetupScrollFreeze(0, 1);
         ImGui::TableSetupColumn("Job ID", ImGuiTableColumnFlags_WidthFixed, 76.0f);
         ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 92.0f);
@@ -129,11 +168,12 @@ void render_transfers_table(const std::vector<core::FileTransferRecord>& rows,
         ImGui::TableSetupColumn("Progress", ImGuiTableColumnFlags_WidthStretch, 0.25f);
         ImGui::TableSetupColumn("Status", ImGuiTableColumnFlags_WidthFixed, 110.0f);
         ImGui::TableSetupColumn("Started", ImGuiTableColumnFlags_WidthFixed, 100.0f);
+        ImGui::TableSetupColumn("Action", ImGuiTableColumnFlags_WidthFixed, 84.0f);
         ImGui::TableHeadersRow();
 
         if (!rows.empty()) {
             for (const auto& row : rows) {
-                render_row(row);
+                render_row(registry, worker_pool, row);
             }
         }
 
