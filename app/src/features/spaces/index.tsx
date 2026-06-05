@@ -11,6 +11,15 @@ export { spaceSectionPath, useSpacePanelRoute } from "./components/spacePanel/sp
 export { SpaceSetupCards } from "./components/SpaceSetupCards";
 export { SpaceSidebarPageSection } from "./components/SpaceSidebarPageSection";
 export { SpaceSidebarSection } from "./components/SpaceSidebarSection";
+export { SpaceViewModeToggle } from "./components/SpaceViewModeToggle";
+export { InstagramBrandIcon } from "./social/InstagramBrandIcon";
+export { MessengerBrandIcon, XBrandIcon } from "./social/SocialProviderBrandIcons";
+export {
+  socialConversationPath,
+  socialProvider,
+  socialProviderFromRoute,
+  socialProviderPath,
+} from "./social/socialRoute";
 export type * from "./model/stores/spaces/interfaces/useSpacesStore";
 export type * from "./model/stores/spaces/types/useSpacesBackendStore";
 export { SpacesRealtimeBridge } from "./SpacesRealtimeBridge";
@@ -38,6 +47,9 @@ const LazySpaceInvitationRedemption = lazy(async () => ({
 const LazySpaceNavRail = lazy(async () => ({
   default: (await import("./components/SpaceNavRail")).SpaceNavRail,
 }));
+const LazyRoadmapDailyMockup = lazy(async () => ({
+  default: (await import("./roadmap/spaceRoadmap/RoadmapDailyMockup")).RoadmapDailyMockup,
+}));
 
 export function SpacesPage() {
   return (
@@ -47,7 +59,12 @@ export function SpacesPage() {
   );
 }
 
-export function SpaceSectionView(props: { spaceId: string; section: string; studioKind?: string }) {
+export function SpaceSectionView(props: {
+  spaceId: string;
+  section: string;
+  studioKind?: string;
+  workspaceTabId?: string;
+}) {
   return (
     <Suspense fallback={null}>
       <LazySpaceSectionView {...props} />
@@ -83,6 +100,14 @@ export function SpaceNavRail() {
   return (
     <Suspense fallback={null}>
       <LazySpaceNavRail />
+    </Suspense>
+  );
+}
+
+export function RoadmapDailyMockup() {
+  return (
+    <Suspense fallback={null}>
+      <LazyRoadmapDailyMockup />
     </Suspense>
   );
 }

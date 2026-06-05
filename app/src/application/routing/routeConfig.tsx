@@ -3,21 +3,19 @@ import { AgentsPage } from "@/features/agents";
 import { RegisterPage, SignInPage } from "@/features/auth";
 import { BrowserWorkspace } from "@/features/browser";
 import { DeveloperWorkspace } from "@/features/developer-workspace";
-import { ExtensionsPage } from "@/features/extensions";
+import { MarketplacePage } from "@/features/marketplace";
 import FilesPage from "@/features/files/explorer";
-import { HomeDashboard } from "@/features/home";
 import { InboxWorkspace } from "@/features/inbox";
-import { spaceNotesEnabled } from "@/features/notes";
 import { SettingsPage } from "@/features/settings";
-import { SpaceInvitationRedemption } from "@/features/spaces";
+import { RoadmapDailyMockup, SpaceInvitationRedemption } from "@/features/spaces";
 import SpacesShell, { SpaceDetail, SpacesIndexRedirect } from "@/features/spaces";
 import { TerminalWorkspace } from "@/features/terminal";
 import { TransfersPage } from "@/features/transfers";
+import { DesktopAccessState } from "@/shared/ui";
 import { createBrowserRouter, Navigate } from "react-router";
 import { AppFrameLayout } from "../layouts/AppFrameLayout";
 import { AppPagesLayout } from "../layouts/AppPagesLayout";
 import { RootLayout } from "../layouts/RootLayout";
-import { WebUnavailablePage } from "../layouts/WebUnavailablePage";
 import { isDeepLinkRouteAllowed, resolveAuthDeepLinkRoute } from "./navigation";
 import { isWebBuild } from "@/shared/platform/buildTarget";
 
@@ -29,12 +27,12 @@ import { isWebBuild } from "@/shared/platform/buildTarget";
  */
 function StartupRedirect() {
   const lastAppRoute = useAppRouteMemoryStore((state) => state.lastAppRoute);
-  const fallback = isWebBuild ? routes.spaces : routes.home;
+  const fallback = routes.spaces;
   return <Navigate to={resolveStartupRoute(lastAppRoute, fallback)} replace />;
 }
 
 const desktopOnlyRoute = (feature: string) =>
-  isWebBuild ? <WebUnavailablePage feature={feature} /> : null;
+  isWebBuild ? <DesktopAccessState feature={feature} /> : null;
 
 export const router = createBrowserRouter([
   {
@@ -55,14 +53,22 @@ export const router = createBrowserRouter([
           {
             element: <AppPagesLayout />,
             children: [
-              { path: "home", element: desktopOnlyRoute("Home dashboard") ?? <HomeDashboard /> },
-              { path: "inbox", element: desktopOnlyRoute("Inbox") ?? <InboxWorkspace /> },
+              { path: "home", element: null },
+              { path: "inbox", element: <InboxWorkspace /> },
               { path: "browser", element: desktopOnlyRoute("Browser") ?? <BrowserWorkspace /> },
               { path: "terminal", element: desktopOnlyRoute("Terminal") ?? <TerminalWorkspace /> },
               { path: "files", element: desktopOnlyRoute("Files") ?? <FilesPage /> },
-              { path: "agents", element: desktopOnlyRoute("Agents") ?? <AgentsPage /> },
+              { path: "agents", element: <AgentsPage /> },
               { path: "code", element: desktopOnlyRoute("Code") ?? <DeveloperWorkspace /> },
-              { path: "extensions", element: desktopOnlyRoute("Extensions") ?? <ExtensionsPage /> },
+              { path: "marketplace", element: <MarketplacePage /> },
+              {
+                path: "roadmap-preview",
+                element: import.meta.env.DEV ? (
+                  <RoadmapDailyMockup />
+                ) : (
+                  <Navigate to={routes.spaces} replace />
+                ),
+              },
               {
                 path: "transfers",
                 element: desktopOnlyRoute("Transfers") ?? <TransfersPage />,
@@ -77,7 +83,7 @@ export const router = createBrowserRouter([
                   { path: "personal", element: <Navigate to={routes.spaces} replace /> },
                   {
                     path: ":spaceId",
-                    element: <Navigate to={spaceNotesEnabled ? "notes" : "drawings"} replace />,
+                    element: <Navigate to="home" replace />,
                   },
                   { path: ":spaceId/:section/studio/:studioKind", element: <SpaceDetail /> },
                   { path: ":spaceId/:section/:subsection/:plannerView", element: <SpaceDetail /> },
@@ -98,13 +104,13 @@ export const router = createBrowserRouter([
               { path: "account/register", element: <Navigate to={routes.register} replace /> },
               {
                 path: "account/settings",
-                element: desktopOnlyRoute("Account settings") ?? <SettingsPage />,
+                element: desktopOnlyRoute("Settings") ?? <SettingsPage />,
               },
             ],
           },
           { path: "settings", element: null },
           { path: "diagnostics", element: <Navigate to={routes.spaces} replace /> },
-          { path: "*", element: <Navigate to={routes.home} replace /> },
+          { path: "*", element: <Navigate to={routes.spaces} replace /> },
         ],
       },
     ],

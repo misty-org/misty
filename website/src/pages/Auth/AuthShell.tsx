@@ -10,7 +10,7 @@ export default function AuthShell({ title, description, children }: AuthShellPro
   return (
     <section
       aria-labelledby="auth-page-title"
-      className="min-h-[calc(100vh-4rem)] bg-background px-6 pb-24 pt-28 text-foreground sm:px-10 sm:pt-32 lg:px-16"
+      className="site-container min-h-[calc(100vh-4rem)] bg-background pb-24 pt-28 text-foreground sm:pt-32"
     >
       <div className="mx-auto flex w-full max-w-md flex-col gap-8">
         <div className="text-center">

@@ -1,11 +1,4 @@
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
   Button,
   Dialog,
   DialogContent,
@@ -14,8 +7,10 @@ import {
   DialogTitle,
   Input,
 } from "@/shared/ui";
+import { reportSystemError } from "@/features/activity";
 import { ManagedAiRequestError } from "@/features/agents";
 import { QRCodeSVG } from "qrcode.react";
+import { Loader2, RefreshCcw, Wifi } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { useConnectedDevices } from "./useConnectedDevices";
 
@@ -38,7 +33,6 @@ export function ConnectedDevicePairingDialog({
 }) {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<PairingFailure | null>(null);
 
   useEffect(() => {
     const state = controller.pairing?.session.state;
@@ -49,11 +43,16 @@ export function ConnectedDevicePairingDialog({
 
   const run = async (action: () => Promise<unknown>) => {
     setBusy(true);
-    setError(null);
     try {
       await action();
     } catch (cause) {
-      setError(pairingFailure(cause));
+      const failure = pairingFailure(cause);
+      reportSystemError({
+        title: failure.title,
+        error: failure.description,
+        scope: "files:device-pairing",
+        target: { kind: "workspace-tool", tool: "files" },
+      });
     } finally {
       setBusy(false);
     }
@@ -73,7 +72,6 @@ export function ConnectedDevicePairingDialog({
           if (!next) {
             controller.setPairing(null);
             setInput("");
-            setError(null);
           }
         }}
       >
@@ -81,10 +79,39 @@ export function ConnectedDevicePairingDialog({
           <DialogHeader>
             <DialogTitle>Connect another device</DialogTitle>
             <DialogDescription>
-              Both devices must be signed into the same Misty account. The code expires after five
-              minutes.
+              Open Misty on the other device, then scan a code or enter one from that device. Both
+              devices must use the same Misty account.
             </DialogDescription>
           </DialogHeader>
+
+          {!controller.ready && !pairing ? (
+            <div className="grid justify-items-center gap-3 py-7 text-center">
+              <span className="grid size-11 place-items-center rounded-full bg-charcoal-active text-cream-bright">
+                {controller.loading ? (
+                  <Loader2 className="animate-spin" size={19} />
+                ) : (
+                  <Wifi size={19} />
+                )}
+              </span>
+              <div className="grid gap-1">
+                <p className="font-medium text-cream">
+                  {controller.loading ? "Preparing device connections" : "Connection setup paused"}
+                </p>
+                <p className="max-w-sm text-sm text-cream-muted">
+                  {controller.error || "Misty is preparing this device for secure local sharing."}
+                </p>
+              </div>
+              {!controller.loading ? (
+                <Button
+                  variant="secondary"
+                  disabled={busy}
+                  onClick={() => void run(controller.refresh)}
+                >
+                  <RefreshCcw size={15} /> Try again
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
 
           {pairing?.deepLink ? (
             <div className="grid justify-items-center gap-4 py-2">
@@ -132,12 +159,12 @@ export function ConnectedDevicePairingDialog({
             </div>
           ) : null}
 
-          {!pairing ? (
+          {!pairing && controller.ready ? (
             <div className="grid gap-4">
               <Button disabled={busy} onClick={() => void run(controller.createPairing)}>
                 Show a QR code
               </Button>
-              <div className="flex items-center gap-3 text-xs uppercase tracking-wider text-cream-muted">
+              <div className="flex items-center gap-3 text-xs text-cream-muted">
                 <span className="h-px flex-1 bg-charcoal-border" /> or{" "}
                 <span className="h-px flex-1 bg-charcoal-border" />
               </div>
@@ -169,22 +196,6 @@ export function ConnectedDevicePairingDialog({
           ) : null}
         </DialogContent>
       </Dialog>
-      <AlertDialog
-        open={error !== null}
-        onOpenChange={(next) => {
-          if (!next) setError(null);
-        }}
-      >
-        <AlertDialogContent className="border-charcoal-border bg-charcoal-card text-cream">
-          <AlertDialogHeader>
-            <AlertDialogTitle>{error?.title}</AlertDialogTitle>
-            <AlertDialogDescription>{error?.description}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setError(null)}>{error?.action}</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 }

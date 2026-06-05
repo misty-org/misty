@@ -83,10 +83,11 @@ use app::shortcut_commands::{
 #[cfg(desktop)]
 use infra::browser::{
     browser_agent_execute, browser_agent_grant_register, browser_agent_grant_revoke,
-    browser_webview_back, browser_webview_close, browser_webview_create, browser_webview_forward,
-    browser_webview_hide, browser_webview_navigate, browser_webview_reconcile,
-    browser_webview_reload, browser_webview_set_bounds, browser_webview_set_theme,
-    browser_webview_show, browser_webviews_hide_all, browser_webviews_set_overlay_active,
+    browser_webview_back, browser_webview_capture_region, browser_webview_close,
+    browser_webview_create, browser_webview_forward, browser_webview_hide,
+    browser_webview_navigate, browser_webview_reconcile, browser_webview_reload,
+    browser_webview_set_bounds, browser_webview_set_theme, browser_webview_show,
+    browser_webviews_hide_all, browser_webviews_set_companion, browser_webviews_set_overlay_active,
     browser_webviews_set_pointer_tracking, BrowserSessionState,
 };
 #[cfg(desktop)]
@@ -177,6 +178,8 @@ pub fn run() {
             app.manage(runtime);
             #[cfg(desktop)]
             app.manage(BrowserSessionState::default());
+            // The floating Misty window is intentionally not created during
+            // the first public beta. The in-app Misty panel remains available.
             #[cfg(desktop)]
             if let Err(error) = tray::setup(app) {
                 let error = std::io::Error::other(error);
@@ -231,7 +234,20 @@ pub fn run() {
                 });
             }
             #[cfg(target_os = "macos")]
-            let _ = (window, event);
+            {
+                if let tauri::WindowEvent::Resized(_) = event {
+                    if let Ok(ns_window) = window.ns_window() {
+                        unsafe {
+                            let ns_window = ns_window as cocoa::base::id;
+                            platform::plugins::mac_rounded_corners::position_traffic_lights(
+                                ns_window,
+                                -4.0,
+                                5.0,
+                            );
+                        }
+                    }
+                }
+            }
         })
         .invoke_handler(tauri::generate_handler![
             mac_rounded_corners::enable_rounded_corners,
@@ -350,6 +366,8 @@ pub fn run() {
             #[cfg(desktop)]
             browser_webview_set_bounds,
             #[cfg(desktop)]
+            browser_webview_capture_region,
+            #[cfg(desktop)]
             browser_webview_reconcile,
             #[cfg(desktop)]
             browser_webview_set_theme,
@@ -367,6 +385,8 @@ pub fn run() {
             browser_webviews_set_overlay_active,
             #[cfg(desktop)]
             browser_webviews_set_pointer_tracking,
+            #[cfg(desktop)]
+            browser_webviews_set_companion,
             #[cfg(desktop)]
             browser_webview_hide,
             #[cfg(desktop)]

@@ -8,10 +8,13 @@ import { useSpacesStore } from "./store/useSpacesStore";
 
 import { spaceNotesEnabled } from "@/features/notes";
 import { SpaceSectionView } from "./SpaceSectionView";
+import { socialProviderFromRoute, socialProviderPath } from "./social/socialRoute";
 
 export { default, SpacesIndexRedirect } from "./components/SpacesShell";
 
 const validSpaceSections = new Set([
+  "home",
+  "social",
   "chat",
   "planner",
   "notes",
@@ -27,11 +30,7 @@ const validSettingsSections = new Set(["general", "members", "connections", "sug
 const validPlannerViews = new Set(["board", "list", "calendar"]);
 
 export function SpaceDetail() {
-  const {
-    spaceId = "",
-    section = spaceNotesEnabled ? "notes" : "drawings",
-    studioKind = "",
-  } = useParams();
+  const { spaceId = "", section = "home", studioKind = "" } = useParams();
   const { user } = useAuth();
   const location = useLocation();
   const { spaces, loadSpace } = useSpacesStore(
@@ -56,6 +55,24 @@ export function SpaceDetail() {
 
   if (section === "files") {
     return <Navigate to={`/spaces/${encodeURIComponent(spaceId)}/library`} replace />;
+  }
+  if (section === "chat") {
+    const provider = socialProviderFromRoute(
+      `/spaces/${encodeURIComponent(spaceId)}/social${location.search}`,
+    );
+    return (
+      <Navigate
+        to={`${socialProviderPath(spaceId, provider, location.search)}${location.hash}`}
+        replace
+      />
+    );
+  }
+  if (section === "social") {
+    const provider = socialProviderFromRoute(`${location.pathname}${location.search}`);
+    const canonicalRoute = `${socialProviderPath(spaceId, provider, location.search)}${location.hash}`;
+    if (`${location.pathname}${location.search}${location.hash}` !== canonicalRoute) {
+      return <Navigate to={canonicalRoute} replace />;
+    }
   }
   if (section === "notes" && !spaceNotesEnabled) {
     return <Navigate to={`/spaces/${encodeURIComponent(spaceId)}/drawings`} replace />;
@@ -108,6 +125,14 @@ export function SpaceDetail() {
       return (
         <Navigate
           to={`/spaces/${encodeURIComponent(spaceId)}/planner/agenda/month${location.search}${location.hash}`}
+          replace
+        />
+      );
+    }
+    if (plannerPart === "goals" || plannerPart === "milestones") {
+      return (
+        <Navigate
+          to={`/spaces/${encodeURIComponent(spaceId)}/planner/roadmaps${location.search}${location.hash}`}
           replace
         />
       );
