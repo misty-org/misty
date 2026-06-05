@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -8,6 +9,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "core/file_transfer/file_transfer.h"
 #include "core/file_sync/file_sync_master.h"
 #include "core/threading/worker_pool.h"
 #include "core/ui/state_registry.h"
@@ -16,6 +18,7 @@
 #include "panels/file_explorer/state/file_explorer_state.h"
 #include "panels/file_explorer/state/file_listings_state.h"
 #include "panels/file_explorer/state/library_state.h"
+#include "panels/file_explorer/state/rename_session_state.h"
 #include "panels/file_explorer/navigation/toolbar_util.h"
 #include "panels/panel/multi_panel.h"
 #include "panels/preview/preview_panel.h"
@@ -254,6 +257,14 @@ private:
      * @brief Refreshes the current listing without adding a history entry.
      */
     void request_manual_refresh(panel::FileExplorerState& state);
+    /**
+     * @brief Queues a relist when a completed transfer touches the active directory.
+     */
+    void queue_transfer_refresh(const core::FileTransferRecord& record);
+    /**
+     * @brief Returns true when a transfer should refresh the explorer's current listing.
+     */
+    bool transfer_touches_current_listing(const core::FileTransferRecord& record) const;
 
     /**
      * @brief Renders back and forward history controls.
@@ -362,9 +373,9 @@ private:
      */
     void show_new_entry_modal(TransientUiState& ui);
     /**
-     * @brief Renders and processes the rename modal.
+     * @brief Renders and processes the final rename review modal.
      */
-    void show_rename_modal(TransientUiState& ui);
+    void show_rename_review_modal();
     /**
      * @brief Renders and processes permanent delete confirmation.
      */
@@ -417,13 +428,17 @@ private:
      */
     void perform_delete_selected(panel::FileExplorerState& state);
     /**
-     * @brief Opens rename state for the current context-menu target.
+     * @brief Starts or expands the shared rename mode from the current selection.
      */
     void initiate_rename(TransientUiState& ui);
     /**
-     * @brief Dispatches the rename operation currently staged in the rename modal.
+     * @brief Opens the final review modal for the active rename session.
      */
-    void perform_rename_from_modal(TransientUiState& ui);
+    void open_rename_review_modal();
+    /**
+     * @brief Executes all valid rename rows from the review modal.
+     */
+    void confirm_rename_review();
     /**
      * @brief Permanently deletes paths staged in the permanent delete modal.
      */
@@ -436,6 +451,40 @@ private:
      * @brief Handles keyboard shortcuts for copy, cut, paste, rename, and delete.
      */
     void handle_file_operation_commands();
+    /**
+     * @brief Synchronizes visible selection state into the shared rename session.
+     */
+    void sync_rename_session_selection(panel::FileExplorerState& state,
+                                       const panel::FileListing& listing,
+                                       bool clear_visible_directory = false);
+    /**
+     * @brief Exits rename mode and discards unresolved drafts.
+     */
+    void cancel_rename_mode();
+    /**
+     * @brief Renders the in-toolbar rename status pill while rename mode is active.
+     */
+    void render_rename_status_banner(float available_width);
+    /**
+     * @brief Returns the shared rename session registry entry.
+     */
+    RenameSessionState& rename_session_state();
+    /**
+     * @brief Returns true when the shared rename session is active.
+     */
+    bool rename_mode_active() const;
+    /**
+     * @brief Returns the rename participant for a visible file item, if any.
+     */
+    bool rename_participant_snapshot_for_file(const panel::FileExplorerState& state,
+                                              const panel::FileItem& file,
+                                              RenameParticipant* out) const;
+    /**
+     * @brief Updates a participant draft and revalidates the session.
+     */
+    void update_rename_participant_draft(const std::string& participant_key,
+                                         const std::string& draft_name,
+                                         bool propagate_to_all = false);
     /**
      * @brief Returns the item targeted by the context menu, if it is still loaded.
      */
@@ -480,6 +529,8 @@ private:
     std::string search_state_key_;
     std::unique_ptr<SearchPanel> search_panel_;
     std::unique_ptr<PreviewPanel> preview_panel_;
+    uint64_t transfer_listener_id_ = 0;
+    std::shared_ptr<std::atomic<bool>> transfer_listener_alive_ = std::make_shared<std::atomic<bool>>(true);
     TransientUiState ui_;
     std::string pending_drag_navigation_path_;
     bool notification_anchor_valid_ = false;

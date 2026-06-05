@@ -10,6 +10,12 @@
 namespace misty::panel::transfers_content {
 namespace {
 
+int64_t now_epoch_ms() {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(
+               std::chrono::system_clock::now().time_since_epoch())
+        .count();
+}
+
 std::string lowercase_copy(std::string value) {
     std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
         return static_cast<char>(std::tolower(c));
@@ -51,7 +57,8 @@ bool matches_filter(const core::FileTransferRecord& row, core::FileTransferFilte
         case core::FileTransferFilter::Active:
             return row.is_alive();
         case core::FileTransferFilter::Failed:
-            return row.status == core::FileTransferStatus::Failed;
+            return row.status == core::FileTransferStatus::Failed ||
+                   row.status == core::FileTransferStatus::Interrupted;
         case core::FileTransferFilter::Completed:
             return row.status == core::FileTransferStatus::Completed;
         case core::FileTransferFilter::All:
@@ -85,7 +92,8 @@ TransferCounts count_rows(const std::vector<core::FileTransferRecord>& rows) {
     for (const auto& row : rows) {
         if (row.is_alive()) {
             ++counts.active;
-        } else if (row.status == core::FileTransferStatus::Failed) {
+        } else if (row.status == core::FileTransferStatus::Failed ||
+                   row.status == core::FileTransferStatus::Interrupted) {
             ++counts.failed;
         } else {
             ++counts.completed;
@@ -105,8 +113,13 @@ std::vector<core::FileTransferRecord> sorted_rows(std::vector<core::FileTransfer
             return (lhs.status == core::FileTransferStatus::Failed) >
                    (rhs.status == core::FileTransferStatus::Failed);
         }
-        const auto lhs_time = lhs.is_alive() ? lhs.started_at : lhs.completed_at;
-        const auto rhs_time = rhs.is_alive() ? rhs.started_at : rhs.completed_at;
+        if ((lhs.status == core::FileTransferStatus::Interrupted) !=
+            (rhs.status == core::FileTransferStatus::Interrupted)) {
+            return (lhs.status == core::FileTransferStatus::Interrupted) >
+                   (rhs.status == core::FileTransferStatus::Interrupted);
+        }
+        const auto lhs_time = lhs.is_alive() ? lhs.started_at_ms : lhs.completed_at_ms;
+        const auto rhs_time = rhs.is_alive() ? rhs.started_at_ms : rhs.completed_at_ms;
         if (lhs_time != rhs_time) {
             return lhs_time > rhs_time;
         }
@@ -151,8 +164,13 @@ const char* type_label(core::FileTransferType type) {
 
 const char* status_label(const core::FileTransferRecord& row) {
     switch (row.status) {
+        case core::FileTransferStatus::Queued: return "Queued";
+        case core::FileTransferStatus::WaitingForResolution: return "Needs input";
         case core::FileTransferStatus::Failed: return "Failed";
         case core::FileTransferStatus::Completed: return "Completed";
+        case core::FileTransferStatus::Canceled: return "Canceled";
+        case core::FileTransferStatus::Skipped: return "Skipped";
+        case core::FileTransferStatus::Interrupted: return "Interrupted";
         case core::FileTransferStatus::Pending:
         case core::FileTransferStatus::InProgress:
             if (row.transfer_type == core::FileTransferType::Upload &&
@@ -220,12 +238,12 @@ std::string target_endpoint(const core::FileTransferRecord& row) {
 }
 
 std::string started_text(const core::FileTransferRecord& row) {
-    if (row.started_at == std::chrono::steady_clock::time_point{}) {
+    const int64_t reference_time_ms = row.started_at_ms > 0 ? row.started_at_ms : row.queued_at_ms;
+    if (reference_time_ms <= 0) {
         return "--";
     }
 
-    const auto elapsed = std::chrono::steady_clock::now() - row.started_at;
-    const auto seconds = std::chrono::duration_cast<std::chrono::seconds>(elapsed).count();
+    const auto seconds = std::max<int64_t>(0, (now_epoch_ms() - reference_time_ms) / 1000);
     if (seconds < 5) {
         return "Now";
     }

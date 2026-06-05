@@ -10,6 +10,7 @@
 #include "panels/file_explorer/content/file_explorer_content_util.h"
 #include "panels/file_explorer/operations/file_operation_jobs.h"
 #include "panels/file_explorer/operations/file_master_operations.h"
+#include "panels/file_explorer/operations/operation_queue_state.h"
 #include "panels/file_explorer/state/remote_mount_state.h"
 
 namespace misty::panel {
@@ -82,6 +83,33 @@ void FileExplorerPanel::handle_commands() {
 
 void FileExplorerPanel::handle_file_operation_commands() {
     ImGuiIO& io = ImGui::GetIO();
+    if (rename_mode_active()) {
+        auto& session = rename_session_state();
+        bool review_modal_open = false;
+        {
+            std::lock_guard<std::mutex> lock(session.mu);
+            review_modal_open = session.review_modal_open;
+        }
+
+        if (review_modal_open) {
+            if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+                std::lock_guard<std::mutex> lock(session.mu);
+                session.review_modal_open = false;
+            }
+            return;
+        }
+
+        if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+            cancel_rename_mode();
+            return;
+        }
+        if (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter)) {
+            open_rename_review_modal();
+            return;
+        }
+        return;
+    }
+
     if (io.WantTextInput && ImGui::IsAnyItemActive()) {
         return;
     }
@@ -89,7 +117,6 @@ void FileExplorerPanel::handle_file_operation_commands() {
     auto& state = registry_.get_state<FileExplorerState>(state_key_);
     const auto& listing = active_listing();
     const bool has_file_master_selection = selected_items_are_file_master_items(ui_.selected_files, listing);
-    const bool has_single_file_master_selection = exactly_one_file_master_item_selected(ui_.selected_files, listing);
     const bool has_clipboard = registry_.get_state<ClipboardState>("Clipboard").has_content();
 
     if (has_file_master_selection && core::CommandManager::get().matches("explorer.copy")) {
@@ -104,7 +131,7 @@ void FileExplorerPanel::handle_file_operation_commands() {
     if (has_file_master_selection && core::CommandManager::get().matches("explorer.delete")) {
         perform_delete_selected(state);
     }
-    if (has_single_file_master_selection && core::CommandManager::get().matches("explorer.rename")) {
+    if (has_file_master_selection && core::CommandManager::get().matches("explorer.rename")) {
         initiate_rename(ui_);
     }
 }
@@ -145,18 +172,21 @@ void FileExplorerPanel::perform_paste(FileExplorerState& state) {
 
     auto& clipboard = registry_.get_state<ClipboardState>("Clipboard");
     const std::string source_state_key = clipboard.source_state_key;
-    const uint64_t job_id = begin_file_operation_job(registry_, clipboard_operation_label(clipboard.op));
-    bool dispatched_cut = false;
-    for (const auto& item : clipboard.items) {
-        if (!is_file_master_item(item)) {
-            continue;
-        }
-        const bool dispatched = perform_paste_item(state, item, dest_dir, clipboard.op, job_id, source_state_key);
-        dispatched_cut = dispatched_cut || (dispatched && clipboard.op == ClipboardOp::CUT);
-    }
-    close_file_operation_job(registry_, job_id);
+    const uint64_t batch_id = enqueue_clipboard_operation_batch(
+        registry_,
+        worker_pool_,
+        state_key_,
+        clipboard.items,
+        dest_dir,
+        clipboard.op,
+        source_state_key,
+        [this, &state](const core::FileMasterResult& result) {
+            if (result.success) {
+                request_manual_refresh(state);
+            }
+        });
 
-    if (dispatched_cut) {
+    if (batch_id != 0 && clipboard.op == ClipboardOp::CUT) {
         clipboard.clear();
     }
 }
@@ -170,14 +200,19 @@ void FileExplorerPanel::perform_drop_items(FileExplorerState& state,
         return;
     }
 
-    const uint64_t job_id = begin_file_operation_job(registry_, clipboard_operation_label(op));
-    for (const auto& item : items) {
-        if (!is_file_master_item(item)) {
-            continue;
-        }
-        perform_paste_item(state, item, dest_dir, op, job_id, source_state_key);
-    }
-    close_file_operation_job(registry_, job_id);
+    enqueue_clipboard_operation_batch(
+        registry_,
+        worker_pool_,
+        state_key_,
+        items,
+        dest_dir,
+        op,
+        source_state_key,
+        [this, &state](const core::FileMasterResult& result) {
+            if (result.success) {
+                request_manual_refresh(state);
+            }
+        });
 }
 
 bool FileExplorerPanel::perform_paste_item(FileExplorerState& state,
@@ -212,21 +247,16 @@ bool FileExplorerPanel::perform_paste_item(FileExplorerState& state,
 }
 
 void FileExplorerPanel::download_remote_item(FileExplorerState& state, const FileItem& item) {
-    auto& transfers = registry_.get_state<core::FileTransfer>("FileMasterTransfers");
-    const uint64_t job_id = begin_file_operation_job(registry_, "Download");
-    add_file_operation_to_job(registry_, job_id);
-    const bool dispatched = download_remote_file_master_item(worker_pool_, transfers, item, job_id, [this, &state, job_id](core::FileMasterResult result) {
-        finish_file_operation_job(registry_, job_id, result.success, result.error_message);
-        if (result.success) {
-            request_manual_refresh(state);
-        }
-    });
-    if (!dispatched) {
-        cancel_file_operation_in_job(registry_, job_id);
-        close_file_operation_job(registry_, job_id);
-        return;
-    }
-    close_file_operation_job(registry_, job_id);
+    enqueue_download_operation(
+        registry_,
+        worker_pool_,
+        state_key_,
+        item,
+        [this, &state](const core::FileMasterResult& result) {
+            if (result.success) {
+                request_manual_refresh(state);
+            }
+        });
 }
 
 void FileExplorerPanel::perform_delete_selected(FileExplorerState& state) {
@@ -248,64 +278,24 @@ void FileExplorerPanel::confirm_permanent_delete(FileExplorerPanel::TransientUiS
     ui.permanent_delete_paths.clear();
 
     auto& state = registry_.get_state<FileExplorerState>(state_key_);
-    auto& transfers = registry_.get_state<core::FileTransfer>("FileMasterTransfers");
-    const uint64_t job_id = begin_file_operation_job(registry_, "Delete");
+    std::vector<FileItem> items;
+    items.reserve(paths.size());
     for (const auto& path : paths) {
         const FileItem* item = find_file_item_by_path(active_listing().files, path);
-        if (!item || !is_file_master_item(*item)) {
-            continue;
+        if (item && is_file_master_item(*item)) {
+            items.push_back(*item);
         }
-
-        add_file_operation_to_job(registry_, job_id);
-        const bool dispatched = remove_file_master_item(worker_pool_, transfers, *item, job_id, [this, &state, job_id](core::FileMasterResult result) {
-            finish_file_operation_job(registry_, job_id, result.success, result.error_message);
+    }
+    enqueue_delete_operation_batch(
+        registry_,
+        worker_pool_,
+        state_key_,
+        items,
+        [this, &state](const core::FileMasterResult& result) {
             if (result.success) {
                 request_manual_refresh(state);
             }
         });
-        if (!dispatched) {
-            cancel_file_operation_in_job(registry_, job_id);
-        }
-    }
-    close_file_operation_job(registry_, job_id);
-}
-
-void FileExplorerPanel::initiate_rename(FileExplorerPanel::TransientUiState& ui) {
-    auto items = selected_file_items(ui.selected_files, active_listing());
-    if (items.size() != 1 || !is_file_master_item(items[0])) {
-        return;
-    }
-
-    std::snprintf(ui.rename_buffer, sizeof(ui.rename_buffer), "%s", items[0].name.c_str());
-    ui.rename_target_path = items[0].path;
-    ui.show_rename_modal = true;
-}
-
-void FileExplorerPanel::perform_rename_from_modal(FileExplorerPanel::TransientUiState& ui) {
-    const std::string new_name(ui.rename_buffer);
-    if (new_name.empty() || new_name.find('/') != std::string::npos || ui.rename_target_path.empty()) {
-        return;
-    }
-
-    const FileItem* item = find_file_item_by_path(active_listing().files, ui.rename_target_path);
-    if (!item || item->name == new_name) {
-        return;
-    }
-
-    auto& transfers = registry_.get_state<core::FileTransfer>("FileMasterTransfers");
-    auto& state = registry_.get_state<FileExplorerState>(state_key_);
-    const uint64_t job_id = begin_file_operation_job(registry_, "Rename");
-    add_file_operation_to_job(registry_, job_id);
-    const bool dispatched = rename_file_master_item(worker_pool_, transfers, *item, new_name, job_id, [this, &state, job_id](core::FileMasterResult result) {
-        finish_file_operation_job(registry_, job_id, result.success, result.error_message);
-        if (result.success) {
-            request_manual_refresh(state);
-        }
-    });
-    if (!dispatched) {
-        cancel_file_operation_in_job(registry_, job_id);
-    }
-    close_file_operation_job(registry_, job_id);
 }
 
 void FileExplorerPanel::create_sync_object_for_current_directory(FileExplorerState& state) {

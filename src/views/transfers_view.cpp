@@ -4,8 +4,9 @@
 
 namespace misty::view {
 
-TransfersView::TransfersView(core::StateRegistry& state_registry)
-    : state_registry_(state_registry) {
+TransfersView::TransfersView(core::StateRegistry& state_registry, core::WorkerPool& worker_pool)
+    : state_registry_(state_registry),
+      worker_pool_(worker_pool) {
     init_panels();
 }
 
@@ -13,7 +14,7 @@ void TransfersView::init_panels() {
     navbar_panel_ = std::make_shared<panel::NavbarPanel>(state_registry_);
     notification_panel_ = std::make_shared<panel::NotificationPanel>(state_registry_);
     context_menu_panel_ = std::make_shared<panel::ContextMenuPanel>(state_registry_);
-    transfers_panel_ = std::make_shared<panel::TransfersPanel>(state_registry_);
+    transfers_panel_ = std::make_shared<panel::TransfersPanel>(state_registry_, worker_pool_);
 }
 
 ViewID TransfersView::get_view_id() {

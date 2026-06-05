@@ -81,6 +81,16 @@ void FileExplorerPanel::open_context_menu(FileExplorerState& state, FileExplorer
 
     request.entries.push_back(ContextMenuEntry::separator());
 
+    ContextMenuEntry rename_entry;
+    rename_entry.id = "rename";
+    rename_entry.label = "Rename";
+    rename_entry.secondary_label = core::CommandManager::get().label("explorer.rename");
+    rename_entry.disabled = !has_file_master_selection;
+    rename_entry.on_select = [this, &ui]() {
+        initiate_rename(ui);
+    };
+    request.entries.push_back(std::move(rename_entry));
+
     ContextMenuEntry delete_entry;
     delete_entry.id = "delete";
     delete_entry.label = "Delete";
@@ -104,41 +114,6 @@ void FileExplorerPanel::open_context_menu(FileExplorerState& state, FileExplorer
     request.entries.push_back(std::move(copy_path_entry));
 
     registry_.get_state<ContextMenuState>(kContextMenuStateKey).open(std::move(request));
-}
-
-void FileExplorerPanel::show_rename_modal(FileExplorerPanel::TransientUiState& ui) {
-    if (!ui.show_rename_modal) {
-        return;
-    }
-
-    ImGui::OpenPopup("Rename");
-    bool open = true;
-    if (ImGui::BeginPopupModal("Rename", &open, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::InputTextWithHint("##rename_name", "Name", ui.rename_buffer, IM_ARRAYSIZE(ui.rename_buffer));
-        const bool submitted = ImGui::IsItemDeactivatedAfterEdit() && ImGui::IsKeyPressed(ImGuiKey_Enter);
-
-        if (ImGui::Button("Cancel", ImVec2(90.0f, 0.0f))) {
-            ui.rename_buffer[0] = '\0';
-            ui.rename_target_path.clear();
-            ui.show_rename_modal = false;
-            ImGui::CloseCurrentPopup();
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Rename", ImVec2(90.0f, 0.0f)) || submitted) {
-            perform_rename_from_modal(ui);
-            ui.rename_buffer[0] = '\0';
-            ui.rename_target_path.clear();
-            ui.show_rename_modal = false;
-            ImGui::CloseCurrentPopup();
-        }
-
-        ImGui::EndPopup();
-    }
-    if (!open) {
-        ui.rename_buffer[0] = '\0';
-        ui.rename_target_path.clear();
-        ui.show_rename_modal = false;
-    }
 }
 
 void FileExplorerPanel::open_background_context_menu(FileExplorerState& state, FileExplorerPanel::TransientUiState& ui) {
