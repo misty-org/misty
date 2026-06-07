@@ -14,6 +14,8 @@
 #include "panels/file_explorer/state/file_explorer_state.h"
 #include "panels/file_explorer/state/library_state.h"
 #include "panels/file_explorer/operations/file_master_operations.h"
+#include "panels/file_explorer/operations/file_operation_jobs.h"
+#include "panels/file_explorer/operations/operation_queue_state.h"
 #include "panels/navbar/navbar_state.h"
 #include "panels/settings/settings_state.h"
 
@@ -65,6 +67,7 @@ namespace misty {
     }
 
     void Application::run() {
+        auto& transfer_state = state_registry_.get_state<core::FileTransfer>("FileMasterTransfers");
         try {
             append_startup_log("startup: begin");
             init_platform();
@@ -72,14 +75,6 @@ namespace misty {
             append_startup_log("startup: platform initialized");
             core::EnvManager::get().reload();
             append_startup_log("startup: env reloaded");
-            std::string transfer_persistence_error;
-            if (!state_registry_.get_state<core::FileTransfer>("FileMasterTransfers").initialize_persistence(
-                    &transfer_persistence_error) &&
-                !transfer_persistence_error.empty()) {
-                append_startup_log("startup: transfer persistence init failed: " + transfer_persistence_error);
-            } else {
-                append_startup_log("startup: transfer persistence initialized");
-            }
             init_client();
             append_startup_log("startup: init_client ok");
             core::PluginManager::get().set_state_registry(&state_registry_);
@@ -104,10 +99,27 @@ namespace misty {
             return;
         }
         std::cout << "Entering main loop." << std::endl;
-            append_startup_log("startup: entering main loop");
+        bool transfer_hydration_applied = false;
+        bool transfer_hydration_started = false;
+        append_startup_log("startup: entering main loop");
         while (is_running()) {
             core::FontManager::get().apply_pending_reload();
             prepare_frame();
+
+            if (transfer_hydration_started && !transfer_hydration_applied) {
+                std::string hydration_error;
+                if (transfer_state.poll_background_hydration(&hydration_error)) {
+                    if (!hydration_error.empty()) {
+                        append_startup_log("startup: transfer persistence hydration failed: " + hydration_error);
+                    } else {
+                        panel::rehydrate_persisted_undo_records(state_registry_);
+                        panel::rehydrate_persisted_retry_operations(state_registry_);
+                        panel::seed_file_operation_job_ids(state_registry_);
+                        append_startup_log("startup: transfer persistence hydrated");
+                    }
+                    transfer_hydration_applied = true;
+                }
+            }
 
             if (core::CommandManager::get().matches("app.toggle_transfers")) {
                 state_registry_.get_state<panel::NavbarState>("Navbar").selected_item = view::ViewID::Transfers;
@@ -128,6 +140,11 @@ namespace misty {
                 frame_pacer_.render_debug_overlay();
             }
             render_frame();
+            if (!transfer_hydration_started) {
+                transfer_state.start_background_hydration(nullptr);
+                transfer_hydration_started = true;
+                append_startup_log("startup: transfer persistence hydration started");
+            }
         }
         persist_file_explorer_state();
 

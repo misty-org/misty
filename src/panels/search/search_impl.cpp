@@ -91,6 +91,8 @@ std::vector<misty::panel::SearchResult> parse_search_results(const std::string& 
         result.path = item.value("path", std::string{});
         result.source = parse_file_source(item.value("source", std::string("LOCAL")));
         result.is_dir = item.value("is_dir", false);
+        result.kind = result.is_dir ? misty::panel::SearchResultKind::Folder
+                                    : misty::panel::SearchResultKind::File;
         result.score = item.value("score", 0);
         if (!result.name.empty() && !result.path.empty()) {
             results.push_back(std::move(result));

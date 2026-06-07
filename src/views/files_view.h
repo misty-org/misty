@@ -3,6 +3,7 @@
 #include <atomic>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -13,6 +14,7 @@
 #include "panels/claude/claude_panel.h"
 #include "panels/context_menu/context_menu_panel.h"
 #include "panels/file_explorer/file_explorer_panel.h"
+#include "panels/search/files_search_palette.h"
 #include "panels/navbar/navbar_panel.h"
 #include "panels/notification/notification_panel.h"
 #include "panels/panel/tab_bar.h"
@@ -58,9 +60,6 @@ namespace misty::view {
         const FileWorkspace* active_workspace() const;
         FileTab* active_tab();
         const FileTab* active_tab() const;
-        void schedule_proxy_probe(bool force = false);
-        float render_proxy_status_banner(const ImVec2& pos, float width);
-
     private:
         core::StateRegistry& state_registry_;
         core::WorkerPool& worker_pool_;
@@ -70,6 +69,7 @@ namespace misty::view {
         std::shared_ptr<panel::ContextMenuPanel> context_menu_panel_;
         std::shared_ptr<panel::ClaudePanel> claude_panel_;
         std::shared_ptr<panel::FileExplorerPanel> explorer_panel_;
+        std::unique_ptr<panel::FilesSearchPalette> search_palette_;
 
         struct FileTab {
             std::int16_t idx = -1;
@@ -103,9 +103,6 @@ namespace misty::view {
         float claude_panel_width_ = 380.0f;
         bool is_resizing_claude_panel_ = false;
         double last_workspace_autosave_at_ = 0.0;
-        std::shared_ptr<std::atomic_bool> proxy_probe_in_flight_ =
-            std::make_shared<std::atomic_bool>(false);
-
         static constexpr float kSidebarMinWidth = 180.0f;
         static constexpr float kSidebarMaxWidth = 400.0f;
         static constexpr float kWorkspaceTabBarHeight = panel::kTabBarHeight;

@@ -245,6 +245,11 @@ namespace misty::panel {
         refresh_all();
     }
 
+    void ProvidersState::set_provider_added_callback(std::function<void()> callback) {
+        std::lock_guard<std::mutex> lock(mu);
+        provider_added_callback_ = std::move(callback);
+    }
+
     void ProvidersState::set_search_query(const std::string& query) {
         std::lock_guard<std::mutex> lock(mu);
         search_query_ = query;
@@ -286,6 +291,10 @@ namespace misty::panel {
     ActiveProviderConfigSession ProvidersState::add_provider_session_snapshot() const {
         std::lock_guard<std::mutex> lock(mu);
         return add_provider_session_;
+    }
+
+    std::function<void()> ProvidersState::provider_added_callback_locked() const {
+        return provider_added_callback_;
     }
 
     void ProvidersState::refresh_all() {
@@ -950,6 +959,7 @@ namespace misty::panel {
                 }
 
                 bool refresh_remotes_after = false;
+                std::function<void()> provider_added_callback;
                 bool start_polling = false;
                 bool browser_launch_attempted = false;
                 bool browser_launch_succeeded = false;
@@ -996,6 +1006,7 @@ namespace misty::panel {
                             add_provider_session_.show_modal = false;
                         }
                         refresh_remotes_after = true;
+                        provider_added_callback = provider_added_callback_locked();
                     } else {
                         add_provider_session_.current_step_kind = step.kind;
                         add_provider_session_.step_state = step.state;
@@ -1015,6 +1026,9 @@ namespace misty::panel {
 
                 if (refresh_remotes_after) {
                     refresh_remotes();
+                    if (provider_added_callback) {
+                        provider_added_callback();
+                    }
                     return;
                 }
                 if (start_polling) {
@@ -1143,6 +1157,7 @@ namespace misty::panel {
                     }
 
                     bool refresh_remotes_after = false;
+                    std::function<void()> provider_added_callback;
                     bool browser_launch_attempted = false;
                     bool browser_launch_succeeded = false;
 
@@ -1197,6 +1212,7 @@ namespace misty::panel {
                                 add_provider_session_.show_modal = false;
                             }
                             refresh_remotes_after = true;
+                            provider_added_callback = provider_added_callback_locked();
                         } else {
                             add_provider_session_.current_step_kind = step.kind;
                             add_provider_session_.step_state = step.state;
@@ -1217,6 +1233,9 @@ namespace misty::panel {
 
                     if (refresh_remotes_after) {
                         refresh_remotes();
+                        if (provider_added_callback) {
+                            provider_added_callback();
+                        }
                         return;
                     }
                 }

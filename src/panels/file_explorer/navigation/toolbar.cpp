@@ -11,7 +11,6 @@
 #include "panels/file_explorer/navigation/toolbar_util.h"
 #include "panels/file_explorer/state/clipboard_state.h"
 #include "panels/file_explorer/state/remote_mount_state.h"
-#include "panels/search/search_state.h"
 using namespace misty::core;
 
 namespace misty::panel {
@@ -224,8 +223,6 @@ void FileExplorerPanel::show_toolbar_actions(FileExplorerState& state) {
     const ImVec4 inactive_tint(0.7f, 0.7f, 0.7f, 1.0f);
     const ImVec2 button_size(kToolbarButtonSize, kToolbarButtonSize);
 
-    const std::string current_path(state.current_path);
-    const bool sync_enabled = can_create_sync_object_for_path(current_path);
     show_view_mode_toggle();
 
     ImGui::SameLine(0, kActionToolbarGap);
@@ -241,9 +238,6 @@ void FileExplorerPanel::show_toolbar_actions(FileExplorerState& state) {
     if (ImGui::BeginPopup("##toolbar_more_actions")) {
         if (ImGui::MenuItem("Refresh")) {
             request_manual_refresh(state);
-        }
-        if (ImGui::MenuItem("Create Sync Object", nullptr, false, sync_enabled)) {
-            create_sync_object_for_current_directory(state);
         }
         ImGui::EndPopup();
     }
@@ -344,7 +338,7 @@ void FileExplorerPanel::show_file_action_toolbar(FileExplorerState& state) {
     {
         auto& session = rename_session_state();
         std::lock_guard<std::mutex> lock(session.mu);
-        show_rename_status = session.active || session.job_banner_active;
+        show_rename_status = session.active;
     }
     if (show_rename_status) {
         ImGui::SameLine(0.0f, kActionToolbarGap);
@@ -501,45 +495,33 @@ void FileExplorerPanel::show_path_control(FileExplorerState& state, float width)
     }
 }
 
-void FileExplorerPanel::show_search_field(FileExplorerState& state, SearchState& search_state, float width) {
+void FileExplorerPanel::show_search_field(FileExplorerState& state, float width) {
     (void)state;
     const float height = ImGui::GetFrameHeight();
-    ImGui::PushStyleColor(ImGuiCol_FrameBg, kExplorerChromeBg);
-    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, kExplorerChromeBgHover);
-    ImGui::PushStyleColor(ImGuiCol_FrameBgActive, kExplorerChromeBgActive);
-    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.90f, 0.92f, 0.96f, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_TextDisabled, ImVec4(0.58f, 0.61f, 0.68f, 1.0f));
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(34.0f, 8.0f));
-    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
-    ImGui::SetNextItemWidth(width);
-    const bool submitted = ImGui::InputTextWithHint("##toolbar_search", "Search",
-                                                    search_state.query_buf,
-                                                    sizeof(search_state.query_buf),
-                                                    ImGuiInputTextFlags_EnterReturnsTrue);
+    const std::string query = search_palette_query_provider_ ? search_palette_query_provider_() : std::string();
+    const char* placeholder = "Search or run command";
+    ImGui::InvisibleButton("##toolbar_search_trigger", ImVec2(width, height));
+    const bool hovered = ImGui::IsItemHovered();
+    const bool active = ImGui::IsItemActive();
     const bool activated = ImGui::IsItemActivated();
-    const bool edited = ImGui::IsItemEdited();
+    const bool clicked = ImGui::IsItemClicked();
     const ImVec2 min = ImGui::GetItemRectMin();
     const ImVec2 max = ImGui::GetItemRectMax();
-    ImGui::PopStyleVar(2);
-    ImGui::PopStyleColor(5);
-
-    ImGui::GetWindowDrawList()->AddRect(min, max,
-                                        ImGui::IsItemHovered() ? IM_COL32(72, 82, 104, 230)
-                                                               : IM_COL32(46, 50, 60, 190),
-                                        8.0f);
+    draw_toolbar_button_frame(min, max, hovered, active);
     draw_icon_at("assets/icons/search-24.svg",
                  ImVec2(min.x + 17.0f, min.y + height * 0.5f),
                  16.0f,
                  IM_COL32(180, 186, 198, 235));
+    const char* display = query.empty() ? placeholder : query.c_str();
+    const ImU32 text_color = query.empty()
+        ? IM_COL32(148, 156, 171, 235)
+        : IM_COL32(229, 233, 240, 255);
+    ImGui::GetWindowDrawList()->AddText(ImVec2(min.x + 34.0f, min.y + (height - ImGui::GetTextLineHeight()) * 0.5f),
+                                        text_color,
+                                        display);
 
-    if (activated) {
-        search_state.is_open = true;
-        search_state.focus_query = false;
-    }
-    if (submitted || edited) {
-        search_state.is_open = true;
-        search_state.search_pending = true;
-        search_state.last_input_change_at = std::chrono::steady_clock::now();
+    if ((activated || clicked) && search_palette_open_handler_) {
+        search_palette_open_handler_();
     }
 }
 
@@ -641,7 +623,7 @@ void FileExplorerPanel::show_breadcrumb_bar(FileExplorerState& state) {
     ImGui::PopStyleVar(2);
 }
 
-void FileExplorerPanel::show_command_toolbar(FileExplorerState& state, SearchState& search_state) {
+void FileExplorerPanel::show_command_toolbar(FileExplorerState& state) {
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(kCommandToolbarGap, 0.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 7.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f, 8.0f));
@@ -686,7 +668,7 @@ void FileExplorerPanel::show_command_toolbar(FileExplorerState& state, SearchSta
         show_path_control(state, path_width);
 
         ImGui::SameLine(0.0f, kCommandToolbarGap);
-        show_search_field(state, search_state, search_width);
+        show_search_field(state, search_width);
     }
     ImGui::EndChild();
 

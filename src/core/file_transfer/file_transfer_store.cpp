@@ -161,6 +161,12 @@ FileTransferStore& FileTransferStore::get() {
     return instance;
 }
 
+FileTransferStore::FileTransferStore() = default;
+
+FileTransferStore::~FileTransferStore() {
+    stop_worker();
+}
+
 bool FileTransferStore::initialize(std::string* error) {
     if (session_id_.empty()) {
         session_id_ = std::to_string(now_epoch_ms());
@@ -173,6 +179,7 @@ std::vector<FileTransferRecord> FileTransferStore::load_recent(std::size_t limit
     if (!initialize(error)) {
         return rows;
     }
+    flush();
 
     {
         auto guard = DB::get().acquire();
@@ -221,7 +228,7 @@ std::vector<FileTransferRecord> FileTransferStore::load_recent(std::size_t limit
         row.undoable = false;
         row.detail_message = "Misty closed before this transfer finished.";
         row.completed_at_ms = std::max(row.completed_at_ms, interrupted_at_ms);
-        if (!upsert(row, error)) {
+        if (!upsert_sync(row, error)) {
             if (error != nullptr && error->empty()) {
                 *error = "Failed to reconcile interrupted transfer history.";
             }
@@ -240,6 +247,11 @@ std::vector<FileTransferRecord> FileTransferStore::load_recent(std::size_t limit
 }
 
 bool FileTransferStore::upsert(const FileTransferRecord& record, std::string* error) {
+    flush();
+    return upsert_sync(record, error);
+}
+
+bool FileTransferStore::upsert_sync(const FileTransferRecord& record, std::string* error) {
     if (!initialize(error)) {
         return false;
     }
@@ -295,10 +307,15 @@ bool FileTransferStore::upsert(const FileTransferRecord& record, std::string* er
             return false;
         }
     }
-    return prune_history(500, error);
+    return prune_history_sync(500, error);
 }
 
 bool FileTransferStore::delete_completed(std::string* error) {
+    flush();
+    return delete_completed_sync(error);
+}
+
+bool FileTransferStore::delete_completed_sync(std::string* error) {
     if (!initialize(error)) {
         return false;
     }
@@ -307,6 +324,11 @@ bool FileTransferStore::delete_completed(std::string* error) {
 }
 
 bool FileTransferStore::delete_failed_like(std::string* error) {
+    flush();
+    return delete_failed_like_sync(error);
+}
+
+bool FileTransferStore::delete_failed_like_sync(std::string* error) {
     if (!initialize(error)) {
         return false;
     }
@@ -317,6 +339,11 @@ bool FileTransferStore::delete_failed_like(std::string* error) {
 }
 
 bool FileTransferStore::prune_history(std::size_t limit, std::string* error) {
+    flush();
+    return prune_history_sync(limit, error);
+}
+
+bool FileTransferStore::prune_history_sync(std::size_t limit, std::string* error) {
     if (!initialize(error)) {
         return false;
     }
@@ -347,6 +374,11 @@ bool FileTransferStore::prune_history(std::size_t limit, std::string* error) {
 }
 
 uint64_t FileTransferStore::next_transfer_id(std::string* error) {
+    flush();
+    return next_transfer_id_sync(error);
+}
+
+uint64_t FileTransferStore::next_transfer_id_sync(std::string* error) {
     if (!initialize(error)) {
         return 1;
     }
@@ -365,7 +397,123 @@ uint64_t FileTransferStore::next_transfer_id(std::string* error) {
     return static_cast<uint64_t>(stmt.column_int64(0));
 }
 
+void FileTransferStore::schedule_upsert(const FileTransferRecord& record) {
+    if (!initialize(nullptr)) {
+        return;
+    }
+    ensure_worker_started();
+    {
+        std::lock_guard<std::mutex> lock(queue_mu_);
+        pending_writes_.push_back(PendingWrite{.kind = PendingWriteKind::Upsert, .record = record});
+    }
+    queue_cv_.notify_one();
+}
+
+void FileTransferStore::schedule_delete_completed() {
+    if (!initialize(nullptr)) {
+        return;
+    }
+    ensure_worker_started();
+    {
+        std::lock_guard<std::mutex> lock(queue_mu_);
+        pending_writes_.push_back(PendingWrite{.kind = PendingWriteKind::DeleteCompleted});
+    }
+    queue_cv_.notify_one();
+}
+
+void FileTransferStore::schedule_delete_failed_like() {
+    if (!initialize(nullptr)) {
+        return;
+    }
+    ensure_worker_started();
+    {
+        std::lock_guard<std::mutex> lock(queue_mu_);
+        pending_writes_.push_back(PendingWrite{.kind = PendingWriteKind::DeleteFailedLike});
+    }
+    queue_cv_.notify_one();
+}
+
+void FileTransferStore::flush() {
+    std::unique_lock<std::mutex> lock(queue_mu_);
+    queue_cv_.wait(lock, [this]() {
+        return pending_writes_.empty() && !worker_busy_;
+    });
+}
+
+void FileTransferStore::ensure_worker_started() {
+    std::lock_guard<std::mutex> lock(queue_mu_);
+    if (worker_started_) {
+        return;
+    }
+    stop_worker_ = false;
+    worker_started_ = true;
+    worker_thread_ = std::thread([this]() { worker_loop(); });
+}
+
+void FileTransferStore::stop_worker() {
+    std::thread worker;
+    {
+        std::lock_guard<std::mutex> lock(queue_mu_);
+        if (!worker_started_) {
+            return;
+        }
+        stop_worker_ = true;
+        worker = std::move(worker_thread_);
+    }
+    queue_cv_.notify_all();
+    if (worker.joinable()) {
+        worker.join();
+    }
+    {
+        std::lock_guard<std::mutex> lock(queue_mu_);
+        worker_started_ = false;
+        stop_worker_ = false;
+        worker_busy_ = false;
+        pending_writes_.clear();
+    }
+}
+
+void FileTransferStore::worker_loop() {
+    while (true) {
+        PendingWrite work;
+        {
+            std::unique_lock<std::mutex> lock(queue_mu_);
+            queue_cv_.wait(lock, [this]() {
+                return stop_worker_ || !pending_writes_.empty();
+            });
+            if (stop_worker_ && pending_writes_.empty()) {
+                worker_busy_ = false;
+                queue_cv_.notify_all();
+                return;
+            }
+            work = std::move(pending_writes_.front());
+            pending_writes_.pop_front();
+            worker_busy_ = true;
+        }
+
+        switch (work.kind) {
+            case PendingWriteKind::Upsert:
+                upsert_sync(work.record, nullptr);
+                break;
+            case PendingWriteKind::DeleteCompleted:
+                delete_completed_sync(nullptr);
+                break;
+            case PendingWriteKind::DeleteFailedLike:
+                delete_failed_like_sync(nullptr);
+                break;
+        }
+
+        {
+            std::lock_guard<std::mutex> lock(queue_mu_);
+            worker_busy_ = false;
+        }
+        queue_cv_.notify_all();
+    }
+}
+
 void FileTransferStore::reset_for_testing() {
+    stop_worker();
+    flush();
     session_id_.clear();
 }
 

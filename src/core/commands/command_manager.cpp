@@ -114,6 +114,7 @@ const std::vector<DefaultCommandEntry>& default_command_entries() {
         {"search.confirm", "Enter"},
         {"search.prev", "Up"},
         {"search.next", "Down"},
+        {"explorer.open_palette", MISTY_PRIMARY_SHORTCUT "+P"},
         {"explorer.copy", MISTY_PRIMARY_SHORTCUT "+C"},
         {"explorer.cut", MISTY_PRIMARY_SHORTCUT "+X"},
         {"explorer.paste", MISTY_PRIMARY_SHORTCUT "+V"},

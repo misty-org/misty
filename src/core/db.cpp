@@ -266,7 +266,7 @@ bool DB::run_migrations_unlocked(std::string* error) {
         version = static_cast<int>(version_stmt.column_int64(0));
     }
 
-    if (version > 1) {
+    if (version > 2) {
         if (error != nullptr) {
             *error = "misty.db schema version is newer than this build supports.";
         }
@@ -274,7 +274,12 @@ bool DB::run_migrations_unlocked(std::string* error) {
     }
 
     if (version == 0) {
-        return exec_unlocked("PRAGMA user_version = 1", error);
+        version = 1;
+    }
+    if (version == 1) {
+        if (!exec_unlocked("PRAGMA user_version = 2", error)) {
+            return false;
+        }
     }
     return true;
 }

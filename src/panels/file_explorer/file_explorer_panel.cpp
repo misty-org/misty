@@ -96,9 +96,16 @@ FileExplorerPanel::FileExplorerPanel(StateRegistry& registry,
       registry_(registry),
       worker_pool_(worker_pool),
       state_key_(std::move(props.state_key)),
-      search_state_key_(state_key_ + "_Search"),
+      compare_owner_state_key_(std::move(props.compare_owner_state_key)),
       preview_panel_(std::make_unique<PreviewPanel>()),
-      owns_state_cleanup_(props.owns_state_cleanup) {
+      owns_state_cleanup_(props.owns_state_cleanup),
+      mode_(props.mode),
+      initial_compare_pair_id_(props.compare_pair_id),
+      initial_compare_watch_mode_(props.compare_watch_mode),
+      initial_compare_diff_tray_open_(props.compare_diff_tray_open) {
+    if (compare_owner_state_key_.empty() && mode_ == FileExplorerPanelMode::CompareSync) {
+        compare_owner_state_key_ = state_key_;
+    }
     registry_.get_state<FileExplorerState>(state_key_);
     auto& library = registry_.get_state<LibraryState>(kLibraryStateKey);
     registry_.get_state<FileListingsState>(kFileListingsStateKey).get_or_create(state_key_);
@@ -137,15 +144,6 @@ FileExplorerPanel::FileExplorerPanel(StateRegistry& registry,
         fs::create_directories(start_path, ec);
     }
 
-    search_panel_ = std::make_unique<SearchPanel>(registry_, worker_pool_, state_key_, search_state_key_);
-    search_panel_->set_navigation_handler([this](const std::string& path) {
-        if (auto* active_explorer = dynamic_cast<FileExplorerPanel*>(active_panel())) {
-            active_explorer->navigate_to_path(path, true, false);
-            return;
-        }
-        navigate_to_path(path, true, false);
-    });
-
     sidebar_panel_ = std::make_shared<FileSidebarPanel>(registry, worker_pool);
     sidebar_panel_->set_mount_path_provider([]() -> std::string {
         if (const char* home = std::getenv("HOME")) {
@@ -175,6 +173,14 @@ FileExplorerPanel::FileExplorerPanel(StateRegistry& registry,
     if (!props.defer_initial_navigation && !start_path.empty()) {
         navigate_to_path(start_path, false);
     }
+}
+
+void FileExplorerPanel::set_search_palette_state_provider(std::function<bool()> open_provider,
+                                                          std::function<std::string()> query_provider,
+                                                          std::function<void()> open_handler) {
+    search_palette_open_provider_ = std::move(open_provider);
+    search_palette_query_provider_ = std::move(query_provider);
+    search_palette_open_handler_ = std::move(open_handler);
 }
 
 FileExplorerPanel::~FileExplorerPanel() {

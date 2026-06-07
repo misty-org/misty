@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <mutex>
 #include <optional>
@@ -116,6 +117,7 @@ namespace misty::panel {
         ~ProvidersState() = default;
 
         void init(core::WorkerPool& pool);
+        void set_provider_added_callback(std::function<void()> callback);
 
         void set_search_query(const std::string& query);
         std::string search_query() const;
@@ -172,6 +174,7 @@ namespace misty::panel {
         void rebuild_health_card_locked();
         std::optional<ProviderWorkflow> workflow_for_type_locked(const std::string& provider_type) const;
         void reset_add_provider_session_locked();
+        std::function<void()> provider_added_callback_locked() const;
 
         core::WorkerPool* worker_pool_ = nullptr;
         std::vector<ProviderCard> provider_cards;
@@ -179,6 +182,7 @@ namespace misty::panel {
         std::vector<ProviderRemote> remotes_;
         std::map<std::string, ProviderRemoteStatus> remote_statuses_;
         ActiveProviderConfigSession add_provider_session_;
+        std::function<void()> provider_added_callback_;
         bool proxy_ready_ = false;
         std::string proxy_error_;
         std::string search_query_;
