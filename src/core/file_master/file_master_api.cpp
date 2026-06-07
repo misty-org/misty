@@ -297,6 +297,13 @@ HttpResponse rename_remote_call(const FileMasterProps& props, RemoteJobProgressC
     const std::string proxy_service_url = proxy_url();
     if (proxy_service_url.empty()) return proxy_config_error();
 
+    if (props.source_is_dir) {
+        return start_remote_json_job(
+            proxy_service_url + "/api/remote/file/move",
+            remote_transfer_body(props),
+            std::move(progress_callback));
+    }
+
     return start_remote_json_job(
         proxy_service_url + "/api/remote/file/rename",
         build_json_object({
@@ -403,7 +410,7 @@ HttpResponse upload_remote_call(const FileMasterProps& props,
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 0L);
 
     struct curl_slist* headers = nullptr;
-    if (auto token = ProxyTokenStore::get().current_access_token(); token && !token->empty()) {
+    if (auto token = ProxyTokenStore::get().current_or_refresh_access_token(); token && !token->empty()) {
         const std::string header = "Authorization: Bearer " + *token;
         headers = curl_slist_append(headers, header.c_str());
     }

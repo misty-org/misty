@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cctype>
 #include <filesystem>
+#include <system_error>
 #include <thread>
 #include <string>
 #include <vector>
@@ -33,8 +34,6 @@ constexpr const char* kProxyBinaryName = "misty-proxy";
 #endif
 
 constexpr auto kProxyProbeRetryInterval = std::chrono::seconds(2);
-constexpr int kProxyUnavailablePromptIntervals = 4;
-
 bool is_local_proxy_url(const std::string& url) {
     return url.rfind("http://127.0.0.1", 0) == 0 ||
            url.rfind("http://localhost", 0) == 0 ||
@@ -94,6 +93,20 @@ int run_blocking_process(const std::string& executable, const std::vector<std::s
 }
 #endif
 
+fs::path misty_log_path(const std::string& filename) {
+    const std::string home_dir = EnvManager::get().get_user_home_dir();
+    if (home_dir.empty()) {
+        return {};
+    }
+    fs::path log_dir = fs::path(home_dir) / ".misty" / "logs";
+    std::error_code ec;
+    fs::create_directories(log_dir, ec);
+    if (ec) {
+        return {};
+    }
+    return log_dir / filename;
+}
+
 } // namespace
 
 ProxyManager& ProxyManager::get() {
@@ -117,46 +130,12 @@ bool ProxyManager::probe_proxy_once(bool force) const {
         }
         last_probe_attempt_ = now;
     }
-    return HTTPClient::get().probe_proxy();
-}
-
-void ProxyManager::record_proxy_request_result(bool available, const std::string& message) {
-    const auto now = std::chrono::steady_clock::now();
-    std::lock_guard<std::mutex> lock(mu_);
-
-    last_known_available_ = available;
-    if (available) {
-        consecutive_probe_failures_ = 0;
-        last_failure_recorded_at_ = std::chrono::steady_clock::time_point{};
-        proxy_status_message_.clear();
-        return;
+    const bool available = HTTPClient::get().probe_proxy();
+    {
+        std::lock_guard<std::mutex> lock(mu_);
+        last_known_available_ = available;
     }
-
-    if (last_failure_recorded_at_.time_since_epoch().count() != 0 &&
-        now - last_failure_recorded_at_ < kProxyProbeRetryInterval) {
-        return;
-    }
-
-    last_failure_recorded_at_ = now;
-    ++consecutive_probe_failures_;
-    if (consecutive_probe_failures_ < kProxyUnavailablePromptIntervals) {
-        return;
-    }
-
-    proxy_status_message_ =
-        message.empty()
-            ? "Misty background service is unavailable. Local files remain available, but cloud and sync features are paused."
-            : message;
-}
-
-bool ProxyManager::is_proxy_available() const {
-    std::lock_guard<std::mutex> lock(mu_);
-    return last_known_available_;
-}
-
-std::string ProxyManager::get_proxy_status_message() const {
-    std::lock_guard<std::mutex> lock(mu_);
-    return proxy_status_message_;
+    return available;
 }
 
 bool ProxyManager::ensure_running(bool force) {
@@ -264,7 +243,13 @@ bool ProxyManager::launch_proxy_process() {
     }
 
     const fs::path proxy_path(proxy_executable);
-    return launch_detached_process(proxy_path.string(), {}, proxy_path.parent_path().string());
+    const fs::path proxy_log_path = misty_log_path("misty-proxy.log");
+    return launch_detached_process(
+        proxy_path.string(),
+        {},
+        proxy_path.parent_path().string(),
+        proxy_log_path.empty() ? std::string() : proxy_log_path.string(),
+        proxy_log_path.empty() ? std::string() : proxy_log_path.string());
 }
 
 bool ProxyManager::terminate_existing_proxies(const std::string& proxy_executable) const {

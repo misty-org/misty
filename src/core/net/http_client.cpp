@@ -162,7 +162,7 @@ namespace misty::core {
             auto merged_headers = headers;
             const bool protected_proxy_request = should_attach_proxy_auth(url);
             if (protected_proxy_request) {
-                if (auto token = ProxyTokenStore::get().current_access_token(); token && !token->empty()) {
+                if (auto token = ProxyTokenStore::get().current_or_refresh_access_token(); token && !token->empty()) {
                     merged_headers["Authorization"] = "Bearer " + *token;
                 } else {
                     merged_headers.erase("Authorization");
@@ -350,16 +350,6 @@ namespace misty::core {
         return is_proxy_request(url);
     }
 
-    void HTTPClient::update_proxy_status(const std::string& url, int status_code) {
-        if (!is_proxy_url(url)) return;
-
-        if (status_code == 0) {
-            ProxyManager::get().record_proxy_request_result(false);
-        } else {
-            ProxyManager::get().record_proxy_request_result(true);
-        }
-    }
-
     HttpResponse HTTPClient::get(const std::string& url, const HttpRequestOptions& options) {
         return perform_request("GET", url, "", options);
     }
@@ -420,10 +410,13 @@ namespace misty::core {
 
         HttpResponse response = execute_stream_request(merged_headers);
         if (response.status_code == 0 && is_proxy_url(url) && ProxyManager::get().ensure_running()) {
+            merged_headers = merge_auth_headers(url, options);
             response = execute_stream_request(merged_headers);
         }
-        update_proxy_status(url, response.status_code);
-
+        if (response.status_code == 401 && should_attach_proxy_auth(url) &&
+            ProxyTokenStore::get().refresh_access_token()) {
+            response = execute_stream_request(merge_auth_headers(url, options));
+        }
         return response;
     }
 
@@ -633,13 +626,19 @@ namespace misty::core {
             options.timeouts.connect_timeout_seconds,
             options.timeouts.total_timeout_seconds);
         if (response.status_code == 0 && is_proxy_url(url) && ProxyManager::get().ensure_running()) {
+            merged_headers = merge_auth_headers(url, options);
             response = execute_curl_request(
                 method, url, body, merged_headers,
                 options.timeouts.connect_timeout_seconds,
                 options.timeouts.total_timeout_seconds);
         }
-        update_proxy_status(url, response.status_code);
-
+        if (response.status_code == 401 && should_attach_proxy_auth(url) &&
+            ProxyTokenStore::get().refresh_access_token()) {
+            response = execute_curl_request(
+                method, url, body, merge_auth_headers(url, options),
+                options.timeouts.connect_timeout_seconds,
+                options.timeouts.total_timeout_seconds);
+        }
         return response;
     }
 
@@ -800,22 +799,23 @@ namespace misty::core {
 
         DownloadResult result = execute_curl_download(url, local_path, merged_headers, progress_cb);
         if (result.final_status_code == 0 && is_proxy_url(url) && ProxyManager::get().ensure_running()) {
+            merged_headers = merge_auth_headers(url, headers);
             result = execute_curl_download(url, local_path, merged_headers, progress_cb);
         }
-        update_proxy_status(url, result.final_status_code);
-
+        if (result.final_status_code == 401 && should_attach_proxy_auth(url) &&
+            ProxyTokenStore::get().refresh_access_token()) {
+            result = execute_curl_download(url, local_path, merge_auth_headers(url, headers), progress_cb);
+        }
         return result;
     }
 
     bool HTTPClient::probe_proxy() {
         std::string proxy_url = EnvManager::get().get("PROXY_SERVICE_URL", "");
         if (proxy_url.empty()) {
-            ProxyManager::get().record_proxy_request_result(false, "PROXY_SERVICE_URL is not configured.");
             return false;
         }
 
         HttpResponse response = execute_curl_request("GET", proxy_url + "/api/health", "", {}, 10L, 30L);
-        update_proxy_status(proxy_url + "/api/health", response.status_code);
         return response.status_code >= 200 && response.status_code < 300;
     }
 

@@ -11,7 +11,7 @@ namespace misty::view {
             const char* home = std::getenv("HOME");
             if (!home || *home == '\0') return;
             namespace fs = std::filesystem;
-            const fs::path path = fs::path(home) / ".misty" / ".cache" / "misty-view.log";
+            const fs::path path = fs::path(home) / ".misty" / "logs" / "misty.log";
             std::error_code ec;
             fs::create_directories(path.parent_path(), ec);
             std::ofstream f(path, std::ios::app);

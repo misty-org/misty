@@ -219,19 +219,6 @@ namespace {
         return std::string(config) + " build on " + platform;
     }
 
-    std::string proxy_status_label() {
-        auto& proxy = misty::core::ProxyManager::get();
-        if (proxy.is_proxy_available()) {
-            return "Running";
-        }
-
-        const std::string message = proxy.get_proxy_status_message();
-        if (message.empty()) {
-            return "Unavailable";
-        }
-        return "Unavailable: " + message;
-    }
-
     std::string config_path_label() {
         const std::string home = misty::core::EnvManager::get().get_user_home_dir();
         if (home.empty()) {
@@ -451,23 +438,6 @@ namespace {
             .title_color = kHeaderTextColor,
             .divider_color = kDividerColor,
         }, [&]() {
-            misty::panel::settings_row("##general_system_proxy_status", {
-                .start_width_pct = 0.52f,
-                .divider_color = kDividerColor,
-            }, [&]() {
-                row_text("Proxy status", "Shows whether the local Misty proxy is currently reachable.");
-            }, [&]() {
-                const std::string status = proxy_status_label();
-                UI::text({
-                    .text = status.c_str(),
-                    .width = UI::Size::auto_size(),
-                    .align = UI::Align::End,
-                    .color = misty::core::ProxyManager::get().is_proxy_available()
-                        ? kSuccessTextColor
-                        : kHeaderTextColor,
-                });
-            });
-
             copyable_value_row(
                 "##general_system_proxy_url",
                 "Proxy URL",

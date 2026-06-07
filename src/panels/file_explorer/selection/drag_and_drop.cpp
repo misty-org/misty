@@ -121,6 +121,11 @@ void FileExplorerPanel::begin_file_drag_source(FileExplorerState& state,
         ui.selected_files.insert(file.id);
         ui.last_selected_index = index;
         state.selected_files = ui.selected_files;
+        const std::string current_path(state.current_path);
+        if (!current_path.empty()) {
+            state.selected_files_by_path[current_path] = state.selected_files;
+            state.last_selected_index_by_path[current_path] = ui.last_selected_index;
+        }
     }
 
     std::vector<std::string> selected_ids;

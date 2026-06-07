@@ -12,9 +12,6 @@ public:
 
     bool ensure_running(bool force = false);
     bool restart_proxy();
-    void record_proxy_request_result(bool available, const std::string& message = "");
-    bool is_proxy_available() const;
-    std::string get_proxy_status_message() const;
 
 private:
     ProxyManager() = default;
@@ -32,10 +29,7 @@ private:
     mutable std::mutex mu_;
     std::chrono::steady_clock::time_point last_launch_attempt_{};
     mutable std::chrono::steady_clock::time_point last_probe_attempt_{};
-    std::chrono::steady_clock::time_point last_failure_recorded_at_{};
-    int consecutive_probe_failures_ = 0;
-    bool last_known_available_ = true;
-    std::string proxy_status_message_;
+    mutable bool last_known_available_ = true;
 };
 
 } // namespace misty::core

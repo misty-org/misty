@@ -4,6 +4,7 @@
 #include "core/manager/proxy_manager.h"
 #include "core/manager/env_manager.h"
 #include "core/manager/font_manager.h"
+#include "core/file_transfer/file_transfer.h"
 #include "views/files_view.h"
 #include "views/providers_view.h"
 #include "views/dock_view.h"
@@ -13,6 +14,8 @@
 #include "panels/file_explorer/state/file_explorer_state.h"
 #include "panels/file_explorer/state/library_state.h"
 #include "panels/file_explorer/operations/file_master_operations.h"
+#include "panels/file_explorer/operations/file_operation_jobs.h"
+#include "panels/file_explorer/operations/operation_queue_state.h"
 #include "panels/navbar/navbar_state.h"
 #include "panels/settings/settings_state.h"
 
@@ -43,7 +46,7 @@ void append_startup_log(const std::string& line) {
     const char* home = std::getenv("HOME");
     if (!home || *home == '\0') return;
     namespace fs = std::filesystem;
-    const fs::path path = fs::path(home) / ".misty" / ".cache" / "misty-client.log";
+    const fs::path path = fs::path(home) / ".misty" / "logs" / "misty.log";
     std::error_code ec;
     fs::create_directories(path.parent_path(), ec);
     std::ofstream f(path, std::ios::app);
@@ -64,6 +67,7 @@ namespace misty {
     }
 
     void Application::run() {
+        auto& transfer_state = state_registry_.get_state<core::FileTransfer>("FileMasterTransfers");
         try {
             append_startup_log("startup: begin");
             init_platform();
@@ -95,10 +99,27 @@ namespace misty {
             return;
         }
         std::cout << "Entering main loop." << std::endl;
-            append_startup_log("startup: entering main loop");
+        bool transfer_hydration_applied = false;
+        bool transfer_hydration_started = false;
+        append_startup_log("startup: entering main loop");
         while (is_running()) {
             core::FontManager::get().apply_pending_reload();
             prepare_frame();
+
+            if (transfer_hydration_started && !transfer_hydration_applied) {
+                std::string hydration_error;
+                if (transfer_state.poll_background_hydration(&hydration_error)) {
+                    if (!hydration_error.empty()) {
+                        append_startup_log("startup: transfer persistence hydration failed: " + hydration_error);
+                    } else {
+                        panel::rehydrate_persisted_undo_records(state_registry_);
+                        panel::rehydrate_persisted_retry_operations(state_registry_);
+                        panel::seed_file_operation_job_ids(state_registry_);
+                        append_startup_log("startup: transfer persistence hydrated");
+                    }
+                    transfer_hydration_applied = true;
+                }
+            }
 
             if (core::CommandManager::get().matches("app.toggle_transfers")) {
                 state_registry_.get_state<panel::NavbarState>("Navbar").selected_item = view::ViewID::Transfers;
@@ -119,6 +140,11 @@ namespace misty {
                 frame_pacer_.render_debug_overlay();
             }
             render_frame();
+            if (!transfer_hydration_started) {
+                transfer_state.start_background_hydration(nullptr);
+                transfer_hydration_started = true;
+                append_startup_log("startup: transfer persistence hydration started");
+            }
         }
         persist_file_explorer_state();
 
@@ -175,7 +201,7 @@ namespace misty {
         });
         view::register_view_factory(view::ViewID::Transfers, [this]() {
             append_startup_log("startup: transfers view instantiated");
-            return std::make_unique<view::TransfersView>(state_registry_);
+            return std::make_unique<view::TransfersView>(state_registry_, worker_pool_);
         });
         // ActivityView removed — Activity is now a modal panel in the navbar
         view::register_view_factory(view::ViewID::Settings, [this]() {
