@@ -16,6 +16,7 @@ struct SearchState : public core::StateEntry {
 
     char query_buf[2048] = "";
     std::vector<SearchResult> results;
+    std::string context_path;
     bool is_open = false;
     bool focus_query = false;
     int selected_index = 0;

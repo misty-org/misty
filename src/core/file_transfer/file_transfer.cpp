@@ -15,6 +15,10 @@ int64_t now_epoch_ms() {
 
 }  // namespace
 
+FileTransfer::~FileTransfer() {
+    stop_background_hydration();
+}
+
 bool FileTransferRecord::is_alive() const {
     if (!error_message.empty() ||
         status == FileTransferStatus::Failed ||
@@ -48,6 +52,111 @@ bool FileTransfer::initialize_persistence(std::string* error) {
         return false;
     }
     hydrate_persisted_rows(std::move(rows), next_id);
+    return true;
+}
+
+bool FileTransfer::initialize_persistence_metadata(std::string* error) {
+    auto& store = FileTransferStore::get();
+    if (!store.initialize(error)) {
+        return false;
+    }
+
+    std::string local_error;
+    std::string* effective_error = error != nullptr ? error : &local_error;
+    effective_error->clear();
+    const uint64_t next_id = store.next_transfer_id(effective_error);
+    if (!effective_error->empty()) {
+        return false;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(mu_);
+        next_id_.store(std::max<uint64_t>(next_id, 1), std::memory_order_relaxed);
+        persistence_enabled_ = true;
+    }
+    return true;
+}
+
+bool FileTransfer::start_background_hydration(std::string* error) {
+    {
+        std::lock_guard<std::mutex> lock(mu_);
+        // Reserve a high local ID range immediately so startup never waits on sqlite
+        // just to avoid collisions with persisted transfer rows.
+        const uint64_t reserved_floor =
+            std::max<uint64_t>(static_cast<uint64_t>(std::max<int64_t>(now_epoch_ms(), 1)) * 1000ULL, 1ULL);
+        next_id_.store(std::max(next_id_.load(std::memory_order_relaxed), reserved_floor),
+                       std::memory_order_relaxed);
+        persistence_enabled_ = true;
+    }
+
+    std::lock_guard<std::mutex> lock(hydration_mu_);
+    if (hydration_started_ || hydration_in_flight_) {
+        return true;
+    }
+
+    hydration_error_.clear();
+    hydration_failed_ = false;
+    hydration_ready_ = false;
+    hydration_started_ = true;
+    hydration_in_flight_ = true;
+    hydration_thread_ = std::thread([this]() {
+        std::string local_error;
+        auto rows = FileTransferStore::get().load_recent(kMaxHistory, &local_error);
+        uint64_t next_id = 1;
+        if (local_error.empty()) {
+            next_id = FileTransferStore::get().next_transfer_id(&local_error);
+        }
+        std::lock_guard<std::mutex> hydration_lock(hydration_mu_);
+        hydration_in_flight_ = false;
+        hydration_failed_ = !local_error.empty();
+        hydration_error_ = std::move(local_error);
+        pending_hydrated_rows_ = std::move(rows);
+        pending_hydrated_next_id_ = next_id;
+        hydration_ready_ = true;
+    });
+    if (error != nullptr) {
+        error->clear();
+    }
+    return true;
+}
+
+bool FileTransfer::poll_background_hydration(std::string* error) {
+    bool ready = false;
+    bool failed = false;
+    std::string local_error;
+    std::vector<FileTransferRecord> rows;
+    uint64_t next_id = 1;
+    {
+        std::lock_guard<std::mutex> lock(hydration_mu_);
+        if (!hydration_ready_) {
+            return false;
+        }
+        ready = true;
+        failed = hydration_failed_;
+        local_error = hydration_error_;
+        rows = std::move(pending_hydrated_rows_);
+        next_id = pending_hydrated_next_id_;
+        hydration_ready_ = false;
+    }
+
+    if (hydration_thread_.joinable()) {
+        hydration_thread_.join();
+    }
+
+    if (!ready) {
+        return false;
+    }
+    if (failed) {
+        if (error != nullptr) {
+            *error = local_error;
+        }
+        return true;
+    }
+
+    merge_persisted_rows(std::move(rows), next_id);
+    if (error != nullptr) {
+        error->clear();
+    }
     return true;
 }
 
@@ -354,7 +463,7 @@ void FileTransfer::clear_completed() {
         should_delete_persisted = persistence_enabled_;
     }
     if (should_delete_persisted) {
-        FileTransferStore::get().delete_completed(nullptr);
+        FileTransferStore::get().schedule_delete_completed();
     }
 }
 
@@ -383,7 +492,7 @@ void FileTransfer::clear_failed() {
         should_delete_persisted = persistence_enabled_;
     }
     if (should_delete_persisted) {
-        FileTransferStore::get().delete_failed_like(nullptr);
+        FileTransferStore::get().schedule_delete_failed_like();
     }
 }
 
@@ -443,7 +552,7 @@ void FileTransfer::persist_record_if_enabled(const FileTransferRecord& record) {
     if (!persistence_enabled_) {
         return;
     }
-    FileTransferStore::get().upsert(record, nullptr);
+    FileTransferStore::get().schedule_upsert(record);
 }
 
 void FileTransfer::hydrate_persisted_rows(std::vector<FileTransferRecord> rows, uint64_t next_id) {
@@ -459,6 +568,47 @@ void FileTransfer::hydrate_persisted_rows(std::vector<FileTransferRecord> rows, 
 
     next_id_.store(std::max<uint64_t>(next_id, 1), std::memory_order_relaxed);
     persistence_enabled_ = true;
+}
+
+void FileTransfer::merge_persisted_rows(std::vector<FileTransferRecord> rows, uint64_t next_id) {
+    std::lock_guard<std::mutex> lock(mu_);
+    for (auto& row : rows) {
+        if (transfers_.contains(row.id)) {
+            continue;
+        }
+        transfer_order_.push_back(row.id);
+        transfers_[row.id] = std::move(row);
+    }
+
+    std::sort(transfer_order_.begin(), transfer_order_.end(), [this](uint64_t lhs_id, uint64_t rhs_id) {
+        const auto lhs_it = transfers_.find(lhs_id);
+        const auto rhs_it = transfers_.find(rhs_id);
+        if (lhs_it == transfers_.end() || rhs_it == transfers_.end()) {
+            return lhs_id < rhs_id;
+        }
+        const auto& lhs = lhs_it->second;
+        const auto& rhs = rhs_it->second;
+        if (lhs.queued_at_ms != rhs.queued_at_ms) {
+            return lhs.queued_at_ms < rhs.queued_at_ms;
+        }
+        return lhs.id < rhs.id;
+    });
+    next_id_.store(std::max(next_id_.load(std::memory_order_relaxed), std::max<uint64_t>(next_id, 1)),
+                   std::memory_order_relaxed);
+    persistence_enabled_ = true;
+}
+
+void FileTransfer::stop_background_hydration() {
+    std::thread worker;
+    {
+        std::lock_guard<std::mutex> lock(hydration_mu_);
+        worker = std::move(hydration_thread_);
+        hydration_in_flight_ = false;
+        hydration_ready_ = false;
+    }
+    if (worker.joinable()) {
+        worker.join();
+    }
 }
 
 void FileTransfer::trim_history() {

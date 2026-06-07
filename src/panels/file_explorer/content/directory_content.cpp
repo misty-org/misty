@@ -16,7 +16,7 @@ namespace misty::panel {
 namespace {
 
 constexpr float kFileRowContentPaddingX = 8.0f;
-constexpr float kFirstHeaderTextPaddingX = 8.0f;
+constexpr float kHeaderTextPaddingX = 14.0f;
 constexpr float kDirectoryTablePaddingX = 2.0f;
 constexpr float kNameColumnWidth = 220.0f;
 constexpr float kModifiedColumnWidth = 220.0f;
@@ -25,6 +25,8 @@ constexpr float kTypeColumnWidth = 128.0f;
 constexpr ImVec2 kTableCellPadding = ImVec2(8.0f, 2.0f);
 constexpr float kTableMinInnerWidth =
     kNameColumnWidth + kModifiedColumnWidth + kSizeColumnWidth + kTypeColumnWidth;
+constexpr ImVec4 kDirectoryHeaderBorder = ImVec4(0.22f, 0.23f, 0.27f, 0.90f);
+constexpr ImVec4 kTransparentBorder = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
 
 
 constexpr UI::Spacing kGridCardPadding = UI::Spacing::sides(5.0f, 5.0f, 10.0f, 0.0f);
@@ -126,7 +128,8 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state, FileLi
     // cross-panel hover/selection collisions.
     ImGui::PushID(state_key_.c_str());
 
-    if (ui.grid_view) {
+    const bool grid_view_enabled = ui.grid_view;
+    if (grid_view_enabled) {
         const float cell_w = 100.0f;
         const float cell_h = 104.0f;
         const float padding = 8.0f;
@@ -178,17 +181,19 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state, FileLi
         ImGui::PopStyleVar();
     } else {
         const float table_width = std::max(0.0f, content_width - kDirectoryTablePaddingX * 2.0f);
-        const float table_inner_width = std::max(table_width, kTableMinInnerWidth);
+        const float table_min_inner_width = kTableMinInnerWidth;
+        const float table_inner_width = std::max(table_width, table_min_inner_width);
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + kDirectoryTablePaddingX);
+        std::vector<UI::Layout::TableColumnProps> columns = {
+            {"Name", 1.0f,
+             ImGuiTableColumnFlags_WidthStretch | ImGuiTableColumnFlags_DefaultSort,
+             kHeaderTextPaddingX},
+            {"Modified", kModifiedColumnWidth, ImGuiTableColumnFlags_WidthFixed, kHeaderTextPaddingX},
+            {"Size", kSizeColumnWidth, ImGuiTableColumnFlags_WidthFixed, kHeaderTextPaddingX},
+            {"Type", kTypeColumnWidth, ImGuiTableColumnFlags_WidthFixed, kHeaderTextPaddingX},
+        };
         UI::table("FileTable", {
-            .columns = {
-                {"Name", 1.0f,
-                 ImGuiTableColumnFlags_WidthStretch | ImGuiTableColumnFlags_DefaultSort,
-                 kFirstHeaderTextPaddingX},
-                {"Modified", kModifiedColumnWidth, ImGuiTableColumnFlags_WidthFixed},
-                {"Size", kSizeColumnWidth, ImGuiTableColumnFlags_WidthFixed},
-                {"Type", kTypeColumnWidth, ImGuiTableColumnFlags_WidthFixed},
-            },
+            .columns = std::move(columns),
             .width = UI::Size::px(table_width),
             .inner_width = table_inner_width,
             .cell_padding = kTableCellPadding,
@@ -197,6 +202,13 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state, FileLi
             .header_color = ImVec4(0.45f, 0.45f, 0.45f, 0.35f),
             .header_hovered_color = ImVec4(0.45f, 0.45f, 0.45f, 0.35f),
             .header_active_color = ImVec4(0.45f, 0.45f, 0.45f, 0.45f),
+            .override_table_border_light = true,
+            .table_border_light_color = kTransparentBorder,
+            .override_table_border_strong = true,
+            .table_border_strong_color = kTransparentBorder,
+            .draw_header_separators = true,
+            .header_separator_color = kDirectoryHeaderBorder,
+            .header_bottom_border_color = kDirectoryHeaderBorder,
         }, [&](ImGuiTableSortSpecs* sorts_specs) {
             if (sorts_specs != nullptr) {
                 if (sorts_specs->SpecsDirty || listing.sort_dirty) {
@@ -434,7 +446,6 @@ void FileExplorerPanel::show_file_item(FileExplorerState& state, FileListing& li
     } else {
         ImGui::TextUnformatted(file.name.c_str());
     }
-
     ImGui::TableNextColumn();
     ImGui::SetCursorPosY(ImGui::GetCursorPosY() + text_y_offset);
     if (!file.last_modified.empty()) ImGui::Text("%s", display_last_modified(file.last_modified).c_str());

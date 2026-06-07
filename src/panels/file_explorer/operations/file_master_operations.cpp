@@ -222,12 +222,14 @@ bool rename_file_master_item(core::WorkerPool& worker_pool,
         auto props = local_file_master_props_for(item, sibling_path_for_name(item.path, new_name));
         props.job_id = job_id;
         props.transfer_id = transfer_id;
+        props.source_is_dir = item.is_dir;
         file_master.rename(props, std::move(callback));
         return true;
     } else if (is_remote_file_master_item(item)) {
         core::FileMasterProps props = remote_file_master_props_for(item);
         props.job_id = job_id;
         props.transfer_id = transfer_id;
+        props.source_is_dir = item.is_dir;
         props.remote_dest = props.remote_source;
         props.remote_dest.remote_path = sibling_path_for_name(item.sync_remote_path, new_name);
         core::FileMasterRemote file_master(file_transfer_worker_pool(), &transfers);

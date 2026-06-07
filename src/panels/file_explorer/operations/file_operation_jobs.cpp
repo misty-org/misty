@@ -1,5 +1,6 @@
 #include "panels/file_explorer/operations/file_operation_jobs.h"
 
+#include <algorithm>
 #include <utility>
 
 namespace misty::panel {
@@ -37,6 +38,17 @@ FileOperationJobs& jobs_state(core::StateRegistry& registry) {
 }
 
 }  // namespace
+
+void FileOperationJobs::seed_next_job_id(uint64_t next_job_id) {
+    if (next_job_id == 0) {
+        next_job_id = 1;
+    }
+
+    uint64_t current = next_job_id_.load(std::memory_order_relaxed);
+    while (current < next_job_id &&
+           !next_job_id_.compare_exchange_weak(current, next_job_id, std::memory_order_relaxed)) {
+    }
+}
 
 uint64_t FileOperationJobs::begin_job(NotificationState& notifications, const std::string& operation_label) {
     const uint64_t job_id = next_job_id_.fetch_add(1);
@@ -148,6 +160,14 @@ void FileOperationJobs::complete_if_ready_locked(NotificationState& notification
 uint64_t begin_file_operation_job(core::StateRegistry& registry,
                                   const std::string& operation_label) {
     return jobs_state(registry).begin_job(notification_state(registry), operation_label);
+}
+
+void seed_file_operation_job_ids(core::StateRegistry& registry) {
+    uint64_t max_job_id = 0;
+    for (const auto& row : registry.get_state<core::FileTransfer>("FileMasterTransfers").get_all_transfers()) {
+        max_job_id = std::max(max_job_id, row.job_id);
+    }
+    jobs_state(registry).seed_next_job_id(max_job_id + 1);
 }
 
 void add_file_operation_to_job(core::StateRegistry& registry, uint64_t job_id) {

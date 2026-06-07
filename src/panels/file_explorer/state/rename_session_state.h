@@ -61,13 +61,9 @@ struct RenameSessionState : public core::StateEntry {
     bool active = false;
     bool review_modal_open = false;
     bool focus_requested = false;
-    bool job_banner_active = false;
     int shared_cursor_pos = 0;
     float shared_cursor_anim = 0.0f;
-    std::size_t job_banner_item_count = 0;
-    uint64_t job_banner_job_id = 0;
     std::string focus_key;
-    std::string job_banner_text;
     std::unordered_map<std::string, RenameParticipant> participants;
     std::vector<std::string> participant_order;
     std::uint64_t next_added_order = 1;

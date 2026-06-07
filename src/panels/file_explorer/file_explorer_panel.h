@@ -5,11 +5,13 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <unordered_set>
 #include <vector>
 
 #include "core/file_transfer/file_transfer.h"
+#include "core/file_sync/file_sync_compare.h"
 #include "core/file_sync/file_sync_master.h"
 #include "core/threading/worker_pool.h"
 #include "core/ui/state_registry.h"
@@ -17,17 +19,21 @@
 #include "panels/file_explorer/state/clipboard_state.h"
 #include "panels/file_explorer/state/file_explorer_state.h"
 #include "panels/file_explorer/state/file_listings_state.h"
+#include "panels/file_explorer/state/file_sync_compare_state.h"
 #include "panels/file_explorer/state/library_state.h"
 #include "panels/file_explorer/state/rename_session_state.h"
 #include "panels/file_explorer/navigation/toolbar_util.h"
 #include "panels/panel/multi_panel.h"
 #include "panels/preview/preview_panel.h"
-#include "panels/search/search_panel.h"
-#include "panels/search/search_state.h"
 
 namespace misty::panel {
 
 class FileTreeMultiPanel;
+
+enum class FileExplorerPanelMode {
+    Standard,
+    CompareSync,
+};
 
 /**
  * @brief Construction options for a file explorer panel instance.
@@ -39,6 +45,11 @@ struct FileExplorerPanelProps {
     std::string initial_path_override;
     bool defer_initial_navigation = false;
     bool owns_state_cleanup = false;
+    FileExplorerPanelMode mode = FileExplorerPanelMode::Standard;
+    std::string compare_owner_state_key;
+    std::int64_t compare_pair_id = 0;
+    bool compare_watch_mode = false;
+    bool compare_diff_tray_open = false;
 };
 
 /**
@@ -93,6 +104,7 @@ public:
         bool path_bar_focus = false;
         float path_bar_scroll_x = 0.0f;
         bool path_bar_scroll_to_end = false;
+        char compare_pair_name_buffer[128] = "";
 
         void clear_transient();
     };
@@ -157,9 +169,34 @@ public:
      */
     void render_active_toolbar();
     /**
+     * @brief Renders the compare-mode controls above the pane content.
+     */
+    void render_compare_header();
+    /**
+     * @brief Renders the compare diff tray above the bottom bar.
+     */
+    void render_compare_diff_tray();
+    /**
      * @brief Returns the fixed shell toolbar height.
      */
     float toolbar_height() const;
+    /**
+     * @brief Returns the dedicated compare header height for compare tabs.
+     */
+    float compare_header_height() const;
+    /**
+     * @brief Returns the dedicated compare diff tray height for compare tabs.
+     */
+    float compare_diff_tray_height() const;
+    /**
+     * @brief Returns the explorer panel mode for the current top-level tab.
+     */
+    FileExplorerPanelMode mode() const;
+    bool is_compare_mode() const;
+    bool compare_diff_tray_open() const;
+    void set_compare_diff_tray_open(bool open);
+    std::int64_t compare_pair_id() const;
+    bool compare_watch_mode() const;
     /**
      * @brief Returns the second toolbar row bounds used for centered transient notifications.
      */
@@ -188,6 +225,10 @@ public:
      * @brief Navigates the explorer to a local, virtual, or remote path.
      */
     void navigate_to_path(const std::string& path, bool update_history = true, bool create_if_missing = true);
+    void set_search_palette_state_provider(std::function<bool()> open_provider,
+                                           std::function<std::string()> query_provider,
+                                           std::function<void()> open_handler);
+    bool execute_palette_command(const std::string& command_id);
 
 private:
     /**
@@ -234,6 +275,33 @@ private:
      * @brief Builds contextual text for the chat overlay from the current explorer state.
      */
     std::string build_chat_context(const TransientUiState& ui) const;
+    const std::string& compare_state_scope_key() const;
+    bool is_compare_context() const;
+    void ensure_compare_state_initialized();
+    std::vector<FileExplorerPanel*> compare_child_panels() const;
+    std::optional<std::pair<FileExplorerPanel*, FileExplorerPanel*>> compare_child_panel_pair() const;
+    std::optional<std::pair<core::FileSyncEndpoint, core::FileSyncEndpoint>> compare_current_endpoints() const;
+    std::pair<std::string, std::string> compare_display_paths() const;
+    bool set_compare_roots(const core::FileSyncEndpoint& left, const core::FileSyncEndpoint& right);
+    bool swap_compare_roots();
+    void sync_compare_state_from_panes();
+    void ensure_compare_dual_pane();
+    bool compare_row_snapshot_for_file(const panel::FileExplorerState& state,
+                                       const panel::FileItem& file,
+                                       core::FileSyncCompareRow* out,
+                                       bool* is_left_side = nullptr) const;
+    void set_compare_row_action(const std::string& relative_path,
+                                core::FileSyncPlannedAction action);
+    void apply_compare_row_action(const panel::FileExplorerState& state,
+                                  const core::FileSyncCompareRow& row,
+                                  core::FileSyncPlannedAction action);
+    void run_compare_session_async(const core::FileSyncEndpoint& left,
+                                   const core::FileSyncEndpoint& right,
+                                   int64_t pair_id,
+                                   bool watch_mode);
+    void maybe_refresh_watched_compare();
+    void render_compare_results(FileSyncCompareState& compare_state);
+    void apply_compare_rows(FileSyncCompareState& compare_state);
 
     /**
      * @brief Pushes the current path onto history when navigating to a distinct target.
@@ -277,7 +345,7 @@ private:
     /**
      * @brief Renders the scoped search field in the file explorer toolbar.
      */
-    void show_search_field(panel::FileExplorerState& state, SearchState& search_state, float width);
+    void show_search_field(panel::FileExplorerState& state, float width);
     /**
      * @brief Renders the combined grid/list view segmented control.
      */
@@ -297,7 +365,7 @@ private:
     /**
      * @brief Renders the Finder-style command toolbar.
      */
-    void show_command_toolbar(panel::FileExplorerState& state, SearchState& search_state);
+    void show_command_toolbar(panel::FileExplorerState& state);
     /**
      * @brief Returns the primary selected item, if exactly one selected item is loaded.
      */
@@ -526,8 +594,7 @@ private:
     std::vector<std::unique_ptr<core::FileSyncMaster>> file_sync_objects_;
     std::unordered_set<std::string> file_sync_roots_;
     std::string state_key_;
-    std::string search_state_key_;
-    std::unique_ptr<SearchPanel> search_panel_;
+    std::string compare_owner_state_key_;
     std::unique_ptr<PreviewPanel> preview_panel_;
     uint64_t transfer_listener_id_ = 0;
     std::shared_ptr<std::atomic<bool>> transfer_listener_alive_ = std::make_shared<std::atomic<bool>>(true);
@@ -538,6 +605,13 @@ private:
     ImVec2 notification_anchor_max_{};
     mutable bool suppress_child_initial_navigation_ = false;
     bool owns_state_cleanup_ = false;
+    FileExplorerPanelMode mode_ = FileExplorerPanelMode::Standard;
+    std::int64_t initial_compare_pair_id_ = 0;
+    bool initial_compare_watch_mode_ = false;
+    bool initial_compare_diff_tray_open_ = false;
+    std::function<bool()> search_palette_open_provider_;
+    std::function<std::string()> search_palette_query_provider_;
+    std::function<void()> search_palette_open_handler_;
 };
 
 }  // namespace misty::panel

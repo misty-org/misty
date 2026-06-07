@@ -13,13 +13,17 @@
 #include <utility>
 
 #include "core/file_master/file_master_util.h"
+#include "core/file_sync/file_sync_compare.h"
+#include "core/file_sync/file_sync_pair_store.h"
 #include "core/file_sync/file_sync_store.h"
 #include "panels/file_explorer/operations/operation_queue_state.h"
 #include "core/manager/asset_manager.h"
 #include "core/ui/ui_animate.h"
+#include "core/ui/ui_layout.h"
 #include "panels/file_explorer/content/file_explorer_content_util.h"
 #include "panels/file_explorer/navigation/history_util.h"
 #include "panels/file_explorer/selection/drag_and_drop.h"
+#include "panels/file_explorer/state/file_sync_compare_state.h"
 #include "panels/file_explorer/state/remote_mount_state.h"
 #include "panels/providers/state/providers_state.h"
 
@@ -44,6 +48,128 @@ namespace misty::panel {
         constexpr float kToolbarButtonHeight = 34.0f;
         constexpr float kToolbarHeight = kToolbarButtonHeight * 2.0f + kToolbarRowGap + kToolbarPadY * 2.0f;
         constexpr float kPanePathHeaderHeight = 28.0f;
+        constexpr float kCompareStripHeight = 86.0f;
+        constexpr int64_t kCompareWatchRefreshMs = 5000;
+
+        std::string compare_state_key_for(const std::string& state_key) {
+            return state_key + "_CompareSync";
+        }
+
+        int64_t epoch_ms_now() {
+            return std::chrono::duration_cast<std::chrono::milliseconds>(
+                       std::chrono::system_clock::now().time_since_epoch())
+                .count();
+        }
+
+        FileSyncCompareState& compare_state_for(core::StateRegistry& registry, const std::string& state_key) {
+            return registry.get_state<FileSyncCompareState>(compare_state_key_for(state_key));
+        }
+
+        core::FileSyncEndpoint compare_endpoint_from_path(const std::string& path) {
+            core::FileSyncEndpoint endpoint;
+            if (auto remote = remote_browse_target_for(path); remote.has_value()) {
+                endpoint.kind = core::FileSyncEndpointKind::Remote;
+                endpoint.remote_name = remote->remote_name;
+                endpoint.remote_path = remote->remote_path.empty() ? "/" : remote->remote_path;
+                endpoint.provider_type = remote->provider_folder;
+                return endpoint;
+            }
+            endpoint.kind = core::FileSyncEndpointKind::Local;
+            endpoint.local_path = path;
+            return endpoint;
+        }
+
+        std::string compare_input_path_for_endpoint(const core::FileSyncEndpoint& endpoint) {
+            if (endpoint.kind == core::FileSyncEndpointKind::Remote) {
+                fs::path mount = fs::path(get_mount_root()) /
+                                 endpoint.provider_type /
+                                 endpoint.remote_name;
+                const fs::path relative = fs::path(endpoint.remote_path).relative_path();
+                if (!relative.empty() && relative != ".") {
+                    mount /= relative;
+                }
+                return mount.lexically_normal().string();
+            }
+            return endpoint.local_path;
+        }
+
+        bool compare_endpoints_equal(const core::FileSyncEndpoint& lhs, const core::FileSyncEndpoint& rhs) {
+            return lhs.kind == rhs.kind &&
+                   lhs.local_path == rhs.local_path &&
+                   lhs.remote_name == rhs.remote_name &&
+                   lhs.remote_path == rhs.remote_path &&
+                   lhs.provider_type == rhs.provider_type;
+        }
+
+        std::string side_summary_label(const core::FileSyncCompareSide& side) {
+            auto format_compare_bytes = [](std::int64_t bytes) {
+                if (bytes <= 0) {
+                    return std::string("-");
+                }
+                const char* units[] = {"B", "KB", "MB", "GB", "TB"};
+                double value = static_cast<double>(bytes);
+                int unit = 0;
+                while (value >= 1024.0 && unit < 4) {
+                    value /= 1024.0;
+                    ++unit;
+                }
+                std::ostringstream out;
+                if (unit == 0) {
+                    out << static_cast<std::int64_t>(value) << " " << units[unit];
+                } else {
+                    out << std::fixed << std::setprecision(value >= 10.0 ? 1 : 2) << value << " " << units[unit];
+                }
+                return out.str();
+            };
+            if (!side.present) {
+                return "--";
+            }
+            if (side.is_dir) {
+                return side.last_modified.empty() ? "Folder" : "Folder • " + side.last_modified;
+            }
+            return format_compare_bytes(side.size) +
+                   (side.last_modified.empty() ? std::string{} : " • " + side.last_modified);
+        }
+
+        FileItem compare_item_from_side(const core::FileSyncCompareSide& side, const std::string& relative_path) {
+            FileItem item;
+            item.is_dir = side.is_dir;
+            item.size = side.size;
+            item.last_modified = side.last_modified;
+            item.path = side.absolute_path;
+            item.id = item.path;
+            item.name = fs::path(relative_path).filename().string();
+            if (item.name.empty()) {
+                item.name = fs::path(side.absolute_path).filename().string();
+            }
+            if (side.is_remote) {
+                item.type = FileType::REMOTE;
+                item.sync_remote_name = side.remote_name;
+                item.sync_remote_path = side.remote_path;
+            } else {
+                item.type = FileType::LOCAL;
+            }
+            return item;
+        }
+
+        bool compare_rows_equal(const std::vector<core::FileSyncCompareRow>& lhs,
+                                const std::vector<core::FileSyncCompareRow>& rhs) {
+            if (lhs.size() != rhs.size()) {
+                return false;
+            }
+            for (std::size_t i = 0; i < lhs.size(); ++i) {
+                if (lhs[i].relative_path != rhs[i].relative_path ||
+                    lhs[i].kind != rhs[i].kind ||
+                    lhs[i].disposition != rhs[i].disposition ||
+                    lhs[i].left.present != rhs[i].left.present ||
+                    lhs[i].left.absolute_path != rhs[i].left.absolute_path ||
+                    lhs[i].right.present != rhs[i].right.present ||
+                    lhs[i].right.absolute_path != rhs[i].right.absolute_path) {
+                    return false;
+                }
+            }
+            return true;
+        }
 
         std::string remote_sync_key(const std::string& remote_name, const std::string& remote_path) {
             return remote_name + ":" + remote_path;
@@ -467,7 +593,59 @@ namespace misty::panel {
         path_bar_scroll_to_end = false;
     }
 
+    const std::string& FileExplorerPanel::compare_state_scope_key() const {
+        return compare_owner_state_key_.empty() ? state_key_ : compare_owner_state_key_;
+    }
+
+    bool FileExplorerPanel::is_compare_context() const {
+        return !compare_owner_state_key_.empty();
+    }
+
+    FileExplorerPanelMode FileExplorerPanel::mode() const {
+        return mode_;
+    }
+
+    bool FileExplorerPanel::is_compare_mode() const {
+        return mode_ == FileExplorerPanelMode::CompareSync;
+    }
+
+    bool FileExplorerPanel::compare_diff_tray_open() const {
+        if (!is_compare_mode()) {
+            return false;
+        }
+        const auto& compare_state = compare_state_for(registry_, compare_state_scope_key());
+        std::lock_guard<std::mutex> lock(compare_state.mu);
+        return compare_state.initialized ? compare_state.diff_tray_open : initial_compare_diff_tray_open_;
+    }
+
+    void FileExplorerPanel::set_compare_diff_tray_open(bool open) {
+        auto& compare_state = compare_state_for(registry_, compare_state_scope_key());
+        std::lock_guard<std::mutex> lock(compare_state.mu);
+        compare_state.diff_tray_open = open;
+    }
+
+    std::int64_t FileExplorerPanel::compare_pair_id() const {
+        if (!is_compare_mode()) {
+            return 0;
+        }
+        const auto& compare_state = compare_state_for(registry_, compare_state_scope_key());
+        std::lock_guard<std::mutex> lock(compare_state.mu);
+        return compare_state.initialized ? compare_state.active_pair_id : initial_compare_pair_id_;
+    }
+
+    bool FileExplorerPanel::compare_watch_mode() const {
+        if (!is_compare_mode()) {
+            return false;
+        }
+        const auto& compare_state = compare_state_for(registry_, compare_state_scope_key());
+        std::lock_guard<std::mutex> lock(compare_state.mu);
+        return compare_state.initialized ? compare_state.watch_mode : initial_compare_watch_mode_;
+    }
+
     std::string FileExplorerPanel::tab_title() const {
+        if (is_compare_mode()) {
+            return "Compare";
+        }
         if (const auto* active_explorer = dynamic_cast<const FileExplorerPanel*>(active_panel())) {
             if (active_explorer != this) {
                 return active_explorer->tab_title();
@@ -487,6 +665,8 @@ namespace misty::panel {
         props.restore_persistent_state = false;
         props.defer_initial_navigation = suppress_child_initial_navigation_;
         props.owns_state_cleanup = true;
+        props.mode = FileExplorerPanelMode::Standard;
+        props.compare_owner_state_key = is_compare_mode() ? compare_state_scope_key() : compare_owner_state_key_;
 
         std::string initial_path = default_local_start_path();
         if (const auto* active_explorer = dynamic_cast<const FileExplorerPanel*>(active_panel())) {
@@ -503,6 +683,10 @@ namespace misty::panel {
         props.initial_path_override = initial_path;
 
         auto panel = std::make_shared<FileExplorerPanel>(registry_, worker_pool_, std::move(props));
+        panel->set_search_palette_state_provider(
+            search_palette_open_provider_,
+            search_palette_query_provider_,
+            search_palette_open_handler_);
         TabController::Tab tab;
         tab.context_key = panel->state_key_;
         tab.state_key = panel->state_key_;
@@ -697,6 +881,727 @@ namespace misty::panel {
         return {};
     }
 
+    void FileExplorerPanel::ensure_compare_state_initialized() {
+        auto& compare_state = compare_state_for(registry_, compare_state_scope_key());
+        std::lock_guard<std::mutex> lock(compare_state.mu);
+        if (compare_state.initialized) {
+            return;
+        }
+
+        std::string error;
+        compare_state.saved_pairs = core::FileSyncPairStore::get().load_all(&error);
+        compare_state.error_message = error;
+        compare_state.initialized = true;
+        compare_state.compare_mode = is_compare_mode();
+        compare_state.active_pair_id = initial_compare_pair_id_;
+        compare_state.watch_mode = initial_compare_watch_mode_;
+        compare_state.diff_tray_open = initial_compare_diff_tray_open_;
+    }
+
+    std::vector<FileExplorerPanel*> FileExplorerPanel::compare_child_panels() const {
+        std::vector<FileExplorerPanel*> children;
+        if (!is_compare_mode()) {
+            return children;
+        }
+
+        const auto snapshot = export_workspace_snapshot();
+        for (const auto& lane : snapshot.grid_pane_ids) {
+            for (const auto& pane_id : lane) {
+                const Pane* pane = get_pane(pane_id);
+                if (!pane) {
+                    continue;
+                }
+                const TabController::Tab* active = pane->tab_controller.current_active_tab();
+                auto* child = active ? dynamic_cast<FileExplorerPanel*>(active->panel.get()) : nullptr;
+                if (!child || child == this) {
+                    continue;
+                }
+                children.push_back(child);
+                if (children.size() == 2) {
+                    return children;
+                }
+            }
+        }
+        return children;
+    }
+
+    std::optional<std::pair<FileExplorerPanel*, FileExplorerPanel*>> FileExplorerPanel::compare_child_panel_pair() const {
+        auto children = compare_child_panels();
+        if (children.size() < 2) {
+            return std::nullopt;
+        }
+        return std::make_pair(children[0], children[1]);
+    }
+
+    std::optional<std::pair<core::FileSyncEndpoint, core::FileSyncEndpoint>> FileExplorerPanel::compare_current_endpoints() const {
+        const auto pair = compare_child_panel_pair();
+        if (!pair.has_value()) {
+            return std::nullopt;
+        }
+        const auto& left_state = registry_.get_state<FileExplorerState>((*pair).first->state_key_);
+        const auto& right_state = registry_.get_state<FileExplorerState>((*pair).second->state_key_);
+        return std::make_pair(compare_endpoint_from_path(left_state.current_path),
+                              compare_endpoint_from_path(right_state.current_path));
+    }
+
+    std::pair<std::string, std::string> FileExplorerPanel::compare_display_paths() const {
+        const auto pair = compare_child_panel_pair();
+        if (!pair.has_value()) {
+            return {};
+        }
+        const auto& left_state = registry_.get_state<FileExplorerState>((*pair).first->state_key_);
+        const auto& right_state = registry_.get_state<FileExplorerState>((*pair).second->state_key_);
+        return {left_state.current_path, right_state.current_path};
+    }
+
+    bool FileExplorerPanel::set_compare_roots(const core::FileSyncEndpoint& left, const core::FileSyncEndpoint& right) {
+        const auto pair = compare_child_panel_pair();
+        if (!pair.has_value()) {
+            return false;
+        }
+        (*pair).first->navigate_to_path(compare_input_path_for_endpoint(left), false, false);
+        (*pair).second->navigate_to_path(compare_input_path_for_endpoint(right), false, false);
+        auto& compare_state = compare_state_for(registry_, compare_state_scope_key());
+        std::lock_guard<std::mutex> lock(compare_state.mu);
+        compare_state.stale = true;
+        return true;
+    }
+
+    bool FileExplorerPanel::swap_compare_roots() {
+        const auto endpoints = compare_current_endpoints();
+        if (!endpoints.has_value()) {
+            return false;
+        }
+        return set_compare_roots(endpoints->second, endpoints->first);
+    }
+
+    void FileExplorerPanel::sync_compare_state_from_panes() {
+        if (!is_compare_mode()) {
+            return;
+        }
+        const auto pair = compare_child_panel_pair();
+        const auto endpoints = compare_current_endpoints();
+        if (!endpoints.has_value() || !pair.has_value()) {
+            return;
+        }
+        auto& compare_state = compare_state_for(registry_, compare_state_scope_key());
+        std::lock_guard<std::mutex> lock(compare_state.mu);
+        compare_state.compare_mode = true;
+        compare_state.left_state_key = (*pair).first->state_key_;
+        compare_state.right_state_key = (*pair).second->state_key_;
+        if (compare_state.last_compared_at_ms == 0) {
+            compare_state.stale = compare_state.stale || !compare_state.rows.empty();
+            return;
+        }
+        if (!compare_endpoints_equal(compare_state.last_left, endpoints->first) ||
+            !compare_endpoints_equal(compare_state.last_right, endpoints->second)) {
+            compare_state.stale = true;
+        }
+    }
+
+    void FileExplorerPanel::ensure_compare_dual_pane() {
+        if (!is_compare_mode() || pane_count() >= 2) {
+            return;
+        }
+
+        const auto snapshot = export_workspace_snapshot();
+        if (snapshot.panes.empty()) {
+            return;
+        }
+
+        auto active_or_first_tab = [](const core::WorkspacePaneSnapshot& pane) {
+            core::WorkspaceTabSnapshot tab;
+            if (pane.tabs.empty()) {
+                return tab;
+            }
+            const auto it = std::find_if(pane.tabs.begin(), pane.tabs.end(), [&](const core::WorkspaceTabSnapshot& candidate) {
+                return candidate.idx == pane.active_tab_idx;
+            });
+            return it != pane.tabs.end() ? *it : pane.tabs.front();
+        };
+
+        const core::WorkspacePaneSnapshot& existing_pane = snapshot.panes.front();
+        core::WorkspaceTabSnapshot cloned_tab = active_or_first_tab(existing_pane);
+        const std::int16_t new_tab_idx = snapshot.next_tab_idx > 0 ? snapshot.next_tab_idx : 2;
+        const std::int16_t new_pane_idx = snapshot.next_pane_idx > 0 ? snapshot.next_pane_idx : 2;
+        cloned_tab.idx = new_tab_idx;
+        cloned_tab.context_key = state_key_ + "_tab_" + std::to_string(new_tab_idx);
+        cloned_tab.state_key = cloned_tab.context_key;
+
+        core::WorkspacePaneSnapshot new_pane;
+        new_pane.pane_id = panel_id() + "_pane_" + std::to_string(new_pane_idx);
+        new_pane.active_tab_idx = new_tab_idx;
+        new_pane.tabs.push_back(cloned_tab);
+
+        core::WorkspaceExplorerSnapshot rebuilt = snapshot;
+        rebuilt.active_pane_id = existing_pane.pane_id;
+        rebuilt.next_tab_idx = new_tab_idx + 1;
+        rebuilt.next_pane_idx = new_pane_idx + 1;
+        rebuilt.grid_pane_ids = {{existing_pane.pane_id}, {new_pane.pane_id}};
+        rebuilt.grid_split_ratio = 0.5f;
+        rebuilt.lane_split_ratios = {0.5f, 0.5f};
+        rebuilt.panes.clear();
+        rebuilt.panes.push_back(existing_pane);
+        rebuilt.panes.push_back(new_pane);
+
+        suppress_child_initial_navigation_ = true;
+        MultiPanel::restore_workspace_snapshot(rebuilt);
+        suppress_child_initial_navigation_ = false;
+    }
+
+    bool FileExplorerPanel::compare_row_snapshot_for_file(const FileExplorerState& state,
+                                                          const FileItem& file,
+                                                          core::FileSyncCompareRow* out,
+                                                          bool* is_left_side) const {
+        if (!is_compare_context() || out == nullptr) {
+            return false;
+        }
+
+        const auto& compare_state = compare_state_for(registry_, compare_state_scope_key());
+        std::lock_guard<std::mutex> lock(compare_state.mu);
+        const bool on_left = compare_state.left_state_key == state_key_;
+        const bool on_right = compare_state.right_state_key == state_key_;
+        if (!on_left && !on_right) {
+            return false;
+        }
+
+        std::error_code ec;
+        std::string relative = fs::path(file.path).lexically_relative(state.current_path).generic_string();
+        if (relative.empty() || relative == ".") {
+            relative = file.name;
+        }
+
+        const auto it = std::find_if(compare_state.rows.begin(),
+                                     compare_state.rows.end(),
+                                     [&](const core::FileSyncCompareRow& row) {
+                                         if (row.relative_path != relative) {
+                                             return false;
+                                         }
+                                         return on_left ? row.left.present : row.right.present;
+                                     });
+        if (it == compare_state.rows.end()) {
+            return false;
+        }
+
+        *out = *it;
+        if (is_left_side != nullptr) {
+            *is_left_side = on_left;
+        }
+        return true;
+    }
+
+    void FileExplorerPanel::set_compare_row_action(const std::string& relative_path,
+                                                   core::FileSyncPlannedAction action) {
+        if (!is_compare_context()) {
+            return;
+        }
+        auto& compare_state = compare_state_for(registry_, compare_state_scope_key());
+        std::lock_guard<std::mutex> lock(compare_state.mu);
+        for (auto& row : compare_state.rows) {
+            if (row.relative_path == relative_path) {
+                row.action = action;
+                compare_state.stale = true;
+                break;
+            }
+        }
+    }
+
+    void FileExplorerPanel::apply_compare_row_action(const FileExplorerState& state,
+                                                     const core::FileSyncCompareRow& row,
+                                                     core::FileSyncPlannedAction action) {
+        if (!is_compare_context() || action == core::FileSyncPlannedAction::Skip) {
+            set_compare_row_action(row.relative_path, core::FileSyncPlannedAction::Skip);
+            return;
+        }
+
+        set_compare_row_action(row.relative_path, action);
+
+        std::vector<FileItem> delete_items;
+        struct CopyPlan {
+            FileItem item;
+            std::string dest_dir;
+        };
+        std::optional<CopyPlan> copy_plan;
+
+        const auto endpoints = compare_current_endpoints();
+        const std::string left_root = endpoints.has_value() ? compare_input_path_for_endpoint(endpoints->first) : std::string();
+        const std::string right_root = endpoints.has_value() ? compare_input_path_for_endpoint(endpoints->second) : std::string();
+
+        switch (action) {
+            case core::FileSyncPlannedAction::CopyLeftToRight:
+                if (row.left.present) {
+                    FileItem item = compare_item_from_side(row.left, row.relative_path);
+                    const std::string dest_dir = row.right.present
+                        ? fs::path(row.right.absolute_path).parent_path().string()
+                        : (fs::path(right_root) / fs::path(row.relative_path).parent_path()).string();
+                    copy_plan = CopyPlan{std::move(item), dest_dir};
+                }
+                break;
+            case core::FileSyncPlannedAction::CopyRightToLeft:
+                if (row.right.present) {
+                    FileItem item = compare_item_from_side(row.right, row.relative_path);
+                    const std::string dest_dir = row.left.present
+                        ? fs::path(row.left.absolute_path).parent_path().string()
+                        : (fs::path(left_root) / fs::path(row.relative_path).parent_path()).string();
+                    copy_plan = CopyPlan{std::move(item), dest_dir};
+                }
+                break;
+            case core::FileSyncPlannedAction::DeleteLeft:
+                if (row.left.present) {
+                    delete_items.push_back(compare_item_from_side(row.left, row.relative_path));
+                }
+                break;
+            case core::FileSyncPlannedAction::DeleteRight:
+                if (row.right.present) {
+                    delete_items.push_back(compare_item_from_side(row.right, row.relative_path));
+                }
+                break;
+            case core::FileSyncPlannedAction::Skip:
+                break;
+        }
+
+        auto stale_callback = [this](const core::FileMasterResult&) {
+            auto& compare_state = compare_state_for(registry_, compare_state_scope_key());
+            std::lock_guard<std::mutex> lock(compare_state.mu);
+            compare_state.stale = true;
+        };
+
+        if (copy_plan.has_value()) {
+            enqueue_clipboard_operation_batch(registry_,
+                                             worker_pool_,
+                                             state_key_,
+                                             {copy_plan->item},
+                                             copy_plan->dest_dir,
+                                             ClipboardOp::COPY,
+                                             state_key_,
+                                             stale_callback);
+        } else if (!delete_items.empty()) {
+            enqueue_delete_operation_batch(registry_, worker_pool_, state_key_, delete_items, stale_callback);
+        }
+    }
+
+    void FileExplorerPanel::run_compare_session_async(const core::FileSyncEndpoint& left,
+                                                      const core::FileSyncEndpoint& right,
+                                                      int64_t pair_id,
+                                                      bool watch_mode) {
+        auto& compare_state = compare_state_for(registry_, compare_state_scope_key());
+        {
+            std::lock_guard<std::mutex> lock(compare_state.mu);
+            compare_state.compare_in_flight = true;
+            compare_state.error_message.clear();
+            compare_state.last_compare_started_ms = epoch_ms_now();
+        }
+
+        worker_pool_.add(
+            [this, left, right, pair_id, watch_mode]() {
+                auto result = core::compare_file_sync_endpoints(left, right);
+                auto& compare_state = compare_state_for(registry_, compare_state_scope_key());
+                std::lock_guard<std::mutex> lock(compare_state.mu);
+                compare_state.compare_in_flight = false;
+                compare_state.error_message = result.error_message;
+                if (result.success) {
+                    const bool had_prior_rows = !compare_state.rows.empty();
+                    const bool changed = had_prior_rows && !compare_rows_equal(compare_state.rows, result.rows);
+                    compare_state.rows = std::move(result.rows);
+                    compare_state.compare_mode = true;
+                    compare_state.diff_tray_open = false;
+                    compare_state.last_compared_at_ms = result.compared_at_ms;
+                    compare_state.last_left = left;
+                    compare_state.last_right = right;
+                    compare_state.watch_mode = watch_mode;
+                    compare_state.active_pair_id = pair_id;
+                    compare_state.stale = watch_mode && changed;
+                    compare_state.compare_revision.fetch_add(1, std::memory_order_relaxed);
+
+                    if (pair_id != 0) {
+                        for (auto& pair : compare_state.saved_pairs) {
+                            if (pair.id == pair_id) {
+                                pair.last_compared_at_ms = result.compared_at_ms;
+                                pair.last_scan_at_ms = result.compared_at_ms;
+                                pair.watch_mode = watch_mode;
+                                pair.stale = compare_state.stale;
+                                std::string save_error;
+                                core::FileSyncPairStore::get().save(pair, &save_error);
+                                if (!save_error.empty()) {
+                                    compare_state.error_message = save_error;
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+            },
+            {},
+            [this](const std::string& error) {
+                auto& compare_state = compare_state_for(registry_, compare_state_scope_key());
+                std::lock_guard<std::mutex> lock(compare_state.mu);
+                compare_state.compare_in_flight = false;
+                compare_state.error_message = error;
+            });
+    }
+
+    void FileExplorerPanel::maybe_refresh_watched_compare() {
+        auto& compare_state = compare_state_for(registry_, compare_state_scope_key());
+        core::FileSyncPair pair;
+        bool should_refresh = false;
+        {
+            std::lock_guard<std::mutex> lock(compare_state.mu);
+            if (!compare_state.watch_mode ||
+                compare_state.active_pair_id == 0 ||
+                compare_state.compare_in_flight) {
+                return;
+            }
+            const int64_t now = epoch_ms_now();
+            if (now - compare_state.last_watch_refresh_ms < kCompareWatchRefreshMs) {
+                return;
+            }
+            const auto it = std::find_if(compare_state.saved_pairs.begin(),
+                                         compare_state.saved_pairs.end(),
+                                         [&](const core::FileSyncPair& candidate) {
+                                             return candidate.id == compare_state.active_pair_id;
+                                         });
+            if (it == compare_state.saved_pairs.end()) {
+                return;
+            }
+            pair = *it;
+            compare_state.last_watch_refresh_ms = now;
+            should_refresh = true;
+        }
+        if (should_refresh) {
+            run_compare_session_async(pair.left, pair.right, pair.id, pair.watch_mode);
+        }
+    }
+
+    void FileExplorerPanel::render_compare_header() {
+        auto& compare_state = compare_state_for(registry_, compare_state_scope_key());
+        ensure_compare_state_initialized();
+        ensure_compare_dual_pane();
+        sync_compare_state_from_panes();
+        maybe_refresh_watched_compare();
+        const auto display_paths = compare_display_paths();
+        const auto endpoints = compare_current_endpoints();
+
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.092f, 0.098f, 0.112f, 1.0f));
+        if (ImGui::BeginChild(("##compare_sync_header_" + state_key_).c_str(),
+                              ImVec2(0.0f, compare_header_height()),
+                              false,
+                              ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse)) {
+            std::string compare_error;
+            int left_only = 0;
+            int right_only = 0;
+            int different = 0;
+            int conflict = 0;
+            bool compare_in_flight = false;
+            bool stale = false;
+            bool watch_mode_value = false;
+            std::string active_name = "Saved pairs";
+            {
+                std::lock_guard<std::mutex> lock(compare_state.mu);
+                compare_error = compare_state.error_message;
+                compare_in_flight = compare_state.compare_in_flight;
+                stale = compare_state.stale;
+                watch_mode_value = compare_state.watch_mode;
+                for (const auto& row : compare_state.rows) {
+                    switch (row.disposition) {
+                        case core::FileSyncCompareDisposition::LeftOnly: ++left_only; break;
+                        case core::FileSyncCompareDisposition::RightOnly: ++right_only; break;
+                        case core::FileSyncCompareDisposition::Different: ++different; break;
+                        case core::FileSyncCompareDisposition::Conflict: ++conflict; break;
+                        case core::FileSyncCompareDisposition::Same: break;
+                    }
+                }
+                for (const auto& pair : compare_state.saved_pairs) {
+                    if (pair.id == compare_state.active_pair_id) {
+                        active_name = pair.name;
+                        break;
+                    }
+                }
+            }
+
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextUnformatted("Compare");
+            ImGui::SameLine();
+            if (compare_in_flight) {
+                ImGui::TextDisabled("Comparing...");
+            } else if (stale) {
+                ImGui::TextColored(ImVec4(0.97f, 0.77f, 0.42f, 1.0f), "Needs review");
+            } else {
+                ImGui::TextColored(ImVec4(0.47f, 0.85f, 0.60f, 1.0f), "Ready");
+            }
+            ImGui::SameLine();
+            ImGui::TextDisabled("Left: %s", display_paths.first.empty() ? "--" : display_paths.first.c_str());
+            ImGui::SameLine();
+            ImGui::TextDisabled("Right: %s", display_paths.second.empty() ? "--" : display_paths.second.c_str());
+
+            ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 6.0f);
+            ImGui::PushItemWidth(220.0f);
+            if (ImGui::BeginCombo("##compare_pair_combo", active_name.c_str())) {
+                std::vector<core::FileSyncPair> pairs;
+                {
+                    std::lock_guard<std::mutex> lock(compare_state.mu);
+                    pairs = compare_state.saved_pairs;
+                }
+                for (const auto& pair : pairs) {
+                    const bool selected = pair.id == compare_pair_id();
+                    if (ImGui::Selectable(pair.name.c_str(), selected)) {
+                        {
+                            std::lock_guard<std::mutex> lock(compare_state.mu);
+                            compare_state.active_pair_id = pair.id;
+                            compare_state.watch_mode = pair.watch_mode;
+                            compare_state.stale = true;
+                            std::snprintf(ui_.compare_pair_name_buffer,
+                                          sizeof(ui_.compare_pair_name_buffer),
+                                          "%s",
+                                          pair.name.c_str());
+                        }
+                        set_compare_roots(pair.left, pair.right);
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            ImGui::PopItemWidth();
+            ImGui::SameLine();
+            ImGui::PushItemWidth(220.0f);
+            ImGui::InputTextWithHint("##compare_pair_name", "Saved pair name", ui_.compare_pair_name_buffer, sizeof(ui_.compare_pair_name_buffer));
+            ImGui::PopItemWidth();
+            ImGui::SameLine();
+            if (ImGui::Button("Save / Update Pair") && endpoints.has_value()) {
+                core::FileSyncPair pair;
+                {
+                    std::lock_guard<std::mutex> lock(compare_state.mu);
+                    pair.id = compare_state.active_pair_id;
+                    pair.name = ui_.compare_pair_name_buffer[0] != '\0'
+                        ? ui_.compare_pair_name_buffer
+                        : (std::string("Pair: ") + file_explorer_tab_title_for_path(display_paths.first) + " <-> " +
+                           file_explorer_tab_title_for_path(display_paths.second));
+                    pair.left = endpoints->first;
+                    pair.right = endpoints->second;
+                    pair.watch_mode = compare_state.watch_mode;
+                    pair.stale = compare_state.stale;
+                    pair.last_compared_at_ms = compare_state.last_compared_at_ms;
+                    pair.last_scan_at_ms = compare_state.last_compared_at_ms;
+                }
+                std::string error;
+                if (core::FileSyncPairStore::get().save(pair, &error)) {
+                    std::lock_guard<std::mutex> lock(compare_state.mu);
+                    compare_state.active_pair_id = pair.id;
+                    auto it = std::find_if(compare_state.saved_pairs.begin(), compare_state.saved_pairs.end(),
+                                           [&](const core::FileSyncPair& candidate) { return candidate.id == pair.id; });
+                    if (it == compare_state.saved_pairs.end()) {
+                        compare_state.saved_pairs.push_back(pair);
+                    } else {
+                        *it = pair;
+                    }
+                } else {
+                    std::lock_guard<std::mutex> lock(compare_state.mu);
+                    compare_state.error_message = error;
+                }
+            }
+            ImGui::SameLine();
+            if (ImGui::Checkbox("Watch mode", &watch_mode_value)) {
+                std::lock_guard<std::mutex> lock(compare_state.mu);
+                compare_state.watch_mode = watch_mode_value;
+                if (compare_state.active_pair_id != 0) {
+                    for (auto& pair : compare_state.saved_pairs) {
+                        if (pair.id == compare_state.active_pair_id) {
+                            pair.watch_mode = watch_mode_value;
+                            std::string error;
+                            core::FileSyncPairStore::get().save(pair, &error);
+                            if (!error.empty()) {
+                                compare_state.error_message = error;
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Swap")) {
+                swap_compare_roots();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Compare") && endpoints.has_value()) {
+                run_compare_session_async(endpoints->first, endpoints->second, compare_pair_id(), watch_mode_value);
+            }
+
+            ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 4.0f);
+            ImGui::TextDisabled("Left only: %d", left_only);
+            ImGui::SameLine();
+            ImGui::TextDisabled("Right only: %d", right_only);
+            ImGui::SameLine();
+            ImGui::TextDisabled("Different: %d", different);
+            ImGui::SameLine();
+            ImGui::TextDisabled("Conflict: %d", conflict);
+            if (!compare_error.empty()) {
+                ImGui::SameLine();
+                ImGui::TextColored(ImVec4(0.96f, 0.45f, 0.45f, 1.0f), "%s", compare_error.c_str());
+            }
+        }
+        ImGui::EndChild();
+        ImGui::PopStyleColor();
+    }
+
+    void FileExplorerPanel::render_compare_diff_tray() {
+        (void)state_key_;
+    }
+
+    void FileExplorerPanel::render_compare_results(FileSyncCompareState& compare_state) {
+        std::vector<core::FileSyncCompareRow> rows;
+        {
+            std::lock_guard<std::mutex> lock(compare_state.mu);
+            rows = compare_state.rows;
+        }
+
+        static ImGuiTableFlags compare_flags = ImGuiTableFlags_ScrollX |
+                                               ImGuiTableFlags_SizingStretchProp |
+                                               ImGuiTableFlags_RowBg |
+                                               ImGuiTableFlags_BordersOuter |
+                                               ImGuiTableFlags_BordersH;
+        const std::string table_id = "CompareSyncTable_" + state_key_;
+        UI::table(table_id.c_str(), {
+            .columns = {
+                {"Path", 1.5f, ImGuiTableColumnFlags_WidthStretch, 12.0f},
+                {"Type", 110.0f, ImGuiTableColumnFlags_WidthFixed, 12.0f},
+                {"State", 120.0f, ImGuiTableColumnFlags_WidthFixed, 12.0f},
+                {"Left", 220.0f, ImGuiTableColumnFlags_WidthFixed, 12.0f},
+                {"Right", 220.0f, ImGuiTableColumnFlags_WidthFixed, 12.0f},
+                {"Action", 170.0f, ImGuiTableColumnFlags_WidthFixed, 12.0f},
+            },
+            .width = UI::Size::pct(100.0f),
+            .cell_padding = ImVec2(10.0f, 6.0f),
+            .freeze_rows = 1,
+            .flags = compare_flags,
+        }, [&](ImGuiTableSortSpecs*) {
+            for (std::size_t i = 0; i < rows.size(); ++i) {
+                auto& row = rows[i];
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0);
+                ImGui::TextUnformatted(row.relative_path.c_str());
+                ImGui::TableSetColumnIndex(1);
+                ImGui::TextUnformatted(core::file_sync_compare_kind_label(row.kind));
+                ImGui::TableSetColumnIndex(2);
+                ImGui::TextUnformatted(core::file_sync_compare_disposition_label(row.disposition));
+                ImGui::TableSetColumnIndex(3);
+                ImGui::TextUnformatted(side_summary_label(row.left).c_str());
+                ImGui::TableSetColumnIndex(4);
+                ImGui::TextUnformatted(side_summary_label(row.right).c_str());
+                ImGui::TableSetColumnIndex(5);
+                const std::string combo_id = "##compare_action_" + std::to_string(i);
+                const char* preview = core::file_sync_planned_action_label(row.action);
+                if (ImGui::BeginCombo(combo_id.c_str(), preview)) {
+                    for (const auto action : {core::FileSyncPlannedAction::Skip,
+                                              core::FileSyncPlannedAction::CopyLeftToRight,
+                                              core::FileSyncPlannedAction::CopyRightToLeft,
+                                              core::FileSyncPlannedAction::DeleteLeft,
+                                              core::FileSyncPlannedAction::DeleteRight}) {
+                        const bool selected = row.action == action;
+                        if (ImGui::Selectable(core::file_sync_planned_action_label(action), selected)) {
+                            row.action = action;
+                            std::lock_guard<std::mutex> lock(compare_state.mu);
+                            if (i < compare_state.rows.size()) {
+                                compare_state.rows[i].action = action;
+                            }
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+            }
+        });
+    }
+
+    void FileExplorerPanel::apply_compare_rows(FileSyncCompareState& compare_state) {
+        std::vector<core::FileSyncCompareRow> current_rows;
+        {
+            std::lock_guard<std::mutex> lock(compare_state.mu);
+            current_rows = compare_state.rows;
+        }
+        const auto planned_rows = core::planned_rows_for_apply(current_rows);
+        if (planned_rows.empty()) {
+            return;
+        }
+
+        std::vector<FileItem> delete_items;
+        struct CopyPlan {
+            FileItem item;
+            std::string dest_dir;
+        };
+        std::vector<CopyPlan> copy_plans;
+        copy_plans.reserve(planned_rows.size());
+        const auto endpoints = compare_current_endpoints();
+        const std::string left_root = endpoints.has_value() ? compare_input_path_for_endpoint(endpoints->first) : std::string();
+        const std::string right_root = endpoints.has_value() ? compare_input_path_for_endpoint(endpoints->second) : std::string();
+
+        for (const auto& row : planned_rows) {
+            switch (row.action) {
+                case core::FileSyncPlannedAction::CopyLeftToRight: {
+                    if (row.left.present) {
+                        FileItem item = compare_item_from_side(row.left, row.relative_path);
+                        const std::string dest_dir = row.right.present
+                            ? fs::path(row.right.absolute_path).parent_path().string()
+                            : (fs::path(right_root) / fs::path(row.relative_path).parent_path()).string();
+                        copy_plans.push_back({std::move(item), dest_dir});
+                    }
+                    break;
+                }
+                case core::FileSyncPlannedAction::CopyRightToLeft: {
+                    if (row.right.present) {
+                        FileItem item = compare_item_from_side(row.right, row.relative_path);
+                        const std::string dest_dir = row.left.present
+                            ? fs::path(row.left.absolute_path).parent_path().string()
+                            : (fs::path(left_root) / fs::path(row.relative_path).parent_path()).string();
+                        copy_plans.push_back({std::move(item), dest_dir});
+                    }
+                    break;
+                }
+                case core::FileSyncPlannedAction::DeleteLeft:
+                    if (row.left.present) {
+                        delete_items.push_back(compare_item_from_side(row.left, row.relative_path));
+                    }
+                    break;
+                case core::FileSyncPlannedAction::DeleteRight:
+                    if (row.right.present) {
+                        delete_items.push_back(compare_item_from_side(row.right, row.relative_path));
+                    }
+                    break;
+                case core::FileSyncPlannedAction::Skip:
+                    break;
+            }
+        }
+
+        for (const auto& plan : copy_plans) {
+            enqueue_clipboard_operation_batch(registry_,
+                                             worker_pool_,
+                                             state_key_,
+                                             {plan.item},
+                                             plan.dest_dir,
+                                             ClipboardOp::COPY,
+                                             state_key_,
+                                             {});
+        }
+        if (!delete_items.empty()) {
+            enqueue_delete_operation_batch(registry_, worker_pool_, state_key_, delete_items, {});
+        }
+
+        {
+            std::lock_guard<std::mutex> lock(compare_state.mu);
+            compare_state.stale = false;
+            if (compare_state.active_pair_id != 0) {
+                for (auto& pair : compare_state.saved_pairs) {
+                    if (pair.id == compare_state.active_pair_id) {
+                        pair.stale = false;
+                        pair.last_scan_at_ms = epoch_ms_now();
+                        std::string error;
+                        core::FileSyncPairStore::get().save(pair, &error);
+                        if (!error.empty()) {
+                            compare_state.error_message = error;
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
     void FileExplorerPanel::render_panel_contents() {
         auto& state = registry_.get_state<FileExplorerState>(state_key_);
         auto& listing = active_listing();
@@ -739,14 +1644,19 @@ namespace misty::panel {
                     show_error_modal(ui_.error_msg, "FileExplorerError");
                 }
                 ImGui::SetCursorPos(list_start);
-                if (search_panel_) {
-                    search_panel_->render(state.current_path, list_height);
-                }
             }
             ImGui::EndChild();
             ImGui::PopStyleVar();
         }
         ImGui::EndChild();
+        {
+            const ImVec2 content_min = ImGui::GetItemRectMin();
+            const ImVec2 content_max = ImGui::GetItemRectMax();
+            ImGui::GetWindowDrawList()->AddLine(ImVec2(content_min.x, content_max.y - 1.0f),
+                                                ImVec2(content_max.x, content_max.y - 1.0f),
+                                                IM_COL32(56, 58, 64, 210),
+                                                1.0f);
+        }
 
         ImGui::SetCursorPosY(ImGui::GetCursorPosY() - ImGui::GetStyle().ItemSpacing.y);
         const std::string status_text = build_directory_status_text(listing, ui_);
@@ -883,6 +1793,14 @@ namespace misty::panel {
         return kToolbarHeight;
     }
 
+    float FileExplorerPanel::compare_header_height() const {
+        return is_compare_mode() ? 74.0f : 0.0f;
+    }
+
+    float FileExplorerPanel::compare_diff_tray_height() const {
+        return 0.0f;
+    }
+
     bool FileExplorerPanel::notification_anchor_bounds(ImVec2& min, ImVec2& max) const {
         if (auto* active_explorer = dynamic_cast<FileExplorerPanel*>(active_panel())) {
             if (active_explorer != this) {
@@ -910,13 +1828,12 @@ namespace misty::panel {
         }
 
         auto& state = registry_.get_state<FileExplorerState>(state_key_);
-        auto& search_state = registry_.get_state<SearchState>(search_state_key_);
         std::unique_lock<std::recursive_mutex> lock(state.mu);
 
         ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.075f, 0.085f, 0.10f, 1.0f));
         if (ImGui::BeginChild("TopBar", ImVec2(0.0f, kToolbarHeight), false, ImGuiWindowFlags_NoScrollbar)) {
             ImGui::SetCursorPos(ImVec2(kToolbarPadX, kToolbarPadY));
-            show_command_toolbar(state, search_state);
+            show_command_toolbar(state);
             ImGui::SetCursorPos(ImVec2(kToolbarPadX, kToolbarPadY + kToolbarButtonHeight + kToolbarRowGap));
             notification_anchor_min_ = ImGui::GetCursorScreenPos();
             notification_anchor_max_ = ImVec2(
@@ -927,6 +1844,44 @@ namespace misty::panel {
         }
         ImGui::EndChild();
         ImGui::PopStyleColor();
+    }
+
+    bool FileExplorerPanel::execute_palette_command(const std::string& command_id) {
+        if (auto* active_explorer = dynamic_cast<FileExplorerPanel*>(active_panel())) {
+            if (active_explorer != this) {
+                return active_explorer->execute_palette_command(command_id);
+            }
+        }
+        auto& state = registry_.get_state<FileExplorerState>(state_key_);
+        if (command_id == "explorer.refresh") {
+            request_manual_refresh(state);
+            return true;
+        }
+        if (command_id == "explorer.rename") {
+            initiate_rename(ui_);
+            return true;
+        }
+        if (command_id == "explorer.delete") {
+            perform_delete_selected(state);
+            return true;
+        }
+        if (command_id == "explorer.copy") {
+            perform_copy(state);
+            return true;
+        }
+        if (command_id == "explorer.cut") {
+            perform_cut(state);
+            return true;
+        }
+        if (command_id == "explorer.paste") {
+            perform_paste(state);
+            return true;
+        }
+        if (command_id == "explorer.toggle_chat") {
+            toggle_chat_overlay();
+            return true;
+        }
+        return false;
     }
 
     void FileExplorerPanel::render_inspector() {

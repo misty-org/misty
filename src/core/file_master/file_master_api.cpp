@@ -297,6 +297,13 @@ HttpResponse rename_remote_call(const FileMasterProps& props, RemoteJobProgressC
     const std::string proxy_service_url = proxy_url();
     if (proxy_service_url.empty()) return proxy_config_error();
 
+    if (props.source_is_dir) {
+        return start_remote_json_job(
+            proxy_service_url + "/api/remote/file/move",
+            remote_transfer_body(props),
+            std::move(progress_callback));
+    }
+
     return start_remote_json_job(
         proxy_service_url + "/api/remote/file/rename",
         build_json_object({

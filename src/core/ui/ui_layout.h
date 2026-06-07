@@ -224,6 +224,13 @@ public:
         ImVec4 header_color = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
         ImVec4 header_hovered_color = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
         ImVec4 header_active_color = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
+        bool override_table_border_light = false;
+        ImVec4 table_border_light_color = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
+        bool override_table_border_strong = false;
+        ImVec4 table_border_strong_color = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
+        bool draw_header_separators = false;
+        ImVec4 header_separator_color = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
+        ImVec4 header_bottom_border_color = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
     };
 
 };

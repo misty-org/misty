@@ -762,6 +762,14 @@ bool table(const char* id, const TableProps& props, const std::function<void(ImG
         ImGui::PushStyleColor(ImGuiCol_HeaderActive, props.header_active_color);
         ++color_count;
     }
+    if (props.override_table_border_light) {
+        ImGui::PushStyleColor(ImGuiCol_TableBorderLight, props.table_border_light_color);
+        ++color_count;
+    }
+    if (props.override_table_border_strong) {
+        ImGui::PushStyleColor(ImGuiCol_TableBorderStrong, props.table_border_strong_color);
+        ++color_count;
+    }
 
     ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, props.cell_padding);
     const bool opened = ImGui::BeginTable(
@@ -781,12 +789,42 @@ bool table(const char* id, const TableProps& props, const std::function<void(ImG
         }
 
         ImGui::TableNextRow(ImGuiTableRowFlags_Headers);
+        struct HeaderRect {
+            ImVec2 min;
+            ImVec2 max;
+        };
+        std::vector<HeaderRect> header_rects;
+        if (props.draw_header_separators) {
+            header_rects.reserve(props.columns.size());
+        }
         for (int column_index = 0; column_index < static_cast<int>(props.columns.size()); ++column_index) {
             ImGui::TableSetColumnIndex(column_index);
             if (props.columns[column_index].header_padding_x > 0.0f) {
                 ImGui::SetCursorPosX(ImGui::GetCursorPosX() + props.columns[column_index].header_padding_x);
             }
             ImGui::TableHeader(props.columns[column_index].label);
+            if (props.draw_header_separators) {
+                header_rects.push_back(HeaderRect{
+                    .min = ImGui::GetItemRectMin(),
+                    .max = ImGui::GetItemRectMax(),
+                });
+            }
+        }
+
+        if (props.draw_header_separators && !header_rects.empty()) {
+            ImDrawList* draw_list = ImGui::GetWindowDrawList();
+            const float top_y = header_rects.front().min.y;
+            const float bottom_y = header_rects.front().max.y;
+            for (std::size_t index = 0; index + 1 < header_rects.size(); ++index) {
+                draw_list->AddLine(ImVec2(header_rects[index].max.x, top_y),
+                                   ImVec2(header_rects[index].max.x, bottom_y),
+                                   ImGui::ColorConvertFloat4ToU32(props.header_separator_color),
+                                   1.0f);
+            }
+            draw_list->AddLine(ImVec2(header_rects.front().min.x, bottom_y - 1.0f),
+                               ImVec2(header_rects.back().max.x, bottom_y - 1.0f),
+                               ImGui::ColorConvertFloat4ToU32(props.header_bottom_border_color),
+                               1.0f);
         }
 
         if (content) {

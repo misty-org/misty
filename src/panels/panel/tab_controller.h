@@ -39,6 +39,9 @@ namespace misty::panel {
         TabController() = default;
         ~TabController() = default;
 
+        const Tab* current_active_tab() const { return get_active_tab(); }
+        std::int16_t current_active_tab_index() const { return active_tab_idx; }
+
     protected:
         const Tab* get_active_tab() const;
         void set_active_tab(std::int16_t idx);

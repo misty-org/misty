@@ -2,6 +2,8 @@
 
 #include <chrono>
 #include <filesystem>
+#include <functional>
+#include <thread>
 
 #include <sqlite3.h>
 
@@ -12,6 +14,18 @@
 namespace fs = std::filesystem;
 
 namespace {
+
+bool wait_for(const std::function<bool()>& predicate,
+              std::chrono::milliseconds timeout = std::chrono::milliseconds(1500)) {
+    const auto deadline = std::chrono::steady_clock::now() + timeout;
+    while (std::chrono::steady_clock::now() < deadline) {
+        if (predicate()) {
+            return true;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    return predicate();
+}
 
 class FileTransferStoreTest : public ::testing::Test {
 protected:
@@ -134,6 +148,42 @@ TEST_F(FileTransferStoreTest, ClearMethodsRemovePersistedRows) {
     auto rows = misty::core::FileTransferStore::get().load_recent(10, &error);
     ASSERT_TRUE(error.empty()) << error;
     EXPECT_TRUE(rows.empty());
+}
+
+TEST_F(FileTransferStoreTest, BackgroundHydrationMergesPersistedRowsWithLiveTransfers) {
+    std::string error;
+    misty::core::FileTransferRecord persisted;
+    persisted.id = 4;
+    persisted.job_id = 11;
+    persisted.file_name = "persisted.txt";
+    persisted.status = misty::core::FileTransferStatus::Completed;
+    persisted.queued_at_ms = 1000;
+    persisted.completed_at_ms = 1100;
+    ASSERT_TRUE(misty::core::FileTransferStore::get().upsert(persisted, &error)) << error;
+
+    misty::core::FileTransfer transfers;
+    ASSERT_TRUE(transfers.initialize_persistence_metadata(&error)) << error;
+    ASSERT_TRUE(transfers.start_background_hydration(&error)) << error;
+
+    misty::core::FileTransferRecord live;
+    live.file_name = "live.txt";
+    live.status = misty::core::FileTransferStatus::Queued;
+    const uint64_t live_id = transfers.create_transfer(live);
+    ASSERT_GT(live_id, persisted.id);
+
+    ASSERT_TRUE(wait_for([&]() {
+        std::string poll_error;
+        return transfers.poll_background_hydration(&poll_error);
+    }));
+
+    const auto rows = transfers.get_all_transfers();
+    ASSERT_EQ(rows.size(), 2u);
+    EXPECT_TRUE(std::any_of(rows.begin(), rows.end(), [](const misty::core::FileTransferRecord& row) {
+        return row.file_name == "persisted.txt";
+    }));
+    EXPECT_TRUE(std::any_of(rows.begin(), rows.end(), [live_id](const misty::core::FileTransferRecord& row) {
+        return row.id == live_id && row.file_name == "live.txt";
+    }));
 }
 
 }  // namespace

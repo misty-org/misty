@@ -14,8 +14,10 @@
 #include "core/ui/ui_style.h"
 #include "panels/activity/activity_state.h"
 #include "panels/file_explorer/state/file_explorer_state.h"
+#include "panels/file_explorer/state/library_state.h"
 #include "panels/notification/notification_state.h"
 #include "panels/panel/tab_bar.h"
+#include "panels/search/search_impl.h"
 
 namespace misty::view {
     namespace {
@@ -24,6 +26,75 @@ namespace misty::view {
     namespace {
         constexpr float kPanelToggleSize = 22.0f;
         constexpr float kFilesBottomBarHeight = 22.0f;
+
+        struct PaletteCommandDefinition {
+            const char* id;
+            const char* label;
+            const char* badge;
+        };
+
+        std::string lower_copy(std::string value) {
+            std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
+                return static_cast<char>(std::tolower(ch));
+            });
+            return value;
+        }
+
+        bool fuzzy_match(const std::string& query, const std::string& text) {
+            if (query.empty()) {
+                return true;
+            }
+            const std::string q = lower_copy(query);
+            const std::string t = lower_copy(text);
+            return t.find(q) != std::string::npos;
+        }
+
+        std::vector<PaletteCommandDefinition> builtin_palette_commands() {
+            return {
+                {"explorer.new_tab", "New tab", "Command"},
+                {"explorer.close_pane", "Close tab", "Command"},
+                {"explorer.refresh", "Refresh", "Command"},
+                {"explorer.rename", "Rename selection", "Command"},
+                {"explorer.delete", "Delete selection", "Command"},
+                {"explorer.copy", "Copy selection", "Command"},
+                {"explorer.cut", "Cut selection", "Command"},
+                {"explorer.paste", "Paste", "Command"},
+                {"app.toggle_transfers", "Open transfers", "View"},
+                {"app.open_settings", "Open settings", "View"},
+                {"explorer.preview.toggle", "Toggle preview", "View"},
+                {"explorer.toggle_chat", "Toggle chat", "View"},
+                {"explorer.next_workspace", "Next workspace", "Workspace"},
+            };
+        }
+
+        std::vector<panel::SearchResult> quick_access_palette_locations() {
+            std::vector<panel::SearchResult> results;
+            const char* home = std::getenv("HOME");
+            if (!home || *home == '\0') {
+                return results;
+            }
+            const std::string home_path = home;
+            const std::vector<std::pair<std::string, std::string>> locations = {
+                {"Home", home_path},
+                {"Desktop", home_path + "/Desktop"},
+                {"Documents", home_path + "/Documents"},
+                {"Downloads", home_path + "/Downloads"},
+                {"Projects", home_path + "/Projects"},
+            };
+            for (const auto& [name, path] : locations) {
+                panel::SearchResult result;
+                result.id = "location:" + path;
+                result.name = name;
+                result.path = path;
+                result.subtitle = path;
+                result.kind = panel::SearchResultKind::Location;
+                result.badge = "Quick";
+                result.is_dir = true;
+                result.score = 70;
+                results.push_back(std::move(result));
+            }
+            return results;
+        }
 
         bool bottom_bar_toggle_button(ImDrawList* dl, ImVec2 min, const char* icon_name, const char* tooltip) {
             const ImVec2 max(min.x + kPanelToggleSize, min.y + kPanelToggleSize);
@@ -65,6 +136,10 @@ namespace misty::view {
             ImDrawList* dl = ImGui::GetForegroundDrawList(ImGui::GetMainViewport());
             const ImVec2 max(pos.x + width, pos.y + kFilesBottomBarHeight);
             dl->AddRectFilled(pos, max, IM_COL32(7, 9, 11, 238));
+            dl->AddLine(ImVec2(pos.x, pos.y + 0.5f),
+                        ImVec2(max.x, pos.y + 0.5f),
+                        IM_COL32(56, 58, 64, 210),
+                        1.0f);
 
             const float button_y = pos.y + (kFilesBottomBarHeight - kPanelToggleSize) * 0.5f;
             if (bottom_bar_toggle_button(dl,
@@ -90,6 +165,17 @@ namespace misty::view {
                 1.0f);
         }
 
+        void render_shell_horizontal_divider(float x0, float x1, float y) {
+            if (x1 <= x0) {
+                return;
+            }
+            ImGui::GetForegroundDrawList(ImGui::GetMainViewport())->AddLine(
+                ImVec2(x0, y),
+                ImVec2(x1, y),
+                IM_COL32(39, 39, 42, 170),
+                1.0f);
+        }
+
     }
 
     FilesView::FilesView(core::StateRegistry& state_registry,
@@ -108,6 +194,123 @@ namespace misty::view {
         notification_panel_ = std::make_shared<panel::NotificationPanel>(state_registry_);
         context_menu_panel_ = std::make_shared<panel::ContextMenuPanel>(state_registry_);
         claude_panel_ = std::make_shared<panel::ClaudePanel>(state_registry_, worker_pool_);
+        search_palette_ = std::make_unique<panel::FilesSearchPalette>(state_registry_, worker_pool_);
+        search_palette_->set_local_result_provider([this](const panel::SearchQuery& query) {
+            std::vector<panel::SearchResult> results;
+            const std::string needle = query.commands_only
+                ? lower_copy(query.query)
+                : lower_copy(query.name_filter.empty() ? query.query : query.name_filter);
+
+            for (const auto& command : builtin_palette_commands()) {
+                if (!needle.empty() && !fuzzy_match(needle, command.label) && !fuzzy_match(needle, command.id)) {
+                    continue;
+                }
+                panel::SearchResult result;
+                result.id = command.id;
+                result.name = command.label;
+                result.command_id = command.id;
+                result.kind = panel::SearchResultKind::Command;
+                result.badge = command.badge;
+                result.subtitle = core::CommandManager::get().label(command.id);
+                result.score = query.commands_only ? 150 : 25;
+                results.push_back(std::move(result));
+            }
+
+            if (query.commands_only) {
+                return results;
+            }
+
+            for (auto& result : quick_access_palette_locations()) {
+                if (!needle.empty() && !fuzzy_match(needle, result.name) && !fuzzy_match(needle, result.path)) {
+                    continue;
+                }
+                results.push_back(std::move(result));
+            }
+
+            if (state_registry_.has_state(panel::kLibraryStateKey)) {
+                auto& library = state_registry_.get_state<panel::LibraryState>(panel::kLibraryStateKey);
+                std::lock_guard<std::mutex> lock(library.mu);
+                for (const auto& item : library.recent_files) {
+                    if (!needle.empty() && !fuzzy_match(needle, item.name) && !fuzzy_match(needle, item.path)) {
+                        continue;
+                    }
+                    panel::SearchResult result;
+                    result.id = "recent:" + item.path;
+                    result.name = item.name;
+                    result.path = item.path;
+                    result.subtitle = item.path;
+                    result.kind = panel::SearchResultKind::Location;
+                    result.badge = "Recent";
+                    result.is_dir = item.is_dir;
+                    result.score = 55;
+                    results.push_back(std::move(result));
+                }
+                for (const auto& item : library.starred_files) {
+                    if (!needle.empty() && !fuzzy_match(needle, item.name) && !fuzzy_match(needle, item.path)) {
+                        continue;
+                    }
+                    panel::SearchResult result;
+                    result.id = "starred:" + item.path;
+                    result.name = item.name;
+                    result.path = item.path;
+                    result.subtitle = item.path;
+                    result.kind = panel::SearchResultKind::Location;
+                    result.badge = "Starred";
+                    result.is_dir = item.is_dir;
+                    result.score = 60;
+                    results.push_back(std::move(result));
+                }
+            }
+            return results;
+        });
+        search_palette_->set_execute_handler([this](const panel::SearchResult& result) {
+            if (result.kind == panel::SearchResultKind::Command) {
+                if (result.command_id == "app.open_settings") {
+                    view::switch_view(view::ViewID::Settings);
+                    return;
+                }
+                if (result.command_id == "app.toggle_transfers") {
+                    view::switch_view(view::ViewID::Transfers);
+                    return;
+                }
+                if (result.command_id == "explorer.preview.toggle") {
+                    if (FileWorkspace* workspace = active_workspace()) {
+                        workspace->inspector_visible = !workspace->inspector_visible;
+                    }
+                    return;
+                }
+                if (result.command_id == "explorer.new_tab") {
+                    create_tab();
+                    return;
+                }
+                if (result.command_id == "explorer.close_pane") {
+                    if (const FileTab* tab = active_tab()) {
+                        close_tab(tab->idx);
+                    }
+                    return;
+                }
+                if (result.command_id == "explorer.next_workspace") {
+                    select_next_workspace();
+                    return;
+                }
+                if (explorer_panel_) {
+                    (void)explorer_panel_->execute_palette_command(result.command_id);
+                }
+                return;
+            }
+
+            if (explorer_panel_) {
+                if (result.kind == panel::SearchResultKind::File) {
+                    const std::filesystem::path item_path(result.path);
+                    const std::string parent = item_path.has_parent_path()
+                        ? item_path.parent_path().string()
+                        : result.path;
+                    explorer_panel_->navigate_to_path(parent, true, false);
+                    return;
+                }
+                explorer_panel_->navigate_to_path(result.path, true, false);
+            }
+        });
         load_workspaces();
     }
 
@@ -183,13 +386,29 @@ namespace misty::view {
         props.restore_persistent_state = workspace.idx == 0 && tab_idx == 0;
         props.defer_initial_navigation = !snapshot.explorer.panes.empty();
         props.owns_state_cleanup = !(workspace.idx == 0 && tab_idx == 0);
-
         FileTab tab;
         tab.idx = tab_idx;
         tab.explorer_panel = std::make_shared<panel::FileExplorerPanel>(
             state_registry_,
             worker_pool_,
             std::move(props));
+        tab.explorer_panel->set_search_palette_state_provider(
+            [this]() -> bool {
+                return search_palette_ && search_palette_->is_open();
+            },
+            [this]() -> std::string {
+                return search_palette_ ? search_palette_->current_query() : std::string();
+            },
+            [this]() {
+                const std::string state_key = active_explorer_state_key();
+                std::string current_path;
+                if (state_registry_.has_state(state_key)) {
+                    current_path = state_registry_.get_state<panel::FileExplorerState>(state_key).current_path;
+                }
+                if (search_palette_) {
+                    search_palette_->open(current_path);
+                }
+            });
         tab.explorer_panel->restore_workspace_snapshot(snapshot.explorer);
         configure_workspace_sidebar(tab.explorer_panel);
         workspace.tabs.push_back(std::move(tab));
@@ -657,10 +876,7 @@ namespace misty::view {
         const float navbar_width = 77.0f;
         const float content_x = viewport->WorkPos.x + navbar_width;
         const float content_width = viewport->WorkSize.x - navbar_width;
-        const float proxy_banner_height = render_proxy_status_banner(
-            ImVec2(content_x, viewport->WorkPos.y),
-            content_width
-        );
+        const float proxy_banner_height = 0.0f;
 
         const ImVec2 navbar_pos = viewport->WorkPos;
         const ImVec2 navbar_size(navbar_width, viewport->WorkSize.y);
@@ -668,6 +884,19 @@ namespace misty::view {
         ImGuiIO& io = ImGui::GetIO();
         if (core::CommandManager::get().matches("app.open_settings")) {
             view::switch_view(view::ViewID::Settings);
+        }
+        if (core::CommandManager::get().matches("explorer.open_palette") ||
+            core::CommandManager::get().matches("search.toggle")) {
+            const std::string state_key = active_explorer_state_key();
+            std::string current_path;
+            if (state_registry_.has_state(state_key)) {
+                current_path = state_registry_.get_state<panel::FileExplorerState>(state_key).current_path;
+            }
+            if (search_palette_ && search_palette_->is_open()) {
+                search_palette_->close();
+            } else if (search_palette_) {
+                search_palette_->open(current_path);
+            }
         }
         if (core::CommandManager::get().matches("explorer.toggle_claude")) {
             claude_panel_->toggle();
@@ -678,7 +907,6 @@ namespace misty::view {
         if (core::CommandManager::get().matches("explorer.new_tab")) {
             create_tab();
         }
-
         render_workspace_tabs(
             ImVec2(content_x, viewport->WorkPos.y + proxy_banner_height),
             content_width);
@@ -866,6 +1094,7 @@ namespace misty::view {
             }
             ImGui::End();
             ImGui::PopStyleVar(2);
+            render_shell_horizontal_divider(content_x, content_x + toolbar_w, shell_content_y);
         }
 
         if (workspace->sidebar_visible) {
@@ -925,6 +1154,14 @@ namespace misty::view {
         } else {
             notification_panel_->render();
         }
+        if (search_palette_) {
+            const std::string state_key = active_explorer_state_key();
+            std::string current_path;
+            if (state_registry_.has_state(state_key)) {
+                current_path = state_registry_.get_state<panel::FileExplorerState>(state_key).current_path;
+            }
+            search_palette_->render(current_path, viewport->WorkPos, viewport->WorkSize);
+        }
 
         if (pending_sidebar_workspace_create_) {
             pending_sidebar_workspace_create_ = false;
@@ -949,81 +1186,6 @@ namespace misty::view {
         }
 
         autosave_workspaces_if_due();
-    }
-
-    void FilesView::schedule_proxy_probe(bool force) {
-        bool expected = false;
-        if (!proxy_probe_in_flight_->compare_exchange_strong(expected, true)) {
-            return;
-        }
-
-        auto probe_state = proxy_probe_in_flight_;
-        worker_pool_.add(
-            [force]() {
-                core::ProxyManager::get().ensure_running(force);
-            },
-            [probe_state]() {
-                probe_state->store(false);
-            },
-            [probe_state](const std::string&) {
-                core::ProxyManager::get().record_proxy_request_result(false);
-                probe_state->store(false);
-            }
-        );
-    }
-
-    float FilesView::render_proxy_status_banner(const ImVec2& pos, float width) {
-        if (core::ProxyManager::get().is_proxy_available()) {
-            return 0.0f;
-        }
-
-        constexpr float kBannerHeight = 62.0f;
-        constexpr float kButtonWidth = 112.0f;
-
-        ImGui::SetNextWindowPos(pos);
-        ImGui::SetNextWindowSize(ImVec2(width, kBannerHeight));
-        ImGuiWindowFlags flags =
-            ImGuiWindowFlags_NoTitleBar |
-            ImGuiWindowFlags_NoResize |
-            ImGuiWindowFlags_NoMove |
-            ImGuiWindowFlags_NoScrollbar |
-            ImGuiWindowFlags_NoSavedSettings;
-
-        if (ImGuiViewport* main_viewport = ImGui::GetMainViewport()) {
-            ImGui::SetNextWindowViewport(main_viewport->ID);
-        }
-
-        ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.20f, 0.13f, 0.09f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.48f, 0.31f, 0.15f, 1.0f));
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16.0f, 12.0f));
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
-
-        if (ImGui::Begin("##proxy_status_banner", nullptr, flags)) {
-            ImGui::PushFont(core::FontManager::get().get_font(core::FontID::DEFAULT));
-            ImGui::TextUnformatted("Background Service Offline");
-            ImGui::PopFont();
-
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.90f, 0.84f, 0.76f, 1.0f));
-            ImGui::TextWrapped("%s", core::ProxyManager::get().get_proxy_status_message().c_str());
-            ImGui::PopStyleColor();
-
-            ImGui::SetCursorPos(ImVec2(
-                ImGui::GetWindowWidth() - kButtonWidth - 16.0f,
-                (kBannerHeight - 32.0f) * 0.5f
-            ));
-            if (proxy_probe_in_flight_->load()) {
-                ImGui::BeginDisabled();
-                ImGui::Button("Checking...", ImVec2(kButtonWidth, 32.0f));
-                ImGui::EndDisabled();
-            } else if (ImGui::Button("Retry", ImVec2(kButtonWidth, 32.0f))) {
-                schedule_proxy_probe(true);
-            }
-        }
-        ImGui::End();
-
-        ImGui::PopStyleVar(2);
-        ImGui::PopStyleColor(2);
-        return kBannerHeight;
     }
 
 }

@@ -116,6 +116,26 @@ std::string shared_inline_editable_name(const RenameSessionState& session) {
     return {};
 }
 
+void restore_inline_rename_focus(RenameSessionState& session) {
+    if (!session.active || session.participants.empty()) {
+        return;
+    }
+    std::string target_key = session.focus_key;
+    if (target_key.empty() || session.participants.find(target_key) == session.participants.end()) {
+        for (const auto& key : session.participant_order) {
+            if (session.participants.find(key) != session.participants.end()) {
+                target_key = key;
+                break;
+            }
+        }
+    }
+    if (target_key.empty()) {
+        return;
+    }
+    session.focus_key = target_key;
+    session.focus_requested = true;
+}
+
 }  // namespace
 
 RenameSessionState& FileExplorerPanel::rename_session_state() {
@@ -315,11 +335,6 @@ void FileExplorerPanel::show_rename_review_modal() {
         }
     }
 
-    if (ImGui::IsPopupOpen("##rename_review_modal")) {
-        ImGui::GetIO().WantCaptureMouse = true;
-        ImGui::GetIO().WantCaptureKeyboard = true;
-    }
-
     ImGui::OpenPopup("##rename_review_modal");
     ImGui::SetNextWindowSize(ImVec2(720.0f, 0.0f), ImGuiCond_Appearing);
     if (ImGuiViewport* main_viewport = ImGui::GetMainViewport()) {
@@ -413,6 +428,7 @@ void FileExplorerPanel::show_rename_review_modal() {
         if (ImGui::Button("Cancel", ImVec2(100.0f, 0.0f))) {
             std::lock_guard<std::mutex> lock(session.mu);
             session.review_modal_open = false;
+            restore_inline_rename_focus(session);
             ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
@@ -427,6 +443,7 @@ void FileExplorerPanel::show_rename_review_modal() {
     if (!modal_open) {
         std::lock_guard<std::mutex> lock(session.mu);
         session.review_modal_open = false;
+        restore_inline_rename_focus(session);
     }
 }
 
@@ -466,14 +483,6 @@ void FileExplorerPanel::confirm_rename_review() {
     {
         std::lock_guard<std::mutex> lock(session.mu);
         session.clear();
-        if (!queue_items.empty()) {
-            session.job_banner_active = true;
-            session.job_banner_item_count = queue_items.size();
-            session.job_banner_job_id = 0;
-            session.job_banner_text = "Rename job: starting " +
-                std::to_string(queue_items.size()) +
-                (queue_items.size() == 1 ? " item" : " items");
-        }
     }
 
     if (queue_items.empty()) {
@@ -489,54 +498,35 @@ void FileExplorerPanel::confirm_rename_review() {
         });
     }
 
-    const uint64_t batch_id = enqueue_rename_operation_batch(
+    enqueue_rename_operation_batch_async(
         registry_,
         worker_pool_,
-        requests,
+        std::move(requests),
         [this](const core::FileMasterResult& result) {
             if (!result.success) {
                 return;
             }
-            auto& session = rename_session_state();
-            std::lock_guard<std::mutex> lock(session.mu);
-            if (session.job_banner_active) {
-                session.job_banner_active = false;
-                session.job_banner_item_count = 0;
-                session.job_banner_job_id = 0;
-                session.job_banner_text.clear();
-            }
         });
-    {
-        auto& session = rename_session_state();
-        std::lock_guard<std::mutex> lock(session.mu);
-        session.job_banner_job_id = batch_id;
-    }
 }
 
 void FileExplorerPanel::render_rename_status_banner(float available_width) {
     auto& session = rename_session_state();
     RenameSessionSummary summary;
-    bool show_job_banner = false;
     std::string text;
     {
         std::lock_guard<std::mutex> lock(session.mu);
         if (session.active) {
             summary = summarize_rename_session(session);
-        } else if (session.job_banner_active) {
-            show_job_banner = true;
-            text = session.job_banner_text;
         } else {
             return;
         }
     }
 
-    if (!show_job_banner) {
-        text = summary.invalid == 0
-            ? "Rename mode: Press Enter to review " + std::to_string(summary.ready) + " items"
-            : "Rename mode: " + std::to_string(summary.ready) + " ready, " +
-                std::to_string(summary.unchanged) + " unchanged, " +
-                std::to_string(summary.invalid) + " need fixes";
-    }
+    text = summary.invalid == 0
+        ? "Rename mode: Press Enter to review " + std::to_string(summary.ready) + " items"
+        : "Rename mode: " + std::to_string(summary.ready) + " ready, " +
+            std::to_string(summary.unchanged) + " unchanged, " +
+            std::to_string(summary.invalid) + " need fixes";
 
     const ImVec2 text_size = ImGui::CalcTextSize(text.c_str());
     const float banner_width = std::min(std::max(available_width, 220.0f), text_size.x + 24.0f);
@@ -545,11 +535,9 @@ void FileExplorerPanel::render_rename_status_banner(float available_width) {
     ImGui::InvisibleButton("##rename_status_banner", size);
     const ImVec2 min = ImGui::GetItemRectMin();
     const ImVec2 max = ImGui::GetItemRectMax();
-    const ImU32 bg = show_job_banner
-        ? IM_COL32(38, 79, 118, 220)
-        : (summary.invalid == 0
-            ? IM_COL32(42, 97, 77, 220)
-            : IM_COL32(112, 66, 32, 220));
+    const ImU32 bg = summary.invalid == 0
+        ? IM_COL32(42, 97, 77, 220)
+        : IM_COL32(112, 66, 32, 220);
     ImGui::GetWindowDrawList()->AddRectFilled(min, max, bg, 8.0f);
     ImGui::GetWindowDrawList()->AddText(
         ImVec2(min.x + 12.0f, min.y + (size.y - ImGui::GetTextLineHeight()) * 0.5f),

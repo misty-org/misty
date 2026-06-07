@@ -175,11 +175,26 @@ uint64_t enqueue_rename_operation_batch(core::StateRegistry& registry,
                                         core::WorkerPool& worker_pool,
                                         const std::vector<RenameExecutionRequest>& requests,
                                         std::function<void(const core::FileMasterResult&)> on_complete = {});
+void enqueue_rename_operation_batch_async(core::StateRegistry& registry,
+                                          core::WorkerPool& worker_pool,
+                                          std::vector<RenameExecutionRequest> requests,
+                                          std::function<void(const core::FileMasterResult&)> on_complete = {});
 
 void pump_operation_queue(core::StateRegistry& registry, core::WorkerPool& worker_pool);
 bool cancel_queued_operation(core::StateRegistry& registry, uint64_t transfer_id);
+void cancel_queued_operation_async(core::StateRegistry& registry,
+                                   core::WorkerPool& worker_pool,
+                                   uint64_t transfer_id);
 bool retry_operation(core::StateRegistry& registry, core::WorkerPool& worker_pool, uint64_t transfer_id);
+void retry_operation_async(core::StateRegistry& registry,
+                           core::WorkerPool& worker_pool,
+                           uint64_t transfer_id);
 bool undo_operation(core::StateRegistry& registry, core::WorkerPool& worker_pool, uint64_t undo_token_id);
+void undo_operation_async(core::StateRegistry& registry,
+                          core::WorkerPool& worker_pool,
+                          uint64_t undo_token_id);
+void rehydrate_persisted_undo_records(core::StateRegistry& registry);
+void rehydrate_persisted_retry_operations(core::StateRegistry& registry);
 void clear_completed_operations(core::StateRegistry& registry);
 void clear_failed_operations(core::StateRegistry& registry);
 void render_operation_conflict_modal(core::StateRegistry& registry, core::WorkerPool& worker_pool);

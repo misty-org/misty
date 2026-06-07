@@ -262,6 +262,282 @@ FileItem renamed_item_snapshot(const FileItem& item, const std::string& new_name
     return renamed;
 }
 
+OperationDescriptor descriptor_for_payload(uint64_t batch_id,
+                                           OperationPayload payload,
+                                           ConflictPolicy conflict_policy,
+                                           bool preserve_order,
+                                           std::function<void(const core::FileMasterResult&)> on_complete);
+std::string synthetic_mount_path_for(core::StateRegistry& registry,
+                                     const std::string& remote_name,
+                                     const std::string& remote_path);
+bool remote_item_is_dir(const std::string& remote_name, const std::string& remote_path);
+void schedule_operation_action(core::WorkerPool& worker_pool, std::function<void()> action) {
+    worker_pool.add(std::move(action), {}, {});
+}
+
+std::optional<UndoRecord> undo_record_from_transfer(core::StateRegistry& registry,
+                                                    const core::FileTransferRecord& row) {
+    if (!row.undoable ||
+        row.undo_token_id == 0 ||
+        row.status != core::FileTransferStatus::Completed) {
+        return std::nullopt;
+    }
+
+    UndoRecord record;
+    record.undo_id = row.undo_token_id;
+    record.source_transfer_id = row.id;
+    record.created_at = std::chrono::steady_clock::now();
+    record.expires_at = record.created_at + std::chrono::minutes(10);
+
+    if (row.transfer_type == core::FileTransferType::Rename &&
+        !row.local_source_path.empty() &&
+        !row.local_dest_path.empty()) {
+        const fs::path current_path(row.local_dest_path);
+        const fs::path original_path(row.local_source_path);
+        if (current_path.filename().empty() || original_path.filename().empty()) {
+            return std::nullopt;
+        }
+
+        record.kind = OperationKind::Rename;
+        record.item.name = current_path.filename().string();
+        record.item.path = current_path.string();
+        record.item.id = record.item.path;
+        record.item.type = FileType::LOCAL;
+        record.rename_new_name = original_path.filename().string();
+        record.summary = "Undo rename";
+        return record;
+    }
+
+    if (row.transfer_type == core::FileTransferType::Rename &&
+        !row.remote_source_name.empty() &&
+        !row.remote_source_path.empty() &&
+        !row.remote_dest_name.empty() &&
+        !row.remote_dest_path.empty()) {
+        const std::string current_name = fs::path(row.remote_dest_path).filename().string();
+        const std::string original_name = fs::path(row.remote_source_path).filename().string();
+        if (current_name.empty() || original_name.empty()) {
+            return std::nullopt;
+        }
+
+        record.kind = OperationKind::Rename;
+        record.item.name = current_name;
+        record.item.sync_remote_name = row.remote_dest_name;
+        record.item.sync_remote_path = row.remote_dest_path;
+        record.item.path = synthetic_mount_path_for(registry, row.remote_dest_name, row.remote_dest_path);
+        record.item.id = record.item.path;
+        record.item.type = FileType::REMOTE;
+        record.item.is_dir = remote_item_is_dir(row.remote_dest_name, row.remote_dest_path);
+        record.rename_new_name = original_name;
+        record.summary = "Undo rename";
+        return record;
+    }
+
+    if (row.transfer_type == core::FileTransferType::Move &&
+        !row.local_source_path.empty() &&
+        !row.local_dest_path.empty()) {
+        const fs::path current_path(row.local_dest_path);
+        const fs::path original_path(row.local_source_path);
+        if (current_path.filename().empty()) {
+            return std::nullopt;
+        }
+
+        record.kind = OperationKind::Move;
+        record.item.name = current_path.filename().string();
+        record.item.path = current_path.string();
+        record.item.id = record.item.path;
+        record.item.type = FileType::LOCAL;
+        record.clipboard_op = ClipboardOp::CUT;
+        record.dest_dir = original_path.parent_path().string();
+        record.summary = "Undo move";
+        return record;
+    }
+
+    return std::nullopt;
+}
+
+std::string inferred_provider_folder_for(core::StateRegistry& registry, const std::string& remote_name) {
+    (void)registry;
+    const std::size_t dash = remote_name.find('-');
+    if (dash != std::string::npos && dash > 0) {
+        return remote_name.substr(0, dash);
+    }
+    return "remote";
+}
+
+std::string synthetic_mount_path_for(core::StateRegistry& registry,
+                                     const std::string& remote_name,
+                                     const std::string& remote_path) {
+    fs::path mount_path = fs::path(get_mount_root()) / inferred_provider_folder_for(registry, remote_name) / remote_name;
+    const fs::path relative = fs::path(remote_path).relative_path();
+    if (!relative.empty() && relative != ".") {
+        mount_path /= relative;
+    }
+    return mount_path.lexically_normal().string();
+}
+
+bool remote_item_is_dir(const std::string& remote_name, const std::string& remote_path) {
+    if (remote_name.empty() || remote_path.empty()) {
+        return false;
+    }
+
+    core::FileMasterProps props;
+    props.remote_source.remote_name = remote_name;
+    props.remote_source.remote_path = fs::path(remote_path).parent_path().generic_string();
+    if (props.remote_source.remote_path.empty()) {
+        props.remote_source.remote_path = "/";
+    }
+
+    std::vector<core::FileMasterListItem> items;
+    if (!core::list_remote_path(props, items).success) {
+        return false;
+    }
+
+    const std::string filename = fs::path(remote_path).filename().string();
+    const auto it = std::find_if(items.begin(), items.end(), [&](const core::FileMasterListItem& item) {
+        return item.name == filename;
+    });
+    return it != items.end() && it->is_dir;
+}
+
+FileItem file_item_from_transfer_row(core::StateRegistry& registry, const core::FileTransferRecord& row) {
+    FileItem item;
+    if (!row.remote_source_name.empty() && !row.remote_source_path.empty()) {
+        item.type = FileType::REMOTE;
+        item.sync_remote_name = row.remote_source_name;
+        item.sync_remote_path = row.remote_source_path;
+        item.name = fs::path(row.remote_source_path).filename().string();
+        if (item.name.empty()) {
+            item.name = row.file_name;
+        }
+        if (row.transfer_type == core::FileTransferType::Download && !row.local_dest_path.empty()) {
+            item.path = row.local_dest_path;
+        } else {
+            item.path = synthetic_mount_path_for(registry, row.remote_source_name, row.remote_source_path);
+        }
+        item.id = item.path;
+        item.is_dir = remote_item_is_dir(row.remote_source_name, row.remote_source_path);
+        return item;
+    }
+
+    item.type = FileType::LOCAL;
+    item.path = row.local_source_path;
+    item.id = item.path;
+    item.name = fs::path(item.path).filename().string();
+    if (item.name.empty()) {
+        item.name = row.file_name;
+    }
+    std::error_code ec;
+    item.is_dir = !item.path.empty() && fs::is_directory(item.path, ec) && !ec;
+    return item;
+}
+
+std::string retry_destination_dir_for(core::StateRegistry& registry, const core::FileTransferRecord& row) {
+    if (!row.remote_dest_name.empty() && !row.remote_dest_path.empty()) {
+        return synthetic_mount_path_for(registry,
+                                        row.remote_dest_name,
+                                        fs::path(row.remote_dest_path).parent_path().generic_string());
+    }
+    if (!row.local_dest_path.empty()) {
+        return fs::path(row.local_dest_path).parent_path().string();
+    }
+    return {};
+}
+
+std::optional<OperationPayload> retry_payload_from_transfer_row(core::StateRegistry& registry,
+                                                                const core::FileTransferRecord& row) {
+    OperationPayload payload;
+    payload.item = file_item_from_transfer_row(registry, row);
+
+    switch (row.transfer_type) {
+        case core::FileTransferType::Copy:
+        case core::FileTransferType::Upload:
+        case core::FileTransferType::Move: {
+            const std::string dest_dir = retry_destination_dir_for(registry, row);
+            if (payload.item.path.empty() || dest_dir.empty()) {
+                return std::nullopt;
+            }
+            payload.kind = OperationPayloadKind::Clipboard;
+            payload.clipboard_op = row.transfer_type == core::FileTransferType::Move
+                ? ClipboardOp::CUT
+                : ClipboardOp::COPY;
+            payload.dest_dir = dest_dir;
+            if (!row.file_name.empty() && row.file_name != payload.item.name) {
+                payload.override_name = row.file_name;
+            }
+            return payload;
+        }
+        case core::FileTransferType::Rename: {
+            const std::string source_name = payload.item.name.empty()
+                ? fs::path(payload.item.path).filename().string()
+                : payload.item.name;
+            const std::string dest_name = !row.remote_dest_path.empty()
+                ? fs::path(row.remote_dest_path).filename().string()
+                : fs::path(row.local_dest_path).filename().string();
+            if (payload.item.path.empty() || source_name.empty() || dest_name.empty() || source_name == dest_name) {
+                return std::nullopt;
+            }
+            payload.kind = OperationPayloadKind::Rename;
+            payload.rename_new_name = dest_name;
+            payload.dest_dir = !row.remote_dest_path.empty()
+                ? synthetic_mount_path_for(registry,
+                                           row.remote_dest_name.empty() ? row.remote_source_name : row.remote_dest_name,
+                                           fs::path(row.remote_dest_path).parent_path().generic_string())
+                : fs::path(row.local_dest_path).parent_path().string();
+            return payload;
+        }
+        case core::FileTransferType::Delete: {
+            if (payload.item.path.empty() && payload.item.sync_remote_path.empty()) {
+                return std::nullopt;
+            }
+            payload.kind = OperationPayloadKind::Delete;
+            return payload;
+        }
+        case core::FileTransferType::Download: {
+            if (!is_remote_file_master_item(payload.item) || row.local_dest_path.empty()) {
+                return std::nullopt;
+            }
+            payload.kind = OperationPayloadKind::Download;
+            payload.item.name = fs::path(row.local_dest_path).filename().string();
+            if (payload.item.name.empty()) {
+                payload.item.name = row.file_name;
+            }
+            payload.item.path = row.local_dest_path;
+            payload.item.id = payload.item.path;
+            return payload;
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<OperationDescriptor> retry_descriptor_from_transfer_row(core::StateRegistry& registry,
+                                                                      const core::FileTransferRecord& row) {
+    if (!row.retryable ||
+        (row.status != core::FileTransferStatus::Failed &&
+         row.status != core::FileTransferStatus::Interrupted)) {
+        return std::nullopt;
+    }
+
+    const auto payload = retry_payload_from_transfer_row(registry, row);
+    if (!payload.has_value()) {
+        return std::nullopt;
+    }
+
+    OperationDescriptor op = descriptor_for_payload(row.job_id, *payload, ConflictPolicy::Ask, false, {});
+    op.transfer_id = row.id;
+    op.retryable = row.retryable;
+    op.cancelable = row.cancelable;
+    if (row.transfer_type == core::FileTransferType::Rename) {
+        op.preserve_order = true;
+    }
+    switch (row.conflict_policy) {
+        case core::FileTransferConflictPolicy::Ask: op.conflict_policy = ConflictPolicy::Ask; break;
+        case core::FileTransferConflictPolicy::Replace: op.conflict_policy = ConflictPolicy::Replace; break;
+        case core::FileTransferConflictPolicy::Skip: op.conflict_policy = ConflictPolicy::Skip; break;
+        case core::FileTransferConflictPolicy::KeepBoth: op.conflict_policy = ConflictPolicy::KeepBoth; break;
+    }
+    return op;
+}
+
 void apply_successful_rename_to_loaded_state(core::StateRegistry& registry,
                                              const std::string& owner_state_key,
                                              const FileItem& item,
@@ -318,7 +594,7 @@ void maybe_record_undo(core::StateRegistry& registry, const OperationDescriptor&
 
     UndoRecord record;
     bool supported = false;
-    if (op.kind == OperationKind::Rename && !op.target.is_remote()) {
+    if (op.kind == OperationKind::Rename) {
         record.kind = OperationKind::Rename;
         record.item = renamed_item_snapshot(op.payload.item, target_name_for(op.payload));
         record.rename_new_name = op.payload.item.name;
@@ -715,6 +991,15 @@ uint64_t enqueue_rename_operation_batch(core::StateRegistry& registry,
     return batch_id;
 }
 
+void enqueue_rename_operation_batch_async(core::StateRegistry& registry,
+                                          core::WorkerPool& worker_pool,
+                                          std::vector<RenameExecutionRequest> requests,
+                                          std::function<void(const core::FileMasterResult&)> on_complete) {
+    schedule_operation_action(worker_pool, [&registry, &worker_pool, requests = std::move(requests), on_complete = std::move(on_complete)]() mutable {
+        enqueue_rename_operation_batch(registry, worker_pool, requests, std::move(on_complete));
+    });
+}
+
 void pump_operation_queue(core::StateRegistry& registry, core::WorkerPool& worker_pool) {
     std::vector<uint64_t> ready_ids;
     {
@@ -803,14 +1088,35 @@ bool cancel_queued_operation(core::StateRegistry& registry, uint64_t transfer_id
     return true;
 }
 
+void cancel_queued_operation_async(core::StateRegistry& registry,
+                                   core::WorkerPool& worker_pool,
+                                   uint64_t transfer_id) {
+    schedule_operation_action(worker_pool, [&registry, transfer_id]() {
+        cancel_queued_operation(registry, transfer_id);
+    });
+}
+
 bool retry_operation(core::StateRegistry& registry, core::WorkerPool& worker_pool, uint64_t transfer_id) {
     core::FileTransferRecord record;
     if (!transfer_state(registry).get_transfer(transfer_id, record)) {
         return false;
     }
 
+    bool needs_rehydrate = false;
     OperationDescriptor original;
     {
+        auto& queue = queue_state(registry);
+        std::lock_guard<std::mutex> lock(queue.mu);
+        const auto it = queue.operations.find(transfer_id);
+        if (it == queue.operations.end()) {
+            needs_rehydrate = true;
+        } else {
+            original = it->second;
+        }
+    }
+
+    if (needs_rehydrate) {
+        rehydrate_persisted_retry_operations(registry);
         auto& queue = queue_state(registry);
         std::lock_guard<std::mutex> lock(queue.mu);
         const auto it = queue.operations.find(transfer_id);
@@ -840,39 +1146,139 @@ bool retry_operation(core::StateRegistry& registry, core::WorkerPool& worker_poo
     return true;
 }
 
-bool undo_operation(core::StateRegistry& registry, core::WorkerPool& worker_pool, uint64_t undo_token_id) {
-    UndoRecord record;
+void retry_operation_async(core::StateRegistry& registry,
+                           core::WorkerPool& worker_pool,
+                           uint64_t transfer_id) {
+    schedule_operation_action(worker_pool, [&registry, &worker_pool, transfer_id]() {
+        retry_operation(registry, worker_pool, transfer_id);
+    });
+}
+
+void rehydrate_persisted_retry_operations(core::StateRegistry& registry) {
+    auto& transfers = transfer_state(registry);
+    auto& queue = queue_state(registry);
+    const auto rows = transfers.get_all_transfers();
+
+    std::unordered_set<uint64_t> existing_ids;
     {
+        std::lock_guard<std::mutex> lock(queue.mu);
+        existing_ids.reserve(queue.operations.size());
+        for (const auto& [transfer_id, _] : queue.operations) {
+            existing_ids.insert(transfer_id);
+        }
+    }
+
+    std::vector<OperationDescriptor> restored_operations;
+    std::vector<uint64_t> invalid_retry_rows;
+    for (const auto& row : rows) {
+        if (!row.retryable ||
+            (row.status != core::FileTransferStatus::Failed &&
+             row.status != core::FileTransferStatus::Interrupted) ||
+            existing_ids.contains(row.id)) {
+            continue;
+        }
+
+        const auto restored = retry_descriptor_from_transfer_row(registry, row);
+        if (!restored.has_value()) {
+            invalid_retry_rows.push_back(row.id);
+            continue;
+        }
+        restored_operations.push_back(*restored);
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(queue.mu);
+        for (auto& op : restored_operations) {
+            queue.operations.emplace(op.transfer_id, std::move(op));
+        }
+    }
+
+    for (uint64_t transfer_id : invalid_retry_rows) {
+        transfers.update_action_flags(transfer_id, false, false, false, 0);
+    }
+}
+
+void rehydrate_persisted_undo_records(core::StateRegistry& registry) {
+    auto& transfers = transfer_state(registry);
+    auto& queue = queue_state(registry);
+    const auto rows = transfers.get_all_transfers();
+
+    uint64_t max_undo_id = 0;
+    std::vector<std::pair<uint64_t, bool>> invalid_rows;
+    {
+        std::lock_guard<std::mutex> lock(queue.mu);
+        for (const auto& row : rows) {
+            if (!row.undoable || row.undo_token_id == 0) {
+                continue;
+            }
+
+            const auto restored = undo_record_from_transfer(registry, row);
+            if (!restored.has_value()) {
+                invalid_rows.emplace_back(row.id, row.retryable);
+                continue;
+            }
+
+            max_undo_id = std::max(max_undo_id, restored->undo_id);
+            queue.undo_records[restored->undo_id] = *restored;
+        }
+        queue.next_undo_id = std::max(queue.next_undo_id, max_undo_id + 1);
+    }
+
+    for (const auto& [transfer_id, retryable] : invalid_rows) {
+        transfers.update_action_flags(transfer_id, false, retryable, false, 0);
+    }
+}
+
+bool undo_operation(core::StateRegistry& registry, core::WorkerPool& worker_pool, uint64_t undo_token_id) {
+    auto take_record = [&]() -> std::optional<UndoRecord> {
         auto& queue = queue_state(registry);
         std::lock_guard<std::mutex> lock(queue.mu);
         const auto it = queue.undo_records.find(undo_token_id);
         if (it == queue.undo_records.end()) {
+            return std::nullopt;
+        }
+        UndoRecord record = it->second;
+        queue.undo_records.erase(it);
+        return record;
+    };
+
+    std::optional<UndoRecord> record = take_record();
+    if (!record.has_value()) {
+        rehydrate_persisted_undo_records(registry);
+        record = take_record();
+        if (!record.has_value()) {
             return false;
         }
-        record = it->second;
-        queue.undo_records.erase(it);
     }
 
-    if (record.kind == OperationKind::Rename) {
+    if (record->kind == OperationKind::Rename) {
         RenameExecutionRequest request;
         request.owner_state_key = "";
-        request.directory_path = fs::path(record.item.path).parent_path().string();
-        request.item = record.item;
-        request.new_name = record.rename_new_name;
+        request.directory_path = fs::path(record->item.path).parent_path().string();
+        request.item = record->item;
+        request.new_name = record->rename_new_name;
         enqueue_rename_operation_batch(registry, worker_pool, {request});
         return true;
     }
 
-    if (record.kind == OperationKind::Move) {
+    if (record->kind == OperationKind::Move) {
         return enqueue_clipboard_operation_batch(registry,
                                                  worker_pool,
                                                  "",
-                                                 {record.item},
-                                                 record.dest_dir,
+                                                 {record->item},
+                                                 record->dest_dir,
                                                  ClipboardOp::CUT,
                                                  "") != 0;
     }
     return false;
+}
+
+void undo_operation_async(core::StateRegistry& registry,
+                          core::WorkerPool& worker_pool,
+                          uint64_t undo_token_id) {
+    schedule_operation_action(worker_pool, [&registry, &worker_pool, undo_token_id]() {
+        undo_operation(registry, worker_pool, undo_token_id);
+    });
 }
 
 void clear_completed_operations(core::StateRegistry& registry) {
@@ -917,10 +1323,10 @@ void render_operation_conflict_modal(core::StateRegistry& registry, core::Worker
         ImGui::Checkbox("Apply to remaining items in this batch", &apply_to_batch);
 
         if (ImGui::Button("Cancel", ImVec2(96.0f, 0.0f))) {
-            cancel_queued_operation(registry, dialog.transfer_id);
             std::lock_guard<std::mutex> lock(queue.mu);
             queue.conflict_dialog = {};
             ImGui::CloseCurrentPopup();
+            cancel_queued_operation_async(registry, worker_pool, dialog.transfer_id);
         }
         ImGui::SameLine();
         if (ImGui::Button("Continue", ImVec2(96.0f, 0.0f))) {
@@ -952,7 +1358,9 @@ void render_operation_conflict_modal(core::StateRegistry& registry, core::Worker
                 queue.conflict_dialog = {};
             }
             ImGui::CloseCurrentPopup();
-            pump_operation_queue(registry, worker_pool);
+            schedule_operation_action(worker_pool, [&registry, &worker_pool]() {
+                pump_operation_queue(registry, worker_pool);
+            });
         }
 
         ImGui::EndPopup();
