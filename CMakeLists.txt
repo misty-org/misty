@@ -36,6 +36,9 @@ if(MISTY_BUILD_BUNDLED_PLUGINS OR MISTY_BUILD_DEV_PLUGINS)
                 "${CMAKE_SOURCE_DIR}/vendor/watcher/include"
                 "${CMAKE_SOURCE_DIR}/vendor/xxhash"
             )
+            target_sources(misty_plugin_sandbox PRIVATE
+                "${CMAKE_SOURCE_DIR}/src/panels/notification/notification_state.cpp"
+            )
         endif()
     else()
         message(FATAL_ERROR "Plugin source directory not found: ${MISTY_EXTERNAL_PLUGIN_DIR}")

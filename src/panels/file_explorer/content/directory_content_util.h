@@ -122,4 +122,13 @@ void render_file_size_cell(const FileItem& file);
  */
 void render_file_state_cell(const FileListing& listing, const FileItem& file);
 
+/**
+ * @brief Renders an ImGui input that edits a std::string in place.
+ */
+bool input_text_string(const char* id,
+                       std::string& value,
+                       ImGuiInputTextFlags flags = 0,
+                       const char* hint = nullptr,
+                       float width = 0.0f);
+
 }  // namespace misty::panel

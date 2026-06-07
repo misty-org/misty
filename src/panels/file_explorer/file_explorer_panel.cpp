@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <nlohmann/json.hpp>
 
+#include "panels/file_explorer/content/file_explorer_content_util.h"
 #include "panels/file_explorer/state/remote_mount_state.h"
 
 namespace fs = std::filesystem;
@@ -16,6 +17,46 @@ using namespace misty::core;
 namespace misty::panel {
 
 namespace {
+std::string normalize_path_text(const std::string& path) {
+    if (path.empty()) {
+        return {};
+    }
+    const std::string normalized = fs::path(path).lexically_normal().generic_string();
+    return normalized.empty() || normalized == "." ? path : normalized;
+}
+
+std::string local_parent_directory_text(const std::string& path) {
+    if (path.empty()) {
+        return {};
+    }
+    const std::string parent = fs::path(path).parent_path().generic_string();
+    if (parent.empty() || parent == ".") {
+        return {};
+    }
+    return normalize_path_text(parent);
+}
+
+std::string remote_parent_directory_text(const std::string& path) {
+    const std::string parent = local_parent_directory_text(path);
+    return parent == "/" ? std::string() : parent;
+}
+
+bool local_transfer_matches_directory(const std::string& current_path, const std::string& candidate_path) {
+    if (current_path.empty() || candidate_path.empty()) {
+        return false;
+    }
+    return normalize_path_text(current_path) == local_parent_directory_text(candidate_path);
+}
+
+bool remote_transfer_matches_directory(const RemoteBrowseTarget& current_target,
+                                       const std::string& remote_name,
+                                       const std::string& remote_path) {
+    if (remote_name.empty() || current_target.remote_name != remote_name || remote_path.empty()) {
+        return false;
+    }
+    return normalize_path_text(current_target.remote_path) == remote_parent_directory_text(remote_path);
+}
+
 std::vector<std::string> stack_to_vector(std::stack<std::string> values) {
     std::vector<std::string> ordered;
     ordered.reserve(values.size());
@@ -40,7 +81,7 @@ std::stack<std::string> vector_to_stack(const json& values) {
     return out;
 }
 
-std::string default_local_start_path() {
+std::string fallback_local_start_path() {
     if (const char* home = std::getenv("HOME")) {
         return home;
     }
@@ -55,9 +96,16 @@ FileExplorerPanel::FileExplorerPanel(StateRegistry& registry,
       registry_(registry),
       worker_pool_(worker_pool),
       state_key_(std::move(props.state_key)),
-      search_state_key_(state_key_ + "_Search"),
+      compare_owner_state_key_(std::move(props.compare_owner_state_key)),
       preview_panel_(std::make_unique<PreviewPanel>()),
-      owns_state_cleanup_(props.owns_state_cleanup) {
+      owns_state_cleanup_(props.owns_state_cleanup),
+      mode_(props.mode),
+      initial_compare_pair_id_(props.compare_pair_id),
+      initial_compare_watch_mode_(props.compare_watch_mode),
+      initial_compare_diff_tray_open_(props.compare_diff_tray_open) {
+    if (compare_owner_state_key_.empty() && mode_ == FileExplorerPanelMode::CompareSync) {
+        compare_owner_state_key_ = state_key_;
+    }
     registry_.get_state<FileExplorerState>(state_key_);
     auto& library = registry_.get_state<LibraryState>(kLibraryStateKey);
     registry_.get_state<FileListingsState>(kFileListingsStateKey).get_or_create(state_key_);
@@ -66,7 +114,7 @@ FileExplorerPanel::FileExplorerPanel(StateRegistry& registry,
         library.load();
     }
 
-    std::string start_path = default_local_start_path();
+    std::string start_path = fallback_local_start_path();
 
     if (!props.initial_path_override.empty()) {
         start_path = std::move(props.initial_path_override);
@@ -96,15 +144,6 @@ FileExplorerPanel::FileExplorerPanel(StateRegistry& registry,
         fs::create_directories(start_path, ec);
     }
 
-    search_panel_ = std::make_unique<SearchPanel>(registry_, worker_pool_, state_key_, search_state_key_);
-    search_panel_->set_navigation_handler([this](const std::string& path) {
-        if (auto* active_explorer = dynamic_cast<FileExplorerPanel*>(active_panel())) {
-            active_explorer->navigate_to_path(path, true, false);
-            return;
-        }
-        navigate_to_path(path, true, false);
-    });
-
     sidebar_panel_ = std::make_shared<FileSidebarPanel>(registry, worker_pool);
     sidebar_panel_->set_mount_path_provider([]() -> std::string {
         if (const char* home = std::getenv("HOME")) {
@@ -123,12 +162,34 @@ FileExplorerPanel::FileExplorerPanel(StateRegistry& registry,
         navigate_to_path(path, true, false);
     });
 
+    auto& transfers = registry_.get_state<core::FileTransfer>("FileMasterTransfers");
+    transfer_listener_id_ = transfers.add_listener([this, alive = transfer_listener_alive_](const core::FileTransferRecord& record) {
+        if (!alive->load(std::memory_order_acquire)) {
+            return;
+        }
+        queue_transfer_refresh(record);
+    });
+
     if (!props.defer_initial_navigation && !start_path.empty()) {
         navigate_to_path(start_path, false);
     }
 }
 
+void FileExplorerPanel::set_search_palette_state_provider(std::function<bool()> open_provider,
+                                                          std::function<std::string()> query_provider,
+                                                          std::function<void()> open_handler) {
+    search_palette_open_provider_ = std::move(open_provider);
+    search_palette_query_provider_ = std::move(query_provider);
+    search_palette_open_handler_ = std::move(open_handler);
+}
+
 FileExplorerPanel::~FileExplorerPanel() {
+    transfer_listener_alive_->store(false, std::memory_order_release);
+    if (transfer_listener_id_ != 0 && registry_.has_state("FileMasterTransfers")) {
+        registry_.get_state<core::FileTransfer>("FileMasterTransfers").remove_listener(transfer_listener_id_);
+        transfer_listener_id_ = 0;
+    }
+
     for (auto& sync : file_sync_objects_) {
         if (sync) {
             sync->sync_stop();
@@ -245,6 +306,39 @@ bool FileExplorerPanel::workspace_dropdown_open() const {
 
 void FileExplorerPanel::render_content() {
     render();
+}
+
+void FileExplorerPanel::queue_transfer_refresh(const core::FileTransferRecord& record) {
+    if (record.status != core::FileTransferStatus::Completed || !registry_.has_state(state_key_)) {
+        return;
+    }
+    if (!transfer_touches_current_listing(record)) {
+        return;
+    }
+
+    auto& state = registry_.get_state<FileExplorerState>(state_key_);
+    state.pending_transfer_refresh_epoch.fetch_add(1, std::memory_order_relaxed);
+}
+
+bool FileExplorerPanel::transfer_touches_current_listing(const core::FileTransferRecord& record) const {
+    if (!registry_.has_state(state_key_)) {
+        return false;
+    }
+
+    auto& state = registry_.get_state<FileExplorerState>(state_key_);
+    std::lock_guard<std::recursive_mutex> lock(state.mu);
+    const std::string current_path = state.current_path;
+    if (current_path.empty()) {
+        return false;
+    }
+
+    if (auto remote_target = remote_browse_target_for(current_path); remote_target.has_value()) {
+        return remote_transfer_matches_directory(*remote_target, record.remote_source_name, record.remote_source_path) ||
+               remote_transfer_matches_directory(*remote_target, record.remote_dest_name, record.remote_dest_path);
+    }
+
+    return local_transfer_matches_directory(current_path, record.local_source_path) ||
+           local_transfer_matches_directory(current_path, record.local_dest_path);
 }
 
 }  // namespace misty::panel

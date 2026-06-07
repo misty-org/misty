@@ -1,9 +1,11 @@
 #pragma once
 
+#include <atomic>
 #include <cstring>
 #include <mutex>
 #include <stack>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 
 #include "core/ui/state_registry.h"
@@ -39,6 +41,10 @@ struct FileExplorerState : public core::StateEntry {
     std::stack<std::string> back_history;
     std::stack<std::string> forward_history;
     std::unordered_set<std::string> selected_files;
+    std::unordered_map<std::string, std::unordered_set<std::string>> selected_files_by_path;
+    std::unordered_map<std::string, int> last_selected_index_by_path;
+    std::atomic<uint64_t> pending_transfer_refresh_epoch{0};
+    uint64_t handled_transfer_refresh_epoch = 0;
     std::recursive_mutex mu;
 
     /**

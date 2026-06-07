@@ -107,6 +107,7 @@ namespace misty::panel {
          * @brief Starts provider list loading if the sidebar cache is empty.
          */
         void ensure_provider_entries_loaded(FileSidebarState& state);
+        void refresh_provider_entries(FileSidebarState& state);
         void refresh_provider_capacity(FileSidebarState& state);
         /**
          * @brief Renders connected provider shortcuts.

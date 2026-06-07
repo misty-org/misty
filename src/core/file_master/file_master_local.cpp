@@ -41,6 +41,11 @@ uint64_t start_local_transfer(FileTransfer* transfers,
         return 0;
     }
 
+    if (props.transfer_id != 0) {
+        transfers->mark_started(props.transfer_id);
+        return props.transfer_id;
+    }
+
     FileTransferRecord record;
     record.transfer_type = type;
     record.item_type = FileTransferItemType::Local;
