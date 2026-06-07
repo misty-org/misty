@@ -5,5 +5,8 @@ export { ConnectionsPreview } from "./ConnectionsPreview";
 export { FilesPreview } from "./FilesPreview";
 export { ProductFrame } from "./ProductFrame";
 export { ProductScreenshot } from "./ProductScreenshot";
+export { ProductCapture } from "./ProductCapture";
+export { ScreenshotSlot } from "./ScreenshotSlot";
 export { SharedLibraryPreview } from "./SharedLibraryPreview";
 export { TasksPreview } from "./TasksPreview";
+export { VideoSlot } from "./VideoSlot";
