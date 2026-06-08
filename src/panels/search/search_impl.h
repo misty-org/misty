@@ -70,16 +70,41 @@ namespace misty::panel {
         std::string subtitle;
         std::string badge;
         std::string command_id;
+        std::string provider_id;
+        std::string account_id;
+        std::string remote_id;
+        std::string remote_path;
         FileSource source = FileSource::LOCAL;
         SearchResultKind kind = SearchResultKind::File;
         bool is_dir = false;
         int score = 0;
     };
 
+    struct SearchRemoteStatus {
+        std::string remote_id;
+        std::string provider_id;
+        std::string account_id;
+        std::string status;
+        std::string error;
+        bool stale = false;
+        bool refreshing = false;
+    };
+
+    struct SearchResponse {
+        std::vector<SearchResult> results;
+        std::vector<SearchRemoteStatus> remote_statuses;
+        bool is_cached = false;
+        bool refresh_in_progress = false;
+        bool updated = false;
+        std::string updated_at;
+        std::string request_id;
+    };
+
     struct SearchQuery {
         std::string raw_query;
         std::string query;
         std::string path;
+        std::vector<std::string> paths;
         SearchScope depth = SearchScope::cwd();
         SearchSource source = SearchSource::LOCAL;
         SearchTypeFilter type_filter = SearchTypeFilter::Any;
@@ -88,9 +113,13 @@ namespace misty::panel {
         std::string size_filter;
         std::string mtime_filter;
         bool commands_only = false;
+        bool allow_cached = true;
+        bool refresh_in_background = true;
+        std::string request_id;
     };
 
-    using SearchCompleteCallback = std::function<void(std::vector<SearchResult>& results)>;
+    using SearchCompleteCallback = std::function<void(SearchResponse& response)>;
+    using SearchUpdateCallback = std::function<void(SearchResponse& response)>;
     using SearchErrorCallback = std::function<void(const std::string& error)>;
 
     class SearchImpl {
@@ -98,8 +127,12 @@ namespace misty::panel {
         SearchImpl() = default;
         ~SearchImpl() = default;
 
+        static std::string build_request_body(const SearchQuery& query);
+        static SearchResponse parse_response_body(const std::string& body);
+
         void search(const SearchQuery& query,
             SearchCompleteCallback on_complete = {},
-            SearchErrorCallback on_error = {});
+            SearchErrorCallback on_error = {},
+            SearchUpdateCallback on_update = {});
     };
 } //namespace misty::panel

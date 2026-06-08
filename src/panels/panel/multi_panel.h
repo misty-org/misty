@@ -88,7 +88,7 @@ namespace misty::panel {
         std::array<float, 2> lane_split_ratios_ = {0.5f, 0.5f};
 
         static constexpr float kPaneHandleWidth = 8.0f;
-        static constexpr float kPaneDividerThickness = 3.0f;
+        static constexpr float kPaneDividerThickness = 1.0f;
         static constexpr float kPaneMinWidth = 280.0f;
         static constexpr float kPaneMinHeight = 220.0f;
         static constexpr int kMaxPaneCount = 4;

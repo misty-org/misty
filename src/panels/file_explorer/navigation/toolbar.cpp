@@ -498,7 +498,6 @@ void FileExplorerPanel::show_path_control(FileExplorerState& state, float width)
 void FileExplorerPanel::show_search_field(FileExplorerState& state, float width) {
     (void)state;
     const float height = ImGui::GetFrameHeight();
-    const std::string query = search_palette_query_provider_ ? search_palette_query_provider_() : std::string();
     const char* placeholder = "Search or run command";
     ImGui::InvisibleButton("##toolbar_search_trigger", ImVec2(width, height));
     const bool hovered = ImGui::IsItemHovered();
@@ -512,13 +511,10 @@ void FileExplorerPanel::show_search_field(FileExplorerState& state, float width)
                  ImVec2(min.x + 17.0f, min.y + height * 0.5f),
                  16.0f,
                  IM_COL32(180, 186, 198, 235));
-    const char* display = query.empty() ? placeholder : query.c_str();
-    const ImU32 text_color = query.empty()
-        ? IM_COL32(148, 156, 171, 235)
-        : IM_COL32(229, 233, 240, 255);
+    const ImU32 text_color = IM_COL32(148, 156, 171, 235);
     ImGui::GetWindowDrawList()->AddText(ImVec2(min.x + 34.0f, min.y + (height - ImGui::GetTextLineHeight()) * 0.5f),
                                         text_color,
-                                        display);
+                                        placeholder);
 
     if ((activated || clicked) && search_palette_open_handler_) {
         search_palette_open_handler_();

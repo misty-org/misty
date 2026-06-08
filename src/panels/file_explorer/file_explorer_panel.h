@@ -213,6 +213,7 @@ public:
      * @brief Returns the state key for the currently active explorer pane or tab.
      */
     std::string active_explorer_state_key() const;
+    std::vector<std::string> workspace_search_roots() const;
     /**
      * @brief Drops the selected items from one explorer state onto a destination path.
      */

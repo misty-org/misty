@@ -54,6 +54,62 @@ void draw_svg_icon(ImDrawList* draw_list,
                         ImVec2(1, 1),
                         tint);
 }
+
+float text_width_for(ImFont* font, float font_size, const std::string& text) {
+    if (text.empty()) {
+        return 0.0f;
+    }
+    if (font) {
+        return font->CalcTextSizeA(font_size, 1000000.0f, 0.0f, text.c_str()).x;
+    }
+    return ImGui::CalcTextSize(text.c_str()).x;
+}
+
+std::string fit_text_with_ellipsis(const std::string& text, float max_width, ImFont* font = nullptr, float font_size = 0.0f) {
+    if (max_width <= 0.0f || text.empty()) {
+        return {};
+    }
+    if (font_size <= 0.0f) {
+        font_size = ImGui::GetFontSize();
+    }
+    if (text_width_for(font, font_size, text) <= max_width) {
+        return text;
+    }
+
+    constexpr const char* kEllipsis = "...";
+    const float ellipsis_width = text_width_for(font, font_size, kEllipsis);
+    if (ellipsis_width >= max_width) {
+        return kEllipsis;
+    }
+
+    std::string clipped = text;
+    while (!clipped.empty()) {
+        clipped.pop_back();
+        const std::string candidate = clipped + kEllipsis;
+        if (text_width_for(font, font_size, candidate) <= max_width) {
+            return candidate;
+        }
+    }
+    return kEllipsis;
+}
+
+void add_ellipsis_text(ImDrawList* draw_list,
+                       ImVec2 pos,
+                       ImU32 color,
+                       const std::string& text,
+                       float max_width,
+                       ImFont* font = nullptr,
+                       float font_size = 0.0f) {
+    const std::string visible = fit_text_with_ellipsis(text, max_width, font, font_size);
+    if (visible.empty()) {
+        return;
+    }
+    if (font) {
+        draw_list->AddText(font, font_size, pos, color, visible.c_str());
+    } else {
+        draw_list->AddText(pos, color, visible.c_str());
+    }
+}
 }
 
 namespace misty::panel {
@@ -232,8 +288,12 @@ DeviceRowResult render_device_row(
                   IM_COL32(232, 236, 244, 245));
 
     const float text_x = cursor.x + 34.0f;
-    draw_list->AddText(ImVec2(text_x, cursor.y + 6.0f),
-                       IM_COL32(236, 239, 246, 255), device.name.c_str());
+    const float row_text_width = std::max(1.0f, cursor.x + content_width - text_x - kDotsWidth - 8.0f);
+    add_ellipsis_text(draw_list,
+                      ImVec2(text_x, cursor.y + 6.0f),
+                      IM_COL32(236, 239, 246, 255),
+                      device.name,
+                      row_text_width);
 
     std::string info;
     if (device.total_bytes > 0) {
@@ -245,9 +305,13 @@ DeviceRowResult render_device_row(
     } else {
         info = device.mount_path;
     }
-    draw_list->AddText(ImGui::GetFont(), ImGui::GetFontSize() * 0.85f,
-                       ImVec2(text_x, cursor.y + 25.0f),
-                       IM_COL32(164, 169, 181, 255), info.c_str());
+    add_ellipsis_text(draw_list,
+                      ImVec2(text_x, cursor.y + 25.0f),
+                      IM_COL32(164, 169, 181, 255),
+                      info,
+                      row_text_width,
+                      ImGui::GetFont(),
+                      ImGui::GetFontSize() * 0.85f);
 
     if (device.total_bytes > 0) {
         const std::uint64_t used = std::min(device.total_bytes - std::min(device.free_bytes, device.total_bytes),

@@ -54,6 +54,7 @@ namespace misty::view {
         void save_workspaces() const;
         void autosave_workspaces_if_due();
         void render_workspace_tabs(const ImVec2& pos, float width);
+        std::vector<std::string> active_workspace_search_roots() const;
         std::string workspace_id(std::int16_t workspace_idx) const;
         std::int16_t workspace_idx_from_id(const std::string& id) const;
         FileWorkspace* active_workspace();
@@ -103,7 +104,7 @@ namespace misty::view {
         float claude_panel_width_ = 380.0f;
         bool is_resizing_claude_panel_ = false;
         double last_workspace_autosave_at_ = 0.0;
-        static constexpr float kSidebarMinWidth = 180.0f;
+        static constexpr float kSidebarMinWidth = 198.0f;
         static constexpr float kSidebarMaxWidth = 400.0f;
         static constexpr float kWorkspaceTabBarHeight = panel::kTabBarHeight;
         static constexpr float kInspectorMinWidth = 240.0f;

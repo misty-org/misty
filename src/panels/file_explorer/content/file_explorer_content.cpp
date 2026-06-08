@@ -703,6 +703,52 @@ namespace misty::panel {
         return state_key_;
     }
 
+    std::vector<std::string> FileExplorerPanel::workspace_search_roots() const {
+        std::vector<std::string> roots;
+        std::unordered_set<std::string> seen;
+        const auto add_root = [&](std::string path) {
+            if (path.empty()) {
+                return;
+            }
+            if (path.rfind("misty://", 0) != 0) {
+                std::error_code ec;
+                const auto normalized = fs::path(path).lexically_normal();
+                if (!normalized.empty()) {
+                    path = normalized.string();
+                }
+                if (const auto absolute = fs::absolute(path, ec); !ec) {
+                    path = absolute.lexically_normal().string();
+                }
+            }
+            if (seen.insert(path).second) {
+                roots.push_back(std::move(path));
+            }
+        };
+
+        for (const auto& [pane_id, pane] : panes) {
+            (void)pane_id;
+            const auto* tab = pane.tab_controller.current_active_tab();
+            if (!tab || !tab->panel) {
+                continue;
+            }
+            if (const auto* explorer = dynamic_cast<const FileExplorerPanel*>(tab->panel.get())) {
+                const auto& state = registry_.get_state<FileExplorerState>(explorer->state_key_);
+                if (state.current_path[0] != '\0') {
+                    add_root(state.current_path);
+                }
+            }
+        }
+
+        if (roots.empty()) {
+            const auto& state = registry_.get_state<FileExplorerState>(state_key_);
+            if (state.current_path[0] != '\0') {
+                add_root(state.current_path);
+            }
+        }
+
+        return roots;
+    }
+
     FileListingsState& FileExplorerPanel::file_listings_state() {
         return registry_.get_state<FileListingsState>(kFileListingsStateKey);
     }
@@ -2257,6 +2303,13 @@ namespace misty::panel {
     }
 
     void FileExplorerPanel::navigate_to_path(const std::string& path, bool update_history, bool create_if_missing) {
+        if (auto* active_explorer = dynamic_cast<FileExplorerPanel*>(active_panel())) {
+            if (active_explorer != this) {
+                active_explorer->navigate_to_path(path, update_history, create_if_missing);
+                return;
+            }
+        }
+
         auto& state = registry_.get_state<FileExplorerState>(state_key_);
         auto& listing = active_listing();
         auto& library = library_state();

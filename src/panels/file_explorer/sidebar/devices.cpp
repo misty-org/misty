@@ -7,7 +7,7 @@ namespace misty::panel {
     void FileSidebarPanel::show_devices_section(float width, float padding) {
         bool do_rescan = cached_devices_.empty() || device_watcher_.has_changed();
 
-        float content_width = width - (padding * 2.0f);
+        float content_width = content_width_for(width, padding);
         ImGui::SetCursorPosX(padding);
         ImGui::BeginGroup();
 
