@@ -335,6 +335,10 @@ SearchQuery FilesSearchPalette::build_query(const std::string& raw_query, const 
 void FilesSearchPalette::submit_search(const SearchQuery& query) {
     auto& state = state_registry_.get_state<SearchState>(state_key_);
     std::uint64_t request_generation = 0;
+    std::vector<SearchResult> local_results;
+    if (local_result_provider_) {
+        local_results = local_result_provider_(query);
+    }
     {
         std::lock_guard<std::mutex> lock(state.mu);
         state.results.clear();
@@ -343,27 +347,42 @@ void FilesSearchPalette::submit_search(const SearchQuery& query) {
         state.search_in_flight = true;
         state.last_submitted_query = query.raw_query;
         state.last_err.clear();
+        state.results_cached = false;
+        state.refresh_in_progress = false;
+        state.results_updated = false;
+        state.updated_at.clear();
+        state.request_id.clear();
+        state.remote_statuses.clear();
         request_generation = ++state.request_generation;
     }
 
     worker_pool_.add(
-        [this, &state, query, request_generation]() mutable {
-            std::vector<SearchResult> merged_results;
-            if (local_result_provider_) {
-                merged_results = local_result_provider_(query);
-            }
-
+        [this, &state, query, request_generation, local_results = std::move(local_results)]() mutable {
             if (!query.commands_only && !backend_query_text(query).empty()) {
                 SearchQuery backend_query = query;
                 backend_query.query = backend_query_text(query);
                 search_impl_.search(
                     backend_query,
-                    [&](std::vector<SearchResult>& backend_results) {
-                        for (auto& result : backend_results) {
+                    [&](SearchResponse& backend_response) {
+                        std::vector<SearchResult> merged_results = local_results;
+                        for (auto& result : backend_response.results) {
                             if (match_result_filters(query, result)) {
                                 merged_results.push_back(std::move(result));
                             }
                         }
+                        sort_results(merged_results);
+                        std::lock_guard<std::mutex> lock(state.mu);
+                        if (state.request_generation != request_generation) {
+                            return;
+                        }
+                        state.results = std::move(merged_results);
+                        state.search_in_flight = false;
+                        state.results_cached = backend_response.is_cached;
+                        state.refresh_in_progress = backend_response.refresh_in_progress;
+                        state.results_updated = backend_response.updated;
+                        state.updated_at = backend_response.updated_at;
+                        state.request_id = backend_response.request_id;
+                        state.remote_statuses = std::move(backend_response.remote_statuses);
                     },
                     [&](const std::string& error) {
                         std::lock_guard<std::mutex> lock(state.mu);
@@ -371,17 +390,40 @@ void FilesSearchPalette::submit_search(const SearchQuery& query) {
                             return;
                         }
                         state.search_in_flight = false;
+                        state.refresh_in_progress = false;
                         state.last_err = error;
+                    },
+                    [&](SearchResponse& backend_response) {
+                        std::vector<SearchResult> merged_results = local_results;
+                        for (auto& result : backend_response.results) {
+                            if (match_result_filters(query, result)) {
+                                merged_results.push_back(std::move(result));
+                            }
+                        }
+                        sort_results(merged_results);
+                        std::lock_guard<std::mutex> lock(state.mu);
+                        if (state.request_generation != request_generation) {
+                            return;
+                        }
+                        state.results = std::move(merged_results);
+                        state.search_in_flight = false;
+                        state.results_cached = backend_response.is_cached;
+                        state.refresh_in_progress = backend_response.refresh_in_progress;
+                        state.results_updated = backend_response.updated;
+                        state.updated_at = backend_response.updated_at;
+                        state.request_id = backend_response.request_id;
+                        state.remote_statuses = std::move(backend_response.remote_statuses);
                     });
+                return;
             }
 
-            sort_results(merged_results);
+            sort_results(local_results);
             {
                 std::lock_guard<std::mutex> lock(state.mu);
                 if (state.request_generation != request_generation) {
                     return;
                 }
-                state.results = std::move(merged_results);
+                state.results = std::move(local_results);
                 state.search_in_flight = false;
             }
         },
@@ -393,6 +435,7 @@ void FilesSearchPalette::submit_search(const SearchQuery& query) {
             }
             state.results.clear();
             state.search_in_flight = false;
+            state.refresh_in_progress = false;
             state.last_err = error;
         });
 }
@@ -592,8 +635,24 @@ void FilesSearchPalette::render(const std::string& current_path, const ImVec2& v
             } else if (!state.last_err.empty()) {
                 ImGui::TextColored(ImVec4(0.92f, 0.45f, 0.45f, 1.0f), "Search failed");
                 ImGui::TextWrapped("%s", state.last_err.c_str());
+            } else if (state.refresh_in_progress) {
+                int refreshing_remotes = 0;
+                for (const auto& remote : state.remote_statuses) {
+                    if (remote.refreshing || remote.status == "refreshing") {
+                        ++refreshing_remotes;
+                    }
+                }
+                if (state.results_cached) {
+                    ImGui::TextDisabled("Showing cached cloud results. Updating %d remote%s...",
+                                        refreshing_remotes,
+                                        refreshing_remotes == 1 ? "" : "s");
+                } else {
+                    ImGui::TextDisabled("Updating cloud results...");
+                }
             } else if (state.results.empty()) {
                 ImGui::TextDisabled("No results");
+            } else if (state.results_updated) {
+                ImGui::TextDisabled("Cloud results updated.");
             }
         }
 

@@ -26,6 +26,12 @@ struct SearchState : public core::StateEntry {
     std::chrono::steady_clock::time_point last_input_change_at{};
     std::string last_submitted_query;
     std::string last_err;
+    bool results_cached = false;
+    bool refresh_in_progress = false;
+    bool results_updated = false;
+    std::string updated_at;
+    std::string request_id;
+    std::vector<SearchRemoteStatus> remote_statuses;
     std::mutex mu;
 };
 
