@@ -114,6 +114,62 @@ namespace {
         return buf;
     }
 
+    float text_width_for(ImFont* font, float font_size, const std::string& text) {
+        if (text.empty()) {
+            return 0.0f;
+        }
+        if (font) {
+            return font->CalcTextSizeA(font_size, 1000000.0f, 0.0f, text.c_str()).x;
+        }
+        return ImGui::CalcTextSize(text.c_str()).x;
+    }
+
+    std::string fit_text_with_ellipsis(const std::string& text, float max_width, ImFont* font = nullptr, float font_size = 0.0f) {
+        if (max_width <= 0.0f || text.empty()) {
+            return {};
+        }
+        if (font_size <= 0.0f) {
+            font_size = ImGui::GetFontSize();
+        }
+        if (text_width_for(font, font_size, text) <= max_width) {
+            return text;
+        }
+
+        constexpr const char* kEllipsis = "...";
+        const float ellipsis_width = text_width_for(font, font_size, kEllipsis);
+        if (ellipsis_width >= max_width) {
+            return kEllipsis;
+        }
+
+        std::string clipped = text;
+        while (!clipped.empty()) {
+            clipped.pop_back();
+            const std::string candidate = clipped + kEllipsis;
+            if (text_width_for(font, font_size, candidate) <= max_width) {
+                return candidate;
+            }
+        }
+        return kEllipsis;
+    }
+
+    void add_ellipsis_text(ImDrawList* dl,
+                           ImVec2 pos,
+                           ImU32 color,
+                           const std::string& text,
+                           float max_width,
+                           ImFont* font = nullptr,
+                           float font_size = 0.0f) {
+        const std::string visible = fit_text_with_ellipsis(text, max_width, font, font_size);
+        if (visible.empty()) {
+            return;
+        }
+        if (font) {
+            dl->AddText(font, font_size, pos, color, visible.c_str());
+        } else {
+            dl->AddText(pos, color, visible.c_str());
+        }
+    }
+
     std::vector<misty::panel::SidebarProviderEntry> parse_sidebar_provider_entries(const std::string& body) {
         using nlohmann::json;
         const json parsed = json::parse(body);
@@ -213,10 +269,13 @@ namespace {
                          : selected ? IM_COL32(145, 190, 255, 255) : IM_COL32(236, 239, 246, 245));
 
         ImVec2 text_pos(cursor.x + 36.0f, cursor.y + (height - ImGui::GetTextLineHeight()) * 0.5f);
-        dl->AddText(text_pos,
-                    selected ? IM_COL32(151, 194, 255, 255)
-                             : (hovered || active ? IM_COL32(246, 248, 252, 255) : IM_COL32(230, 233, 240, 245)),
-                    label);
+        const float text_width = std::max(1.0f, cursor.x + item_size.x - text_pos.x - 8.0f);
+        add_ellipsis_text(dl,
+                          text_pos,
+                          selected ? IM_COL32(151, 194, 255, 255)
+                                   : (hovered || active ? IM_COL32(246, 248, 252, 255) : IM_COL32(230, 233, 240, 245)),
+                          label,
+                          text_width);
         return pressed;
     }
 
@@ -292,8 +351,15 @@ namespace misty::panel {
     namespace {
         constexpr ImVec4 kFileSidebarBg = ImVec4(0.075f, 0.085f, 0.10f, 1.0f);
         constexpr ImVec4 kFileSidebarSeparator = ImVec4(0.20f, 0.23f, 0.28f, 1.0f);
+        constexpr float kFileSidebarPaddingX = 12.0f;
+        constexpr float kFileSidebarRightSafetyInset = 2.0f;
         constexpr int kSidebarProviderFetchAttempts = 4;
         constexpr auto kSidebarProviderFetchRetryDelay = std::chrono::milliseconds(500);
+
+    }
+
+    float FileSidebarPanel::content_width_for(float available_width, float padding) {
+        return std::max(1.0f, available_width - padding * 2.0f - kFileSidebarRightSafetyInset);
     }
 
     FileSidebarPanel::FileSidebarPanel(core::StateRegistry& registry, core::WorkerPool& worker_pool)
@@ -321,30 +387,28 @@ namespace misty::panel {
         }
 
         ImGui::PushStyleColor(ImGuiCol_WindowBg, kFileSidebarBg);
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f, 10.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 10.0f));
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 6.0f));
         ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
         ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, 8.0f);
 
         if (ImGui::Begin("FileSidebar", nullptr, flags)) {
-            float width = ImGui::GetWindowWidth();
-            float padding = std::clamp(width * 0.05f, 8.0f, 14.0f);
-            
-            
+            float available_width = ImGui::GetContentRegionAvail().x;
+            float padding = kFileSidebarPaddingX;
+
             ImGui::PushStyleColor(ImGuiCol_Separator, kFileSidebarSeparator);
-            ImGui::SetCursorPosX(padding + 2.0f);
+            ImGui::SetScrollX(0.0f);
+            ImGui::SetCursorPosX(padding);
             ImGui::TextUnformatted("Workspace");
             ImGui::Dummy(ImVec2(0.0f, 2.0f));
-            show_workspace_dropdown(width, padding);
+            show_workspace_dropdown(available_width, padding);
             ImGui::Dummy(ImVec2(0.0f, 10.0f));
-            show_quick_access(width, padding);
+            show_quick_access(available_width, padding);
             ImGui::Dummy(ImVec2(0.0f, 12.0f));
-            show_providers_section(state, width, padding);
+            show_providers_section(state, available_width, padding);
             ImGui::Dummy(ImVec2(0.0f, 10.0f));
-            show_devices_section(width, padding);
+            show_devices_section(available_width, padding);
             ImGui::PopStyleColor();
-
-      
 
             show_chooser_modal(state);
             show_create_entry_modal(state);
@@ -353,6 +417,7 @@ namespace misty::panel {
             show_device_rename_modal();
             show_workspace_name_modal();
             show_workspace_delete_modal();
+            ImGui::SetScrollX(0.0f);
         }
 
         ImGui::End();
@@ -499,7 +564,7 @@ namespace misty::panel {
             return;
         }
 
-        const float content_width = width - (padding * 2);
+        const float content_width = content_width_for(width, padding);
         const float button_height = 34.0f;
         const std::string selected_label = workspace_label(entries);
         ImGui::SetCursorPosX(padding);
@@ -513,9 +578,13 @@ namespace misty::panel {
         dl->AddRectFilled(button_pos, button_max, button_hovered ? IM_COL32(31, 37, 47, 255) : IM_COL32(25, 30, 38, 255), 7.0f);
         dl->AddRect(button_pos, button_max, IM_COL32(68, 76, 92, 170), 7.0f, 0, 1.0f);
         draw_workspace_icon(dl, ImVec2(button_pos.x + 9.0f, button_pos.y + 6.0f), IM_COL32(178, 185, 198, 235));
-        dl->AddText(ImVec2(button_pos.x + 38.0f, button_pos.y + (button_height - ImGui::GetTextLineHeight()) * 0.5f),
-                    IM_COL32(230, 235, 244, 245),
-                    selected_label.c_str());
+        const ImVec2 label_pos(button_pos.x + 38.0f,
+                               button_pos.y + (button_height - ImGui::GetTextLineHeight()) * 0.5f);
+        add_ellipsis_text(dl,
+                          label_pos,
+                          IM_COL32(230, 235, 244, 245),
+                          selected_label,
+                          std::max(1.0f, content_width - 72.0f));
         draw_chevron_down(dl,
                           ImVec2(button_pos.x + content_width - 28.0f, button_pos.y + 8.0f),
                           IM_COL32(178, 185, 198, 235));
@@ -562,9 +631,11 @@ namespace misty::panel {
                 ImGui::PushClipRect(ImVec2(row_pos.x + 64.0f, row_pos.y),
                                     ImVec2(row_pos.x + popup_width - 74.0f, row_pos.y + row_height),
                                     true);
-                popup_dl->AddText(ImVec2(row_pos.x + 64.0f, row_pos.y + (row_height - ImGui::GetTextLineHeight()) * 0.5f),
+                add_ellipsis_text(popup_dl,
+                                  ImVec2(row_pos.x + 64.0f, row_pos.y + (row_height - ImGui::GetTextLineHeight()) * 0.5f),
                                   entry.active ? IM_COL32(112, 175, 255, 255) : IM_COL32(226, 231, 240, 245),
-                                  title.c_str());
+                                  title,
+                                  std::max(1.0f, popup_width - 138.0f));
                 ImGui::PopClipRect();
 
                 bool consumed_action = false;
@@ -757,7 +828,7 @@ namespace misty::panel {
     }
     
     void FileSidebarPanel::show_providers_section(FileSidebarState& state, float width, float padding) {
-        float content_width = width - (padding * 2);
+        float content_width = content_width_for(width, padding);
         ImGui::SetCursorPosX(padding);
 
         ImGui::BeginGroup();
@@ -766,8 +837,7 @@ namespace misty::panel {
         if (SectionHeader("remote_hdr", "Remote", providers_collapsed_, content_width, false))
             providers_collapsed_ = !providers_collapsed_;
         const bool header_context_requested = ImGui::IsItemClicked(ImGuiMouseButton_Right);
-        ImGui::SameLine();
-        ImGui::SetCursorScreenPos(ImVec2(header_pos.x + content_width - 21.0f, header_pos.y));
+        ImGui::SetCursorScreenPos(ImVec2(header_pos.x + content_width - 18.0f, header_pos.y + 1.0f));
         if (PlusButton("provider_add", !providers_collapsed_)) {
             registry_.get_state<NavbarState>("Navbar").selected_item = view::ViewID::Providers;
             auto& providers_state = registry_.get_state<ProvidersState>("Providers");
@@ -838,9 +908,12 @@ namespace misty::panel {
                                  IM_COL32(255, 255, 255, 255));
 
                     const float text_x = cursor.x + 36.0f;
-                    dl->AddText(ImVec2(text_x, cursor.y + 6.0f),
-                                hovered || active ? IM_COL32(246, 248, 252, 255) : IM_COL32(230, 233, 240, 245),
-                                entry.label.c_str());
+                    const float row_text_width = std::max(1.0f, cursor.x + content_width - text_x - 12.0f);
+                    add_ellipsis_text(dl,
+                                      ImVec2(text_x, cursor.y + 6.0f),
+                                      hovered || active ? IM_COL32(246, 248, 252, 255) : IM_COL32(230, 233, 240, 245),
+                                      entry.label,
+                                      row_text_width);
 
                     std::string info = entry.provider_folder;
                     if (entry.capacity_known && entry.total_bytes > 0) {
@@ -854,11 +927,13 @@ namespace misty::panel {
                             64.0f,
                             IM_COL32(0, 0, 0, 0));
                     } else {
-                        dl->AddText(ImGui::GetFont(),
-                                    ImGui::GetFontSize() * 0.85f,
-                                    ImVec2(text_x, cursor.y + 25.0f),
-                                    IM_COL32(164, 169, 181, 255),
-                                    info.c_str());
+                        add_ellipsis_text(dl,
+                                          ImVec2(text_x, cursor.y + 25.0f),
+                                          IM_COL32(164, 169, 181, 255),
+                                          info,
+                                          row_text_width,
+                                          ImGui::GetFont(),
+                                          ImGui::GetFontSize() * 0.85f);
                     }
 
                     if (entry.capacity_known && entry.total_bytes > 0) {
@@ -912,7 +987,7 @@ namespace misty::panel {
     }
 
     void FileSidebarPanel::show_local_section(float width, float padding) {
-        float content_width = width - (padding * 2);
+        float content_width = content_width_for(width, padding);
         ImGui::SetCursorPosX(padding);
 
         ImGui::BeginGroup();
@@ -1002,7 +1077,7 @@ namespace misty::panel {
 
 
     void FileSidebarPanel::show_quick_access(float width, float padding) {
-        float content_width = width - (padding * 2);
+        float content_width = content_width_for(width, padding);
         ImGui::SetCursorPosX(padding);
 
         ImGui::BeginGroup();

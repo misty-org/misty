@@ -390,14 +390,20 @@ void SearchPanel::submit_search(const std::string& query_text, const std::string
         [this, &state, query = std::move(query), request_generation]() mutable {
             search_impl_.search(
                 query,
-                [&state, request_generation](std::vector<SearchResult>& results) {
-                    sort_results(results);
+                [&state, request_generation](SearchResponse& response) {
+                    sort_results(response.results);
                     std::lock_guard<std::mutex> lock(state.mu);
                     if (state.request_generation != request_generation) {
                         return;
                     }
-                    state.results = std::move(results);
+                    state.results = std::move(response.results);
                     state.search_in_flight = false;
+                    state.results_cached = response.is_cached;
+                    state.refresh_in_progress = response.refresh_in_progress;
+                    state.results_updated = response.updated;
+                    state.updated_at = response.updated_at;
+                    state.request_id = response.request_id;
+                    state.remote_statuses = std::move(response.remote_statuses);
                 },
                 [&state, request_generation](const std::string& error) {
                     std::lock_guard<std::mutex> lock(state.mu);
@@ -406,7 +412,23 @@ void SearchPanel::submit_search(const std::string& query_text, const std::string
                     }
                     state.results.clear();
                     state.search_in_flight = false;
+                    state.refresh_in_progress = false;
                     state.last_err = error;
+                },
+                [&state, request_generation](SearchResponse& response) {
+                    sort_results(response.results);
+                    std::lock_guard<std::mutex> lock(state.mu);
+                    if (state.request_generation != request_generation) {
+                        return;
+                    }
+                    state.results = std::move(response.results);
+                    state.search_in_flight = false;
+                    state.results_cached = response.is_cached;
+                    state.refresh_in_progress = response.refresh_in_progress;
+                    state.results_updated = response.updated;
+                    state.updated_at = response.updated_at;
+                    state.request_id = response.request_id;
+                    state.remote_statuses = std::move(response.remote_statuses);
                 });
         },
         []() {},

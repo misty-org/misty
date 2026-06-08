@@ -1,10 +1,8 @@
 #include "activity_panel.h"
 
-#include <algorithm>
 #include <ctime>
 #include <iomanip>
 #include <sstream>
-#include <vector>
 
 #include "core/ui/ui_helper.h"
 #include "imgui.h"
@@ -47,13 +45,6 @@ bool compact_button(const char* label, bool selected, const ImVec2& size) {
     ImGui::PopStyleColor(4);
     ImGui::PopStyleVar(2);
     return pressed;
-}
-
-std::vector<Notification> unread_only(std::vector<Notification> entries) {
-    entries.erase(std::remove_if(entries.begin(), entries.end(), [](const Notification& notification) {
-        return notification.read;
-    }), entries.end());
-    return entries;
 }
 
 }  // namespace
@@ -119,22 +110,8 @@ void ActivityPanel::render() {
         ImGui::PopStyleColor();
 
         const bool has_entries = notifications.count() > 0;
-        const bool has_unread = notifications.unread_count() > 0;
         ImGui::SetCursorPosY(48.0f);
-        if (compact_button("All##activity_filter", filter_ == Filter::All, ImVec2(44.0f, 28.0f))) {
-            filter_ = Filter::All;
-        }
-        ImGui::SameLine(0.0f, 8.0f);
-        if (compact_button("Unread##activity_filter", filter_ == Filter::Unread, ImVec2(74.0f, 28.0f))) {
-            filter_ = Filter::Unread;
-        }
-
-        ImGui::SameLine();
-        ImGui::SetCursorPosX(POPUP_W - 16.0f - 112.0f - 8.0f - 70.0f);
-        if (compact_button("Mark read##activity_action", false, ImVec2(112.0f, 28.0f)) && has_unread) {
-            notifications.mark_all_read();
-        }
-        ImGui::SameLine(0.0f, 8.0f);
+        ImGui::SetCursorPosX(POPUP_W - 16.0f - 70.0f);
         if (compact_button("Clear##activity_action", false, ImVec2(70.0f, 28.0f)) && has_entries) {
             notifications.clear_history();
         }
@@ -145,9 +122,6 @@ void ActivityPanel::render() {
         ImGui::PopStyleColor();
 
         auto entries = notifications.get_history();
-        if (filter_ == Filter::Unread) {
-            entries = unread_only(std::move(entries));
-        }
 
         ImGui::SetCursorPosY(104.0f);
         if (entries.empty()) {
