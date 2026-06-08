@@ -39,6 +39,7 @@ if(BUILD_TESTING)
             "${CMAKE_SOURCE_DIR}/src/panels/file_explorer/operations/file_operation_jobs.cpp"
             "${CMAKE_SOURCE_DIR}/src/panels/file_explorer/operations/file_master_operations.cpp"
             "${CMAKE_SOURCE_DIR}/src/panels/file_explorer/operations/operation_queue_state.cpp"
+            "${CMAKE_SOURCE_DIR}/src/panels/search/search_impl.cpp"
             "${CMAKE_SOURCE_DIR}/src/panels/search/search_state.cpp"
             "${CMAKE_SOURCE_DIR}/src/panels/activity/activity_state.cpp"
             "${CMAKE_SOURCE_DIR}/src/panels/activity/upload_state.cpp"
