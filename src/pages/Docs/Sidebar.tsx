@@ -1,51 +1,31 @@
-import { useEffect, useState } from "react";
-import type { Section, Category } from "./data";
+import type { Section, Category } from "./types";
 
 export default function Sidebar({
   sections,
   categories,
   activeId,
+  expandedCategories,
   onSelect,
+  onToggleCategory,
   open,
   onClose,
 }: {
   sections: Section[];
   categories: Category[];
   activeId: string;
+  expandedCategories: Record<string, boolean>;
   onSelect: (id: string) => void;
+  onToggleCategory: (key: string) => void;
   open: boolean;
   onClose: () => void;
 }) {
-  const [openCategories, setOpenCategories] = useState<Record<string, boolean>>(
-    {
-      "getting-started": true,
-    },
-  );
-
-  useEffect(() => {
-    const activeCategory = sections.find(
-      (section) => section.id === activeId,
-    )?.category;
-    if (!activeCategory) return;
-
-    setOpenCategories((current) =>
-      current[activeCategory]
-        ? current
-        : { ...current, [activeCategory]: true },
-    );
-  }, [activeId, sections]);
-
-  const toggleCategory = (key: string) => {
-    setOpenCategories((current) => ({ ...current, [key]: !current[key] }));
-  };
-
   const inner = (
     <nav className="flex flex-col gap-4 p-2">
       {categories.map((cat) => (
         <div key={cat.key} className="pb-1">
           <button
             type="button"
-            onClick={() => toggleCategory(cat.key)}
+            onClick={() => onToggleCategory(cat.key)}
             className="flex w-full items-center justify-between px-3 py-2 text-left"
           >
             <span className="text-[15.5px] font-medium text-white">
@@ -53,7 +33,7 @@ export default function Sidebar({
             </span>
             <svg
               className={`h-4 w-4 text-text-muted transition-transform ${
-                openCategories[cat.key] ? "rotate-0" : "-rotate-90"
+                expandedCategories[cat.key] ? "rotate-0" : "-rotate-90"
               }`}
               viewBox="0 0 20 20"
               fill="none"
@@ -64,10 +44,11 @@ export default function Sidebar({
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 7.5 10 12.5 15 7.5" />
             </svg>
           </button>
-          {openCategories[cat.key] && (
+          {expandedCategories[cat.key] && (
             <div className="mt-1 flex flex-col gap-0.5">
               {cat.ids.map((id) => {
-                const sec = sections.find((s) => s.id === id)!;
+                const sec = sections.find((s) => s.id === id);
+                if (!sec) return null;
                 const active = activeId === id;
                 return (
                   <button
@@ -83,11 +64,6 @@ export default function Sidebar({
                     }`}
                   >
                     {sec.label}
-                    {"badge" in sec && sec.badge && (
-                      <span className="ml-auto rounded border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium text-primary">
-                        {sec.badge}
-                      </span>
-                    )}
                   </button>
                 );
               })}

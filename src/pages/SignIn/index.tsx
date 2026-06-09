@@ -3,14 +3,21 @@ import { useLocation, useNavigate } from "react-router";
 import { useAuth } from "../../AuthContext";
 import AuthCard from "../Auth/AuthCard";
 import AuthShell from "../Auth/AuthShell";
-import { forgotPasswordRequest, signInRequest } from "../Auth/api";
+import { forgotPasswordRequest, signInRequest, type AuthUser } from "../Auth/api";
+import { fetchMe, type MeResponse } from "../Dashboard/api";
 import ForgotPasswordForm from "./ForgotPasswordForm";
 import SignInForm from "./SignInForm";
 
 type SignInMode = "signin" | "forgot";
 
+interface SignInContext {
+  email: string;
+  password: string;
+  me: MeResponse | null;
+}
+
 interface SignInProps {
-  onSignedIn?: (user: ReturnType<typeof useAuth>["user"] extends infer T ? Exclude<T, null> : never) => void | Promise<void>;
+  onSignedIn?: (user: AuthUser, context: SignInContext) => void | Promise<void>;
 }
 
 export default function SignIn({ onSignedIn }: SignInProps = {}) {
@@ -52,7 +59,8 @@ export default function SignIn({ onSignedIn }: SignInProps = {}) {
 
     try {
       const user = await signInRequest(email, password);
-      await onSignedIn?.(user);
+      const me = onSignedIn ? await fetchMe() : null;
+      await onSignedIn?.(user, { email, password, me });
       setUser(user);
       navigate(from, { replace: true });
     } catch (err) {

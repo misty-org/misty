@@ -1,31 +1,27 @@
-import type { Section, GuideSection, ApiSection } from "./data";
-
-function formatLabel(value: string) {
-  return value.charAt(0) + value.slice(1).toLowerCase();
-}
+import type { Section } from "./types";
 
 function getAnchors(section: Section): { id: string; label: string }[] {
-  if ("prose" in section) {
-    const guide = section as GuideSection;
-    const anchors: { id: string; label: string }[] = [
-      { id: `${section.id}-overview`, label: "Overview" },
-    ];
-    for (const n of guide.notes) {
-      anchors.push({
-        id: `${section.id}-${n.kind}`,
-        label: n.kind.charAt(0).toUpperCase() + n.kind.slice(1),
-      });
-    }
-    return anchors;
-  } else if ("endpoints" in section) {
-    const api = section as ApiSection;
-    return api.endpoints.map((ep, i) => ({
-      id: `${section.id}-ep-${i}`,
-      label: `${formatLabel(ep.method)} ${ep.path}`,
-    }));
+  if (section.anchors) return section.anchors;
+
+  const anchors: { id: string; label: string }[] = [
+    { id: `${section.id}-overview`, label: "Overview" },
+  ];
+
+  for (const [index, step] of (section.steps ?? []).entries()) {
+    anchors.push({
+      id: `${section.id}-step-${index}`,
+      label: step.heading,
+    });
   }
 
-  return [];
+  for (const note of section.notes) {
+    anchors.push({
+      id: `${section.id}-${note.kind}`,
+      label: note.kind.charAt(0).toUpperCase() + note.kind.slice(1),
+    });
+  }
+
+  return anchors;
 }
 
 export default function RightPanel({ section }: { section: Section }) {
@@ -37,19 +33,19 @@ export default function RightPanel({ section }: { section: Section }) {
         Contents
       </span>
       <nav className="flex flex-col gap-1">
-        {anchors.map((a) => (
+        {anchors.map((anchor) => (
           <a
-            key={a.id}
-            href={`#${a.id}`}
-            onClick={(e) => {
-              e.preventDefault();
+            key={anchor.id}
+            href={`#${anchor.id}`}
+            onClick={(event) => {
+              event.preventDefault();
               document
-                .getElementById(a.id)
+                .getElementById(anchor.id)
                 ?.scrollIntoView({ behavior: "smooth", block: "start" });
             }}
             className="truncate py-1 text-[16.75px] text-text-muted transition-colors hover:text-text"
           >
-            {a.label}
+            {anchor.label}
           </a>
         ))}
       </nav>

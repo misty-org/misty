@@ -1,17 +1,17 @@
 import {
-  SiAmazons3,
   SiBox,
   SiDropbox,
   SiGoogledrive,
   SiMega,
 } from "react-icons/si";
+import { FaAws } from "react-icons/fa";
 import { GrOnedrive } from "react-icons/gr";
 
 const providers = [
   { Icon: SiGoogledrive, label: "Google Drive", iconClassName: "text-[#0F9D58]" },
   { Icon: GrOnedrive, label: "OneDrive", iconClassName: "text-[#0078D4]" },
   { Icon: SiDropbox, label: "Dropbox", iconClassName: "text-[#0061FF]" },
-  { Icon: SiAmazons3, label: "Amazon S3", iconClassName: "text-[#FF9900]" },
+  { Icon: FaAws, label: "Amazon S3", iconClassName: "text-[#FF9900]" },
   { Icon: SiMega, label: "Mega", iconClassName: "text-[#D9272E]" },
   { Icon: SiBox, label: "Box", iconClassName: "text-[#0061D5]" },
 ];

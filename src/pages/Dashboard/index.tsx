@@ -6,14 +6,19 @@ import { useUserStore } from "../../store/userStore";
 
 // ─── display helpers ─────────────────────────────────────────────────────────
 
-const TIER_LABEL: Record<string, string> = { free: "Lite", pro: "Pro", max: "Max" };
+const TIER_LABEL: Record<string, string> = {
+  basic: "Basic",
+  personal: "Personal",
+  pro: "Pro",
+};
 const TIER_COLOR: Record<string, string> = {
-  free: "text-zinc-400 bg-zinc-400/10 border-zinc-400/20",
-  pro: "text-blue-400 bg-blue-400/10 border-blue-400/20",
-  max: "text-violet-400 bg-violet-400/10 border-violet-400/20",
+  basic: "text-zinc-400 bg-zinc-400/10 border-zinc-400/20",
+  personal: "text-blue-400 bg-blue-400/10 border-blue-400/20",
+  pro: "text-violet-400 bg-violet-400/10 border-violet-400/20",
 };
 const STATUS_COLOR: Record<string, string> = {
   active: "text-emerald-400 bg-emerald-400/10 border-emerald-400/20",
+  trialing: "text-blue-400 bg-blue-400/10 border-blue-400/20",
   cancelled: "text-amber-400 bg-amber-400/10 border-amber-400/20",
   expired: "text-red-400 bg-red-400/10 border-red-400/20",
 };
@@ -175,7 +180,7 @@ function AccountPanel({
     <div className="flex flex-col gap-6">
       <Section title="License">
         <Row label="Plan">
-          <Badge label={TIER_LABEL[me.tier] ?? me.tier} cls={TIER_COLOR[me.tier] ?? TIER_COLOR.free} />
+          <Badge label={TIER_LABEL[me.tier] ?? me.tier} cls={TIER_COLOR[me.tier] ?? TIER_COLOR.basic} />
         </Row>
         <Row label="Status">
           <Badge
@@ -183,7 +188,7 @@ function AccountPanel({
             cls={STATUS_COLOR[me.status] ?? STATUS_COLOR.active}
           />
         </Row>
-        <Row label="Type">{me.tier === "free" ? "Free forever" : "Perpetual"}</Row>
+        <Row label="Type">{me.tier === "basic" ? "Basic account" : "Perpetual"}</Row>
         {me.expires_at ? (
           <Row label="Expires">
             {new Date(me.expires_at).toLocaleDateString(undefined, {
@@ -192,7 +197,7 @@ function AccountPanel({
               day: "numeric",
             })}
           </Row>
-        ) : me.tier !== "free" ? (
+        ) : me.tier !== "basic" ? (
           <Row label="Expires">Never</Row>
         ) : null}
       </Section>
@@ -236,7 +241,7 @@ function AccountPanel({
           <Badge label="Active" cls={STATUS_COLOR.active} />
         </div>
 
-        {me.tier === "max" && (
+        {me.tier === "pro" && (
           <div className="py-4">
             <p className="text-xs text-text-muted">
               Additional seats appear here as you activate new devices.
@@ -244,10 +249,10 @@ function AccountPanel({
           </div>
         )}
 
-        {me.tier === "free" && (
+        {me.tier === "basic" && (
           <div className="flex flex-col gap-3 py-4 md:flex-row md:items-center md:justify-between md:gap-6">
             <p className="text-xs text-text-muted">
-              Pro - $30 per device · Max - $89 unlimited devices
+              Personal - $30 per device · Pro - $89 unlimited devices
             </p>
             <a href="/pricing" className="shrink-0 text-xs text-text hover:text-white underline underline-offset-2 transition-colors">
               Upgrade

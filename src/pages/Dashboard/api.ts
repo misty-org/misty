@@ -5,9 +5,11 @@ export interface MeResponse {
   name: string;
   email: string;
   created_at: string;
-  tier: "free" | "pro" | "max";
-  status: "active" | "cancelled" | "expired";
+  tier: "basic" | "personal" | "pro";
+  status: "active" | "trialing" | "cancelled" | "expired";
+  allows_use: boolean;
   expires_at: string | null;
+  trial_started_at: string | null;
   license_device: string;
 }
 
