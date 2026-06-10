@@ -69,15 +69,23 @@ describe("workspace deep links", () => {
     ["/files", "files"],
     ["/agents", "agents"],
     ["/transfers", "transfers"],
-    ["/marketplace", "marketplace"],
+    ["/store", "marketplace"],
   ])("maps %s to the %s surface", (route, surfaceId) => {
     expect(workspaceSurfaceFromRoute(route)?.surfaceId).toBe(surfaceId);
   });
 
   it("opens coming-soon launch surfaces as singleton tabs", () => {
-    for (const route of ["/marketplace", "/transfers"]) {
+    for (const route of ["/store", "/transfers"]) {
       expect(workspaceSurfaceFromRoute(route)?.instancePolicy).toBe("single");
     }
+  });
+
+  it("keeps legacy catalog links compatible with the Store surface", () => {
+    expect(workspaceSurfaceFromRoute("/marketplace")).toMatchObject({
+      surfaceId: "marketplace",
+      groupKey: "tool:marketplace",
+      instancePolicy: "single",
+    });
   });
 
   it("opens Inbox as one account-level tool surface", () => {
@@ -85,6 +93,19 @@ describe("workspace deep links", () => {
       surfaceId: "inbox",
       groupKey: "tool:inbox",
       instancePolicy: "multiple",
+    });
+  });
+
+  it("opens installed apps as independent workspace tabs", () => {
+    expect(
+      workspaceSurfaceFromRoute(
+        "/apps/quick_convert?name=Quick+Convert&selected=%2FUsers%2Fmisty%2Fmovie.mov",
+      ),
+    ).toMatchObject({
+      surfaceId: "extension",
+      groupKey: "app:quick_convert",
+      instancePolicy: "multiple",
+      title: "Quick Convert",
     });
   });
 

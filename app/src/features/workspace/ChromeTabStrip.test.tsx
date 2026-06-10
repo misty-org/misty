@@ -76,6 +76,37 @@ describe("ChromeTabStrip", () => {
     expect(onSelectTab).not.toHaveBeenCalled();
   });
 
+  it("supports roving keyboard navigation across tabs", () => {
+    const onSelectTab = vi.fn();
+    act(() => {
+      root.render(
+        <ChromeTabStrip
+          tabs={[
+            { id: "tab-1", title: "Home", path: "/", paneId: "pane-1" },
+            { id: "tab-2", title: "Docs", path: "/docs", paneId: "pane-2" },
+          ]}
+          activeTabId="tab-1"
+          onAddTab={vi.fn()}
+          onCloseTab={vi.fn()}
+          onSelectTab={onSelectTab}
+        />,
+      );
+    });
+
+    const first = container.querySelector<HTMLButtonElement>(
+      '.chrome-tab[data-tab-id="tab-1"] [role="tab"]',
+    );
+    const second = container.querySelector<HTMLButtonElement>(
+      '.chrome-tab[data-tab-id="tab-2"] [role="tab"]',
+    );
+    expect(first?.tabIndex).toBe(0);
+    expect(second?.tabIndex).toBe(-1);
+    act(() =>
+      first?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true })),
+    );
+    expect(onSelectTab).toHaveBeenCalledWith("tab-2");
+  });
+
   it("marks tabs as Tauri-safe drag sources when reordering is enabled", () => {
     act(() => {
       root.render(

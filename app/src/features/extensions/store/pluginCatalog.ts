@@ -170,7 +170,7 @@ export function normalizeCatalogEntry(
       views: raw.launcher?.views ?? [],
       show_in_launcher: raw.launcher?.show_in_launcher ?? false,
       requires_selected_file: raw.launcher?.requires_selected_file ?? false,
-      open_mode: raw.launcher?.open_mode ?? "popup",
+      open_mode: raw.launcher?.open_mode ?? "tab",
     },
     install: {
       root: raw.install?.root === "private" ? "private" : "public",

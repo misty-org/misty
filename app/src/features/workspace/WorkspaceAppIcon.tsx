@@ -1,7 +1,6 @@
 import { cn } from "@/shared/ui";
 import {
   ArrowLeftRight,
-  Blocks,
   BookOpenText,
   Bot,
   CheckSquare2,
@@ -13,6 +12,7 @@ import {
   MessagesSquare,
   Notebook,
   SquareTerminal,
+  Store,
   type LucideIcon,
 } from "lucide-react";
 import type { WorkspaceToolId } from "./useRecentToolsStore";
@@ -32,10 +32,10 @@ const appIconDetails: Record<WorkspaceToolId, { icon: LucideIcon }> = {
   code: { icon: Code2 },
   terminal: { icon: SquareTerminal },
   transfers: { icon: ArrowLeftRight },
-  marketplace: { icon: Blocks },
+  marketplace: { icon: Store },
 };
 
-/** Keeps top-level app identity neutral across navigation, Settings, and Marketplace. */
+/** Keeps top-level app identity neutral across navigation, Settings, and Store. */
 export function workspaceAppIconColorClass(_appId: WorkspaceToolId): string {
   return "text-cream-bright";
 }

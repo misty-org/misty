@@ -1,7 +1,12 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createDockLeaf, dockLeaves, useWorkspaceStore } from "@/features/workspace";
 import { initialWorkspaceLayout } from "@/features/workspace/virtualWindows";
-import { activeBrowserSurfaceExists, browserBlockingOverlayOpen } from "./BrowserRuntimeBridge";
+import {
+  activeBrowserSurfaceExists,
+  browserBlockingOverlayOpen,
+  focusBrowserRuntimeTab,
+} from "./BrowserRuntimeBridge";
+import { registerBrowserRuntime } from "./browserRuntime";
 
 describe("browser blocking overlays", () => {
   afterEach(() => document.body.replaceChildren());
@@ -63,5 +68,30 @@ describe("browser popup tab opening", () => {
     const focusedPane = dockLeaves(useWorkspaceStore.getState().layout.root)[0];
     expect(focusedPane.activeTabId).toBe(second.id);
     expect(focusedPane.tabs.map((t) => t.id)).toEqual([first.id, second.id]);
+  });
+
+  it("focuses the owning split when the native page receives a pointer-down", () => {
+    const store = useWorkspaceStore.getState();
+    store.reset();
+    const first = store.openBrowserTab({ url: "https://first.example.com" });
+    const firstPane = dockLeaves(useWorkspaceStore.getState().layout.root)[0];
+    const secondPaneId = store.splitPane(firstPane.id, "right");
+    if (!secondPaneId) throw new Error("Expected a second pane");
+    const second = store.openBrowserTab({
+      url: "https://second.example.com",
+      paneId: secondPaneId,
+    });
+    store.focusTab(first.id);
+
+    const focusEvent = vi.fn();
+    window.addEventListener("misty:focus-workspace-tab", focusEvent);
+    expect(focusBrowserRuntimeTab(registerBrowserRuntime(second))).toBe(true);
+    expect(useWorkspaceStore.getState().layout.focusedPaneId).toBe(secondPaneId);
+    expect(
+      dockLeaves(useWorkspaceStore.getState().layout.root).find((pane) => pane.id === secondPaneId)
+        ?.activeTabId,
+    ).toBe(second.id);
+    expect(focusEvent).toHaveBeenCalledOnce();
+    window.removeEventListener("misty:focus-workspace-tab", focusEvent);
   });
 });

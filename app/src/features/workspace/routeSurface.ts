@@ -1,4 +1,5 @@
 import { routes } from "@/features/app-shell";
+import { parseExtensionAppRoute } from "@/features/extensions";
 import {
   browserTabTitle,
   createBrowserTabState,
@@ -51,8 +52,20 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
     return request("transfers", "tool:transfers", "Transfers", pathname, undefined, "single");
   if (pathname.startsWith(routes.agents))
     return request("agents", "tool:agents", "Agents", pathname, undefined, "multiple");
-  if (pathname.startsWith(routes.marketplace))
-    return request("marketplace", "tool:marketplace", "Marketplace", pathname, undefined, "single");
+  if (pathname.startsWith(`${routes.apps}/`)) {
+    const app = parseExtensionAppRoute(pathname);
+    if (!app) return null;
+    return request(
+      "extension",
+      `app:${app.pluginId}`,
+      app.title,
+      pathname,
+      app.pluginId,
+      "multiple",
+    );
+  }
+  if (pathname.startsWith(routes.store) || pathname.startsWith("/marketplace"))
+    return request("marketplace", "tool:marketplace", "Store", pathname, undefined, "single");
   return null;
 }
 

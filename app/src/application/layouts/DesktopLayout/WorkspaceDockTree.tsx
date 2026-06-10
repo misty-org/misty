@@ -9,7 +9,6 @@ import {
   spaceWorkspaceToolFromRoute,
   useWorkspaceStore,
   WorkspaceTabTitleProvider,
-  workspaceTabMatchesRoute,
   type DockSplitDirection,
   type DockDropZone,
   type WorkspaceDockNode,
@@ -40,11 +39,17 @@ import {
   PanelRightDashed,
   PanelTopClose,
   SquareTerminal,
+  Store,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
-import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
-import { WorkspaceSurface } from "./WorkspaceSurface";
+import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
+import {
+  Panel,
+  PanelGroup,
+  PanelResizeHandle,
+  type ImperativePanelGroupHandle,
+} from "react-resizable-panels";
+import { EmptyWorkspacePane, WorkspaceSurface } from "./WorkspaceSurface";
 import {
   AiPaneHost,
   type AiContextReference,
@@ -72,7 +77,8 @@ const surfaceIcons: Record<WorkspaceSurfaceId, LucideIcon> = {
   files: FolderOpen,
   transfers: ArrowLeftRight,
   agents: Bot,
-  marketplace: Blocks,
+  extension: Blocks,
+  marketplace: Store,
 };
 const surfaceLabels: Record<WorkspaceSurfaceId, string> = {
   home: "Home",
@@ -84,7 +90,8 @@ const surfaceLabels: Record<WorkspaceSurfaceId, string> = {
   files: "Files",
   transfers: "Transfers",
   agents: "Agents",
-  marketplace: "Marketplace",
+  extension: "App",
+  marketplace: "Store",
 };
 const tabDragType = "application/x-misty-workspace-tab";
 
@@ -126,6 +133,25 @@ export function groupTabs(tabs: WorkspaceTab[]): TabGroup[] {
   return [...map.values()];
 }
 
+export function tabForGroupedShortcut(
+  tabs: WorkspaceTab[],
+  index: number | "last",
+  lastUsedTabByGroup: Partial<Record<WorkspaceGroupKey, string>>,
+): WorkspaceTab | null {
+  const groups = groupTabs(tabs);
+  const group = index === "last" ? groups[groups.length - 1] : groups[index];
+  if (!group) return null;
+  const preferredId = group.storeGroupKey
+    ? (lastUsedTabByGroup[group.storeGroupKey] ??
+      lastUsedTabByGroup[`tool:${group.surfaceId}` as WorkspaceGroupKey])
+    : undefined;
+  return (
+    (preferredId ? group.tabs.find((tab) => tab.id === preferredId) : undefined) ??
+    [...group.tabs].sort((left, right) => right.lastFocusedAt - left.lastFocusedAt)[0] ??
+    null
+  );
+}
+
 function spaceToolLabel(tool: ReturnType<typeof spaceWorkspaceToolFromRoute>): string {
   if (tool === "journal") return "Journal";
   if (tool === "planner") return "Planner";
@@ -140,9 +166,6 @@ export interface WorkspaceDockTreeProps {
   panelDirection?: DockSplitDirection;
   titlebarInsets?: { left: number; right: number };
   focusedPaneId: string;
-  locationPath: string;
-  locationSearch: string;
-  outlet: ReactNode;
   lastUsedTabByGroup: Partial<Record<WorkspaceGroupKey, string>>;
   onOpen: (tab: WorkspaceTab) => void;
   onClose: (tab: WorkspaceTab) => void;
@@ -180,6 +203,16 @@ function DockSplitView(
       : { top: false, left: edge.left, right: edge.right };
   const persistTimerRef = useRef<number | null>(null);
   const pendingRatioRef = useRef(props.node.ratio);
+  const panelGroupRef = useRef<ImperativePanelGroupHandle | null>(null);
+  useEffect(() => {
+    const handle = panelGroupRef.current;
+    const layout = handle?.getLayout();
+    if (!handle || layout?.length !== 2) return;
+    const desired = props.node.ratio * 100;
+    if (Math.abs((layout[0] ?? desired) - desired) < 0.1) return;
+    pendingRatioRef.current = props.node.ratio;
+    handle.setLayout([desired, 100 - desired]);
+  }, [props.node.ratio]);
   useEffect(
     () => () => {
       if (persistTimerRef.current !== null) window.clearTimeout(persistTimerRef.current);
@@ -188,6 +221,8 @@ function DockSplitView(
   );
   return (
     <PanelGroup
+      ref={panelGroupRef}
+      id={props.node.id}
       direction={props.node.direction}
       className="h-full min-h-0 w-full min-w-0"
       onLayout={(sizes) => {
@@ -199,7 +234,13 @@ function DockSplitView(
         }, 120);
       }}
     >
-      <Panel defaultSize={props.node.ratio * 100} minSize={10} className="min-h-0 min-w-0">
+      <Panel
+        id={`${props.node.id}:first`}
+        order={1}
+        defaultSize={props.node.ratio * 100}
+        minSize={15}
+        className="min-h-0 min-w-0"
+      >
         <WorkspaceDockTree
           {...props}
           node={props.node.first}
@@ -208,14 +249,27 @@ function DockSplitView(
         />
       </Panel>
       <PanelResizeHandle
-        className={cn(
-          "relative z-20 bg-charcoal-border transition-colors hover:bg-charcoal-active data-[resize-handle-active]:bg-charcoal-active",
+        aria-label={
           props.node.direction === "horizontal"
-            ? "w-px cursor-col-resize"
-            : "h-px cursor-row-resize",
+            ? "Resize panes horizontally"
+            : "Resize panes vertically"
+        }
+        className={cn(
+          "relative z-20 bg-charcoal-border transition-colors before:absolute",
+          "hover:bg-charcoal-active focus-visible:outline-none focus-visible:ring-2",
+          "focus-visible:ring-cream-muted/60 data-[resize-handle-active]:bg-charcoal-active",
+          props.node.direction === "horizontal"
+            ? "w-px cursor-col-resize before:inset-y-0 before:left-1/2 before:w-3 before:-translate-x-1/2"
+            : "h-px cursor-row-resize before:inset-x-0 before:top-1/2 before:h-3 before:-translate-y-1/2",
         )}
       />
-      <Panel defaultSize={(1 - props.node.ratio) * 100} minSize={10} className="min-h-0 min-w-0">
+      <Panel
+        id={`${props.node.id}:second`}
+        order={2}
+        defaultSize={(1 - props.node.ratio) * 100}
+        minSize={15}
+        className="min-h-0 min-w-0"
+      >
         <WorkspaceDockTree
           {...props}
           node={props.node.second}
@@ -233,9 +287,12 @@ function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePane }) {
   const [dropZone, setDropZone] = useState<DockDropZone | null>(null);
   const [paneSize, setPaneSize] = useState({ width: 0, height: 0 });
   const activeTab = pane.tabs.find((tab) => tab.id === pane.activeTabId) ?? pane.tabs[0];
-  const defaultAiAdapter = useMemo(() => workspaceAiAdapter(activeTab), [activeTab]);
-  const codeTabs = pane.tabs.filter((tab) => tab.surfaceId === "code");
   const focused = pane.id === props.focusedPaneId;
+  const mountedTabs = pane.tabs.filter(
+    (tab) =>
+      tab.id === activeTab?.id ||
+      dockWidgetRegistry.get(tab.surfaceId).mountPolicy === "keep-alive",
+  );
   const groups = groupTabs(pane.tabs);
   const canCloseTab = pane.tabs.length > 0;
   const scopedTabs = useMemo(
@@ -246,7 +303,7 @@ function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePane }) {
     (leaf) => leaf.id !== pane.id,
   );
   const panelLimitReached = otherPanes.length + 1 >= maxWorkspacePanels;
-  const minimum = minimumForTabs(pane.tabs);
+  const minimum = minimumForWorkspaceTabs(pane.tabs);
   const defaultSplitMinimum = { width: 360, height: 240 };
   const canSplitSideways =
     !panelLimitReached && canFitDockSplit(paneSize, "right", minimum, defaultSplitMinimum);
@@ -321,18 +378,25 @@ function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePane }) {
     <section
       ref={sectionRef}
       className={cn(
-        "relative grid h-full min-h-0 min-w-0 grid-rows-[38px_minmax(0,1fr)] overflow-hidden bg-charcoal-bg transition-[filter,opacity] duration-150",
-        !focused && "opacity-75 brightness-[0.78]",
+        "relative grid h-full min-h-0 min-w-0 grid-rows-[38px_minmax(0,1fr)]",
+        "overflow-hidden bg-charcoal-bg focus:outline-none focus-visible:ring-2",
+        "focus-visible:ring-inset focus-visible:ring-cream-muted/50",
+        focused && "ring-1 ring-inset ring-charcoal-active/60",
       )}
-      style={{ minWidth: minimum.width, minHeight: minimum.height }}
       data-workspace-pane={pane.id}
       onDragOver={dragOver}
       onDragLeave={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropZone(null);
       }}
       onDrop={drop}
+      tabIndex={0}
+      aria-label={activeTab ? `${activeTab.title} workspace pane` : "Empty workspace pane"}
+      onFocus={() => useWorkspaceStore.getState().focusPane(pane.id)}
       onPointerDown={() => {
-        if (!activeTab) return;
+        if (!activeTab) {
+          useWorkspaceStore.getState().focusPane(pane.id);
+          return;
+        }
         if (!focused) props.onOpen(activeTab);
         else useWorkspaceStore.getState().focusTab(activeTab.id);
       }}
@@ -343,20 +407,26 @@ function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePane }) {
         data-misty-window-titlebar-region={titlebarHeader ? "true" : undefined}
       >
         <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
-          {groups.map((group) => (
-            <WorkspaceTabGroupButton
-              key={group.key}
-              group={group}
-              icon={spaceToolIcon(group.tabs[0]) ?? surfaceIcons[group.surfaceId] ?? Blocks}
-              activeTabId={activeTab?.id ?? null}
-              canClose={canCloseTab}
-              canCloseTab={(tab) => canCloseWorkspaceTab(tab, scopedTabs)}
-              lastUsedTabByGroup={props.lastUsedTabByGroup}
-              onOpen={props.onOpen}
-              onClose={props.onClose}
-              onMoveTab={(tabId, index) => props.onMoveTab(tabId, pane.id, index)}
-            />
-          ))}
+          <div
+            className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden"
+            aria-label="Open apps"
+          >
+            {groups.map((group) => (
+              <WorkspaceTabGroupButton
+                key={group.key}
+                group={group}
+                icon={spaceToolIcon(group.tabs[0]) ?? surfaceIcons[group.surfaceId] ?? Blocks}
+                activeTabId={activeTab?.id ?? null}
+                canClose={canCloseTab}
+                canCloseTab={(tab) => canCloseWorkspaceTab(tab, scopedTabs)}
+                lastUsedTabByGroup={props.lastUsedTabByGroup}
+                onOpen={props.onOpen}
+                onClose={props.onClose}
+                onMoveTab={(tabId, index) => props.onMoveTab(tabId, pane.id, index)}
+                paneTabs={pane.tabs}
+              />
+            ))}
+          </div>
           <div className="flex shrink-0 items-center">
             <WorkspaceNewTabMenu paneId={pane.id} onOpenNewTab={props.onOpenNewTab} />
           </div>
@@ -408,31 +478,39 @@ function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePane }) {
         </div>
       </header>
       <div className="min-h-0 min-w-0 overflow-hidden">
-        <AiPaneHost paneId={pane.id} defaultAdapter={defaultAiAdapter}>
-          <WorkspaceTabTitleProvider tabId={activeTab?.id}>
-            {codeTabs.map((codeTab) => (
+        {activeTab ? (
+          mountedTabs.map((mountedTab) => {
+            const isActive = mountedTab.id === activeTab.id;
+            return (
               <div
-                key={codeTab.id}
-                className={cn(
-                  "h-full min-h-0 w-full",
-                  activeTab?.id === codeTab.id ? "block" : "hidden",
-                )}
+                key={mountedTab.id}
+                className={cn("h-full min-h-0 w-full", isActive ? "block" : "hidden")}
+                aria-hidden={!isActive}
               >
-                <WorkspaceSurface tab={codeTab} />
+                <AiPaneHost
+                  paneId={pane.id}
+                  defaultAdapter={workspaceAiAdapter(mountedTab)}
+                  active={isActive}
+                >
+                  <WorkspaceTabTitleProvider tabId={mountedTab.id}>
+                    <WorkspaceSurface tab={mountedTab} active={isActive} />
+                  </WorkspaceTabTitleProvider>
+                </AiPaneHost>
               </div>
-            ))}
-            {activeTab?.surfaceId === "code" ? null : activeTab ? (
-              activeTab.surfaceId === "space" &&
-              focused &&
-              (sameRoute(activeTab.route, props.locationPath, props.locationSearch) ||
-                workspaceTabMatchesRoute(activeTab, props.locationPath)) ? (
-                props.outlet
-              ) : (
-                <WorkspaceSurface tab={activeTab} />
-              )
-            ) : null}
-          </WorkspaceTabTitleProvider>
-        </AiPaneHost>
+            );
+          })
+        ) : (
+          <AiPaneHost paneId={pane.id} active>
+            <EmptyWorkspacePane
+              onOpen={() => {
+                useWorkspaceStore.getState().focusPane(pane.id);
+                window.dispatchEvent(
+                  new CustomEvent("misty:open-new-tab-picker", { detail: { paneId: pane.id } }),
+                );
+              }}
+            />
+          </AiPaneHost>
+        )}
       </div>
       {dropZone ? <DockDropPreview zone={dropZone} /> : null}
     </section>
@@ -617,7 +695,7 @@ const workspaceAiActions: Partial<Record<AiSurfaceId, AiSuggestedAction[]>> = {
     action(
       "marketplace.explain",
       "Explain",
-      "Explain the visible marketplace item and what access it needs.",
+      "Explain the visible Store item and what access it needs.",
     ),
   ],
 };
@@ -690,12 +768,12 @@ function dockSplitFits(
   return canFitDockSplit(
     available,
     zone,
-    minimumForTabs(remaining),
+    minimumForWorkspaceTabs(remaining),
     dockWidgetRegistry.get(movingTab.surfaceId).minimumSize,
   );
 }
 
-function minimumForTabs(tabs: WorkspaceTab[]): { width: number; height: number } {
+export function minimumForWorkspaceTabs(tabs: WorkspaceTab[]): { width: number; height: number } {
   return tabs.reduce(
     (minimum, tab) => {
       const next = dockWidgetRegistry.get(tab.surfaceId).minimumSize;
@@ -710,8 +788,5 @@ function minimumForTabs(tabs: WorkspaceTab[]): { width: number; height: number }
 
 const dockActionClass = [
   "grid size-7 place-items-center rounded text-cream-muted outline-none",
-  "hover:bg-charcoal-card hover:text-cream focus:outline-none disabled:pointer-events-none disabled:opacity-35",
+  "hover:bg-charcoal-card hover:text-cream focus-visible:ring-1 focus-visible:ring-charcoal-active disabled:pointer-events-none disabled:opacity-35",
 ].join(" ");
-function sameRoute(route: string, pathname: string, search: string): boolean {
-  return route === `${pathname}${search}` || route === pathname;
-}

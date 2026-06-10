@@ -15,7 +15,7 @@
     "views": ["Files"],
     "show_in_launcher": true,
     "requires_selected_file": true,
-    "open_mode": "popup"
+    "open_mode": "tab"
   },
   "plugin": {
     "runtime": "web",

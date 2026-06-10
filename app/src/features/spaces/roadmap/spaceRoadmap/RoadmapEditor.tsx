@@ -7,6 +7,7 @@ import type { SpaceTask } from "@/api/spaces/dto/interfaces/types";
 import { SystemErrorActivity } from "@/features/activity";
 import { Button } from "@/shared/ui";
 import { useShortcutHandler } from "@/features/shortcuts";
+import { useWorkspaceTabFocused } from "@/features/workspace";
 import {
   ArrowLeft,
   Check,
@@ -19,7 +20,14 @@ import {
   RefreshCcw,
   X,
 } from "lucide-react";
-import { useCallback, useState, type Dispatch, type SetStateAction } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import type { NavigateFunction } from "react-router-dom";
 import { RoadmapCanvas } from "./RoadmapCanvas";
 import type { RoadmapNode } from "./RoadmapCanvasNodes";
@@ -89,7 +97,21 @@ export function RoadmapEditor(props: {
   const [inspectorAnchor, setInspectorAnchor] = useState<{ x: number; y: number }>();
   const [dailyPlanOpen, setDailyPlanOpen] = useState(true);
   const [focusRequest, setFocusRequest] = useState<{ id: string; token: string }>();
-  useShortcutHandler("roadmap.create", () => setNodeDrawerOpen(true), canManage);
+  const editorRef = useRef<HTMLDivElement | null>(null);
+  const [editorBounds, setEditorBounds] = useState(() => ({
+    left: 0,
+    top: 0,
+    right: typeof window === "undefined" ? 1440 : window.innerWidth,
+    bottom: typeof window === "undefined" ? 900 : window.innerHeight,
+    width: typeof window === "undefined" ? 1440 : window.innerWidth,
+    height: typeof window === "undefined" ? 900 : window.innerHeight,
+  }));
+  const workspaceFocused = useWorkspaceTabFocused();
+  useShortcutHandler(
+    "roadmap.create",
+    () => setNodeDrawerOpen(true),
+    canManage && workspaceFocused,
+  );
   const toggleGoal = useCallback(
     (goalId: string) =>
       setExpandedGoalIds((current) => {
@@ -104,18 +126,40 @@ export function RoadmapEditor(props: {
     setSelectedId(id);
     setInspectorAnchor(id ? anchor : undefined);
   };
-  const viewportWidth = typeof window === "undefined" ? 1440 : window.innerWidth;
-  const viewportHeight = typeof window === "undefined" ? 900 : window.innerHeight;
+  useEffect(() => {
+    const element = editorRef.current;
+    if (!element) return;
+    const update = () => {
+      const bounds = element.getBoundingClientRect();
+      if (bounds.width > 0 && bounds.height > 0) setEditorBounds(bounds);
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+    window.addEventListener("resize", update);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", update);
+    };
+  }, []);
+  const inspectorWidth = Math.max(0, Math.min(344, editorBounds.width - 32));
+  const inspectorHeight = Math.max(0, Math.min(540, editorBounds.height - 32));
   const inspectorLeft = Math.max(
-    16,
-    Math.min((inspectorAnchor?.x ?? viewportWidth - 380) + 18, viewportWidth - 376),
+    editorBounds.left + 16,
+    Math.min(
+      (inspectorAnchor?.x ?? editorBounds.right - inspectorWidth - 16) + 18,
+      editorBounds.right - inspectorWidth - 16,
+    ),
   );
   const inspectorTop = Math.max(
-    16,
-    Math.min((inspectorAnchor?.y ?? 96) - 24, viewportHeight - 560),
+    editorBounds.top + 16,
+    Math.min(
+      (inspectorAnchor?.y ?? editorBounds.top + 96) - 24,
+      editorBounds.bottom - inspectorHeight - 16,
+    ),
   );
   return (
-    <div className="flex h-full min-h-0 flex-col bg-charcoal-bg">
+    <div ref={editorRef} className="flex h-full min-h-0 flex-col bg-charcoal-bg">
       <header className="flex min-h-11 shrink-0 items-center gap-2 border-b border-charcoal-border bg-charcoal-bg py-1.5 pl-1 pr-3">
         <Button
           type="button"
@@ -371,7 +415,12 @@ export function RoadmapEditor(props: {
             "max-h-[min(540px,calc(100vh-32px))] w-[min(344px,calc(100vw-32px))]",
             "shadow-xl ring-1 ring-cream/10",
           ].join(" ")}
-          style={{ left: inspectorLeft, top: inspectorTop }}
+          style={{
+            left: inspectorLeft,
+            top: inspectorTop,
+            width: inspectorWidth,
+            maxHeight: inspectorHeight,
+          }}
           role="dialog"
           aria-label="Edit roadmap selection"
         >

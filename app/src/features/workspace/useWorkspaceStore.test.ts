@@ -78,6 +78,56 @@ describe("desktop dock store", () => {
     ).toHaveLength(1);
   });
 
+  it("treats singleton policy as one instance per pane", () => {
+    const inboxRequest = workspaceSurfaceFromRoute("/inbox");
+    if (!inboxRequest) throw new Error("Expected an Inbox workspace surface");
+    const first = useWorkspaceStore.getState().openSurface(inboxRequest);
+    const firstPane = dockLeaves(useWorkspaceStore.getState().layout.root)[0];
+    const secondPaneId = useWorkspaceStore.getState().splitPane(firstPane.id, "right");
+    if (!secondPaneId) throw new Error("Expected a second pane");
+
+    const second = useWorkspaceStore.getState().openSurface(inboxRequest);
+
+    expect(second.id).not.toBe(first.id);
+    expect(dockTabs(useWorkspaceStore.getState().layout.root)).toHaveLength(2);
+    expect(useWorkspaceStore.getState().openSurface(inboxRequest).id).toBe(second.id);
+  });
+
+  it("opens and reuses the same app independently in each pane", () => {
+    const first = useWorkspaceStore.getState().openSurface(browserRequest);
+    const firstPane = dockLeaves(useWorkspaceStore.getState().layout.root)[0];
+    const secondPaneId = useWorkspaceStore.getState().splitPane(firstPane.id, "right");
+    if (!secondPaneId) throw new Error("Expected a second pane");
+
+    const second = useWorkspaceStore.getState().openSurface(browserRequest);
+    expect(second.id).not.toBe(first.id);
+    expect(useWorkspaceStore.getState().openSurface(browserRequest).id).toBe(second.id);
+
+    useWorkspaceStore.getState().focusPane(firstPane.id);
+    expect(useWorkspaceStore.getState().openSurface(browserRequest).id).toBe(first.id);
+  });
+
+  it("keeps app instances isolated between virtual windows", () => {
+    const first = useWorkspaceStore.getState().openSurface(browserRequest);
+    const secondWindow = useWorkspaceStore.getState().createVirtualWindow("Window 2");
+
+    const second = useWorkspaceStore.getState().openSurface(browserRequest);
+
+    expect(second.id).not.toBe(first.id);
+    expect(useWorkspaceStore.getState().activeVirtualWindowId).toBe(secondWindow.id);
+  });
+
+  it("can focus an empty pane without opening a tab", () => {
+    const first = useWorkspaceStore.getState().openSurface(browserRequest);
+    const firstPane = dockLeaves(useWorkspaceStore.getState().layout.root)[0];
+    const secondPaneId = useWorkspaceStore.getState().splitPane(firstPane.id, "right");
+    if (!secondPaneId) throw new Error("Expected a second pane");
+    useWorkspaceStore.getState().focusTab(first.id);
+
+    expect(useWorkspaceStore.getState().focusPane(secondPaneId)).toBe(true);
+    expect(useWorkspaceStore.getState().layout.focusedPaneId).toBe(secondPaneId);
+  });
+
   it("does not publish a store update when the active tab is focused again", () => {
     const tab = useWorkspaceStore.getState().openSurface(browserRequest);
     const current = useWorkspaceStore.getState();
@@ -300,6 +350,26 @@ describe("desktop dock store", () => {
     ).toBe("/spaces/one/drawings/drawing-2?view=list");
   });
 
+  it("does not reuse a Space tool tab as the Space Home tab", () => {
+    const journalRequest = workspaceSurfaceFromRoute("/spaces/one/notes");
+    const homeRequest = workspaceSurfaceFromRoute("/spaces/one/home");
+    if (!journalRequest || !homeRequest) throw new Error("Expected Space workspace surfaces");
+    const journal = useWorkspaceStore.getState().openSurface(journalRequest);
+
+    const home = useWorkspaceStore.getState().openSurface(homeRequest);
+    const tabs = dockTabs(useWorkspaceStore.getState().layout.root);
+
+    expect(home.id).not.toBe(journal.id);
+    expect(tabs.find((tab) => tab.id === journal.id)).toMatchObject({
+      groupKey: "space:one:journal",
+      route: "/spaces/one/notes",
+    });
+    expect(tabs.find((tab) => tab.id === home.id)).toMatchObject({
+      groupKey: "space:one",
+      route: "/spaces/one/home",
+    });
+  });
+
   it("builds arbitrary nested splits and persists their ratios", () => {
     useWorkspaceStore.getState().openBrowserTab({ url: "https://example.com" });
     const firstPane = dockLeaves(useWorkspaceStore.getState().layout.root)[0];
@@ -347,6 +417,30 @@ describe("desktop dock store", () => {
     expect(dockTabs(useWorkspaceStore.getState().layout.root).map((tab) => tab.id)).toContain(
       first.id,
     );
+  });
+
+  it("opens Browser popups beside their source even when another pane is focused", () => {
+    const store = useWorkspaceStore.getState();
+    const source = store.openBrowserTab({ url: "https://source.example" });
+    const sourcePaneId = dockLeaves(useWorkspaceStore.getState().layout.root)[0].id;
+    const otherPaneId = store.splitPane(sourcePaneId, "right")!;
+    store.openSurface({
+      ...browserRequest,
+      paneId: otherPaneId,
+      forceNew: true,
+      title: "Other",
+    });
+
+    const popup = store.openBrowserTab({
+      url: "https://popup.example",
+      sourceTabId: source.id,
+    });
+    const leaves = dockLeaves(useWorkspaceStore.getState().layout.root);
+    expect(leaves.find((pane) => pane.id === sourcePaneId)?.tabs.map((tab) => tab.id)).toEqual([
+      source.id,
+      popup.id,
+    ]);
+    expect(leaves.find((pane) => pane.id === otherPaneId)?.tabs).toHaveLength(1);
   });
 
   it("keeps legacy empty split leaves available for a new tool", () => {
@@ -439,6 +533,40 @@ describe("desktop dock store", () => {
       second.id,
       first.id,
     ]);
+  });
+
+  it("moves a closed pane's tabs into its adjacent pane instead of the first pane", () => {
+    const store = useWorkspaceStore.getState();
+    const first = store.openBrowserTab({ url: "https://left.example" });
+    const leftPaneId = dockLeaves(useWorkspaceStore.getState().layout.root)[0].id;
+    const rightPaneId = store.splitPane(leftPaneId, "right");
+    if (!rightPaneId) throw new Error("Expected right pane");
+    const right = store.openSurface({
+      ...browserRequest,
+      paneId: rightPaneId,
+      forceNew: true,
+      title: "Right",
+    });
+    const middlePaneId = store.splitPane(leftPaneId, "right");
+    if (!middlePaneId) throw new Error("Expected middle pane");
+    const middle = store.openSurface({
+      ...browserRequest,
+      paneId: middlePaneId,
+      forceNew: true,
+      title: "Middle",
+    });
+
+    store.closePane(middlePaneId);
+    const panes = dockLeaves(useWorkspaceStore.getState().layout.root);
+    expect(panes).toHaveLength(2);
+    expect(panes.find((pane) => pane.id === leftPaneId)?.tabs.map((tab) => tab.id)).toEqual([
+      first.id,
+    ]);
+    expect(panes.find((pane) => pane.id === rightPaneId)?.tabs.map((tab) => tab.id)).toEqual([
+      right.id,
+      middle.id,
+    ]);
+    expect(useWorkspaceStore.getState().layout.focusedPaneId).toBe(rightPaneId);
   });
 
   it("preserves sidebar visibility in versioned snapshots", () => {

@@ -22,9 +22,10 @@ export type WorkspaceSurfaceId =
   | "files"
   | "transfers"
   | "agents"
+  | "extension"
   | "marketplace";
 
-export type WorkspaceGroupKey = `space:${string}` | `tool:${WorkspaceSurfaceId}`;
+export type WorkspaceGroupKey = `space:${string}` | `tool:${WorkspaceSurfaceId}` | `app:${string}`;
 export type WorkspaceInstancePolicy = "multiple" | "single";
 export type WorkspaceScopeKey = "global" | `space:${string}`;
 export type DockMountPolicy = "keep-alive" | "suspend" | "unmount";

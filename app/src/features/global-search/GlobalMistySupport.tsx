@@ -379,6 +379,6 @@ function routeTitle(path: string) {
   if (path.startsWith("/home")) return "Home";
   if (path.startsWith("/files")) return "Files";
   if (path.startsWith("/agents")) return "Agents";
-  if (path.startsWith("/marketplace")) return "Marketplace";
+  if (path.startsWith("/store") || path.startsWith("/marketplace")) return "Store";
   return "Current view";
 }

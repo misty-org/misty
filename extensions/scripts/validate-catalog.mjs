@@ -29,8 +29,8 @@ for (const id of ids) {
   if (catalog.version !== packageJson.version) fail(`${id} catalog version must be ${packageJson.version}.`);
   const panel = manifest.panels?.[0];
   if (!panel?.entry?.startsWith("web/index.html?plugin=")) fail(`${id} must advertise a self-contained web panel entry.`);
-  if (manifest.launcher?.open_mode !== "popup" || catalog.launcher?.open_mode !== "popup") {
-    fail(`${id} must use the first-party popup launcher contract.`);
+  if (manifest.launcher?.open_mode !== "tab" || catalog.launcher?.open_mode !== "tab") {
+    fail(`${id} must use the workspace app-tab launcher contract.`);
   }
   if (!Array.isArray(catalog.install?.artifacts) || catalog.install.artifacts.length === 0) fail(`${id} must have release artifacts.`);
   for (const artifact of catalog.install.artifacts) {
