@@ -3,10 +3,9 @@ import type { MailDraftInput } from "@/api/mail";
 import { reportSystemError } from "@/features/activity";
 import { useAiSurfaceAdapter, type AiSurfaceAdapter } from "@/features/ai-surface/AiPaneHost";
 import { useConnectionsStore } from "@/features/integrations";
-import { dockLeaves, useWorkspaceStore } from "@/features/workspace";
 import { openProviderAuthorizationLink } from "@/shared/platform/openExternalLink";
 import { cn, PermissionState } from "@/shared/ui";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { ComposeDialog } from "./components/ComposeDialog";
@@ -14,20 +13,17 @@ import { InboxBottomBar } from "./components/InboxBottomBar";
 import { InboxSidebar } from "./components/InboxSidebar";
 import { ThreadDetail } from "./components/ThreadDetail";
 import { ThreadList } from "./components/ThreadList";
-import { inboxStoreForWorkspace } from "./store/inboxWorkspaceStores";
-import { selectVisibleInboxThreads } from "./store/useInboxStore";
+import { selectVisibleInboxThreads, useInboxStore } from "./store/useInboxStore";
 import type { InboxThread, ReplyMode } from "./model";
 import { useInboxKeyboardShortcuts } from "./useInboxKeyboardShortcuts";
 
 let refreshInboxAfterAuthorization = false;
 
-export function InboxWorkspace(props: { workspaceId?: string; initialRoute?: string } = {}) {
+export function InboxWorkspace() {
   const { user, transitioning } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  const requestedProvider = searchParams.get("provider");
   const requestedThread = searchParams.get("thread");
   const messageVisible = searchParams.get("view") === "message";
-  const searchInputRef = useRef<HTMLInputElement>(null);
   const [composeOpen, setComposeOpen] = useState(false);
   const [replyTo, setReplyTo] = useState<InboxThread | null>(null);
   const [replyMode, setReplyMode] = useState<ReplyMode>("reply");
@@ -42,8 +38,7 @@ export function InboxWorkspace(props: { workspaceId?: string; initialRoute?: str
   const [reconnectingConnectionId, setReconnectingConnectionId] = useState("");
   const [leftShelfVisible, setLeftShelfVisible] = useState(true);
 
-  const inboxStore = useMemo(() => inboxStoreForWorkspace(props.workspaceId), [props.workspaceId]);
-  const inbox = inboxStore(
+  const inbox = useInboxStore(
     useShallow((state) => ({
       accountId: state.accountId,
       accounts: state.accounts,
@@ -66,7 +61,6 @@ export function InboxWorkspace(props: { workspaceId?: string; initialRoute?: str
       error: state.error,
       setAccount: state.setAccount,
       load: state.load,
-      selectProvider: state.selectProvider,
       selectScope: state.selectScope,
       selectFolderKind: state.selectFolderKind,
       search: state.search,
@@ -77,13 +71,6 @@ export function InboxWorkspace(props: { workspaceId?: string; initialRoute?: str
       sendDraft: state.sendDraft,
     })),
   );
-  const workspaceFocused = useWorkspaceStore((state) => {
-    if (!props.workspaceId) return true;
-    const focusedPane = dockLeaves(state.layout.root).find(
-      (pane) => pane.id === state.layout.focusedPaneId,
-    );
-    return focusedPane?.activeTabId === props.workspaceId;
-  });
 
   const threads = useMemo(
     () =>
@@ -123,8 +110,6 @@ export function InboxWorkspace(props: { workspaceId?: string; initialRoute?: str
 
   const setInboxAccount = inbox.setAccount;
   const loadInbox = inbox.load;
-  const selectInboxProvider = inbox.selectProvider;
-  const selectedInboxProvider = inbox.selectedProvider;
   const openInboxThread = inbox.openThread;
   const selectedInboxThreadKey = inbox.selectedThreadKey;
   const setConnectionsAccount = connections.setAccount;
@@ -134,12 +119,6 @@ export function InboxWorkspace(props: { workspaceId?: string; initialRoute?: str
     setInboxAccount(accountId);
     setConnectionsAccount(accountId);
   }, [setConnectionsAccount, setInboxAccount, user?.id]);
-
-  useEffect(() => {
-    if (requestedProvider !== "google" && requestedProvider !== "microsoft") return;
-    if (selectedInboxProvider === requestedProvider) return;
-    void selectInboxProvider(requestedProvider);
-  }, [requestedProvider, selectInboxProvider, selectedInboxProvider]);
 
   useEffect(() => {
     if (!user?.id || inbox.accountId !== user.id) return;
@@ -257,12 +236,10 @@ export function InboxWorkspace(props: { workspaceId?: string; initialRoute?: str
   };
 
   const handleFocusSearch = () => {
-    const input = searchInputRef.current;
+    const input = document.querySelector<HTMLInputElement>('input[aria-label="Search mail"]');
     input?.focus();
     input?.select();
   };
-
-  const shortcutsEnabled = useCallback(() => workspaceFocused, [workspaceFocused]);
 
   useInboxKeyboardShortcuts({
     threads,
@@ -275,7 +252,6 @@ export function InboxWorkspace(props: { workspaceId?: string; initialRoute?: str
     onOpenCompose: (mode) => openCompose(inbox.selectedThread, mode ?? "reply"),
     onAction: (thread, action) => void inbox.actOnThread(thread, action).catch(() => undefined),
     onFocusSearch: handleFocusSearch,
-    enabled: shortcutsEnabled,
   });
 
   const aiAdapter = useMemo<AiSurfaceAdapter | null>(() => {
@@ -432,7 +408,6 @@ export function InboxWorkspace(props: { workspaceId?: string; initialRoute?: str
 
         <div className="relative min-h-0 min-w-0 overflow-hidden">
           <ThreadList
-            searchInputRef={searchInputRef}
             accounts={visibleAccounts}
             threads={threads}
             totalCount={totalCount}

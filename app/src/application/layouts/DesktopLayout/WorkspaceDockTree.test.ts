@@ -1,6 +1,6 @@
 import type { WorkspaceTab } from "@/features/workspace";
 import { describe, expect, it } from "vitest";
-import { groupTabs, tabForGroupedShortcut } from "./WorkspaceDockTree";
+import { groupTabs } from "./WorkspaceDockTree";
 
 describe("workspace tab groups", () => {
   it("keeps each Space tool in its own tab group", () => {
@@ -74,38 +74,6 @@ describe("workspace tab groups", () => {
         tabs: [{ id: "tab-1" }, { id: "tab-2" }, { id: "tab-3" }],
       },
     ]);
-  });
-
-  it("labels persisted catalog tabs as Store", () => {
-    const tabs: WorkspaceTab[] = [
-      {
-        ...browserTab("store", "Legacy catalog", ""),
-        surfaceId: "marketplace",
-        groupKey: "tool:marketplace",
-        route: "/store",
-      },
-    ];
-
-    expect(groupTabs(tabs)[0]).toMatchObject({
-      surfaceId: "marketplace",
-      label: "Store",
-      contextLabel: "Store",
-    });
-  });
-
-  it("maps numeric shortcuts to visible groups rather than hidden group members", () => {
-    const tabs: WorkspaceTab[] = [
-      browserTab("browser-a", "A", "https://a.example"),
-      browserTab("browser-b", "B", "https://b.example"),
-      {
-        ...browserTab("terminal-a", "Terminal", ""),
-        surfaceId: "terminal",
-        groupKey: "tool:terminal",
-      },
-    ];
-    expect(tabForGroupedShortcut(tabs, 0, { "tool:browser": "browser-b" })?.id).toBe("browser-b");
-    expect(tabForGroupedShortcut(tabs, 1, {})?.id).toBe("terminal-a");
-    expect(tabForGroupedShortcut(tabs, "last", {})?.id).toBe("terminal-a");
   });
 });
 

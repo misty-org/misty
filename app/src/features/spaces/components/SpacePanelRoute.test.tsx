@@ -9,7 +9,6 @@ import {
   spacesTabsSessionKey,
   useSpacesTabsStore,
 } from "../store/useSpacesTabsStore";
-import { canonicalSpaceRoute } from "../spaceRouteNormalization";
 
 function RouteProbe() {
   const route = useSpacePanelRoute();
@@ -89,18 +88,6 @@ describe("Space routing", () => {
       "/spaces/space-1/planner/agenda/month",
     );
     expect(normalizeSpacesTabRoute("/spaces/space-1/home")).toBe("/spaces/space-1/home");
-  });
-
-  it.each([
-    ["/spaces/space-1", "/spaces/space-1/home"],
-    ["/spaces/space-1/files", "/spaces/space-1/library"],
-    ["/spaces/space-1/chat?provider=discord#latest", "/spaces/space-1/social/discord#latest"],
-    ["/spaces/space-1/members", "/spaces/space-1/settings/members"],
-    ["/spaces/space-1/settings/integrations", "/spaces/space-1/settings/connections"],
-    ["/spaces/space-1/planner/calendar?mine=1", "/spaces/space-1/planner/agenda/month?mine=1"],
-    ["/spaces/space-1/assistant", "/agents?spaceId=space-1"],
-  ])("canonicalizes legacy pane route %s", (route, expected) => {
-    expect(canonicalSpaceRoute(route)).toBe(expected);
   });
 
   it.each(["misty", "instagram", "messenger", "x", "discord"] as const)(

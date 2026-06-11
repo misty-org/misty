@@ -554,42 +554,42 @@ pub async fn install_plugin_bundle(
     sha256: Option<String>,
 ) -> Result<String, String> {
     if plugin_id.trim().is_empty() {
-        return Err("App id is required.".to_string());
+        return Err("Extension id is required.".to_string());
     }
     if removed_plugin_id(&plugin_id) {
         return Err(format!(
-            "{plugin_id} has been removed from Misty's app catalog."
+            "{plugin_id} has been removed from Misty's extension catalog."
         ));
     }
     if !matches!(root.as_str(), "public" | "private") {
-        return Err(format!("Unsupported app root: {root}"));
+        return Err(format!("Unsupported extension root: {root}"));
     }
     if url.trim().is_empty() {
-        return Err("App artifact URL is required.".to_string());
+        return Err("Extension artifact URL is required.".to_string());
     }
     if !url.starts_with("https://") {
-        return Err("App artifact URL must use HTTPS.".to_string());
+        return Err("Extension artifact URL must use HTTPS.".to_string());
     }
     if !url.to_ascii_lowercase().ends_with(".zip") {
-        return Err("App install currently expects a .zip bundle.".to_string());
+        return Err("Extension install currently expects a .zip bundle.".to_string());
     }
     if platform
         .as_deref()
         .is_some_and(|value| value.trim().is_empty())
     {
-        return Err("App artifact platform cannot be blank.".to_string());
+        return Err("Extension artifact platform cannot be blank.".to_string());
     }
 
     let client = reqwest::Client::new();
     let bytes = authed_get(&client, &url)
         .send()
         .await
-        .map_err(|error| format!("Could not download app bundle: {error}"))?
+        .map_err(|error| format!("Could not download extension bundle: {error}"))?
         .error_for_status()
-        .map_err(|error| format!("App download failed: {error}"))?
+        .map_err(|error| format!("Extension download failed: {error}"))?
         .bytes()
         .await
-        .map_err(|error| format!("Could not read app bundle: {error}"))?;
+        .map_err(|error| format!("Could not read extension bundle: {error}"))?;
     if let Some(expected) = sha256
         .as_deref()
         .map(str::trim)
@@ -598,19 +598,23 @@ pub async fn install_plugin_bundle(
         let actual = format!("{:x}", Sha256::digest(&bytes));
         if !actual.eq_ignore_ascii_case(expected) {
             return Err(format!(
-                "App bundle checksum mismatch. Expected {expected}, got {actual}."
+                "Extension bundle checksum mismatch. Expected {expected}, got {actual}."
             ));
         }
     }
 
     let root_dir = misty_plugin_root_dir(&root)?;
-    fs::create_dir_all(&root_dir)
-        .map_err(|error| format!("Could not create app root {}: {error}", root_dir.display()))?;
+    fs::create_dir_all(&root_dir).map_err(|error| {
+        format!(
+            "Could not create extension root {}: {error}",
+            root_dir.display()
+        )
+    })?;
     extract_plugin_zip_archive(&bytes, &root_dir, &plugin_id)
-        .map_err(|error| format!("Could not extract app bundle: {error}"))?;
+        .map_err(|error| format!("Could not extract extension bundle: {error}"))?;
 
     Ok(format!(
-        "Installed app {plugin_id} into {}.",
+        "Installed extension {plugin_id} into {}.",
         root_dir.join(&plugin_id).display()
     ))
 }
@@ -624,36 +628,36 @@ pub async fn install_plugin_bundle(
     _platform: Option<String>,
     _sha256: Option<String>,
 ) -> Result<String, String> {
-    Err("Apps are not available in Misty mobile.".to_owned())
+    Err("Extensions are not available in Misty mobile.".to_owned())
 }
 
 #[cfg(desktop)]
 #[tauri::command]
 pub fn uninstall_plugin(plugin_id: String, root: String) -> Result<String, String> {
     if plugin_id.trim().is_empty() {
-        return Err("App id is required.".to_string());
+        return Err("Extension id is required.".to_string());
     }
     if removed_plugin_id(&plugin_id) {
         return Ok(format!(
-            "App {plugin_id} has already been removed from Misty."
+            "Extension {plugin_id} has already been removed from Misty."
         ));
     }
     let plugin_dir = misty_plugin_root_dir(&root)?.join(&plugin_id);
     if !plugin_dir.exists() {
         return Err(format!(
-            "App directory was not found at {}.",
+            "Extension directory was not found at {}.",
             plugin_dir.display()
         ));
     }
     fs::remove_dir_all(&plugin_dir)
         .map_err(|error| format!("Could not remove {}: {error}", plugin_dir.display()))?;
-    Ok(format!("Removed app {plugin_id}."))
+    Ok(format!("Removed extension {plugin_id}."))
 }
 
 #[cfg(mobile)]
 #[tauri::command]
 pub fn uninstall_plugin(_plugin_id: String, _root: String) -> Result<String, String> {
-    Err("Apps are not available in Misty mobile.".to_owned())
+    Err("Extensions are not available in Misty mobile.".to_owned())
 }
 
 #[cfg(desktop)]
@@ -664,11 +668,11 @@ pub fn set_plugin_enabled(
     enabled: bool,
 ) -> Result<String, String> {
     if plugin_id.trim().is_empty() {
-        return Err("App id is required.".to_string());
+        return Err("Extension id is required.".to_string());
     }
     if removed_plugin_id(&plugin_id) {
         return Err(format!(
-            "{plugin_id} has been removed from Misty's app catalog."
+            "{plugin_id} has been removed from Misty's extension catalog."
         ));
     }
 
@@ -687,12 +691,12 @@ pub fn set_plugin_enabled(
     })?;
     object.insert("enabled".to_string(), json!(enabled));
     let next_manifest = serde_json::to_string_pretty(&manifest_json)
-        .map_err(|error| format!("Could not serialize app manifest: {error}"))?;
+        .map_err(|error| format!("Could not serialize extension manifest: {error}"))?;
     fs::write(&manifest_path, format!("{next_manifest}\n"))
         .map_err(|error| format!("Could not write {}: {error}", manifest_path.display()))?;
 
     Ok(format!(
-        "{} app {plugin_id}.",
+        "{} extension {plugin_id}.",
         if enabled { "Enabled" } else { "Disabled" }
     ))
 }
@@ -704,7 +708,7 @@ pub fn set_plugin_enabled(
     _root: String,
     _enabled: bool,
 ) -> Result<String, String> {
-    Err("Apps are not available in Misty mobile.".to_owned())
+    Err("Extensions are not available in Misty mobile.".to_owned())
 }
 
 #[tauri::command]
@@ -1323,8 +1327,10 @@ fn read_local_plugin_record(
         })?
         .and_then(|text| serde_json::from_str::<Value>(&text).ok());
 
-    // Installed packages are Apps for now, so the legacy extension toggle no longer disables them.
-    let manifest_enabled = true;
+    let manifest_enabled = manifest_json
+        .get("enabled")
+        .and_then(Value::as_bool)
+        .unwrap_or(true);
 
     let detail_json = detail_json.unwrap_or_else(|| json!({}));
     let id = plugin_metadata_field(&detail_json, &manifest_json, "id").unwrap_or_else(|| {
@@ -2139,7 +2145,7 @@ mod tests {
         .await
         .expect_err("removed extension should be rejected");
 
-        assert!(error.contains("removed from Misty's app catalog"));
+        assert!(error.contains("removed from Misty's extension catalog"));
     }
 
     #[test]
@@ -2147,7 +2153,7 @@ mod tests {
         let error = set_plugin_enabled("preview-panel".to_string(), "public".to_string(), false)
             .expect_err("removed extension should be rejected");
 
-        assert!(error.contains("removed from Misty's app catalog"));
+        assert!(error.contains("removed from Misty's extension catalog"));
     }
 
     #[test]

@@ -4,7 +4,7 @@ import {
   selectGeneralPreferences,
   useSettingsStore,
 } from "@/features/settings";
-import { multiPanelStoreForPane } from "@/features/workspace";
+import { useMultiPanelStore } from "@/features/workspace";
 import type {
   DirectoryListing,
   ExplorerLibraryItem,
@@ -309,7 +309,7 @@ export function remoteParentDirectory(path: string): string {
 }
 
 export function setPreviewVisibleForPane(paneId: string): void {
-  const multi = multiPanelStoreForPane(paneId).getState();
+  const multi = useMultiPanelStore.getState();
   const tab = multi.tabs.find((candidate) => candidate.panes.some((pane) => pane.id === paneId));
   if (tab) multi.setTabPanelVisibility(tab.id, { previewVisible: true });
 }

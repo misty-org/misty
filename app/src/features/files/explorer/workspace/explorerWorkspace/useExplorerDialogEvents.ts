@@ -12,32 +12,27 @@ import {
  * Context menus and commands fire these rather than calling in directly, so the
  * dialogs stay owned by the workspace no matter what triggered them.
  */
-export function useExplorerDialogEvents(
-  activePaneIdRef: RefObject<string>,
-  ownsPane: (paneId: string) => boolean = () => true,
-) {
+export function useExplorerDialogEvents(activePaneIdRef: RefObject<string>) {
   const [duplicateFinderPaneId, setDuplicateFinderPaneId] = useState<string | null>(null);
   const [compareDialog, setCompareDialog] = useState<CompareDialogSeed | null>(null);
 
   useEffect(() => {
     const openDuplicateFinder = (event: Event) => {
       const detail = (event as CustomEvent<{ paneId?: string }>).detail;
-      const paneId = detail?.paneId || activePaneIdRef.current;
-      if (ownsPane(paneId)) setDuplicateFinderPaneId(paneId);
+      setDuplicateFinderPaneId(detail?.paneId || activePaneIdRef.current);
     };
     window.addEventListener(explorerDuplicateFinderEvent, openDuplicateFinder);
     return () => window.removeEventListener(explorerDuplicateFinderEvent, openDuplicateFinder);
-  }, [activePaneIdRef, ownsPane]);
+  }, [activePaneIdRef]);
 
   useEffect(() => {
     const openCompareWith = (event: Event) => {
       const detail = (event as CustomEvent<CompareDialogSeed>).detail;
-      const seed = detail ?? compareSeedForPane(activePaneIdRef.current);
-      if (ownsPane(seed.paneId)) setCompareDialog(seed);
+      setCompareDialog(detail ?? compareSeedForPane(activePaneIdRef.current));
     };
     window.addEventListener(explorerCompareWithEvent, openCompareWith);
     return () => window.removeEventListener(explorerCompareWithEvent, openCompareWith);
-  }, [activePaneIdRef, ownsPane]);
+  }, [activePaneIdRef]);
 
   return { duplicateFinderPaneId, setDuplicateFinderPaneId, compareDialog, setCompareDialog };
 }

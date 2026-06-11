@@ -1,20 +1,16 @@
 import { closeBrowserRuntime } from "@/features/browser";
 import { toggleDesktopMistyPanel } from "@/features/desktop-pet";
-import { releaseFilesMultiPanelStore } from "@/features/files/explorer";
 import { useGlobalSearchStore } from "@/features/global-search";
-import { releaseInboxWorkspaceStore } from "@/features/inbox";
 import { preferredMistySpace, useSpacesStore } from "@/features/spaces";
 import { killTerminalTab } from "@/features/terminal";
 import { registerShortcutHandler, useShortcutHandler } from "@/features/shortcuts";
 import {
   canCloseWorkspaceTab,
   canCloseWorkspaceWindow,
-  canFitDockSplit,
   dockLeaves,
   dockTabs,
   dockWidgetRegistry,
   findDockLeaf,
-  maxWorkspacePanels,
   nextTabTitle,
   paneBoundsFromDocument,
   paneIdInDirection,
@@ -23,22 +19,20 @@ import {
   toolIdFromTab,
   useRecentToolsStore,
   useWorkspaceStore,
-  releaseWorkspaceTabRouteHistory,
   workspaceSurfaceFromRoute,
   type WorkspaceGroupKey,
   type WorkspaceTab,
 } from "@/features/workspace";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import {
-  minimumForWorkspaceTabs,
-  tabForGroupedShortcut,
-  WorkspaceDockTree,
-} from "./WorkspaceDockTree";
+import { WorkspaceDockTree } from "./WorkspaceDockTree";
 import type { NewTabOption } from "./WorkspaceNewTabMenu";
 import { useVirtualWindowTransition } from "./useVirtualWindowTransition";
 
-export function WorkspaceCanvas(props: { titlebarInsets?: { left: number; right: number } }) {
+export function WorkspaceCanvas(props: {
+  outlet: ReactNode;
+  titlebarInsets?: { left: number; right: number };
+}) {
   const location = useLocation();
   const navigate = useNavigate();
   const spaces = useSpacesStore((state) => state.spaces);
@@ -64,17 +58,6 @@ export function WorkspaceCanvas(props: { titlebarInsets?: { left: number; right:
   const updateSplitRatio = useWorkspaceStore((state) => state.updateSplitRatio);
   const leaves = useMemo(() => dockLeaves(layout.root), [layout.root]);
   const tabCount = useMemo(() => dockTabs(layout.root).length, [layout.root]);
-
-  useEffect(() => {
-    let knownTabs = workspaceTabsById(useWorkspaceStore.getState());
-    return useWorkspaceStore.subscribe((state) => {
-      const nextTabs = workspaceTabsById(state);
-      for (const [tabId, tab] of knownTabs) {
-        if (!nextTabs.has(tabId)) disposeWorkspaceTab(tab);
-      }
-      knownTabs = nextTabs;
-    });
-  }, []);
 
   useEffect(() => {
     if (tabCount > 0 || spaces.length === 0) return;
@@ -136,6 +119,11 @@ export function WorkspaceCanvas(props: { titlebarInsets?: { left: number; right:
         (candidate) => candidate.id === windowId,
       );
       if (!workspaceWindow || !state.closeVirtualWindow(windowId)) return;
+      for (const tab of dockLeaves(workspaceWindow.layout.root).flatMap((pane) => pane.tabs)) {
+        if (tab.surfaceId === "browser") void closeBrowserRuntime(tab);
+        if (tab.surfaceId === "terminal") killTerminalTab(tab.id);
+        dockWidgetRegistry.get(tab.surfaceId).dispose?.(tab.state);
+      }
       window.setTimeout(navigateToActiveLayoutTab, 0);
     },
     [navigateToActiveLayoutTab],
@@ -153,6 +141,9 @@ export function WorkspaceCanvas(props: { titlebarInsets?: { left: number; right:
   const closeWorkspaceTab = useCallback(
     (tab: WorkspaceTab) => {
       if (!closeTab(tab.id)) return;
+      if (tab.surfaceId === "browser") void closeBrowserRuntime(tab);
+      if (tab.surfaceId === "terminal") killTerminalTab(tab.id);
+      dockWidgetRegistry.get(tab.surfaceId).dispose?.(tab.state);
       const state = useWorkspaceStore.getState();
       const leaves = dockLeaves(state.layout.root);
       const focusedPane =
@@ -213,7 +204,7 @@ export function WorkspaceCanvas(props: { titlebarInsets?: { left: number; right:
       openTab(
         openSurface({
           surfaceId: option.surfaceId,
-          groupKey: option.groupKey ?? (`tool:${option.surfaceId}` as WorkspaceGroupKey),
+          groupKey: `tool:${option.surfaceId}` as WorkspaceGroupKey,
           title: tabTitle,
           route: option.route,
           instancePolicy: option.instancePolicy ?? "multiple",
@@ -286,15 +277,9 @@ export function WorkspaceCanvas(props: { titlebarInsets?: { left: number; right:
   );
   useEffect(() => {
     const unregister = Array.from({ length: 9 }, (_, index) =>
-      registerShortcutHandler(`workspace.tab_${index + 1}`, () => {
-        const state = useWorkspaceStore.getState();
-        const pane = findDockLeaf(state.layout.root, state.layout.focusedPaneId);
-        const tab = pane
-          ? tabForGroupedShortcut(pane.tabs, index === 8 ? "last" : index, state.lastUsedTabByGroup)
-          : null;
-        if (tab) state.focusTab(tab.id);
-        openSelectedTab(tab);
-      }),
+      registerShortcutHandler(`workspace.tab_${index + 1}`, () =>
+        openSelectedTab(useWorkspaceStore.getState().selectTab(index === 8 ? "last" : index)),
+      ),
     );
     return () => unregister.forEach((remove) => remove());
   }, [openSelectedTab]);
@@ -311,18 +296,6 @@ export function WorkspaceCanvas(props: { titlebarInsets?: { left: number; right:
       const tab =
         pane?.tabs.find((candidate) => candidate.id === pane.activeTabId) ?? pane?.tabs[0];
       if (tab) openTab(tab);
-      else if (pane) state.focusPane(pane.id);
-    };
-    const canSplitFocusedPane = (direction: "right" | "down") => {
-      const state = useWorkspaceStore.getState();
-      if (dockLeaves(state.layout.root).length >= maxWorkspacePanels) return false;
-      const pane = findDockLeaf(state.layout.root, state.layout.focusedPaneId);
-      const bounds = paneBoundsFromDocument().find((candidate) => candidate.id === pane?.id);
-      if (!pane || !bounds) return false;
-      return canFitDockSplit(bounds, direction, minimumForWorkspaceTabs(pane.tabs), {
-        width: 360,
-        height: 240,
-      });
     };
     const unregister = [
       registerShortcutHandler(
@@ -345,22 +318,14 @@ export function WorkspaceCanvas(props: { titlebarInsets?: { left: number; right:
         () => focusPane("down"),
         () => Boolean(paneInDirection("down")),
       ),
-      registerShortcutHandler(
-        "workspace.split_right",
-        () => {
-          const state = useWorkspaceStore.getState();
-          state.splitPane(state.layout.focusedPaneId, "right");
-        },
-        () => canSplitFocusedPane("right"),
-      ),
-      registerShortcutHandler(
-        "workspace.split_down",
-        () => {
-          const state = useWorkspaceStore.getState();
-          state.splitPane(state.layout.focusedPaneId, "down");
-        },
-        () => canSplitFocusedPane("down"),
-      ),
+      registerShortcutHandler("workspace.split_right", () => {
+        const state = useWorkspaceStore.getState();
+        state.splitPane(state.layout.focusedPaneId, "right");
+      }),
+      registerShortcutHandler("workspace.split_down", () => {
+        const state = useWorkspaceStore.getState();
+        state.splitPane(state.layout.focusedPaneId, "down");
+      }),
       registerShortcutHandler(
         "workspace.close_pane",
         () => {
@@ -484,6 +449,9 @@ export function WorkspaceCanvas(props: { titlebarInsets?: { left: number; right:
         dockEdge={{ top: true, left: true, right: true }}
         titlebarInsets={props.titlebarInsets}
         focusedPaneId={layout.focusedPaneId}
+        locationPath={location.pathname}
+        locationSearch={location.search}
+        outlet={props.outlet}
         lastUsedTabByGroup={lastUsedTabByGroup}
         onOpen={openTab}
         onClose={closeWorkspaceTab}
@@ -502,26 +470,5 @@ export function WorkspaceCanvas(props: { titlebarInsets?: { left: number; right:
         onResizeSplit={updateSplitRatio}
       />
     </div>
-  );
-}
-
-function disposeWorkspaceTab(tab: WorkspaceTab): void {
-  releaseWorkspaceTabRouteHistory(tab.id);
-  if (tab.surfaceId === "browser") void closeBrowserRuntime(tab);
-  if (tab.surfaceId === "terminal") killTerminalTab(tab.id);
-  if (tab.surfaceId === "files") releaseFilesMultiPanelStore(tab.id);
-  if (tab.surfaceId === "inbox") releaseInboxWorkspaceStore(tab.id);
-  dockWidgetRegistry.get(tab.surfaceId).dispose?.(tab.state);
-}
-
-function workspaceTabsById(
-  state: ReturnType<typeof useWorkspaceStore.getState>,
-): Map<string, WorkspaceTab> {
-  return new Map(
-    Object.values(state.virtualWindowsByScope)
-      .filter((windows): windows is NonNullable<typeof windows> => Boolean(windows))
-      .flat()
-      .flatMap((workspaceWindow) => dockTabs(workspaceWindow.layout.root))
-      .map((tab) => [tab.id, tab]),
   );
 }

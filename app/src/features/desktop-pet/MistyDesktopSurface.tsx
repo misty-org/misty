@@ -1,8 +1,7 @@
 import { AuthProvider, useAuth } from "@/features/auth";
 import { GlobalMisty, useGlobalSearchStore } from "@/features/global-search";
-import { ShortcutRuntime, useShortcutHandler } from "@/features/shortcuts";
 import { useSpacesStore } from "@/features/spaces";
-import mistyCompanion from "@/shared/assets/misty-cloud-expression-cycle.webp";
+import mistyCompanion from "@/shared/assets/mist-orb-expression-cycle.webp";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { LogicalPosition, LogicalSize } from "@tauri-apps/api/dpi";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
@@ -26,10 +25,8 @@ import {
   centeredSurfacePosition,
   logicalWorkArea,
   petSize,
-  readSavedPanelSize,
   readSavedPetPosition,
   safePetPosition,
-  savePanelSize,
   savePetPosition,
   type PetPosition,
 } from "./petGeometry";
@@ -40,8 +37,6 @@ const panelHeight = 672;
 // Header, Search / Ask control, and enough transparent breathing room to avoid
 // clipping the panel border inside the native desktop-pet surface.
 const compactPanelHeight = 132;
-const minimumPanelWidth = 480;
-const minimumPanelHeight = 360;
 const panelScreenMargin = 14;
 const petFadeDurationMs = 180;
 const panelExitDurationMs = 320;
@@ -71,7 +66,6 @@ export function MistyDesktopSurfaceRoot({
   return (
     <MemoryRouter>
       <AuthProvider>
-        <ShortcutRuntime />
         <MistyDesktopPet />
       </AuthProvider>
     </MemoryRouter>
@@ -87,8 +81,6 @@ function MistyDesktopPet() {
   const collapseTimerRef = useRef<number | undefined>(undefined);
   const geometryAnimationRef = useRef(0);
   const ignoreMovesUntilRef = useRef(0);
-  const ignoreResizesUntilRef = useRef(0);
-  const panelSizeRef = useRef(readSavedPanelSize());
   const hiddenRef = useRef(false);
   const pointer = useRef<{ x: number; y: number; dragging: boolean } | undefined>(undefined);
 
@@ -97,7 +89,6 @@ function MistyDesktopPet() {
       if (!hasTauriInternals()) return;
       geometryAnimationRef.current += 1;
       ignoreMovesUntilRef.current = Date.now() + 180;
-      ignoreResizesUntilRef.current = Date.now() + 240;
       const current = getCurrentWebviewWindow();
       await current.setPosition(new LogicalPosition(position.x, position.y));
       await current.setSize(new LogicalSize(size.width, size.height));
@@ -118,8 +109,6 @@ function MistyDesktopPet() {
     );
     setPetHidden(true);
     setExpanded(false);
-    await current.setResizable(false);
-    await current.setMinSize(null);
     await placeWindow(position, { width: petSize, height: petSize });
     await afterTwoFrames();
     if (!hiddenRef.current) setPetHidden(false);
@@ -161,25 +150,16 @@ function MistyDesktopPet() {
       const scaleFactor = monitor?.scaleFactor ?? 1;
       const position = physicalPosition.toLogical(scaleFactor);
       const size = physicalSize.toLogical(scaleFactor);
-      const savedSize = panelSizeRef.current;
-      let targetWidth = Math.max(minimumPanelWidth, savedSize?.width ?? panelWidth);
-      let targetHeight = showContent
-        ? Math.max(minimumPanelHeight, savedSize?.height ?? panelHeight)
-        : compactPanelHeight;
-      let workArea: ReturnType<typeof logicalWorkArea> | undefined;
+      let targetWidth = panelWidth;
+      let targetHeight = showContent ? panelHeight : compactPanelHeight;
 
       if (monitor) {
-        workArea = logicalWorkArea(monitor);
-        targetWidth = Math.min(targetWidth, workArea.width - panelScreenMargin * 2);
+        const workArea = logicalWorkArea(monitor);
+        targetWidth = Math.min(panelWidth, workArea.width - panelScreenMargin * 2);
         targetHeight = Math.min(targetHeight, workArea.height - panelScreenMargin * 2);
-      }
-
-      if (!showContent) {
-        await current.setResizable(false);
-        await current.setMinSize(null);
-      }
-
-      if (Math.abs(size.width - targetWidth) >= 1 || Math.abs(size.height - targetHeight) >= 1) {
+        if (Math.abs(size.width - targetWidth) < 1 && Math.abs(size.height - targetHeight) < 1) {
+          return;
+        }
         await placeWindow(
           centeredSurfacePosition(
             position,
@@ -190,17 +170,18 @@ function MistyDesktopPet() {
           ),
           { width: targetWidth, height: targetHeight },
         );
+        return;
       }
-
-      if (showContent) {
-        await current.setMinSize(
-          new LogicalSize(
-            Math.min(minimumPanelWidth, targetWidth),
-            Math.min(minimumPanelHeight, targetHeight),
-          ),
-        );
-        await current.setResizable(true);
+      if (Math.abs(size.width - targetWidth) < 1 && Math.abs(size.height - targetHeight) < 1) {
+        return;
       }
+      await placeWindow(
+        centeredSurfacePosition(position, size, {
+          width: targetWidth,
+          height: targetHeight,
+        }),
+        { width: targetWidth, height: targetHeight },
+      );
     },
     [placeWindow],
   );
@@ -237,11 +218,8 @@ function MistyDesktopPet() {
     const opensWithContent =
       searchState.mode !== "search" ||
       Boolean(searchState.query.trim() || searchState.results.length);
-    const savedSize = panelSizeRef.current;
-    let targetPanelWidth = Math.max(minimumPanelWidth, savedSize?.width ?? panelWidth);
-    let targetPanelHeight = opensWithContent
-      ? Math.max(minimumPanelHeight, savedSize?.height ?? panelHeight)
-      : compactPanelHeight;
+    let targetPanelWidth = panelWidth;
+    let targetPanelHeight = opensWithContent ? panelHeight : compactPanelHeight;
     let targetPanelPosition = centeredSurfacePosition(position, size, {
       width: targetPanelWidth,
       height: targetPanelHeight,
@@ -249,7 +227,7 @@ function MistyDesktopPet() {
 
     if (monitor) {
       const workArea = logicalWorkArea(monitor);
-      targetPanelWidth = Math.min(targetPanelWidth, workArea.width - panelScreenMargin * 2);
+      targetPanelWidth = Math.min(panelWidth, workArea.width - panelScreenMargin * 2);
       targetPanelHeight = Math.min(targetPanelHeight, workArea.height - panelScreenMargin * 2);
       targetPanelPosition = centeredSurfacePosition(
         position,
@@ -265,29 +243,11 @@ function MistyDesktopPet() {
       height: targetPanelHeight,
     });
     if (hiddenRef.current) return;
-    if (opensWithContent) {
-      await current.setMinSize(
-        new LogicalSize(
-          Math.min(minimumPanelWidth, targetPanelWidth),
-          Math.min(minimumPanelHeight, targetPanelHeight),
-        ),
-      );
-      await current.setResizable(true);
-    } else {
-      await current.setResizable(false);
-      await current.setMinSize(null);
-    }
     setExpanded(true);
     setPetHidden(false);
     await current.setAlwaysOnTop(true);
     await current.setFocus();
   }, [placeWindow, user?.id]);
-
-  const togglePanel = useCallback(() => {
-    if (expandedRef.current) requestCollapse();
-    else void expand();
-  }, [expand, requestCollapse]);
-  useShortcutHandler("search.toggle", togglePanel);
 
   const hidePet = useCallback(async () => {
     hiddenRef.current = true;
@@ -336,7 +296,6 @@ function MistyDesktopPet() {
 
     let settleMoveTimer: number | undefined;
     let removeMove: (() => void) | undefined;
-    let removeResize: (() => void) | undefined;
     let removeToggle: (() => void) | undefined;
     void current
       .onMoved(() => {
@@ -368,22 +327,9 @@ function MistyDesktopPet() {
         removeMove = remove;
       });
     void current
-      .onResized(({ payload }) => {
-        if (!expandedRef.current || Date.now() < ignoreResizesUntilRef.current) return;
-        void currentMonitor().then((monitor) => {
-          if (!expandedRef.current || Date.now() < ignoreResizesUntilRef.current) return;
-          const size = payload.toLogical(monitor?.scaleFactor ?? 1);
-          const savedSize = { width: size.width, height: size.height };
-          panelSizeRef.current = savedSize;
-          savePanelSize(savedSize);
-        });
-      })
-      .then((remove) => {
-        removeResize = remove;
-      });
-    void current
       .listen(desktopPetEvents.togglePanel, () => {
-        togglePanel();
+        if (expandedRef.current) requestCollapse();
+        else void expand();
       })
       .then((remove) => {
         removeToggle = remove;
@@ -392,10 +338,9 @@ function MistyDesktopPet() {
       window.clearTimeout(settleMoveTimer);
       window.clearTimeout(collapseTimerRef.current);
       removeMove?.();
-      removeResize?.();
       removeToggle?.();
     };
-  }, [togglePanel]);
+  }, [expand, requestCollapse]);
 
   useEffect(() => {
     if (!expanded || !user?.id) return;
@@ -481,7 +426,6 @@ function MistyDesktopPet() {
       onRequestDrag={() => {
         void getCurrentWebviewWindow().startDragging();
       }}
-      onSwitchToPet={requestCollapse}
       onContentVisibilityChange={handleContentVisibilityChange}
       onNavigate={(href) => sendToMain({ type: "navigate", href })}
       onCommand={(commandId, tabId) => sendToMain({ type: "command", commandId, tabId })}

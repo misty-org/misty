@@ -1,7 +1,6 @@
 import { setNativeWallpaperVideo } from "@/native";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { setAppZoom } from "@/shared/hooks/useAppZoom";
-import { applyStoredExtensionTheme } from "../store/extensionTheme";
 import { selectAppearancePreferences } from "../store/preferences";
 import { useSettingsStore } from "../store/useSettingsStore";
 import { useEffect } from "react";
@@ -23,7 +22,6 @@ export function useDocumentAppAppearance() {
     root.dataset.thumbnailPreviews = String(appearance.thumbnailPreviewsEnabled);
     root.dataset.wallpaperActive = String(Boolean(appearance.wallpaperPath));
     root.style.setProperty("--misty-panel-opacity", String(appearance.panelOpacity));
-    applyStoredExtensionTheme();
   }, [appearance]);
 
   useEffect(() => {

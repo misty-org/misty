@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { centeredSurfacePosition, readSavedPanelSize, savePanelSize } from "./petGeometry";
+import { centeredSurfacePosition } from "./petGeometry";
 
 describe("centeredSurfacePosition", () => {
   it("keeps an expanded panel centered on the pet", () => {
@@ -22,12 +22,5 @@ describe("centeredSurfacePosition", () => {
         14,
       ),
     ).toEqual({ x: 1098, y: 394 });
-  });
-
-  it("remembers the size chosen for the expanded panel", () => {
-    window.localStorage.clear();
-    savePanelSize({ width: 704, height: 518 });
-
-    expect(readSavedPanelSize()).toEqual({ width: 704, height: 518 });
   });
 });

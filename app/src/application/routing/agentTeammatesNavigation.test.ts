@@ -19,7 +19,6 @@ describe("first-class Agent navigation", () => {
     expect(desktopRouteIdFromPath("/agents")).toBe("agents");
     expect(desktopRouteIdFromPath("/assistant")).toBe("agents");
     expect(desktopRouteIdFromPath("/code")).toBe("code");
-    expect(desktopRouteIdFromPath("/store")).toBe("marketplace");
     expect(desktopRouteIdFromPath("/marketplace")).toBe("marketplace");
     expect(desktopRouteIdFromPath("/transfers")).toBe("transfers");
   });

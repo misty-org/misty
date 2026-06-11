@@ -24,17 +24,11 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { MarketplaceBrowser } from "./components/MarketplaceBrowser";
 import type { MarketplaceEntry } from "./components/types";
-import {
-  currentPluginPlatform,
-  extensionAppRoute,
-  usePluginsStore,
-  type PluginEntry,
-} from "@/features/extensions";
+import { currentPluginPlatform, usePluginsStore, type PluginEntry } from "@/features/extensions";
 
 function toBrowserEntry(plugin: PluginEntry): MarketplaceEntry {
   return {
     id: plugin.id,
-    kind: "app",
     name: plugin.name,
     version: plugin.version,
     author: plugin.author,
@@ -52,7 +46,7 @@ function toBrowserEntry(plugin: PluginEntry): MarketplaceEntry {
     links: plugin.links,
     placement: {
       views: plugin.launcher.views,
-      openMode: "tab",
+      openMode: plugin.launcher.open_mode,
       requiresSelection: plugin.launcher.requires_selected_file,
     },
   };
@@ -107,6 +101,7 @@ export default function MarketplacePage(props: { embedded?: boolean }) {
     query,
     selectPlugin,
     selectedPluginId,
+    setPluginEnabled,
     setQuery,
     uninstallPlugin,
     installPlugin,
@@ -122,6 +117,7 @@ export default function MarketplacePage(props: { embedded?: boolean }) {
       query: state.query,
       selectPlugin: state.selectPlugin,
       selectedPluginId: state.selectedPluginId,
+      setPluginEnabled: state.setPluginEnabled,
       setQuery: state.setQuery,
       uninstallPlugin: state.uninstallPlugin,
       installPlugin: state.installPlugin,
@@ -209,12 +205,12 @@ export default function MarketplacePage(props: { embedded?: boolean }) {
     };
     return {
       surfaceId: "marketplace",
-      label: selected?.name ?? "Store",
+      label: selected?.name ?? "Marketplace",
       getContext: () => [
         {
-          kind: "apps.catalog",
+          kind: "extensions.catalog",
           id: pluginPlatform || "unavailable-platform",
-          title: selected?.name ?? "Visible app catalog",
+          title: selected?.name ?? "Visible extension catalog",
           privacy: "device",
           opaqueScopeId: pluginPlatform || "unavailable-platform",
           metadata: {
@@ -230,7 +226,7 @@ export default function MarketplacePage(props: { embedded?: boolean }) {
               kind: "objects",
               content,
               object: {
-                kind: selected ? "app" : "apps.catalog",
+                kind: selected ? "extension" : "extensions.catalog",
                 id: selected?.id ?? (pluginPlatform || "unavailable-platform"),
               },
               anchors: { count: relevant.length, selected: Boolean(selected) },
@@ -242,25 +238,25 @@ export default function MarketplacePage(props: { embedded?: boolean }) {
           id: "extension-explain",
           label: "Explain",
           prompt:
-            "Explain what the selected or visible apps do, where they appear, and what their declared permissions mean.",
+            "Explain what the selected or visible extensions do, where they appear, and what their declared permissions mean.",
         },
         {
           id: "extension-compare",
           label: "Compare",
           prompt:
-            "Compare the visible apps for the current need. Use only the supplied catalog metadata and call out missing information.",
+            "Compare the visible extensions for the current need. Use only the supplied catalog metadata and call out missing information.",
         },
         {
           id: "extension-configure",
           label: "Configuration help",
           prompt:
-            "Explain how to configure and safely use the selected app based on its declared capabilities. Do not change settings or run it.",
+            "Explain how to configure and safely use the selected extension based on its declared capabilities. Do not change settings or run it.",
         },
         {
           id: "extension-install",
           label: "Review install",
           prompt:
-            "Propose installing the selected app. Repeat its exact app identifier, every declared permission, " +
+            "Propose installing the selected extension. Repeat its exact extension identifier, every declared permission, " +
             "and the expected effect. Do not install it yet.",
           requestedArtifactKind: "extension_action",
         },
@@ -271,7 +267,7 @@ export default function MarketplacePage(props: { embedded?: boolean }) {
         const plugin = applicablePlugin(artifact);
         if (!plugin) {
           throw new Error(
-            "The app catalog or declared permissions changed. Ask Misty to regenerate this proposal.",
+            "The extension catalog or declared permissions changed. Ask Misty to regenerate this proposal.",
           );
         }
         await installPlugin(plugin);
@@ -331,7 +327,7 @@ export default function MarketplacePage(props: { embedded?: boolean }) {
           navigate(builtInAppRoute(appId, preferredMistySpace(spaces)?.id, user?.id ?? ""));
           return;
         }
-        navigate(extensionAppRoute(plugin.id, { title: plugin.name }));
+        navigate(`/files?extension=${encodeURIComponent(plugin.id)}`);
       }}
       onQueryChange={(value) => {
         setQuery(value);
@@ -342,6 +338,14 @@ export default function MarketplacePage(props: { embedded?: boolean }) {
         }
       }}
       onSelect={selectAndSyncRoute}
+      onToggle={(plugin, enabled) => {
+        const match =
+          marketplacePlugins.find((entry) => entry.id === plugin.id) ??
+          installedPlugins.find((entry) => entry.id === plugin.id);
+        if (match) {
+          void setPluginEnabled(match, enabled);
+        }
+      }}
       onUninstall={(plugin) => {
         const match =
           installedPlugins.find((entry) => entry.id === plugin.id) ??

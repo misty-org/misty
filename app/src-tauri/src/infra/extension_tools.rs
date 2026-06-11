@@ -8,13 +8,12 @@ use sha2::{Digest, Sha256};
 
 use crate::{
     error::{ApiError, ApiResult},
-    infra::{environment::AppEnvironmentService, system_dependencies::resolve_executable},
+    infra::environment::AppEnvironmentService,
 };
 
 #[derive(Clone)]
 pub struct ExtensionToolResolver {
     roots: [PathBuf; 2],
-    settings_path: PathBuf,
 }
 
 impl ExtensionToolResolver {
@@ -24,7 +23,6 @@ impl ExtensionToolResolver {
                 environment.plugins_private_dir(),
                 environment.plugins_public_dir(),
             ],
-            settings_path: environment.settings_path(),
         }
     }
 
@@ -34,51 +32,16 @@ impl ExtensionToolResolver {
                 "Invalid extension tool identifier.".to_owned(),
             ));
         }
-        let mut bundle_error = None;
         for root in &self.roots {
             let directory = root.join(plugin_id);
             if directory.is_dir() {
-                match resolve_from_directory(&directory, tool_id) {
-                    Ok(path) => return Ok(path),
-                    Err(error) if requires_strict_bundle_verification(&directory, tool_id) => {
-                        return Err(error);
-                    }
-                    Err(error) => bundle_error.get_or_insert(error),
-                };
+                return resolve_from_directory(&directory, tool_id);
             }
         }
-        if let Some(path) = resolve_executable(tool_id, Some(&self.settings_path)) {
-            return Ok(path);
-        }
-        Err(bundle_error.unwrap_or_else(|| {
-            ApiError::Message(format!(
-                "The bundled {tool_id} tool is not installed for this extension."
-            ))
-        }))
+        Err(ApiError::Message(format!(
+            "The bundled {tool_id} tool is not installed for this extension."
+        )))
     }
-}
-
-fn requires_strict_bundle_verification(directory: &Path, tool_id: &str) -> bool {
-    let Ok(bytes) = fs::read(directory.join("manifest.json")) else {
-        return false;
-    };
-    let Ok(manifest) = serde_json::from_slice::<Value>(&bytes) else {
-        return true;
-    };
-    manifest
-        .get("tools")
-        .and_then(Value::as_array)
-        .and_then(|variants| {
-            variants.iter().find(|value| {
-                value.get("id").and_then(Value::as_str) == Some(tool_id)
-                    && value.get("platform").and_then(Value::as_str) == Some(current_platform())
-                    && value.get("architecture").and_then(Value::as_str)
-                        == Some(current_architecture())
-            })
-        })
-        .and_then(|variant| variant.get("sha256"))
-        .and_then(Value::as_str)
-        .is_some_and(|digest| !digest.is_empty())
 }
 
 fn resolve_from_directory(directory: &Path, tool_id: &str) -> ApiResult<PathBuf> {
@@ -218,83 +181,6 @@ mod tests {
             fs::canonicalize(tool).unwrap()
         );
         assert!(resolve_from_directory(&root, "restic").is_err());
-        let _ = fs::remove_dir_all(root);
-    }
-
-    #[test]
-    fn falls_back_to_a_configured_tool_for_an_unpinned_development_bundle() {
-        let root = std::env::temp_dir().join(format!("misty-tools-fallback-{}", Uuid::new_v4()));
-        let environment = AppEnvironmentService::new_with_data_root(Some(root.clone()));
-        let plugin = environment.plugins_private_dir().join("quick_convert");
-        let tools = root.join("configured-tools");
-        fs::create_dir_all(&plugin).unwrap();
-        fs::create_dir_all(&tools).unwrap();
-        fs::write(
-            plugin.join("manifest.json"),
-            serde_json::json!({"tools":[{"id":"ffmpeg","platform":current_platform(),"architecture":current_architecture(),"path":"tools/ffmpeg"}]}).to_string(),
-        ).unwrap();
-        let executable = tools.join(if cfg!(target_os = "windows") {
-            "ffmpeg.exe"
-        } else {
-            "ffmpeg"
-        });
-        fs::write(&executable, b"fixture").unwrap();
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            fs::set_permissions(&executable, fs::Permissions::from_mode(0o755)).unwrap();
-        }
-        fs::create_dir_all(environment.settings_path().parent().unwrap()).unwrap();
-        fs::write(
-            environment.settings_path(),
-            serde_json::json!({"advanced":{"extension_tools_path":tools.display().to_string()}})
-                .to_string(),
-        )
-        .unwrap();
-
-        assert_eq!(
-            ExtensionToolResolver::new(&environment)
-                .resolve("quick_convert", "ffmpeg")
-                .unwrap(),
-            executable
-        );
-        let _ = fs::remove_dir_all(root);
-    }
-
-    #[test]
-    fn does_not_fall_back_when_a_verified_bundle_is_missing() {
-        let root = std::env::temp_dir().join(format!("misty-tools-strict-{}", Uuid::new_v4()));
-        let environment = AppEnvironmentService::new_with_data_root(Some(root.clone()));
-        let plugin = environment.plugins_private_dir().join("quick_convert");
-        let tools = root.join("configured-tools");
-        fs::create_dir_all(&plugin).unwrap();
-        fs::create_dir_all(&tools).unwrap();
-        fs::write(
-            plugin.join("manifest.json"),
-            serde_json::json!({"tools":[{"id":"ffmpeg","platform":current_platform(),"architecture":current_architecture(),"path":"tools/ffmpeg","sha256":"deadbeef"}]}).to_string(),
-        ).unwrap();
-        let executable = tools.join(if cfg!(target_os = "windows") {
-            "ffmpeg.exe"
-        } else {
-            "ffmpeg"
-        });
-        fs::write(&executable, b"fixture").unwrap();
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            fs::set_permissions(&executable, fs::Permissions::from_mode(0o755)).unwrap();
-        }
-        fs::create_dir_all(environment.settings_path().parent().unwrap()).unwrap();
-        fs::write(
-            environment.settings_path(),
-            serde_json::json!({"advanced":{"extension_tools_path":tools.display().to_string()}})
-                .to_string(),
-        )
-        .unwrap();
-
-        assert!(ExtensionToolResolver::new(&environment)
-            .resolve("quick_convert", "ffmpeg")
-            .is_err());
         let _ = fs::remove_dir_all(root);
     }
 }

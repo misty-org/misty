@@ -2,7 +2,6 @@ import { deploymentStorageKey, readDeploymentStorageItem } from "@/api/deploymen
 import { useAuth } from "@/features/auth";
 import { useAppThemeStore } from "@/features/settings";
 import { useShortcutHandler } from "@/features/shortcuts";
-import { useWorkspaceTabFocused } from "@/features/workspace";
 import type {
   SpaceRoadmapEdgeType,
   SpaceRoadmapSnapshot,
@@ -68,7 +67,6 @@ export function RoadmapCanvas(props: {
 
 function RoadmapFlow(props: Parameters<typeof RoadmapCanvas>[0]) {
   const { user } = useAuth();
-  const workspaceFocused = useWorkspaceTabFocused();
   const resolvedTheme = useAppThemeStore((state) => state.resolvedTheme);
   const { fitView, screenToFlowPosition } = useReactFlow<RoadmapNode, Edge>();
   const viewportKey = `misty:roadmap-viewport:${user?.id ?? "anonymous"}:${props.snapshot.roadmap.space_id}:${props.snapshot.roadmap.id}`;
@@ -165,31 +163,31 @@ function RoadmapFlow(props: Parameters<typeof RoadmapCanvas>[0]) {
     if (copiedNodeRef.current) props.onDuplicate(copiedNodeRef.current);
   }, [props]);
 
-  useShortcutHandler("roadmap.copy", copySelection, workspaceFocused && Boolean(props.selectedId));
+  useShortcutHandler("roadmap.copy", copySelection, Boolean(props.selectedId));
   useShortcutHandler(
     "roadmap.paste",
     pasteSelection,
-    () => workspaceFocused && props.canManage && Boolean(copiedNodeRef.current),
+    () => props.canManage && Boolean(copiedNodeRef.current),
   );
   useShortcutHandler(
     "roadmap.duplicate",
     duplicateSelection,
-    workspaceFocused && props.canManage && Boolean(props.selectedId),
+    props.canManage && Boolean(props.selectedId),
   );
   useShortcutHandler(
     "roadmap.undo",
     useCallback(() => commitHistory(history.undo(nodesRef.current)), [commitHistory, history]),
-    workspaceFocused && props.canManage,
+    props.canManage,
   );
   useShortcutHandler(
     "roadmap.redo",
     useCallback(() => commitHistory(history.redo(nodesRef.current)), [commitHistory, history]),
-    workspaceFocused && props.canManage,
+    props.canManage,
   );
   useShortcutHandler(
     "roadmap.delete",
     deleteSelection,
-    workspaceFocused && props.canManage && Boolean(props.selectedId),
+    props.canManage && Boolean(props.selectedId),
   );
 
   const handleNodeChanges = useCallback(

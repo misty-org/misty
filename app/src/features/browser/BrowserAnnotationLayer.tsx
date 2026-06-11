@@ -1,6 +1,5 @@
 import { cn } from "@/shared/ui";
 import { useShortcutHandler } from "@/features/shortcuts";
-import { useWorkspaceTabFocused } from "@/features/workspace";
 import { Circle, Eraser, Minus, Pencil, Redo2, Square, Trash2, Type, Undo2, X } from "lucide-react";
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 
@@ -29,26 +28,9 @@ export function BrowserAnnotationLayer(props: {
   const [draft, setDraft] = useState<DrawingMark | null>(null);
   const [textDraft, setTextDraft] = useState<{ point: Point; value: string } | null>(null);
   const layerRef = useRef<SVGSVGElement | null>(null);
-  const workspaceFocused = useWorkspaceTabFocused();
 
-  useShortcutHandler(
-    "browser.annotation_undo",
-    () => {
-      if (!marks.length) return false;
-      undoLast();
-      return true;
-    },
-    props.active && workspaceFocused,
-  );
-  useShortcutHandler(
-    "browser.annotation_redo",
-    () => {
-      if (!redo.length) return false;
-      redoLast();
-      return true;
-    },
-    props.active && workspaceFocused,
-  );
+  useShortcutHandler("browser.annotation_undo", () => undoLast(), props.active);
+  useShortcutHandler("browser.annotation_redo", () => redoLast(), props.active);
 
   useEffect(() => {
     if (!props.active) return;

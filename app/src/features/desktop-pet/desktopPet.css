@@ -58,18 +58,12 @@ html[data-misty-desktop-surface] #root {
 }
 
 html[data-misty-desktop-surface] section[aria-label="Misty Search"] {
-  width: calc(100dvw - 16px) !important;
-  max-width: none !important;
   max-height: calc(100dvh - 16px) !important;
   border-color: rgb(255 255 255 / 11%) !important;
   background: rgb(18 18 20 / 98%) !important;
   box-shadow: 0 10px 24px rgb(0 0 0 / 52%) !important;
   backdrop-filter: blur(18px) saturate(115%);
   -webkit-backdrop-filter: blur(18px) saturate(115%);
-}
-
-html[data-misty-desktop-surface] section[aria-label="Misty Search"][data-misty-content="true"] {
-  height: calc(100dvh - 16px) !important;
 }
 
 html[data-misty-desktop-surface]
@@ -92,10 +86,6 @@ html[data-misty-desktop-surface]
   [data-misty-conversation-scroll]
   [data-radix-scroll-area-scrollbar] {
   width: 7px;
-}
-
-html[data-misty-desktop-surface] [data-misty-results-scroll] {
-  height: 100% !important;
 }
 
 .misty-desktop-pet:hover img {
