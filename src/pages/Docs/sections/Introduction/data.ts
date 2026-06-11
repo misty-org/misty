@@ -30,4 +30,14 @@ We're really glad you're here! Let's strive to make Misty the best file manager!
       text: "Start with one provider first and make sure file operations feel right. Then, once you're comfortable with the basics, add the rest of your setup.",
     },
   ],
+  screenshots: [
+    {
+      id: "introduction-docs-screenshot",
+      afterParagraph: 5,
+      src: "/",
+      alt: "Getting started docs page",
+      caption:
+        "Drop screenshots between paragraphs by setting afterParagraph on the page data.",
+    },
+  ],
 };

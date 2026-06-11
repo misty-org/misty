@@ -14,6 +14,13 @@ function getAnchors(section: Section): { id: string; label: string }[] {
     });
   }
 
+  for (const screenshot of section.screenshots ?? []) {
+    anchors.push({
+      id: screenshot.id,
+      label: screenshot.caption ?? screenshot.alt,
+    });
+  }
+
   for (const note of section.notes) {
     anchors.push({
       id: `${section.id}-${note.kind}`,

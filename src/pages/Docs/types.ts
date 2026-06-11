@@ -13,6 +13,14 @@ export interface SectionAnchor {
   label: string;
 }
 
+export interface SectionScreenshot {
+  id: string;
+  afterParagraph: number;
+  src: string | null;
+  alt: string;
+  caption?: string;
+}
+
 export interface SectionData {
   id: string;
   label: string;
@@ -21,6 +29,7 @@ export interface SectionData {
   prose: string;
   notes: { kind: NoteKind; text: string }[];
   steps?: Step[];
+  screenshots?: SectionScreenshot[];
   anchors?: SectionAnchor[];
 }
 
