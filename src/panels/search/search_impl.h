@@ -104,6 +104,7 @@ namespace misty::panel {
         std::string raw_query;
         std::string query;
         std::string path;
+        std::vector<std::string> paths;
         SearchScope depth = SearchScope::cwd();
         SearchSource source = SearchSource::LOCAL;
         SearchTypeFilter type_filter = SearchTypeFilter::Any;

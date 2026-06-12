@@ -97,6 +97,7 @@ namespace misty::panel {
         }
 
     private:
+        static float content_width_for(float width, float padding);
         /**
          * @brief Renders the top-level workspace switcher.
          */

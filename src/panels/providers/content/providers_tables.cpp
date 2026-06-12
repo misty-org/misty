@@ -173,13 +173,6 @@ void render_connected_account_row(ProvidersState& state, const ProviderCard& car
     render_provider_status_cell(card);
 
     ImGui::TableSetColumnIndex(2);
-    const std::string details_text = providers_content::provider_details_text(card);
-    ImGui::SetCursorPos(aligned_cell_cursor(kConnectedAccountRowHeight, ImGui::GetTextLineHeight()));
-    ImGui::PushStyleColor(ImGuiCol_Text, details_text == "--" ? kMuted : kText);
-    ImGui::TextUnformatted(details_text.c_str());
-    ImGui::PopStyleColor();
-
-    ImGui::TableSetColumnIndex(3);
     ImGui::PushID(card.id.c_str());
     const char* primary_label = card.needs_reconnect ? "Reconnect" : (card.unavailable ? "Configure" : "Rename");
     const char* primary_icon = card.needs_reconnect ? "sync-16" : (card.unavailable ? "settings-sync-16" : "pencil-16");
@@ -266,7 +259,6 @@ void render_connected_accounts_table(ProvidersState& state,
     const float available_height = std::max(48.0f, max_list_height);
     const float height = std::max(48.0f, std::min(content_height, available_height));
     const ImGuiTableFlags flags =
-        ImGuiTableFlags_RowBg |
         ImGuiTableFlags_BordersInnerH |
         ImGuiTableFlags_BordersOuter |
         ImGuiTableFlags_ScrollY |
@@ -274,18 +266,12 @@ void render_connected_accounts_table(ProvidersState& state,
 
     ImGui::PushStyleColor(ImGuiCol_ChildBg, kCardBg);
     ImGui::PushStyleColor(ImGuiCol_Border, kBorder);
-    ImGui::PushStyleColor(ImGuiCol_Header, kHeaderBg);
-    ImGui::PushStyleColor(ImGuiCol_HeaderHovered, kHeaderBg);
-    ImGui::PushStyleColor(ImGuiCol_HeaderActive, kHeaderBg);
     ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(12.0f, 8.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, kThinScrollbarSize);
-    if (ImGui::BeginTable("##providers_connected_accounts_table", 4, flags, ImVec2(0.0f, height))) {
-        ImGui::TableSetupScrollFreeze(0, 1);
+    if (ImGui::BeginTable("##providers_connected_accounts_table", 3, flags, ImVec2(0.0f, height))) {
         ImGui::TableSetupColumn("Provider", ImGuiTableColumnFlags_WidthStretch, 0.42f);
         ImGui::TableSetupColumn("Status", ImGuiTableColumnFlags_WidthFixed, 190.0f);
-        ImGui::TableSetupColumn("Details", ImGuiTableColumnFlags_WidthStretch, 0.22f);
         ImGui::TableSetupColumn("Actions", ImGuiTableColumnFlags_WidthFixed, 340.0f);
-        ImGui::TableHeadersRow();
 
         for (const auto& card : filtered_cards) {
             render_connected_account_row(state, card);
@@ -294,7 +280,7 @@ void render_connected_accounts_table(ProvidersState& state,
         ImGui::EndTable();
     }
     ImGui::PopStyleVar(2);
-    ImGui::PopStyleColor(5);
+    ImGui::PopStyleColor(2);
 }
 
 }  // namespace misty::panel
