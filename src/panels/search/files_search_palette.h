@@ -17,6 +17,7 @@ class FilesSearchPalette {
 public:
     using LocalResultProvider = std::function<std::vector<SearchResult>(const SearchQuery&)>;
     using ExecuteHandler = std::function<void(const SearchResult&)>;
+    using WorkspacePathsProvider = std::function<std::vector<std::string>()>;
 
     FilesSearchPalette(core::StateRegistry& state_registry,
                        core::WorkerPool& worker_pool,
@@ -24,6 +25,7 @@ public:
 
     void set_local_result_provider(LocalResultProvider provider);
     void set_execute_handler(ExecuteHandler handler);
+    void set_workspace_paths_provider(WorkspacePathsProvider provider);
 
     void open(const std::string& current_path);
     void close();
@@ -43,6 +45,7 @@ private:
     std::string state_key_;
     LocalResultProvider local_result_provider_;
     ExecuteHandler execute_handler_;
+    WorkspacePathsProvider workspace_paths_provider_;
     SearchImpl search_impl_;
 };
 

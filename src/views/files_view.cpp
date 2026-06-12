@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <limits>
 #include <optional>
+#include <unordered_set>
 #include <string_view>
 
 #include "core/commands/command_manager.h"
@@ -18,6 +19,8 @@
 #include "panels/notification/notification_state.h"
 #include "panels/panel/tab_bar.h"
 #include "panels/search/search_impl.h"
+
+namespace fs = std::filesystem;
 
 namespace misty::view {
     namespace {
@@ -47,6 +50,164 @@ namespace misty::view {
             const std::string q = lower_copy(query);
             const std::string t = lower_copy(text);
             return t.find(q) != std::string::npos;
+        }
+
+        bool is_remote_mount_path(const std::string& path) {
+            return path.find("/.misty/mnt/") != std::string::npos;
+        }
+
+        bool local_result_matches(const panel::SearchQuery& query,
+                                  const std::string& name,
+                                  const std::string& full_path,
+                                  bool is_dir) {
+            const std::string needle = lower_copy(
+                query.name_filter.empty() ? query.query : query.name_filter);
+            if (!needle.empty() &&
+                !fuzzy_match(needle, name) &&
+                !fuzzy_match(needle, full_path)) {
+                return false;
+            }
+
+            if (query.type_filter == panel::SearchTypeFilter::File && is_dir) {
+                return false;
+            }
+            if (query.type_filter == panel::SearchTypeFilter::Folder && !is_dir) {
+                return false;
+            }
+            if (!query.ext_filter.empty() && !is_dir) {
+                std::string ext = lower_copy(fs::path(name).extension().string());
+                std::string filter_ext = lower_copy(query.ext_filter);
+                if (!filter_ext.empty() && filter_ext.front() != '.') {
+                    filter_ext.insert(filter_ext.begin(), '.');
+                }
+                if (ext != filter_ext) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        int local_result_score(const std::string& name, const std::string& full_path, const std::string& query) {
+            const std::string needle = lower_copy(query);
+            if (needle.empty()) {
+                return 40;
+            }
+            const std::string lower_name = lower_copy(name);
+            const std::string lower_path = lower_copy(full_path);
+            if (lower_name == needle) {
+                return 140;
+            }
+            if (lower_name.find(needle) != std::string::npos) {
+                return 110;
+            }
+            if (lower_path.find(needle) != std::string::npos) {
+                return 90;
+            }
+            return 55;
+        }
+
+        std::vector<std::string> normalized_local_search_roots(const panel::SearchQuery& query) {
+            std::vector<std::string> roots;
+            std::unordered_set<std::string> seen;
+            const auto add_root = [&](const std::string& candidate) {
+                if (candidate.empty() || is_remote_mount_path(candidate)) {
+                    return;
+                }
+                std::error_code ec;
+                fs::path root(candidate);
+                if (!fs::exists(root, ec) || ec) {
+                    return;
+                }
+                if (!fs::is_directory(root, ec) || ec) {
+                    root = root.parent_path();
+                }
+                ec.clear();
+                if (root.empty() || !fs::exists(root, ec) || ec) {
+                    return;
+                }
+                const std::string normalized = root.lexically_normal().string();
+                if (seen.insert(normalized).second) {
+                    roots.push_back(normalized);
+                }
+            };
+
+            if (!query.paths.empty()) {
+                for (const auto& path : query.paths) {
+                    add_root(path);
+                }
+            } else {
+                add_root(query.path);
+            }
+
+            return roots;
+        }
+
+        std::vector<panel::SearchResult> local_filesystem_palette_results(const panel::SearchQuery& query) {
+            std::vector<panel::SearchResult> results;
+            if (query.commands_only || query.source == panel::SearchSource::REMOTE) {
+                return results;
+            }
+            std::vector<std::string> roots = normalized_local_search_roots(query);
+            if (roots.empty()) {
+                return results;
+            }
+
+            if (query.depth.scope_ == panel::SearchDepth::SYSTEM) {
+                if (const char* home = std::getenv("HOME"); home && *home != '\0') {
+                    roots.assign(1, fs::path(home).lexically_normal().string());
+                }
+            }
+
+            constexpr std::size_t kMaxResults = 150;
+            const int max_depth = query.depth.scope_ == panel::SearchDepth::DEPTH
+                ? std::max(0, query.depth.depth_)
+                : std::numeric_limits<int>::max();
+            const std::string scoring_query = query.name_filter.empty() ? query.query : query.name_filter;
+            std::unordered_set<std::string> seen;
+            fs::directory_options options = fs::directory_options::skip_permission_denied;
+            for (const auto& root_text : roots) {
+                std::error_code ec;
+                fs::recursive_directory_iterator it(fs::path(root_text), options, ec);
+                fs::recursive_directory_iterator end;
+                if (ec) {
+                    continue;
+                }
+                for (; it != end && results.size() < kMaxResults; it.increment(ec)) {
+                    if (ec) {
+                        ec.clear();
+                        continue;
+                    }
+                    if (it.depth() > max_depth) {
+                        it.disable_recursion_pending();
+                    }
+                    const fs::directory_entry& entry = *it;
+                    const std::string full_path = entry.path().string();
+                    const std::string name = entry.path().filename().string();
+                    const bool is_dir = entry.is_directory(ec);
+                    ec.clear();
+                    if (name.empty() || seen.find(full_path) != seen.end()) {
+                        continue;
+                    }
+                    if (!local_result_matches(query, name, full_path, is_dir)) {
+                        continue;
+                    }
+
+                    panel::SearchResult result;
+                    result.id = "local:" + full_path;
+                    result.name = name;
+                    result.path = full_path;
+                    result.subtitle = full_path;
+                    result.source = panel::FileSource::LOCAL;
+                    result.kind = is_dir ? panel::SearchResultKind::Folder : panel::SearchResultKind::File;
+                    result.is_dir = is_dir;
+                    result.badge = "Local";
+                    result.score = local_result_score(name, full_path, scoring_query);
+                    seen.insert(full_path);
+                    results.push_back(std::move(result));
+                }
+            }
+
+            return results;
         }
 
         std::vector<PaletteCommandDefinition> builtin_palette_commands() {
@@ -195,6 +356,9 @@ namespace misty::view {
         context_menu_panel_ = std::make_shared<panel::ContextMenuPanel>(state_registry_);
         claude_panel_ = std::make_shared<panel::ClaudePanel>(state_registry_, worker_pool_);
         search_palette_ = std::make_unique<panel::FilesSearchPalette>(state_registry_, worker_pool_);
+        search_palette_->set_workspace_paths_provider([this]() {
+            return active_workspace_search_roots();
+        });
         search_palette_->set_local_result_provider([this](const panel::SearchQuery& query) {
             std::vector<panel::SearchResult> results;
             const std::string needle = query.commands_only
@@ -261,9 +425,19 @@ namespace misty::view {
                     results.push_back(std::move(result));
                 }
             }
+            auto local_fs = local_filesystem_palette_results(query);
+            results.insert(results.end(),
+                           std::make_move_iterator(local_fs.begin()),
+                           std::make_move_iterator(local_fs.end()));
             return results;
         });
         search_palette_->set_execute_handler([this](const panel::SearchResult& result) {
+            auto target_explorer = [&]() -> std::shared_ptr<panel::FileExplorerPanel> {
+                if (FileTab* tab = active_tab(); tab && tab->explorer_panel) {
+                    return tab->explorer_panel;
+                }
+                return explorer_panel_;
+            };
             if (result.kind == panel::SearchResultKind::Command) {
                 if (result.command_id == "app.open_settings") {
                     view::switch_view(view::ViewID::Settings);
@@ -293,22 +467,26 @@ namespace misty::view {
                     select_next_workspace();
                     return;
                 }
-                if (explorer_panel_) {
-                    (void)explorer_panel_->execute_palette_command(result.command_id);
+                if (auto explorer = target_explorer()) {
+                    (void)explorer->execute_palette_command(result.command_id);
                 }
                 return;
             }
 
-            if (explorer_panel_) {
+            if (auto explorer = target_explorer()) {
+                if (result.kind == panel::SearchResultKind::Location) {
+                    explorer->navigate_to_path(result.path, true, false);
+                    return;
+                }
                 if (result.kind == panel::SearchResultKind::File) {
                     const std::filesystem::path item_path(result.path);
                     const std::string parent = item_path.has_parent_path()
                         ? item_path.parent_path().string()
                         : result.path;
-                    explorer_panel_->navigate_to_path(parent, true, false);
+                    explorer->navigate_to_path(parent, true, false);
                     return;
                 }
-                explorer_panel_->navigate_to_path(result.path, true, false);
+                explorer->navigate_to_path(result.path, true, false);
             }
         });
         load_workspaces();
@@ -815,6 +993,27 @@ namespace misty::view {
         return view::ViewID::Files;
     }
 
+    std::vector<std::string> FilesView::active_workspace_search_roots() const {
+        std::vector<std::string> roots;
+        std::unordered_set<std::string> seen;
+        const FileWorkspace* workspace = active_workspace();
+        if (!workspace) {
+            return roots;
+        }
+
+        for (const auto& tab : workspace->tabs) {
+            if (!tab.explorer_panel) {
+                continue;
+            }
+            for (const auto& root : tab.explorer_panel->workspace_search_roots()) {
+                if (!root.empty() && seen.insert(root).second) {
+                    roots.push_back(root);
+                }
+            }
+        }
+        return roots;
+    }
+
     std::string FilesView::active_explorer_state_key() const {
         const FileTab* tab = active_tab();
         return tab && tab->explorer_panel ? tab->explorer_panel->active_explorer_state_key() : "Files";
@@ -932,9 +1131,11 @@ namespace misty::view {
                                                    toolbar_h -
                                                    kFilesBottomBarHeight);
         const float bottom_bar_y = shell_content_y + shell_content_h;
+        workspace->sidebar_width = std::clamp(workspace->sidebar_width, kSidebarMinWidth, kSidebarMaxWidth);
         float sidebar_w = workspace->sidebar_visible ? workspace->sidebar_width : 0.0f;
         const float sidebar_h = shell_content_h;
         const ImVec2 sidebar_pos(content_x, shell_content_y);
+        const bool search_palette_open = search_palette_ && search_palette_->is_open();
 
         const float inspector_max_for_window =
             std::max(220.0f, shell_w - sidebar_w - claude_w - kExplorerMinWidth);
@@ -1065,10 +1266,10 @@ namespace misty::view {
             }
         }
 
-        if (!activity_popup_open && workspace->inspector_visible) {
+        if (!activity_popup_open && !search_palette_open && workspace->inspector_visible) {
             render_shell_divider(inspector_pos.x, handle_y0, handle_y1);
         }
-        if (!activity_popup_open && claude_panel_->is_open()) {
+        if (!activity_popup_open && !search_palette_open && claude_panel_->is_open()) {
             render_shell_divider(inspector_pos.x + inspector_w, handle_y0, handle_y1);
         }
 
@@ -1094,14 +1295,16 @@ namespace misty::view {
             }
             ImGui::End();
             ImGui::PopStyleVar(2);
-            render_shell_horizontal_divider(content_x, content_x + toolbar_w, shell_content_y);
+            if (!search_palette_open) {
+                render_shell_horizontal_divider(content_x, content_x + toolbar_w, shell_content_y);
+            }
         }
 
         if (workspace->sidebar_visible) {
             ImGui::SetNextWindowPos(sidebar_pos);
             ImGui::SetNextWindowSize(ImVec2(sidebar_w, sidebar_h));
             explorer_panel_->render_sidebar();
-            if (!activity_popup_open && !explorer_panel_->workspace_dropdown_open()) {
+            if (!activity_popup_open && !search_palette_open && !explorer_panel_->workspace_dropdown_open()) {
                 render_shell_divider(explorer_pos.x, handle_y0, handle_y1);
             }
         }

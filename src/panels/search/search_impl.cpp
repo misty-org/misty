@@ -72,6 +72,9 @@ json build_search_request_json(const misty::panel::SearchQuery& query) {
         {"allow_cached", query.allow_cached},
         {"refresh_in_background", query.refresh_in_background},
     };
+    if (!query.paths.empty()) {
+        request["paths"] = query.paths;
+    }
     if (!query.request_id.empty()) {
         request["request_id"] = query.request_id;
     }
@@ -138,7 +141,7 @@ misty::panel::SearchResponse perform_search_request(const misty::panel::SearchQu
     if (base.empty()) {
         throw std::runtime_error("PROXY_SERVICE_URL not set");
     }
-    if (query.path.empty()) {
+    if (query.path.empty() && query.paths.empty()) {
         throw std::runtime_error("search path is required");
     }
 
@@ -151,7 +154,7 @@ misty::panel::SearchResponse perform_search_request(const misty::panel::SearchQu
     const misty::core::HttpResponse response = misty::core::HTTPClient::get().post(
         url,
         body,
-        {.headers = headers, .timeouts = {1L, 3L}}
+        {.headers = headers, .timeouts = {2L, 10L}}
     );
     if (response.status_code < 200 || response.status_code >= 300) {
         throw std::runtime_error(
@@ -203,7 +206,7 @@ void SearchImpl::search(const SearchQuery& query,
         SearchQuery refresh_query = query;
         refresh_query.request_id = initial.request_id;
         SearchResponse latest = initial;
-        for (int attempt = 0; attempt < 12; ++attempt) {
+        for (int attempt = 0; attempt < 40; ++attempt) {
             std::this_thread::sleep_for(std::chrono::milliseconds(250));
             SearchResponse refreshed = perform_search_request(refresh_query);
             const bool changed = refreshed.updated ||
