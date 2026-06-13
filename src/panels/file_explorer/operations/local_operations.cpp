@@ -2,19 +2,27 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <cstdio>
 #include <filesystem>
+#include <fstream>
+#include <optional>
 
+#include "core/clipboard/native_clipboard_factory.h"
 #include "core/commands/command_manager.h"
+#include "core/file_master/file_master_util.h"
 #include "core/file_transfer/file_transfer.h"
 #include "panels/file_explorer/content/file_explorer_content_util.h"
 #include "panels/file_explorer/operations/file_operation_jobs.h"
 #include "panels/file_explorer/operations/file_master_operations.h"
 #include "panels/file_explorer/operations/operation_queue_state.h"
 #include "panels/file_explorer/state/remote_mount_state.h"
+#include "panels/notification/notification_state.h"
 
 namespace misty::panel {
 namespace {
+
+namespace fs = std::filesystem;
 
 bool is_remote_path(const std::string& path) {
     const std::string mount_root = get_mount_root();
@@ -39,6 +47,187 @@ std::string clipboard_operation_label(ClipboardOp op) {
         default:
             return "File operation";
     }
+}
+
+std::string timestamp_suffix();
+
+std::vector<core::ClipboardFileRef> local_file_refs_for(const std::vector<FileItem>& items) {
+    std::vector<core::ClipboardFileRef> refs;
+    const fs::path stage_root =
+        fs::path(std::getenv("HOME") ? std::getenv("HOME") : "/tmp") /
+        ".misty" / "tmp" / "clipboard" / "staged" / timestamp_suffix();
+    for (const auto& item : items) {
+        std::string local_path = item.path;
+        if (is_remote_file_master_item(item)) {
+            const fs::path stage_dir = stage_root;
+            std::error_code ec;
+            fs::create_directories(stage_dir, ec);
+            if (ec) {
+                continue;
+            }
+            core::FileMasterProps props = remote_file_master_props_for(item, stage_dir.string());
+            core::FileMasterResult result = core::copy_remote_path(props);
+            if (!result.success) {
+                continue;
+            }
+            local_path = (stage_dir / item.name).string();
+        } else if (item.type != FileType::LOCAL) {
+            continue;
+        }
+        std::error_code ec;
+        if (local_path.empty() || !fs::exists(local_path, ec)) {
+            continue;
+        }
+        core::ClipboardFileRef ref;
+        ref.display_name = item.name.empty() ? fs::path(local_path).filename().string() : item.name;
+        ref.local_path = local_path;
+        ref.is_dir = item.is_dir;
+        refs.push_back(std::move(ref));
+    }
+    return refs;
+}
+
+bool items_need_clipboard_staging(const std::vector<FileItem>& items) {
+    return std::any_of(items.begin(), items.end(), [](const FileItem& item) {
+        return is_remote_file_master_item(item);
+    });
+}
+
+bool write_file_refs_to_native_clipboard(std::vector<core::ClipboardFileRef> refs) {
+    if (refs.empty()) {
+        return false;
+    }
+    core::ClipboardPayload payload;
+    payload.kind = core::ClipboardPayloadKind::FileRefs;
+    payload.origin = core::ClipboardOrigin::LocalMisty;
+    payload.file_refs = std::move(refs);
+    auto native = core::create_native_clipboard();
+    if (native && native->supported()) {
+        return native->write_payload(payload);
+    }
+    return false;
+}
+
+void write_local_file_refs_to_native_clipboard(const std::vector<FileItem>& items) {
+    (void)write_file_refs_to_native_clipboard(local_file_refs_for(items));
+}
+
+std::string clipboard_staging_message(std::size_t count) {
+    if (count == 1) {
+        return "Preparing clipboard item...";
+    }
+    return "Preparing " + std::to_string(count) + " clipboard items...";
+}
+
+void write_local_file_refs_to_native_clipboard_async(core::StateRegistry& registry,
+                                                     core::WorkerPool& worker_pool,
+                                                     std::vector<FileItem> items) {
+    if (!items_need_clipboard_staging(items)) {
+        write_local_file_refs_to_native_clipboard(items);
+        return;
+    }
+
+    auto& notifications = registry.get_state<NotificationState>("Notifications");
+    const uint64_t toast_id = notifications.add_toast(clipboard_staging_message(items.size()), 0.0f);
+    worker_pool.add(
+        [items = std::move(items), &registry, toast_id]() {
+            auto refs = local_file_refs_for(items);
+            const bool copied = write_file_refs_to_native_clipboard(std::move(refs));
+            auto& notifications = registry.get_state<NotificationState>("Notifications");
+            if (copied) {
+                notifications.update_toast(toast_id, "Clipboard is ready.", 3.0f, NotificationType::SUCCESS);
+            } else {
+                notifications.update_toast(toast_id, "Could not prepare clipboard item.", 5.0f, NotificationType::ERROR);
+            }
+        },
+        []() {},
+        [&registry, toast_id](const std::string& err) {
+            auto& notifications = registry.get_state<NotificationState>("Notifications");
+            notifications.update_toast(toast_id,
+                                       err.empty() ? "Could not prepare clipboard item." : err,
+                                       5.0f,
+                                       NotificationType::ERROR);
+        });
+}
+
+std::optional<core::ClipboardPayload> read_native_clipboard_payload() {
+    auto native = core::create_native_clipboard();
+    if (!native || !native->supported()) {
+        return std::nullopt;
+    }
+    return native->read_payload();
+}
+
+FileItem file_item_for_native_ref(const core::ClipboardFileRef& ref) {
+    FileItem item;
+    item.name = ref.display_name.empty() ? fs::path(ref.local_path).filename().string() : ref.display_name;
+    item.path = ref.local_path;
+    item.id = item.path;
+    item.is_dir = ref.is_dir;
+    item.type = FileType::LOCAL;
+    return item;
+}
+
+std::string timestamp_suffix() {
+    const auto now = std::chrono::system_clock::now().time_since_epoch();
+    return std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(now).count());
+}
+
+fs::path unique_paste_path(const fs::path& dir, const std::string& preferred_name) {
+    fs::path candidate = dir / preferred_name;
+    if (!fs::exists(candidate)) {
+        return candidate;
+    }
+    const fs::path stem = candidate.stem();
+    const fs::path ext = candidate.extension();
+    for (int i = 1; i < 1000; ++i) {
+        fs::path next = dir / (stem.string() + " " + std::to_string(i) + ext.string());
+        if (!fs::exists(next)) {
+            return next;
+        }
+    }
+    return dir / (stem.string() + " " + timestamp_suffix() + ext.string());
+}
+
+bool paste_native_payload_to_directory(const core::ClipboardPayload& payload, const std::string& dest_dir) {
+    std::error_code ec;
+    fs::create_directories(dest_dir, ec);
+    if (dest_dir.empty() || ec) {
+        return false;
+    }
+    bool wrote = false;
+    for (std::size_t i = 0; i < payload.images.size(); ++i) {
+        const auto& image = payload.images[i];
+        if (image.bytes.empty()) {
+            continue;
+        }
+        const std::string name = payload.images.size() == 1
+            ? "clipboard-image-" + timestamp_suffix() + ".png"
+            : "clipboard-image-" + timestamp_suffix() + "-" + std::to_string(i + 1) + ".png";
+        const fs::path out_path = unique_paste_path(dest_dir, name);
+        std::ofstream out(out_path, std::ios::binary | std::ios::trunc);
+        if (out.is_open()) {
+            out.write(reinterpret_cast<const char*>(image.bytes.data()),
+                      static_cast<std::streamsize>(image.bytes.size()));
+            wrote = out.good() || wrote;
+        }
+    }
+    if (!payload.html.empty()) {
+        const fs::path out_path = unique_paste_path(dest_dir, "clipboard.html");
+        std::ofstream out(out_path, std::ios::binary | std::ios::trunc);
+        if (out.is_open()) {
+            out << payload.html;
+            wrote = out.good() || wrote;
+        }
+    } else if (!payload.text.empty()) {
+        const fs::path out_path = unique_paste_path(dest_dir, "clipboard.txt");
+        std::ofstream out(out_path, std::ios::binary | std::ios::trunc);
+        if (out.is_open()) {
+            out << payload.text;
+            wrote = out.good() || wrote;
+        }
+    }
+    return wrote;
 }
 
 void remove_item_from_listing(FileListingsState& listings,
@@ -117,7 +306,6 @@ void FileExplorerPanel::handle_file_operation_commands() {
     auto& state = registry_.get_state<FileExplorerState>(state_key_);
     const auto& listing = active_listing();
     const bool has_file_master_selection = selected_items_are_file_master_items(ui_.selected_files, listing);
-    const bool has_clipboard = registry_.get_state<ClipboardState>("Clipboard").has_content();
 
     if (has_file_master_selection && core::CommandManager::get().matches("explorer.copy")) {
         perform_copy(state);
@@ -125,7 +313,7 @@ void FileExplorerPanel::handle_file_operation_commands() {
     if (has_file_master_selection && core::CommandManager::get().matches("explorer.cut")) {
         perform_cut(state);
     }
-    if (has_clipboard && core::CommandManager::get().matches("explorer.paste")) {
+    if (core::CommandManager::get().matches("explorer.paste")) {
         perform_paste(state);
     }
     if (has_file_master_selection && core::CommandManager::get().matches("explorer.delete")) {
@@ -148,6 +336,7 @@ void FileExplorerPanel::perform_copy(FileExplorerState& state) {
     for (const auto& item : clipboard.items) {
         clipboard.paths.push_back(item.path);
     }
+    write_local_file_refs_to_native_clipboard_async(registry_, worker_pool_, clipboard.items);
 }
 
 void FileExplorerPanel::perform_cut(FileExplorerState& state) {
@@ -171,6 +360,30 @@ void FileExplorerPanel::perform_paste(FileExplorerState& state) {
     }
 
     auto& clipboard = registry_.get_state<ClipboardState>("Clipboard");
+    if (clipboard.op != ClipboardOp::CUT) {
+        if (auto native = read_native_clipboard_payload(); native.has_value() && !native->empty()) {
+            if (!native->file_refs.empty()) {
+                std::vector<FileItem> items;
+                items.reserve(native->file_refs.size());
+                for (const auto& ref : native->file_refs) {
+                    if (!ref.local_path.empty()) {
+                        items.push_back(file_item_for_native_ref(ref));
+                    }
+                }
+                if (!items.empty()) {
+                    perform_drop_items(state, items, dest_dir, ClipboardOp::COPY, {});
+                    return;
+                }
+            }
+            if (paste_native_payload_to_directory(*native, dest_dir)) {
+                request_manual_refresh(state);
+                return;
+            }
+        }
+    }
+    if (!clipboard.has_content()) {
+        return;
+    }
     const std::string source_state_key = clipboard.source_state_key;
     const uint64_t batch_id = enqueue_clipboard_operation_batch(
         registry_,

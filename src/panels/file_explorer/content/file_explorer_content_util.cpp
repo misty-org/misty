@@ -28,14 +28,19 @@ std::string trim_leading_slash(std::string value) {
 std::string remote_sync_path_for_item(const RemoteBrowseTarget& target,
                                       const core::FileMasterListItem& remote_item,
                                       const std::string& item_name) {
+    const std::string base = trim_leading_slash(target.remote_path);
     if (!remote_item.path.empty()) {
-        return trim_leading_slash(remote_item.path);
+        const std::string item_path = trim_leading_slash(remote_item.path);
+        if (base.empty() || item_path == base || item_path.rfind(base + "/", 0) == 0) {
+            return item_path;
+        }
+        return (fs::path(base) / item_path).generic_string();
     }
-    fs::path base = trim_leading_slash(target.remote_path);
+    fs::path path = base;
     if (!item_name.empty()) {
-        base /= item_name;
+        path /= item_name;
     }
-    return base.generic_string();
+    return path.generic_string();
 }
 
 std::string remote_dest_path_for(const RemoteBrowseTarget& target, const std::string& name) {

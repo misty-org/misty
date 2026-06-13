@@ -144,6 +144,8 @@ const std::vector<DefaultCommandEntry>& default_command_entries() {
         {"app.open_settings", MISTY_PRIMARY_SHORTCUT "+Comma"},
         {"app.toggle_plugin_launcher", MISTY_PRIMARY_SHORTCUT "+Shift+P"},
         {"app.toggle_transfers", MISTY_PRIMARY_SHORTCUT "+Shift+Y"},
+        {"clipboard.publish_shared", MISTY_PRIMARY_SHORTCUT "+Alt+C"},
+        {"clipboard.apply_shared", MISTY_PRIMARY_SHORTCUT "+Alt+V"},
         {"modal.confirm", "Enter"},
         {"modal.cancel", "Escape"},
     };

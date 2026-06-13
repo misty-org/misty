@@ -1,5 +1,6 @@
 #include "application.h"
 #include "core/commands/command_manager.h"
+#include "core/clipboard/native_clipboard_factory.h"
 #include "core/manager/plugin_manager.h"
 #include "core/manager/proxy_manager.h"
 #include "core/manager/env_manager.h"
@@ -16,6 +17,7 @@
 #include "panels/file_explorer/operations/file_master_operations.h"
 #include "panels/file_explorer/operations/file_operation_jobs.h"
 #include "panels/file_explorer/operations/operation_queue_state.h"
+#include "panels/clipboard/clipboard_state.h"
 #include "panels/navbar/navbar_state.h"
 #include "panels/settings/settings_state.h"
 
@@ -75,6 +77,8 @@ namespace misty {
             append_startup_log("startup: platform initialized");
             core::EnvManager::get().reload();
             append_startup_log("startup: env reloaded");
+            init_clipboard();
+            append_startup_log("startup: clipboard initialized");
             init_client();
             append_startup_log("startup: init_client ok");
             core::PluginManager::get().set_state_registry(&state_registry_);
@@ -93,6 +97,12 @@ namespace misty {
             std::cout << "Exception caught in Application::run: " << e.what() << std::endl;
             append_startup_log(std::string("startup: exception: ") + e.what());
             panel::shutdown_file_transfer_worker_pool();
+            if (clipboard_service_) {
+                clipboard_service_->stop();
+            }
+            if (proxy_clipboard_client_) {
+                proxy_clipboard_client_->stop();
+            }
             worker_pool_.shutdown();
             view::clear_views();
             cleanup();
@@ -128,6 +138,12 @@ namespace misty {
             if (core::CommandManager::get().matches("app.toggle_plugin_launcher")) {
                 core::PluginManager::get().toggle_launcher();
             }
+            if (clipboard_service_ && core::CommandManager::get().matches("clipboard.publish_shared")) {
+                (void)clipboard_service_->publish_current_to_shared();
+            }
+            if (clipboard_service_ && core::CommandManager::get().matches("clipboard.apply_shared")) {
+                (void)clipboard_service_->apply_shared_to_system_async();
+            }
 
             view::render_current_view();
             errors_panel_.render();
@@ -149,6 +165,12 @@ namespace misty {
         persist_file_explorer_state();
 
         core::PluginManager::get().shutdown();
+        if (clipboard_service_) {
+            clipboard_service_->stop();
+        }
+        if (proxy_clipboard_client_) {
+            proxy_clipboard_client_->stop();
+        }
         panel::shutdown_file_transfer_worker_pool();
         worker_pool_.shutdown();
         view::clear_views();
@@ -186,6 +208,33 @@ namespace misty {
 
     void Application::init_client() {
         client_.reset();
+    }
+
+    void Application::init_clipboard() {
+        proxy_clipboard_client_ = std::make_unique<core::ProxyClipboardClient>(
+            "local",
+            "This Misty");
+        clipboard_service_ = std::make_unique<core::ClipboardService>(
+            core::create_native_clipboard(),
+            proxy_clipboard_client_.get());
+        clipboard_service_->set_device_identity("local", "This Misty");
+        clipboard_service_->set_on_change([this](const core::ClipboardPayload& payload) {
+            auto& state = state_registry_.get_state<panel::ClipboardContextState>(
+                panel::kClipboardContextStateKey);
+            if (payload.origin == core::ClipboardOrigin::RemoteShared) {
+                state.latest_shared = payload;
+            } else {
+                state.local_system = payload;
+            }
+        });
+        if (!clipboard_service_->start()) {
+            append_startup_log("startup: native clipboard watcher unavailable");
+        }
+        proxy_clipboard_client_->start([this](const core::ClipboardPayload& payload) {
+            if (clipboard_service_) {
+                clipboard_service_->accept_remote_payload(payload);
+            }
+        });
     }
 
     void Application::init_views() {
