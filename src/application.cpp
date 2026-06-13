@@ -146,6 +146,7 @@ namespace misty {
             }
 
             view::render_current_view();
+            clipboard_transfer_panel_.render();
             errors_panel_.render();
             core::PluginManager::get().process_shortcuts();
             core::PluginManager::get().render_open_panels();

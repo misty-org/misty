@@ -4,6 +4,7 @@
 #include "core/threading/worker_pool.h"
 #include "core/clipboard/clipboard_service.h"
 #include "core/clipboard/proxy_clipboard_client.h"
+#include "panels/clipboard/clipboard_transfer_panel.h"
 #include "panels/errors/errors_panel.h"
 #include "views/app_view.h"
 #include <memory>
@@ -46,6 +47,7 @@ namespace misty {
         std::shared_ptr<MistyClient> client_;
         std::unique_ptr<core::ProxyClipboardClient> proxy_clipboard_client_;
         std::unique_ptr<core::ClipboardService> clipboard_service_;
+        panel::ClipboardTransferPanel clipboard_transfer_panel_{state_registry_};
         panel::ErrorsPanel errors_panel_;
         core::FramePacer frame_pacer_;
 

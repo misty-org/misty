@@ -5,6 +5,7 @@
 #include <chrono>
 #include <cstdio>
 #include <filesystem>
+#include <functional>
 #include <fstream>
 #include <optional>
 
@@ -17,7 +18,7 @@
 #include "panels/file_explorer/operations/file_master_operations.h"
 #include "panels/file_explorer/operations/operation_queue_state.h"
 #include "panels/file_explorer/state/remote_mount_state.h"
-#include "panels/notification/notification_state.h"
+#include "panels/clipboard/clipboard_transfer_state.h"
 
 namespace misty::panel {
 namespace {
@@ -51,12 +52,20 @@ std::string clipboard_operation_label(ClipboardOp op) {
 
 std::string timestamp_suffix();
 
-std::vector<core::ClipboardFileRef> local_file_refs_for(const std::vector<FileItem>& items) {
+using ClipboardStageProgress =
+    std::function<void(std::size_t completed, std::size_t total, const std::string& current_item)>;
+
+std::vector<core::ClipboardFileRef> local_file_refs_for(const std::vector<FileItem>& items,
+                                                        ClipboardStageProgress progress = nullptr) {
     std::vector<core::ClipboardFileRef> refs;
     const fs::path stage_root =
         fs::path(std::getenv("HOME") ? std::getenv("HOME") : "/tmp") /
         ".misty" / "tmp" / "clipboard" / "staged" / timestamp_suffix();
+    std::size_t completed = 0;
     for (const auto& item : items) {
+        if (progress) {
+            progress(completed, items.size(), item.name);
+        }
         std::string local_path = item.path;
         if (is_remote_file_master_item(item)) {
             const fs::path stage_dir = stage_root;
@@ -83,6 +92,10 @@ std::vector<core::ClipboardFileRef> local_file_refs_for(const std::vector<FileIt
         ref.local_path = local_path;
         ref.is_dir = item.is_dir;
         refs.push_back(std::move(ref));
+        ++completed;
+        if (progress) {
+            progress(completed, items.size(), item.name);
+        }
     }
     return refs;
 }
@@ -127,26 +140,31 @@ void write_local_file_refs_to_native_clipboard_async(core::StateRegistry& regist
         return;
     }
 
-    auto& notifications = registry.get_state<NotificationState>("Notifications");
-    const uint64_t toast_id = notifications.add_toast(clipboard_staging_message(items.size()), 0.0f);
+    auto& transfer_state = registry.get_state<ClipboardTransferState>(kClipboardTransferStateKey);
+    transfer_state.begin("Clipboard Transfer", clipboard_staging_message(items.size()), items.size());
     worker_pool.add(
-        [items = std::move(items), &registry, toast_id]() {
-            auto refs = local_file_refs_for(items);
+        [items = std::move(items), &registry]() {
+            auto& transfer_state = registry.get_state<ClipboardTransferState>(kClipboardTransferStateKey);
+            auto refs = local_file_refs_for(items, [&registry](std::size_t completed,
+                                                               std::size_t total,
+                                                               const std::string& current_item) {
+                auto& state = registry.get_state<ClipboardTransferState>(kClipboardTransferStateKey);
+                const std::string detail = total == 1
+                    ? "Downloading item for native clipboard..."
+                    : "Downloading items for native clipboard...";
+                state.update(detail, current_item, completed);
+            });
             const bool copied = write_file_refs_to_native_clipboard(std::move(refs));
-            auto& notifications = registry.get_state<NotificationState>("Notifications");
             if (copied) {
-                notifications.update_toast(toast_id, "Clipboard is ready.", 3.0f, NotificationType::SUCCESS);
+                transfer_state.finish(true, "Clipboard is ready.");
             } else {
-                notifications.update_toast(toast_id, "Could not prepare clipboard item.", 5.0f, NotificationType::ERROR);
+                transfer_state.finish(false, "Could not prepare clipboard item.");
             }
         },
         []() {},
-        [&registry, toast_id](const std::string& err) {
-            auto& notifications = registry.get_state<NotificationState>("Notifications");
-            notifications.update_toast(toast_id,
-                                       err.empty() ? "Could not prepare clipboard item." : err,
-                                       5.0f,
-                                       NotificationType::ERROR);
+        [&registry](const std::string& err) {
+            auto& transfer_state = registry.get_state<ClipboardTransferState>(kClipboardTransferStateKey);
+            transfer_state.finish(false, err.empty() ? "Could not prepare clipboard item." : err);
         });
 }
 
