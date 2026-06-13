@@ -2,6 +2,8 @@
 #include "core/ui/state_registry.h"
 #include "core/system/frame_pacer.h"
 #include "core/threading/worker_pool.h"
+#include "core/clipboard/clipboard_service.h"
+#include "core/clipboard/proxy_clipboard_client.h"
 #include "panels/errors/errors_panel.h"
 #include "views/app_view.h"
 #include <memory>
@@ -20,6 +22,7 @@ namespace misty {
 
         void run();
         void init_client();
+        void init_clipboard();
         void init_views();
         void on_focus_lost();
         void persist_file_explorer_state();
@@ -41,6 +44,8 @@ namespace misty {
         core::StateRegistry state_registry_;
         core::WorkerPool worker_pool_;
         std::shared_ptr<MistyClient> client_;
+        std::unique_ptr<core::ProxyClipboardClient> proxy_clipboard_client_;
+        std::unique_ptr<core::ClipboardService> clipboard_service_;
         panel::ErrorsPanel errors_panel_;
         core::FramePacer frame_pacer_;
 
