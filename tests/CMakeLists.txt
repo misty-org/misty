@@ -33,6 +33,7 @@ if(BUILD_TESTING)
             "${CMAKE_SOURCE_DIR}/src/core/clipboard/proxy_clipboard_client.cpp"
             "${CMAKE_SOURCE_DIR}/src/core/threading/worker_pool.cpp"
             "${CMAKE_SOURCE_DIR}/src/panels/clipboard/clipboard_state.cpp"
+            "${CMAKE_SOURCE_DIR}/src/panels/clipboard/clipboard_transfer_state.cpp"
             "${CMAKE_SOURCE_DIR}/src/panels/file_explorer/state/file_explorer_state.cpp"
             "${CMAKE_SOURCE_DIR}/src/panels/file_explorer/state/file_listings_state.cpp"
             "${CMAKE_SOURCE_DIR}/src/panels/file_explorer/state/library_state.cpp"
