@@ -24,7 +24,7 @@ pub struct AppEnvironment {
     pub db_dir: PathBuf,
     pub cache_dir: PathBuf,
     pub tmp_dir: PathBuf,
-    pub assets_dir: PathBuf,
+    pub notes_dir: PathBuf,
     pub plugins_public_dir: PathBuf,
     pub plugins_private_dir: PathBuf,
     pub settings_path: PathBuf,
@@ -49,7 +49,7 @@ pub struct AppEnvironmentSnapshot {
     pub db_dir: String,
     pub cache_dir: String,
     pub tmp_dir: String,
-    pub assets_dir: String,
+    pub notes_dir: String,
     pub plugins_public_dir: String,
     pub plugins_private_dir: String,
     pub settings_path: String,
@@ -150,8 +150,8 @@ impl AppEnvironmentService {
         self.inner.cache_dir.clone()
     }
 
-    pub fn assets_dir(&self) -> PathBuf {
-        self.inner.assets_dir.clone()
+    pub fn notes_dir(&self) -> PathBuf {
+        self.inner.notes_dir.clone()
     }
 
     pub fn workspaces_path(&self) -> PathBuf {
@@ -233,18 +233,13 @@ fn replace_file(source: &Path, destination: &Path) -> std::io::Result<()> {
 
 impl AppEnvironment {
     fn load(data_root: Option<PathBuf>) -> Self {
-        let has_explicit_data_root = data_root.is_some();
         let home_dir = data_root.or_else(resolve_home_dir).unwrap_or_default();
         let misty_dir = home_dir.join(".misty");
         let config_dir = misty_dir.join("config");
         let db_dir = misty_dir.join("db");
         let cache_dir = misty_dir.join(".cache");
         let tmp_dir = misty_dir.join("tmp");
-        let assets_dir = if has_explicit_data_root {
-            misty_dir.join("assets")
-        } else {
-            paths::misty_assets_dir().unwrap_or_else(|| misty_dir.join("assets"))
-        };
+        let notes_dir = misty_dir.join("notes");
         let plugins_public_dir = misty_dir.join("plugins").join("public");
         let plugins_private_dir = misty_dir.join("plugins").join("private");
         let settings_path = config_dir.join("settings.json");
@@ -285,7 +280,7 @@ impl AppEnvironment {
             db_dir,
             cache_dir,
             tmp_dir,
-            assets_dir,
+            notes_dir,
             plugins_public_dir,
             plugins_private_dir,
             settings_path,
@@ -309,7 +304,7 @@ impl AppEnvironment {
         let db_dir = misty_dir.join("db");
         let cache_dir = misty_dir.join(".cache");
         let tmp_dir = misty_dir.join("tmp");
-        let assets_dir = misty_dir.join("assets");
+        let notes_dir = misty_dir.join("notes");
         let plugins_public_dir = misty_dir.join("plugins").join("public");
         let plugins_private_dir = misty_dir.join("plugins").join("private");
         let settings_path = config_dir.join("settings.json");
@@ -329,7 +324,7 @@ impl AppEnvironment {
             db_dir,
             cache_dir,
             tmp_dir,
-            assets_dir,
+            notes_dir,
             plugins_public_dir,
             plugins_private_dir,
             settings_path,
@@ -361,7 +356,7 @@ impl AppEnvironment {
             db_dir: display_path(&self.db_dir),
             cache_dir: display_path(&self.cache_dir),
             tmp_dir: display_path(&self.tmp_dir),
-            assets_dir: display_path(&self.assets_dir),
+            notes_dir: display_path(&self.notes_dir),
             plugins_public_dir: display_path(&self.plugins_public_dir),
             plugins_private_dir: display_path(&self.plugins_private_dir),
             settings_path: display_path(&self.settings_path),
@@ -529,7 +524,7 @@ mod tests {
                 db_dir: root.join(".misty/db"),
                 cache_dir: root.join(".misty/.cache"),
                 tmp_dir: root.join(".misty/tmp"),
-                assets_dir: root.join(".misty/assets"),
+                notes_dir: root.join(".misty/notes"),
                 plugins_public_dir: root.join(".misty/plugins/public"),
                 plugins_private_dir: root.join(".misty/plugins/private"),
                 settings_path: root.join(".misty/config/settings.json"),
@@ -570,10 +565,7 @@ mod tests {
         let environment = AppEnvironment::for_home(root.clone());
         let snapshot = environment.snapshot();
 
-        assert_eq!(
-            snapshot.assets_dir,
-            display_path(&root.join(".misty/assets"))
-        );
+        assert_eq!(snapshot.notes_dir, display_path(&root.join(".misty/notes")));
         assert_eq!(snapshot.grpc_address, "127.0.0.1:60051");
         assert_eq!(snapshot.mount_path, "/Volumes/Misty");
         assert_eq!(

@@ -14,6 +14,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  OverflowFadeText,
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -98,17 +99,13 @@ export function GlobalSpaceSwitcher(props: {
                         "max-w-[calc(100%_-_2.375rem)]",
                       )}
                     >
-                      <span
-                        className={cn(
-                          "min-w-0 overflow-hidden whitespace-nowrap text-base font-semibold text-cream",
-                          "[mask-image:linear-gradient(to_right,black_calc(100%-18px),transparent)]",
-                          "[-webkit-mask-image:linear-gradient(to_right,black_calc(100%-18px),transparent)]",
-                        )}
+                      <OverflowFadeText
+                        className="min-w-0 overflow-hidden whitespace-nowrap text-base font-semibold text-cream"
                         data-active-space-name="true"
                         title={activeName}
                       >
                         {activeName}
-                      </span>
+                      </OverflowFadeText>
                       <ChevronDown
                         size={16}
                         className={cn(
@@ -157,17 +154,13 @@ export function GlobalSpaceSwitcher(props: {
                           />
                         ) : null}
                       </span>
-                      <span
-                        className={cn(
-                          "block min-w-0 flex-1 overflow-hidden whitespace-nowrap",
-                          "[mask-image:linear-gradient(to_right,black_calc(100%-18px),transparent)]",
-                          "[-webkit-mask-image:linear-gradient(to_right,black_calc(100%-18px),transparent)]",
-                        )}
+                      <OverflowFadeText
+                        className="block min-w-0 flex-1 overflow-hidden whitespace-nowrap"
                         data-space-name={space.id}
                         title={space.name}
                       >
                         {space.name}
-                      </span>
+                      </OverflowFadeText>
                       {unread > 0 ? <span className="sr-only">{unread} unread</span> : null}
                     </DropdownMenuItem>
                     <div

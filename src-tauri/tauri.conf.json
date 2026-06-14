@@ -42,7 +42,7 @@
           "$AUDIO/**",
           "$HOME/.misty/.cache/**",
           "$HOME/.misty/mnt/**",
-          "$HOME/.misty/**",
+          "$HOME/.misty/notes/**",
           "$APPDATA/**",
           "$APPLOCALDATA/**",
           "$APPCACHE/**",
