@@ -5,6 +5,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include "core/clipboard/clipboard_cache.h"
 #include "core/manager/env_manager.h"
 #include "core/net/http_client.h"
 
@@ -190,6 +191,20 @@ bool ProxyClipboardClient::download_image_blob(ClipboardImage& image) {
     if (image.blob_id.empty()) {
         return false;
     }
+    ClipboardImageBlobCacheKey cache_key;
+    cache_key.blob_id = image.blob_id;
+    cache_key.checksum = image.checksum;
+    cache_key.size_bytes = image.size_bytes;
+    cache_key.mime_type = image.mime_type;
+    ClipboardCache cache;
+    if (auto cached = cache.lookup_image_blob(cache_key); cached.has_value()) {
+        image.bytes = std::move(*cached);
+        if (image.size_bytes == 0) {
+            image.size_bytes = image.bytes.size();
+        }
+        return !image.bytes.empty();
+    }
+
     const auto response = HTTPClient::get().get(endpoint("/api/clipboard/blobs/" + url_encode(image.blob_id)));
     if (response.status_code < 200 || response.status_code >= 300) {
         return false;
@@ -198,6 +213,7 @@ bool ProxyClipboardClient::download_image_blob(ClipboardImage& image) {
     if (image.size_bytes == 0) {
         image.size_bytes = image.bytes.size();
     }
+    (void)cache.store_image_blob(cache_key, image.bytes);
     return !image.bytes.empty();
 }
 

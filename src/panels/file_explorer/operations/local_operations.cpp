@@ -9,6 +9,7 @@
 #include <fstream>
 #include <optional>
 
+#include "core/clipboard/clipboard_cache.h"
 #include "core/clipboard/native_clipboard_factory.h"
 #include "core/commands/command_manager.h"
 #include "core/file_master/file_master_util.h"
@@ -53,7 +54,81 @@ std::string clipboard_operation_label(ClipboardOp op) {
 std::string timestamp_suffix();
 
 using ClipboardStageProgress =
-    std::function<void(std::size_t completed, std::size_t total, const std::string& current_item)>;
+    std::function<void(std::size_t completed,
+                       std::size_t total,
+                       const std::string& current_item,
+                       const std::string& detail)>;
+
+core::ClipboardRemoteFileCacheKey cache_key_for_remote_item(const FileItem& item) {
+    core::ClipboardRemoteFileCacheKey key;
+    key.remote_name = item.sync_remote_name;
+    key.remote_path = item.sync_remote_path;
+    key.size = item.size;
+    key.last_modified = item.last_modified;
+    key.is_dir = item.is_dir;
+    return key;
+}
+
+std::optional<std::string> cached_or_stage_remote_file(const FileItem& item,
+                                                       const fs::path& fallback_stage_root,
+                                                       ClipboardStageProgress progress,
+                                                       std::size_t completed,
+                                                       std::size_t total) {
+    if (!is_remote_file_master_item(item)) {
+        return std::nullopt;
+    }
+
+    if (!item.is_dir) {
+        core::ClipboardCache cache;
+        const auto key = cache_key_for_remote_item(item);
+        if (auto cached = cache.lookup_remote_file(key); cached.has_value()) {
+            if (progress) {
+                progress(completed, total, item.name, "Using cached clipboard item...");
+            }
+            return cached->string();
+        }
+
+        const std::string cache_key = core::ClipboardCache::remote_file_key(key);
+        const fs::path temp_path = cache.temp_path_for(cache_key, item.name);
+        std::error_code ec;
+        fs::create_directories(temp_path.parent_path(), ec);
+        if (ec) {
+            return std::nullopt;
+        }
+        if (progress) {
+            progress(completed, total, item.name, total == 1
+                ? "Downloading item for native clipboard..."
+                : "Downloading items for native clipboard...");
+        }
+        core::FileMasterProps props = remote_file_master_props_for(item);
+        props.local_dest.path = temp_path.string();
+        core::FileMasterResult result = core::copy_remote_path(props);
+        if (!result.success) {
+            fs::remove(temp_path, ec);
+            return std::nullopt;
+        }
+        if (auto cached = cache.store_remote_file(key, temp_path, item.name); cached.has_value()) {
+            return cached->string();
+        }
+        return temp_path.string();
+    }
+
+    const fs::path stage_dir = fallback_stage_root;
+    std::error_code ec;
+    fs::create_directories(stage_dir, ec);
+    if (ec) {
+        return std::nullopt;
+    }
+    if (progress) {
+        progress(completed, total, item.name, "Downloading directory for native clipboard...");
+    }
+    core::FileMasterProps props = remote_file_master_props_for(item, stage_dir.string());
+    core::FileMasterResult result = core::copy_remote_path(props);
+    if (!result.success) {
+        return std::nullopt;
+    }
+    return (stage_dir / item.name).string();
+}
 
 std::vector<core::ClipboardFileRef> local_file_refs_for(const std::vector<FileItem>& items,
                                                         ClipboardStageProgress progress = nullptr) {
@@ -64,22 +139,15 @@ std::vector<core::ClipboardFileRef> local_file_refs_for(const std::vector<FileIt
     std::size_t completed = 0;
     for (const auto& item : items) {
         if (progress) {
-            progress(completed, items.size(), item.name);
+            progress(completed, items.size(), item.name, "Preparing clipboard item...");
         }
         std::string local_path = item.path;
         if (is_remote_file_master_item(item)) {
-            const fs::path stage_dir = stage_root;
-            std::error_code ec;
-            fs::create_directories(stage_dir, ec);
-            if (ec) {
+            auto staged = cached_or_stage_remote_file(item, stage_root, progress, completed, items.size());
+            if (!staged.has_value()) {
                 continue;
             }
-            core::FileMasterProps props = remote_file_master_props_for(item, stage_dir.string());
-            core::FileMasterResult result = core::copy_remote_path(props);
-            if (!result.success) {
-                continue;
-            }
-            local_path = (stage_dir / item.name).string();
+            local_path = *staged;
         } else if (item.type != FileType::LOCAL) {
             continue;
         }
@@ -94,7 +162,7 @@ std::vector<core::ClipboardFileRef> local_file_refs_for(const std::vector<FileIt
         refs.push_back(std::move(ref));
         ++completed;
         if (progress) {
-            progress(completed, items.size(), item.name);
+            progress(completed, items.size(), item.name, "Preparing clipboard item...");
         }
     }
     return refs;
@@ -147,11 +215,9 @@ void write_local_file_refs_to_native_clipboard_async(core::StateRegistry& regist
             auto& transfer_state = registry.get_state<ClipboardTransferState>(kClipboardTransferStateKey);
             auto refs = local_file_refs_for(items, [&registry](std::size_t completed,
                                                                std::size_t total,
-                                                               const std::string& current_item) {
+                                                               const std::string& current_item,
+                                                               const std::string& detail) {
                 auto& state = registry.get_state<ClipboardTransferState>(kClipboardTransferStateKey);
-                const std::string detail = total == 1
-                    ? "Downloading item for native clipboard..."
-                    : "Downloading items for native clipboard...";
                 state.update(detail, current_item, completed);
             });
             const bool copied = write_file_refs_to_native_clipboard(std::move(refs));

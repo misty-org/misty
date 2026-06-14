@@ -82,8 +82,7 @@ std::vector<ClipboardFileRef> read_file_refs(NSPasteboard* pasteboard) {
     return refs;
 }
 
-std::optional<ClipboardImage> read_image(NSPasteboard* pasteboard) {
-    NSData* png = [pasteboard dataForType:NSPasteboardTypePNG];
+std::optional<ClipboardImage> image_from_png_data(NSData* png) {
     if (png) {
         ClipboardImage image;
         image.mime_type = "image/png";
@@ -96,12 +95,10 @@ std::optional<ClipboardImage> read_image(NSPasteboard* pasteboard) {
         }
         return image;
     }
+    return std::nullopt;
+}
 
-    NSData* tiff = [pasteboard dataForType:NSPasteboardTypeTIFF];
-    if (!tiff) {
-        NSImage* ns_image = [[NSImage alloc] initWithPasteboard:pasteboard];
-        tiff = [ns_image TIFFRepresentation];
-    }
+std::optional<ClipboardImage> image_from_tiff_data(NSData* tiff) {
     if (!tiff) {
         return std::nullopt;
     }
@@ -117,6 +114,45 @@ std::optional<ClipboardImage> read_image(NSPasteboard* pasteboard) {
     image.width = static_cast<int>([rep pixelsWide]);
     image.height = static_cast<int>([rep pixelsHigh]);
     return image;
+}
+
+std::vector<ClipboardImage> read_images(NSPasteboard* pasteboard) {
+    std::vector<ClipboardImage> images;
+    for (NSPasteboardItem* item in [pasteboard pasteboardItems]) {
+        if (NSData* png = [item dataForType:NSPasteboardTypePNG]) {
+            if (auto image = image_from_png_data(png); image.has_value()) {
+                images.push_back(std::move(*image));
+                continue;
+            }
+        }
+        if (NSData* tiff = [item dataForType:NSPasteboardTypeTIFF]) {
+            if (auto image = image_from_tiff_data(tiff); image.has_value()) {
+                images.push_back(std::move(*image));
+            }
+        }
+    }
+    if (!images.empty()) {
+        return images;
+    }
+
+    NSData* png = [pasteboard dataForType:NSPasteboardTypePNG];
+    if (auto image = image_from_png_data(png); image.has_value()) {
+        images.push_back(std::move(*image));
+        return images;
+    }
+
+    NSData* tiff = [pasteboard dataForType:NSPasteboardTypeTIFF];
+    if (!tiff) {
+        NSImage* ns_image = [[NSImage alloc] initWithPasteboard:pasteboard];
+        tiff = [ns_image TIFFRepresentation];
+    }
+    if (!tiff) {
+        return images;
+    }
+    if (auto image = image_from_tiff_data(tiff); image.has_value()) {
+        images.push_back(std::move(*image));
+    }
+    return images;
 }
 
 class MacNativeClipboard final : public NativeClipboard {
@@ -172,9 +208,7 @@ public:
         ClipboardPayload payload;
         payload.origin = ClipboardOrigin::LocalSystem;
 
-        if (auto image = read_image(pasteboard); image.has_value()) {
-            payload.images.push_back(std::move(*image));
-        }
+        payload.images = read_images(pasteboard);
         payload.file_refs = read_file_refs(pasteboard);
         if (NSString* html = [pasteboard stringForType:NSPasteboardTypeHTML]) {
             payload.html = utf8_from_nsstring(html);
@@ -197,7 +231,7 @@ public:
         [pasteboard clearContents];
 
         bool wrote = false;
-        NSMutableArray<NSURL*>* urls = [NSMutableArray array];
+        NSMutableArray* objects = [NSMutableArray array];
         for (const auto& ref : payload.file_refs) {
             if (ref.local_path.empty()) {
                 continue;
@@ -205,23 +239,25 @@ public:
             NSString* path = [NSString stringWithUTF8String:ref.local_path.c_str()];
             NSURL* url = [NSURL fileURLWithPath:path isDirectory:ref.is_dir ? YES : NO];
             if (url) {
-                [urls addObject:url];
+                [objects addObject:url];
             }
         }
-        if ([urls count] > 0) {
-            wrote = [pasteboard writeObjects:urls] == YES || wrote;
-        }
 
-        if (!payload.images.empty() && !payload.images.front().bytes.empty()) {
-            NSData* png = data_from_bytes(payload.images.front().bytes);
+        for (const auto& image : payload.images) {
+            NSData* png = data_from_bytes(image.bytes);
             if (png) {
-                wrote = [pasteboard setData:png forType:NSPasteboardTypePNG] == YES || wrote;
+                NSPasteboardItem* item = [[NSPasteboardItem alloc] init];
+                [item setData:png forType:NSPasteboardTypePNG];
                 NSBitmapImageRep* rep = [NSBitmapImageRep imageRepWithData:png];
                 NSData* tiff = [rep TIFFRepresentation];
                 if (tiff) {
-                    [pasteboard setData:tiff forType:NSPasteboardTypeTIFF];
+                    [item setData:tiff forType:NSPasteboardTypeTIFF];
                 }
+                [objects addObject:item];
             }
+        }
+        if ([objects count] > 0) {
+            wrote = [pasteboard writeObjects:objects] == YES || wrote;
         }
 
         if (!payload.html.empty()) {
