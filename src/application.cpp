@@ -1,5 +1,6 @@
 #include "application.h"
 #include "core/commands/command_manager.h"
+#include "core/clipboard/clipboard_cache.h"
 #include "core/clipboard/native_clipboard_factory.h"
 #include "core/manager/plugin_manager.h"
 #include "core/manager/proxy_manager.h"
@@ -212,6 +213,7 @@ namespace misty {
     }
 
     void Application::init_clipboard() {
+        core::ClipboardCache().cleanup_expired();
         proxy_clipboard_client_ = std::make_unique<core::ProxyClipboardClient>(
             "local",
             "This Misty");

@@ -1,8 +1,11 @@
 #include "core/clipboard/clipboard_service.h"
+#include "core/clipboard/clipboard_cache.h"
 #include "core/clipboard/proxy_clipboard_client.h"
 
 #include <gtest/gtest.h>
 
+#include <cstdlib>
+#include <filesystem>
 #include <optional>
 #include <string>
 #include <utility>
@@ -49,6 +52,35 @@ public:
 private:
     ChangeCallback callback_;
 };
+
+class ScopedHome {
+public:
+    explicit ScopedHome(const std::filesystem::path& home) {
+        if (const char* current = std::getenv("HOME")) {
+            old_home_ = current;
+        }
+        setenv("HOME", home.string().c_str(), 1);
+    }
+
+    ~ScopedHome() {
+        if (old_home_.has_value()) {
+            setenv("HOME", old_home_->c_str(), 1);
+        } else {
+            unsetenv("HOME");
+        }
+    }
+
+private:
+    std::optional<std::string> old_home_;
+};
+
+std::filesystem::path temp_home(const std::string& name) {
+    const auto path = std::filesystem::temp_directory_path() / name;
+    std::error_code ec;
+    std::filesystem::remove_all(path, ec);
+    std::filesystem::create_directories(path, ec);
+    return path;
+}
 
 }  // namespace
 
@@ -220,4 +252,31 @@ TEST(ProxyClipboardClientTest, PayloadJsonRoundTripsImageMetadataWithoutBytes) {
     EXPECT_EQ(parsed.images[0].width, 10);
     EXPECT_EQ(parsed.images[0].height, 20);
     EXPECT_TRUE(parsed.images[0].bytes.empty());
+}
+
+TEST(ProxyClipboardClientTest, HydratePayloadUsesCachedImageBlobBeforeProxy) {
+    const auto home = temp_home("misty-proxy-clipboard-cache-test");
+    ScopedHome scoped_home(home);
+
+    misty::core::ClipboardImage image;
+    image.mime_type = "image/png";
+    image.blob_id = "blob-cached";
+    image.checksum = "sha256:cached";
+    image.size_bytes = 3;
+
+    misty::core::ClipboardImageBlobCacheKey key;
+    key.blob_id = image.blob_id;
+    key.checksum = image.checksum;
+    key.size_bytes = image.size_bytes;
+    key.mime_type = image.mime_type;
+    ASSERT_TRUE(misty::core::ClipboardCache().store_image_blob(key, {7, 8, 9}));
+
+    misty::core::ClipboardPayload payload;
+    payload.kind = misty::core::ClipboardPayloadKind::Image;
+    payload.images.push_back(image);
+
+    misty::core::ProxyClipboardClient client("dev", "Device");
+    ASSERT_TRUE(client.hydrate_payload(payload));
+    ASSERT_EQ(payload.images.size(), 1u);
+    EXPECT_EQ(payload.images[0].bytes, std::vector<uint8_t>({7, 8, 9}));
 }
