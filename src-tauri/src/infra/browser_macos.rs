@@ -1,6 +1,24 @@
 use tauri::Webview;
 
 #[cfg(target_os = "macos")]
+pub(super) fn browser_requires_ephemeral_store() -> bool {
+    use objc2_foundation::NSProcessInfo;
+
+    // Named persistent WKWebsiteDataStore instances arrived in macOS 14.
+    // Older releases use a nonpersistent store instead of sharing the Host's
+    // default store. Tabs are therefore session-isolated on those releases.
+    NSProcessInfo::processInfo()
+        .operatingSystemVersion()
+        .majorVersion
+        < 14
+}
+
+#[cfg(not(target_os = "macos"))]
+pub(super) fn browser_requires_ephemeral_store() -> bool {
+    false
+}
+
+#[cfg(target_os = "macos")]
 pub(super) async fn evaluate_browser_async_javascript(
     webview: Webview,
     function_body: String,

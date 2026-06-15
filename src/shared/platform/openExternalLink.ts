@@ -1,30 +1,48 @@
 import type { ProviderAuthorizationOpenResult } from "@/shared/platform/model/interfaces/openExternalLink";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { platform } from "@tauri-apps/plugin-os";
-import type { MouseEvent } from "react";
+import type { MouseEvent as ReactMouseEvent } from "react";
 import { hasTauriInternals } from "./tauri";
 export type { ProviderAuthorizationOpenResult } from "@/shared/platform/model/interfaces/openExternalLink";
 
 let shouldOpenLinksExternally = () => false;
-let openProviderAuthorizationInMisty: ((url: string) => void | Promise<void>) | null = null;
+let openInMistyBrowser: ((url: string) => void | Promise<void>) | null = null;
 
 export function configureExternalLinkPreference(getPreference: () => boolean): void {
   shouldOpenLinksExternally = getPreference;
 }
 
+export function configureMistyBrowserLinkOpener(
+  opener: ((url: string) => void | Promise<void>) | null,
+): void {
+  openInMistyBrowser = opener;
+}
+
 export function configureProviderAuthorizationLinkOpener(
   opener: ((url: string) => void | Promise<void>) | null,
 ): void {
-  openProviderAuthorizationInMisty = opener;
+  configureMistyBrowserLinkOpener(opener);
 }
 
 export async function openExternalLink(url: string): Promise<void> {
   const href = normalizeExternalUrl(url);
   if (!href) return;
 
-  if (shouldOpenLinksExternally() && isExternalUrl(href)) {
+  if (!isWebUrl(href)) {
+    await openSystemExternalLink(href);
+    return;
+  }
+
+  if (shouldOpenLinksExternally()) {
     try {
       await openNativeUrl(href);
+      return;
+    } catch {}
+  }
+
+  if (openInMistyBrowser) {
+    try {
+      await openInMistyBrowser(href);
       return;
     } catch {}
   }
@@ -93,9 +111,9 @@ export async function openProviderAuthorizationLink(
   }
 
   let mistyBrowserError: unknown;
-  if (openProviderAuthorizationInMisty) {
+  if (openInMistyBrowser) {
     try {
-      await openProviderAuthorizationInMisty(href);
+      await openInMistyBrowser(href);
       return {
         strategy: "misty-browser",
         platform: currentPlatform,
@@ -126,15 +144,42 @@ export async function openProviderAuthorizationLink(
 
 export function handleExternalLinkClick(
   url: string,
-): (event: MouseEvent<HTMLAnchorElement>) => void {
+): (event: ReactMouseEvent<HTMLAnchorElement>) => void {
   return (event) => {
     event.preventDefault();
     void openExternalLink(url);
   };
 }
 
-function isExternalUrl(url: string): boolean {
-  return url.startsWith("https://") || url.startsWith("http://") || url.startsWith("mailto:");
+export function installExternalLinkRouting(root: Document = document): () => void {
+  const handleClick = (event: MouseEvent) => {
+    if (event.defaultPrevented || event.button !== 0) return;
+    const element =
+      event.target instanceof Element
+        ? event.target
+        : event.target instanceof Node
+          ? event.target.parentElement
+          : null;
+    const anchor = element?.closest<HTMLAnchorElement>("a[href]");
+    if (
+      !anchor ||
+      anchor.hasAttribute("download") ||
+      anchor.dataset.openSystemExternal === "true"
+    ) {
+      return;
+    }
+    const rawHref = anchor.getAttribute("href")?.trim() ?? "";
+    if (!/^(?:https?:|mailto:|\/\/)/i.test(rawHref)) return;
+    event.preventDefault();
+    void openExternalLink(anchor.href);
+  };
+
+  root.addEventListener("click", handleClick);
+  return () => root.removeEventListener("click", handleClick);
+}
+
+function isWebUrl(url: string): boolean {
+  return url.startsWith("https://") || url.startsWith("http://");
 }
 
 export function normalizeExternalUrl(value: string): string {

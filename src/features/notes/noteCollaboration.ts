@@ -3,6 +3,11 @@ import type { NoteCollaborationTicket } from "@/api/notes/api";
 import { createYjsProvider } from "@/features/collaboration/createYjsProvider";
 import type YProvider from "y-partyserver/provider";
 import * as Y from "yjs";
+import { readActiveSavedAccountSession } from "@/features/auth";
+import type { MobilePendingNoteUpdateRecord } from "@/native/contracts";
+import { mobileCacheRead, mobileCacheWrite } from "@/native/mobile-cache";
+import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
+import { hasTauriInternals } from "@/shared/platform/tauri";
 
 export type { NoteCollaborationRole, NoteCollaborationTicket } from "@/api/notes/api";
 
@@ -17,6 +22,7 @@ export interface NoteCollaborationSession {
   markdown: Y.Text;
   metadata: Y.Map<unknown>;
   provider: YProvider;
+  detachMobilePersistence?: () => void;
 }
 
 type NoteCollaborationCacheEntry = {
@@ -98,9 +104,45 @@ async function createSession(
 ): Promise<NoteCollaborationSession> {
   const firstTicket = await createNoteCollaborationTicket(spaceId, noteId);
   const doc = new Y.Doc();
+  const accountId = readActiveSavedAccountSession()?.id ?? "";
+  const recordKey = `note-update:${spaceId}:${noteId}`;
+  if (isNativeMobileBuild && hasTauriInternals() && accountId) {
+    const saved = await mobileCacheRead<MobilePendingNoteUpdateRecord>(accountId, recordKey).catch(
+      () => null,
+    );
+    if (saved?.schemaVersion === 1 && saved.accountId === accountId) {
+      Y.applyUpdate(doc, decodeBase64(saved.yjsUpdateBase64), "mobile-cache");
+    }
+  }
   const provider = createYjsProvider(firstTicket, doc, "note-room", () =>
     createNoteCollaborationTicket(spaceId, noteId),
   );
+
+  let detachMobilePersistence: (() => void) | undefined;
+  if (isNativeMobileBuild && hasTauriInternals() && accountId) {
+    let timer = 0;
+    const persist = (_update: Uint8Array, origin: unknown) => {
+      if (origin === "mobile-cache") return;
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        const record: MobilePendingNoteUpdateRecord = {
+          schemaVersion: 1,
+          kind: "pending-note-update",
+          accountId,
+          updatedAt: new Date().toISOString(),
+          spaceId,
+          noteId,
+          yjsUpdateBase64: encodeBase64(Y.encodeStateAsUpdate(doc)),
+        };
+        void mobileCacheWrite(accountId, recordKey, record);
+      }, 250);
+    };
+    doc.on("update", persist);
+    detachMobilePersistence = () => {
+      window.clearTimeout(timer);
+      doc.off("update", persist);
+    };
+  }
 
   return {
     key,
@@ -113,6 +155,7 @@ async function createSession(
     markdown: doc.getText("misty:markdown"),
     metadata: doc.getMap("misty:document"),
     provider,
+    detachMobilePersistence,
   };
 }
 
@@ -133,8 +176,22 @@ function clearIdleTimer(entry: NoteCollaborationCacheEntry): void {
 }
 
 function destroySession(session: NoteCollaborationSession): void {
+  session.detachMobilePersistence?.();
   session.provider.destroy();
   session.doc.destroy();
+}
+
+function encodeBase64(value: Uint8Array): string {
+  let binary = "";
+  for (let offset = 0; offset < value.length; offset += 0x8000) {
+    binary += String.fromCharCode(...value.subarray(offset, offset + 0x8000));
+  }
+  return btoa(binary);
+}
+
+function decodeBase64(value: string): Uint8Array {
+  const binary = atob(value);
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
 }
 
 function noteCollaborationKey(spaceId: string, noteId: string): string {

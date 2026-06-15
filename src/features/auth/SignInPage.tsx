@@ -1,4 +1,5 @@
-import { Avatar, AvatarFallback } from "@/shared/ui";
+import { Avatar, AvatarFallback, Button } from "@/shared/ui";
+import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
 import { Trash2, UserPlus } from "lucide-react";
 import type { FormEvent } from "react";
 import { useState } from "react";
@@ -10,6 +11,7 @@ import AuthMessage from "./components/AuthMessage";
 import AuthShell from "./components/AuthShell";
 import AuthSubmitButton from "./components/AuthSubmitButton";
 import type { SavedAccountSession } from "./model/stores/account/interfaces/useAuthTokenStore";
+import { clearAccountCreating } from "@/features/onboarding";
 import { accountSignIn } from "./store/useAccountStore";
 
 export default function SignIn() {
@@ -17,7 +19,7 @@ export default function SignIn() {
   const location = useLocation();
   const { accounts, authenticateAccount, resumeAccount, removeAccount } = useAuth();
   const routeState = location.state as { from?: string; addingAccount?: boolean } | null;
-  const from = routeState?.from || "/files";
+  const from = routeState?.from || (isNativeMobileBuild ? "/home" : "/files");
   const addingAccount = Boolean(routeState?.addingAccount);
   const [mode, setMode] = useState<"chooser" | "login">(
     accounts.length > 0 && !addingAccount ? "chooser" : "login",
@@ -34,7 +36,8 @@ export default function SignIn() {
     setLoading(true);
 
     try {
-      await authenticateAccount(() => accountSignIn(email, password));
+      const user = await authenticateAccount(() => accountSignIn(email, password));
+      if (user?.id) clearAccountCreating(user.id);
       navigate(from, { replace: true });
     } catch (signInError) {
       setError(signInError instanceof Error ? signInError.message : "Could not sign in.");
@@ -49,6 +52,7 @@ export default function SignIn() {
     setBusyAccountId(account.id);
     try {
       await resumeAccount(account.id);
+      clearAccountCreating(account.id);
       navigate(from, { replace: true });
     } catch {
       // The saved token is no longer valid: fall to the login form for this account.
@@ -85,9 +89,10 @@ export default function SignIn() {
                 key={account.id}
                 className="group flex items-center gap-2 rounded-lg border border-charcoal-border p-1 transition hover:border-charcoal-active"
               >
-                <button
+                <Button
                   type="button"
-                  className="flex min-w-0 flex-1 items-center gap-3 rounded-md p-1.5 text-left outline-none disabled:opacity-60"
+                  variant="ghost"
+                  className="h-auto min-w-0 flex-1 justify-start gap-3 p-1.5 text-left font-normal"
                   onClick={() => void handleSelect(account)}
                   disabled={Boolean(busyAccountId)}
                 >
@@ -105,23 +110,26 @@ export default function SignIn() {
                   {busyAccountId === account.id ? (
                     <span className="shrink-0 pr-1 text-xs text-cream-muted">Signing in…</span>
                   ) : null}
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="icon-sm"
                   aria-label={`Remove ${account.email}`}
                   title="Remove from this device"
-                  className="mr-1 shrink-0 rounded-md p-1.5 text-cream-muted opacity-0 transition hover:text-cream focus-visible:opacity-100 group-hover:opacity-100 disabled:opacity-60"
+                  className="mr-1 text-cream-muted opacity-0 focus-visible:opacity-100 group-hover:opacity-100"
                   onClick={() => void handleRemove(account)}
                   disabled={Boolean(busyAccountId)}
                 >
                   <Trash2 size={15} />
-                </button>
+                </Button>
               </div>
             ))}
             {error ? <AuthMessage tone="error" message={error} /> : null}
-            <button
+            <Button
               type="button"
-              className="mt-1 flex items-center gap-2 rounded-lg border border-dashed border-charcoal-border p-3 text-sm text-cream-muted transition hover:border-charcoal-active hover:text-cream"
+              variant="outline"
+              className="mt-1 h-11 justify-start border-dashed px-3 text-cream-muted"
               onClick={() => {
                 setError("");
                 setEmail("");
@@ -131,7 +139,7 @@ export default function SignIn() {
             >
               <UserPlus size={16} className="shrink-0" />
               Use another account
-            </button>
+            </Button>
           </div>
         </AuthCard>
       </AuthShell>
@@ -141,12 +149,12 @@ export default function SignIn() {
   return (
     <AuthShell
       title={
-        addingAccount ? "Add another account" : accounts.length > 0 ? "Sign in" : "Welcome back"
+        addingAccount ? "Add another account" : accounts.length > 0 ? "Sign in" : "Welcome to Misty"
       }
       description={
         addingAccount
           ? "Your current account will remain signed in on this device."
-          : "Sign in to your Misty account."
+          : "Sign in to begin."
       }
       onBack={
         addingAccount
@@ -196,7 +204,7 @@ export default function SignIn() {
             onChange={setPassword}
           />
           {error ? <AuthMessage tone="error" message={error} /> : null}
-          <AuthSubmitButton idleLabel="Sign In" loadingLabel="Signing in..." loading={loading} />
+          <AuthSubmitButton idleLabel="Sign in" loadingLabel="Signing in..." loading={loading} />
         </form>
       </AuthCard>
     </AuthShell>

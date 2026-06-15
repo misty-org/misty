@@ -11,12 +11,9 @@ import {
   Switch,
   Textarea,
 } from "@/shared/ui";
+import { open } from "@tauri-apps/plugin-dialog";
 import { Copy } from "lucide-react";
-import { lazy, Suspense, useContext, useState, type ChangeEvent, type ReactNode } from "react";
-
-const LazyMistyFilePicker = lazy(() =>
-  import("@/features/picker").then((m) => ({ default: m.MistyFilePicker })),
-);
+import { useContext, useState, type ChangeEvent, type ReactNode } from "react";
 
 import {
   settingsControlButtonCompactClass,
@@ -40,7 +37,21 @@ export function WorkspaceRootControl(props: {
   disabled: boolean;
   onChange: (value: string) => void;
 }) {
-  const [pickerOpen, setPickerOpen] = useState(false);
+  const [choosing, setChoosing] = useState(false);
+
+  const chooseFolder = async () => {
+    setChoosing(true);
+    try {
+      const selected = await open({
+        directory: true,
+        multiple: false,
+        title: "Choose workspace root",
+      });
+      if (typeof selected === "string") props.onChange(selected);
+    } finally {
+      setChoosing(false);
+    }
+  };
 
   return (
     <div className="grid min-w-0 justify-items-end gap-2 max-[760px]:justify-items-start">
@@ -60,11 +71,11 @@ export function WorkspaceRootControl(props: {
           size="sm"
           type="button"
           className={settingsControlButtonCompactClass}
-          disabled={props.disabled}
+          disabled={props.disabled || choosing}
           title="Choose workspace root"
-          onClick={() => setPickerOpen(true)}
+          onClick={() => void chooseFolder()}
         >
-          Choose
+          {choosing ? "Choosing…" : "Choose"}
         </Button>
         <Button
           variant="outline"
@@ -77,20 +88,6 @@ export function WorkspaceRootControl(props: {
           Reset
         </Button>
       </div>
-
-      {pickerOpen ? (
-        <Suspense fallback={null}>
-          <LazyMistyFilePicker
-            mode="folder"
-            title="Choose Workspace Root"
-            onCancel={() => setPickerOpen(false)}
-            onSelect={(path) => {
-              setPickerOpen(false);
-              props.onChange(path);
-            }}
-          />
-        </Suspense>
-      ) : null}
     </div>
   );
 }
@@ -309,8 +306,22 @@ export function FilePathControl(props: {
   disabled: boolean;
   onChange: (value: string) => void;
 }) {
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const allowedExtensions = props.filters?.flatMap((f) => f.extensions);
+  const [choosing, setChoosing] = useState(false);
+
+  const chooseFile = async () => {
+    setChoosing(true);
+    try {
+      const selected = await open({
+        directory: false,
+        multiple: false,
+        title: props.title,
+        filters: props.filters,
+      });
+      if (typeof selected === "string") props.onChange(selected);
+    } finally {
+      setChoosing(false);
+    }
+  };
 
   return (
     <div className="grid min-w-0 justify-items-end gap-2 max-[760px]:justify-items-start">
@@ -330,11 +341,11 @@ export function FilePathControl(props: {
           size="sm"
           type="button"
           className={settingsControlButtonCompactClass}
-          disabled={props.disabled}
+          disabled={props.disabled || choosing}
           title={props.title}
-          onClick={() => setPickerOpen(true)}
+          onClick={() => void chooseFile()}
         >
-          Choose
+          {choosing ? "Choosing…" : "Choose"}
         </Button>
         <Button
           variant="outline"
@@ -347,21 +358,6 @@ export function FilePathControl(props: {
           Clear
         </Button>
       </div>
-
-      {pickerOpen ? (
-        <Suspense fallback={null}>
-          <LazyMistyFilePicker
-            mode="file"
-            title={props.title}
-            allowedExtensions={allowedExtensions}
-            onCancel={() => setPickerOpen(false)}
-            onSelect={(path) => {
-              setPickerOpen(false);
-              props.onChange(path);
-            }}
-          />
-        </Suspense>
-      ) : null}
     </div>
   );
 }

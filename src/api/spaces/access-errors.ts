@@ -1,10 +1,8 @@
 import { SpaceRequestError } from "@/api/spaces/api";
-
-const accountSessionInvalidEvent = "misty:account-session-invalid";
+import { notifyApiSessionInvalid } from "@/api/client/session";
 
 export function notifyAccountSessionInvalid(): void {
-  if (typeof window === "undefined") return;
-  window.dispatchEvent(new CustomEvent(accountSessionInvalidEvent));
+  notifyApiSessionInvalid();
 }
 
 export function isInaccessibleSpaceError(error: unknown): boolean {

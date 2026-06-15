@@ -107,6 +107,23 @@
   scrollbar-gutter: stable;
 }
 
+/* Keep the navigation width and icon rasterization stable as hover/scroll
+   feedback appears. Expansion chevrons retain their own state transition. */
+.app-pages-root [data-navigator-section-scroll] {
+  scrollbar-width: thin;
+  scrollbar-gutter: stable;
+}
+
+.app-pages-root [data-tour-target="navigation"] .misty-navigator-row-target {
+  transition: none;
+}
+
+.app-pages-root [data-tour-target="navigation"] [data-app-icon],
+.app-pages-root [data-tour-target="navigation"] .misty-navigator-subsection-icon {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
 html[data-pointer-dragging="true"],
 html[data-pointer-dragging="true"] * {
   cursor: grabbing !important;

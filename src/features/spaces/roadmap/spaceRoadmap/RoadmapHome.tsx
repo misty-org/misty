@@ -1,11 +1,10 @@
-import { spacesApi } from "@/api/spaces/api";
+import { useRoadmapRuntime } from "./roadmapRuntime";
 import type {
   SpaceRoadmap,
   SpaceRoadmapSnapshot,
 } from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
-import { useAuth } from "@/features/auth";
 import { errorText } from "@/shared/lib/format";
-import { useLocalPinnedIds } from "@/shared/hooks/useLocalPinnedIds";
+import { usePinnedIds } from "@/shared/hooks/usePinnedIds";
 import {
   Button,
   ContextMenu,
@@ -18,6 +17,7 @@ import {
   cn,
 } from "@/shared/ui";
 import { ArrowRight, Pin, PinOff, Plus, Search } from "lucide-react";
+import { useMobileSurfaceChrome, useSurfacePresentation } from "@/shared/mobile";
 import { useEffect, useMemo, useState } from "react";
 import { normalizeRoadmapSnapshot } from "./RoadmapWorkspaceHelpers";
 import { RoadmapSnapshotPreview } from "./RoadmapSnapshotPreview";
@@ -32,7 +32,10 @@ export function RoadmapHome(props: {
   onOpen: (roadmapId: string) => void;
   onRetry: () => void;
 }) {
-  const { user } = useAuth();
+  const presentation = useSurfacePresentation();
+  const mobile = presentation !== "desktop";
+  const mobileCompact = presentation === "mobile-compact";
+  const { api: spacesApi, userId, storage } = useRoadmapRuntime();
   const { spaceId } = props;
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState("");
@@ -53,12 +56,13 @@ export function RoadmapHome(props: {
       ),
     [props.roadmaps],
   );
-  const roadmapPinsKey = `misty:roadmap-pins:${user?.id ?? "anonymous"}:${spaceId}`;
+  const roadmapPinsKey = `misty:roadmap-pins:${userId ?? "anonymous"}:${spaceId}`;
   const availableRoadmapIds = useMemo(
     () => orderedRoadmaps.map((roadmap) => roadmap.id),
     [orderedRoadmaps],
   );
-  const { pinnedIdSet, togglePinned } = useLocalPinnedIds(
+  const { pinnedIdSet, togglePinned } = usePinnedIds(
+    storage,
     roadmapPinsKey,
     availableRoadmapIds,
     props.loading,
@@ -68,6 +72,7 @@ export function RoadmapHome(props: {
   const selectedRoadmap =
     visibleRoadmaps.find((roadmap) => roadmap.id === selectedId) ?? visibleRoadmaps[0];
   const selectedRoadmapId = selectedRoadmap?.id;
+  useMobileSurfaceChrome({ title: "Roadmaps", level: "root" });
 
   useEffect(() => {
     if (!selectedRoadmapId) {
@@ -97,15 +102,21 @@ export function RoadmapHome(props: {
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-charcoal-bg text-cream">
-      <div className="grid min-h-0 flex-1 gap-5 p-5 md:grid-cols-[minmax(15rem,20rem)_minmax(0,1fr)]">
+      <div
+        className={cn(
+          "grid min-h-0 flex-1 gap-5",
+          mobile ? "p-3" : "p-5 md:grid-cols-[minmax(15rem,20rem)_minmax(0,1fr)]",
+          presentation === "mobile-regular" && "grid-cols-[300px_minmax(0,1fr)]",
+        )}
+      >
         <section className="flex min-h-0 flex-col">
-          <div className="mb-2 flex h-8 shrink-0 items-center gap-2">
+          <div className={cn("mb-2 flex shrink-0 items-center gap-2", mobile ? "min-h-11" : "h-8")}>
             <h1 className="m-0 min-w-0 flex-1 truncate text-sm font-semibold text-cream-bright">
               My Roadmaps
             </h1>
             {props.canManage ? (
               <Button
-                className="h-8 shrink-0 gap-1.5 px-2.5 text-xs"
+                className={cn("shrink-0 gap-1.5 px-2.5 text-xs", mobile ? "min-h-11" : "h-8")}
                 type="button"
                 disabled={props.loading}
                 onClick={props.onCreate}
@@ -120,7 +131,7 @@ export function RoadmapHome(props: {
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-cream-muted" />
                 <Input
-                  className="h-8 bg-charcoal-bg pl-8 text-xs"
+                  className={cn("bg-charcoal-bg pl-9", mobile ? "h-11 text-base" : "h-8 text-xs")}
                   aria-label="Search roadmaps"
                   placeholder="Search roadmaps"
                   value={query}
@@ -139,6 +150,8 @@ export function RoadmapHome(props: {
                     pinnedIds={pinnedIdSet}
                     onSelect={setSelectedId}
                     onTogglePin={togglePinned}
+                    mobile={mobile}
+                    onOpen={props.onOpen}
                   />
                 ) : (
                   <div className="pb-2">
@@ -150,6 +163,8 @@ export function RoadmapHome(props: {
                       pinnedIds={pinnedIdSet}
                       onSelect={setSelectedId}
                       onTogglePin={togglePinned}
+                      mobile={mobile}
+                      onOpen={props.onOpen}
                     />
                     <RoadmapSection
                       title="Recently edited"
@@ -159,6 +174,8 @@ export function RoadmapHome(props: {
                       pinnedIds={pinnedIdSet}
                       onSelect={setSelectedId}
                       onTogglePin={togglePinned}
+                      mobile={mobile}
+                      onOpen={props.onOpen}
                     />
                   </div>
                 )
@@ -196,7 +213,7 @@ export function RoadmapHome(props: {
           ) : null}
         </section>
 
-        <section className="flex min-h-0 flex-col">
+        <section className={cn("min-h-0 flex-col", mobileCompact ? "hidden" : "flex")}>
           <div className="mb-2 flex h-8 shrink-0 items-center gap-2">
             <h2 className="m-0 min-w-0 flex-1 truncate text-sm font-semibold text-cream-bright">
               {selectedRoadmap?.name ?? "Roadmap preview"}
@@ -253,6 +270,8 @@ type RoadmapRowsProps = {
   pinnedIds: Set<string>;
   onSelect: (roadmapId: string) => void;
   onTogglePin: (roadmapId: string) => void;
+  onOpen: (roadmapId: string) => void;
+  mobile?: boolean;
 };
 
 function RoadmapSection(props: RoadmapRowsProps & { title: string; emptyLabel: string }) {
@@ -285,11 +304,12 @@ function RoadmapRows(props: RoadmapRowsProps) {
                 : "hover:bg-charcoal-border/65",
             )}
           >
-            <button
+            <Button
               type="button"
-              className="flex min-w-0 flex-1 self-stretch items-center gap-2 px-3.5 py-2 text-left outline-none"
+              variant="ghost"
+              className="flex h-auto min-w-0 flex-1 self-stretch items-center justify-start gap-2 rounded-none px-3.5 py-2 text-left outline-none hover:bg-transparent"
               aria-current={selected ? "true" : undefined}
-              onClick={() => props.onSelect(roadmap.id)}
+              onClick={() => (props.mobile ? props.onOpen(roadmap.id) : props.onSelect(roadmap.id))}
             >
               <span className="min-w-0 flex-1">
                 <strong className="block truncate text-[13px] font-medium text-cream-bright">
@@ -302,7 +322,7 @@ function RoadmapRows(props: RoadmapRowsProps) {
               {pinned ? (
                 <Pin className="size-3 shrink-0 text-cream-muted" aria-hidden="true" />
               ) : null}
-            </button>
+            </Button>
           </div>
         </ContextMenuTrigger>
         <ContextMenuContent className="w-40">

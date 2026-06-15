@@ -1,5 +1,4 @@
-import { cn } from "@/shared/ui";
-import { SystemErrorActivity } from "@/features/activity";
+import { cn } from "@/shared/ui/utils";
 import { AlertCircle, RotateCcw } from "lucide-react";
 import { SshHostKeyConfirmation } from "./SshHostKeyConfirmation";
 import type { SshHostKeyStatus } from "./sshEnvironments";
@@ -34,14 +33,9 @@ export function TerminalPaneOverlays(props: TerminalPaneOverlaysProps) {
       ) : null}
       {status === "unavailable" ? (
         <div className="absolute inset-0 grid place-items-center bg-[#111312] p-6">
-          <SystemErrorActivity
-            error={error}
-            scope="terminal:session"
-            title="Terminal session is unavailable"
-          />
           <div className="max-w-sm rounded-md border border-charcoal-border bg-charcoal-card p-4 text-center text-xs text-cream-muted">
             <AlertCircle className="mx-auto mb-2 text-cream-muted" size={20} />
-            <p className="mb-3">Open Activity for details.</p>
+            <p className="mb-3">{error || "The terminal session could not be started."}</p>
             <button
               type="button"
               className="inline-flex h-7 items-center gap-1.5 rounded border border-charcoal-border px-2 text-[11px] hover:bg-charcoal-hover"

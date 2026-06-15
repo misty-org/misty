@@ -24,10 +24,10 @@ export function LibraryNavigatorDisclosure(props: {
   activeRoute: string;
   path: string;
 }) {
-  const libraryPath = `/spaces/${encodeURIComponent(props.spaceId)}/library`;
+  const libraryPath = props.path;
   const destinations = destinationDetails.map((destination) => ({
     ...destination,
-    path: destination.id === "recent" ? libraryPath : `${libraryPath}?collection=${destination.id}`,
+    path: libraryRoute(libraryPath, destination.id),
   }));
 
   return (
@@ -41,6 +41,13 @@ export function LibraryNavigatorDisclosure(props: {
       destinations={destinations}
     />
   );
+}
+
+function libraryRoute(route: string, destination: LibraryDestinationId) {
+  const url = new URL(route, "https://misty.local");
+  if (destination === "recent") url.searchParams.delete("collection");
+  else url.searchParams.set("collection", destination);
+  return `${url.pathname}${url.search}`;
 }
 
 function libraryDestinationFromRoute(route: string): LibraryDestinationId {

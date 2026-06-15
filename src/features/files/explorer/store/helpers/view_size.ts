@@ -1,4 +1,4 @@
-import type { DirectoryListing, DirectorySizeRecord, FileEntry } from "@/native/contracts";
+import type { DirectoryListing, DirectorySizeRecord } from "@/native/contracts";
 import type {
   ExplorerSortState,
   ExplorerStore,
@@ -210,79 +210,15 @@ export function directorySizeRecordsEqual(
   );
 }
 
-export function directorySizeRecordForPath(
-  directorySizes: Record<string, DirectorySizeRecord>,
-  path: string,
-): DirectorySizeRecord | undefined {
-  return directorySizes[H.normalizedPath(path)];
-}
+export { directorySizeRecordForPath, entrySizeBytes } from "../../utils/entrySize";
 
-export function entrySizeBytes(
-  entry: FileEntry,
-  directorySizes: Record<string, DirectorySizeRecord>,
-): number | null {
-  if (entry.kind !== "folder") return entry.sizeBytes;
-  const record = H.directorySizeRecordForPath(directorySizes, entry.path);
-  return record?.status === "ready" ? record.sizeBytes : null;
-}
-
-export function sortListing(
-  listing: DirectoryListing,
-  sort: ExplorerSortState,
-  directorySizes: Record<string, DirectorySizeRecord> = {},
-): DirectoryListing {
-  const entries = [...listing.entries].sort((left, right) => {
-    const folderBias = Number(right.kind === "folder") - Number(left.kind === "folder");
-    if (folderBias !== 0) return folderBias;
-    const direction = sort.direction === "asc" ? 1 : -1;
-    return H.compareEntries(left, right, sort.column, directorySizes) * direction;
-  });
-  return { ...listing, entries };
-}
-
-export function compareEntries(
-  left: FileEntry,
-  right: FileEntry,
-  column: ExplorerSortColumn,
-  directorySizes: Record<string, DirectorySizeRecord>,
-): number {
-  if (column === "modified") {
-    return (
-      H.compareNullableNumber(left.modifiedMs, right.modifiedMs) ||
-      H.compareText(left.remoteModified, right.remoteModified) ||
-      H.compareText(left.name, right.name)
-    );
-  }
-  if (column === "size") {
-    return (
-      H.compareNullableNumber(
-        H.entrySizeBytes(left, directorySizes),
-        H.entrySizeBytes(right, directorySizes),
-      ) || H.compareText(left.name, right.name)
-    );
-  }
-  if (column === "type") {
-    return (
-      H.compareText(H.typeLabel(left), H.typeLabel(right)) || H.compareText(left.name, right.name)
-    );
-  }
-  return H.compareText(left.name, right.name);
-}
-
-export function compareNullableNumber(left: number | null, right: number | null): number {
-  if (left == null && right == null) return 0;
-  if (left == null) return 1;
-  if (right == null) return -1;
-  return left === right ? 0 : left < right ? -1 : 1;
-}
-
-export function compareText(left: string | null, right: string | null): number {
-  return (left ?? "").localeCompare(right ?? "", undefined, { numeric: true, sensitivity: "base" });
-}
-
-export function typeLabel(entry: FileEntry): string {
-  return entry.kind === "folder" ? "Folder" : entry.mimeType || entry.extension || entry.kind;
-}
+export {
+  sortListing,
+  compareEntries,
+  compareNullableNumber,
+  compareText,
+  typeLabel,
+} from "../../utils/sortListing";
 
 export type ExplorerStoreSetter = (
   partial:

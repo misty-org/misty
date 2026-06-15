@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import { mcpConnectionsApi } from "./api";
+import {runtimeMcpApi as mcpConnectionsApi} from "@/features/agents/agentsRuntime";
+
 import { normalizeMcpTool, publicMcpConnection } from "./normalization";
 import type { McpToolWire } from "./normalization";
 import type { McpConnection, McpConnectionInput, McpToolDescriptor } from "./types";

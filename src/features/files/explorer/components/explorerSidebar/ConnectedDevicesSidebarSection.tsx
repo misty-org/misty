@@ -17,7 +17,7 @@ import {
 import { ClipboardCopy, Info, MonitorSmartphone, Pencil, Plus, Unlink } from "lucide-react";
 import { useState } from "react";
 import { ConnectedDevicePairingDialog } from "../../../connected-devices/ConnectedDevicePairingDialog";
-import { peerIsOnline, useConnectedDevices } from "../../../connected-devices/useConnectedDevices";
+import { peerIsOnline, useConnectedDevices } from "@/features/connected-devices";
 import { SidebarDeviceGroupHeader, sidebarStyles } from "../ExplorerSidebarSupport";
 
 interface ConnectedDevicesSidebarSectionProps {

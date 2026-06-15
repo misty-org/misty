@@ -6,7 +6,10 @@ export { DeleteMessageDialog } from "./DeleteMessageDialog";
 export { messageReplyPreviewText } from "./messageHelpers";
 
 import type { SpaceChatMessagesProps } from "@/api/spaces/dto/interfaces/components/SpaceChatMessages";
-import { SystemErrorActivity, systemErrorMessage } from "@/features/activity";
+import {
+  SocialError as SystemErrorActivity,
+  socialErrorMessage as systemErrorMessage,
+} from "@/features/spaces/chat/socialRuntime";
 import { Button } from "@/shared/ui";
 import { CircleAlert, RefreshCw } from "lucide-react";
 import { useMemo } from "react";

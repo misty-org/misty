@@ -29,6 +29,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           persist-credentials: false
+          submodules: true
 
       - name: Install Linux WebKitGTK prerequisites
         if: runner.os == 'Linux'

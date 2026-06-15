@@ -73,6 +73,7 @@ export function SpaceMembers({
             agents={agents}
             loading={state.membersLoading}
             owner={state.canManageMembers}
+            canTransferOwnership={state.canTransferOwnership}
             canManageAgents={false}
             currentUserId={user?.id}
             onMemberAction={dialogs.setMemberAction}
@@ -85,6 +86,7 @@ export function SpaceMembers({
               members={members}
               loading={state.membersLoading}
               owner={state.canManageMembers}
+              canTransferOwnership={state.canTransferOwnership}
               currentUserId={user?.id}
               onAction={dialogs.setMemberAction}
             />

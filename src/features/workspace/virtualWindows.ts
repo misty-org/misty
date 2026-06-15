@@ -15,6 +15,7 @@ import {
   type WorkspaceVirtualWindow,
   type WorkspaceTab,
 } from "./model";
+import { createDefaultWorkspaceTab } from "./workspaceDefaultTab";
 
 export interface VirtualWorkspaceState {
   activeScopeKey: WorkspaceScopeKey;
@@ -27,14 +28,19 @@ export interface VirtualWorkspaceState {
 
 export type VirtualWorkspaceUpdate = Partial<VirtualWorkspaceState>;
 
-export function initialWorkspaceLayout(_scopeKey: WorkspaceScopeKey = "global"): WorkspaceLayout {
-  const pane = createDockLeaf([]);
+export function initialWorkspaceLayout(scopeKey: WorkspaceScopeKey = "global"): WorkspaceLayout {
+  const pane = createDockLeaf([createDefaultWorkspaceTab(scopeKey)]);
   return { root: pane, focusedPaneId: pane.id };
 }
 
-export function normalizeWorkspaceLayout(layout: WorkspaceLayout): WorkspaceLayout {
+export function normalizeWorkspaceLayout(
+  layout: WorkspaceLayout,
+  scopeKey: WorkspaceScopeKey = "global",
+): WorkspaceLayout {
   const root = normalizeDockNode(
-    fillEmptyDockLeaves(capDockLeaves(layout.root, maxWorkspacePanels)),
+    fillEmptyDockLeaves(capDockLeaves(layout.root, maxWorkspacePanels), () =>
+      createDefaultWorkspaceTab(scopeKey),
+    ),
   );
   const panes = dockLeaves(root);
   return {
@@ -48,12 +54,13 @@ export function normalizeWorkspaceLayout(layout: WorkspaceLayout): WorkspaceLayo
 export function createWorkspaceVirtualWindow(
   layout = initialWorkspaceLayout(),
   title = "Window 1",
+  scopeKey: WorkspaceScopeKey = "global",
 ): WorkspaceVirtualWindow {
   const now = Date.now();
   return {
     id: `window:${now.toString(36)}:${Math.random().toString(36).slice(2, 9)}`,
     title,
-    layout: normalizeWorkspaceLayout(layout),
+    layout: normalizeWorkspaceLayout(layout, scopeKey),
     createdAt: now,
     lastFocusedAt: now,
   };
@@ -89,7 +96,7 @@ export function withActiveVirtualWindowLayout(
   state: VirtualWorkspaceState,
   layout: WorkspaceLayout,
 ): VirtualWorkspaceUpdate {
-  const normalized = normalizeWorkspaceLayout(layout);
+  const normalized = normalizeWorkspaceLayout(layout, state.activeScopeKey);
   return {
     layout: normalized,
     layoutsByScope: { ...state.layoutsByScope, [state.activeScopeKey]: normalized },
@@ -138,11 +145,15 @@ export function switchWorkspaceScope(
     [state.activeScopeKey]: state.layout,
   };
   const windows = state.virtualWindowsByScope[scopeKey] ?? [
-    createWorkspaceVirtualWindow(layoutsByScope[scopeKey] ?? initialWorkspaceLayout(scopeKey)),
+    createWorkspaceVirtualWindow(
+      layoutsByScope[scopeKey] ?? initialWorkspaceLayout(scopeKey),
+      undefined,
+      scopeKey,
+    ),
   ];
   const requestedId = state.activeVirtualWindowIdByScope[scopeKey] ?? windows[0].id;
   const active = windows.find((window) => window.id === requestedId) ?? windows[0];
-  const layout = normalizeWorkspaceLayout(active.layout);
+  const layout = normalizeWorkspaceLayout(active.layout, scopeKey);
   return {
     activeScopeKey: scopeKey,
     activeVirtualWindowId: active.id,
@@ -166,11 +177,15 @@ export function adoptDefaultWorkspaceScope(
   const activeIds = { ...state.activeVirtualWindowIdByScope };
   const windows = virtualWindowsByScope[scopeKey] ??
     virtualWindowsByScope.global ?? [
-      createWorkspaceVirtualWindow(layoutsByScope[scopeKey] ?? initialWorkspaceLayout(scopeKey)),
+      createWorkspaceVirtualWindow(
+        layoutsByScope[scopeKey] ?? initialWorkspaceLayout(scopeKey),
+        undefined,
+        scopeKey,
+      ),
     ];
   const requestedId = activeIds[scopeKey] ?? windows[0].id;
   const active = windows.find((window) => window.id === requestedId) ?? windows[0];
-  const layout = normalizeWorkspaceLayout(active.layout);
+  const layout = normalizeWorkspaceLayout(active.layout, scopeKey);
   delete layoutsByScope.global;
   delete virtualWindowsByScope.global;
   delete activeIds.global;
@@ -189,6 +204,7 @@ export function addVirtualWindow(state: VirtualWorkspaceState, title?: string) {
   const window = createWorkspaceVirtualWindow(
     initialWorkspaceLayout(state.activeScopeKey),
     title?.trim() || `Window ${windows.length + 1}`,
+    state.activeScopeKey,
   );
   return { window, update: activateWindowUpdate(state, [...windows, window], window) };
 }
@@ -232,7 +248,7 @@ export function restoreVirtualWindow(
   );
   const restored = {
     ...workspaceWindow,
-    layout: normalizeWorkspaceLayout(workspaceWindow.layout),
+    layout: normalizeWorkspaceLayout(workspaceWindow.layout, state.activeScopeKey),
     lastFocusedAt: Date.now(),
   };
   return activateWindowUpdate(state, [...windows, restored], restored);
@@ -246,12 +262,16 @@ export function extractPaneToVirtualWindow(state: VirtualWorkspaceState, paneId:
   const window = createWorkspaceVirtualWindow(
     { root: pane, focusedPaneId: pane.id },
     activeTab?.title || `Window ${windows.length + 1}`,
+    state.activeScopeKey,
   );
   const sourceRoot = removeDockLeaf(state.layout.root, paneId) ?? createDockLeaf([]);
-  const sourceLayout = normalizeWorkspaceLayout({
-    root: sourceRoot,
-    focusedPaneId: dockLeaves(sourceRoot)[0].id,
-  });
+  const sourceLayout = normalizeWorkspaceLayout(
+    {
+      root: sourceRoot,
+      focusedPaneId: dockLeaves(sourceRoot)[0].id,
+    },
+    state.activeScopeKey,
+  );
   const nextWindows = windows
     .map((candidate) =>
       candidate.id === state.activeVirtualWindowId
@@ -284,7 +304,7 @@ function activateWindowUpdate(
   windows: WorkspaceVirtualWindow[],
   active: WorkspaceVirtualWindow,
 ): VirtualWorkspaceUpdate {
-  const layout = normalizeWorkspaceLayout(active.layout);
+  const layout = normalizeWorkspaceLayout(active.layout, state.activeScopeKey);
   return {
     activeVirtualWindowId: active.id,
     activeVirtualWindowIdByScope: {

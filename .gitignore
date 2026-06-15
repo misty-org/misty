@@ -36,6 +36,7 @@ scripts/.signing.env
 
 **/build/
 **/dist/
+**/dist-*/
 **/dist-web/
 **/node_modules/
 **/target/
@@ -114,6 +115,7 @@ proxy/dist/
 *.zip
 *.tar
 *.tgz
+!/vendor/misty-sdk/*.tgz
 *.tar.gz
 *.tar.bz2
 *.tar.xz
@@ -176,6 +178,7 @@ demo/**/research-session-frame.png
 *.arrow
 
 # Generated and test-only artifacts from the embedded storage service
+/service/rclone/
 service/MANUAL.*
 service/lib/encoder/encoder_cases_test.go
 service/cmd/bisync/testdata/bisync_vscode_debuggers_launch.json
@@ -187,3 +190,7 @@ ds-bundle/
 .design-sync/learnings/
 .design-sync/node_modules
 node_modules/@misty/desktop
+
+# Screenshots used by the Discover app cards.
+!src/assets/discover/journal.png
+!src/assets/discover/library.webp

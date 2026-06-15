@@ -1,4 +1,5 @@
 import { mapDockTabs } from "./dockTree";
+import { officialAppRoute } from "@/features/apps/appRoute";
 import {
   browserTabTitle,
   parseBrowserTabState,
@@ -11,15 +12,8 @@ import { workspaceSurfaceFromRoute } from "./routeSurface";
 
 const supportedWorkspaceSurfaces = new Set<WorkspaceSurfaceId>([
   "home",
-  "inbox",
   "space",
-  "browser",
-  "terminal",
-  "code",
-  "files",
-  "transfers",
-  "agents",
-  "extension",
+  "official-app",
   "marketplace",
 ]);
 
@@ -38,11 +32,7 @@ export function migrateRetiredWorkspaceTabs(
 ): WorkspaceLayout {
   return {
     ...layout,
-    root: mapDockTabs(layout.root, (tab) =>
-      isSupportedWorkspaceSurface((tab as { surfaceId?: unknown }).surfaceId)
-        ? tab
-        : migrateRetiredWorkspaceTab(tab, scopeKey),
-    ),
+    root: mapDockTabs(layout.root, (tab) => migrateRetiredWorkspaceTab(tab, scopeKey)),
   };
 }
 
@@ -50,6 +40,42 @@ export function migrateRetiredWorkspaceTab(
   tab: WorkspaceTab,
   scopeKey: WorkspaceScopeKey = "global",
 ): WorkspaceTab {
+  const groupedAppId = tab.groupKey.startsWith("app:") ? tab.groupKey.slice(4) : "";
+  const surfaceAppId = legacySurfaceAppId(tab.surfaceId);
+  const officialAppId = officialAppIds.has(groupedAppId)
+    ? groupedAppId
+    : officialAppIds.has(surfaceAppId)
+      ? surfaceAppId
+      : "";
+  if (officialAppId) {
+    const spaceId = scopeKey.startsWith("space:") ? scopeKey.slice(6) : "";
+    const existingRequest = workspaceSurfaceFromRoute(tab.route);
+    const route =
+      existingRequest?.surfaceId === "official-app"
+        ? existingRequest.route
+        : officialAppRoute(
+            officialAppId,
+            ["chat", "journal", "planner", "library"].includes(officialAppId) ? spaceId : undefined,
+          );
+    const request = workspaceSurfaceFromRoute(route);
+    if (!request) return tab;
+    return {
+      ...tab,
+      surfaceId: "official-app",
+      groupKey: request.groupKey,
+      instanceKey: request.instanceKey ?? officialAppId,
+      title:
+        officialAppId === "chat" && tab.title.trim().toLowerCase() === "chat"
+          ? "Social"
+          : tab.title.trim() || request.title,
+      route,
+      sidebarVisible: tab.sidebarVisible,
+      state:
+        officialAppId === "browser"
+          ? parseBrowserTabState(tab.state)
+          : (tab.state ?? request.state ?? {}),
+    };
+  }
   if (isSupportedWorkspaceSurface((tab as { surfaceId?: unknown }).surfaceId)) return tab;
   if (scopeKey.startsWith("space:")) {
     const spaceId = scopeKey.slice(6);
@@ -59,22 +85,47 @@ export function migrateRetiredWorkspaceTab(
       groupKey: scopeKey as `space:${string}`,
       instanceKey: spaceId,
       title: "Space",
-      route: `/spaces/${encodeURIComponent(spaceId)}/notes`,
+      route: `/spaces/${encodeURIComponent(spaceId)}/home`,
       sidebarVisible: true,
       state: {},
     };
   }
   return {
     ...tab,
-    surfaceId: "inbox",
-    groupKey: "tool:inbox",
-    instanceKey: "inbox",
-    title: "Inbox",
-    route: "/inbox",
+    surfaceId: "home",
+    groupKey: "tool:home",
+    instanceKey: "home",
+    title: "Home",
+    route: "/home",
     sidebarVisible: false,
     state: {},
   };
 }
+
+function legacySurfaceAppId(surfaceId: WorkspaceSurfaceId): string {
+  if (surfaceId === "inbox") return "inbox";
+  if (surfaceId === "browser") return "browser";
+  if (surfaceId === "terminal") return "terminal";
+  if (surfaceId === "code") return "code";
+  if (surfaceId === "files") return "files";
+  if (surfaceId === "transfers") return "transfers";
+  if (surfaceId === "agents") return "agents";
+  return "";
+}
+
+const officialAppIds = new Set([
+  "chat",
+  "journal",
+  "planner",
+  "library",
+  "inbox",
+  "agents",
+  "files",
+  "browser",
+  "code",
+  "terminal",
+  "transfers",
+]);
 
 export function migrateBrowserTabs(layout: WorkspaceLayout): WorkspaceLayout {
   return {
@@ -100,35 +151,27 @@ export function migrateSpaceToolTabs(layout: WorkspaceLayout): WorkspaceLayout {
     root: mapDockTabs(layout.root, (tab) => {
       if (tab.surfaceId !== "space") return tab;
       const request = workspaceSurfaceFromRoute(tab.route);
-      if (!request || request.surfaceId !== "space") return tab;
+      if (!request) return tab;
+      if (request.surfaceId === "official-app") {
+        return {
+          ...tab,
+          surfaceId: "official-app",
+          groupKey: request.groupKey,
+          instanceKey: request.instanceKey ?? tab.instanceKey,
+          title: request.title,
+          route: request.route,
+          sidebarVisible: true,
+          state: tab.state ?? request.state ?? {},
+        };
+      }
+      if (request.surfaceId !== "space") return tab;
       return {
         ...tab,
         groupKey: request.groupKey,
         instanceKey: request.instanceKey ?? tab.instanceKey,
         title: request.title,
-        route: canonicalSocialRoute(tab.route),
+        route: request.route,
       };
     }),
   };
-}
-
-function canonicalSocialRoute(route: string): string {
-  try {
-    const parsed = new URL(route, "https://misty.local");
-    const parts = parsed.pathname.split("/").filter(Boolean);
-    if (parts[0] !== "spaces" || (parts[2] !== "chat" && parts[2] !== "social")) return route;
-    const requestedProvider = parts[3] ?? parsed.searchParams.get("provider") ?? "misty";
-    const provider =
-      requestedProvider === "instagram" ||
-      requestedProvider === "discord" ||
-      requestedProvider === "messenger" ||
-      requestedProvider === "x"
-        ? requestedProvider
-        : "misty";
-    parsed.pathname = `/spaces/${parts[1]}/social/${provider}`;
-    parsed.searchParams.delete("provider");
-    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
-  } catch {
-    return route;
-  }
 }

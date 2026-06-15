@@ -1,19 +1,16 @@
+import { navigationMenuPrimaryIconClass } from "@/shared/ui";
 import { routes } from "@/features/app-shell";
 import { reportSystemError } from "@/features/activity";
 import { useAuth } from "@/features/auth";
-import { useInboxStore } from "@/features/inbox";
 import {
-  canOpenMistySpaceSection,
-  preferredMistySpace,
-  rememberedJournalRoute,
-  rememberedPlannerRoute,
-  socialProviderPath,
-  useSpacesStore,
-} from "@/features/spaces";
+  officialAppIdForNavigator,
+  officialAppRoute,
+  usePinnedNavigatorAppIds,
+} from "@/features/apps";
+import { useInboxStore } from "@/features/inbox";
+import { preferredDefaultSpace, useSpacesStore } from "@/features/spaces";
 import {
   dockLeaves,
-  navigatorAppIdsForAccount,
-  useNavigatorAppsStore,
   useWorkspaceStore,
   WorkspaceAppIcon,
   workspaceSurfaceFromRoute,
@@ -31,13 +28,15 @@ import { LibraryNavigatorDisclosure } from "./LibraryNavigatorDisclosure";
 import { NavigatorAppsSection } from "./NavigatorAppsSection";
 import {
   NavigatorHeaderHomeButton,
-  NavigatorHeaderStoreButton,
+  NavigatorHeaderDiscoverButton,
   NavigatorHeaderSearchButton,
 } from "./NavigatorUtilityIsland";
 import { NavigatorProfileBar } from "./NavigatorProfileBar";
 import { PlannerNavigatorDisclosure } from "./PlannerNavigatorDisclosure";
 import { SocialNavigatorDisclosure } from "./SocialNavigatorDisclosure";
 import { navigatorRowClass, navigatorTitlebarStripClass } from "./styles";
+import { appNavigationFor, useAppNavigationStore } from "@/features/apps/appNavigation";
+import { DownloadedAppNavigator } from "./DownloadedAppNavigator";
 
 type NavigatorToolItem = {
   id: NavigatorAppId;
@@ -46,12 +45,12 @@ type NavigatorToolItem = {
   disabled?: boolean;
 };
 const globalToolItems = {
-  inbox: { id: "inbox", label: "Inbox", path: routes.inbox },
-  agents: { id: "agents", label: "Agents", path: routes.agents },
-  browser: { id: "browser", label: "Browser", path: routes.browser },
-  files: { id: "files", label: "Files", path: routes.files },
-  code: { id: "code", label: "Code", path: routes.code },
-  terminal: { id: "terminal", label: "Terminal", path: routes.terminal },
+  inbox: { id: "inbox", label: "Inbox", path: officialAppRoute("inbox") },
+  agents: { id: "agents", label: "Agents", path: officialAppRoute("agents") },
+  browser: { id: "browser", label: "Browser", path: officialAppRoute("browser") },
+  files: { id: "files", label: "Files", path: officialAppRoute("files") },
+  code: { id: "code", label: "Code", path: officialAppRoute("code") },
+  terminal: { id: "terminal", label: "Terminal", path: officialAppRoute("terminal") },
 } satisfies Record<string, NavigatorToolItem>;
 
 export function GlobalNavigator(props: {
@@ -68,13 +67,8 @@ export function GlobalNavigator(props: {
   const location = useLocation();
   const { user } = useAuth();
   const accountId = user?.id ?? "";
-  const selectedAppIds = useNavigatorAppsStore((state) =>
-    navigatorAppIdsForAccount(state, accountId),
-  );
-  const adoptGuestApps = useNavigatorAppsStore((state) => state.adoptGuestApps);
-  useEffect(() => {
-    if (accountId) adoptGuestApps(accountId);
-  }, [accountId, adoptGuestApps]);
+  const selectedAppIds = usePinnedNavigatorAppIds();
+  const appNavigation = useAppNavigationStore((state) => state.entries);
   const inboxAccounts = useInboxStore((state) => state.accounts);
   // The rail marks what the workspace is actually showing, not the last thing
   // that was clicked, so it follows the focused pane's active tab.
@@ -91,8 +85,8 @@ export function GlobalNavigator(props: {
   const spacesError = useSpacesStore((state) => state.error);
   // The workspace is always scoped to a Space. Before Spaces load there is
   // nothing to scope to, so the store starts on a bootstrap scope and adopts
-  // Misty — the home Space — the moment one is available.
-  const defaultSpaceId = preferredMistySpace(spaces)?.id;
+  // the account's default Space the moment one is available.
+  const defaultSpaceId = preferredDefaultSpace(spaces)?.id;
   useEffect(() => {
     if (!defaultSpaceId) return;
     useWorkspaceStore.getState().adoptDefaultScope(`space:${defaultSpaceId}`);
@@ -115,13 +109,15 @@ export function GlobalNavigator(props: {
   );
   const canAddSpace = !limits || limits.unlimited_spaces || spaces.length < limits.space_limit;
   const activeSpaceId = activeScopeKey.startsWith("space:") ? activeScopeKey.slice(6) : "";
-  // Space-scoped tools keep their slots during the first frames after launch
-  // or while a Space is loading; they become active once a real context exists.
-  const scopedSpace =
-    spaces.find((space) => space.id === activeSpaceId) ?? preferredMistySpace(spaces);
   const activeRoute = activeTab?.route ?? `${location.pathname}${location.search}`;
   const activeSpaceSection = spaceSectionFromRoute(activeRoute);
   const routeSpaceId = spaceIdFromRoute(activeRoute);
+  // Space-scoped tools keep their slots during the first frames after launch
+  // or while a Space is loading; they become active once a real context exists.
+  const scopedSpace =
+    spaces.find((space) => space.id === routeSpaceId) ??
+    spaces.find((space) => space.id === activeSpaceId) ??
+    preferredDefaultSpace(spaces);
   const homePath = scopedSpace
     ? `/spaces/${encodeURIComponent(scopedSpace.id)}/home`
     : routes.spaces;
@@ -157,6 +153,7 @@ export function GlobalNavigator(props: {
         "overflow-hidden border-r border-charcoal-border bg-charcoal-workspace",
       )}
       aria-label="Primary"
+      data-tour-target="navigation"
       onPointerDown={props.onStartWindowDrag}
     >
       {props.onTitlebarPointerDown ? (
@@ -173,7 +170,10 @@ export function GlobalNavigator(props: {
       ) : null}
 
       <div className="grid shrink-0 select-none gap-1 px-3 py-2" data-navigator-header="true">
-        <div className="flex h-9 w-full min-w-0 items-center" data-navigator-space-row="true">
+        <div
+          className="flex h-9 w-full min-w-0 items-center justify-between gap-1"
+          data-navigator-space-row="true"
+        >
           <GlobalSpaceSwitcher
             activeSpace={scopedSpace}
             activeSpaceId={activeSpaceId}
@@ -181,6 +181,7 @@ export function GlobalNavigator(props: {
             spaces={visibleSpaces}
             userId={user?.id ?? ""}
           />
+          <NavigatorHeaderSearchButton />
         </div>
         <div
           className="grid w-full gap-1"
@@ -188,8 +189,7 @@ export function GlobalNavigator(props: {
           data-navigator-actions-row="true"
         >
           <NavigatorHeaderHomeButton path={homePath} active={homeActive} />
-          <NavigatorHeaderStoreButton path={routes.store} active={marketplaceActive} />
-          <NavigatorHeaderSearchButton />
+          <NavigatorHeaderDiscoverButton path={routes.discover} active={marketplaceActive} />
         </div>
       </div>
       <div
@@ -221,17 +221,31 @@ export function GlobalNavigator(props: {
   );
 
   function toolIsActive(item: NavigatorToolItem): boolean {
-    return !item.disabled && isSpaceToolId(item.id)
-      ? Boolean(
-          activeTab?.surfaceId === "space" &&
-          activeTab.groupKey.startsWith(`space:${scopedSpace?.id ?? activeSpaceId}`) &&
-          spaceToolIsActive(item.id, activeSpaceSection),
-        )
-      : activeGroupKey === `tool:${item.id}`;
+    return !item.disabled && activeGroupKey === `app:${officialAppIdForNavigator(item.id)}`;
   }
 
   function renderToolItem(item: NavigatorToolItem): ReactNode {
     const active = toolIsActive(item);
+    const registration =
+      !item.disabled &&
+      appNavigationFor(appNavigation, {
+        accountId,
+        spaceId: scopedSpace?.id,
+        appId: officialAppIdForNavigator(item.id),
+        instanceId: activeTab?.id,
+      });
+    if (registration)
+      return (
+        <DownloadedAppNavigator
+          key={item.id}
+          accountId={accountId}
+          appId={item.id}
+          label={item.label}
+          active={active}
+          activeRoute={activeRoute}
+          items={registration.items}
+        />
+      );
 
     if (item.id === "inbox") {
       return (
@@ -303,6 +317,7 @@ export function GlobalNavigator(props: {
           key={item.id}
           accountId={accountId}
           activeGroupKey={activeGroupKey}
+          activeRoute={activeRoute}
         />
       );
     }
@@ -337,36 +352,34 @@ export function GlobalNavigator(props: {
 type SpaceToolId = "journal" | "planner" | "social" | "library";
 
 function spaceToolItems(space: { id: string }, accountId: string) {
-  const encodedSpaceId = encodeURIComponent(space.id);
   return [
     {
       id: "social" as const,
       label: "Social",
-      path: socialProviderPath(space.id, "misty"),
+      path: officialAppRoute("chat", space.id, accountId),
     },
     {
       id: "journal" as const,
       label: "Journal",
-      path: rememberedJournalRoute(accountId, space.id),
+      path: officialAppRoute("journal", space.id, accountId),
     },
     {
       id: "planner" as const,
       label: "Planner",
-      path: rememberedPlannerRoute(accountId, space.id),
+      path: officialAppRoute("planner", space.id, accountId),
     },
     {
       id: "library" as const,
       label: "Library",
-      path: `/spaces/${encodedSpaceId}/library`,
+      path: officialAppRoute("library", space.id, accountId),
     },
   ];
 }
 
 function canShowSpaceTool(
-  space: Parameters<typeof canOpenMistySpaceSection>[0],
+  space: { permissions?: Record<string, boolean> },
   id: SpaceToolId,
 ): boolean {
-  if (!canOpenMistySpaceSection(space, id)) return false;
   if (id === "social" && space.permissions?.["messages.read"] === false) return false;
   if (id === "planner" && space.permissions?.["tasks.view"] === false) return false;
   if (id === "library" && space.permissions?.["library.view"] === false) return false;
@@ -383,15 +396,14 @@ function spaceSectionFromRoute(route: string): string {
 
 function spaceIdFromRoute(route: string): string {
   try {
-    const segments = new URL(route, "https://misty.local").pathname.split("/").filter(Boolean);
-    return segments[0] === "spaces" && segments[1] ? decodeURIComponent(segments[1]) : "";
+    const parsed = new URL(route, "https://misty.local");
+    const segments = parsed.pathname.split("/").filter(Boolean);
+    const encodedSpaceId =
+      segments[0] === "spaces" && segments[1] ? segments[1] : parsed.searchParams.get("space");
+    return encodedSpaceId ? decodeURIComponent(encodedSpaceId) : "";
   } catch {
     return "";
   }
-}
-
-function spaceToolIsActive(id: SpaceToolId, section: string): boolean {
-  return id === "journal" ? section === "notes" || section === "drawings" : section === id;
 }
 
 function isSpaceToolId(id: string): id is SpaceToolId {
@@ -458,7 +470,7 @@ function NavigatorLink(props: {
 }) {
   const content = (
     <>
-      <span className="grid size-7 shrink-0 place-items-center">
+      <span className={navigationMenuPrimaryIconClass}>
         <WorkspaceAppIcon
           appId={props.appId}
           className={props.disabled ? "opacity-45 grayscale-[0.35]" : undefined}

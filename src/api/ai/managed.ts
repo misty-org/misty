@@ -1,5 +1,6 @@
 import { httpRequest } from "@/api/client/http";
 import {
+  apiRequestCredentials,
   isApiSessionTransitioning,
   readApiAuthToken,
   readApiSessionGeneration,
@@ -42,7 +43,7 @@ export async function managedAiRequest<T = unknown>(path: string, init?: Request
   let response: Response;
   try {
     response = await httpRequest(`${base}${path}`, {
-      credentials: "include",
+      credentials: apiRequestCredentials(),
       ...init,
       headers,
     });

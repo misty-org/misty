@@ -439,12 +439,6 @@
       "hash": "8979054a15fb7190"
     }
   ],
-  "src/features/spaces/members/components/SpaceMembers.tsx": [
-    {
-      "length": 232,
-      "hash": "85f8fa0410b314ea"
-    }
-  ],
   "src/features/spaces/planner/SpaceTaskCalendarGrid.tsx": [
     {
       "length": 172,

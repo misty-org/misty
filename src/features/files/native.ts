@@ -5,10 +5,7 @@ import type {
   CreateItemRequest,
   DeleteItemsRequest,
   DeviceSnapshot,
-  ConnectedDevicesSnapshot,
   DirectoryListing,
-  PeerResponse,
-  PeerRoot,
   DirectorySizeRecord,
   DirectorySizeRequest,
   ExplorerLibraryItem,
@@ -56,6 +53,7 @@ import { invoke } from "@tauri-apps/api/core";
 export * from "@/native/runtime";
 export * from "@/native/settings-plugins";
 export * from "@/native/transfers-tools";
+export * from "@/native/connected-devices";
 
 export function devicesSnapshot(): Promise<DeviceSnapshot> {
   return invoke("devices_snapshot");
@@ -66,61 +64,6 @@ export function devicesUnmount(request: {
   mountPath: string;
 }): Promise<DeviceSnapshot> {
   return invoke("devices_unmount", { request });
-}
-
-export function connectedDevicesInitialize(request: {
-  accountId: string;
-  deviceId: string;
-  deviceName?: string;
-  developmentTicketKeys?: Record<string, string>;
-}): Promise<ConnectedDevicesSnapshot> {
-  return invoke("connected_devices_initialize", { request });
-}
-
-export function connectedDevicesSnapshot(): Promise<ConnectedDevicesSnapshot> {
-  return invoke("connected_devices_snapshot");
-}
-
-export function connectedDevicesSubscribeDirectory(path: string): Promise<void> {
-  return invoke("connected_devices_subscribe_directory", { path });
-}
-
-export function connectedDevicesConnect(request: {
-  deviceId: string;
-  address: unknown;
-  ticket: string;
-}): Promise<ConnectedDevicesSnapshot> {
-  return invoke("connected_devices_connect", { request });
-}
-
-export function connectedDevicesRoots(deviceId: string): Promise<PeerRoot[]> {
-  return invoke("connected_devices_roots", { deviceId });
-}
-
-export function connectedDevicesListDirectory(request: {
-  deviceId: string;
-  path: string;
-  showHidden?: boolean;
-}): Promise<PeerResponse> {
-  return invoke("connected_devices_list_directory", { request });
-}
-
-export function connectedDevicesReadFile(request: {
-  deviceId: string;
-  path: string;
-  offset: number;
-  length?: number | null;
-  expectedSnapshot?: string | null;
-}): Promise<number[]> {
-  return invoke("connected_devices_read_file", { request });
-}
-
-export function connectedDevicesMediaUrl(path: string): Promise<string> {
-  return invoke("connected_devices_media_url", { path });
-}
-
-export function connectedDevicesPrepareClipboardFiles(deviceId: string): Promise<boolean> {
-  return invoke("connected_devices_prepare_clipboard_files", { deviceId });
 }
 
 export function explorerListDirectory(request: ListDirectoryRequest): Promise<DirectoryListing> {

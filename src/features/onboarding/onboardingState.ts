@@ -1,66 +1,48 @@
-import { deploymentStorageKey } from "@/api/deployment/api";
+import type { Space } from "@/api/spaces/dto/interfaces/types";
 
-export const onboardingVersion = 1;
+export type OnboardingStarterApp = "chat" | "journal" | "planner";
 
-export type OnboardingPurpose = "plan" | "organize" | "collaborate" | "explore";
-export type OnboardingStart = "note" | "task" | "social" | "library";
+const ACCOUNT_CREATING_STORAGE_KEY = "misty:account-creating";
 
-export interface OnboardingCompletion {
-  version: number;
-  completedAt: string;
-  outcome: "completed" | "skipped";
-  purpose?: OnboardingPurpose;
-  start?: OnboardingStart;
-  hostedAiEnabled?: boolean;
+export function markAccountCreating(accountId: string): void {
+  try {
+    sessionStorage.setItem(`${ACCOUNT_CREATING_STORAGE_KEY}:${accountId}`, "true");
+  } catch {}
 }
 
-const storageKey = (accountId: string) =>
-  deploymentStorageKey(`misty:onboarding:v${onboardingVersion}:${accountId}`);
-
-export function readOnboardingCompletion(accountId: string): OnboardingCompletion | null {
-  if (!accountId) return null;
+export function clearAccountCreating(accountId: string): void {
   try {
-    const raw = window.localStorage.getItem(storageKey(accountId));
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<OnboardingCompletion>;
-    if (parsed.version !== onboardingVersion || !parsed.completedAt) return null;
-    return parsed as OnboardingCompletion;
+    sessionStorage.removeItem(`${ACCOUNT_CREATING_STORAGE_KEY}:${accountId}`);
+  } catch {}
+}
+
+export function isAccountCreating(accountId: string | undefined): boolean {
+  if (!accountId) return false;
+  try {
+    return sessionStorage.getItem(`${ACCOUNT_CREATING_STORAGE_KEY}:${accountId}`) === "true";
   } catch {
-    return null;
+    return false;
   }
 }
 
-export function writeOnboardingCompletion(
-  accountId: string,
-  completion: Omit<OnboardingCompletion, "version" | "completedAt">,
-): void {
-  if (!accountId) return;
-  try {
-    window.localStorage.setItem(
-      storageKey(accountId),
-      JSON.stringify({
-        ...completion,
-        version: onboardingVersion,
-        completedAt: new Date().toISOString(),
-      } satisfies OnboardingCompletion),
-    );
-  } catch {
-    // A private context may not allow local storage. The flow still completes
-    // for this session and can be skipped again on the next launch.
-  }
+/**
+ * Onboarding screen is only shown IFF users are actively creating an account
+ * and have not yet created their own default Space.
+ */
+export function accountNeedsOnboarding(
+  accountId: string | undefined,
+  snapshotReady: boolean,
+  spaces: Space[],
+  isCreating: boolean = isAccountCreating(accountId),
+): boolean {
+  return Boolean(
+    accountId &&
+    isCreating &&
+    snapshotReady &&
+    !spaces.some((space) => space.is_default && space.owner_user_id === accountId),
+  );
 }
 
-export function onboardingStartRoute(spaceId: string, start: OnboardingStart): string {
-  const base = `/spaces/${encodeURIComponent(spaceId)}`;
-  if (start === "note") return `${base}/notes?create=note`;
-  if (start === "task") return `${base}/planner/tasks/board?create=task`;
-  if (start === "social") return `${base}/social/misty`;
-  return `${base}/library?upload=1`;
-}
-
-export function suggestedSpaceName(purpose: OnboardingPurpose): string {
-  if (purpose === "plan") return "My projects";
-  if (purpose === "organize") return "My knowledge";
-  if (purpose === "collaborate") return "My team";
-  return "My Space";
+export function onboardingSpaceRoute(spaceId: string): string {
+  return `/spaces/${encodeURIComponent(spaceId)}`;
 }

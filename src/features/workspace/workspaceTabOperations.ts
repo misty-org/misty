@@ -1,3 +1,4 @@
+import { appViewHasUnsavedChanges } from "@/features/apps/appUpdateSafety";
 import { dockTabs } from "./dockTree";
 import type {
   WorkspaceDockNode,
@@ -71,9 +72,11 @@ export function lastUsedUpdatesForTab(
   return updates;
 }
 
-export function canCloseWorkspaceTab(_tab: WorkspaceTab, _scopedTabs: WorkspaceTab[]): boolean {
-  // Tabs are always individually closeable. WorkspaceCanvas restores Home only
-  // after the active scope actually becomes empty.
+export function canCloseWorkspaceTab(_tab?: WorkspaceTab, _scopedTabs?: WorkspaceTab[]): boolean {
+  if (_tab && appViewHasUnsavedChanges(_tab.id)) {
+    window.dispatchEvent(new CustomEvent("misty:app-update-notice", {detail: "Save the changes in Code before closing this tab."}));
+    return false;
+  }
   return true;
 }
 

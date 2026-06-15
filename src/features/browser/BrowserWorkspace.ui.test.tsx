@@ -101,6 +101,23 @@ describe("BrowserWorkspace", () => {
     ).toBe("rgb(24, 25, 28)");
   });
 
+  it("never embeds a website frame when the native Browser runtime is unavailable", async () => {
+    const webTab = {
+      ...browserTab,
+      title: "Google",
+      state: createBrowserTabState("https://www.google.com/"),
+    };
+
+    await act(async () => root.render(<BrowserWorkspace tab={webTab} />));
+
+    expect(container.querySelector("iframe")).toBeNull();
+    expect(
+      container.querySelector('[data-testid="browser-native-runtime-required"]'),
+    ).not.toBeNull();
+    expect(container.textContent).toContain("Open this page in the Misty desktop app");
+    expect(container.textContent).toContain("Open in default browser");
+  });
+
   it("renders browser controls without a nested browser tab strip", () => {
     act(() => root.render(<BrowserWorkspace tab={browserTab} />));
 

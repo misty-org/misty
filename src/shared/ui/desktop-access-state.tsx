@@ -1,8 +1,9 @@
+import { mistyPublicPage } from "@/shared/platform/mistyPublicUrl";
 import { Button } from "./button";
 import { PermissionState } from "./state-view";
 import { cn } from "./utils";
 
-export const mistyDownloadUrl = "https://mistysys.com/download";
+export const mistyDownloadUrl = mistyPublicPage("/download");
 
 export function DesktopAccessState(props: { feature: string; className?: string }) {
   return (

@@ -16,13 +16,10 @@ const aiMocks = vi.hoisted(() => ({
 
 vi.mock("./keychain", () => ({ readApiKey: aiMocks.readApiKey }));
 vi.mock("./providers", () => ({ streamRewrite: aiMocks.streamRewrite }));
-vi.mock("./useAiSettings", () => ({
-  useAiSettings: () => ({
-    providerId: "openai",
-    baseUrl: "https://example.test",
-    model: "test-model",
-  }),
-}));
+vi.mock("./useAiSettings", () => {
+  const snapshot = () => ({providerId: "openai-compat", baseUrl: "https://example.test", model: "test-model"});
+  return { useAiSettings: Object.assign(snapshot, {getState: snapshot}) };
+});
 
 describe("Inline AI apply shortcut", () => {
   beforeEach(() => {

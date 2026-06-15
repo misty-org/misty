@@ -1,9 +1,9 @@
 import { useSmartLibraryStore } from "@/features/spaces/library";
+import { useMultiPanelStoreContext } from "@/features/workspace/MultiPanelWorkspace";
 import {
   useMultiPanelStore,
-  useMultiPanelStoreContext,
   type MultiPanelStoreHook,
-} from "@/features/workspace";
+} from "@/features/workspace/useMultiPanelStore";
 import {
   explorerPathIsDirectory,
   explorerPrepareDragItems,

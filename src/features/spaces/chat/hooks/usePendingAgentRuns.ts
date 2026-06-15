@@ -1,3 +1,4 @@
+import { socialEvents } from "../socialRuntime";
 import type { SpaceMessageAgentRun } from "@/api/spaces/dto/interfaces/types";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -95,8 +96,8 @@ export function usePendingAgentRuns(spaceId: string, conversationId: string) {
       showAfterDelay({ triggerId, runId, agentId });
     };
 
-    window.addEventListener("misty:space-agent-run-event", onRunEvent);
-    return () => window.removeEventListener("misty:space-agent-run-event", onRunEvent);
+    socialEvents.addEventListener("misty:space-agent-run-event", onRunEvent);
+    return () => socialEvents.removeEventListener("misty:space-agent-run-event", onRunEvent);
   }, [conversationId, spaceId, hide, showAfterDelay]);
 
   /**

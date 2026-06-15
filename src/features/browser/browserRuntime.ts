@@ -110,6 +110,7 @@ const runtimeTabIds = new Map<string, string>();
 const runtimeQueues = new Map<string, Promise<void>>();
 const browserSyncStates = new Map<string, BrowserSyncState>();
 const browserWebviewSuspensions = new Set<string>();
+let browserParkGeneration = 0;
 let browserOverlayQueue = Promise.resolve();
 let browserPointerGestureActive = false;
 let browserOverlayResumeGeneration = 0;
@@ -121,6 +122,10 @@ export const browserRuntimeResumeEvent = "misty:browser-runtime-resume";
 
 type BrowserRuntimeTab = Pick<WorkspaceTab, "id" | "instanceKey">;
 type BrowserSyncInput = {
+  /** Opaque host-issued context used by SDK and agent browser grants. */
+  scopeId?: string;
+  /** Host-derived account/deployment profile for SDK-owned browser views. */
+  profileId?: string;
   tab: WorkspaceTab;
   url: string;
   bounds: BrowserBounds;
@@ -139,7 +144,18 @@ export function browserRuntimeId(tab: BrowserRuntimeTab): string {
 }
 
 export function browserScopeId(tab: BrowserRuntimeTab): string {
-  return `scope-${browserRuntimeId(tab)}`;
+  return sdkBrowserContexts.get(tab.id)?.contextId ?? `scope-${browserRuntimeId(tab)}`;
+}
+
+const sdkBrowserContexts = new Map<string, { runtimeId: string; contextId: string }>();
+
+/** A lease prevents an old component's cleanup from retiring its replacement. */
+export function registerSdkBrowserContext(tabId: string, runtimeId: string, contextId: string) {
+  const lease = { runtimeId, contextId };
+  sdkBrowserContexts.set(tabId, lease);
+  return () => {
+    if (sdkBrowserContexts.get(tabId) === lease) sdkBrowserContexts.delete(tabId);
+  };
 }
 
 export function browserTabIdForRuntime(runtimeId: string): string | null {
@@ -147,8 +163,23 @@ export function browserTabIdForRuntime(runtimeId: string): string | null {
 }
 
 export function browserRuntimeIdForTabId(tabId: string): string | null {
+  const sdkContext = sdkBrowserContexts.get(tabId);
+  if (sdkContext) return sdkContext.runtimeId;
   for (const [runtimeId, candidate] of runtimeTabIds) {
     if (candidate === tabId) return runtimeId;
+  }
+  return null;
+}
+
+export function browserRuntimeIdForScope(scopeId: string): string | null {
+  for (const context of sdkBrowserContexts.values()) {
+    if (context.contextId === scopeId) return context.runtimeId;
+  }
+  // Legacy embedded views use named scopes. Opaque SDK contexts must resolve
+  // through a live host lease and must never be interpreted as native IDs.
+  if (scopeId.startsWith("scope-")) {
+    const id = scopeId.slice("scope-".length);
+    if (runtimeTabIds.has(id)) return id;
   }
   return null;
 }
@@ -180,7 +211,7 @@ export function registerBrowserRuntime(tab: BrowserRuntimeTab): string {
 }
 
 export function browserRuntimeCreated(tab: BrowserRuntimeTab): boolean {
-  return createdRuntimeIds.has(browserRuntimeId(tab));
+  return createdRuntimeIds.has(sdkBrowserContexts.get(tab.id)?.runtimeId ?? browserRuntimeId(tab));
 }
 
 export function requestBrowserWebviewLayout(tab: BrowserRuntimeTab): void {
@@ -199,6 +230,7 @@ export function requestBrowserWebviewLayoutByRuntimeId(runtimeId: string): void 
 
 export function syncBrowserWebview(input: BrowserSyncInput): Promise<void> {
   const id = registerBrowserRuntime(input.tab);
+  browserParkGeneration += 1;
   desiredVisibleRuntimeIds.add(id);
   const boundsKey = serializeBounds(input.bounds, input.nativeLiveResize);
   const existingState = browserSyncStates.get(id);
@@ -248,9 +280,10 @@ async function applyBrowserSync(id: string, input: BrowserSyncInput): Promise<vo
       request: {
         id,
         url: input.url,
-        scopeId: browserScopeId(input.tab),
+        scopeId: input.scopeId ?? browserScopeId(input.tab),
         theme: input.theme,
         nativeLiveResize: Boolean(input.nativeLiveResize),
+        ...(input.profileId ? { profileId: input.profileId } : {}),
         ...input.bounds,
       },
     });
@@ -270,9 +303,10 @@ async function applyBrowserSync(id: string, input: BrowserSyncInput): Promise<vo
       request: {
         id,
         url: input.url,
-        scopeId: browserScopeId(input.tab),
+        scopeId: input.scopeId ?? browserScopeId(input.tab),
         theme: input.theme,
         nativeLiveResize: Boolean(input.nativeLiveResize),
+        ...(input.profileId ? { profileId: input.profileId } : {}),
         ...input.bounds,
       },
     });
@@ -431,7 +465,8 @@ export async function closeBrowserRuntime(tab: WorkspaceTab): Promise<void> {
     lastBounds.delete(id);
     browserSyncStates.delete(id);
     runtimeTabIds.delete(id);
-    useBrowserRuntimeStore.getState().removeTab(tab.id);
+    if (![...runtimeTabIds.values()].includes(tab.id))
+      useBrowserRuntimeStore.getState().removeTab(tab.id);
   });
 }
 
@@ -452,6 +487,24 @@ export function hideAllBrowserWebviews(): Promise<void[]> {
     trackedHides.then(() => undefined),
     invoke<void>("browser_webviews_hide_all").catch(() => undefined),
   ]);
+}
+
+export async function parkAllBrowserWebviews(): Promise<void> {
+  const generation = ++browserParkGeneration;
+  desiredVisibleRuntimeIds.clear();
+  visibleRuntimeIds.clear();
+  createdRuntimeIds.forEach((id) => lastBounds.delete(id));
+
+  // Browser workspace cleanup may already have queued an individual hide.
+  // Let that settle, then revive each child underneath the renderer so a
+  // later Browser tab switch has no native hide/show gap.
+  await Promise.all([...runtimeQueues.values()].map((pending) => pending.catch(() => undefined)));
+  if (generation !== browserParkGeneration || desiredVisibleRuntimeIds.size > 0) return;
+  await invoke<void>("browser_webviews_park_all").catch(() => undefined);
+  if (desiredVisibleRuntimeIds.size > 0 && typeof window !== "undefined") {
+    desiredVisibleRuntimeIds.forEach((id) => lastBounds.delete(id));
+    window.dispatchEvent(new Event(browserRuntimeResumeEvent));
+  }
 }
 
 function serializeBounds(bounds: BrowserBounds, nativeLiveResize = false): string {

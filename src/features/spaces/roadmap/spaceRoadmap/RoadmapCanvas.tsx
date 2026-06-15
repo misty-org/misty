@@ -1,8 +1,4 @@
-import { deploymentStorageKey, readDeploymentStorageItem } from "@/api/deployment/api";
-import { useAuth } from "@/features/auth";
-import { useAppThemeStore } from "@/features/settings";
-import { useShortcutHandler } from "@/features/shortcuts";
-import { useWorkspaceTabFocused } from "@/features/workspace";
+import { useRoadmapRuntime, useRoadmapCommand as useShortcutHandler, type PlannerPreferenceStorage } from "./roadmapRuntime";
 import type {
   SpaceRoadmapEdgeType,
   SpaceRoadmapSnapshot,
@@ -67,12 +63,10 @@ export function RoadmapCanvas(props: {
 }
 
 function RoadmapFlow(props: Parameters<typeof RoadmapCanvas>[0]) {
-  const { user } = useAuth();
-  const workspaceFocused = useWorkspaceTabFocused();
-  const resolvedTheme = useAppThemeStore((state) => state.resolvedTheme);
+  const { userId, focused: workspaceFocused, theme: resolvedTheme, storage } = useRoadmapRuntime();
   const { fitView, screenToFlowPosition } = useReactFlow<RoadmapNode, Edge>();
-  const viewportKey = `misty:roadmap-viewport:${user?.id ?? "anonymous"}:${props.snapshot.roadmap.space_id}:${props.snapshot.roadmap.id}`;
-  const savedViewport = useMemo(() => readViewport(viewportKey), [viewportKey]);
+  const viewportKey = `misty:roadmap-viewport:${userId ?? "anonymous"}:${props.snapshot.roadmap.space_id}:${props.snapshot.roadmap.id}`;
+  const savedViewport = useMemo(() => readViewport(storage, viewportKey), [storage, viewportKey]);
   const initialNodes = useMemo(
     () => snapshotRoadmapNodes(props.snapshot, props.expandedGoalIds, props.onToggleGoal),
     [props.expandedGoalIds, props.onToggleGoal, props.snapshot],
@@ -281,7 +275,7 @@ function RoadmapFlow(props: Parameters<typeof RoadmapCanvas>[0]) {
           props.onLayout(next);
         }}
         defaultViewport={savedViewport ?? { x: 0, y: 0, zoom: 1 }}
-        onMoveEnd={(_, viewport) => writeViewport(viewportKey, viewport)}
+        onMoveEnd={(_, viewport) => writeViewport(storage, viewportKey, viewport)}
         minZoom={0.25}
         maxZoom={1.8}
         deleteKeyCode={null}
@@ -333,18 +327,18 @@ function RoadmapFlow(props: Parameters<typeof RoadmapCanvas>[0]) {
   );
 }
 
-function readViewport(key: string) {
+function readViewport(storage: PlannerPreferenceStorage, key: string) {
   try {
-    const viewport = JSON.parse(readDeploymentStorageItem(key) ?? "null") as
+    const viewport = JSON.parse(storage.getItem(key) ?? "null") as
       { x: number; y: number; zoom: number } | undefined;
     return viewport ? { ...viewport, zoom: Math.max(0.35, viewport.zoom) } : undefined;
   } catch {
     return undefined;
   }
 }
-function writeViewport(key: string, viewport: { x: number; y: number; zoom: number }) {
+function writeViewport(storage: PlannerPreferenceStorage, key: string, viewport: { x: number; y: number; zoom: number }) {
   try {
-    window.localStorage.setItem(deploymentStorageKey(key), JSON.stringify(viewport));
+    storage.setItem(key, JSON.stringify(viewport));
   } catch {
     /* optional */
   }

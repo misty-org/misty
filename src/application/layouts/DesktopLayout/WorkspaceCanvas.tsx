@@ -1,10 +1,6 @@
-import { closeBrowserRuntime } from "@/features/browser";
 import { toggleDesktopMistyPanel } from "@/features/desktop-pet";
-import { releaseFilesMultiPanelStore } from "@/features/files/explorer";
 import { useGlobalSearchStore } from "@/features/global-search";
-import { releaseInboxWorkspaceStore } from "@/features/inbox";
-import { preferredMistySpace, useSpacesStore } from "@/features/spaces";
-import { killTerminalTab } from "@/features/terminal";
+import { preferredDefaultSpace, useSpacesStore } from "@/features/spaces";
 import { registerShortcutHandler, useShortcutHandler } from "@/features/shortcuts";
 import {
   canCloseWorkspaceTab,
@@ -30,6 +26,7 @@ import {
 } from "@/features/workspace";
 import { useCallback, useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import type { DockSplitDirection } from "@/features/workspace/model";
 import {
   minimumForWorkspaceTabs,
   tabForGroupedShortcut,
@@ -38,7 +35,10 @@ import {
 import type { NewTabOption } from "./WorkspaceNewTabMenu";
 import { useVirtualWindowTransition } from "./useVirtualWindowTransition";
 
-export function WorkspaceCanvas(props: { titlebarInsets?: { left: number; right: number } }) {
+export function WorkspaceCanvas(props: {
+  titlebarInsets?: { left: number; right: number };
+  windowsTitlebarControls?: boolean;
+}) {
   const location = useLocation();
   const navigate = useNavigate();
   const spaces = useSpacesStore((state) => state.spaces);
@@ -88,7 +88,7 @@ export function WorkspaceCanvas(props: { titlebarInsets?: { left: number; right:
         ? workspace.activeScopeKey.slice(6)
         : "";
       const homeSpace =
-        spaces.find((space) => space.id === scopedSpaceId) ?? preferredMistySpace(spaces);
+        spaces.find((space) => space.id === scopedSpaceId) ?? preferredDefaultSpace(spaces);
       if (!homeSpace) return;
       const route = `/spaces/${encodeURIComponent(homeSpace.id)}/home`;
       const request = workspaceSurfaceFromRoute(route);
@@ -110,6 +110,15 @@ export function WorkspaceCanvas(props: { titlebarInsets?: { left: number; right:
     const tab = pane?.tabs.find((candidate) => candidate.id === pane.activeTabId) ?? pane?.tabs[0];
     if (tab && `${location.pathname}${location.search}` !== tab.route) navigate(tab.route);
   }, [location.pathname, location.search, navigate]);
+
+  const splitWorkspacePane = useCallback(
+    (paneId: string, direction: DockSplitDirection, tabId?: string) => {
+      const newPaneId = splitPane(paneId, direction, tabId);
+      if (newPaneId) window.setTimeout(navigateToActiveLayoutTab, 0);
+      return newPaneId;
+    },
+    [navigateToActiveLayoutTab, splitPane],
+  );
 
   const selectVirtualWindow = useCallback(
     (windowId: string) => {
@@ -349,7 +358,7 @@ export function WorkspaceCanvas(props: { titlebarInsets?: { left: number; right:
         "workspace.split_right",
         () => {
           const state = useWorkspaceStore.getState();
-          state.splitPane(state.layout.focusedPaneId, "right");
+          splitWorkspacePane(state.layout.focusedPaneId, "right");
         },
         () => canSplitFocusedPane("right"),
       ),
@@ -357,7 +366,7 @@ export function WorkspaceCanvas(props: { titlebarInsets?: { left: number; right:
         "workspace.split_down",
         () => {
           const state = useWorkspaceStore.getState();
-          state.splitPane(state.layout.focusedPaneId, "down");
+          splitWorkspacePane(state.layout.focusedPaneId, "down");
         },
         () => canSplitFocusedPane("down"),
       ),
@@ -371,7 +380,7 @@ export function WorkspaceCanvas(props: { titlebarInsets?: { left: number; right:
       ),
     ];
     return () => unregister.forEach((remove) => remove());
-  }, [openTab]);
+  }, [openTab, splitWorkspacePane]);
 
   useEffect(() => {
     const hasMultipleVirtualWindows = () => {
@@ -483,6 +492,7 @@ export function WorkspaceCanvas(props: { titlebarInsets?: { left: number; right:
         node={layout.root}
         dockEdge={{ top: true, left: true, right: true }}
         titlebarInsets={props.titlebarInsets}
+        windowsTitlebarControls={props.windowsTitlebarControls}
         focusedPaneId={layout.focusedPaneId}
         lastUsedTabByGroup={lastUsedTabByGroup}
         onOpen={openTab}
@@ -490,7 +500,7 @@ export function WorkspaceCanvas(props: { titlebarInsets?: { left: number; right:
         onOpenNewTab={openNewTab}
         onMoveTab={moveTab}
         onDockTab={dockTab}
-        onSplitPane={splitPane}
+        onSplitPane={splitWorkspacePane}
         onClosePane={closePane}
         virtualWindows={virtualWindows}
         activeVirtualWindowId={activeVirtualWindowId}
@@ -507,10 +517,6 @@ export function WorkspaceCanvas(props: { titlebarInsets?: { left: number; right:
 
 function disposeWorkspaceTab(tab: WorkspaceTab): void {
   releaseWorkspaceTabRouteHistory(tab.id);
-  if (tab.surfaceId === "browser") void closeBrowserRuntime(tab);
-  if (tab.surfaceId === "terminal") killTerminalTab(tab.id);
-  if (tab.surfaceId === "files") releaseFilesMultiPanelStore(tab.id);
-  if (tab.surfaceId === "inbox") releaseInboxWorkspaceStore(tab.id);
   dockWidgetRegistry.get(tab.surfaceId).dispose?.(tab.state);
 }
 

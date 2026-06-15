@@ -1,4 +1,4 @@
-import { spacesApi } from "@/api/spaces/api";
+import { libraryApi as spacesApi } from "@/features/spaces/library/libraryRuntime";
 import { BookOpenText as LibraryIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 

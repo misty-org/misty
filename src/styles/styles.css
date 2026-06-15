@@ -18,6 +18,9 @@
   --misty-theme-danger: #c94747;
   --misty-theme-sage: #a3bfab;
   --misty-theme-sage-bg: #28312b;
+  --misty-extension-artwork-background: var(--misty-theme-card);
+  --misty-extension-artwork-border: var(--misty-theme-border);
+  --misty-extension-artwork-foreground: var(--misty-theme-text-bright);
 }
 
 @theme inline {
@@ -147,6 +150,8 @@
   html:has([data-browser-page-host]) [data-workspace-panes],
   html:has([data-browser-page-host]) [data-workspace-pane]:has([data-browser-page-host]),
   html:has([data-browser-page-host]) [data-workspace-pane]:has([data-browser-page-host]) > div,
+  html:has([data-browser-page-host]) [data-misty-trusted-app]:has([data-browser-page-host]),
+  html:has([data-browser-page-host]) [data-misty-native-surface]:has([data-browser-page-host]),
   html:has([data-browser-page-host]) [data-browser-workspace-tab],
   html:has([data-browser-page-host]) [data-browser-page-stage],
   html:has([data-browser-page-host]) [data-browser-page-host] {

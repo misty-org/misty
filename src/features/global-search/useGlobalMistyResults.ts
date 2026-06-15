@@ -1,9 +1,9 @@
 import {
-  filesMultiPanelStore,
   revealSearchResultInPane,
   searchResultNavigationTarget,
   useExplorerStore,
 } from "@/features/files/explorer";
+import { filesMultiPanelStore } from "@/features/files/dockStores";
 import {
   useMultiPanelStore,
   useWorkspaceStore,
@@ -69,7 +69,8 @@ export function useGlobalMistyResults(input: {
 
     input.closePanel();
     const target = searchResultNavigationTarget(fileResult);
-    const surface = workspaceSurfaceFromRoute("/files");
+    const filesRoute = `/apps/files?path=${encodeURIComponent(fileResult.entry.path)}`;
+    const surface = workspaceSurfaceFromRoute(filesRoute);
     if (surface) {
       const tab = useWorkspaceStore.getState().openSurface({
         ...surface,
@@ -78,7 +79,7 @@ export function useGlobalMistyResults(input: {
       targetFilesWorkspaceId = tab.id;
       useWorkspaceStore.getState().focusTab(tab.id);
     }
-    navigate("/files");
+    navigate(filesRoute);
 
     const reveal = async (): Promise<boolean> => {
       const paneId =

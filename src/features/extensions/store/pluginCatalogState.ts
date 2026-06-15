@@ -1,4 +1,5 @@
 import { hasTauriInternals } from "@/shared/platform/tauri";
+import { OFFICIAL_APP_IDS } from "@/api/apps";
 import { invoke } from "@tauri-apps/api/core";
 import type {
   LocalPluginRecord,
@@ -66,7 +67,11 @@ export async function scanLocalPlugins() {
     return [];
   }
   const plugins = await invoke<LocalPluginRecord[]>("scan_local_plugins");
-  return dedupeLocalPlugins(plugins.filter((plugin) => !REMOVED_PLUGIN_IDS.has(plugin.id)));
+  return dedupeLocalPlugins(
+    plugins.filter(
+      (plugin) => !REMOVED_PLUGIN_IDS.has(plugin.id) && !OFFICIAL_APP_IDS.has(plugin.id),
+    ),
+  );
 }
 
 export function localPluginPriority(plugin: LocalPluginRecord) {

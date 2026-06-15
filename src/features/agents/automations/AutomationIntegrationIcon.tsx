@@ -60,8 +60,10 @@ export function AutomationIntegrationIcon(props: {
 
 function utilityIcon(value: string): Brand {
   if (value.includes("webhook")) return { icon: Webhook, color: "#65B7D7" };
-  if (value.includes("schedule") || value.includes("clock")) return { icon: Clock3, color: "#D7B568" };
-  if (value.includes("router") || value.includes("branch")) return { icon: GitBranch, color: "#B89BE8" };
+  if (value.includes("schedule") || value.includes("clock"))
+    return { icon: Clock3, color: "#D7B568" };
+  if (value.includes("router") || value.includes("branch"))
+    return { icon: GitBranch, color: "#B89BE8" };
   if (value.includes("loop")) return { icon: Repeat2, color: "#6BCBA4" };
   if (value.includes("filter")) return { icon: Filter, color: "#E69A6A" };
   if (value.includes("code")) return { icon: Braces, color: "#77A7F2" };

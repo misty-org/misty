@@ -1,7 +1,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useNavigatorAppsStore } from "@/features/workspace";
+import { useAppsStore } from "@/features/apps";
 import { createNewTabOptions, WorkspaceNewTabMenu } from "./WorkspaceNewTabMenu";
 
 describe("WorkspaceNewTabMenu", () => {
@@ -9,9 +9,20 @@ describe("WorkspaceNewTabMenu", () => {
   let root: Root;
 
   beforeEach(() => {
-    useNavigatorAppsStore.setState({
-      appIdsByAccount: { guest: ["inbox", "social", "planner", "browser"] },
-      collapsedByAccount: {},
+    useAppsStore.setState({
+      ready: true,
+      catalog: [],
+      installations: ["inbox", "chat", "planner", "browser"].map((app_id, pin_rank) => ({
+        app_id,
+        state: "installed" as const,
+        installed_version: "1.0.0",
+        permission_version: 1,
+        granted_scopes: [],
+        pinned: true,
+        pin_rank,
+        installed_at: "2026-01-01T00:00:00Z",
+        updated_at: "2026-01-01T00:00:00Z",
+      })),
     });
     container = document.createElement("div");
     document.body.append(container);
@@ -66,7 +77,7 @@ describe("WorkspaceNewTabMenu", () => {
     expect(browser?.className).not.toContain("focus:text-cream");
     await act(async () => browser?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
     expect(onOpenNewTab).toHaveBeenCalledWith(
-      expect.objectContaining({ label: "Browser", route: "/browser" }),
+        expect.objectContaining({ label: "Browser", route: "/apps/browser" }),
       "pane-1",
     );
   });
@@ -87,7 +98,7 @@ describe("WorkspaceNewTabMenu", () => {
   });
 
   it("shows a useful empty state when every app is disabled", async () => {
-    useNavigatorAppsStore.setState({ appIdsByAccount: { guest: [] } });
+    useAppsStore.setState({ installations: [] });
     await act(async () => {
       root.render(<WorkspaceNewTabMenu paneId="pane-1" onOpenNewTab={vi.fn()} />);
     });
@@ -119,19 +130,19 @@ describe("WorkspaceNewTabMenu", () => {
       "terminal",
     ]);
     expect(options.find((option) => option.appId === "social")?.route).toBe(
-      "/spaces/space%20one/social/misty",
+      "/apps/social?space=space+one",
     );
     expect(options.find((option) => option.appId === "journal")?.route).toBe(
-      "/spaces/space%20one/notes",
+      "/apps/journal?space=space+one",
     );
     expect(options.find((option) => option.appId === "planner")?.route).toBe(
-      "/spaces/space%20one/planner/tasks/board",
+      "/apps/planner?space=space+one",
     );
     expect(options.find((option) => option.appId === "library")?.route).toBe(
-      "/spaces/space%20one/library",
+      "/apps/library?space=space+one",
     );
-    expect(options.find((option) => option.appId === "inbox")?.instancePolicy).toBe("single");
-    expect(options.find((option) => option.appId === "agents")?.instancePolicy).toBe("single");
+    expect(options.find((option) => option.appId === "inbox")?.surfaceId).toBe("official-app");
+    expect(options.find((option) => option.appId === "agents")?.surfaceId).toBe("official-app");
     expect(options.find((option) => option.appId === "browser")?.instancePolicy).toBe("multiple");
   });
 });

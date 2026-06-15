@@ -1,8 +1,6 @@
-import {
-  MultiPanelWorkspace,
-  type ChromeTabStripTab,
-  type MultiPanelWorkspaceProps,
-} from "@/features/workspace";
+import { MultiPanelWorkspace } from "@/features/workspace/MultiPanelWorkspace";
+import type { ChromeTabStripTab } from "@/features/workspace/ChromeTabStrip";
+import type { MultiPanelWorkspaceProps } from "@/features/workspace/MultiPanelWorkspace";
 import { useCallback } from "react";
 import { useExplorerDropRegistry } from "../drag/ExplorerDragContext";
 import { createExplorerDropTargetSpec } from "../drag/ExplorerDropTarget";

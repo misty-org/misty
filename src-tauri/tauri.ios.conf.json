@@ -5,5 +5,11 @@
   "build": {
     "beforeDevCommand": "npm run dev:mobile",
     "beforeBuildCommand": "npm run build:mobile"
+  },
+  "bundle": {
+    "iOS": {
+      "developmentTeam": "7D6BVN4W87",
+      "minimumSystemVersion": "15.0"
+    }
   }
 }

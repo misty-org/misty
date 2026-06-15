@@ -5,6 +5,7 @@ coverage
 src-tauri/target
 src-tauri/gen
 src-tauri/vendor
+src/features/extensions/generated
 .codex-qa
 .demo
 .windows-test

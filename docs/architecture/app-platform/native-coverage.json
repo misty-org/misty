@@ -1,0 +1,2451 @@
+{
+  "schemaVersion": 1,
+  "note": "Classification is a migration plan, not implementation/verification status. No native command is auto-exposed based on this file.",
+  "methods": [
+    {
+      "command": "agents_device_identity_load",
+      "apps": [
+        "agents"
+      ],
+      "sites": [
+        "src/features/agents/store/useAgentDeviceStore.ts:177"
+      ],
+      "status": "host-only",
+      "domain": "identity/host configuration",
+      "action": "Keep credentials, account lifecycle, device identity and agent grant authority in the host; expose reviewed capability operations or host-owned configuration UI only."
+    },
+    {
+      "command": "agents_device_identity_store",
+      "apps": [
+        "agents"
+      ],
+      "sites": [
+        "src/features/agents/store/useAgentDeviceStore.ts:200"
+      ],
+      "status": "host-only",
+      "domain": "identity/host configuration",
+      "action": "Keep credentials, account lifecycle, device identity and agent grant authority in the host; expose reviewed capability operations or host-owned configuration UI only."
+    },
+    {
+      "command": "agents_device_snapshot",
+      "apps": [
+        "agents"
+      ],
+      "sites": [
+        "src/features/agents/store/useAgentsStore.ts:10"
+      ],
+      "status": "contract-needed",
+      "domain": "agents",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "android_all_files_access_status",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/files/native.ts:80"
+      ],
+      "status": "contract-needed",
+      "domain": "android",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "android_grant_local_folder",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/files/native.ts:76"
+      ],
+      "status": "contract-needed",
+      "domain": "android",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "android_open_all_files_access_settings",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/files/native.ts:84"
+      ],
+      "status": "contract-needed",
+      "domain": "android",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "app_snapshot",
+      "apps": [
+        "chat",
+        "library",
+        "agents",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/runtime.ts:37"
+      ],
+      "status": "adapter-needed",
+      "domain": "context/settings",
+      "action": "Provide scoped settings/context/cache snapshots and SDK updates; preserve host ownership."
+    },
+    {
+      "command": "archive_create",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/transfers-tools.ts:123"
+      ],
+      "status": "contract-needed",
+      "domain": "archive",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "archive_extract",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/transfers-tools.ts:127"
+      ],
+      "status": "contract-needed",
+      "domain": "archive",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "archive_list",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/transfers-tools.ts:119"
+      ],
+      "status": "contract-needed",
+      "domain": "archive",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "browser_shortcuts_update",
+      "apps": [
+        "chat",
+        "library",
+        "agents",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/settings-plugins.ts:139"
+      ],
+      "status": "adapter-needed",
+      "domain": "context/settings",
+      "action": "Provide scoped settings/context/cache snapshots and SDK updates; preserve host ownership."
+    },
+    {
+      "command": "check_system",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/installer/store/useSetupStore.ts:25",
+        "src/features/installer/store/useSetupStore.ts:189"
+      ],
+      "status": "host-only",
+      "domain": "workspace",
+      "action": "Use SDK app/panel launch or host UI; do not delegate runtime administration."
+    },
+    {
+      "command": "clipboard_apply_shared",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/runtime.ts:120"
+      ],
+      "status": "contract-needed",
+      "domain": "clipboard",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "clipboard_publish_image_bytes",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/runtime.ts:116"
+      ],
+      "status": "contract-needed",
+      "domain": "clipboard",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "clipboard_publish_shared",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/runtime.ts:107"
+      ],
+      "status": "contract-needed",
+      "domain": "clipboard",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "clipboard_set_local",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/runtime.ts:103"
+      ],
+      "status": "contract-needed",
+      "domain": "clipboard",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "clipboard_shared_image_bytes",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/runtime.ts:124"
+      ],
+      "status": "contract-needed",
+      "domain": "clipboard",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "clipboard_snapshot",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/runtime.ts:99"
+      ],
+      "status": "contract-needed",
+      "domain": "clipboard",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "clipboard_write_file_bytes",
+      "apps": [
+        "chat",
+        "library"
+      ],
+      "sites": [
+        "src/native/runtime.ts:138"
+      ],
+      "status": "contract-needed",
+      "domain": "clipboard",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "clipboard_write_file_refs",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/runtime.ts:132"
+      ],
+      "status": "contract-needed",
+      "domain": "clipboard",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "code_create_file",
+      "apps": [
+        "code"
+      ],
+      "sites": [
+        "src/features/coding-workspace/native.ts:52"
+      ],
+      "status": "contract-needed",
+      "domain": "code",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "code_create_folder",
+      "apps": [
+        "code"
+      ],
+      "sites": [
+        "src/features/coding-workspace/native.ts:56"
+      ],
+      "status": "contract-needed",
+      "domain": "code",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "code_delete_path",
+      "apps": [
+        "code"
+      ],
+      "sites": [
+        "src/features/coding-workspace/native.ts:64"
+      ],
+      "status": "contract-needed",
+      "domain": "code",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "code_find_in_files",
+      "apps": [
+        "code"
+      ],
+      "sites": [
+        "src/features/coding-workspace/native.ts:83"
+      ],
+      "status": "contract-needed",
+      "domain": "code",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "code_lsp_send",
+      "apps": [
+        "code"
+      ],
+      "sites": [
+        "src/features/coding-workspace/native.ts:99"
+      ],
+      "status": "contract-needed",
+      "domain": "code",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "code_lsp_start",
+      "apps": [
+        "code"
+      ],
+      "sites": [
+        "src/features/coding-workspace/native.ts:95"
+      ],
+      "status": "contract-needed",
+      "domain": "code",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "code_lsp_stop",
+      "apps": [
+        "code"
+      ],
+      "sites": [
+        "src/features/coding-workspace/native.ts:103"
+      ],
+      "status": "contract-needed",
+      "domain": "code",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "code_read_text_file",
+      "apps": [
+        "code"
+      ],
+      "sites": [
+        "src/features/coding-workspace/native.ts:40"
+      ],
+      "status": "contract-needed",
+      "domain": "code",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "code_rename_path",
+      "apps": [
+        "code"
+      ],
+      "sites": [
+        "src/features/coding-workspace/native.ts:60"
+      ],
+      "status": "contract-needed",
+      "domain": "code",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "code_stop_watch",
+      "apps": [
+        "code"
+      ],
+      "sites": [
+        "src/features/coding-workspace/native.ts:91"
+      ],
+      "status": "contract-needed",
+      "domain": "code",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "code_walk_files",
+      "apps": [
+        "code"
+      ],
+      "sites": [
+        "src/features/coding-workspace/native.ts:75"
+      ],
+      "status": "contract-needed",
+      "domain": "code",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "code_watch_dir",
+      "apps": [
+        "code"
+      ],
+      "sites": [
+        "src/features/coding-workspace/native.ts:87"
+      ],
+      "status": "contract-needed",
+      "domain": "code",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "code_write_text_file",
+      "apps": [
+        "code"
+      ],
+      "sites": [
+        "src/features/coding-workspace/native.ts:48"
+      ],
+      "status": "contract-needed",
+      "domain": "code",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "coding_ai_read_api_key",
+      "apps": [
+        "code"
+      ],
+      "sites": [
+        "src/native/settings-plugins.ts:236"
+      ],
+      "status": "host-only",
+      "domain": "identity",
+      "action": "Replace with a credential-free service; never export secrets."
+    },
+    {
+      "command": "coding_ai_write_api_key",
+      "apps": [
+        "code"
+      ],
+      "sites": [
+        "src/native/settings-plugins.ts:240"
+      ],
+      "status": "host-only",
+      "domain": "identity",
+      "action": "Replace with a credential-free service; never export secrets."
+    },
+    {
+      "command": "compare_apply_text_merge",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/transfers-tools.ts:166"
+      ],
+      "status": "contract-needed",
+      "domain": "compare",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "compare_files",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/transfers-tools.ts:155"
+      ],
+      "status": "contract-needed",
+      "domain": "compare",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "compare_folders",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/transfers-tools.ts:159"
+      ],
+      "status": "contract-needed",
+      "domain": "compare",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "connected_devices_media_url",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/connected-devices.ts:65"
+      ],
+      "status": "adapter-needed",
+      "domain": "connections",
+      "action": "Use owned connection handles and credential-free snapshots; host owns device/service authentication."
+    },
+    {
+      "command": "connected_devices_prepare_clipboard_files",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/connected-devices.ts:69"
+      ],
+      "status": "adapter-needed",
+      "domain": "connections",
+      "action": "Use owned connection handles and credential-free snapshots; host owns device/service authentication."
+    },
+    {
+      "command": "connected_devices_roots",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/connected-devices.ts:43"
+      ],
+      "status": "adapter-needed",
+      "domain": "connections",
+      "action": "Use owned connection handles and credential-free snapshots; host owns device/service authentication."
+    },
+    {
+      "command": "connected_devices_subscribe_directory",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/connected-devices.ts:24"
+      ],
+      "status": "adapter-needed",
+      "domain": "connections",
+      "action": "Use owned connection handles and credential-free snapshots; host owns device/service authentication."
+    },
+    {
+      "command": "devices_snapshot",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/files/native.ts:59"
+      ],
+      "status": "contract-needed",
+      "domain": "devices",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "devices_unmount",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/files/native.ts:66"
+      ],
+      "status": "contract-needed",
+      "domain": "devices",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "duplicates_cancel",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/transfers-tools.ts:135"
+      ],
+      "status": "contract-needed",
+      "domain": "duplicates",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "duplicates_hash_remote_candidates",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/transfers-tools.ts:139"
+      ],
+      "status": "contract-needed",
+      "domain": "duplicates",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "duplicates_scan",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/transfers-tools.ts:131"
+      ],
+      "status": "contract-needed",
+      "domain": "duplicates",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "ensure_local_access_token",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/installer/store/useSetupStore.ts:84"
+      ],
+      "status": "host-only",
+      "domain": "identity",
+      "action": "Replace with a credential-free service; never export secrets."
+    },
+    {
+      "command": "explorer_calculate_directory_sizes",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/files/native.ts:94"
+      ],
+      "status": "contract-needed",
+      "domain": "explorer",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "explorer_cancel_drag_preparation",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/files/native.ts:146"
+      ],
+      "status": "contract-needed",
+      "domain": "explorer",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "explorer_directory_size_snapshot",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/files/native.ts:88"
+      ],
+      "status": "contract-needed",
+      "domain": "explorer",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "explorer_generate_image_thumbnail",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/files/native.ts:168"
+      ],
+      "status": "contract-needed",
+      "domain": "explorer",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "explorer_library_record_last_opened",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/files/native.ts:200"
+      ],
+      "status": "contract-needed",
+      "domain": "explorer",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "explorer_library_record_recent",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/files/native.ts:196"
+      ],
+      "status": "contract-needed",
+      "domain": "explorer",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "explorer_library_snapshot",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/files/native.ts:190"
+      ],
+      "status": "contract-needed",
+      "domain": "explorer",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "explorer_list_directory",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/files/native.ts:70",
+        "src/features/coding-workspace/native.ts:69"
+      ],
+      "status": "contract-needed",
+      "domain": "explorer",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "explorer_open_path",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/files/native.ts:317"
+      ],
+      "status": "contract-needed",
+      "domain": "explorer",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "explorer_open_with",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/files/native.ts:313"
+      ],
+      "status": "contract-needed",
+      "domain": "explorer",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "explorer_path_is_directory",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/files/native.ts:182"
+      ],
+      "status": "contract-needed",
+      "domain": "explorer",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "explorer_prepare_drag_items",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/files/native.ts:142"
+      ],
+      "status": "contract-needed",
+      "domain": "explorer",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "explorer_prepare_open_item",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/files/native.ts:136"
+      ],
+      "status": "contract-needed",
+      "domain": "explorer",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "explorer_preview_item",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/files/native.ts:150"
+      ],
+      "status": "contract-needed",
+      "domain": "explorer",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "explorer_queue_create_item",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/files/native.ts:352"
+      ],
+      "status": "contract-needed",
+      "domain": "explorer",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "explorer_queue_delete_items",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/files/native.ts:370"
+      ],
+      "status": "contract-needed",
+      "domain": "explorer",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "explorer_queue_paste_items",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/files/native.ts:338"
+      ],
+      "status": "contract-needed",
+      "domain": "explorer",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "explorer_queue_rename_item",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/files/native.ts:358"
+      ],
+      "status": "contract-needed",
+      "domain": "explorer",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "explorer_queue_rename_items",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/files/native.ts:364"
+      ],
+      "status": "contract-needed",
+      "domain": "explorer",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "explorer_save_preview_item",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/files/native.ts:156"
+      ],
+      "status": "contract-needed",
+      "domain": "explorer",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "extension_command_run",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/settings-plugins.ts:162"
+      ],
+      "status": "host-only",
+      "domain": "workspace",
+      "action": "Use SDK app/panel launch or host UI; do not delegate runtime administration."
+    },
+    {
+      "command": "fetch_misty_releases",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/installer/store/useSetupStore.ts:162"
+      ],
+      "status": "host-only",
+      "domain": "workspace",
+      "action": "Use SDK app/panel launch or host UI; do not delegate runtime administration."
+    },
+    {
+      "command": "file_metadata_snapshot",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/files/native.ts:178"
+      ],
+      "status": "contract-needed",
+      "domain": "file",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "file_tools_checksum",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/transfers-tools.ts:172"
+      ],
+      "status": "contract-needed",
+      "domain": "file",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "file_tools_create_symlink",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/transfers-tools.ts:188"
+      ],
+      "status": "contract-needed",
+      "domain": "file",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "file_tools_read_symlink",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/transfers-tools.ts:194"
+      ],
+      "status": "contract-needed",
+      "domain": "file",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "install_misty_template",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/installer/store/useSetupStore.ts:397"
+      ],
+      "status": "host-only",
+      "domain": "workspace",
+      "action": "Use SDK app/panel launch or host UI; do not delegate runtime administration."
+    },
+    {
+      "command": "launch_misty",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/installer/store/useSetupStore.ts:273"
+      ],
+      "status": "host-only",
+      "domain": "workspace",
+      "action": "Use SDK app/panel launch or host UI; do not delegate runtime administration."
+    },
+    {
+      "command": "media_search_complete_legacy_adoption",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/files/native.ts:306"
+      ],
+      "status": "contract-needed",
+      "domain": "media",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "media_search_resolve_assets",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/files/native.ts:309"
+      ],
+      "status": "contract-needed",
+      "domain": "media",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "media_search_snapshot",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/files/native.ts:264"
+      ],
+      "status": "contract-needed",
+      "domain": "media",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "mini_app_close",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/apps/NativeAppView.tsx:75",
+        "src/features/apps/NativeAppView.tsx:188",
+        "src/features/apps/NativeAppView.tsx:207",
+        "src/features/files/explorer/workspace/explorerPlugins/pluginPanelHosts.tsx:153",
+        "src/features/files/explorer/workspace/explorerPlugins/pluginPanelHosts.tsx:160"
+      ],
+      "status": "host-only",
+      "domain": "workspace",
+      "action": "Use SDK app/panel launch or host UI; do not delegate runtime administration."
+    },
+    {
+      "command": "mini_app_context",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/apps/NativeAppView.tsx:117",
+        "src/features/apps/useNativeAppPermissions.tsx:192"
+      ],
+      "status": "host-only",
+      "domain": "workspace",
+      "action": "Use SDK app/panel launch or host UI; do not delegate runtime administration."
+    },
+    {
+      "command": "mini_app_device_call",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/apps/useNativeAppPermissions.tsx:202",
+        "src/features/apps/useNativeAppPermissions.tsx:274"
+      ],
+      "status": "host-only",
+      "domain": "workspace",
+      "action": "Use SDK app/panel launch or host UI; do not delegate runtime administration."
+    },
+    {
+      "command": "mini_app_layout",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/apps/NativeAppView.tsx:251"
+      ],
+      "status": "host-only",
+      "domain": "workspace",
+      "action": "Use SDK app/panel launch or host UI; do not delegate runtime administration."
+    },
+    {
+      "command": "mini_app_open",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/apps/NativeAppView.tsx:179"
+      ],
+      "status": "host-only",
+      "domain": "workspace",
+      "action": "Use SDK app/panel launch or host UI; do not delegate runtime administration."
+    },
+    {
+      "command": "mini_app_permission_decide",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/apps/useNativeAppPermissions.tsx:171",
+        "src/features/apps/useNativeAppPermissions.tsx:221",
+        "src/features/apps/useNativeAppPermissions.tsx:229"
+      ],
+      "status": "host-only",
+      "domain": "workspace",
+      "action": "Use SDK app/panel launch or host UI; do not delegate runtime administration."
+    },
+    {
+      "command": "mini_app_permission_list",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/apps/useNativeAppPermissions.tsx:166"
+      ],
+      "status": "host-only",
+      "domain": "workspace",
+      "action": "Use SDK app/panel launch or host UI; do not delegate runtime administration."
+    },
+    {
+      "command": "mini_app_permission_status",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/apps/useNativeAppPermissions.tsx:212",
+        "src/features/apps/useNativeAppPermissions.tsx:242",
+        "src/features/apps/useNativeAppPermissions.tsx:260"
+      ],
+      "status": "host-only",
+      "domain": "workspace",
+      "action": "Use SDK app/panel launch or host UI; do not delegate runtime administration."
+    },
+    {
+      "command": "mini_app_post",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/apps/NativeAppView.tsx:228"
+      ],
+      "status": "host-only",
+      "domain": "workspace",
+      "action": "Use SDK app/panel launch or host UI; do not delegate runtime administration."
+    },
+    {
+      "command": "mini_app_reply",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/apps/NativeAppView.tsx:149"
+      ],
+      "status": "host-only",
+      "domain": "workspace",
+      "action": "Use SDK app/panel launch or host UI; do not delegate runtime administration."
+    },
+    {
+      "command": "mini_widget_open",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/files/explorer/workspace/explorerPlugins/pluginPanelHosts.tsx:145"
+      ],
+      "status": "host-only",
+      "domain": "workspace",
+      "action": "Use SDK app/panel launch or host UI; do not delegate runtime administration."
+    },
+    {
+      "command": "misty_template_status",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/installer/store/useSetupStore.ts:26"
+      ],
+      "status": "host-only",
+      "domain": "workspace",
+      "action": "Use SDK app/panel launch or host UI; do not delegate runtime administration."
+    },
+    {
+      "command": "mobile_cache_read",
+      "apps": [
+        "chat",
+        "library",
+        "agents",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/mobile-cache.ts:4"
+      ],
+      "status": "adapter-needed",
+      "domain": "context/settings",
+      "action": "Provide scoped settings/context/cache snapshots and SDK updates; preserve host ownership."
+    },
+    {
+      "command": "mobile_cache_remove",
+      "apps": [
+        "chat"
+      ],
+      "sites": [
+        "src/native/mobile-cache.ts:18"
+      ],
+      "status": "adapter-needed",
+      "domain": "context/settings",
+      "action": "Provide scoped settings/context/cache snapshots and SDK updates; preserve host ownership."
+    },
+    {
+      "command": "mobile_cache_write",
+      "apps": [
+        "chat",
+        "library",
+        "agents",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/mobile-cache.ts:14"
+      ],
+      "status": "adapter-needed",
+      "domain": "context/settings",
+      "action": "Provide scoped settings/context/cache snapshots and SDK updates; preserve host ownership."
+    },
+    {
+      "command": "open_terminal_at_path",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/files/native.ts:321"
+      ],
+      "status": "contract-needed",
+      "domain": "open",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "operation_queue_cancel",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/transfers-tools.ts:53"
+      ],
+      "status": "contract-needed",
+      "domain": "operation",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "operation_queue_cancel_batch",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/transfers-tools.ts:57"
+      ],
+      "status": "contract-needed",
+      "domain": "operation",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "operation_queue_clear_terminal",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/transfers-tools.ts:206"
+      ],
+      "status": "contract-needed",
+      "domain": "operation",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "operation_queue_pause",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/transfers-tools.ts:69"
+      ],
+      "status": "contract-needed",
+      "domain": "operation",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "operation_queue_pause_all",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/transfers-tools.ts:85"
+      ],
+      "status": "contract-needed",
+      "domain": "operation",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "operation_queue_pause_batch",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/transfers-tools.ts:77"
+      ],
+      "status": "contract-needed",
+      "domain": "operation",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "operation_queue_redo",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/transfers-tools.ts:115"
+      ],
+      "status": "contract-needed",
+      "domain": "operation",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "operation_queue_resolve_conflict",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/transfers-tools.ts:202"
+      ],
+      "status": "contract-needed",
+      "domain": "operation",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "operation_queue_resume",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/transfers-tools.ts:73"
+      ],
+      "status": "contract-needed",
+      "domain": "operation",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "operation_queue_resume_all",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/transfers-tools.ts:89"
+      ],
+      "status": "contract-needed",
+      "domain": "operation",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "operation_queue_resume_batch",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/transfers-tools.ts:81"
+      ],
+      "status": "contract-needed",
+      "domain": "operation",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "operation_queue_retry",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/transfers-tools.ts:61"
+      ],
+      "status": "contract-needed",
+      "domain": "operation",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "operation_queue_retry_transfer",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/transfers-tools.ts:65"
+      ],
+      "status": "contract-needed",
+      "domain": "operation",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "operation_queue_set_bandwidth_limit",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/transfers-tools.ts:93"
+      ],
+      "status": "contract-needed",
+      "domain": "operation",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "operation_queue_set_transfer_profile",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/transfers-tools.ts:102"
+      ],
+      "status": "contract-needed",
+      "domain": "operation",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "operation_queue_snapshot",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/transfers-tools.ts:49"
+      ],
+      "status": "contract-needed",
+      "domain": "operation",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "operation_queue_undo",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/transfers-tools.ts:111"
+      ],
+      "status": "contract-needed",
+      "domain": "operation",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "plugin_command_run",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/settings-plugins.ts:152"
+      ],
+      "status": "host-only",
+      "domain": "workspace",
+      "action": "Use SDK app/panel launch or host UI; do not delegate runtime administration."
+    },
+    {
+      "command": "plugin_commands_snapshot",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/settings-plugins.ts:146"
+      ],
+      "status": "host-only",
+      "domain": "workspace",
+      "action": "Use SDK app/panel launch or host UI; do not delegate runtime administration."
+    },
+    {
+      "command": "plugin_panel_render",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/settings-plugins.ts:158"
+      ],
+      "status": "host-only",
+      "domain": "workspace",
+      "action": "Use SDK app/panel launch or host UI; do not delegate runtime administration."
+    },
+    {
+      "command": "probe_paths",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/installer/store/useSetupStore.ts:27"
+      ],
+      "status": "contract-needed",
+      "domain": "probe",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "providers_config_paths",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/settings-plugins.ts:206"
+      ],
+      "status": "host-only",
+      "domain": "identity/host configuration",
+      "action": "Keep credentials, account lifecycle, device identity and agent grant authority in the host; expose reviewed capability operations or host-owned configuration UI only."
+    },
+    {
+      "command": "providers_disconnect_remote",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/settings-plugins.ts:232"
+      ],
+      "status": "adapter-needed",
+      "domain": "connections",
+      "action": "Use owned connection handles and credential-free snapshots; host owns device/service authentication."
+    },
+    {
+      "command": "providers_import_cloud_connection",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/settings-plugins.ts:190"
+      ],
+      "status": "host-only",
+      "domain": "identity/host configuration",
+      "action": "Keep credentials, account lifecycle, device identity and agent grant authority in the host; expose reviewed capability operations or host-owned configuration UI only."
+    },
+    {
+      "command": "providers_job_status",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/settings-plugins.ts:220"
+      ],
+      "status": "adapter-needed",
+      "domain": "connections",
+      "action": "Use owned connection handles and credential-free snapshots; host owns device/service authentication."
+    },
+    {
+      "command": "providers_refresh",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/settings-plugins.ts:178"
+      ],
+      "status": "adapter-needed",
+      "domain": "connections",
+      "action": "Use owned connection handles and credential-free snapshots; host owns device/service authentication."
+    },
+    {
+      "command": "providers_save_remote",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/settings-plugins.ts:198"
+      ],
+      "status": "host-only",
+      "domain": "identity/host configuration",
+      "action": "Keep credentials, account lifecycle, device identity and agent grant authority in the host; expose reviewed capability operations or host-owned configuration UI only."
+    },
+    {
+      "command": "providers_select_remote",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/settings-plugins.ts:194"
+      ],
+      "status": "adapter-needed",
+      "domain": "connections",
+      "action": "Use owned connection handles and credential-free snapshots; host owns device/service authentication."
+    },
+    {
+      "command": "providers_snapshot",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/settings-plugins.ts:174"
+      ],
+      "status": "adapter-needed",
+      "domain": "connections",
+      "action": "Use owned connection handles and credential-free snapshots; host owns device/service authentication."
+    },
+    {
+      "command": "providers_test_remote",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/settings-plugins.ts:202"
+      ],
+      "status": "adapter-needed",
+      "domain": "connections",
+      "action": "Use owned connection handles and credential-free snapshots; host owns device/service authentication."
+    },
+    {
+      "command": "providers_verify_result",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/settings-plugins.ts:228"
+      ],
+      "status": "adapter-needed",
+      "domain": "connections",
+      "action": "Use owned connection handles and credential-free snapshots; host owns device/service authentication."
+    },
+    {
+      "command": "providers_verify_start",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/settings-plugins.ts:216"
+      ],
+      "status": "adapter-needed",
+      "domain": "connections",
+      "action": "Use owned connection handles and credential-free snapshots; host owns device/service authentication."
+    },
+    {
+      "command": "restart_misty",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/installer/store/useSetupStore.ts:288"
+      ],
+      "status": "host-only",
+      "domain": "workspace",
+      "action": "Use SDK app/panel launch or host UI; do not delegate runtime administration."
+    },
+    {
+      "command": "restart_misty_app",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/installer/store/useSetupStore.ts:422"
+      ],
+      "status": "host-only",
+      "domain": "workspace",
+      "action": "Use SDK app/panel launch or host UI; do not delegate runtime administration."
+    },
+    {
+      "command": "save_authenticated_user",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/installer/store/useSetupStore.ts:235"
+      ],
+      "status": "host-only",
+      "domain": "identity",
+      "action": "Replace with a credential-free service; never export secrets."
+    },
+    {
+      "command": "save_verified_license",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/installer/store/useSetupStore.ts:126",
+        "src/features/providers/store/providerConnectionHelpers.ts:76"
+      ],
+      "status": "host-only",
+      "domain": "identity",
+      "action": "Replace with a credential-free service; never export secrets."
+    },
+    {
+      "command": "saved_searches_delete",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/transfers-tools.ts:151"
+      ],
+      "status": "contract-needed",
+      "domain": "saved",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "saved_searches_save",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/transfers-tools.ts:147"
+      ],
+      "status": "contract-needed",
+      "domain": "saved",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "saved_searches_snapshot",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/transfers-tools.ts:143"
+      ],
+      "status": "contract-needed",
+      "domain": "saved",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "search_cancel_scan",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/files/native.ts:110"
+      ],
+      "status": "contract-needed",
+      "domain": "search",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "search_get_status",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/files/native.ts:102"
+      ],
+      "status": "contract-needed",
+      "domain": "search",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "search_init",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/files/native.ts:98"
+      ],
+      "status": "contract-needed",
+      "domain": "search",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "search_query",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/files/native.ts:114"
+      ],
+      "status": "contract-needed",
+      "domain": "search",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "search_start_scan",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/files/native.ts:106"
+      ],
+      "status": "contract-needed",
+      "domain": "search",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "self_host_entitlement_load",
+      "apps": [
+        "chat",
+        "library",
+        "agents",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/runtime.ts:75"
+      ],
+      "status": "host-only",
+      "domain": "identity",
+      "action": "Replace with a credential-free service; never export secrets."
+    },
+    {
+      "command": "settings_apply_launch_on_login",
+      "apps": [
+        "chat",
+        "library",
+        "agents",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/settings-plugins.ts:49"
+      ],
+      "status": "adapter-needed",
+      "domain": "context/settings",
+      "action": "Provide scoped settings/context/cache snapshots and SDK updates; preserve host ownership."
+    },
+    {
+      "command": "settings_launch_on_login_snapshot",
+      "apps": [
+        "chat",
+        "library",
+        "agents",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/settings-plugins.ts:45"
+      ],
+      "status": "adapter-needed",
+      "domain": "context/settings",
+      "action": "Provide scoped settings/context/cache snapshots and SDK updates; preserve host ownership."
+    },
+    {
+      "command": "settings_open_with_associations",
+      "apps": [
+        "chat",
+        "library",
+        "agents",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/settings-plugins.ts:53"
+      ],
+      "status": "adapter-needed",
+      "domain": "context/settings",
+      "action": "Provide scoped settings/context/cache snapshots and SDK updates; preserve host ownership."
+    },
+    {
+      "command": "settings_remove_open_with_association",
+      "apps": [
+        "chat",
+        "library",
+        "agents",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/settings-plugins.ts:57"
+      ],
+      "status": "adapter-needed",
+      "domain": "context/settings",
+      "action": "Provide scoped settings/context/cache snapshots and SDK updates; preserve host ownership."
+    },
+    {
+      "command": "settings_save",
+      "apps": [
+        "chat",
+        "library",
+        "agents",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/settings-plugins.ts:41"
+      ],
+      "status": "adapter-needed",
+      "domain": "context/settings",
+      "action": "Provide scoped settings/context/cache snapshots and SDK updates; preserve host ownership."
+    },
+    {
+      "command": "settings_snapshot",
+      "apps": [
+        "chat",
+        "library",
+        "agents",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/settings-plugins.ts:37"
+      ],
+      "status": "adapter-needed",
+      "domain": "context/settings",
+      "action": "Provide scoped settings/context/cache snapshots and SDK updates; preserve host ownership."
+    },
+    {
+      "command": "shortcuts_reassign",
+      "apps": [
+        "chat",
+        "library",
+        "agents",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/settings-plugins.ts:82"
+      ],
+      "status": "adapter-needed",
+      "domain": "context/settings",
+      "action": "Provide scoped settings/context/cache snapshots and SDK updates; preserve host ownership."
+    },
+    {
+      "command": "shortcuts_reset",
+      "apps": [
+        "chat",
+        "library",
+        "agents",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/settings-plugins.ts:68"
+      ],
+      "status": "adapter-needed",
+      "domain": "context/settings",
+      "action": "Provide scoped settings/context/cache snapshots and SDK updates; preserve host ownership."
+    },
+    {
+      "command": "shortcuts_snapshot",
+      "apps": [
+        "chat",
+        "library",
+        "agents",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/settings-plugins.ts:61"
+      ],
+      "status": "adapter-needed",
+      "domain": "context/settings",
+      "action": "Provide scoped settings/context/cache snapshots and SDK updates; preserve host ownership."
+    },
+    {
+      "command": "shortcuts_update",
+      "apps": [
+        "chat",
+        "library",
+        "agents",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/settings-plugins.ts:74"
+      ],
+      "status": "adapter-needed",
+      "domain": "context/settings",
+      "action": "Provide scoped settings/context/cache snapshots and SDK updates; preserve host ownership."
+    },
+    {
+      "command": "sign_out_misty",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/installer/store/useSetupStore.ts:318"
+      ],
+      "status": "host-only",
+      "domain": "identity/host configuration",
+      "action": "Keep credentials, account lifecycle, device identity and agent grant authority in the host; expose reviewed capability operations or host-owned configuration UI only."
+    },
+    {
+      "command": "smart_library_apply_results",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/files/native.ts:227"
+      ],
+      "status": "contract-needed",
+      "domain": "smart",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "smart_library_assets_page",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/files/native.ts:257"
+      ],
+      "status": "contract-needed",
+      "domain": "smart",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "smart_library_delete",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/files/native.ts:245"
+      ],
+      "status": "contract-needed",
+      "domain": "smart",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "smart_library_import_files",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/files/native.ts:212"
+      ],
+      "status": "contract-needed",
+      "domain": "smart",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "smart_library_preflight_import",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/files/native.ts:216"
+      ],
+      "status": "contract-needed",
+      "domain": "smart",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "smart_library_prepare_previews",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/files/native.ts:223"
+      ],
+      "status": "contract-needed",
+      "domain": "smart",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "smart_library_resolve_assets",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/files/native.ts:251"
+      ],
+      "status": "contract-needed",
+      "domain": "smart",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "smart_library_scan",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/files/native.ts:208"
+      ],
+      "status": "contract-needed",
+      "domain": "smart",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "smart_library_set_server_folder_id",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/files/native.ts:233"
+      ],
+      "status": "contract-needed",
+      "domain": "smart",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "smart_library_snapshot",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/features/files/native.ts:204"
+      ],
+      "status": "contract-needed",
+      "domain": "smart",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "telemetry_set_error_reporting_enabled",
+      "apps": [
+        "chat",
+        "library",
+        "agents",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/runtime.ts:17"
+      ],
+      "status": "host-only",
+      "domain": "identity/host configuration",
+      "action": "Keep credentials, account lifecycle, device identity and agent grant authority in the host; expose reviewed capability operations or host-owned configuration UI only."
+    },
+    {
+      "command": "transfers_delete_all",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/transfers-tools.ts:45"
+      ],
+      "status": "contract-needed",
+      "domain": "transfers",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "transfers_delete_selected",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/transfers-tools.ts:41"
+      ],
+      "status": "contract-needed",
+      "domain": "transfers",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    },
+    {
+      "command": "transfers_snapshot",
+      "apps": [
+        "chat",
+        "library",
+        "files",
+        "code"
+      ],
+      "sites": [
+        "src/native/transfers-tools.ts:37"
+      ],
+      "status": "contract-needed",
+      "domain": "transfers",
+      "action": "Define typed method, capability, validation, ownership and teardown; verify native implementation."
+    }
+  ]
+}

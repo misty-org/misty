@@ -1,0 +1,16 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Misty SDK terminal probe</title></head>
+<body><output id="result">Running the macOS SDK terminal probe…</output>
+<script>
+  // Report module-loading failures too: static imports fail before the probe runs.
+  const report = (message) => {
+    document.getElementById("result").textContent = message;
+    const invoke = window.__TAURI_INTERNALS__?.invoke;
+    if (invoke) void invoke("sdk_probe_complete", {
+      nonce: new URLSearchParams(location.search).get("nonce"), success: false, message,
+    });
+  };
+  window.addEventListener("error", event => report(event.message || "SDK probe module failed to load"));
+  window.addEventListener("unhandledrejection", event => report(String(event.reason)));
+</script>
+<script type="module" src="./sdk-terminal-probe.ts"></script></body></html>

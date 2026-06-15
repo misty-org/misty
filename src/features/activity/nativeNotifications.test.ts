@@ -3,6 +3,7 @@ import type { ActivityItem } from "./types";
 
 const mocks = vi.hoisted(() => ({
   tauri: true,
+  mobile: false,
   focused: false,
   granted: true,
   requestedPermission: "granted" as NotificationPermission,
@@ -23,6 +24,12 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/shared/platform/tauri", () => ({
   hasTauriInternals: () => mocks.tauri,
+}));
+
+vi.mock("@/shared/platform/buildTarget", () => ({
+  get isNativeMobileBuild() {
+    return mocks.mobile;
+  },
 }));
 
 vi.mock("@tauri-apps/plugin-notification", () => ({
@@ -54,6 +61,7 @@ describe("nativeNotifications", () => {
   beforeEach(() => {
     localStorage.clear();
     mocks.tauri = true;
+    mocks.mobile = false;
     mocks.focused = false;
     mocks.granted = true;
     mocks.requestedPermission = "granted";
@@ -87,6 +95,16 @@ describe("nativeNotifications", () => {
         sound: "Ping",
       }),
     );
+  });
+
+  it("redacts mobile notification content to a generic count", async () => {
+    mocks.mobile = true;
+    expect(await publishNativeActivity(itemFixture())).toBe(true);
+    expect(mocks.sendNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Misty", body: "1 new update." }),
+    );
+    expect(JSON.stringify(mocks.sendNotification.mock.calls[0])).not.toContain("Transfer");
+    expect(JSON.stringify(mocks.sendNotification.mock.calls[0])).not.toContain("file");
   });
 
   it.each(["disabled", "quiet", "digest"])("suppresses %s background delivery", async (mode) => {

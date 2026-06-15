@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import type { ExplorerSidebarProps } from "../../model/interfaces/components/ExplorerSidebar";
+import type { QuickAccessItem } from "../../model/types/components/ExplorerSidebar";
 import type { QuickAccessMenuItem } from "../../model/types/components/ExplorerSidebarSupport";
 import {
   addHiddenQuickAccessPath,
@@ -17,6 +18,7 @@ import { buildQuickAccessItems } from "./quickAccessItems";
  */
 export function useSidebarQuickAccess(options: {
   sidebar: ExplorerSidebarProps;
+  items?: QuickAccessItem[];
   hiddenQuickAccessPaths: string[];
   setHiddenQuickAccessPaths: React.Dispatch<React.SetStateAction<string[]>>;
 }) {
@@ -24,6 +26,7 @@ export function useSidebarQuickAccess(options: {
 
   const quickAccess = useMemo(
     () =>
+      options.items ??
       buildQuickAccessItems({
         androidLocal: sidebar.androidLocal,
         androidAllFilesAccess: sidebar.androidAllFilesAccess,
@@ -31,6 +34,7 @@ export function useSidebarQuickAccess(options: {
         homePath: sidebar.homePath,
       }),
     [
+      options.items,
       sidebar.androidAllFilesAccess,
       sidebar.androidGrantedFolders,
       sidebar.androidLocal,

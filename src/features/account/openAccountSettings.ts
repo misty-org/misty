@@ -1,5 +1,5 @@
-import type { AccountHandoffPath } from "@/features/auth";
-import { accountCreateHandoffUrl, resolveAccountApiBase } from "@/features/auth";
+import type { AccountHandoffPath } from "@/api/account/types";
+import { accountCreateHandoffUrl, resolveAccountApiBase } from "@/features/auth/accountStore";
 import { openSystemExternalLink } from "@/shared/platform/openExternalLink";
 
 /**

@@ -61,12 +61,12 @@ export const mailApi = {
       method: "PUT",
       body: JSON.stringify(draft),
     }),
-  sendDraft: (draftId: string, connectionId: string) =>
+  sendDraft: (draftId: string, connectionId: string, authoringSource: "user" | "ai" = "user") =>
     apiRequest<MailSendResponse>(`/mail/drafts/${part(draftId)}/send`, {
       method: "POST",
       body: JSON.stringify({
         connection_id: connectionId,
-        authoring_source: "user",
+        authoring_source: authoringSource,
         confirmed: true,
       }),
     }),

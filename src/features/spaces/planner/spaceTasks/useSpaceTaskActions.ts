@@ -1,4 +1,4 @@
-import { spacesApi } from "@/api/spaces/api";
+import type { PlannerTaskServices } from "./taskServices";
 import type { SpaceTask } from "@/api/spaces/dto/interfaces/types";
 import type { SpaceTaskStatus } from "@/api/spaces/dto/types/types";
 import { errorText } from "@/shared/lib/format";
@@ -30,11 +30,12 @@ export type TaskPatch = Partial<
  * `null` means it is open for a new task, and a task means it is open for edits.
  */
 export function useSpaceTaskActions(options: {
+  api: PlannerTaskServices;
   spaceId: string;
   canManage: boolean;
   data: SpaceTasksData;
 }) {
-  const { spaceId, canManage, data } = options;
+  const { spaceId, canManage, data, api: spacesApi } = options;
   const [editing, setEditing] = useState<SpaceTask | null | undefined>(undefined);
   const [draft, setDraft] = useState<TaskDraft>(emptyDraft);
   const [busy, setBusy] = useState("");

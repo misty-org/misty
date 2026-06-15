@@ -1,7 +1,7 @@
 import { MockTelemetryClient } from "@/telemetry/client";
 import { ANALYTICS_SESSION_TIMEOUT_MS, AnalyticsLifecycleManager } from "@/telemetry/lifecycle";
 import type { CommonClientProperties } from "@/telemetry/model/interfaces/types";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 const metadata: CommonClientProperties = {
   platform: "macos",
@@ -42,6 +42,18 @@ function harness() {
 }
 
 describe("analytics lifecycle", () => {
+  it("can be imported when the sandbox rejects the localStorage property", async () => {
+    vi.resetModules();
+    const storage = vi.spyOn(window, "localStorage", "get").mockImplementation(() => {
+      throw new DOMException("Storage is unavailable in an opaque sandbox", "SecurityError");
+    });
+    try {
+      await expect(import("./lifecycle")).resolves.toHaveProperty("AnalyticsLifecycleManager");
+    } finally {
+      storage.mockRestore();
+    }
+  });
+
   it("initializes once and emits first open and one process session", async () => {
     const { client, manager } = harness();
     manager.initialize();

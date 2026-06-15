@@ -1,6 +1,6 @@
 import type { SpaceAgendaEntry } from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
 import { Button, cn } from "@/shared/ui";
-import { CalendarDays, CheckSquare2, GitFork } from "lucide-react";
+import { CalendarDays, CheckSquare2, ChevronRight, GitFork } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { dayKey, groupAgendaEntries, startOfDay, startOfWeek } from "./agendaDates";
 
@@ -16,6 +16,61 @@ interface AgendaTimelineViewProps extends AgendaViewProps {
   view: "week" | "day";
   zoomMinutes: AgendaZoomMinutes;
   onZoom: (direction: "in" | "out") => void;
+}
+
+export function MobileAgendaList({ anchor, entries, onOpen }: AgendaViewProps) {
+  const grouped = groupAgendaEntries(entries);
+  const keys = Object.keys(grouped).sort();
+  if (!keys.length) {
+    return (
+      <div className="grid min-h-64 place-items-center px-6 text-center text-sm text-cream-muted">
+        No tasks or events in this range.
+      </div>
+    );
+  }
+  return (
+    <div className="misty-scrollbar h-full overflow-y-auto px-4 py-3">
+      {keys.map((key) => {
+        const date = new Date(`${key}T12:00:00`);
+        return (
+          <section key={key} className="mb-5" aria-label={date.toDateString()}>
+            <h2 className="sticky top-0 z-10 m-0 bg-charcoal-bg py-2 text-sm font-semibold text-cream-bright">
+              {date.toLocaleDateString([], {
+                weekday: "long",
+                month: "short",
+                day: "numeric",
+                year: date.getFullYear() === anchor.getFullYear() ? undefined : "numeric",
+              })}
+            </h2>
+            <div className="overflow-hidden rounded-xl border border-charcoal-border bg-charcoal-card">
+              {(grouped[key] ?? []).map((entry) => (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  key={entry.id}
+                  className="flex h-auto min-h-16 w-full items-center justify-start gap-3 rounded-none border-b border-charcoal-border px-4 text-left hover:bg-charcoal-hover last:border-b-0"
+                  onClick={() => onOpen(entry)}
+                >
+                  <span className="w-14 shrink-0 text-xs text-cream-muted">
+                    {entry.all_day ? "All day" : formatTime(entry.starts_at)}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-cream-bright">
+                      {entry.title}
+                    </span>
+                    <span className="mt-1 block truncate text-xs capitalize text-cream-muted">
+                      {entry.kind.replace(/_/g, " ")}
+                    </span>
+                  </span>
+                  <ChevronRight className="size-5 text-cream-muted" aria-hidden="true" />
+                </Button>
+              ))}
+            </div>
+          </section>
+        );
+      })}
+    </div>
+  );
 }
 
 export function AgendaMonthView({ anchor, entries, onOpen }: AgendaViewProps) {
@@ -368,7 +423,7 @@ function AgendaTimedEvent({
       <span className="min-w-0">
         <span className="block truncate text-xs font-semibold leading-4">{entry.title}</span>
         {height >= 38 ? (
-          <span className="block truncate text-[9px] leading-3.5 opacity-75">
+          <span className="block truncate text-[10px] leading-3.5 opacity-75">
             {formatTimeRange(entry)}
           </span>
         ) : null}

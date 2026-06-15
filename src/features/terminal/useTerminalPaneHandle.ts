@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import type { TerminalServices } from "./terminalServices";
 import type { SearchAddon } from "@xterm/addon-search";
 import type { Terminal } from "@xterm/xterm";
 import { useImperativeHandle, type Dispatch, type ForwardedRef, type SetStateAction } from "react";
@@ -21,6 +21,7 @@ export interface TerminalPaneHandle {
 }
 
 interface TerminalPaneHandleOptions {
+  services: TerminalServices;
   handleRef: ForwardedRef<TerminalPaneHandle>;
   terminalRef: { current: Terminal | null };
   searchRef: { current: SearchAddon | null };
@@ -29,7 +30,7 @@ interface TerminalPaneHandleOptions {
 }
 
 export function useTerminalPaneHandle(options: TerminalPaneHandleOptions) {
-  const { handleRef, terminalRef, searchRef, sessionIdRef, setFontScale } = options;
+  const { services, handleRef, terminalRef, searchRef, sessionIdRef, setFontScale } = options;
   useImperativeHandle(
     handleRef,
     () => ({
@@ -37,8 +38,7 @@ export function useTerminalPaneHandle(options: TerminalPaneHandleOptions) {
       clear: () => {
         terminalRef.current?.clear();
         const sessionId = sessionIdRef.current;
-        if (sessionId)
-          void invoke("terminal_write", { sessionId, data: "\x0c" }).catch(() => undefined);
+        if (sessionId) void services.terminal.write(sessionId, "\x0c").catch(() => undefined);
       },
       bumpFontScale: (delta) => {
         setFontScale((current) => {
@@ -51,7 +51,7 @@ export function useTerminalPaneHandle(options: TerminalPaneHandleOptions) {
         const selection = terminalRef.current?.getSelection();
         if (!selection) return;
         try {
-          await navigator.clipboard.writeText(selection);
+          await services.clipboard.writeText(selection);
         } catch {
           // The native menu remains available when browser clipboard access is blocked.
         }
@@ -60,7 +60,7 @@ export function useTerminalPaneHandle(options: TerminalPaneHandleOptions) {
         const term = terminalRef.current;
         if (!term || !sessionIdRef.current) return;
         try {
-          const text = await navigator.clipboard.readText();
+          const text = await services.clipboard.readText();
           if (text) term.paste(text);
         } catch {
           // Clipboard access can be unavailable outside a focused desktop window.
@@ -103,10 +103,10 @@ export function useTerminalPaneHandle(options: TerminalPaneHandleOptions) {
         }
         // Intentionally omit a newline: applying an AI artifact may prepare a
         // command, but only the user's final Enter gesture may execute it.
-        await invoke("terminal_write", { sessionId, data: command });
+        await services.terminal.write(sessionId, command);
         terminalRef.current?.focus();
       },
     }),
-    [searchRef, sessionIdRef, setFontScale, terminalRef],
+    [services, searchRef, sessionIdRef, setFontScale, terminalRef],
   );
 }

@@ -3,6 +3,7 @@ import {
   applyStoredExtensionTheme,
   extensionThemeSnapshot,
   runExtensionThemeCommand,
+  revertExtensionThemePreview,
 } from "./extensionTheme";
 import { useAppThemeStore } from "./useAppThemeStore";
 
@@ -65,4 +66,19 @@ describe("extension theme bridge", () => {
     });
     expect(result).toMatchObject({ ok: false });
   });
+});
+
+it("closing or revoking an older App does not revert another App's preview", () => {
+  window.localStorage.clear();
+  applyStoredExtensionTheme();
+  runExtensionThemeCommand("themes.applyPreset", { preset: "copper", preview: true }, "first");
+  runExtensionThemeCommand("themes.applyPreset", { preset: "aurora", preview: true }, "second");
+  revertExtensionThemePreview("first");
+  expect(extensionThemeSnapshot().themeId).toBe("aurora");
+  expect(runExtensionThemeCommand("themes.revert", {}, "first").ok).toBe(false);
+  revertExtensionThemePreview("second");
+  expect(extensionThemeSnapshot().themeId).toBe("misty-dark");
+  runExtensionThemeCommand("themes.applyPreset", { preset: "copper", preview: false }, "second");
+  revertExtensionThemePreview("second");
+  expect(extensionThemeSnapshot().themeId).toBe("copper");
 });

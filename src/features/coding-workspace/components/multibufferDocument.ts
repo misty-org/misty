@@ -32,7 +32,7 @@ export function buildMultibufferDocument(
   const excerpts: Excerpt[] = [];
   for (const interval of intervals) {
     const buffer = buffers[interval.path];
-    if (!buffer || buffer.loading || buffer.error) continue;
+    if (!buffer || buffer.loading || (buffer.error && !buffer.loaded)) continue;
     const contents = contentOverrides.get(interval.path) ?? buffer.contents;
     const lines = lineOffsets(contents);
     const startLine = Math.max(1, interval.startLine);

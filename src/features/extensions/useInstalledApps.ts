@@ -1,4 +1,5 @@
 import type { PluginPanelEntry } from "@/native/contracts";
+import { OFFICIAL_APP_IDS } from "@/api/apps";
 import { pluginCommandsSnapshot } from "@/native/settings-plugins";
 import { useEffect, useState } from "react";
 import { pluginCatalogChangedEvent } from "./utils/pluginEvents";
@@ -11,6 +12,7 @@ export interface InstalledApp {
 export function installedAppsFromPanels(panels: readonly PluginPanelEntry[]): InstalledApp[] {
   const apps = new Map<string, InstalledApp>();
   for (const panel of panels) {
+    if (OFFICIAL_APP_IDS.has(panel.pluginId)) continue;
     if (!apps.has(panel.pluginId)) {
       apps.set(panel.pluginId, { id: panel.pluginId, name: panel.pluginName });
     }

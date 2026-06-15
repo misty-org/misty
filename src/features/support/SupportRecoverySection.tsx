@@ -3,6 +3,7 @@ import { openSystemExternalLink } from "@/shared/platform/openExternalLink";
 import { Button, cn, Input, Textarea } from "@/shared/ui";
 import {
   AlertTriangle,
+  Compass,
   Download,
   ExternalLink,
   PanelTopOpen,
@@ -10,6 +11,8 @@ import {
   RotateCcw,
   ShieldCheck,
 } from "lucide-react";
+import { useAuth } from "@/features/auth";
+import { useTourStore } from "@/features/tour";
 import { useState } from "react";
 import {
   buildPublicFeedbackIssueUrl,
@@ -43,11 +46,17 @@ const supportDisabledControlClass =
   "disabled:border-charcoal-border/80 disabled:bg-charcoal-bg disabled:text-cream-muted disabled:opacity-100 disabled:shadow-none";
 
 export function SupportRecoverySection() {
+  const { user } = useAuth();
   const [draft, setDraft] = useState(initialDraft);
   const [notice, setNotice] = useState("");
   const [working, setWorking] = useState<"bundle" | "feedback" | "">("");
   const [resetArmed, setResetArmed] = useState(false);
   const [reloadArmed, setReloadArmed] = useState(false);
+
+  const replayTour = () => {
+    window.dispatchEvent(new CustomEvent("misty:close-settings"));
+    useTourStore.getState().resetTour(user?.id);
+  };
 
   const updateDraft = <Key extends keyof FeedbackDraft>(key: Key, value: FeedbackDraft[Key]) =>
     setDraft((current) => ({ ...current, [key]: value }));
@@ -125,6 +134,21 @@ export function SupportRecoverySection() {
 
   return (
     <>
+      <SupportSectionBlock
+        title="App Tour & Walkthrough"
+        description="Revisit the onboarding tour to rediscover where everything is, configure starter apps, and review workspace prerequisites."
+      >
+        <div className="grid gap-px bg-charcoal-border">
+          <RecoveryAction
+            icon={Compass}
+            title="Replay app tour"
+            detail="Restart the interactive tour sequence from the beginning."
+            action="Start tour"
+            onClick={replayTour}
+          />
+        </div>
+      </SupportSectionBlock>
+
       <SupportSectionBlock
         title="Recover Misty"
         description="Try these safe actions when a tab disappears, the layout feels stuck, or the app needs a fresh start."

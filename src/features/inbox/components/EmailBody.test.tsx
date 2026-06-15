@@ -137,6 +137,25 @@ describe("EmailBody", () => {
       const iframe = document.querySelector("iframe");
       expect(iframe).not.toBeNull();
       expect(iframe?.getAttribute("srcdoc")).toContain("Rich <b>email</b> content");
+      expect(iframe?.getAttribute("srcdoc")).toContain("default-src 'none'");
+      expect(iframe?.getAttribute("sandbox")).toBe("allow-same-origin");
+      expect(iframe?.getAttribute("referrerpolicy")).toBe("no-referrer");
+    });
+
+    it("does not substitute another email when short cache hashes collide", async () => {
+      // Aa and BB collide under the existing 31-based height-cache hash.
+      for (const content of ["Aa", "BB"]) {
+        await act(async () =>
+          root.render(
+            <EmailBody
+              body={{ text: "", html: `<p>${content}</p>`, had_html: true, truncated: false }}
+            />,
+          ),
+        );
+        const source = container.querySelector("iframe")?.getAttribute("srcdoc");
+        expect(source).toContain(`<p>${content}</p>`);
+        expect(source).not.toContain(`<p>${content === "Aa" ? "BB" : "Aa"}</p>`);
+      }
     });
 
     it("renders markdown when only text is present", async () => {

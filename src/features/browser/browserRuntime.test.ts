@@ -3,9 +3,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   browserTabIdForRuntime,
   browserRuntimeId,
+  browserRuntimeIdForTabId,
+  browserRuntimeIdForScope,
+  browserRuntimeCreated,
+  browserScopeId,
+  registerSdkBrowserContext,
   closeBrowserRuntime,
   hideAllBrowserWebviews,
   hideBrowserWebview,
+  parkAllBrowserWebviews,
   setBrowserPointerTrackingEnabled,
   setNativeBrowserCompanionState,
   setBrowserPointerGestureActive,
@@ -38,6 +44,51 @@ function browserTab(instanceKey: string): WorkspaceTab {
 }
 
 describe("browser native view synchronization", () => {
+  it("resolves an SDK view from its workspace tab and preserves a replacement during stale cleanup", async () => {
+    const workspace = browserTab("sdk-context-workspace");
+    const first = { ...workspace, instanceKey: "sdk-context-first" };
+    const second = { ...workspace, instanceKey: "sdk-context-second" };
+    const releaseFirst = registerSdkBrowserContext(
+      workspace.id,
+      browserRuntimeId(first),
+      "context-first",
+    );
+    const sync = (tab: WorkspaceTab, scopeId: string) =>
+      syncBrowserWebview({
+        tab,
+        scopeId,
+        url: "https://example.com",
+        theme: "dark",
+        bounds: { x: 0, y: 0, width: 400, height: 300 },
+      });
+    await sync(first, "context-first");
+    expect(browserRuntimeCreated(workspace)).toBe(true);
+    expect(browserScopeId(workspace)).toBe("context-first");
+    expect(browserRuntimeIdForScope("context-first")).toBe(browserRuntimeId(first));
+    const releaseSecond = registerSdkBrowserContext(
+      workspace.id,
+      browserRuntimeId(second),
+      "context-second",
+    );
+    await sync(second, "context-second");
+    useBrowserRuntimeStore.getState().setError(workspace.id, "Replacement state");
+    releaseFirst();
+    await closeBrowserRuntime(first);
+    expect(browserRuntimeIdForScope("context-first")).toBeNull();
+    expect(browserRuntimeIdForScope("context-second")).toBe(browserRuntimeId(second));
+    expect(browserRuntimeIdForTabId(workspace.id)).toBe(browserRuntimeId(second));
+    expect(browserScopeId(workspace)).toBe("context-second");
+    expect(browserRuntimeCreated(workspace)).toBe(true);
+    expect(useBrowserRuntimeStore.getState().errors[workspace.id]).toBe("Replacement state");
+    expect(invoke).toHaveBeenCalledWith("browser_webview_create", {
+      request: expect.objectContaining({ id: browserRuntimeId(second), scopeId: "context-second" }),
+    });
+    releaseSecond();
+    await closeBrowserRuntime(second);
+    expect(browserRuntimeIdForScope("context-second")).toBeNull();
+    expect(browserRuntimeIdForTabId(workspace.id)).toBeNull();
+    expect(browserRuntimeCreated(workspace)).toBe(false);
+  });
   beforeEach(() => {
     invoke.mockClear();
     invoke.mockImplementation((command) =>
@@ -296,6 +347,12 @@ describe("browser native view synchronization", () => {
     await hideAllBrowserWebviews();
 
     expect(invoke).toHaveBeenCalledWith("browser_webviews_hide_all");
+  });
+
+  it("parks native children for a gapless return from another workspace tab", async () => {
+    await parkAllBrowserWebviews();
+
+    expect(invoke).toHaveBeenCalledWith("browser_webviews_park_all");
   });
 
   it("keeps the native page live underneath app overlays", async () => {

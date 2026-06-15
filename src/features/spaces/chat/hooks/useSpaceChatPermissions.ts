@@ -1,4 +1,4 @@
-import { useSpacesStore } from "@/features/spaces";
+import { useSocialSpaces as useSpacesStore } from "@/features/spaces/chat/socialRuntime";
 import type { Space } from "@/api/spaces/dto/interfaces/types";
 
 export interface SpaceChatPermissions {
@@ -22,7 +22,7 @@ export interface SpaceChatPermissions {
 export function useSpaceChatPermissions(
   spaceId: string,
   _conversationId = "",
-  _conversationKind?: "standard" | "direct" | "misty_support",
+  _conversationKind?: "standard" | "direct",
 ): SpaceChatPermissions {
   const activeSpace = useSpacesStore((state) => state.spaces.find((space) => space.id === spaceId));
   const referenceOnly = useSpacesStore((state) => state.referenceOnly);

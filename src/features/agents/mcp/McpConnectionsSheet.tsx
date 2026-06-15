@@ -1,5 +1,7 @@
-import { SystemErrorActivity } from "@/features/activity";
-import { useAuth } from "@/features/auth";
+import {AgentsError as SystemErrorActivity} from "@/features/agents/agentsRuntime";
+
+import {useAgentsAuth as useAuth} from "@/features/agents/agentsRuntime";
+
 import { publicBetaFeatureEnabled } from "@/features/launch";
 import {
   AlertDialog,
@@ -22,7 +24,6 @@ import {
 } from "@/shared/ui";
 import { Cable, LoaderCircle, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { mcpConnectionsApi } from "./api";
 import { publicMcpOrigin, validRemoteMcpEndpoint } from "./normalization";
 import type { McpConnection } from "./types";
 import { useMcpConnectionsStore } from "./useMcpConnectionsStore";

@@ -1,4 +1,4 @@
-import { blankBrowserUrl, browserSearchEngine, browserSearchUrl } from "@/features/workspace";
+import { blankBrowserUrl, browserSearchEngine, browserSearchUrl } from "@/features/workspace/model";
 
 export interface BrowserSuggestion {
   id: string;
