@@ -1,7 +1,7 @@
 import { mkdirSync, copyFileSync, existsSync, readFileSync, cpSync, rmSync } from 'node:fs';
 import { resolve, basename } from 'node:path';
 import { createPublicKey, verify } from 'node:crypto';
-import { root, readJSON, writeJSON, run, capture, sha256, version, checksums } from './lib.mjs';
+import { root, readJSON, writeJSON, run, capture, sha256, version, checksums, verifyRepackedArchive } from './lib.mjs';
 
 const host = readJSON(resolve(root,'package.json'));
 const releaseVersion = version(host.version);
@@ -40,7 +40,8 @@ for (const pkg of sdkPackages) {
   const archive = resolve(root,'vendor/misty-sdk',pkg.filename);
   if (sha256(archive) !== pkg.sha256) throw new Error(`SDK snapshot mismatch: ${pkg.name}`);
   const packed = JSON.parse(capture('npm',['pack','--json','--pack-destination',output],resolve(sdk,'packages',pkg.name.split('/')[1])))[0];
-  if (sha256(resolve(output,packed.filename)) !== pkg.sha256) throw new Error(`SDK source does not reproduce ${pkg.name}. Refresh the pinned archives.`);
+  verifyRepackedArchive(archive,resolve(output,packed.filename));
+  copyFileSync(archive,resolve(output,packed.filename));
 }
 run('node',['scripts/sync-server-official-apps.mjs',resolve(output,'catalog.go'),catalogPath],apps);
 // Package the site now. Promotion uses these bytes, never a rebuild.

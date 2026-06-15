@@ -33,6 +33,7 @@ verifyChecksums(directory);
 const manifest = readJSON(resolve(directory,'release-manifest.json'));
 if (manifest.version !== releaseVersion || manifest.source.sdk !== pins.sdk || manifest.source.apps !== pins.apps) throw new Error('Draft source pins do not match this checkout.');
 if (command === 'prepare') {
+  if (manifest.source.host !== capture('git',['rev-parse','HEAD'])) throw new Error('The draft belongs to a different host revision. Check out its prepared revision before collecting.');
   let sdkRelease;
   try { sdkRelease = JSON.parse(capture('gh',['release','view',sdkTag,'--repo','misty-org/misty-sdk','--json','isDraft,assets,targetCommitish'])); } catch {}
   if (!sdkRelease) run('gh',['release','create',sdkTag,'--repo','misty-org/misty-sdk','--target',pins.sdk,'--draft','--title',`Misty SDK ${sdkVersion}`,'--notes','Typed contracts and SDK archives, verified in an isolated consumer. Install both archives together. npm publication is deferred.']);
