@@ -75,6 +75,7 @@ jobs:
       MISTY_PUBLIC_API_URL: https://dev-api.mistysys.com/v1
       MISTY_RELEASE_CHANNEL: beta
       MACOSX_DEPLOYMENT_TARGET: '12.0'
+      NODE_OPTIONS: --max-old-space-size=4096
     steps:
       - uses: actions/checkout@v4
         with:
