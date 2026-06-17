@@ -19,6 +19,8 @@ type PluginBrowserProps = {
   onInstall?: (plugin: PluginBrowserEntry) => void;
   onToggle?: (plugin: PluginBrowserEntry, enabled: boolean) => void;
   onUninstall?: (plugin: PluginBrowserEntry) => void;
+  primaryActionLabel?: string;
+  onPrimaryAction?: (plugin: PluginBrowserEntry) => void;
   onOpenLink?: (url: string) => void;
 };
 
@@ -223,28 +225,41 @@ function PrimaryAction({
   busy,
   onInstall,
   onToggle,
+  primaryActionLabel,
+  onPrimaryAction,
 }: {
   plugin: PluginBrowserEntry;
   busy: boolean;
   onInstall?: (plugin: PluginBrowserEntry) => void;
   onToggle?: (plugin: PluginBrowserEntry, enabled: boolean) => void;
+  primaryActionLabel?: string;
+  onPrimaryAction?: (plugin: PluginBrowserEntry) => void;
 }) {
+  const hasPrimaryAction = Boolean(onPrimaryAction);
+
   return (
     <button
       className="inline-flex h-10 items-center gap-2 rounded-xl bg-white px-4 text-sm font-medium text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
       disabled={
         busy ||
-        (!plugin.installed && !onInstall) ||
-        (plugin.installed && !onToggle)
+        (!hasPrimaryAction &&
+          ((!plugin.installed && !onInstall) ||
+            (plugin.installed && !onToggle)))
       }
-      onClick={() =>
-        !plugin.installed
-          ? onInstall?.(plugin)
-          : onToggle?.(plugin, !plugin.enabled)
-      }
+      onClick={() => {
+        if (onPrimaryAction) {
+          onPrimaryAction(plugin);
+          return;
+        }
+        if (!plugin.installed) {
+          onInstall?.(plugin);
+          return;
+        }
+        onToggle?.(plugin, !plugin.enabled);
+      }}
       type="button"
     >
-      {actionLabel(plugin)}
+      {hasPrimaryAction ? (primaryActionLabel ?? "Open Misty Hub") : actionLabel(plugin)}
     </button>
   );
 }
@@ -263,6 +278,8 @@ export function PluginBrowser({
   onInstall,
   onToggle,
   onUninstall,
+  primaryActionLabel,
+  onPrimaryAction,
   onOpenLink,
 }: PluginBrowserProps) {
   const [browserTab, setBrowserTab] = useState<PluginBrowserTab>("marketplace");
@@ -391,8 +408,10 @@ export function PluginBrowser({
                     <PrimaryAction
                       busy={loading}
                       onInstall={onInstall}
+                      onPrimaryAction={onPrimaryAction}
                       onToggle={onToggle}
                       plugin={selectedPlugin}
+                      primaryActionLabel={primaryActionLabel}
                     />
                     {selectedPlugin.installed && onUninstall ? (
                       <button

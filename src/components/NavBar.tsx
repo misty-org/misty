@@ -59,7 +59,7 @@ export default function Navbar() {
   }
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 transition-all duration-300 bg-[#07090b]">
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-[#0e1114] transition-all duration-300">
       <div
         style={{
           maxWidth: location.pathname === "/" ? "1060px" : "100%",
