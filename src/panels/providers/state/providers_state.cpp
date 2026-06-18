@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cctype>
+#include <ctime>
 #include <set>
 #include <sstream>
 #include <utility>
@@ -107,24 +108,6 @@ namespace misty::panel {
             return remote.name;
         }
 
-        std::vector<std::string> parse_rclone_configured_remotes(const std::string& body) {
-            std::vector<std::string> names;
-            const json parsed = json::parse(body);
-            const auto remotes_json = parsed.value("remotes", json::array());
-            if (!remotes_json.is_array()) {
-                return names;
-            }
-            for (const auto& remote_json : remotes_json) {
-                if (remote_json.is_string()) {
-                    std::string name = remote_json.get<std::string>();
-                    if (!name.empty()) {
-                        names.push_back(std::move(name));
-                    }
-                }
-            }
-            return names;
-        }
-
         std::map<std::string, ProviderRemoteStatus> parse_rclone_config_dump_statuses(const std::string& body) {
             std::map<std::string, ProviderRemoteStatus> statuses;
             const json parsed = json::parse(body);
@@ -166,19 +149,6 @@ namespace misty::panel {
             }
 
             return statuses;
-        }
-
-        std::string rclone_rc_url_from_port_text(const std::string& port_text) {
-            std::string digits;
-            for (unsigned char c : port_text) {
-                if (std::isdigit(c)) {
-                    digits.push_back(static_cast<char>(c));
-                }
-            }
-            if (digits.empty()) {
-                return "http://127.0.0.1:5572";
-            }
-            return "http://127.0.0.1:" + digits;
         }
 
         void seed_provider_options_defaults(
@@ -237,12 +207,72 @@ namespace misty::panel {
         health_card.status_value = "Unavailable";
     }
 
-    void ProvidersState::init(core::WorkerPool& pool) {
+    void ProvidersState::init(core::WorkerPool& pool, bool refresh_on_init) {
         if (worker_pool_) {
             return;
         }
         worker_pool_ = &pool;
-        refresh_all();
+        if (refresh_on_init) {
+            refresh_all();
+        }
+    }
+
+    void ProvidersState::attach_shared_state(ProvidersState* shared_state) {
+        shared_state_ = shared_state == this ? nullptr : shared_state;
+    }
+
+    void ProvidersState::sync_shared_data_from(const ProvidersState& shared_state) {
+        if (&shared_state == this) {
+            return;
+        }
+        std::scoped_lock lock(mu, shared_state.mu);
+        health_card = shared_state.health_card;
+        provider_cards = shared_state.provider_cards;
+        workflows_ = shared_state.workflows_;
+        remotes_ = shared_state.remotes_;
+        configured_remote_names_ = shared_state.configured_remote_names_;
+        remote_statuses_ = shared_state.remote_statuses_;
+        proxy_ready_ = shared_state.proxy_ready_;
+        proxy_error_ = shared_state.proxy_error_;
+        is_loading_health = shared_state.is_loading_health;
+        is_loading_workflows = shared_state.is_loading_workflows;
+        is_loading_remotes = shared_state.is_loading_remotes;
+        is_loading_remote_statuses = shared_state.is_loading_remote_statuses;
+        if (remote_edit_session_.has_selection && !remote_edit_session_.original_remote_name.empty()) {
+            const bool still_exists = std::any_of(remotes_.begin(), remotes_.end(), [&](const ProviderRemote& remote) {
+                return remote.name == remote_edit_session_.original_remote_name;
+            });
+            remote_edit_session_.stale = !still_exists;
+            validate_remote_edit_session_locked();
+        }
+    }
+
+    bool ProvidersState::has_in_flight_work() const {
+        std::lock_guard<std::mutex> lock(mu);
+        return is_loading_health || is_loading_workflows || is_loading_remotes || is_loading_remote_statuses ||
+            disconnect_in_flight || rename_session_.in_flight || details_session_.in_flight ||
+            remote_edit_session_.loading || remote_edit_session_.saving || remote_edit_session_.testing ||
+            remote_edit_session_.revealing || rclone_config_session_.loading || rclone_config_session_.revealing ||
+            add_provider_session_.submit_in_flight || add_provider_session_.poll_in_flight;
+    }
+
+    void ProvidersState::prepare_for_workspace_close() {
+        std::lock_guard<std::mutex> lock(mu);
+        add_provider_session_.generation++;
+        remote_edit_session_.generation++;
+        rclone_config_session_.generation++;
+        add_provider_session_ = ActiveProviderConfigSession{};
+        remote_edit_session_ = ProviderRemoteEditSession{};
+        rclone_config_session_ = ProviderRcloneConfigSession{};
+        rename_session_ = ProviderRenameSession{};
+        details_session_ = ProviderDetailsSession{};
+        show_rename_modal = false;
+        show_disconnect_modal = false;
+        show_onedrive_repair_modal = false;
+        pending_provider_id.clear();
+        dialog_message.clear();
+        error_message.clear();
+        success_message.clear();
     }
 
     void ProvidersState::set_provider_added_callback(std::function<void()> callback) {
@@ -293,17 +323,57 @@ namespace misty::panel {
         return add_provider_session_;
     }
 
+    ProviderRenameSession ProvidersState::rename_session_snapshot() const {
+        std::lock_guard<std::mutex> lock(mu);
+        return rename_session_;
+    }
+
+    ProviderDetailsSession ProvidersState::details_session_snapshot() const {
+        std::lock_guard<std::mutex> lock(mu);
+        return details_session_;
+    }
+
+    ProviderRemoteEditSession ProvidersState::remote_edit_session_snapshot() const {
+        std::lock_guard<std::mutex> lock(mu);
+        return remote_edit_session_;
+    }
+
+    ProviderRcloneConfigSession ProvidersState::rclone_config_session_snapshot() const {
+        std::lock_guard<std::mutex> lock(mu);
+        return rclone_config_session_;
+    }
+
+    ProvidersPageTab ProvidersState::selected_page_tab() const {
+        std::lock_guard<std::mutex> lock(mu);
+        return selected_page_tab_;
+    }
+
+    bool ProvidersState::edit_panel_visible() const {
+        std::lock_guard<std::mutex> lock(mu);
+        return edit_panel_visible_;
+    }
+
     std::function<void()> ProvidersState::provider_added_callback_locked() const {
         return provider_added_callback_;
     }
 
     void ProvidersState::refresh_all() {
+        ProvidersState* shared = shared_state_;
+        if (shared) {
+            shared->refresh_all();
+            return;
+        }
         refresh_health();
         refresh_workflows();
         refresh_remotes();
     }
 
     void ProvidersState::refresh_health() {
+        ProvidersState* shared = shared_state_;
+        if (shared) {
+            shared->refresh_health();
+            return;
+        }
         if (!worker_pool_) {
             return;
         }
@@ -382,6 +452,11 @@ namespace misty::panel {
     }
 
     void ProvidersState::refresh_workflows() {
+        ProvidersState* shared = shared_state_;
+        if (shared) {
+            shared->refresh_workflows();
+            return;
+        }
         if (!worker_pool_) {
             return;
         }
@@ -436,6 +511,11 @@ namespace misty::panel {
     }
 
     void ProvidersState::refresh_remotes() {
+        ProvidersState* shared = shared_state_;
+        if (shared) {
+            shared->refresh_remotes();
+            return;
+        }
         if (!worker_pool_) {
             return;
         }
@@ -476,8 +556,19 @@ namespace misty::panel {
                     is_loading_remotes = false;
                     if (remotes_.empty()) {
                         remote_statuses_.clear();
+                        configured_remote_names_.clear();
+                        reset_remote_edit_session_locked();
                     } else {
                         refresh_statuses_after = true;
+                        if (remote_edit_session_.has_selection) {
+                            const bool selected_exists = std::any_of(remotes_.begin(), remotes_.end(), [&](const ProviderRemote& remote) {
+                                return remote.name == remote_edit_session_.selected_remote ||
+                                    remote.name == remote_edit_session_.original_remote_name;
+                            });
+                            if (!selected_exists) {
+                                reset_remote_edit_session_locked();
+                            }
+                        }
                     }
                     rebuild_provider_cards_locked();
                     rebuild_health_card_locked();
@@ -497,6 +588,11 @@ namespace misty::panel {
     }
 
     void ProvidersState::refresh_remote_statuses() {
+        ProvidersState* shared = shared_state_;
+        if (shared) {
+            shared->refresh_remote_statuses();
+            return;
+        }
         if (!worker_pool_) {
             return;
         }
@@ -575,6 +671,7 @@ namespace misty::panel {
 
                 std::lock_guard<std::mutex> lock(mu);
                 remote_statuses_ = std::move(statuses);
+                configured_remote_names_ = configured_remotes;
                 for (const auto& [remote_name, status] : configured_statuses) {
                     remote_statuses_[remote_name] = status;
                 }
@@ -630,6 +727,8 @@ namespace misty::panel {
             add_provider_session_.show_modal = true;
             show_rename_modal = false;
             show_disconnect_modal = false;
+            rename_session_ = ProviderRenameSession{};
+            details_session_.show_modal = false;
             pending_provider_id.clear();
             dialog_message.clear();
             error_message.clear();
@@ -679,6 +778,8 @@ namespace misty::panel {
             seed_provider_options_defaults(add_provider_session_, options_to_seed);
             show_rename_modal = false;
             show_disconnect_modal = false;
+            rename_session_ = ProviderRenameSession{};
+            details_session_.show_modal = false;
             pending_provider_id.clear();
             dialog_message.clear();
             error_message.clear();
@@ -725,6 +826,8 @@ namespace misty::panel {
             seed_provider_options_defaults(add_provider_session_, options_to_seed);
             show_rename_modal = false;
             show_disconnect_modal = false;
+            rename_session_ = ProviderRenameSession{};
+            details_session_.show_modal = false;
             pending_provider_id.clear();
             dialog_message.clear();
             error_message.clear();
@@ -1252,11 +1355,772 @@ namespace misty::panel {
 
     void ProvidersState::on_request_rename(const std::string& provider_id) {
         std::lock_guard<std::mutex> lock(mu);
+        const auto remote_it = std::find_if(remotes_.begin(), remotes_.end(), [&](const ProviderRemote& remote) {
+            return remote.name == provider_id;
+        });
+        if (remote_it == remotes_.end()) {
+            error_message = "Provider \"" + provider_id + "\" was not found.";
+            return;
+        }
+
         add_provider_session_.show_modal = false;
-        show_rename_modal = true;
+        show_rename_modal = false;
         show_disconnect_modal = false;
+        details_session_.show_modal = false;
         pending_provider_id = provider_id;
-        dialog_message = "Rename is not wired yet for proxy-backed providers.";
+        dialog_message.clear();
+        error_message.clear();
+        success_message.clear();
+        rename_session_ = ProviderRenameSession{};
+        rename_session_.show_modal = true;
+        rename_session_.old_name = provider_id;
+        rename_session_.new_name = provider_id;
+        rename_session_.validation_error =
+            provider_rename_validation_error(provider_id, provider_id, current_remote_names_locked());
+    }
+
+    void ProvidersState::set_pending_rename_name(const std::string& name) {
+        std::lock_guard<std::mutex> lock(mu);
+        rename_session_.new_name = name;
+        rename_session_.validation_error = provider_rename_validation_error(
+            rename_session_.old_name,
+            rename_session_.new_name,
+            current_remote_names_locked());
+    }
+
+    void ProvidersState::confirm_rename() {
+        if (!worker_pool_) {
+            return;
+        }
+
+        std::string old_name;
+        std::string new_name;
+        {
+            std::lock_guard<std::mutex> lock(mu);
+            if (!rename_session_.show_modal || rename_session_.in_flight) {
+                return;
+            }
+            rename_session_.validation_error = provider_rename_validation_error(
+                rename_session_.old_name,
+                rename_session_.new_name,
+                current_remote_names_locked());
+            if (!rename_session_.validation_error.empty()) {
+                return;
+            }
+            old_name = rename_session_.old_name;
+            new_name = rename_session_.new_name;
+            rename_session_.in_flight = true;
+            error_message.clear();
+            success_message.clear();
+        }
+
+        worker_pool_->add(
+            [this, old_name, new_name]() {
+                const auto headers = provider_json_headers();
+                const std::string url = providers_proxy_url("/api/remote/rename");
+                if (url.empty()) {
+                    std::lock_guard<std::mutex> lock(mu);
+                    rename_session_.in_flight = false;
+                    rename_session_.validation_error = "PROXY_SERVICE_URL not set";
+                    return;
+                }
+
+                const json rename_body = {
+                    {"old_name", old_name},
+                    {"new_name", new_name},
+                };
+                const auto response = core::HTTPClient::get().post(
+                    url,
+                    rename_body.dump(),
+                    {.headers = headers});
+                if (response.status_code < 200 || response.status_code >= 300) {
+                    std::lock_guard<std::mutex> lock(mu);
+                    rename_session_.in_flight = false;
+                    rename_session_.validation_error =
+                        provider_response_error_message(response, "Failed to rename provider");
+                    return;
+                }
+
+                {
+                    std::lock_guard<std::mutex> lock(mu);
+                    rename_session_ = ProviderRenameSession{};
+                    pending_provider_id.clear();
+                    success_message = "Provider \"" + old_name + "\" renamed to \"" + new_name + "\".";
+                    error_message.clear();
+                    for (auto& remote : remotes_) {
+                        if (remote.name == old_name) {
+                            remote.name = new_name;
+                        }
+                    }
+                    auto status_it = remote_statuses_.find(old_name);
+                    if (status_it != remote_statuses_.end()) {
+                        ProviderRemoteStatus status = status_it->second;
+                        remote_statuses_.erase(status_it);
+                        status.name = new_name;
+                        remote_statuses_[new_name] = std::move(status);
+                    }
+                    rebuild_provider_cards_locked();
+                    rebuild_health_card_locked();
+                }
+
+                refresh_remotes();
+            },
+            []() {},
+            [this](const std::string& err) {
+                std::lock_guard<std::mutex> lock(mu);
+                rename_session_.in_flight = false;
+                rename_session_.validation_error = "confirm_rename: " + err;
+            }
+        );
+    }
+
+    void ProvidersState::on_request_details(const std::string& provider_id) {
+        if (!worker_pool_) {
+            return;
+        }
+
+        std::string rclone_rc_url;
+        std::string provider_type;
+        {
+            std::lock_guard<std::mutex> lock(mu);
+            const auto remote_it = std::find_if(remotes_.begin(), remotes_.end(), [&](const ProviderRemote& remote) {
+                return remote.name == provider_id;
+            });
+            if (remote_it == remotes_.end()) {
+                error_message = "Provider \"" + provider_id + "\" was not found.";
+                return;
+            }
+            provider_type = remote_it->type;
+            rclone_rc_url = rclone_rc_url_from_port_text(health_card.port_text);
+            details_session_ = ProviderDetailsSession{};
+            details_session_.show_modal = true;
+            details_session_.in_flight = true;
+            details_session_.remote_name = provider_id;
+            details_session_.provider_type = provider_type;
+        }
+
+        worker_pool_->add(
+            [this, provider_id, provider_type, rclone_rc_url]() {
+                const auto headers = provider_json_headers();
+                std::string config_json;
+                std::string about_json;
+                std::string error;
+
+                const json get_body = {{"name", provider_id}};
+                const auto get_response = core::HTTPClient::get().post(
+                    rclone_rc_url + "/config/get",
+                    get_body.dump(),
+                    {.headers = headers});
+                if (get_response.status_code >= 200 && get_response.status_code < 300) {
+                    config_json = get_response.body;
+                } else {
+                    error = provider_response_error_message(get_response, "Failed to load remote config");
+                }
+
+                const json about_body = {{"fs", provider_id + ":"}};
+                const auto about_response = core::HTTPClient::get().post(
+                    rclone_rc_url + "/operations/about",
+                    about_body.dump(),
+                    {.headers = headers});
+                if (about_response.status_code >= 200 && about_response.status_code < 300) {
+                    about_json = about_response.body;
+                } else if (error.empty()) {
+                    about_json = provider_response_error_message(about_response, "Storage details unavailable");
+                }
+
+                std::lock_guard<std::mutex> lock(mu);
+                details_session_.show_modal = true;
+                details_session_.in_flight = false;
+                details_session_.remote_name = provider_id;
+                details_session_.provider_type = provider_type;
+                details_session_.config_json = std::move(config_json);
+                details_session_.about_json = std::move(about_json);
+                details_session_.error = std::move(error);
+            },
+            []() {},
+            [this](const std::string& err) {
+                std::lock_guard<std::mutex> lock(mu);
+                details_session_.in_flight = false;
+                details_session_.error = "load_provider_details: " + err;
+            }
+        );
+    }
+
+    void ProvidersState::select_remote(const std::string& provider_id) {
+        if (!worker_pool_) {
+            return;
+        }
+
+        std::string provider_type;
+        std::string rclone_rc_url;
+        std::uint64_t generation = 0;
+        {
+            std::lock_guard<std::mutex> lock(mu);
+            const auto remote_it = std::find_if(remotes_.begin(), remotes_.end(), [&](const ProviderRemote& remote) {
+                return remote.name == provider_id;
+            });
+            if (remote_it == remotes_.end()) {
+                error_message = "Remote \"" + provider_id + "\" was not found.";
+                return;
+            }
+
+            provider_type = remote_it->type;
+            rclone_rc_url = rclone_rc_url_from_port_text(health_card.port_text);
+            remote_edit_session_.generation++;
+            generation = remote_edit_session_.generation;
+            remote_edit_session_.has_selection = true;
+            remote_edit_session_.loading = true;
+            remote_edit_session_.saving = false;
+            remote_edit_session_.testing = false;
+            remote_edit_session_.revealing = false;
+            remote_edit_session_.token_visible = false;
+            remote_edit_session_.dirty = false;
+            remote_edit_session_.can_save = false;
+            remote_edit_session_.selected_remote = provider_id;
+            remote_edit_session_.original_remote_name = provider_id;
+            remote_edit_session_.provider_type = provider_type;
+            remote_edit_session_.original_config.clear();
+            remote_edit_session_.edit_config.clear();
+            remote_edit_session_.about_json.clear();
+            remote_edit_session_.validation_error.clear();
+            remote_edit_session_.error_message.clear();
+            remote_edit_session_.success_message.clear();
+            remote_edit_session_.test_message.clear();
+            remote_edit_session_.reveal_error.clear();
+            remote_edit_session_.last_checked_unix = 0;
+        }
+
+        worker_pool_->add(
+            [this, provider_id, provider_type, rclone_rc_url, generation]() {
+                const auto headers = provider_json_headers();
+                std::map<std::string, std::string> config;
+                std::string config_error;
+                std::string about_json;
+
+                const json get_body = {{"name", provider_id}};
+                const auto get_response = core::HTTPClient::get().post(
+                    rclone_rc_url + "/config/get",
+                    get_body.dump(),
+                    {.headers = headers});
+                if (get_response.status_code >= 200 && get_response.status_code < 300) {
+                    try {
+                        config = parse_rclone_config_map(get_response.body);
+                    } catch (const std::exception& ex) {
+                        config_error = std::string("Failed to parse remote config: ") + ex.what();
+                    }
+                } else {
+                    config_error = provider_response_error_message(get_response, "Failed to load remote config");
+                }
+
+                const json about_body = {{"fs", provider_id + ":"}};
+                const auto about_response = core::HTTPClient::get().post(
+                    rclone_rc_url + "/operations/about",
+                    about_body.dump(),
+                    {.headers = headers});
+                if (about_response.status_code >= 200 && about_response.status_code < 300) {
+                    about_json = about_response.body;
+                }
+
+                std::lock_guard<std::mutex> lock(mu);
+                if (generation != remote_edit_session_.generation ||
+                    remote_edit_session_.selected_remote != provider_id) {
+                    return;
+                }
+
+                remote_edit_session_.loading = false;
+                remote_edit_session_.provider_type = provider_type;
+                if (!config_error.empty()) {
+                    remote_edit_session_.error_message = std::move(config_error);
+                    remote_edit_session_.edit_config = {{"type", provider_type}};
+                    remote_edit_session_.original_config = remote_edit_session_.edit_config;
+                    validate_remote_edit_session_locked();
+                    return;
+                }
+
+                if (config.find("type") == config.end()) {
+                    config["type"] = provider_type;
+                }
+                remote_edit_session_.original_config = config;
+                remote_edit_session_.edit_config = std::move(config);
+                remote_edit_session_.about_json = std::move(about_json);
+                remote_edit_session_.last_checked_unix = static_cast<std::int64_t>(std::time(nullptr));
+                validate_remote_edit_session_locked();
+            },
+            []() {},
+            [this, provider_id, generation](const std::string& err) {
+                std::lock_guard<std::mutex> lock(mu);
+                if (generation != remote_edit_session_.generation ||
+                    remote_edit_session_.selected_remote != provider_id) {
+                    return;
+                }
+                remote_edit_session_.loading = false;
+                remote_edit_session_.error_message = "select_remote: " + err;
+                validate_remote_edit_session_locked();
+            }
+        );
+    }
+
+    void ProvidersState::set_edit_remote_name(const std::string& name) {
+        std::lock_guard<std::mutex> lock(mu);
+        if (!remote_edit_session_.has_selection || remote_edit_session_.saving) {
+            return;
+        }
+        remote_edit_session_.selected_remote = name;
+        remote_edit_session_.success_message.clear();
+        remote_edit_session_.error_message.clear();
+        validate_remote_edit_session_locked();
+    }
+
+    void ProvidersState::set_edit_field(const std::string& key, const std::string& value) {
+        std::lock_guard<std::mutex> lock(mu);
+        if (!remote_edit_session_.has_selection || remote_edit_session_.saving || key == "type") {
+            return;
+        }
+        remote_edit_session_.edit_config[key] = value;
+        remote_edit_session_.success_message.clear();
+        remote_edit_session_.error_message.clear();
+        validate_remote_edit_session_locked();
+    }
+
+    void ProvidersState::set_page_tab(ProvidersPageTab tab) {
+        bool should_refresh_config = false;
+        {
+            std::lock_guard<std::mutex> lock(mu);
+            selected_page_tab_ = tab;
+            should_refresh_config =
+                tab == ProvidersPageTab::Diagnostics &&
+                !rclone_config_session_.loading &&
+                rclone_config_session_.config_path.empty() &&
+                rclone_config_session_.error_message.empty();
+        }
+        if (should_refresh_config) {
+            refresh_rclone_config_paths();
+        }
+    }
+
+    void ProvidersState::show_edit_panel() {
+        std::lock_guard<std::mutex> lock(mu);
+        edit_panel_visible_ = true;
+    }
+
+    void ProvidersState::hide_edit_panel() {
+        std::lock_guard<std::mutex> lock(mu);
+        edit_panel_visible_ = false;
+    }
+
+    void ProvidersState::toggle_token_visibility() {
+        std::lock_guard<std::mutex> lock(mu);
+        remote_edit_session_.token_visible = !remote_edit_session_.token_visible;
+    }
+
+    void ProvidersState::save_selected_remote() {
+        if (!worker_pool_) {
+            return;
+        }
+
+        std::string old_name;
+        std::string new_name;
+        std::string rclone_rc_url;
+        std::map<std::string, std::string> parameters;
+        std::uint64_t generation = 0;
+        {
+            std::lock_guard<std::mutex> lock(mu);
+            if (!remote_edit_session_.has_selection || remote_edit_session_.saving) {
+                return;
+            }
+            validate_remote_edit_session_locked();
+            if (!remote_edit_session_.can_save) {
+                return;
+            }
+
+            old_name = remote_edit_session_.original_remote_name;
+            new_name = remote_edit_session_.selected_remote;
+            parameters = remote_edit_session_.edit_config;
+            rclone_rc_url = rclone_rc_url_from_port_text(health_card.port_text);
+            remote_edit_session_.saving = true;
+            remote_edit_session_.success_message.clear();
+            remote_edit_session_.error_message.clear();
+            remote_edit_session_.test_message.clear();
+            remote_edit_session_.generation++;
+            generation = remote_edit_session_.generation;
+        }
+
+        worker_pool_->add(
+            [this, old_name, new_name, parameters, rclone_rc_url, generation]() {
+                const auto headers = provider_json_headers();
+                if (old_name != new_name) {
+                    const std::string rename_url = providers_proxy_url("/api/remote/rename");
+                    if (rename_url.empty()) {
+                        std::lock_guard<std::mutex> lock(mu);
+                        if (generation == remote_edit_session_.generation) {
+                            remote_edit_session_.saving = false;
+                            remote_edit_session_.error_message = "PROXY_SERVICE_URL not set";
+                            validate_remote_edit_session_locked();
+                        }
+                        return;
+                    }
+
+                    const json rename_body = {
+                        {"old_name", old_name},
+                        {"new_name", new_name},
+                    };
+                    const auto rename_response = core::HTTPClient::get().post(
+                        rename_url,
+                        rename_body.dump(),
+                        {.headers = headers});
+                    if (rename_response.status_code < 200 || rename_response.status_code >= 300) {
+                        std::lock_guard<std::mutex> lock(mu);
+                        if (generation == remote_edit_session_.generation) {
+                            remote_edit_session_.saving = false;
+                            remote_edit_session_.error_message =
+                                provider_response_error_message(rename_response, "Failed to rename remote");
+                            validate_remote_edit_session_locked();
+                        }
+                        return;
+                    }
+                }
+
+                const auto update_response = core::HTTPClient::get().post(
+                    rclone_rc_url + "/config/update",
+                    rclone_config_update_body(new_name, parameters),
+                    {.headers = headers});
+                if (update_response.status_code < 200 || update_response.status_code >= 300) {
+                    std::lock_guard<std::mutex> lock(mu);
+                    if (generation == remote_edit_session_.generation) {
+                        remote_edit_session_.saving = false;
+                        remote_edit_session_.error_message =
+                            provider_response_error_message(update_response, "Failed to save remote config");
+                        if (old_name != new_name) {
+                            remote_edit_session_.original_remote_name = new_name;
+                        }
+                        validate_remote_edit_session_locked();
+                    }
+                    if (old_name != new_name) {
+                        refresh_remotes();
+                    }
+                    return;
+                }
+
+                {
+                    std::lock_guard<std::mutex> lock(mu);
+                    if (generation != remote_edit_session_.generation) {
+                        return;
+                    }
+                    remote_edit_session_.saving = false;
+                    remote_edit_session_.selected_remote = new_name;
+                    remote_edit_session_.original_remote_name = new_name;
+                    remote_edit_session_.original_config = parameters;
+                    remote_edit_session_.edit_config = parameters;
+                    remote_edit_session_.success_message = "Remote changes saved.";
+                    remote_edit_session_.error_message.clear();
+                    remote_edit_session_.last_checked_unix = static_cast<std::int64_t>(std::time(nullptr));
+                    for (auto& remote : remotes_) {
+                        if (remote.name == old_name) {
+                            remote.name = new_name;
+                        }
+                    }
+                    auto status_it = remote_statuses_.find(old_name);
+                    if (status_it != remote_statuses_.end()) {
+                        ProviderRemoteStatus status = status_it->second;
+                        remote_statuses_.erase(status_it);
+                        status.name = new_name;
+                        remote_statuses_[new_name] = std::move(status);
+                    }
+                    rebuild_provider_cards_locked();
+                    validate_remote_edit_session_locked();
+                }
+
+                refresh_remotes();
+                refresh_remote_statuses();
+            },
+            []() {},
+            [this, generation](const std::string& err) {
+                std::lock_guard<std::mutex> lock(mu);
+                if (generation != remote_edit_session_.generation) {
+                    return;
+                }
+                remote_edit_session_.saving = false;
+                remote_edit_session_.error_message = "save_selected_remote: " + err;
+                validate_remote_edit_session_locked();
+            }
+        );
+    }
+
+    void ProvidersState::test_selected_remote() {
+        if (!worker_pool_) {
+            return;
+        }
+
+        std::string remote_name;
+        std::string rclone_rc_url;
+        std::uint64_t generation = 0;
+        {
+            std::lock_guard<std::mutex> lock(mu);
+            if (!remote_edit_session_.has_selection || remote_edit_session_.testing) {
+                return;
+            }
+            remote_name = remote_edit_session_.selected_remote;
+            rclone_rc_url = rclone_rc_url_from_port_text(health_card.port_text);
+            remote_edit_session_.testing = true;
+            remote_edit_session_.test_message.clear();
+            remote_edit_session_.error_message.clear();
+            remote_edit_session_.generation++;
+            generation = remote_edit_session_.generation;
+        }
+
+        worker_pool_->add(
+            [this, remote_name, rclone_rc_url, generation]() {
+                const json about_body = {{"fs", remote_name + ":"}};
+                const auto response = core::HTTPClient::get().post(
+                    rclone_rc_url + "/operations/about",
+                    about_body.dump(),
+                    {.headers = provider_json_headers()});
+
+                std::lock_guard<std::mutex> lock(mu);
+                if (generation != remote_edit_session_.generation) {
+                    return;
+                }
+                remote_edit_session_.testing = false;
+                if (response.status_code >= 200 && response.status_code < 300) {
+                    remote_edit_session_.about_json = response.body;
+                    remote_edit_session_.test_message = "Connection test succeeded.";
+                    remote_edit_session_.last_checked_unix = static_cast<std::int64_t>(std::time(nullptr));
+                    remote_edit_session_.error_message.clear();
+                } else {
+                    remote_edit_session_.test_message.clear();
+                    remote_edit_session_.error_message =
+                        provider_response_error_message(response, "Connection test failed");
+                }
+                validate_remote_edit_session_locked();
+            },
+            []() {},
+            [this, generation](const std::string& err) {
+                std::lock_guard<std::mutex> lock(mu);
+                if (generation != remote_edit_session_.generation) {
+                    return;
+                }
+                remote_edit_session_.testing = false;
+                remote_edit_session_.error_message = "test_selected_remote: " + err;
+                validate_remote_edit_session_locked();
+            }
+        );
+    }
+
+    void ProvidersState::refresh_rclone_config_paths() {
+        if (!worker_pool_) {
+            return;
+        }
+
+        std::string rclone_rc_url;
+        std::uint64_t generation = 0;
+        {
+            std::lock_guard<std::mutex> lock(mu);
+            if (rclone_config_session_.loading) {
+                return;
+            }
+            rclone_rc_url = rclone_rc_url_from_port_text(health_card.port_text);
+            rclone_config_session_.loading = true;
+            rclone_config_session_.error_message.clear();
+            rclone_config_session_.success_message.clear();
+            rclone_config_session_.generation++;
+            generation = rclone_config_session_.generation;
+        }
+
+        worker_pool_->add(
+            [this, rclone_rc_url, generation]() {
+                const auto response = core::HTTPClient::get().post(
+                    rclone_rc_url + "/config/paths",
+                    "{}",
+                    {.headers = provider_json_headers()});
+                std::string error;
+                std::string config_path;
+                std::string cache_path;
+                std::string temp_path;
+                if (response.status_code >= 200 && response.status_code < 300) {
+                    try {
+                        const json parsed = json::parse(response.body);
+                        config_path = parsed.value("config", std::string{});
+                        cache_path = parsed.value("cache", std::string{});
+                        temp_path = parsed.value("temp", std::string{});
+                    } catch (const std::exception& ex) {
+                        error = std::string("Failed to parse config paths: ") + ex.what();
+                    }
+                } else {
+                    error = provider_response_error_message(response, "Failed to locate rclone config");
+                }
+                if (error.empty() && config_path.empty()) {
+                    error = "Rclone did not return a config path.";
+                }
+
+                std::lock_guard<std::mutex> lock(mu);
+                if (generation != rclone_config_session_.generation) {
+                    return;
+                }
+                rclone_config_session_.loading = false;
+                rclone_config_session_.config_path = std::move(config_path);
+                rclone_config_session_.cache_path = std::move(cache_path);
+                rclone_config_session_.temp_path = std::move(temp_path);
+                rclone_config_session_.error_message = std::move(error);
+            },
+            []() {},
+            [this, generation](const std::string& err) {
+                std::lock_guard<std::mutex> lock(mu);
+                if (generation != rclone_config_session_.generation) {
+                    return;
+                }
+                rclone_config_session_.loading = false;
+                rclone_config_session_.error_message = "refresh_rclone_config_paths: " + err;
+            }
+        );
+    }
+
+    void ProvidersState::open_rclone_config_file() {
+        if (!worker_pool_) {
+            return;
+        }
+
+        std::string known_config_path;
+        std::string rclone_rc_url;
+        std::uint64_t generation = 0;
+        {
+            std::lock_guard<std::mutex> lock(mu);
+            if (rclone_config_session_.revealing) {
+                return;
+            }
+            known_config_path = rclone_config_session_.config_path;
+            rclone_rc_url = rclone_rc_url_from_port_text(health_card.port_text);
+            rclone_config_session_.revealing = true;
+            rclone_config_session_.error_message.clear();
+            rclone_config_session_.success_message.clear();
+            rclone_config_session_.generation++;
+            generation = rclone_config_session_.generation;
+        }
+
+        worker_pool_->add(
+            [this, known_config_path, rclone_rc_url, generation]() {
+                std::string config_path = known_config_path;
+                std::string cache_path;
+                std::string temp_path;
+                std::string error;
+                if (config_path.empty()) {
+                    const auto response = core::HTTPClient::get().post(
+                        rclone_rc_url + "/config/paths",
+                        "{}",
+                        {.headers = provider_json_headers()});
+                    if (response.status_code >= 200 && response.status_code < 300) {
+                        try {
+                            const json parsed = json::parse(response.body);
+                            config_path = parsed.value("config", std::string{});
+                            cache_path = parsed.value("cache", std::string{});
+                            temp_path = parsed.value("temp", std::string{});
+                        } catch (const std::exception& ex) {
+                            error = std::string("Failed to parse config paths: ") + ex.what();
+                        }
+                    } else {
+                        error = provider_response_error_message(response, "Failed to locate rclone config");
+                    }
+                }
+
+                if (error.empty() && config_path.empty()) {
+                    error = "Rclone did not return a config path.";
+                }
+                if (error.empty() && !core::open_path_default(config_path)) {
+                    error = "Failed to open rclone config.";
+                }
+
+                std::lock_guard<std::mutex> lock(mu);
+                if (generation != rclone_config_session_.generation) {
+                    return;
+                }
+                rclone_config_session_.revealing = false;
+                if (!config_path.empty()) {
+                    rclone_config_session_.config_path = std::move(config_path);
+                }
+                if (!cache_path.empty()) {
+                    rclone_config_session_.cache_path = std::move(cache_path);
+                }
+                if (!temp_path.empty()) {
+                    rclone_config_session_.temp_path = std::move(temp_path);
+                }
+                rclone_config_session_.error_message = std::move(error);
+                if (rclone_config_session_.error_message.empty()) {
+                    rclone_config_session_.success_message = "Opened rclone.conf.";
+                }
+            },
+            []() {},
+            [this, generation](const std::string& err) {
+                std::lock_guard<std::mutex> lock(mu);
+                if (generation != rclone_config_session_.generation) {
+                    return;
+                }
+                rclone_config_session_.revealing = false;
+                rclone_config_session_.error_message = "open_rclone_config_file: " + err;
+            }
+        );
+    }
+
+    void ProvidersState::reveal_rclone_config() {
+        if (!worker_pool_) {
+            return;
+        }
+
+        std::string rclone_rc_url;
+        std::uint64_t generation = 0;
+        {
+            std::lock_guard<std::mutex> lock(mu);
+            if (remote_edit_session_.revealing) {
+                return;
+            }
+            rclone_rc_url = rclone_rc_url_from_port_text(health_card.port_text);
+            remote_edit_session_.revealing = true;
+            remote_edit_session_.reveal_error.clear();
+            remote_edit_session_.generation++;
+            generation = remote_edit_session_.generation;
+        }
+
+        worker_pool_->add(
+            [this, rclone_rc_url, generation]() {
+                const auto response = core::HTTPClient::get().post(
+                    rclone_rc_url + "/config/paths",
+                    "{}",
+                    {.headers = provider_json_headers()});
+                std::string error;
+                std::string config_path;
+                if (response.status_code >= 200 && response.status_code < 300) {
+                    try {
+                        const json parsed = json::parse(response.body);
+                        config_path = parsed.value("config", std::string{});
+                    } catch (const std::exception& ex) {
+                        error = std::string("Failed to parse config path: ") + ex.what();
+                    }
+                } else {
+                    error = provider_response_error_message(response, "Failed to locate rclone config");
+                }
+
+                if (error.empty() && config_path.empty()) {
+                    error = "Rclone did not return a config path.";
+                }
+                if (error.empty() && !core::open_path_default(config_path)) {
+                    error = "Failed to open rclone config.";
+                }
+
+                std::lock_guard<std::mutex> lock(mu);
+                if (generation != remote_edit_session_.generation) {
+                    return;
+                }
+                remote_edit_session_.revealing = false;
+                remote_edit_session_.reveal_error = std::move(error);
+            },
+            []() {},
+            [this, generation](const std::string& err) {
+                std::lock_guard<std::mutex> lock(mu);
+                if (generation != remote_edit_session_.generation) {
+                    return;
+                }
+                remote_edit_session_.revealing = false;
+                remote_edit_session_.reveal_error = "reveal_rclone_config: " + err;
+            }
+        );
     }
 
     void ProvidersState::on_request_disconnect(const std::string& provider_id) {
@@ -1264,6 +2128,8 @@ namespace misty::panel {
         add_provider_session_.show_modal = false;
         show_rename_modal = false;
         show_disconnect_modal = true;
+        rename_session_ = ProviderRenameSession{};
+        details_session_.show_modal = false;
         pending_provider_id = provider_id;
         disconnect_in_flight = false;
         dialog_message = "Disconnecting this provider will remove it from Misty until you connect it again.";
@@ -1318,6 +2184,10 @@ namespace misty::panel {
                     dialog_message.clear();
                     success_message = "Provider \"" + provider_id + "\" disconnected.";
                     error_message.clear();
+                    if (remote_edit_session_.selected_remote == provider_id ||
+                        remote_edit_session_.original_remote_name == provider_id) {
+                        reset_remote_edit_session_locked();
+                    }
                 }
 
                 refresh_remotes();
@@ -1336,6 +2206,8 @@ namespace misty::panel {
         reset_add_provider_session_locked();
         show_rename_modal = false;
         show_disconnect_modal = false;
+        rename_session_ = ProviderRenameSession{};
+        details_session_ = ProviderDetailsSession{};
         disconnect_in_flight = false;
         pending_provider_id.clear();
         dialog_message.clear();
@@ -1353,6 +2225,74 @@ namespace misty::panel {
         }
 
         return provider_card_matches_query(card, query);
+    }
+
+    std::vector<std::string> ProvidersState::current_remote_names_locked() const {
+        std::vector<std::string> names;
+        names.reserve(remotes_.size());
+        for (const auto& remote : remotes_) {
+            if (!remote.name.empty()) {
+                names.push_back(remote.name);
+            }
+        }
+        for (const auto& name : configured_remote_names_) {
+            if (!name.empty() && std::find(names.begin(), names.end(), name) == names.end()) {
+                names.push_back(name);
+            }
+        }
+        return names;
+    }
+
+    void ProvidersState::validate_remote_edit_session_locked() {
+        remote_edit_session_.dirty = false;
+        remote_edit_session_.can_save = false;
+        remote_edit_session_.validation_error.clear();
+
+        if (!remote_edit_session_.has_selection || remote_edit_session_.loading) {
+            return;
+        }
+
+        if (remote_edit_session_.stale) {
+            remote_edit_session_.dirty =
+                remote_edit_session_.selected_remote != remote_edit_session_.original_remote_name ||
+                remote_edit_session_.edit_config != remote_edit_session_.original_config;
+            remote_edit_session_.validation_error =
+                "This remote changed in another tab. Reload it before saving.";
+            return;
+        }
+
+        if (remote_edit_session_.selected_remote.empty()) {
+            remote_edit_session_.validation_error = "Enter a remote name.";
+            return;
+        }
+        if (remote_edit_session_.selected_remote.find(':') != std::string::npos ||
+            remote_edit_session_.selected_remote.find('/') != std::string::npos ||
+            remote_edit_session_.selected_remote.find('\\') != std::string::npos) {
+            remote_edit_session_.validation_error = "Remote names cannot contain colons or path separators.";
+            return;
+        }
+
+        const auto existing_names = current_remote_names_locked();
+        for (const auto& name : existing_names) {
+            if (name == remote_edit_session_.selected_remote &&
+                name != remote_edit_session_.original_remote_name) {
+                remote_edit_session_.validation_error = "A remote with that name already exists.";
+                return;
+            }
+        }
+
+        remote_edit_session_.dirty =
+            remote_edit_session_.selected_remote != remote_edit_session_.original_remote_name ||
+            remote_edit_session_.edit_config != remote_edit_session_.original_config;
+        remote_edit_session_.can_save =
+            remote_edit_session_.dirty &&
+            !remote_edit_session_.saving &&
+            remote_edit_session_.validation_error.empty();
+    }
+
+    void ProvidersState::reset_remote_edit_session_locked() {
+        remote_edit_session_.generation++;
+        remote_edit_session_ = ProviderRemoteEditSession{};
     }
 
     void ProvidersState::rebuild_provider_cards_locked() {

@@ -36,5 +36,7 @@ namespace misty::panel {
         const char* title
     );
 
+    void show_provider_rename_popup(ProvidersState& state);
+    void show_provider_details_popup(ProvidersState& state);
     void show_provider_disconnect_popup(ProvidersState& state, bool open);
 }

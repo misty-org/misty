@@ -134,32 +134,41 @@ TransfersToolbarAction render_transfers_toolbar(TransfersState& state,
     const std::size_t selected_count = state.selected_count();
 
     if (filter_icon_button()) {
-        ImGui::OpenPopup("##transfers_filter_popup");
+        action = TransfersToolbarAction::ToggleFilters;
     }
-
-    ImGui::SameLine(0.0f, 8.0f);
-    if (filter_summary_button(state, counts)) {
-        ImGui::OpenPopup("##transfers_filter_popup");
+    if (state.active_filter_count() > 0) {
+        const std::string count = std::to_string(state.active_filter_count());
+        const ImVec2 max = ImGui::GetItemRectMax();
+        ImGui::GetWindowDrawList()->AddCircleFilled(ImVec2(max.x - 4.0f, max.y - 4.0f), 9.0f,
+                                                     IM_COL32(53, 120, 221, 255));
+        const ImVec2 text_size = ImGui::CalcTextSize(count.c_str());
+        ImGui::GetWindowDrawList()->AddText(ImVec2(max.x - 4.0f - text_size.x * 0.5f,
+                                                   max.y - 4.0f - text_size.y * 0.5f),
+                                            IM_COL32(245, 247, 250, 255), count.c_str());
     }
-    render_filter_popup(state, counts);
 
     ImGui::SameLine(0.0f, 12.0f);
-    const float search_w = std::min(420.0f, std::max(260.0f, ImGui::GetContentRegionAvail().x * 0.34f));
+    const float search_w = std::min(420.0f, std::max(180.0f, ImGui::GetContentRegionAvail().x * 0.34f));
     search_box(state, search_w);
 
     if (selected_count > 0) {
-        ImGui::SameLine(0.0f, 12.0f);
+        if (ImGui::GetContentRegionAvail().x > 190.0f) {
+            ImGui::SameLine(0.0f, 12.0f);
+        }
         const std::string delete_selected_label = "Delete selected (" + std::to_string(selected_count) + ")";
         if (toolbar_button(delete_selected_label.c_str(), ImVec2(174.0f, 38.0f), true)) {
             action = TransfersToolbarAction::DeleteSelected;
         }
 
-        ImGui::SameLine(0.0f, 8.0f);
+    }
+    if (total_count > 0) {
+        if (ImGui::GetContentRegionAvail().x > 116.0f) {
+            ImGui::SameLine(0.0f, 8.0f);
+        }
         if (toolbar_button("Delete all", ImVec2(104.0f, 38.0f), true)) {
             action = TransfersToolbarAction::DeleteAll;
         }
     }
-    (void)total_count;
 
     return action;
 }

@@ -85,6 +85,44 @@ bool matches_search(const core::FileTransferRecord& row, const char* search_quer
     return contains_case_insensitive(haystack, query);
 }
 
+bool matches_provider_filter(const core::FileTransferRecord& row, const std::set<std::string>& provider_filters) {
+    if (provider_filters.empty()) {
+        return true;
+    }
+    const auto keys = provider_keys_for_row(row);
+    return std::any_of(keys.begin(), keys.end(), [&](const std::string& key) {
+        return provider_filters.contains(key);
+    });
+}
+
+bool matches_type_filter(const core::FileTransferRecord& row,
+                         const std::set<core::FileTransferType>& type_filters) {
+    return type_filters.empty() || type_filters.contains(row.transfer_type);
+}
+
+bool matches_location_scope(const core::FileTransferRecord& row, TransferLocationScope scope) {
+    if (scope == TransferLocationScope::All) {
+        return true;
+    }
+    const bool uses_remote = !row.remote_source_name.empty() || !row.remote_dest_name.empty();
+    return scope == TransferLocationScope::Remote ? uses_remote : !uses_remote;
+}
+
+int64_t row_time(const core::FileTransferRecord& row) {
+    if (row.is_alive()) {
+        return row.started_at_ms > 0 ? row.started_at_ms : row.queued_at_ms;
+    }
+    return row.completed_at_ms > 0 ? row.completed_at_ms : row.started_at_ms;
+}
+
+int status_rank(const core::FileTransferRecord& row) {
+    if (row.is_alive()) return 0;
+    if (row.status == core::FileTransferStatus::Failed ||
+        row.status == core::FileTransferStatus::Interrupted) return 1;
+    if (row.status == core::FileTransferStatus::Completed) return 2;
+    return 3;
+}
+
 }  // namespace
 
 TransferCounts count_rows(const std::vector<core::FileTransferRecord>& rows) {
@@ -102,39 +140,107 @@ TransferCounts count_rows(const std::vector<core::FileTransferRecord>& rows) {
     return counts;
 }
 
+std::vector<std::string> provider_keys_for_row(const core::FileTransferRecord& row) {
+    std::vector<std::string> keys;
+    if (!row.remote_source_name.empty()) {
+        keys.push_back(row.remote_source_name);
+    }
+    if (!row.remote_dest_name.empty() &&
+        std::find(keys.begin(), keys.end(), row.remote_dest_name) == keys.end()) {
+        keys.push_back(row.remote_dest_name);
+    }
+    if (keys.empty()) {
+        keys.push_back(kTransferProviderLocal);
+    }
+    return keys;
+}
+
+std::vector<TransferProviderGroup> provider_groups(
+    const std::vector<core::FileTransferRecord>& rows,
+    const std::map<std::string, std::string>& remote_labels) {
+    std::map<std::string, TransferProviderGroup> grouped;
+    grouped[kTransferProviderLocal] = TransferProviderGroup{kTransferProviderLocal, "Local", 0, 0};
+    for (const auto& row : rows) {
+        for (const auto& key : provider_keys_for_row(row)) {
+            auto& group = grouped[key];
+            if (group.key.empty()) {
+                group.key = key;
+                const auto label_it = remote_labels.find(key);
+                group.label = label_it == remote_labels.end() ? key : label_it->second;
+            }
+            ++group.count;
+            if (row.is_alive()) {
+                ++group.active;
+            }
+        }
+    }
+
+    std::vector<TransferProviderGroup> out;
+    out.reserve(grouped.size());
+    for (auto& [key, group] : grouped) {
+        if (key == kTransferProviderLocal && group.count == 0) {
+            continue;
+        }
+        out.push_back(std::move(group));
+    }
+    std::sort(out.begin(), out.end(), [](const TransferProviderGroup& lhs, const TransferProviderGroup& rhs) {
+        if (lhs.key == kTransferProviderLocal) {
+            return true;
+        }
+        if (rhs.key == kTransferProviderLocal) {
+            return false;
+        }
+        return lowercase_copy(lhs.label) < lowercase_copy(rhs.label);
+    });
+    return out;
+}
+
 std::vector<core::FileTransferRecord> sorted_rows(std::vector<core::FileTransferRecord> rows) {
-    std::sort(rows.begin(), rows.end(), [](const core::FileTransferRecord& lhs,
-                                           const core::FileTransferRecord& rhs) {
-        if (lhs.is_alive() != rhs.is_alive()) {
-            return lhs.is_alive() > rhs.is_alive();
+    return sorted_rows(std::move(rows), TransferSortKey::Time, TransferSortDirection::Descending);
+}
+
+std::vector<core::FileTransferRecord> sorted_rows(std::vector<core::FileTransferRecord> rows,
+                                                  TransferSortKey key,
+                                                  TransferSortDirection direction) {
+    std::sort(rows.begin(), rows.end(), [&](const core::FileTransferRecord& lhs,
+                                            const core::FileTransferRecord& rhs) {
+        int comparison = 0;
+        switch (key) {
+            case TransferSortKey::Name:
+                comparison = lowercase_copy(lhs.file_name).compare(lowercase_copy(rhs.file_name));
+                break;
+            case TransferSortKey::Operation:
+                comparison = std::string(type_label(lhs.transfer_type)).compare(type_label(rhs.transfer_type));
+                break;
+            case TransferSortKey::Status:
+                comparison = status_rank(lhs) - status_rank(rhs);
+                break;
+            case TransferSortKey::Time:
+                comparison = row_time(lhs) < row_time(rhs) ? -1 : row_time(lhs) > row_time(rhs) ? 1 : 0;
+                break;
         }
-        if ((lhs.status == core::FileTransferStatus::Failed) !=
-            (rhs.status == core::FileTransferStatus::Failed)) {
-            return (lhs.status == core::FileTransferStatus::Failed) >
-                   (rhs.status == core::FileTransferStatus::Failed);
+        if (comparison == 0) {
+            comparison = lhs.id < rhs.id ? -1 : lhs.id > rhs.id ? 1 : 0;
         }
-        if ((lhs.status == core::FileTransferStatus::Interrupted) !=
-            (rhs.status == core::FileTransferStatus::Interrupted)) {
-            return (lhs.status == core::FileTransferStatus::Interrupted) >
-                   (rhs.status == core::FileTransferStatus::Interrupted);
-        }
-        const auto lhs_time = lhs.is_alive() ? lhs.started_at_ms : lhs.completed_at_ms;
-        const auto rhs_time = rhs.is_alive() ? rhs.started_at_ms : rhs.completed_at_ms;
-        if (lhs_time != rhs_time) {
-            return lhs_time > rhs_time;
-        }
-        return lhs.id > rhs.id;
+        return direction == TransferSortDirection::Ascending ? comparison < 0 : comparison > 0;
     });
     return rows;
 }
 
 std::vector<core::FileTransferRecord> visible_rows(const std::vector<core::FileTransferRecord>& rows,
                                                    const char* search_query,
-                                                   core::FileTransferFilter filter) {
+                                                   core::FileTransferFilter filter,
+                                                   const std::set<std::string>& provider_filters,
+                                                   const std::set<core::FileTransferType>& type_filters,
+                                                   TransferLocationScope location_scope) {
     std::vector<core::FileTransferRecord> visible;
     visible.reserve(rows.size());
     for (const auto& row : rows) {
-        if (matches_filter(row, filter) && matches_search(row, search_query)) {
+        if (matches_filter(row, filter) &&
+            matches_search(row, search_query) &&
+            matches_provider_filter(row, provider_filters) &&
+            matches_type_filter(row, type_filters) &&
+            matches_location_scope(row, location_scope)) {
             visible.push_back(row);
         }
     }

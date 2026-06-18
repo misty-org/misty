@@ -36,6 +36,7 @@ void TransfersView::render() {
     ImGui::SetNextWindowPos(ImVec2(sx, sy), ImGuiCond_Always);
     ImGui::SetNextWindowSize(ImVec2(sw, sh), ImGuiCond_Always);
     ImGui::SetNextWindowViewport(viewport->ID);
+    transfers_panel_->handle_commands();
     transfers_panel_->render();
     navbar_panel_->render_activity_popup();
     context_menu_panel_->render();

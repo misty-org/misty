@@ -4,6 +4,7 @@
 #include <string>
 
 #include "imgui.h"
+#include "imgui_internal.h"
 #include "panels/file_explorer/operations/operation_queue_state.h"
 #include "panels/transfers/content/transfers_content_util.h"
 
@@ -123,12 +124,18 @@ ImVec4 status_bg_color(const core::FileTransferRecord& row) {
     return ImVec4(0.08f, 0.15f, 0.24f, 1.0f);
 }
 
-void render_empty_state(float height) {
-    ImGui::Dummy(ImVec2(0.0f, std::max(24.0f, height * 0.28f)));
-    const float center_x = ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x * 0.5f;
+void render_empty_state(const ImVec2& table_origin, const ImVec2& table_size) {
+    constexpr float kHeaderHeight = 42.0f;
+    const float scrollbar_size = ImGui::GetStyle().ScrollbarSize;
+    const ImVec2 body_min(table_origin.x, table_origin.y + kHeaderHeight);
+    const ImVec2 body_max(table_origin.x + table_size.x - scrollbar_size,
+                          table_origin.y + table_size.y - scrollbar_size);
+    const ImVec2 body_center((body_min.x + body_max.x) * 0.5f,
+                             (body_min.y + body_max.y) * 0.5f);
+
     ImDrawList* dl = ImGui::GetWindowDrawList();
-    const ImVec2 icon_center(ImGui::GetCursorScreenPos().x + ImGui::GetContentRegionAvail().x * 0.5f,
-                             ImGui::GetCursorScreenPos().y + 36.0f);
+    dl->PushClipRect(body_min, body_max, true);
+    const ImVec2 icon_center(body_center.x, body_center.y - 38.0f);
     dl->AddLine(ImVec2(icon_center.x - 28.0f, icon_center.y - 2.0f),
                 ImVec2(icon_center.x + 26.0f, icon_center.y - 2.0f),
                 IM_COL32(241, 238, 232, 255), 4.0f);
@@ -147,16 +154,15 @@ void render_empty_state(float height) {
     dl->AddLine(ImVec2(icon_center.x - 8.0f, icon_center.y + 50.0f),
                 ImVec2(icon_center.x - 28.0f, icon_center.y + 32.0f),
                 IM_COL32(105, 116, 134, 180), 4.0f);
-    ImGui::Dummy(ImVec2(0.0f, 86.0f));
-
-    const std::string title = "No transfers";
-    ImGui::SetCursorPosX(center_x - ImGui::CalcTextSize(title.c_str()).x * 0.5f);
-    ImGui::TextUnformatted(title.c_str());
-    ImGui::PushStyleColor(ImGuiCol_Text, kMuted);
+    const char* title = "No transfers";
+    const ImVec2 title_size = ImGui::CalcTextSize(title);
+    dl->AddText(ImVec2(body_center.x - title_size.x * 0.5f, icon_center.y + 64.0f),
+                ImGui::GetColorU32(kText), title);
     const char* body = "New uploads, downloads, and local operations will appear here.";
-    ImGui::SetCursorPosX(center_x - ImGui::CalcTextSize(body).x * 0.5f);
-    ImGui::TextUnformatted(body);
-    ImGui::PopStyleColor();
+    const ImVec2 body_size = ImGui::CalcTextSize(body);
+    dl->AddText(ImVec2(body_center.x - body_size.x * 0.5f, icon_center.y + 90.0f),
+                ImGui::GetColorU32(kMuted), body);
+    dl->PopClipRect();
 }
 
 void render_inline_progress(const core::FileTransferRecord& row, float width) {
@@ -231,7 +237,18 @@ void render_row(core::StateRegistry& registry,
                 core::WorkerPool& worker_pool,
                 TransfersState& state,
                 const core::FileTransferRecord& row) {
+    ImGui::PushID(static_cast<int>(row.id));
     ImGui::TableNextRow(ImGuiTableRowFlags_None, 76.0f);
+    ImGui::TableSetColumnIndex(0);
+    const ImVec2 row_start = ImGui::GetCursorScreenPos();
+    const ImVec2 selectable_pos = row_start;
+    if (ImGui::Selectable("##focus_transfer",
+                          state.focused_transfer_id() == row.id,
+                          ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap,
+                          ImVec2(0.0f, 75.0f))) {
+        state.set_focused_transfer_id(row.id);
+    }
+    ImGui::SetCursorScreenPos(selectable_pos);
     if (state.is_selected(row.id)) {
         ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, kRowSelectedBg);
     }
@@ -239,7 +256,6 @@ void render_row(core::StateRegistry& registry,
         ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg1, kRowAltBg);
     }
 
-    ImGui::TableSetColumnIndex(0);
     ImGui::SetCursorPosX(ImGui::GetCursorPosX() + kCheckboxLeftPadding);
     ImGui::PushID(static_cast<int>(row.id));
     bool selected = state.is_selected(row.id);
@@ -284,6 +300,7 @@ void render_row(core::StateRegistry& registry,
 
     ImGui::TableSetColumnIndex(5);
     render_row_actions(registry, worker_pool, state, row);
+    ImGui::PopID();
 }
 
 void render_select_page_header(TransfersState& state,
@@ -319,22 +336,63 @@ void render_transfers_table(core::StateRegistry& registry,
     const float table_height = std::max(180.0f, height);
     const ImGuiTableFlags flags =
         ImGuiTableFlags_BordersInnerH |
+        ImGuiTableFlags_Resizable |
+        ImGuiTableFlags_Reorderable |
+        ImGuiTableFlags_Sortable |
+        ImGuiTableFlags_ScrollX |
         ImGuiTableFlags_ScrollY |
-        ImGuiTableFlags_SizingStretchProp;
+        ImGuiTableFlags_SizingFixedFit;
 
     const float content_height = 40.0f + static_cast<float>(rows.size()) * 76.0f;
-    const float table_shell_height = rows.empty() ? 50.0f : std::min(table_height, std::max(180.0f, content_height));
+    const float table_shell_height = rows.empty()
+        ? table_height
+        : std::min(table_height, std::max(180.0f, content_height));
     constexpr float kTableOuterPadding = 12.0f;
     ImGui::Indent(kTableOuterPadding);
     ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(6.0f, 12.0f));
-    if (ImGui::BeginTable("##transfers_table", 6, flags, ImVec2(0.0f, table_shell_height))) {
+    const ImVec2 table_origin = ImGui::GetCursorScreenPos();
+    const float table_visible_width = ImGui::GetContentRegionAvail().x;
+    if (ImGui::BeginTable("##transfers_table", 6, flags, ImVec2(0.0f, table_shell_height), 850.0f)) {
         ImGui::TableSetupScrollFreeze(0, 1);
-        ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoResize, 58.0f);
-        ImGui::TableSetupColumn("Transfer", ImGuiTableColumnFlags_WidthStretch, 0.58f);
-        ImGui::TableSetupColumn("Operation", ImGuiTableColumnFlags_WidthFixed, 124.0f);
-        ImGui::TableSetupColumn("Status", ImGuiTableColumnFlags_WidthFixed, 136.0f);
-        ImGui::TableSetupColumn("Time", ImGuiTableColumnFlags_WidthFixed, 96.0f);
-        ImGui::TableSetupColumn("Actions", ImGuiTableColumnFlags_WidthFixed, 168.0f);
+        ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoResize |
+                                       ImGuiTableColumnFlags_NoSort | ImGuiTableColumnFlags_NoReorder, 54.0f, 0);
+        ImGui::TableSetupColumn("Transfer", ImGuiTableColumnFlags_WidthFixed, 270.0f, 1);
+        ImGui::TableSetupColumn("Operation", ImGuiTableColumnFlags_WidthFixed, 124.0f, 2);
+        ImGui::TableSetupColumn("Status", ImGuiTableColumnFlags_WidthFixed, 136.0f, 3);
+        ImGui::TableSetupColumn("Time", ImGuiTableColumnFlags_WidthFixed |
+                                       ImGuiTableColumnFlags_DefaultSort |
+                                       ImGuiTableColumnFlags_PreferSortDescending, 110.0f, 4);
+        ImGui::TableSetupColumn("Actions", ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoSort, 156.0f, 5);
+
+        ImGuiTableSortSpecs* sort_specs = ImGui::TableGetSortSpecs();
+        if (sort_specs && sort_specs->SpecsDirty && sort_specs->SpecsCount > 0) {
+            const ImGuiTableColumnSortSpecs& spec = sort_specs->Specs[0];
+            TransferSortKey key = TransferSortKey::Time;
+            if (spec.ColumnUserID == 1) key = TransferSortKey::Name;
+            if (spec.ColumnUserID == 2) key = TransferSortKey::Operation;
+            if (spec.ColumnUserID == 3) key = TransferSortKey::Status;
+            state.set_sort(key,
+                           spec.SortDirection == ImGuiSortDirection_Ascending
+                               ? TransferSortDirection::Ascending
+                               : TransferSortDirection::Descending);
+            sort_specs->SpecsDirty = false;
+        } else if (sort_specs) {
+            ImGuiID desired_user_id = 4;
+            int desired_column = 4;
+            if (state.sort_key() == TransferSortKey::Name) desired_user_id = desired_column = 1;
+            if (state.sort_key() == TransferSortKey::Operation) desired_user_id = desired_column = 2;
+            if (state.sort_key() == TransferSortKey::Status) desired_user_id = desired_column = 3;
+            const ImGuiSortDirection desired_direction =
+                state.sort_direction() == TransferSortDirection::Ascending
+                    ? ImGuiSortDirection_Ascending
+                    : ImGuiSortDirection_Descending;
+            const bool matches = sort_specs->SpecsCount > 0 &&
+                sort_specs->Specs[0].ColumnUserID == desired_user_id &&
+                sort_specs->Specs[0].SortDirection == desired_direction;
+            if (!matches) {
+                ImGui::TableSetColumnSortDirection(desired_column, desired_direction, false);
+            }
+        }
         ImGui::TableNextRow(ImGuiTableRowFlags_Headers, 42.0f);
         ImGui::TableSetColumnIndex(0);
         render_select_page_header(state, rows);
@@ -352,11 +410,11 @@ void render_transfers_table(core::StateRegistry& registry,
 
         ImGui::EndTable();
     }
+    if (rows.empty()) {
+        render_empty_state(table_origin, ImVec2(table_visible_width, table_shell_height));
+    }
     ImGui::PopStyleVar();
     ImGui::Unindent(kTableOuterPadding);
-    if (rows.empty()) {
-        render_empty_state(std::max(180.0f, table_height - table_shell_height));
-    }
 }
 
 }  // namespace misty::panel

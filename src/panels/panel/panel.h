@@ -54,6 +54,7 @@ namespace misty::panel {
         virtual std::string save_restore_state() const { return {}; }
         virtual void load_restore_state(const std::string& state) { (void)state; }
         virtual void release_state() {}
+        virtual std::string close_warning() const { return {}; }
 
     protected:
         void show_error_modal(std::string& error_msg, const char* modal_id = "Error");

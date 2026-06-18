@@ -10,8 +10,7 @@ void TransfersState::set_filter(core::FileTransferFilter filter) {
         return;
     }
     filter_ = filter;
-    page_index_ = 0;
-    clear_selection();
+    on_view_filter_changed();
 }
 
 bool TransfersState::update_search_revision() {
@@ -23,6 +22,74 @@ bool TransfersState::update_search_revision() {
     page_index_ = 0;
     clear_selection();
     return true;
+}
+
+void TransfersState::toggle_provider_filter(const std::string& provider) {
+    if (provider.empty()) {
+        return;
+    }
+    if (provider_filters_.contains(provider)) {
+        provider_filters_.erase(provider);
+    } else {
+        provider_filters_.insert(provider);
+    }
+    on_view_filter_changed();
+}
+
+bool TransfersState::provider_selected(const std::string& provider) const {
+    return provider_filters_.contains(provider);
+}
+
+void TransfersState::toggle_type_filter(core::FileTransferType type) {
+    if (type_filters_.contains(type)) {
+        type_filters_.erase(type);
+    } else {
+        type_filters_.insert(type);
+    }
+    on_view_filter_changed();
+}
+
+bool TransfersState::type_selected(core::FileTransferType type) const {
+    return type_filters_.contains(type);
+}
+
+void TransfersState::set_location_scope(TransferLocationScope scope) {
+    if (location_scope_ == scope) {
+        return;
+    }
+    location_scope_ = scope;
+    on_view_filter_changed();
+}
+
+void TransfersState::set_sort(TransferSortKey key, TransferSortDirection direction) {
+    if (sort_key_ == key && sort_direction_ == direction) {
+        return;
+    }
+    sort_key_ = key;
+    sort_direction_ = direction;
+    page_index_ = 0;
+}
+
+std::size_t TransfersState::active_filter_count() const {
+    return provider_filters_.size() + type_filters_.size() +
+        (location_scope_ == TransferLocationScope::All ? 0u : 1u) +
+        (filter_ == core::FileTransferFilter::All ? 0u : 1u);
+}
+
+void TransfersState::clear_filters() {
+    provider_filters_.clear();
+    type_filters_.clear();
+    location_scope_ = TransferLocationScope::All;
+    filter_ = core::FileTransferFilter::All;
+    on_view_filter_changed();
+}
+
+void TransfersState::on_view_filter_changed(bool clear_focus) {
+    page_index_ = 0;
+    clear_selection();
+    if (clear_focus) {
+        clear_focused_transfer();
+    }
 }
 
 void TransfersState::next_page(std::size_t page_count) {
@@ -80,6 +147,18 @@ void TransfersState::prune_selection(const std::vector<core::FileTransferRecord>
         } else {
             ++it;
         }
+    }
+}
+
+void TransfersState::prune_focused_transfer(const std::vector<core::FileTransferRecord>& rows) {
+    if (focused_transfer_id_ == 0) {
+        return;
+    }
+    const auto it = std::find_if(rows.begin(), rows.end(), [&](const core::FileTransferRecord& row) {
+        return row.id == focused_transfer_id_;
+    });
+    if (it == rows.end()) {
+        focused_transfer_id_ = 0;
     }
 }
 

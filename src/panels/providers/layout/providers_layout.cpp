@@ -44,39 +44,48 @@ namespace misty::panel {
         }
     }
 
-    void ProvidersPanel::render() {
-        auto& state = registry_.get_state<ProvidersState>("Providers");
+    void ProvidersPanel::render_panel_contents() {
+        auto& shared_state = registry_.get_state<ProvidersState>("Providers");
+        auto& state = registry_.get_state<ProvidersState>(state_key_);
+        state.init(worker_pool_, false);
+        state.attach_shared_state(&shared_state);
+        state.sync_shared_data_from(shared_state);
+        if (!pending_restore_remote_.empty()) {
+            state.select_remote(pending_restore_remote_);
+            pending_restore_remote_.clear();
+        }
+        if (state.selected_page_tab() == ProvidersPageTab::Diagnostics &&
+            state.rclone_config_session_snapshot().config_path.empty()) {
+            state.refresh_rclone_config_paths();
+        }
         sync_search_buffer(state);
 
-        ImGuiWindowFlags flags =
-            ImGuiWindowFlags_NoTitleBar |
-            ImGuiWindowFlags_NoResize |
-            ImGuiWindowFlags_NoMove |
-            ImGuiWindowFlags_NoCollapse |
-            ImGuiWindowFlags_NoSavedSettings;
+        const float pane_width = ImGui::GetContentRegionAvail().x;
+        const bool compact_pane = pane_width < 760.0f;
+        const ImVec2 workspace_padding(
+            compact_pane ? 14.0f : 24.0f,
+            compact_pane ? 16.0f : 20.0f);
 
-        if (ImGuiViewport* main_viewport = ImGui::GetMainViewport()) {
-            ImGui::SetNextWindowViewport(main_viewport->ID);
-        }
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, kPanelBg);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, workspace_padding);
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 8.0f));
 
-        ImGui::PushStyleColor(ImGuiCol_WindowBg, kPanelBg);
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(32.0f, 28.0f));
-        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 10.0f));
-
-        if (ImGui::Begin("ProvidersPanel", nullptr, flags)) {
+        if (ImGui::BeginChild("##providers_workspace", ImVec2(0.0f, 0.0f),
+                              ImGuiChildFlags_AlwaysUseWindowPadding,
+                              ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse)) {
             const float content_width = ImGui::GetContentRegionAvail().x;
             show_top_bar(state, content_width);
-            ImGui::Dummy(ImVec2(0.0f, 8.0f));
+            ImGui::Dummy(ImVec2(0.0f, 6.0f));
             show_status_messages(state);
 
             const float remaining_height = ImGui::GetContentRegionAvail().y;
             const float list_height_budget = std::max(0.0f, remaining_height);
 
-            render_connected_accounts_table(state, list_height_budget);
+            render_providers_workspace(registry_, state, list_height_budget);
             show_provider_dialogs(state);
         }
 
-        ImGui::End();
+        ImGui::EndChild();
         ImGui::PopStyleVar(2);
         ImGui::PopStyleColor();
     }
@@ -117,14 +126,21 @@ namespace misty::panel {
         ImGui::SetWindowFontScale(1.0f);
         ImGui::PopStyleColor();
 
-        const float button_width = 166.0f;
+        const bool compact = content_width < 700.0f;
+        const float button_width = compact ? std::min(146.0f, content_width * 0.36f) : 166.0f;
         const float right_gap = 14.0f;
-        const float search_width = std::min(compute_provider_search_width(content_width), content_width * 0.36f);
+        const float search_width = compact
+            ? std::max(120.0f, content_width - button_width - right_gap)
+            : std::min(compute_provider_search_width(content_width), content_width * 0.36f);
         const float right_block = search_width + button_width + right_gap;
         const float right_start = std::max(title_right + 24.0f, content_width - right_block);
 
-        ImGui::SameLine();
-        ImGui::SetCursorPosX(right_start);
+        if (compact) {
+            ImGui::Dummy(ImVec2(0.0f, 4.0f));
+        } else {
+            ImGui::SameLine();
+            ImGui::SetCursorPosX(right_start);
+        }
 
         ImGui::BeginGroup();
         ImGui::PushStyleColor(ImGuiCol_FrameBg, kSearchBg);
@@ -133,10 +149,10 @@ namespace misty::panel {
         ImGui::PushStyleColor(ImGuiCol_TextDisabled, kMuted);
         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
         ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
-        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(42.0f, 12.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(40.0f, 10.0f));
 
         ImGui::SetNextItemWidth(search_width);
-        const bool changed = ImGui::InputTextWithHint("##providers_search", "Search providers", search_buf_, sizeof(search_buf_));
+        const bool changed = ImGui::InputTextWithHint("##providers_search", "Search remotes", search_buf_, sizeof(search_buf_));
         if (changed) {
             state.set_search_query(search_buf_);
         }
@@ -229,7 +245,7 @@ namespace misty::panel {
         ImGui::PopStyleColor(4);
 
         ImGui::SameLine(0.0f, right_gap);
-        if (provider_teal_button("Add Provider", ImVec2(button_width, input_max.y - input_min.y))) {
+        if (provider_teal_button("+  Add Remote", ImVec2(button_width, input_max.y - input_min.y))) {
             state.on_add_provider();
         }
         ImGui::EndGroup();
