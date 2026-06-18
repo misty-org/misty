@@ -31,6 +31,7 @@ void RenameSessionState::clear() {
     active = false;
     review_modal_open = false;
     focus_requested = false;
+    inline_input_active = false;
     shared_cursor_pos = 0;
     shared_cursor_anim = 0.0f;
     focus_key.clear();
@@ -57,7 +58,8 @@ RenameParticipant make_rename_participant(const std::string& owner_key,
                                           const std::string& directory_path,
                                           const FileItem& item,
                                           const std::unordered_set<std::string>& sibling_names,
-                                          std::uint64_t added_order) {
+                                          std::uint64_t added_order,
+                                          bool create_mode) {
     RenameParticipant participant;
     participant.key = rename_participant_key(owner_key, item.path);
     participant.owner_key = owner_key;
@@ -71,7 +73,15 @@ RenameParticipant make_rename_participant(const std::string& owner_key,
     participant.locked_extension = std::move(locked_extension);
     participant.sibling_names = sibling_names;
     participant.added_order = added_order;
+    participant.create_mode = create_mode;
     return participant;
+}
+
+bool rename_session_is_create_mode(const RenameSessionState& session) {
+    return !session.participants.empty() &&
+           std::all_of(session.participants.begin(), session.participants.end(), [](const auto& entry) {
+               return entry.second.create_mode;
+           });
 }
 
 void apply_rename_participant_draft(RenameSessionState& session,
@@ -109,7 +119,7 @@ void update_rename_session_validation(RenameSessionState& session) {
         if (draft.empty() || has_invalid_separator(draft)) {
             continue;
         }
-        if (draft == participant.original_name) {
+        if (draft == participant.original_name && !participant.create_mode) {
             continue;
         }
         const std::string target_path = renamed_path_for_item(participant, draft);
@@ -140,7 +150,7 @@ void update_rename_session_validation(RenameSessionState& session) {
         }
 
         const std::string effective_name = rename_effective_name(participant);
-        if (effective_name == participant.original_name) {
+        if (effective_name == participant.original_name && !participant.create_mode) {
             participant.validation.code = RenameValidationCode::Unchanged;
             participant.validation.message = "Unchanged.";
             continue;

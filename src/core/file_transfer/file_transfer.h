@@ -22,6 +22,7 @@ enum class FileTransferItemType {
 enum class FileTransferType {
     Upload,
     Download,
+    Create,
     Copy,
     Move,
     Rename,
@@ -83,6 +84,11 @@ struct FileTransferRecord {
     bool is_alive() const;
 };
 
+struct FileTransferPage {
+    std::vector<FileTransferRecord> rows;
+    std::size_t total_count = 0;
+};
+
 class FileTransfer : public StateEntry {
 public:
     static constexpr size_t kMaxHistory = 500;
@@ -114,8 +120,13 @@ public:
     void complete_transfer(uint64_t id);
 
     void fail_transfer(uint64_t id, const std::string& error_message);
+    void remove_transfer(uint64_t id);
+    void clear_all();
     void clear_completed();
     void clear_failed();
+    FileTransferPage get_transfer_page(std::size_t offset,
+                                       std::size_t limit,
+                                       const std::string& search_query = {}) const;
     std::vector<FileTransferRecord> get_all_transfers() const;
     bool get_transfer(uint64_t id, FileTransferRecord& out) const;
 

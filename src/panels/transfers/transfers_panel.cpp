@@ -1,5 +1,9 @@
 #include "panels/transfers/transfers_panel.h"
 
+#include <algorithm>
+#include <string>
+#include <vector>
+
 #include "imgui.h"
 #include "panels/file_explorer/operations/operation_queue_state.h"
 #include "panels/transfers/content/transfers_content_util.h"
@@ -23,6 +27,85 @@ void render_header_text() {
     ImGui::PopStyleColor();
 }
 
+std::size_t page_count_for(std::size_t total_count) {
+    if (total_count == 0) {
+        return 1;
+    }
+    return (total_count + TransfersState::kPageSize - 1) / TransfersState::kPageSize;
+}
+
+core::FileTransferPage page_for_rows(const std::vector<core::FileTransferRecord>& rows,
+                                     std::size_t offset,
+                                     std::size_t limit) {
+    core::FileTransferPage page;
+    page.total_count = rows.size();
+    if (offset >= rows.size() || limit == 0) {
+        return page;
+    }
+    const auto first = rows.begin() + static_cast<std::ptrdiff_t>(offset);
+    const auto last = rows.begin() + static_cast<std::ptrdiff_t>(std::min(rows.size(), offset + limit));
+    page.rows.assign(first, last);
+    return page;
+}
+
+void render_pagination_controls(TransfersState& state, std::size_t total_count) {
+    const std::size_t page_count = page_count_for(total_count);
+    const std::size_t page_number = total_count == 0 ? 0 : state.page_index() + 1;
+    const std::string label = total_count == 0
+        ? "No transfers"
+        : "Page " + std::to_string(page_number) + " of " + std::to_string(page_count) +
+              "  |  " + std::to_string(total_count) + " transfers";
+
+    ImGui::PushStyleColor(ImGuiCol_Text, kMutedText);
+    ImGui::TextUnformatted(label.c_str());
+    ImGui::PopStyleColor();
+
+    const float next_w = 68.0f;
+    const float prev_w = 84.0f;
+    const float gap = 8.0f;
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(),
+                                  ImGui::GetWindowContentRegionMax().x - prev_w - next_w - gap));
+
+    ImGui::BeginDisabled(state.page_index() == 0 || total_count == 0);
+    if (ImGui::Button("Previous", ImVec2(prev_w, 0.0f))) {
+        state.previous_page();
+    }
+    ImGui::EndDisabled();
+    ImGui::SameLine(0.0f, gap);
+    ImGui::BeginDisabled(state.page_index() + 1 >= page_count || total_count == 0);
+    if (ImGui::Button("Next", ImVec2(next_w, 0.0f))) {
+        state.next_page(page_count);
+    }
+    ImGui::EndDisabled();
+}
+
+bool render_delete_all_confirmation(std::size_t total_count) {
+    bool confirmed = false;
+    ImGui::SetNextWindowSize(ImVec2(420.0f, 0.0f), ImGuiCond_Appearing);
+    if (ImGui::BeginPopupModal("Delete all transfers?",
+                               nullptr,
+                               ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove)) {
+        ImGui::TextWrapped("This will remove all %zu transfer history entries from this list.", total_count);
+        ImGui::Dummy(ImVec2(0.0f, 10.0f));
+
+        if (ImGui::Button("Cancel", ImVec2(110.0f, 0.0f))) {
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.22f, 0.08f, 0.08f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.32f, 0.12f, 0.12f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.42f, 0.14f, 0.14f, 1.0f));
+        if (ImGui::Button("Delete all", ImVec2(120.0f, 0.0f))) {
+            confirmed = true;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::PopStyleColor(3);
+        ImGui::EndPopup();
+    }
+    return confirmed;
+}
+
 }  // namespace
 
 TransfersPanel::TransfersPanel(core::StateRegistry& registry, core::WorkerPool& worker_pool)
@@ -32,9 +115,6 @@ TransfersPanel::TransfersPanel(core::StateRegistry& registry, core::WorkerPool& 
 void TransfersPanel::render() {
     auto& tracker = registry_.get_state<core::FileTransfer>("FileMasterTransfers");
     auto& state = registry_.get_state<TransfersState>(kTransfersStateKey);
-
-    auto rows = transfers_content::sorted_rows(tracker.get_all_transfers());
-    rows = transfers_content::visible_rows(rows, state.search_query());
     const ImGuiWindowFlags window_flags =
         ImGuiWindowFlags_NoTitleBar |
         ImGuiWindowFlags_NoMove |
@@ -53,21 +133,46 @@ void TransfersPanel::render() {
         return;
     }
 
-    bool clear_finished = false;
-    bool clear_failed = false;
-    render_transfers_header(clear_finished, clear_failed);
+    render_transfers_header();
 
     ImGui::Dummy(ImVec2(0.0f, 14.0f));
-    render_transfers_toolbar(state);
+    auto all_rows = tracker.get_all_transfers();
+    state.prune_selection(all_rows);
+    const auto counts = transfers_content::count_rows(all_rows);
+    const TransfersToolbarAction toolbar_action = render_transfers_toolbar(state, counts);
+    switch (toolbar_action) {
+        case TransfersToolbarAction::DeleteSelected:
+            for (const auto transfer_id : state.selected_transfer_ids()) {
+                tracker.remove_transfer(transfer_id);
+            }
+            state.clear_selection();
+            all_rows = tracker.get_all_transfers();
+            break;
+        case TransfersToolbarAction::DeleteAll:
+            ImGui::OpenPopup("Delete all transfers?");
+            break;
+        case TransfersToolbarAction::None:
+            break;
+    }
+    if (render_delete_all_confirmation(all_rows.size())) {
+        tracker.clear_all();
+        state.clear_selection();
+        state.set_page_index(0);
+        all_rows = tracker.get_all_transfers();
+    }
+    state.update_search_revision();
+
+    auto visible_rows = transfers_content::visible_rows(
+        transfers_content::sorted_rows(all_rows), state.search_query(), state.filter());
+    state.clamp_page(visible_rows.size());
+    auto page = page_for_rows(visible_rows, state.page_offset(), TransfersState::kPageSize);
+    state.clamp_page(page.total_count);
 
     ImGui::Dummy(ImVec2(0.0f, 18.0f));
-    render_transfers_table(registry_, worker_pool_, rows, ImGui::GetContentRegionAvail().y);
-    if (clear_finished) {
-        clear_completed_operations(registry_);
-    }
-    if (clear_failed) {
-        clear_failed_operations(registry_);
-    }
+    render_transfers_table(
+        registry_, worker_pool_, state, page.rows, std::max(180.0f, ImGui::GetContentRegionAvail().y - 38.0f));
+    ImGui::Dummy(ImVec2(0.0f, 8.0f));
+    render_pagination_controls(state, page.total_count);
     render_operation_conflict_modal(registry_, worker_pool_);
 
     ImGui::End();

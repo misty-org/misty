@@ -859,8 +859,10 @@ namespace misty::panel {
         auto& library = library_state();
         {
             std::lock_guard<std::mutex> lock(library.mu);
-            library.last_opened_path = state.current_path;
-            library.dirty = true;
+            if (library.last_opened_path != state.current_path) {
+                library.last_opened_path = state.current_path;
+                library.dirty = true;
+            }
         }
     }
 

@@ -17,7 +17,8 @@ struct TransferCounts {
 TransferCounts count_rows(const std::vector<core::FileTransferRecord>& rows);
 std::vector<core::FileTransferRecord> sorted_rows(std::vector<core::FileTransferRecord> rows);
 std::vector<core::FileTransferRecord> visible_rows(const std::vector<core::FileTransferRecord>& rows,
-                                                   const char* search_query);
+                                                   const char* search_query,
+                                                   core::FileTransferFilter filter = core::FileTransferFilter::All);
 
 const char* filter_label(core::FileTransferFilter filter);
 const char* type_label(core::FileTransferType type);
