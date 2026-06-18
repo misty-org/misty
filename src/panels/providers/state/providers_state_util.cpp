@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <set>
 #include <thread>
 #include <utility>
 
@@ -51,11 +52,118 @@ namespace misty::panel {
         return base + path;
     }
 
+    std::string rclone_rc_url_from_port_text(const std::string& port_text) {
+        std::string digits;
+        for (char c : port_text) {
+            if (std::isdigit(static_cast<unsigned char>(c))) {
+                digits.push_back(c);
+            }
+        }
+        if (digits.empty()) {
+            return "http://127.0.0.1:5572";
+        }
+        return "http://127.0.0.1:" + digits;
+    }
+
     std::map<std::string, std::string> provider_json_headers() {
         std::map<std::string, std::string> headers;
         headers["Content-Type"] = "application/json";
         headers["Accept"] = "application/json";
         return headers;
+    }
+
+    std::vector<ProviderTokenField> parse_rclone_token_fields(const std::string& token_json) {
+        const json parsed = json::parse(token_json, nullptr, false);
+        if (!parsed.is_object()) {
+            return {};
+        }
+
+        std::vector<ProviderTokenField> fields;
+        fields.reserve(parsed.size());
+        for (const auto& [key, value] : parsed.items()) {
+            ProviderTokenField field;
+            field.key = key;
+            field.sensitive = (key != "token_type" && key.find("token") != std::string::npos) ||
+                              key.find("secret") != std::string::npos;
+            if (value.is_string()) {
+                field.value = value.get<std::string>();
+            } else if (!value.is_null()) {
+                field.value = value.dump();
+            }
+            fields.push_back(std::move(field));
+        }
+
+        const auto priority = [](const std::string& key) {
+            if (key == "access_token") return 0;
+            if (key == "refresh_token") return 1;
+            if (key == "token_type") return 2;
+            if (key == "expiry") return 3;
+            if (key == "expires_in") return 4;
+            return 5;
+        };
+        std::stable_sort(fields.begin(), fields.end(), [&](const auto& left, const auto& right) {
+            return priority(left.key) < priority(right.key);
+        });
+        return fields;
+    }
+
+    std::string update_rclone_token_field(
+        const std::string& token_json,
+        const std::string& key,
+        const std::string& value
+    ) {
+        json parsed = json::parse(token_json, nullptr, false);
+        if (!parsed.is_object() || !parsed.contains(key)) {
+            return token_json;
+        }
+
+        const json& original = parsed[key];
+        if (original.is_boolean()) {
+            if (value == "true") parsed[key] = true;
+            else if (value == "false") parsed[key] = false;
+            else parsed[key] = value;
+        } else if (original.is_number_integer()) {
+            try {
+                parsed[key] = std::stoll(value);
+            } catch (const std::exception&) {
+                parsed[key] = value;
+            }
+        } else if (original.is_number_float()) {
+            try {
+                parsed[key] = std::stod(value);
+            } catch (const std::exception&) {
+                parsed[key] = value;
+            }
+        } else if (original.is_object() || original.is_array()) {
+            const json replacement = json::parse(value, nullptr, false);
+            parsed[key] = replacement.is_discarded() ? json(value) : replacement;
+        } else {
+            parsed[key] = value;
+        }
+        return parsed.dump();
+    }
+
+    std::string provider_rename_validation_error(
+        const std::string& old_name,
+        const std::string& new_name,
+        const std::vector<std::string>& existing_names
+    ) {
+        if (new_name.empty()) {
+            return "Enter a remote name.";
+        }
+        if (new_name == old_name) {
+            return "Choose a different remote name.";
+        }
+        if (new_name.find(':') != std::string::npos ||
+            new_name.find('/') != std::string::npos ||
+            new_name.find('\\') != std::string::npos) {
+            return "Remote names cannot contain colons or path separators.";
+        }
+        const auto exists = std::find(existing_names.begin(), existing_names.end(), new_name);
+        if (exists != existing_names.end()) {
+            return "A remote with that name already exists.";
+        }
+        return {};
     }
 
     std::string provider_response_error_message(const core::HttpResponse& response, const std::string& fallback) {
@@ -224,6 +332,75 @@ namespace misty::panel {
         return statuses;
     }
 
+    std::vector<std::string> parse_rclone_configured_remotes(const std::string& body) {
+        std::vector<std::string> names;
+        const json parsed = json::parse(body);
+        const auto remotes_json = parsed.value("remotes", json::array());
+        if (!remotes_json.is_array()) {
+            return names;
+        }
+        for (const auto& remote_json : remotes_json) {
+            if (!remote_json.is_string()) {
+                continue;
+            }
+            std::string name = remote_json.get<std::string>();
+            if (name.empty()) {
+                continue;
+            }
+            if (!name.empty() && name.back() == ':') {
+                name.pop_back();
+            }
+            if (!name.empty()) {
+                names.push_back(std::move(name));
+            }
+        }
+        return names;
+    }
+
+    std::map<std::string, std::string> parse_rclone_config_map(const std::string& body) {
+        std::map<std::string, std::string> config;
+        const json parsed = json::parse(body);
+        if (!parsed.is_object()) {
+            return config;
+        }
+
+        for (auto it = parsed.begin(); it != parsed.end(); ++it) {
+            if (it.value().is_string()) {
+                config[it.key()] = it.value().get<std::string>();
+            } else if (it.value().is_boolean()) {
+                config[it.key()] = it.value().get<bool>() ? "true" : "false";
+            } else if (it.value().is_number_integer() || it.value().is_number_unsigned() || it.value().is_number_float()) {
+                config[it.key()] = it.value().dump();
+            } else if (!it.value().is_null()) {
+                config[it.key()] = it.value().dump();
+            }
+        }
+        return config;
+    }
+
+    std::string rclone_config_update_body(
+        const std::string& name,
+        const std::map<std::string, std::string>& parameters
+    ) {
+        json parameter_json = json::object();
+        for (const auto& [key, value] : parameters) {
+            if (key == "type") {
+                continue;
+            }
+            parameter_json[key] = value;
+        }
+
+        const json body = {
+            {"name", name},
+            {"parameters", parameter_json},
+            {"opt", {
+                {"nonInteractive", true},
+                {"noOutput", true},
+            }},
+        };
+        return body.dump();
+    }
+
     ProviderStep parse_provider_step(const std::string& body) {
         const json parsed = json::parse(body);
         ProviderStep step;
@@ -362,6 +539,7 @@ namespace misty::panel {
             card.status_label = status_it->second.status_label.empty()
                 ? "Connected"
                 : status_it->second.status_label;
+            card.status_detail = status_it->second.error;
             card.needs_reconnect = status_it->second.needs_reconnect;
             card.unavailable = !status_it->second.needs_reconnect && card.status_label == "Unavailable";
         } else if (is_loading_remote_statuses) {

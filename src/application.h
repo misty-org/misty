@@ -26,7 +26,7 @@ namespace misty {
         void init_clipboard();
         void init_views();
         void on_focus_lost();
-        void persist_file_explorer_state();
+        void persist_file_explorer_state(bool best_effort = false);
         core::FramePacer& frame_pacer();
         const core::FramePacer& frame_pacer() const;
 

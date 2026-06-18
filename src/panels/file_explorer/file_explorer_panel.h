@@ -501,6 +501,10 @@ private:
      */
     void initiate_rename(TransientUiState& ui);
     /**
+     * @brief Creates a local file or folder and starts inline rename on the new row.
+     */
+    void create_new_entry_inline(panel::FileExplorerState& state, bool is_dir);
+    /**
      * @brief Opens the final review modal for the active rename session.
      */
     void open_rename_review_modal();

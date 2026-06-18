@@ -351,6 +351,12 @@ namespace misty::panel {
             return;
         }
 
+        if (core::CommandManager::get().matches("explorer.new_tab")) {
+            active_pane->tab_controller.add_tab(create_default_tab(next_tab_idx_++));
+        }
+        if (core::CommandManager::get().matches("explorer.restore_tab")) {
+            active_pane->tab_controller.restore_tab();
+        }
         if (core::CommandManager::get().matches("explorer.split_vertical")) {
             split_active_vertical();
         }
@@ -358,7 +364,7 @@ namespace misty::panel {
             split_active_horizontal();
         }
         if (core::CommandManager::get().matches("explorer.close_pane")) {
-            close_active_pane();
+            request_close_active_pane();
         }
         if (core::CommandManager::get().matches("explorer.restore_pane")) {
             restore_last_closed_pane();
@@ -370,6 +376,24 @@ namespace misty::panel {
             return;
         }
         pane.tab_controller.remove_tab(tab_idx);
+    }
+
+    void MultiPanel::request_close_tab(Pane& pane, std::int16_t tab_idx) {
+        const TabController::Tab* tab = pane.tab_controller.get_tab(tab_idx);
+        if (!tab || !tab->panel) {
+            return;
+        }
+        const std::string warning = tab->panel->close_warning();
+        if (warning.empty()) {
+            close_tab(pane, tab_idx);
+            return;
+        }
+        pending_close_ = PendingCloseRequest{
+            .kind = PendingCloseKind::Tab,
+            .pane_id = pane.pane_id,
+            .tab_idx = tab_idx,
+            .warning = warning,
+        };
     }
 
     void MultiPanel::split_active_vertical() {
@@ -464,9 +488,70 @@ namespace misty::panel {
 
         auto& lane = grid_.lanes[location.lane_index].pane_ids;
         lane.erase(lane.begin() + location.row_index);
+        active_pane->tab_controller.release_all_tabs();
         remove_pane(active_pane_id);
         normalize_grid();
         choose_active_pane_after_removal(location);
+    }
+
+    void MultiPanel::request_close_active_pane() {
+        if (pane_count() <= 1) {
+            return;
+        }
+        Pane* pane = get_pane(active_pane_id);
+        if (!pane) {
+            return;
+        }
+        std::string warning;
+        for (const std::int16_t tab_idx : pane->tab_controller.tab_order) {
+            const TabController::Tab* tab = pane->tab_controller.get_tab(tab_idx);
+            if (tab && tab->panel) {
+                const std::string tab_warning = tab->panel->close_warning();
+                if (!tab_warning.empty()) {
+                    warning = "This pane contains unsaved changes. Closing it will discard those changes.";
+                    break;
+                }
+            }
+        }
+        if (warning.empty()) {
+            close_active_pane();
+            return;
+        }
+        pending_close_ = PendingCloseRequest{
+            .kind = PendingCloseKind::Pane,
+            .pane_id = active_pane_id,
+            .warning = std::move(warning),
+        };
+    }
+
+    void MultiPanel::render_pending_close_confirmation() {
+        if (pending_close_.kind == PendingCloseKind::None) {
+            return;
+        }
+
+        bool open = true;
+        const bool confirmed = show_confirm_modal({
+            .is_open = &open,
+            .modal_id = "DiscardUnsavedPanelChanges",
+            .title = "Discard unsaved changes?",
+            .message = pending_close_.warning.c_str(),
+            .confirm_label = "Discard and close",
+            .cancel_label = "Cancel",
+            .dangerous = true,
+        });
+        if (confirmed) {
+            const PendingCloseRequest request = pending_close_;
+            pending_close_ = {};
+            if (request.kind == PendingCloseKind::Tab) {
+                if (Pane* pane = get_pane(request.pane_id)) {
+                    close_tab(*pane, request.tab_idx);
+                }
+            } else if (request.kind == PendingCloseKind::Pane && request.pane_id == active_pane_id) {
+                close_active_pane();
+            }
+        } else if (!open) {
+            pending_close_ = {};
+        }
     }
 
     void MultiPanel::restore_last_closed_pane() {
@@ -714,7 +799,7 @@ namespace misty::panel {
                         pane->tab_controller.add_tab(create_default_tab(next_tab_idx_++));
                     }
                     if (close_tab_idx >= 0) {
-                        close_tab(*pane, close_tab_idx);
+                        request_close_tab(*pane, close_tab_idx);
                     }
                 } else if (const TabController::Tab* tab = pane->tab_controller.get_active_tab()) {
                     render_tab(*tab);
@@ -793,6 +878,7 @@ namespace misty::panel {
         }
 
         show_error_modal(error_msg_, "MultiPanelError");
+        render_pending_close_confirmation();
         ImGui::End();
         ImGui::PopStyleVar();
     }

@@ -141,7 +141,7 @@ namespace misty::panel {
         /**
          * @brief Renders quick access virtual-folder shortcuts.
          */
-        void show_quick_access(float width, float padding);
+        void show_quick_access(FileSidebarState& state, float width, float padding);
         /**
          * @brief Renders the custom device path modal.
          */

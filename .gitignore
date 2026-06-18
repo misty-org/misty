@@ -25,6 +25,9 @@ releases/**/*.AppImage
 **/.DS_Store
 **/build
 **/dist/
+**/node_modules/
+**/target/
+**/src-tauri/gen/
 **/libs/
 **/.vs/
 **.log

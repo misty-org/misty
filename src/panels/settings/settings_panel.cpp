@@ -152,7 +152,7 @@ void SettingsPanel::settings_content(SettingsState& state) {
             ImGuiIO& io = ImGui::GetIO();
             const float scroll_x_before_input = ImGui::GetScrollX();
             if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup)) {
-                constexpr float kSettingsWheelStep = 4.0f;
+                constexpr float kSettingsWheelStep = 44.0f;
                 constexpr float kSettingsWheelHStep = 24.0f;
 
                 const bool can_scroll_x = ImGui::GetScrollMaxX() > 0.0f;

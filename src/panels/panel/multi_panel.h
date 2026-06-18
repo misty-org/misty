@@ -65,12 +65,28 @@ namespace misty::panel {
             int row_index = -1;
         };
 
+        enum class PendingCloseKind {
+            None,
+            Tab,
+            Pane,
+        };
+
+        struct PendingCloseRequest {
+            PendingCloseKind kind = PendingCloseKind::None;
+            std::string pane_id;
+            std::int16_t tab_idx = -1;
+            std::string warning;
+        };
+
         void default_multi_panel();
         void close_tab(Pane& pane, std::int16_t tab_idx);
+        void request_close_tab(Pane& pane, std::int16_t tab_idx);
         void split_active_vertical();
         void split_active_horizontal();
         void close_active_pane();
+        void request_close_active_pane();
         void restore_last_closed_pane();
+        void render_pending_close_confirmation();
         void normalize_grid();
         void choose_active_pane_after_removal(const PaneLocation& removed_location);
         void render_grid_lane(int lane_index, const ImVec2& pos, const ImVec2& size);
@@ -86,6 +102,7 @@ namespace misty::panel {
         std::vector<ClosedPaneSnapshot> closed_pane_snapshots_;
         float grid_split_ratio_ = 0.5f;
         std::array<float, 2> lane_split_ratios_ = {0.5f, 0.5f};
+        PendingCloseRequest pending_close_;
 
         static constexpr float kPaneHandleWidth = 8.0f;
         static constexpr float kPaneDividerThickness = 1.0f;

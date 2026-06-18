@@ -205,16 +205,22 @@ FileExplorerPanel::~FileExplorerPanel() {
     auto& state = registry_.get_state<FileExplorerState>(state_key_);
     auto& library = registry_.get_state<LibraryState>(kLibraryStateKey);
     {
-        std::lock_guard<std::recursive_mutex> state_lock(state.mu);
-        std::lock_guard<std::mutex> library_lock(library.mu);
-        if (state.current_path[0] != '\0') {
+        std::unique_lock<std::recursive_mutex> state_lock(state.mu, std::try_to_lock);
+        if (!state_lock.owns_lock()) {
+            return;
+        }
+        std::unique_lock<std::mutex> library_lock(library.mu, std::try_to_lock);
+        if (!library_lock.owns_lock()) {
+            return;
+        }
+        if (state.current_path[0] != '\0' && library.last_opened_path != state.current_path) {
             library.last_opened_path = state.current_path;
             library.dirty = true;
         }
     }
 
     if (library.dirty.load(std::memory_order_relaxed)) {
-        library.save();
+        library.save_best_effort();
     }
 }
 

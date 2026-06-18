@@ -127,6 +127,11 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state, FileLi
     // Scope per-pane widget IDs so split views can render identical rows without
     // cross-panel hover/selection collisions.
     ImGui::PushID(state_key_.c_str());
+    {
+        auto& session = rename_session_state();
+        std::lock_guard<std::mutex> lock(session.mu);
+        session.inline_input_active = false;
+    }
 
     const bool grid_view_enabled = ui.grid_view;
     if (grid_view_enabled) {
@@ -209,6 +214,7 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state, FileLi
             .draw_header_separators = true,
             .header_separator_color = kDirectoryHeaderBorder,
             .header_bottom_border_color = kDirectoryHeaderBorder,
+            .disable_default_context_menu = true,
         }, [&](ImGuiTableSortSpecs* sorts_specs) {
             if (sorts_specs != nullptr) {
                 if (sorts_specs->SpecsDirty || listing.sort_dirty) {
@@ -262,12 +268,14 @@ void FileExplorerPanel::show_directory_contents(FileExplorerState& state, FileLi
         auto& session = rename_session_state();
         int shared_cursor_pos = 0;
         bool review_modal_open = false;
+        bool inline_input_active = false;
         {
             std::lock_guard<std::mutex> lock(session.mu);
             shared_cursor_pos = session.shared_cursor_pos;
             review_modal_open = session.review_modal_open;
+            inline_input_active = session.inline_input_active;
         }
-        if (!review_modal_open) {
+        if (!review_modal_open && inline_input_active) {
             for (const auto& caret : pending_rename_carets()) {
                 draw_passive_rename_caret(caret.min,
                                           caret.max,
@@ -410,14 +418,21 @@ void FileExplorerPanel::show_file_item(FileExplorerState& state, FileListing& li
         const ImVec2 input_min = ImGui::GetItemRectMin();
         const ImVec2 input_max = ImGui::GetItemRectMax();
         const bool input_active = ImGui::IsItemActive();
+        const bool input_clicked = ImGui::IsItemClicked(ImGuiMouseButton_Left);
         if (focus_requested) {
             if (ImGuiInputTextState* input_state = ImGui::GetInputTextState(ImGui::GetItemID())) {
                 input_state->SetSelection(0, rename_selection_end(editable_name, file.is_dir));
             }
         }
+        if (input_active || input_clicked || row_pressed) {
+            std::lock_guard<std::mutex> lock(session.mu);
+            session.focus_key = rename_participant.key;
+            session.focus_requested = !input_active;
+        }
         if (input_active) {
             if (ImGuiInputTextState* input_state = ImGui::GetInputTextState(ImGui::GetItemID())) {
                 std::lock_guard<std::mutex> lock(session.mu);
+                session.inline_input_active = true;
                 session.shared_cursor_pos = std::clamp(input_state->GetCursorPos(),
                                                        0,
                                                        static_cast<int>(editable_name.size()));
@@ -588,14 +603,21 @@ void FileExplorerPanel::show_grid_item(FileExplorerState& state, FileListing& li
         const ImVec2 input_min = ImGui::GetItemRectMin();
         const ImVec2 input_max = ImGui::GetItemRectMax();
         const bool input_active = ImGui::IsItemActive();
+        const bool input_clicked = ImGui::IsItemClicked(ImGuiMouseButton_Left);
         if (focus_requested) {
             if (ImGuiInputTextState* input_state = ImGui::GetInputTextState(ImGui::GetItemID())) {
                 input_state->SetSelection(0, rename_selection_end(editable_name, file.is_dir));
             }
         }
+        if (input_active || input_clicked || clicked) {
+            std::lock_guard<std::mutex> lock(session.mu);
+            session.focus_key = grid_rename_participant.key;
+            session.focus_requested = !input_active;
+        }
         if (input_active) {
             if (ImGuiInputTextState* input_state = ImGui::GetInputTextState(ImGui::GetItemID())) {
                 std::lock_guard<std::mutex> lock(session.mu);
+                session.inline_input_active = true;
                 session.shared_cursor_pos = std::clamp(input_state->GetCursorPos(),
                                                        0,
                                                        static_cast<int>(editable_name.size()));

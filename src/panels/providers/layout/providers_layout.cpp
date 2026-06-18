@@ -15,13 +15,11 @@
 
 namespace misty::panel {
     namespace {
-        constexpr ImVec4 kPanelBg = ImVec4(0.10f, 0.11f, 0.13f, 1.0f);
+        constexpr ImVec4 kPanelBg = ImVec4(0.027f, 0.035f, 0.043f, 1.0f);
         constexpr ImVec4 kText = ImVec4(0.945f, 0.933f, 0.910f, 1.0f);
         constexpr ImVec4 kMuted = ImVec4(0.788f, 0.769f, 0.737f, 1.0f);
-        constexpr ImVec4 kSearchBg = ImVec4(0.15f, 0.17f, 0.19f, 1.0f);
-        constexpr ImVec4 kBorder = ImVec4(0.24f, 0.27f, 0.30f, 1.0f);
-        constexpr ImVec4 kReadyBg = ImVec4(0.14f, 0.17f, 0.19f, 1.0f);
-        constexpr ImVec4 kReadyText = ImVec4(0.42f, 0.86f, 0.55f, 1.0f);
+        constexpr ImVec4 kSearchBg = ImVec4(0.043f, 0.051f, 0.059f, 1.0f);
+        constexpr ImVec4 kBorder = ImVec4(0.153f, 0.153f, 0.165f, 1.0f);
         std::string lowercase_copy(std::string value) {
             std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
                 return static_cast<char>(std::tolower(c));
@@ -44,60 +42,50 @@ namespace misty::panel {
             card.provider_label = workflow.name;
             draw_provider_logo(card, size);
         }
-
-        void draw_ready_pill(const ProvidersHealthCard& health) {
-            const char* label = health.status_value.empty() ? "Unavailable" : health.status_value.c_str();
-            const ImVec2 text_size = ImGui::CalcTextSize(label);
-            const ImVec2 pos = ImGui::GetCursorScreenPos();
-            const ImVec2 size(text_size.x + 44.0f, 32.0f);
-            ImDrawList* draw_list = ImGui::GetWindowDrawList();
-            const float radius = 16.0f;
-            draw_list->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + size.y), ImGui::GetColorU32(kReadyBg), radius);
-            draw_list->AddRect(pos, ImVec2(pos.x + size.x, pos.y + size.y), ImGui::GetColorU32(kBorder), radius);
-            const ImU32 dot = health.is_ready ? IM_COL32(79, 216, 119, 255) : IM_COL32(142, 151, 162, 255);
-            draw_list->AddCircleFilled(ImVec2(pos.x + 18.0f, pos.y + size.y * 0.5f), 5.0f, dot);
-            ImGui::SetCursorScreenPos(ImVec2(pos.x + 32.0f, pos.y + (size.y - text_size.y) * 0.5f));
-            ImGui::PushStyleColor(ImGuiCol_Text, health.is_ready ? kReadyText : kMuted);
-            ImGui::TextUnformatted(label);
-            ImGui::PopStyleColor();
-            ImGui::SetCursorScreenPos(ImVec2(pos.x, pos.y));
-            ImGui::Dummy(size);
-        }
     }
 
-    void ProvidersPanel::render() {
-        auto& state = registry_.get_state<ProvidersState>("Providers");
+    void ProvidersPanel::render_panel_contents() {
+        auto& shared_state = registry_.get_state<ProvidersState>("Providers");
+        auto& state = registry_.get_state<ProvidersState>(state_key_);
+        state.init(worker_pool_, false);
+        state.attach_shared_state(&shared_state);
+        state.sync_shared_data_from(shared_state);
+        if (!pending_restore_remote_.empty()) {
+            state.select_remote(pending_restore_remote_);
+            pending_restore_remote_.clear();
+        }
+        if (state.selected_page_tab() == ProvidersPageTab::Diagnostics &&
+            state.rclone_config_session_snapshot().config_path.empty()) {
+            state.refresh_rclone_config_paths();
+        }
         sync_search_buffer(state);
 
-        ImGuiWindowFlags flags =
-            ImGuiWindowFlags_NoTitleBar |
-            ImGuiWindowFlags_NoResize |
-            ImGuiWindowFlags_NoMove |
-            ImGuiWindowFlags_NoCollapse |
-            ImGuiWindowFlags_NoSavedSettings;
+        const float pane_width = ImGui::GetContentRegionAvail().x;
+        const bool compact_pane = pane_width < 760.0f;
+        const ImVec2 workspace_padding(
+            compact_pane ? 14.0f : 24.0f,
+            compact_pane ? 16.0f : 20.0f);
 
-        if (ImGuiViewport* main_viewport = ImGui::GetMainViewport()) {
-            ImGui::SetNextWindowViewport(main_viewport->ID);
-        }
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, kPanelBg);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, workspace_padding);
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 8.0f));
 
-        ImGui::PushStyleColor(ImGuiCol_WindowBg, kPanelBg);
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(32.0f, 28.0f));
-        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 10.0f));
-
-        if (ImGui::Begin("ProvidersPanel", nullptr, flags)) {
+        if (ImGui::BeginChild("##providers_workspace", ImVec2(0.0f, 0.0f),
+                              ImGuiChildFlags_AlwaysUseWindowPadding,
+                              ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse)) {
             const float content_width = ImGui::GetContentRegionAvail().x;
             show_top_bar(state, content_width);
-            ImGui::Dummy(ImVec2(0.0f, 8.0f));
+            ImGui::Dummy(ImVec2(0.0f, 6.0f));
             show_status_messages(state);
 
             const float remaining_height = ImGui::GetContentRegionAvail().y;
             const float list_height_budget = std::max(0.0f, remaining_height);
 
-            render_connected_accounts_table(state, list_height_budget);
+            render_providers_workspace(registry_, state, list_height_budget);
             show_provider_dialogs(state);
         }
 
-        ImGui::End();
+        ImGui::EndChild();
         ImGui::PopStyleVar(2);
         ImGui::PopStyleColor();
     }
@@ -131,26 +119,28 @@ namespace misty::panel {
     }
 
     void ProvidersPanel::show_top_bar(ProvidersState& state, float content_width) {
-        const ProvidersHealthCard health = state.health_card_snapshot();
-
         ImGui::PushStyleColor(ImGuiCol_Text, kText);
         ImGui::SetWindowFontScale(1.55f);
         ImGui::TextUnformatted("Providers");
+        const float title_right = ImGui::GetItemRectMax().x - ImGui::GetWindowPos().x;
         ImGui::SetWindowFontScale(1.0f);
         ImGui::PopStyleColor();
 
-        ImGui::SameLine(0.0f, 18.0f);
-        ImGui::SetCursorPosY(ImGui::GetCursorPosY() - 3.0f);
-        draw_ready_pill(health);
-
-        const float button_width = 166.0f;
+        const bool compact = content_width < 700.0f;
+        const float button_width = compact ? std::min(146.0f, content_width * 0.36f) : 166.0f;
         const float right_gap = 14.0f;
-        const float search_width = std::min(compute_provider_search_width(content_width), content_width * 0.36f);
+        const float search_width = compact
+            ? std::max(120.0f, content_width - button_width - right_gap)
+            : std::min(compute_provider_search_width(content_width), content_width * 0.36f);
         const float right_block = search_width + button_width + right_gap;
-        const float right_start = std::max(ImGui::GetCursorPosX() + 18.0f, content_width - right_block);
+        const float right_start = std::max(title_right + 24.0f, content_width - right_block);
 
-        ImGui::SameLine();
-        ImGui::SetCursorPosX(right_start);
+        if (compact) {
+            ImGui::Dummy(ImVec2(0.0f, 4.0f));
+        } else {
+            ImGui::SameLine();
+            ImGui::SetCursorPosX(right_start);
+        }
 
         ImGui::BeginGroup();
         ImGui::PushStyleColor(ImGuiCol_FrameBg, kSearchBg);
@@ -159,10 +149,10 @@ namespace misty::panel {
         ImGui::PushStyleColor(ImGuiCol_TextDisabled, kMuted);
         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
         ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
-        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(42.0f, 12.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(40.0f, 10.0f));
 
         ImGui::SetNextItemWidth(search_width);
-        const bool changed = ImGui::InputTextWithHint("##providers_search", "Search providers", search_buf_, sizeof(search_buf_));
+        const bool changed = ImGui::InputTextWithHint("##providers_search", "Search remotes", search_buf_, sizeof(search_buf_));
         if (changed) {
             state.set_search_query(search_buf_);
         }
@@ -195,7 +185,7 @@ namespace misty::panel {
         ImGui::SetNextWindowSize(ImVec2(search_width, 0.0f));
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f, 8.0f));
         ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 8.0f);
-        ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.13f, 0.15f, 0.17f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_PopupBg, kSearchBg);
         ImGui::PushStyleColor(ImGuiCol_Border, kBorder);
         if (ImGui::BeginPopup("##providers_search_dropdown")) {
             ImGui::PushStyleColor(ImGuiCol_Text, kMuted);
@@ -222,7 +212,7 @@ namespace misty::panel {
                         draw_list->AddRectFilled(
                             row_start,
                             ImVec2(row_start.x + row_size.x, row_start.y + row_size.y),
-                            ImGui::GetColorU32(ImVec4(0.17f, 0.20f, 0.24f, 1.0f)),
+                            ImGui::GetColorU32(ImVec4(0.094f, 0.094f, 0.106f, 1.0f)),
                             6.0f);
                     }
 
@@ -255,7 +245,7 @@ namespace misty::panel {
         ImGui::PopStyleColor(4);
 
         ImGui::SameLine(0.0f, right_gap);
-        if (provider_teal_button("Add Provider", ImVec2(button_width, input_max.y - input_min.y))) {
+        if (provider_teal_button("+  Add Remote", ImVec2(button_width, input_max.y - input_min.y))) {
             state.on_add_provider();
         }
         ImGui::EndGroup();

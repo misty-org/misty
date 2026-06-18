@@ -150,6 +150,89 @@ TEST_F(FileTransferStoreTest, ClearMethodsRemovePersistedRows) {
     EXPECT_TRUE(rows.empty());
 }
 
+TEST_F(FileTransferStoreTest, LoadPageReturnsRequestedWindowAndTotalCount) {
+    std::string error;
+    for (uint64_t i = 1; i <= 30; ++i) {
+        misty::core::FileTransferRecord record;
+        record.id = i;
+        record.job_id = i;
+        record.file_name = "transfer-" + std::to_string(i);
+        record.status = misty::core::FileTransferStatus::Completed;
+        record.queued_at_ms = static_cast<int64_t>(i * 1000);
+        record.completed_at_ms = static_cast<int64_t>(i * 1000 + 10);
+        ASSERT_TRUE(misty::core::FileTransferStore::get().upsert(record, &error)) << error;
+    }
+
+    auto first_page = misty::core::FileTransferStore::get().load_page(25, 0, "", &error);
+    ASSERT_TRUE(error.empty()) << error;
+    ASSERT_EQ(first_page.total_count, 30u);
+    ASSERT_EQ(first_page.rows.size(), 25u);
+    EXPECT_EQ(first_page.rows.front().id, 30u);
+    EXPECT_EQ(first_page.rows.back().id, 6u);
+
+    auto second_page = misty::core::FileTransferStore::get().load_page(25, 25, "", &error);
+    ASSERT_TRUE(error.empty()) << error;
+    ASSERT_EQ(second_page.total_count, 30u);
+    ASSERT_EQ(second_page.rows.size(), 5u);
+    EXPECT_EQ(second_page.rows.front().id, 5u);
+    EXPECT_EQ(second_page.rows.back().id, 1u);
+}
+
+TEST_F(FileTransferStoreTest, LoadPageSearchFiltersRowsAndCount) {
+    std::string error;
+    misty::core::FileTransferRecord alpha;
+    alpha.id = 1;
+    alpha.file_name = "alpha.txt";
+    alpha.local_source_path = "/tmp/source";
+    alpha.status = misty::core::FileTransferStatus::Completed;
+    alpha.queued_at_ms = 1000;
+    alpha.completed_at_ms = 1100;
+
+    misty::core::FileTransferRecord beta = alpha;
+    beta.id = 2;
+    beta.job_id = 27;
+    beta.file_name = "beta.txt";
+    beta.error_message = "network timeout";
+    beta.queued_at_ms = 2000;
+    beta.completed_at_ms = 2100;
+
+    ASSERT_TRUE(misty::core::FileTransferStore::get().upsert(alpha, &error)) << error;
+    ASSERT_TRUE(misty::core::FileTransferStore::get().upsert(beta, &error)) << error;
+
+    auto page = misty::core::FileTransferStore::get().load_page(25, 0, "timeout", &error);
+    ASSERT_TRUE(error.empty()) << error;
+    ASSERT_EQ(page.total_count, 1u);
+    ASSERT_EQ(page.rows.size(), 1u);
+    EXPECT_EQ(page.rows[0].id, 2u);
+
+    page = misty::core::FileTransferStore::get().load_page(25, 0, "J-27", &error);
+    ASSERT_TRUE(error.empty()) << error;
+    ASSERT_EQ(page.total_count, 1u);
+    ASSERT_EQ(page.rows.size(), 1u);
+    EXPECT_EQ(page.rows[0].id, 2u);
+}
+
+TEST_F(FileTransferStoreTest, RemoveTransferDeletesPersistedRow) {
+    std::string error;
+    misty::core::FileTransferRecord record;
+    record.id = 42;
+    record.file_name = "remove-me.txt";
+    record.status = misty::core::FileTransferStatus::Completed;
+    record.queued_at_ms = 1000;
+    record.completed_at_ms = 1100;
+
+    ASSERT_TRUE(misty::core::FileTransferStore::get().upsert(record, &error)) << error;
+
+    misty::core::FileTransfer transfers;
+    ASSERT_TRUE(transfers.initialize_persistence_metadata(&error)) << error;
+    transfers.remove_transfer(record.id);
+
+    auto page = misty::core::FileTransferStore::get().load_page(25, 0, "", &error);
+    ASSERT_TRUE(error.empty()) << error;
+    EXPECT_EQ(page.total_count, 0u);
+    EXPECT_TRUE(page.rows.empty());
+}
+
 TEST_F(FileTransferStoreTest, BackgroundHydrationMergesPersistedRowsWithLiveTransfers) {
     std::string error;
     misty::core::FileTransferRecord persisted;

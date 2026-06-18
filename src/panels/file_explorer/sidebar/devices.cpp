@@ -22,7 +22,6 @@ namespace misty::panel {
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 2.0f));
             const auto display_devices = build_device_display_entries(
                 cached_devices_, device_name_overrides_, hidden_device_paths_, custom_mount_paths_);
-
             if (display_devices.empty()) {
                 render_empty_devices_row(padding + 8.0f);
             }
@@ -43,7 +42,6 @@ namespace misty::panel {
                     }
                 }
             }
-
             ImGui::PopStyleVar();
         } // !devices_collapsed_
 
