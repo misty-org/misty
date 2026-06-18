@@ -12,7 +12,7 @@ namespace misty::view {
     void ProvidersView::init_panels() {
         state_registry_.get_state<panel::ProvidersState>("Providers").init(worker_pool_);
         navbar_panel_ = std::make_shared<panel::NavbarPanel>(state_registry_);
-        providers_panel_ = std::make_shared<panel::ProvidersPanel>(state_registry_);
+        providers_panel_ = std::make_shared<panel::ProvidersPanel>(state_registry_, worker_pool_);
         notification_panel_ = std::make_shared<panel::NotificationPanel>(state_registry_);
         context_menu_panel_ = std::make_shared<panel::ContextMenuPanel>(state_registry_);
     }
@@ -37,6 +37,7 @@ namespace misty::view {
         float sh = viewport->WorkSize.y;
         ImGui::SetNextWindowPos(ImVec2(sx, sy), ImGuiCond_Always);
         ImGui::SetNextWindowSize(ImVec2(sw, sh), ImGuiCond_Always);
+        providers_panel_->handle_commands();
         providers_panel_->render();
 
         // Render notifications on top

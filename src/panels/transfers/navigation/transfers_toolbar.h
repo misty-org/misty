@@ -8,6 +8,7 @@ namespace misty::panel {
 
 enum class TransfersToolbarAction {
     None,
+    ToggleFilters,
     DeleteSelected,
     DeleteAll,
 };

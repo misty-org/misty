@@ -7,8 +7,10 @@
 #include <string>
 
 #include "imgui.h"
+#include <nlohmann/json.hpp>
 #include "panels/providers/cards/provider_cards_util.h"
 #include "panels/providers/layout/providers_layout_util.h"
+#include "panels/providers/state/providers_state_util.h"
 
 namespace misty::panel {
     namespace {
@@ -77,6 +79,36 @@ namespace misty::panel {
                 return help_line;
             }
             return title_from_option_name(option.name);
+        }
+
+        std::string pretty_json_or_text(const std::string& value) {
+            if (value.empty()) {
+                return "";
+            }
+            auto parsed = nlohmann::json::parse(value, nullptr, false);
+            if (parsed.is_discarded()) {
+                return value;
+            }
+            const auto redact = [](auto&& self, nlohmann::json& node) -> void {
+                if (node.is_object()) {
+                    for (auto it = node.begin(); it != node.end(); ++it) {
+                        const std::string key = lowercase_provider_copy(it.key());
+                        if (key.find("token") != std::string::npos ||
+                            key.find("password") != std::string::npos ||
+                            key.find("secret") != std::string::npos) {
+                            it.value() = "<redacted>";
+                        } else {
+                            self(self, it.value());
+                        }
+                    }
+                } else if (node.is_array()) {
+                    for (auto& item : node) {
+                        self(self, item);
+                    }
+                }
+            };
+            redact(redact, parsed);
+            return parsed.dump(2);
         }
 
         std::string provider_option_help(const ProviderOption& option, const std::string& prompt) {
@@ -300,6 +332,171 @@ namespace misty::panel {
                 state.dismiss_active_dialog();
                 ImGui::CloseCurrentPopup();
             }
+            ImGui::EndPopup();
+        }
+
+        ImGui::PopStyleColor(2);
+        ImGui::PopStyleVar(2);
+    }
+
+    void show_provider_rename_popup(ProvidersState& state) {
+        const ProviderRenameSession session = state.rename_session_snapshot();
+        if (!session.show_modal) {
+            return;
+        }
+
+        const char* popup_name = "##providers_rename";
+        if (!ImGui::IsPopupOpen(popup_name)) {
+            ImGui::OpenPopup(popup_name);
+        }
+
+        ImGuiViewport* viewport = ImGui::GetMainViewport();
+        ImGui::SetNextWindowPos(viewport->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+        ImGui::SetNextWindowSize(ImVec2(460.0f, 0.0f), ImGuiCond_Always);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 12.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(22.0f, 22.0f));
+        ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.12f, 0.13f, 0.15f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_Border, kBorder);
+
+        if (ImGui::BeginPopupModal(popup_name, nullptr,
+                                   ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                                       ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize)) {
+            ImGui::PushStyleColor(ImGuiCol_Text, kText);
+            ImGui::SetWindowFontScale(1.15f);
+            ImGui::TextUnformatted("Rename Provider");
+            ImGui::SetWindowFontScale(1.0f);
+            ImGui::PopStyleColor();
+
+            ImGui::PushStyleColor(ImGuiCol_Text, kMuted);
+            ImGui::TextWrapped("Rename the rclone remote used by Misty.");
+            ImGui::Spacing();
+            ImGui::TextWrapped("Current: %s", session.old_name.c_str());
+            ImGui::PopStyleColor();
+
+            char buffer[128] = {0};
+            std::snprintf(buffer, sizeof(buffer), "%s", session.new_name.c_str());
+            ImGui::SetNextItemWidth(-1.0f);
+            if (session.in_flight) {
+                ImGui::BeginDisabled();
+            }
+            if (ImGui::InputText("##provider_rename_input", buffer, sizeof(buffer))) {
+                state.set_pending_rename_name(buffer);
+            }
+            if (session.in_flight) {
+                ImGui::EndDisabled();
+            }
+
+            if (!session.validation_error.empty()) {
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.894f, 0.373f, 0.373f, 1.0f));
+                ImGui::TextWrapped("%s", session.validation_error.c_str());
+                ImGui::PopStyleColor();
+            }
+
+            ImGui::Spacing();
+            const bool can_confirm = !session.in_flight && session.validation_error.empty();
+            if (!can_confirm) {
+                ImGui::BeginDisabled();
+            }
+            if (provider_teal_button(session.in_flight ? "Renaming..." : "Rename", ImVec2(210.0f, 40.0f))) {
+                state.confirm_rename();
+            }
+            if (!can_confirm) {
+                ImGui::EndDisabled();
+            }
+
+            ImGui::SameLine(0.0f, 12.0f);
+            if (session.in_flight) {
+                ImGui::BeginDisabled();
+            }
+            if (provider_outline_button("Cancel", ImVec2(210.0f, 40.0f))) {
+                state.dismiss_active_dialog();
+                ImGui::CloseCurrentPopup();
+            }
+            if (session.in_flight) {
+                ImGui::EndDisabled();
+            }
+
+            ImGui::EndPopup();
+        }
+
+        ImGui::PopStyleColor(2);
+        ImGui::PopStyleVar(2);
+    }
+
+    void show_provider_details_popup(ProvidersState& state) {
+        const ProviderDetailsSession session = state.details_session_snapshot();
+        if (!session.show_modal) {
+            return;
+        }
+
+        const char* popup_name = "##providers_details";
+        if (!ImGui::IsPopupOpen(popup_name)) {
+            ImGui::OpenPopup(popup_name);
+        }
+
+        ImGuiViewport* viewport = ImGui::GetMainViewport();
+        ImGui::SetNextWindowPos(viewport->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+        ImGui::SetNextWindowSize(ImVec2(620.0f, 520.0f), ImGuiCond_Always);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 12.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(22.0f, 22.0f));
+        ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.12f, 0.13f, 0.15f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_Border, kBorder);
+
+        if (ImGui::BeginPopupModal(popup_name, nullptr,
+                                   ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                                       ImGuiWindowFlags_NoMove)) {
+            ImGui::PushStyleColor(ImGuiCol_Text, kText);
+            ImGui::SetWindowFontScale(1.15f);
+            ImGui::TextUnformatted("Provider Details");
+            ImGui::SetWindowFontScale(1.0f);
+            ImGui::PopStyleColor();
+
+            ImGui::PushStyleColor(ImGuiCol_Text, kMuted);
+            ImGui::TextWrapped("%s", session.remote_name.c_str());
+            if (!session.provider_type.empty()) {
+                ImGui::TextWrapped("Type: %s", session.provider_type.c_str());
+            }
+            ImGui::PopStyleColor();
+
+            ImGui::Spacing();
+            if (session.in_flight) {
+                ImGui::PushStyleColor(ImGuiCol_Text, kMuted);
+                ImGui::TextUnformatted("Loading details...");
+                ImGui::PopStyleColor();
+            } else if (!session.error.empty()) {
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.894f, 0.373f, 0.373f, 1.0f));
+                ImGui::TextWrapped("%s", session.error.c_str());
+                ImGui::PopStyleColor();
+            }
+
+            ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.043f, 0.051f, 0.059f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Border, kBorder);
+            if (ImGui::BeginChild("##provider_details_body", ImVec2(0.0f, 330.0f), true)) {
+                const std::string about = pretty_json_or_text(session.about_json);
+                const std::string config = pretty_json_or_text(session.config_json);
+                ImGui::PushStyleColor(ImGuiCol_Text, kText);
+                ImGui::TextUnformatted("Storage");
+                ImGui::PopStyleColor();
+                ImGui::PushStyleColor(ImGuiCol_Text, kMuted);
+                ImGui::TextWrapped("%s", about.empty() ? "Storage details unavailable." : about.c_str());
+                ImGui::PopStyleColor();
+                ImGui::Spacing();
+                ImGui::PushStyleColor(ImGuiCol_Text, kText);
+                ImGui::TextUnformatted("Config");
+                ImGui::PopStyleColor();
+                ImGui::PushStyleColor(ImGuiCol_Text, kMuted);
+                ImGui::TextWrapped("%s", config.empty() ? "Config details unavailable." : config.c_str());
+                ImGui::PopStyleColor();
+            }
+            ImGui::EndChild();
+            ImGui::PopStyleColor(2);
+
+            ImGui::Spacing();
+            if (provider_outline_button("Close", ImVec2(-1.0f, 40.0f))) {
+                state.dismiss_active_dialog();
+                ImGui::CloseCurrentPopup();
+            }
+
             ImGui::EndPopup();
         }
 

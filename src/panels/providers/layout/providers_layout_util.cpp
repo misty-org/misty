@@ -4,10 +4,10 @@
 
 namespace misty::panel {
     namespace {
-        constexpr ImVec4 kAccent = ImVec4(0.941f, 0.922f, 0.894f, 1.0f);
-        constexpr ImVec4 kAccentHover = ImVec4(0.831f, 0.808f, 0.776f, 1.0f);
-        constexpr ImVec4 kAccentActive = ImVec4(0.710f, 0.690f, 0.660f, 1.0f);
-        constexpr ImVec4 kAccentText = ImVec4(0.027f, 0.035f, 0.043f, 1.0f);
+        constexpr ImVec4 kAccent = ImVec4(0.153f, 0.416f, 0.859f, 1.0f);
+        constexpr ImVec4 kAccentHover = ImVec4(0.196f, 0.498f, 0.945f, 1.0f);
+        constexpr ImVec4 kAccentActive = ImVec4(0.110f, 0.318f, 0.690f, 1.0f);
+        constexpr ImVec4 kAccentText = ImVec4(0.945f, 0.965f, 1.0f, 1.0f);
     }
 
     int compute_provider_columns(float available_width, float min_item_width, float spacing) {
