@@ -231,6 +231,7 @@ public:
         bool draw_header_separators = false;
         ImVec4 header_separator_color = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
         ImVec4 header_bottom_border_color = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
+        bool disable_default_context_menu = false;
     };
 
 };

@@ -163,6 +163,41 @@ TEST_F(OperationQueueTest, UndoSuccessfulRenameRestoresOriginalPath) {
     ASSERT_TRUE(wait_for([&]() { return fs::exists(source) && !fs::exists(renamed); }));
 }
 
+TEST_F(OperationQueueTest, CreateModeDefaultNameCreatesCreateTransfer) {
+    const fs::path created = temp_dir_ / "Untitled Folder";
+    fs::create_directory(created);
+
+    misty::panel::FileItem item = make_local_item(created);
+    item.is_dir = true;
+
+    misty::panel::RenameExecutionRequest request;
+    request.owner_state_key = "Files";
+    request.directory_path = temp_dir_.string();
+    request.item = item;
+    request.new_name = "Untitled Folder";
+    request.create_mode = true;
+
+    const auto batch_id = misty::panel::enqueue_rename_operation_batch(
+        registry_,
+        worker_pool_,
+        {request});
+    ASSERT_NE(batch_id, 0u);
+
+    ASSERT_TRUE(wait_for([&]() {
+        const auto rows = registry_.get_state<misty::core::FileTransfer>("FileMasterTransfers").get_all_transfers();
+        return rows.size() == 1u && rows[0].status == misty::core::FileTransferStatus::Completed;
+    }));
+
+    const auto rows = registry_.get_state<misty::core::FileTransfer>("FileMasterTransfers").get_all_transfers();
+    ASSERT_EQ(rows.size(), 1u);
+    EXPECT_EQ(rows[0].transfer_type, misty::core::FileTransferType::Create);
+    EXPECT_EQ(rows[0].file_name, "Untitled Folder");
+    EXPECT_EQ(rows[0].local_source_path, created.string());
+    EXPECT_EQ(rows[0].local_dest_path, created.string());
+    EXPECT_FALSE(rows[0].undoable);
+    EXPECT_TRUE(fs::exists(created));
+}
+
 TEST_F(OperationQueueTest, RehydratedUndoCanUndoAgainAfterRestart) {
     std::string error;
     ASSERT_TRUE(registry_.get_state<misty::core::FileTransfer>("FileMasterTransfers").initialize_persistence(&error))

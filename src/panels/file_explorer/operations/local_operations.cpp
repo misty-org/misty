@@ -8,6 +8,7 @@
 #include <functional>
 #include <fstream>
 #include <optional>
+#include <unordered_set>
 
 #include "core/clipboard/clipboard_cache.h"
 #include "core/clipboard/native_clipboard_factory.h"
@@ -52,6 +53,36 @@ std::string clipboard_operation_label(ClipboardOp op) {
 }
 
 std::string timestamp_suffix();
+
+std::string unique_child_name(const fs::path& parent, const std::string& base_name) {
+    fs::path candidate = parent / base_name;
+    std::error_code ec;
+    if (!fs::exists(candidate, ec)) {
+        return base_name;
+    }
+
+    for (int suffix = 2; suffix < 10000; ++suffix) {
+        const std::string name = base_name + " " + std::to_string(suffix);
+        candidate = parent / name;
+        ec.clear();
+        if (!fs::exists(candidate, ec)) {
+            return name;
+        }
+    }
+    return base_name + " " + timestamp_suffix();
+}
+
+std::unordered_set<std::string> sibling_names_for_new_item(const FileListing& listing, const FileItem& item) {
+    std::unordered_set<std::string> siblings;
+    siblings.reserve(listing.files.size());
+    for (const auto& candidate : listing.files) {
+        if (candidate.path == item.path) {
+            continue;
+        }
+        siblings.insert(candidate.name);
+    }
+    return siblings;
+}
 
 using ClipboardStageProgress =
     std::function<void(std::size_t completed,
@@ -377,6 +408,21 @@ void FileExplorerPanel::handle_file_operation_commands() {
             return;
         }
         if (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter)) {
+            bool create_mode = false;
+            bool can_confirm_create = false;
+            {
+                std::lock_guard<std::mutex> lock(session.mu);
+                update_rename_session_validation(session);
+                const RenameSessionSummary summary = summarize_rename_session(session);
+                create_mode = rename_session_is_create_mode(session);
+                can_confirm_create = create_mode && summary.invalid == 0 && summary.ready > 0;
+            }
+            if (create_mode) {
+                if (can_confirm_create) {
+                    confirm_rename_review();
+                }
+                return;
+            }
             open_rename_review_modal();
             return;
         }
@@ -405,6 +451,88 @@ void FileExplorerPanel::handle_file_operation_commands() {
     }
     if (has_file_master_selection && core::CommandManager::get().matches("explorer.rename")) {
         initiate_rename(ui_);
+    }
+}
+
+void FileExplorerPanel::create_new_entry_inline(FileExplorerState& state, bool is_dir) {
+    const std::string directory_path(state.current_path);
+    if (directory_path.empty() || is_virtual_path(directory_path)) {
+        ui_.error_msg = "New files can only be created in local folders.";
+        return;
+    }
+
+    std::error_code ec;
+    const fs::path parent = fs::path(directory_path);
+    if (!fs::is_directory(parent, ec) || ec) {
+        ui_.error_msg = "New files can only be created in local folders.";
+        return;
+    }
+
+    cancel_rename_mode();
+
+    const std::string name = unique_child_name(parent, is_dir ? "Untitled Folder" : "Untitled File");
+    const fs::path new_path = parent / name;
+    if (is_dir) {
+        fs::create_directory(new_path, ec);
+    } else {
+        std::ofstream created(new_path, std::ios::binary | std::ios::trunc);
+        if (!created.is_open()) {
+            ec = std::make_error_code(std::errc::io_error);
+        }
+    }
+    if (ec) {
+        ui_.error_msg = "Failed to create " + std::string(is_dir ? "folder: " : "file: ") + ec.message();
+        return;
+    }
+
+    FileItem item;
+    item.name = name;
+    item.path = new_path.string();
+    item.id = item.path;
+    item.is_dir = is_dir;
+    item.size = 0;
+    item.type = FileType::LOCAL;
+
+    auto& listing = active_listing();
+    {
+        std::lock_guard<std::recursive_mutex> state_lock(state.mu);
+        ui_.selected_files.clear();
+        ui_.selected_files.insert(item.id);
+        ui_.last_selected_index = -1;
+        state.selected_files.clear();
+        state.selected_files.insert(item.id);
+        state.selected_files_by_path[directory_path] = state.selected_files;
+        ui_.error_msg.clear();
+
+        auto existing = std::find_if(listing.files.begin(), listing.files.end(), [&](const FileItem& candidate) {
+            return candidate.path == item.path || candidate.id == item.id;
+        });
+        if (existing == listing.files.end()) {
+            listing.files.push_back(item);
+        } else {
+            *existing = item;
+        }
+        listing.sort_dirty = true;
+        listing.note_listing_changed();
+    }
+
+    auto& session = rename_session_state();
+    {
+        std::lock_guard<std::mutex> lock(session.mu);
+        session.clear();
+        session.active = true;
+        RenameParticipant participant = make_rename_participant(
+            state_key_,
+            directory_path,
+            item,
+            sibling_names_for_new_item(listing, item),
+            session.next_added_order++,
+            true);
+        session.focus_key = participant.key;
+        session.focus_requested = true;
+        session.participant_order.push_back(participant.key);
+        session.participants.emplace(participant.key, std::move(participant));
+        update_rename_session_validation(session);
     }
 }
 

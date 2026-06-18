@@ -48,6 +48,7 @@ struct RenameParticipant {
     RenameValidationResult validation;
     std::string execution_error;
     std::uint64_t added_order = 0;
+    bool create_mode = false;
 };
 
 struct RenameSessionSummary {
@@ -61,6 +62,7 @@ struct RenameSessionState : public core::StateEntry {
     bool active = false;
     bool review_modal_open = false;
     bool focus_requested = false;
+    bool inline_input_active = false;
     int shared_cursor_pos = 0;
     float shared_cursor_anim = 0.0f;
     std::string focus_key;
@@ -79,7 +81,9 @@ RenameParticipant make_rename_participant(const std::string& owner_key,
                                           const std::string& directory_path,
                                           const FileItem& item,
                                           const std::unordered_set<std::string>& sibling_names,
-                                          std::uint64_t added_order);
+                                          std::uint64_t added_order,
+                                          bool create_mode = false);
+bool rename_session_is_create_mode(const RenameSessionState& session);
 void apply_rename_participant_draft(RenameSessionState& session,
                                     const std::string& participant_key,
                                     const std::string& draft_name,

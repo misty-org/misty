@@ -114,6 +114,30 @@ TEST(RenameSessionStateTest, CountsReadyUnchangedAndInvalidItems) {
     EXPECT_EQ(summary.invalid, 1u);
 }
 
+TEST(RenameSessionStateTest, CreateModeTreatsDefaultNameAsReady) {
+    misty::panel::RenameSessionState session;
+    session.active = true;
+
+    auto participant = misty::panel::make_rename_participant(
+        "Files",
+        "/tmp",
+        make_item("/tmp/Untitled Folder", "Untitled Folder"),
+        {},
+        session.next_added_order++,
+        true);
+
+    session.participant_order = {participant.key};
+    session.participants.emplace(participant.key, std::move(participant));
+
+    misty::panel::update_rename_session_validation(session);
+    const auto summary = misty::panel::summarize_rename_session(session);
+
+    EXPECT_TRUE(misty::panel::rename_session_is_create_mode(session));
+    EXPECT_EQ(summary.ready, 1u);
+    EXPECT_EQ(summary.unchanged, 0u);
+    EXPECT_TRUE(session.participants.begin()->second.validation.is_ready());
+}
+
 TEST(RenameSessionStateTest, LocksFileExtensionDuringRename) {
     misty::panel::RenameSessionState session;
     session.active = true;

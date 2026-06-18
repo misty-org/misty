@@ -25,6 +25,7 @@ inline constexpr const char* kOperationQueueStateKey = "OperationQueue";
 enum class OperationKind {
     Copy,
     Move,
+    Create,
     Rename,
     Delete,
     Download,
@@ -61,6 +62,7 @@ struct RenameExecutionRequest {
     std::string directory_path;
     FileItem item;
     std::string new_name;
+    bool create_mode = false;
 };
 
 struct UndoRecord {
@@ -92,6 +94,7 @@ struct OperationPayload {
     std::string dest_dir;
     std::string rename_new_name;
     std::string override_name;
+    bool create_mode = false;
 };
 
 struct OperationDescriptor {

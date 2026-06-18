@@ -1,6 +1,7 @@
 #include "core/threading/worker_pool.h"
 #include <algorithm>
 #include <iostream>
+#include <queue>
 
 namespace misty::core {
     WorkerPool::WorkerPool(size_t thread_count) {
@@ -19,12 +20,19 @@ namespace misty::core {
     }
 
     void WorkerPool::shutdown() {
+        std::size_t dropped_tasks = 0;
         {
             std::unique_lock<std::mutex> lock(mu_);
             if (stop_) {
                 return;
             }
             stop_ = true;
+            dropped_tasks = task_queue.size();
+            std::queue<Worker> empty;
+            task_queue.swap(empty);
+        }
+        if (dropped_tasks > 0) {
+            std::cout << "[DEBUG] WorkerPool shutdown dropped " << dropped_tasks << " queued tasks." << std::endl;
         }
         cv_.notify_all();
         for (std::thread& worker : workers_) {

@@ -7,14 +7,16 @@
 
 namespace misty::panel {
     namespace {
-        constexpr ImVec4 kBorder = ImVec4(0.24f, 0.27f, 0.30f, 1.0f);
+        constexpr ImVec4 kBorder = ImVec4(0.153f, 0.153f, 0.165f, 1.0f);
         constexpr ImVec4 kText = ImVec4(0.945f, 0.933f, 0.910f, 1.0f);
-        constexpr ImVec4 kBadgeBg = ImVec4(0.16f, 0.19f, 0.21f, 1.0f);
+        constexpr ImVec4 kPanelBg = ImVec4(0.043f, 0.051f, 0.059f, 1.0f);
+        constexpr ImVec4 kPanelAltBg = ImVec4(0.094f, 0.094f, 0.106f, 1.0f);
+        constexpr ImVec4 kBadgeBg = kPanelBg;
         constexpr ImVec4 kBadgeText = ImVec4(0.945f, 0.933f, 0.910f, 1.0f);
-        constexpr ImVec4 kWarningBadgeBg = ImVec4(0.96f, 0.88f, 0.66f, 1.0f);
-        constexpr ImVec4 kWarningBadgeText = ImVec4(0.58f, 0.36f, 0.02f, 1.0f);
-        constexpr ImVec4 kMutedBadgeBg = ImVec4(0.29f, 0.32f, 0.36f, 1.0f);
-        constexpr ImVec4 kMutedBadgeText = ImVec4(0.82f, 0.85f, 0.88f, 1.0f);
+        constexpr ImVec4 kWarningBadgeBg = ImVec4(0.20f, 0.15f, 0.08f, 1.0f);
+        constexpr ImVec4 kWarningBadgeText = ImVec4(0.925f, 0.729f, 0.455f, 1.0f);
+        constexpr ImVec4 kMutedBadgeBg = kPanelAltBg;
+        constexpr ImVec4 kMutedBadgeText = ImVec4(0.788f, 0.769f, 0.737f, 1.0f);
 
         std::string lowercase_copy(std::string value) {
             std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
@@ -91,9 +93,9 @@ namespace misty::panel {
     }
 
     bool provider_outline_button(const char* label, const ImVec2& size) {
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.15f, 0.17f, 0.19f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.20f, 0.22f, 0.25f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.12f, 0.14f, 0.16f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_Button, kPanelBg);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, kPanelAltBg);
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.027f, 0.035f, 0.043f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_Border, kBorder);
         ImGui::PushStyleColor(ImGuiCol_Text, kText);
         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);

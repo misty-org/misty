@@ -1,6 +1,9 @@
 #include "core/clipboard/proxy_clipboard_client.h"
 
+#include <chrono>
+#include <iostream>
 #include <sstream>
+#include <thread>
 #include <utility>
 
 #include <nlohmann/json.hpp>
@@ -68,7 +71,12 @@ bool ProxyClipboardClient::register_device() {
     };
     HttpRequestOptions options;
     options.headers["Content-Type"] = "application/json";
+    options.debug_label = "clipboard.register_device";
+    std::cerr << "[Misty Clipboard] registering device id=" << device_id_
+              << " endpoint=" << endpoint("/api/clipboard/register")
+              << std::endl;
     const auto response = HTTPClient::get().post(endpoint("/api/clipboard/register"), body.dump(), options);
+    std::cerr << "[Misty Clipboard] register_device status=" << response.status_code << std::endl;
     return response.status_code >= 200 && response.status_code < 300;
 }
 
@@ -76,7 +84,10 @@ void ProxyClipboardClient::start(RemoteClipboardCallback on_clipboard) {
     if (running_.exchange(true)) {
         return;
     }
-    register_device();
+    stream_cancel_requested_.store(false, std::memory_order_relaxed);
+    const bool registered = register_device();
+    std::cerr << "[Misty Clipboard] start stream registered=" << (registered ? "true" : "false")
+              << " device_id=" << device_id_ << std::endl;
     stream_thread_ = std::thread(&ProxyClipboardClient::stream_loop, this, std::move(on_clipboard));
 }
 
@@ -84,6 +95,7 @@ void ProxyClipboardClient::stop() {
     if (!running_.exchange(false)) {
         return;
     }
+    stream_cancel_requested_.store(true, std::memory_order_relaxed);
     if (stream_thread_.joinable()) {
         stream_thread_.join();
     }
@@ -131,9 +143,14 @@ void ProxyClipboardClient::stream_loop(RemoteClipboardCallback on_clipboard) {
         std::string event_name;
         std::string data;
         HttpRequestOptions options;
-        options.timeouts.total_timeout_seconds = 5L;
-        (void)HTTPClient::get().get_stream(
-            endpoint("/api/clipboard/stream?device_id=" + url_encode(device_id_)),
+        options.cancel_flag = &stream_cancel_requested_;
+        options.debug_label = "clipboard.stream";
+        options.timeouts.connect_timeout_seconds = 2L;
+        options.timeouts.total_timeout_seconds = 0L;
+        const std::string stream_url = endpoint("/api/clipboard/stream?device_id=" + url_encode(device_id_));
+        std::cerr << "[Misty Clipboard] opening stream url=" << stream_url << std::endl;
+        const auto response = HTTPClient::get().get_stream(
+            stream_url,
             [&](const std::string& line) {
                 if (!running_.load()) {
                     return false;
@@ -162,6 +179,13 @@ void ProxyClipboardClient::stream_loop(RemoteClipboardCallback on_clipboard) {
                 return true;
             },
             options);
+        if (!running_.load()) {
+            break;
+        }
+        std::cerr << "[Misty Clipboard] stream ended status=" << response.status_code
+                  << "; retrying in 1000ms"
+                  << std::endl;
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     }
 }
 

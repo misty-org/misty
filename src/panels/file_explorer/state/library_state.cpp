@@ -56,6 +56,57 @@ FileItem deserialize_item(const json& j) {
 
 }  // namespace
 
+bool write_library_snapshot(LibraryState& state, bool block_for_lock) {
+    const std::string path = get_state_file_path();
+    if (path.empty()) {
+        return false;
+    }
+
+    json j;
+    {
+        std::unique_lock<std::mutex> lock(state.mu, std::defer_lock);
+        if (block_for_lock) {
+            lock.lock();
+        } else if (!lock.try_lock()) {
+            return false;
+        }
+
+        j["recent_files"] = json::array();
+        for (const auto& item : state.recent_files) {
+            j["recent_files"].push_back(serialize_item(item));
+        }
+
+        j["starred_files"] = json::array();
+        for (const auto& item : state.starred_files) {
+            j["starred_files"].push_back(serialize_item(item));
+        }
+
+        j["last_opened_path"] = state.last_opened_path;
+        state.dirty = false;
+    }
+
+    try {
+        fs::create_directories(fs::path(path).parent_path());
+        const std::string tmp = path + ".tmp";
+        {
+            std::ofstream f(tmp);
+            f << j.dump(4);
+        }
+        std::error_code ec;
+        fs::rename(tmp, path, ec);
+        if (ec) {
+            fs::remove(tmp, ec);
+            std::ofstream f(path);
+            f << j.dump(4);
+        }
+        std::printf("LibraryState: Saved state to %s\n", path.c_str());
+        return true;
+    } catch (const std::exception& e) {
+        std::printf("LibraryState: Failed to save state: %s\n", e.what());
+        return false;
+    }
+}
+
 void LibraryState::load() {
     const std::string path = get_state_file_path();
     if (path.empty() || !fs::exists(path)) {
@@ -92,37 +143,12 @@ void LibraryState::load() {
 }
 
 void LibraryState::save() {
-    const std::string path = get_state_file_path();
-    if (path.empty()) {
-        return;
-    }
+    (void)write_library_snapshot(*this, true);
+}
 
-    try {
-        fs::create_directories(fs::path(path).parent_path());
-
-        json j;
-        {
-            std::lock_guard<std::mutex> lock(mu);
-            j["recent_files"] = json::array();
-            for (const auto& item : recent_files) {
-                j["recent_files"].push_back(serialize_item(item));
-            }
-
-            j["starred_files"] = json::array();
-            for (const auto& item : starred_files) {
-                j["starred_files"].push_back(serialize_item(item));
-            }
-
-            j["last_opened_path"] = last_opened_path;
-            dirty = false;
-        }
-
-        std::ofstream f(path);
-        f << j.dump(4);
-
-        std::printf("LibraryState: Saved state to %s\n", path.c_str());
-    } catch (const std::exception& e) {
-        std::printf("LibraryState: Failed to save state: %s\n", e.what());
+void LibraryState::save_best_effort() {
+    if (!write_library_snapshot(*this, false)) {
+        std::printf("LibraryState: Skipped best-effort save; state is busy.\n");
     }
 }
 

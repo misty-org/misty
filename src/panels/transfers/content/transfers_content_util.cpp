@@ -129,11 +129,12 @@ std::vector<core::FileTransferRecord> sorted_rows(std::vector<core::FileTransfer
 }
 
 std::vector<core::FileTransferRecord> visible_rows(const std::vector<core::FileTransferRecord>& rows,
-                                                   const char* search_query) {
+                                                   const char* search_query,
+                                                   core::FileTransferFilter filter) {
     std::vector<core::FileTransferRecord> visible;
     visible.reserve(rows.size());
     for (const auto& row : rows) {
-        if (matches_search(row, search_query)) {
+        if (matches_filter(row, filter) && matches_search(row, search_query)) {
             visible.push_back(row);
         }
     }
@@ -154,6 +155,7 @@ const char* type_label(core::FileTransferType type) {
     switch (type) {
         case core::FileTransferType::Upload: return "Upload";
         case core::FileTransferType::Download: return "Download";
+        case core::FileTransferType::Create: return "Create";
         case core::FileTransferType::Copy: return "Copy";
         case core::FileTransferType::Move: return "Move";
         case core::FileTransferType::Rename: return "Rename";
@@ -181,6 +183,7 @@ const char* status_label(const core::FileTransferRecord& row) {
             switch (row.transfer_type) {
                 case core::FileTransferType::Upload: return "Uploading";
                 case core::FileTransferType::Download: return "Downloading";
+                case core::FileTransferType::Create: return "Creating";
                 case core::FileTransferType::Copy: return "Copying";
                 case core::FileTransferType::Move: return "Moving";
                 case core::FileTransferType::Rename: return "Renaming";

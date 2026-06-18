@@ -1,6 +1,7 @@
 #include "core/file_transfer/file_transfer.h"
 
 #include <algorithm>
+#include <cctype>
 
 #include "core/file_transfer/file_transfer_store.h"
 
@@ -11,6 +12,54 @@ int64_t now_epoch_ms() {
     return std::chrono::duration_cast<std::chrono::milliseconds>(
                std::chrono::system_clock::now().time_since_epoch())
         .count();
+}
+
+std::string lowercase_copy(std::string value) {
+    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
+    return value;
+}
+
+bool matches_search(const FileTransferRecord& row, const std::string& search_query) {
+    if (search_query.empty()) {
+        return true;
+    }
+    const std::string needle = lowercase_copy(search_query);
+    const std::string haystack = lowercase_copy(
+        std::to_string(row.id) + "\n" +
+        std::to_string(row.job_id) + "\n" +
+        "J-" + std::to_string(row.job_id) + "\n" +
+        row.file_name + "\n" +
+        row.local_source_path + "\n" +
+        row.local_dest_path + "\n" +
+        row.remote_source_name + "\n" +
+        row.remote_source_path + "\n" +
+        row.remote_dest_name + "\n" +
+        row.remote_dest_path + "\n" +
+        row.error_message + "\n" +
+        row.detail_message);
+    return haystack.find(needle) != std::string::npos;
+}
+
+void sort_transfer_page_rows(std::vector<FileTransferRecord>& rows) {
+    std::sort(rows.begin(), rows.end(), [](const FileTransferRecord& lhs, const FileTransferRecord& rhs) {
+        if (lhs.is_alive() != rhs.is_alive()) {
+            return lhs.is_alive() > rhs.is_alive();
+        }
+        if ((lhs.status == FileTransferStatus::Failed) != (rhs.status == FileTransferStatus::Failed)) {
+            return (lhs.status == FileTransferStatus::Failed) > (rhs.status == FileTransferStatus::Failed);
+        }
+        if ((lhs.status == FileTransferStatus::Interrupted) != (rhs.status == FileTransferStatus::Interrupted)) {
+            return (lhs.status == FileTransferStatus::Interrupted) > (rhs.status == FileTransferStatus::Interrupted);
+        }
+        const auto lhs_time = lhs.is_alive() ? lhs.started_at_ms : lhs.completed_at_ms;
+        const auto rhs_time = rhs.is_alive() ? rhs.started_at_ms : rhs.completed_at_ms;
+        if (lhs_time != rhs_time) {
+            return lhs_time > rhs_time;
+        }
+        return lhs.id > rhs.id;
+    });
 }
 
 }  // namespace
@@ -441,6 +490,38 @@ void FileTransfer::fail_transfer(uint64_t id, const std::string& error_message) 
     notify_listeners(notify_record);
 }
 
+void FileTransfer::remove_transfer(uint64_t id) {
+    bool should_delete_persisted = false;
+    {
+        std::lock_guard<std::mutex> lock(mu_);
+        const auto it = transfers_.find(id);
+        if (it != transfers_.end()) {
+            transfers_.erase(it);
+            last_persisted_progress_at_ms_.erase(id);
+            transfer_order_.erase(std::remove(transfer_order_.begin(), transfer_order_.end(), id),
+                                  transfer_order_.end());
+        }
+        should_delete_persisted = persistence_enabled_;
+    }
+    if (should_delete_persisted) {
+        FileTransferStore::get().schedule_delete_by_id(id);
+    }
+}
+
+void FileTransfer::clear_all() {
+    bool should_delete_persisted = false;
+    {
+        std::lock_guard<std::mutex> lock(mu_);
+        transfers_.clear();
+        transfer_order_.clear();
+        last_persisted_progress_at_ms_.clear();
+        should_delete_persisted = persistence_enabled_;
+    }
+    if (should_delete_persisted) {
+        FileTransferStore::get().schedule_delete_all();
+    }
+}
+
 void FileTransfer::clear_completed() {
     bool should_delete_persisted = false;
     {
@@ -494,6 +575,52 @@ void FileTransfer::clear_failed() {
     if (should_delete_persisted) {
         FileTransferStore::get().schedule_delete_failed_like();
     }
+}
+
+FileTransferPage FileTransfer::get_transfer_page(std::size_t offset,
+                                                 std::size_t limit,
+                                                 const std::string& search_query) const {
+    if (limit == 0) {
+        return {};
+    }
+
+    bool persistence_enabled = false;
+    {
+        std::lock_guard<std::mutex> lock(mu_);
+        persistence_enabled = persistence_enabled_;
+    }
+
+    if (persistence_enabled) {
+        std::string error;
+        FileTransferPage page = FileTransferStore::get().load_page(limit, offset, search_query, &error);
+        if (error.empty()) {
+            std::lock_guard<std::mutex> lock(mu_);
+            for (auto& row : page.rows) {
+                const auto it = transfers_.find(row.id);
+                if (it != transfers_.end()) {
+                    row = it->second;
+                }
+            }
+            return page;
+        }
+    }
+
+    std::vector<FileTransferRecord> rows = get_all_transfers();
+    rows.erase(std::remove_if(rows.begin(), rows.end(), [&search_query](const FileTransferRecord& row) {
+                   return !matches_search(row, search_query);
+               }),
+               rows.end());
+    sort_transfer_page_rows(rows);
+
+    FileTransferPage page;
+    page.total_count = rows.size();
+    if (offset >= rows.size()) {
+        return page;
+    }
+    const auto first = rows.begin() + static_cast<std::ptrdiff_t>(offset);
+    const auto last = rows.begin() + static_cast<std::ptrdiff_t>(std::min(rows.size(), offset + limit));
+    page.rows.assign(first, last);
+    return page;
 }
 
 std::vector<FileTransferRecord> FileTransfer::get_all_transfers() const {

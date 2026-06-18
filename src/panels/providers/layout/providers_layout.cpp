@@ -15,13 +15,11 @@
 
 namespace misty::panel {
     namespace {
-        constexpr ImVec4 kPanelBg = ImVec4(0.10f, 0.11f, 0.13f, 1.0f);
+        constexpr ImVec4 kPanelBg = ImVec4(0.027f, 0.035f, 0.043f, 1.0f);
         constexpr ImVec4 kText = ImVec4(0.945f, 0.933f, 0.910f, 1.0f);
         constexpr ImVec4 kMuted = ImVec4(0.788f, 0.769f, 0.737f, 1.0f);
-        constexpr ImVec4 kSearchBg = ImVec4(0.15f, 0.17f, 0.19f, 1.0f);
-        constexpr ImVec4 kBorder = ImVec4(0.24f, 0.27f, 0.30f, 1.0f);
-        constexpr ImVec4 kReadyBg = ImVec4(0.14f, 0.17f, 0.19f, 1.0f);
-        constexpr ImVec4 kReadyText = ImVec4(0.42f, 0.86f, 0.55f, 1.0f);
+        constexpr ImVec4 kSearchBg = ImVec4(0.043f, 0.051f, 0.059f, 1.0f);
+        constexpr ImVec4 kBorder = ImVec4(0.153f, 0.153f, 0.165f, 1.0f);
         std::string lowercase_copy(std::string value) {
             std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
                 return static_cast<char>(std::tolower(c));
@@ -43,25 +41,6 @@ namespace misty::panel {
             card.provider_id = workflow.type.empty() ? workflow.name : workflow.type;
             card.provider_label = workflow.name;
             draw_provider_logo(card, size);
-        }
-
-        void draw_ready_pill(const ProvidersHealthCard& health) {
-            const char* label = health.status_value.empty() ? "Unavailable" : health.status_value.c_str();
-            const ImVec2 text_size = ImGui::CalcTextSize(label);
-            const ImVec2 pos = ImGui::GetCursorScreenPos();
-            const ImVec2 size(text_size.x + 44.0f, 32.0f);
-            ImDrawList* draw_list = ImGui::GetWindowDrawList();
-            const float radius = 16.0f;
-            draw_list->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + size.y), ImGui::GetColorU32(kReadyBg), radius);
-            draw_list->AddRect(pos, ImVec2(pos.x + size.x, pos.y + size.y), ImGui::GetColorU32(kBorder), radius);
-            const ImU32 dot = health.is_ready ? IM_COL32(79, 216, 119, 255) : IM_COL32(142, 151, 162, 255);
-            draw_list->AddCircleFilled(ImVec2(pos.x + 18.0f, pos.y + size.y * 0.5f), 5.0f, dot);
-            ImGui::SetCursorScreenPos(ImVec2(pos.x + 32.0f, pos.y + (size.y - text_size.y) * 0.5f));
-            ImGui::PushStyleColor(ImGuiCol_Text, health.is_ready ? kReadyText : kMuted);
-            ImGui::TextUnformatted(label);
-            ImGui::PopStyleColor();
-            ImGui::SetCursorScreenPos(ImVec2(pos.x, pos.y));
-            ImGui::Dummy(size);
         }
     }
 
@@ -131,23 +110,18 @@ namespace misty::panel {
     }
 
     void ProvidersPanel::show_top_bar(ProvidersState& state, float content_width) {
-        const ProvidersHealthCard health = state.health_card_snapshot();
-
         ImGui::PushStyleColor(ImGuiCol_Text, kText);
         ImGui::SetWindowFontScale(1.55f);
         ImGui::TextUnformatted("Providers");
+        const float title_right = ImGui::GetItemRectMax().x - ImGui::GetWindowPos().x;
         ImGui::SetWindowFontScale(1.0f);
         ImGui::PopStyleColor();
-
-        ImGui::SameLine(0.0f, 18.0f);
-        ImGui::SetCursorPosY(ImGui::GetCursorPosY() - 3.0f);
-        draw_ready_pill(health);
 
         const float button_width = 166.0f;
         const float right_gap = 14.0f;
         const float search_width = std::min(compute_provider_search_width(content_width), content_width * 0.36f);
         const float right_block = search_width + button_width + right_gap;
-        const float right_start = std::max(ImGui::GetCursorPosX() + 18.0f, content_width - right_block);
+        const float right_start = std::max(title_right + 24.0f, content_width - right_block);
 
         ImGui::SameLine();
         ImGui::SetCursorPosX(right_start);
@@ -195,7 +169,7 @@ namespace misty::panel {
         ImGui::SetNextWindowSize(ImVec2(search_width, 0.0f));
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f, 8.0f));
         ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 8.0f);
-        ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.13f, 0.15f, 0.17f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_PopupBg, kSearchBg);
         ImGui::PushStyleColor(ImGuiCol_Border, kBorder);
         if (ImGui::BeginPopup("##providers_search_dropdown")) {
             ImGui::PushStyleColor(ImGuiCol_Text, kMuted);
@@ -222,7 +196,7 @@ namespace misty::panel {
                         draw_list->AddRectFilled(
                             row_start,
                             ImVec2(row_start.x + row_size.x, row_start.y + row_size.y),
-                            ImGui::GetColorU32(ImVec4(0.17f, 0.20f, 0.24f, 1.0f)),
+                            ImGui::GetColorU32(ImVec4(0.094f, 0.094f, 0.106f, 1.0f)),
                             6.0f);
                     }
 

@@ -29,6 +29,7 @@ struct RenameExecutionItem {
     std::string directory_path;
     FileItem item;
     std::string new_name;
+    bool create_mode = false;
 };
 
 std::unordered_set<std::string> sibling_names_for_item(const FileListing& listing, const FileItem& item) {
@@ -313,11 +314,24 @@ void FileExplorerPanel::initiate_rename(TransientUiState& ui) {
 
 void FileExplorerPanel::open_rename_review_modal() {
     auto& session = rename_session_state();
-    std::lock_guard<std::mutex> lock(session.mu);
-    if (!session.active || session.participants.empty()) {
-        return;
+    bool create_mode = false;
+    bool can_confirm_create = false;
+    {
+        std::lock_guard<std::mutex> lock(session.mu);
+        if (!session.active || session.participants.empty()) {
+            return;
+        }
+        update_rename_session_validation(session);
+        const RenameSessionSummary summary = summarize_rename_session(session);
+        create_mode = rename_session_is_create_mode(session);
+        can_confirm_create = create_mode && summary.invalid == 0 && summary.ready > 0;
+        if (!create_mode) {
+            session.review_modal_open = true;
+        }
     }
-    session.review_modal_open = true;
+    if (can_confirm_create) {
+        confirm_rename_review();
+    }
 }
 
 void FileExplorerPanel::show_rename_review_modal() {
@@ -353,7 +367,8 @@ void FileExplorerPanel::show_rename_review_modal() {
             summary = summarize_rename_session(session);
         }
 
-        ImGui::TextUnformatted("Review Renames");
+        const bool create_mode = rename_session_is_create_mode(session);
+        ImGui::TextUnformatted(create_mode ? "Review Creates" : "Review Renames");
         ImGui::Dummy(ImVec2(0.0f, 6.0f));
         ImGui::TextDisabled("%zu ready, %zu unchanged, %zu need fixes",
                             summary.ready,
@@ -465,6 +480,7 @@ void FileExplorerPanel::confirm_rename_review() {
                 .directory_path = participant.directory_path,
                 .item = participant.item,
                 .new_name = rename_effective_name(participant),
+                .create_mode = participant.create_mode,
             });
         }
     }
@@ -495,6 +511,7 @@ void FileExplorerPanel::confirm_rename_review() {
             .directory_path = item.directory_path,
             .item = item.item,
             .new_name = item.new_name,
+            .create_mode = item.create_mode,
         });
     }
 
@@ -522,11 +539,17 @@ void FileExplorerPanel::render_rename_status_banner(float available_width) {
         }
     }
 
-    text = summary.invalid == 0
-        ? "Rename mode: Press Enter to review " + std::to_string(summary.ready) + " items"
-        : "Rename mode: " + std::to_string(summary.ready) + " ready, " +
-            std::to_string(summary.unchanged) + " unchanged, " +
-            std::to_string(summary.invalid) + " need fixes";
+    const bool create_mode = rename_session_is_create_mode(session);
+    if (create_mode && summary.invalid == 0) {
+        text = "Create mode: Press Enter to create";
+    } else {
+        const char* mode_label = create_mode ? "Create mode" : "Rename mode";
+        text = summary.invalid == 0
+            ? std::string(mode_label) + ": Press Enter to review " + std::to_string(summary.ready) + " items"
+            : std::string(mode_label) + ": " + std::to_string(summary.ready) + " ready, " +
+                std::to_string(summary.unchanged) + " unchanged, " +
+                std::to_string(summary.invalid) + " need fixes";
+    }
 
     const ImVec2 text_size = ImGui::CalcTextSize(text.c_str());
     const float banner_width = std::min(std::max(available_width, 220.0f), text_size.x + 24.0f);

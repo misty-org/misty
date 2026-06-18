@@ -6,6 +6,7 @@
 
 #include "core/manager/font_manager.h"
 #include "core/ui/ui_style.h"
+#include "imgui_internal.h"
 
 namespace misty::UI {
 
@@ -780,6 +781,12 @@ bool table(const char* id, const TableProps& props, const std::function<void(ImG
         props.inner_width
     );
     if (opened) {
+        if (props.disable_default_context_menu) {
+            if (ImGuiTable* table = ImGui::GetCurrentTable()) {
+                table->DisableDefaultContextMenu = true;
+            }
+        }
+
         if (props.freeze_columns > 0 || props.freeze_rows > 0) {
             ImGui::TableSetupScrollFreeze(props.freeze_columns, props.freeze_rows);
         }

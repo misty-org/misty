@@ -21,6 +21,7 @@ const char* transfer_type_text(FileTransferType type) {
     switch (type) {
         case FileTransferType::Upload: return "upload";
         case FileTransferType::Download: return "download";
+        case FileTransferType::Create: return "create";
         case FileTransferType::Copy: return "copy";
         case FileTransferType::Move: return "move";
         case FileTransferType::Rename: return "rename";
@@ -32,6 +33,7 @@ const char* transfer_type_text(FileTransferType type) {
 FileTransferType transfer_type_from_text(const std::string& value) {
     if (value == "upload") return FileTransferType::Upload;
     if (value == "download") return FileTransferType::Download;
+    if (value == "create") return FileTransferType::Create;
     if (value == "move") return FileTransferType::Move;
     if (value == "rename") return FileTransferType::Rename;
     if (value == "delete") return FileTransferType::Delete;
@@ -154,6 +156,58 @@ bool is_terminal_status(FileTransferStatus status) {
            status == FileTransferStatus::Interrupted;
 }
 
+std::string transfer_select_columns() {
+    return "id, job_id, transfer_type, item_type, status, conflict_policy, file_name, "
+           "local_source_path, local_dest_path, remote_source_name, remote_source_path, "
+           "remote_dest_name, remote_dest_path, total_bytes, transferred_bytes, error_message, "
+           "detail_message, queued_at_ms, started_at_ms, completed_at_ms, cancelable, retryable, "
+           "undoable, undo_token_id ";
+}
+
+std::string transfer_search_where(const std::string& search_query) {
+    if (search_query.empty()) {
+        return "";
+    }
+    return "WHERE ("
+           "CAST(id AS TEXT) LIKE ? OR "
+           "CAST(job_id AS TEXT) LIKE ? OR "
+           "('J-' || CAST(job_id AS TEXT)) LIKE ? OR "
+           "file_name LIKE ? OR "
+           "local_source_path LIKE ? OR "
+           "local_dest_path LIKE ? OR "
+           "remote_source_name LIKE ? OR "
+           "remote_source_path LIKE ? OR "
+           "remote_dest_name LIKE ? OR "
+           "remote_dest_path LIKE ? OR "
+           "error_message LIKE ? OR "
+           "detail_message LIKE ?"
+           ") ";
+}
+
+int bind_search_terms(DB::Statement& stmt, int first_index, const std::string& search_query) {
+    if (search_query.empty()) {
+        return first_index;
+    }
+    const std::string pattern = "%" + search_query + "%";
+    for (int i = 0; i < 12; ++i) {
+        if (!stmt.bind_text(first_index + i, pattern)) {
+            return 0;
+        }
+    }
+    return first_index + 12;
+}
+
+const char* transfer_page_order_sql() {
+    return "ORDER BY "
+           "CASE WHEN status IN ('queued', 'pending', 'in_progress', 'waiting_for_resolution') THEN 0 "
+           "     WHEN status = 'failed' THEN 1 "
+           "     WHEN status = 'interrupted' THEN 2 "
+           "     ELSE 3 END ASC, "
+           "CASE WHEN status IN ('queued', 'pending', 'in_progress', 'waiting_for_resolution') "
+           "     THEN started_at_ms ELSE completed_at_ms END DESC, "
+           "id DESC ";
+}
+
 }  // namespace
 
 FileTransferStore& FileTransferStore::get() {
@@ -246,6 +300,79 @@ std::vector<FileTransferRecord> FileTransferStore::load_recent(std::size_t limit
     return rows;
 }
 
+FileTransferPage FileTransferStore::load_page(std::size_t limit,
+                                              std::size_t offset,
+                                              const std::string& search_query,
+                                              std::string* error) {
+    FileTransferPage page;
+    if (!initialize(error)) {
+        return page;
+    }
+    flush();
+
+    const std::string where = transfer_search_where(search_query);
+
+    {
+        auto guard = DB::get().acquire();
+        DB::Statement count_stmt = guard.prepare("SELECT COUNT(*) FROM transfers " + where, error);
+        const int next_index = bind_search_terms(count_stmt, 1, search_query);
+        if (!count_stmt.valid() || next_index == 0) {
+            if (error != nullptr && error->empty()) {
+                *error = "Failed to prepare transfer count query.";
+            }
+            return page;
+        }
+        if (count_stmt.step() != SQLITE_ROW) {
+            if (error != nullptr) {
+                *error = "Failed while counting transfer history.";
+            }
+            return page;
+        }
+        page.total_count = static_cast<std::size_t>(std::max<int64_t>(0, count_stmt.column_int64(0)));
+    }
+
+    {
+        auto guard = DB::get().acquire();
+        DB::Statement stmt = guard.prepare(
+            "SELECT " + transfer_select_columns() +
+                "FROM transfers " +
+                where +
+                transfer_page_order_sql() +
+                "LIMIT ? OFFSET ?",
+            error);
+        int next_index = bind_search_terms(stmt, 1, search_query);
+        if (next_index == 0 ||
+            !stmt.valid() ||
+            !stmt.bind_int64(next_index, static_cast<int64_t>(limit)) ||
+            !stmt.bind_int64(next_index + 1, static_cast<int64_t>(offset))) {
+            if (error != nullptr && error->empty()) {
+                *error = "Failed to prepare transfer page query.";
+            }
+            page.rows.clear();
+            page.total_count = 0;
+            return page;
+        }
+
+        while (true) {
+            const int result = stmt.step();
+            if (result == SQLITE_DONE) {
+                break;
+            }
+            if (result != SQLITE_ROW) {
+                if (error != nullptr) {
+                    *error = "Failed while reading transfer page.";
+                }
+                page.rows.clear();
+                page.total_count = 0;
+                return page;
+            }
+            page.rows.push_back(read_record(stmt));
+        }
+    }
+
+    return page;
+}
+
 bool FileTransferStore::upsert(const FileTransferRecord& record, std::string* error) {
     flush();
     return upsert_sync(record, error);
@@ -308,6 +435,45 @@ bool FileTransferStore::upsert_sync(const FileTransferRecord& record, std::strin
         }
     }
     return prune_history_sync(500, error);
+}
+
+bool FileTransferStore::delete_by_id(uint64_t id, std::string* error) {
+    flush();
+    return delete_by_id_sync(id, error);
+}
+
+bool FileTransferStore::delete_by_id_sync(uint64_t id, std::string* error) {
+    if (!initialize(error)) {
+        return false;
+    }
+    auto guard = DB::get().acquire();
+    DB::Statement stmt = guard.prepare("DELETE FROM transfers WHERE id = ?", error);
+    if (!stmt.valid() || !stmt.bind_int64(1, static_cast<int64_t>(id))) {
+        if (error != nullptr && error->empty()) {
+            *error = "Failed to prepare transfer delete.";
+        }
+        return false;
+    }
+    if (stmt.step() != SQLITE_DONE) {
+        if (error != nullptr) {
+            *error = "Failed to delete transfer row.";
+        }
+        return false;
+    }
+    return true;
+}
+
+bool FileTransferStore::delete_all(std::string* error) {
+    flush();
+    return delete_all_sync(error);
+}
+
+bool FileTransferStore::delete_all_sync(std::string* error) {
+    if (!initialize(error)) {
+        return false;
+    }
+    auto guard = DB::get().acquire();
+    return guard.exec("DELETE FROM transfers", error);
 }
 
 bool FileTransferStore::delete_completed(std::string* error) {
@@ -409,6 +575,30 @@ void FileTransferStore::schedule_upsert(const FileTransferRecord& record) {
     queue_cv_.notify_one();
 }
 
+void FileTransferStore::schedule_delete_by_id(uint64_t id) {
+    if (!initialize(nullptr)) {
+        return;
+    }
+    ensure_worker_started();
+    {
+        std::lock_guard<std::mutex> lock(queue_mu_);
+        pending_writes_.push_back(PendingWrite{.kind = PendingWriteKind::DeleteById, .id = id});
+    }
+    queue_cv_.notify_one();
+}
+
+void FileTransferStore::schedule_delete_all() {
+    if (!initialize(nullptr)) {
+        return;
+    }
+    ensure_worker_started();
+    {
+        std::lock_guard<std::mutex> lock(queue_mu_);
+        pending_writes_.push_back(PendingWrite{.kind = PendingWriteKind::DeleteAll});
+    }
+    queue_cv_.notify_one();
+}
+
 void FileTransferStore::schedule_delete_completed() {
     if (!initialize(nullptr)) {
         return;
@@ -494,6 +684,12 @@ void FileTransferStore::worker_loop() {
         switch (work.kind) {
             case PendingWriteKind::Upsert:
                 upsert_sync(work.record, nullptr);
+                break;
+            case PendingWriteKind::DeleteById:
+                delete_by_id_sync(work.id, nullptr);
+                break;
+            case PendingWriteKind::DeleteAll:
+                delete_all_sync(nullptr);
                 break;
             case PendingWriteKind::DeleteCompleted:
                 delete_completed_sync(nullptr);

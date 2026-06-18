@@ -26,7 +26,7 @@ constexpr float kToolbarIconSize = 18.0f;
 constexpr float kCommandToolbarGap = 14.0f;
 constexpr float kActionToolbarGap = 14.0f;
 constexpr float kActionButtonWidth = 34.0f;
-constexpr float kNewButtonWidth = kToolbarButtonSize * 2.0f + kCommandToolbarGap;
+constexpr float kNewButtonWidth = 104.0f;
 constexpr float kToolbarRightPadX = 8.0f;
 constexpr float kViewToggleWidth = 76.0f;
 
@@ -37,6 +37,14 @@ bool can_create_sync_object_for_path(const std::string& path) {
     const std::string mount_root = get_mount_root();
     if (!mount_root.empty() && path.rfind(mount_root, 0) == 0) {
         return true;
+    }
+    std::error_code ec;
+    return fs::is_directory(path, ec) && !ec;
+}
+
+bool can_create_entry_for_path(const std::string& path) {
+    if (path.empty() || path.rfind("misty://", 0) == 0) {
+        return false;
     }
     std::error_code ec;
     return fs::is_directory(path, ec) && !ec;
@@ -140,22 +148,65 @@ bool toolbar_text_icon_button(const char* id,
 
     const ImU32 tint = ImGui::ColorConvertFloat4ToU32(enabled ? ImVec4(0.88f, 0.88f, 0.88f, 1.0f) : kTextDisabled);
     constexpr float icon_size = 16.0f;
-    float x = min.x + 10.0f;
+    constexpr float leading_pad = 14.0f;
+    constexpr float icon_label_gap = 8.0f;
+    constexpr float trailing_pad = 15.0f;
+    constexpr float trailing_icon_size = 12.0f;
+    float x = min.x + leading_pad;
     const float center_y = min.y + size.y * 0.5f;
 
     draw_icon_at(icon_path, ImVec2(x + icon_size * 0.5f, center_y), icon_size, tint);
-    x += icon_size + 7.0f;
-    ImGui::GetWindowDrawList()->AddText(ImVec2(x, min.y + (size.y - ImGui::GetTextLineHeight()) * 0.5f),
+    x += icon_size + icon_label_gap;
+    const ImVec2 label_size = ImGui::CalcTextSize(label ? label : "");
+    ImGui::GetWindowDrawList()->AddText(ImVec2(x, min.y + (size.y - label_size.y) * 0.5f),
                                         tint,
                                         label ? label : "");
 
     if (trailing_icon_path) {
-        draw_icon_at(trailing_icon_path, ImVec2(max.x - 13.0f, center_y), 14.0f, tint);
+        draw_icon_at(trailing_icon_path,
+                     ImVec2(max.x - trailing_pad - trailing_icon_size * 0.5f, center_y),
+                     trailing_icon_size,
+                     tint);
     }
 
     if (hovered && tooltip) {
         ImGui::SetTooltip("%s", tooltip);
     }
+    return enabled && pressed;
+}
+
+bool popup_action_row(const char* id,
+                      const char* icon_path,
+                      const char* label,
+                      bool enabled,
+                      const ImVec2& size,
+                      float icon_size = 18.0f) {
+    ImGui::PushID(id);
+    const bool pressed = ImGui::InvisibleButton("##popup_action", size);
+    const bool hovered = enabled && ImGui::IsItemHovered();
+    const bool active = enabled && ImGui::IsItemActive();
+    const ImVec2 min = ImGui::GetItemRectMin();
+    const ImVec2 max = ImGui::GetItemRectMax();
+    ImGui::PopID();
+
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    if (hovered || active) {
+        dl->AddRectFilled(min,
+                          max,
+                          active ? IM_COL32(255, 255, 255, 30) : IM_COL32(255, 255, 255, 18),
+                          7.0f);
+    }
+
+    const ImU32 icon_tint = enabled ? IM_COL32(176, 184, 198, 235) : IM_COL32(120, 126, 138, 160);
+    const ImU32 text_tint = enabled ? IM_COL32(226, 231, 240, 245) : IM_COL32(130, 136, 148, 170);
+    const float center_y = min.y + size.y * 0.5f;
+    draw_icon_at(icon_path, ImVec2(min.x + 20.0f, center_y), icon_size, icon_tint);
+
+    const ImVec2 label_size = ImGui::CalcTextSize(label ? label : "");
+    dl->AddText(ImVec2(min.x + 42.0f, min.y + (size.y - label_size.y) * 0.5f),
+                text_tint,
+                label ? label : "");
+
     return enabled && pressed;
 }
 
@@ -251,28 +302,50 @@ void FileExplorerPanel::show_file_action_toolbar(FileExplorerState& state) {
     const bool has_file_master_selection = selected_items_are_file_master_items(ui_.selected_files, listing);
     const bool has_single_file_master_selection = exactly_one_file_master_item_selected(ui_.selected_files, listing);
     const bool has_clipboard = registry_.get_state<ClipboardState>("Clipboard").has_content();
-    const bool can_create = !rename_active && !std::string(state.current_path).empty();
+    const bool can_create = !rename_active && can_create_entry_for_path(std::string(state.current_path));
 
-    if (toolbar_text_icon_button("new_entry",
-                                 "assets/icons/plus-24.svg",
-                                 "New",
-                                 "assets/icons/chevron-down-24.svg",
-                                 "New",
-                                 can_create,
-                                 ImVec2(kNewButtonWidth, kToolbarButtonSize))) {
+    const bool new_pressed = toolbar_text_icon_button("new_entry",
+                                                      "assets/icons/plus-24.svg",
+                                                      "New",
+                                                      "assets/icons/chevron-down-24.svg",
+                                                      "New",
+                                                      can_create,
+                                                      ImVec2(kNewButtonWidth, kToolbarButtonSize));
+    const ImVec2 new_button_min = ImGui::GetItemRectMin();
+    const ImVec2 new_button_max = ImGui::GetItemRectMax();
+    if (new_pressed) {
         ImGui::OpenPopup("##file_action_new");
     }
+    ImGui::SetNextWindowPos(ImVec2(new_button_min.x, new_button_max.y + 6.0f), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(176.0f, 0.0f), ImGuiCond_Always);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f, 8.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 4.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 8.0f);
+    ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.07f, 0.085f, 0.105f, 0.98f));
     if (ImGui::BeginPopup("##file_action_new")) {
-        if (ImGui::MenuItem("Folder", nullptr, false, can_create)) {
-            ui_.new_entry_is_dir = true;
-            ui_.show_new_entry_modal = true;
+        const float popup_width = ImGui::GetContentRegionAvail().x;
+        if (popup_action_row("new_folder",
+                             "assets/icons/file-directory-24.svg",
+                             "Folder",
+                             can_create,
+                             ImVec2(popup_width, 38.0f),
+                             18.0f)) {
+            create_new_entry_inline(state, true);
+            ImGui::CloseCurrentPopup();
         }
-        if (ImGui::MenuItem("File", nullptr, false, can_create)) {
-            ui_.new_entry_is_dir = false;
-            ui_.show_new_entry_modal = true;
+        if (popup_action_row("new_file",
+                             "assets/icons/file-16.svg",
+                             "File",
+                             can_create,
+                             ImVec2(popup_width, 38.0f),
+                             16.0f)) {
+            create_new_entry_inline(state, false);
+            ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();
     }
+    ImGui::PopStyleColor();
+    ImGui::PopStyleVar(3);
 
     ImGui::SameLine(0.0f, kCommandToolbarGap);
     if (toolbar_icon_button("cut_selection",

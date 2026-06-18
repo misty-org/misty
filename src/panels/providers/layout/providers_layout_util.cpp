@@ -4,9 +4,10 @@
 
 namespace misty::panel {
     namespace {
-        constexpr ImVec4 kTeal = ImVec4(0.02f, 0.71f, 0.74f, 1.0f);
-        constexpr ImVec4 kTealHover = ImVec4(0.06f, 0.77f, 0.80f, 1.0f);
-        constexpr ImVec4 kTealActive = ImVec4(0.01f, 0.60f, 0.63f, 1.0f);
+        constexpr ImVec4 kAccent = ImVec4(0.941f, 0.922f, 0.894f, 1.0f);
+        constexpr ImVec4 kAccentHover = ImVec4(0.831f, 0.808f, 0.776f, 1.0f);
+        constexpr ImVec4 kAccentActive = ImVec4(0.710f, 0.690f, 0.660f, 1.0f);
+        constexpr ImVec4 kAccentText = ImVec4(0.027f, 0.035f, 0.043f, 1.0f);
     }
 
     int compute_provider_columns(float available_width, float min_item_width, float spacing) {
@@ -32,10 +33,10 @@ namespace misty::panel {
     }
 
     bool provider_teal_button(const char* label, const ImVec2& size) {
-        ImGui::PushStyleColor(ImGuiCol_Button, kTeal);
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, kTealHover);
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, kTealActive);
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.98f, 0.99f, 1.0f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_Button, kAccent);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, kAccentHover);
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, kAccentActive);
+        ImGui::PushStyleColor(ImGuiCol_Text, kAccentText);
         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
         const bool pressed = ImGui::Button(label, size);
         ImGui::PopStyleVar();

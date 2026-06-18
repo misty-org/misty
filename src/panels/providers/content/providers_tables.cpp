@@ -11,13 +11,12 @@
 namespace misty::panel {
 namespace {
 
-constexpr ImVec4 kCardBg(0.16f, 0.18f, 0.20f, 1.0f);
-constexpr ImVec4 kHeaderBg(0.11f, 0.13f, 0.15f, 1.0f);
-constexpr ImVec4 kBorder(0.24f, 0.27f, 0.30f, 1.0f);
+constexpr ImVec4 kCardBg(0.043f, 0.051f, 0.059f, 1.0f);
+constexpr ImVec4 kBorder(0.153f, 0.153f, 0.165f, 1.0f);
 constexpr ImVec4 kText(0.945f, 0.933f, 0.910f, 1.0f);
 constexpr ImVec4 kMuted(0.788f, 0.769f, 0.737f, 1.0f);
-constexpr ImVec4 kAccent(0.48f, 0.86f, 0.59f, 1.0f);
-constexpr ImVec4 kWarning(0.96f, 0.68f, 0.28f, 1.0f);
+constexpr ImVec4 kAccent(0.475f, 0.729f, 0.561f, 1.0f);
+constexpr ImVec4 kWarning(0.925f, 0.729f, 0.455f, 1.0f);
 constexpr float kThinScrollbarSize = 8.0f;
 constexpr float kConnectedAccountRowHeight = 74.0f;
 constexpr float kConnectedAccountLogoSize = 34.0f;
@@ -47,7 +46,7 @@ void draw_section_header(const char* label, size_t count) {
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
     draw_list->AddCircleFilled(ImVec2(pos.x + size.x * 0.5f, pos.y + size.y * 0.5f),
                                size.y * 0.5f,
-                               ImGui::GetColorU32(ImVec4(0.17f, 0.19f, 0.22f, 1.0f)));
+                               ImGui::GetColorU32(kCardBg));
     draw_list->AddCircle(ImVec2(pos.x + size.x * 0.5f, pos.y + size.y * 0.5f),
                          size.y * 0.5f,
                          ImGui::GetColorU32(kBorder));
@@ -61,11 +60,11 @@ void draw_section_header(const char* label, size_t count) {
 }
 
 bool provider_action_button(const char* label, const char* icon_name, const ImVec2& size, bool danger = false) {
-    const ImVec4 bg = danger ? ImVec4(0.17f, 0.15f, 0.15f, 1.0f) : ImVec4(0.15f, 0.17f, 0.19f, 1.0f);
-    const ImVec4 hovered = danger ? ImVec4(0.26f, 0.17f, 0.17f, 1.0f) : ImVec4(0.20f, 0.22f, 0.25f, 1.0f);
-    const ImVec4 active = danger ? ImVec4(0.18f, 0.11f, 0.11f, 1.0f) : ImVec4(0.12f, 0.14f, 0.16f, 1.0f);
-    const ImVec4 border = danger ? ImVec4(0.45f, 0.19f, 0.17f, 1.0f) : kBorder;
-    const ImVec4 text = danger ? ImVec4(0.97f, 0.39f, 0.34f, 1.0f) : kText;
+    const ImVec4 bg = danger ? ImVec4(0.13f, 0.05f, 0.05f, 1.0f) : kCardBg;
+    const ImVec4 hovered = danger ? ImVec4(0.20f, 0.08f, 0.08f, 1.0f) : ImVec4(0.094f, 0.094f, 0.106f, 1.0f);
+    const ImVec4 active = danger ? ImVec4(0.24f, 0.09f, 0.09f, 1.0f) : ImVec4(0.027f, 0.035f, 0.043f, 1.0f);
+    const ImVec4 border = danger ? ImVec4(0.42f, 0.14f, 0.14f, 1.0f) : kBorder;
+    const ImVec4 text = danger ? ImVec4(0.894f, 0.373f, 0.373f, 1.0f) : kText;
     ImGui::PushStyleColor(ImGuiCol_Button, bg);
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, hovered);
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, active);
@@ -105,7 +104,7 @@ bool provider_icon_button(const char* id, const char* icon_name, const char* too
     const bool pressed = ImGui::InvisibleButton(id, size);
     const bool hovered = ImGui::IsItemHovered();
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
-    const ImVec4 bg = hovered ? ImVec4(0.20f, 0.22f, 0.25f, 1.0f) : ImVec4(0.15f, 0.17f, 0.19f, 1.0f);
+    const ImVec4 bg = hovered ? ImVec4(0.094f, 0.094f, 0.106f, 1.0f) : kCardBg;
     draw_list->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + size.y), ImGui::GetColorU32(bg), 8.0f);
     draw_list->AddRect(pos, ImVec2(pos.x + size.x, pos.y + size.y), ImGui::GetColorU32(kBorder), 8.0f);
     auto& icon = core::AssetManager::get().get_svg_texture(icon_name, 24);

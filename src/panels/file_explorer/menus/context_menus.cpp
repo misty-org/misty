@@ -7,6 +7,7 @@
 #include "panels/context_menu/context_menu_state.h"
 #include "panels/file_explorer/content/file_explorer_content_util.h"
 #include "panels/file_explorer/state/clipboard_state.h"
+#include "panels/file_explorer/state/file_sidebar_state.h"
 
 namespace misty::panel {
 namespace {
@@ -20,6 +21,14 @@ std::string delete_target_label(const std::vector<std::string>& paths) {
         return filename.empty() ? paths.front() : filename;
     }
     return std::to_string(paths.size()) + " items";
+}
+
+bool can_create_entry_in(const std::string& path) {
+    if (path.empty() || path.rfind("misty://", 0) == 0) {
+        return false;
+    }
+    std::error_code ec;
+    return std::filesystem::is_directory(path, ec) && !ec;
 }
 
 } // namespace
@@ -81,6 +90,26 @@ void FileExplorerPanel::open_context_menu(FileExplorerState& state, FileExplorer
 
     request.entries.push_back(ContextMenuEntry::separator());
 
+    ContextMenuEntry new_folder_entry;
+    new_folder_entry.id = "new_folder";
+    new_folder_entry.label = "New Folder";
+    new_folder_entry.disabled = !can_create_entry_in(std::string(state.current_path)) || rename_mode_active();
+    new_folder_entry.on_select = [this, &state]() {
+        create_new_entry_inline(state, true);
+    };
+    request.entries.push_back(std::move(new_folder_entry));
+
+    ContextMenuEntry new_file_entry;
+    new_file_entry.id = "new_file";
+    new_file_entry.label = "New File";
+    new_file_entry.disabled = !can_create_entry_in(std::string(state.current_path)) || rename_mode_active();
+    new_file_entry.on_select = [this, &state]() {
+        create_new_entry_inline(state, false);
+    };
+    request.entries.push_back(std::move(new_file_entry));
+
+    request.entries.push_back(ContextMenuEntry::separator());
+
     ContextMenuEntry rename_entry;
     rename_entry.id = "rename";
     rename_entry.label = "Rename";
@@ -101,6 +130,28 @@ void FileExplorerPanel::open_context_menu(FileExplorerState& state, FileExplorer
         perform_delete_selected(state);
     };
     request.entries.push_back(std::move(delete_entry));
+
+    request.entries.push_back(ContextMenuEntry::separator());
+
+    auto& sidebar_state = registry_.get_state<FileSidebarState>("FileSidebar");
+    const bool target_is_pinnable_dir = target != nullptr && target->is_dir && is_file_master_item(*target);
+    const std::string target_pin_path = target ? target->path : std::string{};
+    const std::string target_pin_key = normalize_quick_access_pin_path(target_pin_path);
+    const bool target_is_pinned = !target_pin_key.empty() &&
+                                  sidebar_state.pinned_quick_access_seen.count(target_pin_key) > 0;
+    ContextMenuEntry pin_entry;
+    pin_entry.id = target_is_pinned ? "unpin_quick_access" : "pin_quick_access";
+    pin_entry.label = target_is_pinned ? "Unpin from Quick access" : "Pin to Quick access";
+    pin_entry.disabled = !target_is_pinnable_dir;
+    pin_entry.on_select = [this, target_pin_path, target_is_pinned]() {
+        auto& sidebar_state = registry_.get_state<FileSidebarState>("FileSidebar");
+        if (target_is_pinned) {
+            unpin_quick_access_path(sidebar_state, target_pin_path);
+        } else {
+            pin_quick_access_path(sidebar_state, target_pin_path);
+        }
+    };
+    request.entries.push_back(std::move(pin_entry));
 
     request.entries.push_back(ContextMenuEntry::separator());
 
@@ -125,6 +176,26 @@ void FileExplorerPanel::open_background_context_menu(FileExplorerState& state, F
     }
 
     const bool has_clipboard = registry_.get_state<ClipboardState>("Clipboard").has_content();
+
+    ContextMenuEntry new_folder_entry;
+    new_folder_entry.id = "new_folder";
+    new_folder_entry.label = "New Folder";
+    new_folder_entry.disabled = !can_create_entry_in(std::string(state.current_path)) || rename_mode_active();
+    new_folder_entry.on_select = [this, &state]() {
+        create_new_entry_inline(state, true);
+    };
+    request.entries.push_back(std::move(new_folder_entry));
+
+    ContextMenuEntry new_file_entry;
+    new_file_entry.id = "new_file";
+    new_file_entry.label = "New File";
+    new_file_entry.disabled = !can_create_entry_in(std::string(state.current_path)) || rename_mode_active();
+    new_file_entry.on_select = [this, &state]() {
+        create_new_entry_inline(state, false);
+    };
+    request.entries.push_back(std::move(new_file_entry));
+
+    request.entries.push_back(ContextMenuEntry::separator());
 
     ContextMenuEntry paste_entry;
     paste_entry.id = "paste";
