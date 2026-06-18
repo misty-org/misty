@@ -809,14 +809,13 @@ namespace misty::panel {
             ImGui::PopStyleVar(2);
         }
 
-        bool show_rename = false;
         bool show_disconnect = false;
         {
             std::lock_guard<std::mutex> lock(state.mu);
-            show_rename = state.show_rename_modal;
             show_disconnect = state.show_disconnect_modal;
         }
-        show_provider_placeholder_popup(state, show_rename, "##providers_rename_placeholder", "Rename Provider");
+        show_provider_rename_popup(state);
+        show_provider_details_popup(state);
         show_provider_disconnect_popup(state, show_disconnect);
         show_onedrive_drive_repair_dialog(state);
     }

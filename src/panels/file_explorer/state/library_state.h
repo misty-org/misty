@@ -38,6 +38,11 @@ struct LibraryState : public core::StateEntry {
     void save();
 
     /**
+     * @brief Writes persisted state only if it can snapshot immediately.
+     */
+    void save_best_effort();
+
+    /**
      * @brief Queues a non-blocking write-behind save when state is dirty.
      */
     void save_async(core::WorkerPool& pool);

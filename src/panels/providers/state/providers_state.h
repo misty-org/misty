@@ -19,6 +19,7 @@ namespace misty::panel {
         std::string provider_label;
         std::string account_label;
         std::string status_label = "Connected";
+        std::string status_detail;
         std::string logo_asset_path;
         bool connected = true;
         bool needs_reconnect = false;
@@ -73,6 +74,65 @@ namespace misty::panel {
         std::string error;
     };
 
+    enum class ProvidersPageTab {
+        Remotes,
+        Diagnostics,
+    };
+
+    struct ProviderRcloneConfigSession {
+        bool loading = false;
+        bool revealing = false;
+        std::string config_path;
+        std::string cache_path;
+        std::string temp_path;
+        std::string error_message;
+        std::string success_message;
+        std::uint64_t generation = 0;
+    };
+
+    struct ProviderRenameSession {
+        bool show_modal = false;
+        bool in_flight = false;
+        std::string old_name;
+        std::string new_name;
+        std::string validation_error;
+    };
+
+    struct ProviderDetailsSession {
+        bool show_modal = false;
+        bool in_flight = false;
+        std::string remote_name;
+        std::string provider_type;
+        std::string config_json;
+        std::string about_json;
+        std::string error;
+    };
+
+    struct ProviderRemoteEditSession {
+        bool has_selection = false;
+        bool loading = false;
+        bool saving = false;
+        bool testing = false;
+        bool revealing = false;
+        bool token_visible = false;
+        bool dirty = false;
+        bool can_save = false;
+        bool stale = false;
+        std::string selected_remote;
+        std::string original_remote_name;
+        std::string provider_type;
+        std::map<std::string, std::string> original_config;
+        std::map<std::string, std::string> edit_config;
+        std::string about_json;
+        std::string validation_error;
+        std::string error_message;
+        std::string success_message;
+        std::string test_message;
+        std::string reveal_error;
+        std::int64_t last_checked_unix = 0;
+        std::uint64_t generation = 0;
+    };
+
     struct ProviderStep {
         std::string kind;
         std::string name;
@@ -116,7 +176,11 @@ namespace misty::panel {
         ProvidersState();
         ~ProvidersState() = default;
 
-        void init(core::WorkerPool& pool);
+        void init(core::WorkerPool& pool, bool refresh_on_init = true);
+        void attach_shared_state(ProvidersState* shared_state);
+        void sync_shared_data_from(const ProvidersState& shared_state);
+        bool has_in_flight_work() const;
+        void prepare_for_workspace_close();
         void set_provider_added_callback(std::function<void()> callback);
 
         void set_search_query(const std::string& query);
@@ -127,6 +191,12 @@ namespace misty::panel {
         ProvidersHealthCard health_card_snapshot() const;
         std::vector<ProviderWorkflow> workflows_snapshot() const;
         ActiveProviderConfigSession add_provider_session_snapshot() const;
+        ProviderRenameSession rename_session_snapshot() const;
+        ProviderDetailsSession details_session_snapshot() const;
+        ProviderRemoteEditSession remote_edit_session_snapshot() const;
+        ProviderRcloneConfigSession rclone_config_session_snapshot() const;
+        ProvidersPageTab selected_page_tab() const;
+        bool edit_panel_visible() const;
 
         void refresh_all();
         void refresh_health();
@@ -146,6 +216,21 @@ namespace misty::panel {
         void reopen_browser_auth();
 
         void on_request_rename(const std::string& provider_id);
+        void set_pending_rename_name(const std::string& name);
+        void confirm_rename();
+        void on_request_details(const std::string& provider_id);
+        void select_remote(const std::string& provider_id);
+        void set_edit_remote_name(const std::string& name);
+        void set_edit_field(const std::string& key, const std::string& value);
+        void set_page_tab(ProvidersPageTab tab);
+        void show_edit_panel();
+        void hide_edit_panel();
+        void toggle_token_visibility();
+        void save_selected_remote();
+        void test_selected_remote();
+        void refresh_rclone_config_paths();
+        void open_rclone_config_file();
+        void reveal_rclone_config();
         void on_request_disconnect(const std::string& provider_id);
         void confirm_disconnect();
         void dismiss_active_dialog();
@@ -170,6 +255,9 @@ namespace misty::panel {
         static bool matches_query(const ProviderCard& card, const std::string& query);
 
         void schedule_browser_auth_poll(std::uint64_t generation);
+        std::vector<std::string> current_remote_names_locked() const;
+        void validate_remote_edit_session_locked();
+        void reset_remote_edit_session_locked();
         void rebuild_provider_cards_locked();
         void rebuild_health_card_locked();
         std::optional<ProviderWorkflow> workflow_for_type_locked(const std::string& provider_type) const;
@@ -177,14 +265,22 @@ namespace misty::panel {
         std::function<void()> provider_added_callback_locked() const;
 
         core::WorkerPool* worker_pool_ = nullptr;
+        ProvidersState* shared_state_ = nullptr;
         std::vector<ProviderCard> provider_cards;
         std::vector<ProviderWorkflow> workflows_;
         std::vector<ProviderRemote> remotes_;
+        std::vector<std::string> configured_remote_names_;
         std::map<std::string, ProviderRemoteStatus> remote_statuses_;
         ActiveProviderConfigSession add_provider_session_;
+        ProviderRenameSession rename_session_;
+        ProviderDetailsSession details_session_;
+        ProviderRemoteEditSession remote_edit_session_;
+        ProviderRcloneConfigSession rclone_config_session_;
         std::function<void()> provider_added_callback_;
         bool proxy_ready_ = false;
         std::string proxy_error_;
         std::string search_query_;
+        ProvidersPageTab selected_page_tab_ = ProvidersPageTab::Remotes;
+        bool edit_panel_visible_ = true;
     };
 }

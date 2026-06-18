@@ -156,6 +156,71 @@ namespace misty::core {
             return !is_public_proxy_endpoint(proxy_request_path(url));
         }
 
+        void log_http_attempt(const std::string& label,
+                              const std::string& method,
+                              const std::string& url,
+                              long connect_timeout_seconds,
+                              long total_timeout_seconds) {
+            if (label.empty()) {
+                return;
+            }
+            std::cerr << "[Misty HTTP] " << label
+                      << " start method=" << method
+                      << " url=" << url
+                      << " connect_timeout=" << connect_timeout_seconds << "s"
+                      << " total_timeout=" << total_timeout_seconds << "s"
+                      << std::endl;
+        }
+
+        void log_curl_error(const std::string& label,
+                            const std::string& method,
+                            const std::string& url,
+                            CURL* curl,
+                            CURLcode result,
+                            long connect_timeout_seconds,
+                            long total_timeout_seconds) {
+            double name_lookup_time = 0.0;
+            double connect_time = 0.0;
+            double app_connect_time = 0.0;
+            double start_transfer_time = 0.0;
+            double total_time = 0.0;
+            long response_code = 0;
+            char* primary_ip = nullptr;
+            long primary_port = 0;
+
+            if (curl) {
+                curl_easy_getinfo(curl, CURLINFO_NAMELOOKUP_TIME, &name_lookup_time);
+                curl_easy_getinfo(curl, CURLINFO_CONNECT_TIME, &connect_time);
+                curl_easy_getinfo(curl, CURLINFO_APPCONNECT_TIME, &app_connect_time);
+                curl_easy_getinfo(curl, CURLINFO_STARTTRANSFER_TIME, &start_transfer_time);
+                curl_easy_getinfo(curl, CURLINFO_TOTAL_TIME, &total_time);
+                curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response_code);
+                curl_easy_getinfo(curl, CURLINFO_PRIMARY_IP, &primary_ip);
+                curl_easy_getinfo(curl, CURLINFO_PRIMARY_PORT, &primary_port);
+            }
+
+            std::cerr << "[Misty HTTP] CURL error";
+            if (!label.empty()) {
+                std::cerr << " label=" << label;
+            }
+            std::cerr << " method=" << method
+                      << " url=" << url
+                      << " error=" << curl_easy_strerror(result)
+                      << " code=" << static_cast<int>(result)
+                      << " http_status=" << response_code
+                      << " connect_timeout=" << connect_timeout_seconds << "s"
+                      << " total_timeout=" << total_timeout_seconds << "s"
+                      << " timings={dns:" << name_lookup_time
+                      << ", connect:" << connect_time
+                      << ", tls:" << app_connect_time
+                      << ", first_byte:" << start_transfer_time
+                      << ", total:" << total_time << "}";
+            if (primary_ip && primary_ip[0] != '\0') {
+                std::cerr << " peer=" << primary_ip << ":" << primary_port;
+            }
+            std::cerr << std::endl;
+        }
+
         std::map<std::string, std::string> merge_auth_headers(
             const std::string& url,
             const std::map<std::string, std::string>& headers) {
@@ -215,6 +280,7 @@ namespace misty::core {
         std::map<std::string, std::string> response_headers;
         std::string partial_line;
         StreamLineCallback line_callback;
+        std::atomic<bool>* cancel_flag = nullptr;
     };
 
     static size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
@@ -287,6 +353,9 @@ namespace misty::core {
         if (!data) {
             return 0;
         }
+        if (data->cancel_flag && data->cancel_flag->load(std::memory_order_relaxed)) {
+            return 0;
+        }
 
         const char* bytes = static_cast<const char*>(contents);
         data->response_body.append(bytes, total_size);
@@ -308,6 +377,15 @@ namespace misty::core {
         }
 
         return total_size;
+    }
+
+    static int StreamProgressFunc(void* clientp,
+                                  curl_off_t,
+                                  curl_off_t,
+                                  curl_off_t,
+                                  curl_off_t) {
+        auto* cancel_flag = static_cast<std::atomic<bool>*>(clientp);
+        return cancel_flag && cancel_flag->load(std::memory_order_relaxed) ? 1 : 0;
     }
 
     static size_t FileWriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
@@ -339,7 +417,8 @@ namespace misty::core {
                                              const std::string& body,
                                              const std::map<std::string, std::string>& headers,
                                              long connect_timeout_seconds,
-                                             long total_timeout_seconds);
+                                             long total_timeout_seconds,
+                                             const std::string& debug_label);
 
     HTTPClient& HTTPClient::get() {
         static HTTPClient instance;
@@ -371,6 +450,13 @@ namespace misty::core {
 
             StreamResponseData data;
             data.line_callback = line_callback;
+            data.cancel_flag = options.cancel_flag;
+
+            log_http_attempt(options.debug_label,
+                             "GET_STREAM",
+                             url,
+                             options.timeouts.connect_timeout_seconds,
+                             options.timeouts.total_timeout_seconds);
 
             curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
             curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, StreamWriteCallback);
@@ -380,6 +466,11 @@ namespace misty::core {
             curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
             curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, options.timeouts.connect_timeout_seconds);
             curl_easy_setopt(curl, CURLOPT_TIMEOUT, options.timeouts.total_timeout_seconds);
+            if (options.cancel_flag) {
+                curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
+                curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, StreamProgressFunc);
+                curl_easy_setopt(curl, CURLOPT_XFERINFODATA, options.cancel_flag);
+            }
 
             struct curl_slist* header_list = nullptr;
             for (const auto& [key, value] : request_headers) {
@@ -397,8 +488,15 @@ namespace misty::core {
                 response.status_code = static_cast<int>(response_code);
                 response.body = data.response_body;
                 response.headers = data.response_headers;
-            } else {
-                std::cerr << "CURL error: " << curl_easy_strerror(res) << std::endl;
+            } else if (!(options.cancel_flag && options.cancel_flag->load(std::memory_order_relaxed) &&
+                         (res == CURLE_ABORTED_BY_CALLBACK || res == CURLE_WRITE_ERROR))) {
+                log_curl_error(options.debug_label,
+                               "GET_STREAM",
+                               url,
+                               curl,
+                               res,
+                               options.timeouts.connect_timeout_seconds,
+                               options.timeouts.total_timeout_seconds);
             }
 
             if (header_list) {
@@ -442,7 +540,8 @@ namespace misty::core {
                                              const std::string& body,
                                              const std::map<std::string, std::string>& headers,
                                              long connect_timeout_seconds,
-                                             long total_timeout_seconds) {
+                                             long total_timeout_seconds,
+                                             const std::string& debug_label) {
         HttpResponse response;
         response.status_code = 0;
         response.body = "";
@@ -454,6 +553,8 @@ namespace misty::core {
         }
 
         CurlData data;
+
+        log_http_attempt(debug_label, method, url, connect_timeout_seconds, total_timeout_seconds);
 
         // Set URL
         curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
@@ -503,7 +604,13 @@ namespace misty::core {
             response.body = data.response_body;
             response.headers = data.response_headers;
         } else {
-            std::cerr << "CURL error: " << curl_easy_strerror(res) << std::endl;
+            log_curl_error(debug_label,
+                           method,
+                           url,
+                           curl,
+                           res,
+                           connect_timeout_seconds,
+                           total_timeout_seconds);
         }
 
         // Cleanup
@@ -624,20 +731,23 @@ namespace misty::core {
         HttpResponse response = execute_curl_request(
             method, url, body, merged_headers,
             options.timeouts.connect_timeout_seconds,
-            options.timeouts.total_timeout_seconds);
+            options.timeouts.total_timeout_seconds,
+            options.debug_label);
         if (response.status_code == 0 && is_proxy_url(url) && ProxyManager::get().ensure_running()) {
             merged_headers = merge_auth_headers(url, options);
             response = execute_curl_request(
                 method, url, body, merged_headers,
                 options.timeouts.connect_timeout_seconds,
-                options.timeouts.total_timeout_seconds);
+                options.timeouts.total_timeout_seconds,
+                options.debug_label);
         }
         if (response.status_code == 401 && should_attach_proxy_auth(url) &&
             ProxyTokenStore::get().refresh_access_token()) {
             response = execute_curl_request(
                 method, url, body, merge_auth_headers(url, options),
                 options.timeouts.connect_timeout_seconds,
-                options.timeouts.total_timeout_seconds);
+                options.timeouts.total_timeout_seconds,
+                options.debug_label);
         }
         return response;
     }
@@ -815,7 +925,7 @@ namespace misty::core {
             return false;
         }
 
-        HttpResponse response = execute_curl_request("GET", proxy_url + "/api/health", "", {}, 10L, 30L);
+        HttpResponse response = execute_curl_request("GET", proxy_url + "/api/health", "", {}, 10L, 30L, "proxy.probe");
         return response.status_code >= 200 && response.status_code < 300;
     }
 
@@ -829,7 +939,8 @@ namespace misty::core {
             body,
             options.headers,
             options.timeouts.connect_timeout_seconds,
-            options.timeouts.total_timeout_seconds);
+            options.timeouts.total_timeout_seconds,
+            options.debug_label);
     }
 
     std::string build_json_object(const std::map<std::string, std::string>& fields) {

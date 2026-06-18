@@ -53,6 +53,8 @@ OperationKind operation_kind_for(core::FileTransferType type) {
         case core::FileTransferType::Copy:
         case core::FileTransferType::Upload:
             return OperationKind::Copy;
+        case core::FileTransferType::Create:
+            return OperationKind::Create;
         case core::FileTransferType::Move:
             return OperationKind::Move;
         case core::FileTransferType::Rename:
@@ -67,6 +69,8 @@ OperationKind operation_kind_for(core::FileTransferType type) {
 
 core::FileTransferType transfer_type_for(const OperationDescriptor& op) {
     switch (op.kind) {
+        case OperationKind::Create:
+            return core::FileTransferType::Create;
         case OperationKind::Copy:
             if (op.payload.kind == OperationPayloadKind::Clipboard &&
                 op.payload.item.type == FileType::LOCAL &&
@@ -233,7 +237,8 @@ ConflictProbeResult probe_conflict(const OperationDescriptor& op) {
     }
     result.supported = true;
     result.supports_replace = !op.target.remote_name.empty() || !op.target.local_path.empty();
-    result.supports_keep_both = op.kind != OperationKind::Delete &&
+    result.supports_keep_both = op.kind != OperationKind::Create &&
+                                op.kind != OperationKind::Delete &&
                                 op.kind != OperationKind::Rename &&
                                 !op.target.is_remote();
     result.conflict = !same_endpoint(op.source, op.target) && endpoint_exists(op.target);
@@ -466,6 +471,7 @@ std::optional<OperationPayload> retry_payload_from_transfer_row(core::StateRegis
             }
             return payload;
         }
+        case core::FileTransferType::Create:
         case core::FileTransferType::Rename: {
             const std::string source_name = payload.item.name.empty()
                 ? fs::path(payload.item.path).filename().string()
@@ -473,11 +479,13 @@ std::optional<OperationPayload> retry_payload_from_transfer_row(core::StateRegis
             const std::string dest_name = !row.remote_dest_path.empty()
                 ? fs::path(row.remote_dest_path).filename().string()
                 : fs::path(row.local_dest_path).filename().string();
-            if (payload.item.path.empty() || source_name.empty() || dest_name.empty() || source_name == dest_name) {
+            if (payload.item.path.empty() || source_name.empty() || dest_name.empty() ||
+                (source_name == dest_name && row.transfer_type != core::FileTransferType::Create)) {
                 return std::nullopt;
             }
             payload.kind = OperationPayloadKind::Rename;
             payload.rename_new_name = dest_name;
+            payload.create_mode = row.transfer_type == core::FileTransferType::Create;
             payload.dest_dir = !row.remote_dest_path.empty()
                 ? synthetic_mount_path_for(registry,
                                            row.remote_dest_name.empty() ? row.remote_source_name : row.remote_dest_name,
@@ -526,7 +534,8 @@ std::optional<OperationDescriptor> retry_descriptor_from_transfer_row(core::Stat
     op.transfer_id = row.id;
     op.retryable = row.retryable;
     op.cancelable = row.cancelable;
-    if (row.transfer_type == core::FileTransferType::Rename) {
+    if (row.transfer_type == core::FileTransferType::Create ||
+        row.transfer_type == core::FileTransferType::Rename) {
         op.preserve_order = true;
     }
     switch (row.conflict_policy) {
@@ -640,7 +649,7 @@ OperationDescriptor descriptor_for_payload(uint64_t batch_id,
     op.batch_id = batch_id;
     op.payload = std::move(payload);
     op.kind = op.payload.kind == OperationPayloadKind::Rename
-        ? OperationKind::Rename
+        ? (op.payload.create_mode ? OperationKind::Create : OperationKind::Rename)
         : op.payload.kind == OperationPayloadKind::Delete
             ? OperationKind::Delete
             : op.payload.kind == OperationPayloadKind::Download
@@ -668,7 +677,7 @@ uint64_t register_operation(core::StateRegistry& registry,
     record.item_type = op.payload.item.type == FileType::REMOTE
         ? core::FileTransferItemType::Remote
         : core::FileTransferItemType::Local;
-    record.file_name = op.payload.item.name;
+    record.file_name = op.kind == OperationKind::Create ? target_name_for(op.payload) : op.payload.item.name;
     record.job_id = op.batch_id;
     record.status = core::FileTransferStatus::Queued;
     record.conflict_policy = to_transfer_conflict_policy(op.conflict_policy);
@@ -719,7 +728,7 @@ void on_operation_finished(core::StateRegistry& registry,
         auto& listings = registry.get_state<FileListingsState>(kFileListingsStateKey);
         remove_item_from_listing(listings, descriptor->payload.source_state_key, descriptor->payload.item);
     }
-    if (descriptor->kind == OperationKind::Rename && result.success) {
+    if ((descriptor->kind == OperationKind::Rename || descriptor->kind == OperationKind::Create) && result.success) {
         apply_successful_rename_to_loaded_state(registry,
                                                 descriptor->payload.owner_state_key,
                                                 descriptor->payload.item,
@@ -800,17 +809,24 @@ bool dispatch_one_operation(core::StateRegistry& registry,
                 target_name_for(op.payload));
             break;
         case OperationPayloadKind::Rename:
-            dispatched = rename_file_master_item(
-                worker_pool,
-                transfers,
-                op.payload.item,
-                target_name_for(op.payload),
-                op.batch_id,
-                [&, transfer_id = op.transfer_id](core::FileMasterResult result) {
-                    finish_file_operation_job(registry, op.batch_id, result.success, result.error_message);
-                    on_operation_finished(registry, worker_pool, transfer_id, std::move(result));
-                },
-                op.transfer_id);
+            if (op.kind == OperationKind::Create && same_endpoint(op.source, op.target)) {
+                finish_file_operation_job(registry, op.batch_id, true);
+                transfers.complete_transfer(op.transfer_id);
+                on_operation_finished(registry, worker_pool, op.transfer_id, core::make_success());
+                dispatched = true;
+            } else {
+                dispatched = rename_file_master_item(
+                    worker_pool,
+                    transfers,
+                    op.payload.item,
+                    target_name_for(op.payload),
+                    op.batch_id,
+                    [&, transfer_id = op.transfer_id](core::FileMasterResult result) {
+                        finish_file_operation_job(registry, op.batch_id, result.success, result.error_message);
+                        on_operation_finished(registry, worker_pool, transfer_id, std::move(result));
+                    },
+                    op.transfer_id);
+            }
             break;
         case OperationPayloadKind::Delete:
             dispatched = remove_file_master_item(
@@ -874,6 +890,7 @@ const char* operation_kind_label(OperationKind kind) {
     switch (kind) {
         case OperationKind::Copy: return "Copy";
         case OperationKind::Move: return "Move";
+        case OperationKind::Create: return "Create";
         case OperationKind::Rename: return "Rename";
         case OperationKind::Delete: return "Delete";
         case OperationKind::Download: return "Download";
@@ -970,11 +987,16 @@ uint64_t enqueue_rename_operation_batch(core::StateRegistry& registry,
                                         core::WorkerPool& worker_pool,
                                         const std::vector<RenameExecutionRequest>& requests,
                                         std::function<void(const core::FileMasterResult&)> on_complete) {
-    const uint64_t batch_id = begin_file_operation_job(registry, "Rename");
+    const bool create_batch = !requests.empty() &&
+        std::all_of(requests.begin(), requests.end(), [](const RenameExecutionRequest& request) {
+            return request.create_mode;
+        });
+    const char* batch_label = create_batch ? "Create" : "Rename";
+    const uint64_t batch_id = begin_file_operation_job(registry, batch_label);
     {
         auto& queue = queue_state(registry);
         std::lock_guard<std::mutex> lock(queue.mu);
-        queue.batches[batch_id] = OperationBatch{.batch_id = batch_id, .label = "Rename", .preserve_order = true};
+        queue.batches[batch_id] = OperationBatch{.batch_id = batch_id, .label = batch_label, .preserve_order = true};
     }
     for (const auto& request : requests) {
         add_file_operation_to_job(registry, batch_id);
@@ -984,6 +1006,7 @@ uint64_t enqueue_rename_operation_batch(core::StateRegistry& registry,
         payload.owner_state_key = request.owner_state_key;
         payload.dest_dir = request.directory_path;
         payload.rename_new_name = request.new_name;
+        payload.create_mode = request.create_mode;
         register_operation(registry, descriptor_for_payload(batch_id, std::move(payload), ConflictPolicy::Ask, true, on_complete));
     }
     close_file_operation_job(registry, batch_id);

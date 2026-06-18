@@ -2,6 +2,6 @@
 
 namespace misty::panel {
 
-void render_transfers_header(bool& clear_finished, bool& clear_failed);
+void render_transfers_header();
 
 }  // namespace misty::panel
