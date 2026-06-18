@@ -1,3 +1,4 @@
+import { runtimeProperty } from "@/shared/lib/runtimeProperty";
 import type { agentsApi } from "@/api/agents/api";
 import type { assistantApi } from "@/api/assistant/api";
 import type { aiSurfaceApi, subscribeToAiInvocation } from "@/features/ai-surface/api";
@@ -48,10 +49,8 @@ export function agentsRuntime() {
 }
 function service<K extends keyof AgentsRuntime>(name: K): AgentsRuntime[K] {
   return new Proxy((...args: unknown[]) => (agentsRuntime()[name] as Function)(...args), {
-    get:
-      (_, key) =>
-      (...args: unknown[]) =>
-        (agentsRuntime()[name] as unknown as Record<string | symbol, Function>)[key](...args),
+    get: (target, key) => runtimeProperty(target, key, () => (...args: unknown[]) =>
+        (agentsRuntime()[name] as unknown as Record<string | symbol, Function>)[key](...args)),
   }) as AgentsRuntime[K];
 }
 export const runtimeAgentsApi = service("agentsApi"),

@@ -229,11 +229,23 @@ mod tests {
     fn independent_descriptor_survives_source_close_and_path_replacement() {
         let (root, mut registry) = fixture();
         let ticket = share(&mut registry, true);
-        // Rename the chosen directory and replace its old path: adoption must
-        // retain the chosen inode, not reopen the new folder at that path.
-        std::fs::rename(root.path().join("project"), root.path().join("moved")).unwrap();
-        std::fs::create_dir(root.path().join("project")).unwrap();
-        std::fs::write(root.path().join("project/日本語.txt"), "replacement").unwrap();
+        #[cfg(unix)]
+        let retained_path = {
+            // Rename the chosen directory and replace its old path: adoption must
+            // retain the chosen inode, not reopen the new folder at that path.
+            std::fs::rename(root.path().join("project"), root.path().join("moved")).unwrap();
+            std::fs::create_dir(root.path().join("project")).unwrap();
+            std::fs::write(root.path().join("project/日本語.txt"), "replacement").unwrap();
+            root.path().join("moved")
+        };
+        #[cfg(windows)]
+        let retained_path = {
+            // Windows keeps the granted directory locked against replacement.
+            assert!(
+                std::fs::rename(root.path().join("project"), root.path().join("moved")).is_err()
+            );
+            root.path().join("project")
+        };
         let receipt = adopt(&mut registry, &ticket, true).unwrap();
         assert!(adopt(&mut registry, &ticket, true).is_err());
         registry.remove("first");
@@ -245,9 +257,10 @@ mod tests {
         );
         folder.directory.write("new.txt", "new").unwrap();
         assert_eq!(
-            std::fs::read_to_string(root.path().join("moved/new.txt")).unwrap(),
+            std::fs::read_to_string(retained_path.join("new.txt")).unwrap(),
             "new"
         );
+        #[cfg(unix)]
         assert!(!root.path().join("project/new.txt").exists());
     }
     #[test]

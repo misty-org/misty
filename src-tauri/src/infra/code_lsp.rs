@@ -424,8 +424,16 @@ mod tests {
     #[test]
     fn immediate_exit_is_removed_and_reaped_before_exit_event() {
         let (send, receive) = std::sync::mpsc::channel();
+        #[cfg(unix)]
+        let command = Command::new("/usr/bin/true");
+        #[cfg(windows)]
+        let command = {
+            let mut command = Command::new("cmd.exe");
+            command.args(["/C", "exit", "0"]);
+            command
+        };
         let id = launch(
-            Command::new("/usr/bin/true"),
+            command,
             |_, _| {},
             move |id, _| {
                 send.send(id).unwrap();
@@ -444,8 +452,23 @@ mod tests {
     #[test]
     fn explicit_stop_terminates_process_and_output_reader() {
         let (send, receive) = std::sync::mpsc::channel();
-        let mut command = Command::new("/bin/sleep");
-        command.arg("30");
+        #[cfg(unix)]
+        let command = {
+            let mut command = Command::new("/bin/sleep");
+            command.arg("30");
+            command
+        };
+        #[cfg(windows)]
+        let command = {
+            let mut command = Command::new("powershell.exe");
+            command.args([
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                "Start-Sleep -Seconds 30",
+            ]);
+            command
+        };
         let id = launch(
             command,
             |_, _| {},
