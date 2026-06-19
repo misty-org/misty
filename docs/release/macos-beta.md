@@ -8,9 +8,13 @@ Use Node 22, Rust 1.91, GitHub CLI authenticated to `misty-org`, and sibling che
 
 The beta uses `https://dev-api.mistysys.com/v1`. Its existing Go server and named development tunnel must stay online. Do not switch the beta to Hono.
 
+Before the first **promotion**, enable GitHub Pages for `misty-org/misty-apps` with GitHub Actions as its source and set the custom domain to `apps.mistysys.com`. Then create the DNS CNAME `apps` pointing to `misty-org.github.io` and wait for HTTPS to work. A missing initial catalog/feed may return 404; DNS, TLS, or other HTTP failures abort promotion. Draft preparation does not need this public site. These settings were not configured during this preparation. Follow [GitHub's custom-domain setup](https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/managing-a-custom-domain-for-your-github-pages-site).
+
 The `misty` repository already has these Apple secrets: `MACOS_DEVELOPER_ID`, `MACOS_DEVELOPER_ID_CERT_P12`, `MACOS_DEVELOPER_ID_CERT_PASSWORD`, `MACOS_NOTARY_APPLE_ID`, `MACOS_NOTARY_APP_PASSWORD`, and `MACOS_NOTARY_TEAM_ID`. The certificate secret is base64-encoded PKCS#12. Signing and notarization must succeed; the workflow never substitutes an unsigned installer.
 
 Run `npm run beta:keys` only on the release maintainer’s computer. It creates or verifies two separate signing keys, configures the GitHub signing secrets, and updates public trust. Private backups live in `~/.config/misty-release/` with owner-only permissions. Back up that directory securely. On another computer, restore those keys first; the command refuses to replace established trust. Apple signing, app-package signing, and desktop-updater signing are separate systems.
+
+The Go repository is private and disables deploy keys. The authenticated local `prepare` and `promote` commands verify its exact commit and successful `Verify` CI check through GitHub CLI. The macOS workflow checks out the public SDK and Apps pins; it does not need private server source or a broad personal token. A workflow artifact alone does not complete private-server verification: finish with `npm run beta:prepare -- --collect` using an account that can read the Go repository.
 
 ## Prepare
 
@@ -24,7 +28,7 @@ The host draft contains two DMGs, two updater archives and signatures, ten app Z
 
 ## Promote and verify
 
-Run `npm run beta:promote -- assets` only when ready to make the prepared assets public. This publishes the host and SDK releases and dispatches the Apps site deployment using the prepared site archive. It preserves the previous feed and catalog. Wait for that deployment to finish; it does not rebuild packages.
+Run `npm run beta:promote -- assets` only when ready to make the prepared assets public. This publishes the host and SDK releases and dispatches the Apps site deployment using the prepared site archive. It preserves the previous feed and catalog, and retains every archive referenced by the live catalog after checking its checksum, including on the first beta. Wait for that deployment to finish; it does not rebuild packages.
 
 Apply the draft’s exact `catalog.go` overlay to a checkout of the pinned Go server revision, review/commit it, and deploy using the existing Go workflow:
 

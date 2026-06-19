@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import { root, readJSON, run, capture, version, verifyChecksums } from './lib.mjs';
+import { verifyPinnedServer } from './verify-server.mjs';
 const command = process.argv[2];
 const releaseVersion = version(readJSON(resolve(root,'package.json')).version);
 const tag = `v${releaseVersion}`;
@@ -11,6 +12,7 @@ const sdkVersion = pins.sdkVersion;
 if (!/^\d+\.\d+\.\d+$/.test(sdkVersion)) throw new Error('Invalid pinned SDK version.');
 const sdkTag = `v${sdkVersion}`;
 if (!['prepare','promote'].includes(command)) throw new Error('Usage: npm run beta:prepare | npm run beta:promote -- assets|feeds');
+verifyPinnedServer(pins.server);
 if (command === 'prepare' && !process.argv.includes('--collect')) {
   if (capture('git',['status','--porcelain'])) throw new Error('Commit and push the verified release branch before preparing a draft.');
   const sha = capture('git',['rev-parse','HEAD']);
@@ -31,7 +33,7 @@ const directory = mkdtempSync(resolve(tmpdir(),`misty-${tag}-`));
 run('gh',['release','download',tag,'--repo','misty-org/misty','--dir',directory]);
 verifyChecksums(directory);
 const manifest = readJSON(resolve(directory,'release-manifest.json'));
-if (manifest.version !== releaseVersion || manifest.source.sdk !== pins.sdk || manifest.source.apps !== pins.apps) throw new Error('Draft source pins do not match this checkout.');
+if (manifest.version !== releaseVersion || manifest.source.sdk !== pins.sdk || manifest.source.apps !== pins.apps || manifest.source.server !== pins.server) throw new Error('Draft source pins do not match this checkout.');
 if (command === 'prepare') {
   if (manifest.source.host !== capture('git',['rev-parse','HEAD'])) throw new Error('The draft belongs to a different host revision. Check out its prepared revision before collecting.');
   let sdkRelease;

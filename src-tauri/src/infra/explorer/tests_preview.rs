@@ -218,6 +218,7 @@ async fn late_canceled_create_cleans_created_item() {
     tokio::fs::create_dir_all(&root).await.unwrap();
     let service = test_explorer_service();
     let cancellation = Arc::new(AtomicBool::new(false));
+    let completed = Arc::new(tokio::sync::Barrier::new(2));
     let operation = service.create_item_with_cancellation(
         CreateItemRequest {
             directory: display_path(&root),
@@ -229,9 +230,13 @@ async fn late_canceled_create_cleans_created_item() {
     let trigger_cancel = async {
         wait_until_path_exists(&target).await;
         cancellation.store(true, Ordering::SeqCst);
+        completed.wait().await;
     };
 
-    let (result, _) = tokio::join!(operation, trigger_cancel);
+    let (result, _) = tokio::join!(
+        MUTATION_COMPLETED.scope(completed.clone(), operation),
+        trigger_cancel
+    );
 
     assert!(result.as_ref().is_err_and(is_cancellation_error));
     assert!(!target.exists());
@@ -249,6 +254,7 @@ async fn late_canceled_rename_reverts_item() {
     tokio::fs::write(&source, b"keep original").await.unwrap();
     let service = test_explorer_service();
     let cancellation = Arc::new(AtomicBool::new(false));
+    let completed = Arc::new(tokio::sync::Barrier::new(2));
     let operation = service.rename_item_with_cancellation(
         RenameItemRequest {
             path: display_path(&source),
@@ -260,9 +266,13 @@ async fn late_canceled_rename_reverts_item() {
     let trigger_cancel = async {
         wait_until_path_exists(&destination).await;
         cancellation.store(true, Ordering::SeqCst);
+        completed.wait().await;
     };
 
-    let (result, _) = tokio::join!(operation, trigger_cancel);
+    let (result, _) = tokio::join!(
+        MUTATION_COMPLETED.scope(completed.clone(), operation),
+        trigger_cancel
+    );
 
     assert!(result.as_ref().is_err_and(is_cancellation_error));
     assert!(source.exists());
