@@ -59,11 +59,14 @@ function listingEntry(listing: DirectoryListing | null): FileEntry | null {
     name: listing.path.split("/").filter(Boolean).pop() || listing.path,
     path: listing.path,
     extension: "",
+    mimeType: null,
+    remoteModified: null,
     kind: "folder",
     sizeBytes: null,
     modifiedMs: null,
     createdMs: null,
     readonly: false,
     hidden: false,
+    location: listing.location,
   };
 }

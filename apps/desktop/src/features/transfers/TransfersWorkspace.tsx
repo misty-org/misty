@@ -1,6 +1,8 @@
-import { RefreshCcw, Search, Trash2 } from "lucide-react";
+import { RefreshCcw, RotateCcw, Search, Trash2, XCircle } from "lucide-react";
+import { useEffect } from "react";
 import { prettyLabel } from "../../shared/format";
 import { relativeTime, remoteSummary, transferProgress } from "./transferUtils";
+import { useOperationQueueStore } from "./useOperationQueueStore";
 import { useTransfersStore } from "./useTransfersStore";
 
 export function TransfersWorkspace() {
@@ -15,6 +17,17 @@ export function TransfersWorkspace() {
     deleteSelected,
     deleteAll,
   } = useTransfersStore();
+  const queue = useOperationQueueStore();
+
+  useEffect(() => {
+    void load();
+    void queue.load();
+    const interval = window.setInterval(() => {
+      void load(undefined, { silent: true });
+      void useOperationQueueStore.getState().load({ silent: true });
+    }, 1500);
+    return () => window.clearInterval(interval);
+  }, []);
 
   return (
     <section className="panel transfers-panel">
@@ -44,6 +57,7 @@ export function TransfersWorkspace() {
       </div>
 
       <div className="transfer-table-wrap">
+        <OperationQueueStrip />
         <table className="transfer-table">
           <thead>
             <tr>
@@ -83,6 +97,75 @@ export function TransfersWorkspace() {
         </table>
         {transfers && transfers.rows.length === 0 ? <div className="empty">No transfer history found.</div> : null}
       </div>
+    </section>
+  );
+}
+
+function OperationQueueStrip() {
+  const { snapshot, working, error, load, cancel, retry, resolveConflict, clearTerminal } = useOperationQueueStore();
+  const operations = snapshot?.operations ?? [];
+  const active = operations.filter((operation) => operation.status === "queued" || operation.status === "in_progress" || operation.status === "waiting_for_resolution");
+  const terminal = operations.length - active.length;
+  const conflict = snapshot?.conflictDialog;
+
+  return (
+    <section className="operation-queue-strip">
+      <div>
+        <strong>Operation Queue</strong>
+        <span>
+          {snapshot ? `${active.length} active · ${terminal} finished · ${snapshot.maxConcurrent} max` : "Not loaded"}
+        </span>
+      </div>
+      <div className="operation-queue-actions">
+        {error ? <span className="error-text">{error}</span> : null}
+        <button type="button" onClick={() => void load()} disabled={working}>
+          <RefreshCcw size={14} />
+          Refresh
+        </button>
+        <button type="button" onClick={() => void clearTerminal()} disabled={working || terminal === 0}>
+          <Trash2 size={14} />
+          Clear Finished
+        </button>
+      </div>
+      {conflict?.open ? (
+        <div className="operation-conflict-row">
+          <div>
+            <strong>{conflict.title || "Resolve conflict"}</strong>
+            <span>{conflict.sourceLabel} → {conflict.targetLabel}</span>
+          </div>
+          <button type="button" disabled={working} onClick={() => void resolveConflict(conflict.operationId, "replace", conflict.applyToBatch)}>
+            Replace
+          </button>
+          <button type="button" disabled={working} onClick={() => void resolveConflict(conflict.operationId, "skip", conflict.applyToBatch)}>
+            Skip
+          </button>
+          {conflict.supportsKeepBoth ? (
+            <button type="button" disabled={working} onClick={() => void resolveConflict(conflict.operationId, "keep_both", conflict.applyToBatch)}>
+              Keep Both
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+      {operations.length > 0 ? (
+        <div className="operation-queue-list">
+          {operations.slice(0, 5).map((operation) => (
+            <div key={operation.operationId} className="operation-queue-row">
+              <span>{operation.title || prettyLabel(operation.kind)}</span>
+              <span className={`status-badge ${operation.status}`}>{prettyLabel(operation.status)}</span>
+              <span>{operation.source.localPath || `${operation.source.remoteName}:${operation.source.remotePath}`}</span>
+              <span>{operation.target.localPath || `${operation.target.remoteName}:${operation.target.remotePath}`}</span>
+              <button type="button" disabled={!operation.cancelable || working} onClick={() => void cancel(operation.operationId)}>
+                <XCircle size={14} />
+                Cancel
+              </button>
+              <button type="button" disabled={!operation.retryable || operation.status !== "failed" || working} onClick={() => void retry(operation.operationId)}>
+                <RotateCcw size={14} />
+                Retry
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : null}
     </section>
   );
 }

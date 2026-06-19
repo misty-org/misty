@@ -1,15 +1,20 @@
 import { Columns2, PanelTopClose, Rows2, RotateCcw, X } from "lucide-react";
-import type { ReactNode } from "react";
+import { memo } from "react";
+import type { PointerEvent, ReactNode } from "react";
+import { useShallow } from "zustand/react/shallow";
+import type { MultiPanelTab } from "./types";
 import { activeMultiPanelTab, maxMultiPanelPanes, useMultiPanelStore } from "./useMultiPanelStore";
 
 interface MultiPanelWorkspaceProps {
   className?: string;
   renderToolbar?: (paneId: string, path: string) => ReactNode;
+  renderContextHeader?: (tab: MultiPanelTab) => ReactNode;
   renderAside?: ReactNode;
+  onAsideResizeStart?: (event: PointerEvent<HTMLDivElement>) => void;
   renderPane: (paneId: string, path: string) => ReactNode;
 }
 
-export function MultiPanelWorkspace(props: MultiPanelWorkspaceProps) {
+export const MultiPanelWorkspace = memo(function MultiPanelWorkspace(props: MultiPanelWorkspaceProps) {
   const {
     tabs,
     activeTabId,
@@ -22,7 +27,19 @@ export function MultiPanelWorkspace(props: MultiPanelWorkspaceProps) {
     closePane,
     restorePane,
     setActivePane,
-  } = useMultiPanelStore();
+  } = useMultiPanelStore(useShallow((state) => ({
+    tabs: state.tabs,
+    activeTabId: state.activeTabId,
+    activePaneId: state.activePaneId,
+    closedPanes: state.closedPanes,
+    addTab: state.addTab,
+    closeTab: state.closeTab,
+    selectTab: state.selectTab,
+    splitPane: state.splitPane,
+    closePane: state.closePane,
+    restorePane: state.restorePane,
+    setActivePane: state.setActivePane,
+  })));
   const activeTab = activeMultiPanelTab({ tabs, activeTabId });
   if (!activeTab) return null;
   const canSplit = activeTab.panes.length < maxMultiPanelPanes();
@@ -50,6 +67,8 @@ export function MultiPanelWorkspace(props: MultiPanelWorkspaceProps) {
               ) : null}
             </button>
           ))}
+        </div>
+        <div className="multi-tab-controls">
           <button type="button" className="multi-tab-add" onClick={() => addTab(activeTab.path, activeTab.title)}>
             +
           </button>
@@ -75,7 +94,12 @@ export function MultiPanelWorkspace(props: MultiPanelWorkspaceProps) {
         </div>
       </div>
 
-      {props.renderToolbar ? props.renderToolbar(activeTab.activePaneId, activeTab.path) : null}
+      {props.renderToolbar || props.renderContextHeader ? (
+        <div className="multi-workspace-tools">
+          {props.renderToolbar ? props.renderToolbar(activeTab.activePaneId, activeTab.path) : null}
+          {props.renderContextHeader ? props.renderContextHeader(activeTab) : null}
+        </div>
+      ) : null}
 
       <div className={`multi-workspace-body${props.renderAside ? " has-aside" : ""}`}>
         <div className={`multi-panel ${activeTab.layout.orientation} pane-count-${activeTab.layout.paneIds.length}`}>
@@ -86,15 +110,22 @@ export function MultiPanelWorkspace(props: MultiPanelWorkspaceProps) {
               <div
                 key={pane.id}
                 className={`multi-pane ${activePaneId === pane.id ? "active" : ""}`}
-                onMouseDown={() => setActivePane(pane.id)}
+                onMouseDown={() => {
+                  if (activePaneId !== pane.id) setActivePane(pane.id);
+                }}
               >
                 <div className="multi-pane-content">{props.renderPane(pane.id, pane.path)}</div>
               </div>
             );
           })}
         </div>
-        {props.renderAside ? <aside className="multi-workspace-aside">{props.renderAside}</aside> : null}
+        {props.renderAside ? (
+          <>
+            <div className="multi-workspace-aside-resizer" onPointerDown={props.onAsideResizeStart} />
+            <aside className="multi-workspace-aside">{props.renderAside}</aside>
+          </>
+        ) : null}
       </div>
     </section>
   );
-}
+});

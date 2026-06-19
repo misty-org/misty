@@ -1,11 +1,19 @@
 import { create } from "zustand";
-import { settingsSave, settingsSnapshot, shortcutsSave, shortcutsSnapshot } from "../../api/misty";
-import type { ShortcutsSnapshot, SettingsSnapshot } from "../../api/types";
+import {
+  settingsOpenWithAssociations,
+  settingsRemoveOpenWithAssociation,
+  settingsSave,
+  settingsSnapshot,
+  shortcutsSave,
+  shortcutsSnapshot,
+} from "../../api/misty";
+import type { OpenWithAssociation, ShortcutsSnapshot, SettingsSnapshot } from "../../api/types";
 import { errorText } from "../../shared/format";
 
 interface SettingsStore {
   settings: SettingsSnapshot | null;
   settingsText: string;
+  openWithAssociations: OpenWithAssociation[];
   shortcuts: ShortcutsSnapshot | null;
   working: boolean;
   error: string | null;
@@ -13,6 +21,7 @@ interface SettingsStore {
   load: () => Promise<void>;
   setSettingsText: (value: string) => void;
   saveSettingsDocument: () => Promise<void>;
+  removeOpenWithAssociation: (key: string) => Promise<void>;
   setShortcut: (commandId: string, shortcut: string) => void;
   saveShortcuts: () => Promise<void>;
 }
@@ -20,6 +29,7 @@ interface SettingsStore {
 export const useSettingsStore = create<SettingsStore>((set, get) => ({
   settings: null,
   settingsText: "{}",
+  openWithAssociations: [],
   shortcuts: null,
   working: false,
   error: null,
@@ -28,10 +38,15 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   load: async () => {
     set({ working: true, error: null });
     try {
-      const [settings, shortcuts] = await Promise.all([settingsSnapshot(), shortcutsSnapshot()]);
+      const [settings, shortcuts, openWithAssociations] = await Promise.all([
+        settingsSnapshot(),
+        shortcutsSnapshot(),
+        settingsOpenWithAssociations(),
+      ]);
       set({
         settings,
         settingsText: JSON.stringify(settings.document, null, 2),
+        openWithAssociations,
         shortcuts,
       });
     } catch (error) {
@@ -54,7 +69,25 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       set({
         settings,
         settingsText: JSON.stringify(settings.document, null, 2),
+        openWithAssociations: await settingsOpenWithAssociations(),
         message: "Settings saved.",
+      });
+    } catch (error) {
+      set({ error: errorText(error) });
+    } finally {
+      set({ working: false });
+    }
+  },
+
+  removeOpenWithAssociation: async (key) => {
+    set({ working: true, error: null, message: null });
+    try {
+      const settings = await settingsRemoveOpenWithAssociation(key);
+      set({
+        settings,
+        settingsText: JSON.stringify(settings.document, null, 2),
+        openWithAssociations: await settingsOpenWithAssociations(),
+        message: `Removed Open With association for ${key}.`,
       });
     } catch (error) {
       set({ error: errorText(error) });

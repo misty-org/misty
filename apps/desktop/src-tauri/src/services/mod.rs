@@ -1,7 +1,10 @@
 pub mod commands;
 pub mod environment;
 pub mod explorer;
+pub mod file_sync;
+pub mod operation_queue;
 pub mod providers;
 pub mod proxy;
 pub mod settings;
 pub mod transfers;
+pub mod workspaces;

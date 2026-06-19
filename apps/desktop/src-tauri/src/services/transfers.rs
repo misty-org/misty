@@ -7,74 +7,18 @@ use std::{
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 
+use crate::core::file_transfer::now_epoch_ms;
+pub use crate::core::file_transfer::{
+    FileTransferConflictPolicy as TransferConflictPolicy, FileTransferItemType as TransferItemType,
+    FileTransferRecord as TransferRecord, FileTransferStatus as TransferStatus,
+    FileTransferType as TransferType,
+};
 use crate::error::{ApiError, ApiResult};
 use crate::services::environment::AppEnvironmentService;
 
 #[derive(Debug, Clone)]
 pub struct TransferService {
     db_path: PathBuf,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TransferRecord {
-    pub id: u64,
-    pub job_id: u64,
-    pub transfer_type: TransferType,
-    pub item_type: TransferItemType,
-    pub status: TransferStatus,
-    pub conflict_policy: String,
-    pub file_name: String,
-    pub local_source_path: String,
-    pub local_dest_path: String,
-    pub remote_source_name: String,
-    pub remote_source_path: String,
-    pub remote_dest_name: String,
-    pub remote_dest_path: String,
-    pub total_bytes: i64,
-    pub transferred_bytes: i64,
-    pub error_message: String,
-    pub detail_message: String,
-    pub queued_at_ms: i64,
-    pub started_at_ms: i64,
-    pub completed_at_ms: i64,
-    pub cancelable: bool,
-    pub retryable: bool,
-    pub undoable: bool,
-    pub undo_token_id: u64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum TransferType {
-    Upload,
-    Download,
-    Create,
-    Copy,
-    Move,
-    Rename,
-    Delete,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum TransferItemType {
-    Local,
-    Remote,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum TransferStatus {
-    Queued,
-    Pending,
-    InProgress,
-    WaitingForResolution,
-    Completed,
-    Failed,
-    Canceled,
-    Skipped,
-    Interrupted,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -117,6 +61,59 @@ impl TransferService {
     pub async fn delete_all(&self) -> ApiResult<()> {
         let db_path = self.db_path.clone();
         tokio::task::spawn_blocking(move || delete_all(&db_path))
+            .await
+            .map_err(|err| ApiError::Message(format!("Transfer worker failed: {err}")))?
+    }
+
+    pub async fn create_transfer(&self, record: TransferRecord) -> ApiResult<u64> {
+        let db_path = self.db_path.clone();
+        tokio::task::spawn_blocking(move || create_transfer(&db_path, record, false))
+            .await
+            .map_err(|err| ApiError::Message(format!("Transfer worker failed: {err}")))?
+    }
+
+    pub async fn start_transfer(&self, record: TransferRecord) -> ApiResult<u64> {
+        let db_path = self.db_path.clone();
+        tokio::task::spawn_blocking(move || create_transfer(&db_path, record, true))
+            .await
+            .map_err(|err| ApiError::Message(format!("Transfer worker failed: {err}")))?
+    }
+
+    pub async fn mark_started(&self, id: u64) -> ApiResult<()> {
+        self.mutate(id, |record| record.mark_started()).await
+    }
+
+    pub async fn update_progress(
+        &self,
+        id: u64,
+        transferred_bytes: i64,
+        total_bytes: i64,
+    ) -> ApiResult<()> {
+        self.mutate(id, move |record| {
+            record.update_progress(transferred_bytes, total_bytes)
+        })
+        .await
+    }
+
+    pub async fn update_detail(&self, id: u64, detail: String) -> ApiResult<()> {
+        self.mutate(id, move |record| record.detail_message = detail)
+            .await
+    }
+
+    pub async fn complete_transfer(&self, id: u64) -> ApiResult<()> {
+        self.mutate(id, |record| record.complete()).await
+    }
+
+    pub async fn fail_transfer(&self, id: u64, message: String) -> ApiResult<()> {
+        self.mutate(id, move |record| record.fail(message)).await
+    }
+
+    async fn mutate<F>(&self, id: u64, mutation: F) -> ApiResult<()>
+    where
+        F: FnOnce(&mut TransferRecord) + Send + 'static,
+    {
+        let db_path = self.db_path.clone();
+        tokio::task::spawn_blocking(move || mutate_transfer(&db_path, id, mutation))
             .await
             .map_err(|err| ApiError::Message(format!("Transfer worker failed: {err}")))?
     }
@@ -181,6 +178,143 @@ fn count_rows(conn: &Connection, where_sql: &str, search: &str) -> ApiResult<usi
         })
         .map_err(sql_error)?;
     Ok(count.max(0) as usize)
+}
+
+fn create_transfer(
+    db_path: &Path,
+    mut record: TransferRecord,
+    start_immediately: bool,
+) -> ApiResult<u64> {
+    let conn = open_db(db_path)?;
+    let tx = conn.unchecked_transaction().map_err(sql_error)?;
+    record.id = tx
+        .query_row(
+            "SELECT COALESCE(MAX(id), 0) + 1 FROM transfers",
+            [],
+            |row| row.get::<_, i64>(0),
+        )
+        .map_err(sql_error)?
+        .max(1) as u64;
+    if record.job_id == 0 {
+        record.job_id = record.id;
+    }
+    if record.queued_at_ms <= 0 {
+        record.queued_at_ms = now_epoch_ms();
+    }
+    if start_immediately && record.status != TransferStatus::Queued {
+        record.mark_started();
+    }
+    upsert_record(&tx, &record)?;
+    prune_history(&tx, 500)?;
+    tx.commit().map_err(sql_error)?;
+    Ok(record.id)
+}
+
+fn mutate_transfer<F>(db_path: &Path, id: u64, mutation: F) -> ApiResult<()>
+where
+    F: FnOnce(&mut TransferRecord),
+{
+    let conn = open_db(db_path)?;
+    let tx = conn.unchecked_transaction().map_err(sql_error)?;
+    let mut record = tx
+        .query_row(
+            &format!(
+                "SELECT {} FROM transfers WHERE id = ?",
+                transfer_select_columns()
+            ),
+            params![id as i64],
+            read_record,
+        )
+        .optional()
+        .map_err(sql_error)?
+        .ok_or_else(|| ApiError::Message(format!("Transfer {id} was not found.")))?;
+    mutation(&mut record);
+    upsert_record(&tx, &record)?;
+    prune_history(&tx, 500)?;
+    tx.commit().map_err(sql_error)?;
+    Ok(())
+}
+
+fn upsert_record(conn: &Connection, record: &TransferRecord) -> ApiResult<()> {
+    conn.execute(
+        "INSERT INTO transfers (
+            id, job_id, transfer_type, item_type, status, conflict_policy, file_name,
+            local_source_path, local_dest_path, remote_source_name, remote_source_path,
+            remote_dest_name, remote_dest_path, total_bytes, transferred_bytes, error_message,
+            detail_message, queued_at_ms, started_at_ms, completed_at_ms, cancelable, retryable,
+            undoable, undo_token_id, created_session_id
+        ) VALUES (
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        ) ON CONFLICT(id) DO UPDATE SET
+            job_id = excluded.job_id,
+            transfer_type = excluded.transfer_type,
+            item_type = excluded.item_type,
+            status = excluded.status,
+            conflict_policy = excluded.conflict_policy,
+            file_name = excluded.file_name,
+            local_source_path = excluded.local_source_path,
+            local_dest_path = excluded.local_dest_path,
+            remote_source_name = excluded.remote_source_name,
+            remote_source_path = excluded.remote_source_path,
+            remote_dest_name = excluded.remote_dest_name,
+            remote_dest_path = excluded.remote_dest_path,
+            total_bytes = excluded.total_bytes,
+            transferred_bytes = excluded.transferred_bytes,
+            error_message = excluded.error_message,
+            detail_message = excluded.detail_message,
+            queued_at_ms = excluded.queued_at_ms,
+            started_at_ms = excluded.started_at_ms,
+            completed_at_ms = excluded.completed_at_ms,
+            cancelable = excluded.cancelable,
+            retryable = excluded.retryable,
+            undoable = excluded.undoable,
+            undo_token_id = excluded.undo_token_id,
+            created_session_id = excluded.created_session_id",
+        params![
+            record.id as i64,
+            record.job_id as i64,
+            transfer_type_text(record.transfer_type),
+            item_type_text(record.item_type),
+            status_text(record.status),
+            conflict_policy_text(record.conflict_policy),
+            record.file_name,
+            record.local_source_path,
+            record.local_dest_path,
+            record.remote_source_name,
+            record.remote_source_path,
+            record.remote_dest_name,
+            record.remote_dest_path,
+            record.total_bytes,
+            record.transferred_bytes,
+            record.error_message,
+            record.detail_message,
+            record.queued_at_ms,
+            record.started_at_ms,
+            record.completed_at_ms,
+            record.cancelable as i64,
+            record.retryable as i64,
+            record.undoable as i64,
+            record.undo_token_id as i64,
+            format!("rust-{}", now_epoch_ms()),
+        ],
+    )
+    .map_err(sql_error)?;
+    Ok(())
+}
+
+fn prune_history(conn: &Connection, limit: usize) -> ApiResult<()> {
+    conn.execute(
+        "DELETE FROM transfers
+         WHERE id IN (
+            SELECT id FROM transfers
+            WHERE status IN ('completed', 'failed', 'canceled', 'skipped', 'interrupted')
+            ORDER BY COALESCE(completed_at_ms, queued_at_ms) DESC, id DESC
+            LIMIT -1 OFFSET ?
+         )",
+        params![limit as i64],
+    )
+    .map_err(sql_error)?;
+    Ok(())
 }
 
 fn delete_selected(db_path: &Path, ids: Vec<u64>) -> ApiResult<()> {
@@ -290,7 +424,7 @@ fn read_record(row: &rusqlite::Row<'_>) -> rusqlite::Result<TransferRecord> {
         transfer_type: transfer_type_from_text(row.get::<_, String>(2)?.as_str()),
         item_type: item_type_from_text(row.get::<_, String>(3)?.as_str()),
         status: status_from_text(row.get::<_, String>(4)?.as_str()),
-        conflict_policy: row.get(5)?,
+        conflict_policy: conflict_policy_from_text(row.get::<_, String>(5)?.as_str()),
         file_name: row.get(6)?,
         local_source_path: row.get(7)?,
         local_dest_path: row.get(8)?,
@@ -372,11 +506,30 @@ fn transfer_type_from_text(value: &str) -> TransferType {
     }
 }
 
+fn transfer_type_text(value: TransferType) -> &'static str {
+    match value {
+        TransferType::Upload => "upload",
+        TransferType::Download => "download",
+        TransferType::Create => "create",
+        TransferType::Copy => "copy",
+        TransferType::Move => "move",
+        TransferType::Rename => "rename",
+        TransferType::Delete => "delete",
+    }
+}
+
 fn item_type_from_text(value: &str) -> TransferItemType {
     if value == "remote" {
         TransferItemType::Remote
     } else {
         TransferItemType::Local
+    }
+}
+
+fn item_type_text(value: TransferItemType) -> &'static str {
+    match value {
+        TransferItemType::Local => "local",
+        TransferItemType::Remote => "remote",
     }
 }
 
@@ -394,6 +547,121 @@ fn status_from_text(value: &str) -> TransferStatus {
     }
 }
 
+fn status_text(value: TransferStatus) -> &'static str {
+    match value {
+        TransferStatus::Queued => "queued",
+        TransferStatus::Pending => "pending",
+        TransferStatus::InProgress => "in_progress",
+        TransferStatus::WaitingForResolution => "waiting_for_resolution",
+        TransferStatus::Completed => "completed",
+        TransferStatus::Failed => "failed",
+        TransferStatus::Canceled => "canceled",
+        TransferStatus::Skipped => "skipped",
+        TransferStatus::Interrupted => "interrupted",
+    }
+}
+
+fn conflict_policy_from_text(value: &str) -> TransferConflictPolicy {
+    match value {
+        "replace" => TransferConflictPolicy::Replace,
+        "skip" => TransferConflictPolicy::Skip,
+        "keep_both" => TransferConflictPolicy::KeepBoth,
+        _ => TransferConflictPolicy::Ask,
+    }
+}
+
+fn conflict_policy_text(value: TransferConflictPolicy) -> &'static str {
+    match value {
+        TransferConflictPolicy::Ask => "ask",
+        TransferConflictPolicy::Replace => "replace",
+        TransferConflictPolicy::Skip => "skip",
+        TransferConflictPolicy::KeepBoth => "keep_both",
+    }
+}
+
 fn sql_error(error: rusqlite::Error) -> ApiError {
     ApiError::Message(format!("SQLite transfer store failed: {error}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_service(label: &str) -> (TransferService, PathBuf) {
+        let root = std::env::temp_dir().join(format!(
+            "misty-transfer-{label}-{}-{}",
+            std::process::id(),
+            now_epoch_ms()
+        ));
+        let db_path = root.join("misty.db");
+        (TransferService { db_path }, root)
+    }
+
+    #[tokio::test]
+    async fn fresh_store_persists_transfer_lifecycle() {
+        let (service, root) = test_service("lifecycle");
+        let mut record =
+            TransferRecord::new(TransferType::Upload, TransferItemType::Local, "archive.zip");
+        record.local_source_path = "/tmp/archive.zip".to_string();
+        record.remote_dest_name = "backup".to_string();
+        record.remote_dest_path = "/archive.zip".to_string();
+        record.total_bytes = 100;
+
+        let id = service
+            .start_transfer(record)
+            .await
+            .expect("start transfer");
+        service
+            .update_progress(id, 45, 100)
+            .await
+            .expect("update progress");
+        service
+            .complete_transfer(id)
+            .await
+            .expect("complete transfer");
+
+        let page = service
+            .snapshot(TransferFilter::default())
+            .await
+            .expect("load transfer page");
+        assert_eq!(page.rows.len(), 1);
+        assert_eq!(page.rows[0].id, id);
+        assert_eq!(page.rows[0].status, TransferStatus::Completed);
+        assert_eq!(page.rows[0].transferred_bytes, 100);
+        assert_eq!(page.rows[0].conflict_policy, TransferConflictPolicy::Ask);
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[tokio::test]
+    async fn failed_transfer_keeps_context_and_becomes_retryable() {
+        let (service, root) = test_service("failure");
+        let mut record = TransferRecord::new(
+            TransferType::Download,
+            TransferItemType::Remote,
+            "report.pdf",
+        );
+        record.remote_source_name = "drive".to_string();
+        record.remote_source_path = "/report.pdf".to_string();
+        record.local_dest_path = "/tmp/report.pdf".to_string();
+        let id = service
+            .start_transfer(record)
+            .await
+            .expect("start transfer");
+        service
+            .fail_transfer(id, "connection reset".to_string())
+            .await
+            .expect("fail transfer");
+
+        let page = service
+            .snapshot(TransferFilter::default())
+            .await
+            .expect("load transfer page");
+        assert_eq!(page.rows[0].status, TransferStatus::Failed);
+        assert_eq!(page.rows[0].remote_source_name, "drive");
+        assert_eq!(page.rows[0].error_message, "connection reset");
+        assert!(page.rows[0].retryable);
+
+        let _ = fs::remove_dir_all(root);
+    }
 }

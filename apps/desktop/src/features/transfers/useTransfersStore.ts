@@ -3,6 +3,8 @@ import { transfersDeleteAll, transfersDeleteSelected, transfersSnapshot } from "
 import type { TransferPage } from "../../api/types";
 import { errorText } from "../../shared/format";
 
+let silentTransferLoadInFlight = false;
+
 interface TransfersStore {
   transfers: TransferPage | null;
   search: string;
@@ -10,7 +12,7 @@ interface TransfersStore {
   working: boolean;
   error: string | null;
   message: string | null;
-  load: (search?: string) => Promise<void>;
+  load: (search?: string, options?: { silent?: boolean }) => Promise<void>;
   setSearch: (search: string) => void;
   toggleTransfer: (id: number, checked: boolean) => void;
   deleteSelected: () => Promise<void>;
@@ -25,19 +27,22 @@ export const useTransfersStore = create<TransfersStore>((set, get) => ({
   error: null,
   message: null,
 
-  load: async (search = get().search) => {
-    set({ working: true, error: null });
+  load: async (search = get().search, options = {}) => {
+    if (options.silent && silentTransferLoadInFlight) return;
+    if (options.silent) silentTransferLoadInFlight = true;
+    if (!options.silent) set({ working: true, error: null });
     try {
       const next = await transfersSnapshot({ search, limit: 100 });
       const visibleIds = new Set(next.rows.map((row) => row.id));
       set((state) => ({
-        transfers: next,
-        selectedIds: new Set([...state.selectedIds].filter((id) => visibleIds.has(id))),
+        transfers: transferPagesEqual(state.transfers, next) ? state.transfers : next,
+        selectedIds: pruneSelectedIds(state.selectedIds, visibleIds),
       }));
     } catch (error) {
       set({ error: errorText(error) });
     } finally {
-      set({ working: false });
+      if (options.silent) silentTransferLoadInFlight = false;
+      if (!options.silent) set({ working: false });
     }
   },
 
@@ -93,3 +98,47 @@ export const useTransfersStore = create<TransfersStore>((set, get) => ({
     }
   },
 }));
+
+function pruneSelectedIds(selectedIds: Set<number>, visibleIds: Set<number>): Set<number> {
+  const next = new Set([...selectedIds].filter((id) => visibleIds.has(id)));
+  if (next.size !== selectedIds.size) return next;
+  for (const id of next) {
+    if (!selectedIds.has(id)) return next;
+  }
+  return selectedIds;
+}
+
+function transferPagesEqual(left: TransferPage | null, right: TransferPage): boolean {
+  if (!left) return false;
+  if (left.totalCount !== right.totalCount || left.dbPath !== right.dbPath || left.rows.length !== right.rows.length) {
+    return false;
+  }
+  return left.rows.every((row, index) => transferRowsEqual(row, right.rows[index]));
+}
+
+function transferRowsEqual(left: TransferPage["rows"][number], right: TransferPage["rows"][number]): boolean {
+  return left.id === right.id
+    && left.jobId === right.jobId
+    && left.transferType === right.transferType
+    && left.itemType === right.itemType
+    && left.status === right.status
+    && left.conflictPolicy === right.conflictPolicy
+    && left.fileName === right.fileName
+    && left.localSourcePath === right.localSourcePath
+    && left.localDestPath === right.localDestPath
+    && left.remoteSourceName === right.remoteSourceName
+    && left.remoteSourcePath === right.remoteSourcePath
+    && left.remoteDestName === right.remoteDestName
+    && left.remoteDestPath === right.remoteDestPath
+    && left.totalBytes === right.totalBytes
+    && left.transferredBytes === right.transferredBytes
+    && left.errorMessage === right.errorMessage
+    && left.detailMessage === right.detailMessage
+    && left.queuedAtMs === right.queuedAtMs
+    && left.startedAtMs === right.startedAtMs
+    && left.completedAtMs === right.completedAtMs
+    && left.cancelable === right.cancelable
+    && left.retryable === right.retryable
+    && left.undoable === right.undoable
+    && left.undoTokenId === right.undoTokenId;
+}
