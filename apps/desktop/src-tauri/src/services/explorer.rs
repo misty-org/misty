@@ -1,64 +1,65 @@
 use std::{
-    fs,
+    collections::BTreeSet,
     path::{Path, PathBuf},
-    time::UNIX_EPOCH,
+    sync::Arc,
+    time::Duration,
 };
 
-use serde::{Deserialize, Serialize};
+use tokio::sync::Mutex;
 
+use crate::core::clipboard::{ClipboardCache, ClipboardRemoteFileCacheKey};
+use crate::core::explorer::{
+    create_item, delete_items, list_directory, paste_items, rename_item, CreateItemRequest,
+    DeleteItemsRequest, DirectoryListing, ExplorerLocation, ExplorerLocationKind,
+    ExplorerOperationResult, FileEntry, FileKind, ListDirectoryRequest, PasteItemsRequest,
+    PasteTextRequest, PrepareOpenItemRequest, PreparedOpenItem, RenameItemRequest,
+};
+use crate::core::file_master::{
+    join_remote_path, normalize_remote_path, virtual_path_parts, RemoteBrowseTarget,
+    RemoteJobStart, RemoteJobStatus, RemoteListItem,
+};
+use crate::core::file_transfer::now_epoch_ms;
+use crate::core::file_transfer::{FileTransferItemType, FileTransferRecord, FileTransferType};
+use crate::core::listing_cache::ListingCache;
 use crate::error::{ApiError, ApiResult};
-use crate::services::environment::AppEnvironmentService;
+use crate::services::{
+    environment::AppEnvironmentService,
+    providers::{ProviderRemote, ProviderService},
+    proxy::ProxyService,
+    transfers::TransferService,
+};
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ExplorerService {
     home_dir: PathBuf,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ListDirectoryRequest {
-    pub path: Option<String>,
-    pub show_hidden: Option<bool>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DirectoryListing {
-    pub path: String,
-    pub parent_path: Option<String>,
-    pub entries: Vec<FileEntry>,
-    pub total_count: usize,
-    pub hidden_count: usize,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct FileEntry {
-    pub id: String,
-    pub name: String,
-    pub path: String,
-    pub extension: String,
-    pub kind: FileKind,
-    pub size_bytes: Option<u64>,
-    pub modified_ms: Option<i64>,
-    pub created_ms: Option<i64>,
-    pub readonly: bool,
-    pub hidden: bool,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum FileKind {
-    Folder,
-    File,
-    Symlink,
-    Other,
+    mount_root: PathBuf,
+    proxy: ProxyService,
+    providers: ProviderService,
+    transfers: TransferService,
+    listing_cache: ListingCache,
+    remote_open_cache: Arc<Mutex<ClipboardCache>>,
+    clipboard_text_cache_dir: PathBuf,
 }
 
 impl ExplorerService {
-    pub fn new(environment: AppEnvironmentService) -> Self {
+    pub fn new(
+        environment: AppEnvironmentService,
+        proxy: ProxyService,
+        providers: ProviderService,
+        transfers: TransferService,
+    ) -> Self {
+        let cache_dir = environment.cache_dir();
         Self {
             home_dir: environment.home_dir(),
+            mount_root: environment.mount_root(),
+            proxy,
+            providers,
+            transfers,
+            listing_cache: ListingCache::new(cache_dir.join("remotes"), cache_dir.join("listings")),
+            remote_open_cache: Arc::new(Mutex::new(ClipboardCache::new(
+                cache_dir.join("remote-open").join("v1"),
+            ))),
+            clipboard_text_cache_dir: cache_dir.join("clipboard-paste").join("text"),
         }
     }
 
@@ -66,119 +67,1389 @@ impl ExplorerService {
         &self,
         request: ListDirectoryRequest,
     ) -> ApiResult<DirectoryListing> {
+        let requested = request
+            .path
+            .as_deref()
+            .filter(|path| !path.trim().is_empty())
+            .map(PathBuf::from)
+            .unwrap_or_else(|| self.home_dir.clone());
+
+        if requested == self.mount_root || requested.starts_with(&self.mount_root) {
+            return self
+                .list_virtual_directory(&requested, request.show_hidden.unwrap_or(false))
+                .await;
+        }
+
         let home_dir = self.home_dir.clone();
         tokio::task::spawn_blocking(move || list_directory(home_dir, request))
             .await
             .map_err(|err| ApiError::Message(format!("Explorer worker failed: {err}")))?
     }
-}
 
-fn list_directory(home_dir: PathBuf, request: ListDirectoryRequest) -> ApiResult<DirectoryListing> {
-    let requested = request
-        .path
-        .filter(|path| !path.trim().is_empty())
-        .map(PathBuf::from)
-        .unwrap_or(home_dir);
-    let path = requested
-        .canonicalize()
-        .unwrap_or_else(|_| requested.clone());
-    let show_hidden = request.show_hidden.unwrap_or(false);
-    let read_dir = fs::read_dir(&path).map_err(|err| {
-        ApiError::Message(format!(
-            "Failed to list directory {}: {err}",
-            path.display()
-        ))
-    })?;
-
-    let mut entries = Vec::new();
-    let mut total_count = 0usize;
-    let mut hidden_count = 0usize;
-    for item in read_dir {
-        let item = match item {
-            Ok(item) => item,
-            Err(_) => continue,
-        };
-        total_count += 1;
-        let file_name = item.file_name().to_string_lossy().to_string();
-        let hidden = file_name.starts_with('.');
-        if hidden {
-            hidden_count += 1;
+    pub async fn item_is_directory(&self, path: &str) -> ApiResult<Option<bool>> {
+        if let Some(target) = self.remote_target(path) {
+            if target.remote_path == "/" {
+                return Ok(Some(true));
+            }
+            let parent = RemoteBrowseTarget {
+                provider_type: target.provider_type.clone(),
+                remote_name: target.remote_name.clone(),
+                remote_path: remote_parent_path(&target.remote_path),
+            };
+            let items = self.fetch_remote_items(&parent).await?;
+            return remote_item_is_directory(&parent, &target.remote_path, &items);
         }
-        if hidden && !show_hidden {
-            continue;
-        }
-        if let Some(entry) = file_entry(item.path(), file_name) {
-            entries.push(entry);
+        self.reject_virtual_mount_container(path, "inspect")?;
+        match tokio::fs::symlink_metadata(path).await {
+            Ok(metadata) => Ok(Some(metadata.is_dir())),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(error) => Err(ApiError::Message(format!(
+                "Failed to inspect {path}: {error}"
+            ))),
         }
     }
 
-    entries.sort_by(|left, right| {
-        folder_rank(&left.kind)
-            .cmp(&folder_rank(&right.kind))
-            .then_with(|| left.name.to_lowercase().cmp(&right.name.to_lowercase()))
-    });
-
-    Ok(DirectoryListing {
-        parent_path: path.parent().map(display_path),
-        path: display_path(&path),
-        entries,
-        total_count,
-        hidden_count,
-    })
-}
-
-fn file_entry(path: PathBuf, name: String) -> Option<FileEntry> {
-    let metadata = fs::symlink_metadata(&path).ok()?;
-    let file_type = metadata.file_type();
-    let kind = if file_type.is_symlink() {
-        FileKind::Symlink
-    } else if file_type.is_dir() {
-        FileKind::Folder
-    } else if file_type.is_file() {
-        FileKind::File
-    } else {
-        FileKind::Other
-    };
-    Some(FileEntry {
-        id: display_path(&path),
-        extension: path
-            .extension()
-            .and_then(|value| value.to_str())
-            .unwrap_or_default()
-            .to_owned(),
-        name,
-        hidden: path
+    pub async fn prepare_open_item(
+        &self,
+        request: PrepareOpenItemRequest,
+    ) -> ApiResult<PreparedOpenItem> {
+        let Some(source) = self.remote_target(&request.path) else {
+            self.reject_virtual_mount_container(&request.path, "open")?;
+            if !Path::new(&request.path).is_file() {
+                return Err(ApiError::Message(format!(
+                    "{} is not a file.",
+                    request.path
+                )));
+            }
+            return Ok(PreparedOpenItem {
+                local_path: request.path,
+                cached: true,
+            });
+        };
+        if self.item_is_directory(&request.path).await? != Some(false) {
+            return Err(ApiError::Message(
+                "Only remote files can be opened.".to_string(),
+            ));
+        }
+        let file_name = Path::new(&source.remote_path)
             .file_name()
             .and_then(|value| value.to_str())
-            .map(|value| value.starts_with('.'))
-            .unwrap_or(false),
-        path: display_path(&path),
-        kind,
-        size_bytes: if metadata.is_file() {
-            Some(metadata.len())
+            .ok_or_else(|| ApiError::Message("Remote file has no name.".to_string()))?
+            .to_string();
+        let cache_key = ClipboardRemoteFileCacheKey {
+            remote_name: source.remote_name.clone(),
+            remote_path: source.remote_path.clone(),
+            size: request.size_bytes.unwrap_or_default(),
+            last_modified: request.remote_modified.unwrap_or_default(),
+            is_dir: false,
+        };
+        let cache_id = ClipboardCache::remote_file_key(&cache_key);
+        let temp_path = {
+            let mut cache = self.remote_open_cache.lock().await;
+            if let Some(path) = cache.lookup_remote_file(&cache_key) {
+                return Ok(PreparedOpenItem {
+                    local_path: display_path(&path),
+                    cached: true,
+                });
+            }
+            cache.temp_path_for(&cache_id, &file_name)
+        };
+
+        let mut record = FileTransferRecord::new(
+            FileTransferType::Download,
+            FileTransferItemType::Remote,
+            &file_name,
+        );
+        record.remote_source_name = source.remote_name.clone();
+        record.remote_source_path = source.remote_path.clone();
+        record.local_dest_path = display_path(&temp_path);
+        record.total_bytes = request.size_bytes.unwrap_or_default();
+        record.detail_message = "Preparing remote file to open".to_string();
+        let transfer_id = self.begin_transfer(record).await;
+        let result = self
+            .download_remote_item(&source, false, &temp_path, transfer_id)
+            .await;
+        self.finish_transfer(transfer_id, result).await?;
+
+        let local_path = self
+            .remote_open_cache
+            .lock()
+            .await
+            .store_remote_file(&cache_key, &temp_path, &file_name)
+            .ok_or_else(|| {
+                ApiError::Message(format!("Failed to cache remote file {file_name}."))
+            })?;
+        Ok(PreparedOpenItem {
+            local_path: display_path(&local_path),
+            cached: false,
+        })
+    }
+
+    pub async fn create_item(
+        &self,
+        request: CreateItemRequest,
+    ) -> ApiResult<ExplorerOperationResult> {
+        if let Some(target) = self.remote_target(&request.directory) {
+            if !matches!(request.kind, crate::core::explorer::CreateItemKind::Folder) {
+                return Err(ApiError::Message(
+                    "Creating an empty remote file is not supported by the rclone file API."
+                        .to_string(),
+                ));
+            }
+            let name = validate_remote_name(&request.name)?;
+            let remote_path = normalize_remote_path(&join_remote_path(&target.remote_path, name))?;
+            let mut record = FileTransferRecord::new(
+                FileTransferType::Create,
+                FileTransferItemType::Remote,
+                name,
+            );
+            record.remote_dest_name = target.remote_name.clone();
+            record.remote_dest_path = remote_path.clone();
+            record.detail_message = "Creating remote folder".to_string();
+            let transfer_id = self.begin_transfer(record).await;
+            self.finish_transfer(
+                transfer_id,
+                self.start_json_job(
+                    "/api/remote/file/mkdir",
+                    serde_json::json!({ "remote": target.remote_name, "path": remote_path }),
+                    transfer_id,
+                )
+                .await,
+            )
+            .await?;
+            self.listing_cache
+                .clear(&target.remote_name, &target.remote_path)
+                .await?;
+            return Ok(ExplorerOperationResult {
+                affected_paths: vec![display_path(
+                    &target.virtual_path(&self.mount_root).join(name),
+                )],
+                parent_path: Some(display_path(&target.virtual_path(&self.mount_root))),
+            });
+        }
+        self.reject_virtual_mount_container(&request.directory, "create")?;
+        let mut record = FileTransferRecord::new(
+            FileTransferType::Create,
+            FileTransferItemType::Local,
+            request.name.clone(),
+        );
+        record.local_dest_path = display_path(&Path::new(&request.directory).join(&request.name));
+        record.detail_message = "Creating local item".to_string();
+        let transfer_id = self.begin_transfer(record).await;
+        let result = tokio::task::spawn_blocking(move || create_item(request))
+            .await
+            .map_err(|err| ApiError::Message(format!("Explorer worker failed: {err}")))?;
+        self.finish_transfer(transfer_id, result).await
+    }
+
+    pub async fn rename_item(
+        &self,
+        request: RenameItemRequest,
+    ) -> ApiResult<ExplorerOperationResult> {
+        if let Some(source) = self.remote_target(&request.path) {
+            if source.remote_path == "/" {
+                return Err(ApiError::Message(
+                    "Rename remotes from the Providers workspace.".to_string(),
+                ));
+            }
+            let name = validate_remote_name(&request.new_name)?;
+            let parent = remote_parent_path(&source.remote_path);
+            let destination_path = normalize_remote_path(&join_remote_path(&parent, name))?;
+            let mut record = FileTransferRecord::new(
+                FileTransferType::Rename,
+                FileTransferItemType::Remote,
+                name,
+            );
+            record.remote_source_name = source.remote_name.clone();
+            record.remote_source_path = source.remote_path.clone();
+            record.remote_dest_name = source.remote_name.clone();
+            record.remote_dest_path = destination_path.clone();
+            record.detail_message = "Renaming remote item".to_string();
+            let transfer_id = self.begin_transfer(record).await;
+            let operation = if request.source_is_directory.unwrap_or(false) {
+                self.start_json_job(
+                    "/api/remote/file/move",
+                    serde_json::json!({
+                        "source_remote": source.remote_name,
+                        "source_path": source.remote_path,
+                        "dest_remote": source.remote_name,
+                        "dest_path": destination_path,
+                    }),
+                    transfer_id,
+                )
+                .await
+            } else {
+                self.start_json_job(
+                    "/api/remote/file/rename",
+                    serde_json::json!({
+                        "remote": source.remote_name,
+                        "old_path": source.remote_path,
+                        "new_path": destination_path,
+                    }),
+                    transfer_id,
+                )
+                .await
+            };
+            self.finish_transfer(transfer_id, operation).await?;
+            self.listing_cache
+                .clear(&source.remote_name, &parent)
+                .await?;
+            let parent_target = RemoteBrowseTarget {
+                provider_type: source.provider_type.clone(),
+                remote_name: source.remote_name.clone(),
+                remote_path: parent,
+            };
+            return Ok(ExplorerOperationResult {
+                affected_paths: vec![display_path(
+                    &parent_target.virtual_path(&self.mount_root).join(name),
+                )],
+                parent_path: Some(display_path(&parent_target.virtual_path(&self.mount_root))),
+            });
+        }
+        self.reject_virtual_mount_container(&request.path, "rename")?;
+        let destination = Path::new(&request.path)
+            .parent()
+            .unwrap_or_else(|| Path::new(""))
+            .join(&request.new_name);
+        let mut record = FileTransferRecord::new(
+            FileTransferType::Rename,
+            FileTransferItemType::Local,
+            request.new_name.clone(),
+        );
+        record.local_source_path = request.path.clone();
+        record.local_dest_path = display_path(&destination);
+        record.total_bytes = local_item_size(
+            Path::new(&request.path),
+            request.source_is_directory.unwrap_or(false),
+        )
+        .await;
+        record.detail_message = "Renaming local item".to_string();
+        let transfer_id = self.begin_transfer(record).await;
+        let result = tokio::task::spawn_blocking(move || rename_item(request))
+            .await
+            .map_err(|err| ApiError::Message(format!("Explorer worker failed: {err}")))?;
+        self.finish_transfer(transfer_id, result).await
+    }
+
+    pub async fn delete_items(
+        &self,
+        request: DeleteItemsRequest,
+    ) -> ApiResult<ExplorerOperationResult> {
+        let mut local_paths = Vec::new();
+        let mut affected_paths = Vec::new();
+        let mut parent_path = None;
+        for path in request.paths {
+            if let Some(target) = self.remote_target(&path) {
+                if target.remote_path == "/" {
+                    return Err(ApiError::Message(
+                        "Disconnect remotes from the Providers workspace.".to_string(),
+                    ));
+                }
+                let file_name = Path::new(&target.remote_path)
+                    .file_name()
+                    .and_then(|value| value.to_str())
+                    .unwrap_or(&target.remote_path)
+                    .to_string();
+                let mut record = FileTransferRecord::new(
+                    FileTransferType::Delete,
+                    FileTransferItemType::Remote,
+                    file_name,
+                );
+                record.remote_source_name = target.remote_name.clone();
+                record.remote_source_path = target.remote_path.clone();
+                record.detail_message = "Deleting remote item".to_string();
+                let transfer_id = self.begin_transfer(record).await;
+                self.finish_transfer(
+                    transfer_id,
+                    self.delete_remote_target(&target, transfer_id).await,
+                )
+                .await?;
+                let virtual_path = target.virtual_path(&self.mount_root);
+                parent_path.get_or_insert_with(|| {
+                    virtual_path.parent().map(display_path).unwrap_or_default()
+                });
+                affected_paths.push(display_path(&virtual_path));
+            } else {
+                self.reject_virtual_mount_container(&path, "delete")?;
+                local_paths.push(path);
+            }
+        }
+        for local_path in local_paths {
+            let file_name = Path::new(&local_path)
+                .file_name()
+                .and_then(|value| value.to_str())
+                .unwrap_or(&local_path)
+                .to_string();
+            let metadata = tokio::fs::symlink_metadata(&local_path).await.ok();
+            let mut record = FileTransferRecord::new(
+                FileTransferType::Delete,
+                FileTransferItemType::Local,
+                file_name,
+            );
+            record.local_source_path = local_path.clone();
+            record.total_bytes = metadata
+                .as_ref()
+                .filter(|metadata| metadata.is_file())
+                .map(|metadata| metadata.len().min(i64::MAX as u64) as i64)
+                .unwrap_or_default();
+            record.detail_message = "Deleting local item".to_string();
+            let transfer_id = self.begin_transfer(record).await;
+            let local_result = tokio::task::spawn_blocking(move || {
+                delete_items(DeleteItemsRequest {
+                    paths: vec![local_path],
+                })
+            })
+            .await
+            .map_err(|err| ApiError::Message(format!("Explorer worker failed: {err}")))?;
+            let local_result = self.finish_transfer(transfer_id, local_result).await?;
+            if parent_path.is_none() {
+                parent_path = local_result.parent_path.clone();
+            }
+            affected_paths.extend(local_result.affected_paths);
+        }
+        Ok(ExplorerOperationResult {
+            affected_paths,
+            parent_path,
+        })
+    }
+
+    pub async fn paste_items(
+        &self,
+        request: PasteItemsRequest,
+    ) -> ApiResult<ExplorerOperationResult> {
+        if let Some(destination) = self.remote_target(&request.destination_directory) {
+            let mut affected_paths = Vec::new();
+            for item in &request.sources {
+                let source_name = request
+                    .target_name
+                    .as_deref()
+                    .filter(|_| request.sources.len() == 1)
+                    .map(validate_remote_name)
+                    .transpose()?
+                    .map(ToOwned::to_owned)
+                    .or_else(|| {
+                        Path::new(&item.path)
+                            .file_name()
+                            .and_then(|value| value.to_str())
+                            .map(ToOwned::to_owned)
+                    })
+                    .ok_or_else(|| ApiError::Message("Source has no file name".to_string()))?;
+                let source_target = self.remote_target(&item.path);
+                let transfer_type = if source_target.is_some() {
+                    match request.operation {
+                        crate::core::explorer::ClipboardOperation::Copy => FileTransferType::Copy,
+                        crate::core::explorer::ClipboardOperation::Move => FileTransferType::Move,
+                    }
+                } else {
+                    FileTransferType::Upload
+                };
+                let mut record = FileTransferRecord::new(
+                    transfer_type,
+                    if source_target.is_some() {
+                        FileTransferItemType::Remote
+                    } else {
+                        FileTransferItemType::Local
+                    },
+                    &source_name,
+                );
+                record.remote_dest_name = destination.remote_name.clone();
+                record.remote_dest_path = normalize_remote_path(&join_remote_path(
+                    &destination.remote_path,
+                    &source_name,
+                ))?;
+                if let Some(source) = &source_target {
+                    record.remote_source_name = source.remote_name.clone();
+                    record.remote_source_path = source.remote_path.clone();
+                } else {
+                    record.local_source_path = item.path.clone();
+                    record.total_bytes =
+                        local_item_size(Path::new(&item.path), item.is_directory).await;
+                }
+                record.detail_message = if source_target.is_some() {
+                    "Transferring remote item".to_string()
+                } else {
+                    "Uploading local item".to_string()
+                };
+                let transfer_id = self.begin_transfer(record).await;
+
+                let operation = if let Some(source) = source_target {
+                    let destination_path = normalize_remote_path(&join_remote_path(
+                        &destination.remote_path,
+                        &source_name,
+                    ))?;
+                    let endpoint = match request.operation {
+                        crate::core::explorer::ClipboardOperation::Copy => "/api/remote/file/copy",
+                        crate::core::explorer::ClipboardOperation::Move => "/api/remote/file/move",
+                    };
+                    self.start_json_job(
+                        endpoint,
+                        serde_json::json!({
+                            "source_remote": source.remote_name,
+                            "source_path": source.remote_path,
+                            "dest_remote": destination.remote_name,
+                            "dest_path": destination_path,
+                        }),
+                        transfer_id,
+                    )
+                    .await
+                    .map(|_| ())
+                } else {
+                    let upload = self
+                        .upload_local_item(
+                            Path::new(&item.path),
+                            item.is_directory,
+                            &destination,
+                            &source_name,
+                            transfer_id,
+                        )
+                        .await;
+                    if upload.is_ok()
+                        && matches!(
+                            request.operation,
+                            crate::core::explorer::ClipboardOperation::Move
+                        )
+                    {
+                        remove_local_path(Path::new(&item.path), item.is_directory).await
+                    } else {
+                        upload
+                    }
+                };
+                self.finish_transfer(transfer_id, operation).await?;
+                affected_paths.push(display_path(
+                    &destination
+                        .virtual_path(&self.mount_root)
+                        .join(&source_name),
+                ));
+            }
+            self.listing_cache
+                .clear(&destination.remote_name, &destination.remote_path)
+                .await?;
+            return Ok(ExplorerOperationResult {
+                affected_paths,
+                parent_path: Some(display_path(&destination.virtual_path(&self.mount_root))),
+            });
+        }
+        self.reject_virtual_mount_container(&request.destination_directory, "paste")?;
+        if request
+            .sources
+            .iter()
+            .any(|item| self.remote_target(&item.path).is_some())
+        {
+            let destination = PathBuf::from(&request.destination_directory);
+            let mut affected_paths = Vec::new();
+            for item in &request.sources {
+                let source = self.remote_target(&item.path).ok_or_else(|| {
+                    ApiError::Message(
+                        "A single paste cannot mix local and remote sources.".to_string(),
+                    )
+                })?;
+                let name = request
+                    .target_name
+                    .as_deref()
+                    .filter(|_| request.sources.len() == 1)
+                    .map(validate_remote_name)
+                    .transpose()?
+                    .unwrap_or_else(|| {
+                        Path::new(&source.remote_path)
+                            .file_name()
+                            .and_then(|value| value.to_str())
+                            .unwrap_or(&source.remote_path)
+                    });
+                let local_path = destination.join(name);
+                ensure_destination_available(&local_path).await?;
+                let mut record = FileTransferRecord::new(
+                    FileTransferType::Download,
+                    FileTransferItemType::Remote,
+                    name,
+                );
+                record.remote_source_name = source.remote_name.clone();
+                record.remote_source_path = source.remote_path.clone();
+                record.local_dest_path = display_path(&local_path);
+                record.detail_message = "Downloading remote item".to_string();
+                let transfer_id = self.begin_transfer(record).await;
+                let download = self
+                    .download_remote_item(&source, item.is_directory, &local_path, transfer_id)
+                    .await;
+                let operation = if download.is_ok()
+                    && matches!(
+                        request.operation,
+                        crate::core::explorer::ClipboardOperation::Move
+                    ) {
+                    self.delete_remote_target(&source, transfer_id).await
+                } else {
+                    download
+                };
+                self.finish_transfer(transfer_id, operation).await?;
+                affected_paths.push(display_path(&local_path));
+            }
+            return Ok(ExplorerOperationResult {
+                affected_paths,
+                parent_path: Some(display_path(&destination)),
+            });
+        }
+        let mut transfer_ids = Vec::with_capacity(request.sources.len());
+        for item in &request.sources {
+            let file_name = request
+                .target_name
+                .as_deref()
+                .filter(|_| request.sources.len() == 1)
+                .unwrap_or_else(|| {
+                    Path::new(&item.path)
+                        .file_name()
+                        .and_then(|value| value.to_str())
+                        .unwrap_or(&item.path)
+                })
+                .to_string();
+            let mut record = FileTransferRecord::new(
+                match request.operation {
+                    crate::core::explorer::ClipboardOperation::Copy => FileTransferType::Copy,
+                    crate::core::explorer::ClipboardOperation::Move => FileTransferType::Move,
+                },
+                FileTransferItemType::Local,
+                &file_name,
+            );
+            record.local_source_path = item.path.clone();
+            record.local_dest_path =
+                display_path(&Path::new(&request.destination_directory).join(file_name));
+            record.total_bytes = local_item_size(Path::new(&item.path), item.is_directory).await;
+            record.detail_message = "Transferring local item".to_string();
+            if let Some(id) = self.begin_transfer(record).await {
+                transfer_ids.push(id);
+            }
+        }
+        let result = tokio::task::spawn_blocking(move || paste_items(request))
+            .await
+            .map_err(|err| ApiError::Message(format!("Explorer worker failed: {err}")))?;
+        self.finish_transfers(&transfer_ids, result).await
+    }
+
+    pub async fn stage_clipboard_text_paste(
+        &self,
+        request: PasteTextRequest,
+    ) -> ApiResult<PasteItemsRequest> {
+        if request.text.is_empty() {
+            return Err(ApiError::Message("Clipboard text is empty.".to_string()));
+        }
+        let preferred_name =
+            validate_remote_name(request.preferred_name.as_deref().unwrap_or("clipboard.txt"))?
+                .to_string();
+        tokio::fs::create_dir_all(&self.clipboard_text_cache_dir)
+            .await
+            .map_err(|error| {
+                ApiError::Message(format!(
+                    "Failed to prepare clipboard cache {}: {error}",
+                    self.clipboard_text_cache_dir.display()
+                ))
+            })?;
+        let source_path = self
+            .clipboard_text_cache_dir
+            .join(format!("clipboard-{}.txt", now_epoch_ms()));
+        tokio::fs::write(&source_path, request.text)
+            .await
+            .map_err(|error| {
+                ApiError::Message(format!(
+                    "Failed to stage clipboard text {}: {error}",
+                    source_path.display()
+                ))
+            })?;
+        Ok(PasteItemsRequest {
+            sources: vec![crate::core::explorer::PasteItem {
+                path: display_path(&source_path),
+                is_directory: false,
+            }],
+            destination_directory: request.destination_directory,
+            operation: crate::core::explorer::ClipboardOperation::Copy,
+            target_name: Some(preferred_name),
+        })
+    }
+
+    async fn list_virtual_directory(
+        &self,
+        path: &Path,
+        show_hidden: bool,
+    ) -> ApiResult<DirectoryListing> {
+        let parts = virtual_path_parts(&self.mount_root, path).ok_or_else(|| {
+            ApiError::Message(format!("Invalid remote mount path: {}", path.display()))
+        })?;
+        let remotes = self.remote_inventory().await?;
+
+        match parts.len() {
+            0 => Ok(self.provider_root_listing(remotes, show_hidden)),
+            1 => Ok(self.provider_listing(path, &parts[0], remotes, show_hidden)),
+            _ => {
+                let target = RemoteBrowseTarget::from_virtual_path(&self.mount_root, path)
+                    .ok_or_else(|| ApiError::Message("Invalid remote browse path".to_string()))?;
+                if !remotes.iter().any(|remote| {
+                    remote.name == target.remote_name
+                        && remote.provider_type == target.provider_type
+                }) {
+                    return Err(ApiError::Message(format!(
+                        "Remote \"{}\" was not found.",
+                        target.remote_name
+                    )));
+                }
+                self.remote_listing(target, show_hidden).await
+            }
+        }
+    }
+
+    async fn remote_inventory(&self) -> ApiResult<Vec<ProviderRemote>> {
+        let snapshot = self.providers.snapshot().await?;
+        if !snapshot.remotes.is_empty() || snapshot.loading {
+            return Ok(snapshot.remotes);
+        }
+        Ok(self.providers.refresh().await?.remotes)
+    }
+
+    fn provider_root_listing(
+        &self,
+        remotes: Vec<ProviderRemote>,
+        show_hidden: bool,
+    ) -> DirectoryListing {
+        let providers = remotes
+            .iter()
+            .map(|remote| remote.provider_type.clone())
+            .filter(|provider| !provider.is_empty())
+            .collect::<BTreeSet<_>>();
+        let entries = providers
+            .into_iter()
+            .filter(|provider| show_hidden || !provider.starts_with('.'))
+            .map(|provider| {
+                virtual_folder_entry(
+                    self.mount_root.join(&provider),
+                    provider.clone(),
+                    ExplorerLocation {
+                        kind: ExplorerLocationKind::RemoteProvider,
+                        provider_type: Some(provider),
+                        remote_name: None,
+                        remote_path: None,
+                    },
+                )
+            })
+            .collect::<Vec<_>>();
+        DirectoryListing {
+            path: display_path(&self.mount_root),
+            parent_path: self.mount_root.parent().map(display_path),
+            location: ExplorerLocation {
+                kind: ExplorerLocationKind::RemoteProvider,
+                provider_type: None,
+                remote_name: None,
+                remote_path: None,
+            },
+            total_count: entries.len(),
+            hidden_count: 0,
+            entries,
+        }
+    }
+
+    fn provider_listing(
+        &self,
+        path: &Path,
+        provider_type: &str,
+        remotes: Vec<ProviderRemote>,
+        show_hidden: bool,
+    ) -> DirectoryListing {
+        let mut matching = remotes
+            .into_iter()
+            .filter(|remote| remote.provider_type == provider_type)
+            .collect::<Vec<_>>();
+        matching.sort_by(|left, right| left.name.to_lowercase().cmp(&right.name.to_lowercase()));
+        let hidden_count = matching
+            .iter()
+            .filter(|remote| remote.name.starts_with('.'))
+            .count();
+        let entries = matching
+            .into_iter()
+            .filter(|remote| show_hidden || !remote.name.starts_with('.'))
+            .map(|remote| {
+                virtual_folder_entry(
+                    path.join(&remote.name),
+                    remote.name.clone(),
+                    ExplorerLocation {
+                        kind: ExplorerLocationKind::Remote,
+                        provider_type: Some(provider_type.to_string()),
+                        remote_name: Some(remote.name),
+                        remote_path: Some("/".to_string()),
+                    },
+                )
+            })
+            .collect::<Vec<_>>();
+        DirectoryListing {
+            path: display_path(path),
+            parent_path: Some(display_path(&self.mount_root)),
+            location: ExplorerLocation {
+                kind: ExplorerLocationKind::RemoteProvider,
+                provider_type: Some(provider_type.to_string()),
+                remote_name: None,
+                remote_path: None,
+            },
+            total_count: entries.len() + hidden_count,
+            hidden_count,
+            entries,
+        }
+    }
+
+    async fn remote_listing(
+        &self,
+        target: RemoteBrowseTarget,
+        show_hidden: bool,
+    ) -> ApiResult<DirectoryListing> {
+        let mut items = match self.fetch_remote_items(&target).await {
+            Ok(items) => items,
+            Err(remote_error) => {
+                let cached = self
+                    .listing_cache
+                    .load(&target.remote_name, &target.remote_path)
+                    .await?;
+                match cached {
+                    Some(body) => serde_json::from_slice::<Vec<RemoteListItem>>(&body).map_err(|error| {
+                        ApiError::Message(format!(
+                            "Remote listing failed ({remote_error}); cached listing was invalid: {error}"
+                        ))
+                    })?,
+                    None => return Err(remote_error),
+                }
+            }
+        };
+        items.sort_by(|left, right| {
+            (!left.is_dir)
+                .cmp(&(!right.is_dir))
+                .then_with(|| left.name.to_lowercase().cmp(&right.name.to_lowercase()))
+        });
+
+        let hidden_count = items
+            .iter()
+            .filter(|item| item.name.starts_with('.'))
+            .count();
+        let total_count = items.len();
+        let mut entries = Vec::with_capacity(items.len());
+        for item in items {
+            if !show_hidden && item.name.starts_with('.') {
+                continue;
+            }
+            let remote_path = target.child_remote_path(&item)?;
+            let item_target = RemoteBrowseTarget {
+                provider_type: target.provider_type.clone(),
+                remote_name: target.remote_name.clone(),
+                remote_path: remote_path.clone(),
+            };
+            let virtual_path = item_target.virtual_path(&self.mount_root);
+            let name = if item.name.is_empty() {
+                Path::new(&remote_path)
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .unwrap_or(&remote_path)
+                    .to_string()
+            } else {
+                item.name
+            };
+            entries.push(FileEntry {
+                id: display_path(&virtual_path),
+                extension: Path::new(&name)
+                    .extension()
+                    .and_then(|value| value.to_str())
+                    .unwrap_or_default()
+                    .to_string(),
+                mime_type: (!item.mime_type.is_empty()).then_some(item.mime_type),
+                remote_modified: (!item.mod_time.is_empty()).then_some(item.mod_time),
+                hidden: name.starts_with('.'),
+                name,
+                path: display_path(&virtual_path),
+                kind: if item.is_dir {
+                    FileKind::Folder
+                } else {
+                    FileKind::File
+                },
+                size_bytes: if item.is_dir {
+                    None
+                } else {
+                    Some(item.size.max(0) as u64)
+                },
+                modified_ms: None,
+                created_ms: None,
+                readonly: false,
+                location: ExplorerLocation {
+                    kind: ExplorerLocationKind::Remote,
+                    provider_type: Some(target.provider_type.clone()),
+                    remote_name: Some(target.remote_name.clone()),
+                    remote_path: Some(remote_path),
+                },
+            });
+        }
+
+        let listing_path = target.virtual_path(&self.mount_root);
+        let parent_path = listing_path.parent().map(display_path);
+        Ok(DirectoryListing {
+            path: display_path(&listing_path),
+            parent_path,
+            location: ExplorerLocation {
+                kind: ExplorerLocationKind::Remote,
+                provider_type: Some(target.provider_type),
+                remote_name: Some(target.remote_name),
+                remote_path: Some(target.remote_path),
+            },
+            entries,
+            total_count,
+            hidden_count,
+        })
+    }
+
+    async fn upload_local_item(
+        &self,
+        source: &Path,
+        is_directory: bool,
+        destination: &RemoteBrowseTarget,
+        source_name: &str,
+        transfer_id: Option<u64>,
+    ) -> ApiResult<()> {
+        let metadata = tokio::fs::symlink_metadata(source).await.map_err(|error| {
+            ApiError::Message(format!("Failed to inspect {}: {error}", source.display()))
+        })?;
+        if is_directory != metadata.is_dir() {
+            return Err(ApiError::Message(format!(
+                "Source type changed before paste: {}",
+                source.display()
+            )));
+        }
+
+        if !is_directory {
+            return self
+                .upload_remote_file(
+                    source,
+                    &destination.remote_name,
+                    &destination.remote_path,
+                    source_name,
+                    transfer_id,
+                )
+                .await;
+        }
+
+        let root_remote_path =
+            normalize_remote_path(&join_remote_path(&destination.remote_path, source_name))?;
+        self.create_remote_directory(&destination.remote_name, &root_remote_path, transfer_id)
+            .await?;
+        let mut pending = vec![(source.to_path_buf(), root_remote_path)];
+        while let Some((local_directory, remote_directory)) = pending.pop() {
+            let mut children = tokio::fs::read_dir(&local_directory)
+                .await
+                .map_err(|error| {
+                    ApiError::Message(format!(
+                        "Failed to read {}: {error}",
+                        local_directory.display()
+                    ))
+                })?;
+            while let Some(child) = children.next_entry().await.map_err(|error| {
+                ApiError::Message(format!(
+                    "Failed to read {}: {error}",
+                    local_directory.display()
+                ))
+            })? {
+                let child_path = child.path();
+                let child_name = child.file_name().to_string_lossy().to_string();
+                let child_metadata = child.metadata().await.map_err(|error| {
+                    ApiError::Message(format!(
+                        "Failed to inspect {}: {error}",
+                        child_path.display()
+                    ))
+                })?;
+                if child_metadata.is_dir() {
+                    let child_remote_path =
+                        normalize_remote_path(&join_remote_path(&remote_directory, &child_name))?;
+                    self.create_remote_directory(
+                        &destination.remote_name,
+                        &child_remote_path,
+                        transfer_id,
+                    )
+                    .await?;
+                    pending.push((child_path, child_remote_path));
+                } else {
+                    self.upload_remote_file(
+                        &child_path,
+                        &destination.remote_name,
+                        &remote_directory,
+                        &child_name,
+                        transfer_id,
+                    )
+                    .await?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    async fn upload_remote_file(
+        &self,
+        local_path: &Path,
+        remote_name: &str,
+        remote_directory: &str,
+        file_name: &str,
+        transfer_id: Option<u64>,
+    ) -> ApiResult<()> {
+        let response = self
+            .proxy
+            .upload_file(remote_name, remote_directory, local_path, file_name)
+            .await?;
+        let start: RemoteJobStart = response_json(response, "start remote upload").await?;
+        self.wait_for_job(&start.job_id, transfer_id).await?;
+        Ok(())
+    }
+
+    async fn create_remote_directory(
+        &self,
+        remote_name: &str,
+        remote_path: &str,
+        transfer_id: Option<u64>,
+    ) -> ApiResult<()> {
+        self.start_json_job(
+            "/api/remote/file/mkdir",
+            serde_json::json!({ "remote": remote_name, "path": remote_path }),
+            transfer_id,
+        )
+        .await?;
+        Ok(())
+    }
+
+    async fn download_remote_item(
+        &self,
+        source: &RemoteBrowseTarget,
+        is_directory: bool,
+        destination: &Path,
+        transfer_id: Option<u64>,
+    ) -> ApiResult<()> {
+        if !is_directory {
+            return self
+                .download_remote_file(source, destination, transfer_id)
+                .await;
+        }
+
+        tokio::fs::create_dir(destination).await.map_err(|error| {
+            ApiError::Message(format!(
+                "Failed to create {}: {error}",
+                destination.display()
+            ))
+        })?;
+        let mut pending = vec![(source.clone(), destination.to_path_buf())];
+        while let Some((remote_directory, local_directory)) = pending.pop() {
+            let items = self.fetch_remote_items(&remote_directory).await?;
+            for item in items {
+                let remote_path = remote_directory.child_remote_path(&item)?;
+                let name = if item.name.is_empty() {
+                    Path::new(&remote_path)
+                        .file_name()
+                        .and_then(|value| value.to_str())
+                        .unwrap_or("item")
+                        .to_string()
+                } else {
+                    item.name.clone()
+                };
+                let child_target = RemoteBrowseTarget {
+                    provider_type: remote_directory.provider_type.clone(),
+                    remote_name: remote_directory.remote_name.clone(),
+                    remote_path,
+                };
+                let child_destination = local_directory.join(name);
+                if item.is_dir {
+                    tokio::fs::create_dir(&child_destination)
+                        .await
+                        .map_err(|error| {
+                            ApiError::Message(format!(
+                                "Failed to create {}: {error}",
+                                child_destination.display()
+                            ))
+                        })?;
+                    pending.push((child_target, child_destination));
+                } else {
+                    self.download_remote_file(&child_target, &child_destination, transfer_id)
+                        .await?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    async fn download_remote_file(
+        &self,
+        source: &RemoteBrowseTarget,
+        destination: &Path,
+        transfer_id: Option<u64>,
+    ) -> ApiResult<()> {
+        let response = self
+            .proxy
+            .get_with_query(
+                "/api/remote/file/download",
+                &[
+                    ("remote", source.remote_name.as_str()),
+                    ("path", source.remote_path.as_str()),
+                ],
+            )
+            .await?;
+        let start: RemoteJobStart = response_json(response, "start remote download").await?;
+        self.wait_for_job(&start.job_id, transfer_id).await?;
+        self.proxy
+            .download_to_file(
+                &format!("/api/remote/file/jobs/{}/result/download", start.job_id),
+                destination,
+            )
+            .await
+    }
+
+    async fn fetch_remote_items(
+        &self,
+        target: &RemoteBrowseTarget,
+    ) -> ApiResult<Vec<RemoteListItem>> {
+        let response = self
+            .proxy
+            .get_with_query(
+                "/api/remote/file/list",
+                &[
+                    ("remote", target.remote_name.as_str()),
+                    ("path", target.remote_path.as_str()),
+                ],
+            )
+            .await?;
+        let start: RemoteJobStart = response_json(response, "start remote list").await?;
+        self.wait_for_job(&start.job_id, None).await?;
+        let response = self
+            .proxy
+            .get(&format!(
+                "/api/remote/file/jobs/{}/result/list",
+                start.job_id
+            ))
+            .await?;
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        if !status.is_success() {
+            return Err(ApiError::Message(if body.is_empty() {
+                format!(
+                    "Failed to load remote list result (HTTP {})",
+                    status.as_u16()
+                )
+            } else {
+                body
+            }));
+        }
+        let items = serde_json::from_str::<Vec<RemoteListItem>>(&body).map_err(|error| {
+            ApiError::Message(format!("Failed to parse remote list result: {error}"))
+        })?;
+        self.listing_cache
+            .save(&target.remote_name, &target.remote_path, body.as_bytes())
+            .await?;
+        Ok(items)
+    }
+
+    async fn delete_remote_target(
+        &self,
+        target: &RemoteBrowseTarget,
+        transfer_id: Option<u64>,
+    ) -> ApiResult<()> {
+        let response = self
+            .proxy
+            .delete_with_query(
+                "/api/remote/file",
+                &[
+                    ("remote", target.remote_name.as_str()),
+                    ("path", target.remote_path.as_str()),
+                ],
+            )
+            .await?;
+        let start: RemoteJobStart = response_json(response, "start remote delete").await?;
+        self.wait_for_job(&start.job_id, transfer_id).await?;
+        self.listing_cache
+            .clear(&target.remote_name, &target.remote_path)
+            .await?;
+        self.listing_cache
+            .clear(
+                &target.remote_name,
+                &remote_parent_path(&target.remote_path),
+            )
+            .await?;
+        Ok(())
+    }
+
+    async fn wait_for_job(
+        &self,
+        job_id: &str,
+        transfer_id: Option<u64>,
+    ) -> ApiResult<RemoteJobStatus> {
+        for _ in 0..1_200 {
+            let response = self
+                .proxy
+                .get(&format!("/api/remote/file/jobs/{job_id}"))
+                .await?;
+            let status: RemoteJobStatus = response_json(response, "poll remote job").await?;
+            if let Some(transfer_id) = transfer_id {
+                let _ = self
+                    .transfers
+                    .update_progress(transfer_id, status.bytes_completed, status.bytes_total)
+                    .await;
+                if !status.phase.is_empty() {
+                    let _ = self
+                        .transfers
+                        .update_detail(transfer_id, status.phase.clone())
+                        .await;
+                }
+            }
+            match status.state.as_str() {
+                "succeeded" => return Ok(status),
+                "failed" | "cancelled" => {
+                    let message = if status.message.is_empty() {
+                        format!("Remote {} job {}", status.operation, status.state)
+                    } else {
+                        status.message
+                    };
+                    return Err(ApiError::Message(message));
+                }
+                _ => tokio::time::sleep(Duration::from_millis(150)).await,
+            }
+        }
+        Err(ApiError::Message("Remote operation timed out".to_string()))
+    }
+
+    async fn start_json_job(
+        &self,
+        path: &str,
+        body: serde_json::Value,
+        transfer_id: Option<u64>,
+    ) -> ApiResult<RemoteJobStatus> {
+        let response = self.proxy.post_json(path, &body).await?;
+        let start: RemoteJobStart = response_json(response, "start remote operation").await?;
+        if start.job_id.trim().is_empty() {
+            return Err(ApiError::Message(
+                "Remote operation did not return a job id".to_string(),
+            ));
+        }
+        self.wait_for_job(&start.job_id, transfer_id).await
+    }
+
+    async fn begin_transfer(&self, record: FileTransferRecord) -> Option<u64> {
+        self.transfers.start_transfer(record).await.ok()
+    }
+
+    async fn finish_transfer<T>(
+        &self,
+        transfer_id: Option<u64>,
+        result: ApiResult<T>,
+    ) -> ApiResult<T> {
+        match result {
+            Ok(value) => {
+                if let Some(transfer_id) = transfer_id {
+                    let _ = self.transfers.complete_transfer(transfer_id).await;
+                }
+                Ok(value)
+            }
+            Err(error) => {
+                if let Some(transfer_id) = transfer_id {
+                    let _ = self
+                        .transfers
+                        .fail_transfer(transfer_id, error.to_string())
+                        .await;
+                }
+                Err(error)
+            }
+        }
+    }
+
+    async fn finish_transfers<T>(
+        &self,
+        transfer_ids: &[u64],
+        result: ApiResult<T>,
+    ) -> ApiResult<T> {
+        match result {
+            Ok(value) => {
+                for transfer_id in transfer_ids {
+                    let _ = self.transfers.complete_transfer(*transfer_id).await;
+                }
+                Ok(value)
+            }
+            Err(error) => {
+                let message = error.to_string();
+                for transfer_id in transfer_ids {
+                    let _ = self
+                        .transfers
+                        .fail_transfer(*transfer_id, message.clone())
+                        .await;
+                }
+                Err(error)
+            }
+        }
+    }
+
+    fn remote_target(&self, path: &str) -> Option<RemoteBrowseTarget> {
+        RemoteBrowseTarget::from_virtual_path(&self.mount_root, Path::new(path))
+    }
+
+    fn reject_virtual_mount_container(&self, path: &str, operation: &str) -> ApiResult<()> {
+        let path = Path::new(path);
+        if path == self.mount_root || path.starts_with(&self.mount_root) {
+            return Err(ApiError::Message(format!(
+                "Remote {operation} is not available in this migration build yet."
+            )));
+        }
+        Ok(())
+    }
+}
+
+async fn local_item_size(path: &Path, is_directory: bool) -> i64 {
+    if is_directory {
+        return 0;
+    }
+    tokio::fs::metadata(path)
+        .await
+        .ok()
+        .map(|metadata| metadata.len().min(i64::MAX as u64) as i64)
+        .unwrap_or_default()
+}
+
+fn validate_remote_name(name: &str) -> ApiResult<&str> {
+    let trimmed = name.trim();
+    if trimmed.is_empty() || trimmed.contains('/') || trimmed.contains('\\') {
+        return Err(ApiError::Message(
+            "Names cannot be empty or contain path separators.".to_string(),
+        ));
+    }
+    if trimmed == "." || trimmed == ".." {
+        return Err(ApiError::Message("Choose a different name.".to_string()));
+    }
+    Ok(trimmed)
+}
+
+fn remote_parent_path(path: &str) -> String {
+    let parent = Path::new(path)
+        .parent()
+        .and_then(|value| value.to_str())
+        .unwrap_or("/");
+    if parent.is_empty() {
+        "/".to_string()
+    } else {
+        parent.to_string()
+    }
+}
+
+fn remote_item_is_directory(
+    parent: &RemoteBrowseTarget,
+    target_path: &str,
+    items: &[RemoteListItem],
+) -> ApiResult<Option<bool>> {
+    for item in items {
+        if parent.child_remote_path(item)? == target_path {
+            return Ok(Some(item.is_dir));
+        }
+    }
+    Ok(None)
+}
+
+async fn ensure_destination_available(path: &Path) -> ApiResult<()> {
+    match tokio::fs::symlink_metadata(path).await {
+        Ok(_) => Err(ApiError::Message(format!(
+            "{} already exists.",
+            path.display()
+        ))),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(ApiError::Message(format!(
+            "Failed to inspect {}: {error}",
+            path.display()
+        ))),
+    }
+}
+
+async fn remove_local_path(path: &Path, is_directory: bool) -> ApiResult<()> {
+    let result = if is_directory {
+        tokio::fs::remove_dir_all(path).await
+    } else {
+        tokio::fs::remove_file(path).await
+    };
+    result
+        .map_err(|error| ApiError::Message(format!("Failed to remove {}: {error}", path.display())))
+}
+
+async fn response_json<T>(response: reqwest::Response, operation: &str) -> ApiResult<T>
+where
+    T: serde::de::DeserializeOwned,
+{
+    let status = response.status();
+    let body = response.text().await.unwrap_or_default();
+    if !status.is_success() {
+        return Err(ApiError::Message(if body.is_empty() {
+            format!("Failed to {operation} (HTTP {})", status.as_u16())
         } else {
-            None
-        },
-        modified_ms: metadata.modified().ok().and_then(system_time_ms),
-        created_ms: metadata.created().ok().and_then(system_time_ms),
-        readonly: metadata.permissions().readonly(),
+            body
+        }));
+    }
+    serde_json::from_str(&body).map_err(|error| {
+        ApiError::Message(format!("Failed to parse {operation} response: {error}"))
     })
 }
 
-fn system_time_ms(time: std::time::SystemTime) -> Option<i64> {
-    let duration = time.duration_since(UNIX_EPOCH).ok()?;
-    Some(duration.as_millis().try_into().ok()?)
-}
-
-fn folder_rank(kind: &FileKind) -> u8 {
-    match kind {
-        FileKind::Folder => 0,
-        FileKind::Symlink => 1,
-        FileKind::File => 2,
-        FileKind::Other => 3,
+fn virtual_folder_entry(path: PathBuf, name: String, location: ExplorerLocation) -> FileEntry {
+    FileEntry {
+        id: display_path(&path),
+        name: name.clone(),
+        path: display_path(&path),
+        extension: String::new(),
+        mime_type: None,
+        remote_modified: None,
+        kind: FileKind::Folder,
+        size_bytes: None,
+        modified_ms: None,
+        created_ms: None,
+        readonly: false,
+        hidden: name.starts_with('.'),
+        location,
     }
 }
 
 fn display_path(path: &Path) -> String {
-    path.display().to_string()
+    path.to_string_lossy().to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn remote_conflict_lookup_accepts_relative_and_full_list_paths() {
+        let parent = RemoteBrowseTarget {
+            provider_type: "drive".into(),
+            remote_name: "work".into(),
+            remote_path: "/Documents".into(),
+        };
+        let items = vec![
+            RemoteListItem {
+                name: "report.pdf".into(),
+                path: "report.pdf".into(),
+                is_dir: false,
+                ..remote_list_item_default()
+            },
+            RemoteListItem {
+                name: "Archive".into(),
+                path: "/Documents/Archive".into(),
+                is_dir: true,
+                ..remote_list_item_default()
+            },
+        ];
+
+        assert_eq!(
+            remote_item_is_directory(&parent, "/Documents/report.pdf", &items).unwrap(),
+            Some(false)
+        );
+        assert_eq!(
+            remote_item_is_directory(&parent, "/Documents/Archive", &items).unwrap(),
+            Some(true)
+        );
+        assert_eq!(
+            remote_item_is_directory(&parent, "/Documents/missing.txt", &items).unwrap(),
+            None
+        );
+    }
+
+    fn remote_list_item_default() -> RemoteListItem {
+        RemoteListItem {
+            name: String::new(),
+            path: String::new(),
+            is_dir: false,
+            size: 0,
+            mod_time: String::new(),
+            mime_type: String::new(),
+        }
+    }
 }

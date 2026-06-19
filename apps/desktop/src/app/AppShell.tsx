@@ -1,6 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom";
 import { ArrowRightLeft, Bell, Blocks, Folder, PanelsTopLeft, Settings as SettingsIcon } from "lucide-react";
+import { useShallow } from "zustand/react/shallow";
 import mistyLogo from "../assets/misty.png";
 import { DiagnosticsWorkspace } from "../features/diagnostics/DiagnosticsWorkspace";
 import { ExplorerWorkspace } from "../features/explorer/ExplorerWorkspace";
@@ -27,26 +28,47 @@ const bottomNavItems = [
 
 export function AppShell() {
   const location = useLocation();
-  const { app, loadApp, error: appError, message: appMessage } = useAppStore();
-  const providersState = useProvidersStore();
-  const transfersState = useTransfersStore();
-  const settingsState = useSettingsStore();
-  const providerDerived = selectProviderDerived(providersState);
+  const { app, loadApp, appError, appMessage } = useAppStore(useShallow((state) => ({
+    app: state.app,
+    loadApp: state.loadApp,
+    appError: state.error,
+    appMessage: state.message,
+  })));
+  const providerLoad = useProvidersStore((state) => state.load);
+  const providerError = useProvidersStore((state) => state.error);
+  const providerMessage = useProvidersStore((state) => state.message);
+  const providerStatus = useProvidersStore((state) => selectProviderDerived(state).status);
+  const transferLoad = useTransfersStore((state) => state.load);
+  const transferError = useTransfersStore((state) => state.error);
+  const transferMessage = useTransfersStore((state) => state.message);
+  const settingsLoad = useSettingsStore((state) => state.load);
+  const settingsError = useSettingsStore((state) => state.error);
+  const settingsMessage = useSettingsStore((state) => state.message);
   const routeId = routeIdFromPath(location.pathname);
+  const appLoadStarted = useRef(false);
+  const loadedRoutes = useRef(new Set<AppTab>());
 
   useEffect(() => {
+    if (appLoadStarted.current) return;
+    appLoadStarted.current = true;
     void loadApp();
-    void providersState.load(true);
-    void transfersState.load("");
-    void settingsState.load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [loadApp]);
+
+  useEffect(() => {
+    if (loadedRoutes.current.has(routeId)) return;
+    loadedRoutes.current.add(routeId);
+    if (routeId === "files" || routeId === "providers" || routeId === "diagnostics") {
+      void providerLoad(routeId === "providers");
+    }
+    if (routeId === "transfers") void transferLoad("");
+    if (routeId === "settings") void settingsLoad();
+  }, [providerLoad, routeId, settingsLoad, transferLoad]);
 
   const notice = noticeForRoute(routeId, {
     app: { error: appError, message: appMessage },
-    providers: { error: providersState.error, message: providersState.message },
-    transfers: { error: transfersState.error, message: transfersState.message },
-    settings: { error: settingsState.error, message: settingsState.message },
+    providers: { error: providerError, message: providerMessage },
+    transfers: { error: transferError, message: transferMessage },
+    settings: { error: settingsError, message: settingsMessage },
   });
 
   return (
@@ -75,7 +97,7 @@ export function AppShell() {
           <Route path="/plugins" element={<PlaceholderPage title="Plugins" subtitle="Plugin workspace route is registered for the Tauri shell." />} />
           <Route path="/activity" element={<PlaceholderPage title="Activity" subtitle="Activity workspace route is registered for the Tauri shell." />} />
           <Route path="/settings" element={<SettingsWorkspace />} />
-          <Route path="/diagnostics" element={<DiagnosticsWorkspace environment={app?.environment ?? null} proxyStatus={providerDerived.status} />} />
+          <Route path="/diagnostics" element={<DiagnosticsWorkspace environment={app?.environment ?? null} proxyStatus={providerStatus} />} />
         </Routes>
       </section>
     </main>

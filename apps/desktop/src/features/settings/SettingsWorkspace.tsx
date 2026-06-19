@@ -1,3 +1,4 @@
+import { OpenWithAssociationsPanel } from "./components/OpenWithAssociationsPanel";
 import { SettingsJsonPanel } from "./components/SettingsJsonPanel";
 import { ShortcutsPanel } from "./components/ShortcutsPanel";
 import { useSettingsStore } from "./useSettingsStore";
@@ -6,11 +7,13 @@ export function SettingsWorkspace() {
   const {
     settings,
     settingsText,
+    openWithAssociations,
     shortcuts,
     working,
     setSettingsText,
     load,
     saveSettingsDocument,
+    removeOpenWithAssociation,
     setShortcut,
     saveShortcuts,
   } = useSettingsStore();
@@ -30,6 +33,12 @@ export function SettingsWorkspace() {
         working={working}
         onShortcutChange={setShortcut}
         onSave={() => void saveShortcuts()}
+      />
+      <OpenWithAssociationsPanel
+        associations={openWithAssociations}
+        working={working}
+        onRefresh={() => void load()}
+        onRemove={(key) => void removeOpenWithAssociation(key)}
       />
     </section>
   );

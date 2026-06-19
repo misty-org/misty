@@ -1,6 +1,8 @@
+use std::path::Path;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
+use tokio::io::AsyncWriteExt;
 use tokio::sync::RwLock;
 
 use crate::error::{ApiError, ApiResult};
@@ -95,5 +97,97 @@ impl ProxyService {
             .and_then(|value| value.parse::<u16>().ok())
             .unwrap_or(5572);
         format!("http://127.0.0.1:{port}")
+    }
+
+    pub async fn get_with_query<Q>(&self, path: &str, query: &Q) -> ApiResult<reqwest::Response>
+    where
+        Q: Serialize + ?Sized,
+    {
+        let url = self.url(path)?;
+        Ok(self.inner.client.get(url).query(query).send().await?)
+    }
+
+    pub async fn get(&self, path: &str) -> ApiResult<reqwest::Response> {
+        let url = self.url(path)?;
+        Ok(self.inner.client.get(url).send().await?)
+    }
+
+    pub async fn post_json(
+        &self,
+        path: &str,
+        body: &serde_json::Value,
+    ) -> ApiResult<reqwest::Response> {
+        let url = self.url(path)?;
+        Ok(self.inner.client.post(url).json(body).send().await?)
+    }
+
+    pub async fn delete_with_query<Q>(&self, path: &str, query: &Q) -> ApiResult<reqwest::Response>
+    where
+        Q: Serialize + ?Sized,
+    {
+        let url = self.url(path)?;
+        Ok(self.inner.client.delete(url).query(query).send().await?)
+    }
+
+    pub async fn upload_file(
+        &self,
+        remote: &str,
+        remote_directory: &str,
+        local_path: &Path,
+        file_name: &str,
+    ) -> ApiResult<reqwest::Response> {
+        let url = self.url("/api/remote/file/upload")?;
+        let file = reqwest::multipart::Part::file(local_path)
+            .await
+            .map_err(|error| {
+                ApiError::Message(format!("Failed to open {}: {error}", local_path.display()))
+            })?
+            .file_name(file_name.to_string());
+        let form = reqwest::multipart::Form::new()
+            .text("remote", remote.to_string())
+            .text("path", remote_directory.to_string())
+            .part("file", file);
+        Ok(self.inner.client.post(url).multipart(form).send().await?)
+    }
+
+    pub async fn download_to_file(&self, path: &str, destination: &Path) -> ApiResult<()> {
+        let mut response = self.get(path).await?;
+        let status = response.status();
+        if !status.is_success() {
+            let body = response.text().await.unwrap_or_default();
+            return Err(ApiError::Message(if body.is_empty() {
+                format!("Remote download failed (HTTP {})", status.as_u16())
+            } else {
+                body
+            }));
+        }
+        if let Some(parent) = destination.parent() {
+            tokio::fs::create_dir_all(parent).await.map_err(|error| {
+                ApiError::Message(format!("Failed to create {}: {error}", parent.display()))
+            })?;
+        }
+        let mut output = tokio::fs::File::create(destination)
+            .await
+            .map_err(|error| {
+                ApiError::Message(format!(
+                    "Failed to create {}: {error}",
+                    destination.display()
+                ))
+            })?;
+        while let Some(chunk) = response.chunk().await? {
+            output.write_all(&chunk).await.map_err(|error| {
+                ApiError::Message(format!(
+                    "Failed to write {}: {error}",
+                    destination.display()
+                ))
+            })?;
+        }
+        output.flush().await.map_err(|error| {
+            ApiError::Message(format!(
+                "Failed to flush {}: {error}",
+                destination.display()
+            ))
+        })?;
+        Ok(())
     }
 }

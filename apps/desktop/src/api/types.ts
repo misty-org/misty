@@ -36,24 +36,75 @@ export interface ProxySnapshot {
   error: string | null;
 }
 
+export type ClipboardPayloadKind = "empty" | "text" | "html" | "image" | "file_refs";
+export type ClipboardOrigin = "local_system" | "local_misty" | "remote_shared";
+
+export interface ClipboardFileRef {
+  display_name: string;
+  local_path: string;
+  remote_name: string;
+  remote_path: string;
+  is_dir: boolean;
+}
+
+export interface ClipboardImage {
+  mime_type: string;
+  blob_id: string;
+  checksum: string;
+  size_bytes: number;
+  width: number;
+  height: number;
+}
+
+export interface ClipboardPayload {
+  kind: ClipboardPayloadKind;
+  origin: ClipboardOrigin;
+  payload_id: string;
+  source_device_id: string;
+  source_device_name: string;
+  revision: number;
+  created_unix_ms: number;
+  text: string;
+  html: string;
+  file_refs: ClipboardFileRef[];
+  images: ClipboardImage[];
+}
+
+export interface ClipboardSnapshot {
+  local: ClipboardPayload;
+  shared: ClipboardPayload;
+}
+
 export type FileKind = "folder" | "file" | "symlink" | "other";
+export type ExplorerLocationKind = "local" | "remote_provider" | "remote";
+
+export interface ExplorerLocation {
+  kind: ExplorerLocationKind;
+  providerType: string | null;
+  remoteName: string | null;
+  remotePath: string | null;
+}
 
 export interface FileEntry {
   id: string;
   name: string;
   path: string;
   extension: string;
+  mimeType: string | null;
+  remoteModified: string | null;
   kind: FileKind;
   sizeBytes: number | null;
   modifiedMs: number | null;
   createdMs: number | null;
   readonly: boolean;
   hidden: boolean;
+  location: ExplorerLocation;
 }
 
 export interface DirectoryListing {
   path: string;
   parentPath: string | null;
+  location: ExplorerLocation;
   entries: FileEntry[];
   totalCount: number;
   hiddenCount: number;
@@ -64,9 +115,130 @@ export interface ListDirectoryRequest {
   showHidden?: boolean;
 }
 
+export type CreateItemKind = "file" | "folder";
+
+export interface CreateItemRequest {
+  directory: string;
+  name: string;
+  kind: CreateItemKind;
+}
+
+export interface RenameItemRequest {
+  path: string;
+  newName: string;
+  sourceIsDirectory?: boolean;
+}
+
+export interface RenameItemsRequest {
+  items: RenameItemRequest[];
+}
+
+export interface DeleteItemsRequest {
+  paths: string[];
+}
+
+export type ClipboardOperation = "copy" | "move";
+
+export interface PasteItemsRequest {
+  sources: PasteItem[];
+  destinationDirectory: string;
+  operation: ClipboardOperation;
+  targetName?: string | null;
+}
+
+export interface PasteTextRequest {
+  destinationDirectory: string;
+  text: string;
+  preferredName?: string | null;
+}
+
+export interface PasteItem {
+  path: string;
+  isDirectory: boolean;
+}
+
+export interface ExplorerOperationResult {
+  affectedPaths: string[];
+  parentPath: string | null;
+}
+
+export interface PrepareOpenItemRequest {
+  path: string;
+  sizeBytes?: number | null;
+  remoteModified?: string | null;
+}
+
+export interface PreparedOpenItem {
+  localPath: string;
+  cached: boolean;
+}
+
+export interface NativeWorkspaceTabSnapshot {
+  context_key: string;
+  state_key: string;
+  title: string;
+  restore_state: string;
+  idx: number;
+}
+
+export interface NativeWorkspacePaneSnapshot {
+  pane_id: string;
+  tabs: NativeWorkspaceTabSnapshot[];
+  closed_tabs: NativeWorkspaceTabSnapshot[];
+  active_tab_idx: number;
+}
+
+export interface NativeWorkspaceClosedPaneSnapshot extends NativeWorkspacePaneSnapshot {
+  restore_mode: string;
+  lane_index: number;
+  row_index: number;
+}
+
+export interface NativeWorkspaceExplorerSnapshot {
+  active_pane_id: string;
+  next_tab_idx: number;
+  next_pane_idx: number;
+  grid_pane_ids: string[][];
+  grid_split_ratio: number;
+  lane_split_ratios: number[];
+  panes: NativeWorkspacePaneSnapshot[];
+  closed_panes: NativeWorkspaceClosedPaneSnapshot[];
+}
+
+export interface NativeWorkspaceFileTabSnapshot {
+  idx: number;
+  title: string;
+  explorer: NativeWorkspaceExplorerSnapshot;
+}
+
+export interface NativeWorkspace {
+  id: string;
+  title: string;
+  sidebar_width: number;
+  sidebar_visible: boolean;
+  inspector_width: number;
+  inspector_visible: boolean;
+  active_tab_idx: number;
+  next_tab_idx: number;
+  tabs: NativeWorkspaceFileTabSnapshot[];
+  explorer: NativeWorkspaceExplorerSnapshot;
+}
+
+export interface NativeWorkspaceDocument {
+  schema_version: number;
+  active_workspace_id: string;
+  next_workspace_idx: number;
+  workspaces: NativeWorkspace[];
+}
+
 export interface SettingsSnapshot {
   path: string;
   document: Record<string, unknown>;
+}
+
+export interface OpenWithAssociation {
+  key: string;
+  applicationPath: string;
 }
 
 export interface SaveSettingsRequest {
@@ -219,4 +391,143 @@ export interface TransferPage {
   rows: TransferRecord[];
   totalCount: number;
   dbPath: string;
+}
+
+export type OperationKind = "copy" | "move" | "create" | "rename" | "delete" | "download";
+export type OperationConflictPolicy = "ask" | "replace" | "skip" | "keep_both";
+export type OperationStatus =
+  | "queued"
+  | "in_progress"
+  | "waiting_for_resolution"
+  | "completed"
+  | "failed"
+  | "canceled"
+  | "skipped";
+
+export interface OperationEndpoint {
+  localPath: string;
+  remoteName: string;
+  remotePath: string;
+}
+
+export interface OperationDescriptor {
+  operationId: number;
+  transferId: number;
+  batchId: number;
+  kind: OperationKind;
+  source: OperationEndpoint;
+  target: OperationEndpoint;
+  conflictPolicy: OperationConflictPolicy;
+  status: OperationStatus;
+  preserveOrder: boolean;
+  retryable: boolean;
+  cancelable: boolean;
+  undoable: boolean;
+  supportsReplace: boolean;
+  supportsKeepBoth: boolean;
+  title: string;
+  errorMessage: string;
+  attempt: number;
+}
+
+export interface OperationBatch {
+  batchId: number;
+  label: string;
+  preserveOrder: boolean;
+  paused: boolean;
+  pausedOperationId: number;
+  operationIds: number[];
+}
+
+export interface ConflictDialogState {
+  open: boolean;
+  operationId: number;
+  batchId: number;
+  applyToBatch: boolean;
+  supportsKeepBoth: boolean;
+  selectedPolicy: OperationConflictPolicy;
+  title: string;
+  sourceLabel: string;
+  targetLabel: string;
+}
+
+export interface OperationQueueSnapshot {
+  operations: OperationDescriptor[];
+  batches: OperationBatch[];
+  conflictDialog: ConflictDialogState;
+  activeCount: number;
+  maxConcurrent: number;
+}
+
+export type FileSyncEndpointKind = "local" | "remote";
+export type FileSyncPolicy = "remote_first" | "local_first" | "bi_directional";
+export type FileSyncCompareKind = "file" | "folder" | "mismatch";
+export type FileSyncCompareDisposition = "left_only" | "right_only" | "different" | "same" | "conflict";
+export type FileSyncPlannedAction =
+  | "skip"
+  | "copy_left_to_right"
+  | "copy_right_to_left"
+  | "delete_left"
+  | "delete_right";
+
+export interface FileSyncEndpoint {
+  kind: FileSyncEndpointKind;
+  localPath: string;
+  remoteName: string;
+  remotePath: string;
+  providerType: string;
+}
+
+export interface FileSyncPair {
+  id: number;
+  name: string;
+  left: FileSyncEndpoint;
+  right: FileSyncEndpoint;
+  watchMode: boolean;
+  stale: boolean;
+  preferredPolicy: FileSyncPolicy;
+  lastComparedAtMs: number;
+  lastScanAtMs: number;
+}
+
+export interface FileSyncCompareSide {
+  present: boolean;
+  isRemote: boolean;
+  isDir: boolean;
+  size: number;
+  lastModified: string;
+  absolutePath: string;
+  remoteName: string;
+  remotePath: string;
+}
+
+export interface FileSyncCompareRow {
+  relativePath: string;
+  kind: FileSyncCompareKind;
+  disposition: FileSyncCompareDisposition;
+  left: FileSyncCompareSide;
+  right: FileSyncCompareSide;
+  action: FileSyncPlannedAction;
+}
+
+export interface FileSyncCompareResult {
+  success: boolean;
+  errorMessage: string;
+  rows: FileSyncCompareRow[];
+  comparedAtMs: number;
+}
+
+export interface FileSyncCompareRequest {
+  left: FileSyncEndpoint;
+  right: FileSyncEndpoint;
+  pairId?: number;
+}
+
+export interface FileSyncApplyRequest extends FileSyncCompareRequest {
+  rows: FileSyncCompareRow[];
+}
+
+export interface FileSyncApplyResult {
+  appliedCount: number;
+  affectedPaths: string[];
 }

@@ -1,12 +1,18 @@
-import { Briefcase, Download, FileText, Folder, HardDrive, Home, Monitor } from "lucide-react";
+import { Briefcase, Cloud, Download, FileText, Folder, HardDrive, Home, Monitor } from "lucide-react";
+import { memo } from "react";
+import type { ProviderRemote } from "../../../api/types";
 
 interface ExplorerSidebarProps {
   homePath: string;
   activePath: string;
+  mountRoot: string;
+  remotes: ProviderRemote[];
+  remoteLoading: boolean;
+  pinnedPaths: string[];
   onNavigate: (path: string) => void;
 }
 
-export function ExplorerSidebar(props: ExplorerSidebarProps) {
+export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSidebarProps) {
   const quickAccess = [
     { label: "Home", icon: Home, path: props.homePath },
     { label: "Desktop", icon: Monitor, path: `${props.homePath}/Desktop` },
@@ -42,12 +48,44 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
               </button>
             );
           })}
+          {props.pinnedPaths.map((path) => (
+            <button
+              key={`pin:${path}`}
+              className={props.activePath === path ? "selected" : ""}
+              onClick={() => props.onNavigate(path)}
+              title={path}
+            >
+              <Folder size={18} />
+              <span>{path.split("/").filter(Boolean).pop() || path}</span>
+            </button>
+          ))}
         </div>
       </section>
 
       <section>
         <h2>Remote</h2>
-        <div className="sidebar-muted">Loading remote...</div>
+        {props.remoteLoading && props.remotes.length === 0 ? (
+          <div className="sidebar-muted">Loading remote...</div>
+        ) : props.remotes.length === 0 ? (
+          <div className="sidebar-muted">No remotes connected</div>
+        ) : (
+          <div className="sidebar-list remote-sidebar-list">
+            {props.remotes.map((remote) => {
+              const path = joinPath(props.mountRoot, remote.type, remote.name);
+              return (
+                <button
+                  key={`${remote.type}:${remote.name}`}
+                  className={props.activePath === path || props.activePath.startsWith(`${path}/`) ? "selected" : ""}
+                  onClick={() => props.onNavigate(path)}
+                  title={`${remote.type}: ${remote.name}`}
+                >
+                  <Cloud size={18} />
+                  <span>{remote.name}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </section>
 
       <section>
@@ -63,4 +101,9 @@ export function ExplorerSidebar(props: ExplorerSidebarProps) {
       </section>
     </aside>
   );
+});
+
+function joinPath(...parts: string[]): string {
+  const [first, ...rest] = parts;
+  return [first.replace(/\/+$/, ""), ...rest.map((part) => part.replace(/^\/+|\/+$/g, ""))].join("/");
 }

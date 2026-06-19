@@ -6,28 +6,52 @@ const maxPanesPerTab = 4;
 interface MultiPanelStore {
   tabs: MultiPanelTab[];
   activeTabId: string;
+  closedTabs: MultiPanelTab[];
   closedPanes: MultiPanelPane[];
   activePaneId: string;
   nextPaneIndex: number;
   nextTabIndex: number;
   initialize: (path: string, title?: string) => void;
   addTab: (path: string, title?: string) => string;
+  addCompareTab: (leftPath: string, rightPath?: string) => string;
   closeTab: (tabId: string) => void;
+  restoreTab: () => void;
   selectTab: (tabId: string) => void;
   updateActiveTabPath: (paneId: string, path: string, title?: string) => void;
   splitPane: (paneId: string, orientation: SplitOrientation) => void;
   closePane: (paneId: string) => void;
   restorePane: () => void;
   setActivePane: (paneId: string) => void;
+  hydrate: (snapshot: {
+    tabs: MultiPanelTab[];
+    activeTabId: string;
+    activePaneId: string;
+    closedPanes?: MultiPanelPane[];
+    nextPaneIndex: number;
+    nextTabIndex: number;
+  }) => void;
 }
 
 export const useMultiPanelStore = create<MultiPanelStore>((set, get) => ({
   tabs: [],
   activeTabId: "",
+  closedTabs: [],
   closedPanes: [],
   activePaneId: "",
   nextPaneIndex: 1,
   nextTabIndex: 1,
+
+  hydrate: (snapshot) => {
+    if (snapshot.tabs.length === 0) return;
+    set({
+      tabs: snapshot.tabs,
+      activeTabId: snapshot.activeTabId,
+      activePaneId: snapshot.activePaneId,
+      closedPanes: snapshot.closedPanes ?? [],
+      nextPaneIndex: snapshot.nextPaneIndex,
+      nextTabIndex: snapshot.nextTabIndex,
+    });
+  },
 
   initialize: (path, title = "Home") => {
     const state = get();
@@ -58,6 +82,30 @@ export const useMultiPanelStore = create<MultiPanelStore>((set, get) => ({
     return tabId;
   },
 
+  addCompareTab: (leftPath, rightPath = leftPath) => {
+    const state = get();
+    const tabId = `explorer-tab-${state.nextTabIndex}`;
+    const leftPane = createPane(`explorer-pane-${state.nextPaneIndex}`, leftPath, titleFromPath(leftPath));
+    const rightPane = createPane(`explorer-pane-${state.nextPaneIndex + 1}`, rightPath, titleFromPath(rightPath));
+    const tab: MultiPanelTab = {
+      id: tabId,
+      title: "Compare",
+      path: leftPath,
+      panes: [leftPane, rightPane],
+      activePaneId: leftPane.id,
+      layout: { orientation: "vertical", paneIds: [leftPane.id, rightPane.id] },
+      mode: "compare",
+    };
+    set({
+      tabs: [...state.tabs, tab],
+      activeTabId: tabId,
+      activePaneId: leftPane.id,
+      nextPaneIndex: state.nextPaneIndex + 2,
+      nextTabIndex: state.nextTabIndex + 1,
+    });
+    return tabId;
+  },
+
   closeTab: (tabId) => {
     set((state) => {
       if (state.tabs.length <= 1) return state;
@@ -70,8 +118,22 @@ export const useMultiPanelStore = create<MultiPanelStore>((set, get) => ({
           : tabs.find((tab) => tab.id === state.activeTabId) ?? tabs[0];
       return {
         tabs,
+        closedTabs: [state.tabs[closedIndex], ...state.closedTabs].slice(0, 10),
         activeTabId: activeTab.id,
         activePaneId: activeTab.activePaneId,
+      };
+    });
+  },
+
+  restoreTab: () => {
+    set((state) => {
+      const [tab, ...closedTabs] = state.closedTabs;
+      if (!tab) return state;
+      return {
+        tabs: [...state.tabs, tab],
+        closedTabs,
+        activeTabId: tab.id,
+        activePaneId: tab.activePaneId,
       };
     });
   },
@@ -88,21 +150,29 @@ export const useMultiPanelStore = create<MultiPanelStore>((set, get) => ({
   },
 
   updateActiveTabPath: (paneId, path, title) => {
-    set((state) => ({
-      tabs: state.tabs.map((tab) => {
+    set((state) => {
+      let changed = false;
+      const tabs = state.tabs.map((tab) => {
         const pane = tab.panes.find((candidate) => candidate.id === paneId);
         if (!pane) return tab;
         const nextTitle = title ?? titleFromPath(path);
+        const nextTabTitle = tab.activePaneId === paneId ? nextTitle : tab.title;
+        const nextTabPath = tab.activePaneId === paneId ? path : tab.path;
+        if (pane.path === path && pane.title === nextTitle && tab.title === nextTabTitle && tab.path === nextTabPath) {
+          return tab;
+        }
+        changed = true;
         return {
           ...tab,
-          title: tab.activePaneId === paneId ? nextTitle : tab.title,
-          path: tab.activePaneId === paneId ? path : tab.path,
+          title: nextTabTitle,
+          path: nextTabPath,
           panes: tab.panes.map((candidate) =>
             candidate.id === paneId ? { ...candidate, path, title: nextTitle } : candidate,
           ),
         };
-      }),
-    }));
+      });
+      return changed ? { tabs } : state;
+    });
   },
 
   splitPane: (paneId, orientation) => {
@@ -189,6 +259,7 @@ export const useMultiPanelStore = create<MultiPanelStore>((set, get) => ({
     set((state) => {
       const activeTab = activeMultiPanelTab(state);
       if (!activeTab || !activeTab.panes.some((pane) => pane.id === paneId)) return state;
+      if (state.activePaneId === paneId && activeTab.activePaneId === paneId) return state;
       const pane = activeTab.panes.find((candidate) => candidate.id === paneId);
       return {
         activePaneId: paneId,
@@ -223,6 +294,7 @@ function createTab(id: string, paneId: string, path: string, title: string): Mul
     panes: [createPane(paneId, path, title)],
     activePaneId: paneId,
     layout: { orientation: "vertical", paneIds: [paneId] },
+    mode: "browse",
   };
 }
 
