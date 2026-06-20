@@ -1,4 +1,18 @@
-import { ChevronDown, ChevronUp, File, Folder } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronUp,
+  File,
+  FileArchive,
+  FileAudio,
+  FileCode2,
+  FileImage,
+  FileJson,
+  FileSpreadsheet,
+  FileText,
+  FileVideo,
+  Folder,
+  Trash2,
+} from "lucide-react";
 import { memo, useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent, MouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import type { DirectoryListing, FileEntry } from "../../../api/types";
@@ -10,11 +24,11 @@ import type {
 } from "../state/useExplorerStore";
 import { formatBytes, formatDate } from "../utils/fileFormat";
 
-const TABLE_ROW_HEIGHT = 44;
+const TABLE_ROW_HEIGHT = 32;
 const TABLE_OVERSCAN_ROWS = 10;
-const GRID_MIN_ITEM_WIDTH = 112;
-const GRID_ITEM_HEIGHT = 92;
-const GRID_GAP = 10;
+const GRID_MIN_ITEM_WIDTH = 100;
+const GRID_ITEM_HEIGHT = 104;
+const GRID_GAP = 8;
 const GRID_PADDING = 14;
 const GRID_OVERSCAN_ROWS = 4;
 const TABLE_COLUMN_STORAGE_KEY = "misty.explorer.fileTable.columnWidths";
@@ -23,6 +37,11 @@ const emptyEntries: FileEntry[] = [];
 
 type FileTableColumn = ExplorerSortColumn;
 type FileTableColumnWidths = Record<FileTableColumn, number>;
+type PassiveRenameDraft = {
+  value: string;
+  lockedExtension: string;
+  error: string | null;
+};
 
 const fileTableColumns: FileTableColumn[] = ["name", "modified", "size", "type"];
 const fileTableColumnLabels: Record<FileTableColumn, string> = {
@@ -33,10 +52,10 @@ const fileTableColumnLabels: Record<FileTableColumn, string> = {
 };
 
 const defaultColumnWidths: FileTableColumnWidths = {
-  name: 320,
+  name: 220,
   modified: 220,
-  size: 120,
-  type: 160,
+  size: 128,
+  type: 128,
 };
 
 const minimumColumnWidths: FileTableColumnWidths = {
@@ -47,6 +66,7 @@ const minimumColumnWidths: FileTableColumnWidths = {
 };
 
 interface FileBrowserProps {
+  paneId: string;
   listing: DirectoryListing | null;
   selectedIds: string[];
   loading: boolean;
@@ -56,7 +76,7 @@ interface FileBrowserProps {
   commandQuery: string;
   inlineEdit: ExplorerInlineEditState | null;
   onSort: (column: ExplorerSortColumn) => void;
-  onSelect: (entryId: string, event: MouseEvent) => void;
+  onSelect: (entryId: string, event: MouseEvent, visibleEntryIds: string[]) => void;
   onClearSelection: () => void;
   onOpen: (entry: FileEntry) => void;
   onContextMenu: (event: MouseEvent, entry: FileEntry) => void;
@@ -129,6 +149,9 @@ function FileTable(props: FileBrowserProps & { listing: DirectoryListing }) {
   const [columnOrder, setColumnOrder] = useState<FileTableColumn[]>(loadColumnOrder);
   const [draggedColumn, setDraggedColumn] = useState<FileTableColumn | null>(null);
   const selectedIds = useMemo(() => new Set(props.selectedIds), [props.selectedIds]);
+  const visibleEntryIds = useMemo(() => props.listing.entries.map((entry) => entry.id), [props.listing.entries]);
+  const passiveRenameDrafts = useMemo(() => passiveRenameDraftsFor(props.inlineEdit, props.paneId), [props.inlineEdit, props.paneId]);
+  const activeInlineEdit = props.inlineEdit?.paneId === props.paneId ? props.inlineEdit : null;
   const rowCount = props.listing.entries.length;
   const tableWidth = columnOrder.reduce((sum, column) => sum + columnWidths[column], 0);
   const visibleCapacity = Math.max(1, Math.ceil(viewportHeight / TABLE_ROW_HEIGHT));
@@ -182,7 +205,7 @@ function FileTable(props: FileBrowserProps & { listing: DirectoryListing }) {
     else if (rowBottom > element.scrollTop + element.clientHeight) {
       element.scrollTo({ top: rowBottom - element.clientHeight });
     }
-  }, [props.inlineEdit?.entryId, props.inlineEdit?.kind, props.listing.entries]);
+  }, [props.inlineEdit?.entryId, props.inlineEdit?.kind, props.listing.path]);
 
   const handleScroll = useCallback(() => {
     if (scrollFrameRef.current !== null) return;
@@ -235,6 +258,10 @@ function FileTable(props: FileBrowserProps & { listing: DirectoryListing }) {
       return next;
     });
   }, []);
+  const handleSelect = useCallback(
+    (entryId: string, event: MouseEvent) => props.onSelect(entryId, event, visibleEntryIds),
+    [props.onSelect, visibleEntryIds],
+  );
 
   return (
     <div
@@ -281,14 +308,15 @@ function FileTable(props: FileBrowserProps & { listing: DirectoryListing }) {
               entry={entry}
               columns={columnOrder}
               selected={selectedIds.has(entry.id)}
-              onSelect={props.onSelect}
+              onSelect={handleSelect}
               onOpen={props.onOpen}
               onContextMenu={props.onContextMenu}
               onDragStart={props.onDragStart}
               onDragEnd={props.onDragEnd}
               onDragHover={props.onDragHover}
               onDrop={props.onDrop}
-              inlineEdit={props.inlineEdit?.entryId === entry.id ? props.inlineEdit : null}
+              inlineEdit={activeInlineEdit?.entryId === entry.id ? activeInlineEdit : null}
+              passiveRename={passiveRenameDrafts.get(entry.id) ?? null}
               onInlineEditChange={props.onInlineEditChange}
               onInlineEditCommit={props.onInlineEditCommit}
               onInlineEditCancel={props.onInlineEditCancel}
@@ -367,6 +395,7 @@ const FileTableRow = memo(function FileTableRow(props: {
   onDragHover: FileBrowserProps["onDragHover"];
   onDrop: FileBrowserProps["onDrop"];
   inlineEdit: ExplorerInlineEditState | null;
+  passiveRename: PassiveRenameDraft | null;
   onInlineEditChange: FileBrowserProps["onInlineEditChange"];
   onInlineEditCommit: FileBrowserProps["onInlineEditCommit"];
   onInlineEditCancel: FileBrowserProps["onInlineEditCancel"];
@@ -374,23 +403,25 @@ const FileTableRow = memo(function FileTableRow(props: {
   const { entry } = props;
   return (
     <tr
-      className={`${props.selected ? "selected" : ""}${props.inlineEdit ? " inline-editing" : ""}`}
-      data-drop-destination={entry.kind === "folder" ? entry.path : undefined}
-      data-drop-kind={entry.kind === "folder" ? "folder" : undefined}
-      onClick={(event) => props.onSelect(entry.id, event)}
-      onDoubleClick={() => props.onOpen(entry)}
+      className={`${props.selected ? "selected" : ""}${props.inlineEdit ? " inline-editing" : ""}${entry.isDeleted ? " deleted" : ""}`}
+      data-drop-destination={!entry.isDeleted && entry.kind === "folder" ? entry.path : undefined}
+      data-drop-kind={!entry.isDeleted && entry.kind === "folder" ? "folder" : undefined}
+      onClick={(event) => props.onSelect(entry.id, event, [])}
+      onDoubleClick={() => {
+        if (!entry.isDeleted) props.onOpen(entry);
+      }}
       onContextMenu={(event) => props.onContextMenu(event, entry)}
-      draggable={!props.inlineEdit}
+      draggable={!props.inlineEdit && !entry.isDeleted}
       onDragStart={(event) => props.onDragStart(event, entry)}
       onDragEnd={props.onDragEnd}
       onDragOver={(event) => {
-        if (entry.kind === "folder") {
+        if (!entry.isDeleted && entry.kind === "folder") {
           event.preventDefault();
           props.onDragHover(entry.path);
         }
       }}
       onDrop={(event) => {
-        if (entry.kind !== "folder") return;
+        if (entry.isDeleted || entry.kind !== "folder") return;
         event.stopPropagation();
         props.onDrop(event, entry.path);
       }}
@@ -401,6 +432,7 @@ const FileTableRow = memo(function FileTableRow(props: {
           column={column}
           entry={entry}
           inlineEdit={props.inlineEdit}
+          passiveRename={props.passiveRename}
           onInlineEditChange={props.onInlineEditChange}
           onInlineEditCommit={props.onInlineEditCommit}
           onInlineEditCancel={props.onInlineEditCancel}
@@ -414,6 +446,7 @@ function FileTableCell(props: {
   column: FileTableColumn;
   entry: FileEntry;
   inlineEdit: ExplorerInlineEditState | null;
+  passiveRename: PassiveRenameDraft | null;
   onInlineEditChange: FileBrowserProps["onInlineEditChange"];
   onInlineEditCommit: FileBrowserProps["onInlineEditCommit"];
   onInlineEditCancel: FileBrowserProps["onInlineEditCancel"];
@@ -430,6 +463,8 @@ function FileTableCell(props: {
               onCommit={props.onInlineEditCommit}
               onCancel={props.onInlineEditCancel}
             />
+          ) : props.passiveRename ? (
+            <PassiveRenameDraftView draft={props.passiveRename} />
           ) : <span>{props.entry.name}</span>}
         </td>
       );
@@ -438,6 +473,7 @@ function FileTableCell(props: {
     case "size":
       return <td>{formatBytes(props.entry.sizeBytes)}</td>;
     case "type":
+      if (props.entry.isDeleted) return <td>Deleted</td>;
       return <td>{props.entry.kind === "folder" ? "Folder" : props.entry.mimeType || props.entry.extension || props.entry.kind}</td>;
   }
 }
@@ -452,6 +488,9 @@ function FileGrid(props: FileBrowserProps & { listing: DirectoryListing }) {
   const [viewportHeight, setViewportHeight] = useState(0);
   const [viewportWidth, setViewportWidth] = useState(0);
   const selectedIds = useMemo(() => new Set(props.selectedIds), [props.selectedIds]);
+  const visibleEntryIds = useMemo(() => props.listing.entries.map((entry) => entry.id), [props.listing.entries]);
+  const passiveRenameDrafts = useMemo(() => passiveRenameDraftsFor(props.inlineEdit, props.paneId), [props.inlineEdit, props.paneId]);
+  const activeInlineEdit = props.inlineEdit?.paneId === props.paneId ? props.inlineEdit : null;
   const createOffset = props.inlineEdit?.kind === "create" ? 1 : 0;
   const itemCount = props.listing.entries.length + createOffset;
   const usableWidth = Math.max(1, viewportWidth - GRID_PADDING * 2);
@@ -527,7 +566,7 @@ function FileGrid(props: FileBrowserProps & { listing: DirectoryListing }) {
     else if (rowBottom > element.scrollTop + element.clientHeight) {
       element.scrollTo({ top: rowBottom - element.clientHeight });
     }
-  }, [columns, createOffset, props.inlineEdit?.entryId, props.inlineEdit?.kind, props.listing.entries, rowStride]);
+  }, [columns, createOffset, props.inlineEdit?.entryId, props.inlineEdit?.kind, props.listing.path, rowStride]);
 
   const handleScroll = useCallback(() => {
     if (scrollFrameRef.current !== null) return;
@@ -541,6 +580,10 @@ function FileGrid(props: FileBrowserProps & { listing: DirectoryListing }) {
       }
     });
   }, []);
+  const handleSelect = useCallback(
+    (entryId: string, event: MouseEvent) => props.onSelect(entryId, event, visibleEntryIds),
+    [props.onSelect, visibleEntryIds],
+  );
 
   return (
     <div ref={scrollRef} className="file-grid-virtual-scroll" onScroll={handleScroll}>
@@ -548,7 +591,7 @@ function FileGrid(props: FileBrowserProps & { listing: DirectoryListing }) {
         <div
           className="file-grid"
           style={{
-            gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+            gridTemplateColumns: `repeat(${columns}, minmax(0, ${GRID_MIN_ITEM_WIDTH}px))`,
             top: gridTop,
           }}
         >
@@ -556,7 +599,7 @@ function FileGrid(props: FileBrowserProps & { listing: DirectoryListing }) {
             if (item.kind === "create") {
               return (
                 <div key={item.key} className="file-grid-item inline-edit selected">
-                  {props.inlineEdit?.itemKind === "folder" ? <Folder size={28} className="folder-icon" /> : <File size={28} className="file-icon" />}
+                  {props.inlineEdit?.itemKind === "folder" ? <Folder size={32} className="folder-icon" /> : <File size={32} className="file-icon" />}
                   {props.inlineEdit ? (
                     <InlineNameEditor
                       edit={props.inlineEdit}
@@ -573,8 +616,9 @@ function FileGrid(props: FileBrowserProps & { listing: DirectoryListing }) {
                 key={item.key}
                 entry={item.entry}
                 selected={selectedIds.has(item.entry.id)}
-                inlineEdit={props.inlineEdit?.entryId === item.entry.id ? props.inlineEdit : null}
-                onSelect={props.onSelect}
+                inlineEdit={activeInlineEdit?.entryId === item.entry.id ? activeInlineEdit : null}
+                passiveRename={passiveRenameDrafts.get(item.entry.id) ?? null}
+                onSelect={handleSelect}
                 onOpen={props.onOpen}
                 onContextMenu={props.onContextMenu}
                 onDragStart={props.onDragStart}
@@ -597,6 +641,7 @@ const FileGridItem = memo(function FileGridItem(props: {
   entry: FileEntry;
   selected: boolean;
   inlineEdit: ExplorerInlineEditState | null;
+  passiveRename: PassiveRenameDraft | null;
   onSelect: FileBrowserProps["onSelect"];
   onOpen: FileBrowserProps["onOpen"];
   onContextMenu: FileBrowserProps["onContextMenu"];
@@ -611,33 +656,35 @@ const FileGridItem = memo(function FileGridItem(props: {
   const { entry } = props;
   return (
     <div
-      className={`file-grid-item${props.selected ? " selected" : ""}`}
-      data-drop-destination={entry.kind === "folder" ? entry.path : undefined}
-      data-drop-kind={entry.kind === "folder" ? "folder" : undefined}
+      className={`file-grid-item${props.selected ? " selected" : ""}${entry.isDeleted ? " deleted" : ""}`}
+      data-drop-destination={!entry.isDeleted && entry.kind === "folder" ? entry.path : undefined}
+      data-drop-kind={!entry.isDeleted && entry.kind === "folder" ? "folder" : undefined}
       role="button"
       tabIndex={0}
-      onClick={(event) => props.onSelect(entry.id, event)}
-      onDoubleClick={() => props.onOpen(entry)}
+      onClick={(event) => props.onSelect(entry.id, event, [])}
+      onDoubleClick={() => {
+        if (!entry.isDeleted) props.onOpen(entry);
+      }}
       onKeyDown={(event) => {
-        if (event.key === "Enter") props.onOpen(entry);
+        if (event.key === "Enter" && !entry.isDeleted) props.onOpen(entry);
       }}
       onContextMenu={(event) => props.onContextMenu(event, entry)}
-      draggable={!props.inlineEdit}
+      draggable={!props.inlineEdit && !entry.isDeleted}
       onDragStart={(event) => props.onDragStart(event, entry)}
       onDragEnd={props.onDragEnd}
       onDragOver={(event) => {
-        if (entry.kind === "folder") {
+        if (!entry.isDeleted && entry.kind === "folder") {
           event.preventDefault();
           props.onDragHover(entry.path);
         }
       }}
       onDrop={(event) => {
-        if (entry.kind !== "folder") return;
+        if (entry.isDeleted || entry.kind !== "folder") return;
         event.stopPropagation();
         props.onDrop(event, entry.path);
       }}
     >
-      <FileIcon entry={entry} size={28} />
+      <FileIcon entry={entry} size={32} />
       {props.inlineEdit ? (
         <InlineNameEditor
           edit={props.inlineEdit}
@@ -645,6 +692,8 @@ const FileGridItem = memo(function FileGridItem(props: {
           onCommit={props.onInlineEditCommit}
           onCancel={props.onInlineEditCancel}
         />
+      ) : props.passiveRename ? (
+        <PassiveRenameDraftView draft={props.passiveRename} />
       ) : <span>{entry.name}</span>}
     </div>
   );
@@ -685,13 +734,11 @@ function InlineNameEditor(props: {
   onCancel: () => void;
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const settledRef = useRef(false);
   const sessionKey = `${props.edit.paneId}:${props.edit.kind}:${props.edit.entryId ?? "new"}:${props.edit.originalName}`;
 
   useLayoutEffect(() => {
     const input = inputRef.current;
     if (!input) return;
-    settledRef.current = false;
     input.focus();
     input.setSelectionRange(0, props.edit.value.length);
   }, [sessionKey]);
@@ -713,18 +760,10 @@ function InlineNameEditor(props: {
             if (event.nativeEvent.isComposing) return;
             if (event.key === "Enter") {
               event.preventDefault();
-              settledRef.current = true;
               props.onCommit();
             } else if (event.key === "Escape") {
               event.preventDefault();
-              settledRef.current = true;
               props.onCancel();
-            }
-          }}
-          onBlur={() => {
-            if (!settledRef.current && !props.edit.error) {
-              settledRef.current = true;
-              props.onCommit();
             }
           }}
         />
@@ -735,13 +774,95 @@ function InlineNameEditor(props: {
   );
 }
 
+function PassiveRenameDraftView(props: { draft: PassiveRenameDraft }) {
+  return (
+    <span className={`passive-rename-draft${props.draft.error ? " invalid" : ""}`} title={props.draft.error ?? undefined}>
+      <span>{props.draft.value || " "}</span>
+      {props.draft.lockedExtension ? <small>{props.draft.lockedExtension}</small> : null}
+      <i aria-hidden="true" />
+    </span>
+  );
+}
+
 function FileIcon(props: { entry: FileEntry; size?: number }) {
   const size = props.size ?? 18;
-  return props.entry.kind === "folder" ? (
-    <Folder size={size} className="folder-icon" />
-  ) : (
-    <File size={size} className="file-icon" />
-  );
+  if (props.entry.isDeleted) return <Trash2 size={size} className="deleted-icon" />;
+  if (props.entry.kind === "folder") return <Folder size={size} className="folder-icon" />;
+
+  const iconKind = fileIconKind(props.entry);
+  const className = `file-icon ${iconKind}-icon`;
+  switch (iconKind) {
+    case "archive":
+      return <FileArchive size={size} className={className} />;
+    case "audio":
+      return <FileAudio size={size} className={className} />;
+    case "code":
+      return <FileCode2 size={size} className={className} />;
+    case "image":
+      return <FileImage size={size} className={className} />;
+    case "json":
+      return <FileJson size={size} className={className} />;
+    case "spreadsheet":
+      return <FileSpreadsheet size={size} className={className} />;
+    case "text":
+      return <FileText size={size} className={className} />;
+    case "video":
+      return <FileVideo size={size} className={className} />;
+    default:
+      return <File size={size} className={className} />;
+  }
+}
+
+type FileIconKind = "archive" | "audio" | "code" | "file" | "image" | "json" | "spreadsheet" | "text" | "video";
+
+const archiveExtensions = new Set(["7z", "bz2", "dmg", "gz", "pkg", "rar", "tar", "tgz", "xz", "zip"]);
+const audioExtensions = new Set(["aac", "aif", "aiff", "flac", "m4a", "mp3", "ogg", "opus", "wav"]);
+const codeExtensions = new Set([
+  "c",
+  "cc",
+  "cpp",
+  "cs",
+  "css",
+  "go",
+  "h",
+  "hpp",
+  "html",
+  "java",
+  "js",
+  "jsx",
+  "kt",
+  "mjs",
+  "rs",
+  "sh",
+  "swift",
+  "toml",
+  "ts",
+  "tsx",
+  "vue",
+  "xml",
+  "yaml",
+  "yml",
+  "zsh",
+]);
+const imageExtensions = new Set(["bmp", "gif", "heic", "ico", "jpeg", "jpg", "png", "svg", "tif", "tiff", "webp"]);
+const jsonExtensions = new Set(["json", "jsonc", "lock"]);
+const spreadsheetExtensions = new Set(["csv", "numbers", "ods", "tsv", "xls", "xlsm", "xlsx"]);
+const textExtensions = new Set(["doc", "docx", "log", "md", "pdf", "rtf", "txt"]);
+const videoExtensions = new Set(["avi", "m4v", "mkv", "mov", "mp4", "mpeg", "mpg", "webm"]);
+
+function fileIconKind(entry: FileEntry): FileIconKind {
+  const extension = entry.extension.replace(/^\./, "").toLowerCase();
+  const mimeType = (entry.mimeType ?? "").toLowerCase();
+
+  if (mimeType.startsWith("image/") || imageExtensions.has(extension)) return "image";
+  if (mimeType.startsWith("video/") || videoExtensions.has(extension)) return "video";
+  if (mimeType.startsWith("audio/") || audioExtensions.has(extension)) return "audio";
+  if (mimeType.includes("json") || jsonExtensions.has(extension)) return "json";
+  if (spreadsheetExtensions.has(extension)) return "spreadsheet";
+  if (archiveExtensions.has(extension)) return "archive";
+  if (mimeType.startsWith("text/") || codeExtensions.has(extension)) return "code";
+  if (textExtensions.has(extension)) return "text";
+  return "file";
 }
 
 function entryMatchesQuery(entry: FileEntry, query: string): boolean {
@@ -754,6 +875,20 @@ function entryMatchesQuery(entry: FileEntry, query: string): boolean {
     entry.location.providerType ?? "",
   ].join(" ").toLowerCase();
   return haystack.includes(query);
+}
+
+function passiveRenameDraftsFor(edit: ExplorerInlineEditState | null, paneId: string): Map<string, PassiveRenameDraft> {
+  const drafts = new Map<string, PassiveRenameDraft>();
+  if (edit?.kind !== "rename" || !edit.batchItems || edit.batchItems.length <= 1) return drafts;
+  for (const item of edit.batchItems) {
+    if (item.paneId !== paneId || (item.paneId === edit.paneId && item.entryId === edit.entryId)) continue;
+    drafts.set(item.entryId, {
+      value: item.value,
+      lockedExtension: item.lockedExtension,
+      error: item.error,
+    });
+  }
+  return drafts;
 }
 
 function loadColumnWidths(): FileTableColumnWidths {

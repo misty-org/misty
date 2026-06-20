@@ -209,7 +209,7 @@ export const useFileSyncStore = create<FileSyncStore>((set, get) => ({
       updateSession(set, sessionId, (value) => ({
         ...value,
         stale: false,
-        message: `Applied ${result.appliedCount} sync ${result.appliedCount === 1 ? "action" : "actions"}.`,
+        message: `Queued ${result.appliedCount} sync ${result.appliedCount === 1 ? "action" : "actions"}.`,
       }));
       return result;
     } catch (error) {

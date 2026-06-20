@@ -1,16 +1,17 @@
 use std::{
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
     sync::Arc,
     time::Duration,
 };
 
 use serde::{Deserialize, Serialize};
+use tokio::sync::Mutex;
 
 use crate::{
     core::{
         explorer::{
-            ClipboardOperation, DeleteItemsRequest, ExplorerOperationResult, ListDirectoryRequest,
-            PasteItem, PasteItemsRequest,
+            ClipboardOperation, ListDirectoryRequest, PasteItem, PasteItemsRequest,
         },
         file_sync::{
             capture_local_snapshot, compare_file_sync_snapshots, planned_rows_for_apply,
@@ -21,15 +22,20 @@ use crate::{
         },
     },
     error::{ApiError, ApiResult},
-    services::{environment::AppEnvironmentService, explorer::ExplorerService},
+    services::{
+        environment::AppEnvironmentService, explorer::ExplorerService,
+        operation_queue::OperationQueueService,
+    },
 };
 
 #[derive(Clone)]
 pub struct FileSyncService {
     explorer: ExplorerService,
+    operation_queue: OperationQueueService,
     pairs: FileSyncPairStore,
     mount_root: PathBuf,
     master: FileSyncMaster,
+    watch_apply_operations: Arc<Mutex<HashMap<i64, Vec<u64>>>>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -56,17 +62,33 @@ pub struct FileSyncApplyResult {
     pub affected_paths: Vec<String>,
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct FileSyncApplyQueuePlan {
+    pub copy_requests: Vec<PasteItemsRequest>,
+    pub delete_paths: Vec<String>,
+    pub affected_paths: Vec<String>,
+}
+
+impl FileSyncApplyQueuePlan {
+    pub fn operation_count(&self) -> usize {
+        self.copy_requests.len() + self.delete_paths.len()
+    }
+}
+
 impl FileSyncService {
     pub fn new(
         environment: AppEnvironmentService,
         explorer: ExplorerService,
+        operation_queue: OperationQueueService,
         pairs: FileSyncPairStore,
     ) -> Self {
         Self {
             explorer,
+            operation_queue,
             pairs,
             mount_root: environment.mount_root(),
             master: FileSyncMaster::new(),
+            watch_apply_operations: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -122,35 +144,90 @@ impl FileSyncService {
     }
 
     pub async fn apply(&self, request: FileSyncApplyRequest) -> ApiResult<FileSyncApplyResult> {
+        self.enqueue_apply(request, None).await.map(|(result, _)| result)
+    }
+
+    pub async fn enqueue_apply(
+        &self,
+        request: FileSyncApplyRequest,
+        label: Option<String>,
+    ) -> ApiResult<(FileSyncApplyResult, Vec<u64>)> {
+        let plan = self.apply_queue_plan(&request)?;
+        let applied_count = plan.operation_count();
+        let affected_paths = plan.affected_paths;
+        let (_, operation_ids) = self
+            .operation_queue
+            .enqueue_file_sync_apply(
+                label.unwrap_or_else(|| "File sync apply".to_string()),
+                plan.copy_requests,
+                plan.delete_paths,
+            )
+            .await?;
+        self.mark_apply_queued(request.pair_id).await;
+        Ok((
+            FileSyncApplyResult {
+                applied_count,
+                affected_paths,
+            },
+            operation_ids,
+        ))
+    }
+
+    pub fn apply_queue_plan(
+        &self,
+        request: &FileSyncApplyRequest,
+    ) -> ApiResult<FileSyncApplyQueuePlan> {
         let planned = planned_rows_for_apply(&request.rows);
-        let mut result = FileSyncApplyResult::default();
+        let mut plan = FileSyncApplyQueuePlan::default();
         for row in planned {
-            let operation = match row.action {
+            match row.action {
                 FileSyncPlannedAction::CopyLeftToRight => {
-                    self.copy_side(&row.left, &request.right, &row.relative_path)
-                        .await
+                    let request =
+                        self.copy_side_queue_request(&row.left, &request.right, &row.relative_path)?;
+                    plan.affected_paths
+                        .push(request.destination_directory.clone());
+                    plan.affected_paths.push(row.left.absolute_path.clone());
+                    plan.copy_requests.push(request);
                 }
                 FileSyncPlannedAction::CopyRightToLeft => {
-                    self.copy_side(&row.right, &request.left, &row.relative_path)
-                        .await
+                    let request =
+                        self.copy_side_queue_request(&row.right, &request.left, &row.relative_path)?;
+                    plan.affected_paths
+                        .push(request.destination_directory.clone());
+                    plan.affected_paths.push(row.right.absolute_path.clone());
+                    plan.copy_requests.push(request);
                 }
-                FileSyncPlannedAction::DeleteLeft => self.delete_side(&row.left).await,
-                FileSyncPlannedAction::DeleteRight => self.delete_side(&row.right).await,
-                FileSyncPlannedAction::Skip => continue,
-            }?;
-            result.applied_count += 1;
-            result.affected_paths.extend(operation.affected_paths);
-        }
-        if let Some(pair_id) = request.pair_id.filter(|id| *id > 0) {
-            if let Ok(pairs) = self.pairs.load_all().await {
-                if let Some(mut pair) = pairs.into_iter().find(|pair| pair.id == pair_id) {
-                    pair.stale = false;
-                    pair.last_scan_at_ms = crate::core::file_transfer::now_epoch_ms();
-                    let _ = self.pairs.save(pair).await;
+                FileSyncPlannedAction::DeleteLeft => {
+                    if row.left.present {
+                        plan.affected_paths.push(row.left.absolute_path.clone());
+                        plan.delete_paths.push(row.left.absolute_path.clone());
+                    }
                 }
+                FileSyncPlannedAction::DeleteRight => {
+                    if row.right.present {
+                        plan.affected_paths.push(row.right.absolute_path.clone());
+                        plan.delete_paths.push(row.right.absolute_path.clone());
+                    }
+                }
+                FileSyncPlannedAction::Skip => {}
             }
         }
-        Ok(result)
+        plan.affected_paths.sort();
+        plan.affected_paths.dedup();
+        Ok(plan)
+    }
+
+    pub async fn mark_apply_queued(&self, pair_id: Option<i64>) {
+        let Some(pair_id) = pair_id.filter(|id| *id > 0) else {
+            return;
+        };
+        if let Ok(pairs) = self.pairs.load_all().await {
+            if let Some(mut pair) = pairs.into_iter().find(|pair| pair.id == pair_id) {
+                pair.stale = false;
+                pair.last_scan_at_ms = crate::core::file_transfer::now_epoch_ms();
+                let _ = self.pairs.save(pair).await;
+            }
+        }
     }
 
     async fn start_watcher(&self, pair: FileSyncPair) {
@@ -211,13 +288,30 @@ impl FileSyncService {
             .iter()
             .any(|row| row.action != FileSyncPlannedAction::Skip)
         {
-            self.apply(FileSyncApplyRequest {
-                left: pair.left.clone(),
-                right: pair.right.clone(),
-                rows,
-                pair_id: None,
-            })
-            .await?;
+            if self.watch_apply_pending(pair.id).await {
+                pair.stale = unresolved;
+                pair.last_compared_at_ms = comparison.compared_at_ms;
+                pair.last_scan_at_ms = comparison.compared_at_ms;
+                self.pairs.save(pair).await?;
+                return Ok(true);
+            }
+            let (_, operation_ids) = self
+                .enqueue_apply(
+                    FileSyncApplyRequest {
+                        left: pair.left.clone(),
+                        right: pair.right.clone(),
+                        rows,
+                        pair_id: None,
+                    },
+                    Some(format!("File sync apply {}", pair_display_name(&pair))),
+                )
+                .await?;
+            if !operation_ids.is_empty() {
+                self.watch_apply_operations
+                    .lock()
+                    .await
+                    .insert(pair.id, operation_ids);
+            }
         }
         pair.stale = unresolved;
         pair.last_compared_at_ms = comparison.compared_at_ms;
@@ -291,12 +385,12 @@ impl FileSyncService {
         Ok(snapshot)
     }
 
-    async fn copy_side(
+    fn copy_side_queue_request(
         &self,
         source: &FileSyncCompareSide,
         destination_root: &FileSyncEndpoint,
         relative_path: &str,
-    ) -> ApiResult<ExplorerOperationResult> {
+    ) -> ApiResult<PasteItemsRequest> {
         if !source.present {
             return Err(ApiError::Message("Compare source no longer exists.".into()));
         }
@@ -304,31 +398,15 @@ impl FileSyncService {
         let parent = Path::new(relative_path)
             .parent()
             .unwrap_or_else(|| Path::new(""));
-        self.explorer
-            .paste_items(PasteItemsRequest {
-                sources: vec![PasteItem {
-                    path: source.absolute_path.clone(),
-                    is_directory: source.is_dir,
-                }],
-                destination_directory: destination.join(parent).to_string_lossy().to_string(),
-                operation: ClipboardOperation::Copy,
-                target_name: None,
-            })
-            .await
-    }
-
-    async fn delete_side(&self, side: &FileSyncCompareSide) -> ApiResult<ExplorerOperationResult> {
-        if !side.present {
-            return Ok(ExplorerOperationResult {
-                affected_paths: Vec::new(),
-                parent_path: None,
-            });
-        }
-        self.explorer
-            .delete_items(DeleteItemsRequest {
-                paths: vec![side.absolute_path.clone()],
-            })
-            .await
+        Ok(PasteItemsRequest {
+            sources: vec![PasteItem {
+                path: source.absolute_path.clone(),
+                is_directory: source.is_dir,
+            }],
+            destination_directory: destination.join(parent).to_string_lossy().to_string(),
+            operation: ClipboardOperation::Copy,
+            target_name: None,
+        })
     }
 
     fn endpoint_path(&self, endpoint: &FileSyncEndpoint) -> PathBuf {
@@ -348,6 +426,36 @@ impl FileSyncService {
             }
         }
     }
+
+    async fn watch_apply_pending(&self, pair_id: i64) -> bool {
+        let Some(operation_ids) = self.watch_apply_operations.lock().await.get(&pair_id).cloned()
+        else {
+            return false;
+        };
+        let operation_ids: HashSet<_> = operation_ids.into_iter().collect();
+        let snapshot = self.operation_queue.snapshot().await;
+        let pending = snapshot
+            .operations
+            .iter()
+            .any(|operation| {
+                operation_ids.contains(&operation.operation_id)
+                    && !terminal_operation_status(operation.status)
+            });
+        if !pending {
+            self.watch_apply_operations.lock().await.remove(&pair_id);
+        }
+        pending
+    }
+}
+
+fn terminal_operation_status(status: crate::core::operation_queue::OperationStatus) -> bool {
+    matches!(
+        status,
+        crate::core::operation_queue::OperationStatus::Completed
+            | crate::core::operation_queue::OperationStatus::Failed
+            | crate::core::operation_queue::OperationStatus::Canceled
+            | crate::core::operation_queue::OperationStatus::Skipped
+    )
 }
 
 fn watched_actions(
@@ -404,6 +512,15 @@ fn compare_error(message: impl Into<String>) -> FileSyncCompareResult {
     FileSyncCompareResult {
         error_message: message.into(),
         ..FileSyncCompareResult::default()
+    }
+}
+
+fn pair_display_name(pair: &FileSyncPair) -> String {
+    let name = pair.name.trim();
+    if name.is_empty() {
+        format!("#{}", pair.id)
+    } else {
+        name.to_string()
     }
 }
 
@@ -476,5 +593,29 @@ mod tests {
         assert_eq!(rows[0].action, FileSyncPlannedAction::DeleteLeft);
         assert_eq!(rows[1].action, FileSyncPlannedAction::CopyRightToLeft);
         assert_eq!(rows[2].action, FileSyncPlannedAction::CopyRightToLeft);
+    }
+
+    #[test]
+    fn pair_display_name_prefers_saved_name_and_falls_back_to_id() {
+        let mut named = pair(FileSyncPolicy::BiDirectional);
+        named.id = 7;
+        named.name = "  Documents mirror  ".into();
+        assert_eq!(pair_display_name(&named), "Documents mirror");
+
+        named.name.clear();
+        assert_eq!(pair_display_name(&named), "#7");
+    }
+
+    #[test]
+    fn operation_status_helper_treats_only_finished_states_as_terminal() {
+        use crate::core::operation_queue::OperationStatus;
+
+        assert!(!terminal_operation_status(OperationStatus::Queued));
+        assert!(!terminal_operation_status(OperationStatus::InProgress));
+        assert!(!terminal_operation_status(OperationStatus::WaitingForResolution));
+        assert!(terminal_operation_status(OperationStatus::Completed));
+        assert!(terminal_operation_status(OperationStatus::Failed));
+        assert!(terminal_operation_status(OperationStatus::Canceled));
+        assert!(terminal_operation_status(OperationStatus::Skipped));
     }
 }

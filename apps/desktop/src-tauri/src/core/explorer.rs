@@ -72,6 +72,15 @@ pub struct PasteTextRequest {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct PasteBlobRequest {
+    pub destination_directory: String,
+    pub bytes: Vec<u8>,
+    #[serde(default)]
+    pub preferred_name: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PasteItem {
     pub path: String,
     pub is_directory: bool,
@@ -90,6 +99,13 @@ pub struct PrepareOpenItemRequest {
 pub struct PreparedOpenItem {
     pub local_path: String,
     pub cached: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExplorerPreviewPayload {
+    pub mime_type: String,
+    pub bytes: Vec<u8>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]
@@ -132,6 +148,8 @@ pub struct FileEntry {
     pub created_ms: Option<i64>,
     pub readonly: bool,
     pub hidden: bool,
+    #[serde(default, rename = "isDeleted")]
+    pub is_deleted: bool,
     pub location: ExplorerLocation,
 }
 
@@ -294,39 +312,6 @@ pub fn rename_item(request: RenameItemRequest) -> ApiResult<ExplorerOperationRes
     })
 }
 
-pub fn delete_items(request: DeleteItemsRequest) -> ApiResult<ExplorerOperationResult> {
-    if request.paths.is_empty() {
-        return Err(ApiError::Message("Select an item to delete.".to_string()));
-    }
-
-    let mut affected_paths = Vec::new();
-    let mut parent_path = None;
-    for raw_path in request.paths {
-        let path = PathBuf::from(&raw_path);
-        let metadata = fs::symlink_metadata(&path).map_err(|err| {
-            ApiError::Message(format!("Failed to inspect {}: {err}", path.display()))
-        })?;
-        if parent_path.is_none() {
-            parent_path = path.parent().map(display_path);
-        }
-        if metadata.is_dir() && !metadata.file_type().is_symlink() {
-            fs::remove_dir_all(&path).map_err(|err| {
-                ApiError::Message(format!("Failed to delete folder {}: {err}", path.display()))
-            })?;
-        } else {
-            fs::remove_file(&path).map_err(|err| {
-                ApiError::Message(format!("Failed to delete file {}: {err}", path.display()))
-            })?;
-        }
-        affected_paths.push(display_path(&path));
-    }
-
-    Ok(ExplorerOperationResult {
-        affected_paths,
-        parent_path,
-    })
-}
-
 pub fn paste_items(request: PasteItemsRequest) -> ApiResult<ExplorerOperationResult> {
     if request.sources.is_empty() {
         return Err(ApiError::Message("Copy or cut an item first.".to_string()));
@@ -454,6 +439,7 @@ fn file_entry(path: PathBuf, name: String) -> Option<FileEntry> {
         modified_ms: metadata.modified().ok().and_then(system_time_ms),
         created_ms: metadata.created().ok().and_then(system_time_ms),
         readonly: metadata.permissions().readonly(),
+        is_deleted: false,
         location: ExplorerLocation::local(),
     })
 }

@@ -6,6 +6,7 @@ import {
   Eye,
   FolderPlus,
   GitCompareArrows,
+  MessageSquare,
   PanelLeft,
   PanelRight,
   Pencil,
@@ -13,18 +14,32 @@ import {
   RefreshCcw,
   Scissors,
   Trash2,
+  X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import type { CSSProperties, PointerEvent } from "react";
+import type { CSSProperties, PointerEvent, ReactNode } from "react";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { readText, writeHtml, writeImage, writeText } from "@tauri-apps/plugin-clipboard-manager";
+import { useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { MultiPanelWorkspace } from "../../shared/multipanel/MultiPanelWorkspace";
 import { useAppStore } from "../../app/useAppStore";
+import {
+  clipboardApplyShared,
+  clipboardPublishImageBytes,
+  clipboardPublishShared,
+  clipboardSetLocal,
+  clipboardSharedImageBytes,
+  clipboardWriteFileRefs,
+  devicesSnapshot,
+  pluginCommandsSnapshot,
+  shortcutsSnapshot,
+} from "../../api/misty";
 import { ExplorerPane } from "./components/ExplorerPane";
 import { ExplorerSidebar } from "./components/ExplorerSidebar";
 import { ExplorerToolbar } from "./components/ExplorerToolbar";
-import type { ExplorerCommandId } from "./components/ExplorerToolbar";
+import type { ExplorerLocationResult } from "./components/ExplorerToolbar";
 import { FileInspector } from "./components/FileInspector";
 import {
   explorerWorkspaceNeedsSave,
@@ -32,28 +47,145 @@ import {
   selectedEntryForPane,
   useExplorerStore,
 } from "./state/useExplorerStore";
+import type { ExplorerInlineEditState, ExplorerNotification } from "./state/useExplorerStore";
 import { useMultiPanelStore } from "../../shared/multipanel/useMultiPanelStore";
 import { useProvidersStore } from "../providers/useProvidersStore";
-import type { FileSyncEndpoint, FileSyncPlannedAction, ProviderRemote } from "../../api/types";
+import type {
+  ClipboardPayload,
+  ExplorerLibrarySnapshot,
+  FileSyncEndpoint,
+  FileSyncCompareSide,
+  FileSyncPlannedAction,
+  MountedDevice,
+  PluginCommandEntry,
+  ProviderRemote,
+} from "../../api/types";
 import type { MultiPanelTab } from "../../shared/multipanel/types";
 import { useFileSyncStore } from "./state/useFileSyncStore";
+import { shortcutMapFromBindings, shortcutMatchesEvent } from "../../shared/shortcuts";
+import type { ShortcutMap } from "../../shared/shortcuts";
+import { errorText } from "../../shared/format";
+import { clipboardImagePng } from "./utils/clipboardImage";
+import { formatBytes } from "./utils/fileFormat";
 
 const minSidebarWidth = 212;
 const maxSidebarWidth = 380;
 const minPreviewWidth = 240;
 const maxPreviewWidth = 420;
+const minClaudePanelWidth = 280;
+const maxClaudePanelWidth = 600;
 const folderHoverOpenDelayMs = 3000;
+const transferRefreshPollMs = 12000;
 const emptyPinnedPaths: string[] = [];
 const emptyProviderRemotes: ProviderRemote[] = [];
+const emptyPluginCommands: PluginCommandEntry[] = [];
+const emptyMountedDevices: MountedDevice[] = [];
+const executableShortcutCommands = [
+  "app.open_settings",
+  "app.toggle_transfers",
+  "app.toggle_plugin_launcher",
+  "clipboard.publish_shared",
+  "clipboard.apply_shared",
+  "explorer.open_palette",
+  "explorer.copy",
+  "explorer.cut",
+  "explorer.paste",
+  "explorer.delete",
+  "explorer.rename",
+  "explorer.refresh",
+  "explorer.new_tab",
+  "explorer.restore_tab",
+  "explorer.close_pane",
+  "explorer.restore_pane",
+  "explorer.split_vertical",
+  "explorer.split_horizontal",
+  "explorer.toggle_chat",
+  "explorer.toggle_claude",
+  "explorer.next_workspace",
+  "explorer.tab_1",
+  "explorer.tab_2",
+  "explorer.tab_3",
+  "explorer.tab_4",
+  "explorer.tab_5",
+  "explorer.tab_6",
+  "explorer.tab_7",
+  "explorer.tab_8",
+  "explorer.tab_9",
+] as const;
+const defaultMacExplorerShortcuts: ShortcutMap = {
+  "app.open_settings": "Cmd+Comma",
+  "app.toggle_transfers": "Cmd+Shift+Y",
+  "app.toggle_plugin_launcher": "Cmd+Shift+P",
+  "clipboard.publish_shared": "Cmd+Alt+C",
+  "clipboard.apply_shared": "Cmd+Alt+V",
+  "explorer.open_palette": "Cmd+P",
+  "explorer.copy": "Cmd+C",
+  "explorer.cut": "Cmd+X",
+  "explorer.paste": "Cmd+V",
+  "explorer.delete": "Delete",
+  "explorer.rename": "F2",
+  "explorer.refresh": "Cmd+R",
+  "explorer.toggle_chat": "Cmd+J",
+  "explorer.toggle_claude": "Cmd+Shift+A",
+  "explorer.next_workspace": "Cmd+Shift+Grave",
+  "explorer.new_tab": "Cmd+T",
+  "explorer.restore_tab": "Cmd+Shift+T",
+  "explorer.close_pane": "Cmd+W",
+  "explorer.restore_pane": "Cmd+Ctrl+Backslash",
+  "explorer.split_vertical": "Cmd+Backslash",
+  "explorer.split_horizontal": "Cmd+Shift+Backslash",
+  "explorer.tab_1": "Cmd+1",
+  "explorer.tab_2": "Cmd+2",
+  "explorer.tab_3": "Cmd+3",
+  "explorer.tab_4": "Cmd+4",
+  "explorer.tab_5": "Cmd+5",
+  "explorer.tab_6": "Cmd+6",
+  "explorer.tab_7": "Cmd+7",
+  "explorer.tab_8": "Cmd+8",
+  "explorer.tab_9": "Cmd+9",
+};
+const defaultNonMacExplorerShortcuts: ShortcutMap = {
+  "app.open_settings": "Ctrl+Comma",
+  "app.toggle_transfers": "Ctrl+Shift+Y",
+  "app.toggle_plugin_launcher": "Ctrl+Shift+P",
+  "clipboard.publish_shared": "Ctrl+Alt+C",
+  "clipboard.apply_shared": "Ctrl+Alt+V",
+  "explorer.open_palette": "Ctrl+P",
+  "explorer.copy": "Ctrl+C",
+  "explorer.cut": "Ctrl+X",
+  "explorer.paste": "Ctrl+V",
+  "explorer.delete": "Delete",
+  "explorer.rename": "F2",
+  "explorer.refresh": "Ctrl+R",
+  "explorer.toggle_chat": "Ctrl+J",
+  "explorer.toggle_claude": "Ctrl+Shift+A",
+  "explorer.next_workspace": "Ctrl+Shift+Grave",
+  "explorer.new_tab": "Ctrl+T",
+  "explorer.restore_tab": "Ctrl+Shift+T",
+  "explorer.close_pane": "Ctrl+W",
+  "explorer.restore_pane": "Ctrl+Ctrl+Backslash",
+  "explorer.split_vertical": "Ctrl+Backslash",
+  "explorer.split_horizontal": "Ctrl+Shift+Backslash",
+  "explorer.tab_1": "Ctrl+1",
+  "explorer.tab_2": "Ctrl+2",
+  "explorer.tab_3": "Ctrl+3",
+  "explorer.tab_4": "Ctrl+4",
+  "explorer.tab_5": "Ctrl+5",
+  "explorer.tab_6": "Ctrl+6",
+  "explorer.tab_7": "Ctrl+7",
+  "explorer.tab_8": "Ctrl+8",
+  "explorer.tab_9": "Ctrl+9",
+};
 
-type ResizeTarget = "sidebar" | "preview" | null;
+type ResizeTarget = "sidebar" | "preview" | "claude" | null;
 type ExternalDropTarget = {
   paneId: string;
   destination: string;
   kind: "directory" | "folder" | "unknown";
 };
 
-export function ExplorerWorkspace() {
+export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
+  const navigate = useNavigate();
   const app = useAppStore((state) => state.app);
   const {
     initialize,
@@ -62,7 +194,22 @@ export function ExplorerWorkspace() {
     sidebarWidth,
     previewWidth,
     pinnedPaths,
+    library,
+    workspaceEntries,
+    activeWorkspaceId,
+    activeWorkspaceTitle,
+    selectWorkspace,
+    createWorkspace,
+    renameWorkspace,
+    deleteWorkspace,
     operationError,
+    inlineEdit,
+    notifications,
+    pushNotification,
+    dismissNotification,
+    chatOverlayOpen,
+    claudePanelOpen,
+    claudePanelWidth,
   } = useExplorerStore(useShallow((state) => ({
     initialize: state.initialize,
     sidebarVisible: state.sidebarVisible,
@@ -70,27 +217,74 @@ export function ExplorerWorkspace() {
     sidebarWidth: state.sidebarWidth,
     previewWidth: state.previewWidth,
     pinnedPaths: state.pinnedPaths,
+    library: state.library,
+    workspaceEntries: state.workspaceEntries,
+    activeWorkspaceId: state.activeWorkspaceId,
+    activeWorkspaceTitle: state.activeWorkspaceTitle,
+    selectWorkspace: state.selectWorkspace,
+    createWorkspace: state.createWorkspace,
+    renameWorkspace: state.renameWorkspace,
+    deleteWorkspace: state.deleteWorkspace,
     operationError: state.operationError,
+    inlineEdit: state.inlineEdit,
+    notifications: state.notifications,
+    pushNotification: state.pushNotification,
+    dismissNotification: state.dismissNotification,
+    chatOverlayOpen: state.chatOverlayOpen,
+    claudePanelOpen: state.claudePanelOpen,
+    claudePanelWidth: state.claudePanelWidth,
   })));
-  const providers = useProvidersStore((state) => state.providers);
-  const providersLoading = useProvidersStore((state) => state.loading);
-  const activePaneId = useMultiPanelStore((state) => state.activePaneId);
+  const { providersLoading, sidebarRemotes } = useProvidersStore(useShallow((state) => ({
+    providersLoading: state.loading,
+    sidebarRemotes: state.providers?.remotes ?? emptyProviderRemotes,
+  })));
+  const { activePaneId, workspacePathSignature } = useMultiPanelStore(useShallow((state) => ({
+    activePaneId: state.activePaneId,
+    workspacePathSignature: state.tabs
+      .flatMap((tab) => [tab.path, ...tab.panes.map((pane) => pane.path)])
+      .join("\n"),
+  })));
   const workspaceRef = useRef<HTMLElement | null>(null);
   const mainRef = useRef<HTMLElement | null>(null);
   const resizeFrameRef = useRef<number | null>(null);
   const pendingResizeXRef = useRef(0);
+  const resizeTargetRef = useRef<ResizeTarget>(null);
+  const pendingResizeSaveRef = useRef(false);
   const externalHoverTimerRef = useRef<number | null>(null);
   const externalHoverTargetRef = useRef<string | null>(null);
   const transferRefreshInFlightRef = useRef(false);
+  const deviceRefreshInFlightRef = useRef(false);
+  const deviceRefreshMountedRef = useRef(true);
+  const lastOperationErrorToastRef = useRef<string | null>(null);
   const [resizeTarget, setResizeTarget] = useState<ResizeTarget>(null);
+  const [pluginCommands, setPluginCommands] = useState<PluginCommandEntry[]>(emptyPluginCommands);
+  const [mountedDevices, setMountedDevices] = useState<MountedDevice[]>(emptyMountedDevices);
+  const [devicesLoading, setDevicesLoading] = useState(false);
   const homePath = app?.environment.homeDir ?? "/";
   const mountRoot = resolveMountRoot(homePath, app?.environment.mountPath ?? ".misty/mnt");
   const activePath = useExplorerStore((state) => state.panes[activePaneId]?.listing?.path ?? homePath);
-  const sidebarRemotes = providers?.remotes ?? emptyProviderRemotes;
-  const workspaceStyle = {
+  const activePaneIdRef = useRef(activePaneId);
+  const activePathRef = useRef(activePath);
+  const shortcutMapRef = useRef<ShortcutMap>(defaultExplorerShortcutMap());
+  const executableCommandIdsRef = useRef<readonly string[]>(executableShortcutCommands);
+  const workspacePaths = useMemo(
+    () => workspacePathSignature.split("\n").filter(Boolean),
+    [workspacePathSignature],
+  );
+  const locationResults = useMemo(
+    () => buildExplorerLocationResults(homePath, mountRoot, pinnedPaths, sidebarRemotes, library, workspacePaths),
+    [homePath, library, mountRoot, pinnedPaths, sidebarRemotes, workspacePaths],
+  );
+  const workspaceStyle = useMemo(() => ({
     "--explorer-sidebar-width": `${sidebarWidth}px`,
     "--preview-width": `${previewWidth}px`,
-  } as CSSProperties;
+    "--claude-panel-width": `${claudePanelWidth}px`,
+  } as CSSProperties), [claudePanelWidth, previewWidth, sidebarWidth]);
+
+  useEffect(() => {
+    activePaneIdRef.current = activePaneId;
+    activePathRef.current = activePath;
+  }, [activePaneId, activePath]);
 
   useEffect(() => {
     if (app?.environment.homeDir) {
@@ -99,8 +293,23 @@ export function ExplorerWorkspace() {
   }, [app?.environment.homeDir, initialize]);
 
   useEffect(() => {
+    if (!operationError) {
+      lastOperationErrorToastRef.current = null;
+      return;
+    }
+    if (lastOperationErrorToastRef.current === operationError) return;
+    lastOperationErrorToastRef.current = operationError;
+    pushNotification(operationError, "error", 4500);
+  }, [operationError, pushNotification]);
+
+  useEffect(() => {
     const unsubscribeExplorer = useExplorerStore.subscribe((state, previous) => {
-      if (explorerWorkspaceNeedsSave(state, previous)) scheduleExplorerWorkspaceSave();
+      if (!explorerWorkspaceNeedsSave(state, previous)) return;
+      if (resizeTargetRef.current) {
+        pendingResizeSaveRef.current = true;
+      } else {
+        scheduleExplorerWorkspaceSave();
+      }
     });
     const unsubscribeMulti = useMultiPanelStore.subscribe((state, previous) => {
       if (multiPanelWorkspaceNeedsSave(state, previous)) scheduleExplorerWorkspaceSave();
@@ -112,6 +321,81 @@ export function ExplorerWorkspace() {
   }, []);
 
   useEffect(() => {
+    resizeTargetRef.current = resizeTarget;
+    if (!resizeTarget && pendingResizeSaveRef.current) {
+      pendingResizeSaveRef.current = false;
+      scheduleExplorerWorkspaceSave();
+    }
+  }, [resizeTarget]);
+
+  useEffect(() => {
+    let disposed = false;
+    const loadCommandMetadata = async () => {
+      try {
+        const [shortcutSnapshot, pluginSnapshot] = await Promise.all([
+          shortcutsSnapshot(),
+          pluginCommandsSnapshot(),
+        ]);
+        if (!disposed) {
+          const shortcutMap = shortcutMapFromBindings(shortcutSnapshot.bindings, defaultExplorerShortcutMap());
+          for (const command of pluginSnapshot.commands) {
+            if (command.defaultShortcut && !shortcutMap[command.id]) {
+              shortcutMap[command.id] = command.defaultShortcut;
+            }
+          }
+          shortcutMapRef.current = shortcutMap;
+          executableCommandIdsRef.current = [
+            ...executableShortcutCommands,
+            ...pluginSnapshot.commands.map((command) => command.id),
+          ];
+          setPluginCommands((current) => pluginCommandsEqual(current, pluginSnapshot.commands) ? current : pluginSnapshot.commands);
+        }
+      } catch {
+        if (!disposed) {
+          shortcutMapRef.current = defaultExplorerShortcutMap();
+          executableCommandIdsRef.current = executableShortcutCommands;
+          setPluginCommands((current) => current.length === 0 ? current : emptyPluginCommands);
+        }
+      }
+    };
+    void loadCommandMetadata();
+    window.addEventListener("focus", loadCommandMetadata);
+    return () => {
+      disposed = true;
+      window.removeEventListener("focus", loadCommandMetadata);
+    };
+  }, []);
+
+  const refreshDevices = useCallback(async () => {
+    if (deviceRefreshInFlightRef.current) return;
+    deviceRefreshInFlightRef.current = true;
+    if (deviceRefreshMountedRef.current) setDevicesLoading(true);
+    try {
+      const snapshot = await devicesSnapshot();
+      if (deviceRefreshMountedRef.current) {
+        setMountedDevices((current) => mountedDevicesEqual(current, snapshot.devices) ? current : snapshot.devices);
+      }
+    } catch {
+      if (deviceRefreshMountedRef.current) {
+        setMountedDevices((current) => current.length === 0 ? current : emptyMountedDevices);
+      }
+    } finally {
+      deviceRefreshInFlightRef.current = false;
+      if (deviceRefreshMountedRef.current) setDevicesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    deviceRefreshMountedRef.current = true;
+    void refreshDevices();
+    window.addEventListener("focus", refreshDevices);
+    return () => {
+      deviceRefreshMountedRef.current = false;
+      window.removeEventListener("focus", refreshDevices);
+    };
+  }, [refreshDevices]);
+
+  useEffect(() => {
     const poll = async () => {
       if (document.hidden || transferRefreshInFlightRef.current || !useExplorerStore.getState().initialized) return;
       transferRefreshInFlightRef.current = true;
@@ -121,16 +405,18 @@ export function ExplorerWorkspace() {
         transferRefreshInFlightRef.current = false;
       }
     };
-    void poll();
-    const interval = window.setInterval(poll, 2500);
-    return () => window.clearInterval(interval);
+    const initialTimer = window.setTimeout(poll, 1000);
+    const interval = window.setInterval(poll, transferRefreshPollMs);
+    return () => {
+      window.clearTimeout(initialTimer);
+      window.clearInterval(interval);
+    };
   }, [mountRoot]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       const editing = target?.matches("input, textarea, select, [contenteditable='true']") ?? false;
-      const primary = event.metaKey || event.ctrlKey;
       const explorerState = useExplorerStore.getState();
       const multi = useMultiPanelStore.getState();
       const paneId = multi.activePaneId;
@@ -143,55 +429,25 @@ export function ExplorerWorkspace() {
       }
       if (editing) return;
 
-      if (primary && event.code === "KeyC") {
+      const commandId = shortcutCommandForEvent(event, shortcutMapRef.current, executableCommandIdsRef.current);
+      if (commandId) {
         event.preventDefault();
-        explorerState.copySelected(paneId);
-      } else if (primary && event.code === "KeyX") {
-        event.preventDefault();
-        explorerState.cutSelected(paneId);
-      } else if (primary && event.code === "KeyV") {
-        event.preventDefault();
-        void explorerState.pasteIntoPane(paneId);
-      } else if (primary && event.code === "KeyR") {
-        event.preventDefault();
-        void explorerState.refreshPane(paneId);
-      } else if (primary && event.code === "KeyT" && event.shiftKey) {
-        event.preventDefault();
-        multi.restoreTab();
-      } else if (primary && event.code === "KeyT") {
-        event.preventDefault();
-        const activeTab = multi.tabs.find((tab) => tab.id === multi.activeTabId);
-        multi.addTab(activeTab?.path ?? homePath, activeTab?.title);
-      } else if (primary && event.code === "KeyW") {
-        event.preventDefault();
-        const activeTab = multi.tabs.find((tab) => tab.id === multi.activeTabId);
-        if (activeTab && activeTab.panes.length > 1) multi.closePane(paneId);
-        else if (activeTab) multi.closeTab(activeTab.id);
-      } else if (primary && event.code === "Backslash") {
-        event.preventDefault();
-        multi.splitPane(paneId, event.shiftKey ? "horizontal" : "vertical");
-      } else if (primary && /^Digit[1-9]$/.test(event.code)) {
-        event.preventDefault();
-        const index = Number(event.code.slice(-1)) - 1;
-        const tab = multi.tabs[index];
-        if (tab) multi.selectTab(tab.id);
+        if (commandId === "explorer.open_palette") explorerState.setCommandQuery(paneId, ">");
+        else runExplorerCommand(commandId, paneId, navigate);
       } else if (event.altKey && event.key === "ArrowLeft") {
         event.preventDefault();
         void explorerState.navigateBack(paneId);
       } else if (event.altKey && event.key === "ArrowRight") {
         event.preventDefault();
         void explorerState.navigateForward(paneId);
-      } else if (event.key === "F2") {
-        event.preventDefault();
-        void explorerState.renameSelected(paneId);
-      } else if (event.key === "Delete" || (event.metaKey && event.key === "Backspace")) {
+      } else if (event.metaKey && event.key === "Backspace") {
         event.preventDefault();
         void explorerState.deleteSelected(paneId);
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [homePath]);
+  }, [navigate]);
 
   useEffect(() => {
     if (!resizeTarget) return;
@@ -207,9 +463,12 @@ export function ExplorerWorkspace() {
       if (resizeTarget === "sidebar") {
         const rect = workspaceRef.current?.getBoundingClientRect();
         if (rect) useExplorerStore.getState().setSidebarWidth(clamp(clientX - rect.left, minSidebarWidth, maxSidebarWidth));
-      } else {
+      } else if (resizeTarget === "preview") {
         const rect = mainRef.current?.getBoundingClientRect();
         if (rect) useExplorerStore.getState().setPreviewWidth(clamp(rect.right - clientX, minPreviewWidth, maxPreviewWidth));
+      } else if (resizeTarget === "claude") {
+        const rect = workspaceRef.current?.getBoundingClientRect();
+        if (rect) useExplorerStore.getState().setClaudePanelWidth(clamp(rect.right - clientX, minClaudePanelWidth, maxClaudePanelWidth));
       }
     };
 
@@ -245,7 +504,7 @@ export function ExplorerWorkspace() {
       externalHoverTargetRef.current = null;
     };
     const scheduleExternalHover = (target: ExternalDropTarget | null) => {
-      if (!target || target.kind !== "folder" || !target.destination || target.destination === activePath) {
+      if (!target || target.kind !== "folder" || !target.destination || target.destination === activePathRef.current) {
         clearExternalHover();
         return;
       }
@@ -261,19 +520,26 @@ export function ExplorerWorkspace() {
         }
       }, folderHoverOpenDelayMs);
     };
-    void getCurrentWebview().onDragDropEvent((event) => {
+    let webview;
+    try {
+      webview = getCurrentWebview();
+    } catch {
+      return;
+    }
+
+    void webview.onDragDropEvent((event) => {
       const payload = event.payload;
       if (payload.type === "leave") {
         clearExternalHover();
         return;
       }
       if (payload.type === "over") {
-        scheduleExternalHover(externalDropTargetAt(payload.position, activePaneId, activePath));
+        scheduleExternalHover(externalDropTargetAt(payload.position, activePaneIdRef.current, activePathRef.current));
         return;
       }
       if (payload.type !== "drop" || payload.paths.length === 0) return;
       clearExternalHover();
-      const target = externalDropTargetAt(payload.position, activePaneId, activePath);
+      const target = externalDropTargetAt(payload.position, activePaneIdRef.current, activePathRef.current);
       if (!target) return;
       void useExplorerStore.getState().dropExternalPaths(target.paneId, payload.paths, target.destination);
     }).then((cleanup) => {
@@ -287,7 +553,7 @@ export function ExplorerWorkspace() {
       clearExternalHover();
       unlisten?.();
     };
-  }, [activePaneId, activePath]);
+  }, []);
 
   const startSidebarResize = useCallback((event: PointerEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -298,14 +564,38 @@ export function ExplorerWorkspace() {
     event.preventDefault();
     setResizeTarget("preview");
   }, []);
+  const startClaudeResize = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setResizeTarget("claude");
+  }, []);
   const navigateSidebar = useCallback((path: string) => {
     const paneId = useMultiPanelStore.getState().activePaneId;
     if (paneId) void useExplorerStore.getState().navigatePane(paneId, path);
   }, []);
+  const handleSelectWorkspace = useCallback((workspaceId: string) => {
+    void selectWorkspace(workspaceId, homePath);
+  }, [homePath, selectWorkspace]);
+  const handleCreateWorkspace = useCallback((title: string) => {
+    void createWorkspace(title, homePath);
+  }, [createWorkspace, homePath]);
+  const handleRenameWorkspace = useCallback((workspaceId: string, title: string) => {
+    void renameWorkspace(workspaceId, title);
+  }, [renameWorkspace]);
+  const handleDeleteWorkspace = useCallback((workspaceId: string) => {
+    void deleteWorkspace(workspaceId, homePath);
+  }, [deleteWorkspace, homePath]);
 
   const renderToolbar = useCallback(
-    (paneId: string, path: string) => <ConnectedExplorerToolbar paneId={paneId} fallbackPath={path} />,
-    [],
+    (paneId: string, path: string) => (
+      <ConnectedExplorerToolbar
+        paneId={paneId}
+        fallbackPath={path}
+        locationResults={locationResults}
+        pluginCommands={pluginCommands}
+        onNavigateRoute={navigate}
+      />
+    ),
+    [locationResults, navigate, pluginCommands],
   );
   const renderPane = useCallback((paneId: string, path: string) => <ExplorerPane paneId={paneId} path={path} />, []);
   const inspector = useMemo(() => (previewVisible ? <ConnectedFileInspector /> : undefined), [previewVisible]);
@@ -317,7 +607,7 @@ export function ExplorerWorkspace() {
   return (
     <section
       ref={workspaceRef}
-      className={`explorer-workspace${sidebarVisible ? "" : " sidebar-collapsed"}`}
+      className={`explorer-workspace${sidebarVisible ? "" : " sidebar-collapsed"}${claudePanelOpen ? " claude-open" : ""}`}
       style={workspaceStyle}
     >
       {sidebarVisible ? (
@@ -328,8 +618,18 @@ export function ExplorerWorkspace() {
             mountRoot={mountRoot}
             remotes={sidebarRemotes}
             remoteLoading={providersLoading}
+            devices={mountedDevices}
+            devicesLoading={devicesLoading}
             pinnedPaths={pinnedPaths}
+            workspaceEntries={workspaceEntries}
+            activeWorkspaceId={activeWorkspaceId}
+            activeWorkspaceTitle={activeWorkspaceTitle}
             onNavigate={navigateSidebar}
+            onRefreshDevices={refreshDevices}
+            onSelectWorkspace={handleSelectWorkspace}
+            onCreateWorkspace={handleCreateWorkspace}
+            onRenameWorkspace={handleRenameWorkspace}
+            onDeleteWorkspace={handleDeleteWorkspace}
           />
           <div className="explorer-sidebar-resizer" onPointerDown={startSidebarResize} />
         </>
@@ -344,17 +644,100 @@ export function ExplorerWorkspace() {
           renderPane={renderPane}
         />
       </main>
+      {claudePanelOpen ? (
+        <>
+          <div className="explorer-claude-resizer" onPointerDown={startClaudeResize} />
+          <ExplorerClaudePanel />
+        </>
+      ) : null}
       <ExplorerBottomBar
         sidebarVisible={sidebarVisible}
         previewVisible={previewVisible}
         onToggleSidebar={() => useExplorerStore.getState().setSidebarVisible(!sidebarVisible)}
         onTogglePreview={() => useExplorerStore.getState().setPreviewVisible(!previewVisible)}
       />
-      {operationError ? <div className="explorer-operation-error">{operationError}</div> : null}
+      <ExplorerRenameStatus edit={inlineEdit} />
+      <ExplorerNotifications notifications={notifications} onDismiss={dismissNotification} />
+      {chatOverlayOpen ? <ExplorerChatOverlay /> : null}
       <ExplorerContextMenu />
       <ExplorerDialog />
     </section>
   );
+});
+
+function ExplorerRenameStatus(props: { edit: ExplorerInlineEditState | null }) {
+  if (!props.edit) return null;
+  const summary = renameStatusSummary(props.edit);
+  return (
+    <div className={`explorer-rename-status ${summary.tone}`} role="status" aria-live="polite">
+      <span>{summary.text}</span>
+    </div>
+  );
+}
+
+function renameStatusSummary(edit: ExplorerInlineEditState): { text: string; tone: "ready" | "warning" } {
+  if (edit.kind === "create") {
+    if (edit.error) {
+      return { text: `Create mode: ${edit.error}`, tone: "warning" };
+    }
+    return { text: "Create mode: Press Enter to create", tone: "ready" };
+  }
+
+  const batchItems = edit.batchItems && edit.batchItems.length > 1
+    ? edit.batchItems
+    : [{
+        originalName: edit.originalName,
+        value: edit.value,
+        lockedExtension: edit.lockedExtension,
+        error: edit.error,
+      }];
+  let ready = 0;
+  let unchanged = 0;
+  let invalid = 0;
+  for (const item of batchItems) {
+    if (item.error) {
+      invalid += 1;
+      continue;
+    }
+    const effectiveName = `${item.value.trim()}${item.lockedExtension}`;
+    if (effectiveName === item.originalName) unchanged += 1;
+    else ready += 1;
+  }
+
+  if (invalid === 0) {
+    return { text: `Rename mode: Press Enter to review ${ready} ${ready === 1 ? "item" : "items"}`, tone: "ready" };
+  }
+  return {
+    text: `Rename mode: ${ready} ready, ${unchanged} unchanged, ${invalid} need fixes`,
+    tone: "warning",
+  };
+}
+
+function ExplorerNotifications(props: {
+  notifications: ExplorerNotification[];
+  onDismiss: (id: number) => void;
+}) {
+  if (props.notifications.length === 0) return null;
+  return (
+    <div className="explorer-notifications" aria-live="polite" aria-atomic="false">
+      {props.notifications.map((notification) => (
+        <button
+          key={notification.id}
+          type="button"
+          className={`explorer-notification ${notification.type}`}
+          title={notification.message}
+          onClick={() => props.onDismiss(notification.id)}
+        >
+          {compactNotificationMessage(notification.message)}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function compactNotificationMessage(message: string): string {
+  const normalized = message.replace(/\s+/g, " ").trim();
+  return normalized.length <= 64 ? normalized : `${normalized.slice(0, 61)}...`;
 }
 
 function ExplorerDialog() {
@@ -363,9 +746,10 @@ function ExplorerDialog() {
   if (dialog.kind === "batchRename") {
     const invalidCount = dialog.items.filter((item) => item.error).length;
     const firstInvalidIndex = dialog.items.findIndex((item) => item.error);
-    const changedCount = dialog.items.filter((item) => `${item.value.trim()}${item.lockedExtension}` !== item.originalName).length;
+    const readyCount = dialog.items.filter((item) => !item.error && `${item.value.trim()}${item.lockedExtension}` !== item.originalName).length;
+    const unchangedCount = dialog.items.length - readyCount - invalidCount;
     return createPortal(
-      <div className="explorer-dialog-backdrop" role="presentation" onPointerDown={() => useExplorerStore.getState().closeDialog()}>
+      <div className="explorer-dialog-backdrop" role="presentation">
         <form
           className="explorer-dialog explorer-dialog-wide"
           role="dialog"
@@ -380,13 +764,17 @@ function ExplorerDialog() {
           <header className="batch-rename-header">
             <div>
               <h2 id="explorer-dialog-title">Review Renames</h2>
-              <p>{changedCount} of {dialog.items.length} selected items will be renamed.</p>
+              <p>{readyCount} ready, {unchangedCount} unchanged, {invalidCount} need fixes.</p>
             </div>
             {invalidCount > 0 ? <span>{invalidCount} need fixes</span> : null}
           </header>
+          <div className="batch-rename-table-head" aria-hidden="true">
+            <span>Before</span>
+            <span>After</span>
+          </div>
           <div className="batch-rename-list">
             {dialog.items.map((item, index) => (
-              <label className="batch-rename-row" key={`${item.paneId}:${item.entryId}`}>
+              <label className={`batch-rename-row${item.error ? " invalid" : ""}`} key={`${item.paneId}:${item.entryId}`}>
                 <span title={item.originalName}>{item.originalName}</span>
                 <div>
                   <div className="batch-rename-input">
@@ -399,14 +787,18 @@ function ExplorerDialog() {
                     />
                     {item.lockedExtension ? <small>{item.lockedExtension}</small> : null}
                   </div>
-                  {item.error ? <em>{item.error}</em> : null}
+                  {item.error ? <em>{item.error}</em> : (
+                    <em className={`${`${item.value.trim()}${item.lockedExtension}` === item.originalName ? "muted" : "ready"}`}>
+                      {`${item.value.trim()}${item.lockedExtension}` === item.originalName ? "Unchanged" : "Ready"}
+                    </em>
+                  )}
                 </div>
               </label>
             ))}
           </div>
           <div className="explorer-dialog-actions">
             <button type="button" onClick={() => useExplorerStore.getState().closeDialog()}>Cancel</button>
-            <button type="submit" disabled={invalidCount > 0 || changedCount === 0}>Rename</button>
+            <button type="submit" disabled={readyCount === 0}>Confirm</button>
           </div>
         </form>
       </div>,
@@ -418,7 +810,7 @@ function ExplorerDialog() {
     : `${dialog.paths.length} items`;
 
   return createPortal(
-    <div className="explorer-dialog-backdrop" role="presentation" onPointerDown={() => useExplorerStore.getState().closeDialog()}>
+    <div className="explorer-dialog-backdrop" role="presentation">
       <form
         className="explorer-dialog"
         role="dialog"
@@ -552,11 +944,15 @@ function FileSyncCompareBar(props: { tab: MultiPanelTab; mountRoot: string }) {
           <summary>{session.rows.length} comparison results</summary>
           <div className="compare-results-scroll">
             <table>
-              <thead><tr><th>Path</th><th>Type</th><th>State</th><th>Action</th></tr></thead>
+              <thead><tr><th>Path</th><th>Type</th><th>State</th><th>Left</th><th>Right</th><th>Action</th></tr></thead>
               <tbody>
                 {session.rows.map((row) => (
                   <tr key={row.relativePath}>
-                    <td>{row.relativePath}</td><td>{row.kind}</td><td>{row.disposition.replace(/_/g, " ")}</td>
+                    <td>{row.relativePath}</td>
+                    <td>{row.kind}</td>
+                    <td>{row.disposition.replace(/_/g, " ")}</td>
+                    <td title={compareSideTitle(row.left)}>{compareSideSummary(row.left)}</td>
+                    <td title={compareSideTitle(row.right)}>{compareSideSummary(row.right)}</td>
                     <td>
                       <select
                         value={row.action}
@@ -580,19 +976,30 @@ function FileSyncCompareBar(props: { tab: MultiPanelTab; mountRoot: string }) {
   );
 }
 
-function ConnectedExplorerToolbar(props: { paneId: string; fallbackPath: string }) {
+const ConnectedExplorerToolbar = memo(function ConnectedExplorerToolbar(props: {
+  paneId: string;
+  fallbackPath: string;
+  locationResults: ExplorerLocationResult[];
+  pluginCommands: PluginCommandEntry[];
+  onNavigateRoute: (path: string) => void;
+}) {
   const state = useExplorerStore(useShallow((explorer) => {
     const pane = explorer.panes[props.paneId];
     return {
       path: pane?.listing?.path ?? props.fallbackPath,
       commandQuery: pane?.commandQuery ?? "",
-      viewMode: explorer.viewMode,
-      showHidden: explorer.showHidden,
+      viewMode: explorer.paneViewModes[props.paneId] ?? explorer.viewMode,
+      showHidden: explorer.paneShowHidden[props.paneId] ?? explorer.showHidden,
       canGoBack: Boolean(pane?.backHistory.length),
       canGoForward: Boolean(pane?.forwardHistory.length),
+      canCreateFile: explorer.canCreateItem(props.paneId, "file"),
+      canCreateFolder: explorer.canCreateItem(props.paneId, "folder"),
     };
   }));
   const onNavigate = useCallback((path: string) => {
+    void useExplorerStore.getState().navigatePane(props.paneId, path);
+  }, [props.paneId]);
+  const onNavigateLocation = useCallback((path: string) => {
     void useExplorerStore.getState().navigatePane(props.paneId, path);
   }, [props.paneId]);
   const onBack = useCallback(() => {
@@ -611,8 +1018,11 @@ function ConnectedExplorerToolbar(props: { paneId: string; fallbackPath: string 
     useExplorerStore.getState().setCommandQuery(props.paneId, query);
   }, [props.paneId]);
   const onToggleHidden = useCallback(() => {
-    void useExplorerStore.getState().toggleHidden();
-  }, []);
+    void useExplorerStore.getState().toggleHidden(props.paneId);
+  }, [props.paneId]);
+  const onViewMode = useCallback((mode: "grid" | "list") => {
+    useExplorerStore.getState().setViewMode(mode, props.paneId);
+  }, [props.paneId]);
   const onCreateFile = useCallback(() => {
     void useExplorerStore.getState().createItem(props.paneId, "file");
   }, [props.paneId]);
@@ -644,20 +1054,34 @@ function ConnectedExplorerToolbar(props: { paneId: string; fallbackPath: string 
     const path = useExplorerStore.getState().panes[props.paneId]?.listing?.path ?? props.fallbackPath;
     useMultiPanelStore.getState().addCompareTab(path, path);
   }, [props.fallbackPath, props.paneId]);
-  const onRunCommand = useCallback((commandId: ExplorerCommandId) => {
-    runExplorerCommand(commandId, props.paneId);
-  }, [props.paneId]);
+  const pluginCommandIds = useMemo(
+    () => new Set(props.pluginCommands.map((command) => command.id)),
+    [props.pluginCommands],
+  );
+  const onRunCommand = useCallback((commandId: string) => {
+    if (pluginCommandIds.has(commandId)) {
+      props.onNavigateRoute("/plugins");
+      useExplorerStore.setState({
+        operationError: `Plugin command "${commandId}" is discovered, but plugin command execution is not available in the Tauri explorer yet.`,
+      });
+      return;
+    }
+    runExplorerCommand(commandId, props.paneId, props.onNavigateRoute);
+  }, [pluginCommandIds, props.onNavigateRoute, props.paneId]);
 
   return (
     <ExplorerToolbar
       {...state}
+      locationResults={props.locationResults}
+      pluginCommands={props.pluginCommands}
       onNavigate={onNavigate}
+      onNavigateLocation={onNavigateLocation}
       onBack={onBack}
       onForward={onForward}
       onParent={onParent}
       onRefresh={onRefresh}
       onCommandQuery={onCommandQuery}
-      onViewMode={useExplorerStore.getState().setViewMode}
+      onViewMode={onViewMode}
       onToggleHidden={onToggleHidden}
       onCreateFile={onCreateFile}
       onCreateFolder={onCreateFolder}
@@ -672,11 +1096,71 @@ function ConnectedExplorerToolbar(props: { paneId: string; fallbackPath: string 
       onRunCommand={onRunCommand}
     />
   );
+});
+
+function shortcutCommandForEvent(
+  event: KeyboardEvent,
+  shortcuts: ShortcutMap,
+  commandIds: readonly string[],
+): string | null {
+  for (const commandId of commandIds) {
+    if (shortcutMatchesEvent(shortcuts[commandId], event)) return commandId;
+  }
+  return null;
 }
 
-function runExplorerCommand(commandId: ExplorerCommandId, paneId: string): void {
+function defaultExplorerShortcutMap(): ShortcutMap {
+  return /mac|iphone|ipad|ipod/i.test(navigator.platform)
+    ? defaultMacExplorerShortcuts
+    : defaultNonMacExplorerShortcuts;
+}
+
+function runExplorerCommand(commandId: string, paneId: string, navigateRoute: (path: string) => void): void {
   const explorer = useExplorerStore.getState();
+  const multi = useMultiPanelStore.getState();
+  const activeTab = multi.tabs.find((tab) => tab.id === multi.activeTabId) ?? multi.tabs[0];
+  if (commandId.startsWith("plugin.")) {
+    navigateRoute("/plugins");
+    useExplorerStore.setState({
+      operationError: `Plugin command "${commandId}" is discovered, but plugin command execution is not available in the Tauri explorer yet.`,
+    });
+    return;
+  }
   switch (commandId) {
+    case "app.toggle_transfers":
+      navigateRoute("/transfers");
+      break;
+    case "app.open_settings":
+      navigateRoute("/settings");
+      break;
+    case "app.toggle_plugin_launcher":
+      navigateRoute("/plugins");
+      break;
+    case "clipboard.publish_shared":
+      void publishSharedClipboard();
+      break;
+    case "clipboard.apply_shared":
+      void applySharedClipboardToSystem();
+      break;
+    case "explorer.new_tab":
+      multi.addTab(activeTab?.path ?? explorer.panes[paneId]?.listing?.path ?? "/", activeTab?.title);
+      break;
+    case "explorer.restore_tab":
+      multi.restoreTab();
+      break;
+    case "explorer.close_pane":
+      if (activeTab && activeTab.panes.length > 1) multi.closePane(paneId);
+      else if (activeTab) multi.closeTab(activeTab.id);
+      break;
+    case "explorer.restore_pane":
+      multi.restorePane();
+      break;
+    case "explorer.split_vertical":
+      multi.splitPane(paneId, "vertical");
+      break;
+    case "explorer.split_horizontal":
+      multi.splitPane(paneId, "horizontal");
+      break;
     case "explorer.refresh":
       void explorer.refreshPane(paneId);
       break;
@@ -699,162 +1183,457 @@ function runExplorerCommand(commandId: ExplorerCommandId, paneId: string): void 
       void explorer.pasteIntoPane(paneId);
       break;
     case "explorer.toggle_hidden":
-      void explorer.toggleHidden();
+      void explorer.toggleHidden(paneId);
       break;
+    case "explorer.preview.toggle":
+      explorer.setPreviewVisible(!explorer.previewVisible);
+      break;
+    case "explorer.sidebar.toggle":
+      explorer.setSidebarVisible(!explorer.sidebarVisible);
+      break;
+    case "explorer.toggle_chat":
+      explorer.toggleChatOverlay();
+      break;
+    case "explorer.toggle_claude":
+      explorer.toggleClaudePanel();
+      break;
+    case "explorer.next_workspace": {
+      if (multi.tabs.length <= 1) break;
+      const activeIndex = Math.max(0, multi.tabs.findIndex((tab) => tab.id === multi.activeTabId));
+      const nextTab = multi.tabs[(activeIndex + 1) % multi.tabs.length];
+      if (nextTab) multi.selectTab(nextTab.id);
+      break;
+    }
+    case "explorer.tab_1":
+    case "explorer.tab_2":
+    case "explorer.tab_3":
+    case "explorer.tab_4":
+    case "explorer.tab_5":
+    case "explorer.tab_6":
+    case "explorer.tab_7":
+    case "explorer.tab_8":
+    case "explorer.tab_9": {
+      const index = Number(commandId.slice("explorer.tab_".length)) - 1;
+      const tab = multi.tabs[index];
+      if (tab) multi.selectTab(tab.id);
+      break;
+    }
   }
 }
 
-function ConnectedFileInspector() {
-  const activePaneId = useMultiPanelStore((state) => state.activePaneId);
-  const pane = useExplorerStore((state) => state.panes[activePaneId]);
-  return <FileInspector listing={pane?.listing ?? null} selectedEntry={selectedEntryForPane(pane)} />;
+async function publishSharedClipboard(): Promise<void> {
+  try {
+    let published = await clipboardPublishShared();
+    if (!published) {
+      const systemText = await readText().catch(() => "");
+      if (systemText.trim()) {
+        await clipboardSetLocal(textClipboardPayload(systemText));
+        published = await clipboardPublishShared();
+      }
+    }
+    if (!published) {
+      const image = await clipboardImagePng();
+      if (image) {
+        published = await clipboardPublishImageBytes({
+          bytes: [...image.bytes],
+          width: image.width,
+          height: image.height,
+          mimeType: "image/png",
+        });
+      }
+    }
+    if (!published) {
+      useExplorerStore.setState({
+        operationError: "Shared clipboard publish failed. Check that the proxy is configured and the local clipboard has content.",
+      });
+    }
+  } catch (error) {
+    useExplorerStore.setState({ operationError: `Shared clipboard publish failed: ${errorText(error)}` });
+  }
 }
 
-function ExplorerContextMenu() {
+function textClipboardPayload(text: string): ClipboardPayload {
+  return {
+    kind: text ? "text" : "empty",
+    origin: "local_system",
+    payload_id: "",
+    source_device_id: "",
+    source_device_name: "",
+    revision: 0,
+    created_unix_ms: 0,
+    text,
+    html: "",
+    file_refs: [],
+    images: [],
+  };
+}
+
+async function applySharedClipboardToSystem(): Promise<void> {
+  try {
+    const payload = await clipboardApplyShared();
+    await writeSharedClipboardPayload(payload);
+  } catch (error) {
+    useExplorerStore.setState({ operationError: `Shared clipboard apply failed: ${errorText(error)}` });
+  }
+}
+
+async function writeSharedClipboardPayload(payload: ClipboardPayload): Promise<void> {
+  switch (payload.kind) {
+    case "text":
+      if (!payload.text) break;
+      await writeText(payload.text);
+      return;
+    case "html":
+      if (!payload.html && !payload.text) break;
+      if (payload.html) await writeHtml(payload.html, payload.text || undefined);
+      else await writeText(payload.text);
+      return;
+    case "file_refs": {
+      const localItems = sharedClipboardLocalPasteItems(payload);
+      if (localItems.length > 0 && await clipboardWriteFileRefs(localItems)) return;
+      const text = sharedClipboardText(payload);
+      if (!text) break;
+      await writeText(text);
+      return;
+    }
+    case "image": {
+      const image = payload.images.find((candidate) => candidate.blob_id);
+      if (!image) break;
+      const bytes = await clipboardSharedImageBytes(image.blob_id);
+      await writeImage(new Uint8Array(bytes));
+      return;
+    }
+    case "empty":
+      break;
+  }
+  throw new Error("This shared clipboard payload cannot be applied to the system clipboard yet.");
+}
+
+function sharedClipboardText(payload: ClipboardPayload): string {
+  switch (payload.kind) {
+    case "text":
+      return payload.text;
+    case "html":
+      return payload.html || payload.text;
+    case "file_refs":
+      return payload.file_refs
+        .map((ref) => ref.local_path || (ref.remote_name ? `${ref.remote_name}:${ref.remote_path}` : ref.remote_path))
+        .filter(Boolean)
+        .join("\n");
+    default:
+      return "";
+  }
+}
+
+function sharedClipboardLocalPasteItems(payload: ClipboardPayload) {
+  return payload.file_refs
+    .filter((ref) => ref.local_path)
+    .map((ref) => ({ path: ref.local_path, isDirectory: ref.is_dir }));
+}
+
+const ConnectedFileInspector = memo(function ConnectedFileInspector() {
+  const activePaneId = useMultiPanelStore((state) => state.activePaneId);
+  const { listing, selectedEntry, selectedCount } = useExplorerStore(useShallow((state) => {
+    const pane = state.panes[activePaneId];
+    const selectedCount = pane?.selectedIds.length ?? 0;
+    return {
+      listing: pane?.listing ?? null,
+      selectedEntry: selectedCount === 1 ? selectedEntryForPane(pane) : null,
+      selectedCount,
+    };
+  }));
+  const onOpen = useCallback(() => {
+    if (selectedEntry) void useExplorerStore.getState().openEntry(activePaneId, selectedEntry);
+  }, [activePaneId, selectedEntry]);
+  const onMore = useCallback((x: number, y: number) => {
+    useExplorerStore.getState().openContextMenu(activePaneId, x, y, selectedEntry?.id ?? null);
+  }, [activePaneId, selectedEntry?.id]);
+  return (
+    <FileInspector
+      listing={listing}
+      selectedEntry={selectedEntry}
+      selectedCount={selectedCount}
+      onOpen={onOpen}
+      onMore={onMore}
+    />
+  );
+});
+
+const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
+  const activePaneId = useMultiPanelStore((state) => state.activePaneId);
+  const { listing, selectedEntry } = useExplorerStore(useShallow((state) => {
+    const pane = state.panes[activePaneId];
+    return {
+      listing: pane?.listing ?? null,
+      selectedEntry: selectedEntryForPane(pane),
+    };
+  }));
+  return (
+    <section className="explorer-chat-overlay" aria-label="Explorer chat">
+      <header>
+        <span>
+          <MessageSquare size={16} />
+          Chat
+        </span>
+        <button type="button" aria-label="Close chat" onClick={() => useExplorerStore.getState().toggleChatOverlay()}>
+          <X size={16} />
+        </button>
+      </header>
+      <div>
+        <p>Explorer chat is ready for Tauri command wiring.</p>
+        <dl>
+          <dt>Folder</dt>
+          <dd>{listing?.path ?? "No active folder"}</dd>
+          <dt>Selection</dt>
+          <dd>{selectedEntry?.name ?? "None"}</dd>
+        </dl>
+      </div>
+    </section>
+  );
+});
+
+const ExplorerClaudePanel = memo(function ExplorerClaudePanel() {
+  const activePaneId = useMultiPanelStore((state) => state.activePaneId);
+  const listing = useExplorerStore((state) => state.panes[activePaneId]?.listing ?? null);
+  return (
+    <aside className="explorer-claude-panel" aria-label="Claude">
+      <header>
+        <span>
+          <MessageSquare size={16} />
+          Claude
+        </span>
+        <button type="button" aria-label="Close Claude" onClick={() => useExplorerStore.getState().setClaudePanelOpen(false)}>
+          <X size={16} />
+        </button>
+      </header>
+      <div>
+        <p>Claude tools are not available in this build.</p>
+        <dl>
+          <dt>Working directory</dt>
+          <dd>{listing?.path ?? "No active folder"}</dd>
+        </dl>
+      </div>
+    </aside>
+  );
+});
+
+const ExplorerContextMenu = memo(function ExplorerContextMenu() {
+  const menuRef = useRef<HTMLDivElement | null>(null);
   const {
-    contextMenu,
-    pane,
-    createItem,
-    copySelected,
-    cutSelected,
-    pasteIntoPane,
-    renameSelected,
-    deleteSelected,
-    openWithSelected,
-    refreshPane,
-    toggleHidden,
-    togglePinnedPath,
-    copyPath,
-    pinnedPaths,
+    open,
+    x,
+    y,
+    paneId,
+    entryId,
     hasClipboard,
-    closeContextMenu,
-  } = useExplorerStore(useShallow((state) => ({
-    contextMenu: state.contextMenu,
-    pane: state.contextMenu.open ? state.panes[state.contextMenu.paneId] : undefined,
-    createItem: state.createItem,
-    copySelected: state.copySelected,
-    cutSelected: state.cutSelected,
-    pasteIntoPane: state.pasteIntoPane,
-    renameSelected: state.renameSelected,
-    deleteSelected: state.deleteSelected,
-    openWithSelected: state.openWithSelected,
-    refreshPane: state.refreshPane,
-    toggleHidden: state.toggleHidden,
-    togglePinnedPath: state.togglePinnedPath,
-    copyPath: state.copyPath,
-    pinnedPaths: state.contextMenu.open ? state.pinnedPaths : emptyPinnedPaths,
-    hasClipboard: Boolean(state.clipboard?.items.length),
-    closeContextMenu: state.closeContextMenu,
-  })));
-  const targetEntry = pane?.listing?.entries.find((entry) => entry.id === contextMenu.entryId) ?? null;
-  const hasSelection = Boolean(contextMenu.entryId && pane?.selectedIds.length);
-  const targetPinned = Boolean(targetEntry && pinnedPaths.some((path) => normalizedPath(path) === normalizedPath(targetEntry.path)));
-  const targetCanOpenWith = Boolean(targetEntry && targetEntry.kind !== "folder" && targetEntry.kind !== "symlink");
+    showHidden,
+    targetEntry,
+    hasSelection,
+    targetPinned,
+    targetCanOpenWith,
+    canCreateFile,
+    canCreateFolder,
+  } = useExplorerStore(useShallow((state) => {
+    const { open, x, y, paneId, entryId } = state.contextMenu;
+    const targetPane = open ? state.panes[paneId] : undefined;
+    const targetEntry = open && entryId
+      ? targetPane?.listing?.entries.find((entry) => entry.id === entryId) ?? null
+      : null;
+    const selectedCount = open ? selectedActionableEntryCount(targetPane) : 0;
+    const pinnedPaths = open && entryId ? state.pinnedPaths : emptyPinnedPaths;
+    return {
+      open,
+      x,
+      y,
+      paneId,
+      entryId,
+      hasClipboard: Boolean(state.clipboard?.items.length),
+      showHidden: state.paneShowHidden[paneId] ?? state.showHidden,
+      targetEntry,
+      hasSelection: Boolean(entryId && selectedCount),
+      targetPinned: Boolean(targetEntry && !targetEntry.isDeleted && pinnedPaths.some((path) => normalizedPath(path) === normalizedPath(targetEntry.path))),
+      targetCanOpenWith: Boolean(targetEntry && !targetEntry.isDeleted && targetEntry.kind !== "folder" && targetEntry.kind !== "symlink"),
+      canCreateFile: state.canCreateItem(paneId, "file"),
+      canCreateFolder: state.canCreateItem(paneId, "folder"),
+    };
+  }));
 
   useEffect(() => {
-    if (!contextMenu.open) return;
-    const close = () => useExplorerStore.getState().closeContextMenu();
-    window.addEventListener("pointerdown", close);
-    window.addEventListener("keydown", close);
-    return () => {
-      window.removeEventListener("pointerdown", close);
-      window.removeEventListener("keydown", close);
+    if (!open) return;
+    const closeOnOutsidePointer = (event: globalThis.PointerEvent) => {
+      const target = event.target as Node | null;
+      if (target && menuRef.current?.contains(target)) return;
+      useExplorerStore.getState().closeContextMenu();
     };
-  }, [contextMenu.open]);
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") useExplorerStore.getState().closeContextMenu();
+    };
+    window.addEventListener("pointerdown", closeOnOutsidePointer);
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.removeEventListener("pointerdown", closeOnOutsidePointer);
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [open]);
 
-  if (!contextMenu.open) return null;
+  if (!open) return null;
+
+  const primaryShortcut = primaryShortcutLabel();
+  const selectionDisabledReason = hasSelection ? undefined : "Select a file or folder first.";
+  const createDisabledReason = "New items are only available in writable folders.";
 
   const run = (action: () => void) => {
-    closeContextMenu();
+    useExplorerStore.getState().closeContextMenu();
     action();
   };
 
   return createPortal(
     <div
+      ref={menuRef}
       className="explorer-context-menu"
-      style={{ left: contextMenu.x, top: contextMenu.y }}
+      style={{ left: x, top: y }}
       onPointerDown={(event) => event.stopPropagation()}
       role="menu"
     >
-      <button type="button" role="menuitem" onClick={() => run(() => void createItem(contextMenu.paneId, "folder"))}>
-        <FolderPlus size={17} />
-        New Folder
-      </button>
-      <button type="button" role="menuitem" onClick={() => run(() => void createItem(contextMenu.paneId, "file"))}>
-        <FilePlus size={17} />
-        New File
-      </button>
+      <ContextMenuItem
+        icon={<FolderPlus size={17} />}
+        label="New Folder"
+        shortcut={`${primaryShortcut}+Shift+N`}
+        disabled={!canCreateFolder}
+        disabledReason={createDisabledReason}
+        onRun={() => run(() => void useExplorerStore.getState().createItem(paneId, "folder"))}
+      />
+      <ContextMenuItem
+        icon={<FilePlus size={17} />}
+        label="New File"
+        disabled={!canCreateFile}
+        disabledReason={createDisabledReason}
+        onRun={() => run(() => void useExplorerStore.getState().createItem(paneId, "file"))}
+      />
       <div className="context-menu-separator" />
-      <button type="button" role="menuitem" disabled={!hasSelection} onClick={() => run(() => copySelected(contextMenu.paneId))}>
-        <Copy size={17} />
-        Copy
-      </button>
-      <button type="button" role="menuitem" disabled={!hasSelection} onClick={() => run(() => cutSelected(contextMenu.paneId))}>
-        <Scissors size={17} />
-        Cut
-      </button>
-      <button type="button" role="menuitem" disabled={!hasClipboard} onClick={() => run(() => void pasteIntoPane(contextMenu.paneId))}>
-        <Clipboard size={17} />
-        Paste
-      </button>
+      <ContextMenuItem
+        icon={<Copy size={17} />}
+        label="Copy"
+        shortcut={`${primaryShortcut}+C`}
+        disabled={!hasSelection}
+        disabledReason={selectionDisabledReason}
+        onRun={() => run(() => useExplorerStore.getState().copySelected(paneId))}
+      />
+      <ContextMenuItem
+        icon={<Scissors size={17} />}
+        label="Cut"
+        shortcut={`${primaryShortcut}+X`}
+        disabled={!hasSelection}
+        disabledReason={selectionDisabledReason}
+        onRun={() => run(() => useExplorerStore.getState().cutSelected(paneId))}
+      />
+      <ContextMenuItem
+        icon={<Clipboard size={17} />}
+        label="Paste"
+        shortcut={`${primaryShortcut}+V`}
+        disabled={!hasClipboard}
+        disabledReason={hasClipboard ? undefined : "Copy or cut something first."}
+        onRun={() => run(() => void useExplorerStore.getState().pasteIntoPane(paneId))}
+      />
       <div className="context-menu-separator" />
-      <button type="button" role="menuitem" disabled={!hasSelection} onClick={() => run(() => void renameSelected(contextMenu.paneId))}>
-        <Pencil size={17} />
-        Rename
-      </button>
-      <button type="button" role="menuitem" disabled={!hasSelection} onClick={() => run(() => void deleteSelected(contextMenu.paneId))}>
-        <Trash2 size={17} />
-        Delete
-      </button>
-      {contextMenu.entryId ? (
+      <ContextMenuItem
+        icon={<Pencil size={17} />}
+        label="Rename"
+        shortcut="Enter"
+        disabled={!hasSelection}
+        disabledReason={selectionDisabledReason}
+        onRun={() => run(() => void useExplorerStore.getState().renameSelected(paneId))}
+      />
+      <ContextMenuItem
+        icon={<Trash2 size={17} />}
+        label="Delete"
+        shortcut="Del"
+        disabled={!hasSelection}
+        disabledReason={selectionDisabledReason}
+        onRun={() => run(() => void useExplorerStore.getState().deleteSelected(paneId))}
+      />
+      {entryId ? (
         <>
           <div className="context-menu-separator" />
-          <button
-            type="button"
-            role="menuitem"
+          <ContextMenuItem
+            icon={<AppWindow size={17} />}
+            label="Open With..."
             disabled={!targetCanOpenWith}
-            onClick={() => run(() => void openWithSelected(contextMenu.paneId))}
-          >
-            <AppWindow size={17} />
-            Open With...
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            disabled={!targetEntry || targetEntry.kind !== "folder"}
-            onClick={() => run(() => targetEntry && togglePinnedPath(targetEntry.path))}
-          >
-            <Pin size={17} />
-            {targetPinned ? "Unpin from Quick access" : "Pin to Quick access"}
-          </button>
+            disabledReason="Open With is available for files."
+            onRun={() => run(() => void useExplorerStore.getState().openWithSelected(paneId))}
+          />
+          <ContextMenuItem
+            icon={<Pin size={17} />}
+            label={targetPinned ? "Unpin from Quick access" : "Pin to Quick access"}
+            disabled={!targetEntry || targetEntry.isDeleted || targetEntry.kind !== "folder"}
+            disabledReason="Only folders can be pinned."
+            onRun={() => run(() => targetEntry && useExplorerStore.getState().togglePinnedPath(targetEntry.path))}
+          />
           <div className="context-menu-separator" />
-          <button
-            type="button"
-            role="menuitem"
+          <ContextMenuItem
+            icon={<Copy size={17} />}
+            label="Copy Path"
+            shortcut={`${primaryShortcut}+Alt+C`}
             disabled={!targetEntry}
-            onClick={() => run(() => targetEntry && void copyPath(targetEntry.path))}
-          >
-            <Copy size={17} />
-            Copy Path
-          </button>
+            disabledReason="Choose an item first."
+            onRun={() => run(() => targetEntry && void useExplorerStore.getState().copyPath(targetEntry.path))}
+          />
         </>
       ) : (
         <>
           <div className="context-menu-separator" />
-          <button type="button" role="menuitem" onClick={() => run(() => void toggleHidden())}>
-            <Eye size={17} />
-            {useExplorerStore.getState().showHidden ? "Hide Hidden Files" : "Show Hidden Files"}
-          </button>
+          <ContextMenuItem
+            icon={<Eye size={17} />}
+            label={showHidden ? "Hide Hidden Files" : "Show Hidden Files"}
+            shortcut={`${primaryShortcut}+Shift+.`}
+            onRun={() => run(() => void useExplorerStore.getState().toggleHidden(paneId))}
+          />
         </>
       )}
       <div className="context-menu-separator" />
-      <button type="button" role="menuitem" onClick={() => run(() => void refreshPane(contextMenu.paneId))}>
-        <RefreshCcw size={17} />
-        Refresh
-      </button>
+      <ContextMenuItem
+        icon={<RefreshCcw size={17} />}
+        label="Refresh"
+        shortcut={`${primaryShortcut}+R`}
+        onRun={() => run(() => void useExplorerStore.getState().refreshPane(paneId))}
+      />
     </div>,
     document.body,
   );
+});
+
+function ContextMenuItem(props: {
+  icon: ReactNode;
+  label: string;
+  shortcut?: string;
+  disabled?: boolean;
+  disabledReason?: string;
+  onRun: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      disabled={props.disabled}
+      title={props.disabled ? props.disabledReason : undefined}
+      onClick={props.onRun}
+    >
+      <span className="context-menu-icon">{props.icon}</span>
+      <span className="context-menu-label">{props.label}</span>
+      {props.shortcut ? <span className="context-menu-shortcut">{props.shortcut}</span> : null}
+    </button>
+  );
+}
+
+function primaryShortcutLabel(): string {
+  if (typeof navigator !== "undefined" && /Mac|iPhone|iPad|iPod/i.test(navigator.platform)) return "Cmd";
+  return "Ctrl";
+}
+
+function selectedActionableEntryCount(pane: ReturnType<typeof useExplorerStore.getState>["panes"][string] | undefined): number {
+  if (!pane?.listing) return 0;
+  const selected = new Set(pane.selectedIds);
+  return pane.listing.entries.filter((entry) => selected.has(entry.id) && !entry.isDeleted).length;
 }
 
 function ExplorerBottomBar(props: {
@@ -923,6 +1702,115 @@ function compareCounts(rows: Array<{ disposition: string }>): Record<string, num
   return counts;
 }
 
+function compareSideSummary(side: FileSyncCompareSide): string {
+  if (!side.present) return "--";
+  const suffix = side.lastModified ? ` - ${side.lastModified}` : "";
+  if (side.isDir) return `Folder${suffix}`;
+  const size = side.size > 0 ? formatBytes(side.size) : "-";
+  return `${size}${suffix}`;
+}
+
+function compareSideTitle(side: FileSyncCompareSide): string | undefined {
+  if (!side.present) return undefined;
+  if (side.isRemote) return `${side.remoteName}:${side.remotePath || "/"}`;
+  return side.absolutePath || undefined;
+}
+
+function buildExplorerLocationResults(
+  homePath: string,
+  mountRoot: string,
+  pinnedPaths: string[],
+  remotes: ProviderRemote[],
+  library: ExplorerLibrarySnapshot | null,
+  workspacePaths: string[],
+): ExplorerLocationResult[] {
+  const results: ExplorerLocationResult[] = [];
+  const seen = new Set<string>();
+  const add = (label: string, path: string, badge: string) => {
+    if (!path) return;
+    const key = normalizedPath(path) || "/";
+    if (seen.has(key)) return;
+    seen.add(key);
+    results.push({
+      id: `${badge}:${key}`,
+      label,
+      path,
+      subtitle: path,
+      badge,
+    });
+  };
+
+  add("Home", homePath, "Quick");
+  add("Desktop", joinPath(homePath, "Desktop"), "Quick");
+  add("Documents", joinPath(homePath, "Documents"), "Quick");
+  add("Downloads", joinPath(homePath, "Downloads"), "Quick");
+  add("Projects", joinPath(homePath, "Projects"), "Quick");
+
+  for (const path of pinnedPaths) {
+    add(path.split("/").filter(Boolean).pop() || path, path, "Pinned");
+  }
+  for (const path of workspacePaths) {
+    add(titleFromPath(path), path, "Workspace");
+  }
+  for (const item of library?.starredFiles ?? []) {
+    add(item.name || titleFromPath(item.path), item.path, "Starred");
+  }
+  for (const item of library?.recentFiles ?? []) {
+    add(item.name || titleFromPath(item.path), item.path, "Recent");
+  }
+  for (const remote of remotes) {
+    add(remote.name, joinPath(mountRoot, remote.type, remote.name), remote.type);
+  }
+
+  return results;
+}
+
+function pluginCommandsEqual(left: PluginCommandEntry[], right: PluginCommandEntry[]): boolean {
+  if (left === right) return true;
+  if (left.length !== right.length) return false;
+  return left.every((command, index) => {
+    const other = right[index];
+    return command.id === other.id
+      && command.label === other.label
+      && command.hint === other.hint
+      && command.pluginId === other.pluginId
+      && command.pluginName === other.pluginName
+      && command.defaultShortcut === other.defaultShortcut
+      && command.source === other.source;
+  });
+}
+
+function mountedDevicesEqual(left: MountedDevice[], right: MountedDevice[]): boolean {
+  if (left === right) return true;
+  if (left.length !== right.length) return false;
+  return left.every((device, index) => {
+    const other = right[index];
+    return device.id === other.id
+      && device.name === other.name
+      && device.mountPath === other.mountPath
+      && device.fsType === other.fsType
+      && device.isRemovable === other.isRemovable
+      && device.totalBytes === other.totalBytes
+      && device.freeBytes === other.freeBytes;
+  });
+}
+
+function workspaceSearchPaths(tabs: MultiPanelTab[]): string[] {
+  const paths: string[] = [];
+  const seen = new Set<string>();
+  const add = (path: string) => {
+    const key = normalizedPath(path) || "/";
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    paths.push(path);
+  };
+  for (const tab of tabs) {
+    add(tab.path);
+    for (const pane of tab.panes) add(pane.path);
+  }
+  return paths;
+}
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
@@ -936,20 +1824,45 @@ function normalizedPath(path: string): string {
   return path.replace(/\/+$/, "");
 }
 
+function titleFromPath(path: string): string {
+  if (path === "misty://recent") return "Recent";
+  if (path === "misty://starred") return "Starred";
+  if (path === "misty://trash") return "Trash";
+  const clean = normalizedPath(path);
+  return clean.split("/").filter(Boolean).pop() || clean || "Home";
+}
+
+function joinPath(...parts: string[]): string {
+  const [first, ...rest] = parts;
+  return [first.replace(/\/+$/, ""), ...rest.map((part) => part.replace(/^\/+|\/+$/g, ""))].join("/");
+}
+
 function multiPanelWorkspaceNeedsSave(
   state: ReturnType<typeof useMultiPanelStore.getState>,
   previous: ReturnType<typeof useMultiPanelStore.getState>,
 ): boolean {
   return state.tabs !== previous.tabs
     || state.activeTabId !== previous.activeTabId
-    || state.activePaneId !== previous.activePaneId
     || state.closedPanes !== previous.closedPanes
     || state.nextPaneIndex !== previous.nextPaneIndex
     || state.nextTabIndex !== previous.nextTabIndex;
 }
 
 function isTauriRuntime(): boolean {
-  return "__TAURI_INTERNALS__" in window;
+  const candidate = (window as typeof window & {
+    __TAURI_INTERNALS__?: {
+      metadata?: {
+        currentWindow?: { label?: unknown };
+        currentWebview?: { label?: unknown };
+      };
+      invoke?: unknown;
+    };
+  }).__TAURI_INTERNALS__;
+  return Boolean(
+    candidate?.invoke
+      && candidate.metadata?.currentWindow?.label
+      && candidate.metadata?.currentWebview?.label,
+  );
 }
 
 function externalDropTargetAt(

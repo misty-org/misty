@@ -146,6 +146,12 @@ impl ClipboardService {
         payload
     }
 
+    pub fn publish_local_system_payload_to_shared(&self, payload: ClipboardPayload) -> bool {
+        let payload = self.finalize_payload(payload, ClipboardOrigin::LocalSystem);
+        self.set_local_payload(payload.clone());
+        self.publish_payload_to_shared(&payload)
+    }
+
     pub fn make_text_payload(&self, text: String, origin: ClipboardOrigin) -> ClipboardPayload {
         let payload = ClipboardPayload {
             kind: if text.is_empty() {
@@ -309,5 +315,59 @@ mod tests {
         let first_fingerprint = ClipboardService::fingerprint_for(&first);
         first.images[0].bytes[2] = 4;
         assert_ne!(first_fingerprint, ClipboardService::fingerprint_for(&first));
+    }
+
+    #[test]
+    fn publishes_local_system_image_payload_to_shared_client() {
+        #[derive(Default)]
+        struct CaptureSharedClient {
+            published: Mutex<Option<ClipboardPayload>>,
+        }
+
+        impl SharedClipboardClient for CaptureSharedClient {
+            fn publish(&self, payload: &ClipboardPayload) -> bool {
+                *self.published.lock().expect("published lock") = Some(payload.clone());
+                true
+            }
+
+            fn hydrate_payload(&self, _payload: &mut ClipboardPayload) -> bool {
+                true
+            }
+        }
+
+        let client = Arc::new(CaptureSharedClient::default());
+        let shared: Arc<dyn SharedClipboardClient> = client.clone();
+        let service = ClipboardService::new(None, Some(shared));
+        service.set_device_identity("device-a".into(), "Laptop".into());
+        let ok = service.publish_local_system_payload_to_shared(ClipboardPayload {
+            kind: ClipboardPayloadKind::Image,
+            images: vec![super::super::ClipboardImage {
+                mime_type: "image/png".into(),
+                size_bytes: 3,
+                width: 12,
+                height: 8,
+                bytes: vec![1, 2, 3],
+                ..super::super::ClipboardImage::default()
+            }],
+            ..ClipboardPayload::default()
+        });
+
+        assert!(ok);
+        let local = service.current_local();
+        assert_eq!(local.origin, ClipboardOrigin::LocalSystem);
+        assert_eq!(local.source_device_id, "device-a");
+        assert_eq!(local.revision, 1);
+
+        let published = client
+            .published
+            .lock()
+            .expect("published lock")
+            .clone()
+            .expect("published payload");
+        assert_eq!(published.origin, ClipboardOrigin::LocalSystem);
+        assert_eq!(published.images[0].mime_type, "image/png");
+        assert_eq!(published.images[0].width, 12);
+        assert_eq!(published.images[0].height, 8);
+        assert_eq!(published.images[0].bytes, vec![1, 2, 3]);
     }
 }

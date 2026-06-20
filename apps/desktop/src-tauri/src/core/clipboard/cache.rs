@@ -179,11 +179,12 @@ impl ClipboardCache {
 
     pub fn cleanup_expired(&mut self) {
         let mut index = self.read_index();
+        let now_ms = self.now_unix_ms();
+        let ttl_ms = Self::DEFAULT_TTL_HOURS * 60 * 60 * 1000;
+        self.cleanup_partial_files(now_ms, ttl_ms);
         let Some(entries) = index.get_mut("entries").and_then(Value::as_object_mut) else {
             return;
         };
-        let now_ms = self.now_unix_ms();
-        let ttl_ms = Self::DEFAULT_TTL_HOURS * 60 * 60 * 1000;
         let mut remove = Vec::new();
         for (key, entry) in entries.iter() {
             let last_access = entry
@@ -219,6 +220,31 @@ impl ClipboardCache {
             entries.remove(&key);
         }
         self.write_index(&index);
+    }
+
+    fn cleanup_partial_files(&self, now_ms: i64, ttl_ms: i64) {
+        let partial_dir = self.root.join("partial");
+        let Ok(entries) = fs::read_dir(&partial_dir) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if !path.is_file() || !path_under_root(&self.root, &path) {
+                continue;
+            }
+            let Ok(metadata) = entry.metadata() else {
+                continue;
+            };
+            let modified_ms = metadata
+                .modified()
+                .ok()
+                .and_then(|modified| modified.duration_since(UNIX_EPOCH).ok())
+                .map(|duration| duration.as_millis().min(i64::MAX as u128) as i64)
+                .unwrap_or_default();
+            if modified_ms <= 0 || now_ms.saturating_sub(modified_ms) > ttl_ms {
+                let _ = fs::remove_file(path);
+            }
+        }
     }
 
     pub fn set_now_for_tests(&mut self, now_unix_ms: i64) {
@@ -498,6 +524,25 @@ mod tests {
         cache.cleanup_expired();
         assert!(cache.lookup_remote_file(&expired).is_none());
         assert!(cache.lookup_remote_file(&fresh).is_some());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn cleanup_removes_stale_partial_files_without_index() {
+        let root = root("partial");
+        let mut cache = ClipboardCache::new(root.clone());
+        let partial = cache.temp_path_for("stale-key", "download.bin");
+        fs::write(&partial, b"partial").expect("write partial file");
+
+        let now_ms = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis()
+            .min(i64::MAX as u128) as i64;
+        cache.set_now_for_tests(now_ms + 73 * 60 * 60 * 1000);
+        cache.cleanup_expired();
+
+        assert!(!partial.exists());
         let _ = fs::remove_dir_all(root);
     }
 }

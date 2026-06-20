@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 import type {
   AppSnapshot,
   AppEnvironmentSnapshot,
@@ -6,8 +6,12 @@ import type {
   ClipboardSnapshot,
   CreateItemRequest,
   DeleteItemsRequest,
+  DeviceSnapshot,
   DirectoryListing,
   ExplorerOperationResult,
+  ExplorerPreviewPayload,
+  ExplorerLibraryItem,
+  ExplorerLibrarySnapshot,
   FileSyncApplyRequest,
   FileSyncApplyResult,
   FileSyncCompareRequest,
@@ -18,11 +22,16 @@ import type {
   OpenWithAssociation,
   OperationConflictPolicy,
   OperationQueueSnapshot,
+  PasteBlobRequest,
+  PasteItem,
   PasteItemsRequest,
   PasteTextRequest,
+  PluginCommandsSnapshot,
   PrepareOpenItemRequest,
   PreparedOpenItem,
   ProviderRemote,
+  ProviderConfigRequest,
+  ProviderConfigStep,
   ProvidersSnapshot,
   ProxySnapshot,
   RcloneConfigPaths,
@@ -38,6 +47,16 @@ import type {
   TransferFilter,
   TransferPage,
 } from "./types";
+
+function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
+  const internals = (window as typeof window & {
+    __TAURI_INTERNALS__?: { invoke?: unknown };
+  }).__TAURI_INTERNALS__;
+  if (typeof internals?.invoke !== "function") {
+    return Promise.reject(new Error(`Native command "${command}" is only available in the Tauri app.`));
+  }
+  return tauriInvoke<T>(command, args);
+}
 
 export function appSnapshot(): Promise<AppSnapshot> {
   return invoke("app_snapshot");
@@ -57,6 +76,39 @@ export function clipboardSnapshot(): Promise<ClipboardSnapshot> {
 
 export function clipboardSetLocal(payload: ClipboardPayload): Promise<ClipboardPayload> {
   return invoke("clipboard_set_local", { payload });
+}
+
+export function clipboardPublishShared(): Promise<boolean> {
+  return invoke("clipboard_publish_shared");
+}
+
+export function clipboardPublishImageBytes(request: {
+  bytes: number[];
+  width: number;
+  height: number;
+  mimeType?: string;
+}): Promise<boolean> {
+  return invoke("clipboard_publish_image_bytes", request);
+}
+
+export function clipboardApplyShared(): Promise<ClipboardPayload> {
+  return invoke("clipboard_apply_shared");
+}
+
+export function clipboardSharedImageBytes(blobId: string): Promise<number[]> {
+  return invoke("clipboard_shared_image_bytes", { blobId });
+}
+
+export function clipboardNativeFileRefs(): Promise<PasteItem[]> {
+  return invoke("clipboard_native_file_refs");
+}
+
+export function clipboardWriteFileRefs(items: PasteItem[]): Promise<boolean> {
+  return invoke("clipboard_write_file_refs", { items });
+}
+
+export function devicesSnapshot(): Promise<DeviceSnapshot> {
+  return invoke("devices_snapshot");
 }
 
 export function explorerListDirectory(request: ListDirectoryRequest): Promise<DirectoryListing> {
@@ -83,12 +135,28 @@ export function explorerPrepareOpenItem(request: PrepareOpenItemRequest): Promis
   return invoke("explorer_prepare_open_item", { request });
 }
 
+export function explorerPreviewItem(path: string): Promise<ExplorerPreviewPayload> {
+  return invoke("explorer_preview_item", { path });
+}
+
 export function explorerPathIsDirectory(path: string): Promise<boolean> {
   return invoke("explorer_path_is_directory", { path });
 }
 
 export function explorerPathExists(path: string): Promise<boolean> {
   return invoke("explorer_path_exists", { path });
+}
+
+export function explorerLibrarySnapshot(): Promise<ExplorerLibrarySnapshot> {
+  return invoke("explorer_library_snapshot");
+}
+
+export function explorerLibraryRecordRecent(item: ExplorerLibraryItem): Promise<ExplorerLibrarySnapshot> {
+  return invoke("explorer_library_record_recent", { request: { item } });
+}
+
+export function explorerLibraryRecordLastOpened(path: string): Promise<ExplorerLibrarySnapshot> {
+  return invoke("explorer_library_record_last_opened", { request: { path } });
 }
 
 export function explorerOpenWith(applicationPath: string, filePath: string): Promise<void> {
@@ -109,6 +177,10 @@ export function explorerQueuePasteItems(request: PasteItemsRequest): Promise<Ope
 
 export function explorerQueuePasteText(request: PasteTextRequest): Promise<OperationQueueSnapshot> {
   return invoke("explorer_queue_paste_text", { request });
+}
+
+export function explorerQueuePasteBlob(request: PasteBlobRequest): Promise<OperationQueueSnapshot> {
+  return invoke("explorer_queue_paste_blob", { request });
 }
 
 export function explorerQueueCreateItem(request: CreateItemRequest): Promise<OperationQueueSnapshot> {
@@ -159,6 +231,10 @@ export function shortcutsSave(request: SaveShortcutsRequest): Promise<ShortcutsS
   return invoke("shortcuts_save", { request });
 }
 
+export function pluginCommandsSnapshot(): Promise<PluginCommandsSnapshot> {
+  return invoke("plugin_commands_snapshot");
+}
+
 export function providersSnapshot(): Promise<ProvidersSnapshot> {
   return invoke("providers_snapshot");
 }
@@ -183,6 +259,14 @@ export function providersConfigPaths(): Promise<RcloneConfigPaths> {
   return invoke("providers_config_paths");
 }
 
+export function providersConfigureRemote(request: ProviderConfigRequest): Promise<ProviderConfigStep> {
+  return invoke("providers_configure_remote", { request });
+}
+
+export function providersDisconnectRemote(name: string): Promise<ProvidersSnapshot> {
+  return invoke("providers_disconnect_remote", { name });
+}
+
 export function transfersSnapshot(filter: TransferFilter = {}): Promise<TransferPage> {
   return invoke("transfers_snapshot", { filter });
 }
@@ -205,6 +289,10 @@ export function operationQueueCancel(operationId: number): Promise<OperationQueu
 
 export function operationQueueRetry(operationId: number): Promise<OperationQueueSnapshot> {
   return invoke("operation_queue_retry", { operationId });
+}
+
+export function operationQueueUndo(undoTokenId: number): Promise<OperationQueueSnapshot> {
+  return invoke("operation_queue_undo", { undoTokenId });
 }
 
 export function operationQueueResolveConflict(
