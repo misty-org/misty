@@ -1,9 +1,10 @@
+import { memo } from "react";
 import { OpenWithAssociationsPanel } from "./components/OpenWithAssociationsPanel";
 import { SettingsJsonPanel } from "./components/SettingsJsonPanel";
 import { ShortcutsPanel } from "./components/ShortcutsPanel";
 import { useSettingsStore } from "./useSettingsStore";
 
-export function SettingsWorkspace() {
+export const SettingsWorkspace = memo(function SettingsWorkspace() {
   const {
     settings,
     settingsText,
@@ -42,4 +43,4 @@ export function SettingsWorkspace() {
       />
     </section>
   );
-}
+});

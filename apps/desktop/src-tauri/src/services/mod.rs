@@ -1,10 +1,15 @@
 pub mod commands;
+pub mod devices;
 pub mod environment;
 pub mod explorer;
+pub mod explorer_library;
 pub mod file_sync;
+pub mod native_clipboard;
 pub mod operation_queue;
+pub mod plugin_commands;
 pub mod providers;
 pub mod proxy;
+pub mod proxy_clipboard;
 pub mod settings;
 pub mod transfers;
 pub mod workspaces;

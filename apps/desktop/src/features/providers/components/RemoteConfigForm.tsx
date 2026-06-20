@@ -26,7 +26,7 @@ export function RemoteConfigForm(props: RemoteConfigFormProps) {
   } = props;
 
   return (
-    <>
+    <div className="remote-config-form">
       <div className="form-grid">
         <label>
           Name
@@ -57,7 +57,7 @@ export function RemoteConfigForm(props: RemoteConfigFormProps) {
           <div>Temp: {configPaths.tempPath ?? "--"}</div>
         </div>
       ) : null}
-    </>
+    </div>
   );
 }
 

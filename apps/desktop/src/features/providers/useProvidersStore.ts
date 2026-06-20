@@ -1,15 +1,48 @@
 import { create } from "zustand";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import {
+  providersConfigureRemote,
   providersConfigPaths,
+  providersDisconnectRemote,
   providersRefresh,
   providersSaveRemote,
   providersSelectRemote,
   providersSnapshot,
   providersTestRemote,
 } from "../../api/misty";
-import type { ProvidersSnapshot, RcloneConfigPaths, RemoteEditDraft } from "../../api/types";
+import type {
+  ProviderConfigMode,
+  ProviderConfigStep,
+  ProviderRemote,
+  ProviderWorkflow,
+  ProvidersSnapshot,
+  RcloneConfigPaths,
+  RemoteEditDraft,
+} from "../../api/types";
 import { errorText } from "../../shared/format";
 import { configPriority, stableConfig, updateTokenField } from "./providerUtils";
+
+export interface ProviderConnectionSession {
+  mode: ProviderConfigMode;
+  stage: "provider" | "configure" | "authorize" | "complete";
+  providerType: string;
+  remoteName: string;
+  parameters: Record<string, string>;
+  step: ProviderConfigStep | null;
+  inFlight: boolean;
+  polling: boolean;
+  openedAuthorizeUrl: string | null;
+  error: string | null;
+}
+
+export interface ProvidersWorkspaceState {
+  draft: RemoteEditDraft | null;
+  originalDraft: RemoteEditDraft | null;
+  configPaths: RcloneConfigPaths | null;
+  tokenVisible: boolean;
+  loadingRemoteName: string | null;
+  loadedRemoteRevision: number;
+}
 
 interface ProvidersStore {
   providers: ProvidersSnapshot | null;
@@ -17,20 +50,53 @@ interface ProvidersStore {
   originalDraft: RemoteEditDraft | null;
   configPaths: RcloneConfigPaths | null;
   tokenVisible: boolean;
+  workspaces: Record<string, ProvidersWorkspaceState>;
+  remoteRevisions: Record<string, number>;
   loading: boolean;
   working: boolean;
   error: string | null;
   message: string | null;
+  connection: ProviderConnectionSession | null;
+  disconnectTarget: string | null;
+  ensureWorkspace: (workspaceId: string) => void;
+  discardWorkspaces: (workspaceIds: string[]) => void;
+  reloadWorkspaceRemote: (workspaceId: string) => Promise<void>;
   load: (refresh?: boolean) => Promise<void>;
   selectRemote: (name: string, guardDirty?: boolean) => Promise<void>;
+  selectRemoteInWorkspace: (workspaceId: string, name: string, guardDirty?: boolean) => Promise<void>;
   setDraftName: (name: string) => void;
+  setWorkspaceDraftName: (workspaceId: string, name: string) => void;
   setConfigField: (key: string, value: string) => void;
+  setWorkspaceConfigField: (workspaceId: string, key: string, value: string) => void;
   setTokenField: (key: string, value: string) => void;
+  setWorkspaceTokenField: (workspaceId: string, key: string, value: string) => void;
   setTokenVisible: (visible: boolean) => void;
+  setWorkspaceTokenVisible: (workspaceId: string, visible: boolean) => void;
   saveRemote: () => Promise<void>;
+  saveWorkspaceRemote: (workspaceId: string) => Promise<void>;
   testConnection: () => Promise<void>;
+  testWorkspaceConnection: (workspaceId: string) => Promise<void>;
   revealConfig: () => Promise<void>;
+  revealWorkspaceConfig: (workspaceId: string) => Promise<void>;
+  openAddRemote: () => void;
+  openReconnectRemote: (remote: ProviderRemote) => void;
+  openRepairRemote: (remote: ProviderRemote) => void;
+  closeConnection: () => void;
+  chooseConnectionProvider: (providerType: string) => void;
+  setConnectionName: (name: string) => void;
+  setConnectionParameter: (key: string, value: string) => void;
+  advanceConnection: () => void;
+  submitConnection: (polling?: boolean) => Promise<void>;
+  requestDisconnect: (name: string) => void;
+  cancelDisconnect: () => void;
+  confirmDisconnect: () => Promise<void>;
 }
+
+type ProvidersSet = (
+  partial: Partial<ProvidersStore> | ((state: ProvidersStore) => Partial<ProvidersStore>),
+) => void;
+
+let connectionGeneration = 0;
 
 export const useProvidersStore = create<ProvidersStore>((set, get) => ({
   providers: null,
@@ -38,10 +104,45 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
   originalDraft: null,
   configPaths: null,
   tokenVisible: false,
+  workspaces: {},
+  remoteRevisions: {},
   loading: true,
   working: false,
   error: null,
   message: null,
+  connection: null,
+  disconnectTarget: null,
+
+  ensureWorkspace: (workspaceId) => {
+    set((state) => state.workspaces[workspaceId] ? state : {
+      workspaces: {
+        ...state.workspaces,
+        [workspaceId]: createProvidersWorkspaceState(),
+      },
+    });
+  },
+
+  discardWorkspaces: (workspaceIds) => {
+    if (workspaceIds.length === 0) return;
+    set((state) => {
+      let changed = false;
+      const next = { ...state.workspaces };
+      for (const workspaceId of workspaceIds) {
+        if (workspaceId in next) {
+          delete next[workspaceId];
+          changed = true;
+        }
+      }
+      return changed ? { workspaces: next } : state;
+    });
+  },
+
+  reloadWorkspaceRemote: async (workspaceId) => {
+    const workspace = get().workspaces[workspaceId];
+    const name = workspace?.draft?.originalName;
+    if (!name) return;
+    await get().selectRemoteInWorkspace(workspaceId, name, false);
+  },
 
   load: async (refresh = false) => {
     set({ loading: true, error: null });
@@ -71,10 +172,38 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
     }
   },
 
+  selectRemoteInWorkspace: async (workspaceId, name, guardDirty = true) => {
+    get().ensureWorkspace(workspaceId);
+    const workspace = get().workspaces[workspaceId] ?? createProvidersWorkspaceState();
+    if (guardDirty && isWorkspaceDirty(workspace) && !window.confirm("Discard unsaved remote edits?")) {
+      return;
+    }
+    set({ error: null, message: null });
+    setWorkspaceState(set, workspaceId, { tokenVisible: false, loadingRemoteName: name });
+    try {
+      const nextDraft = await providersSelectRemote(name);
+      setWorkspaceState(set, workspaceId, {
+        draft: nextDraft,
+        originalDraft: nextDraft,
+        loadingRemoteName: null,
+        loadedRemoteRevision: revisionForRemote(get().remoteRevisions, nextDraft.originalName),
+      });
+    } catch (error) {
+      setWorkspaceState(set, workspaceId, { loadingRemoteName: null });
+      set({ error: errorText(error) });
+    }
+  },
+
   setDraftName: (name) => {
     const { draft } = get();
     if (!draft) return;
     set({ draft: { ...draft, name } });
+  },
+
+  setWorkspaceDraftName: (workspaceId, name) => {
+    const workspace = get().workspaces[workspaceId];
+    if (!workspace?.draft) return;
+    setWorkspaceState(set, workspaceId, { draft: { ...workspace.draft, name } });
   },
 
   setConfigField: (key, value) => {
@@ -83,13 +212,28 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
     set({ draft: { ...draft, config: { ...draft.config, [key]: value } } });
   },
 
+  setWorkspaceConfigField: (workspaceId, key, value) => {
+    const workspace = get().workspaces[workspaceId];
+    if (!workspace?.draft || key === "type") return;
+    setWorkspaceState(set, workspaceId, {
+      draft: { ...workspace.draft, config: { ...workspace.draft.config, [key]: value } },
+    });
+  },
+
   setTokenField: (key, value) => {
     const { draft } = get();
     if (!draft) return;
     get().setConfigField("token", updateTokenField(draft.config.token ?? "", key, value));
   },
 
+  setWorkspaceTokenField: (workspaceId, key, value) => {
+    const workspace = get().workspaces[workspaceId];
+    if (!workspace?.draft) return;
+    get().setWorkspaceConfigField(workspaceId, "token", updateTokenField(workspace.draft.config.token ?? "", key, value));
+  },
+
   setTokenVisible: (tokenVisible) => set({ tokenVisible }),
+  setWorkspaceTokenVisible: (workspaceId, tokenVisible) => setWorkspaceState(set, workspaceId, { tokenVisible }),
 
   saveRemote: async () => {
     const { draft, originalDraft } = get();
@@ -101,10 +245,50 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
         name: draft.name,
         parameters: draft.config,
       });
+      const remoteRevisions = bumpRemoteRevisions(get().remoteRevisions, [
+        originalDraft.originalName,
+        saved.originalName,
+      ]);
       set({
         draft: saved,
         originalDraft: saved,
         providers: await providersRefresh(),
+        remoteRevisions,
+        message: "Remote saved.",
+      });
+    } catch (error) {
+      set({ error: errorText(error) });
+    } finally {
+      set({ working: false });
+    }
+  },
+
+  saveWorkspaceRemote: async (workspaceId) => {
+    const workspace = get().workspaces[workspaceId];
+    if (!workspace?.draft || !workspace.originalDraft || !isValidRemoteName(workspace.draft)) return;
+    if (isProviderWorkspaceStale(workspace, get().remoteRevisions, get().providers?.remotes ?? [])) {
+      set({ error: "This remote changed in another pane. Reload it before saving." });
+      return;
+    }
+    set({ working: true, error: null, message: null });
+    try {
+      const saved = await providersSaveRemote({
+        originalName: workspace.originalDraft.originalName,
+        name: workspace.draft.name,
+        parameters: workspace.draft.config,
+      });
+      const remoteRevisions = bumpRemoteRevisions(get().remoteRevisions, [
+        workspace.originalDraft.originalName,
+        saved.originalName,
+      ]);
+      setWorkspaceState(set, workspaceId, {
+        draft: saved,
+        originalDraft: saved,
+        loadedRemoteRevision: revisionForRemote(remoteRevisions, saved.originalName),
+      });
+      set({
+        providers: await providersRefresh(),
+        remoteRevisions,
         message: "Remote saved.",
       });
     } catch (error) {
@@ -131,6 +315,28 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
     }
   },
 
+  testWorkspaceConnection: async (workspaceId) => {
+    const workspace = get().workspaces[workspaceId];
+    const draft = workspace?.draft;
+    if (!draft) return;
+    set({ working: true, error: null, message: null });
+    try {
+      const result = await providersTestRemote(draft.name);
+      set({
+        message: result.message,
+      });
+      if (result.aboutJson) {
+        setWorkspaceState(set, workspaceId, {
+          draft: { ...draft, aboutJson: result.aboutJson, lastCheckedUnix: result.checkedUnix },
+        });
+      }
+    } catch (error) {
+      set({ error: errorText(error) });
+    } finally {
+      set({ working: false });
+    }
+  },
+
   revealConfig: async () => {
     set({ working: true, error: null, message: null });
     try {
@@ -138,6 +344,209 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
       set({
         configPaths: paths,
         message: paths.configPath ? `Config path: ${paths.configPath}` : "Config paths loaded.",
+      });
+    } catch (error) {
+      set({ error: errorText(error) });
+    } finally {
+      set({ working: false });
+    }
+  },
+
+  revealWorkspaceConfig: async (workspaceId) => {
+    set({ working: true, error: null, message: null });
+    try {
+      const paths = await providersConfigPaths();
+      setWorkspaceState(set, workspaceId, { configPaths: paths });
+      set({
+        message: paths.configPath ? `Config path: ${paths.configPath}` : "Config paths loaded.",
+      });
+    } catch (error) {
+      set({ error: errorText(error) });
+    } finally {
+      set({ working: false });
+    }
+  },
+
+  openAddRemote: () => {
+    connectionGeneration += 1;
+    set({
+      connection: createConnectionSession("add"),
+      error: null,
+      message: null,
+    });
+  },
+
+  openReconnectRemote: (remote) => {
+    connectionGeneration += 1;
+    const connection = createConnectionSession("reconnect", remote);
+    connection.parameters = defaultParameters(workflowForType(get().providers?.workflows ?? [], remote.type));
+    set({
+      connection,
+      error: null,
+      message: null,
+    });
+  },
+
+  openRepairRemote: (remote) => {
+    connectionGeneration += 1;
+    const connection = createConnectionSession("repair", remote);
+    connection.parameters = defaultParameters(workflowForType(get().providers?.workflows ?? [], remote.type));
+    set({
+      connection,
+      error: null,
+      message: null,
+    });
+  },
+
+  closeConnection: () => {
+    connectionGeneration += 1;
+    set({ connection: null });
+  },
+
+  chooseConnectionProvider: (providerType) => set((state) => {
+    if (!state.connection) return state;
+    const workflow = workflowForType(state.providers?.workflows ?? [], providerType);
+    return {
+      connection: {
+        ...state.connection,
+        providerType,
+        remoteName: state.connection.remoteName || providerType,
+        parameters: defaultParameters(workflow),
+        error: null,
+      },
+    };
+  }),
+
+  setConnectionName: (remoteName) => set((state) => state.connection ? {
+    connection: { ...state.connection, remoteName, error: null },
+  } : state),
+
+  setConnectionParameter: (key, value) => set((state) => state.connection ? {
+    connection: {
+      ...state.connection,
+      parameters: { ...state.connection.parameters, [key]: value },
+      error: null,
+    },
+  } : state),
+
+  advanceConnection: () => set((state) => {
+    const session = state.connection;
+    if (!session || !session.providerType) return state;
+    return { connection: { ...session, stage: "configure", error: null } };
+  }),
+
+  submitConnection: async (polling = false) => {
+    const session = get().connection;
+    if (!session || session.inFlight) return;
+    const validationError = validateConnectionSession(session, get().providers?.workflows ?? []);
+    const duplicateName = session.mode === "add"
+      && get().providers?.remotes.some((remote) => remote.name === session.remoteName.trim());
+    if ((validationError || duplicateName) && !polling) {
+      set({
+        connection: {
+          ...session,
+          error: duplicateName ? "A remote with that name already exists." : validationError,
+        },
+      });
+      return;
+    }
+    const generation = connectionGeneration;
+    set({
+      connection: {
+        ...session,
+        inFlight: true,
+        polling,
+        error: null,
+      },
+    });
+    try {
+      const step = await providersConfigureRemote({
+        name: session.remoteName.trim(),
+        providerType: session.providerType,
+        parameters: session.parameters,
+        state: session.step?.state ?? "",
+        result: session.step?.result ?? "",
+        mode: session.mode,
+        continuing: session.step != null,
+        continueExisting: session.mode === "repair"
+          && session.step != null
+          && session.providerType.toLowerCase().includes("onedrive"),
+      });
+      if (generation !== connectionGeneration || !get().connection) return;
+
+      const current = get().connection!;
+      const parameters = { ...current.parameters };
+      if (step.option && parameters[step.option.name] == null) {
+        parameters[step.option.name] = step.option.defaultValue || step.option.choices[0]?.value || "";
+      }
+      const complete = step.done || step.kind === "done";
+      const authorize = step.kind === "browser_auth" || Boolean(step.authorizeUrl);
+      const next: ProviderConnectionSession = {
+        ...current,
+        stage: complete ? "complete" : authorize ? "authorize" : "configure",
+        parameters,
+        step,
+        inFlight: false,
+        polling: authorize,
+        error: null,
+      };
+
+      if (step.authorizeUrl && step.authorizeUrl !== current.openedAuthorizeUrl) {
+        try {
+          await openUrl(step.authorizeUrl);
+          next.openedAuthorizeUrl = step.authorizeUrl;
+        } catch (error) {
+          next.error = `Could not open browser sign-in: ${errorText(error)}`;
+        }
+      }
+      set({ connection: next });
+
+      if (complete) {
+        const providers = await providersRefresh();
+        if (generation !== connectionGeneration) return;
+        set({
+          providers,
+          remoteRevisions: bumpRemoteRevisions(get().remoteRevisions, [next.remoteName]),
+          message: `Remote “${next.remoteName}” connected.`,
+        });
+        return;
+      }
+      if (authorize) {
+        window.setTimeout(() => {
+          if (generation === connectionGeneration && get().connection?.stage === "authorize") {
+            void get().submitConnection(true);
+          }
+        }, Math.max(500, step.pollAfterMs || 1000));
+      }
+    } catch (error) {
+      if (generation !== connectionGeneration) return;
+      set((state) => state.connection ? {
+        connection: {
+          ...state.connection,
+          inFlight: false,
+          polling: false,
+          error: errorText(error),
+        },
+      } : state);
+    }
+  },
+
+  requestDisconnect: (disconnectTarget) => set({ disconnectTarget }),
+  cancelDisconnect: () => set({ disconnectTarget: null }),
+  confirmDisconnect: async () => {
+    const name = get().disconnectTarget;
+    if (!name) return;
+    set({ working: true, error: null, message: null });
+    try {
+      const providers = await providersDisconnectRemote(name);
+      set({
+        providers,
+        remoteRevisions: bumpRemoteRevisions(get().remoteRevisions, [name]),
+        draft: get().draft?.originalName === name ? null : get().draft,
+        originalDraft: get().originalDraft?.originalName === name ? null : get().originalDraft,
+        workspaces: pruneRemoteFromWorkspaces(get().workspaces, name),
+        disconnectTarget: null,
+        message: `Remote “${name}” disconnected.`,
       });
     } catch (error) {
       set({ error: errorText(error) });
@@ -164,6 +573,40 @@ export function selectProviderDerived(state: ProvidersStore) {
   };
 }
 
+export function selectProviderWorkspaceDerived(workspace: ProvidersWorkspaceState) {
+  return {
+    dirty: isWorkspaceDirty(workspace),
+    validRemoteName: workspace.draft ? isValidRemoteName(workspace.draft) : false,
+    configKeys: workspace.draft
+      ? Object.keys(workspace.draft.config)
+          .filter((key) => key !== "type")
+          .sort((left, right) => configPriority(left) - configPriority(right) || left.localeCompare(right))
+      : [],
+  };
+}
+
+export function createProvidersWorkspaceState(): ProvidersWorkspaceState {
+  return {
+    draft: null,
+    originalDraft: null,
+    configPaths: null,
+    tokenVisible: false,
+    loadingRemoteName: null,
+    loadedRemoteRevision: 0,
+  };
+}
+
+export function isProviderWorkspaceStale(
+  workspace: ProvidersWorkspaceState,
+  remoteRevisions: Record<string, number>,
+  remotes: ProviderRemote[],
+): boolean {
+  const remoteName = workspace.draft?.originalName;
+  if (!remoteName) return false;
+  if (!remotes.some((remote) => remote.name === remoteName)) return true;
+  return workspace.loadedRemoteRevision < revisionForRemote(remoteRevisions, remoteName);
+}
+
 function isDirty(state: Pick<ProvidersStore, "draft" | "originalDraft">): boolean {
   if (!state.draft || !state.originalDraft) return false;
   return (
@@ -172,7 +615,113 @@ function isDirty(state: Pick<ProvidersStore, "draft" | "originalDraft">): boolea
   );
 }
 
+function isWorkspaceDirty(state: Pick<ProvidersWorkspaceState, "draft" | "originalDraft">): boolean {
+  if (!state.draft || !state.originalDraft) return false;
+  return (
+    state.draft.name !== state.originalDraft.name ||
+    stableConfig(state.draft.config) !== stableConfig(state.originalDraft.config)
+  );
+}
+
+function setWorkspaceState(
+  set: ProvidersSet,
+  workspaceId: string,
+  patch: Partial<ProvidersWorkspaceState>,
+): void {
+  set((state) => {
+    const current = state.workspaces[workspaceId] ?? createProvidersWorkspaceState();
+    return {
+      workspaces: {
+        ...state.workspaces,
+        [workspaceId]: { ...current, ...patch },
+      },
+    };
+  });
+}
+
+function pruneRemoteFromWorkspaces(
+  workspaces: Record<string, ProvidersWorkspaceState>,
+  name: string,
+): Record<string, ProvidersWorkspaceState> {
+  let changed = false;
+  const next: Record<string, ProvidersWorkspaceState> = {};
+  for (const [workspaceId, workspace] of Object.entries(workspaces)) {
+    if (workspace.draft?.originalName === name || workspace.originalDraft?.originalName === name) {
+      next[workspaceId] = { ...workspace, draft: null, originalDraft: null };
+      changed = true;
+    } else {
+      next[workspaceId] = workspace;
+    }
+  }
+  return changed ? next : workspaces;
+}
+
+function revisionForRemote(remoteRevisions: Record<string, number>, name: string): number {
+  return remoteRevisions[name] ?? 0;
+}
+
+function bumpRemoteRevisions(
+  remoteRevisions: Record<string, number>,
+  names: string[],
+): Record<string, number> {
+  const next = { ...remoteRevisions };
+  for (const name of new Set(names.map((value) => value.trim()).filter(Boolean))) {
+    next[name] = revisionForRemote(next, name) + 1;
+  }
+  return next;
+}
+
 function isValidRemoteName(draft: RemoteEditDraft): boolean {
   const trimmed = draft.name.trim();
   return trimmed.length > 0 && !trimmed.includes(":") && !trimmed.includes("/") && !trimmed.includes("\\");
+}
+
+function createConnectionSession(mode: ProviderConfigMode, remote?: ProviderRemote): ProviderConnectionSession {
+  return {
+    mode,
+    stage: mode === "add" ? "provider" : "configure",
+    providerType: remote?.type ?? "",
+    remoteName: remote?.name ?? "",
+    parameters: {},
+    step: null,
+    inFlight: false,
+    polling: false,
+    openedAuthorizeUrl: null,
+    error: null,
+  };
+}
+
+function workflowForType(workflows: ProviderWorkflow[], providerType: string): ProviderWorkflow | null {
+  const normalized = providerType.toLowerCase().replace(/[^a-z0-9]/g, "");
+  return workflows.find((workflow) => workflow.type === providerType)
+    ?? workflows.find((workflow) => {
+      const type = workflow.type.toLowerCase().replace(/[^a-z0-9]/g, "");
+      const name = workflow.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+      return type === normalized || name === normalized || type.includes(normalized) || normalized.includes(type);
+    })
+    ?? null;
+}
+
+function defaultParameters(workflow: ProviderWorkflow | null): Record<string, string> {
+  if (!workflow) return {};
+  return Object.fromEntries(workflow.options.map((option) => [
+    option.name,
+    option.defaultValue || option.choices[0]?.value || "",
+  ]));
+}
+
+function validateConnectionSession(
+  session: ProviderConnectionSession,
+  workflows: ProviderWorkflow[],
+): string | null {
+  if (!session.providerType) return "Choose a provider.";
+  const name = session.remoteName.trim();
+  if (!name) return "Enter a remote name.";
+  if (name.includes(":") || name.includes("/") || name.includes("\\")) {
+    return "Remote names cannot contain colons or path separators.";
+  }
+  const workflow = workflowForType(workflows, session.providerType);
+  const options = session.step?.option ? [session.step.option] : workflow?.options ?? [];
+  const missing = options.find((option) => option.required && !(session.parameters[option.name] ?? "").trim());
+  return missing ? `${missing.label || missing.name} is required.` : null;
 }

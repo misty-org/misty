@@ -1,6 +1,13 @@
-use std::path::Path;
-use std::sync::Arc;
+use std::{
+    path::Path,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+};
 
+use reqwest::{Method, RequestBuilder, Response, StatusCode};
+use rusqlite::{Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use tokio::io::AsyncWriteExt;
 use tokio::sync::RwLock;
@@ -16,6 +23,7 @@ pub struct ProxyService {
 struct ProxyInner {
     client: reqwest::Client,
     proxy_url: Option<String>,
+    database_path: std::path::PathBuf,
     snapshot: RwLock<ProxySnapshot>,
 }
 
@@ -31,6 +39,7 @@ pub struct ProxySnapshot {
 impl ProxyService {
     pub fn new(environment: AppEnvironmentService) -> Self {
         let proxy_url = environment.proxy_url();
+        let database_path = environment.misty_db_path();
         let snapshot = ProxySnapshot {
             proxy_url: proxy_url.clone(),
             ready: false,
@@ -41,6 +50,7 @@ impl ProxyService {
             inner: Arc::new(ProxyInner {
                 client: reqwest::Client::new(),
                 proxy_url,
+                database_path,
                 snapshot: RwLock::new(snapshot),
             }),
         }
@@ -104,12 +114,14 @@ impl ProxyService {
         Q: Serialize + ?Sized,
     {
         let url = self.url(path)?;
-        Ok(self.inner.client.get(url).query(query).send().await?)
+        self.send_authenticated(Method::GET, &url, |request| request.query(query))
+            .await
     }
 
     pub async fn get(&self, path: &str) -> ApiResult<reqwest::Response> {
         let url = self.url(path)?;
-        Ok(self.inner.client.get(url).send().await?)
+        self.send_authenticated(Method::GET, &url, |request| request)
+            .await
     }
 
     pub async fn post_json(
@@ -118,7 +130,8 @@ impl ProxyService {
         body: &serde_json::Value,
     ) -> ApiResult<reqwest::Response> {
         let url = self.url(path)?;
-        Ok(self.inner.client.post(url).json(body).send().await?)
+        self.send_authenticated(Method::POST, &url, |request| request.json(body))
+            .await
     }
 
     pub async fn delete_with_query<Q>(&self, path: &str, query: &Q) -> ApiResult<reqwest::Response>
@@ -126,7 +139,14 @@ impl ProxyService {
         Q: Serialize + ?Sized,
     {
         let url = self.url(path)?;
-        Ok(self.inner.client.delete(url).query(query).send().await?)
+        self.send_authenticated(Method::DELETE, &url, |request| request.query(query))
+            .await
+    }
+
+    pub async fn delete(&self, path: &str) -> ApiResult<reqwest::Response> {
+        let url = self.url(path)?;
+        self.send_authenticated(Method::DELETE, &url, |request| request)
+            .await
     }
 
     pub async fn upload_file(
@@ -147,10 +167,81 @@ impl ProxyService {
             .text("remote", remote.to_string())
             .text("path", remote_directory.to_string())
             .part("file", file);
-        Ok(self.inner.client.post(url).multipart(form).send().await?)
+        let request = self
+            .with_current_auth(self.inner.client.post(url).multipart(form))
+            .await;
+        Ok(request.send().await?)
     }
 
-    pub async fn download_to_file(&self, path: &str, destination: &Path) -> ApiResult<()> {
+    async fn send_authenticated<F>(
+        &self,
+        method: Method,
+        url: &str,
+        configure: F,
+    ) -> ApiResult<Response>
+    where
+        F: Fn(RequestBuilder) -> RequestBuilder,
+    {
+        let send = |token: Option<&str>| {
+            let mut request = self.inner.client.request(method.clone(), url);
+            if let Some(token) = token {
+                request = request.bearer_auth(token);
+            }
+            configure(request)
+        };
+
+        let token = self.current_or_refresh_access_token().await;
+        let response = send(token.as_deref()).send().await?;
+        if response.status() != StatusCode::UNAUTHORIZED || !self.refresh_access_token().await {
+            return Ok(response);
+        }
+        let token = self.current_access_token().await;
+        Ok(send(token.as_deref()).send().await?)
+    }
+
+    async fn with_current_auth(&self, request: RequestBuilder) -> RequestBuilder {
+        match self.current_or_refresh_access_token().await {
+            Some(token) => request.bearer_auth(token),
+            None => request,
+        }
+    }
+
+    async fn current_or_refresh_access_token(&self) -> Option<String> {
+        if let Some(token) = self.current_access_token().await {
+            return Some(token);
+        }
+        if self.refresh_access_token().await {
+            return self.current_access_token().await;
+        }
+        None
+    }
+
+    async fn current_access_token(&self) -> Option<String> {
+        let database_path = self.inner.database_path.clone();
+        tokio::task::spawn_blocking(move || read_current_access_token(&database_path))
+            .await
+            .ok()
+            .flatten()
+    }
+
+    async fn refresh_access_token(&self) -> bool {
+        let Ok(url) = self.url("/api/session/refresh") else {
+            return false;
+        };
+        self.inner
+            .client
+            .post(url)
+            .send()
+            .await
+            .is_ok_and(|response| response.status().is_success())
+    }
+
+    pub async fn download_to_file_with_cancellation(
+        &self,
+        path: &str,
+        destination: &Path,
+        cancellation: Option<&AtomicBool>,
+    ) -> ApiResult<()> {
         let mut response = self.get(path).await?;
         let status = response.status();
         if !status.is_success() {
@@ -175,12 +266,18 @@ impl ProxyService {
                 ))
             })?;
         while let Some(chunk) = response.chunk().await? {
+            if cancellation.is_some_and(|token| token.load(Ordering::SeqCst)) {
+                return Err(ApiError::Message("Operation canceled.".to_string()));
+            }
             output.write_all(&chunk).await.map_err(|error| {
                 ApiError::Message(format!(
                     "Failed to write {}: {error}",
                     destination.display()
                 ))
             })?;
+        }
+        if cancellation.is_some_and(|token| token.load(Ordering::SeqCst)) {
+            return Err(ApiError::Message("Operation canceled.".to_string()));
         }
         output.flush().await.map_err(|error| {
             ApiError::Message(format!(
@@ -189,5 +286,70 @@ impl ProxyService {
             ))
         })?;
         Ok(())
+    }
+}
+
+fn read_current_access_token(database_path: &Path) -> Option<String> {
+    if !database_path.exists() {
+        return None;
+    }
+    let connection =
+        Connection::open_with_flags(database_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+            .ok()?;
+    connection
+        .query_row(
+            r#"
+                SELECT token
+                FROM access_tokens
+                WHERE revoked = 0
+                  AND datetime(expires_at) > datetime('now')
+                ORDER BY datetime(created_at) DESC
+                LIMIT 1
+            "#,
+            [],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()
+        .ok()
+        .flatten()
+        .filter(|token| !token.is_empty())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::read_current_access_token;
+    use rusqlite::Connection;
+
+    #[test]
+    fn reads_latest_unexpired_proxy_access_token() {
+        let path = std::env::temp_dir().join(format!(
+            "misty-proxy-token-{}.db",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let connection = Connection::open(&path).unwrap();
+        connection
+            .execute_batch(
+                r#"
+                    CREATE TABLE access_tokens (
+                        id TEXT PRIMARY KEY,
+                        token TEXT NOT NULL,
+                        expires_at TEXT NOT NULL,
+                        created_at TEXT NOT NULL,
+                        revoked INTEGER NOT NULL DEFAULT 0
+                    );
+                    INSERT INTO access_tokens VALUES
+                        ('expired', 'old', '2000-01-01T00:00:00Z', '2000-01-01T00:00:00Z', 0),
+                        ('revoked', 'bad', '2999-01-01T00:00:00Z', '2024-01-01T00:00:00Z', 1),
+                        ('current', 'good', '2999-01-01T00:00:00Z', '2025-01-01T00:00:00Z', 0);
+                "#,
+            )
+            .unwrap();
+        drop(connection);
+
+        assert_eq!(read_current_access_token(&path).as_deref(), Some("good"));
+        let _ = std::fs::remove_file(path);
     }
 }

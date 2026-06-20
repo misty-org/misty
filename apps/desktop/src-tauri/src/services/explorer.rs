@@ -1,18 +1,24 @@
 use std::{
     collections::BTreeSet,
+    ffi::OsStr,
     path::{Path, PathBuf},
-    sync::Arc,
-    time::Duration,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    time::{Duration, UNIX_EPOCH},
 };
 
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::Mutex;
 
 use crate::core::clipboard::{ClipboardCache, ClipboardRemoteFileCacheKey};
 use crate::core::explorer::{
-    create_item, delete_items, list_directory, paste_items, rename_item, CreateItemRequest,
-    DeleteItemsRequest, DirectoryListing, ExplorerLocation, ExplorerLocationKind,
-    ExplorerOperationResult, FileEntry, FileKind, ListDirectoryRequest, PasteItemsRequest,
-    PasteTextRequest, PrepareOpenItemRequest, PreparedOpenItem, RenameItemRequest,
+    create_item, list_directory, paste_items, rename_item, CreateItemRequest, DeleteItemsRequest,
+    DirectoryListing, ExplorerLocation, ExplorerLocationKind, ExplorerOperationResult,
+    ExplorerPreviewPayload, FileEntry, FileKind, ListDirectoryRequest, PasteBlobRequest,
+    PasteItemsRequest, PasteTextRequest, PrepareOpenItemRequest, PreparedOpenItem,
+    RenameItemRequest,
 };
 use crate::core::file_master::{
     join_remote_path, normalize_remote_path, virtual_path_parts, RemoteBrowseTarget,
@@ -24,10 +30,16 @@ use crate::core::listing_cache::ListingCache;
 use crate::error::{ApiError, ApiResult};
 use crate::services::{
     environment::AppEnvironmentService,
+    explorer_library::{ExplorerLibraryItem, ExplorerLibraryService},
     providers::{ProviderRemote, ProviderService},
     proxy::ProxyService,
     transfers::TransferService,
 };
+
+const VIRTUAL_PATH_RECENT: &str = "misty://recent";
+const VIRTUAL_PATH_STARRED: &str = "misty://starred";
+const VIRTUAL_PATH_TRASH: &str = "misty://trash";
+const MAX_PREVIEW_BYTES: u64 = 32 * 1024 * 1024;
 
 #[derive(Clone)]
 pub struct ExplorerService {
@@ -36,9 +48,14 @@ pub struct ExplorerService {
     proxy: ProxyService,
     providers: ProviderService,
     transfers: TransferService,
+    explorer_library: ExplorerLibraryService,
     listing_cache: ListingCache,
     remote_open_cache: Arc<Mutex<ClipboardCache>>,
     clipboard_text_cache_dir: PathBuf,
+    clipboard_blob_cache_dir: PathBuf,
+    trash_dir: PathBuf,
+    #[cfg(test)]
+    remote_job_cancellation_log: Option<Arc<Mutex<Vec<String>>>>,
 }
 
 impl ExplorerService {
@@ -47,26 +64,52 @@ impl ExplorerService {
         proxy: ProxyService,
         providers: ProviderService,
         transfers: TransferService,
+        explorer_library: ExplorerLibraryService,
     ) -> Self {
         let cache_dir = environment.cache_dir();
+        let mut remote_open_cache = ClipboardCache::new(cache_dir.join("remote-open").join("v1"));
+        remote_open_cache.cleanup_expired();
         Self {
             home_dir: environment.home_dir(),
             mount_root: environment.mount_root(),
             proxy,
             providers,
             transfers,
+            explorer_library,
             listing_cache: ListingCache::new(cache_dir.join("remotes"), cache_dir.join("listings")),
-            remote_open_cache: Arc::new(Mutex::new(ClipboardCache::new(
-                cache_dir.join("remote-open").join("v1"),
-            ))),
+            remote_open_cache: Arc::new(Mutex::new(remote_open_cache)),
             clipboard_text_cache_dir: cache_dir.join("clipboard-paste").join("text"),
+            clipboard_blob_cache_dir: cache_dir.join("clipboard-paste").join("blob"),
+            trash_dir: cache_dir.join("trash"),
+            #[cfg(test)]
+            remote_job_cancellation_log: None,
         }
+    }
+
+    #[cfg(test)]
+    fn with_remote_job_cancellation_log(mut self, log: Arc<Mutex<Vec<String>>>) -> Self {
+        self.remote_job_cancellation_log = Some(log);
+        self
     }
 
     pub async fn list_directory(
         &self,
         request: ListDirectoryRequest,
     ) -> ApiResult<DirectoryListing> {
+        if let Some(path) = request.path.as_deref().map(str::trim) {
+            if path == VIRTUAL_PATH_RECENT || path == VIRTUAL_PATH_STARRED {
+                return self.list_library_virtual_directory(path).await;
+            }
+            if path == VIRTUAL_PATH_TRASH {
+                return self.list_trash_virtual_directory().await;
+            }
+            if path.starts_with("misty://") {
+                return Err(ApiError::Message(format!(
+                    "Unsupported virtual Explorer location: {path}"
+                )));
+            }
+        }
+
         let requested = request
             .path
             .as_deref()
@@ -86,6 +129,130 @@ impl ExplorerService {
             .map_err(|err| ApiError::Message(format!("Explorer worker failed: {err}")))?
     }
 
+    async fn list_library_virtual_directory(&self, path: &str) -> ApiResult<DirectoryListing> {
+        let snapshot = self.explorer_library.snapshot().await?;
+        let source_items = if path == VIRTUAL_PATH_RECENT {
+            snapshot.recent_files
+        } else {
+            snapshot.starred_files
+        };
+        let mut entries: Vec<FileEntry> = source_items
+            .into_iter()
+            .filter_map(|item| self.library_item_to_file_entry(item, path == VIRTUAL_PATH_RECENT))
+            .collect();
+        entries.sort_by(|left, right| {
+            virtual_folder_rank(&left.kind)
+                .cmp(&virtual_folder_rank(&right.kind))
+                .then_with(|| left.name.to_lowercase().cmp(&right.name.to_lowercase()))
+        });
+        let total_count = entries.len();
+        Ok(DirectoryListing {
+            path: path.to_string(),
+            parent_path: None,
+            location: ExplorerLocation::local(),
+            hidden_count: 0,
+            total_count,
+            entries,
+        })
+    }
+
+    async fn list_trash_virtual_directory(&self) -> ApiResult<DirectoryListing> {
+        let trash_dir = self.trash_dir.clone();
+        let entries = tokio::task::spawn_blocking(move || trash_virtual_entries(&trash_dir))
+            .await
+            .map_err(|err| ApiError::Message(format!("Explorer trash worker failed: {err}")))??;
+        let total_count = entries.len();
+        Ok(DirectoryListing {
+            path: VIRTUAL_PATH_TRASH.to_string(),
+            parent_path: None,
+            location: ExplorerLocation::local(),
+            hidden_count: 0,
+            total_count,
+            entries,
+        })
+    }
+
+    fn library_item_to_file_entry(
+        &self,
+        item: ExplorerLibraryItem,
+        prune_missing_local: bool,
+    ) -> Option<FileEntry> {
+        let path = item.path.trim();
+        if path.is_empty() {
+            return None;
+        }
+        if self.remote_target(path).is_none() && prune_missing_local && !Path::new(path).exists() {
+            return None;
+        }
+        let path_buf = PathBuf::from(path);
+        let name = if item.name.trim().is_empty() {
+            path_buf
+                .file_name()
+                .and_then(|value| value.to_str())
+                .unwrap_or(path)
+                .to_string()
+        } else {
+            item.name
+        };
+        let kind = if item.is_dir {
+            FileKind::Folder
+        } else {
+            FileKind::File
+        };
+        let location = self
+            .remote_target(path)
+            .map(|target| ExplorerLocation {
+                kind: ExplorerLocationKind::Remote,
+                provider_type: Some(target.provider_type),
+                remote_name: Some(target.remote_name),
+                remote_path: Some(target.remote_path),
+            })
+            .unwrap_or_else(ExplorerLocation::local);
+        let size_bytes = if item.size > 0 && !item.is_dir {
+            Some(item.size as u64)
+        } else {
+            None
+        };
+        let mime_type = if item.mime_type.trim().is_empty() {
+            None
+        } else {
+            Some(item.mime_type)
+        };
+        let remote_modified = if item.last_modified.trim().is_empty() {
+            None
+        } else {
+            Some(item.last_modified)
+        };
+        Some(FileEntry {
+            id: if item.id.trim().is_empty() {
+                path.to_string()
+            } else {
+                item.id
+            },
+            name,
+            path: path.to_string(),
+            extension: path_buf
+                .extension()
+                .and_then(|value| value.to_str())
+                .unwrap_or_default()
+                .to_string(),
+            mime_type,
+            remote_modified,
+            kind,
+            size_bytes,
+            modified_ms: None,
+            created_ms: None,
+            readonly: false,
+            hidden: path_buf
+                .file_name()
+                .and_then(|value| value.to_str())
+                .map(|value| value.starts_with('.'))
+                .unwrap_or(false),
+            is_deleted: false,
+            location,
+        })
+    }
+
     pub async fn item_is_directory(&self, path: &str) -> ApiResult<Option<bool>> {
         if let Some(target) = self.remote_target(path) {
             if target.remote_path == "/" {
@@ -100,13 +267,66 @@ impl ExplorerService {
             return remote_item_is_directory(&parent, &target.remote_path, &items);
         }
         self.reject_virtual_mount_container(path, "inspect")?;
-        match tokio::fs::symlink_metadata(path).await {
+        // Match std::filesystem::is_directory in the native Explorer: the
+        // decision to browse or open follows a local symlink's target.
+        match tokio::fs::metadata(path).await {
             Ok(metadata) => Ok(Some(metadata.is_dir())),
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
             Err(error) => Err(ApiError::Message(format!(
                 "Failed to inspect {path}: {error}"
             ))),
         }
+    }
+
+    pub async fn preview_item(&self, path: &str) -> ApiResult<ExplorerPreviewPayload> {
+        if self.remote_target(path).is_some() {
+            return Err(ApiError::Message(
+                "Preview is available after opening or downloading a remote file.".to_string(),
+            ));
+        }
+        self.reject_virtual_mount_container(path, "preview")?;
+        let path = Path::new(path);
+        let mime_type = preview_mime_type(path).ok_or_else(|| {
+            ApiError::Message("This file type does not support preview.".to_string())
+        })?;
+        let metadata = tokio::fs::metadata(path).await.map_err(|error| {
+            ApiError::Message(format!("Failed to inspect preview file {}: {error}", path.display()))
+        })?;
+        if !metadata.is_file() {
+            return Err(ApiError::Message("Only files can be previewed.".to_string()));
+        }
+        if metadata.len() > MAX_PREVIEW_BYTES {
+            return Err(ApiError::Message(format!(
+                "Preview is limited to {} MB.",
+                MAX_PREVIEW_BYTES / (1024 * 1024)
+            )));
+        }
+        let bytes = tokio::fs::read(path).await.map_err(|error| {
+            ApiError::Message(format!("Failed to read preview file {}: {error}", path.display()))
+        })?;
+        Ok(ExplorerPreviewPayload {
+            mime_type: mime_type.to_string(),
+            bytes,
+        })
+    }
+
+    pub async fn remote_virtual_path(
+        &self,
+        remote_name: &str,
+        remote_path: &str,
+    ) -> ApiResult<String> {
+        let remote_path = normalize_remote_path(remote_path)?;
+        let remotes = self.remote_inventory().await?;
+        let remote = remotes
+            .iter()
+            .find(|remote| remote.name == remote_name)
+            .ok_or_else(|| ApiError::Message(format!("Remote \"{remote_name}\" was not found.")))?;
+        let target = RemoteBrowseTarget {
+            provider_type: remote.provider_type.clone(),
+            remote_name: remote.name.clone(),
+            remote_path,
+        };
+        Ok(display_path(&target.virtual_path(&self.mount_root)))
     }
 
     pub async fn prepare_open_item(
@@ -167,7 +387,7 @@ impl ExplorerService {
         record.detail_message = "Preparing remote file to open".to_string();
         let transfer_id = self.begin_transfer(record).await;
         let result = self
-            .download_remote_item(&source, false, &temp_path, transfer_id)
+            .download_remote_item(&source, false, &temp_path, transfer_id, None)
             .await;
         self.finish_transfer(transfer_id, result).await?;
 
@@ -189,6 +409,24 @@ impl ExplorerService {
         &self,
         request: CreateItemRequest,
     ) -> ApiResult<ExplorerOperationResult> {
+        self.create_item_impl(request, None).await
+    }
+
+    pub async fn create_item_with_cancellation(
+        &self,
+        request: CreateItemRequest,
+        cancellation: Arc<AtomicBool>,
+    ) -> ApiResult<ExplorerOperationResult> {
+        self.create_item_impl(request, Some(cancellation.as_ref()))
+            .await
+    }
+
+    async fn create_item_impl(
+        &self,
+        request: CreateItemRequest,
+        cancellation: Option<&AtomicBool>,
+    ) -> ApiResult<ExplorerOperationResult> {
+        ensure_not_canceled_if(cancellation)?;
         if let Some(target) = self.remote_target(&request.directory) {
             if !matches!(request.kind, crate::core::explorer::CreateItemKind::Folder) {
                 return Err(ApiError::Message(
@@ -213,6 +451,7 @@ impl ExplorerService {
                     "/api/remote/file/mkdir",
                     serde_json::json!({ "remote": target.remote_name, "path": remote_path }),
                     transfer_id,
+                    cancellation,
                 )
                 .await,
             )
@@ -236,6 +475,7 @@ impl ExplorerService {
         record.local_dest_path = display_path(&Path::new(&request.directory).join(&request.name));
         record.detail_message = "Creating local item".to_string();
         let transfer_id = self.begin_transfer(record).await;
+        ensure_not_canceled_if(cancellation)?;
         let result = tokio::task::spawn_blocking(move || create_item(request))
             .await
             .map_err(|err| ApiError::Message(format!("Explorer worker failed: {err}")))?;
@@ -246,6 +486,24 @@ impl ExplorerService {
         &self,
         request: RenameItemRequest,
     ) -> ApiResult<ExplorerOperationResult> {
+        self.rename_item_impl(request, None).await
+    }
+
+    pub async fn rename_item_with_cancellation(
+        &self,
+        request: RenameItemRequest,
+        cancellation: Arc<AtomicBool>,
+    ) -> ApiResult<ExplorerOperationResult> {
+        self.rename_item_impl(request, Some(cancellation.as_ref()))
+            .await
+    }
+
+    async fn rename_item_impl(
+        &self,
+        request: RenameItemRequest,
+        cancellation: Option<&AtomicBool>,
+    ) -> ApiResult<ExplorerOperationResult> {
+        ensure_not_canceled_if(cancellation)?;
         if let Some(source) = self.remote_target(&request.path) {
             if source.remote_path == "/" {
                 return Err(ApiError::Message(
@@ -276,6 +534,7 @@ impl ExplorerService {
                         "dest_path": destination_path,
                     }),
                     transfer_id,
+                    cancellation,
                 )
                 .await
             } else {
@@ -287,6 +546,7 @@ impl ExplorerService {
                         "new_path": destination_path,
                     }),
                     transfer_id,
+                    cancellation,
                 )
                 .await
             };
@@ -325,6 +585,7 @@ impl ExplorerService {
         .await;
         record.detail_message = "Renaming local item".to_string();
         let transfer_id = self.begin_transfer(record).await;
+        ensure_not_canceled_if(cancellation)?;
         let result = tokio::task::spawn_blocking(move || rename_item(request))
             .await
             .map_err(|err| ApiError::Message(format!("Explorer worker failed: {err}")))?;
@@ -335,10 +596,29 @@ impl ExplorerService {
         &self,
         request: DeleteItemsRequest,
     ) -> ApiResult<ExplorerOperationResult> {
+        self.delete_items_impl(request, None).await
+    }
+
+    pub async fn delete_items_with_cancellation(
+        &self,
+        request: DeleteItemsRequest,
+        cancellation: Arc<AtomicBool>,
+    ) -> ApiResult<ExplorerOperationResult> {
+        self.delete_items_impl(request, Some(cancellation.as_ref()))
+            .await
+    }
+
+    async fn delete_items_impl(
+        &self,
+        request: DeleteItemsRequest,
+        cancellation: Option<&AtomicBool>,
+    ) -> ApiResult<ExplorerOperationResult> {
+        ensure_not_canceled_if(cancellation)?;
         let mut local_paths = Vec::new();
         let mut affected_paths = Vec::new();
         let mut parent_path = None;
         for path in request.paths {
+            ensure_not_canceled_if(cancellation)?;
             if let Some(target) = self.remote_target(&path) {
                 if target.remote_path == "/" {
                     return Err(ApiError::Message(
@@ -361,9 +641,11 @@ impl ExplorerService {
                 let transfer_id = self.begin_transfer(record).await;
                 self.finish_transfer(
                     transfer_id,
-                    self.delete_remote_target(&target, transfer_id).await,
+                    self.delete_remote_target(&target, transfer_id, cancellation)
+                        .await,
                 )
                 .await?;
+                ensure_not_canceled_if(cancellation)?;
                 let virtual_path = target.virtual_path(&self.mount_root);
                 parent_path.get_or_insert_with(|| {
                     virtual_path.parent().map(display_path).unwrap_or_default()
@@ -375,6 +657,7 @@ impl ExplorerService {
             }
         }
         for local_path in local_paths {
+            ensure_not_canceled_if(cancellation)?;
             let file_name = Path::new(&local_path)
                 .file_name()
                 .and_then(|value| value.to_str())
@@ -394,13 +677,12 @@ impl ExplorerService {
                 .unwrap_or_default();
             record.detail_message = "Deleting local item".to_string();
             let transfer_id = self.begin_transfer(record).await;
-            let local_result = tokio::task::spawn_blocking(move || {
-                delete_items(DeleteItemsRequest {
-                    paths: vec![local_path],
-                })
-            })
-            .await
-            .map_err(|err| ApiError::Message(format!("Explorer worker failed: {err}")))?;
+            let local_result = delete_local_path_cancellable(Path::new(&local_path), cancellation)
+                .await
+                .map(|()| ExplorerOperationResult {
+                    affected_paths: vec![local_path.clone()],
+                    parent_path: Path::new(&local_path).parent().map(display_path),
+                });
             let local_result = self.finish_transfer(transfer_id, local_result).await?;
             if parent_path.is_none() {
                 parent_path = local_result.parent_path.clone();
@@ -417,9 +699,19 @@ impl ExplorerService {
         &self,
         request: PasteItemsRequest,
     ) -> ApiResult<ExplorerOperationResult> {
+        self.paste_items_impl(request, None).await
+    }
+
+    async fn paste_items_impl(
+        &self,
+        request: PasteItemsRequest,
+        cancellation: Option<&AtomicBool>,
+    ) -> ApiResult<ExplorerOperationResult> {
+        ensure_not_canceled_if(cancellation)?;
         if let Some(destination) = self.remote_target(&request.destination_directory) {
             let mut affected_paths = Vec::new();
             for item in &request.sources {
+                ensure_not_canceled_if(cancellation)?;
                 let source_name = request
                     .target_name
                     .as_deref()
@@ -490,6 +782,7 @@ impl ExplorerService {
                             "dest_path": destination_path,
                         }),
                         transfer_id,
+                        cancellation,
                     )
                     .await
                     .map(|_| ())
@@ -501,6 +794,7 @@ impl ExplorerService {
                             &destination,
                             &source_name,
                             transfer_id,
+                            cancellation,
                         )
                         .await;
                     if upload.is_ok()
@@ -515,6 +809,7 @@ impl ExplorerService {
                     }
                 };
                 self.finish_transfer(transfer_id, operation).await?;
+                ensure_not_canceled_if(cancellation)?;
                 affected_paths.push(display_path(
                     &destination
                         .virtual_path(&self.mount_root)
@@ -538,6 +833,7 @@ impl ExplorerService {
             let destination = PathBuf::from(&request.destination_directory);
             let mut affected_paths = Vec::new();
             for item in &request.sources {
+                ensure_not_canceled_if(cancellation)?;
                 let source = self.remote_target(&item.path).ok_or_else(|| {
                     ApiError::Message(
                         "A single paste cannot mix local and remote sources.".to_string(),
@@ -568,18 +864,26 @@ impl ExplorerService {
                 record.detail_message = "Downloading remote item".to_string();
                 let transfer_id = self.begin_transfer(record).await;
                 let download = self
-                    .download_remote_item(&source, item.is_directory, &local_path, transfer_id)
+                    .download_remote_item(
+                        &source,
+                        item.is_directory,
+                        &local_path,
+                        transfer_id,
+                        cancellation,
+                    )
                     .await;
                 let operation = if download.is_ok()
                     && matches!(
                         request.operation,
                         crate::core::explorer::ClipboardOperation::Move
                     ) {
-                    self.delete_remote_target(&source, transfer_id).await
+                    self.delete_remote_target(&source, transfer_id, cancellation)
+                        .await
                 } else {
                     download
                 };
                 self.finish_transfer(transfer_id, operation).await?;
+                ensure_not_canceled_if(cancellation)?;
                 affected_paths.push(display_path(&local_path));
             }
             return Ok(ExplorerOperationResult {
@@ -623,6 +927,118 @@ impl ExplorerService {
         self.finish_transfers(&transfer_ids, result).await
     }
 
+    pub async fn paste_items_with_cancellation(
+        &self,
+        request: PasteItemsRequest,
+        cancellation: Arc<AtomicBool>,
+    ) -> ApiResult<ExplorerOperationResult> {
+        ensure_not_canceled(cancellation.as_ref())?;
+        if self.remote_target(&request.destination_directory).is_some()
+            || request
+                .sources
+                .iter()
+                .any(|item| self.remote_target(&item.path).is_some())
+        {
+            let result = self
+                .paste_items_impl(request, Some(cancellation.as_ref()))
+                .await;
+            ensure_not_canceled(cancellation.as_ref())?;
+            return result;
+        }
+        self.paste_local_items_with_cancellation(request, cancellation.as_ref())
+            .await
+    }
+
+    async fn paste_local_items_with_cancellation(
+        &self,
+        request: PasteItemsRequest,
+        cancellation: &AtomicBool,
+    ) -> ApiResult<ExplorerOperationResult> {
+        if request.sources.is_empty() {
+            return Err(ApiError::Message("Copy or cut an item first.".to_string()));
+        }
+
+        self.reject_virtual_mount_container(&request.destination_directory, "paste")?;
+        let destination_directory =
+            normalize_existing_local_dir(&request.destination_directory).await?;
+        let target_name = if request.sources.len() == 1 {
+            request
+                .target_name
+                .as_deref()
+                .map(validate_local_file_name)
+                .transpose()?
+        } else {
+            None
+        };
+        let mut affected_paths = Vec::new();
+        let mut transfer_ids = Vec::with_capacity(request.sources.len());
+
+        for item in &request.sources {
+            ensure_not_canceled(cancellation)?;
+            let source = PathBuf::from(&item.path);
+            let source_metadata = tokio::fs::symlink_metadata(&source)
+                .await
+                .map_err(|error| {
+                    ApiError::Message(format!("Failed to inspect {}: {error}", source.display()))
+                })?;
+            let file_name = target_name
+                .map(OsStr::new)
+                .or_else(|| source.file_name())
+                .ok_or_else(|| ApiError::Message(format!("Cannot paste {}.", source.display())))?;
+            let destination = destination_directory.join(file_name);
+            ensure_destination_available(&destination).await?;
+
+            if source_metadata.is_dir()
+                && !source_metadata.file_type().is_symlink()
+                && destination_directory.starts_with(&source)
+            {
+                return Err(ApiError::Message(
+                    "Cannot paste a folder into itself.".to_string(),
+                ));
+            }
+
+            let file_name = file_name.to_string_lossy().to_string();
+            let mut record = FileTransferRecord::new(
+                match request.operation {
+                    crate::core::explorer::ClipboardOperation::Copy => FileTransferType::Copy,
+                    crate::core::explorer::ClipboardOperation::Move => FileTransferType::Move,
+                },
+                FileTransferItemType::Local,
+                &file_name,
+            );
+            record.local_source_path = display_path(&source);
+            record.local_dest_path = display_path(&destination);
+            record.total_bytes = local_item_size(&source, item.is_directory).await;
+            record.detail_message = "Transferring local item".to_string();
+            if let Some(id) = self.begin_transfer(record).await {
+                transfer_ids.push(id);
+            }
+
+            let result = match request.operation {
+                crate::core::explorer::ClipboardOperation::Copy => {
+                    copy_local_path_cancellable(&source, &destination, cancellation).await
+                }
+                crate::core::explorer::ClipboardOperation::Move => {
+                    move_local_path_cancellable(&source, &destination, cancellation).await
+                }
+            };
+            let result = cleanup_partial_destination_on_cancel(
+                &destination,
+                source_metadata.is_dir() && !source_metadata.file_type().is_symlink(),
+                result,
+            )
+            .await;
+            self.finish_transfers(&transfer_ids, result).await?;
+            transfer_ids.clear();
+            affected_paths.push(display_path(&destination));
+        }
+
+        Ok(ExplorerOperationResult {
+            affected_paths,
+            parent_path: Some(display_path(&destination_directory)),
+        })
+    }
+
     pub async fn stage_clipboard_text_paste(
         &self,
         request: PasteTextRequest,
@@ -649,6 +1065,46 @@ impl ExplorerService {
             .map_err(|error| {
                 ApiError::Message(format!(
                     "Failed to stage clipboard text {}: {error}",
+                    source_path.display()
+                ))
+            })?;
+        Ok(PasteItemsRequest {
+            sources: vec![crate::core::explorer::PasteItem {
+                path: display_path(&source_path),
+                is_directory: false,
+            }],
+            destination_directory: request.destination_directory,
+            operation: crate::core::explorer::ClipboardOperation::Copy,
+            target_name: Some(preferred_name),
+        })
+    }
+
+    pub async fn stage_clipboard_blob_paste(
+        &self,
+        request: PasteBlobRequest,
+    ) -> ApiResult<PasteItemsRequest> {
+        if request.bytes.is_empty() {
+            return Err(ApiError::Message("Clipboard image is empty.".to_string()));
+        }
+        let preferred_name =
+            validate_remote_name(request.preferred_name.as_deref().unwrap_or("clipboard.png"))?
+                .to_string();
+        tokio::fs::create_dir_all(&self.clipboard_blob_cache_dir)
+            .await
+            .map_err(|error| {
+                ApiError::Message(format!(
+                    "Failed to prepare clipboard cache {}: {error}",
+                    self.clipboard_blob_cache_dir.display()
+                ))
+            })?;
+        let source_path = self
+            .clipboard_blob_cache_dir
+            .join(format!("clipboard-{}.bin", now_epoch_ms()));
+        tokio::fs::write(&source_path, request.bytes)
+            .await
+            .map_err(|error| {
+                ApiError::Message(format!(
+                    "Failed to stage clipboard image {}: {error}",
                     source_path.display()
                 ))
             })?;
@@ -868,6 +1324,7 @@ impl ExplorerService {
                 modified_ms: None,
                 created_ms: None,
                 readonly: false,
+                is_deleted: false,
                 location: ExplorerLocation {
                     kind: ExplorerLocationKind::Remote,
                     provider_type: Some(target.provider_type.clone()),
@@ -901,7 +1358,9 @@ impl ExplorerService {
         destination: &RemoteBrowseTarget,
         source_name: &str,
         transfer_id: Option<u64>,
+        cancellation: Option<&AtomicBool>,
     ) -> ApiResult<()> {
+        ensure_not_canceled_if(cancellation)?;
         let metadata = tokio::fs::symlink_metadata(source).await.map_err(|error| {
             ApiError::Message(format!("Failed to inspect {}: {error}", source.display()))
         })?;
@@ -920,16 +1379,23 @@ impl ExplorerService {
                     &destination.remote_path,
                     source_name,
                     transfer_id,
+                    cancellation,
                 )
                 .await;
         }
 
         let root_remote_path =
             normalize_remote_path(&join_remote_path(&destination.remote_path, source_name))?;
-        self.create_remote_directory(&destination.remote_name, &root_remote_path, transfer_id)
-            .await?;
+        self.create_remote_directory(
+            &destination.remote_name,
+            &root_remote_path,
+            transfer_id,
+            cancellation,
+        )
+        .await?;
         let mut pending = vec![(source.to_path_buf(), root_remote_path)];
         while let Some((local_directory, remote_directory)) = pending.pop() {
+            ensure_not_canceled_if(cancellation)?;
             let mut children = tokio::fs::read_dir(&local_directory)
                 .await
                 .map_err(|error| {
@@ -945,6 +1411,7 @@ impl ExplorerService {
                 ))
             })? {
                 let child_path = child.path();
+                ensure_not_canceled_if(cancellation)?;
                 let child_name = child.file_name().to_string_lossy().to_string();
                 let child_metadata = child.metadata().await.map_err(|error| {
                     ApiError::Message(format!(
@@ -959,6 +1426,7 @@ impl ExplorerService {
                         &destination.remote_name,
                         &child_remote_path,
                         transfer_id,
+                        cancellation,
                     )
                     .await?;
                     pending.push((child_path, child_remote_path));
@@ -969,6 +1437,7 @@ impl ExplorerService {
                         &remote_directory,
                         &child_name,
                         transfer_id,
+                        cancellation,
                     )
                     .await?;
                 }
@@ -984,13 +1453,16 @@ impl ExplorerService {
         remote_directory: &str,
         file_name: &str,
         transfer_id: Option<u64>,
+        cancellation: Option<&AtomicBool>,
     ) -> ApiResult<()> {
+        ensure_not_canceled_if(cancellation)?;
         let response = self
             .proxy
             .upload_file(remote_name, remote_directory, local_path, file_name)
             .await?;
         let start: RemoteJobStart = response_json(response, "start remote upload").await?;
-        self.wait_for_job(&start.job_id, transfer_id).await?;
+        self.wait_for_job(&start.job_id, transfer_id, cancellation)
+            .await?;
         Ok(())
     }
 
@@ -999,11 +1471,13 @@ impl ExplorerService {
         remote_name: &str,
         remote_path: &str,
         transfer_id: Option<u64>,
+        cancellation: Option<&AtomicBool>,
     ) -> ApiResult<()> {
         self.start_json_job(
             "/api/remote/file/mkdir",
             serde_json::json!({ "remote": remote_name, "path": remote_path }),
             transfer_id,
+            cancellation,
         )
         .await?;
         Ok(())
@@ -1015,10 +1489,12 @@ impl ExplorerService {
         is_directory: bool,
         destination: &Path,
         transfer_id: Option<u64>,
+        cancellation: Option<&AtomicBool>,
     ) -> ApiResult<()> {
+        ensure_not_canceled_if(cancellation)?;
         if !is_directory {
             return self
-                .download_remote_file(source, destination, transfer_id)
+                .download_remote_file(source, destination, transfer_id, cancellation)
                 .await;
         }
 
@@ -1030,8 +1506,10 @@ impl ExplorerService {
         })?;
         let mut pending = vec![(source.clone(), destination.to_path_buf())];
         while let Some((remote_directory, local_directory)) = pending.pop() {
+            ensure_not_canceled_if(cancellation)?;
             let items = self.fetch_remote_items(&remote_directory).await?;
             for item in items {
+                ensure_not_canceled_if(cancellation)?;
                 let remote_path = remote_directory.child_remote_path(&item)?;
                 let name = if item.name.is_empty() {
                     Path::new(&remote_path)
@@ -1059,8 +1537,13 @@ impl ExplorerService {
                         })?;
                     pending.push((child_target, child_destination));
                 } else {
-                    self.download_remote_file(&child_target, &child_destination, transfer_id)
-                        .await?;
+                    self.download_remote_file(
+                        &child_target,
+                        &child_destination,
+                        transfer_id,
+                        cancellation,
+                    )
+                    .await?;
                 }
             }
         }
@@ -1072,7 +1555,9 @@ impl ExplorerService {
         source: &RemoteBrowseTarget,
         destination: &Path,
         transfer_id: Option<u64>,
+        cancellation: Option<&AtomicBool>,
     ) -> ApiResult<()> {
+        ensure_not_canceled_if(cancellation)?;
         let response = self
             .proxy
             .get_with_query(
@@ -1084,11 +1569,14 @@ impl ExplorerService {
             )
             .await?;
         let start: RemoteJobStart = response_json(response, "start remote download").await?;
-        self.wait_for_job(&start.job_id, transfer_id).await?;
+        self.wait_for_job(&start.job_id, transfer_id, cancellation)
+            .await?;
+        ensure_not_canceled_if(cancellation)?;
         self.proxy
-            .download_to_file(
+            .download_to_file_with_cancellation(
                 &format!("/api/remote/file/jobs/{}/result/download", start.job_id),
                 destination,
+                cancellation,
             )
             .await
     }
@@ -1108,7 +1596,7 @@ impl ExplorerService {
             )
             .await?;
         let start: RemoteJobStart = response_json(response, "start remote list").await?;
-        self.wait_for_job(&start.job_id, None).await?;
+        self.wait_for_job(&start.job_id, None, None).await?;
         let response = self
             .proxy
             .get(&format!(
@@ -1141,7 +1629,9 @@ impl ExplorerService {
         &self,
         target: &RemoteBrowseTarget,
         transfer_id: Option<u64>,
+        cancellation: Option<&AtomicBool>,
     ) -> ApiResult<()> {
+        ensure_not_canceled_if(cancellation)?;
         let response = self
             .proxy
             .delete_with_query(
@@ -1153,7 +1643,8 @@ impl ExplorerService {
             )
             .await?;
         let start: RemoteJobStart = response_json(response, "start remote delete").await?;
-        self.wait_for_job(&start.job_id, transfer_id).await?;
+        self.wait_for_job(&start.job_id, transfer_id, cancellation)
+            .await?;
         self.listing_cache
             .clear(&target.remote_name, &target.remote_path)
             .await?;
@@ -1170,8 +1661,13 @@ impl ExplorerService {
         &self,
         job_id: &str,
         transfer_id: Option<u64>,
+        cancellation: Option<&AtomicBool>,
     ) -> ApiResult<RemoteJobStatus> {
         for _ in 0..1_200 {
+            if cancellation.is_some_and(|token| token.load(Ordering::SeqCst)) {
+                let _ = self.cancel_remote_job(job_id).await;
+                return Err(ApiError::Message("Operation canceled.".to_string()));
+            }
             let response = self
                 .proxy
                 .get(&format!("/api/remote/file/jobs/{job_id}"))
@@ -1191,7 +1687,7 @@ impl ExplorerService {
             }
             match status.state.as_str() {
                 "succeeded" => return Ok(status),
-                "failed" | "cancelled" => {
+                "failed" | "canceled" | "cancelled" => {
                     let message = if status.message.is_empty() {
                         format!("Remote {} job {}", status.operation, status.state)
                     } else {
@@ -1205,12 +1701,41 @@ impl ExplorerService {
         Err(ApiError::Message("Remote operation timed out".to_string()))
     }
 
+    async fn cancel_remote_job(&self, job_id: &str) -> ApiResult<()> {
+        let path = remote_job_path(job_id);
+        #[cfg(test)]
+        if let Some(log) = &self.remote_job_cancellation_log {
+            log.lock().await.push(format!("DELETE {path}"));
+            return Ok(());
+        }
+        let response = self
+            .proxy
+            .delete(&path)
+            .await?;
+        if response.status().is_success() || response.status().as_u16() == 404 {
+            Ok(())
+        } else {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            Err(ApiError::Message(if body.is_empty() {
+                format!(
+                    "Failed to cancel remote job {job_id} (HTTP {})",
+                    status.as_u16()
+                )
+            } else {
+                body
+            }))
+        }
+    }
+
     async fn start_json_job(
         &self,
         path: &str,
         body: serde_json::Value,
         transfer_id: Option<u64>,
+        cancellation: Option<&AtomicBool>,
     ) -> ApiResult<RemoteJobStatus> {
+        ensure_not_canceled_if(cancellation)?;
         let response = self.proxy.post_json(path, &body).await?;
         let start: RemoteJobStart = response_json(response, "start remote operation").await?;
         if start.job_id.trim().is_empty() {
@@ -1218,7 +1743,8 @@ impl ExplorerService {
                 "Remote operation did not return a job id".to_string(),
             ));
         }
-        self.wait_for_job(&start.job_id, transfer_id).await
+        self.wait_for_job(&start.job_id, transfer_id, cancellation)
+            .await
     }
 
     async fn begin_transfer(&self, record: FileTransferRecord) -> Option<u64> {
@@ -1239,10 +1765,17 @@ impl ExplorerService {
             }
             Err(error) => {
                 if let Some(transfer_id) = transfer_id {
-                    let _ = self
-                        .transfers
-                        .fail_transfer(transfer_id, error.to_string())
-                        .await;
+                    if is_cancellation_error(&error) {
+                        let _ = self
+                            .transfers
+                            .cancel_transfer(transfer_id, "Canceled".to_string())
+                            .await;
+                    } else {
+                        let _ = self
+                            .transfers
+                            .fail_transfer(transfer_id, error.to_string())
+                            .await;
+                    }
                 }
                 Err(error)
             }
@@ -1264,10 +1797,17 @@ impl ExplorerService {
             Err(error) => {
                 let message = error.to_string();
                 for transfer_id in transfer_ids {
-                    let _ = self
-                        .transfers
-                        .fail_transfer(*transfer_id, message.clone())
-                        .await;
+                    if is_cancellation_error(&error) {
+                        let _ = self
+                            .transfers
+                            .cancel_transfer(*transfer_id, "Canceled".to_string())
+                            .await;
+                    } else {
+                        let _ = self
+                            .transfers
+                            .fail_transfer(*transfer_id, message.clone())
+                            .await;
+                    }
                 }
                 Err(error)
             }
@@ -1352,6 +1892,293 @@ async fn ensure_destination_available(path: &Path) -> ApiResult<()> {
     }
 }
 
+async fn normalize_existing_local_dir(path: &str) -> ApiResult<PathBuf> {
+    let path = PathBuf::from(path);
+    let canonical = tokio::fs::canonicalize(&path).await.map_err(|error| {
+        ApiError::Message(format!(
+            "Failed to resolve directory {}: {error}",
+            path.display()
+        ))
+    })?;
+    let metadata = tokio::fs::metadata(&canonical).await.map_err(|error| {
+        ApiError::Message(format!(
+            "Failed to inspect {}: {error}",
+            canonical.display()
+        ))
+    })?;
+    if !metadata.is_dir() {
+        return Err(ApiError::Message(format!(
+            "{} is not a directory.",
+            canonical.display()
+        )));
+    }
+    Ok(canonical)
+}
+
+fn validate_local_file_name(name: &str) -> ApiResult<&str> {
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        return Err(ApiError::Message("Enter a name.".to_string()));
+    }
+    let path = Path::new(trimmed);
+    let mut components = path.components();
+    match (components.next(), components.next()) {
+        (Some(std::path::Component::Normal(_)), None) => Ok(trimmed),
+        _ => Err(ApiError::Message(
+            "Names cannot contain path separators.".to_string(),
+        )),
+    }
+}
+
+async fn copy_local_path_cancellable(
+    source: &Path,
+    destination: &Path,
+    cancellation: &AtomicBool,
+) -> ApiResult<()> {
+    ensure_not_canceled(cancellation)?;
+    let metadata = tokio::fs::symlink_metadata(source).await.map_err(|error| {
+        ApiError::Message(format!("Failed to inspect {}: {error}", source.display()))
+    })?;
+    if metadata.is_dir() && !metadata.file_type().is_symlink() {
+        copy_local_directory_cancellable(source, destination, cancellation).await
+    } else {
+        copy_local_file_cancellable(source, destination, cancellation).await
+    }
+}
+
+async fn copy_local_directory_cancellable(
+    source: &Path,
+    destination: &Path,
+    cancellation: &AtomicBool,
+) -> ApiResult<()> {
+    tokio::fs::create_dir(destination).await.map_err(|error| {
+        ApiError::Message(format!(
+            "Failed to create folder {}: {error}",
+            destination.display()
+        ))
+    })?;
+
+    let mut pending = vec![(source.to_path_buf(), destination.to_path_buf())];
+    while let Some((current_source, current_destination)) = pending.pop() {
+        ensure_not_canceled(cancellation)?;
+        let mut entries = tokio::fs::read_dir(&current_source)
+            .await
+            .map_err(|error| {
+                ApiError::Message(format!(
+                    "Failed to read folder {}: {error}",
+                    current_source.display()
+                ))
+            })?;
+        while let Some(entry) = entries.next_entry().await.map_err(|error| {
+            ApiError::Message(format!(
+                "Failed to read folder {}: {error}",
+                current_source.display()
+            ))
+        })? {
+            ensure_not_canceled(cancellation)?;
+            let child_source = entry.path();
+            let child_destination = current_destination.join(entry.file_name());
+            let metadata = tokio::fs::symlink_metadata(&child_source)
+                .await
+                .map_err(|error| {
+                    ApiError::Message(format!(
+                        "Failed to inspect {}: {error}",
+                        child_source.display()
+                    ))
+                })?;
+            if metadata.is_dir() && !metadata.file_type().is_symlink() {
+                tokio::fs::create_dir(&child_destination)
+                    .await
+                    .map_err(|error| {
+                        ApiError::Message(format!(
+                            "Failed to create folder {}: {error}",
+                            child_destination.display()
+                        ))
+                    })?;
+                pending.push((child_source, child_destination));
+            } else {
+                copy_local_file_cancellable(&child_source, &child_destination, cancellation)
+                    .await?;
+            }
+        }
+    }
+    Ok(())
+}
+
+async fn copy_local_file_cancellable(
+    source: &Path,
+    destination: &Path,
+    cancellation: &AtomicBool,
+) -> ApiResult<()> {
+    ensure_not_canceled(cancellation)?;
+    if let Some(parent) = destination.parent() {
+        tokio::fs::create_dir_all(parent).await.map_err(|error| {
+            ApiError::Message(format!("Failed to create {}: {error}", parent.display()))
+        })?;
+    }
+    let mut input = tokio::fs::File::open(source).await.map_err(|error| {
+        ApiError::Message(format!("Failed to open {}: {error}", source.display()))
+    })?;
+    let mut output = tokio::fs::File::create(destination)
+        .await
+        .map_err(|error| {
+            ApiError::Message(format!(
+                "Failed to create {}: {error}",
+                destination.display()
+            ))
+        })?;
+    let mut buffer = vec![0; 1024 * 1024];
+    loop {
+        ensure_not_canceled(cancellation)?;
+        let read = input.read(&mut buffer).await.map_err(|error| {
+            ApiError::Message(format!("Failed to read {}: {error}", source.display()))
+        })?;
+        if read == 0 {
+            break;
+        }
+        output.write_all(&buffer[..read]).await.map_err(|error| {
+            ApiError::Message(format!(
+                "Failed to write {}: {error}",
+                destination.display()
+            ))
+        })?;
+        tokio::task::yield_now().await;
+    }
+    ensure_not_canceled(cancellation)?;
+    output.flush().await.map_err(|error| {
+        ApiError::Message(format!(
+            "Failed to flush {}: {error}",
+            destination.display()
+        ))
+    })?;
+    Ok(())
+}
+
+async fn move_local_path_cancellable(
+    source: &Path,
+    destination: &Path,
+    cancellation: &AtomicBool,
+) -> ApiResult<()> {
+    ensure_not_canceled(cancellation)?;
+    match tokio::fs::rename(source, destination).await {
+        Ok(()) => Ok(()),
+        Err(rename_error) => {
+            copy_local_path_cancellable(source, destination, cancellation).await?;
+            ensure_not_canceled(cancellation)?;
+            let metadata = tokio::fs::symlink_metadata(source).await.map_err(|error| {
+                ApiError::Message(format!("Failed to inspect {}: {error}", source.display()))
+            })?;
+            let remove = if metadata.is_dir() && !metadata.file_type().is_symlink() {
+                tokio::fs::remove_dir_all(source).await
+            } else {
+                tokio::fs::remove_file(source).await
+            };
+            remove.map_err(|error| {
+                ApiError::Message(format!(
+                    "Moved copy to {}, but failed to remove source {} after rename failed ({rename_error}): {error}",
+                    destination.display(),
+                    source.display()
+                ))
+            })
+        }
+    }
+}
+
+fn ensure_not_canceled(cancellation: &AtomicBool) -> ApiResult<()> {
+    if cancellation.load(Ordering::SeqCst) {
+        return Err(ApiError::Message("Operation canceled.".to_string()));
+    }
+    Ok(())
+}
+
+fn ensure_not_canceled_if(cancellation: Option<&AtomicBool>) -> ApiResult<()> {
+    if let Some(cancellation) = cancellation {
+        ensure_not_canceled(cancellation)?;
+    }
+    Ok(())
+}
+
+fn is_cancellation_error(error: &ApiError) -> bool {
+    error
+        .to_string()
+        .eq_ignore_ascii_case("Operation canceled.")
+}
+
+fn remote_job_path(job_id: &str) -> String {
+    format!("/api/remote/file/jobs/{job_id}")
+}
+
+async fn cleanup_partial_destination_on_cancel<T>(
+    destination: &Path,
+    is_directory: bool,
+    result: ApiResult<T>,
+) -> ApiResult<T> {
+    if result.as_ref().is_err_and(is_cancellation_error) {
+        let _ = remove_local_path(destination, is_directory).await;
+    }
+    result
+}
+
+async fn delete_local_path_cancellable(
+    path: &Path,
+    cancellation: Option<&AtomicBool>,
+) -> ApiResult<()> {
+    ensure_not_canceled_if(cancellation)?;
+    let metadata = tokio::fs::symlink_metadata(path).await.map_err(|error| {
+        ApiError::Message(format!("Failed to inspect {}: {error}", path.display()))
+    })?;
+    if !metadata.is_dir() || metadata.file_type().is_symlink() {
+        tokio::fs::remove_file(path).await.map_err(|error| {
+            ApiError::Message(format!("Failed to delete file {}: {error}", path.display()))
+        })?;
+        return Ok(());
+    }
+
+    let mut stack = vec![(path.to_path_buf(), false)];
+    while let Some((current, visited)) = stack.pop() {
+        ensure_not_canceled_if(cancellation)?;
+        let metadata = match tokio::fs::symlink_metadata(&current).await {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(error) => {
+                return Err(ApiError::Message(format!(
+                    "Failed to inspect {}: {error}",
+                    current.display()
+                )));
+            }
+        };
+        if metadata.is_dir() && !metadata.file_type().is_symlink() {
+            if visited {
+                tokio::fs::remove_dir(&current).await.map_err(|error| {
+                    ApiError::Message(format!(
+                        "Failed to delete folder {}: {error}",
+                        current.display()
+                    ))
+                })?;
+            } else {
+                stack.push((current.clone(), true));
+                let mut children = tokio::fs::read_dir(&current).await.map_err(|error| {
+                    ApiError::Message(format!("Failed to read {}: {error}", current.display()))
+                })?;
+                while let Some(child) = children.next_entry().await.map_err(|error| {
+                    ApiError::Message(format!("Failed to read {}: {error}", current.display()))
+                })? {
+                    ensure_not_canceled_if(cancellation)?;
+                    stack.push((child.path(), false));
+                }
+            }
+        } else {
+            tokio::fs::remove_file(&current).await.map_err(|error| {
+                ApiError::Message(format!(
+                    "Failed to delete file {}: {error}",
+                    current.display()
+                ))
+            })?;
+        }
+    }
+    Ok(())
+}
+
 async fn remove_local_path(path: &Path, is_directory: bool) -> ApiResult<()> {
     let result = if is_directory {
         tokio::fs::remove_dir_all(path).await
@@ -1394,7 +2221,99 @@ fn virtual_folder_entry(path: PathBuf, name: String, location: ExplorerLocation)
         created_ms: None,
         readonly: false,
         hidden: name.starts_with('.'),
+        is_deleted: false,
         location,
+    }
+}
+
+fn trash_virtual_entries(trash_dir: &Path) -> ApiResult<Vec<FileEntry>> {
+    if !trash_dir.exists() {
+        return Ok(Vec::new());
+    }
+    let read_dir = std::fs::read_dir(trash_dir).map_err(|err| {
+        ApiError::Message(format!(
+            "Failed to list trash directory {}: {err}",
+            trash_dir.display()
+        ))
+    })?;
+    let mut entries = Vec::new();
+    for item in read_dir {
+        let item = match item {
+            Ok(item) => item,
+            Err(_) => continue,
+        };
+        let path = item.path();
+        let metadata = match std::fs::symlink_metadata(&path) {
+            Ok(metadata) => metadata,
+            Err(_) => continue,
+        };
+        let name = item.file_name().to_string_lossy().to_string();
+        let file_type = metadata.file_type();
+        let kind = if file_type.is_symlink() {
+            FileKind::Symlink
+        } else if file_type.is_dir() {
+            FileKind::Folder
+        } else if file_type.is_file() {
+            FileKind::File
+        } else {
+            FileKind::Other
+        };
+        entries.push(FileEntry {
+            id: display_path(&path),
+            name: name.clone(),
+            path: display_path(&path),
+            extension: path
+                .extension()
+                .and_then(|value| value.to_str())
+                .unwrap_or_default()
+                .to_string(),
+            mime_type: None,
+            remote_modified: None,
+            kind,
+            size_bytes: if metadata.is_file() {
+                Some(metadata.len())
+            } else {
+                None
+            },
+            modified_ms: metadata.modified().ok().and_then(service_system_time_ms),
+            created_ms: metadata.created().ok().and_then(service_system_time_ms),
+            readonly: metadata.permissions().readonly(),
+            hidden: name.starts_with('.'),
+            is_deleted: true,
+            location: ExplorerLocation::local(),
+        });
+    }
+    entries.sort_by(|left, right| {
+        virtual_folder_rank(&left.kind)
+            .cmp(&virtual_folder_rank(&right.kind))
+            .then_with(|| left.name.to_lowercase().cmp(&right.name.to_lowercase()))
+    });
+    Ok(entries)
+}
+
+fn service_system_time_ms(time: std::time::SystemTime) -> Option<i64> {
+    let duration = time.duration_since(UNIX_EPOCH).ok()?;
+    Some(duration.as_millis().try_into().ok()?)
+}
+
+fn virtual_folder_rank(kind: &FileKind) -> u8 {
+    match kind {
+        FileKind::Folder => 0,
+        FileKind::Symlink => 1,
+        FileKind::File => 2,
+        FileKind::Other => 3,
+    }
+}
+
+fn preview_mime_type(path: &Path) -> Option<&'static str> {
+    match path.extension()?.to_str()?.to_ascii_lowercase().as_str() {
+        "png" => Some("image/png"),
+        "jpg" | "jpeg" => Some("image/jpeg"),
+        "gif" => Some("image/gif"),
+        "bmp" => Some("image/bmp"),
+        "webp" => Some("image/webp"),
+        "pdf" => Some("application/pdf"),
+        _ => None,
     }
 }
 
@@ -1405,6 +2324,8 @@ fn display_path(path: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::services::environment::AppEnvironmentService;
+    use std::sync::atomic::AtomicBool;
 
     #[test]
     fn remote_conflict_lookup_accepts_relative_and_full_list_paths() {
@@ -1442,6 +2363,205 @@ mod tests {
         );
     }
 
+    #[test]
+    fn trash_virtual_entries_are_marked_deleted() {
+        let root = unique_test_dir("trash-virtual");
+        let trashed = root.join("deleted.txt");
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(&trashed, b"deleted").unwrap();
+
+        let entries = trash_virtual_entries(&root).unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].name, "deleted.txt");
+        assert!(entries[0].is_deleted);
+        assert!(matches!(entries[0].kind, FileKind::File));
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn local_directory_inspection_follows_symlink_targets() {
+        use std::os::unix::fs::symlink;
+
+        let root = unique_test_dir("symlink-directory-inspection");
+        let directory = root.join("folder");
+        let file = root.join("file.txt");
+        let directory_link = root.join("folder-link");
+        let file_link = root.join("file-link");
+        tokio::fs::create_dir_all(&directory).await.unwrap();
+        tokio::fs::write(&file, b"file").await.unwrap();
+        symlink(&directory, &directory_link).unwrap();
+        symlink(&file, &file_link).unwrap();
+
+        let service = test_explorer_service();
+        assert_eq!(
+            service
+                .item_is_directory(&display_path(&directory_link))
+                .await
+                .unwrap(),
+            Some(true)
+        );
+        assert_eq!(
+            service
+                .item_is_directory(&display_path(&file_link))
+                .await
+                .unwrap(),
+            Some(false)
+        );
+
+        let _ = tokio::fs::remove_dir_all(&root).await;
+    }
+
+    #[tokio::test]
+    async fn local_preview_payload_is_typed_and_rejects_unsupported_files() {
+        let root = unique_test_dir("preview-payload");
+        let image = root.join("image.png");
+        let unsupported = root.join("notes.txt");
+        tokio::fs::create_dir_all(&root).await.unwrap();
+        tokio::fs::write(&image, [0x89, b'P', b'N', b'G']).await.unwrap();
+        tokio::fs::write(&unsupported, b"notes").await.unwrap();
+
+        let service = test_explorer_service();
+        let preview = service.preview_item(&display_path(&image)).await.unwrap();
+        assert_eq!(preview.mime_type, "image/png");
+        assert_eq!(preview.bytes, vec![0x89, b'P', b'N', b'G']);
+        assert!(service.preview_item(&display_path(&unsupported)).await.is_err());
+
+        let _ = tokio::fs::remove_dir_all(&root).await;
+    }
+
+    #[tokio::test]
+    async fn cancellable_file_copy_stops_when_token_is_set() {
+        let root = unique_test_dir("cancel-copy");
+        let source = root.join("source.bin");
+        let destination = root.join("destination.bin");
+        tokio::fs::create_dir_all(&root).await.unwrap();
+        tokio::fs::write(&source, vec![7u8; 1024]).await.unwrap();
+
+        let cancellation = AtomicBool::new(true);
+        let result = copy_local_file_cancellable(&source, &destination, &cancellation).await;
+        assert!(result.as_ref().is_err_and(is_cancellation_error));
+        assert!(!destination.exists());
+
+        let _ = tokio::fs::remove_dir_all(&root).await;
+    }
+
+    #[tokio::test]
+    async fn canceled_create_item_stops_before_touching_filesystem() {
+        let root = unique_test_dir("cancel-create-item");
+        tokio::fs::create_dir_all(&root).await.unwrap();
+        let service = test_explorer_service();
+        let cancellation = Arc::new(AtomicBool::new(true));
+
+        let result = service
+            .create_item_with_cancellation(
+                CreateItemRequest {
+                    directory: display_path(&root),
+                    name: "never-created.txt".to_string(),
+                    kind: crate::core::explorer::CreateItemKind::File,
+                },
+                cancellation,
+            )
+            .await;
+
+        assert!(result.as_ref().is_err_and(is_cancellation_error));
+        assert!(!root.join("never-created.txt").exists());
+
+        let _ = tokio::fs::remove_dir_all(&root).await;
+    }
+
+    #[tokio::test]
+    async fn canceled_rename_item_stops_before_touching_filesystem() {
+        let root = unique_test_dir("cancel-rename-item");
+        let source = root.join("original.txt");
+        let destination = root.join("renamed.txt");
+        tokio::fs::create_dir_all(&root).await.unwrap();
+        tokio::fs::write(&source, b"keep name").await.unwrap();
+        let service = test_explorer_service();
+        let cancellation = Arc::new(AtomicBool::new(true));
+
+        let result = service
+            .rename_item_with_cancellation(
+                RenameItemRequest {
+                    path: display_path(&source),
+                    new_name: "renamed.txt".to_string(),
+                    source_is_directory: Some(false),
+                },
+                cancellation,
+            )
+            .await;
+
+        assert!(result.as_ref().is_err_and(is_cancellation_error));
+        assert!(source.exists());
+        assert!(!destination.exists());
+
+        let _ = tokio::fs::remove_dir_all(&root).await;
+    }
+
+    #[tokio::test]
+    async fn cancellable_delete_stops_when_token_is_set() {
+        let root = unique_test_dir("cancel-delete");
+        let source = root.join("source.txt");
+        tokio::fs::create_dir_all(&root).await.unwrap();
+        tokio::fs::write(&source, b"keep me").await.unwrap();
+
+        let cancellation = AtomicBool::new(true);
+        let result = delete_local_path_cancellable(&source, Some(&cancellation)).await;
+        assert!(result.as_ref().is_err_and(is_cancellation_error));
+        assert!(source.exists());
+
+        let _ = tokio::fs::remove_dir_all(&root).await;
+    }
+
+    #[tokio::test]
+    async fn cancellable_delete_removes_nested_directory() {
+        let root = unique_test_dir("delete-nested");
+        let source = root.join("source");
+        let nested = source.join("nested");
+        tokio::fs::create_dir_all(&nested).await.unwrap();
+        tokio::fs::write(nested.join("file.txt"), b"gone")
+            .await
+            .unwrap();
+
+        let result = delete_local_path_cancellable(&source, None).await;
+        assert!(result.is_ok());
+        assert!(!source.exists());
+
+        let _ = tokio::fs::remove_dir_all(&root).await;
+    }
+
+    #[tokio::test]
+    async fn remote_job_cancel_requests_proxy_stop() {
+        let cancellations = Arc::new(Mutex::new(Vec::new()));
+        let service = test_explorer_service().with_remote_job_cancellation_log(cancellations.clone());
+        let cancellation = AtomicBool::new(true);
+
+        let result = service.wait_for_job("job-1", None, Some(&cancellation)).await;
+
+        assert!(result.as_ref().is_err_and(is_cancellation_error));
+        let cancellations = cancellations.lock().await.clone();
+        assert!(
+            cancellations.iter().any(|request| request == "DELETE /api/remote/file/jobs/job-1"),
+            "expected cancellation to delete the remote job, saw {cancellations:?}",
+        );
+    }
+
+    #[tokio::test]
+    async fn cancellation_cleanup_removes_partial_destination() {
+        let root = unique_test_dir("cancel-cleanup");
+        let destination = root.join("destination.bin");
+        tokio::fs::create_dir_all(&root).await.unwrap();
+        tokio::fs::write(&destination, b"partial").await.unwrap();
+
+        let result: ApiResult<()> = Err(ApiError::Message("Operation canceled.".to_string()));
+        let result = cleanup_partial_destination_on_cancel(&destination, false, result).await;
+        assert!(result.as_ref().is_err_and(is_cancellation_error));
+        assert!(!destination.exists());
+
+        let _ = tokio::fs::remove_dir_all(&root).await;
+    }
+
     fn remote_list_item_default() -> RemoteListItem {
         RemoteListItem {
             name: String::new(),
@@ -1451,5 +2571,24 @@ mod tests {
             mod_time: String::new(),
             mime_type: String::new(),
         }
+    }
+
+    fn test_explorer_service() -> ExplorerService {
+        let environment = AppEnvironmentService::new();
+        let proxy = ProxyService::new(environment.clone());
+        let providers = ProviderService::new(proxy.clone());
+        let transfers = TransferService::new(environment.clone());
+        let explorer_library = ExplorerLibraryService::new(environment.clone());
+        ExplorerService::new(environment, proxy, providers, transfers, explorer_library)
+    }
+
+    fn unique_test_dir(name: &str) -> PathBuf {
+        std::env::temp_dir().join(format!(
+            "misty-{name}-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ))
     }
 }

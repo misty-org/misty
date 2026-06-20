@@ -75,6 +75,20 @@ export interface ClipboardSnapshot {
   shared: ClipboardPayload;
 }
 
+export interface MountedDevice {
+  id: string;
+  name: string;
+  mountPath: string;
+  fsType: string;
+  isRemovable: boolean;
+  totalBytes: number;
+  freeBytes: number;
+}
+
+export interface DeviceSnapshot {
+  devices: MountedDevice[];
+}
+
 export type FileKind = "folder" | "file" | "symlink" | "other";
 export type ExplorerLocationKind = "local" | "remote_provider" | "remote";
 
@@ -98,6 +112,7 @@ export interface FileEntry {
   createdMs: number | null;
   readonly: boolean;
   hidden: boolean;
+  isDeleted?: boolean;
   location: ExplorerLocation;
 }
 
@@ -108,6 +123,11 @@ export interface DirectoryListing {
   entries: FileEntry[];
   totalCount: number;
   hiddenCount: number;
+}
+
+export interface ExplorerPreviewPayload {
+  mimeType: string;
+  bytes: number[];
 }
 
 export interface ListDirectoryRequest {
@@ -152,6 +172,12 @@ export interface PasteTextRequest {
   preferredName?: string | null;
 }
 
+export interface PasteBlobRequest {
+  destinationDirectory: string;
+  bytes: number[];
+  preferredName?: string | null;
+}
+
 export interface PasteItem {
   path: string;
   isDirectory: boolean;
@@ -171,6 +197,32 @@ export interface PrepareOpenItemRequest {
 export interface PreparedOpenItem {
   localPath: string;
   cached: boolean;
+}
+
+export interface ExplorerLibraryItem {
+  path: string;
+  name: string;
+  id: string;
+  isDir: boolean;
+  size: number;
+  lastModified: string;
+  mimeType: string;
+  type: number;
+}
+
+export interface ExplorerLibrarySnapshot {
+  path: string;
+  recentFiles: ExplorerLibraryItem[];
+  starredFiles: ExplorerLibraryItem[];
+  lastOpenedPath: string;
+}
+
+export interface RecordRecentRequest {
+  item: ExplorerLibraryItem;
+}
+
+export interface RecordLastOpenedRequest {
+  path: string;
 }
 
 export interface NativeWorkspaceTabSnapshot {
@@ -262,6 +314,21 @@ export interface SaveShortcutsRequest {
   bindings: ShortcutBinding[];
 }
 
+export interface PluginCommandEntry {
+  id: string;
+  label: string;
+  hint: string;
+  pluginId: string;
+  pluginName: string;
+  defaultShortcut: string;
+  source: string;
+}
+
+export interface PluginCommandsSnapshot {
+  roots: string[];
+  commands: PluginCommandEntry[];
+}
+
 export interface ProviderHealth {
   ready: boolean;
   port: string | null;
@@ -332,6 +399,32 @@ export interface RcloneConfigPaths {
   cachePath: string | null;
   tempPath: string | null;
   rawJson: string;
+}
+
+export type ProviderConfigMode = "add" | "reconnect" | "repair";
+
+export interface ProviderConfigRequest {
+  name: string;
+  providerType: string;
+  parameters: Record<string, string>;
+  state?: string;
+  result?: string;
+  mode: ProviderConfigMode;
+  continuing?: boolean;
+  continueExisting?: boolean;
+}
+
+export interface ProviderConfigStep {
+  kind: string;
+  name: string;
+  state: string;
+  result: string;
+  done: boolean;
+  error: string;
+  authorizeUrl: string;
+  instructions: string;
+  pollAfterMs: number;
+  option: ProviderWorkflowOption | null;
 }
 
 export type TransferType =

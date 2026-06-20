@@ -11,6 +11,7 @@ interface RemoteEditPanelProps {
   working: boolean;
   tokenVisible: boolean;
   validRemoteName: boolean;
+  stale: boolean;
   onDraftName: (name: string) => void;
   onConfigField: (key: string, value: string) => void;
   onTokenField: (key: string, value: string) => void;
@@ -18,6 +19,7 @@ interface RemoteEditPanelProps {
   onTest: () => void;
   onReveal: () => void;
   onSave: () => void;
+  onReload: () => void;
 }
 
 export function RemoteEditPanel(props: RemoteEditPanelProps) {
@@ -28,11 +30,20 @@ export function RemoteEditPanel(props: RemoteEditPanelProps) {
       <PanelHeader
         title="Edit Remote"
         subtitle={draft ? `${draft.providerType} · ${draft.originalName}` : "Select a remote"}
-        actions={props.dirty ? <span className="dirty-pill">Unsaved</span> : null}
+        actions={<>
+          {props.stale ? <span className="stale-pill">Stale</span> : null}
+          {props.dirty ? <span className="dirty-pill">Unsaved</span> : null}
+        </>}
       />
 
       {draft ? (
         <>
+          {props.stale ? (
+            <div className="stale-provider-warning">
+              <span>This remote changed in another pane. Reload before saving.</span>
+              <button type="button" onClick={props.onReload} disabled={props.working}>Reload</button>
+            </div>
+          ) : null}
           <RemoteConfigForm
             draft={draft}
             configKeys={props.configKeys}
@@ -47,6 +58,7 @@ export function RemoteEditPanel(props: RemoteEditPanelProps) {
             working={props.working}
             dirty={props.dirty}
             validRemoteName={props.validRemoteName}
+            stale={props.stale}
             onTest={props.onTest}
             onReveal={props.onReveal}
             onSave={props.onSave}

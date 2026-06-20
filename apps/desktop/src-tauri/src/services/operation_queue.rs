@@ -11,21 +11,23 @@ use tokio::sync::Mutex;
 
 use crate::core::{
     explorer::{
-        ClipboardOperation, CreateItemKind, CreateItemRequest, DeleteItemsRequest,
+        ClipboardOperation, CreateItemKind, CreateItemRequest, DeleteItemsRequest, PasteItem,
         PasteItemsRequest, RenameItemRequest, RenameItemsRequest,
     },
+    file_transfer::{FileTransferItemType, FileTransferStatus, FileTransferType},
     operation_queue::{
         ConflictPolicy, OperationDescriptor, OperationEndpoint, OperationKind, OperationQueue,
         OperationQueueSnapshot, OperationStatus,
     },
 };
 use crate::error::{ApiError, ApiResult};
-use crate::services::explorer::ExplorerService;
+use crate::services::{explorer::ExplorerService, transfers::TransferService};
 
 #[derive(Clone)]
 pub struct OperationQueueService {
     queue: OperationQueue,
     explorer: ExplorerService,
+    transfers: TransferService,
     payloads: Arc<Mutex<HashMap<u64, QueuedExplorerOperation>>>,
     cancellations: Arc<Mutex<HashMap<u64, Arc<AtomicBool>>>>,
     pumping: Arc<AtomicBool>,
@@ -46,10 +48,11 @@ enum ExecutionOutcome {
 }
 
 impl OperationQueueService {
-    pub fn new(explorer: ExplorerService) -> Self {
+    pub fn new(explorer: ExplorerService, transfers: TransferService) -> Self {
         Self {
             queue: OperationQueue::new(4),
             explorer,
+            transfers,
             payloads: Arc::new(Mutex::new(HashMap::new())),
             cancellations: Arc::new(Mutex::new(HashMap::new())),
             pumping: Arc::new(AtomicBool::new(false)),
@@ -67,11 +70,18 @@ impl OperationQueueService {
         let mut descriptors = Vec::with_capacity(request.sources.len());
         let mut payloads = Vec::with_capacity(request.sources.len());
         for source in &request.sources {
-            let file_name = Path::new(&source.path)
-                .file_name()
-                .and_then(|value| value.to_str())
-                .unwrap_or(&source.path)
-                .to_string();
+            let file_name = request
+                .target_name
+                .as_deref()
+                .filter(|_| request.sources.len() == 1)
+                .map(str::to_string)
+                .unwrap_or_else(|| {
+                    Path::new(&source.path)
+                        .file_name()
+                        .and_then(|value| value.to_str())
+                        .unwrap_or(&source.path)
+                        .to_string()
+                });
             let target_path = Path::new(&request.destination_directory)
                 .join(&file_name)
                 .to_string_lossy()
@@ -105,7 +115,11 @@ impl OperationQueueService {
                 sources: vec![source.clone()],
                 destination_directory: request.destination_directory.clone(),
                 operation: request.operation,
-                target_name: None,
+                target_name: request
+                    .target_name
+                    .as_ref()
+                    .filter(|_| request.sources.len() == 1)
+                    .cloned(),
             }));
         }
 
@@ -119,7 +133,7 @@ impl OperationQueueService {
             .await;
         {
             let mut stored = self.payloads.lock().await;
-            for (operation_id, payload) in operation_ids.into_iter().zip(payloads) {
+            for (operation_id, payload) in operation_ids.iter().copied().zip(payloads) {
                 stored.insert(operation_id, payload);
             }
         }
@@ -243,6 +257,19 @@ impl OperationQueueService {
         descriptors: Vec<OperationDescriptor>,
         payloads: Vec<QueuedExplorerOperation>,
     ) -> ApiResult<OperationQueueSnapshot> {
+        Ok(self
+            .enqueue_operations_with_ids(label, preserve_order, descriptors, payloads)
+            .await?
+            .0)
+    }
+
+    async fn enqueue_operations_with_ids(
+        &self,
+        label: impl Into<String>,
+        preserve_order: bool,
+        descriptors: Vec<OperationDescriptor>,
+        payloads: Vec<QueuedExplorerOperation>,
+    ) -> ApiResult<(OperationQueueSnapshot, Vec<u64>)> {
         if descriptors.len() != payloads.len() {
             return Err(ApiError::Message(
                 "Operation descriptors and payloads are out of sync.".to_string(),
@@ -254,12 +281,95 @@ impl OperationQueueService {
             .await;
         {
             let mut stored = self.payloads.lock().await;
-            for (operation_id, payload) in operation_ids.into_iter().zip(payloads) {
+            for (operation_id, payload) in operation_ids.iter().copied().zip(payloads) {
                 stored.insert(operation_id, payload);
             }
         }
         self.schedule_pump();
-        Ok(self.queue.snapshot().await)
+        Ok((self.queue.snapshot().await, operation_ids))
+    }
+
+    pub async fn enqueue_file_sync_apply(
+        &self,
+        label: impl Into<String>,
+        copy_requests: Vec<PasteItemsRequest>,
+        delete_paths: Vec<String>,
+    ) -> ApiResult<(OperationQueueSnapshot, Vec<u64>)> {
+        if copy_requests.is_empty() && delete_paths.is_empty() {
+            return Ok((self.queue.snapshot().await, Vec::new()));
+        }
+        let mut descriptors = Vec::new();
+        let mut payloads = Vec::new();
+
+        for request in copy_requests {
+            for source in &request.sources {
+                let file_name = request
+                    .target_name
+                    .as_deref()
+                    .filter(|_| request.sources.len() == 1)
+                    .map(str::to_string)
+                    .unwrap_or_else(|| {
+                        Path::new(&source.path)
+                            .file_name()
+                            .and_then(|value| value.to_str())
+                            .unwrap_or(&source.path)
+                            .to_string()
+                    });
+                let target_path = Path::new(&request.destination_directory)
+                    .join(&file_name)
+                    .to_string_lossy()
+                    .to_string();
+                descriptors.push(OperationDescriptor {
+                    kind: match request.operation {
+                        ClipboardOperation::Copy => OperationKind::Copy,
+                        ClipboardOperation::Move => OperationKind::Move,
+                    },
+                    source: local_endpoint(source.path.clone()),
+                    target: local_endpoint(target_path),
+                    supports_replace: true,
+                    supports_keep_both: true,
+                    title: format!(
+                        "{} {}",
+                        match request.operation {
+                            ClipboardOperation::Copy => "Copy",
+                            ClipboardOperation::Move => "Move",
+                        },
+                        file_name
+                    ),
+                    ..OperationDescriptor::default()
+                });
+                payloads.push(QueuedExplorerOperation::Paste(PasteItemsRequest {
+                    sources: vec![source.clone()],
+                    destination_directory: request.destination_directory.clone(),
+                    operation: request.operation,
+                    target_name: request
+                        .target_name
+                        .as_ref()
+                        .filter(|_| request.sources.len() == 1)
+                        .cloned(),
+                }));
+            }
+        }
+
+        for path in delete_paths {
+            let name = Path::new(&path)
+                .file_name()
+                .and_then(|value| value.to_str())
+                .unwrap_or(&path)
+                .to_string();
+            descriptors.push(OperationDescriptor {
+                kind: OperationKind::Delete,
+                source: local_endpoint(path.clone()),
+                title: format!("Delete {name}"),
+                ..OperationDescriptor::default()
+            });
+            payloads.push(QueuedExplorerOperation::Delete(DeleteItemsRequest {
+                paths: vec![path],
+            }));
+        }
+
+        self.enqueue_operations_with_ids(label, false, descriptors, payloads)
+            .await
     }
 
     pub async fn snapshot(&self) -> OperationQueueSnapshot {
@@ -290,6 +400,29 @@ impl OperationQueueService {
         Ok(self.queue.snapshot().await)
     }
 
+    pub async fn undo(&self, undo_token_id: u64) -> ApiResult<OperationQueueSnapshot> {
+        let row = self.transfers.transfer_by_undo_token(undo_token_id).await?;
+        if row.status != FileTransferStatus::Completed || !row.undoable {
+            return Err(ApiError::Message(format!(
+                "Transfer {} cannot be undone.",
+                row.id
+            )));
+        }
+
+        let snapshot = match row.transfer_type {
+            FileTransferType::Rename => self.enqueue_undo_rename(&row).await?,
+            FileTransferType::Move => self.enqueue_undo_move(&row).await?,
+            _ => {
+                return Err(ApiError::Message(format!(
+                    "Transfer {} does not support undo.",
+                    row.id
+                )));
+            }
+        };
+        self.transfers.clear_undo(row.id).await?;
+        Ok(snapshot)
+    }
+
     pub async fn resolve_conflict(
         &self,
         operation_id: u64,
@@ -314,6 +447,128 @@ impl OperationQueueService {
         self.queue.clear_terminal().await;
         self.prune_missing_payloads().await;
         self.queue.snapshot().await
+    }
+
+    async fn enqueue_undo_rename(
+        &self,
+        row: &crate::core::file_transfer::FileTransferRecord,
+    ) -> ApiResult<OperationQueueSnapshot> {
+        if row.item_type == FileTransferItemType::Remote {
+            if row.remote_source_name.is_empty()
+                || row.remote_source_path.is_empty()
+                || row.remote_dest_name.is_empty()
+                || row.remote_dest_path.is_empty()
+            {
+                return Err(ApiError::Message(
+                    "Remote rename undo is missing source or destination metadata.".to_string(),
+                ));
+            }
+            let current_path = self
+                .explorer
+                .remote_virtual_path(&row.remote_dest_name, &row.remote_dest_path)
+                .await?;
+            let original_name = file_name_for_path(&row.remote_source_path)?;
+            let source_is_directory = self
+                .explorer
+                .item_is_directory(&current_path)
+                .await?
+                .unwrap_or(false);
+            return self
+                .enqueue_rename_item(RenameItemRequest {
+                    path: current_path,
+                    new_name: original_name,
+                    source_is_directory: Some(source_is_directory),
+                })
+                .await;
+        }
+
+        if row.local_source_path.is_empty() || row.local_dest_path.is_empty() {
+            return Err(ApiError::Message(
+                "Local rename undo is missing source or destination metadata.".to_string(),
+            ));
+        }
+        let original_name = file_name_for_path(&row.local_source_path)?;
+        let source_is_directory = self
+            .explorer
+            .item_is_directory(&row.local_dest_path)
+            .await?
+            .unwrap_or(false);
+        self.enqueue_rename_item(RenameItemRequest {
+            path: row.local_dest_path.clone(),
+            new_name: original_name,
+            source_is_directory: Some(source_is_directory),
+        })
+        .await
+    }
+
+    async fn enqueue_undo_move(
+        &self,
+        row: &crate::core::file_transfer::FileTransferRecord,
+    ) -> ApiResult<OperationQueueSnapshot> {
+        if row.item_type == FileTransferItemType::Remote {
+            if row.remote_source_name.is_empty()
+                || row.remote_source_path.is_empty()
+                || row.remote_dest_name.is_empty()
+                || row.remote_dest_path.is_empty()
+            {
+                return Err(ApiError::Message(
+                    "Remote move undo is missing source or destination metadata.".to_string(),
+                ));
+            }
+            let current_path = self
+                .explorer
+                .remote_virtual_path(&row.remote_dest_name, &row.remote_dest_path)
+                .await?;
+            let original_parent_path = remote_parent_for_path(&row.remote_source_path)?;
+            let original_parent = self
+                .explorer
+                .remote_virtual_path(&row.remote_source_name, &original_parent_path)
+                .await?;
+            let original_name = file_name_for_path(&row.remote_source_path)?;
+            let is_directory = self
+                .explorer
+                .item_is_directory(&current_path)
+                .await?
+                .unwrap_or(false);
+            return self
+                .enqueue_paste_items(PasteItemsRequest {
+                    sources: vec![PasteItem {
+                        path: current_path,
+                        is_directory,
+                    }],
+                    destination_directory: original_parent,
+                    operation: ClipboardOperation::Move,
+                    target_name: Some(original_name),
+                })
+                .await;
+        }
+
+        if row.local_source_path.is_empty() || row.local_dest_path.is_empty() {
+            return Err(ApiError::Message(
+                "Local move undo is missing source or destination metadata.".to_string(),
+            ));
+        }
+        let original_name = file_name_for_path(&row.local_source_path)?;
+        let original_parent = Path::new(&row.local_source_path)
+            .parent()
+            .unwrap_or_else(|| Path::new(""))
+            .to_string_lossy()
+            .to_string();
+        let is_directory = self
+            .explorer
+            .item_is_directory(&row.local_dest_path)
+            .await?
+            .unwrap_or(false);
+        self.enqueue_paste_items(PasteItemsRequest {
+            sources: vec![PasteItem {
+                path: row.local_dest_path.clone(),
+                is_directory,
+            }],
+            destination_directory: original_parent,
+            operation: ClipboardOperation::Move,
+            target_name: Some(original_name),
+        })
+        .await
     }
 
     fn schedule_pump(&self) {
@@ -391,13 +646,19 @@ impl OperationQueueService {
         ensure_not_canceled(&cancellation)?;
         match payload {
             QueuedExplorerOperation::Create(request) => {
-                self.explorer.create_item(request).await?;
+                self.explorer
+                    .create_item_with_cancellation(request, cancellation.clone())
+                    .await?;
             }
             QueuedExplorerOperation::Rename(request) => {
-                self.explorer.rename_item(request).await?;
+                self.explorer
+                    .rename_item_with_cancellation(request, cancellation.clone())
+                    .await?;
             }
             QueuedExplorerOperation::Delete(request) => {
-                self.explorer.delete_items(request).await?;
+                self.explorer
+                    .delete_items_with_cancellation(request, cancellation.clone())
+                    .await?;
             }
             QueuedExplorerOperation::Paste(mut request) => {
                 ensure_not_canceled(&cancellation)?;
@@ -445,9 +706,12 @@ impl OperationQueueService {
                                     )));
                                 }
                                 self.explorer
-                                    .delete_items(DeleteItemsRequest {
-                                        paths: vec![destination_path],
-                                    })
+                                    .delete_items_with_cancellation(
+                                        DeleteItemsRequest {
+                                            paths: vec![destination_path],
+                                        },
+                                        cancellation.clone(),
+                                    )
                                     .await?;
                             }
                             ConflictPolicy::Skip => {
@@ -472,7 +736,9 @@ impl OperationQueueService {
                     }
                 }
                 ensure_not_canceled(&cancellation)?;
-                self.explorer.paste_items(request).await?;
+                self.explorer
+                    .paste_items_with_cancellation(request, cancellation.clone())
+                    .await?;
             }
         }
         ensure_not_canceled(&cancellation)?;
@@ -555,6 +821,26 @@ fn local_endpoint(path: String) -> OperationEndpoint {
     }
 }
 
+fn file_name_for_path(path: &str) -> ApiResult<String> {
+    Path::new(path)
+        .file_name()
+        .and_then(|value| value.to_str())
+        .map(str::to_string)
+        .ok_or_else(|| ApiError::Message(format!("Could not determine file name for {path}.")))
+}
+
+fn remote_parent_for_path(path: &str) -> ApiResult<String> {
+    let parent = Path::new(path)
+        .parent()
+        .and_then(|value| value.to_str())
+        .ok_or_else(|| ApiError::Message(format!("Could not determine parent for {path}.")))?;
+    if parent.is_empty() {
+        Ok("/".to_string())
+    } else {
+        Ok(parent.to_string())
+    }
+}
+
 fn paste_destination(request: &PasteItemsRequest) -> Option<PathBuf> {
     let source = request.sources.first()?;
     if request.sources.len() != 1 {
@@ -628,6 +914,34 @@ mod tests {
                 .file_name()
                 .unwrap(),
             "report copy 2.txt"
+        );
+    }
+
+    #[test]
+    fn paste_destination_uses_explicit_target_name() {
+        let destination = paste_destination(&PasteItemsRequest {
+            sources: vec![PasteItem {
+                path: "/tmp/current-name.txt".to_string(),
+                is_directory: false,
+            }],
+            destination_directory: "/tmp/original-parent".to_string(),
+            operation: ClipboardOperation::Move,
+            target_name: Some("original-name.txt".to_string()),
+        })
+        .expect("destination");
+
+        assert_eq!(
+            destination,
+            Path::new("/tmp/original-parent").join("original-name.txt")
+        );
+    }
+
+    #[test]
+    fn remote_parent_for_path_keeps_root_parent() {
+        assert_eq!(remote_parent_for_path("/photo.png").unwrap(), "/");
+        assert_eq!(
+            remote_parent_for_path("/source/photo.png").unwrap(),
+            "/source"
         );
     }
 }

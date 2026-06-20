@@ -101,11 +101,34 @@ impl TransferService {
     }
 
     pub async fn complete_transfer(&self, id: u64) -> ApiResult<()> {
-        self.mutate(id, |record| record.complete()).await
+        self.mutate(id, |record| {
+            record.complete();
+            maybe_mark_undoable(record);
+        })
+        .await
     }
 
     pub async fn fail_transfer(&self, id: u64, message: String) -> ApiResult<()> {
         self.mutate(id, move |record| record.fail(message)).await
+    }
+
+    pub async fn cancel_transfer(&self, id: u64, detail: String) -> ApiResult<()> {
+        self.mutate(id, move |record| record.cancel(detail)).await
+    }
+
+    pub async fn transfer_by_undo_token(&self, undo_token_id: u64) -> ApiResult<TransferRecord> {
+        let db_path = self.db_path.clone();
+        tokio::task::spawn_blocking(move || transfer_by_undo_token(&db_path, undo_token_id))
+            .await
+            .map_err(|err| ApiError::Message(format!("Transfer worker failed: {err}")))?
+    }
+
+    pub async fn clear_undo(&self, id: u64) -> ApiResult<()> {
+        self.mutate(id, |record| {
+            record.undoable = false;
+            record.undo_token_id = 0;
+        })
+        .await
     }
 
     async fn mutate<F>(&self, id: u64, mutation: F) -> ApiResult<()>
@@ -117,6 +140,32 @@ impl TransferService {
             .await
             .map_err(|err| ApiError::Message(format!("Transfer worker failed: {err}")))?
     }
+}
+
+fn maybe_mark_undoable(record: &mut TransferRecord) {
+    let supported = match record.transfer_type {
+        TransferType::Rename => {
+            (!record.local_source_path.is_empty() && !record.local_dest_path.is_empty())
+                || (record.item_type == TransferItemType::Remote
+                    && !record.remote_source_name.is_empty()
+                    && !record.remote_source_path.is_empty()
+                    && !record.remote_dest_name.is_empty()
+                    && !record.remote_dest_path.is_empty())
+        }
+        TransferType::Move => {
+            (record.item_type == TransferItemType::Local
+                && !record.local_source_path.is_empty()
+                && !record.local_dest_path.is_empty())
+                || (record.item_type == TransferItemType::Remote
+                    && !record.remote_source_name.is_empty()
+                    && !record.remote_source_path.is_empty()
+                    && !record.remote_dest_name.is_empty()
+                    && !record.remote_dest_path.is_empty())
+        }
+        _ => false,
+    };
+    record.undoable = supported;
+    record.undo_token_id = if supported { record.id } else { 0 };
 }
 
 fn load_page(db_path: &Path, filter: TransferFilter) -> ApiResult<TransferPage> {
@@ -233,6 +282,23 @@ where
     prune_history(&tx, 500)?;
     tx.commit().map_err(sql_error)?;
     Ok(())
+}
+
+fn transfer_by_undo_token(db_path: &Path, undo_token_id: u64) -> ApiResult<TransferRecord> {
+    let conn = open_db(db_path)?;
+    let record = conn
+        .query_row(
+            &format!(
+                "SELECT {} FROM transfers WHERE undo_token_id = ? AND undoable = 1",
+                transfer_select_columns()
+            ),
+            params![undo_token_id as i64],
+            read_record,
+        )
+        .optional()
+        .map_err(sql_error)?
+        .ok_or_else(|| ApiError::Message(format!("Undo token {undo_token_id} was not found.")))?;
+    Ok(record)
 }
 
 fn upsert_record(conn: &Connection, record: &TransferRecord) -> ApiResult<()> {
@@ -661,6 +727,159 @@ mod tests {
         assert_eq!(page.rows[0].remote_source_name, "drive");
         assert_eq!(page.rows[0].error_message, "connection reset");
         assert!(page.rows[0].retryable);
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[tokio::test]
+    async fn completed_local_rename_gets_undo_token() {
+        let (service, root) = test_service("undo-rename");
+        let mut record =
+            TransferRecord::new(TransferType::Rename, TransferItemType::Local, "notes.md");
+        record.local_source_path = "/tmp/notes.md".to_string();
+        record.local_dest_path = "/tmp/renamed.md".to_string();
+
+        let id = service
+            .start_transfer(record)
+            .await
+            .expect("start rename transfer");
+        service
+            .complete_transfer(id)
+            .await
+            .expect("complete rename transfer");
+
+        let row = service
+            .transfer_by_undo_token(id)
+            .await
+            .expect("lookup undo token");
+        assert_eq!(row.id, id);
+        assert!(row.undoable);
+        assert_eq!(row.undo_token_id, id);
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[tokio::test]
+    async fn completed_local_move_gets_undo_token() {
+        let (service, root) = test_service("undo-move");
+        let mut record =
+            TransferRecord::new(TransferType::Move, TransferItemType::Local, "photo.png");
+        record.local_source_path = "/tmp/source/photo.png".to_string();
+        record.local_dest_path = "/tmp/dest/photo.png".to_string();
+
+        let id = service
+            .start_transfer(record)
+            .await
+            .expect("start move transfer");
+        service
+            .complete_transfer(id)
+            .await
+            .expect("complete move transfer");
+
+        let page = service
+            .snapshot(TransferFilter::default())
+            .await
+            .expect("load transfer page");
+        assert_eq!(page.rows[0].id, id);
+        assert!(page.rows[0].undoable);
+        assert_eq!(page.rows[0].undo_token_id, id);
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[tokio::test]
+    async fn completed_remote_move_gets_undo_token() {
+        let (service, root) = test_service("undo-remote-move");
+        let mut record =
+            TransferRecord::new(TransferType::Move, TransferItemType::Remote, "photo.png");
+        record.remote_source_name = "drive".to_string();
+        record.remote_source_path = "/source/photo.png".to_string();
+        record.remote_dest_name = "drive".to_string();
+        record.remote_dest_path = "/dest/photo.png".to_string();
+
+        let id = service
+            .start_transfer(record)
+            .await
+            .expect("start remote move transfer");
+        service
+            .complete_transfer(id)
+            .await
+            .expect("complete remote move transfer");
+
+        let page = service
+            .snapshot(TransferFilter::default())
+            .await
+            .expect("load transfer page");
+        assert_eq!(page.rows[0].id, id);
+        assert!(page.rows[0].undoable);
+        assert_eq!(page.rows[0].undo_token_id, id);
+        assert_eq!(
+            service
+                .transfer_by_undo_token(id)
+                .await
+                .expect("lookup undo token")
+                .id,
+            id
+        );
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[tokio::test]
+    async fn completed_remote_rename_gets_undo_token() {
+        let (service, root) = test_service("undo-remote-rename");
+        let mut record =
+            TransferRecord::new(TransferType::Rename, TransferItemType::Remote, "final.txt");
+        record.remote_source_name = "drive".to_string();
+        record.remote_source_path = "/draft.txt".to_string();
+        record.remote_dest_name = "drive".to_string();
+        record.remote_dest_path = "/final.txt".to_string();
+
+        let id = service
+            .start_transfer(record)
+            .await
+            .expect("start remote rename transfer");
+        service
+            .complete_transfer(id)
+            .await
+            .expect("complete remote rename transfer");
+
+        let page = service
+            .snapshot(TransferFilter::default())
+            .await
+            .expect("load transfer page");
+        assert_eq!(page.rows[0].id, id);
+        assert!(page.rows[0].undoable);
+        assert_eq!(page.rows[0].undo_token_id, id);
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[tokio::test]
+    async fn clearing_undo_token_removes_lookup() {
+        let (service, root) = test_service("undo-clear");
+        let mut record =
+            TransferRecord::new(TransferType::Rename, TransferItemType::Local, "draft.txt");
+        record.local_source_path = "/tmp/draft.txt".to_string();
+        record.local_dest_path = "/tmp/final.txt".to_string();
+
+        let id = service
+            .start_transfer(record)
+            .await
+            .expect("start rename transfer");
+        service
+            .complete_transfer(id)
+            .await
+            .expect("complete rename transfer");
+        service.clear_undo(id).await.expect("clear undo");
+
+        let page = service
+            .snapshot(TransferFilter::default())
+            .await
+            .expect("load transfer page");
+        assert!(!page.rows[0].undoable);
+        assert_eq!(page.rows[0].undo_token_id, 0);
+        assert!(service.transfer_by_undo_token(id).await.is_err());
 
         let _ = fs::remove_dir_all(root);
     }

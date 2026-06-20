@@ -3,11 +3,14 @@ use std::process::Command;
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
-use crate::core::clipboard::ClipboardPayload;
+use crate::core::clipboard::{
+    ClipboardImage, ClipboardPayload, ClipboardPayloadKind, SharedClipboardClient,
+};
 use crate::core::explorer::{
     CreateItemRequest, DeleteItemsRequest, DirectoryListing, ExplorerOperationResult,
-    ListDirectoryRequest, PasteItemsRequest, PasteTextRequest, PrepareOpenItemRequest,
-    PreparedOpenItem, RenameItemRequest, RenameItemsRequest,
+    ExplorerPreviewPayload, ListDirectoryRequest, PasteBlobRequest, PasteItem, PasteItemsRequest,
+    PasteTextRequest, PrepareOpenItemRequest, PreparedOpenItem, RenameItemRequest,
+    RenameItemsRequest,
 };
 use crate::core::file_sync::FileSyncPair;
 use crate::core::operation_queue::{ConflictPolicy, OperationQueueSnapshot};
@@ -15,12 +18,18 @@ use crate::core::workspace::WorkspaceDocument;
 use crate::error::{ApiError, ApiResult};
 use crate::runtime::MistyRuntime;
 use crate::services::commands::{SaveShortcutsRequest, ShortcutsSnapshot};
+use crate::services::devices::DeviceSnapshot;
 use crate::services::environment::AppEnvironmentSnapshot;
+use crate::services::explorer_library::{
+    ExplorerLibrarySnapshot, RecordLastOpenedRequest, RecordRecentRequest,
+};
 use crate::services::file_sync::{
     FileSyncApplyRequest, FileSyncApplyResult, FileSyncCompareRequest,
 };
+use crate::services::plugin_commands::PluginCommandsSnapshot;
 use crate::services::providers::{
-    ProvidersSnapshot, RcloneConfigPaths, RemoteEditDraft, RemoteTestResult, SaveRemoteRequest,
+    ProviderConfigRequest, ProviderConfigStep, ProvidersSnapshot, RcloneConfigPaths,
+    RemoteEditDraft, RemoteTestResult, SaveRemoteRequest,
 };
 use crate::services::proxy::ProxySnapshot;
 use crate::services::settings::{OpenWithAssociation, SaveSettingsRequest, SettingsSnapshot};
@@ -80,6 +89,98 @@ pub fn clipboard_set_local(
 }
 
 #[tauri::command]
+pub fn clipboard_publish_shared(state: State<'_, MistyRuntime>) -> ApiResult<bool> {
+    Ok(state.clipboard.publish_current_to_shared())
+}
+
+#[tauri::command]
+pub fn clipboard_publish_image_bytes(
+    bytes: Vec<u8>,
+    width: i32,
+    height: i32,
+    mime_type: Option<String>,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<bool> {
+    if bytes.is_empty() {
+        return Err(ApiError::Message("Clipboard image is empty.".to_owned()));
+    }
+    if width <= 0 || height <= 0 {
+        return Err(ApiError::Message(
+            "Clipboard image dimensions are invalid.".to_owned(),
+        ));
+    }
+    let size_bytes = bytes.len() as u64;
+    let payload = ClipboardPayload {
+        kind: ClipboardPayloadKind::Image,
+        images: vec![ClipboardImage {
+            mime_type: mime_type
+                .filter(|value| !value.trim().is_empty())
+                .unwrap_or_else(|| "image/png".to_owned()),
+            size_bytes,
+            width,
+            height,
+            bytes,
+            ..ClipboardImage::default()
+        }],
+        ..ClipboardPayload::default()
+    };
+    Ok(state
+        .clipboard
+        .publish_local_system_payload_to_shared(payload))
+}
+
+#[tauri::command]
+pub fn clipboard_apply_shared(state: State<'_, MistyRuntime>) -> ApiResult<ClipboardPayload> {
+    let payload = state.clipboard.latest_shared();
+    if payload.empty() {
+        Err(ApiError::Message(
+            "No shared clipboard payload is available.".to_owned(),
+        ))
+    } else {
+        Ok(payload)
+    }
+}
+
+#[tauri::command]
+pub fn clipboard_shared_image_bytes(
+    blob_id: String,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<Vec<u8>> {
+    if blob_id.trim().is_empty() {
+        return Err(ApiError::Message(
+            "Shared clipboard image is missing a blob id.".to_owned(),
+        ));
+    }
+    let mut payload = state.clipboard.latest_shared();
+    if payload.kind != ClipboardPayloadKind::Image || payload.images.is_empty() {
+        return Err(ApiError::Message(
+            "No shared clipboard image is available.".to_owned(),
+        ));
+    }
+    if !state.proxy_clipboard.hydrate_payload(&mut payload) {
+        return Err(ApiError::Message(
+            "Failed to download the shared clipboard image.".to_owned(),
+        ));
+    }
+    payload
+        .images
+        .into_iter()
+        .find(|image| image.blob_id == blob_id)
+        .and_then(|image| (!image.bytes.is_empty()).then_some(image.bytes))
+        .ok_or_else(|| ApiError::Message("Shared clipboard image data is unavailable.".to_owned()))
+}
+
+#[tauri::command]
+pub fn clipboard_native_file_refs() -> ApiResult<Vec<PasteItem>> {
+    crate::services::native_clipboard::native_clipboard_file_refs()
+}
+
+#[tauri::command]
+pub fn clipboard_write_file_refs(items: Vec<PasteItem>) -> ApiResult<bool> {
+    crate::services::native_clipboard::write_native_clipboard_file_refs(&items)
+}
+
+#[tauri::command]
 pub async fn explorer_list_directory(
     request: ListDirectoryRequest,
     state: State<'_, MistyRuntime>,
@@ -128,6 +229,14 @@ pub async fn explorer_prepare_open_item(
 }
 
 #[tauri::command]
+pub async fn explorer_preview_item(
+    path: String,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<ExplorerPreviewPayload> {
+    state.explorer.preview_item(&path).await
+}
+
+#[tauri::command]
 pub async fn explorer_path_is_directory(
     path: String,
     state: State<'_, MistyRuntime>,
@@ -142,6 +251,29 @@ pub async fn explorer_path_is_directory(
 #[tauri::command]
 pub async fn explorer_path_exists(path: String, state: State<'_, MistyRuntime>) -> ApiResult<bool> {
     Ok(state.explorer.item_is_directory(&path).await?.is_some())
+}
+
+#[tauri::command]
+pub async fn explorer_library_snapshot(
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<ExplorerLibrarySnapshot> {
+    state.explorer_library.snapshot().await
+}
+
+#[tauri::command]
+pub async fn explorer_library_record_recent(
+    request: RecordRecentRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<ExplorerLibrarySnapshot> {
+    state.explorer_library.record_recent(request).await
+}
+
+#[tauri::command]
+pub async fn explorer_library_record_last_opened(
+    request: RecordLastOpenedRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<ExplorerLibrarySnapshot> {
+    state.explorer_library.record_last_opened(request).await
 }
 
 #[tauri::command]
@@ -203,6 +335,18 @@ pub async fn explorer_queue_paste_text(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<OperationQueueSnapshot> {
     let paste_request = state.explorer.stage_clipboard_text_paste(request).await?;
+    state
+        .operation_queue
+        .enqueue_paste_items(paste_request)
+        .await
+}
+
+#[tauri::command]
+pub async fn explorer_queue_paste_blob(
+    request: PasteBlobRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<OperationQueueSnapshot> {
+    let paste_request = state.explorer.stage_clipboard_blob_paste(request).await?;
     state
         .operation_queue
         .enqueue_paste_items(paste_request)
@@ -281,6 +425,21 @@ pub async fn shortcuts_save(
 }
 
 #[tauri::command]
+pub async fn plugin_commands_snapshot(
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<PluginCommandsSnapshot> {
+    state.plugin_commands.snapshot().await
+}
+
+#[tauri::command]
+pub async fn devices_snapshot(state: State<'_, MistyRuntime>) -> ApiResult<DeviceSnapshot> {
+    let devices = state.devices.clone();
+    tokio::task::spawn_blocking(move || devices.snapshot())
+        .await
+        .map_err(|err| ApiError::Message(format!("Device scan failed: {err}")))
+}
+
+#[tauri::command]
 pub async fn providers_snapshot(state: State<'_, MistyRuntime>) -> ApiResult<ProvidersSnapshot> {
     state.providers.snapshot().await
 }
@@ -319,6 +478,22 @@ pub async fn providers_config_paths(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<RcloneConfigPaths> {
     state.providers.config_paths().await
+}
+
+#[tauri::command]
+pub async fn providers_configure_remote(
+    request: ProviderConfigRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<ProviderConfigStep> {
+    state.providers.configure_remote(request).await
+}
+
+#[tauri::command]
+pub async fn providers_disconnect_remote(
+    name: String,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<ProvidersSnapshot> {
+    state.providers.disconnect_remote(name).await
 }
 
 #[tauri::command]
@@ -385,6 +560,14 @@ pub async fn operation_queue_retry(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<OperationQueueSnapshot> {
     state.operation_queue.retry(operation_id).await
+}
+
+#[tauri::command]
+pub async fn operation_queue_undo(
+    undo_token_id: u64,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<OperationQueueSnapshot> {
+    state.operation_queue.undo(undo_token_id).await
 }
 
 #[tauri::command]

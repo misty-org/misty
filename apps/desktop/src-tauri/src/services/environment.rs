@@ -101,6 +101,14 @@ impl AppEnvironmentService {
         self.inner.commands_path.clone()
     }
 
+    pub fn plugins_public_dir(&self) -> PathBuf {
+        self.inner.plugins_public_dir.clone()
+    }
+
+    pub fn plugins_private_dir(&self) -> PathBuf {
+        self.inner.plugins_private_dir.clone()
+    }
+
     pub fn home_dir(&self) -> PathBuf {
         self.inner.home_dir.clone()
     }
