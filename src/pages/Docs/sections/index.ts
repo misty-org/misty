@@ -7,17 +7,6 @@ import ProvidersOverview, { data as providersOverview } from "./ProvidersOvervie
 import GoogleDrive, { data as googleDrive } from "./GoogleDrive";
 import OneDrive, { data as oneDrive } from "./OneDrive";
 import S3Sftp, { data as s3Sftp } from "./S3Sftp";
-import BackupsOverview, { data as backupsOverview } from "./BackupsOverview";
-import Snapshots, { data as snapshots } from "./Snapshots";
-import Restore, { data as restore } from "./Restore";
-import SearchOverview, { data as searchOverview } from "./SearchOverview";
-import Indexing, { data as indexing } from "./Indexing";
-import SearchWorkflows, { data as searchWorkflows } from "./SearchWorkflows";
-import PluginsOverview, { data as pluginsOverview } from "./PluginsOverview";
-import BuildingPlugins, { data as buildingPlugins } from "./BuildingPlugins";
-import MistyAiOverview, { data as mistyAiOverview } from "./MistyAiOverview";
-import AskMistyAi, { data as askMistyAi } from "./AskMistyAi";
-import MistyAiActions, { data as mistyAiActions } from "./MistyAiActions";
 
 export const guideSections: Section[] = [
   { ...introduction, Component: Introduction },
@@ -27,26 +16,11 @@ export const guideSections: Section[] = [
   { ...googleDrive, Component: GoogleDrive },
   { ...oneDrive, Component: OneDrive },
   { ...s3Sftp, Component: S3Sftp },
-  { ...backupsOverview, Component: BackupsOverview },
-  { ...snapshots, Component: Snapshots },
-  { ...restore, Component: Restore },
-  { ...searchOverview, Component: SearchOverview },
-  { ...indexing, Component: Indexing },
-  { ...searchWorkflows, Component: SearchWorkflows },
-  { ...pluginsOverview, Component: PluginsOverview },
-  { ...buildingPlugins, Component: BuildingPlugins },
-  { ...mistyAiOverview, Component: MistyAiOverview },
-  { ...askMistyAi, Component: AskMistyAi },
-  { ...mistyAiActions, Component: MistyAiActions },
 ];
 
 const categoryLabels: Record<string, string> = {
   "getting-started": "Getting Started",
-  providers: "Providers",
-  backups: "Backups",
-  search: "Search",
-  plugins: "Plugins",
-  mistyai: "MistyAI",
+  providers: "Remote",
 };
 
 export const guideCategories: Category[] = Object.entries(categoryLabels).map(

@@ -94,23 +94,26 @@ export default function Navbar() {
 
           {/* Resources dropdown */}
           <div className="relative" onMouseEnter={openResources} onMouseLeave={() => setResourcesOpen(false)}>
-            <NavLink
-              to="/changelog"
-              onClick={() => setResourcesOpen(false)}
+            <button
+              type="button"
+              onClick={openResources}
+              aria-haspopup="menu"
+              aria-expanded={resourcesOpen}
               className={`relative px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 block ${
                 resourcesLinks.some(({ to }) => location.pathname.startsWith(to)) ? "text-white" : "text-text hover:text-white"
               }`}
             >
               Resources
               {resourcesLinks.some(({ to }) => location.pathname.startsWith(to)) && <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-primary rounded-full" />}
-            </NavLink>
+            </button>
             <div className={`absolute left-1/2 -translate-x-1/2 top-full pt-1 w-44 transition-all duration-200 ${resourcesOpen ? "opacity-100 visible" : "opacity-0 invisible"}`}>
-              <div className="bg-surface border border-border rounded-xl overflow-hidden shadow-xl shadow-bg/50">
+              <div className="bg-surface border border-border rounded-xl overflow-hidden shadow-xl shadow-bg/50" role="menu">
                 {resourcesLinks.map(({ to, label }) => (
                   <NavLink
                     key={to}
                     to={to}
                     end
+                    role="menuitem"
                     className="block px-4 py-2.5 text-sm text-text transition-colors hover:text-white hover:bg-elevated"
                   >
                     {label}

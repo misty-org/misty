@@ -20,13 +20,13 @@ export default function Sidebar({
   onClose: () => void;
 }) {
   const inner = (
-    <nav className="flex flex-col gap-4 p-2">
+    <nav className="flex flex-col gap-1.5 p-2">
       {categories.map((cat) => (
-        <div key={cat.key} className="pb-1">
+        <div key={cat.key}>
           <button
             type="button"
             onClick={() => onToggleCategory(cat.key)}
-            className="flex w-full items-center justify-between px-3 py-2 text-left"
+            className="flex w-full items-center justify-between px-3 py-1.5 text-left"
           >
             <span className="text-[15.5px] font-medium text-white">
               {cat.label}
@@ -45,7 +45,7 @@ export default function Sidebar({
             </svg>
           </button>
           {expandedCategories[cat.key] && (
-            <div className="mt-1 flex flex-col gap-0.5">
+            <div className="mt-0.5 flex flex-col">
               {cat.ids.map((id) => {
                 const sec = sections.find((s) => s.id === id);
                 if (!sec) return null;
@@ -57,7 +57,7 @@ export default function Sidebar({
                       onSelect(id);
                       onClose();
                     }}
-                    className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[15.5px] transition-colors cursor-pointer ${
+                    className={`flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left text-[15.5px] transition-colors cursor-pointer ${
                       active
                         ? "bg-primary/10 font-medium text-white"
                         : "font-normal text-text-muted hover:bg-elevated hover:text-white"
