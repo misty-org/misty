@@ -23,6 +23,7 @@ if (!apps.length) {
 }
 
 for (const app of apps) {
+  await rm(resolve(appsRoot, ".build/official-apps", app.id, "optional-assets"), {recursive:true, force:true});
   for (const platform of ["desktop", "mobile"]) {
     if (platform === "desktop" && app.desktop.runtime !== "downloaded") continue;
     if (platform === "mobile" && app.mobile.runtime !== "hosted") continue;
