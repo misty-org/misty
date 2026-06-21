@@ -93,6 +93,10 @@ impl AppEnvironmentService {
         self.inner.db_dir.join("misty.db")
     }
 
+    pub fn proxy_token_db_path(&self) -> PathBuf {
+        self.inner.db_dir.join("data.db")
+    }
+
     pub fn settings_path(&self) -> PathBuf {
         self.inner.settings_path.clone()
     }
@@ -101,8 +105,33 @@ impl AppEnvironmentService {
         self.inner.commands_path.clone()
     }
 
+    pub fn plugins_public_dir(&self) -> PathBuf {
+        self.inner.plugins_public_dir.clone()
+    }
+
+    pub fn plugins_private_dir(&self) -> PathBuf {
+        self.inner.plugins_private_dir.clone()
+    }
+
     pub fn home_dir(&self) -> PathBuf {
         self.inner.home_dir.clone()
+    }
+
+    pub fn mount_root(&self) -> PathBuf {
+        let configured = PathBuf::from(&self.inner.mount_path);
+        if configured.is_absolute() {
+            configured
+        } else {
+            self.inner.home_dir.join(configured)
+        }
+    }
+
+    pub fn cache_dir(&self) -> PathBuf {
+        self.inner.cache_dir.clone()
+    }
+
+    pub fn workspaces_path(&self) -> PathBuf {
+        self.inner.workspaces_path.clone()
     }
 }
 
@@ -210,4 +239,42 @@ fn resolve_home_dir() -> Option<PathBuf> {
 
 fn display_path(path: &Path) -> String {
     path.display().to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn proxy_token_database_uses_shared_data_db() {
+        let root = env::temp_dir().join("misty-env-proxy-token-db");
+        let service = AppEnvironmentService {
+            inner: Arc::new(AppEnvironment {
+                home_dir: root.clone(),
+                misty_dir: root.join(".misty"),
+                config_dir: root.join(".misty/config"),
+                db_dir: root.join(".misty/db"),
+                cache_dir: root.join(".misty/.cache"),
+                tmp_dir: root.join(".misty/tmp"),
+                assets_dir: root.join(".misty/assets"),
+                plugins_public_dir: root.join(".misty/plugins/public"),
+                plugins_private_dir: root.join(".misty/plugins/private"),
+                settings_path: root.join(".misty/config/settings.json"),
+                misty_config_path: root.join(".misty/config/misty.json"),
+                workspaces_path: root.join(".misty/config/workspaces.json"),
+                commands_path: root.join(".misty/config/commands.msy"),
+                proxy_url: None,
+                server_url: None,
+                grpc_address: "localhost:50051".to_owned(),
+                mount_path: ".misty/mnt".to_owned(),
+                config_exists: false,
+            }),
+        };
+
+        assert_eq!(
+            service.proxy_token_db_path(),
+            root.join(".misty/db/data.db")
+        );
+        assert_eq!(service.misty_db_path(), root.join(".misty/db/misty.db"));
+    }
 }
