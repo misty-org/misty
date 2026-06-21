@@ -103,8 +103,8 @@ export const FileBrowser = memo(function FileBrowser(props: FileBrowserProps) {
   if (props.error) {
     return <div className="explorer-empty error">{props.error}</div>;
   }
-  if (props.loading && !props.listing) {
-    return <div className="explorer-empty">Loading directory...</div>;
+  if (props.loading) {
+    return <FileBrowserSkeleton viewMode={props.viewMode} />;
   }
   if (!props.listing) {
     return <div className="explorer-empty">Choose a location to begin.</div>;
@@ -137,6 +137,39 @@ export const FileBrowser = memo(function FileBrowser(props: FileBrowserProps) {
     </section>
   );
 });
+
+function FileBrowserSkeleton(props: { viewMode: ExplorerViewMode }) {
+  const rows = Array.from({ length: 12 }, (_, index) => index);
+  const tiles = Array.from({ length: 20 }, (_, index) => index);
+
+  return (
+    <section className="file-browser file-browser-loading" aria-busy="true" aria-label="Loading directory">
+      {props.viewMode === "grid" ? (
+        <div className="file-grid-skeleton" aria-hidden="true">
+          {tiles.map((index) => <span key={index} />)}
+        </div>
+      ) : (
+        <div className="file-table-skeleton" aria-hidden="true">
+          <div className="file-table-skeleton-header">
+            <span />
+            <span />
+            <span />
+            <span />
+          </div>
+          {rows.map((index) => (
+            <div className="file-table-skeleton-row" key={index}>
+              <span />
+              <span />
+              <span />
+              <span />
+            </div>
+          ))}
+        </div>
+      )}
+      <footer className="file-browser-footer">Loading directory...</footer>
+    </section>
+  );
+}
 
 function FileTable(props: FileBrowserProps & { listing: DirectoryListing }) {
   const scrollRef = useRef<HTMLDivElement | null>(null);

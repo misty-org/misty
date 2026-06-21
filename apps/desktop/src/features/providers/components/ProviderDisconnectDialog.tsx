@@ -1,4 +1,5 @@
-import { Trash2 } from "lucide-react";
+import { iconAssets } from "../../../shared/assets/icons";
+import { AssetIcon } from "../../../shared/components/AssetIcon";
 
 export function ProviderDisconnectDialog(props: {
   remoteName: string;
@@ -16,7 +17,7 @@ export function ProviderDisconnectDialog(props: {
         <footer>
           <button type="button" onClick={props.onCancel} disabled={props.working}>Cancel</button>
           <button className="danger" type="button" onClick={props.onConfirm} disabled={props.working}>
-            <Trash2 size={16} />
+            <AssetIcon src={iconAssets.trash24} size={16} />
             {props.working ? "Disconnecting…" : "Disconnect"}
           </button>
         </footer>

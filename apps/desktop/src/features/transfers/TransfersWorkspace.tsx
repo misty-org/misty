@@ -257,6 +257,7 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
   }, [queueSnapshot?.operations]);
   const pageIds = useMemo(() => pageRows.map((row) => row.id), [pageRows]);
   const pageSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
+  const transferSummary = useMemo(() => summarizeTransfers(rows), [rows]);
   const tableScrollRef = useRef<HTMLDivElement | null>(null);
   const tableScrollFrameRef = useRef<number | null>(null);
   const tableViewportHeightRef = useRef(0);
@@ -383,6 +384,8 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
           </button>
         </div>
       </div>
+
+      <TransferSummaryCards summary={transferSummary} visibleCount={filteredRows.length} />
 
       <div className="transfers-panels-scroll">
         <div className="transfers-three-panel">
@@ -512,6 +515,44 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
           </aside>
         </div>
       </div>
+    </div>
+  );
+});
+
+function summarizeTransfers(rows: TransferRecord[]) {
+  let active = 0;
+  let completed = 0;
+  let failed = 0;
+  let waiting = 0;
+  for (const row of rows) {
+    if (row.status === "completed") completed += 1;
+    else if (row.status === "failed" || row.status === "canceled" || row.status === "interrupted") failed += 1;
+    else if (row.status === "waiting_for_resolution") waiting += 1;
+    else active += 1;
+  }
+  return { active, completed, failed, waiting, total: rows.length };
+}
+
+const TransferSummaryCards = memo(function TransferSummaryCards(props: {
+  summary: ReturnType<typeof summarizeTransfers>;
+  visibleCount: number;
+}) {
+  const cards = [
+    { label: "Visible", value: props.visibleCount, detail: `${props.summary.total} total loaded` },
+    { label: "Active", value: props.summary.active, detail: "queued or running" },
+    { label: "Completed", value: props.summary.completed, detail: "finished cleanly" },
+    { label: "Attention", value: props.summary.failed + props.summary.waiting, detail: "failed or waiting" },
+  ];
+
+  return (
+    <div className="transfer-summary" aria-label="Transfer summary">
+      {cards.map((card) => (
+        <div className="transfer-summary-card" key={card.label}>
+          <span>{card.label}</span>
+          <strong>{card.value}</strong>
+          <em>{card.detail}</em>
+        </div>
+      ))}
     </div>
   );
 });
@@ -1040,6 +1081,15 @@ function OperationQueueStrip() {
   const active = operations.filter((operation) => operation.status === "queued" || operation.status === "in_progress" || operation.status === "waiting_for_resolution");
   const terminal = operations.length - active.length;
   const conflict = snapshot?.conflictDialog;
+  const conflictBatch = conflict?.open ? snapshot?.batches.find((batch) => batch.batchId === conflict.batchId) : null;
+  const canApplyConflictToBatch = Boolean(conflictBatch && conflictBatch.operationIds.length > 1);
+  const [applyConflictToBatch, setApplyConflictToBatch] = useState(conflict?.applyToBatch ?? true);
+
+  useEffect(() => {
+    if (conflict?.open) {
+      setApplyConflictToBatch(conflict.applyToBatch);
+    }
+  }, [conflict?.operationId, conflict?.applyToBatch, conflict?.open]);
 
   return (
     <section className="operation-queue-strip">
@@ -1066,14 +1116,28 @@ function OperationQueueStrip() {
             <strong>{conflict.title || "Resolve conflict"}</strong>
             <span>{conflict.sourceLabel} → {conflict.targetLabel}</span>
           </div>
-          <button type="button" disabled={working} onClick={() => void resolveConflict(conflict.operationId, "replace", conflict.applyToBatch)}>
-            Replace
+          <label className="operation-conflict-apply">
+            <input
+              type="checkbox"
+              checked={canApplyConflictToBatch && applyConflictToBatch}
+              disabled={working || !canApplyConflictToBatch}
+              onChange={(event) => setApplyConflictToBatch(event.currentTarget.checked)}
+            />
+            <span>Apply to batch</span>
+          </label>
+          <button type="button" disabled={working} onClick={() => void cancel(conflict.operationId)}>
+            Cancel
           </button>
-          <button type="button" disabled={working} onClick={() => void resolveConflict(conflict.operationId, "skip", conflict.applyToBatch)}>
+          {conflict.supportsReplace ? (
+            <button type="button" disabled={working} onClick={() => void resolveConflict(conflict.operationId, "replace", canApplyConflictToBatch && applyConflictToBatch)}>
+              Replace
+            </button>
+          ) : null}
+          <button type="button" disabled={working} onClick={() => void resolveConflict(conflict.operationId, "skip", canApplyConflictToBatch && applyConflictToBatch)}>
             Skip
           </button>
           {conflict.supportsKeepBoth ? (
-            <button type="button" disabled={working} onClick={() => void resolveConflict(conflict.operationId, "keep_both", conflict.applyToBatch)}>
+            <button type="button" disabled={working} onClick={() => void resolveConflict(conflict.operationId, "keep_both", canApplyConflictToBatch && applyConflictToBatch)}>
               Keep Both
             </button>
           ) : null}
