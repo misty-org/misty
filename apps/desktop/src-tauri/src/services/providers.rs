@@ -55,12 +55,25 @@ pub struct ProviderWorkflowChoice {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ProviderWorkflowOption {
+    #[serde(default, alias = "Name")]
     pub name: String,
+    #[serde(
+        default,
+        alias = "title",
+        alias = "question",
+        alias = "display_name",
+        alias = "FieldName"
+    )]
     pub label: String,
+    #[serde(default, alias = "Help")]
     pub help: String,
+    #[serde(default, alias = "default", alias = "DefaultStr")]
     pub default_value: String,
+    #[serde(default, alias = "Required")]
     pub required: bool,
+    #[serde(default, alias = "IsPassword")]
     pub password: bool,
+    #[serde(default)]
     pub choices: Vec<ProviderWorkflowChoice>,
 }
 
@@ -120,6 +133,61 @@ pub struct RcloneConfigPaths {
     pub raw_json: String,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ProviderConfigMode {
+    Add,
+    Reconnect,
+    Repair,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderConfigRequest {
+    pub name: String,
+    pub provider_type: String,
+    #[serde(default)]
+    pub parameters: BTreeMap<String, String>,
+    #[serde(default)]
+    pub state: String,
+    #[serde(default)]
+    pub result: String,
+    pub mode: ProviderConfigMode,
+    #[serde(default)]
+    pub continuing: bool,
+    #[serde(default)]
+    pub continue_existing: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderConfigStep {
+    #[serde(default)]
+    pub kind: String,
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub state: String,
+    #[serde(default)]
+    pub result: String,
+    #[serde(default)]
+    pub done: bool,
+    #[serde(default)]
+    pub error: String,
+    #[serde(default, rename = "authorizeUrl", alias = "authorize_url")]
+    pub authorize_url: String,
+    #[serde(default)]
+    pub instructions: String,
+    #[serde(
+        default = "default_poll_after_ms",
+        rename = "pollAfterMs",
+        alias = "poll_after_ms"
+    )]
+    pub poll_after_ms: u64,
+    #[serde(default, alias = "field", alias = "prompt")]
+    pub option: Option<ProviderWorkflowOption>,
+}
+
 #[derive(Debug, Deserialize)]
 struct RawRemote {
     name: String,
@@ -152,7 +220,11 @@ impl ProviderService {
     }
 
     pub async fn snapshot(&self) -> ApiResult<ProvidersSnapshot> {
-        Ok(self.inner.snapshot.read().await.clone())
+        let snapshot = self.inner.snapshot.read().await.clone();
+        if snapshot.health.ready || snapshot.loading || !snapshot.workflows.is_empty() {
+            return Ok(snapshot);
+        }
+        self.refresh().await
     }
 
     pub async fn refresh(&self) -> ApiResult<ProvidersSnapshot> {
@@ -246,16 +318,16 @@ impl ProviderService {
             }
         }
         if request.original_name != request.name {
-            let rename_url = self.inner.proxy.url("/api/remote/rename")?;
             let response = self
                 .inner
-                .client
-                .post(rename_url)
-                .json(&serde_json::json!({
-                    "old_name": request.original_name,
-                    "new_name": request.name,
-                }))
-                .send()
+                .proxy
+                .post_json(
+                    "/api/remote/rename",
+                    &serde_json::json!({
+                        "old_name": request.original_name,
+                        "new_name": request.name,
+                    }),
+                )
                 .await?;
             if !response.status().is_success() {
                 return Err(ApiError::Message(
@@ -349,14 +421,79 @@ impl ProviderService {
         })
     }
 
+    pub async fn configure_remote(
+        &self,
+        request: ProviderConfigRequest,
+    ) -> ApiResult<ProviderConfigStep> {
+        validate_config_request(&request)?;
+        let endpoint = if request.continuing {
+            "/api/remote/config/continue"
+        } else {
+            match request.mode {
+                ProviderConfigMode::Add => "/api/remote/config/start",
+                ProviderConfigMode::Reconnect => "/api/remote/config/reconnect",
+                ProviderConfigMode::Repair => "/api/remote/config/repair",
+            }
+        };
+        let body = provider_config_request_body(&request);
+        let response = self.inner.proxy.post_json(endpoint, &body).await?;
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        if !status.is_success() {
+            return Err(proxy_response_error(
+                status.as_u16(),
+                &body,
+                "Provider configuration failed",
+            ));
+        }
+        let mut step = parse_provider_config_step(&body)?;
+        if !step.error.is_empty() || step.kind == "error" {
+            return Err(ApiError::Message(if step.error.is_empty() {
+                "Provider configuration failed.".to_string()
+            } else {
+                std::mem::take(&mut step.error)
+            }));
+        }
+        if step.done || step.kind == "done" {
+            let _ = self.refresh().await;
+        }
+        Ok(step)
+    }
+
+    pub async fn disconnect_remote(&self, name: String) -> ApiResult<ProvidersSnapshot> {
+        if name.trim().is_empty() {
+            return Err(ApiError::Message(
+                "Choose a remote to disconnect.".to_string(),
+            ));
+        }
+        let response = self
+            .inner
+            .proxy
+            .delete_with_query("/api/remote", &[("name", name.as_str())])
+            .await?;
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        if !status.is_success() {
+            return Err(proxy_response_error(
+                status.as_u16(),
+                &body,
+                "Failed to disconnect remote",
+            ));
+        }
+        self.refresh().await
+    }
+
     async fn refresh_inner(&self) -> ApiResult<ProvidersSnapshot> {
         let raw_health = self.inner.proxy.probe_remote_health().await?;
         let health = parse_health(&raw_health);
 
-        let workflows = self
+        let mut workflows = self
             .get_json::<Vec<ProviderWorkflow>>("/api/remote/workflows")
             .await
             .unwrap_or_default();
+        if workflows.is_empty() && health.ready {
+            workflows = default_provider_workflows();
+        }
         let raw_remotes = self
             .get_json::<Vec<RawRemote>>("/api/remote")
             .await
@@ -403,8 +540,7 @@ impl ProviderService {
     where
         T: serde::de::DeserializeOwned,
     {
-        let url = self.inner.proxy.url(path)?;
-        let response = self.inner.client.get(url).send().await?;
+        let response = self.inner.proxy.get(path).await?;
         if !response.status().is_success() {
             return Err(ApiError::Message(response.text().await.unwrap_or_default()));
         }
@@ -502,6 +638,136 @@ fn validate_remote_name(request: &SaveRemoteRequest) -> ApiResult<()> {
     Ok(())
 }
 
+fn validate_config_request(request: &ProviderConfigRequest) -> ApiResult<()> {
+    if request.name.trim().is_empty() {
+        return Err(ApiError::Message("Enter a remote name.".to_string()));
+    }
+    if request.name.contains(':') || request.name.contains('/') || request.name.contains('\\') {
+        return Err(ApiError::Message(
+            "Remote names cannot contain colons or path separators.".to_string(),
+        ));
+    }
+    if request.provider_type.trim().is_empty() {
+        return Err(ApiError::Message("Choose a provider.".to_string()));
+    }
+    Ok(())
+}
+
+fn provider_config_request_body(request: &ProviderConfigRequest) -> serde_json::Value {
+    let mut body = serde_json::Map::new();
+    body.insert(
+        "name".to_string(),
+        serde_json::Value::String(request.name.clone()),
+    );
+    body.insert(
+        "type".to_string(),
+        serde_json::Value::String(request.provider_type.clone()),
+    );
+    body.insert(
+        "parameters".to_string(),
+        serde_json::to_value(&request.parameters).unwrap_or_else(|_| serde_json::json!({})),
+    );
+    if request.continuing {
+        body.insert(
+            "state".to_string(),
+            serde_json::Value::String(request.state.clone()),
+        );
+        body.insert(
+            "result".to_string(),
+            serde_json::Value::String(request.result.clone()),
+        );
+        if request.continue_existing {
+            body.insert(
+                "continue_existing".to_string(),
+                serde_json::Value::Bool(true),
+            );
+        }
+    }
+    serde_json::Value::Object(body)
+}
+
+fn default_provider_workflows() -> Vec<ProviderWorkflow> {
+    vec![
+        ProviderWorkflow {
+            provider_type: "drive".to_string(),
+            name: "Google Drive".to_string(),
+            description: "Connect a Google Drive remote with browser sign-in.".to_string(),
+            options: vec![ProviderWorkflowOption {
+                name: "scope".to_string(),
+                label: "Scope".to_string(),
+                help: "Access scope requested from Google Drive.".to_string(),
+                default_value: "drive".to_string(),
+                required: true,
+                password: false,
+                choices: vec![ProviderWorkflowChoice {
+                    value: "drive".to_string(),
+                    help: "Full Google Drive access".to_string(),
+                }],
+            }],
+        },
+        ProviderWorkflow {
+            provider_type: "dropbox".to_string(),
+            name: "Dropbox".to_string(),
+            description: "Connect a Dropbox remote with browser sign-in.".to_string(),
+            options: Vec::new(),
+        },
+        ProviderWorkflow {
+            provider_type: "onedrive".to_string(),
+            name: "OneDrive".to_string(),
+            description: "Connect a Microsoft OneDrive remote with browser sign-in.".to_string(),
+            options: Vec::new(),
+        },
+    ]
+}
+
+fn parse_provider_config_step(body: &str) -> ApiResult<ProviderConfigStep> {
+    let mut value = serde_json::from_str::<serde_json::Value>(body)?;
+    if let Some(object) = value.as_object_mut() {
+        let option = object.get("option").cloned().or_else(|| {
+            object
+                .get("field")
+                .or_else(|| object.get("prompt"))
+                .or_else(|| {
+                    object
+                        .get("options")
+                        .and_then(|options| options.as_array()?.first())
+                })
+                .cloned()
+        });
+        object.remove("field");
+        object.remove("prompt");
+        object.remove("options");
+        if let Some(option) = option {
+            object.insert("option".to_string(), option);
+        }
+    }
+    let mut step = serde_json::from_value::<ProviderConfigStep>(value)?;
+    if step.poll_after_ms == 0 {
+        step.poll_after_ms = default_poll_after_ms();
+    }
+    Ok(step)
+}
+
+fn proxy_response_error(status: u16, body: &str, fallback: &str) -> ApiError {
+    let message = serde_json::from_str::<serde_json::Value>(body)
+        .ok()
+        .and_then(|value| {
+            value
+                .get("error")
+                .or_else(|| value.get("message"))
+                .and_then(|message| message.as_str())
+                .map(ToOwned::to_owned)
+        })
+        .filter(|message| !message.is_empty())
+        .or_else(|| (!body.trim().is_empty()).then(|| body.trim().to_string()))
+        .unwrap_or_else(|| format!("{fallback} (HTTP {status})"));
+    ApiError::Message(message)
+}
+
+const fn default_poll_after_ms() -> u64 {
+    1000
+}
+
 fn now_unix() -> Option<i64> {
     Some(SystemTime::now().duration_since(UNIX_EPOCH).ok()?.as_secs() as i64)
 }
@@ -515,4 +781,117 @@ fn json_string(value: &serde_json::Value, keys: &[&str]) -> Option<String> {
         }
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn provider_step_accepts_proxy_field_alias() {
+        let step = parse_provider_config_step(
+            r#"{
+                "kind":"post_auth_config",
+                "state":"state-1",
+                "field":{"name":"drive_id","label":"Drive","required":true},
+                "poll_after_ms":0
+            }"#,
+        )
+        .unwrap();
+        assert_eq!(step.kind, "post_auth_config");
+        assert_eq!(step.state, "state-1");
+        assert_eq!(step.option.unwrap().name, "drive_id");
+        assert_eq!(step.poll_after_ms, 1000);
+    }
+
+    #[test]
+    fn provider_step_accepts_first_options_entry() {
+        let step = parse_provider_config_step(
+            r#"{"kind":"post_auth_config","options":[{"name":"scope","defaultValue":"drive"}]}"#,
+        )
+        .unwrap();
+        assert_eq!(step.option.unwrap().name, "scope");
+    }
+
+    #[test]
+    fn provider_config_start_body_omits_continuation_fields() {
+        let request = ProviderConfigRequest {
+            name: "drive-misty".into(),
+            provider_type: "drive".into(),
+            parameters: BTreeMap::from([("scope".to_string(), "drive".to_string())]),
+            state: "stale-state".into(),
+            result: "stale-result".into(),
+            mode: ProviderConfigMode::Add,
+            continuing: false,
+            continue_existing: false,
+        };
+
+        let body = provider_config_request_body(&request);
+
+        assert_eq!(body["name"], "drive-misty");
+        assert_eq!(body["type"], "drive");
+        assert_eq!(body["parameters"]["scope"], "drive");
+        assert!(body.get("state").is_none());
+        assert!(body.get("result").is_none());
+        assert!(body.get("continue_existing").is_none());
+    }
+
+    #[test]
+    fn provider_config_continue_body_includes_state_and_only_true_continue_existing() {
+        let request = ProviderConfigRequest {
+            name: "onedrive-misty".into(),
+            provider_type: "onedrive".into(),
+            parameters: BTreeMap::new(),
+            state: "state-token".into(),
+            result: "result-token".into(),
+            mode: ProviderConfigMode::Repair,
+            continuing: true,
+            continue_existing: true,
+        };
+
+        let body = provider_config_request_body(&request);
+
+        assert_eq!(body["name"], "onedrive-misty");
+        assert_eq!(body["type"], "onedrive");
+        assert_eq!(body["state"], "state-token");
+        assert_eq!(body["result"], "result-token");
+        assert_eq!(body["continue_existing"], true);
+    }
+
+    #[test]
+    fn default_provider_workflows_include_supported_clouds() {
+        let workflows = default_provider_workflows();
+
+        assert_eq!(workflows.len(), 3);
+        assert!(workflows
+            .iter()
+            .any(|workflow| workflow.provider_type == "drive"));
+        assert!(workflows
+            .iter()
+            .any(|workflow| workflow.provider_type == "dropbox"));
+        assert!(workflows
+            .iter()
+            .any(|workflow| workflow.provider_type == "onedrive"));
+        let drive = workflows
+            .iter()
+            .find(|workflow| workflow.provider_type == "drive")
+            .unwrap();
+        assert_eq!(drive.options[0].name, "scope");
+        assert_eq!(drive.options[0].default_value, "drive");
+    }
+
+    #[test]
+    fn provider_config_request_rejects_path_like_names() {
+        let request = ProviderConfigRequest {
+            name: "bad/name".into(),
+            provider_type: "drive".into(),
+            parameters: BTreeMap::new(),
+            state: String::new(),
+            result: String::new(),
+            mode: ProviderConfigMode::Add,
+            continuing: false,
+            continue_existing: false,
+        };
+        assert!(validate_config_request(&request).is_err());
+    }
 }

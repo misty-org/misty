@@ -1,15 +1,46 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 import type {
   AppSnapshot,
   AppEnvironmentSnapshot,
+  ClipboardPayload,
+  ClipboardSnapshot,
+  CreateItemRequest,
+  DeleteItemsRequest,
+  DeviceSnapshot,
   DirectoryListing,
+  ExplorerOperationResult,
+  ExplorerPreviewPayload,
+  ExplorerLibraryItem,
+  ExplorerLibrarySnapshot,
+  FileEntry,
+  FileSyncApplyRequest,
+  FileSyncApplyResult,
+  FileSyncCompareRequest,
+  FileSyncCompareResult,
+  FileSyncPair,
   ListDirectoryRequest,
+  NativeWorkspaceDocument,
+  OpenWithAssociation,
+  OperationConflictPolicy,
+  OperationQueueSnapshot,
+  PasteBlobRequest,
+  PasteItem,
+  PasteItemsRequest,
+  PasteTextRequest,
+  PluginCommandsSnapshot,
+  PrepareOpenItemRequest,
+  PreparedOpenItem,
   ProviderRemote,
+  ProviderWorkflow,
+  ProviderConfigRequest,
+  ProviderConfigStep,
   ProvidersSnapshot,
   ProxySnapshot,
   RcloneConfigPaths,
   RemoteEditDraft,
   RemoteTestResult,
+  RenameItemRequest,
+  RenameItemsRequest,
   SaveSettingsRequest,
   SaveRemoteRequest,
   SaveShortcutsRequest,
@@ -18,6 +49,258 @@ import type {
   TransferFilter,
   TransferPage,
 } from "./types";
+
+function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
+  const internals = (window as typeof window & {
+    __TAURI_INTERNALS__?: { invoke?: unknown };
+  }).__TAURI_INTERNALS__;
+  if (typeof internals?.invoke !== "function") {
+    const fallback = browserSmokeFallback<T>(command, args);
+    if (fallback) return fallback;
+    return Promise.reject(new Error(`Native command "${command}" is only available in the Tauri app.`));
+  }
+  return tauriInvoke<T>(command, args);
+}
+
+function browserSmokeFallback<T>(command: string, args?: Record<string, unknown>): Promise<T> | null {
+  switch (command) {
+    case "app_snapshot":
+      return Promise.resolve(browserAppSnapshot() as T);
+    case "app_environment_snapshot":
+      return Promise.resolve(browserAppSnapshot().environment as T);
+    case "proxy_snapshot":
+      return Promise.resolve({ proxyUrl: null, ready: false, statusCode: null, error: "Browser smoke mode" } as T);
+    case "clipboard_snapshot":
+      return Promise.resolve({ local: emptyClipboardPayload(), shared: emptyClipboardPayload() } as T);
+    case "workspaces_snapshot":
+      return Promise.resolve(browserWorkspaceDocument() as T);
+    case "workspaces_save":
+      return Promise.resolve((args?.document ?? browserWorkspaceDocument()) as T);
+    case "explorer_list_directory":
+      return Promise.resolve(browserDirectoryListing((args?.request as ListDirectoryRequest | undefined) ?? {}) as T);
+    case "devices_snapshot":
+      return Promise.resolve({ devices: [] } as T);
+    case "providers_snapshot":
+    case "providers_refresh":
+      return Promise.resolve(browserProvidersSnapshot() as T);
+    case "transfers_snapshot":
+      return Promise.resolve({ rows: [], totalCount: 0, dbPath: "" } as T);
+    case "operation_queue_snapshot":
+      return Promise.resolve(browserOperationQueueSnapshot() as T);
+    case "explorer_library_snapshot":
+      return Promise.resolve({ recent: [], starred: [], trash: [], lastOpenedPath: null } as T);
+    case "plugin_commands_snapshot":
+      return Promise.resolve({ roots: [], commands: [] } as T);
+    case "shortcuts_snapshot":
+      return Promise.resolve({ path: "", bindings: [] } as T);
+    default:
+      return null;
+  }
+}
+
+const browserSmokeHome = "/Users/misty";
+
+function browserAppSnapshot(): AppSnapshot {
+  const mistyDir = `${browserSmokeHome}/.misty`;
+  return {
+    appName: "Misty",
+    migrationStage: "Browser smoke mode",
+    proxyUrl: null,
+    environment: {
+      homeDir: browserSmokeHome,
+      mistyDir,
+      configDir: `${mistyDir}/config`,
+      dbDir: `${mistyDir}/db`,
+      cacheDir: `${mistyDir}/cache`,
+      tmpDir: `${mistyDir}/tmp`,
+      assetsDir: `${mistyDir}/assets`,
+      pluginsPublicDir: `${mistyDir}/plugins/public`,
+      pluginsPrivateDir: `${mistyDir}/plugins/private`,
+      settingsPath: `${mistyDir}/config/settings.json`,
+      mistyConfigPath: `${mistyDir}/config/misty.json`,
+      workspacesPath: `${mistyDir}/config/workspaces.json`,
+      commandsPath: `${mistyDir}/config/commands.msy`,
+      proxyUrl: null,
+      serverUrl: null,
+      grpcAddress: "",
+      mountPath: ".misty/mnt",
+      configExists: false,
+      derivedEnv: {},
+    },
+  };
+}
+
+function emptyClipboardPayload(): ClipboardPayload {
+  return {
+    kind: "empty",
+    origin: "local_misty",
+    payload_id: "",
+    source_device_id: "",
+    source_device_name: "",
+    revision: 0,
+    created_unix_ms: 0,
+    text: "",
+    html: "",
+    file_refs: [],
+    images: [],
+  };
+}
+
+function browserWorkspaceDocument() {
+  return {
+    schema_version: 1,
+    active_workspace_id: "workspace_0",
+    next_workspace_idx: 1,
+    workspaces: [],
+  };
+}
+
+function browserProvidersSnapshot(): ProvidersSnapshot {
+  return {
+    health: {
+      ready: false,
+      port: null,
+      version: null,
+      uptimeSeconds: 0,
+      connectedProviders: 0,
+      availableProviders: 0,
+      error: "Browser smoke mode",
+    },
+    remotes: [],
+    workflows: defaultProviderWorkflows(),
+    loading: false,
+    error: null,
+  };
+}
+
+function defaultProviderWorkflows(): ProviderWorkflow[] {
+  return [
+    {
+      type: "drive",
+      name: "Google Drive",
+      description: "Connect a Google Drive remote with browser sign-in.",
+      options: [
+        {
+          name: "scope",
+          label: "Scope",
+          help: "Access scope requested from Google Drive.",
+          defaultValue: "drive",
+          required: true,
+          password: false,
+          choices: [{ value: "drive", help: "Full Google Drive access" }],
+        },
+      ],
+    },
+    {
+      type: "dropbox",
+      name: "Dropbox",
+      description: "Connect a Dropbox remote with browser sign-in.",
+      options: [],
+    },
+    {
+      type: "onedrive",
+      name: "OneDrive",
+      description: "Connect a Microsoft OneDrive remote with browser sign-in.",
+      options: [],
+    },
+  ];
+}
+
+function browserOperationQueueSnapshot(): OperationQueueSnapshot {
+  return {
+    operations: [],
+    batches: [],
+    conflictDialog: {
+      open: false,
+      operationId: 0,
+      batchId: 0,
+      applyToBatch: false,
+      supportsReplace: true,
+      supportsKeepBoth: true,
+      selectedPolicy: "ask",
+      title: "",
+      sourceLabel: "",
+      targetLabel: "",
+    },
+    activeCount: 0,
+    maxConcurrent: 4,
+  };
+}
+
+function browserDirectoryListing(request: ListDirectoryRequest): DirectoryListing {
+  const requestedPath = normalizeBrowserPath(request.path || browserSmokeHome);
+  const entries = browserEntriesForPath(requestedPath);
+  return {
+    path: requestedPath,
+    parentPath: requestedPath === "/" ? null : parentBrowserPath(requestedPath),
+    location: { kind: "local", providerType: null, remoteName: null, remotePath: null },
+    entries,
+    totalCount: entries.length,
+    hiddenCount: entries.filter((entry) => entry.hidden).length,
+  };
+}
+
+function browserEntriesForPath(path: string) {
+  const now = Date.now();
+  const folder = (name: string, offset: number) => browserFileEntry(path, name, "folder", null, now - offset);
+  const file = (name: string, sizeBytes: number, offset: number) => browserFileEntry(path, name, "file", sizeBytes, now - offset);
+  if (path === "/" || path === "/Users") {
+    return [folder("misty", 86_400_000)];
+  }
+  if (path === browserSmokeHome) {
+    return [
+      folder("Desktop", 3_600_000),
+      folder("Documents", 7_200_000),
+      folder("Downloads", 10_800_000),
+      folder("Projects", 14_400_000),
+      file("migration-notes.md", 3_224, 18_000_000),
+      file("screenshot.png", 248_120, 22_000_000),
+    ];
+  }
+  return [
+    file("example.txt", 1_024, 3_600_000),
+    folder("Nested Folder", 7_200_000),
+  ];
+}
+
+function browserFileEntry(
+  parentPath: string,
+  name: string,
+  kind: "folder" | "file",
+  sizeBytes: number | null,
+  modifiedMs: number,
+): FileEntry {
+  const path = `${parentPath.replace(/\/+$/, "")}/${name}`.replace(/^$/, "/");
+  const extension = kind === "file" && name.includes(".") ? name.split(".").pop() || "" : "";
+  return {
+    id: path,
+    name,
+    path,
+    extension,
+    mimeType: extension === "png" ? "image/png" : extension === "md" ? "text/markdown" : null,
+    remoteModified: null,
+    kind,
+    sizeBytes,
+    modifiedMs,
+    createdMs: modifiedMs,
+    readonly: false,
+    hidden: name.startsWith("."),
+    isDeleted: false,
+    location: { kind: "local", providerType: null, remoteName: null, remotePath: null },
+  };
+}
+
+function normalizeBrowserPath(path: string): string {
+  const trimmed = path.trim() || browserSmokeHome;
+  return trimmed.startsWith("/") ? trimmed.replace(/\/+$/, "") || "/" : `${browserSmokeHome}/${trimmed}`;
+}
+
+function parentBrowserPath(path: string): string | null {
+  const normalized = normalizeBrowserPath(path);
+  if (normalized === "/") return null;
+  const index = normalized.lastIndexOf("/");
+  return index <= 0 ? "/" : normalized.slice(0, index);
+}
 
 export function appSnapshot(): Promise<AppSnapshot> {
   return invoke("app_snapshot");
@@ -31,8 +314,141 @@ export function proxySnapshot(): Promise<ProxySnapshot> {
   return invoke("proxy_snapshot");
 }
 
+export function clipboardSnapshot(): Promise<ClipboardSnapshot> {
+  return invoke("clipboard_snapshot");
+}
+
+export function clipboardSetLocal(payload: ClipboardPayload): Promise<ClipboardPayload> {
+  return invoke("clipboard_set_local", { payload });
+}
+
+export function clipboardPublishShared(): Promise<boolean> {
+  return invoke("clipboard_publish_shared");
+}
+
+export function clipboardPublishImageBytes(request: {
+  bytes: number[];
+  width: number;
+  height: number;
+  mimeType?: string;
+}): Promise<boolean> {
+  return invoke("clipboard_publish_image_bytes", request);
+}
+
+export function clipboardApplyShared(): Promise<ClipboardPayload> {
+  return invoke("clipboard_apply_shared");
+}
+
+export function clipboardSharedImageBytes(blobId: string): Promise<number[]> {
+  return invoke("clipboard_shared_image_bytes", { blobId });
+}
+
+export function clipboardNativeFileRefs(): Promise<PasteItem[]> {
+  return invoke("clipboard_native_file_refs");
+}
+
+export function clipboardWriteFileRefs(items: PasteItem[]): Promise<boolean> {
+  return invoke("clipboard_write_file_refs", { items });
+}
+
+export function devicesSnapshot(): Promise<DeviceSnapshot> {
+  return invoke("devices_snapshot");
+}
+
 export function explorerListDirectory(request: ListDirectoryRequest): Promise<DirectoryListing> {
   return invoke("explorer_list_directory", { request });
+}
+
+export function explorerCreateItem(request: CreateItemRequest): Promise<ExplorerOperationResult> {
+  return invoke("explorer_create_item", { request });
+}
+
+export function explorerRenameItem(request: RenameItemRequest): Promise<ExplorerOperationResult> {
+  return invoke("explorer_rename_item", { request });
+}
+
+export function explorerDeleteItems(request: DeleteItemsRequest): Promise<ExplorerOperationResult> {
+  return invoke("explorer_delete_items", { request });
+}
+
+export function explorerPasteItems(request: PasteItemsRequest): Promise<ExplorerOperationResult> {
+  return invoke("explorer_paste_items", { request });
+}
+
+export function explorerPrepareOpenItem(request: PrepareOpenItemRequest): Promise<PreparedOpenItem> {
+  return invoke("explorer_prepare_open_item", { request });
+}
+
+export function explorerPreviewItem(path: string): Promise<ExplorerPreviewPayload> {
+  return invoke("explorer_preview_item", { path });
+}
+
+export function explorerPathIsDirectory(path: string): Promise<boolean> {
+  return invoke("explorer_path_is_directory", { path });
+}
+
+export function explorerPathExists(path: string): Promise<boolean> {
+  return invoke("explorer_path_exists", { path });
+}
+
+export function explorerLibrarySnapshot(): Promise<ExplorerLibrarySnapshot> {
+  return invoke("explorer_library_snapshot");
+}
+
+export function explorerLibraryRecordRecent(item: ExplorerLibraryItem): Promise<ExplorerLibrarySnapshot> {
+  return invoke("explorer_library_record_recent", { request: { item } });
+}
+
+export function explorerLibraryRecordLastOpened(path: string): Promise<ExplorerLibrarySnapshot> {
+  return invoke("explorer_library_record_last_opened", { request: { path } });
+}
+
+export function explorerOpenWith(applicationPath: string, filePath: string): Promise<void> {
+  return invoke("explorer_open_with", { applicationPath, filePath });
+}
+
+export function explorerOpenAssociation(filePath: string): Promise<string | null> {
+  return invoke("explorer_open_association", { filePath });
+}
+
+export function explorerSetOpenAssociation(filePath: string, applicationPath: string): Promise<SettingsSnapshot> {
+  return invoke("explorer_set_open_association", { filePath, applicationPath });
+}
+
+export function explorerQueuePasteItems(request: PasteItemsRequest): Promise<OperationQueueSnapshot> {
+  return invoke("explorer_queue_paste_items", { request });
+}
+
+export function explorerQueuePasteText(request: PasteTextRequest): Promise<OperationQueueSnapshot> {
+  return invoke("explorer_queue_paste_text", { request });
+}
+
+export function explorerQueuePasteBlob(request: PasteBlobRequest): Promise<OperationQueueSnapshot> {
+  return invoke("explorer_queue_paste_blob", { request });
+}
+
+export function explorerQueueCreateItem(request: CreateItemRequest): Promise<OperationQueueSnapshot> {
+  return invoke("explorer_queue_create_item", { request });
+}
+
+export function explorerQueueRenameItem(request: RenameItemRequest): Promise<OperationQueueSnapshot> {
+  return invoke("explorer_queue_rename_item", { request });
+}
+
+export function explorerQueueRenameItems(request: RenameItemsRequest): Promise<OperationQueueSnapshot> {
+  return invoke("explorer_queue_rename_items", { request });
+}
+
+export function explorerQueueDeleteItems(request: DeleteItemsRequest): Promise<OperationQueueSnapshot> {
+  return invoke("explorer_queue_delete_items", { request });
+}
+
+export function workspacesSnapshot(): Promise<NativeWorkspaceDocument> {
+  return invoke("workspaces_snapshot");
+}
+
+export function workspacesSave(document: NativeWorkspaceDocument): Promise<NativeWorkspaceDocument> {
+  return invoke("workspaces_save", { document });
 }
 
 export function settingsSnapshot(): Promise<SettingsSnapshot> {
@@ -43,12 +459,24 @@ export function settingsSave(request: SaveSettingsRequest): Promise<SettingsSnap
   return invoke("settings_save", { request });
 }
 
+export function settingsOpenWithAssociations(): Promise<OpenWithAssociation[]> {
+  return invoke("settings_open_with_associations");
+}
+
+export function settingsRemoveOpenWithAssociation(key: string): Promise<SettingsSnapshot> {
+  return invoke("settings_remove_open_with_association", { key });
+}
+
 export function shortcutsSnapshot(): Promise<ShortcutsSnapshot> {
   return invoke("shortcuts_snapshot");
 }
 
 export function shortcutsSave(request: SaveShortcutsRequest): Promise<ShortcutsSnapshot> {
   return invoke("shortcuts_save", { request });
+}
+
+export function pluginCommandsSnapshot(): Promise<PluginCommandsSnapshot> {
+  return invoke("plugin_commands_snapshot");
 }
 
 export function providersSnapshot(): Promise<ProvidersSnapshot> {
@@ -75,6 +503,14 @@ export function providersConfigPaths(): Promise<RcloneConfigPaths> {
   return invoke("providers_config_paths");
 }
 
+export function providersConfigureRemote(request: ProviderConfigRequest): Promise<ProviderConfigStep> {
+  return invoke("providers_configure_remote", { request });
+}
+
+export function providersDisconnectRemote(name: string): Promise<ProvidersSnapshot> {
+  return invoke("providers_disconnect_remote", { name });
+}
+
 export function transfersSnapshot(filter: TransferFilter = {}): Promise<TransferPage> {
   return invoke("transfers_snapshot", { filter });
 }
@@ -85,6 +521,54 @@ export function transfersDeleteSelected(ids: number[]): Promise<void> {
 
 export function transfersDeleteAll(): Promise<void> {
   return invoke("transfers_delete_all");
+}
+
+export function operationQueueSnapshot(): Promise<OperationQueueSnapshot> {
+  return invoke("operation_queue_snapshot");
+}
+
+export function operationQueueCancel(operationId: number): Promise<OperationQueueSnapshot> {
+  return invoke("operation_queue_cancel", { operationId });
+}
+
+export function operationQueueRetry(operationId: number): Promise<OperationQueueSnapshot> {
+  return invoke("operation_queue_retry", { operationId });
+}
+
+export function operationQueueUndo(undoTokenId: number): Promise<OperationQueueSnapshot> {
+  return invoke("operation_queue_undo", { undoTokenId });
+}
+
+export function operationQueueResolveConflict(
+  operationId: number,
+  policy: OperationConflictPolicy,
+  applyToBatch: boolean,
+): Promise<OperationQueueSnapshot> {
+  return invoke("operation_queue_resolve_conflict", { operationId, policy, applyToBatch });
+}
+
+export function operationQueueClearTerminal(): Promise<OperationQueueSnapshot> {
+  return invoke("operation_queue_clear_terminal");
+}
+
+export function fileSyncPairsSnapshot(): Promise<FileSyncPair[]> {
+  return invoke("file_sync_pairs_snapshot");
+}
+
+export function fileSyncPairSave(pair: FileSyncPair): Promise<FileSyncPair> {
+  return invoke("file_sync_pair_save", { pair });
+}
+
+export function fileSyncPairRemove(pairId: number): Promise<void> {
+  return invoke("file_sync_pair_remove", { pairId });
+}
+
+export function fileSyncCompare(request: FileSyncCompareRequest): Promise<FileSyncCompareResult> {
+  return invoke("file_sync_compare", { request });
+}
+
+export function fileSyncApply(request: FileSyncApplyRequest): Promise<FileSyncApplyResult> {
+  return invoke("file_sync_apply", { request });
 }
 
 export function remoteDisplayName(remote: ProviderRemote): string {

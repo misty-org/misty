@@ -1,1 +1,1 @@
-export type AppTab = "files" | "transfers" | "providers" | "plugins" | "activity" | "settings" | "diagnostics";
+export type AppTab = "files" | "transfers" | "providers" | "hub" | "activity" | "settings" | "diagnostics";
