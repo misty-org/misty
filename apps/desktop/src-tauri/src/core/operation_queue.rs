@@ -103,6 +103,7 @@ pub struct ConflictDialogState {
     pub operation_id: u64,
     pub batch_id: u64,
     pub apply_to_batch: bool,
+    pub supports_replace: bool,
     pub supports_keep_both: bool,
     pub selected_policy: ConflictPolicy,
     pub title: String,
@@ -263,8 +264,13 @@ impl OperationQueue {
             operation_id,
             batch_id: operation.batch_id,
             apply_to_batch: true,
+            supports_replace: operation.supports_replace,
             supports_keep_both: operation.supports_keep_both,
-            selected_policy: ConflictPolicy::Replace,
+            selected_policy: if operation.supports_replace {
+                ConflictPolicy::Replace
+            } else {
+                ConflictPolicy::Skip
+            },
             title: operation.title.clone(),
             source_label: operation.source.display(),
             target_label: operation.target.display(),
@@ -457,6 +463,58 @@ mod tests {
                 .await
         );
         assert_eq!(queue.take_ready().await.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn conflict_resolution_can_apply_only_to_current_operation() {
+        let queue = OperationQueue::new(2);
+        queue
+            .enqueue_batch("copy", true, vec![descriptor("one"), descriptor("two")])
+            .await;
+        let first = queue.take_ready().await.remove(0);
+        assert!(queue.wait_for_conflict(first.operation_id).await);
+        assert!(
+            queue
+                .resolve_conflict(first.operation_id, ConflictPolicy::Skip, false)
+                .await
+        );
+
+        let snapshot = queue.snapshot().await;
+        let skipped = snapshot
+            .operations
+            .iter()
+            .find(|operation| operation.operation_id == first.operation_id)
+            .unwrap();
+        let remaining = snapshot
+            .operations
+            .iter()
+            .find(|operation| operation.operation_id != first.operation_id)
+            .unwrap();
+        assert_eq!(skipped.status, OperationStatus::Skipped);
+        assert_eq!(skipped.conflict_policy, ConflictPolicy::Skip);
+        assert_eq!(remaining.conflict_policy, ConflictPolicy::Ask);
+        assert_eq!(queue.take_ready().await.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn conflict_dialog_defaults_to_skip_when_replace_is_unsupported() {
+        let queue = OperationQueue::new(1);
+        let mut operation = descriptor("one");
+        operation.supports_replace = false;
+        operation.supports_keep_both = false;
+        queue.enqueue_batch("delete", true, vec![operation]).await;
+
+        let first = queue.take_ready().await.remove(0);
+        assert!(queue.wait_for_conflict(first.operation_id).await);
+
+        let snapshot = queue.snapshot().await;
+        assert!(snapshot.conflict_dialog.open);
+        assert!(!snapshot.conflict_dialog.supports_replace);
+        assert!(!snapshot.conflict_dialog.supports_keep_both);
+        assert_eq!(
+            snapshot.conflict_dialog.selected_policy,
+            ConflictPolicy::Skip
+        );
     }
 
     #[tokio::test]

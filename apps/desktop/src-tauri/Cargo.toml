@@ -9,8 +9,16 @@ edition = "2021"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+aes-gcm = "0.10"
+base64 = "0.22"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+dirs = "6.0.0"
+hex = "0.4"
+jsonwebtoken = "9"
+rand = "0.8"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+sha2 = "0.10"
 tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
 tauri-plugin-clipboard-manager = "2"
@@ -20,6 +28,8 @@ tokio = { version = "1", features = ["fs", "io-util", "macros", "rt-multi-thread
 reqwest = { version = "0.12", features = ["blocking", "json", "multipart", "stream"] }
 rusqlite = { version = "0.32", features = ["bundled"] }
 uuid = { version = "1", features = ["v4"] }
+image = { version = "0.25.10", default-features = false, features = ["hdr", "png", "pnm", "tga"] }
+zip = { version = "2", default-features = false, features = ["deflate"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6.4"

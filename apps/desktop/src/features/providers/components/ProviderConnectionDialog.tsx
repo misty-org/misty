@@ -1,6 +1,7 @@
-import { Check, ExternalLink, LoaderCircle, PlugZap, X } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import type { ProviderWorkflow, ProviderWorkflowOption } from "../../../api/types";
+import { iconAssets, providerIconForType } from "../../../shared/assets/icons";
+import { AssetIcon } from "../../../shared/components/AssetIcon";
 import type { ProviderConnectionSession } from "../useProvidersStore";
 
 interface ProviderConnectionDialogProps {
@@ -32,7 +33,7 @@ export function ProviderConnectionDialog(props: ProviderConnectionDialogProps) {
             <p>{dialogSubtitle(session)}</p>
           </div>
           <button className="icon-button" type="button" onClick={props.onClose} disabled={session.inFlight} aria-label="Close">
-            <X size={18} />
+            <AssetIcon src={iconAssets.x24} size={18} />
           </button>
         </header>
 
@@ -63,13 +64,13 @@ export function ProviderConnectionDialog(props: ProviderConnectionDialogProps) {
           {session.stage === "authorize" ? (
             <div className="provider-authorize-state">
               <div className="provider-authorize-icon">
-                {session.polling ? <LoaderCircle className="spin" size={28} /> : <ExternalLink size={28} />}
+                <AssetIcon className={session.polling ? "spin" : ""} src={session.polling ? iconAssets.sync24 : iconAssets.rclone24} size={28} />
               </div>
               <h3>Finish signing in with your provider</h3>
               <p>{session.step?.instructions || "Misty opened the authorization page in your browser and is waiting for it to finish."}</p>
               {session.step?.authorizeUrl ? (
                 <button className="provider-auth-link" type="button" onClick={() => void openUrl(session.step!.authorizeUrl)}>
-                  <ExternalLink size={15} /> Open authorization page
+                  <AssetIcon src={iconAssets.rclone24} size={15} /> Open authorization page
                 </button>
               ) : null}
             </div>
@@ -77,7 +78,7 @@ export function ProviderConnectionDialog(props: ProviderConnectionDialogProps) {
 
           {session.stage === "complete" ? (
             <div className="provider-authorize-state complete">
-              <div className="provider-authorize-icon"><Check size={30} /></div>
+              <div className="provider-authorize-icon"><AssetIcon src={iconAssets.verified24} size={30} /></div>
               <h3>Remote connected</h3>
               <p><strong>{session.remoteName}</strong> is ready to use in Explorer.</p>
             </div>
@@ -97,7 +98,7 @@ export function ProviderConnectionDialog(props: ProviderConnectionDialogProps) {
           ) : null}
           {session.stage === "configure" ? (
             <button className="primary" type="button" onClick={props.onSubmit} disabled={session.inFlight}>
-              {session.inFlight ? <LoaderCircle className="spin" size={16} /> : <PlugZap size={16} />}
+              <AssetIcon className={session.inFlight ? "spin" : ""} src={session.inFlight ? iconAssets.sync16 : iconAssets.shieldLock24} size={16} />
               {submitLabel(session)}
             </button>
           ) : null}
@@ -118,21 +119,38 @@ function ProviderPicker(props: {
   return (
     <div className="provider-workflow-grid">
       {props.workflows.map((workflow) => (
-        <button
+        <ProviderWorkflowButton
           key={workflow.type}
-          type="button"
-          className={props.selected === workflow.type ? "selected" : ""}
-          onClick={() => props.onSelect(workflow.type)}
-        >
-          <span className="provider-workflow-mark">{workflow.name.slice(0, 1).toUpperCase()}</span>
-          <span>
-            <strong>{workflow.name || workflow.type}</strong>
-            <small>{workflow.description || workflow.type}</small>
-          </span>
-          {props.selected === workflow.type ? <Check size={17} /> : null}
-        </button>
+          workflow={workflow}
+          selected={props.selected === workflow.type}
+          onSelect={() => props.onSelect(workflow.type)}
+        />
       ))}
     </div>
+  );
+}
+
+function ProviderWorkflowButton(props: {
+  workflow: ProviderWorkflow;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  const providerIcon = providerIconForType(props.workflow.type);
+  return (
+    <button
+      type="button"
+      className={props.selected ? "selected" : ""}
+      onClick={props.onSelect}
+    >
+      <span className="provider-workflow-mark">
+        <AssetIcon src={providerIcon.src} color={providerIcon.color} size={22} />
+      </span>
+      <span>
+        <strong>{props.workflow.name || props.workflow.type}</strong>
+        <small>{props.workflow.description || props.workflow.type}</small>
+      </span>
+      {props.selected ? <AssetIcon src={iconAssets.verified24} size={17} /> : null}
+    </button>
   );
 }
 
@@ -203,7 +221,7 @@ function ProviderOptionField(props: {
 function ProgressStep(props: { label: string; active: boolean; complete: boolean }) {
   return (
     <div className={`${props.active ? "active" : ""}${props.complete ? " complete" : ""}`}>
-      <span>{props.complete ? <Check size={12} /> : null}</span>
+      <span>{props.complete ? <AssetIcon src={iconAssets.verified24} size={12} /> : null}</span>
       {props.label}
     </div>
   );

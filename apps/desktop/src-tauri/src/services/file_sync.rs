@@ -10,9 +10,7 @@ use tokio::sync::Mutex;
 
 use crate::{
     core::{
-        explorer::{
-            ClipboardOperation, ListDirectoryRequest, PasteItem, PasteItemsRequest,
-        },
+        explorer::{ClipboardOperation, ListDirectoryRequest, PasteItem, PasteItemsRequest},
         file_sync::{
             capture_local_snapshot, compare_file_sync_snapshots, planned_rows_for_apply,
             FileSyncCompareDisposition, FileSyncCompareResult, FileSyncCompareSide,
@@ -144,7 +142,9 @@ impl FileSyncService {
     }
 
     pub async fn apply(&self, request: FileSyncApplyRequest) -> ApiResult<FileSyncApplyResult> {
-        self.enqueue_apply(request, None).await.map(|(result, _)| result)
+        self.enqueue_apply(request, None)
+            .await
+            .map(|(result, _)| result)
     }
 
     pub async fn enqueue_apply(
@@ -182,16 +182,22 @@ impl FileSyncService {
         for row in planned {
             match row.action {
                 FileSyncPlannedAction::CopyLeftToRight => {
-                    let request =
-                        self.copy_side_queue_request(&row.left, &request.right, &row.relative_path)?;
+                    let request = self.copy_side_queue_request(
+                        &row.left,
+                        &request.right,
+                        &row.relative_path,
+                    )?;
                     plan.affected_paths
                         .push(request.destination_directory.clone());
                     plan.affected_paths.push(row.left.absolute_path.clone());
                     plan.copy_requests.push(request);
                 }
                 FileSyncPlannedAction::CopyRightToLeft => {
-                    let request =
-                        self.copy_side_queue_request(&row.right, &request.left, &row.relative_path)?;
+                    let request = self.copy_side_queue_request(
+                        &row.right,
+                        &request.left,
+                        &row.relative_path,
+                    )?;
                     plan.affected_paths
                         .push(request.destination_directory.clone());
                     plan.affected_paths.push(row.right.absolute_path.clone());
@@ -355,6 +361,7 @@ impl FileSyncService {
                 .list_directory(ListDirectoryRequest {
                     path: Some(directory.to_string_lossy().to_string()),
                     show_hidden: Some(true),
+                    force_remote_refresh: None,
                 })
                 .await?;
             for entry in listing.entries {
@@ -428,19 +435,21 @@ impl FileSyncService {
     }
 
     async fn watch_apply_pending(&self, pair_id: i64) -> bool {
-        let Some(operation_ids) = self.watch_apply_operations.lock().await.get(&pair_id).cloned()
+        let Some(operation_ids) = self
+            .watch_apply_operations
+            .lock()
+            .await
+            .get(&pair_id)
+            .cloned()
         else {
             return false;
         };
         let operation_ids: HashSet<_> = operation_ids.into_iter().collect();
         let snapshot = self.operation_queue.snapshot().await;
-        let pending = snapshot
-            .operations
-            .iter()
-            .any(|operation| {
-                operation_ids.contains(&operation.operation_id)
-                    && !terminal_operation_status(operation.status)
-            });
+        let pending = snapshot.operations.iter().any(|operation| {
+            operation_ids.contains(&operation.operation_id)
+                && !terminal_operation_status(operation.status)
+        });
         if !pending {
             self.watch_apply_operations.lock().await.remove(&pair_id);
         }
@@ -612,7 +621,9 @@ mod tests {
 
         assert!(!terminal_operation_status(OperationStatus::Queued));
         assert!(!terminal_operation_status(OperationStatus::InProgress));
-        assert!(!terminal_operation_status(OperationStatus::WaitingForResolution));
+        assert!(!terminal_operation_status(
+            OperationStatus::WaitingForResolution
+        ));
         assert!(terminal_operation_status(OperationStatus::Completed));
         assert!(terminal_operation_status(OperationStatus::Failed));
         assert!(terminal_operation_status(OperationStatus::Canceled));

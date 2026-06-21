@@ -14,6 +14,8 @@ use crate::error::{ApiError, ApiResult};
 pub struct ListDirectoryRequest {
     pub path: Option<String>,
     pub show_hidden: Option<bool>,
+    #[serde(default)]
+    pub force_remote_refresh: Option<bool>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

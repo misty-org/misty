@@ -86,6 +86,9 @@ interface PaneExplorerState {
 }
 
 type NavigationMode = "push" | "back" | "forward" | "replace";
+interface LoadPaneOptions {
+  forceRemoteRefresh?: boolean;
+}
 
 export interface ExplorerContextMenuState {
   open: boolean;
@@ -166,7 +169,7 @@ interface ExplorerStore {
   createWorkspace: (title: string, homePath: string) => Promise<void>;
   renameWorkspace: (workspaceId: string, title: string) => Promise<void>;
   deleteWorkspace: (workspaceId: string, homePath: string) => Promise<void>;
-  loadPane: (paneId: string, path: string, mode?: NavigationMode) => Promise<void>;
+  loadPane: (paneId: string, path: string, mode?: NavigationMode, options?: LoadPaneOptions) => Promise<void>;
   navigatePane: (paneId: string, path: string) => Promise<void>;
   navigateBack: (paneId: string) => Promise<void>;
   navigateForward: (paneId: string) => Promise<void>;
@@ -297,7 +300,9 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
 
   initialize: async (homePath) => {
     const multi = useMultiPanelStore.getState();
-    if (multi.tabs.length > 0 || get().initialized || initializationInFlight) return;
+    const shouldResetWorkspace = consumeExplorerWorkspaceResetFlag();
+    if (initializationInFlight) return;
+    if (!shouldResetWorkspace && (multi.tabs.length > 0 || get().initialized)) return;
     initializationInFlight = true;
     void get().loadLibrary();
     try {
@@ -306,7 +311,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         clipboardSnapshot(),
       ]);
       const restoredClipboard = explorerClipboardFromPayload(processClipboard.local);
-      if (consumeExplorerWorkspaceResetFlag()) {
+      if (shouldResetWorkspace) {
         const resetDocument = defaultWorkspaceDocument();
         const workspace = defaultNativeWorkspace("workspace_0", "Workspace 1", homePath, get());
         workspaceDocumentCache = await saveWorkspaceDocument({
@@ -443,7 +448,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     }
   },
 
-  loadPane: async (paneId, path, mode = "push") => {
+  loadPane: async (paneId, path, mode = "push", options) => {
     set((state) => {
       const pane = state.panes[paneId] ?? emptyPaneState();
       const multi = useMultiPanelStore.getState();
@@ -462,7 +467,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
             [paneId]: sibling ? showHiddenForPane(state, sibling.id) : state.showHidden,
           }
         : state.paneShowHidden;
-      const quietRefresh = mode === "replace" && pane.listing?.path === path && !pane.needsLoad;
+      const quietRefresh = !options?.forceRemoteRefresh && mode === "replace" && pane.listing?.path === path && !pane.needsLoad;
       const nextPane = quietRefresh
         ? (pane.error ? { ...pane, error: null } : pane)
         : { ...pane, loading: true, needsLoad: false, error: null };
@@ -484,7 +489,11 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     });
     try {
       const listing = sortListing(
-        await explorerListDirectory({ path, showHidden: showHiddenForPane(get(), paneId) }),
+        await explorerListDirectory({
+          path,
+          showHidden: showHiddenForPane(get(), paneId),
+          forceRemoteRefresh: options?.forceRemoteRefresh,
+        }),
         sortForPane(get(), paneId),
       );
       if (mode !== "replace") void get().recordLastOpenedPath(listing.path);
@@ -550,7 +559,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
   refreshPane: async (paneId) => {
     const path = get().panes[paneId]?.listing?.path;
     if (path) {
-      await get().loadPane(paneId, path, "replace");
+      await get().loadPane(paneId, path, "replace", { forceRemoteRefresh: true });
     }
   },
 

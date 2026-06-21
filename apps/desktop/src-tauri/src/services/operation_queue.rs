@@ -14,6 +14,7 @@ use crate::core::{
         ClipboardOperation, CreateItemKind, CreateItemRequest, DeleteItemsRequest, PasteItem,
         PasteItemsRequest, RenameItemRequest, RenameItemsRequest,
     },
+    file_master::RemoteBrowseTarget,
     file_transfer::{FileTransferItemType, FileTransferStatus, FileTransferType},
     operation_queue::{
         ConflictPolicy, OperationDescriptor, OperationEndpoint, OperationKind, OperationQueue,
@@ -86,19 +87,15 @@ impl OperationQueueService {
                 .join(&file_name)
                 .to_string_lossy()
                 .to_string();
+            let source_endpoint = self.endpoint_for_path(source.path.clone());
+            let target_endpoint = self.endpoint_for_path(target_path);
             descriptors.push(OperationDescriptor {
                 kind: match request.operation {
                     ClipboardOperation::Copy => OperationKind::Copy,
                     ClipboardOperation::Move => OperationKind::Move,
                 },
-                source: OperationEndpoint {
-                    local_path: source.path.clone(),
-                    ..OperationEndpoint::default()
-                },
-                target: OperationEndpoint {
-                    local_path: target_path,
-                    ..OperationEndpoint::default()
-                },
+                source: source_endpoint,
+                target: target_endpoint,
                 supports_replace: true,
                 supports_keep_both: true,
                 title: format!(
@@ -158,7 +155,9 @@ impl OperationQueueService {
             false,
             vec![OperationDescriptor {
                 kind: OperationKind::Create,
-                target: local_endpoint(target_path),
+                target: self.endpoint_for_path(target_path),
+                supports_replace: true,
+                supports_keep_both: false,
                 title: format!("Create {}", request.name),
                 ..OperationDescriptor::default()
             }],
@@ -182,8 +181,10 @@ impl OperationQueueService {
             false,
             vec![OperationDescriptor {
                 kind: OperationKind::Rename,
-                source: local_endpoint(request.path.clone()),
-                target: local_endpoint(target_path),
+                source: self.endpoint_for_path(request.path.clone()),
+                target: self.endpoint_for_path(target_path),
+                supports_replace: true,
+                supports_keep_both: false,
                 title: format!("Rename to {}", request.new_name),
                 ..OperationDescriptor::default()
             }],
@@ -210,8 +211,10 @@ impl OperationQueueService {
                 .to_string();
             descriptors.push(OperationDescriptor {
                 kind: OperationKind::Rename,
-                source: local_endpoint(item.path.clone()),
-                target: local_endpoint(target_path),
+                source: self.endpoint_for_path(item.path.clone()),
+                target: self.endpoint_for_path(target_path),
+                supports_replace: true,
+                supports_keep_both: false,
                 title: format!("Rename to {}", item.new_name),
                 ..OperationDescriptor::default()
             });
@@ -238,7 +241,7 @@ impl OperationQueueService {
                 .to_string();
             descriptors.push(OperationDescriptor {
                 kind: OperationKind::Delete,
-                source: local_endpoint(path.clone()),
+                source: self.endpoint_for_path(path.clone()),
                 title: format!("Delete {name}"),
                 ..OperationDescriptor::default()
             });
@@ -289,6 +292,11 @@ impl OperationQueueService {
         Ok((self.queue.snapshot().await, operation_ids))
     }
 
+    fn endpoint_for_path(&self, path: String) -> OperationEndpoint {
+        let remote = self.explorer.remote_target_for_path(&path);
+        endpoint_for_path(path, remote)
+    }
+
     pub async fn enqueue_file_sync_apply(
         &self,
         label: impl Into<String>,
@@ -319,13 +327,15 @@ impl OperationQueueService {
                     .join(&file_name)
                     .to_string_lossy()
                     .to_string();
+                let source_endpoint = self.endpoint_for_path(source.path.clone());
+                let target_endpoint = self.endpoint_for_path(target_path);
                 descriptors.push(OperationDescriptor {
                     kind: match request.operation {
                         ClipboardOperation::Copy => OperationKind::Copy,
                         ClipboardOperation::Move => OperationKind::Move,
                     },
-                    source: local_endpoint(source.path.clone()),
-                    target: local_endpoint(target_path),
+                    source: source_endpoint,
+                    target: target_endpoint,
                     supports_replace: true,
                     supports_keep_both: true,
                     title: format!(
@@ -359,7 +369,7 @@ impl OperationQueueService {
                 .to_string();
             descriptors.push(OperationDescriptor {
                 kind: OperationKind::Delete,
-                source: local_endpoint(path.clone()),
+                source: self.endpoint_for_path(path.clone()),
                 title: format!("Delete {name}"),
                 ..OperationDescriptor::default()
             });
@@ -382,7 +392,7 @@ impl OperationQueueService {
                 "Operation {operation_id} cannot be canceled."
             )));
         }
-        if let Some(token) = self.cancellations.lock().await.get(&operation_id).cloned() {
+        if let Some(token) = self.cancellations.lock().await.remove(&operation_id) {
             token.store(true, Ordering::SeqCst);
         }
         self.prune_non_retryable_payloads().await;
@@ -646,11 +656,36 @@ impl OperationQueueService {
         ensure_not_canceled(&cancellation)?;
         match payload {
             QueuedExplorerOperation::Create(request) => {
+                if let Some(outcome) = self
+                    .resolve_target_conflict(
+                        operation.operation_id,
+                        &create_destination(&request),
+                        operation.conflict_policy,
+                        cancellation.clone(),
+                    )
+                    .await?
+                {
+                    return Ok(outcome);
+                }
                 self.explorer
                     .create_item_with_cancellation(request, cancellation.clone())
                     .await?;
             }
             QueuedExplorerOperation::Rename(request) => {
+                let destination = rename_destination(&request);
+                if request.path != destination.to_string_lossy() {
+                    if let Some(outcome) = self
+                        .resolve_target_conflict(
+                            operation.operation_id,
+                            &destination,
+                            operation.conflict_policy,
+                            cancellation.clone(),
+                        )
+                        .await?
+                    {
+                        return Ok(outcome);
+                    }
+                }
                 self.explorer
                     .rename_item_with_cancellation(request, cancellation.clone())
                     .await?;
@@ -745,6 +780,51 @@ impl OperationQueueService {
         Ok(ExecutionOutcome::Completed)
     }
 
+    async fn resolve_target_conflict(
+        &self,
+        operation_id: u64,
+        destination: &Path,
+        policy: ConflictPolicy,
+        cancellation: Arc<AtomicBool>,
+    ) -> ApiResult<Option<ExecutionOutcome>> {
+        ensure_not_canceled(&cancellation)?;
+        let destination_path = destination.to_string_lossy().to_string();
+        if self
+            .explorer
+            .item_is_directory(&destination_path)
+            .await?
+            .is_none()
+        {
+            return Ok(None);
+        }
+
+        match policy {
+            ConflictPolicy::Ask => {
+                if !self.queue.wait_for_conflict(operation_id).await {
+                    return Err(ApiError::Message(format!(
+                        "Operation {operation_id} could not wait for conflict resolution."
+                    )));
+                }
+                Ok(Some(ExecutionOutcome::WaitingForConflict))
+            }
+            ConflictPolicy::Replace => {
+                self.explorer
+                    .delete_items_with_cancellation(
+                        DeleteItemsRequest {
+                            paths: vec![destination_path],
+                        },
+                        cancellation,
+                    )
+                    .await?;
+                Ok(None)
+            }
+            ConflictPolicy::Skip => Ok(Some(ExecutionOutcome::Completed)),
+            ConflictPolicy::KeepBoth => Err(ApiError::Message(
+                "Keep Both is not available for create or rename operations.".to_string(),
+            )),
+        }
+    }
+
     async fn available_keep_both_destination(&self, path: &Path) -> ApiResult<PathBuf> {
         if self
             .explorer
@@ -821,6 +901,18 @@ fn local_endpoint(path: String) -> OperationEndpoint {
     }
 }
 
+fn endpoint_for_path(path: String, remote: Option<RemoteBrowseTarget>) -> OperationEndpoint {
+    if let Some(remote) = remote {
+        OperationEndpoint {
+            remote_name: remote.remote_name,
+            remote_path: remote.remote_path,
+            ..OperationEndpoint::default()
+        }
+    } else {
+        local_endpoint(path)
+    }
+}
+
 fn file_name_for_path(path: &str) -> ApiResult<String> {
     Path::new(path)
         .file_name()
@@ -851,6 +943,17 @@ fn paste_destination(request: &PasteItemsRequest) -> Option<PathBuf> {
         .map(std::ffi::OsStr::new)
         .or_else(|| Path::new(&source.path).file_name())?;
     Some(Path::new(&request.destination_directory).join(file_name))
+}
+
+fn create_destination(request: &CreateItemRequest) -> PathBuf {
+    Path::new(&request.directory).join(&request.name)
+}
+
+fn rename_destination(request: &RenameItemRequest) -> PathBuf {
+    Path::new(&request.path)
+        .parent()
+        .unwrap_or_else(|| Path::new(""))
+        .join(&request.new_name)
 }
 
 fn keep_both_candidate(path: &Path, index: usize) -> ApiResult<PathBuf> {
@@ -886,6 +989,10 @@ fn split_file_name(file_name: &str) -> (&str, Option<&str>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::services::{
+        environment::AppEnvironmentService, explorer_library::ExplorerLibraryService,
+        providers::ProviderService, proxy::ProxyService,
+    };
 
     #[test]
     fn split_file_name_keeps_regular_extensions() {
@@ -937,12 +1044,230 @@ mod tests {
     }
 
     #[test]
+    fn create_and_rename_destinations_match_payload_targets() {
+        assert_eq!(
+            create_destination(&CreateItemRequest {
+                directory: "/tmp/work".to_string(),
+                name: "report.md".to_string(),
+                kind: CreateItemKind::File,
+            }),
+            Path::new("/tmp/work").join("report.md"),
+        );
+
+        assert_eq!(
+            rename_destination(&RenameItemRequest {
+                path: "/tmp/work/current.md".to_string(),
+                new_name: "renamed.md".to_string(),
+                source_is_directory: Some(false),
+            }),
+            Path::new("/tmp/work").join("renamed.md"),
+        );
+    }
+
+    #[test]
+    fn endpoint_for_path_preserves_remote_metadata() {
+        let endpoint = endpoint_for_path(
+            "/Users/misty/.misty/mnt/drive/work/report.pdf".to_string(),
+            Some(RemoteBrowseTarget {
+                provider_type: "drive".to_string(),
+                remote_name: "drive-work".to_string(),
+                remote_path: "/report.pdf".to_string(),
+            }),
+        );
+
+        assert!(endpoint.local_path.is_empty());
+        assert_eq!(endpoint.remote_name, "drive-work");
+        assert_eq!(endpoint.remote_path, "/report.pdf");
+    }
+
+    #[test]
+    fn endpoint_for_path_keeps_local_paths_local() {
+        let endpoint = endpoint_for_path("/tmp/report.pdf".to_string(), None);
+
+        assert_eq!(endpoint.local_path, "/tmp/report.pdf");
+        assert!(endpoint.remote_name.is_empty());
+        assert!(endpoint.remote_path.is_empty());
+    }
+
+    #[test]
     fn remote_parent_for_path_keeps_root_parent() {
         assert_eq!(remote_parent_for_path("/photo.png").unwrap(), "/");
         assert_eq!(
             remote_parent_for_path("/source/photo.png").unwrap(),
             "/source"
         );
+    }
+
+    #[tokio::test]
+    async fn canceling_queued_service_operation_prunes_payload_before_execution() {
+        let service = test_operation_queue_service();
+        let root = unique_test_dir("queued-cancel");
+        tokio::fs::create_dir_all(&root).await.unwrap();
+        let target = root.join("never-created.txt");
+        let request = CreateItemRequest {
+            directory: root.to_string_lossy().to_string(),
+            name: "never-created.txt".to_string(),
+            kind: CreateItemKind::File,
+        };
+        let (_, operation_ids) = service
+            .queue
+            .enqueue_batch_with_ids(
+                "Create file",
+                false,
+                vec![OperationDescriptor {
+                    kind: OperationKind::Create,
+                    target: local_endpoint(target.to_string_lossy().to_string()),
+                    title: "Create never-created.txt".to_string(),
+                    ..OperationDescriptor::default()
+                }],
+            )
+            .await;
+        let operation_id = operation_ids[0];
+        service
+            .payloads
+            .lock()
+            .await
+            .insert(operation_id, QueuedExplorerOperation::Create(request));
+
+        let snapshot = service.cancel(operation_id).await.unwrap();
+
+        let operation = snapshot
+            .operations
+            .iter()
+            .find(|operation| operation.operation_id == operation_id)
+            .unwrap();
+        assert_eq!(operation.status, OperationStatus::Canceled);
+        assert!(!service.payloads.lock().await.contains_key(&operation_id));
+        assert!(!target.exists());
+
+        let _ = tokio::fs::remove_dir_all(&root).await;
+    }
+
+    #[tokio::test]
+    async fn retrying_failed_service_operation_reuses_payload_and_executes() {
+        let service = test_operation_queue_service();
+        let root = unique_test_dir("retry-create");
+        let missing_parent = root.join("created-after-failure");
+        let target = missing_parent.join("retried.txt");
+
+        let snapshot = service
+            .enqueue_create_item(CreateItemRequest {
+                directory: missing_parent.to_string_lossy().to_string(),
+                name: "retried.txt".to_string(),
+                kind: CreateItemKind::File,
+            })
+            .await
+            .unwrap();
+        let operation_id = snapshot.operations[0].operation_id;
+
+        wait_for_operation_status(&service, operation_id, OperationStatus::Failed).await;
+        assert!(service.payloads.lock().await.contains_key(&operation_id));
+        assert!(!target.exists());
+
+        tokio::fs::create_dir_all(&missing_parent).await.unwrap();
+        service.retry(operation_id).await.unwrap();
+
+        wait_for_operation_status(&service, operation_id, OperationStatus::Completed).await;
+        assert!(!service.payloads.lock().await.contains_key(&operation_id));
+        assert!(target.is_file());
+
+        let _ = tokio::fs::remove_dir_all(&root).await;
+    }
+
+    #[tokio::test]
+    async fn canceling_conflict_paused_operation_removes_payload_and_cancellation_token() {
+        let service = test_operation_queue_service();
+        let root = unique_test_dir("cancel-conflict");
+        let target = root.join("existing.txt");
+        tokio::fs::create_dir_all(&root).await.unwrap();
+        tokio::fs::write(&target, b"already here").await.unwrap();
+
+        let snapshot = service
+            .enqueue_create_item(CreateItemRequest {
+                directory: root.to_string_lossy().to_string(),
+                name: "existing.txt".to_string(),
+                kind: CreateItemKind::File,
+            })
+            .await
+            .unwrap();
+        let operation_id = snapshot.operations[0].operation_id;
+
+        wait_for_operation_status(
+            &service,
+            operation_id,
+            OperationStatus::WaitingForResolution,
+        )
+        .await;
+        assert!(service.payloads.lock().await.contains_key(&operation_id));
+        assert!(service
+            .cancellations
+            .lock()
+            .await
+            .contains_key(&operation_id));
+
+        let snapshot = service.cancel(operation_id).await.unwrap();
+
+        let operation = snapshot
+            .operations
+            .iter()
+            .find(|operation| operation.operation_id == operation_id)
+            .unwrap();
+        assert_eq!(operation.status, OperationStatus::Canceled);
+        assert!(!service.payloads.lock().await.contains_key(&operation_id));
+        assert!(!service
+            .cancellations
+            .lock()
+            .await
+            .contains_key(&operation_id));
+        assert_eq!(tokio::fs::read(&target).await.unwrap(), b"already here");
+
+        let _ = tokio::fs::remove_dir_all(&root).await;
+    }
+
+    fn test_operation_queue_service() -> OperationQueueService {
+        let environment = AppEnvironmentService::new();
+        let proxy = ProxyService::new(environment.clone());
+        let providers = ProviderService::new(proxy.clone());
+        let transfers = TransferService::new(environment.clone());
+        let explorer_library = ExplorerLibraryService::new(environment.clone());
+        let explorer = ExplorerService::new(
+            environment,
+            proxy,
+            providers,
+            transfers.clone(),
+            explorer_library,
+        );
+        OperationQueueService::new(explorer, transfers)
+    }
+
+    fn unique_test_dir(name: &str) -> PathBuf {
+        std::env::temp_dir().join(format!(
+            "misty-operation-queue-{name}-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ))
+    }
+
+    async fn wait_for_operation_status(
+        service: &OperationQueueService,
+        operation_id: u64,
+        expected: OperationStatus,
+    ) {
+        for _ in 0..100 {
+            let snapshot = service.snapshot().await;
+            let status = snapshot
+                .operations
+                .iter()
+                .find(|operation| operation.operation_id == operation_id)
+                .map(|operation| operation.status);
+            if status == Some(expected) {
+                return;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        }
+        panic!("operation {operation_id} did not reach {expected:?}");
     }
 }
 

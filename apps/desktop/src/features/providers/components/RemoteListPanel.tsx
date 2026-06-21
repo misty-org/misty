@@ -1,7 +1,8 @@
-import { MoreHorizontal, Plus, RefreshCcw, RotateCcw, Settings2, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { remoteDisplayName } from "../../../api/misty";
 import type { ProviderRemote } from "../../../api/types";
+import { iconAssets, providerIconForType } from "../../../shared/assets/icons";
+import { AssetIcon } from "../../../shared/components/AssetIcon";
 import { IconButton } from "../../../shared/components/IconButton";
 import { Panel, PanelHeader } from "../../../shared/components/Panel";
 
@@ -26,10 +27,10 @@ export function RemoteListPanel(props: RemoteListPanelProps) {
         subtitle={`${props.remotes.length} remotes`}
         actions={<div className="remote-list-actions">
           <IconButton onClick={props.onRefresh} disabled={props.loading || props.working} title="Refresh remotes">
-            <RefreshCcw size={16} />
+            <AssetIcon src={iconAssets.sync16} size={16} />
           </IconButton>
           <button className="primary compact" type="button" onClick={props.onAdd} disabled={props.working}>
-            <Plus size={16} /> Add Remote
+            <AssetIcon src={iconAssets.plus16} size={16} /> Add Remote
           </button>
         </div>}
       />
@@ -62,12 +63,19 @@ function RemoteRow(props: {
 }) {
   const { remote, selected, onSelect } = props;
   const [menuOpen, setMenuOpen] = useState(false);
+  const providerIcon = providerIconForType(remote.type);
   return (
     <div className={`remote-row ${selected ? "selected" : ""}`}>
       <button className="remote-row-select" type="button" onClick={onSelect}>
+        <span className={remote.needsReconnect ? "remote-provider-icon warning" : "remote-provider-icon"}>
+          <AssetIcon src={providerIcon.src} color={providerIcon.color} size={17} />
+        </span>
         <span className="remote-name">{remoteDisplayName(remote)}</span>
         <span className="remote-type">{remote.type}</span>
-        <span className={remote.needsReconnect ? "remote-status warning" : "remote-status"}>{remote.statusLabel}</span>
+        <span className={remote.needsReconnect ? "remote-status warning" : "remote-status"}>
+          <AssetIcon src={remote.needsReconnect ? iconAssets.xCircleFill16 : iconAssets.verified24} size={14} />
+          {remote.statusLabel}
+        </span>
       </button>
       <div className="remote-row-menu-wrap">
         <button
@@ -77,13 +85,13 @@ function RemoteRow(props: {
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen((open) => !open)}
         >
-          <MoreHorizontal size={17} />
+          <AssetIcon src={iconAssets.kebabHorizontal24} size={17} />
         </button>
         {menuOpen ? (
           <div className="remote-row-menu" role="menu">
-            {remote.needsReconnect ? <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); props.onReconnect(); }}><RotateCcw size={15} /> Reconnect</button> : null}
-            <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); props.onRepair(); }}><Settings2 size={15} /> Configure</button>
-            <button className="danger" type="button" role="menuitem" onClick={() => { setMenuOpen(false); props.onDisconnect(); }}><Trash2 size={15} /> Disconnect</button>
+            {remote.needsReconnect ? <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); props.onReconnect(); }}><AssetIcon src={iconAssets.sync16} size={15} /> Reconnect</button> : null}
+            <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); props.onRepair(); }}><AssetIcon src={iconAssets.gear24} size={15} /> Configure</button>
+            <button className="danger" type="button" role="menuitem" onClick={() => { setMenuOpen(false); props.onDisconnect(); }}><AssetIcon src={iconAssets.trash24} size={15} /> Disconnect</button>
           </div>
         ) : null}
       </div>

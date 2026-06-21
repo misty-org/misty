@@ -4,6 +4,7 @@ pub mod environment;
 pub mod explorer;
 pub mod explorer_library;
 pub mod file_sync;
+pub mod hub;
 pub mod native_clipboard;
 pub mod operation_queue;
 pub mod plugin_commands;

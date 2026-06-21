@@ -33,8 +33,10 @@ import {
   clipboardSharedImageBytes,
   clipboardWriteFileRefs,
   devicesSnapshot,
+  operationQueueUndo,
   pluginCommandsSnapshot,
   shortcutsSnapshot,
+  transfersSnapshot,
 } from "../../api/misty";
 import { ExplorerPane } from "./components/ExplorerPane";
 import { ExplorerSidebar } from "./components/ExplorerSidebar";
@@ -59,9 +61,12 @@ import type {
   MountedDevice,
   PluginCommandEntry,
   ProviderRemote,
+  TransferRecord,
 } from "../../api/types";
 import type { MultiPanelTab } from "../../shared/multipanel/types";
 import { useFileSyncStore } from "./state/useFileSyncStore";
+import { useOperationQueueStore } from "../transfers/useOperationQueueStore";
+import { useTransfersStore } from "../transfers/useTransfersStore";
 import { shortcutMapFromBindings, shortcutMatchesEvent } from "../../shared/shortcuts";
 import type { ShortcutMap } from "../../shared/shortcuts";
 import { errorText } from "../../shared/format";
@@ -76,6 +81,7 @@ const minClaudePanelWidth = 280;
 const maxClaudePanelWidth = 600;
 const folderHoverOpenDelayMs = 3000;
 const transferRefreshPollMs = 12000;
+const explorerSearchFocusEvent = "misty:explorer-search-focus";
 const emptyPinnedPaths: string[] = [];
 const emptyProviderRemotes: ProviderRemote[] = [];
 const emptyPluginCommands: PluginCommandEntry[] = [];
@@ -86,10 +92,13 @@ const executableShortcutCommands = [
   "app.toggle_plugin_launcher",
   "clipboard.publish_shared",
   "clipboard.apply_shared",
+  "search.toggle",
   "explorer.open_palette",
   "explorer.copy",
   "explorer.cut",
   "explorer.paste",
+  "explorer.undo",
+  "explorer.redo",
   "explorer.delete",
   "explorer.rename",
   "explorer.refresh",
@@ -118,10 +127,13 @@ const defaultMacExplorerShortcuts: ShortcutMap = {
   "app.toggle_plugin_launcher": "Cmd+Shift+P",
   "clipboard.publish_shared": "Cmd+Alt+C",
   "clipboard.apply_shared": "Cmd+Alt+V",
+  "search.toggle": "Cmd+K",
   "explorer.open_palette": "Cmd+P",
   "explorer.copy": "Cmd+C",
   "explorer.cut": "Cmd+X",
   "explorer.paste": "Cmd+V",
+  "explorer.undo": "Cmd+Z",
+  "explorer.redo": "Cmd+Shift+Z",
   "explorer.delete": "Delete",
   "explorer.rename": "F2",
   "explorer.refresh": "Cmd+R",
@@ -150,10 +162,13 @@ const defaultNonMacExplorerShortcuts: ShortcutMap = {
   "app.toggle_plugin_launcher": "Ctrl+Shift+P",
   "clipboard.publish_shared": "Ctrl+Alt+C",
   "clipboard.apply_shared": "Ctrl+Alt+V",
+  "search.toggle": "Ctrl+K",
   "explorer.open_palette": "Ctrl+P",
   "explorer.copy": "Ctrl+C",
   "explorer.cut": "Ctrl+X",
   "explorer.paste": "Ctrl+V",
+  "explorer.undo": "Ctrl+Z",
+  "explorer.redo": "Ctrl+Shift+Z",
   "explorer.delete": "Delete",
   "explorer.rename": "F2",
   "explorer.refresh": "Ctrl+R",
@@ -258,6 +273,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
   const lastOperationErrorToastRef = useRef<string | null>(null);
   const [resizeTarget, setResizeTarget] = useState<ResizeTarget>(null);
   const [pluginCommands, setPluginCommands] = useState<PluginCommandEntry[]>(emptyPluginCommands);
+  const pluginCommandsRef = useRef<PluginCommandEntry[]>(emptyPluginCommands);
   const [mountedDevices, setMountedDevices] = useState<MountedDevice[]>(emptyMountedDevices);
   const [devicesLoading, setDevicesLoading] = useState(false);
   const homePath = app?.environment.homeDir ?? "/";
@@ -348,12 +364,14 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
             ...executableShortcutCommands,
             ...pluginSnapshot.commands.map((command) => command.id),
           ];
+          pluginCommandsRef.current = pluginSnapshot.commands;
           setPluginCommands((current) => pluginCommandsEqual(current, pluginSnapshot.commands) ? current : pluginSnapshot.commands);
         }
       } catch {
         if (!disposed) {
           shortcutMapRef.current = defaultExplorerShortcutMap();
           executableCommandIdsRef.current = executableShortcutCommands;
+          pluginCommandsRef.current = emptyPluginCommands;
           setPluginCommands((current) => current.length === 0 ? current : emptyPluginCommands);
         }
       }
@@ -432,7 +450,8 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
       const commandId = shortcutCommandForEvent(event, shortcutMapRef.current, executableCommandIdsRef.current);
       if (commandId) {
         event.preventDefault();
-        if (commandId === "explorer.open_palette") explorerState.setCommandQuery(paneId, ">");
+        const pluginCommand = pluginCommandsRef.current.find((command) => command.id === commandId);
+        if (pluginCommand) runPluginCommand(pluginCommand, navigate);
         else runExplorerCommand(commandId, paneId, navigate);
       } else if (event.altKey && event.key === "ArrowLeft") {
         event.preventDefault();
@@ -1054,24 +1073,23 @@ const ConnectedExplorerToolbar = memo(function ConnectedExplorerToolbar(props: {
     const path = useExplorerStore.getState().panes[props.paneId]?.listing?.path ?? props.fallbackPath;
     useMultiPanelStore.getState().addCompareTab(path, path);
   }, [props.fallbackPath, props.paneId]);
-  const pluginCommandIds = useMemo(
-    () => new Set(props.pluginCommands.map((command) => command.id)),
+  const pluginCommandById = useMemo(
+    () => new Map(props.pluginCommands.map((command) => [command.id, command])),
     [props.pluginCommands],
   );
   const onRunCommand = useCallback((commandId: string) => {
-    if (pluginCommandIds.has(commandId)) {
-      props.onNavigateRoute("/plugins");
-      useExplorerStore.setState({
-        operationError: `Plugin command "${commandId}" is discovered, but plugin command execution is not available in the Tauri explorer yet.`,
-      });
+    const pluginCommand = pluginCommandById.get(commandId);
+    if (pluginCommand) {
+      runPluginCommand(pluginCommand, props.onNavigateRoute);
       return;
     }
     runExplorerCommand(commandId, props.paneId, props.onNavigateRoute);
-  }, [pluginCommandIds, props.onNavigateRoute, props.paneId]);
+  }, [pluginCommandById, props.onNavigateRoute, props.paneId]);
 
   return (
     <ExplorerToolbar
       {...state}
+      paneId={props.paneId}
       locationResults={props.locationResults}
       pluginCommands={props.pluginCommands}
       onNavigate={onNavigate}
@@ -1120,13 +1138,18 @@ function runExplorerCommand(commandId: string, paneId: string, navigateRoute: (p
   const multi = useMultiPanelStore.getState();
   const activeTab = multi.tabs.find((tab) => tab.id === multi.activeTabId) ?? multi.tabs[0];
   if (commandId.startsWith("plugin.")) {
-    navigateRoute("/plugins");
     useExplorerStore.setState({
       operationError: `Plugin command "${commandId}" is discovered, but plugin command execution is not available in the Tauri explorer yet.`,
     });
     return;
   }
   switch (commandId) {
+    case "search.toggle":
+      focusExplorerSearch(paneId, "search");
+      break;
+    case "explorer.open_palette":
+      focusExplorerSearch(paneId, "command");
+      break;
     case "app.toggle_transfers":
       navigateRoute("/transfers");
       break;
@@ -1134,7 +1157,7 @@ function runExplorerCommand(commandId: string, paneId: string, navigateRoute: (p
       navigateRoute("/settings");
       break;
     case "app.toggle_plugin_launcher":
-      navigateRoute("/plugins");
+      navigateRoute("/hub");
       break;
     case "clipboard.publish_shared":
       void publishSharedClipboard();
@@ -1182,6 +1205,12 @@ function runExplorerCommand(commandId: string, paneId: string, navigateRoute: (p
     case "explorer.paste":
       void explorer.pasteIntoPane(paneId);
       break;
+    case "explorer.undo":
+      void undoLatestTransferOperation();
+      break;
+    case "explorer.redo":
+      explorer.pushNotification("Redo is not available for file operations yet.", "info", 3500);
+      break;
     case "explorer.toggle_hidden":
       void explorer.toggleHidden(paneId);
       break;
@@ -1219,6 +1248,56 @@ function runExplorerCommand(commandId: string, paneId: string, navigateRoute: (p
       break;
     }
   }
+}
+
+function runPluginCommand(command: PluginCommandEntry, navigateRoute: (path: string) => void): void {
+  if (command.source === "launcher") {
+    navigateRoute("/hub/plugins");
+    return;
+  }
+  navigateRoute("/hub/plugins");
+  useExplorerStore.setState({
+    operationError: `Plugin command "${command.id}" is discovered, but plugin command execution is not available in the Tauri explorer yet.`,
+  });
+}
+
+function focusExplorerSearch(paneId: string, mode: "search" | "command"): void {
+  useExplorerStore.getState().setCommandQuery(paneId, mode === "command" ? ">" : "");
+  window.dispatchEvent(new CustomEvent(explorerSearchFocusEvent, { detail: { paneId, mode } }));
+}
+
+async function undoLatestTransferOperation(): Promise<void> {
+  const explorer = useExplorerStore.getState();
+  try {
+    const loadedRows = useTransfersStore.getState().transfers?.rows;
+    const rows = loadedRows ?? (await transfersSnapshot({ limit: 500 })).rows;
+    const latest = newestUndoableTransfer(rows);
+    if (!latest) {
+      explorer.pushNotification("No completed rename or move is available to undo.", "info", 3500);
+      return;
+    }
+
+    const snapshot = await operationQueueUndo(latest.undoTokenId);
+    useOperationQueueStore.setState({ snapshot, error: null });
+    await useTransfersStore.getState().load(undefined, { silent: true });
+    explorer.pushNotification(`Undo queued for ${latest.fileName || transferTypeLabel(latest.transferType)}.`, "success", 3500);
+  } catch (error) {
+    explorer.pushNotification(`Undo failed: ${errorText(error)}`, "error", 4500);
+  }
+}
+
+function newestUndoableTransfer(rows: readonly TransferRecord[]): TransferRecord | null {
+  return rows
+    .filter((row) => row.undoable && row.undoTokenId > 0 && row.status === "completed")
+    .sort((left, right) => transferRecencyMs(right) - transferRecencyMs(left) || right.id - left.id)[0] ?? null;
+}
+
+function transferRecencyMs(row: TransferRecord): number {
+  return row.completedAtMs || row.startedAtMs || row.queuedAtMs || row.id;
+}
+
+function transferTypeLabel(type: TransferRecord["transferType"]): string {
+  return type.charAt(0).toUpperCase() + type.slice(1);
 }
 
 async function publishSharedClipboard(): Promise<void> {

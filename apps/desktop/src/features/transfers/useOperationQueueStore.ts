@@ -152,6 +152,7 @@ function operationConflictDialogsEqual(
     && left.operationId === right.operationId
     && left.batchId === right.batchId
     && left.applyToBatch === right.applyToBatch
+    && left.supportsReplace === right.supportsReplace
     && left.supportsKeepBoth === right.supportsKeepBoth
     && left.selectedPolicy === right.selectedPolicy
     && left.title === right.title

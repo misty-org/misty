@@ -1,6 +1,7 @@
 use std::{
     collections::BTreeSet,
     ffi::OsStr,
+    io::Cursor,
     path::{Path, PathBuf},
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -14,11 +15,10 @@ use tokio::sync::Mutex;
 
 use crate::core::clipboard::{ClipboardCache, ClipboardRemoteFileCacheKey};
 use crate::core::explorer::{
-    create_item, list_directory, paste_items, rename_item, CreateItemRequest, DeleteItemsRequest,
-    DirectoryListing, ExplorerLocation, ExplorerLocationKind, ExplorerOperationResult,
-    ExplorerPreviewPayload, FileEntry, FileKind, ListDirectoryRequest, PasteBlobRequest,
-    PasteItemsRequest, PasteTextRequest, PrepareOpenItemRequest, PreparedOpenItem,
-    RenameItemRequest,
+    list_directory, paste_items, CreateItemRequest, DeleteItemsRequest, DirectoryListing,
+    ExplorerLocation, ExplorerLocationKind, ExplorerOperationResult, ExplorerPreviewPayload,
+    FileEntry, FileKind, ListDirectoryRequest, PasteBlobRequest, PasteItemsRequest,
+    PasteTextRequest, PrepareOpenItemRequest, PreparedOpenItem, RenameItemRequest,
 };
 use crate::core::file_master::{
     join_remote_path, normalize_remote_path, virtual_path_parts, RemoteBrowseTarget,
@@ -119,7 +119,11 @@ impl ExplorerService {
 
         if requested == self.mount_root || requested.starts_with(&self.mount_root) {
             return self
-                .list_virtual_directory(&requested, request.show_hidden.unwrap_or(false))
+                .list_virtual_directory(
+                    &requested,
+                    request.show_hidden.unwrap_or(false),
+                    request.force_remote_refresh.unwrap_or(false),
+                )
                 .await;
         }
 
@@ -286,14 +290,19 @@ impl ExplorerService {
         }
         self.reject_virtual_mount_container(path, "preview")?;
         let path = Path::new(path);
-        let mime_type = preview_mime_type(path).ok_or_else(|| {
+        let format = preview_format(path).ok_or_else(|| {
             ApiError::Message("This file type does not support preview.".to_string())
         })?;
         let metadata = tokio::fs::metadata(path).await.map_err(|error| {
-            ApiError::Message(format!("Failed to inspect preview file {}: {error}", path.display()))
+            ApiError::Message(format!(
+                "Failed to inspect preview file {}: {error}",
+                path.display()
+            ))
         })?;
         if !metadata.is_file() {
-            return Err(ApiError::Message("Only files can be previewed.".to_string()));
+            return Err(ApiError::Message(
+                "Only files can be previewed.".to_string(),
+            ));
         }
         if metadata.len() > MAX_PREVIEW_BYTES {
             return Err(ApiError::Message(format!(
@@ -302,12 +311,39 @@ impl ExplorerService {
             )));
         }
         let bytes = tokio::fs::read(path).await.map_err(|error| {
-            ApiError::Message(format!("Failed to read preview file {}: {error}", path.display()))
+            ApiError::Message(format!(
+                "Failed to read preview file {}: {error}",
+                path.display()
+            ))
         })?;
-        Ok(ExplorerPreviewPayload {
-            mime_type: mime_type.to_string(),
-            bytes,
-        })
+        match format {
+            PreviewFormat::Direct(mime_type) => Ok(ExplorerPreviewPayload {
+                mime_type: mime_type.to_string(),
+                bytes,
+            }),
+            PreviewFormat::TranscodeImage(image_format) => {
+                let image =
+                    image::load_from_memory_with_format(&bytes, image_format).map_err(|error| {
+                        ApiError::Message(format!(
+                            "Failed to decode preview image {}: {error}",
+                            path.display()
+                        ))
+                    })?;
+                let mut encoded = Cursor::new(Vec::new());
+                image
+                    .write_to(&mut encoded, image::ImageFormat::Png)
+                    .map_err(|error| {
+                        ApiError::Message(format!(
+                            "Failed to encode preview image {}: {error}",
+                            path.display()
+                        ))
+                    })?;
+                Ok(ExplorerPreviewPayload {
+                    mime_type: "image/png".to_string(),
+                    bytes: encoded.into_inner(),
+                })
+            }
+        }
     }
 
     pub async fn remote_virtual_path(
@@ -476,9 +512,7 @@ impl ExplorerService {
         record.detail_message = "Creating local item".to_string();
         let transfer_id = self.begin_transfer(record).await;
         ensure_not_canceled_if(cancellation)?;
-        let result = tokio::task::spawn_blocking(move || create_item(request))
-            .await
-            .map_err(|err| ApiError::Message(format!("Explorer worker failed: {err}")))?;
+        let result = create_local_item_cancellable(request, cancellation).await;
         self.finish_transfer(transfer_id, result).await
     }
 
@@ -586,9 +620,7 @@ impl ExplorerService {
         record.detail_message = "Renaming local item".to_string();
         let transfer_id = self.begin_transfer(record).await;
         ensure_not_canceled_if(cancellation)?;
-        let result = tokio::task::spawn_blocking(move || rename_item(request))
-            .await
-            .map_err(|err| ApiError::Message(format!("Explorer worker failed: {err}")))?;
+        let result = rename_local_item_cancellable(request, cancellation).await;
         self.finish_transfer(transfer_id, result).await
     }
 
@@ -1123,6 +1155,7 @@ impl ExplorerService {
         &self,
         path: &Path,
         show_hidden: bool,
+        force_remote_refresh: bool,
     ) -> ApiResult<DirectoryListing> {
         let parts = virtual_path_parts(&self.mount_root, path).ok_or_else(|| {
             ApiError::Message(format!("Invalid remote mount path: {}", path.display()))
@@ -1144,7 +1177,8 @@ impl ExplorerService {
                         target.remote_name
                     )));
                 }
-                self.remote_listing(target, show_hidden).await
+                self.remote_listing(target, show_hidden, force_remote_refresh)
+                    .await
             }
         }
     }
@@ -1249,24 +1283,47 @@ impl ExplorerService {
         &self,
         target: RemoteBrowseTarget,
         show_hidden: bool,
+        force_remote_refresh: bool,
     ) -> ApiResult<DirectoryListing> {
-        let mut items = match self.fetch_remote_items(&target).await {
-            Ok(items) => items,
-            Err(remote_error) => {
-                let cached = self
-                    .listing_cache
-                    .load(&target.remote_name, &target.remote_path)
-                    .await?;
-                match cached {
-                    Some(body) => serde_json::from_slice::<Vec<RemoteListItem>>(&body).map_err(|error| {
-                        ApiError::Message(format!(
-                            "Remote listing failed ({remote_error}); cached listing was invalid: {error}"
-                        ))
-                    })?,
-                    None => return Err(remote_error),
-                }
+        if !force_remote_refresh {
+            if let Some(items) = self.load_cached_remote_items(&target).await? {
+                return self.remote_listing_from_items(target, show_hidden, items);
             }
+        }
+
+        let items = match self.fetch_remote_items(&target).await {
+            Ok(items) => items,
+            Err(remote_error) => match self.load_cached_remote_items(&target).await? {
+                Some(items) => items,
+                None => return Err(remote_error),
+            },
         };
+        self.remote_listing_from_items(target, show_hidden, items)
+    }
+
+    async fn load_cached_remote_items(
+        &self,
+        target: &RemoteBrowseTarget,
+    ) -> ApiResult<Option<Vec<RemoteListItem>>> {
+        let Some(body) = self
+            .listing_cache
+            .load(&target.remote_name, &target.remote_path)
+            .await?
+        else {
+            return Ok(None);
+        };
+        match serde_json::from_slice::<Vec<RemoteListItem>>(&body) {
+            Ok(items) => Ok(Some(items)),
+            Err(_) => Ok(None),
+        }
+    }
+
+    fn remote_listing_from_items(
+        &self,
+        target: RemoteBrowseTarget,
+        show_hidden: bool,
+        mut items: Vec<RemoteListItem>,
+    ) -> ApiResult<DirectoryListing> {
         items.sort_by(|left, right| {
             (!left.is_dir)
                 .cmp(&(!right.is_dir))
@@ -1708,10 +1765,7 @@ impl ExplorerService {
             log.lock().await.push(format!("DELETE {path}"));
             return Ok(());
         }
-        let response = self
-            .proxy
-            .delete(&path)
-            .await?;
+        let response = self.proxy.delete(&path).await?;
         if response.status().is_success() || response.status().as_u16() == 404 {
             Ok(())
         } else {
@@ -1816,6 +1870,10 @@ impl ExplorerService {
 
     fn remote_target(&self, path: &str) -> Option<RemoteBrowseTarget> {
         RemoteBrowseTarget::from_virtual_path(&self.mount_root, Path::new(path))
+    }
+
+    pub fn remote_target_for_path(&self, path: &str) -> Option<RemoteBrowseTarget> {
+        self.remote_target(path)
     }
 
     fn reject_virtual_mount_container(&self, path: &str, operation: &str) -> ApiResult<()> {
@@ -1928,6 +1986,92 @@ fn validate_local_file_name(name: &str) -> ApiResult<&str> {
             "Names cannot contain path separators.".to_string(),
         )),
     }
+}
+
+async fn create_local_item_cancellable(
+    request: CreateItemRequest,
+    cancellation: Option<&AtomicBool>,
+) -> ApiResult<ExplorerOperationResult> {
+    ensure_not_canceled_if(cancellation)?;
+    let directory = normalize_existing_local_dir(&request.directory).await?;
+    let name = validate_local_file_name(&request.name)?;
+    let path = directory.join(name);
+    ensure_destination_available(&path).await?;
+    ensure_not_canceled_if(cancellation)?;
+    let is_directory = matches!(request.kind, crate::core::explorer::CreateItemKind::Folder);
+    let operation = if is_directory {
+        tokio::fs::create_dir(&path).await
+    } else {
+        tokio::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)
+            .await
+            .map(|_| ())
+    };
+    operation.map_err(|error| {
+        ApiError::Message(format!(
+            "Failed to create {} {}: {error}",
+            if is_directory { "folder" } else { "file" },
+            path.display()
+        ))
+    })?;
+    observe_local_mutation_for_cancellation().await;
+    if let Err(error) = ensure_not_canceled_if(cancellation) {
+        let _ = remove_local_path(&path, is_directory).await;
+        return Err(error);
+    }
+    Ok(ExplorerOperationResult {
+        affected_paths: vec![display_path(&path)],
+        parent_path: Some(display_path(&directory)),
+    })
+}
+
+async fn rename_local_item_cancellable(
+    request: RenameItemRequest,
+    cancellation: Option<&AtomicBool>,
+) -> ApiResult<ExplorerOperationResult> {
+    ensure_not_canceled_if(cancellation)?;
+    let path = PathBuf::from(&request.path);
+    tokio::fs::symlink_metadata(&path).await.map_err(|error| {
+        ApiError::Message(format!("Failed to inspect {}: {error}", path.display()))
+    })?;
+    let parent = path
+        .parent()
+        .map(Path::to_path_buf)
+        .ok_or_else(|| ApiError::Message("Cannot rename a filesystem root.".to_string()))?;
+    let name = validate_local_file_name(&request.new_name)?;
+    let destination = parent.join(name);
+    ensure_destination_available(&destination).await?;
+    ensure_not_canceled_if(cancellation)?;
+    tokio::fs::rename(&path, &destination)
+        .await
+        .map_err(|error| {
+            ApiError::Message(format!(
+                "Failed to rename {} to {}: {error}",
+                path.display(),
+                destination.display()
+            ))
+        })?;
+    observe_local_mutation_for_cancellation().await;
+    if let Err(error) = ensure_not_canceled_if(cancellation) {
+        let _ = tokio::fs::rename(&destination, &path).await;
+        return Err(error);
+    }
+    Ok(ExplorerOperationResult {
+        affected_paths: vec![display_path(&destination)],
+        parent_path: Some(display_path(&parent)),
+    })
+}
+
+#[cfg(test)]
+async fn observe_local_mutation_for_cancellation() {
+    tokio::time::sleep(Duration::from_millis(10)).await;
+}
+
+#[cfg(not(test))]
+async fn observe_local_mutation_for_cancellation() {
+    tokio::task::yield_now().await;
 }
 
 async fn copy_local_path_cancellable(
@@ -2305,14 +2449,24 @@ fn virtual_folder_rank(kind: &FileKind) -> u8 {
     }
 }
 
-fn preview_mime_type(path: &Path) -> Option<&'static str> {
+enum PreviewFormat {
+    Direct(&'static str),
+    TranscodeImage(image::ImageFormat),
+}
+
+fn preview_format(path: &Path) -> Option<PreviewFormat> {
     match path.extension()?.to_str()?.to_ascii_lowercase().as_str() {
-        "png" => Some("image/png"),
-        "jpg" | "jpeg" => Some("image/jpeg"),
-        "gif" => Some("image/gif"),
-        "bmp" => Some("image/bmp"),
-        "webp" => Some("image/webp"),
-        "pdf" => Some("application/pdf"),
+        "png" => Some(PreviewFormat::Direct("image/png")),
+        "jpg" | "jpeg" => Some(PreviewFormat::Direct("image/jpeg")),
+        "gif" => Some(PreviewFormat::Direct("image/gif")),
+        "bmp" => Some(PreviewFormat::Direct("image/bmp")),
+        "webp" => Some(PreviewFormat::Direct("image/webp")),
+        "pdf" => Some(PreviewFormat::Direct("application/pdf")),
+        "tga" => Some(PreviewFormat::TranscodeImage(image::ImageFormat::Tga)),
+        "hdr" => Some(PreviewFormat::TranscodeImage(image::ImageFormat::Hdr)),
+        "pbm" | "pgm" | "pnm" | "ppm" => {
+            Some(PreviewFormat::TranscodeImage(image::ImageFormat::Pnm))
+        }
         _ => None,
     }
 }
@@ -2417,16 +2571,28 @@ mod tests {
     async fn local_preview_payload_is_typed_and_rejects_unsupported_files() {
         let root = unique_test_dir("preview-payload");
         let image = root.join("image.png");
+        let pnm = root.join("pixel.ppm");
         let unsupported = root.join("notes.txt");
         tokio::fs::create_dir_all(&root).await.unwrap();
-        tokio::fs::write(&image, [0x89, b'P', b'N', b'G']).await.unwrap();
+        tokio::fs::write(&image, [0x89, b'P', b'N', b'G'])
+            .await
+            .unwrap();
+        tokio::fs::write(&pnm, b"P3\n1 1\n255\n255 0 0\n")
+            .await
+            .unwrap();
         tokio::fs::write(&unsupported, b"notes").await.unwrap();
 
         let service = test_explorer_service();
         let preview = service.preview_item(&display_path(&image)).await.unwrap();
         assert_eq!(preview.mime_type, "image/png");
         assert_eq!(preview.bytes, vec![0x89, b'P', b'N', b'G']);
-        assert!(service.preview_item(&display_path(&unsupported)).await.is_err());
+        let transcoded = service.preview_item(&display_path(&pnm)).await.unwrap();
+        assert_eq!(transcoded.mime_type, "image/png");
+        assert!(transcoded.bytes.starts_with(&[0x89, b'P', b'N', b'G']));
+        assert!(service
+            .preview_item(&display_path(&unsupported))
+            .await
+            .is_err());
 
         let _ = tokio::fs::remove_dir_all(&root).await;
     }
@@ -2500,6 +2666,67 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn late_canceled_create_cleans_created_item() {
+        let root = unique_test_dir("late-cancel-create-item");
+        let name = format!("created-then-canceled-{}.txt", unique_test_name(&root));
+        let target = root.join(&name);
+        tokio::fs::create_dir_all(&root).await.unwrap();
+        let service = test_explorer_service();
+        let cancellation = Arc::new(AtomicBool::new(false));
+        let operation = service.create_item_with_cancellation(
+            CreateItemRequest {
+                directory: display_path(&root),
+                name: name.clone(),
+                kind: crate::core::explorer::CreateItemKind::File,
+            },
+            cancellation.clone(),
+        );
+        let trigger_cancel = async {
+            wait_until_path_exists(&target).await;
+            cancellation.store(true, Ordering::SeqCst);
+        };
+
+        let (result, _) = tokio::join!(operation, trigger_cancel);
+
+        assert!(result.as_ref().is_err_and(is_cancellation_error));
+        assert!(!target.exists());
+
+        let _ = tokio::fs::remove_dir_all(&root).await;
+    }
+
+    #[tokio::test]
+    async fn late_canceled_rename_reverts_item() {
+        let root = unique_test_dir("late-cancel-rename-item");
+        let source = root.join("original.txt");
+        let name = format!("renamed-{}.txt", unique_test_name(&root));
+        let destination = root.join(&name);
+        tokio::fs::create_dir_all(&root).await.unwrap();
+        tokio::fs::write(&source, b"keep original").await.unwrap();
+        let service = test_explorer_service();
+        let cancellation = Arc::new(AtomicBool::new(false));
+        let operation = service.rename_item_with_cancellation(
+            RenameItemRequest {
+                path: display_path(&source),
+                new_name: name.clone(),
+                source_is_directory: Some(false),
+            },
+            cancellation.clone(),
+        );
+        let trigger_cancel = async {
+            wait_until_path_exists(&destination).await;
+            cancellation.store(true, Ordering::SeqCst);
+        };
+
+        let (result, _) = tokio::join!(operation, trigger_cancel);
+
+        assert!(result.as_ref().is_err_and(is_cancellation_error));
+        assert!(source.exists());
+        assert!(!destination.exists());
+
+        let _ = tokio::fs::remove_dir_all(&root).await;
+    }
+
+    #[tokio::test]
     async fn cancellable_delete_stops_when_token_is_set() {
         let root = unique_test_dir("cancel-delete");
         let source = root.join("source.txt");
@@ -2534,15 +2761,20 @@ mod tests {
     #[tokio::test]
     async fn remote_job_cancel_requests_proxy_stop() {
         let cancellations = Arc::new(Mutex::new(Vec::new()));
-        let service = test_explorer_service().with_remote_job_cancellation_log(cancellations.clone());
+        let service =
+            test_explorer_service().with_remote_job_cancellation_log(cancellations.clone());
         let cancellation = AtomicBool::new(true);
 
-        let result = service.wait_for_job("job-1", None, Some(&cancellation)).await;
+        let result = service
+            .wait_for_job("job-1", None, Some(&cancellation))
+            .await;
 
         assert!(result.as_ref().is_err_and(is_cancellation_error));
         let cancellations = cancellations.lock().await.clone();
         assert!(
-            cancellations.iter().any(|request| request == "DELETE /api/remote/file/jobs/job-1"),
+            cancellations
+                .iter()
+                .any(|request| request == "DELETE /api/remote/file/jobs/job-1"),
             "expected cancellation to delete the remote job, saw {cancellations:?}",
         );
     }
@@ -2575,11 +2807,24 @@ mod tests {
 
     fn test_explorer_service() -> ExplorerService {
         let environment = AppEnvironmentService::new();
+        if let Some(db_dir) = environment.misty_db_path().parent() {
+            let _ = std::fs::create_dir_all(db_dir);
+        }
         let proxy = ProxyService::new(environment.clone());
         let providers = ProviderService::new(proxy.clone());
         let transfers = TransferService::new(environment.clone());
         let explorer_library = ExplorerLibraryService::new(environment.clone());
         ExplorerService::new(environment, proxy, providers, transfers, explorer_library)
+    }
+
+    async fn wait_until_path_exists(path: &Path) {
+        for _ in 0..100 {
+            if path.exists() {
+                return;
+            }
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+        panic!("{} did not appear before timeout", path.display());
     }
 
     fn unique_test_dir(name: &str) -> PathBuf {
@@ -2590,5 +2835,12 @@ mod tests {
                 .unwrap()
                 .as_nanos()
         ))
+    }
+
+    fn unique_test_name(path: &Path) -> String {
+        path.file_name()
+            .and_then(OsStr::to_str)
+            .unwrap_or("item")
+            .replace(['/', '\\', ':'], "-")
     }
 }

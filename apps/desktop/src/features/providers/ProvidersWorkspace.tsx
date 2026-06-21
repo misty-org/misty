@@ -1,4 +1,5 @@
-import { memo, useCallback, useEffect } from "react";
+import { memo, useCallback, useEffect, useMemo } from "react";
+import { useShallow } from "zustand/react/shallow";
 import type { MultiPanelClosedPane, MultiPanelTab } from "../../shared/multipanel/types";
 import { MultiPanelWorkspace } from "../../shared/multipanel/MultiPanelWorkspace";
 import { createMultiPanelStore, type MultiPanelStore } from "../../shared/multipanel/useMultiPanelStore";
@@ -6,6 +7,8 @@ import { RemoteEditPanel } from "./components/RemoteEditPanel";
 import { RemoteListPanel } from "./components/RemoteListPanel";
 import { ProviderConnectionDialog } from "./components/ProviderConnectionDialog";
 import { ProviderDisconnectDialog } from "./components/ProviderDisconnectDialog";
+import type { ProviderRemote, ProviderWorkflow } from "../../api/types";
+import { prettyLabel } from "../../shared/format";
 import {
   createProvidersWorkspaceState,
   isProviderWorkspaceStale,
@@ -15,6 +18,8 @@ import {
 
 const useProvidersMultiPanelStore = createMultiPanelStore({ idPrefix: "providers", defaultTitle: "Providers" });
 const PROVIDERS_MULTIPANEL_STORAGE_KEY = "misty.providers.multipanel.v1";
+const EMPTY_PROVIDER_REMOTES: ProviderRemote[] = [];
+const EMPTY_PROVIDER_WORKFLOWS: ProviderWorkflow[] = [];
 
 interface ProvidersMultiPanelSnapshot {
   tabs: MultiPanelTab[];
@@ -26,7 +31,41 @@ interface ProvidersMultiPanelSnapshot {
 }
 
 export const ProvidersWorkspace = memo(function ProvidersWorkspace() {
-  const state = useProvidersStore();
+  const {
+    connection,
+    disconnectTarget,
+    error,
+    message,
+    providers,
+    working,
+    advanceConnection,
+    cancelDisconnect,
+    chooseConnectionProvider,
+    closeConnection,
+    confirmDisconnect,
+    discardWorkspaces,
+    setConnectionName,
+    setConnectionParameter,
+    submitConnection,
+  } = useProvidersStore(useShallow((state) => ({
+    connection: state.connection,
+    disconnectTarget: state.disconnectTarget,
+    error: state.error,
+    message: state.message,
+    providers: state.providers,
+    working: state.working,
+    advanceConnection: state.advanceConnection,
+    cancelDisconnect: state.cancelDisconnect,
+    chooseConnectionProvider: state.chooseConnectionProvider,
+    closeConnection: state.closeConnection,
+    confirmDisconnect: state.confirmDisconnect,
+    discardWorkspaces: state.discardWorkspaces,
+    setConnectionName: state.setConnectionName,
+    setConnectionParameter: state.setConnectionParameter,
+    submitConnection: state.submitConnection,
+  })));
+  const loadProviders = useProvidersStore((state) => state.load);
+  const providerWorkflows = providers?.workflows ?? EMPTY_PROVIDER_WORKFLOWS;
 
   useEffect(() => {
     const multi = useProvidersMultiPanelStore.getState();
@@ -41,14 +80,15 @@ export const ProvidersWorkspace = memo(function ProvidersWorkspace() {
   }, []);
 
   useEffect(() => {
-    void state.load();
-  }, [state.load]);
+    void loadProviders();
+  }, [loadProviders]);
 
-  const dirtyPaneIdsForTab = useCallback((tab: MultiPanelTab) => (
-    tab.panes
-      .filter((pane) => selectProviderWorkspaceDerived(state.workspaces[pane.id] ?? createProvidersWorkspaceState()).dirty)
-      .map((pane) => pane.id)
-  ), [state.workspaces]);
+  const dirtyPaneIdsForTab = useCallback((tab: MultiPanelTab) => {
+    const { workspaces } = useProvidersStore.getState();
+    return tab.panes
+      .filter((pane) => selectProviderWorkspaceDerived(workspaces[pane.id] ?? createProvidersWorkspaceState()).dirty)
+      .map((pane) => pane.id);
+  }, []);
 
   const canCloseTab = useCallback((tab: MultiPanelTab) => {
     const dirtyPaneIds = dirtyPaneIdsForTab(tab);
@@ -58,23 +98,23 @@ export const ProvidersWorkspace = memo(function ProvidersWorkspace() {
   }, [dirtyPaneIdsForTab]);
 
   const canClosePane = useCallback((paneId: string) => {
-    const workspace = state.workspaces[paneId] ?? createProvidersWorkspaceState();
+    const workspace = useProvidersStore.getState().workspaces[paneId] ?? createProvidersWorkspaceState();
     if (!selectProviderWorkspaceDerived(workspace).dirty) return true;
     return window.confirm("Discard unsaved remote edits before closing this provider pane?");
-  }, [state.workspaces]);
+  }, []);
 
   const discardTabWorkspaces = useCallback((tab: MultiPanelTab) => {
-    state.discardWorkspaces(tab.panes.map((pane) => pane.id));
-  }, [state]);
+    discardWorkspaces(tab.panes.map((pane) => pane.id));
+  }, [discardWorkspaces]);
 
   const discardPaneWorkspace = useCallback((paneId: string) => {
-    state.discardWorkspaces([paneId]);
-  }, [state]);
+    discardWorkspaces([paneId]);
+  }, [discardWorkspaces]);
 
   return (
     <>
-      {state.error ? <div className="provider-page-message error" role="alert">{state.error}</div> : null}
-      {state.message ? <div className="provider-page-message success" role="status">{state.message}</div> : null}
+      {error ? <div className="provider-page-message error" role="alert">{error}</div> : null}
+      {message ? <div className="provider-page-message success" role="status">{message}</div> : null}
       <MultiPanelWorkspace
         className="providers-workspace"
         store={useProvidersMultiPanelStore}
@@ -85,25 +125,25 @@ export const ProvidersWorkspace = memo(function ProvidersWorkspace() {
         renderPane={(paneId) => <ProvidersPane workspaceId={paneId} />}
       />
 
-      {state.connection ? (
+      {connection ? (
         <ProviderConnectionDialog
-          session={state.connection}
-          workflows={state.providers?.workflows ?? []}
-          onClose={state.closeConnection}
-          onChooseProvider={state.chooseConnectionProvider}
-          onName={state.setConnectionName}
-          onParameter={state.setConnectionParameter}
-          onAdvance={state.advanceConnection}
-          onSubmit={() => void state.submitConnection()}
+          session={connection}
+          workflows={providerWorkflows}
+          onClose={closeConnection}
+          onChooseProvider={chooseConnectionProvider}
+          onName={setConnectionName}
+          onParameter={setConnectionParameter}
+          onAdvance={advanceConnection}
+          onSubmit={() => void submitConnection()}
         />
       ) : null}
 
-      {state.disconnectTarget ? (
+      {disconnectTarget ? (
         <ProviderDisconnectDialog
-          remoteName={state.disconnectTarget}
-          working={state.working}
-          onCancel={state.cancelDisconnect}
-          onConfirm={() => void state.confirmDisconnect()}
+          remoteName={disconnectTarget}
+          working={working}
+          onCancel={cancelDisconnect}
+          onConfirm={() => void confirmDisconnect()}
         />
       ) : null}
     </>
@@ -111,35 +151,83 @@ export const ProvidersWorkspace = memo(function ProvidersWorkspace() {
 });
 
 const ProvidersPane = memo(function ProvidersPane(props: { workspaceId: string }) {
-  const state = useProvidersStore();
-  const workspace = state.workspaces[props.workspaceId] ?? createProvidersWorkspaceState();
-  const { dirty, validRemoteName, configKeys } = selectProviderWorkspaceDerived(workspace);
-  const remotes = state.providers?.remotes ?? [];
-  const stale = state.providers ? isProviderWorkspaceStale(workspace, state.remoteRevisions, remotes) : false;
+  const {
+    loading,
+    remoteRevisions,
+    remotes,
+    working,
+    workspace,
+    ensureWorkspace,
+    load,
+    openAddRemote,
+    openReconnectRemote,
+    openRepairRemote,
+    reloadWorkspaceRemote,
+    requestDisconnect,
+    revealWorkspaceConfig,
+    saveWorkspaceRemote,
+    selectRemoteInWorkspace,
+    setWorkspaceConfigField,
+    setWorkspaceDraftName,
+    setWorkspaceTokenField,
+    setWorkspaceTokenVisible,
+    testWorkspaceConnection,
+  } = useProvidersStore(useShallow((state) => ({
+    loading: state.loading,
+    remoteRevisions: state.remoteRevisions,
+    remotes: state.providers?.remotes ?? EMPTY_PROVIDER_REMOTES,
+    working: state.working,
+    workspace: state.workspaces[props.workspaceId] ?? createProvidersWorkspaceState(),
+    ensureWorkspace: state.ensureWorkspace,
+    load: state.load,
+    openAddRemote: state.openAddRemote,
+    openReconnectRemote: state.openReconnectRemote,
+    openRepairRemote: state.openRepairRemote,
+    reloadWorkspaceRemote: state.reloadWorkspaceRemote,
+    requestDisconnect: state.requestDisconnect,
+    revealWorkspaceConfig: state.revealWorkspaceConfig,
+    saveWorkspaceRemote: state.saveWorkspaceRemote,
+    selectRemoteInWorkspace: state.selectRemoteInWorkspace,
+    setWorkspaceConfigField: state.setWorkspaceConfigField,
+    setWorkspaceDraftName: state.setWorkspaceDraftName,
+    setWorkspaceTokenField: state.setWorkspaceTokenField,
+    setWorkspaceTokenVisible: state.setWorkspaceTokenVisible,
+    testWorkspaceConnection: state.testWorkspaceConnection,
+  })));
+  const { dirty, validRemoteName, configKeys } = useMemo(
+    () => selectProviderWorkspaceDerived(workspace),
+    [workspace],
+  );
+  const stale = useMemo(
+    () => isProviderWorkspaceStale(workspace, remoteRevisions, remotes),
+    [remoteRevisions, remotes, workspace],
+  );
 
   useEffect(() => {
-    state.ensureWorkspace(props.workspaceId);
-  }, [props.workspaceId, state.ensureWorkspace]);
+    ensureWorkspace(props.workspaceId);
+  }, [ensureWorkspace, props.workspaceId]);
 
   useEffect(() => {
-    if (!state.loading && !workspace.draft && !workspace.loadingRemoteName && remotes.length > 0) {
-      void state.selectRemoteInWorkspace(props.workspaceId, remotes[0].name, false);
+    if (!loading && !workspace.draft && !workspace.loadingRemoteName && remotes.length > 0) {
+      void selectRemoteInWorkspace(props.workspaceId, remotes[0].name, false);
     }
-  }, [props.workspaceId, remotes, state, state.loading, workspace.draft, workspace.loadingRemoteName]);
+  }, [loading, props.workspaceId, remotes, selectRemoteInWorkspace, workspace.draft, workspace.loadingRemoteName]);
 
   return (
     <section className="providers-pane-workspace">
+      <ProviderOverview remotes={remotes} />
+
       <RemoteListPanel
         remotes={remotes}
-        selectedRemoteName={workspace.draft?.originalName ?? null}
-        loading={state.loading}
-        working={state.working}
-        onRefresh={() => void state.load(true)}
-        onAdd={state.openAddRemote}
-        onSelectRemote={(name) => void state.selectRemoteInWorkspace(props.workspaceId, name)}
-        onReconnect={state.openReconnectRemote}
-        onRepair={state.openRepairRemote}
-        onDisconnect={state.requestDisconnect}
+        selectedRemoteName={workspace.loadingRemoteName ?? workspace.draft?.originalName ?? null}
+        loading={loading}
+        working={working}
+        onRefresh={() => void load(true)}
+        onAdd={openAddRemote}
+        onSelectRemote={(name) => void selectRemoteInWorkspace(props.workspaceId, name)}
+        onReconnect={openReconnectRemote}
+        onRepair={openRepairRemote}
+        onDisconnect={requestDisconnect}
       />
 
       <RemoteEditPanel
@@ -147,23 +235,51 @@ const ProvidersPane = memo(function ProvidersPane(props: { workspaceId: string }
         configPaths={workspace.configPaths}
         configKeys={configKeys}
         dirty={dirty}
-        working={state.working}
+        loadingRemoteName={workspace.loadingRemoteName}
+        working={working}
         tokenVisible={workspace.tokenVisible}
         validRemoteName={validRemoteName}
         stale={stale}
-        onDraftName={(name) => state.setWorkspaceDraftName(props.workspaceId, name)}
-        onConfigField={(key, value) => state.setWorkspaceConfigField(props.workspaceId, key, value)}
-        onTokenField={(key, value) => state.setWorkspaceTokenField(props.workspaceId, key, value)}
-        onTokenVisible={(visible) => state.setWorkspaceTokenVisible(props.workspaceId, visible)}
-        onTest={() => void state.testWorkspaceConnection(props.workspaceId)}
-        onReveal={() => void state.revealWorkspaceConfig(props.workspaceId)}
-        onSave={() => void state.saveWorkspaceRemote(props.workspaceId)}
+        onDraftName={(name) => setWorkspaceDraftName(props.workspaceId, name)}
+        onConfigField={(key, value) => setWorkspaceConfigField(props.workspaceId, key, value)}
+        onTokenField={(key, value) => setWorkspaceTokenField(props.workspaceId, key, value)}
+        onTokenVisible={(visible) => setWorkspaceTokenVisible(props.workspaceId, visible)}
+        onTest={() => void testWorkspaceConnection(props.workspaceId)}
+        onReveal={() => void revealWorkspaceConfig(props.workspaceId)}
+        onSave={() => void saveWorkspaceRemote(props.workspaceId)}
         onReload={() => {
           if (dirty && !window.confirm("Reload this remote and discard unsaved edits in this pane?")) return;
-          void state.reloadWorkspaceRemote(props.workspaceId);
+          void reloadWorkspaceRemote(props.workspaceId);
         }}
       />
     </section>
+  );
+});
+
+const ProviderOverview = memo(function ProviderOverview(props: { remotes: ProviderRemote[] }) {
+  const summary = useMemo(() => {
+    const needsAttention = props.remotes.filter((remote) => remote.needsReconnect).length;
+    const healthy = props.remotes.length - needsAttention;
+    const providerTypes = new Set(props.remotes.map((remote) => remote.type));
+    const mostRecentType = props.remotes[0]?.type ? prettyLabel(props.remotes[0].type) : "None";
+    return [
+      { label: "Configured", value: String(props.remotes.length), detail: "remote connections" },
+      { label: "Healthy", value: String(healthy), detail: "ready to browse" },
+      { label: "Needs attention", value: String(needsAttention), detail: needsAttention > 0 ? "reconnect required" : "all clear" },
+      { label: "Provider types", value: String(providerTypes.size), detail: mostRecentType },
+    ];
+  }, [props.remotes]);
+
+  return (
+    <div className="provider-overview" aria-label="Provider summary">
+      {summary.map((item) => (
+        <div className="provider-overview-card" key={item.label}>
+          <span>{item.label}</span>
+          <strong>{item.value}</strong>
+          <em>{item.detail}</em>
+        </div>
+      ))}
+    </div>
   );
 });
 

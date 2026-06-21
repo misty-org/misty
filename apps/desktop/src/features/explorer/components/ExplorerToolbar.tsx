@@ -42,6 +42,7 @@ export type ExplorerCommandId =
   | "app.toggle_plugin_launcher"
   | "clipboard.publish_shared"
   | "clipboard.apply_shared"
+  | "search.toggle"
   | "explorer.new_tab"
   | "explorer.restore_tab"
   | "explorer.close_pane"
@@ -55,6 +56,8 @@ export type ExplorerCommandId =
   | "explorer.copy"
   | "explorer.cut"
   | "explorer.paste"
+  | "explorer.undo"
+  | "explorer.redo"
   | "explorer.toggle_hidden"
   | "explorer.preview.toggle"
   | "explorer.sidebar.toggle"
@@ -82,9 +85,10 @@ interface ExplorerCommandPaletteEntry {
 const explorerCommands: ExplorerCommandPaletteEntry[] = [
   { id: "app.toggle_transfers", label: "Open Transfers", hint: "Switch to transfer history and active work" },
   { id: "app.open_settings", label: "Open Settings", hint: "Switch to application settings" },
-  { id: "app.toggle_plugin_launcher", label: "Open Plugins", hint: "Switch to the plugin launcher" },
+  { id: "app.toggle_plugin_launcher", label: "Open Hub", hint: "Open Misty Hub" },
   { id: "clipboard.publish_shared", label: "Publish Shared Clipboard", hint: "Send the current clipboard to shared devices" },
   { id: "clipboard.apply_shared", label: "Apply Shared Clipboard", hint: "Copy the latest shared clipboard payload locally" },
+  { id: "search.toggle", label: "Search", hint: "Focus Explorer search for the active folder" },
   { id: "explorer.new_tab", label: "New Tab", hint: "Open another tab for the active folder" },
   { id: "explorer.restore_tab", label: "Restore Closed Tab", hint: "Restore the most recently closed tab" },
   { id: "explorer.close_pane", label: "Close Pane", hint: "Close the active split pane or tab" },
@@ -98,6 +102,8 @@ const explorerCommands: ExplorerCommandPaletteEntry[] = [
   { id: "explorer.copy", label: "Copy", hint: "Copy selected items" },
   { id: "explorer.cut", label: "Cut", hint: "Move selected items with paste" },
   { id: "explorer.paste", label: "Paste", hint: "Paste into the active folder" },
+  { id: "explorer.undo", label: "Undo", hint: "Undo the latest completed rename or move" },
+  { id: "explorer.redo", label: "Redo", hint: "Redo is not available for file operations yet" },
   { id: "explorer.toggle_hidden", label: "Toggle Hidden Files", hint: "Show or hide hidden files" },
   { id: "explorer.preview.toggle", label: "Toggle Preview", hint: "Show or hide the preview/details panel" },
   { id: "explorer.sidebar.toggle", label: "Toggle Sidebar", hint: "Show or hide the navigation sidebar" },
@@ -116,6 +122,7 @@ const explorerCommands: ExplorerCommandPaletteEntry[] = [
 ];
 
 interface ExplorerToolbarProps {
+  paneId: string;
   path: string;
   commandQuery: string;
   viewMode: ExplorerViewMode;
@@ -260,6 +267,20 @@ export const ExplorerToolbar = memo(function ExplorerToolbar(props: ExplorerTool
     if (!commandMode) return;
     commandInputRef.current?.focus();
   }, [commandMode]);
+
+  useEffect(() => {
+    const onSearchFocus = (event: Event) => {
+      const detail = (event as CustomEvent<{ paneId?: string; mode?: "search" | "command" }>).detail;
+      if (detail?.paneId !== props.paneId) return;
+      setSearchFocused(true);
+      window.requestAnimationFrame(() => {
+        commandInputRef.current?.focus();
+        commandInputRef.current?.select();
+      });
+    };
+    window.addEventListener("misty:explorer-search-focus", onSearchFocus);
+    return () => window.removeEventListener("misty:explorer-search-focus", onSearchFocus);
+  }, [props.paneId]);
 
   useEffect(() => {
     if (!newMenuOpen) return;

@@ -39,7 +39,7 @@ pub struct ProxySnapshot {
 impl ProxyService {
     pub fn new(environment: AppEnvironmentService) -> Self {
         let proxy_url = environment.proxy_url();
-        let database_path = environment.misty_db_path();
+        let database_path = environment.proxy_token_db_path();
         let snapshot = ProxySnapshot {
             proxy_url: proxy_url.clone(),
             ready: false,

@@ -44,6 +44,11 @@ export interface ProvidersWorkspaceState {
   loadedRemoteRevision: number;
 }
 
+interface CachedRemoteDraft {
+  draft: RemoteEditDraft;
+  revision: number;
+}
+
 interface ProvidersStore {
   providers: ProvidersSnapshot | null;
   draft: RemoteEditDraft | null;
@@ -51,6 +56,7 @@ interface ProvidersStore {
   configPaths: RcloneConfigPaths | null;
   tokenVisible: boolean;
   workspaces: Record<string, ProvidersWorkspaceState>;
+  remoteDraftCache: Record<string, CachedRemoteDraft>;
   remoteRevisions: Record<string, number>;
   loading: boolean;
   working: boolean;
@@ -63,7 +69,7 @@ interface ProvidersStore {
   reloadWorkspaceRemote: (workspaceId: string) => Promise<void>;
   load: (refresh?: boolean) => Promise<void>;
   selectRemote: (name: string, guardDirty?: boolean) => Promise<void>;
-  selectRemoteInWorkspace: (workspaceId: string, name: string, guardDirty?: boolean) => Promise<void>;
+  selectRemoteInWorkspace: (workspaceId: string, name: string, guardDirty?: boolean, forceReload?: boolean) => Promise<void>;
   setDraftName: (name: string) => void;
   setWorkspaceDraftName: (workspaceId: string, name: string) => void;
   setConfigField: (key: string, value: string) => void;
@@ -78,9 +84,9 @@ interface ProvidersStore {
   testWorkspaceConnection: (workspaceId: string) => Promise<void>;
   revealConfig: () => Promise<void>;
   revealWorkspaceConfig: (workspaceId: string) => Promise<void>;
-  openAddRemote: () => void;
-  openReconnectRemote: (remote: ProviderRemote) => void;
-  openRepairRemote: (remote: ProviderRemote) => void;
+  openAddRemote: () => Promise<void>;
+  openReconnectRemote: (remote: ProviderRemote) => Promise<void>;
+  openRepairRemote: (remote: ProviderRemote) => Promise<void>;
   closeConnection: () => void;
   chooseConnectionProvider: (providerType: string) => void;
   setConnectionName: (name: string) => void;
@@ -105,6 +111,7 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
   configPaths: null,
   tokenVisible: false,
   workspaces: {},
+  remoteDraftCache: {},
   remoteRevisions: {},
   loading: true,
   working: false,
@@ -139,9 +146,9 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
 
   reloadWorkspaceRemote: async (workspaceId) => {
     const workspace = get().workspaces[workspaceId];
-    const name = workspace?.draft?.originalName;
+    const name = workspace?.loadingRemoteName ?? workspace?.draft?.originalName;
     if (!name) return;
-    await get().selectRemoteInWorkspace(workspaceId, name, false);
+    await get().selectRemoteInWorkspace(workspaceId, name, false, true);
   },
 
   load: async (refresh = false) => {
@@ -172,24 +179,60 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
     }
   },
 
-  selectRemoteInWorkspace: async (workspaceId, name, guardDirty = true) => {
+  selectRemoteInWorkspace: async (workspaceId, name, guardDirty = true, forceReload = false) => {
     get().ensureWorkspace(workspaceId);
     const workspace = get().workspaces[workspaceId] ?? createProvidersWorkspaceState();
     if (guardDirty && isWorkspaceDirty(workspace) && !window.confirm("Discard unsaved remote edits?")) {
       return;
     }
+    const revision = revisionForRemote(get().remoteRevisions, name);
+    const cached = get().remoteDraftCache[name];
+    if (!forceReload && cached && cached.revision === revision) {
+      set({ error: null, message: null });
+      setWorkspaceState(set, workspaceId, {
+        draft: cached.draft,
+        originalDraft: cached.draft,
+        tokenVisible: false,
+        loadingRemoteName: null,
+        loadedRemoteRevision: cached.revision,
+      });
+      return;
+    }
     set({ error: null, message: null });
-    setWorkspaceState(set, workspaceId, { tokenVisible: false, loadingRemoteName: name });
+    setWorkspaceState(set, workspaceId, {
+      draft: null,
+      originalDraft: null,
+      tokenVisible: false,
+      loadingRemoteName: name,
+      loadedRemoteRevision: revision,
+    });
     try {
       const nextDraft = await providersSelectRemote(name);
+      const current = get().workspaces[workspaceId];
+      if (current?.loadingRemoteName !== name) {
+        return;
+      }
+      const loadedRevision = revisionForRemote(get().remoteRevisions, nextDraft.originalName);
+      set((state) => ({
+        remoteDraftCache: {
+          ...state.remoteDraftCache,
+          [nextDraft.originalName]: {
+            draft: nextDraft,
+            revision: loadedRevision,
+          },
+        },
+      }));
       setWorkspaceState(set, workspaceId, {
         draft: nextDraft,
         originalDraft: nextDraft,
         loadingRemoteName: null,
-        loadedRemoteRevision: revisionForRemote(get().remoteRevisions, nextDraft.originalName),
+        loadedRemoteRevision: loadedRevision,
       });
     } catch (error) {
-      setWorkspaceState(set, workspaceId, { loadingRemoteName: null });
+      const current = get().workspaces[workspaceId];
+      if (current?.loadingRemoteName === name) {
+        setWorkspaceState(set, workspaceId, { loadingRemoteName: null });
+      }
       set({ error: errorText(error) });
     }
   },
@@ -253,6 +296,13 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
         draft: saved,
         originalDraft: saved,
         providers: await providersRefresh(),
+        remoteDraftCache: {
+          ...removeRemoteDraftCache(get().remoteDraftCache, originalDraft.originalName),
+          [saved.originalName]: {
+            draft: saved,
+            revision: revisionForRemote(remoteRevisions, saved.originalName),
+          },
+        },
         remoteRevisions,
         message: "Remote saved.",
       });
@@ -288,6 +338,13 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
       });
       set({
         providers: await providersRefresh(),
+        remoteDraftCache: {
+          ...removeRemoteDraftCache(get().remoteDraftCache, workspace.originalDraft.originalName),
+          [saved.originalName]: {
+            draft: saved,
+            revision: revisionForRemote(remoteRevisions, saved.originalName),
+          },
+        },
         remoteRevisions,
         message: "Remote saved.",
       });
@@ -326,9 +383,21 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
         message: result.message,
       });
       if (result.aboutJson) {
+        const nextDraft = { ...draft, aboutJson: result.aboutJson, lastCheckedUnix: result.checkedUnix };
         setWorkspaceState(set, workspaceId, {
-          draft: { ...draft, aboutJson: result.aboutJson, lastCheckedUnix: result.checkedUnix },
+          draft: nextDraft,
         });
+        if (!isWorkspaceDirty({ draft: nextDraft, originalDraft: workspace.originalDraft })) {
+          set((state) => ({
+            remoteDraftCache: {
+              ...state.remoteDraftCache,
+              [nextDraft.originalName]: {
+                draft: nextDraft,
+                revision: workspace.loadedRemoteRevision,
+              },
+            },
+          }));
+        }
       }
     } catch (error) {
       set({ error: errorText(error) });
@@ -367,8 +436,23 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
     }
   },
 
-  openAddRemote: () => {
+  openAddRemote: async () => {
     connectionGeneration += 1;
+    const generation = connectionGeneration;
+    set({ working: true, error: null, message: null });
+    try {
+      const providers = await providersRefresh();
+      if (generation !== connectionGeneration) return;
+      set({ providers });
+    } catch (error) {
+      if (generation !== connectionGeneration) return;
+      set({ error: errorText(error) });
+    } finally {
+      if (generation === connectionGeneration) {
+        set({ working: false });
+      }
+    }
+    if (generation !== connectionGeneration) return;
     set({
       connection: createConnectionSession("add"),
       error: null,
@@ -376,8 +460,23 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
     });
   },
 
-  openReconnectRemote: (remote) => {
+  openReconnectRemote: async (remote) => {
     connectionGeneration += 1;
+    const generation = connectionGeneration;
+    set({ working: true, error: null, message: null });
+    try {
+      const providers = await providersRefresh();
+      if (generation !== connectionGeneration) return;
+      set({ providers });
+    } catch (error) {
+      if (generation !== connectionGeneration) return;
+      set({ error: errorText(error) });
+    } finally {
+      if (generation === connectionGeneration) {
+        set({ working: false });
+      }
+    }
+    if (generation !== connectionGeneration) return;
     const connection = createConnectionSession("reconnect", remote);
     connection.parameters = defaultParameters(workflowForType(get().providers?.workflows ?? [], remote.type));
     set({
@@ -387,8 +486,23 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
     });
   },
 
-  openRepairRemote: (remote) => {
+  openRepairRemote: async (remote) => {
     connectionGeneration += 1;
+    const generation = connectionGeneration;
+    set({ working: true, error: null, message: null });
+    try {
+      const providers = await providersRefresh();
+      if (generation !== connectionGeneration) return;
+      set({ providers });
+    } catch (error) {
+      if (generation !== connectionGeneration) return;
+      set({ error: errorText(error) });
+    } finally {
+      if (generation === connectionGeneration) {
+        set({ working: false });
+      }
+    }
+    if (generation !== connectionGeneration) return;
     const connection = createConnectionSession("repair", remote);
     connection.parameters = defaultParameters(workflowForType(get().providers?.workflows ?? [], remote.type));
     set({
@@ -544,6 +658,7 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
         remoteRevisions: bumpRemoteRevisions(get().remoteRevisions, [name]),
         draft: get().draft?.originalName === name ? null : get().draft,
         originalDraft: get().originalDraft?.originalName === name ? null : get().originalDraft,
+        remoteDraftCache: removeRemoteDraftCache(get().remoteDraftCache, name),
         workspaces: pruneRemoteFromWorkspaces(get().workspaces, name),
         disconnectTarget: null,
         message: `Remote “${name}” disconnected.`,
@@ -654,6 +769,16 @@ function pruneRemoteFromWorkspaces(
     }
   }
   return changed ? next : workspaces;
+}
+
+function removeRemoteDraftCache(
+  cache: Record<string, CachedRemoteDraft>,
+  name: string,
+): Record<string, CachedRemoteDraft> {
+  if (!(name in cache)) return cache;
+  const next = { ...cache };
+  delete next[name];
+  return next;
 }
 
 function revisionForRemote(remoteRevisions: Record<string, number>, name: string): number {
