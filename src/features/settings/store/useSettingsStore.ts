@@ -25,7 +25,6 @@ import { configureBrowserSearchEngine } from "@/features/workspace/browserSearch
 import { configureWorkspaceDefaultTab } from "@/features/workspace/workspaceDefaultTab";
 import { telemetryPreferencesChanged } from "@/telemetry/lifecycle";
 import { errorText } from "@/shared/lib/format";
-import { configureExternalLinkPreference } from "@/shared/platform/openExternalLink";
 import { create } from "zustand";
 import type { SettingsSection, SettingValue } from "../types/store";
 import {
@@ -286,8 +285,3 @@ export interface SettingsStore {
   reassignShortcut: (request: ReassignShortcutRequest) => Promise<void>;
   resetShortcuts: (request?: ResetShortcutRequest) => Promise<void>;
 }
-
-configureExternalLinkPreference(
-  () =>
-    selectGeneralPreferences(useSettingsStore.getState().settings?.document).openLinksExternally,
-);

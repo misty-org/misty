@@ -12,7 +12,7 @@ import {
   formatShortcutLabel,
   registerShortcutHandler,
 } from "@/features/shortcuts";
-import { openSystemExternalLink } from "@/shared/platform/openExternalLink";
+import { openSystemExternalLink, normalizeExternalUrl } from "@/shared/platform/openExternalLink";
 import { reportSystemError } from "@/features/activity/systemActivity";
 import { AppRpcError, type AppRpcScope } from "./session";
 import type { AppUiBackend } from "./appUi";
@@ -24,6 +24,9 @@ import { browserHomeUrl } from "@/features/workspace/browserHome";
 
 import { appOwnedRoute } from "../appCapabilityGateway";
 import { officialAppSlug } from "../appRoute";
+
+import { browserRuntimeIdForTabId } from "@/features/browser/browserRuntime";
+import { openBrowserPopup } from "@/features/browser/openBrowserPopup";
 
 const workspaceRevisions = new Map<string, { users: number; value: number; content: string }>();
 
@@ -234,7 +237,9 @@ export function createAppUiBackend(scope: AppRpcScope): AppUiBackend {
       // Never return the whole settings document: it contains other Apps and
       // host configuration. Add each domain's safe fields as its SDK migrates.
       return {
-        ...(scope.identity.appId === "code" ? { code: selectEditorPreferences(useSettingsStore.getState().settings?.document) } : {}),
+        ...(scope.identity.appId === "code"
+          ? { code: selectEditorPreferences(useSettingsStore.getState().settings?.document) }
+          : {}),
         ...(scope.identity.appId === "browser"
           ? {
               browser: {
@@ -279,7 +284,14 @@ export function createAppUiBackend(scope: AppRpcScope): AppUiBackend {
           return false;
         }
       }),
-    openExternal: openSystemExternalLink,
+    async openExternal(url) {
+      const href = normalizeExternalUrl(url);
+      ownedPane();
+      const sourceId = browserRuntimeIdForTabId(scope.identity.instanceId);
+      if (/^https?:\/\//i.test(href) && sourceId && openBrowserPopup({ sourceId, url: href }))
+        return;
+      await openSystemExternalLink(href);
+    },
     reportError(message) {
       scope.assert();
       reportSystemError({

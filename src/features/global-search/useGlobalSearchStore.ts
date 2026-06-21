@@ -67,6 +67,7 @@ export const useGlobalSearchStore = create<GlobalSearchState>((set, get) => ({
     }
   },
   newConversation: async (spaceId) => {
+    const accountId = get().accountId;
     const fallback = localConversation(spaceId);
     let conversation = fallback;
     try {
@@ -76,6 +77,9 @@ export const useGlobalSearchStore = create<GlobalSearchState>((set, get) => ({
     } catch {
       // Older servers keep the conversation in memory for this app session.
     }
+    // A browser handoff can await the server while the user switches accounts.
+    // Its response belongs to the original account, including local fallbacks.
+    if (get().accountId !== accountId) return conversation.id;
     set({
       conversations: [
         conversation,
@@ -86,6 +90,7 @@ export const useGlobalSearchStore = create<GlobalSearchState>((set, get) => ({
       panel: get().panel === "closed" ? "closed" : "answer",
       query: "",
       context: [],
+      browserRequest: undefined,
       error: null,
     });
     return conversation.id;
@@ -121,6 +126,7 @@ export const useGlobalSearchStore = create<GlobalSearchState>((set, get) => ({
   },
   selectConversation: (activeConversationId) =>
     set({
+      browserRequest: undefined,
       activeConversationId,
       mode: "ask",
       panel: get().panel === "closed" ? "closed" : "answer",
@@ -234,19 +240,28 @@ export const useGlobalSearchStore = create<GlobalSearchState>((set, get) => ({
     selection,
     presentation = "panel",
     deviceContexts = [],
+    origin,
   ) => {
     const normalized = prompt.trim();
     if ((!normalized && !attachments.length) || get().working) return;
+    const browserRequest = get().browserRequest;
+    if (browserRequest && !origin) {
+      origin = { conversationId: browserRequest.conversationId, context: structuredClone(browserRequest.context) };
+      selection = structuredClone(browserRequest.selection);
+      deviceContexts = structuredClone(browserRequest.deviceContexts);
+    }
     const accountId = get().accountId;
+    const requestState = origin ? { ...get(), activeConversationId: origin.conversationId } : get();
+    const requestContext = structuredClone(origin?.context ?? requestState.context);
     let conversationId: string;
     try {
-      conversationId = await conversationForGlobalPrompt(get, normalized);
+      conversationId = await conversationForGlobalPrompt(() => ({ ...requestState, context: requestContext }), normalized);
     } catch (error) {
       if (get().accountId === accountId) set({ error: globalMistyError(error) });
       return;
     }
     if (get().accountId !== accountId) return;
-    const invocationContext = globalAiContext(get().context);
+    const invocationContext = globalAiContext(requestContext);
     const userMessage = { ...conversationMessage("user", "ask", normalized), attachments };
     const assistantMessage = conversationMessage("assistant", "ask", "");
     updateConversation(set, get, conversationId, (conversation) => ({
@@ -261,7 +276,7 @@ export const useGlobalSearchStore = create<GlobalSearchState>((set, get) => ({
       working: true,
       error: null,
       query: "",
-      context: [],
+      context: browserRequest?.context ?? [],
     });
     replaceActiveGlobalInvocationStream();
     try {
@@ -312,15 +327,17 @@ export const useGlobalSearchStore = create<GlobalSearchState>((set, get) => ({
     const normalized = prompt.trim();
     if (!normalized || get().working) return;
     const accountId = get().accountId;
+    const requestState = get();
+    const requestContext = structuredClone(requestState.context);
     let conversationId: string;
     try {
-      conversationId = await conversationForGlobalPrompt(get, normalized);
+      conversationId = await conversationForGlobalPrompt(() => ({ ...requestState, context: requestContext }), normalized);
     } catch (error) {
       if (get().accountId === accountId) set({ error: globalMistyError(error) });
       return;
     }
     if (get().accountId !== accountId) return;
-    const invocationContext = globalAiContext(get().context);
+    const invocationContext = globalAiContext(requestContext);
     const userMessage = conversationMessage("user", "action", normalized);
     const pending = proposeAction(normalized);
     pending.state = "running";

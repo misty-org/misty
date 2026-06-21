@@ -1,6 +1,6 @@
-import { initializeHostAgentsRuntime } from "../src/features/agents/hostAgentsRuntime";
+import { initializeHostAgentsRuntime } from "@/features/agents/hostAgentsRuntime";
 import { initializeHostSocialRuntime } from "../src/features/spaces/chat/hostSocialRuntime";
-import { initializeHostLibraryRuntime } from "../src/features/spaces/library/hostLibraryRuntime";
+import { initializeHostLibraryRuntime } from "@/features/spaces/library/hostLibraryRuntime";
 /** Native signed-package + actual host UI check. Account/installation API replies are fixtures. */
 import React, { useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
@@ -21,7 +21,7 @@ import { workspaceSurfaceFromRoute } from "../src/features/workspace/routeSurfac
 import { configureBrowserHomeUrl } from "../src/features/workspace/browserHome";
 import { GlobalNavigator } from "../src/application/layouts/DesktopLayout/GlobalNavigator";
 import { WorkspaceCanvas } from "../src/application/layouts/DesktopLayout/WorkspaceCanvas";
-import { BrowserRuntimeBridge } from "../src/features/browser/BrowserRuntimeBridge";
+import { BrowserRuntimeBridge } from "@/features/browser/BrowserRuntimeBridge";
 import { TooltipProvider } from "../src/shared/ui";
 import { officialDesktopPackageReady } from "../src/features/apps/desktopPackages";
 

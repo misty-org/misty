@@ -2406,3 +2406,14 @@ pub async fn file_tools_read_symlink(
 #[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct Placeholder {}
+
+#[tauri::command]
+pub async fn navigation_names_snapshot(webview: tauri::Webview, state: State<'_, MistyRuntime>, account: String) -> Result<crate::infra::navigation_names::NavigationSnapshot, String> {
+    if webview.label() != "main" { return Err("Only the trusted Misty shell can read navigation names.".into()); }
+    Ok(state.navigation_names.snapshot(&account).await)
+}
+#[tauri::command]
+pub async fn navigation_names_update(webview: tauri::Webview, state: State<'_, MistyRuntime>, account: String, key: String, name: Option<String>) -> Result<crate::infra::navigation_names::NavigationSnapshot, String> {
+    if webview.label() != "main" { return Err("Only the trusted Misty shell can rename navigation.".into()); }
+    state.navigation_names.update(account, key, name).await
+}

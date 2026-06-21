@@ -84,15 +84,19 @@ export const devicesApi = {
   revokePair: (request: SignedDeviceRequest, localId: string, deviceId: string, pairId: string) =>
     signed(request, localId, `${pairPath(deviceId, pairId)}/revoke`, "POST", {}),
   claimWorkflowJob: <T>(request: SignedDeviceRequest, localId: string, deviceId: string) =>
-    signed<T>(request, localId, `${devicePath(deviceId)}/workflow-node-jobs/claim`, "POST"),
-  renewWorkflowJobLease: (
+    signed<T>(request, localId, `${devicePath(deviceId)}/workflow-node-jobs/claim`, "POST", { protocolVersion: 2 }),
+  beginWorkflowJob: <T>(request: SignedDeviceRequest, localId: string, deviceId: string, jobId: string, leaseToken: string) =>
+    signed<T>(request, localId, `${workflowJobPath(deviceId, jobId)}/begin`, "POST", { leaseToken }),
+  uncertainWorkflowJob: (request: SignedDeviceRequest, localId: string, deviceId: string, jobId: string, body: unknown) =>
+    signed(request, localId, `${workflowJobPath(deviceId, jobId)}/uncertain`, "POST", body),
+  renewWorkflowJobLease: <T>(
     request: SignedDeviceRequest,
     localId: string,
     deviceId: string,
     jobId: string,
     leaseToken: string,
   ) =>
-    signed(request, localId, `${workflowJobPath(deviceId, jobId)}/lease`, "POST", { leaseToken }),
+    signed<T>(request, localId, `${workflowJobPath(deviceId, jobId)}/lease`, "POST", { leaseToken }),
   completeWorkflowJob: (
     request: SignedDeviceRequest,
     localId: string,

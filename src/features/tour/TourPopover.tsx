@@ -90,7 +90,7 @@ export function TourPopover(props: {
   return (
     <div
       className={cn(
-        "fixed z-[100] w-[340px] rounded-lg border border-charcoal-border bg-charcoal-card p-5 text-cream",
+        "misty-popup-surface fixed z-[100] w-[340px] rounded-lg border border-charcoal-border bg-charcoal-card p-5 text-cream",
         "shadow-2xl ring-1 ring-cream/10 transition-all duration-200 ease-out",
       )}
       style={style ?? { top: "25%", left: "50%", transform: "translateX(-50%)" }}

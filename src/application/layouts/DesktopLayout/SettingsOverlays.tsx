@@ -1,4 +1,4 @@
-import { ProvidersWorkspace } from "@/features/providers";
+import { ConnectedStoragePanel } from "@/features/providers";
 import { SettingsWorkspace } from "@/features/settings";
 import { isWebBuild } from "@/shared/platform/buildTarget";
 import { DesktopAccessState } from "@/shared/ui";
@@ -19,13 +19,11 @@ export function SettingsOverlay(props: OverlayProps) {
 }
 
 export function RemotesOverlay(props: OverlayProps) {
+  if (!props.open) return null;
+  if (!isWebBuild) return <ConnectedStoragePanel onClose={props.onClose} />;
   return (
     <WorkspaceOverlay {...props} ariaLabel="Remotes">
-      {isWebBuild ? (
-        <DesktopAccessState feature="Connected storage" />
-      ) : (
-        <ProvidersWorkspace presentation="overlay" onClose={props.onClose} />
-      )}
+      <DesktopAccessState feature="Connected storage" />
     </WorkspaceOverlay>
   );
 }

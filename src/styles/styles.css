@@ -23,6 +23,28 @@
   --misty-extension-artwork-foreground: var(--misty-theme-text-bright);
 }
 
+/* Popup chrome is shared by the host and every app, including portaled menus.
+   Use a real edge rather than the faint utility ring, without changing the
+   ordinary card/divider palette or putting a frame around full-screen views. */
+:root
+  :is(
+    [data-slot="dialog-content"],
+    [data-slot="alert-dialog-content"],
+    [data-slot="popover-content"],
+    [data-slot="dropdown-menu-content"],
+    [data-slot="dropdown-menu-sub-content"],
+    [data-slot="select-content"],
+    [data-slot="workspace-overlay-panel"],
+    [role="menu"],
+    .misty-popup-surface,
+    [data-popup-surface],
+    [id="browser-omnibox-suggestions"],
+    .misty-tiptap-suggestion
+  ) {
+  border: 1px solid color-mix(in srgb, currentColor 24%, transparent);
+  --tw-ring-shadow: 0 0 #0000;
+}
+
 @theme inline {
   --color-charcoal-workspace: var(--misty-theme-workspace);
   --color-charcoal-bg: var(--misty-theme-bg);
@@ -152,6 +174,7 @@
   html:has([data-browser-page-host]) [data-workspace-pane]:has([data-browser-page-host]) > div,
   html:has([data-browser-page-host]) [data-misty-trusted-app]:has([data-browser-page-host]),
   html:has([data-browser-page-host]) [data-misty-native-surface]:has([data-browser-page-host]),
+  html:has([data-browser-page-host]) [data-browser-page-container]:has([data-browser-page-host]),
   html:has([data-browser-page-host]) [data-browser-workspace-tab],
   html:has([data-browser-page-host]) [data-browser-page-stage],
   html:has([data-browser-page-host]) [data-browser-page-host] {

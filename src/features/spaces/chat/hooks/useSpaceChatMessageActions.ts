@@ -19,7 +19,6 @@ export interface SpaceChatMessageActionsOptions {
   currentUser: { id: string; name: string } | undefined;
   activeConversation: SpaceConversation | undefined;
   members: SpaceMember[];
-  agents: SpaceStudioResource[];
   draft: SpaceChatDraft;
   editing: MessageEditingState;
   setGroupMessages: Dispatch<SetStateAction<SpaceMessage[]>>;
@@ -31,7 +30,6 @@ export interface SpaceChatMessageActionsOptions {
     attachmentIds: string[],
     libraryIds: string[],
     replyToMessageId: string,
-    agentIdsByLabel: Record<string, string>,
     optimisticMessage?: SpaceMessage,
   ) => Promise<unknown>;
   storeUpdateMessage: (
@@ -42,7 +40,6 @@ export interface SpaceChatMessageActionsOptions {
   ) => Promise<unknown>;
   storeDeleteMessage: (spaceId: string, messageId: string) => Promise<unknown>;
   /** Starts the typing indicator without waiting for the queued run event. */
-  onAgentRunsQueued: (runs: SpaceMessage["triggered_runs"]) => void;
   storeToggleReaction: (
     spaceId: string,
     messageId: string,
@@ -59,7 +56,7 @@ export interface SpaceChatMessageActionsOptions {
  * errors. That asymmetry is why only the conversation paths set an error here.
  */
 export function useSpaceChatMessageActions(options: SpaceChatMessageActionsOptions) {
-  const { spaceId, conversationId, members, agents, draft, editing } = options;
+  const { spaceId, conversationId, members, draft, editing } = options;
   const { setGroupMessages, setGroupChatError } = options;
 
   const reportConversationError = (error: unknown, fallback: string) => {
@@ -71,7 +68,7 @@ export function useSpaceChatMessageActions(options: SpaceChatMessageActionsOptio
     if (draft.isEmpty) return;
     const value = draft.text.trim();
     const attachmentIds = draft.pendingAttachments.map((item) => item.id);
-    const content = buildMessageSpans(value, members, agents, draft.selectedAgentIdsByLabel);
+    const content = buildMessageSpans(value, members);
     const clientNonce = createClientNonce();
     const optimisticMessage: SpaceMessage = {
       seq: Date.now(),
@@ -96,7 +93,6 @@ export function useSpaceChatMessageActions(options: SpaceChatMessageActionsOptio
       selectedFileIds: draft.selectedFileIds,
       selectedLibraryIds: draft.selectedLibraryIds,
       replyToMessageId: draft.replyToMessageId,
-      selectedAgentIdsByLabel: draft.selectedAgentIdsByLabel,
     };
 
     // The composer and message list update together. The server response or
@@ -146,12 +142,7 @@ export function useSpaceChatMessageActions(options: SpaceChatMessageActionsOptio
           clientNonce,
         );
         response.message.client_nonce ||= clientNonce;
-        response.message.triggered_runs = (response.triggered_runs ?? []).map((run) => ({
-          ...run,
-          state: run.state as NonNullable<SpaceMessage["triggered_runs"]>[number]["state"],
-        }));
         setGroupMessages((current) => mergeSpaceMessages(current, [response.message]));
-        options.onAgentRunsQueued(response.message.triggered_runs);
       } else {
         await options.storeSendMessage(
           spaceId,
@@ -160,7 +151,6 @@ export function useSpaceChatMessageActions(options: SpaceChatMessageActionsOptio
           attachmentIds,
           snapshot.selectedLibraryIds,
           snapshot.replyToMessageId,
-          snapshot.selectedAgentIdsByLabel,
           optimisticMessage,
         );
       }
@@ -191,7 +181,7 @@ export function useSpaceChatMessageActions(options: SpaceChatMessageActionsOptio
           spaceId,
           conversationId,
           message.id,
-          buildMessageSpans(value, members, agents),
+          buildMessageSpans(value, members),
           message.file_node_ids,
         );
         setGroupMessages((current) => mergeSpaceMessages(current, [saved]));

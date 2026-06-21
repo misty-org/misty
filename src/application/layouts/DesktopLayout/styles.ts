@@ -1,4 +1,4 @@
-import { cn, navigationMenuPrimaryLayoutClass } from "@/shared/ui";
+import { cn, navigationMenuPrimaryLayoutClass, navigationMenuLinkClass } from "@/shared/ui";
 import type { FramePacingState } from "@/application/layouts/model/types";
 
 export const desktopFrameClass = [
@@ -97,16 +97,10 @@ export const navigatorIslandActionClass = [
 
 export function navigatorRowClass(active: boolean): string {
   return cn(
-    "misty-navigator-row-target relative h-9 w-full",
-    navigatorPrimaryRowLayoutClass,
-    "rounded-md border-0 bg-transparent px-2.5 text-sm text-cream-muted no-underline",
-    "outline-none transition-colors",
-    "hover:bg-charcoal-card hover:text-cream-bright",
-    navigatorFocusRingClass,
+    navigationMenuLinkClass,
+    "relative w-full",
     "disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-cream-muted",
     active && "bg-charcoal-card text-cream-bright",
-    active && "before:absolute before:h-6 before:w-0.5 before:rounded-r before:bg-sage-fg",
-    active && "before:-left-3",
   );
 }
 

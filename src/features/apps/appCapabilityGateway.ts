@@ -1,3 +1,6 @@
+import { appLocalStoragePrefix } from "./appLocalStorage";
+import { createFileSystemRpc } from "./rpc/fileSystem";
+import { invoke } from "@/native/invoke";
 import { isMistyServerMethod, type MistyNavigationItem } from "@misty/sdk";
 import { createAppRpcScope } from "./rpc/session";
 import { createServerRpc } from "./rpc/server";
@@ -55,6 +58,7 @@ export async function executeAppCapability(
       "The App session has expired. Reopen the App to continue.",
     );
   }
+  if (method.startsWith("fileSystem.")) return fileSystemRequest(context, method, params);
   const input = record(params);
   if (method === "native.surface.open") {
     const id = grantedNativeSurface(context.app, context.session);
@@ -268,10 +272,11 @@ function localStorageOperation(
   input: Record<string, unknown>,
 ) {
   // Account IDs are only unique within a deployment. Never reuse another server's data.
-  const deployment = new URL(context.serverBase);
-  deployment.search = "";
-  deployment.hash = "";
-  const prefix = `misty:app:v2:${encodeURIComponent(deployment.href.replace(/\/+$/, ""))}:${encodeURIComponent(context.user.id)}:${encodeURIComponent(context.app.app_id ?? context.app.id)}:`;
+  const prefix = appLocalStoragePrefix(
+    context.serverBase,
+    context.user.id,
+    context.app.app_id ?? context.app.id,
+  );
   if (operation === "keys") {
     return Object.keys(localStorage)
       .filter((key) => key.startsWith(prefix))
@@ -430,4 +435,26 @@ function boundedString(value: unknown, maximum: number) {
 
 function record(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+}
+
+async function fileSystemRequest(context: AppCapabilityContext, method: string, params: unknown) {
+  const scope = createAppRpcScope({
+    identity: {
+      appId: context.app.id,
+      accountId: context.user.id,
+      spaceId: context.session.space_id,
+      instanceId: context.tab?.id ?? "file-service-request",
+    },
+    scopes: context.session.scopes.filter((item) => context.app.scopes.includes(item)),
+    expiresAt: context.session.expires_at,
+    isCurrentAccount: () => !context.signal?.aborted,
+  });
+  const close = () => scope.close();
+  context.signal?.addEventListener("abort", close, { once: true });
+  try {
+    return await createFileSystemRpc(scope, invoke)({ method, params });
+  } finally {
+    context.signal?.removeEventListener("abort", close);
+    scope.close();
+  }
 }

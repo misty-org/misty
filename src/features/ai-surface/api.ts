@@ -5,6 +5,7 @@ import {
   readApiAuthToken,
   resolveRequiredApiBase,
 } from "@/api/client";
+import type { BillingUsage } from "@/api/spaces/dto/interfaces/agentUsageTypes";
 import type {
   AiArtifact,
   AiInvocationCreated,
@@ -17,7 +18,6 @@ import type {
 
 export interface AiUserSettings {
   enabled: boolean;
-  active_companion_agent_id?: string;
   memory_enabled: boolean;
   retention_days: number;
   purge_state: "none" | "queued" | "working" | "verified" | "failed";
@@ -47,9 +47,8 @@ export interface AiConversationMessageRecord {
 export interface AiConversationRecord {
   id: string;
   title: string;
-  agentId?: string;
   spaceId?: string;
-  kind: "companion_task" | "misty";
+  kind: "misty";
   originSurface?: string;
   originHref?: string;
   privacyBoundary?: string;
@@ -60,7 +59,6 @@ export interface AiConversationRecord {
 
 export interface AiSurfacePreferenceRecord {
   surface_id: string;
-  pinned_agent_id?: string;
   proactive_enabled: boolean;
   proactive_cooldown_minutes: number;
   proactive_snoozed_until?: string;
@@ -103,16 +101,7 @@ export interface AiProviderStatus {
   model_name: string;
 }
 
-export interface AiBillingUsage {
-  plan: string;
-  agent_usage?: {
-    percentage_used: number;
-    available: boolean;
-    paused: boolean;
-    reset_at?: string;
-    plan?: string;
-  };
-}
+export type AiBillingUsage = BillingUsage;
 
 export const aiSurfaceApi = {
   status: () => apiRequest<AiProviderStatus>("/ai/status"),
@@ -140,7 +129,7 @@ export const aiSurfaceApi = {
     surfaceId: string,
     input: Pick<
       AiSurfacePreferenceRecord,
-      "pinned_agent_id" | "proactive_enabled" | "saved_actions"
+      "proactive_enabled" | "saved_actions"
     >,
   ) =>
     apiRequest<{ preference: AiSurfacePreferenceRecord }>(

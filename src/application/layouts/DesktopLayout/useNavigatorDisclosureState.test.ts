@@ -87,3 +87,32 @@ describe("navigatorDisclosureSetting", () => {
     });
   });
 });
+
+it("keeps nested disclosure settings when another section changes", () => {
+  const save = vi.fn();
+  useSettingsStore.setState({
+    loaded: true,
+    settings: {
+      path: "/test/settings.json",
+      document: {
+        navigation: {
+          disclosures_by_account: {
+            "account-1": { "item:social:instagram/pin-friends": false, apps: true },
+            "account-2": { "item:social:instagram": true },
+          },
+        },
+      },
+    },
+    updateSetting: save,
+  });
+  const { result, unmount } = renderHook(() =>
+    useNavigatorDisclosureState("account-1", "item:social:instagram/pin-friends", true),
+  );
+  expect(result.current[0]).toBe(false);
+  act(() => result.current[1](true));
+  expect(save).toHaveBeenCalledWith("navigation", "disclosures_by_account", {
+    "account-1": { "item:social:instagram/pin-friends": true, apps: true },
+    "account-2": { "item:social:instagram": true },
+  });
+  unmount();
+});

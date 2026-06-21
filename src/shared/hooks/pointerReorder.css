@@ -1,0 +1,41 @@
+[data-reorder-list] [data-reorder-handle],
+[data-reorder-list] [data-reorder-handle] * {
+  -webkit-user-drag: none !important;
+  -webkit-app-region: no-drag;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+[data-reorder-list] [data-reorder-handle] {
+  cursor: grab;
+}
+[data-reorder-dragging="true"] {
+  opacity: 0.5;
+}
+html[data-pointer-dragging="true"],
+html[data-pointer-dragging="true"] * {
+  cursor: grabbing !important;
+  user-select: none !important;
+}
+.pointer-reorder-shield {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483400;
+  cursor: grabbing;
+}
+.pointer-reorder-preview {
+  position: fixed;
+  z-index: 2147483500;
+  pointer-events: none;
+  opacity: 0.7;
+}
+.pointer-reorder-preview * {
+  pointer-events: none !important;
+}
+.pointer-reorder-indicator {
+  position: fixed;
+  z-index: 2147483501;
+  pointer-events: none;
+  background: var(--color-cream, #eee);
+  border-radius: 1px;
+}

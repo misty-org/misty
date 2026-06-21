@@ -18,7 +18,8 @@ if (!isNativeMobileBuild && !isWebBuild) {
     if (!hasTauriInternals())
       throw new Error("Misty Browser is unavailable outside the desktop app.");
     const { useWorkspaceStore } = await import("@/features/workspace");
-    useWorkspaceStore.getState().openBrowserTab({ url });
+    if (!useWorkspaceStore.getState().openBrowserTab({ url }))
+      throw new Error("Misty Browser could not open this link.");
   });
 }
 installExternalLinkRouting();

@@ -4,11 +4,13 @@ const mocks = vi.hoisted(() => ({
   invoke: vi.fn(),
   open: vi.fn(),
   openUrl: vi.fn(),
+  openInMisty: vi.fn(),
 }));
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: mocks.invoke }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: mocks.open }));
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: mocks.openUrl }));
+vi.mock("@/shared/platform/openExternalLink", () => ({ openExternalLink: mocks.openInMisty }));
 
 import {
   createOfficialAppNativeAccess,
@@ -24,6 +26,20 @@ describe("official app desktop host bridge", () => {
       if (command === "official_app_resolve_granted_path") return payload?.candidate;
       return undefined;
     });
+  });
+
+  it("routes browser open commands into Misty without invoking the OS browser", async () => {
+    const source = { postMessage: vi.fn() };
+    await respondToOfficialAppCommand(
+      commandEvent(source, "browser", "browser.openExternal", {
+        url: "https://outlook.live.com/mail/",
+      }),
+      "browser",
+      ["browser.navigate"],
+      createOfficialAppNativeAccess(),
+    );
+    expect(mocks.openInMisty).toHaveBeenCalledWith("https://outlook.live.com/mail/");
+    expect(mocks.openUrl).not.toHaveBeenCalled();
   });
 
   it("requires the exact app permission and rejects unknown commands", async () => {

@@ -24,6 +24,8 @@ export interface OfficialApp {
   name: string;
   publisher: "Misty";
   description: string;
+  about?: string;
+  repository_url?: string;
   version: string;
   permission_version: number;
   minimum_host_protocol: number;
@@ -31,6 +33,7 @@ export interface OfficialApp {
   official: true;
   age_rating: string;
   scopes: string[];
+  requires_apps?: string[];
   network_origins?: string[];
   desktop: {
     runtime: MistyAppRuntime;
@@ -194,14 +197,15 @@ function matchingDevelopmentApp(server: OfficialApp, local: OfficialApp): boolea
     server.version === local.version &&
     server.permission_version === local.permission_version &&
     server.minimum_host_protocol === local.minimum_host_protocol &&
+    server.minimum_host_version === local.minimum_host_version &&
+    sameCatalogValues(server.requires_apps, local.requires_apps) &&
     sameCatalogValues(server.scopes, local.scopes) &&
     sameCatalogValues(server.network_origins, local.network_origins)
   );
 }
 
 export async function loadOfficialAppCatalog(
-  localDevelopmentCatalog = import.meta.env.DEV &&
-    import.meta.env.VITE_MISTY_LOCAL_OFFICIAL_APPS === "true",
+  localDevelopmentCatalog = import.meta.env.DEV && !!import.meta.env.VITE_MISTY_APPS_DIRECTORY,
 ): Promise<OfficialAppCatalogResponse> {
   const serverCatalog = await appRequest<OfficialAppCatalogResponse>("/apps");
   if (!localDevelopmentCatalog) return serverCatalog;
@@ -221,6 +225,8 @@ export async function loadOfficialAppCatalog(
         if (!local) return app;
         return {
           ...app,
+          about: local.about ?? app.about,
+          repository_url: local.repository_url ?? app.repository_url,
           desktop: app.desktop.runtime === "unsupported" ? app.desktop : local.desktop,
           mobile: app.mobile.runtime === "unsupported" ? app.mobile : local.mobile,
         };
@@ -230,6 +236,10 @@ export async function loadOfficialAppCatalog(
     // An optional local build must not prevent installing the server's release.
     return serverCatalog;
   }
+}
+
+export async function localAppComponentReady(url: URL): Promise<boolean> {
+  return (await fetch(url, { method: "HEAD", cache: "no-store", credentials: "omit" })).ok;
 }
 
 export const appsApi = {

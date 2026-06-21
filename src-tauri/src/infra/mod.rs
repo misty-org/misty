@@ -1,4 +1,6 @@
 #[cfg(desktop)]
+pub mod browser_agent_control;
+#[cfg(desktop)]
 pub mod agent_device_identity;
 pub mod agents;
 #[cfg(target_os = "macos")]
@@ -92,3 +94,12 @@ pub mod tray;
 pub mod workspaces;
 
 mod browser_profile;
+
+pub mod browser_provider;
+
+#[cfg(all(debug_assertions, target_os = "macos"))]
+pub(crate) async fn evaluate_probe_javascript(webview: tauri::Webview, script: String) -> Result<String, String> {
+    browser_macos::evaluate_browser_async_javascript(webview, script).await
+}
+
+pub mod navigation_names;

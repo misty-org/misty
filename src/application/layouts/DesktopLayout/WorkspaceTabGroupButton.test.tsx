@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Code2, Inbox } from "lucide-react";
 import {
   workspaceTabDropIndex,
+  workspaceTabDisplayTitle,
   WorkspaceTabGroupButton,
   type TabGroup,
 } from "./WorkspaceTabGroupButton";
@@ -31,7 +32,7 @@ describe("WorkspaceTabGroupButton", () => {
     container.remove();
   });
 
-  it("uses the active filename for a Code group", () => {
+  it("keeps the Code group generic", () => {
     const code: WorkspaceTab = {
       id: "code-a",
       surfaceId: "code",
@@ -67,7 +68,7 @@ describe("WorkspaceTabGroupButton", () => {
       );
     });
 
-    expect(container.textContent).toContain("scheduler.tsx");
+    expect(container.textContent).toContain("Code");
   });
 
   it("uses one responsive width contract for every top-level tab", () => {
@@ -112,7 +113,7 @@ describe("WorkspaceTabGroupButton", () => {
     expect(renderedTab?.className).toContain("max-w-[160px]");
   });
 
-  it("centers a grouped tab count in a fixed badge box", () => {
+  it("keeps the count with the tab title and the dropdown trigger separate", () => {
     const tabs = ["one", "two"].map(
       (id) =>
         ({
@@ -151,10 +152,12 @@ describe("WorkspaceTabGroupButton", () => {
     });
 
     const badge = [...container.querySelectorAll("span")].find(
-      (element) => element.textContent === "2",
+      (element) => element.textContent === "(2)",
     );
-    expect(badge?.className).toContain("items-center");
-    expect(badge?.className).toContain("justify-center");
+    expect(badge?.closest("button")).toBe(container.querySelector("button"));
+    expect(container.querySelector('[aria-label="Show Inbox tabs"]')?.textContent).toBe("");
+    expect(container.querySelector('[aria-label^="Close "]')).toBeNull();
+    expect(badge?.className).toContain("text-[10px]");
     expect(badge?.className).toContain("leading-none");
     expect(badge?.className).toContain("tabular-nums");
   });
@@ -275,7 +278,7 @@ describe("WorkspaceTabGroupButton", () => {
     expect(container.querySelector("svg")).not.toBeNull();
   });
 
-  it("renders only the favicon without the default icon when faviconUrl exists", async () => {
+  it("keeps the app icon on the group and shows page favicons in the dropdown", async () => {
     const browserTab: WorkspaceTab = {
       id: "tab:browser-1",
       surfaceId: "browser",
@@ -289,6 +292,8 @@ describe("WorkspaceTabGroupButton", () => {
       lastFocusedAt: 1,
     };
 
+    const onClose = vi.fn();
+    const onOpen = vi.fn();
     act(() => {
       root.render(
         <WorkspaceTabGroupButton
@@ -296,28 +301,38 @@ describe("WorkspaceTabGroupButton", () => {
             key: browserTab.groupKey,
             surfaceId: browserTab.surfaceId,
             label: "Browser",
-            tabs: [browserTab],
+            tabs: [browserTab, { ...browserTab, id: "second", title: "Second page" }],
             storeGroupKey: null,
           }}
           icon={Inbox}
           activeTabId={browserTab.id}
-          canClose={false}
+          canClose
           lastUsedTabByGroup={{}}
-          onOpen={vi.fn()}
-          onClose={vi.fn()}
+          onOpen={onOpen}
+          onClose={onClose}
           onMoveTab={vi.fn()}
         />,
       );
     });
 
-    const img = container.querySelector("img");
-    expect(img).not.toBeNull();
-    expect(img?.src).toBe("https://leetcode.com/favicon.ico");
-    // Default SVG icon must not be rendered behind the favicon
-    expect(container.querySelector("svg")).toBeNull();
+    expect(container.querySelector("img")).toBeNull();
+    expect(container.querySelector("svg")?.getAttribute("width")).toBe("14");
+    await act(async () => {
+      container
+        .querySelector('[aria-label="Show Browser tabs"]')!
+        .dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    });
+    const menu = document.querySelector('[role="menu"]')!;
+    expect(menu.querySelector("img")?.src).toBe("https://leetcode.com/favicon.ico");
+    expect(menu.textContent).not.toContain("Browser");
+    await act(async () => {
+      (menu.querySelector('[aria-label="Close LeetCode"]') as HTMLButtonElement).click();
+    });
+    expect(onClose).toHaveBeenCalledWith(browserTab);
+    expect(onOpen).not.toHaveBeenCalled();
   });
 
-  it("renders a loading spinner as the favicon when a webpage is loading", async () => {
+  it("keeps the group icon stable while a webpage loads", async () => {
     const { useBrowserRuntimeStore } = await import("@/features/browser");
     const browserTab: WorkspaceTab = {
       id: "tab:browser-loading",
@@ -354,20 +369,20 @@ describe("WorkspaceTabGroupButton", () => {
       );
     });
 
-    // While loading, the image must not be rendered; instead a spinning loader svg is shown
+    // Loading belongs to the page; the app group keeps its identity.
     expect(container.querySelector("img")).toBeNull();
     const spinner = container.querySelector("svg");
     expect(spinner).not.toBeNull();
-    expect(spinner?.classList.contains("animate-spin")).toBe(true);
+    expect(spinner?.classList.contains("animate-spin")).toBe(false);
 
-    // When loading finishes, the favicon image appears
+    // Finishing a load does not replace the group icon.
     act(() => {
       useBrowserRuntimeStore.getState().setLoading(browserTab.id, false);
     });
-    expect(container.querySelector("img")).not.toBeNull();
+    expect(container.querySelector("img")).toBeNull();
   });
 
-  it("cycles to the next tab in the group when clicking an already-active group", () => {
+  it("returns to the current page when clicking an already-active group", () => {
     const tab1: WorkspaceTab = {
       id: "tab-1",
       surfaceId: "browser",
@@ -420,7 +435,7 @@ describe("WorkspaceTabGroupButton", () => {
       mainButton.click();
     });
 
-    expect(onOpen).toHaveBeenCalledWith(tab2);
+    expect(onOpen).toHaveBeenCalledWith(tab1);
   });
 
   it("displays Space content first and keeps context in the tooltip", () => {
@@ -459,10 +474,10 @@ describe("WorkspaceTabGroupButton", () => {
       );
     });
 
-    expect(container.textContent).toContain("Launch plan");
+    expect(container.textContent).toContain("Planner");
     expect(container.textContent).not.toContain("Misty Space · Planner");
     expect(container.querySelector("button")?.getAttribute("title")).toBe(
-      "Launch plan • Misty Space · Planner",
+      "Launch plan • Planner • Misty Space · Planner",
     );
   });
 
@@ -499,7 +514,7 @@ describe("WorkspaceTabGroupButton", () => {
 
     expect(container.textContent).toContain("Chat");
     expect(container.textContent).not.toContain("Family Chat");
-    expect(container.querySelector("button")?.getAttribute("title")).toBe("Chat • Family · Chat");
+    expect(container.querySelector("button")?.getAttribute("title")).toBe("Family · Chat");
   });
 
   it("displays the active tab title directly and provides context in tooltip", () => {
@@ -532,7 +547,7 @@ describe("WorkspaceTabGroupButton", () => {
       );
     });
 
-    expect(container.textContent).toContain("zsh");
+    expect(container.textContent).toContain("Terminal");
     expect(container.querySelector("button")?.getAttribute("title")).toBe("zsh • Terminal");
   });
 
@@ -567,7 +582,7 @@ describe("WorkspaceTabGroupButton", () => {
     });
 
     expect(container.textContent).toContain("Inbox");
-    expect(container.querySelector("button")?.getAttribute("title")).toBe("Inbox");
+    expect(container.querySelector("button")?.getAttribute("title")).toBe("Misty Inbox • Inbox");
   });
 
   it("switches back to the last active tab within a group when group is clicked", () => {
@@ -596,7 +611,7 @@ describe("WorkspaceTabGroupButton", () => {
       );
     });
 
-    expect(container.textContent).toContain("Inbox 2");
+    expect(container.textContent).toContain("Inbox");
     expect(container.querySelector("button")?.getAttribute("title")).toBe("Inbox 2 • Inbox");
 
     const mainButton = container.querySelector("button")!;
@@ -621,3 +636,21 @@ function testTab(partial: Partial<WorkspaceTab> & { id: string; title: string })
     ...partial,
   };
 }
+
+it.each([
+  ["/apps/planner?view=agenda", "Planner", "Agenda"],
+  ["/apps/journal?view=drawings", "Journal", "Drawings"],
+  ["/apps/files?view=transfers", "Files", "Transfers"],
+  ["/apps/inbox?provider=google", "Inbox", "Gmail"],
+  ["/apps/journal?provider=notion", "Journal", "Notion"],
+  ["/apps/journal?provider=notion", "Launch notes · Notion", "Launch notes · Notion"],
+])("describes the destination in %s", (route, title, expected) => {
+  const tab = {
+    route,
+    title,
+    surfaceId: "official-app",
+    groupKey: "app:" + route.split("/")[2].split("?")[0],
+    state: {},
+  } as WorkspaceTab;
+  expect(workspaceTabDisplayTitle(tab, { surfaceId: "official-app", label: title })).toBe(expected);
+});

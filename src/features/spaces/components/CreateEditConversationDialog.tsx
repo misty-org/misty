@@ -2,7 +2,6 @@ import { spacesApi } from "@/api/spaces/api";
 import { SystemErrorActivity } from "@/features/activity";
 import type {
   SpaceActorRef,
-  SpaceAgentMembership,
   SpaceConversation,
   SpaceMember,
 } from "@/api/spaces/dto/interfaces/types";
@@ -24,7 +23,6 @@ export function CreateEditConversationDialog({
   open,
   onOpenChange,
   members,
-  agents: _agents,
   currentUserId,
   conversation,
   onSaved,
@@ -33,7 +31,6 @@ export function CreateEditConversationDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   members: SpaceMember[];
-  agents: SpaceAgentMembership[];
   currentUserId?: string;
   /** Present when editing an existing conversation; absent when creating one. */
   conversation?: SpaceConversation | null;
@@ -68,7 +65,7 @@ export function CreateEditConversationDialog({
   };
 
   const actorKey = (actor: SpaceActorRef) =>
-    actor.kind === "agent" ? `agent:${actor.agent_id}` : `person:${actor.user_id}`;
+    `person:${actor.user_id}`;
   const toggleActor = (actor: SpaceActorRef, checked: boolean) => {
     const key = actorKey(actor);
     setSelectedActors((current) =>
@@ -117,7 +114,7 @@ export function CreateEditConversationDialog({
           <DialogHeader>
             <DialogTitle>{conversation ? "Edit conversation" : "New conversation"}</DialogTitle>
             <DialogDescription>
-              Choose the people in this conversation. Agents join through explicit mentions.
+              Choose the people in this conversation.
             </DialogDescription>
           </DialogHeader>
           <label className="mt-5 grid gap-2 text-xs font-medium text-cream-muted">

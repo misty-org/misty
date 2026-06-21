@@ -14,18 +14,21 @@ import { createServer as createPortReservation } from "node:net";
 
 const [appId, candidate] = process.argv.slice(2);
 if (process.platform !== "darwin") throw new Error("This verification runner requires macOS.");
-if (!["terminal", "planner", "browser", "journal", "inbox"].includes(appId) || !candidate)
-  throw new Error("Pass terminal, planner, browser, journal or inbox and its candidate repository directory.");
+if (!["terminal", "planner", "browser", "journal", "inbox", "chat", "files"].includes(appId) || !candidate)
+  throw new Error("Pass terminal, planner, browser, journal, chat or inbox and its candidate repository directory.");
 const root = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
+const localFiles = appId === "files";
 const candidateRoot = path.resolve(candidate);
 const catalogPath = path.join(candidateRoot, "apps/catalog.json");
 const catalog = JSON.parse(await readFile(catalogPath, "utf8"));
 const app = catalog.apps.find(item => item.id === appId);
 if (app?.desktop.runtime !== "downloaded") throw new Error("The candidate must declare a downloaded runtime.");
 const assets = path.join(candidateRoot, "public/official-apps");
-await access(assets);
+if (!localFiles) await access(assets);
+if (localFiles) process.env.VITE_MISTY_APPS_DIRECTORY = candidateRoot;
 process.env.MISTY_OFFICIAL_APPS_CATALOG = catalogPath;
 process.env.MISTY_OFFICIAL_APPS_DIR = assets;
+process.env.MISTY_APPS_ROOT ??= path.resolve(root, "../misty-apps");
 const require = createRequire(import.meta.url);
 const yjsRequire = createRequire(require.resolve("yjs"));
 let journalFixture;
@@ -39,6 +42,7 @@ if (process.env.MISTY_SDK_JOURNAL_FIXTURE) {
     throw new Error("Journal host verification only accepts a disposable loopback account.");
 }
 let server;
+let probeOrigin;
 let child;
 let interrupted = false;
 let bundleRoot;
@@ -54,9 +58,25 @@ try {
   const port = reservation.address().port;
   await new Promise((resolve, reject) => reservation.close(error => error ? reject(error) : resolve()));
   server = await createServer({
-    root, mode: "desktop",
-    plugins: [{ name: "sdk-browser-download-fixture", configureServer(server) {
+    // Keep signed candidate verification independent of the desktop source-preview catalog.
+    root, mode: localFiles ? "desktop" : "sdk-probe",
+    cacheDir: path.join(root, "node_modules/.vite", "misty-sdk-package-probe"),
+    plugins: [{ name: "sdk-browser-download-fixture", enforce: "pre", configureServer(server) {
       server.middlewares.use((request, response, next) => {
+        if (request.url?.split("?", 1)[0] === "/official-apps/catalog.json") {
+          const candidateCatalog = structuredClone(catalog);
+          for (const candidateApp of candidateCatalog.apps) {
+            if (candidateApp.desktop?.runtime === "downloaded") {
+              candidateApp.desktop.entry = localFiles
+                ? `/__misty-local-apps/${candidateApp.id}/desktop/app.js`
+                : `${probeOrigin}/official-apps/${candidateApp.id}/${candidateApp.version}/desktop.zip`;
+            }
+          }
+          response.setHeader("Content-Type", "application/json");
+          response.setHeader("Cache-Control", "no-store");
+          response.end(JSON.stringify(candidateCatalog));
+          return;
+        }
         if (journalFixture && request.url === "/scripts/sdk-journal-host-fixture.json") {
           const { accountToken, userId, spaceId, noteId, drawingId } = journalFixture;
           response.setHeader("Content-Type", "application/json");
@@ -72,7 +92,7 @@ try {
     } }],
     // The collaboration fixture uses the same nested lib0 package as Yjs.
     resolve: { alias: { lib0: path.dirname(yjsRequire.resolve("lib0/package.json")) } },
-    server: { host: "127.0.0.1", port, strictPort: true,
+    server: { host: "127.0.0.1", port, strictPort: true, watch: { ignored: ["**/*"] }, hmr: false, ws: false,
       ...(journalFixture ? { proxy: { "/__sdk-journal-api": {
         target: new URL(journalFixture.apiBase).origin,
         rewrite: (path) => path.replace(/^\/__sdk-journal-api/, ""),
@@ -84,12 +104,19 @@ try {
   if (!address || typeof address === "string") throw new Error("No loopback probe server.");
   if (interrupted) throw new Error("Probe interrupted before native launch.");
   const origin = `http://127.0.0.1:${address.port}`;
-  console.log(`Verifying signed ${appId} candidate in a disposable macOS window.`);
+  probeOrigin = origin;
+  const servedCatalog = await fetch(`${origin}/official-apps/catalog.json`).then(response => response.json());
+  if (servedCatalog.apps.find(candidateApp => candidateApp.id === appId)?.desktop.sha256 !== app.desktop.sha256)
+    throw new Error("Probe server did not serve the requested signed candidate.");
+  console.log(`Verifying ${localFiles ? "local" : "signed"} ${appId} candidate in a disposable macOS window.`);
   const run = async (command, args, env = process.env) => {
     child = spawn(command, args, { cwd: root, stdio: "inherit", env });
     return await new Promise((resolve, reject) => {
       child.once("error", reject);
-      child.once("exit", code => resolve(interrupted ? 1 : code ?? 1));
+      child.once("exit", (code, signal) => {
+        if (signal) console.error(`Native verification process ended with ${signal}.`);
+        resolve(interrupted ? 1 : code ?? 1);
+      });
     });
   };
   const built = await run("cargo", ["build", "--manifest-path", "src-tauri/Cargo.toml", "--example", "sdk_package_probe"]);
@@ -106,7 +133,15 @@ try {
   const args = debug
     ? ["--batch", "-o", "breakpoint set -n objc_exception_throw", "-o", "run", "-o", "po (id)$x0", "-o", "bt", "-o", "process kill", "--", binary]
     : [];
-  const status = await run(command, args, { ...process.env, MISTY_SDK_PROBE_APP: appId, MISTY_SDK_PROBE_ORIGIN: origin, MISTY_SDK_PROBE_CATALOG: `${origin}/official-apps/catalog.json` });
+  const catalogUrl = new URL(`${origin}/official-apps/catalog.json`);
+  if (process.env.MISTY_SDK_PROBE_WEBSITE || process.env.MISTY_SDK_PROBE_PROVIDER_ID) {
+    if (process.env.MISTY_SDK_PROBE_DIRECTORY === "1") catalogUrl.searchParams.set("directory", "1");
+    const website = process.env.MISTY_SDK_PROBE_WEBSITE || process.env.MISTY_SDK_PROBE_PROVIDER_ID;
+    if (!(appId === "chat" ? ["instagram", "messenger", "x", "discord", "slack", "microsoft-teams"] : appId === "inbox" ? ["google", "microsoft", "icloud", "yahoo"] : []).includes(website))
+      throw new Error("Choose a provider belonging to the Social or Inbox app.");
+    catalogUrl.searchParams.set(process.env.MISTY_SDK_PROBE_WEBSITE ? "website" : "provider", website);
+  }
+  const status = await run(command, args, { ...process.env, MISTY_SDK_PROBE_APP: appId, MISTY_SDK_PROBE_ORIGIN: origin, MISTY_SDK_PROBE_CATALOG: catalogUrl.href });
   process.exitCode = debug ? 1 : status;
 } finally {
   if (child?.exitCode === null) child.kill("SIGTERM");

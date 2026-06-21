@@ -5,14 +5,12 @@ use url::Url;
 pub(super) const BROWSER_VIEWPORT_SCRIPT: &str = r#"
 (() => {
   const shortcutToken = __MISTY_SHORTCUT_TOKEN_PLACEHOLDER__;
+  __MISTY_CONTEXT_MENU_PLACEHOLDER__
   let pointerTrackingEnabled = __MISTY_POINTER_TRACKING_PLACEHOLDER__;
-  const install = () => {
-    if (document.getElementById('misty-browser-viewport-style')) return;
-    const style = document.createElement('style');
-    style.id = 'misty-browser-viewport-style';
-    style.textContent = 'html, body { overscroll-behavior: none !important; }';
-    (document.head || document.documentElement).appendChild(style);
-  };
+
+  // External pages own their layout, scrollbars, and scrolling behavior.
+  // Page zoom is handled by the native WebView; never emulate it with DOM
+  // observers, overflow overrides, or scroll-position corrections here.
 
   let pendingEvent = null;
   let frame = 0;
@@ -110,10 +108,6 @@ pub(super) const BROWSER_VIEWPORT_SCRIPT: &str = r#"
     if (!frame) frame = requestAnimationFrame(flush);
   };
 
-  install();
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', install, { once: true });
-  }
   const handleLinkClick = (event) => {
     if (!event.isTrusted) return;
     const isMiddleClick = event.type === 'auxclick' && event.button === 1;
@@ -165,6 +159,8 @@ pub(super) const BROWSER_COMPANION_SCRIPT: &str = r#"
 
 pub(super) fn browser_viewport_script(shortcut_token: &str, pointer_tracking: bool) -> String {
     BROWSER_VIEWPORT_SCRIPT
+        .replace("__MISTY_CONTEXT_MENU_PLACEHOLDER__", if cfg!(target_os = "macos") { include_str!("browser_context_menu.js") } else { "" })
+        .replace("__MISTY_CONTEXT_SEMANTIC_PLACEHOLDER__", include_str!("browser_semantic_snapshot.js"))
         .replace(
             "__MISTY_SHORTCUT_TOKEN_PLACEHOLDER__",
             &serde_json::to_string(shortcut_token).unwrap_or_else(|_| "\"\"".to_owned()),

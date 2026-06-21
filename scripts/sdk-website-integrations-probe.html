@@ -1,0 +1,45 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Misty website integrations verification</title>
+    <link rel="stylesheet" href="/src/styles/styles.css" />
+    <style>
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        background: #131313;
+        color: #e0e0e0;
+      }
+      #a {
+        height: calc(100vh - 32px);
+      }
+      #result {
+        display: block;
+        height: 32px;
+        padding: 8px;
+        font: 12px system-ui;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="a"></div>
+    <output id="result">Checking website integrations…</output>
+    <script>
+      const report = (message) => {
+        document.getElementById("result").textContent = message;
+        void window.__TAURI_INTERNALS__?.invoke("sdk_probe_complete", {
+          nonce: new URLSearchParams(location.search).get("nonce"),
+          success: false,
+          message,
+        });
+      };
+      window.addEventListener("error", (event) =>
+        report(event.message || "Unlabeled native page error"),
+      );
+      window.addEventListener("unhandledrejection", (event) => report(String(event.reason)));
+    </script>
+    <script type="module" src="./sdk-website-integrations-probe.ts"></script>
+  </body>
+</html>

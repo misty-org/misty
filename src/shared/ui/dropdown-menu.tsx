@@ -1,3 +1,4 @@
+import { menuContentClass, menuItemClass } from "./menu-styles";
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
 import { Check, ChevronRight, Circle } from "lucide-react";
 import * as React from "react";
@@ -78,10 +79,7 @@ const DropdownMenuContent = React.forwardRef<
       data-slot="dropdown-menu-content"
       sideOffset={sideOffset}
       align={align}
-      className={cn(
-        "relative z-[2147483400] grid max-h-[min(24rem,calc(100dvh-2rem))] w-auto min-w-32 origin-center gap-1 overflow-x-hidden overflow-y-auto rounded-md bg-charcoal-card p-1 text-cream shadow-md ring-1 ring-cream/10 duration-150 ease-out before:pointer-events-none before:absolute before:inset-0 before:-z-1 before:rounded-[inherit] data-[state=closed]:overflow-hidden data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 **:data-[slot$=-item]:focus:bg-charcoal-hover **:data-[slot$=-item]:data-highlighted:bg-charcoal-hover **:data-[slot$=-separator]:bg-charcoal-hover **:data-[slot$=-trigger]:focus:bg-charcoal-hover **:data-[slot$=-trigger]:aria-expanded:bg-charcoal-hover! **:data-[variant=destructive]:focus:bg-charcoal-hover! **:data-[variant=destructive]:text-cream! **:data-[variant=destructive]:**:text-cream!",
-        className,
-      )}
+      className={cn(menuContentClass, className)}
       {...props}
     />
   </DropdownMenuPrimitive.Portal>
@@ -100,10 +98,7 @@ const DropdownMenuItem = React.forwardRef<
     data-slot="dropdown-menu-item"
     data-inset={inset}
     data-variant={variant}
-    className={cn(
-      "group/dropdown-menu-item relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1 text-sm outline-hidden select-none focus:bg-charcoal-hover data-inset:pl-8 data-[variant=destructive]:text-cream-bright data-[variant=destructive]:focus:bg-charcoal-active data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 data-[variant=destructive]:*:[svg]:text-cream-bright",
-      className,
-    )}
+    className={cn(menuItemClass, className)}
     {...props}
   />
 ));

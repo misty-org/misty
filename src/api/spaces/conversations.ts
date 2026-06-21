@@ -53,22 +53,9 @@ export function createSpaceConversationsApi(request: SpaceRequest) {
       replyToMessageId = "",
       clientNonce = "",
       inputModality: "text" | "voice" = "text",
-      directAgent?: {
-        agentId: string;
-        timezone?: string;
-        contextNoteId?: string;
-        contextReferences: Array<{
-          device_id: string;
-          kind: "browser_tab" | "project_root";
-          opaque_ref: string;
-          display_name?: string;
-          capabilities: string[];
-        }>;
-      },
     ) =>
       request<{
         message: SpaceMessage;
-        triggered_runs: Array<{ id: string; agent_id: string; state: string }>;
       }>(
         `/spaces/${encodeURIComponent(spaceId)}/conversations/${encodeURIComponent(conversationId)}/messages`,
         {
@@ -81,16 +68,6 @@ export function createSpaceConversationsApi(request: SpaceRequest) {
             reply_to_message_id: replyToMessageId,
             client_nonce: clientNonce,
             input_modality: inputModality,
-            agent_invocations: directAgent
-              ? [
-                  {
-                    agent_id: directAgent.agentId,
-                    timezone: directAgent.timezone,
-                    context_note_id: directAgent.contextNoteId,
-                    context_references: directAgent.contextReferences,
-                  },
-                ]
-              : agentInvocations(content),
           }),
         },
       ),
@@ -110,14 +87,6 @@ export function createSpaceConversationsApi(request: SpaceRequest) {
     addConversationMessageReaction: reactionRequest(request, "PUT"),
     removeConversationMessageReaction: reactionRequest(request, "DELETE"),
   };
-}
-
-function agentInvocations(content: MessageSpan[]) {
-  const ids = new Set<string>();
-  for (const span of content) {
-    if (span.type === "mention" && "agent_id" in span && span.agent_id) ids.add(span.agent_id);
-  }
-  return [...ids].map((agent_id) => ({ agent_id }));
 }
 
 function deleteConversation(request: SpaceRequest, spaceId: string, conversationId: string) {
