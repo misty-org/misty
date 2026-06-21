@@ -1,13 +1,14 @@
+import { appIcons } from "@/shared/ui/app-icons";
 import { ChromeTabStrip } from "@/features/workspace/ChromeTabStrip";
 import { NewTabMenu } from "@/features/workspace/NewTabMenu";
-import { LibraryBig, ListChecks, MessageCircle, Notebook } from "lucide-react";
+import { LibraryBig, MessageCircle, Notebook } from "lucide-react";
 import type { SpacesTab, SpacesTabsSession } from "../store/useSpacesTabsStore";
 
 export type SpaceTabDestination = "journal" | "planner" | "social" | "library";
 
 const spaceTabOptions = [
   { id: "journal", label: "Journal", icon: Notebook },
-  { id: "planner", label: "Planner", icon: ListChecks },
+  { id: "planner", label: "Planner", icon: appIcons.planner },
   { id: "social", label: "Chat", icon: MessageCircle },
   { id: "library", label: "Library", icon: LibraryBig },
 ] satisfies ReadonlyArray<{

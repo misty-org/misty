@@ -175,6 +175,28 @@ describe("Space loading access boundary", () => {
     });
   });
 
+  it("opens a Space without requesting content owned by optional apps", async () => {
+    apiMocks.snapshot.mockResolvedValue({
+      spaces: [spaceFixture({ id: "space", permissions: { "messages.read": true } })],
+      invitations: [],
+      limits: null,
+    });
+    apiMocks.members.mockResolvedValue({ members: [member] });
+    apiMocks.messages.mockRejectedValue(new SpaceRequestError("Chat is not installed", 403));
+    apiMocks.nodes.mockRejectedValue(new SpaceRequestError("Chat is not installed", 403));
+
+    await useSpacesStore.getState().loadSpace("space");
+
+    expect(apiMocks.members).toHaveBeenCalledWith("space");
+    expect(apiMocks.messages).not.toHaveBeenCalled();
+    expect(apiMocks.nodes).not.toHaveBeenCalled();
+    expect(useSpacesStore.getState()).toMatchObject({
+      loading: false,
+      error: null,
+      membersBySpace: { space: [member] },
+    });
+  });
+
   it("locks Spaces and clears stale content when refreshing fails", async () => {
     apiMocks.snapshot.mockRejectedValue(new Error("offline"));
     useSpacesStore.setState({ spaces: [spaceFixture({ id: "stale" })] });

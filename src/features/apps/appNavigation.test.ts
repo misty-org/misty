@@ -78,7 +78,7 @@ it("retains provider shortcuts when a view closes, scoped to the account and Spa
   useAppNavigationStore.setState({ providerCache: [] });
 });
 
-it.each(["browser", "chat", "inbox", "planner", "journal", "library"])(
+it.each(["browser", "chat", "inbox", "planner", "journal", "library", "agents"])(
   "retains %s destinations without a gallery navigation row",
   (appId) => {
     const scope = createAppRpcScope({

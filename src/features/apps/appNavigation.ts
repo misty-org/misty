@@ -52,7 +52,9 @@ export function createAppNavigationRegistration(scope: AppRpcScope) {
       scope.assert("navigation.write");
       const copy = structuredClone(items);
       useAppNavigationStore.setState((state) => ({
-        ...(["browser", "chat", "inbox", "planner", "journal", "library"].includes(scope.identity.appId)
+        ...(["browser", "chat", "inbox", "planner", "journal", "library", "agents"].includes(
+          scope.identity.appId,
+        )
           ? {
               providerCache: [
                 ...state.providerCache.filter(

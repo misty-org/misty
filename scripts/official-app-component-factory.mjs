@@ -1,3 +1,5 @@
+import { build } from "esbuild";
+
 /**
  * A module import is cached by the WebView. Evaluate the bundled application
  * inside each mount instead, so its stores belong to that mount, not the account
@@ -13,7 +15,14 @@ export const componentFrameworkGlobals = {
 };
 export function officialAppComponentFactory(appId, { framework = false, runtime = false } = {}) {
   if (!/^[a-z0-9][a-z0-9_-]{0,79}$/.test(appId)) throw new Error("Invalid component app ID.");
+  let collaborationAsset;
   return {
+    async buildStart() {
+      if (appId !== "journal" || !framework) return;
+      const result = await build({ entryPoints: ["yjs"], bundle: true, write: false, format: "esm",
+        platform: "browser", target: "es2022", minify: true });
+      collaborationAsset = this.emitFile({ type: "asset", name: "collaboration.js", source: result.outputFiles[0].text });
+    },
     name: "misty-component-instance-factory",
     generateBundle(options, bundle) {
       const chunks = Object.values(bundle).filter((item) => item.type === "chunk");
@@ -23,7 +32,29 @@ export function officialAppComponentFactory(appId, { framework = false, runtime 
       }
       const chunk = chunks[0];
       const needsYjs = chunk.imports.includes("yjs");
-      chunk.code = `export default Object.freeze({
+      const libraries = collaborationAsset ? `{...input.libraries, yjs: MistyAppCollaboration}` : "input.libraries";
+      if (appId === "files" && !runtime) {
+        chunk.code = `const MistyComponentAssetBase = import.meta.url;
+        function instantiate(MistyComponentLibraries) {
+          if (!MistyComponentLibraries?.react?.version?.startsWith("19.") ||
+              !MistyComponentLibraries.reactDomClient?.createRoot)
+            throw new Error("This App requires Misty's React 19 component runtime.");
+          ${chunk.code}
+          return MistyComponentBundle.default ?? MistyComponentBundle;
+        }
+        export default Object.freeze({ appId: "files", protocol: 2,
+          createSession(input) {
+            if (input.signal.aborted) throw new Error("The downloaded App session is closed.");
+            const definition = instantiate(input.libraries);
+            return definition.createSession(input);
+          },
+          mount(input) { return instantiate(input.libraries).mount(input); }
+        });`;
+        return;
+      }
+      chunk.code = `${collaborationAsset ? `import * as MistyAppCollaboration from "./${this.getFileName(collaborationAsset)}";` : ""}
+      const MistyComponentAssetBase = import.meta.url;
+      export default Object.freeze({
         appId: ${JSON.stringify(appId)}, protocol: 2,
         mount(input) {
           ${runtime ? `const lifetime = new AbortController();
@@ -34,7 +65,7 @@ export function officialAppComponentFactory(appId, { framework = false, runtime 
           const MistyComponentRuntime = Object.freeze({sdk:input.misty, signal:lifetime.signal});
           try {
           if (lifetime.signal.aborted) throw new Error("The downloaded App view is closed.");` : ""}
-          ${framework ? `const MistyComponentLibraries = input.libraries;
+          ${framework ? `const MistyComponentLibraries = ${libraries};
           if (!MistyComponentLibraries?.react?.version?.startsWith("19.") ||
               !MistyComponentLibraries.reactDomClient?.createRoot) {
             throw new Error("This App requires Misty's React 19 component runtime.");

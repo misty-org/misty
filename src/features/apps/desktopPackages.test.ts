@@ -8,7 +8,7 @@ import { desktopComponentUrl } from "./desktopAppLoader";
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 vi.mock("@/shared/platform/tauri", () => ({ hasTauriInternals: () => true }));
 vi.mock("@/api/apps/api", () => ({ localAppComponentReady: vi.fn() }));
-const app = {
+const publishedApp = {
   id: "files",
   app_id: "com.misty.files",
   name: "Files",
@@ -24,6 +24,10 @@ const app = {
     signature_key_id: "release-key",
   },
 } as OfficialApp;
+const app = {
+  ...publishedApp,
+  desktop: { ...publishedApp.desktop, entry: "/__misty-local-apps/files/desktop/app.js" },
+};
 beforeEach(() => {
   vi.clearAllMocks();
   vi.stubEnv("DEV", true);
@@ -50,10 +54,33 @@ it("reports a missing local build without falling back to the published ZIP", as
 it("keeps the signed installer for production builds", async () => {
   vi.stubEnv("DEV", false);
   vi.mocked(invoke).mockResolvedValue("operation");
-  expect(await stageOfficialDesktopPackage(app)).toBe("operation");
+  expect(await stageOfficialDesktopPackage(publishedApp)).toBe("operation");
   expect(invoke).toHaveBeenCalledWith(
     "install_plugin_bundle",
-    expect.objectContaining({ url: app.desktop.entry, signature: "release-signature" }),
+    expect.objectContaining({ url: publishedApp.desktop.entry, signature: "release-signature" }),
   );
+  expect(localAppComponentReady).not.toHaveBeenCalled();
+});
+
+it("loads immutable package URLs independently for different releases", () => {
+  vi.stubEnv("DEV", false);
+  const first = desktopComponentUrl(publishedApp);
+  const second = desktopComponentUrl({
+    ...publishedApp,
+    version: "2",
+    desktop: { ...publishedApp.desktop, sha256: "another-release" },
+  });
+  expect(first.pathname).toBe("/public/releases/release-hash/files/web/app.js");
+  expect(second.pathname).toBe("/public/releases/another-release/files/web/app.js");
+  expect(first.pathname).not.toBe(second.pathname);
+});
+
+it("downloads the signed local ZIP when a development component needs native services", async () => {
+  vi.mocked(invoke).mockResolvedValue("operation");
+  await stageOfficialDesktopPackage(app, true);
+  expect(invoke).toHaveBeenCalledWith("install_plugin_bundle", expect.objectContaining({
+    url: new URL(`/official-apps/files/${app.version}/desktop.zip`, window.location.origin).href,
+    sha256: app.desktop.sha256, signature: app.desktop.signature,
+  }));
   expect(localAppComponentReady).not.toHaveBeenCalled();
 });

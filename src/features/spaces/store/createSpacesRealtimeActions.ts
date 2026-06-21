@@ -195,6 +195,12 @@ export async function applyRealtimeEvent(
   const generation = readAccountGeneration();
   writeRealtimeCursor(accountId, event.id);
   const permissions = get().spaces.find((space) => space.id === event.space_id)?.permissions;
+  if (event.type === "apps.changed")
+    window.dispatchEvent(
+      new CustomEvent("misty:space-apps-changed", {
+        detail: { accountId, spaceId: event.space_id },
+      }),
+    );
   if (event.type.startsWith("message.") && permissions?.["messages.read"] !== false) {
     const includedMessage = messageFromSpaceEvent(event);
     const conversationId =

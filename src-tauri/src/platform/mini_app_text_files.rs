@@ -61,8 +61,8 @@ pub(super) fn execute(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::FileGrant;
+    use super::*;
 
     fn fixture(writable: bool) -> PermissionSet {
         let mut permissions = PermissionSet::from_document(

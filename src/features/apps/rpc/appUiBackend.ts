@@ -1,3 +1,6 @@
+import { allLayoutPanes, layoutTabs } from "@/features/workspace/layoutTabs";
+import { useActivityStore } from "@/features/activity/useActivityStore";
+import { systemErrorMessage } from "@/features/activity/systemActivity";
 import { MistyViewStateSchema, type MistyViewState, commandsForApp } from "@misty/sdk";
 import {
   selectGeneralPreferences,
@@ -60,7 +63,7 @@ export function createAppUiBackend(scope: AppRpcScope): AppUiBackend {
       (scope.identity.spaceId ? `space:${scope.identity.spaceId}` : "global")
     )
       throw new AppRpcError("view_closed", "The App's Space is no longer active.");
-    const pane = dockLeaves(state.layout.root).find((pane) =>
+    const pane = allLayoutPanes(state.layout).find((pane) =>
       pane.tabs.some((tab) => tab.id === scope.identity.instanceId && isOwned(tab)),
     );
     if (!pane) throw new AppRpcError("view_closed", "The App's workspace view is no longer open.");
@@ -77,7 +80,7 @@ export function createAppUiBackend(scope: AppRpcScope): AppUiBackend {
   };
   const target = (viewId: string) => {
     const { state } = ownedPane();
-    for (const pane of dockLeaves(state.layout.root)) {
+    for (const pane of allLayoutPanes(state.layout)) {
       const tab = pane.tabs.find((tab) => tab.id === viewId && isOwned(tab));
       if (tab) return { state, pane, tab };
     }
@@ -115,7 +118,7 @@ export function createAppUiBackend(scope: AppRpcScope): AppUiBackend {
     workspaceSnapshot() {
       const { state } = ownedPane();
       const snapshot = {
-        views: dockLeaves(state.layout.root).flatMap((pane) =>
+        views: allLayoutPanes(state.layout).flatMap((pane) =>
           pane.tabs.filter(isOwned).map((tab) => ({
             viewId: tab.id,
             panelId: pane.id,
@@ -127,7 +130,9 @@ export function createAppUiBackend(scope: AppRpcScope): AppUiBackend {
                 .slice(0, 160) || "App",
             state: stateFor(tab),
             sidebarVisible: tab.sidebarVisible,
-            active: pane.activeTabId === tab.id,
+            active:
+              dockLeaves(state.layout.root).some((active) => active.id === pane.id) &&
+              pane.activeTabId === tab.id,
             focused: state.layout.focusedPaneId === pane.id && pane.activeTabId === tab.id,
           })),
         ),
@@ -158,19 +163,19 @@ export function createAppUiBackend(scope: AppRpcScope): AppUiBackend {
     placeWorkspace({ viewId, targetViewId, placement }) {
       const source = target(viewId),
         destination = target(targetViewId);
-      if (source.pane.id === destination.pane.id && placement === "tab") {
-        source.state.focusTab(viewId);
+      if (placement === "tab") {
+        if (!source.state.detachPaneToTab(viewId)) source.state.focusTab(viewId);
         return;
       }
-      if (placement !== "tab" && dockLeaves(source.state.layout.root).length >= maxWorkspacePanels)
-        throw new AppRpcError("panel_limit", "Close a panel before opening another.");
       if (
-        !source.state.dockTab(
-          viewId,
-          destination.pane.id,
-          placement === "tab" ? "center" : placement,
-        )
+        dockLeaves(
+          layoutTabs(source.state.layout).find((tab) =>
+            dockLeaves(tab.root).some((pane) => pane.id === destination.pane.id),
+          )!.root,
+        ).length >= maxWorkspacePanels
       )
+        throw new AppRpcError("panel_limit", "Close a panel before opening another.");
+      if (!source.state.dockTab(viewId, destination.pane.id, placement))
         throw new AppRpcError(
           "panel_unavailable",
           "The App view could not be placed in that panel.",
@@ -205,10 +210,17 @@ export function createAppUiBackend(scope: AppRpcScope): AppUiBackend {
           "invalid_navigation",
           "The requested view is outside this App's workspace.",
         );
-      if (placement !== "tab" && dockLeaves(state.layout.root).length >= maxWorkspacePanels)
+      if (
+        placement !== "tab" &&
+        dockLeaves(
+          layoutTabs(state.layout).find((tab) =>
+            dockLeaves(tab.root).some((item) => item.id === pane.id),
+          )!.root,
+        ).length >= maxWorkspacePanels
+      )
         throw new AppRpcError("panel_limit", "Close a panel before opening another.");
       if (
-        dockLeaves(state.layout.root)
+        allLayoutPanes(state.layout)
           .flatMap((pane) => pane.tabs)
           .filter(isOwned).length >= 128
       )
@@ -292,12 +304,35 @@ export function createAppUiBackend(scope: AppRpcScope): AppUiBackend {
         return;
       await openSystemExternalLink(href);
     },
+    reportOperation(event) {
+      scope.assert();
+      useActivityStore.getState().ingestLocal({
+        id: `app-operation:${scope.identity.appId}:${scope.identity.spaceId ?? "personal"}:${event.operationId}`,
+        accountId: scope.identity.accountId,
+        appId: scope.identity.appId,
+        spaceId: scope.identity.spaceId,
+        sourceLabel: scope.identity.appId,
+        revision: event.revision,
+        status: event.status,
+        lifecycle: event.status === "blocked" ? "request" : "update",
+        kind:
+          event.status === "blocked"
+            ? "failure"
+            : event.status === "completed"
+              ? "completion"
+              : "system",
+        title: event.title,
+        body: event.body ? systemErrorMessage(event.body) : "",
+        target: { kind: "route", href: event.route! },
+      });
+    },
     reportError(message) {
       scope.assert();
       reportSystemError({
         accountId: scope.identity.accountId,
         error: message,
-        scope: `app:${scope.identity.appId}:${scope.identity.instanceId}`,
+        scope: `app:${scope.identity.appId}`,
+        intent: "background",
         title: `${scope.identity.appId} reported an error`,
       });
     },

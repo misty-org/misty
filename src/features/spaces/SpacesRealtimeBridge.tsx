@@ -55,6 +55,7 @@ export function SpacesRealtimeBridge() {
         accountId,
         error,
         scope: "spaces:realtime",
+        intent: "background",
         title: "Spaces needs attention",
       });
     }, 1_200);

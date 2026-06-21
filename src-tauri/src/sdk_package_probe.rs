@@ -1,17 +1,19 @@
 //! Debug-only integration harness; not registered by the normal application.
 //! Uses the real installer, signature verifier, package protocol and terminal.
+#[cfg(not(target_os = "macos"))]
+use crate::infra::{ssh_terminal, terminal};
 use crate::{
-    infra::{browser, misty, ssh_terminal, terminal},
+    infra::{browser, misty},
     platform::extension_protocol,
 };
 use std::io::Write;
 #[path = "sdk_probe_clipboard.rs"]
 mod clipboard;
-use tauri::Manager;
 use std::sync::{
     atomic::{AtomicI32, Ordering},
     Arc,
 };
+use tauri::Manager;
 
 struct ProbeState {
     nonce: String,
@@ -42,8 +44,14 @@ fn sdk_probe_complete(
 }
 
 #[tauri::command]
-fn sdk_probe_log(state: tauri::State<'_, ProbeState>, nonce: String, message: String) -> Result<(), String> {
-    if nonce != state.nonce { return Err("Invalid probe nonce".into()); }
+fn sdk_probe_log(
+    state: tauri::State<'_, ProbeState>,
+    nonce: String,
+    message: String,
+) -> Result<(), String> {
+    if nonce != state.nonce {
+        return Err("Invalid probe nonce".into());
+    }
     println!("Files probe: {message}");
     Ok(())
 }
@@ -68,38 +76,87 @@ fn sdk_probe_tamper(state: tauri::State<'_, ProbeState>, nonce: String) -> Resul
 }
 
 #[tauri::command]
-fn sdk_probe_browser_count(app: tauri::AppHandle, state: tauri::State<'_, ProbeState>, nonce: String) -> Result<usize, String> {
-    if nonce != state.nonce { return Err("Invalid probe nonce".into()); }
-    Ok(app.webviews().keys().filter(|label| label.starts_with("misty-browser-")).count())
+fn sdk_probe_browser_count(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, ProbeState>,
+    nonce: String,
+) -> Result<usize, String> {
+    if nonce != state.nonce {
+        return Err("Invalid probe nonce".into());
+    }
+    Ok(app
+        .webviews()
+        .keys()
+        .filter(|label| label.starts_with("misty-browser-"))
+        .count())
 }
 
 /// Native popup regression check. Loopback fixtures and disposable profile storage only.
 #[tauri::command]
-async fn sdk_probe_oauth_popups(app: tauri::AppHandle, state: tauri::State<'_, ProbeState>, nonce: String, origin: String) -> Result<String, String> {
-    if nonce != state.nonce { return Err("Invalid probe nonce".into()); }
+async fn sdk_probe_oauth_popups(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, ProbeState>,
+    nonce: String,
+    origin: String,
+) -> Result<String, String> {
+    if nonce != state.nonce {
+        return Err("Invalid probe nonce".into());
+    }
     browser::popup_probe::run(app, origin).await
 }
 
 #[tauri::command]
-async fn sdk_probe_browser_rendering(app: tauri::AppHandle, state: tauri::State<'_, ProbeState>, nonce: String, origin: String) -> Result<String, String> {
-    if nonce != state.nonce { return Err("Invalid probe nonce".into()); }
+async fn sdk_probe_browser_rendering(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, ProbeState>,
+    nonce: String,
+    origin: String,
+) -> Result<String, String> {
+    if nonce != state.nonce {
+        return Err("Invalid probe nonce".into());
+    }
     browser::render_probe::run(app, origin).await
 }
 
 /// Controlled synthetic content in disposable provider profiles. Never registered by the main app.
 #[tauri::command]
-async fn sdk_probe_provider_fixture(app: tauri::AppHandle, state: tauri::State<'_, ProbeState>, nonce: String, id: String, mode: String) -> Result<serde_json::Value, String> {
-    if nonce != state.nonce || !matches!(state.app_id.as_str(), "chat" | "inbox" | "journal" | "planner") { return Err("Invalid provider probe".into()); }
+async fn sdk_probe_provider_fixture(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, ProbeState>,
+    nonce: String,
+    id: String,
+    mode: String,
+) -> Result<serde_json::Value, String> {
+    if nonce != state.nonce
+        || !matches!(
+            state.app_id.as_str(),
+            "chat" | "inbox" | "journal" | "planner"
+        )
+    {
+        return Err("Invalid provider probe".into());
+    }
     if matches!(mode.as_str(), "popup-state" | "popup-close") {
         return browser::popup_probe::provider_popup_state(&app, &id, mode == "popup-close").await;
     }
-    let webview = app.get_webview(&format!("misty-browser-{id}")).ok_or("Provider view unavailable")?;
+    let webview = app
+        .get_webview(&format!("misty-browser-{id}"))
+        .ok_or("Provider view unavailable")?;
     let script = match mode.as_str() {
-        "install" => r#"if (location.protocol !== 'https:' || !document.body) return JSON.stringify({installed:false, origin:''}); window.stop(); const main = document.createElement('main'); const heading = document.createElement('h1'); heading.textContent = 'Controlled provider fixture'; const reply = document.createElement('textarea'); reply.setAttribute('aria-label', 'Reply'); const popup = document.createElement('button'); popup.textContent = 'Open authentication fixture'; popup.onclick = () => window.open('about:blank', '_blank'); main.append(heading, reply, popup); document.body.replaceChildren(main); return JSON.stringify({installed:true, origin:location.origin});"#,
-        "location" => r#"return JSON.stringify({url:location.href, origin:location.origin, ready:document.readyState});"#,
-        "store" => r#"localStorage.setItem('misty-provider-probe', 'account-one'); return JSON.stringify({stored:true, origin:location.origin});"#,
-        "blocked-frame" => r#"const frame = document.createElement('iframe'); frame.src = 'https://outside-provider.invalid/embedded-frame'; document.body.append(frame); return JSON.stringify({created:true});"#,
-        "state" => r#"return JSON.stringify({marker:localStorage.getItem('misty-provider-probe'), opener:!!window.opener, origin:location.origin, draft:document.querySelector('textarea')?.value || ''});"#,
+        "install" => {
+            r#"if (location.protocol !== 'https:' || !document.body) return JSON.stringify({installed:false, origin:''}); window.stop(); const main = document.createElement('main'); const heading = document.createElement('h1'); heading.textContent = 'Controlled provider fixture'; const reply = document.createElement('textarea'); reply.setAttribute('aria-label', 'Reply'); const popup = document.createElement('button'); popup.textContent = 'Open authentication fixture'; popup.onclick = () => window.open('about:blank', '_blank'); main.append(heading, reply, popup); document.body.replaceChildren(main); return JSON.stringify({installed:true, origin:location.origin});"#
+        }
+        "location" => {
+            r#"return JSON.stringify({url:location.href, origin:location.origin, ready:document.readyState});"#
+        }
+        "store" => {
+            r#"localStorage.setItem('misty-provider-probe', 'account-one'); return JSON.stringify({stored:true, origin:location.origin});"#
+        }
+        "blocked-frame" => {
+            r#"const frame = document.createElement('iframe'); frame.src = 'https://outside-provider.invalid/embedded-frame'; document.body.append(frame); return JSON.stringify({created:true});"#
+        }
+        "state" => {
+            r#"return JSON.stringify({marker:localStorage.getItem('misty-provider-probe'), opener:!!window.opener, origin:location.origin, draft:document.querySelector('textarea')?.value || ''});"#
+        }
         _ => return Err("Unknown provider fixture operation".into()),
     };
     let raw = crate::infra::evaluate_probe_javascript(webview, script.to_owned()).await?;
@@ -108,12 +165,24 @@ async fn sdk_probe_provider_fixture(app: tauri::AppHandle, state: tauri::State<'
 
 /// Exercise scrolling in the disposable native zoom fixture only.
 #[tauri::command]
-async fn sdk_probe_browser_zoom_state(app: tauri::AppHandle, state: tauri::State<'_, ProbeState>, nonce: String, scroll: bool, reset_fixture: Option<bool>, smooth_scroll: Option<bool>) -> Result<serde_json::Value, String> {
-    if nonce != state.nonce || state.app_id != "browser" { return Err("Invalid zoom probe".into()); }
-    let webview = app.get_webview("misty-browser-zoom-probe").ok_or("Zoom probe unavailable")?;
+async fn sdk_probe_browser_zoom_state(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, ProbeState>,
+    nonce: String,
+    scroll: bool,
+    reset_fixture: Option<bool>,
+    smooth_scroll: Option<bool>,
+) -> Result<serde_json::Value, String> {
+    if nonce != state.nonce || state.app_id != "browser" {
+        return Err("Invalid zoom probe".into());
+    }
+    let webview = app
+        .get_webview("misty-browser-zoom-probe")
+        .ok_or("Zoom probe unavailable")?;
     let reset_fixture = reset_fixture.unwrap_or(false);
     let smooth_scroll = smooth_scroll.unwrap_or(false);
-    let script = format!(r#"
+    let script = format!(
+        r#"
       if ({smooth_scroll}) {{
         if (!['127.0.0.1','localhost'].includes(location.hostname) || !location.pathname.endsWith('/sdk-browser-zoom-page.html')) throw new Error('Scrolling probe requires its local fixture');
         return JSON.stringify(await window.runScrollingProbe());
@@ -129,55 +198,102 @@ async fn sdk_probe_browser_zoom_state(app: tauri::AppHandle, state: tauri::State
         bar: {{display:getComputedStyle(root, '::-webkit-scrollbar').display, height:getComputedStyle(root, '::-webkit-scrollbar').height}},
         fixed: Array.from(document.querySelectorAll('body *')).filter(e => getComputedStyle(e).position === 'fixed').slice(0,15).map(e => ({{tag:e.tagName,id:e.id,width:e.scrollWidth,right:e.getBoundingClientRect().right}}))
       }});
-    "#);
+    "#
+    );
     let raw = crate::infra::evaluate_probe_javascript(webview, script).await?;
-    serde_json::from_str(&raw).map_err(|error|error.to_string())
+    serde_json::from_str(&raw).map_err(|error| error.to_string())
 }
 
 #[tauri::command]
-fn sdk_probe_downloads(state: tauri::State<'_, ProbeState>, nonce: String) -> Result<Vec<String>, String> {
-    if nonce != state.nonce { return Err("Invalid probe nonce".into()); }
-    if !state.downloads.exists() { return Ok(Vec::new()); }
-    std::fs::read_dir(&state.downloads).map_err(|error| error.to_string())?
+fn sdk_probe_downloads(
+    state: tauri::State<'_, ProbeState>,
+    nonce: String,
+) -> Result<Vec<String>, String> {
+    if nonce != state.nonce {
+        return Err("Invalid probe nonce".into());
+    }
+    if !state.downloads.exists() {
+        return Ok(Vec::new());
+    }
+    std::fs::read_dir(&state.downloads)
+        .map_err(|error| error.to_string())?
         .map(|entry| {
             let path = entry.map_err(|error| error.to_string())?.path();
             if path.metadata().map_err(|error| error.to_string())?.len() > 1024 {
                 return Err("Probe download exceeded fixture size".into());
             }
             std::fs::read_to_string(path).map_err(|error| error.to_string())
-        }).collect()
+        })
+        .collect()
 }
 
 #[tauri::command]
-async fn sdk_probe_clipboard_call(app: tauri::AppHandle, webview: tauri::Webview, probe: tauri::State<'_, ProbeState>, state: tauri::State<'_, crate::platform::mini_app::MiniAppState>, nonce: String, instance: String, method: String, params: serde_json::Value) -> Result<serde_json::Value, String> {
-    if nonce != probe.nonce { return Err("Invalid probe nonce".into()); }
+async fn sdk_probe_clipboard_call(
+    app: tauri::AppHandle,
+    webview: tauri::Webview,
+    probe: tauri::State<'_, ProbeState>,
+    state: tauri::State<'_, crate::platform::mini_app::MiniAppState>,
+    nonce: String,
+    instance: String,
+    method: String,
+    params: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    if nonce != probe.nonce {
+        return Err("Invalid probe nonce".into());
+    }
     clipboard::call(app, webview, state, instance, method, params).await
 }
 
 #[tauri::command]
-fn sdk_probe_exports(state: tauri::State<'_, ProbeState>, nonce: String) -> Result<Vec<serde_json::Value>, String> {
-    if nonce != state.nonce { return Err("Invalid probe nonce".into()); }
-    std::fs::read_dir(&state.exports).map_err(|error| error.to_string())?.map(|entry| {
-        let path = entry.map_err(|error| error.to_string())?.path();
-        let size = path.metadata().map_err(|error| error.to_string())?.len();
-        if size > 10 * 1024 * 1024 { return Err("Probe export exceeded fixture limit".into()); }
-        let text = std::fs::read_to_string(&path).map_err(|error| error.to_string())?;
-        Ok(serde_json::json!({"name":path.file_name().unwrap().to_string_lossy(),"text":text}))
-    }).collect()
+fn sdk_probe_exports(
+    state: tauri::State<'_, ProbeState>,
+    nonce: String,
+) -> Result<Vec<serde_json::Value>, String> {
+    if nonce != state.nonce {
+        return Err("Invalid probe nonce".into());
+    }
+    std::fs::read_dir(&state.exports)
+        .map_err(|error| error.to_string())?
+        .map(|entry| {
+            let path = entry.map_err(|error| error.to_string())?.path();
+            let size = path.metadata().map_err(|error| error.to_string())?.len();
+            if size > 10 * 1024 * 1024 {
+                return Err("Probe export exceeded fixture limit".into());
+            }
+            let text = std::fs::read_to_string(&path).map_err(|error| error.to_string())?;
+            Ok(serde_json::json!({"name":path.file_name().unwrap().to_string_lossy(),"text":text}))
+        })
+        .collect()
 }
 
 // Production ciphertext storage with a disposable cache root for this harness.
 #[tauri::command]
-async fn mail_cache_read(state: tauri::State<'_, ProbeState>, account_id: String) -> Result<Option<String>, String> {
-    crate::infra::mail_cache::read(&state.data_root.join("cache"), &account_id).await.map_err(|error| error.to_string())
+async fn mail_cache_read(
+    state: tauri::State<'_, ProbeState>,
+    account_id: String,
+) -> Result<Option<String>, String> {
+    crate::infra::mail_cache::read(&state.data_root.join("cache"), &account_id)
+        .await
+        .map_err(|error| error.to_string())
 }
 #[tauri::command]
-async fn mail_cache_write(state: tauri::State<'_, ProbeState>, account_id: String, value: String) -> Result<(), String> {
-    crate::infra::mail_cache::write(&state.data_root.join("cache"), &account_id, &value).await.map_err(|error| error.to_string())
+async fn mail_cache_write(
+    state: tauri::State<'_, ProbeState>,
+    account_id: String,
+    value: String,
+) -> Result<(), String> {
+    crate::infra::mail_cache::write(&state.data_root.join("cache"), &account_id, &value)
+        .await
+        .map_err(|error| error.to_string())
 }
 #[tauri::command]
-async fn mail_cache_remove(state: tauri::State<'_, ProbeState>, account_id: String) -> Result<(), String> {
-    crate::infra::mail_cache::remove(&state.data_root.join("cache"), &account_id).await.map_err(|error| error.to_string())
+async fn mail_cache_remove(
+    state: tauri::State<'_, ProbeState>,
+    account_id: String,
+) -> Result<(), String> {
+    crate::infra::mail_cache::remove(&state.data_root.join("cache"), &account_id)
+        .await
+        .map_err(|error| error.to_string())
 }
 
 pub fn run(mut context: tauri::Context<tauri::Wry>) {
@@ -194,25 +310,45 @@ pub fn run(mut context: tauri::Context<tauri::Wry>) {
     let names_probe = std::env::var("MISTY_NAVIGATION_NAMES_PROBE").as_deref() == Ok("1");
     let page = match app_id.as_str() {
         _ if names_probe => "navigation-names-probe.html",
-        _ if std::env::var("MISTY_SDK_PROBE_BROWSER_RENDERING").as_deref() == Ok("1") => "sdk-browser-render-probe.html",
-        _ if std::env::var("MISTY_SDK_PROBE_OAUTH_POPUPS").as_deref() == Ok("1") => "sdk-oauth-popup-probe.html",
-        "journal" | "planner" if std::env::var("MISTY_SDK_PROBE_WEBSITE_APPS").as_deref() == Ok("1") => "sdk-website-integrations-probe.html",
+        _ if std::env::var("MISTY_SDK_PROBE_BROWSER_RENDERING").as_deref() == Ok("1") => {
+            "sdk-browser-render-probe.html"
+        }
+        _ if std::env::var("MISTY_SDK_PROBE_OAUTH_POPUPS").as_deref() == Ok("1") => {
+            "sdk-oauth-popup-probe.html"
+        }
+        "journal" | "planner"
+            if std::env::var("MISTY_SDK_PROBE_WEBSITE_APPS").as_deref() == Ok("1") =>
+        {
+            "sdk-website-integrations-probe.html"
+        }
         "chat" => "sdk-provider-probe.html",
-        "inbox" if std::env::var("MISTY_SDK_PROBE_PROVIDER").as_deref() == Ok("1") => "sdk-provider-probe.html",
+        "inbox" if std::env::var("MISTY_SDK_PROBE_PROVIDER").as_deref() == Ok("1") => {
+            "sdk-provider-probe.html"
+        }
         "inbox" => "sdk-inbox-host-probe.html",
         "terminal" => "sdk-component-probe.html",
         "files" => "sdk-local-files-probe.html",
         "planner" => "sdk-planner-probe.html",
-        "browser" if std::env::var("MISTY_SDK_PROBE_ZOOM").as_deref() == Ok("1") => "sdk-browser-zoom-probe.html",
-        "browser" if std::env::var("MISTY_SDK_PROBE_HOST").as_deref() == Ok("1") => "sdk-browser-host-probe.html",
+        "browser" if std::env::var("MISTY_SDK_PROBE_ZOOM").as_deref() == Ok("1") => {
+            "sdk-browser-zoom-probe.html"
+        }
+        "browser" if std::env::var("MISTY_SDK_PROBE_HOST").as_deref() == Ok("1") => {
+            "sdk-browser-host-probe.html"
+        }
         "browser" => "sdk-browser-probe.html",
-        "journal" if std::env::var("MISTY_SDK_PROBE_HOST").as_deref() == Ok("1") => "sdk-journal-host-probe.html",
+        "journal" if std::env::var("MISTY_SDK_PROBE_HOST").as_deref() == Ok("1") => {
+            "sdk-journal-host-probe.html"
+        }
         "journal" => "sdk-journal-native-probe.html",
         _ => panic!("Unsupported SDK probe App"),
     };
-    let origin = std::env::var("MISTY_SDK_PROBE_ORIGIN").unwrap_or_else(|_| "http://127.0.0.1:5173".into());
+    let origin =
+        std::env::var("MISTY_SDK_PROBE_ORIGIN").unwrap_or_else(|_| "http://127.0.0.1:5173".into());
     let origin = url::Url::parse(&origin).expect("Invalid probe origin");
-    assert!(origin.scheme() == "http" && matches!(origin.host_str(), Some("127.0.0.1" | "localhost")), "The probe requires a loopback development server");
+    assert!(
+        origin.scheme() == "http" && matches!(origin.host_str(), Some("127.0.0.1" | "localhost")),
+        "The probe requires a loopback development server"
+    );
     let mut url = origin.join(&format!("/scripts/{page}")).unwrap();
     url.query_pairs_mut()
         .append_pair("fixture", fixture.path().to_str().unwrap())
@@ -235,7 +371,11 @@ pub fn run(mut context: tauri::Context<tauri::Wry>) {
     if files_probe {
         std::fs::create_dir(fixture.path().join("source")).unwrap();
         std::fs::create_dir(fixture.path().join("destination")).unwrap();
-        std::fs::write(fixture.path().join("source/example.txt"), "Misty native Files fixture\n").unwrap();
+        std::fs::write(
+            fixture.path().join("source/example.txt"),
+            "Misty native Files fixture\n",
+        )
+        .unwrap();
     }
     // WebKit/AppKit shutdown can return zero after a requested nonzero exit.
     // Only an explicit successful report from the probe may pass this harness.
@@ -245,7 +385,10 @@ pub fn run(mut context: tauri::Context<tauri::Wry>) {
         .manage(crate::platform::mini_app::MiniAppState::default())
         .manage(crate::platform::mini_app::permissions::MiniAppProbeDirectory(exports.clone()))
         .plugin(tauri_plugin_dialog::init())
-        .manage(browser::BrowserProbeDirectories { profiles: profile.path().join("children"), downloads: fixture.path().join("downloads") })
+        .manage(browser::BrowserProbeDirectories {
+            profiles: profile.path().join("children"),
+            downloads: fixture.path().join("downloads"),
+        })
         .manage(ProbeState {
             nonce,
             data_root: data.path().to_owned(),
@@ -295,7 +438,6 @@ pub fn run(mut context: tauri::Context<tauri::Wry>) {
             crate::app::commands::search_get_status,
             crate::app::commands::storage_snapshot,
             crate::app::commands::smart_library_snapshot,
-
             sdk_probe_tamper,
             sdk_probe_browser_count,
             sdk_probe_oauth_popups,
@@ -313,15 +455,31 @@ pub fn run(mut context: tauri::Context<tauri::Wry>) {
             misty::install_plugin_bundle,
             misty::finalize_official_app_install,
             misty::official_app_package_ready,
+            misty::official_app_package_path,
             misty::scan_local_plugins,
             misty::uninstall_plugin,
+            #[cfg(not(target_os = "macos"))]
             terminal::terminal_create,
+            #[cfg(not(target_os = "macos"))]
             terminal::terminal_write,
+            #[cfg(not(target_os = "macos"))]
             terminal::terminal_resize,
+            #[cfg(not(target_os = "macos"))]
             terminal::terminal_kill,
+            #[cfg(not(target_os = "macos"))]
             ssh_terminal::terminal_ssh_environments,
+            #[cfg(not(target_os = "macos"))]
             ssh_terminal::terminal_ssh_preflight,
+            #[cfg(not(target_os = "macos"))]
             ssh_terminal::terminal_ssh_trust_host,
+            #[cfg(target_os = "macos")]
+            crate::infra::terminal_service::terminal_service_create,
+            #[cfg(target_os = "macos")]
+            crate::infra::terminal_service::terminal_service_call,
+            #[cfg(target_os = "macos")]
+            crate::infra::terminal_service::terminal_service_close,
+            #[cfg(target_os = "macos")]
+            crate::infra::terminal_service::terminal_service_request,
             sdk_probe_provider_fixture,
             sdk_probe_browser_zoom_state,
             browser::browser_webview_create,
@@ -347,7 +505,11 @@ pub fn run(mut context: tauri::Context<tauri::Wry>) {
             browser::browser_agent_execute
         ])
         .setup(move |app| {
-            if files_probe || names_probe { app.manage(crate::app::runtime::MistyRuntime::new_with_data_root(Some(file_runtime_root))); }
+            if files_probe || names_probe {
+                app.manage(crate::app::runtime::MistyRuntime::new_with_data_root(Some(
+                    file_runtime_root,
+                )));
+            }
             tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::External(url))
                 .on_page_load(|window, payload| {
                     eprintln!("SDK probe host page: {:?}", payload.event());
@@ -366,7 +528,17 @@ pub fn run(mut context: tauri::Context<tauri::Wry>) {
             app.show()?;
             let handle = app.handle().clone();
             std::thread::spawn(move || {
-                let timeout = std::env::var("MISTY_SDK_PROBE_TIMEOUT_SECONDS").ok().and_then(|value| value.parse::<u64>().ok()).map(|value| value.clamp(35, 300)).unwrap_or_else(|| if std::env::var("MISTY_SDK_PROBE_APP").as_deref() == Ok("journal") { 120 } else { 35 });
+                let timeout = std::env::var("MISTY_SDK_PROBE_TIMEOUT_SECONDS")
+                    .ok()
+                    .and_then(|value| value.parse::<u64>().ok())
+                    .map(|value| value.clamp(35, 300))
+                    .unwrap_or_else(|| {
+                        if std::env::var("MISTY_SDK_PROBE_APP").as_deref() == Ok("journal") {
+                            120
+                        } else {
+                            35
+                        }
+                    });
                 std::thread::sleep(std::time::Duration::from_secs(timeout));
                 eprintln!("SDK package probe watchdog expired");
                 handle.exit(1);

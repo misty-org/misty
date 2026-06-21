@@ -36,6 +36,10 @@ pub enum PeerRequest {
     Stat {
         path: String,
     },
+    ReadLink {
+        path: String,
+        expected_snapshot: Option<String>,
+    },
     ReadFile {
         path: String,
         offset: u64,
@@ -84,6 +88,10 @@ pub enum PeerResponse {
     },
     Stat {
         entry: PeerEntry,
+    },
+    Symlink {
+        target: Vec<u8>,
+        snapshot: String,
     },
     FileRange {
         snapshot: String,
@@ -163,6 +171,7 @@ pub struct PeerRoot {
 pub enum PeerRootKind {
     System,
     Volume,
+    Folder,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -262,6 +271,30 @@ pub struct PeerTicketClaims {
     pub exp: i64,
 }
 
+pub const SPACE_DEVICE_PROTOCOL_VERSION: &str = "misty-device/2";
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SpacePeerTicketClaims {
+    #[serde(flatten)]
+    pub peer: PeerTicketClaims,
+    pub space_id: String,
+    pub app_id: String,
+    pub installed_version: String,
+    pub authority_generation: i64,
+}
+
+/// Obtained from the active installation and paired devices, never from a ticket.
+pub struct SpacePeerAuthority<'a> {
+    pub space_id: &'a str,
+    pub installed_version: &'a str,
+    pub authority_generation: i64,
+    pub source_device_id: &'a str,
+    pub target_device_id: &'a str,
+    pub source_endpoint_id: &'a str,
+    pub target_endpoint_id: &'a str,
+}
+
 #[derive(Debug, Deserialize)]
 struct TicketHeader {
     alg: String,
@@ -343,6 +376,41 @@ pub fn verify_peer_ticket(
     now_unix: i64,
     used_ticket_ids: &mut HashMap<String, i64>,
 ) -> ApiResult<PeerTicketClaims> {
+    let claims: PeerTicketClaims = verify_signed_peer_ticket(ticket, keys)?;
+    if claims.iss != "misty-api"
+        || claims.aud != DEVICE_PROTOCOL_VERSION
+        || claims.protocol_version != DEVICE_PROTOCOL_VERSION
+        || claims.source_endpoint_id != expected_source_endpoint
+        || claims.target_endpoint_id != expected_target_endpoint
+        || claims.iat > now_unix.saturating_add(30)
+        || claims.exp <= now_unix
+        || claims
+            .exp
+            .checked_sub(claims.iat)
+            .is_none_or(|lifetime| !(1..=300).contains(&lifetime))
+        || claims.jti.is_empty()
+    {
+        return Err(ApiError::Message(
+            "Peer ticket is expired or does not authorize this connection.".to_owned(),
+        ));
+    }
+    used_ticket_ids.retain(|_, expires| *expires > now_unix);
+    if used_ticket_ids.contains_key(&claims.jti) {
+        return Err(ApiError::Message(
+            "Peer ticket has already been used.".to_owned(),
+        ));
+    }
+    used_ticket_ids.insert(claims.jti.clone(), claims.exp);
+    Ok(claims)
+}
+
+fn verify_signed_peer_ticket<T: DeserializeOwned>(
+    ticket: &str,
+    keys: &HashMap<String, VerifyingKey>,
+) -> ApiResult<T> {
+    if ticket.len() > 16384 {
+        return Err(ApiError::Message("Peer ticket exceeds its limit.".into()));
+    }
     let parts: Vec<&str> = ticket.split('.').collect();
     if parts.len() != 3 {
         return Err(ApiError::Message("Peer ticket is malformed.".to_owned()));
@@ -368,28 +436,67 @@ pub fn verify_peer_ticket(
         .map_err(|_| ApiError::Message("Peer ticket signature is malformed.".to_owned()))?;
     key.verify(format!("{}.{}", parts[0], parts[1]).as_bytes(), &signature)
         .map_err(|_| ApiError::Message("Peer ticket signature is invalid.".to_owned()))?;
-    let claims: PeerTicketClaims = decode_jwt_part(parts[1])?;
-    if claims.iss != "misty-api"
-        || claims.aud != DEVICE_PROTOCOL_VERSION
-        || claims.protocol_version != DEVICE_PROTOCOL_VERSION
-        || claims.source_endpoint_id != expected_source_endpoint
-        || claims.target_endpoint_id != expected_target_endpoint
-        || claims.iat > now_unix + 30
-        || claims.exp <= now_unix
-        || claims.exp - claims.iat > 300
-        || claims.jti.is_empty()
+    decode_jwt_part(parts[1])
+}
+
+pub fn verify_space_peer_ticket(
+    ticket: &str,
+    keys: &HashMap<String, VerifyingKey>,
+    expected: &SpacePeerAuthority<'_>,
+    now_unix: i64,
+    used_ticket_ids: &mut HashMap<String, i64>,
+) -> ApiResult<SpacePeerTicketClaims> {
+    let claims: SpacePeerTicketClaims = verify_signed_peer_ticket(ticket, keys)?;
+    let peer = &claims.peer;
+    if expected.space_id.is_empty()
+        || expected.installed_version.is_empty()
+        || expected.authority_generation < 1
+        || claims.space_id != expected.space_id
+        || claims.app_id != "files"
+        || claims.installed_version != expected.installed_version
+        || claims.authority_generation != expected.authority_generation
+        || peer.iss != "misty-api"
+        || peer.aud != SPACE_DEVICE_PROTOCOL_VERSION
+        || peer.protocol_version != SPACE_DEVICE_PROTOCOL_VERSION
+        || peer.source_device_id != expected.source_device_id
+        || peer.target_device_id != expected.target_device_id
+        || peer.source_endpoint_id != expected.source_endpoint_id
+        || peer.target_endpoint_id != expected.target_endpoint_id
+        || peer.source_device_id.is_empty()
+        || peer.target_device_id.is_empty()
+        || peer.source_device_id == peer.target_device_id
+        || peer.source_endpoint_id.is_empty()
+        || peer.target_endpoint_id.is_empty()
+        || peer.pair_id.is_empty()
+        || peer.jti.is_empty()
+        || peer.iat > now_unix.saturating_add(30)
+        || peer.exp <= now_unix
+        || peer
+            .exp
+            .checked_sub(peer.iat)
+            .is_none_or(|lifetime| !(1..=300).contains(&lifetime))
+        || !peer
+            .permissions
+            .iter()
+            .any(|permission| permission == "files:read")
+        || peer.permissions.iter().any(|permission| {
+            !matches!(
+                permission.as_str(),
+                "roots:read" | "files:read" | "directories:subscribe"
+            )
+        })
     {
         return Err(ApiError::Message(
-            "Peer ticket is expired or does not authorize this connection.".to_owned(),
+            "Peer ticket does not authorize this Space installation and device pair.".into(),
         ));
     }
     used_ticket_ids.retain(|_, expires| *expires > now_unix);
-    if used_ticket_ids.contains_key(&claims.jti) {
+    if used_ticket_ids.contains_key(&peer.jti) {
         return Err(ApiError::Message(
-            "Peer ticket has already been used.".to_owned(),
+            "Peer ticket has already been used.".into(),
         ));
     }
-    used_ticket_ids.insert(claims.jti.clone(), claims.exp);
+    used_ticket_ids.insert(peer.jti.clone(), peer.exp);
     Ok(claims)
 }
 
@@ -490,6 +597,105 @@ mod tests {
             "endpoint-b",
             1_300,
             &mut HashMap::new(),
+        )
+        .is_err());
+    }
+    #[test]
+    fn space_tickets_bind_installation_devices_permissions_and_replay() {
+        use serde_json::json;
+        let signing = SigningKey::from_bytes(&[8u8; 32]);
+        let keys = HashMap::from([("current".to_string(), signing.verifying_key())]);
+        let expected = SpacePeerAuthority {
+            space_id: "family",
+            installed_version: "1.1.5",
+            authority_generation: 7,
+            source_device_id: "device-a",
+            target_device_id: "device-b",
+            source_endpoint_id: "endpoint-a",
+            target_endpoint_id: "endpoint-b",
+        };
+        let claims = json!({"iss":"misty-api","aud":"misty-device/2","protocolVersion":"misty-device/2","jti":"space-ticket","pairId":"pair-1",
+            "sourceDeviceId":"device-a","targetDeviceId":"device-b","sourceEndpointId":"endpoint-a","targetEndpointId":"endpoint-b",
+            "spaceId":"family","appId":"files","installedVersion":"1.1.5","authorityGeneration":7,
+            "permissions":["files:read","roots:read","directories:subscribe"],"iat":1000,"exp":1300});
+        let sign = |claims: &serde_json::Value| {
+            let header = URL_SAFE_NO_PAD.encode(br#"{"alg":"EdDSA","kid":"current"}"#);
+            let payload = URL_SAFE_NO_PAD.encode(serde_json::to_vec(claims).unwrap());
+            let input = format!("{header}.{payload}");
+            format!(
+                "{input}.{}",
+                URL_SAFE_NO_PAD.encode(signing.sign(input.as_bytes()).to_bytes())
+            )
+        };
+        let ticket = sign(&claims);
+        let mut replay = HashMap::new();
+        for (field, value) in [
+            ("spaceId", json!("work")),
+            ("appId", json!("terminal")),
+            ("installedVersion", json!("1.1.4")),
+            ("authorityGeneration", json!(6)),
+            ("sourceDeviceId", json!("device-c")),
+            ("targetDeviceId", json!("device-c")),
+            ("sourceEndpointId", json!("endpoint-c")),
+            ("targetEndpointId", json!("endpoint-c")),
+            ("aud", json!("misty-device/1")),
+            ("protocolVersion", json!("misty-device/1")),
+            ("permissions", json!(["files:read", "clipboard:send"])),
+            ("permissions", json!([])),
+            ("iat", json!(1040)),
+            ("exp", json!(1001)),
+        ] {
+            let mut changed = claims.clone();
+            changed[field] = value;
+            assert!(
+                verify_space_peer_ticket(&sign(&changed), &keys, &expected, 1001, &mut replay)
+                    .is_err(),
+                "accepted {field}"
+            );
+            assert!(replay.is_empty(), "invalid ticket consumed replay state");
+        }
+        let mut missing = claims.clone();
+        missing.as_object_mut().unwrap().remove("spaceId");
+        assert!(
+            verify_space_peer_ticket(&sign(&missing), &keys, &expected, 1001, &mut replay).is_err()
+        );
+        let mut overflow = claims.clone();
+        overflow["iat"] = json!(i64::MIN);
+        overflow["exp"] = json!(i64::MAX);
+        assert!(
+            verify_space_peer_ticket(&sign(&overflow), &keys, &expected, 1001, &mut replay)
+                .is_err()
+        );
+        assert!(verify_peer_ticket(
+            &ticket,
+            &keys,
+            "endpoint-a",
+            "endpoint-b",
+            1001,
+            &mut replay
+        )
+        .is_err());
+        let verified =
+            verify_space_peer_ticket(&ticket, &keys, &expected, 1001, &mut replay).unwrap();
+        assert_eq!(verified.authority_generation, 7);
+        assert!(verify_space_peer_ticket(&ticket, &keys, &expected, 1001, &mut replay).is_err());
+        let mut legacy = claims.clone();
+        legacy["aud"] = json!("misty-device/1");
+        legacy["protocolVersion"] = json!("misty-device/1");
+        for field in [
+            "spaceId",
+            "appId",
+            "installedVersion",
+            "authorityGeneration",
+        ] {
+            legacy.as_object_mut().unwrap().remove(field);
+        }
+        assert!(verify_space_peer_ticket(
+            &sign(&legacy),
+            &keys,
+            &expected,
+            1001,
+            &mut HashMap::new()
         )
         .is_err());
     }

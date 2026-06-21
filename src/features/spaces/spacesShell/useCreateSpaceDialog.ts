@@ -1,3 +1,6 @@
+import { appsApi, type OfficialApp } from "@/api/apps";
+import { personalSpaceTemplatesApi } from "@/api/spaces/templates";
+import { selectionComplete } from "./SpaceAppSelection";
 import { reportSystemError } from "@/features/activity";
 import { spacesApi } from "@/api/spaces/api";
 import type { SpaceIntegrationProvider, SpaceTemplate } from "@/api/spaces/dto/interfaces/types";
@@ -18,6 +21,8 @@ export function useCreateSpaceDialog(options: {
     name: string;
     template_id: string;
     integration_providers: SpaceIntegrationProvider[];
+    app_ids: string[];
+    app_permissions: Record<string, number>;
   }) => Promise<{ space: { id: string } }>;
   clearError: () => void;
 }) {
@@ -26,26 +31,46 @@ export function useCreateSpaceDialog(options: {
   const [name, setName] = useState("");
   const [step, setStep] = useState(0);
   const [templates, setTemplates] = useState<SpaceTemplate[]>([]);
-  const [templateId, setTemplateId] = useState("blank");
+  const [templateId, setTemplateIdValue] = useState("blank");
+  const [catalog, setCatalog] = useState<OfficialApp[]>([]);
+  const [selectedApps, setSelectedApps] = useState<string[]>([]);
+  const [loadError, setLoadError] = useState("");
+  const [createError, setCreateError] = useState("");
+  const setTemplateId = (id: string) => {
+    setTemplateIdValue(id);
+    setSelectedApps(templates.find((template) => template.id === id)?.app_ids ?? []);
+  };
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     if (!open || templates.length) return;
     let active = true;
-    spacesApi
-      .templates()
-      .then(({ templates: loaded }) => {
+    Promise.all([spacesApi.templates(), appsApi.catalog(), personalSpaceTemplatesApi.list()])
+      .then(([curated, apps, personal]) => {
         if (!active) return;
-        setTemplates(loaded);
+        setCatalog(apps.apps);
+        setTemplates([
+          ...curated.templates,
+          ...personal.templates.map((item) => ({
+            id: item.id,
+            name: item.name,
+            description: item.description,
+            version: item.version,
+            app_ids: item.apps.map((app) => app.app_id),
+            personal: true,
+            recommended_integrations: [],
+            seed_summary: { task_count: 0, note_count: 0, collection_count: 0 },
+          })),
+        ]);
+        setLoadError("");
       })
       .catch((error) => {
-        if (active) {
-          reportSystemError({
-            error,
-            scope: "spaces:create:templates",
-            title: "Space templates could not be loaded",
-          });
-        }
+        if (active)
+          setLoadError(
+            error instanceof Error
+              ? error.message
+              : "Templates could not be loaded. Reopen this dialog to retry.",
+          );
       });
     return () => {
       active = false;
@@ -53,6 +78,7 @@ export function useCreateSpaceDialog(options: {
   }, [open, templates.length]);
 
   const resetDraft = () => {
+    setCreateError("");
     setName("");
     setStep(0);
     setTemplateId("blank");
@@ -74,19 +100,35 @@ export function useCreateSpaceDialog(options: {
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     const trimmed = name.trim();
-    if (!trimmed || creating || step < CREATE_STEP_COUNT - 1) return;
+    if (
+      !trimmed ||
+      creating ||
+      !selectionComplete(catalog, selectedApps) ||
+      step < CREATE_STEP_COUNT - 1
+    )
+      return;
     setCreating(true);
+    setCreateError("");
     try {
       const created = await options.createSpace({
         name: trimmed,
         template_id: templateId,
         integration_providers: [],
+        app_ids: selectedApps,
+        app_permissions: Object.fromEntries(
+          catalog
+            .filter((app) => selectedApps.includes(app.id))
+            .map((app) => [app.id, app.permission_version]),
+        ),
       });
       setOpen(false);
       restoreDocumentInteractivityAfterModalClose();
       resetDraft();
       navigate(`/spaces/${encodeURIComponent(created.space.id)}/home`);
     } catch (error) {
+      setCreateError(
+        error instanceof Error ? error.message : "The Space could not be created. Try again.",
+      );
       reportSystemError({
         error,
         scope: "spaces:create",
@@ -108,6 +150,12 @@ export function useCreateSpaceDialog(options: {
     templateId,
     setTemplateId,
     creating,
+    catalog,
+    selectedApps,
+    setSelectedApps,
+    loadError,
+    createError,
+    selectionValid: selectionComplete(catalog, selectedApps),
     close,
     start,
     submit,
