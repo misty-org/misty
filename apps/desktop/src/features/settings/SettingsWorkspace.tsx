@@ -1,4 +1,7 @@
 import { memo, type ChangeEvent, type ReactNode } from "react";
+import { open } from "@tauri-apps/plugin-dialog";
+import { Link } from "react-router-dom";
+import { useShallow } from "zustand/react/shallow";
 import {
   Bell,
   Check,
@@ -10,6 +13,7 @@ import {
   Rows3,
   Settings2,
   Trash2,
+  UserCircle,
   type LucideIcon,
 } from "lucide-react";
 import { useAppStore } from "../../app/useAppStore";
@@ -19,9 +23,14 @@ import {
   useAppThemeStore,
 } from "../../app/useAppThemeStore";
 import type { OpenWithAssociation, ShortcutBinding } from "../../api/types";
-import { useSettingsStore } from "./useSettingsStore";
+import {
+  fontLabelFromPath,
+  selectCustomFontPreferences,
+  useSettingsStore,
+  type CustomFontPreference,
+} from "./useSettingsStore";
 
-type SettingsSection = "general" | "appearance" | "privacy" | "sync" | "notifications" | "shortcuts" | "advanced";
+type SettingsSection = "general" | "appearance" | "account" | "privacy" | "sync" | "notifications" | "shortcuts" | "advanced";
 type SettingValue = string | number | boolean | Array<Record<string, unknown>>;
 
 interface NavItem {
@@ -33,6 +42,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { id: "general", label: "General", icon: Rows3 },
   { id: "appearance", label: "Appearance", icon: Eye },
+  { id: "account", label: "Account", icon: UserCircle },
   { id: "privacy", label: "Privacy", icon: Lock },
   { id: "sync", label: "Sync", icon: RefreshCcw },
   { id: "notifications", label: "Notifications", icon: Bell },
@@ -40,7 +50,7 @@ const navItems: NavItem[] = [
   { id: "advanced", label: "Advanced", icon: Settings2 },
 ];
 
-const startupViewOptions = ["Files", "Providers", "Activity"];
+const startupViewOptions = ["Files", "Providers", "Activity", "Transfers", "Plugins", "Hub", "Settings"];
 const releaseChannelOptions = ["Stable"];
 const defaultFileActionOptions = ["Open", "Preview", "Show Details"];
 const transferBehaviorOptions = ["Ask Every Time", "Use Default Location"];
@@ -62,7 +72,19 @@ export const SettingsWorkspace = memo(function SettingsWorkspace() {
     removeOpenWithAssociation,
     setShortcut,
     saveShortcuts,
-  } = useSettingsStore();
+  } = useSettingsStore(useShallow((state) => ({
+    activeSection: state.activeSection,
+    settings: state.settings,
+    openWithAssociations: state.openWithAssociations,
+    shortcuts: state.shortcuts,
+    working: state.working,
+    setActiveSection: state.setActiveSection,
+    updateSetting: state.updateSetting,
+    load: state.load,
+    removeOpenWithAssociation: state.removeOpenWithAssociation,
+    setShortcut: state.setShortcut,
+    saveShortcuts: state.saveShortcuts,
+  })));
   const app = useAppStore((state) => state.app);
   const document = settings?.document ?? {};
   const title = navItems.find((item) => item.id === activeSection)?.label ?? "General";
@@ -104,6 +126,7 @@ export const SettingsWorkspace = memo(function SettingsWorkspace() {
           <h1>{title}</h1>
           {activeSection === "general" ? <GeneralSettings {...controlProps} /> : null}
           {activeSection === "appearance" ? <AppearanceSettings {...controlProps} /> : null}
+          {activeSection === "account" ? <AccountSettings {...controlProps} /> : null}
           {activeSection === "privacy" ? <PrivacySettings {...controlProps} /> : null}
           {activeSection === "sync" ? <SyncSettings {...controlProps} /> : null}
           {activeSection === "notifications" ? <NotificationsSettings {...controlProps} /> : null}
@@ -266,6 +289,26 @@ function AppearanceSettings(props: SettingsContentProps) {
   const themeMode = useAppThemeStore((state) => state.themeMode);
   const setThemeMode = useAppThemeStore((state) => state.setThemeMode);
   const themeIndex = themeModeToSettingsIndex(themeMode);
+  const customFonts = selectCustomFontPreferences(props.document);
+  const updateCustomFonts = (fonts: CustomFontPreference[]) => {
+    props.onSettingChange("appearance", "custom_fonts", fonts.map((font) => ({ label: font.label, path: font.path })));
+  };
+  const addCustomFont = async () => {
+    const selection = await open({
+      title: "Select Font",
+      multiple: false,
+      directory: false,
+      filters: [{ name: "Fonts", extensions: ["ttf", "otf"] }],
+    });
+    const path = Array.isArray(selection) ? selection[0] : selection;
+    if (!path) return;
+    const existing = new Set(customFonts.map((font) => font.path));
+    if (existing.has(path)) return;
+    updateCustomFonts([...customFonts, { label: fontLabelFromPath(path), path }]);
+  };
+  const removeCustomFont = (index: number) => {
+    updateCustomFonts(customFonts.filter((_, fontIndex) => fontIndex !== index));
+  };
 
   return (
     <>
@@ -314,12 +357,34 @@ function AppearanceSettings(props: SettingsContentProps) {
 
       <SettingsSectionBlock title="Fonts">
         <SettingsNote>Add custom fallback fonts to support filenames and text in additional languages.</SettingsNote>
-        <SettingsRow label="Custom fonts" description="Configured fallback fonts available to the native renderer." last>
-          <ValueText
-            value={`${arraySetting(props.document, "appearance", "custom_fonts").length} added`}
-            muted={arraySetting(props.document, "appearance", "custom_fonts").length === 0}
-          />
-        </SettingsRow>
+        <div className="settings-reference-list settings-font-list">
+          <div className="settings-reference-row header">
+            <span>Label</span>
+            <span>Path</span>
+            <span />
+          </div>
+          {customFonts.map((font, index) => (
+            <div className="settings-reference-row" key={`${font.path}:${index}`}>
+              <span>{font.label || fontLabelFromPath(font.path)}</span>
+              <span title={font.path}>{font.path}</span>
+              <button
+                type="button"
+                className="settings-icon-danger"
+                aria-label={`Remove ${font.label || font.path}`}
+                disabled={props.working}
+                onClick={() => removeCustomFont(index)}
+              >
+                <Trash2 size={15} />
+              </button>
+            </div>
+          ))}
+          {customFonts.length === 0 ? <p className="settings-empty">No custom fonts added yet.</p> : null}
+        </div>
+        <div className="settings-inline-actions">
+          <button type="button" className="settings-control-button compact" disabled={props.working} onClick={() => void addCustomFont()}>
+            Add Font
+          </button>
+        </div>
       </SettingsSectionBlock>
 
       <SettingsSectionBlock title="Media">
@@ -336,6 +401,36 @@ function AppearanceSettings(props: SettingsContentProps) {
             disabled={props.working}
             onChange={(value) => props.onSettingChange("appearance", "reduced_motion_enabled", value)}
           />
+        </SettingsRow>
+      </SettingsSectionBlock>
+    </>
+  );
+}
+
+function AccountSettings(props: SettingsContentProps) {
+  const email = stringSetting(props.document, "account", "email", "");
+  const plan = stringSetting(props.document, "account", "subscription_plan_label", "Free");
+  const providerCount = numberSetting(props.document, "account", "connected_provider_count", 0);
+
+  return (
+    <>
+      <SettingsSectionBlock title="Profile">
+        <SettingsRow label="Signed in as" description="The account Misty uses for Hub, licensing, and product services.">
+          <ValueText value={email || "Not signed in"} muted={!email} />
+        </SettingsRow>
+        <SettingsRow label="Subscription" description="The currently cached product plan for this installation.">
+          <ValueText value={plan || "Free"} muted={!plan || plan === "Free"} />
+        </SettingsRow>
+        <SettingsRow label="Connected providers" description="Provider connections associated with this local Misty profile." last>
+          <ValueText value={String(providerCount)} muted={providerCount === 0} />
+        </SettingsRow>
+      </SettingsSectionBlock>
+
+      <SettingsSectionBlock title="Management">
+        <SettingsRow label="Misty Hub account" description="Open the embedded Hub account area for sign-in, licensing, and profile controls." last>
+          <Link className="settings-control-button settings-link-button" to="/hub/account">
+            Open Account
+          </Link>
         </SettingsRow>
       </SettingsSectionBlock>
     </>
@@ -521,7 +616,7 @@ function ShortcutsSettings(props: SettingsContentProps) {
             onChange={(value) => props.onSettingChange("shortcuts", "keymap_index", value)}
           />
         </SettingsRow>
-        <SettingsRow label="Enable custom shortcuts" description="Reserve room for per-command remapping as the shortcut editor lands." last>
+        <SettingsRow label="Enable custom shortcuts" description="Use saved per-command shortcut overrides instead of only Misty's built-in defaults." last>
           <SwitchControl
             checked={booleanSetting(props.document, "shortcuts", "custom_shortcuts_enabled", false)}
             disabled={props.working}
@@ -785,9 +880,4 @@ function booleanSetting(document: Record<string, unknown>, section: string, key:
 function stringSetting(document: Record<string, unknown>, section: string, key: string, fallback: string): string {
   const value = sectionRecord(document, section)[key];
   return typeof value === "string" ? value : fallback;
-}
-
-function arraySetting(document: Record<string, unknown>, section: string, key: string): Array<Record<string, unknown>> {
-  const value = sectionRecord(document, section)[key];
-  return Array.isArray(value) ? value.filter((entry): entry is Record<string, unknown> => !!entry && typeof entry === "object") : [];
 }

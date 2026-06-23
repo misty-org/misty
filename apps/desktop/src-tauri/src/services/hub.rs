@@ -364,8 +364,8 @@ pub fn probe_paths(paths: Vec<String>) -> Result<Vec<PathProbe>, String> {
 
 #[tauri::command]
 pub fn open_external_url(url: String) -> Result<(), String> {
-    if !(url.starts_with("https://") || url.starts_with("http://")) {
-        return Err("Only http and https links can be opened externally.".to_string());
+    if !can_open_external_url(&url) {
+        return Err("Only http, https, and mailto links can be opened externally.".to_string());
     }
 
     open_url_in_system_browser(&url)
@@ -1391,19 +1391,20 @@ fn read_local_plugin_record(
         .and_then(Value::as_bool)
         .unwrap_or(true);
 
-    let plugin_json = detail_json.unwrap_or_else(|| json!({}));
-    let id = string_field(&plugin_json, &manifest_json, "id").unwrap_or_else(|| {
+    let detail_json = detail_json.unwrap_or_else(|| json!({}));
+    let id = plugin_metadata_field(&detail_json, &manifest_json, "id").unwrap_or_else(|| {
         plugin_dir
             .file_name()
             .map(|value| value.to_string_lossy().to_string())
             .unwrap_or_else(|| "plugin".to_string())
     });
-    let name = string_field(&plugin_json, &manifest_json, "name").unwrap_or_else(|| id.clone());
-    let version = string_field(&plugin_json, &manifest_json, "version")
+    let name =
+        plugin_metadata_field(&detail_json, &manifest_json, "name").unwrap_or_else(|| id.clone());
+    let version = plugin_metadata_field(&detail_json, &manifest_json, "version")
         .unwrap_or_else(|| "0.0.0".to_string());
-    let author = string_field(&plugin_json, &manifest_json, "author").unwrap_or_default();
-    let overview = string_field(&plugin_json, &manifest_json, "overview")
-        .or_else(|| string_field(&plugin_json, &manifest_json, "description"))
+    let author = plugin_metadata_field(&detail_json, &manifest_json, "author").unwrap_or_default();
+    let overview = plugin_metadata_field(&detail_json, &manifest_json, "overview")
+        .or_else(|| plugin_metadata_field(&detail_json, &manifest_json, "description"))
         .unwrap_or_default();
     let status = if manifest_enabled {
         "installed"
@@ -1411,10 +1412,16 @@ fn read_local_plugin_record(
         "disabled"
     }
     .to_string();
-    let verified = plugin_json
+    let verified = detail_json
         .get("verified")
         .and_then(Value::as_bool)
         .or_else(|| manifest_json.get("verified").and_then(Value::as_bool))
+        .or_else(|| {
+            manifest_json
+                .get("plugin")
+                .and_then(|plugin| plugin.get("verified"))
+                .and_then(Value::as_bool)
+        })
         .unwrap_or(false);
 
     Ok(Some(LocalPluginRecord {
@@ -1431,14 +1438,14 @@ fn read_local_plugin_record(
         manifest_path: manifest_path.display().to_string(),
         plugin_dir: plugin_dir.display().to_string(),
         logo_path: plugin_logo_path(plugin_dir),
-        capabilities: string_list(&plugin_json, "capabilities"),
-        where_it_appears: string_list(&plugin_json, "where_it_appears"),
-        permissions: string_list(&plugin_json, "permissions"),
-        getting_started: string_list(&plugin_json, "getting_started"),
-        changelog: string_list(&plugin_json, "changelog"),
-        links: plugin_links(&plugin_json),
-        actions: plugin_actions(&plugin_json),
-        launcher: plugin_launcher(&plugin_json, &manifest_json),
+        capabilities: plugin_metadata_list(&detail_json, &manifest_json, "capabilities"),
+        where_it_appears: plugin_metadata_list(&detail_json, &manifest_json, "where_it_appears"),
+        permissions: plugin_metadata_list(&detail_json, &manifest_json, "permissions"),
+        getting_started: plugin_metadata_list(&detail_json, &manifest_json, "getting_started"),
+        changelog: plugin_metadata_list(&detail_json, &manifest_json, "changelog"),
+        links: plugin_links(plugin_metadata_source(&detail_json, &manifest_json)),
+        actions: plugin_actions(plugin_metadata_source(&detail_json, &manifest_json)),
+        launcher: plugin_launcher(&detail_json, &manifest_json),
     }))
 }
 
@@ -1521,6 +1528,39 @@ fn string_field(primary: &Value, fallback: &Value, key: &str) -> Option<String> 
         })
 }
 
+fn plugin_metadata_field(detail: &Value, manifest: &Value, key: &str) -> Option<String> {
+    string_field(detail, manifest, key).or_else(|| {
+        manifest
+            .get("plugin")
+            .and_then(|plugin| plugin.get(key))
+            .and_then(Value::as_str)
+            .map(ToString::to_string)
+    })
+}
+
+fn plugin_metadata_source<'a>(detail: &'a Value, manifest: &'a Value) -> &'a Value {
+    if detail.is_object() && !detail.as_object().is_some_and(|object| object.is_empty()) {
+        detail
+    } else {
+        manifest.get("plugin").unwrap_or(manifest)
+    }
+}
+
+fn plugin_metadata_list(detail: &Value, manifest: &Value, key: &str) -> Vec<String> {
+    let values = string_list(detail, key);
+    if !values.is_empty() {
+        return values;
+    }
+    let values = string_list(manifest, key);
+    if !values.is_empty() {
+        return values;
+    }
+    manifest
+        .get("plugin")
+        .map(|plugin| string_list(plugin, key))
+        .unwrap_or_default()
+}
+
 fn string_list(value: &Value, key: &str) -> Vec<String> {
     value
         .get(key)
@@ -1578,6 +1618,12 @@ fn plugin_launcher(plugin_json: &Value, manifest_json: &Value) -> PluginLauncher
         .or_else(|| {
             manifest_json
                 .get("launcher")
+                .filter(|value| value.is_object())
+        })
+        .or_else(|| {
+            manifest_json
+                .get("plugin")
+                .and_then(|plugin| plugin.get("launcher"))
                 .filter(|value| value.is_object())
         });
 
@@ -1694,6 +1740,10 @@ fn open_url_in_system_browser(url: &str) -> io::Result<()> {
         Command::new("xdg-open").arg(url).spawn()?;
         return Ok(());
     }
+}
+
+fn can_open_external_url(url: &str) -> bool {
+    url.starts_with("https://") || url.starts_with("http://") || url.starts_with("mailto:")
 }
 
 fn bootstrap_database(conn: &Connection) -> rusqlite::Result<()> {
@@ -2061,6 +2111,51 @@ mod tests {
     }
 
     #[test]
+    fn local_plugin_record_reads_nested_manifest_plugin_metadata() {
+        let home = temp_misty_home();
+        let plugin_dir = home.join("plugins/public/nested");
+        fs::create_dir_all(&plugin_dir).expect("plugin dir should be created");
+        fs::write(
+            plugin_dir.join("manifest.json"),
+            serde_json::to_string_pretty(&json!({
+                "enabled": true,
+                "plugin": {
+                    "id": "nested_manifest",
+                    "name": "Nested Manifest",
+                    "version": "2.0.0",
+                    "author": "Misty",
+                    "overview": "Nested plugin metadata.",
+                    "capabilities": ["dock"],
+                    "launcher": {
+                        "show_in_launcher": true,
+                        "requires_selected_file": true,
+                        "open_mode": "split",
+                        "views": ["Dock"]
+                    }
+                }
+            }))
+            .unwrap(),
+        )
+        .expect("manifest should be written");
+
+        let record = read_local_plugin_record(&plugin_dir, "public")
+            .expect("plugin should read")
+            .expect("plugin should exist");
+
+        assert_eq!(record.id, "nested_manifest");
+        assert_eq!(record.name, "Nested Manifest");
+        assert_eq!(record.version, "2.0.0");
+        assert_eq!(record.overview, "Nested plugin metadata.");
+        assert_eq!(record.capabilities, vec!["dock"]);
+        assert!(record.launcher.show_in_launcher);
+        assert!(record.launcher.requires_selected_file);
+        assert_eq!(record.launcher.open_mode, "split");
+        assert_eq!(record.launcher.views, vec!["Dock"]);
+
+        let _ = fs::remove_dir_all(home);
+    }
+
+    #[test]
     fn extracts_only_paths_present_in_zip() {
         let home = temp_misty_home();
         fs::create_dir_all(home.join("assets/themes")).expect("assets dir should exist");
@@ -2119,5 +2214,15 @@ mod tests {
         assert!(!missing_probe.exists);
 
         fs::remove_dir_all(home).ok();
+    }
+
+    #[test]
+    fn external_url_allowlist_includes_mailto_without_custom_schemes() {
+        assert!(can_open_external_url("https://misty.app"));
+        assert!(can_open_external_url("http://localhost:1420"));
+        assert!(can_open_external_url("mailto:hello@misty.app"));
+        assert!(!can_open_external_url("javascript:alert(1)"));
+        assert!(!can_open_external_url("misty://settings"));
+        assert!(!can_open_external_url("file:///tmp/secret.txt"));
     }
 }

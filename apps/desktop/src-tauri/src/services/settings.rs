@@ -4,7 +4,7 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{json, Map, Value};
 
 use crate::error::{ApiError, ApiResult};
 use crate::services::environment::AppEnvironmentService;
@@ -96,6 +96,9 @@ impl SettingsService {
 fn load_settings(path: PathBuf) -> ApiResult<SettingsSnapshot> {
     let mut document = load_settings_document(&path)?;
     migrate_legacy_open_with_if_needed(&path, &mut document)?;
+    if normalize_settings_document(&mut document) {
+        save_settings_document(&path, &document)?;
+    }
 
     Ok(SettingsSnapshot {
         path: path.display().to_string(),
@@ -120,13 +123,14 @@ fn load_settings_document(path: &Path) -> ApiResult<Value> {
     }
 }
 
-fn save_settings(path: PathBuf, document: Value) -> ApiResult<SettingsSnapshot> {
+fn save_settings(path: PathBuf, mut document: Value) -> ApiResult<SettingsSnapshot> {
     if !document.is_object() {
         return Err(ApiError::Message(
             "Settings document must be a JSON object.".to_owned(),
         ));
     }
 
+    normalize_settings_document(&mut document);
     save_settings_document(&path, &document)?;
 
     Ok(SettingsSnapshot {
@@ -148,6 +152,169 @@ fn save_settings_document(path: &Path, document: &Value) -> ApiResult<()> {
             "Failed to write ~/.misty/config/settings.json: {err}"
         ))
     })
+}
+
+fn normalize_settings_document(document: &mut Value) -> bool {
+    let mut changed = false;
+    if !document.is_object() {
+        *document = Value::Object(Map::new());
+        changed = true;
+    }
+
+    let root = document.as_object_mut().expect("settings document object");
+    if root.get("schema_version").and_then(Value::as_i64) != Some(1) {
+        root.insert("schema_version".to_owned(), json!(1));
+        changed = true;
+    }
+
+    changed |= ensure_section_defaults(
+        root,
+        "general",
+        &[
+            ("startup_view_index", json!(0)),
+            ("reopen_last_session", json!(true)),
+            ("launch_on_login", json!(false)),
+            ("auto_update_enabled", json!(true)),
+            ("release_channel_index", json!(0)),
+            ("update_available", json!(false)),
+            ("available_version_label", json!("v0.1.1")),
+            ("confirm_destructive_actions", json!(true)),
+            ("default_file_action_index", json!(0)),
+            ("open_links_externally", json!(true)),
+            ("preferred_workspace_root", json!("")),
+            ("default_transfer_behavior_index", json!(0)),
+            ("last_update_check_label", json!("Never checked")),
+        ],
+    );
+    changed |= ensure_section_defaults(
+        root,
+        "appearance",
+        &[
+            ("theme_index", json!(0)),
+            ("compact_mode_enabled", json!(false)),
+            ("reduced_motion_enabled", json!(false)),
+            ("thumbnail_previews_enabled", json!(true)),
+            ("ui_scale_index", json!(1)),
+            ("font_size_index", json!(1)),
+            ("custom_fonts", json!([])),
+        ],
+    );
+    changed |= ensure_section_defaults(
+        root,
+        "account",
+        &[
+            ("email", json!("")),
+            ("subscription_plan_label", json!("Free")),
+            ("connected_provider_count", json!(0)),
+        ],
+    );
+    changed |= ensure_section_defaults(
+        root,
+        "privacy",
+        &[
+            ("data_stays_local", json!(true)),
+            ("local_processing_only", json!(true)),
+            ("export_data_enabled", json!(true)),
+            ("diagnostics_sharing_enabled", json!(false)),
+        ],
+    );
+    changed |= ensure_section_defaults(
+        root,
+        "sync",
+        &[
+            ("auto_sync_enabled", json!(true)),
+            ("sync_on_launch_enabled", json!(true)),
+            ("sync_on_quit_enabled", json!(false)),
+            ("allow_metered_sync", json!(false)),
+            ("conflict_resolution_index", json!(0)),
+            ("version_history_enabled", json!(true)),
+        ],
+    );
+    changed |= ensure_section_defaults(
+        root,
+        "notifications",
+        &[
+            ("desktop_notifications_enabled", json!(true)),
+            ("in_app_notifications_enabled", json!(true)),
+            ("sound_notifications_enabled", json!(false)),
+            ("badge_count_enabled", json!(true)),
+            ("quiet_hours_enabled", json!(false)),
+            ("digest_notifications_enabled", json!(false)),
+        ],
+    );
+    changed |= ensure_section_defaults(
+        root,
+        "shortcuts",
+        &[
+            ("keymap_index", json!(0)),
+            ("custom_shortcuts_enabled", json!(false)),
+            ("shortcut_hints_enabled", json!(true)),
+        ],
+    );
+    changed |= ensure_section_defaults(
+        root,
+        "advanced",
+        &[
+            ("server_address", json!("localhost:50051")),
+            ("mount_path", json!(".misty/mnt")),
+            ("confirm_clear_recent", json!(false)),
+            ("confirm_clear_starred", json!(false)),
+            ("confirm_empty_trash", json!(false)),
+            ("confirm_clear_cache", json!(false)),
+            ("debug_logging_enabled", json!(false)),
+            ("frame_pacing_overlay_enabled", json!(false)),
+            ("experimental_features_enabled", json!(false)),
+        ],
+    );
+    changed |= ensure_section_defaults(
+        root,
+        "ai",
+        &[
+            (
+                "api_url",
+                json!("https://api.openai.com/v1/chat/completions"),
+            ),
+            ("model", json!("")),
+            ("api_key", json!("")),
+        ],
+    );
+    changed |= ensure_object(root, "open_with");
+
+    changed
+}
+
+fn ensure_section_defaults(
+    root: &mut Map<String, Value>,
+    section: &str,
+    defaults: &[(&str, Value)],
+) -> bool {
+    let mut changed = false;
+    let value = root.entry(section.to_owned()).or_insert_with(|| {
+        changed = true;
+        Value::Object(Map::new())
+    });
+    if !value.is_object() {
+        *value = Value::Object(Map::new());
+        changed = true;
+    }
+    let section = value.as_object_mut().expect("settings section object");
+    for (key, default_value) in defaults {
+        if !section.contains_key(*key) {
+            section.insert((*key).to_owned(), default_value.clone());
+            changed = true;
+        }
+    }
+    changed
+}
+
+fn ensure_object(root: &mut Map<String, Value>, key: &str) -> bool {
+    match root.get(key) {
+        Some(value) if value.is_object() => false,
+        _ => {
+            root.insert(key.to_owned(), Value::Object(Map::new()));
+            true
+        }
+    }
 }
 
 fn open_with_association_for_path(
@@ -338,6 +505,81 @@ mod tests {
         fs::create_dir_all(app_path.parent().expect("test app parent")).expect("create app parent");
         fs::write(&app_path, "test app").expect("write test app");
         app_path
+    }
+
+    #[test]
+    fn load_settings_normalizes_imgui_settings_schema_without_clobbering_existing_values() {
+        let settings_path = test_settings_path();
+        save_settings_document(
+            &settings_path,
+            &json!({
+                "general": {
+                    "startup_view_index": 2,
+                    "custom_general_value": "kept"
+                },
+                "appearance": {
+                    "custom_theme": { "accent": "#80aaff" }
+                },
+                "plugin_namespace": {
+                    "enabled": true
+                }
+            }),
+        )
+        .expect("write partial settings");
+
+        let snapshot = load_settings(settings_path.clone()).expect("load settings");
+        let document = snapshot.document;
+        assert_eq!(
+            document.get("schema_version").and_then(Value::as_i64),
+            Some(1)
+        );
+        assert_eq!(
+            document
+                .get("general")
+                .and_then(Value::as_object)
+                .and_then(|general| general.get("startup_view_index"))
+                .and_then(Value::as_i64),
+            Some(2),
+        );
+        assert_eq!(
+            document
+                .get("general")
+                .and_then(Value::as_object)
+                .and_then(|general| general.get("open_links_externally"))
+                .and_then(Value::as_bool),
+            Some(true),
+        );
+        assert_eq!(
+            document
+                .get("appearance")
+                .and_then(Value::as_object)
+                .and_then(|appearance| appearance.get("custom_theme"))
+                .and_then(Value::as_object)
+                .and_then(|custom_theme| custom_theme.get("accent"))
+                .and_then(Value::as_str),
+            Some("#80aaff"),
+        );
+        assert_eq!(
+            document
+                .get("plugin_namespace")
+                .and_then(Value::as_object)
+                .and_then(|plugin| plugin.get("enabled"))
+                .and_then(Value::as_bool),
+            Some(true),
+        );
+        assert!(document
+            .get("notifications")
+            .and_then(Value::as_object)
+            .is_some_and(
+                |notifications| notifications.contains_key("desktop_notifications_enabled")
+            ));
+
+        let _ = fs::remove_dir_all(
+            settings_path
+                .parent()
+                .and_then(Path::parent)
+                .expect("test root"),
+        );
     }
 
     #[test]

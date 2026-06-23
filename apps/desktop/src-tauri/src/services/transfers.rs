@@ -1,10 +1,11 @@
 use std::{
     fs,
     path::{Path, PathBuf},
+    sync::{Arc, Mutex},
     time::Duration,
 };
 
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 use serde::{Deserialize, Serialize};
 
 use crate::core::file_transfer::now_epoch_ms;
@@ -19,6 +20,7 @@ use crate::services::environment::AppEnvironmentService;
 #[derive(Debug, Clone)]
 pub struct TransferService {
     db_path: PathBuf,
+    db_lock: Arc<Mutex<()>>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -41,42 +43,63 @@ impl TransferService {
     pub fn new(environment: AppEnvironmentService) -> Self {
         Self {
             db_path: environment.misty_db_path(),
+            db_lock: Arc::new(Mutex::new(())),
         }
     }
 
     pub async fn snapshot(&self, filter: TransferFilter) -> ApiResult<TransferPage> {
         let db_path = self.db_path.clone();
-        tokio::task::spawn_blocking(move || load_page(&db_path, filter))
-            .await
-            .map_err(|err| ApiError::Message(format!("Transfer worker failed: {err}")))?
+        let db_lock = self.db_lock.clone();
+        tokio::task::spawn_blocking(move || {
+            let _guard = lock_db(&db_lock)?;
+            load_page(&db_path, filter)
+        })
+        .await
+        .map_err(|err| ApiError::Message(format!("Transfer worker failed: {err}")))?
     }
 
     pub async fn delete_selected(&self, ids: Vec<u64>) -> ApiResult<()> {
         let db_path = self.db_path.clone();
-        tokio::task::spawn_blocking(move || delete_selected(&db_path, ids))
-            .await
-            .map_err(|err| ApiError::Message(format!("Transfer worker failed: {err}")))?
+        let db_lock = self.db_lock.clone();
+        tokio::task::spawn_blocking(move || {
+            let _guard = lock_db(&db_lock)?;
+            delete_selected(&db_path, ids)
+        })
+        .await
+        .map_err(|err| ApiError::Message(format!("Transfer worker failed: {err}")))?
     }
 
     pub async fn delete_all(&self) -> ApiResult<()> {
         let db_path = self.db_path.clone();
-        tokio::task::spawn_blocking(move || delete_all(&db_path))
-            .await
-            .map_err(|err| ApiError::Message(format!("Transfer worker failed: {err}")))?
+        let db_lock = self.db_lock.clone();
+        tokio::task::spawn_blocking(move || {
+            let _guard = lock_db(&db_lock)?;
+            delete_all(&db_path)
+        })
+        .await
+        .map_err(|err| ApiError::Message(format!("Transfer worker failed: {err}")))?
     }
 
     pub async fn create_transfer(&self, record: TransferRecord) -> ApiResult<u64> {
         let db_path = self.db_path.clone();
-        tokio::task::spawn_blocking(move || create_transfer(&db_path, record, false))
-            .await
-            .map_err(|err| ApiError::Message(format!("Transfer worker failed: {err}")))?
+        let db_lock = self.db_lock.clone();
+        tokio::task::spawn_blocking(move || {
+            let _guard = lock_db(&db_lock)?;
+            create_transfer(&db_path, record, false)
+        })
+        .await
+        .map_err(|err| ApiError::Message(format!("Transfer worker failed: {err}")))?
     }
 
     pub async fn start_transfer(&self, record: TransferRecord) -> ApiResult<u64> {
         let db_path = self.db_path.clone();
-        tokio::task::spawn_blocking(move || create_transfer(&db_path, record, true))
-            .await
-            .map_err(|err| ApiError::Message(format!("Transfer worker failed: {err}")))?
+        let db_lock = self.db_lock.clone();
+        tokio::task::spawn_blocking(move || {
+            let _guard = lock_db(&db_lock)?;
+            create_transfer(&db_path, record, true)
+        })
+        .await
+        .map_err(|err| ApiError::Message(format!("Transfer worker failed: {err}")))?
     }
 
     pub async fn mark_started(&self, id: u64) -> ApiResult<()> {
@@ -118,9 +141,13 @@ impl TransferService {
 
     pub async fn transfer_by_undo_token(&self, undo_token_id: u64) -> ApiResult<TransferRecord> {
         let db_path = self.db_path.clone();
-        tokio::task::spawn_blocking(move || transfer_by_undo_token(&db_path, undo_token_id))
-            .await
-            .map_err(|err| ApiError::Message(format!("Transfer worker failed: {err}")))?
+        let db_lock = self.db_lock.clone();
+        tokio::task::spawn_blocking(move || {
+            let _guard = lock_db(&db_lock)?;
+            transfer_by_undo_token(&db_path, undo_token_id)
+        })
+        .await
+        .map_err(|err| ApiError::Message(format!("Transfer worker failed: {err}")))?
     }
 
     pub async fn clear_undo(&self, id: u64) -> ApiResult<()> {
@@ -136,10 +163,19 @@ impl TransferService {
         F: FnOnce(&mut TransferRecord) + Send + 'static,
     {
         let db_path = self.db_path.clone();
-        tokio::task::spawn_blocking(move || mutate_transfer(&db_path, id, mutation))
-            .await
-            .map_err(|err| ApiError::Message(format!("Transfer worker failed: {err}")))?
+        let db_lock = self.db_lock.clone();
+        tokio::task::spawn_blocking(move || {
+            let _guard = lock_db(&db_lock)?;
+            mutate_transfer(&db_path, id, mutation)
+        })
+        .await
+        .map_err(|err| ApiError::Message(format!("Transfer worker failed: {err}")))?
     }
+}
+
+fn lock_db(lock: &Mutex<()>) -> ApiResult<std::sync::MutexGuard<'_, ()>> {
+    lock.lock()
+        .map_err(|_| ApiError::Message("SQLite transfer store lock was poisoned.".to_string()))
 }
 
 fn maybe_mark_undoable(record: &mut TransferRecord) {
@@ -234,8 +270,10 @@ fn create_transfer(
     mut record: TransferRecord,
     start_immediately: bool,
 ) -> ApiResult<u64> {
-    let conn = open_db(db_path)?;
-    let tx = conn.unchecked_transaction().map_err(sql_error)?;
+    let mut conn = open_db(db_path)?;
+    let tx = conn
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .map_err(sql_error)?;
     record.id = tx
         .query_row(
             "SELECT COALESCE(MAX(id), 0) + 1 FROM transfers",
@@ -419,11 +457,20 @@ fn open_db(path: &Path) -> ApiResult<Connection> {
             .map_err(|err| ApiError::Message(format!("Failed to create ~/.misty/db: {err}")))?;
     }
     let conn = Connection::open(path).map_err(sql_error)?;
-    conn.busy_timeout(Duration::from_millis(3000))
+    conn.busy_timeout(Duration::from_millis(10_000))
         .map_err(sql_error)?;
+    configure_connection(&conn)?;
     initialize_schema(&conn)?;
     run_migrations(&conn)?;
     Ok(conn)
+}
+
+fn configure_connection(conn: &Connection) -> ApiResult<()> {
+    conn.pragma_update(None, "journal_mode", "WAL")
+        .map_err(sql_error)?;
+    conn.pragma_update(None, "synchronous", "NORMAL")
+        .map_err(sql_error)?;
+    Ok(())
 }
 
 fn initialize_schema(conn: &Connection) -> ApiResult<()> {
@@ -660,7 +707,13 @@ mod tests {
             now_epoch_ms()
         ));
         let db_path = root.join("misty.db");
-        (TransferService { db_path }, root)
+        (
+            TransferService {
+                db_path,
+                db_lock: Arc::new(Mutex::new(())),
+            },
+            root,
+        )
     }
 
     #[tokio::test]
@@ -727,6 +780,52 @@ mod tests {
         assert_eq!(page.rows[0].remote_source_name, "drive");
         assert_eq!(page.rows[0].error_message, "connection reset");
         assert!(page.rows[0].retryable);
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[tokio::test]
+    async fn concurrent_transfer_creates_allocate_unique_ids() {
+        let (service, root) = test_service("concurrent-create");
+        let mut tasks = tokio::task::JoinSet::new();
+        for index in 0..16 {
+            let service = service.clone();
+            tasks.spawn(async move {
+                let mut record = TransferRecord::new(
+                    TransferType::Download,
+                    TransferItemType::Remote,
+                    &format!("item-{index}.bin"),
+                );
+                record.remote_source_name = "drive".to_string();
+                record.remote_source_path = format!("/item-{index}.bin");
+                record.local_dest_path = format!("/tmp/item-{index}.bin");
+                let id = service.start_transfer(record).await?;
+                service.update_progress(id, 10, 10).await?;
+                service.complete_transfer(id).await?;
+                ApiResult::Ok(id)
+            });
+        }
+
+        let mut ids = Vec::new();
+        while let Some(result) = tasks.join_next().await {
+            ids.push(result.expect("join transfer task").expect("transfer task"));
+        }
+        ids.sort_unstable();
+        ids.dedup();
+
+        let page = service
+            .snapshot(TransferFilter {
+                limit: Some(32),
+                ..TransferFilter::default()
+            })
+            .await
+            .expect("load transfer page");
+        assert_eq!(ids.len(), 16);
+        assert_eq!(page.total_count, 16);
+        assert!(page
+            .rows
+            .iter()
+            .all(|row| row.status == TransferStatus::Completed));
 
         let _ = fs::remove_dir_all(root);
     }

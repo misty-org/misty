@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   providersConfigureRemote,
   providersConfigPaths,
@@ -20,7 +19,17 @@ import type {
   RemoteEditDraft,
 } from "../../api/types";
 import { errorText } from "../../shared/format";
-import { configPriority, stableConfig, updateTokenField } from "./providerUtils";
+import { openSystemExternalLink } from "../../shared/openExternalLink";
+import {
+  configPriority,
+  providerOptionsForConnection,
+  shouldBootstrapOneDriveRepairContinue,
+  shouldContinueExistingOneDriveRepair,
+  stableConfig,
+  updateTokenField,
+} from "./providerUtils";
+
+const MAX_PROVIDER_AUTH_POLL_ATTEMPTS = 90;
 
 export interface ProviderConnectionSession {
   mode: ProviderConfigMode;
@@ -32,6 +41,7 @@ export interface ProviderConnectionSession {
   inFlight: boolean;
   polling: boolean;
   openedAuthorizeUrl: string | null;
+  authPollAttempts: number;
   error: string | null;
 }
 
@@ -93,6 +103,7 @@ interface ProvidersStore {
   setConnectionParameter: (key: string, value: string) => void;
   advanceConnection: () => void;
   submitConnection: (polling?: boolean) => Promise<void>;
+  reopenConnectionAuthorization: () => Promise<void>;
   requestDisconnect: (name: string) => void;
   cancelDisconnect: () => void;
   confirmDisconnect: () => Promise<void>;
@@ -103,6 +114,7 @@ type ProvidersSet = (
 ) => void;
 
 let connectionGeneration = 0;
+let providersLoadPromise: Promise<void> | null = null;
 
 export const useProvidersStore = create<ProvidersStore>((set, get) => ({
   providers: null,
@@ -152,18 +164,33 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
   },
 
   load: async (refresh = false) => {
-    set({ loading: true, error: null });
-    try {
-      const next = refresh ? await providersRefresh() : await providersSnapshot();
-      set({ providers: next });
-      if (!get().draft && next.remotes.length > 0) {
-        await get().selectRemote(next.remotes[0].name, false);
+    if (!refresh && get().providers) return;
+    if (providersLoadPromise) return providersLoadPromise;
+    providersLoadPromise = (async () => {
+      set({ loading: true, error: null });
+      try {
+        const next = refresh ? await providersRefresh() : await providersSnapshot();
+        const remoteRevisions = refresh
+          ? bumpRemoteRevisions(get().remoteRevisions, next.remotes.map((remote) => remote.name))
+          : get().remoteRevisions;
+        set({
+          providers: next,
+          remoteRevisions,
+          remoteDraftCache: refresh
+            ? pruneRemoteDraftCacheToRemotes(get().remoteDraftCache, next.remotes)
+            : get().remoteDraftCache,
+        });
+        if (!get().draft && next.remotes.length > 0) {
+          await get().selectRemote(next.remotes[0].name, false);
+        }
+      } catch (error) {
+        set({ error: errorText(error) });
+      } finally {
+        providersLoadPromise = null;
+        set({ loading: false });
       }
-    } catch (error) {
-      set({ error: errorText(error) });
-    } finally {
-      set({ loading: false });
-    }
+    })();
+    return providersLoadPromise;
   },
 
   selectRemote: async (name, guardDirty = true) => {
@@ -439,20 +466,17 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
   openAddRemote: async () => {
     connectionGeneration += 1;
     const generation = connectionGeneration;
-    set({ working: true, error: null, message: null });
-    try {
-      const providers = await providersRefresh();
-      if (generation !== connectionGeneration) return;
-      set({ providers });
-    } catch (error) {
-      if (generation !== connectionGeneration) return;
-      set({ error: errorText(error) });
-    } finally {
-      if (generation === connectionGeneration) {
-        set({ working: false });
+    if (!get().providers) {
+      set({ working: true, error: null, message: null });
+      try {
+        await get().load();
+      } finally {
+        if (generation === connectionGeneration) {
+          set({ working: false });
+        }
       }
+      if (generation !== connectionGeneration || !get().providers) return;
     }
-    if (generation !== connectionGeneration) return;
     set({
       connection: createConnectionSession("add"),
       error: null,
@@ -463,20 +487,17 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
   openReconnectRemote: async (remote) => {
     connectionGeneration += 1;
     const generation = connectionGeneration;
-    set({ working: true, error: null, message: null });
-    try {
-      const providers = await providersRefresh();
-      if (generation !== connectionGeneration) return;
-      set({ providers });
-    } catch (error) {
-      if (generation !== connectionGeneration) return;
-      set({ error: errorText(error) });
-    } finally {
-      if (generation === connectionGeneration) {
-        set({ working: false });
+    if (!get().providers) {
+      set({ working: true, error: null, message: null });
+      try {
+        await get().load();
+      } finally {
+        if (generation === connectionGeneration) {
+          set({ working: false });
+        }
       }
+      if (generation !== connectionGeneration || !get().providers) return;
     }
-    if (generation !== connectionGeneration) return;
     const connection = createConnectionSession("reconnect", remote);
     connection.parameters = defaultParameters(workflowForType(get().providers?.workflows ?? [], remote.type));
     set({
@@ -489,22 +510,22 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
   openRepairRemote: async (remote) => {
     connectionGeneration += 1;
     const generation = connectionGeneration;
-    set({ working: true, error: null, message: null });
-    try {
-      const providers = await providersRefresh();
-      if (generation !== connectionGeneration) return;
-      set({ providers });
-    } catch (error) {
-      if (generation !== connectionGeneration) return;
-      set({ error: errorText(error) });
-    } finally {
-      if (generation === connectionGeneration) {
-        set({ working: false });
+    if (!get().providers) {
+      set({ working: true, error: null, message: null });
+      try {
+        await get().load();
+      } finally {
+        if (generation === connectionGeneration) {
+          set({ working: false });
+        }
       }
+      if (generation !== connectionGeneration || !get().providers) return;
     }
-    if (generation !== connectionGeneration) return;
     const connection = createConnectionSession("repair", remote);
-    connection.parameters = defaultParameters(workflowForType(get().providers?.workflows ?? [], remote.type));
+    connection.parameters = defaultParametersForSession(
+      connection,
+      workflowForType(get().providers?.workflows ?? [], remote.type),
+    );
     set({
       connection,
       error: null,
@@ -520,13 +541,17 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
   chooseConnectionProvider: (providerType) => set((state) => {
     if (!state.connection) return state;
     const workflow = workflowForType(state.providers?.workflows ?? [], providerType);
+    const connection = {
+      ...state.connection,
+      providerType,
+      remoteName: state.connection.remoteName || providerType,
+      parameters: {},
+      error: null,
+    };
     return {
       connection: {
-        ...state.connection,
-        providerType,
-        remoteName: state.connection.remoteName || providerType,
-        parameters: defaultParameters(workflow),
-        error: null,
+        ...connection,
+        parameters: defaultParametersForSession(connection, workflow),
       },
     };
   }),
@@ -574,40 +599,50 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
       },
     });
     try {
+      const pollingBrowserAuth = polling && session.step?.kind === "browser_auth";
+      const bootstrapExistingConfigContinue = shouldBootstrapOneDriveRepairContinue(session);
+      const continueExistingOneDriveRepair = shouldContinueExistingOneDriveRepair(session);
       const step = await providersConfigureRemote({
         name: session.remoteName.trim(),
         providerType: session.providerType,
-        parameters: session.parameters,
+        parameters: pollingBrowserAuth ? {} : session.parameters,
         state: session.step?.state ?? "",
         result: session.step?.result ?? "",
         mode: session.mode,
-        continuing: session.step != null,
-        continueExisting: session.mode === "repair"
-          && session.step != null
-          && session.providerType.toLowerCase().includes("onedrive"),
+        continuing: bootstrapExistingConfigContinue || session.step != null,
+        continueExisting: continueExistingOneDriveRepair,
       });
       if (generation !== connectionGeneration || !get().connection) return;
 
       const current = get().connection!;
       const parameters = { ...current.parameters };
-      if (step.option && parameters[step.option.name] == null) {
+      if (step.option && !parameters[step.option.name]) {
         parameters[step.option.name] = step.option.defaultValue || step.option.choices[0]?.value || "";
       }
       const complete = step.done || step.kind === "done";
       const authorize = step.kind === "browser_auth" || Boolean(step.authorizeUrl);
+      const configuringProvider = Boolean(step.option?.name);
+      const authPollAttempts = authorize && polling ? current.authPollAttempts + 1 : 0;
+      const authPollingTimedOut = authorize
+        && polling
+        && authPollAttempts >= MAX_PROVIDER_AUTH_POLL_ATTEMPTS;
       const next: ProviderConnectionSession = {
         ...current,
-        stage: complete ? "complete" : authorize ? "authorize" : "configure",
+        stage: complete ? "complete" : configuringProvider ? "configure" : authorize ? "authorize" : "configure",
         parameters,
         step,
         inFlight: false,
-        polling: authorize,
-        error: null,
+        polling: authorize && !complete && !configuringProvider && !authPollingTimedOut,
+        authPollAttempts,
+        error: authPollingTimedOut ? providerAuthorizationTimedOutMessage() : null,
       };
 
-      if (step.authorizeUrl && step.authorizeUrl !== current.openedAuthorizeUrl) {
+      const shouldOpenAuthorizeUrl = Boolean(step.authorizeUrl)
+        && (!pollingBrowserAuth || !current.openedAuthorizeUrl)
+        && step.authorizeUrl !== current.openedAuthorizeUrl;
+      if (shouldOpenAuthorizeUrl) {
         try {
-          await openUrl(step.authorizeUrl);
+          await openSystemExternalLink(step.authorizeUrl);
           next.openedAuthorizeUrl = step.authorizeUrl;
         } catch (error) {
           next.error = `Could not open browser sign-in: ${errorText(error)}`;
@@ -618,14 +653,16 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
       if (complete) {
         const providers = await providersRefresh();
         if (generation !== connectionGeneration) return;
+        const remoteRevisions = bumpRemoteRevisions(get().remoteRevisions, [next.remoteName]);
         set({
           providers,
-          remoteRevisions: bumpRemoteRevisions(get().remoteRevisions, [next.remoteName]),
-          message: `Remote “${next.remoteName}” connected.`,
+          remoteDraftCache: removeRemoteDraftCache(get().remoteDraftCache, next.remoteName),
+          remoteRevisions,
+          message: `Remote “${next.remoteName}” ${providerFlowSuccessSuffix(next.mode)}`,
         });
         return;
       }
-      if (authorize) {
+      if (next.polling) {
         window.setTimeout(() => {
           if (generation === connectionGeneration && get().connection?.stage === "authorize") {
             void get().submitConnection(true);
@@ -635,13 +672,51 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
     } catch (error) {
       if (generation !== connectionGeneration) return;
       set((state) => state.connection ? {
+        connection: nextConnectionAfterProviderError(state.connection, error, polling),
+      } : state);
+      const current = get().connection;
+      if (polling && current?.polling) {
+        window.setTimeout(() => {
+          if (generation === connectionGeneration && get().connection?.stage === "authorize") {
+            void get().submitConnection(true);
+          }
+        }, Math.max(1500, current.step?.pollAfterMs ?? 1000));
+      }
+    }
+  },
+
+  reopenConnectionAuthorization: async () => {
+    const session = get().connection;
+    const authorizeUrl = session?.step?.authorizeUrl;
+    if (!session || !authorizeUrl) {
+      set((state) => state.connection ? {
         connection: {
           ...state.connection,
-          inFlight: false,
-          polling: false,
-          error: errorText(error),
+          error: "This provider flow did not return a browser URL to reopen.",
         },
       } : state);
+      return;
+    }
+    try {
+      await openSystemExternalLink(authorizeUrl);
+      const current = get().connection;
+      if (!current || current.step?.authorizeUrl !== authorizeUrl) return;
+      set({
+        connection: {
+          ...current,
+          openedAuthorizeUrl: authorizeUrl,
+          error: null,
+        },
+      });
+    } catch (error) {
+      const current = get().connection;
+      if (!current || current.step?.authorizeUrl !== authorizeUrl) return;
+      set({
+        connection: {
+          ...current,
+          error: `Could not open browser sign-in: ${errorText(error)}`,
+        },
+      });
     }
   },
 
@@ -781,6 +856,23 @@ function removeRemoteDraftCache(
   return next;
 }
 
+function pruneRemoteDraftCacheToRemotes(
+  cache: Record<string, CachedRemoteDraft>,
+  remotes: ProviderRemote[],
+): Record<string, CachedRemoteDraft> {
+  const remoteNames = new Set(remotes.map((remote) => remote.name));
+  let changed = false;
+  const next: Record<string, CachedRemoteDraft> = {};
+  for (const [name, cached] of Object.entries(cache)) {
+    if (remoteNames.has(name)) {
+      next[name] = cached;
+    } else {
+      changed = true;
+    }
+  }
+  return changed ? next : cache;
+}
+
 function revisionForRemote(remoteRevisions: Record<string, number>, name: string): number {
   return remoteRevisions[name] ?? 0;
 }
@@ -812,8 +904,59 @@ function createConnectionSession(mode: ProviderConfigMode, remote?: ProviderRemo
     inFlight: false,
     polling: false,
     openedAuthorizeUrl: null,
+    authPollAttempts: 0,
     error: null,
   };
+}
+
+function providerConnectionErrorText(error: unknown, polling: boolean): string {
+  const message = errorText(error);
+  if (!polling) return message;
+  if (isRecoverableAuthPollingError(error)) {
+    return "Still waiting for provider authorization. Complete the browser sign-in, then return to Misty.";
+  }
+  return message;
+}
+
+function nextConnectionAfterProviderError(
+  connection: ProviderConnectionSession,
+  error: unknown,
+  polling: boolean,
+): ProviderConnectionSession {
+  const authPollAttempts = polling ? connection.authPollAttempts + 1 : connection.authPollAttempts;
+  const recoverablePolling = polling
+    && isRecoverableAuthPollingError(error)
+    && authPollAttempts < MAX_PROVIDER_AUTH_POLL_ATTEMPTS;
+  return {
+    ...connection,
+    stage: polling && connection.step ? "authorize" : connection.stage,
+    inFlight: false,
+    polling: recoverablePolling,
+    authPollAttempts,
+    error: polling && !recoverablePolling && isRecoverableAuthPollingError(error)
+      ? providerAuthorizationTimedOutMessage()
+      : providerConnectionErrorText(error, polling),
+  };
+}
+
+function providerAuthorizationTimedOutMessage(): string {
+  return "Provider authorization timed out. Reopen the browser sign-in page, complete the flow, then try Connect again.";
+}
+
+function providerFlowSuccessSuffix(mode: ProviderConfigMode): string {
+  if (mode === "repair") return "configured.";
+  if (mode === "reconnect") return "reconnected.";
+  return "connected.";
+}
+
+function isRecoverableAuthPollingError(error: unknown): boolean {
+  const message = errorText(error).toLowerCase();
+  return message.includes("authorization")
+    || message.includes("oauth")
+    || message.includes("token")
+    || message.includes("auth header")
+    || message.includes("unauthorized")
+    || message.includes("forbidden");
 }
 
 function workflowForType(workflows: ProviderWorkflow[], providerType: string): ProviderWorkflow | null {
@@ -835,6 +978,17 @@ function defaultParameters(workflow: ProviderWorkflow | null): Record<string, st
   ]));
 }
 
+function defaultParametersForSession(
+  session: ProviderConnectionSession,
+  workflow: ProviderWorkflow | null,
+): Record<string, string> {
+  const options = providerOptionsForConnection(session, workflow);
+  return Object.fromEntries(options.map((option) => [
+    option.name,
+    option.defaultValue || option.choices[0]?.value || "",
+  ]));
+}
+
 function validateConnectionSession(
   session: ProviderConnectionSession,
   workflows: ProviderWorkflow[],
@@ -846,7 +1000,7 @@ function validateConnectionSession(
     return "Remote names cannot contain colons or path separators.";
   }
   const workflow = workflowForType(workflows, session.providerType);
-  const options = session.step?.option ? [session.step.option] : workflow?.options ?? [];
+  const options = providerOptionsForConnection(session, workflow);
   const missing = options.find((option) => option.required && !(session.parameters[option.name] ?? "").trim());
   return missing ? `${missing.label || missing.name} is required.` : null;
 }

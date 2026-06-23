@@ -3,13 +3,15 @@ use std::{
     ffi::OsStr,
     io::Cursor,
     path::{Path, PathBuf},
+    process::{Command, Stdio},
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
-    time::{Duration, UNIX_EPOCH},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+use sha2::{Digest, Sha256};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::Mutex;
 
@@ -18,7 +20,9 @@ use crate::core::explorer::{
     list_directory, paste_items, CreateItemRequest, DeleteItemsRequest, DirectoryListing,
     ExplorerLocation, ExplorerLocationKind, ExplorerOperationResult, ExplorerPreviewPayload,
     FileEntry, FileKind, ListDirectoryRequest, PasteBlobRequest, PasteItemsRequest,
-    PasteTextRequest, PrepareOpenItemRequest, PreparedOpenItem, RenameItemRequest,
+    PasteTextRequest, PrepareDragItemRequest, PrepareDragItemsRequest, PrepareOpenItemRequest,
+    PreparedDragItem, PreparedDragItemsResult, PreparedDragSkippedItem, PreparedOpenItem,
+    RenameItemRequest,
 };
 use crate::core::file_master::{
     join_remote_path, normalize_remote_path, virtual_path_parts, RemoteBrowseTarget,
@@ -51,6 +55,7 @@ pub struct ExplorerService {
     explorer_library: ExplorerLibraryService,
     listing_cache: ListingCache,
     remote_open_cache: Arc<Mutex<ClipboardCache>>,
+    drag_stage_dir: PathBuf,
     clipboard_text_cache_dir: PathBuf,
     clipboard_blob_cache_dir: PathBuf,
     trash_dir: PathBuf,
@@ -69,6 +74,8 @@ impl ExplorerService {
         let cache_dir = environment.cache_dir();
         let mut remote_open_cache = ClipboardCache::new(cache_dir.join("remote-open").join("v1"));
         remote_open_cache.cleanup_expired();
+        let drag_stage_dir = cache_dir.join("drag-out").join("v1");
+        cleanup_expired_drag_stage_dirs(&drag_stage_dir);
         Self {
             home_dir: environment.home_dir(),
             mount_root: environment.mount_root(),
@@ -78,6 +85,7 @@ impl ExplorerService {
             explorer_library,
             listing_cache: ListingCache::new(cache_dir.join("remotes"), cache_dir.join("listings")),
             remote_open_cache: Arc::new(Mutex::new(remote_open_cache)),
+            drag_stage_dir,
             clipboard_text_cache_dir: cache_dir.join("clipboard-paste").join("text"),
             clipboard_blob_cache_dir: cache_dir.join("clipboard-paste").join("blob"),
             trash_dir: cache_dir.join("trash"),
@@ -283,13 +291,43 @@ impl ExplorerService {
     }
 
     pub async fn preview_item(&self, path: &str) -> ApiResult<ExplorerPreviewPayload> {
-        if self.remote_target(path).is_some() {
-            return Err(ApiError::Message(
-                "Preview is available after opening or downloading a remote file.".to_string(),
-            ));
+        if let Some(source) = self.remote_target(path) {
+            let parent = RemoteBrowseTarget {
+                provider_type: source.provider_type.clone(),
+                remote_name: source.remote_name.clone(),
+                remote_path: remote_parent_path(&source.remote_path),
+            };
+            let items = self.fetch_remote_items(&parent).await?;
+            let Some((size_bytes, remote_modified)) =
+                remote_preview_metadata_from_items(&parent, &source.remote_path, &items)?
+            else {
+                return Err(ApiError::Message(format!(
+                    "Remote file {} was not found.",
+                    source.remote_path
+                )));
+            };
+            let remote_modified = if remote_modified.trim().is_empty() {
+                None
+            } else {
+                Some(remote_modified)
+            };
+            let prepared = self
+                .prepare_remote_file_for_local_use(
+                    &source,
+                    Some(size_bytes),
+                    remote_modified.as_deref(),
+                    "Preparing remote file for preview",
+                )
+                .await?;
+            return self
+                .preview_local_item(Path::new(&prepared.local_path))
+                .await;
         }
         self.reject_virtual_mount_container(path, "preview")?;
-        let path = Path::new(path);
+        self.preview_local_item(Path::new(path)).await
+    }
+
+    async fn preview_local_item(&self, path: &Path) -> ApiResult<ExplorerPreviewPayload> {
         let format = preview_format(path).ok_or_else(|| {
             ApiError::Message("This file type does not support preview.".to_string())
         })?;
@@ -310,18 +348,29 @@ impl ExplorerService {
                 MAX_PREVIEW_BYTES / (1024 * 1024)
             )));
         }
-        let bytes = tokio::fs::read(path).await.map_err(|error| {
-            ApiError::Message(format!(
-                "Failed to read preview file {}: {error}",
-                path.display()
-            ))
-        })?;
         match format {
-            PreviewFormat::Direct(mime_type) => Ok(ExplorerPreviewPayload {
-                mime_type: mime_type.to_string(),
-                bytes,
-            }),
+            PreviewFormat::Pdf => {
+                if let Some(bytes) = render_pdf_preview_png(path, &metadata).await? {
+                    return Ok(ExplorerPreviewPayload {
+                        mime_type: "image/png".to_string(),
+                        bytes,
+                    });
+                }
+                let bytes = read_preview_file(path).await?;
+                Ok(ExplorerPreviewPayload {
+                    mime_type: "application/pdf".to_string(),
+                    bytes,
+                })
+            }
+            PreviewFormat::Direct(mime_type) => {
+                let bytes = read_preview_file(path).await?;
+                Ok(ExplorerPreviewPayload {
+                    mime_type: mime_type.to_string(),
+                    bytes,
+                })
+            }
             PreviewFormat::TranscodeImage(image_format) => {
+                let bytes = read_preview_file(path).await?;
                 let image =
                     image::load_from_memory_with_format(&bytes, image_format).map_err(|error| {
                         ApiError::Message(format!(
@@ -341,6 +390,13 @@ impl ExplorerService {
                 Ok(ExplorerPreviewPayload {
                     mime_type: "image/png".to_string(),
                     bytes: encoded.into_inner(),
+                })
+            }
+            PreviewFormat::Psd => {
+                let bytes = read_preview_file(path).await?;
+                Ok(ExplorerPreviewPayload {
+                    mime_type: "image/png".to_string(),
+                    bytes: transcode_psd_preview_png(&bytes, path)?,
                 })
             }
         }
@@ -387,6 +443,142 @@ impl ExplorerService {
                 "Only remote files can be opened.".to_string(),
             ));
         }
+        self.prepare_remote_file_for_local_use(
+            &source,
+            request.size_bytes,
+            request.remote_modified.as_deref(),
+            "Preparing remote file to open",
+        )
+        .await
+    }
+
+    pub async fn prepare_drag_items(
+        &self,
+        request: PrepareDragItemsRequest,
+    ) -> ApiResult<PreparedDragItemsResult> {
+        let mut prepared = Vec::new();
+        let mut skipped = Vec::new();
+        for item in request.items {
+            match self.prepare_drag_item(item).await {
+                Ok(item) => prepared.push(item),
+                Err(error) => skipped.push(PreparedDragSkippedItem {
+                    source_path: error.0,
+                    reason: error.1,
+                }),
+            }
+        }
+        Ok(PreparedDragItemsResult {
+            items: prepared,
+            skipped,
+        })
+    }
+
+    async fn prepare_drag_item(
+        &self,
+        request: PrepareDragItemRequest,
+    ) -> Result<PreparedDragItem, (String, String)> {
+        let source_path = request.path.clone();
+        match self.prepare_drag_item_inner(request).await {
+            Ok(item) => Ok(item),
+            Err(error) => Err((source_path, error.to_string())),
+        }
+    }
+
+    async fn prepare_drag_item_inner(
+        &self,
+        request: PrepareDragItemRequest,
+    ) -> ApiResult<PreparedDragItem> {
+        let Some(source) = self.remote_target(&request.path) else {
+            self.reject_virtual_mount_container(&request.path, "drag")?;
+            let path = Path::new(&request.path);
+            if !path.exists() {
+                return Err(ApiError::Message(format!(
+                    "{} does not exist.",
+                    request.path
+                )));
+            }
+            let is_directory = path.is_dir();
+            return Ok(PreparedDragItem {
+                source_path: request.path.clone(),
+                local_path: request.path,
+                is_directory,
+                cached: true,
+            });
+        };
+
+        let file_name = Path::new(&source.remote_path)
+            .file_name()
+            .and_then(|value| value.to_str())
+            .filter(|value| !value.is_empty())
+            .unwrap_or("item")
+            .to_string();
+        let is_directory = request.is_directory;
+        if !is_directory {
+            let prepared = self
+                .prepare_remote_file_for_local_use(
+                    &source,
+                    request.size_bytes,
+                    request.remote_modified.as_deref(),
+                    "Preparing remote file for drag-out",
+                )
+                .await?;
+            return Ok(PreparedDragItem {
+                source_path: request.path,
+                local_path: prepared.local_path,
+                is_directory: false,
+                cached: prepared.cached,
+            });
+        }
+
+        cleanup_expired_drag_stage_dirs(&self.drag_stage_dir);
+        let stage_path = self
+            .drag_stage_dir
+            .join(format!(
+                "{}-{}",
+                now_epoch_ms(),
+                sanitize_drag_file_name(&file_name)
+            ))
+            .join(&file_name);
+        if let Some(parent) = stage_path.parent() {
+            tokio::fs::create_dir_all(parent).await.map_err(|error| {
+                ApiError::Message(format!(
+                    "Failed to prepare drag cache {}: {error}",
+                    parent.display()
+                ))
+            })?;
+        }
+        let _ = tokio::fs::remove_dir_all(&stage_path).await;
+        let mut record = FileTransferRecord::new(
+            FileTransferType::Download,
+            FileTransferItemType::Remote,
+            &file_name,
+        );
+        record.remote_source_name = source.remote_name.clone();
+        record.remote_source_path = source.remote_path.clone();
+        record.local_dest_path = display_path(&stage_path);
+        record.total_bytes = request.size_bytes.unwrap_or_default();
+        record.detail_message = "Preparing remote folder for drag-out".to_string();
+        let transfer_id = self.begin_transfer(record).await;
+        let result = self
+            .download_remote_item(&source, true, &stage_path, transfer_id, None)
+            .await;
+        self.finish_transfer(transfer_id, result).await?;
+
+        Ok(PreparedDragItem {
+            source_path: request.path,
+            local_path: display_path(&stage_path),
+            is_directory: true,
+            cached: false,
+        })
+    }
+
+    async fn prepare_remote_file_for_local_use(
+        &self,
+        source: &RemoteBrowseTarget,
+        size_bytes: Option<i64>,
+        remote_modified: Option<&str>,
+        detail_message: &str,
+    ) -> ApiResult<PreparedOpenItem> {
         let file_name = Path::new(&source.remote_path)
             .file_name()
             .and_then(|value| value.to_str())
@@ -395,8 +587,8 @@ impl ExplorerService {
         let cache_key = ClipboardRemoteFileCacheKey {
             remote_name: source.remote_name.clone(),
             remote_path: source.remote_path.clone(),
-            size: request.size_bytes.unwrap_or_default(),
-            last_modified: request.remote_modified.unwrap_or_default(),
+            size: size_bytes.unwrap_or_default(),
+            last_modified: remote_modified.unwrap_or_default().to_string(),
             is_dir: false,
         };
         let cache_id = ClipboardCache::remote_file_key(&cache_key);
@@ -419,11 +611,11 @@ impl ExplorerService {
         record.remote_source_name = source.remote_name.clone();
         record.remote_source_path = source.remote_path.clone();
         record.local_dest_path = display_path(&temp_path);
-        record.total_bytes = request.size_bytes.unwrap_or_default();
-        record.detail_message = "Preparing remote file to open".to_string();
+        record.total_bytes = size_bytes.unwrap_or_default();
+        record.detail_message = detail_message.to_string();
         let transfer_id = self.begin_transfer(record).await;
         let result = self
-            .download_remote_item(&source, false, &temp_path, transfer_id, None)
+            .download_remote_item(source, false, &temp_path, transfer_id, None)
             .await;
         self.finish_transfer(transfer_id, result).await?;
 
@@ -1329,6 +1521,7 @@ impl ExplorerService {
                 .cmp(&(!right.is_dir))
                 .then_with(|| left.name.to_lowercase().cmp(&right.name.to_lowercase()))
         });
+        let items = dedupe_remote_list_items(&target, items)?;
 
         let hidden_count = items
             .iter()
@@ -1515,7 +1708,13 @@ impl ExplorerService {
         ensure_not_canceled_if(cancellation)?;
         let response = self
             .proxy
-            .upload_file(remote_name, remote_directory, local_path, file_name)
+            .upload_file_with_cancellation(
+                remote_name,
+                remote_directory,
+                local_path,
+                file_name,
+                cancellation,
+            )
             .await?;
         let start: RemoteJobStart = response_json(response, "start remote upload").await?;
         self.wait_for_job(&start.job_id, transfer_id, cancellation)
@@ -1676,8 +1875,12 @@ impl ExplorerService {
         let items = serde_json::from_str::<Vec<RemoteListItem>>(&body).map_err(|error| {
             ApiError::Message(format!("Failed to parse remote list result: {error}"))
         })?;
+        let items = dedupe_remote_list_items(target, items)?;
+        let cache_body = serde_json::to_vec(&items).map_err(|error| {
+            ApiError::Message(format!("Failed to encode remote list cache: {error}"))
+        })?;
         self.listing_cache
-            .save(&target.remote_name, &target.remote_path, body.as_bytes())
+            .save(&target.remote_name, &target.remote_path, &cache_body)
             .await?;
         Ok(items)
     }
@@ -1934,6 +2137,46 @@ fn remote_item_is_directory(
         }
     }
     Ok(None)
+}
+
+fn remote_preview_metadata_from_items(
+    parent: &RemoteBrowseTarget,
+    target_path: &str,
+    items: &[RemoteListItem],
+) -> ApiResult<Option<(i64, String)>> {
+    for item in items {
+        if parent.child_remote_path(item)? != target_path {
+            continue;
+        }
+        if item.is_dir {
+            return Err(ApiError::Message(
+                "Only files can be previewed.".to_string(),
+            ));
+        }
+        if item.size >= 0 && item.size as u64 > MAX_PREVIEW_BYTES {
+            return Err(ApiError::Message(format!(
+                "Preview is limited to {} MB.",
+                MAX_PREVIEW_BYTES / (1024 * 1024)
+            )));
+        }
+        return Ok(Some((item.size, item.mod_time.clone())));
+    }
+    Ok(None)
+}
+
+fn dedupe_remote_list_items(
+    parent: &RemoteBrowseTarget,
+    items: Vec<RemoteListItem>,
+) -> ApiResult<Vec<RemoteListItem>> {
+    let mut seen_paths = BTreeSet::new();
+    let mut deduped = Vec::with_capacity(items.len());
+    for item in items {
+        let child_path = parent.child_remote_path(&item)?;
+        if seen_paths.insert(child_path) {
+            deduped.push(item);
+        }
+    }
+    Ok(deduped)
 }
 
 async fn ensure_destination_available(path: &Path) -> ApiResult<()> {
@@ -2452,6 +2695,8 @@ fn virtual_folder_rank(kind: &FileKind) -> u8 {
 enum PreviewFormat {
     Direct(&'static str),
     TranscodeImage(image::ImageFormat),
+    Pdf,
+    Psd,
 }
 
 fn preview_format(path: &Path) -> Option<PreviewFormat> {
@@ -2461,9 +2706,18 @@ fn preview_format(path: &Path) -> Option<PreviewFormat> {
         "gif" => Some(PreviewFormat::Direct("image/gif")),
         "bmp" => Some(PreviewFormat::Direct("image/bmp")),
         "webp" => Some(PreviewFormat::Direct("image/webp")),
-        "pdf" => Some(PreviewFormat::Direct("application/pdf")),
+        "svg" => Some(PreviewFormat::Direct("image/svg+xml")),
+        "pdf" => Some(PreviewFormat::Pdf),
+        "psd" => Some(PreviewFormat::Psd),
+        "txt" | "text" | "log" | "md" | "markdown" | "toml" | "yaml" | "yml" | "ini" | "conf"
+        | "cfg" | "csv" | "tsv" | "rs" | "go" | "js" | "jsx" | "ts" | "tsx" | "css" | "html"
+        | "xml" | "sh" | "zsh" | "bash" | "fish" | "py" | "rb" | "java" | "c" | "h" | "cpp"
+        | "hpp" | "swift" | "kt" | "sql" => {
+            Some(PreviewFormat::Direct("text/plain; charset=utf-8"))
+        }
+        "json" | "jsonc" => Some(PreviewFormat::Direct("application/json; charset=utf-8")),
         "tga" => Some(PreviewFormat::TranscodeImage(image::ImageFormat::Tga)),
-        "hdr" => Some(PreviewFormat::TranscodeImage(image::ImageFormat::Hdr)),
+        "hdr" | "pic" => Some(PreviewFormat::TranscodeImage(image::ImageFormat::Hdr)),
         "pbm" | "pgm" | "pnm" | "ppm" => {
             Some(PreviewFormat::TranscodeImage(image::ImageFormat::Pnm))
         }
@@ -2471,8 +2725,221 @@ fn preview_format(path: &Path) -> Option<PreviewFormat> {
     }
 }
 
+async fn read_preview_file(path: &Path) -> ApiResult<Vec<u8>> {
+    tokio::fs::read(path).await.map_err(|error| {
+        ApiError::Message(format!(
+            "Failed to read preview file {}: {error}",
+            path.display()
+        ))
+    })
+}
+
+fn transcode_psd_preview_png(bytes: &[u8], path: &Path) -> ApiResult<Vec<u8>> {
+    use zune_psd::zune_core::{bytestream::ZCursor, result::DecodingResult};
+
+    let mut decoder = zune_psd::PSDDecoder::new(ZCursor::new(bytes));
+    let decoded = decoder.decode().map_err(|error| {
+        ApiError::Message(format!(
+            "Failed to decode PSD preview {}: {error:?}",
+            path.display()
+        ))
+    })?;
+    let (width, height) = decoder.dimensions().ok_or_else(|| {
+        ApiError::Message(format!(
+            "Failed to decode PSD preview {}: missing dimensions",
+            path.display()
+        ))
+    })?;
+    let color_space = decoder.colorspace().ok_or_else(|| {
+        ApiError::Message(format!(
+            "Failed to decode PSD preview {}: unsupported color space",
+            path.display()
+        ))
+    })?;
+    let rgba = match decoded {
+        DecodingResult::U8(pixels) => psd_pixels_to_rgba8(&pixels, color_space),
+        DecodingResult::U16(pixels) => {
+            let pixels = pixels
+                .into_iter()
+                .map(|value| (value >> 8) as u8)
+                .collect::<Vec<_>>();
+            psd_pixels_to_rgba8(&pixels, color_space)
+        }
+        _ => None,
+    }
+    .ok_or_else(|| {
+        ApiError::Message(format!(
+            "Failed to decode PSD preview {}: unsupported pixel layout",
+            path.display()
+        ))
+    })?;
+    let image = image::RgbaImage::from_raw(width as u32, height as u32, rgba).ok_or_else(|| {
+        ApiError::Message(format!(
+            "Failed to decode PSD preview {}: invalid pixel buffer",
+            path.display()
+        ))
+    })?;
+    let mut encoded = Cursor::new(Vec::new());
+    image
+        .write_to(&mut encoded, image::ImageFormat::Png)
+        .map_err(|error| {
+            ApiError::Message(format!(
+                "Failed to encode PSD preview {}: {error}",
+                path.display()
+            ))
+        })?;
+    Ok(encoded.into_inner())
+}
+
+fn psd_pixels_to_rgba8(
+    pixels: &[u8],
+    color_space: zune_psd::zune_core::colorspace::ColorSpace,
+) -> Option<Vec<u8>> {
+    use zune_psd::zune_core::colorspace::ColorSpace;
+
+    let channels = color_space.num_components();
+    if channels == 0 || pixels.len() % channels != 0 {
+        return None;
+    }
+    let mut rgba = Vec::with_capacity((pixels.len() / channels) * 4);
+    for chunk in pixels.chunks_exact(channels) {
+        match color_space {
+            ColorSpace::RGB => rgba.extend_from_slice(&[chunk[0], chunk[1], chunk[2], 255]),
+            ColorSpace::RGBA => rgba.extend_from_slice(&[chunk[0], chunk[1], chunk[2], chunk[3]]),
+            ColorSpace::Luma => rgba.extend_from_slice(&[chunk[0], chunk[0], chunk[0], 255]),
+            ColorSpace::LumaA => rgba.extend_from_slice(&[chunk[0], chunk[0], chunk[0], chunk[1]]),
+            _ => return None,
+        }
+    }
+    Some(rgba)
+}
+
+async fn render_pdf_preview_png(
+    path: &Path,
+    metadata: &std::fs::Metadata,
+) -> ApiResult<Option<Vec<u8>>> {
+    let Some(mutool) = find_mutool() else {
+        return Ok(None);
+    };
+    let out_path = pdf_preview_path(path, metadata);
+    if let Some(parent) = out_path.parent() {
+        tokio::fs::create_dir_all(parent).await.map_err(|error| {
+            ApiError::Message(format!(
+                "Failed to create PDF preview directory {}: {error}",
+                parent.display()
+            ))
+        })?;
+    }
+    let status = Command::new(mutool)
+        .arg("draw")
+        .arg("-o")
+        .arg(&out_path)
+        .arg("-F")
+        .arg("png")
+        .arg("-r")
+        .arg("140")
+        .arg(path)
+        .arg("1")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
+    if !status.is_ok_and(|status| status.success()) {
+        return Ok(None);
+    }
+    match tokio::fs::read(&out_path).await {
+        Ok(bytes) if !bytes.is_empty() => Ok(Some(bytes)),
+        _ => Ok(None),
+    }
+}
+
+fn find_mutool() -> Option<&'static str> {
+    if Command::new("sh")
+        .arg("-c")
+        .arg("command -v mutool >/dev/null 2>&1")
+        .status()
+        .is_ok_and(|status| status.success())
+    {
+        return Some("mutool");
+    }
+    #[cfg(target_os = "macos")]
+    {
+        if Path::new("/opt/homebrew/bin/mutool").is_file() {
+            return Some("/opt/homebrew/bin/mutool");
+        }
+        if Path::new("/usr/local/bin/mutool").is_file() {
+            return Some("/usr/local/bin/mutool");
+        }
+    }
+    None
+}
+
+fn pdf_preview_path(path: &Path, metadata: &std::fs::Metadata) -> PathBuf {
+    let mut hasher = Sha256::new();
+    hasher.update(path.to_string_lossy().as_bytes());
+    hasher.update(metadata.len().to_le_bytes());
+    if let Ok(modified) = metadata.modified() {
+        if let Ok(duration) = modified.duration_since(UNIX_EPOCH) {
+            hasher.update(duration.as_millis().to_le_bytes());
+        }
+    }
+    let digest = hasher.finalize();
+    std::env::temp_dir().join(format!("misty-preview-{}.png", hex::encode(&digest[..16])))
+}
+
 fn display_path(path: &Path) -> String {
     path.to_string_lossy().to_string()
+}
+
+fn sanitize_drag_file_name(name: &str) -> String {
+    let mut sanitized = String::with_capacity(name.len());
+    for character in name.chars() {
+        if matches!(character, '/' | '\\' | ':' | '\0') || character.is_control() {
+            sanitized.push('_');
+        } else {
+            sanitized.push(character);
+        }
+    }
+    let trimmed = sanitized.trim_matches([' ', '.']).trim();
+    if trimmed.is_empty() {
+        "item".to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+fn cleanup_expired_drag_stage_dirs(root: &Path) {
+    let Ok(entries) = std::fs::read_dir(root) else {
+        return;
+    };
+    let now_ms = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis()
+        .min(i64::MAX as u128) as i64;
+    let ttl_ms = ClipboardCache::DEFAULT_TTL_HOURS * 60 * 60 * 1000;
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let Ok(metadata) = entry.metadata() else {
+            continue;
+        };
+        if !metadata.is_dir() {
+            continue;
+        }
+        let modified_ms = metadata
+            .modified()
+            .ok()
+            .and_then(|modified| modified.duration_since(UNIX_EPOCH).ok())
+            .map(|duration| duration.as_millis().min(i64::MAX as u128) as i64)
+            .unwrap_or_default();
+        if drag_stage_entry_expired(modified_ms, now_ms, ttl_ms) {
+            let _ = std::fs::remove_dir_all(path);
+        }
+    }
+}
+
+fn drag_stage_entry_expired(modified_ms: i64, now_ms: i64, ttl_ms: i64) -> bool {
+    modified_ms <= 0 || now_ms.saturating_sub(modified_ms) > ttl_ms
 }
 
 #[cfg(test)]
@@ -2515,6 +2982,84 @@ mod tests {
             remote_item_is_directory(&parent, "/Documents/missing.txt", &items).unwrap(),
             None
         );
+    }
+
+    #[test]
+    fn remote_preview_metadata_rejects_directories_and_oversized_files() {
+        let parent = RemoteBrowseTarget {
+            provider_type: "drive".into(),
+            remote_name: "work".into(),
+            remote_path: "/Documents".into(),
+        };
+        let items = vec![
+            RemoteListItem {
+                name: "notes.txt".into(),
+                path: "notes.txt".into(),
+                size: 128,
+                mod_time: "2026-06-21T00:00:00Z".into(),
+                ..remote_list_item_default()
+            },
+            RemoteListItem {
+                name: "Archive".into(),
+                path: "Archive".into(),
+                is_dir: true,
+                ..remote_list_item_default()
+            },
+            RemoteListItem {
+                name: "large.pdf".into(),
+                path: "large.pdf".into(),
+                size: (MAX_PREVIEW_BYTES + 1) as i64,
+                ..remote_list_item_default()
+            },
+        ];
+
+        assert_eq!(
+            remote_preview_metadata_from_items(&parent, "/Documents/notes.txt", &items).unwrap(),
+            Some((128, "2026-06-21T00:00:00Z".into()))
+        );
+        assert!(remote_preview_metadata_from_items(&parent, "/Documents/Archive", &items).is_err());
+        assert!(
+            remote_preview_metadata_from_items(&parent, "/Documents/large.pdf", &items).is_err()
+        );
+        assert_eq!(
+            remote_preview_metadata_from_items(&parent, "/Documents/missing.txt", &items).unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn remote_list_items_are_deduped_by_resolved_path() {
+        let parent = RemoteBrowseTarget {
+            provider_type: "drive".into(),
+            remote_name: "work".into(),
+            remote_path: "/Documents".into(),
+        };
+        let items = vec![
+            RemoteListItem {
+                name: "fig2_topo.pdf".into(),
+                path: "fig2_topo.pdf".into(),
+                size: 1024,
+                ..remote_list_item_default()
+            },
+            RemoteListItem {
+                name: "fig2_topo.pdf".into(),
+                path: "/Documents/fig2_topo.pdf".into(),
+                size: 1024,
+                ..remote_list_item_default()
+            },
+            RemoteListItem {
+                name: "Misty_Terms_of_Service.docx".into(),
+                path: "Misty_Terms_of_Service.docx".into(),
+                size: 2048,
+                ..remote_list_item_default()
+            },
+        ];
+
+        let deduped = dedupe_remote_list_items(&parent, items).unwrap();
+
+        assert_eq!(deduped.len(), 2);
+        assert_eq!(deduped[0].name, "fig2_topo.pdf");
+        assert_eq!(deduped[1].name, "Misty_Terms_of_Service.docx");
     }
 
     #[test]
@@ -2571,30 +3116,131 @@ mod tests {
     async fn local_preview_payload_is_typed_and_rejects_unsupported_files() {
         let root = unique_test_dir("preview-payload");
         let image = root.join("image.png");
+        let svg = root.join("vector.svg");
         let pnm = root.join("pixel.ppm");
-        let unsupported = root.join("notes.txt");
+        let psd = root.join("pixel.psd");
+        let text = root.join("notes.txt");
+        let unsupported = root.join("payload.bin");
         tokio::fs::create_dir_all(&root).await.unwrap();
         tokio::fs::write(&image, [0x89, b'P', b'N', b'G'])
+            .await
+            .unwrap();
+        tokio::fs::write(&svg, br#"<svg xmlns="http://www.w3.org/2000/svg"/>"#)
             .await
             .unwrap();
         tokio::fs::write(&pnm, b"P3\n1 1\n255\n255 0 0\n")
             .await
             .unwrap();
-        tokio::fs::write(&unsupported, b"notes").await.unwrap();
+        tokio::fs::write(&psd, minimal_rgb_psd()).await.unwrap();
+        tokio::fs::write(&text, b"notes").await.unwrap();
+        tokio::fs::write(&unsupported, b"binary").await.unwrap();
 
         let service = test_explorer_service();
         let preview = service.preview_item(&display_path(&image)).await.unwrap();
         assert_eq!(preview.mime_type, "image/png");
         assert_eq!(preview.bytes, vec![0x89, b'P', b'N', b'G']);
+        let svg_preview = service.preview_item(&display_path(&svg)).await.unwrap();
+        assert_eq!(svg_preview.mime_type, "image/svg+xml");
+        assert_eq!(
+            svg_preview.bytes,
+            br#"<svg xmlns="http://www.w3.org/2000/svg"/>"#
+        );
         let transcoded = service.preview_item(&display_path(&pnm)).await.unwrap();
         assert_eq!(transcoded.mime_type, "image/png");
         assert!(transcoded.bytes.starts_with(&[0x89, b'P', b'N', b'G']));
+        let psd_preview = service.preview_item(&display_path(&psd)).await.unwrap();
+        assert_eq!(psd_preview.mime_type, "image/png");
+        assert!(psd_preview.bytes.starts_with(&[0x89, b'P', b'N', b'G']));
+        let text_preview = service.preview_item(&display_path(&text)).await.unwrap();
+        assert_eq!(text_preview.mime_type, "text/plain; charset=utf-8");
+        assert_eq!(text_preview.bytes, b"notes");
         assert!(service
             .preview_item(&display_path(&unsupported))
             .await
             .is_err());
 
         let _ = tokio::fs::remove_dir_all(&root).await;
+    }
+
+    #[test]
+    fn preview_format_matches_imgui_radiance_pic_support() {
+        assert!(matches!(
+            preview_format(Path::new("studio-lighting.pic")),
+            Some(PreviewFormat::TranscodeImage(image::ImageFormat::Hdr))
+        ));
+        assert!(matches!(
+            preview_format(Path::new("thumbnail.psd")),
+            Some(PreviewFormat::Psd)
+        ));
+    }
+
+    fn minimal_rgb_psd() -> Vec<u8> {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(b"8BPS");
+        bytes.extend_from_slice(&1u16.to_be_bytes());
+        bytes.extend_from_slice(&[0; 6]);
+        bytes.extend_from_slice(&3u16.to_be_bytes());
+        bytes.extend_from_slice(&1u32.to_be_bytes());
+        bytes.extend_from_slice(&1u32.to_be_bytes());
+        bytes.extend_from_slice(&8u16.to_be_bytes());
+        bytes.extend_from_slice(&3u16.to_be_bytes());
+        bytes.extend_from_slice(&0u32.to_be_bytes());
+        bytes.extend_from_slice(&0u32.to_be_bytes());
+        bytes.extend_from_slice(&0u32.to_be_bytes());
+        bytes.extend_from_slice(&0u16.to_be_bytes());
+        bytes.extend_from_slice(&[255, 0, 0]);
+        bytes
+    }
+
+    #[tokio::test]
+    async fn pdf_preview_path_tracks_file_identity() {
+        let root = unique_test_dir("pdf-preview-path");
+        let first = root.join("first.pdf");
+        let second = root.join("second.pdf");
+        tokio::fs::create_dir_all(&root).await.unwrap();
+        tokio::fs::write(&first, b"%PDF-first").await.unwrap();
+        tokio::fs::write(&second, b"%PDF-second").await.unwrap();
+
+        let first_metadata = tokio::fs::metadata(&first).await.unwrap();
+        let second_metadata = tokio::fs::metadata(&second).await.unwrap();
+        let first_path = pdf_preview_path(&first, &first_metadata);
+        let repeated_first_path = pdf_preview_path(&first, &first_metadata);
+        let second_path = pdf_preview_path(&second, &second_metadata);
+
+        assert_eq!(first_path, repeated_first_path);
+        assert_ne!(first_path, second_path);
+        assert_eq!(
+            first_path.extension().and_then(|value| value.to_str()),
+            Some("png")
+        );
+
+        let _ = tokio::fs::remove_dir_all(&root).await;
+    }
+
+    #[test]
+    fn drag_stage_file_names_are_sanitized() {
+        assert_eq!(sanitize_drag_file_name("report.pdf"), "report.pdf");
+        assert_eq!(sanitize_drag_file_name("../bad:name"), "_bad_name");
+        assert_eq!(sanitize_drag_file_name("..."), "item");
+        assert_eq!(sanitize_drag_file_name("  "), "item");
+        assert_eq!(
+            sanitize_drag_file_name("bad\u{0007}name.txt"),
+            "bad_name.txt"
+        );
+    }
+
+    #[test]
+    fn drag_stage_expiration_uses_remote_open_cache_ttl() {
+        let ttl_ms = ClipboardCache::DEFAULT_TTL_HOURS * 60 * 60 * 1000;
+        let now_ms = ttl_ms * 2;
+
+        assert!(!drag_stage_entry_expired(now_ms - ttl_ms, now_ms, ttl_ms));
+        assert!(drag_stage_entry_expired(
+            now_ms - ttl_ms - 1,
+            now_ms,
+            ttl_ms
+        ));
+        assert!(drag_stage_entry_expired(0, now_ms, ttl_ms));
     }
 
     #[tokio::test]

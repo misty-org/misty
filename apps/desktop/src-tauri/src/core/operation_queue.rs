@@ -119,6 +119,7 @@ pub struct OperationQueueSnapshot {
     pub conflict_dialog: ConflictDialogState,
     pub active_count: usize,
     pub max_concurrent: usize,
+    pub redo_available: bool,
 }
 
 #[derive(Default)]
@@ -348,6 +349,30 @@ impl OperationQueue {
         true
     }
 
+    pub async fn skip(&self, operation_id: u64) -> bool {
+        let mut inner = self.inner.lock().await;
+        let Some(status) = inner
+            .operations
+            .get(&operation_id)
+            .map(|operation| operation.status)
+        else {
+            return false;
+        };
+        if status == OperationStatus::Canceled {
+            return true;
+        }
+        if status == OperationStatus::InProgress {
+            inner.active_count = inner.active_count.saturating_sub(1);
+        }
+        let operation = inner
+            .operations
+            .get_mut(&operation_id)
+            .expect("operation exists");
+        operation.status = OperationStatus::Skipped;
+        operation.error_message.clear();
+        true
+    }
+
     pub async fn cancel(&self, operation_id: u64) -> bool {
         let mut inner = self.inner.lock().await;
         let Some(operation) = inner.operations.get_mut(&operation_id) else {
@@ -383,6 +408,55 @@ impl OperationQueue {
         true
     }
 
+    pub async fn cancel_batch(&self, batch_id: u64) -> Vec<u64> {
+        let mut inner = self.inner.lock().await;
+        let Some(operation_ids) = inner
+            .batches
+            .get(&batch_id)
+            .map(|batch| batch.operation_ids.clone())
+        else {
+            return Vec::new();
+        };
+        let mut canceled = Vec::new();
+        for operation_id in operation_ids {
+            let was_active = {
+                let Some(operation) = inner.operations.get_mut(&operation_id) else {
+                    continue;
+                };
+                if !operation.cancelable
+                    || !matches!(
+                        operation.status,
+                        OperationStatus::Queued
+                            | OperationStatus::InProgress
+                            | OperationStatus::WaitingForResolution
+                    )
+                {
+                    continue;
+                }
+                let was_active = operation.status == OperationStatus::InProgress;
+                operation.status = OperationStatus::Canceled;
+                operation.cancelable = false;
+                was_active
+            };
+            if was_active {
+                inner.active_count = inner.active_count.saturating_sub(1);
+            }
+            canceled.push(operation_id);
+        }
+        if canceled.is_empty() {
+            return canceled;
+        }
+        inner.pending.retain(|id| !canceled.contains(id));
+        if inner.conflict_dialog.batch_id == batch_id {
+            inner.conflict_dialog = ConflictDialogState::default();
+        }
+        if let Some(batch) = inner.batches.get_mut(&batch_id) {
+            batch.paused = false;
+            batch.paused_operation_id = 0;
+        }
+        canceled
+    }
+
     pub async fn retry(&self, operation_id: u64) -> bool {
         let mut inner = self.inner.lock().await;
         let Some(operation) = inner.operations.get_mut(&operation_id) else {
@@ -409,6 +483,7 @@ impl OperationQueue {
             conflict_dialog: inner.conflict_dialog.clone(),
             active_count: inner.active_count,
             max_concurrent: inner.max_concurrent,
+            redo_available: false,
         }
     }
 
@@ -570,5 +645,26 @@ mod tests {
         assert!(queue.wait_for_conflict(first.operation_id).await);
         assert!(queue.cancel(first.operation_id).await);
         assert_eq!(queue.take_ready().await.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn canceling_conflict_batch_cancels_waiting_and_queued_operations() {
+        let queue = OperationQueue::new(1);
+        queue
+            .enqueue_batch("copy", true, vec![descriptor("one"), descriptor("two")])
+            .await;
+        let first = queue.take_ready().await.remove(0);
+        assert!(queue.wait_for_conflict(first.operation_id).await);
+
+        let canceled = queue.cancel_batch(first.batch_id).await;
+        assert_eq!(canceled.len(), 2);
+
+        let snapshot = queue.snapshot().await;
+        assert!(!snapshot.conflict_dialog.open);
+        assert_eq!(snapshot.active_count, 0);
+        assert!(snapshot.operations.iter().all(|operation| {
+            operation.status == OperationStatus::Canceled && !operation.cancelable
+        }));
+        assert!(queue.take_ready().await.is_empty());
     }
 }

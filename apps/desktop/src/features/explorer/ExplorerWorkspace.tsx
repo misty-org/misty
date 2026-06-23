@@ -2,6 +2,7 @@ import {
   AppWindow,
   Clipboard,
   Copy,
+  Download,
   FilePlus,
   Eye,
   FolderPlus,
@@ -33,7 +34,10 @@ import {
   clipboardSharedImageBytes,
   clipboardWriteFileRefs,
   devicesSnapshot,
+  explorerPrepareDragItems,
+  operationQueueRedo,
   operationQueueUndo,
+  pluginCommandRun,
   pluginCommandsSnapshot,
   shortcutsSnapshot,
   transfersSnapshot,
@@ -47,9 +51,11 @@ import {
   explorerWorkspaceNeedsSave,
   scheduleExplorerWorkspaceSave,
   selectedEntryForPane,
+  selectedPathsForPane,
   useExplorerStore,
 } from "./state/useExplorerStore";
 import type { ExplorerInlineEditState, ExplorerNotification } from "./state/useExplorerStore";
+import { useClaudeSessionStore } from "./state/useClaudeSessionStore";
 import { useMultiPanelStore } from "../../shared/multipanel/useMultiPanelStore";
 import { useProvidersStore } from "../providers/useProvidersStore";
 import type {
@@ -69,7 +75,10 @@ import { useOperationQueueStore } from "../transfers/useOperationQueueStore";
 import { useTransfersStore } from "../transfers/useTransfersStore";
 import { shortcutMapFromBindings, shortcutMatchesEvent } from "../../shared/shortcuts";
 import type { ShortcutMap } from "../../shared/shortcuts";
+import { selectAdvancedPreferences, selectGeneralPreferences, selectShortcutPreferences, useSettingsStore } from "../settings/useSettingsStore";
 import { errorText } from "../../shared/format";
+import { pluginCatalogChangedEvent } from "../plugins/pluginEvents";
+import { publishPluginNotifications } from "../plugins/pluginNotifications";
 import { clipboardImagePng } from "./utils/clipboardImage";
 import { formatBytes } from "./utils/fileFormat";
 
@@ -86,6 +95,8 @@ const emptyPinnedPaths: string[] = [];
 const emptyProviderRemotes: ProviderRemote[] = [];
 const emptyPluginCommands: PluginCommandEntry[] = [];
 const emptyMountedDevices: MountedDevice[] = [];
+const emptyInspectorTags: string[] = [];
+
 const executableShortcutCommands = [
   "app.open_settings",
   "app.toggle_transfers",
@@ -100,6 +111,7 @@ const executableShortcutCommands = [
   "explorer.undo",
   "explorer.redo",
   "explorer.delete",
+  "explorer.download",
   "explorer.rename",
   "explorer.refresh",
   "explorer.new_tab",
@@ -192,6 +204,18 @@ const defaultNonMacExplorerShortcuts: ShortcutMap = {
   "explorer.tab_9": "Ctrl+9",
 };
 
+const vscodeExplorerShortcutOverrides: ShortcutMap = {
+  "explorer.open_palette": "Primary+Shift+P",
+  "search.toggle": "Primary+P",
+};
+
+const finderExplorerShortcutOverrides: ShortcutMap = {
+  "explorer.open_palette": "Primary+Shift+P",
+  "search.toggle": "Primary+F",
+  "explorer.delete": "Primary+Backspace",
+  "explorer.rename": "Enter",
+};
+
 type ResizeTarget = "sidebar" | "preview" | "claude" | null;
 type ExternalDropTarget = {
   paneId: string;
@@ -276,12 +300,21 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
   const pluginCommandsRef = useRef<PluginCommandEntry[]>(emptyPluginCommands);
   const [mountedDevices, setMountedDevices] = useState<MountedDevice[]>(emptyMountedDevices);
   const [devicesLoading, setDevicesLoading] = useState(false);
-  const homePath = app?.environment.homeDir ?? "/";
-  const mountRoot = resolveMountRoot(homePath, app?.environment.mountPath ?? ".misty/mnt");
+  const { preferredWorkspaceRoot, settingsLoaded, settingsMountPath } = useSettingsStore(useShallow((state) => ({
+    preferredWorkspaceRoot: selectGeneralPreferences(state.settings?.document).preferredWorkspaceRoot,
+    settingsMountPath: selectAdvancedPreferences(state.settings?.document).mountPath,
+    settingsLoaded: state.loaded,
+  })));
+  const shortcutPreferences = useSettingsStore(useShallow((state) =>
+    selectShortcutPreferences(state.settings?.document),
+  ));
+  const environmentHomePath = app?.environment.homeDir ?? "/";
+  const homePath = resolvePreferredWorkspaceRoot(preferredWorkspaceRoot, environmentHomePath);
+  const mountRoot = resolveMountRoot(homePath, settingsMountPath || app?.environment.mountPath || ".misty/mnt");
   const activePath = useExplorerStore((state) => state.panes[activePaneId]?.listing?.path ?? homePath);
   const activePaneIdRef = useRef(activePaneId);
   const activePathRef = useRef(activePath);
-  const shortcutMapRef = useRef<ShortcutMap>(defaultExplorerShortcutMap());
+  const shortcutMapRef = useRef<ShortcutMap>(defaultExplorerShortcutMap(shortcutPreferences.keymapIndex));
   const executableCommandIdsRef = useRef<readonly string[]>(executableShortcutCommands);
   const workspacePaths = useMemo(
     () => workspacePathSignature.split("\n").filter(Boolean),
@@ -303,10 +336,10 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
   }, [activePaneId, activePath]);
 
   useEffect(() => {
-    if (app?.environment.homeDir) {
-      void initialize(app.environment.homeDir);
+    if (app?.environment.homeDir && settingsLoaded) {
+      void initialize(homePath);
     }
-  }, [app?.environment.homeDir, initialize]);
+  }, [app?.environment.homeDir, homePath, initialize, settingsLoaded]);
 
   useEffect(() => {
     if (!operationError) {
@@ -353,7 +386,10 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
           pluginCommandsSnapshot(),
         ]);
         if (!disposed) {
-          const shortcutMap = shortcutMapFromBindings(shortcutSnapshot.bindings, defaultExplorerShortcutMap());
+          const fallbackShortcuts = defaultExplorerShortcutMap(shortcutPreferences.keymapIndex);
+          const shortcutMap = shortcutPreferences.customShortcutsEnabled
+            ? shortcutMapFromBindings(shortcutSnapshot.bindings, fallbackShortcuts)
+            : fallbackShortcuts;
           for (const command of pluginSnapshot.commands) {
             if (command.defaultShortcut && !shortcutMap[command.id]) {
               shortcutMap[command.id] = command.defaultShortcut;
@@ -369,7 +405,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
         }
       } catch {
         if (!disposed) {
-          shortcutMapRef.current = defaultExplorerShortcutMap();
+          shortcutMapRef.current = defaultExplorerShortcutMap(shortcutPreferences.keymapIndex);
           executableCommandIdsRef.current = executableShortcutCommands;
           pluginCommandsRef.current = emptyPluginCommands;
           setPluginCommands((current) => current.length === 0 ? current : emptyPluginCommands);
@@ -378,11 +414,13 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
     };
     void loadCommandMetadata();
     window.addEventListener("focus", loadCommandMetadata);
+    window.addEventListener(pluginCatalogChangedEvent, loadCommandMetadata);
     return () => {
       disposed = true;
       window.removeEventListener("focus", loadCommandMetadata);
+      window.removeEventListener(pluginCatalogChangedEvent, loadCommandMetadata);
     };
-  }, []);
+  }, [shortcutPreferences.customShortcutsEnabled, shortcutPreferences.keymapIndex]);
 
   const refreshDevices = useCallback(async () => {
     if (deviceRefreshInFlightRef.current) return;
@@ -451,7 +489,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
       if (commandId) {
         event.preventDefault();
         const pluginCommand = pluginCommandsRef.current.find((command) => command.id === commandId);
-        if (pluginCommand) runPluginCommand(pluginCommand, navigate);
+        if (pluginCommand) void runPluginCommand(pluginCommand, paneId, navigate);
         else runExplorerCommand(commandId, paneId, navigate);
       } else if (event.altKey && event.key === "ArrowLeft") {
         event.preventDefault();
@@ -1080,7 +1118,7 @@ const ConnectedExplorerToolbar = memo(function ConnectedExplorerToolbar(props: {
   const onRunCommand = useCallback((commandId: string) => {
     const pluginCommand = pluginCommandById.get(commandId);
     if (pluginCommand) {
-      runPluginCommand(pluginCommand, props.onNavigateRoute);
+      void runPluginCommand(pluginCommand, props.paneId, props.onNavigateRoute);
       return;
     }
     runExplorerCommand(commandId, props.paneId, props.onNavigateRoute);
@@ -1127,10 +1165,17 @@ function shortcutCommandForEvent(
   return null;
 }
 
-function defaultExplorerShortcutMap(): ShortcutMap {
-  return /mac|iphone|ipad|ipod/i.test(navigator.platform)
+function defaultExplorerShortcutMap(keymapIndex = 0): ShortcutMap {
+  const base = /mac|iphone|ipad|ipod/i.test(navigator.platform)
     ? defaultMacExplorerShortcuts
     : defaultNonMacExplorerShortcuts;
+  if (keymapIndex === 1) {
+    return { ...base, ...vscodeExplorerShortcutOverrides };
+  }
+  if (keymapIndex === 2) {
+    return { ...base, ...finderExplorerShortcutOverrides };
+  }
+  return { ...base };
 }
 
 function runExplorerCommand(commandId: string, paneId: string, navigateRoute: (path: string) => void): void {
@@ -1138,9 +1183,7 @@ function runExplorerCommand(commandId: string, paneId: string, navigateRoute: (p
   const multi = useMultiPanelStore.getState();
   const activeTab = multi.tabs.find((tab) => tab.id === multi.activeTabId) ?? multi.tabs[0];
   if (commandId.startsWith("plugin.")) {
-    useExplorerStore.setState({
-      operationError: `Plugin command "${commandId}" is discovered, but plugin command execution is not available in the Tauri explorer yet.`,
-    });
+    void runPluginCommandById(commandId, paneId, navigateRoute);
     return;
   }
   switch (commandId) {
@@ -1193,6 +1236,9 @@ function runExplorerCommand(commandId: string, paneId: string, navigateRoute: (p
     case "explorer.delete":
       void explorer.deleteSelected(paneId);
       break;
+    case "explorer.download":
+      void explorer.downloadSelected(paneId);
+      break;
     case "explorer.open_with":
       void explorer.openWithSelected(paneId);
       break;
@@ -1209,7 +1255,7 @@ function runExplorerCommand(commandId: string, paneId: string, navigateRoute: (p
       void undoLatestTransferOperation();
       break;
     case "explorer.redo":
-      explorer.pushNotification("Redo is not available for file operations yet.", "info", 3500);
+      void redoLatestTransferOperation();
       break;
     case "explorer.toggle_hidden":
       void explorer.toggleHidden(paneId);
@@ -1221,6 +1267,9 @@ function runExplorerCommand(commandId: string, paneId: string, navigateRoute: (p
       explorer.setSidebarVisible(!explorer.sidebarVisible);
       break;
     case "explorer.toggle_chat":
+      if (explorer.chatOverlayOpen && !useClaudeSessionStore.getState().status?.running) {
+        useClaudeSessionStore.getState().clearConversation();
+      }
       explorer.toggleChatOverlay();
       break;
     case "explorer.toggle_claude":
@@ -1250,15 +1299,50 @@ function runExplorerCommand(commandId: string, paneId: string, navigateRoute: (p
   }
 }
 
-function runPluginCommand(command: PluginCommandEntry, navigateRoute: (path: string) => void): void {
-  if (command.source === "launcher") {
-    navigateRoute("/hub/plugins");
-    return;
+async function runPluginCommand(
+  command: PluginCommandEntry,
+  paneId: string,
+  navigateRoute: (path: string) => void,
+): Promise<void> {
+  try {
+    const selectedPaths = selectedPathsForPane(useExplorerStore.getState().panes[paneId]);
+    const result = await pluginCommandRun({ commandId: command.id, selectedPaths });
+    if (result.targetRoute) navigateRoute(result.targetRoute);
+    if (result.handled) {
+      publishPluginNotifications(result.notifications, result.message);
+      return;
+    }
+    useExplorerStore.setState({
+      operationError: `Plugin command "${result.label}" could not run: ${result.message}`,
+    });
+  } catch (error) {
+    useExplorerStore.setState({
+      operationError: `Plugin command "${command.label}" failed: ${errorText(error)}`,
+    });
   }
-  navigateRoute("/hub/plugins");
-  useExplorerStore.setState({
-    operationError: `Plugin command "${command.id}" is discovered, but plugin command execution is not available in the Tauri explorer yet.`,
-  });
+}
+
+async function runPluginCommandById(
+  commandId: string,
+  paneId: string,
+  navigateRoute: (path: string) => void,
+): Promise<void> {
+  try {
+    const selectedPaths = selectedPathsForPane(useExplorerStore.getState().panes[paneId]);
+    const result = await pluginCommandRun({ commandId, selectedPaths });
+    if (result.targetRoute) navigateRoute(result.targetRoute);
+    if (result.handled) {
+      publishPluginNotifications(result.notifications, result.message);
+      return;
+    }
+    useExplorerStore.setState({
+      operationError: `Plugin command "${result.label}" could not run: ${result.message}`,
+    });
+  } catch (error) {
+    useExplorerStore.setState({
+      operationError: `Plugin command "${commandId}" failed: ${errorText(error)}`,
+    });
+  }
 }
 
 function focusExplorerSearch(paneId: string, mode: "search" | "command"): void {
@@ -1283,6 +1367,18 @@ async function undoLatestTransferOperation(): Promise<void> {
     explorer.pushNotification(`Undo queued for ${latest.fileName || transferTypeLabel(latest.transferType)}.`, "success", 3500);
   } catch (error) {
     explorer.pushNotification(`Undo failed: ${errorText(error)}`, "error", 4500);
+  }
+}
+
+async function redoLatestTransferOperation(): Promise<void> {
+  const explorer = useExplorerStore.getState();
+  try {
+    const snapshot = await operationQueueRedo();
+    useOperationQueueStore.setState({ snapshot, error: null });
+    await useTransfersStore.getState().load(undefined, { silent: true });
+    explorer.pushNotification("Redo queued.", "success", 3500);
+  } catch (error) {
+    explorer.pushNotification(`Redo failed: ${errorText(error)}`, "error", 4500);
   }
 }
 
@@ -1369,7 +1465,19 @@ async function writeSharedClipboardPayload(payload: ClipboardPayload): Promise<v
       return;
     case "file_refs": {
       const localItems = sharedClipboardLocalPasteItems(payload);
-      if (localItems.length > 0 && await clipboardWriteFileRefs(localItems)) return;
+      const remoteItems = await sharedClipboardRemotePasteItems(payload);
+      const nativeItems = [...localItems, ...remoteItems];
+      if (nativeItems.length > 0 && await clipboardWriteFileRefs(nativeItems)) {
+        if (remoteItems.length > 0) {
+          useExplorerStore.getState().pushNotification(
+            `Prepared ${remoteItems.length} shared remote ${remoteItems.length === 1 ? "item" : "items"} for clipboard.`,
+            "success",
+            3500,
+            false,
+          );
+        }
+        return;
+      }
       const text = sharedClipboardText(payload);
       if (!text) break;
       await writeText(text);
@@ -1396,7 +1504,7 @@ function sharedClipboardText(payload: ClipboardPayload): string {
       return payload.html || payload.text;
     case "file_refs":
       return payload.file_refs
-        .map((ref) => ref.local_path || (ref.remote_name ? `${ref.remote_name}:${ref.remote_path}` : ref.remote_path))
+        .map((ref) => ref.local_path || sharedClipboardRemoteLabel(ref))
         .filter(Boolean)
         .join("\n");
     default:
@@ -1404,36 +1512,128 @@ function sharedClipboardText(payload: ClipboardPayload): string {
   }
 }
 
+function sharedClipboardRemoteLabel(ref: ClipboardPayload["file_refs"][number]): string {
+  const providerType = clipboardRefValue(ref.provider_type);
+  const remoteName = clipboardRefValue(ref.remote_name);
+  const remotePath = clipboardRefValue(ref.remote_path);
+  if (!remoteName && !remotePath) return "";
+  const provider = providerType ? `${providerType}/` : "";
+  return `${provider}${remoteName}:${remotePath}`;
+}
+
 function sharedClipboardLocalPasteItems(payload: ClipboardPayload) {
   return payload.file_refs
-    .filter((ref) => ref.local_path)
-    .map((ref) => ({ path: ref.local_path, isDirectory: ref.is_dir }));
+    .map((ref) => ({
+      path: clipboardRefValue(ref.local_path),
+      remoteName: clipboardRefValue(ref.remote_name),
+      remotePath: clipboardRefValue(ref.remote_path),
+      isDirectory: ref.is_dir,
+    }))
+    .filter((ref) => ref.path && !ref.remoteName && !ref.remotePath)
+    .map((ref) => ({ path: ref.path, isDirectory: ref.isDirectory }));
+}
+
+async function sharedClipboardRemotePasteItems(payload: ClipboardPayload) {
+  const remoteRefs = payload.file_refs
+    .map((ref) => ({
+      providerType: clipboardRefValue(ref.provider_type),
+      remoteName: clipboardRefValue(ref.remote_name),
+      remotePath: clipboardRefValue(ref.remote_path),
+      localPath: clipboardRefValue(ref.local_path),
+      isDirectory: ref.is_dir,
+    }))
+    .filter((ref) => !ref.localPath && ref.providerType && ref.remoteName && ref.remotePath);
+  if (remoteRefs.length === 0) return [];
+  useExplorerStore.getState().pushNotification(
+    `Preparing ${remoteRefs.length} shared remote ${remoteRefs.length === 1 ? "item" : "items"} for clipboard...`,
+    "info",
+    3500,
+    false,
+  );
+  try {
+    const prepared = await explorerPrepareDragItems({
+      items: remoteRefs.map((ref) => ({
+        path: remoteClipboardMountPath(ref),
+        isDirectory: ref.isDirectory,
+      })),
+    });
+    if (prepared.skipped.length > 0) {
+      useExplorerStore.getState().pushNotification(
+        `Skipped ${prepared.skipped.length} shared remote ${prepared.skipped.length === 1 ? "item" : "items"} while preparing clipboard.`,
+        "error",
+        4500,
+        false,
+      );
+    }
+    return prepared.items.map((item) => ({ path: item.localPath, isDirectory: item.isDirectory }));
+  } catch (error) {
+    useExplorerStore.getState().pushNotification(
+      `Shared remote clipboard preparation failed: ${errorText(error)}`,
+      "error",
+      5500,
+      false,
+    );
+    return [];
+  }
+}
+
+function remoteClipboardMountPath(ref: {
+  providerType: string;
+  remoteName: string;
+  remotePath: string;
+}): string {
+  const app = useAppStore.getState().app;
+  const homePath = app?.environment.homeDir ?? "/";
+  const settingsMountPath = selectAdvancedPreferences(useSettingsStore.getState().settings?.document).mountPath;
+  const mountRoot = resolveMountRoot(homePath, settingsMountPath || app?.environment.mountPath || ".misty/mnt");
+  return joinPath(mountRoot, ref.providerType, ref.remoteName, ref.remotePath);
+}
+
+function clipboardRefValue(value: string): string {
+  return value.trim();
 }
 
 const ConnectedFileInspector = memo(function ConnectedFileInspector() {
   const activePaneId = useMultiPanelStore((state) => state.activePaneId);
-  const { listing, selectedEntry, selectedCount } = useExplorerStore(useShallow((state) => {
+  const { listing, selectedEntry, selectedCount, tags } = useExplorerStore(useShallow((state) => {
     const pane = state.panes[activePaneId];
     const selectedCount = pane?.selectedIds.length ?? 0;
+    const selectedEntry = selectedCount === 1 ? selectedEntryForPane(pane) : null;
+    const libraryItem = selectedEntry
+      ? [
+        ...(state.library?.recentFiles ?? []),
+        ...(state.library?.starredFiles ?? []),
+      ].find((item) => item.path === selectedEntry.path)
+      : undefined;
     return {
       listing: pane?.listing ?? null,
-      selectedEntry: selectedCount === 1 ? selectedEntryForPane(pane) : null,
+      selectedEntry,
       selectedCount,
+      tags: libraryItem?.tags ?? emptyInspectorTags,
     };
   }));
   const onOpen = useCallback(() => {
     if (selectedEntry) void useExplorerStore.getState().openEntry(activePaneId, selectedEntry);
   }, [activePaneId, selectedEntry]);
+  const onDownload = useCallback(() => {
+    void useExplorerStore.getState().downloadSelected(activePaneId);
+  }, [activePaneId]);
   const onMore = useCallback((x: number, y: number) => {
     useExplorerStore.getState().openContextMenu(activePaneId, x, y, selectedEntry?.id ?? null);
   }, [activePaneId, selectedEntry?.id]);
+  const onTagsChange = useCallback((nextTags: string[]) => {
+    if (selectedEntry) void useExplorerStore.getState().setLibraryTags(selectedEntry, nextTags);
+  }, [selectedEntry]);
   return (
     <FileInspector
       listing={listing}
       selectedEntry={selectedEntry}
       selectedCount={selectedCount}
+      tags={tags}
       onOpen={onOpen}
+      onDownload={onDownload}
       onMore={onMore}
+      onTagsChange={onTagsChange}
     />
   );
 });
@@ -1447,25 +1647,116 @@ const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
       selectedEntry: selectedEntryForPane(pane),
     };
   }));
+  const { status, messages, error, refreshStatus, sendPrompt, abortPrompt, clearConversation } = useClaudeSessionStore(useShallow((state) => ({
+    status: state.status,
+    messages: state.messages,
+    error: state.error,
+    refreshStatus: state.refreshStatus,
+    sendPrompt: state.sendPrompt,
+    abortPrompt: state.abortPrompt,
+    clearConversation: state.clearConversation,
+  })));
+  const [prompt, setPrompt] = useState("");
+  const logRef = useRef<HTMLDivElement | null>(null);
+  const workingDirectory = listing?.path ?? "";
+  const running = status?.running ?? false;
+  const installed = status?.installed ?? false;
+
+  useEffect(() => {
+    void refreshStatus();
+  }, [refreshStatus]);
+
+  useEffect(() => {
+    logRef.current?.scrollTo({ top: logRef.current.scrollHeight });
+  }, [messages]);
+
+  const submitPrompt = useCallback(() => {
+    const trimmed = prompt.trim();
+    if (!trimmed || running) return;
+    setPrompt("");
+    void sendPrompt({
+      displayPrompt: trimmed,
+      prompt: buildClaudePrompt(trimmed, workingDirectory, selectedEntry?.path ?? null),
+      cwd: workingDirectory || null,
+    });
+  }, [prompt, running, selectedEntry?.path, sendPrompt, workingDirectory]);
+
+  const openPanel = useCallback(() => {
+    useExplorerStore.getState().toggleChatOverlay();
+    useExplorerStore.getState().setClaudePanelOpen(true);
+  }, []);
+
+  const closeOverlay = useCallback(() => {
+    useExplorerStore.getState().toggleChatOverlay();
+    if (!running) {
+      clearConversation();
+    }
+    setPrompt("");
+  }, [clearConversation, running]);
+
   return (
     <section className="explorer-chat-overlay" aria-label="Explorer chat">
       <header>
         <span>
           <MessageSquare size={16} />
           Chat
+          {running ? <small>Running</small> : null}
         </span>
-        <button type="button" aria-label="Close chat" onClick={() => useExplorerStore.getState().toggleChatOverlay()}>
+        <button type="button" aria-label="Close chat" onClick={closeOverlay}>
           <X size={16} />
         </button>
       </header>
       <div>
-        <p>Explorer chat is ready for Tauri command wiring.</p>
-        <dl>
-          <dt>Folder</dt>
-          <dd>{listing?.path ?? "No active folder"}</dd>
-          <dt>Selection</dt>
-          <dd>{selectedEntry?.name ?? "None"}</dd>
-        </dl>
+        <div className="explorer-chat-status">
+          <dl>
+            <dt>Status</dt>
+            <dd>{status ? (installed ? "Claude CLI ready" : "Claude CLI not found") : "Checking Claude CLI..."}</dd>
+            <dt>Folder</dt>
+            <dd>{workingDirectory || "No active folder"}</dd>
+            <dt>Selection</dt>
+            <dd>{selectedEntry?.path ?? "None"}</dd>
+          </dl>
+          {error ? <p className="error">{error}</p> : null}
+        </div>
+        <div ref={logRef} className="explorer-chat-log" aria-live="polite">
+          {messages.length === 0 ? (
+            <p className="empty">Ask about the active folder or selected file.</p>
+          ) : messages.map((message) => (
+            <article key={message.id} className={`explorer-chat-message ${message.role}`}>
+              <strong>{message.role === "user" ? "You" : message.role === "tool" ? "Tool" : message.role === "error" ? "Error" : "Claude"}</strong>
+              <pre>{message.text || (message.role === "assistant" && running ? "Thinking..." : "")}</pre>
+            </article>
+          ))}
+        </div>
+        <form
+          className="explorer-chat-composer"
+          onSubmit={(event) => {
+            event.preventDefault();
+            submitPrompt();
+          }}
+        >
+          <textarea
+            value={prompt}
+            rows={3}
+            placeholder={installed ? "Ask Misty..." : "Install Claude Code CLI to enable chat"}
+            disabled={!installed || running}
+            onChange={(event) => setPrompt(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+                event.preventDefault();
+                submitPrompt();
+              }
+            }}
+          />
+          <div>
+            <button type="button" className="secondary" onClick={openPanel}>Open Panel</button>
+            {running ? (
+              <button type="button" onClick={abortPrompt}>Stop</button>
+            ) : (
+              <button type="submit" disabled={!installed || !prompt.trim()}>Send</button>
+            )}
+          </div>
+        </form>
       </div>
     </section>
   );
@@ -1473,31 +1764,128 @@ const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
 
 const ExplorerClaudePanel = memo(function ExplorerClaudePanel() {
   const activePaneId = useMultiPanelStore((state) => state.activePaneId);
-  const listing = useExplorerStore((state) => state.panes[activePaneId]?.listing ?? null);
+  const { listing, selectedEntry } = useExplorerStore(useShallow((state) => {
+    const pane = state.panes[activePaneId];
+    return {
+      listing: pane?.listing ?? null,
+      selectedEntry: selectedEntryForPane(pane),
+    };
+  }));
+  const { status, messages, error, refreshStatus, sendPrompt, abortPrompt } = useClaudeSessionStore(useShallow((state) => ({
+    status: state.status,
+    messages: state.messages,
+    error: state.error,
+    refreshStatus: state.refreshStatus,
+    sendPrompt: state.sendPrompt,
+    abortPrompt: state.abortPrompt,
+  })));
+  const [prompt, setPrompt] = useState("");
+  const logRef = useRef<HTMLDivElement | null>(null);
+  const workingDirectory = listing?.path ?? "";
+  const running = status?.running ?? false;
+  const installed = status?.installed ?? false;
+
+  useEffect(() => {
+    void refreshStatus();
+  }, [refreshStatus]);
+
+  useEffect(() => {
+    logRef.current?.scrollTo({ top: logRef.current.scrollHeight });
+  }, [messages]);
+
+  const submitPrompt = useCallback(() => {
+    const trimmed = prompt.trim();
+    if (!trimmed || running) return;
+    const requestPrompt = buildClaudePrompt(trimmed, workingDirectory, selectedEntry?.path ?? null);
+    setPrompt("");
+    void sendPrompt({
+      displayPrompt: trimmed,
+      prompt: requestPrompt,
+      cwd: workingDirectory || null,
+    });
+  }, [prompt, running, selectedEntry?.path, sendPrompt, workingDirectory]);
+
   return (
     <aside className="explorer-claude-panel" aria-label="Claude">
       <header>
         <span>
           <MessageSquare size={16} />
           Claude
+          {running ? <small>Running</small> : null}
         </span>
         <button type="button" aria-label="Close Claude" onClick={() => useExplorerStore.getState().setClaudePanelOpen(false)}>
           <X size={16} />
         </button>
       </header>
       <div>
-        <p>Claude tools are not available in this build.</p>
-        <dl>
-          <dt>Working directory</dt>
-          <dd>{listing?.path ?? "No active folder"}</dd>
-        </dl>
+        <div className="explorer-claude-status">
+          <dl>
+            <dt>Status</dt>
+            <dd>{status ? (installed ? "Claude CLI ready" : "Claude CLI not found") : "Checking Claude CLI..."}</dd>
+            <dt>Working directory</dt>
+            <dd>{workingDirectory || "No active folder"}</dd>
+            <dt>Selection</dt>
+            <dd>{selectedEntry?.path ?? "None"}</dd>
+          </dl>
+          {error ? <p className="error">{error}</p> : null}
+        </div>
+        <div ref={logRef} className="explorer-claude-log" aria-live="polite">
+          {messages.length === 0 ? (
+            <p className="empty">Ask Claude about the active folder or selected file.</p>
+          ) : messages.map((message) => (
+            <article key={message.id} className={`explorer-claude-message ${message.role}`}>
+              <strong>{message.role === "user" ? "You" : message.role === "tool" ? "Tool" : message.role === "error" ? "Error" : "Claude"}</strong>
+              <pre>{message.text || (message.role === "assistant" && running ? "Thinking..." : "")}</pre>
+            </article>
+          ))}
+        </div>
+        <form
+          className="explorer-claude-composer"
+          onSubmit={(event) => {
+            event.preventDefault();
+            submitPrompt();
+          }}
+        >
+          <textarea
+            value={prompt}
+            rows={3}
+            placeholder={installed ? "Ask about this folder..." : "Install Claude Code CLI to enable this panel"}
+            disabled={!installed || running}
+            onChange={(event) => setPrompt(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+                event.preventDefault();
+                submitPrompt();
+              }
+            }}
+          />
+          <div>
+            {running ? (
+              <button type="button" onClick={abortPrompt}>Stop</button>
+            ) : (
+              <button type="submit" disabled={!installed || !prompt.trim()}>Send</button>
+            )}
+          </div>
+        </form>
       </div>
     </aside>
   );
 });
 
+function buildClaudePrompt(userPrompt: string, workingDirectory: string, selectedPath: string | null): string {
+  const context = [
+    "You are helping inside Misty, a desktop file manager.",
+    workingDirectory ? `Current folder: ${workingDirectory}` : "Current folder: none",
+    selectedPath ? `Selected item: ${selectedPath}` : "Selected item: none",
+  ].join("\n");
+  return `${context}\n\nUser request:\n${userPrompt}`;
+}
+
 const ExplorerContextMenu = memo(function ExplorerContextMenu() {
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const shortcutHintsEnabled = useSettingsStore((state) =>
+    selectShortcutPreferences(state.settings?.document).shortcutHintsEnabled,
+  );
   const {
     open,
     x,
@@ -1508,6 +1896,7 @@ const ExplorerContextMenu = memo(function ExplorerContextMenu() {
     showHidden,
     targetEntry,
     hasSelection,
+    hasRemoteSelection,
     targetPinned,
     targetCanOpenWith,
     canCreateFile,
@@ -1519,6 +1908,7 @@ const ExplorerContextMenu = memo(function ExplorerContextMenu() {
       ? targetPane?.listing?.entries.find((entry) => entry.id === entryId) ?? null
       : null;
     const selectedCount = open ? selectedActionableEntryCount(targetPane) : 0;
+    const remoteSelectedCount = open ? selectedRemoteEntryCount(targetPane) : 0;
     const pinnedPaths = open && entryId ? state.pinnedPaths : emptyPinnedPaths;
     return {
       open,
@@ -1530,6 +1920,7 @@ const ExplorerContextMenu = memo(function ExplorerContextMenu() {
       showHidden: state.paneShowHidden[paneId] ?? state.showHidden,
       targetEntry,
       hasSelection: Boolean(entryId && selectedCount),
+      hasRemoteSelection: Boolean(remoteSelectedCount),
       targetPinned: Boolean(targetEntry && !targetEntry.isDeleted && pinnedPaths.some((path) => normalizedPath(path) === normalizedPath(targetEntry.path))),
       targetCanOpenWith: Boolean(targetEntry && !targetEntry.isDeleted && targetEntry.kind !== "folder" && targetEntry.kind !== "symlink"),
       canCreateFile: state.canCreateItem(paneId, "file"),
@@ -1557,9 +1948,10 @@ const ExplorerContextMenu = memo(function ExplorerContextMenu() {
 
   if (!open) return null;
 
-  const primaryShortcut = primaryShortcutLabel();
+  const primaryShortcut = shortcutHintsEnabled ? primaryShortcutLabel() : "";
   const selectionDisabledReason = hasSelection ? undefined : "Select a file or folder first.";
   const createDisabledReason = "New items are only available in writable folders.";
+  const shortcut = (value: string) => shortcutHintsEnabled ? value : undefined;
 
   const run = (action: () => void) => {
     useExplorerStore.getState().closeContextMenu();
@@ -1577,7 +1969,7 @@ const ExplorerContextMenu = memo(function ExplorerContextMenu() {
       <ContextMenuItem
         icon={<FolderPlus size={17} />}
         label="New Folder"
-        shortcut={`${primaryShortcut}+Shift+N`}
+        shortcut={shortcut(`${primaryShortcut}+Shift+N`)}
         disabled={!canCreateFolder}
         disabledReason={createDisabledReason}
         onRun={() => run(() => void useExplorerStore.getState().createItem(paneId, "folder"))}
@@ -1593,7 +1985,7 @@ const ExplorerContextMenu = memo(function ExplorerContextMenu() {
       <ContextMenuItem
         icon={<Copy size={17} />}
         label="Copy"
-        shortcut={`${primaryShortcut}+C`}
+        shortcut={shortcut(`${primaryShortcut}+C`)}
         disabled={!hasSelection}
         disabledReason={selectionDisabledReason}
         onRun={() => run(() => useExplorerStore.getState().copySelected(paneId))}
@@ -1601,7 +1993,7 @@ const ExplorerContextMenu = memo(function ExplorerContextMenu() {
       <ContextMenuItem
         icon={<Scissors size={17} />}
         label="Cut"
-        shortcut={`${primaryShortcut}+X`}
+        shortcut={shortcut(`${primaryShortcut}+X`)}
         disabled={!hasSelection}
         disabledReason={selectionDisabledReason}
         onRun={() => run(() => useExplorerStore.getState().cutSelected(paneId))}
@@ -1609,7 +2001,7 @@ const ExplorerContextMenu = memo(function ExplorerContextMenu() {
       <ContextMenuItem
         icon={<Clipboard size={17} />}
         label="Paste"
-        shortcut={`${primaryShortcut}+V`}
+        shortcut={shortcut(`${primaryShortcut}+V`)}
         disabled={!hasClipboard}
         disabledReason={hasClipboard ? undefined : "Copy or cut something first."}
         onRun={() => run(() => void useExplorerStore.getState().pasteIntoPane(paneId))}
@@ -1618,7 +2010,7 @@ const ExplorerContextMenu = memo(function ExplorerContextMenu() {
       <ContextMenuItem
         icon={<Pencil size={17} />}
         label="Rename"
-        shortcut="Enter"
+        shortcut={shortcut("Enter")}
         disabled={!hasSelection}
         disabledReason={selectionDisabledReason}
         onRun={() => run(() => void useExplorerStore.getState().renameSelected(paneId))}
@@ -1626,10 +2018,17 @@ const ExplorerContextMenu = memo(function ExplorerContextMenu() {
       <ContextMenuItem
         icon={<Trash2 size={17} />}
         label="Delete"
-        shortcut="Del"
+        shortcut={shortcut("Del")}
         disabled={!hasSelection}
         disabledReason={selectionDisabledReason}
         onRun={() => run(() => void useExplorerStore.getState().deleteSelected(paneId))}
+      />
+      <ContextMenuItem
+        icon={<Download size={17} />}
+        label="Download"
+        disabled={!hasRemoteSelection}
+        disabledReason="Download is available for remote files and folders."
+        onRun={() => run(() => void useExplorerStore.getState().downloadSelected(paneId))}
       />
       {entryId ? (
         <>
@@ -1652,7 +2051,7 @@ const ExplorerContextMenu = memo(function ExplorerContextMenu() {
           <ContextMenuItem
             icon={<Copy size={17} />}
             label="Copy Path"
-            shortcut={`${primaryShortcut}+Alt+C`}
+            shortcut={shortcut(`${primaryShortcut}+Alt+C`)}
             disabled={!targetEntry}
             disabledReason="Choose an item first."
             onRun={() => run(() => targetEntry && void useExplorerStore.getState().copyPath(targetEntry.path))}
@@ -1664,7 +2063,7 @@ const ExplorerContextMenu = memo(function ExplorerContextMenu() {
           <ContextMenuItem
             icon={<Eye size={17} />}
             label={showHidden ? "Hide Hidden Files" : "Show Hidden Files"}
-            shortcut={`${primaryShortcut}+Shift+.`}
+            shortcut={shortcut(`${primaryShortcut}+Shift+.`)}
             onRun={() => run(() => void useExplorerStore.getState().toggleHidden(paneId))}
           />
         </>
@@ -1673,7 +2072,7 @@ const ExplorerContextMenu = memo(function ExplorerContextMenu() {
       <ContextMenuItem
         icon={<RefreshCcw size={17} />}
         label="Refresh"
-        shortcut={`${primaryShortcut}+R`}
+        shortcut={shortcut(`${primaryShortcut}+R`)}
         onRun={() => run(() => void useExplorerStore.getState().refreshPane(paneId))}
       />
     </div>,
@@ -1713,6 +2112,14 @@ function selectedActionableEntryCount(pane: ReturnType<typeof useExplorerStore.g
   if (!pane?.listing) return 0;
   const selected = new Set(pane.selectedIds);
   return pane.listing.entries.filter((entry) => selected.has(entry.id) && !entry.isDeleted).length;
+}
+
+function selectedRemoteEntryCount(pane: ReturnType<typeof useExplorerStore.getState>["panes"][string] | undefined): number {
+  if (!pane?.listing) return 0;
+  const selected = new Set(pane.selectedIds);
+  return pane.listing.entries.filter((entry) =>
+    selected.has(entry.id) && !entry.isDeleted && entry.location.kind === "remote"
+  ).length;
 }
 
 function ExplorerBottomBar(props: {
@@ -1855,7 +2262,13 @@ function pluginCommandsEqual(left: PluginCommandEntry[], right: PluginCommandEnt
       && command.pluginId === other.pluginId
       && command.pluginName === other.pluginName
       && command.defaultShortcut === other.defaultShortcut
-      && command.source === other.source;
+      && command.source === other.source
+      && command.actionKind === other.actionKind
+      && command.launcherOpenMode === other.launcherOpenMode
+      && command.requiresSelectedFile === other.requiresSelectedFile
+      && command.pluginDir === other.pluginDir
+      && command.manifestPath === other.manifestPath
+      && command.libraryPath === other.libraryPath;
   });
 }
 
@@ -1897,6 +2310,18 @@ function clamp(value: number, min: number, max: number): number {
 function resolveMountRoot(homePath: string, configuredPath: string): string {
   if (configuredPath.startsWith("/")) return configuredPath.replace(/\/+$/, "");
   return `${homePath.replace(/\/+$/, "")}/${configuredPath.replace(/^\/+|\/+$/g, "")}`;
+}
+
+function resolvePreferredWorkspaceRoot(preferredWorkspaceRoot: string, fallbackHomePath: string): string {
+  const trimmed = preferredWorkspaceRoot.trim();
+  if (!trimmed || trimmed === "~") return fallbackHomePath;
+  if (trimmed.startsWith("~/")) return joinPath(fallbackHomePath, trimmed.slice(2));
+  if (isAbsolutePath(trimmed)) return normalizedPath(trimmed) || fallbackHomePath;
+  return joinPath(fallbackHomePath, trimmed);
+}
+
+function isAbsolutePath(path: string): boolean {
+  return path.startsWith("/") || /^[A-Za-z]:[\\/]/.test(path);
 }
 
 function normalizedPath(path: string): string {

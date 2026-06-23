@@ -2,19 +2,23 @@ import { create } from "zustand";
 import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { open } from "@tauri-apps/plugin-dialog";
 import { openPath } from "@tauri-apps/plugin-opener";
+import { useAppStore } from "../../../app/useAppStore";
 import {
   clipboardNativeFileRefs,
   clipboardSetLocal,
   clipboardSnapshot,
+  clipboardWriteFileRefs,
   explorerListDirectory,
   explorerLibraryRecordLastOpened,
   explorerLibraryRecordRecent,
+  explorerLibrarySetTags,
   explorerLibrarySnapshot,
   explorerOpenAssociation,
   explorerSetOpenAssociation,
   explorerOpenWith,
   explorerPathExists,
   explorerPathIsDirectory,
+  explorerPrepareDragItems,
   explorerPrepareOpenItem,
   explorerQueuePasteBlob,
   explorerQueueCreateItem,
@@ -44,6 +48,12 @@ import type {
 import { errorText } from "../../../shared/format";
 import { useMultiPanelStore } from "../../../shared/multipanel/useMultiPanelStore";
 import type { MultiPanelClosedPane, MultiPanelPane, MultiPanelTab } from "../../../shared/multipanel/types";
+import {
+  selectAdvancedPreferences,
+  selectGeneralPreferences,
+  selectNotificationPreferences,
+  useSettingsStore,
+} from "../../settings/useSettingsStore";
 import { clipboardImagePng } from "../utils/clipboardImage";
 
 export type ExplorerViewMode = "list" | "grid";
@@ -164,6 +174,7 @@ interface ExplorerStore {
   loadLibrary: () => Promise<void>;
   recordLibraryRecent: (entry: FileEntry) => Promise<void>;
   recordLastOpenedPath: (path: string) => Promise<void>;
+  setLibraryTags: (entry: FileEntry, tags: string[]) => Promise<void>;
   initialize: (homePath: string) => Promise<void>;
   selectWorkspace: (workspaceId: string, homePath: string) => Promise<void>;
   createWorkspace: (title: string, homePath: string) => Promise<void>;
@@ -187,6 +198,7 @@ interface ExplorerStore {
   createItem: (paneId: string, kind: CreateItemKind, name?: string) => Promise<void>;
   renameSelected: (paneId: string, name?: string) => Promise<void>;
   deleteSelected: (paneId: string) => Promise<void>;
+  downloadSelected: (paneId: string) => Promise<void>;
   copySelected: (paneId: string) => void;
   cutSelected: (paneId: string) => void;
   pasteIntoPane: (paneId: string) => Promise<void>;
@@ -227,6 +239,7 @@ let transferRefreshWatermarkMs = 0;
 let transferRefreshStatuses: Record<number, string> = {};
 let nextExplorerNotificationId = 1;
 const pendingPaneRefreshes = new Map<string, { firstTimer: number | null; followupTimer: number | null }>();
+const paneLoadRequestsInFlight = new Map<string, Promise<void>>();
 
 function emptyPaneState(): PaneExplorerState {
   return {
@@ -295,6 +308,14 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       set({ library: await explorerLibraryRecordLastOpened(path) });
     } catch {
       // Best-effort parity with the native last-opened path.
+    }
+  },
+
+  setLibraryTags: async (entry, tags) => {
+    try {
+      set({ library: await explorerLibrarySetTags(libraryItemFromEntry(entry), tags) });
+    } catch (error) {
+      set({ operationError: `Tag update failed: ${errorText(error)}` });
     }
   },
 
@@ -448,7 +469,18 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     }
   },
 
-  loadPane: async (paneId, path, mode = "push", options) => {
+  loadPane: (paneId, path, mode = "push", options) => {
+    const loadKey = [
+      paneId,
+      path,
+      mode,
+      showHiddenForPane(get(), paneId) ? "hidden" : "visible",
+      options?.forceRemoteRefresh ? "force" : "cached",
+    ].join("\0");
+    const pendingLoad = paneLoadRequestsInFlight.get(loadKey);
+    if (pendingLoad) return pendingLoad;
+
+    const loadRequest = (async () => {
     set((state) => {
       const pane = state.panes[paneId] ?? emptyPaneState();
       const multi = useMultiPanelStore.getState();
@@ -531,6 +563,15 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         },
       }));
     }
+    })();
+
+    paneLoadRequestsInFlight.set(loadKey, loadRequest);
+    void loadRequest.finally(() => {
+      if (paneLoadRequestsInFlight.get(loadKey) === loadRequest) {
+        paneLoadRequestsInFlight.delete(loadKey);
+      }
+    });
+    return loadRequest;
   },
 
   navigatePane: async (paneId, path) => {
@@ -716,6 +757,16 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       }
     }
     get().selectEntry(paneId, entry.id);
+    const defaultFileAction = selectGeneralPreferences(
+      useSettingsStore.getState().settings?.document,
+    ).defaultFileActionIndex;
+    if (defaultFileAction === 1 || defaultFileAction === 2) {
+      set({ previewVisible: true, operationError: null });
+      if (defaultFileAction === 1) {
+        get().pushNotification("Preview opened", "info", 1800, false);
+      }
+      return;
+    }
     try {
       set({ operationError: null });
       const localPath = await localPathForEntry(entry);
@@ -832,7 +883,42 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     const pane = get().panes[paneId];
     const paths = selectedPathsForPane(pane);
     if (paths.length === 0) return;
+    if (!selectGeneralPreferences(useSettingsStore.getState().settings?.document).confirmDestructiveActions) {
+      try {
+        set({ operationError: null });
+        const directory = pane?.listing?.path;
+        await explorerQueueDeleteItems({ paths });
+        get().pushNotification(`Queued delete for ${itemCountLabel(paths.length)}`, "success");
+        get().clearSelection(paneId);
+        if (directory) queuePaneRefresh(paneId, directory);
+      } catch (error) {
+        set({ operationError: errorText(error) });
+      }
+      return;
+    }
     set({ dialog: { kind: "delete", paneId, paths } });
+  },
+
+  downloadSelected: async (paneId) => {
+    const pane = get().panes[paneId];
+    const items = selectedRemotePasteItemsForPane(pane);
+    if (items.length === 0) return;
+    try {
+      const downloadsDirectory = await downloadDestinationDirectory();
+      if (!downloadsDirectory) return;
+      set({ operationError: null });
+      await explorerQueuePasteItems({
+        sources: items,
+        destinationDirectory: downloadsDirectory,
+        operation: "copy",
+      });
+      get().pushNotification(`Queued download for ${itemCountLabel(items.length)}`, "success");
+      if (pane?.listing && samePath(pane.listing.path, downloadsDirectory)) {
+        queuePaneRefresh(paneId, downloadsDirectory);
+      }
+    } catch (error) {
+      set({ operationError: `Download failed: ${errorText(error)}` });
+    }
   },
 
   confirmDialog: async () => {
@@ -959,7 +1045,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     void clipboardSetLocal(clipboardPayloadForPane(pane)).catch((error) => {
       set({ operationError: `Clipboard update failed: ${errorText(error)}` });
     });
-    void writeText(items.map((item) => item.path).join("\n")).catch(() => undefined);
+    void writeNativeOrTextClipboardForSelection(pane).catch(() => undefined);
   },
 
   cutSelected: (paneId) => {
@@ -967,9 +1053,6 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     const items = selectedPasteItemsForPane(pane);
     if (items.length === 0) return;
     set({ clipboard: { items, operation: "move" }, operationError: null });
-    void clipboardSetLocal(clipboardPayloadForPane(pane)).catch((error) => {
-      set({ operationError: `Clipboard update failed: ${errorText(error)}` });
-    });
   },
 
   pasteIntoPane: async (paneId) => {
@@ -1161,22 +1244,36 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
   pushNotification: (message, type = "info", durationMs = 3000, showInActivity = true) => {
     const trimmed = message.trim();
     if (!trimmed) return 0;
+    const notificationPreferences = selectNotificationPreferences(useSettingsStore.getState().settings?.document);
+    const quietSuppressed = notificationPreferences.quietHoursEnabled && type !== "error";
+    const digestSuppressed = notificationPreferences.digestNotificationsEnabled && type !== "error";
+    const alertSuppressed = quietSuppressed || digestSuppressed;
+    const showToast = notificationPreferences.inAppNotificationsEnabled && !alertSuppressed;
+    const showDesktop = notificationPreferences.desktopNotificationsEnabled && !alertSuppressed;
+    const playSound = notificationPreferences.soundNotificationsEnabled && !alertSuppressed;
+    const recordActivity = showInActivity;
     const id = nextExplorerNotificationId++;
     const notification = {
       id,
       message: trimmed,
       type,
       createdAtMs: Date.now(),
-      read: false,
-      showInActivity,
+      read: alertSuppressed,
+      showInActivity: recordActivity,
     };
     set((state) => ({
-      notifications: [...state.notifications, notification].slice(-3),
-      notificationHistory: showInActivity
+      notifications: showToast
+        ? [...state.notifications, notification].slice(-3)
+        : state.notifications,
+      notificationHistory: recordActivity
         ? [...state.notificationHistory, notification].slice(-200)
         : state.notificationHistory,
     }));
-    if (durationMs > 0) {
+    void publishDesktopNotification(notification, showDesktop);
+    if (playSound) {
+      playNotificationSound(type);
+    }
+    if (showToast && durationMs > 0) {
       window.setTimeout(() => {
         useExplorerStore.getState().dismissNotification(id);
       }, durationMs);
@@ -1220,6 +1317,12 @@ function selectedEntriesForPane(pane: PaneExplorerState | undefined): FileEntry[
   return pane.listing.entries.filter((entry) => selected.has(entry.id));
 }
 
+function selectedRemotePasteItemsForPane(pane: PaneExplorerState | undefined): PasteItem[] {
+  return selectedEntriesForPane(pane)
+    .filter((entry) => !entry.isDeleted && entry.location.kind === "remote")
+    .map((entry) => ({ path: entry.path, isDirectory: entry.kind === "folder" }));
+}
+
 function arraysEqual(left: readonly string[], right: readonly string[]): boolean {
   if (left === right) return true;
   if (left.length !== right.length) return false;
@@ -1228,6 +1331,42 @@ function arraysEqual(left: readonly string[], right: readonly string[]): boolean
 
 function itemCountLabel(count: number): string {
   return count === 1 ? "1 item" : `${count} items`;
+}
+
+function defaultDownloadsDirectory(): string {
+  const homeDir = useAppStore.getState().app?.environment.homeDir;
+  return homeDir ? joinExplorerPath(homeDir, "Downloads") : "Downloads";
+}
+
+async function downloadDestinationDirectory(): Promise<string | null> {
+  const defaultDirectory = defaultDownloadsDirectory();
+  const transferBehaviorIndex = selectGeneralPreferences(
+    useSettingsStore.getState().settings?.document,
+  ).defaultTransferBehaviorIndex;
+  if (transferBehaviorIndex === 1) {
+    return defaultDirectory;
+  }
+  const selection = await open({
+    title: "Choose Download Folder",
+    multiple: false,
+    directory: true,
+    defaultPath: defaultDirectory,
+  });
+  if (!selection) return null;
+  return Array.isArray(selection) ? selection[0] ?? null : selection;
+}
+
+function joinExplorerPath(...parts: string[]): string {
+  const clean = parts
+    .filter(Boolean)
+    .map((part, index) => (
+      index === 0
+        ? part.replace(/\/+$/g, "")
+        : part.replace(/^\/+|\/+$/g, "")
+    ))
+    .filter(Boolean);
+  if (clean.length === 0) return "/";
+  return clean.join("/");
 }
 
 function splitRenameParts(entry: FileEntry): [string, string] {
@@ -1659,7 +1798,8 @@ function clipboardPayloadForPane(pane: PaneExplorerState | undefined): Clipboard
     html: "",
     file_refs: entries.map((entry) => ({
       display_name: entry.name,
-      local_path: entry.path,
+      local_path: entry.location.kind === "local" ? entry.path : "",
+      provider_type: entry.location.providerType ?? "",
       remote_name: entry.location.remoteName ?? "",
       remote_path: entry.location.remotePath ?? "",
       is_dir: entry.kind === "folder",
@@ -1668,12 +1808,171 @@ function clipboardPayloadForPane(pane: PaneExplorerState | undefined): Clipboard
   };
 }
 
+async function writeNativeOrTextClipboardForSelection(
+  pane: PaneExplorerState | undefined,
+): Promise<void> {
+  const entries = selectedFileEntriesForPane(pane);
+  if (entries.length === 0) return;
+
+  const localItems = entries
+    .filter((entry) => entry.location.kind === "local")
+    .map((entry) => ({ path: entry.path, isDirectory: entry.kind === "folder" }));
+  if (localItems.length === entries.length && await clipboardWriteFileRefs(localItems)) {
+    return;
+  }
+
+  const remoteEntries = entries.filter((entry) => entry.location.kind !== "local");
+  if (remoteEntries.length > 0) {
+    useExplorerStore.getState().pushNotification(
+      `Preparing ${remoteEntries.length} remote ${remoteEntries.length === 1 ? "item" : "items"} for clipboard...`,
+      "info",
+      3500,
+      false,
+    );
+  }
+
+  const preparedRemoteResult = remoteEntries.length === 0
+    ? null
+    : await explorerPrepareDragItems({
+      items: remoteEntries.map((entry) => ({
+        path: entry.path,
+        isDirectory: entry.kind === "folder",
+        sizeBytes: entry.sizeBytes,
+        remoteModified: entry.remoteModified,
+      })),
+    });
+  if (preparedRemoteResult?.skipped.length) {
+    useExplorerStore.getState().pushNotification(
+      `Skipped ${preparedRemoteResult.skipped.length} remote ${preparedRemoteResult.skipped.length === 1 ? "item" : "items"} while preparing clipboard.`,
+      "error",
+      4500,
+      false,
+    );
+  }
+  const preparedRemoteItems = preparedRemoteResult?.items.map((item) => ({
+    path: item.localPath,
+    isDirectory: item.isDirectory,
+  })) ?? [];
+  const nativeItems = [...localItems, ...preparedRemoteItems];
+  if (nativeItems.length > 0 && await clipboardWriteFileRefs(nativeItems)) {
+    if (preparedRemoteItems.length > 0) {
+      useExplorerStore.getState().pushNotification(
+        `Prepared ${preparedRemoteItems.length} remote ${preparedRemoteItems.length === 1 ? "item" : "items"} for clipboard.`,
+        "success",
+        3500,
+        false,
+      );
+    }
+    return;
+  }
+
+  await writeText(entries.map((entry) => clipboardTextForEntry(entry)).join("\n"));
+}
+
 function explorerClipboardFromPayload(payload: ClipboardPayload): ExplorerClipboardState | null {
   if (payload.kind !== "file_refs" || payload.file_refs.length === 0) return null;
   const items = payload.file_refs
-    .filter((fileRef) => fileRef.local_path.length > 0)
-    .map((fileRef) => ({ path: fileRef.local_path, isDirectory: fileRef.is_dir }));
+    .map(pasteItemFromClipboardRef)
+    .filter((item): item is PasteItem => item !== null);
   return items.length > 0 ? { items, operation: "copy" } : null;
+}
+
+function selectedFileEntriesForPane(pane: PaneExplorerState | undefined): FileEntry[] {
+  if (!pane?.listing) return [];
+  if (pane.listing.path === "misty://trash") return [];
+  const selected = new Set(pane.selectedIds);
+  return pane.listing.entries.filter((entry) => selected.has(entry.id) && isFileMasterEntry(entry));
+}
+
+function clipboardTextForEntry(entry: FileEntry): string {
+  if (entry.location.kind === "local") return entry.path;
+  const provider = entry.location.providerType ? `${entry.location.providerType}/` : "";
+  const remoteName = entry.location.remoteName ?? "";
+  const remotePath = entry.location.remotePath ?? entry.path;
+  return `${provider}${remoteName}:${remotePath}`;
+}
+
+function pasteItemFromClipboardRef(fileRef: ClipboardPayload["file_refs"][number]): PasteItem | null {
+  if (fileRef.local_path.trim()) {
+    return { path: fileRef.local_path, isDirectory: fileRef.is_dir };
+  }
+  if (!fileRef.provider_type.trim() || !fileRef.remote_name.trim() || !fileRef.remote_path.trim()) {
+    return null;
+  }
+  const environment = useAppStore.getState().app?.environment;
+  if (!environment?.mountPath) return null;
+  const settingsMountPath = selectAdvancedPreferences(useSettingsStore.getState().settings?.document).mountPath;
+  const mountPath = resolveMountRoot(environment.homeDir, settingsMountPath || environment.mountPath);
+  return {
+    path: remoteClipboardVirtualPath(mountPath, fileRef.provider_type, fileRef.remote_name, fileRef.remote_path),
+    isDirectory: fileRef.is_dir,
+  };
+}
+
+function remoteClipboardVirtualPath(
+  mountPath: string,
+  providerType: string,
+  remoteName: string,
+  remotePath: string,
+): string {
+  const base = [mountPath, providerType, remoteName]
+    .map((part, index) => index === 0 ? part.replace(/\/+$/, "") : part.replace(/^\/+|\/+$/g, ""))
+    .filter(Boolean)
+    .join("/");
+  const child = remotePath.trim().replace(/^\/+/, "");
+  return child ? `${base}/${child}` : base;
+}
+
+function resolveMountRoot(homePath: string, configuredPath: string): string {
+  if (configuredPath.startsWith("/")) return configuredPath.replace(/\/+$/, "");
+  return `${homePath.replace(/\/+$/, "")}/${configuredPath.replace(/^\/+|\/+$/g, "")}`;
+}
+
+async function publishDesktopNotification(
+  notification: ExplorerNotification,
+  enabled: boolean,
+): Promise<void> {
+  if (!enabled || typeof Notification === "undefined") return;
+  try {
+    const permission = Notification.permission === "default"
+      ? await Notification.requestPermission()
+      : Notification.permission;
+    if (permission !== "granted") return;
+    const title = notification.type === "error"
+      ? "Misty needs attention"
+      : notification.type === "success"
+        ? "Misty completed an action"
+        : "Misty";
+    new Notification(title, {
+      body: notification.message,
+      tag: `misty-${notification.id}`,
+    });
+  } catch {
+    // Some webviews disable the Web Notification API; in-app Activity still records the event.
+  }
+}
+
+function playNotificationSound(type: ExplorerNotificationType): void {
+  try {
+    const AudioContextConstructor = window.AudioContext
+      || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextConstructor) return;
+    const context = new AudioContextConstructor();
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.type = "sine";
+    oscillator.frequency.value = type === "error" ? 220 : type === "success" ? 660 : 440;
+    gain.gain.setValueAtTime(0.001, context.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.045, context.currentTime + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.16);
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+    oscillator.start();
+    oscillator.stop(context.currentTime + 0.18);
+    window.setTimeout(() => void context.close(), 260);
+  } catch {
+    // Audio output can be unavailable or blocked until user interaction.
+  }
 }
 
 function applyNavigationResult(
@@ -1774,6 +2073,7 @@ function libraryItemFromEntry(entry: FileEntry): ExplorerLibraryItem {
     lastModified: entry.remoteModified ?? (entry.modifiedMs ? new Date(entry.modifiedMs).toISOString() : ""),
     mimeType: entry.mimeType ?? "",
     type: entry.location.kind === "remote" ? 1 : 0,
+    tags: [],
   };
 }
 

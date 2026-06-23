@@ -1,22 +1,29 @@
-import { File, Folder, MoreHorizontal, Tag } from "lucide-react";
+import { Download, File, Folder, MoreHorizontal, Tag } from "lucide-react";
 import { useEffect, useState } from "react";
 import { explorerPrepareOpenItem, explorerPreviewItem } from "../../../api/misty";
 import type { DirectoryListing, FileEntry } from "../../../api/types";
 import { errorText } from "../../../shared/format";
+import { selectAppearancePreferences, useSettingsStore } from "../../settings/useSettingsStore";
 import { formatBytes, formatDate } from "../utils/fileFormat";
 
 interface FileInspectorProps {
   listing: DirectoryListing | null;
   selectedEntry: FileEntry | null;
   selectedCount: number;
+  tags: string[];
   onOpen: () => void;
+  onDownload: () => void;
   onMore: (x: number, y: number) => void;
+  onTagsChange: (tags: string[]) => void;
 }
 
 interface LoadedPreview {
+  text: string | null;
   url: string;
   mimeType: string;
 }
+
+const MAX_PREVIEW_BYTES = 32 * 1024 * 1024;
 
 export function FileInspector(props: FileInspectorProps) {
   const folder = listingEntry(props.listing);
@@ -24,7 +31,28 @@ export function FileInspector(props: FileInspectorProps) {
   const multiple = props.selectedCount > 1;
   const title = multiple ? "Multiple Items" : displayEntry?.name ?? "No Selection";
   const kind = multiple ? "Selection" : kindLabel(displayEntry);
-  const { preview, previewError, previewLoading } = useFilePreview(props.selectedEntry);
+  const thumbnailPreviewsEnabled = useSettingsStore((state) =>
+    selectAppearancePreferences(state.settings?.document).thumbnailPreviewsEnabled,
+  );
+  const { preview, previewError, previewLoading } = useFilePreview(
+    props.selectedEntry,
+    thumbnailPreviewsEnabled,
+  );
+  const [tagDraft, setTagDraft] = useState("");
+  const canEditTags = Boolean(props.selectedEntry && !multiple);
+  const canDownload = Boolean(props.selectedEntry?.location.kind === "remote" && !multiple);
+  const addTag = () => {
+    const nextTag = tagDraft.trim();
+    if (!nextTag || props.tags.includes(nextTag)) {
+      setTagDraft("");
+      return;
+    }
+    props.onTagsChange([...props.tags, nextTag]);
+    setTagDraft("");
+  };
+  const removeTag = (tag: string) => {
+    props.onTagsChange(props.tags.filter((candidate) => candidate !== tag));
+  };
 
   return (
     <aside className="file-inspector">
@@ -33,6 +61,8 @@ export function FileInspector(props: FileInspectorProps) {
           {previewLoading ? <span>Loading preview...</span> : null}
           {preview?.mimeType === "application/pdf" ? (
             <object data={preview.url} type={preview.mimeType} aria-label={`Preview of ${title}`} />
+          ) : preview?.text != null ? (
+            <pre>{preview.text}</pre>
           ) : preview ? (
             <img src={preview.url} alt={`Preview of ${title}`} />
           ) : null}
@@ -53,6 +83,10 @@ export function FileInspector(props: FileInspectorProps) {
         <button type="button" disabled={!props.selectedEntry || multiple} onClick={props.onOpen}>
           <Folder size={18} />
           Open
+        </button>
+        <button type="button" disabled={!canDownload} onClick={props.onDownload}>
+          <Download size={18} />
+          Download
         </button>
         <button
           type="button"
@@ -87,17 +121,41 @@ export function FileInspector(props: FileInspectorProps) {
         )}
         <div className="inspector-tags">
           <span>Tags</span>
-          <button type="button" disabled title="Tag editing is not available yet">
-            <Tag size={14} />
-            Add Tag
-          </button>
+          {props.tags.length > 0 ? (
+            <div className="inspector-tag-list">
+              {props.tags.map((tag) => (
+                <button key={tag} type="button" disabled={!canEditTags} title={`Remove ${tag}`} onClick={() => removeTag(tag)}>
+                  {tag}
+                  <span aria-hidden="true">x</span>
+                </button>
+              ))}
+            </div>
+          ) : <small>No tags</small>}
+          <form
+            className="inspector-tag-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              addTag();
+            }}
+          >
+            <input
+              value={tagDraft}
+              disabled={!canEditTags}
+              placeholder="Add tag"
+              onChange={(event) => setTagDraft(event.target.value)}
+            />
+            <button type="submit" disabled={!canEditTags || !tagDraft.trim()}>
+              <Tag size={14} />
+              Add
+            </button>
+          </form>
         </div>
       </section>
     </aside>
   );
 }
 
-function useFilePreview(entry: FileEntry | null): {
+function useFilePreview(entry: FileEntry | null, enabled = true): {
   preview: LoadedPreview | null;
   previewError: string | null;
   previewLoading: boolean;
@@ -111,7 +169,13 @@ function useFilePreview(entry: FileEntry | null): {
     let objectUrl: string | null = null;
     setPreview(null);
     setPreviewError(null);
-    if (!entry || !previewSupported(entry)) {
+    if (!enabled || !entry || !previewSupported(entry)) {
+      setPreviewLoading(false);
+      return () => undefined;
+    }
+    const sizeLimitError = previewSizeLimitError(entry);
+    if (sizeLimitError) {
+      setPreviewError(sizeLimitError);
       setPreviewLoading(false);
       return () => undefined;
     }
@@ -121,8 +185,17 @@ function useFilePreview(entry: FileEntry | null): {
       .then((path) => explorerPreviewItem(path))
       .then((payload) => {
         if (!active) return;
-        objectUrl = URL.createObjectURL(new Blob([new Uint8Array(payload.bytes)], { type: payload.mimeType }));
-        setPreview({ url: objectUrl, mimeType: payload.mimeType });
+        const bytes = new Uint8Array(payload.bytes);
+        if (previewPayloadIsText(payload.mimeType)) {
+          setPreview({
+            text: new TextDecoder("utf-8", { fatal: false }).decode(bytes),
+            url: "",
+            mimeType: payload.mimeType,
+          });
+          return;
+        }
+        objectUrl = URL.createObjectURL(new Blob([bytes], { type: payload.mimeType }));
+        setPreview({ text: null, url: objectUrl, mimeType: payload.mimeType });
       })
       .catch((error) => {
         if (active) setPreviewError(errorText(error));
@@ -135,7 +208,7 @@ function useFilePreview(entry: FileEntry | null): {
       active = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [entry?.id, entry?.modifiedMs, entry?.path]);
+  }, [enabled, entry?.id, entry?.modifiedMs, entry?.path, entry?.remoteModified, entry?.sizeBytes]);
 
   return { preview, previewError, previewLoading };
 }
@@ -152,7 +225,24 @@ async function previewPathForEntry(entry: FileEntry): Promise<string> {
 
 function previewSupported(entry: FileEntry): boolean {
   const extension = entry.extension.toLowerCase().replace(/^\./, "");
-  return ["png", "jpg", "jpeg", "gif", "bmp", "webp", "pdf", "tga", "hdr", "pbm", "pgm", "pnm", "ppm"].includes(extension);
+  return [
+    "png", "jpg", "jpeg", "gif", "bmp", "webp", "svg", "pdf", "psd", "tga", "hdr", "pic", "pbm", "pgm", "pnm", "ppm",
+    "txt", "text", "log", "md", "markdown", "toml", "yaml", "yml", "ini", "conf", "cfg",
+    "csv", "tsv", "rs", "go", "js", "jsx", "ts", "tsx", "css", "html", "xml", "sh",
+    "zsh", "bash", "fish", "py", "rb", "java", "c", "h", "cpp", "hpp", "swift", "kt",
+    "sql", "json", "jsonc",
+  ].includes(extension);
+}
+
+function previewSizeLimitError(entry: FileEntry): string | null {
+  if (entry.kind === "folder" || entry.sizeBytes == null || entry.sizeBytes <= MAX_PREVIEW_BYTES) {
+    return null;
+  }
+  return `Preview is limited to ${MAX_PREVIEW_BYTES / (1024 * 1024)} MB.`;
+}
+
+function previewPayloadIsText(mimeType: string): boolean {
+  return mimeType.startsWith("text/") || mimeType.startsWith("application/json");
 }
 
 function kindLabel(entry: FileEntry | null): string {

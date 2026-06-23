@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { handleExternalLinkClick } from "../../../../../shared/openExternalLink";
 
 const changelog = [
   {
@@ -73,7 +74,13 @@ export default function Changelog() {
       </div>
       <p className="text-sm text-text-muted mt-6">
         
-        <a href="https://forms.gle/your-form-id" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline text-zinc-300">
+        <a
+          href="https://forms.gle/your-form-id"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-primary hover:underline text-zinc-300"
+          onClick={handleExternalLinkClick("https://forms.gle/your-form-id")}
+        >
           See recent updates and changes to Misty &rarr;
         </a>
       </p>

@@ -36,12 +36,39 @@ export interface ProxySnapshot {
   error: string | null;
 }
 
+export interface ClaudeStatus {
+  installed: boolean;
+  running: boolean;
+  sessionId: string | null;
+  error: string | null;
+}
+
+export interface ClaudeSendRequest {
+  prompt: string;
+  cwd?: string | null;
+  resumeSession?: boolean;
+}
+
+export type ClaudeEventKind = "system" | "text" | "tool_use" | "tool_result" | "result" | "error";
+
+export interface ClaudeStreamEvent {
+  kind: ClaudeEventKind;
+  sessionId: string | null;
+  text: string;
+  toolName: string;
+  toolInput: string;
+  toolUseId: string;
+  toolResult: string;
+  costUsd: number;
+}
+
 export type ClipboardPayloadKind = "empty" | "text" | "html" | "image" | "file_refs";
 export type ClipboardOrigin = "local_system" | "local_misty" | "remote_shared";
 
 export interface ClipboardFileRef {
   display_name: string;
   local_path: string;
+  provider_type: string;
   remote_name: string;
   remote_path: string;
   is_dir: boolean;
@@ -195,9 +222,37 @@ export interface PrepareOpenItemRequest {
   remoteModified?: string | null;
 }
 
+export interface PrepareDragItemsRequest {
+  items: PrepareDragItemRequest[];
+}
+
+export interface PrepareDragItemRequest {
+  path: string;
+  isDirectory: boolean;
+  sizeBytes?: number | null;
+  remoteModified?: string | null;
+}
+
 export interface PreparedOpenItem {
   localPath: string;
   cached: boolean;
+}
+
+export interface PreparedDragItemsResult {
+  items: PreparedDragItem[];
+  skipped: PreparedDragSkippedItem[];
+}
+
+export interface PreparedDragItem {
+  sourcePath: string;
+  localPath: string;
+  isDirectory: boolean;
+  cached: boolean;
+}
+
+export interface PreparedDragSkippedItem {
+  sourcePath: string;
+  reason: string;
 }
 
 export interface ExplorerLibraryItem {
@@ -209,6 +264,7 @@ export interface ExplorerLibraryItem {
   lastModified: string;
   mimeType: string;
   type: number;
+  tags: string[];
 }
 
 export interface ExplorerLibrarySnapshot {
@@ -224,6 +280,11 @@ export interface RecordRecentRequest {
 
 export interface RecordLastOpenedRequest {
   path: string;
+}
+
+export interface SetExplorerTagsRequest {
+  item: ExplorerLibraryItem;
+  tags: string[];
 }
 
 export interface NativeWorkspaceTabSnapshot {
@@ -289,6 +350,13 @@ export interface SettingsSnapshot {
   document: Record<string, unknown>;
 }
 
+export interface LaunchOnLoginSnapshot {
+  supported: boolean;
+  enabled: boolean;
+  target: string;
+  detail: string;
+}
+
 export interface OpenWithAssociation {
   key: string;
   applicationPath: string;
@@ -323,11 +391,83 @@ export interface PluginCommandEntry {
   pluginName: string;
   defaultShortcut: string;
   source: string;
+  actionKind: string;
+  launcherOpenMode: string;
+  requiresSelectedFile: boolean;
+  pluginDir: string;
+  manifestPath: string;
+  libraryPath: string;
+}
+
+export interface PluginPanelEntry {
+  id: string;
+  title: string;
+  pluginId: string;
+  pluginName: string;
+  windowType: string;
+  defaultWidth: number;
+  defaultHeight: number;
+  pluginDir: string;
+  manifestPath: string;
+  libraryPath: string;
+  launcherViews: string[];
 }
 
 export interface PluginCommandsSnapshot {
   roots: string[];
   commands: PluginCommandEntry[];
+  panels: PluginPanelEntry[];
+}
+
+export interface RunPluginCommandRequest {
+  commandId: string;
+  selectedPaths?: string[];
+}
+
+export interface PluginCommandRunResult {
+  commandId: string;
+  pluginId: string;
+  pluginName: string;
+  label: string;
+  handled: boolean;
+  targetRoute: string;
+  message: string;
+  notifications: PluginPanelNotification[];
+  runtimeStatus: string;
+}
+
+export interface RenderPluginPanelRequest {
+  panelId: string;
+  pluginId?: string;
+  selectedPaths?: string[];
+  clickedButton?: string;
+  inputs?: Record<string, string>;
+}
+
+export interface PluginPanelRenderResult {
+  panelId: string;
+  pluginId: string;
+  pluginName: string;
+  title: string;
+  elements: PluginPanelElement[];
+  notifications: PluginPanelNotification[];
+  message: string;
+  runtimeStatus: string;
+}
+
+export interface PluginPanelElement {
+  kind: string;
+  id: string;
+  text: string;
+  width: number;
+  height: number;
+  border: boolean;
+}
+
+export interface PluginPanelNotification {
+  level: string;
+  title: string;
+  message: string;
 }
 
 export interface ProviderHealth {
@@ -552,6 +692,7 @@ export interface OperationQueueSnapshot {
   conflictDialog: ConflictDialogState;
   activeCount: number;
   maxConcurrent: number;
+  redoAvailable: boolean;
 }
 
 export type FileSyncEndpointKind = "local" | "remote";

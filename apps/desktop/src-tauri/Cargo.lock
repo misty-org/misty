@@ -2215,7 +2215,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6e9ec52138abedcc58dc17a7c6c0c00a2bdb4f3427c7f63fa97fd0d859155caf"
 dependencies = [
  "gtk-sys",
- "libloading",
+ "libloading 0.7.4",
  "once_cell",
 ]
 
@@ -2242,6 +2242,16 @@ checksum = "b67380fd3b2fbe7527a606e18729d21c6f3951633d0500574c4dc22d2d638b9f"
 dependencies = [
  "cfg-if",
  "winapi",
+]
+
+[[package]]
+name = "libloading"
+version = "0.8.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d7c4b02199fee7c5d21a5ae7d8cfa79a6ef5bb2fc834d6e9058e89c825efdc55"
+dependencies = [
+ "cfg-if",
+ "windows-link 0.2.1",
 ]
 
 [[package]]
@@ -2365,6 +2375,7 @@ dependencies = [
  "hex",
  "image",
  "jsonwebtoken",
+ "libloading 0.8.9",
  "objc2",
  "objc2-app-kit",
  "objc2-foundation",
@@ -2383,6 +2394,7 @@ dependencies = [
  "tokio",
  "uuid",
  "zip",
+ "zune-psd",
 ]
 
 [[package]]
@@ -6105,6 +6117,15 @@ name = "zune-jpeg"
 version = "0.5.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "27bc9d5b815bc103f142aa054f561d9187d191692ec7c2d1e2b4737f8dbd7296"
+dependencies = [
+ "zune-core",
+]
+
+[[package]]
+name = "zune-psd"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8a518b7a7bee76246a6c783d795c56204cd9184ce0e2e4483717f1b9438c902c"
 dependencies = [
  "zune-core",
 ]

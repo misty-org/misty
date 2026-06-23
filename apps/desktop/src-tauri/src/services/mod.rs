@@ -1,3 +1,5 @@
+pub mod autostart;
+pub mod claude;
 pub mod commands;
 pub mod devices;
 pub mod environment;
