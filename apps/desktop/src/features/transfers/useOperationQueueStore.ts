@@ -1,7 +1,9 @@
 import { create } from "zustand";
 import {
   operationQueueCancel,
+  operationQueueCancelBatch,
   operationQueueClearTerminal,
+  operationQueueRedo,
   operationQueueResolveConflict,
   operationQueueRetry,
   operationQueueSnapshot,
@@ -18,8 +20,10 @@ interface OperationQueueStore {
   error: string | null;
   load: (options?: { silent?: boolean }) => Promise<void>;
   cancel: (operationId: number) => Promise<void>;
+  cancelBatch: (batchId: number) => Promise<void>;
   retry: (operationId: number) => Promise<void>;
   undo: (undoTokenId: number) => Promise<void>;
+  redo: () => Promise<void>;
   resolveConflict: (operationId: number, policy: OperationConflictPolicy, applyToBatch: boolean) => Promise<void>;
   clearTerminal: () => Promise<void>;
 }
@@ -55,6 +59,17 @@ export const useOperationQueueStore = create<OperationQueueStore>((set) => ({
     }
   },
 
+  cancelBatch: async (batchId) => {
+    set({ working: true, error: null });
+    try {
+      set({ snapshot: await operationQueueCancelBatch(batchId) });
+    } catch (error) {
+      set({ error: errorText(error) });
+    } finally {
+      set({ working: false });
+    }
+  },
+
   retry: async (operationId) => {
     set({ working: true, error: null });
     try {
@@ -72,6 +87,22 @@ export const useOperationQueueStore = create<OperationQueueStore>((set) => ({
       set({ snapshot: await operationQueueUndo(undoTokenId) });
     } catch (error) {
       set({ error: errorText(error) });
+    } finally {
+      set({ working: false });
+    }
+  },
+
+  redo: async () => {
+    set({ working: true, error: null });
+    try {
+      set({ snapshot: await operationQueueRedo() });
+    } catch (error) {
+      set({ error: errorText(error) });
+      try {
+        set({ snapshot: await operationQueueSnapshot() });
+      } catch {
+        // Keep the original redo error visible if the follow-up snapshot refresh also fails.
+      }
     } finally {
       set({ working: false });
     }
@@ -104,6 +135,7 @@ function operationQueueSnapshotsEqual(left: OperationQueueSnapshot | null, right
   if (!left) return false;
   return left.activeCount === right.activeCount
     && left.maxConcurrent === right.maxConcurrent
+    && left.redoAvailable === right.redoAvailable
     && operationConflictDialogsEqual(left.conflictDialog, right.conflictDialog)
     && arraysEqual(left.operations, right.operations, operationsEqual)
     && arraysEqual(left.batches, right.batches, batchesEqual);

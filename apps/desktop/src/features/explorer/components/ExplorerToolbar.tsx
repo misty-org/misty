@@ -52,6 +52,7 @@ export type ExplorerCommandId =
   | "explorer.refresh"
   | "explorer.rename"
   | "explorer.delete"
+  | "explorer.download"
   | "explorer.open_with"
   | "explorer.copy"
   | "explorer.cut"
@@ -98,12 +99,13 @@ const explorerCommands: ExplorerCommandPaletteEntry[] = [
   { id: "explorer.refresh", label: "Refresh", hint: "Reload the active folder" },
   { id: "explorer.rename", label: "Rename", hint: "Rename the selected item" },
   { id: "explorer.delete", label: "Delete", hint: "Delete the selected items" },
+  { id: "explorer.download", label: "Download", hint: "Download selected remote items to Downloads" },
   { id: "explorer.open_with", label: "Open With", hint: "Choose an app for the selected file" },
   { id: "explorer.copy", label: "Copy", hint: "Copy selected items" },
   { id: "explorer.cut", label: "Cut", hint: "Move selected items with paste" },
   { id: "explorer.paste", label: "Paste", hint: "Paste into the active folder" },
   { id: "explorer.undo", label: "Undo", hint: "Undo the latest completed rename or move" },
-  { id: "explorer.redo", label: "Redo", hint: "Redo is not available for file operations yet" },
+  { id: "explorer.redo", label: "Redo", hint: "Redo the latest undone rename or move" },
   { id: "explorer.toggle_hidden", label: "Toggle Hidden Files", hint: "Show or hide hidden files" },
   { id: "explorer.preview.toggle", label: "Toggle Preview", hint: "Show or hide the preview/details panel" },
   { id: "explorer.sidebar.toggle", label: "Toggle Sidebar", hint: "Show or hide the navigation sidebar" },

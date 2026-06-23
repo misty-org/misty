@@ -1,5 +1,7 @@
 import { useEffect, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
+import { openExternalLink } from "../../../../shared/openExternalLink";
 import { PluginBrowser } from "../../website/pages/Plugins/PluginBrowser";
 import type { PluginBrowserEntry } from "../../website/pages/Plugins/types";
 import { currentPluginPlatform, pluginRootLabel, usePluginsStore } from "../../store/usePluginsStore";
@@ -29,6 +31,8 @@ function toBrowserEntry(plugin: PluginEntry): PluginBrowserEntry {
 }
 
 export default function PluginsPage() {
+  const [searchParams] = useSearchParams();
+  const routePluginId = searchParams.get("plugin")?.trim() ?? "";
   const pluginPlatform = useSetupStore((state) =>
     state.status ? currentPluginPlatform(state.status.os, state.status.arch) : "",
   );
@@ -82,6 +86,16 @@ export default function PluginsPage() {
     () => installedPlugins.map(toBrowserEntry),
     [installedPlugins],
   );
+  const routePluginAvailable = useMemo(
+    () => Boolean(routePluginId) && [...marketplacePlugins, ...installedPlugins].some((plugin) => plugin.id === routePluginId),
+    [installedPlugins, marketplacePlugins, routePluginId],
+  );
+
+  useEffect(() => {
+    if (routePluginAvailable && routePluginId !== selectedPluginId) {
+      selectPlugin(routePluginId);
+    }
+  }, [routePluginAvailable, routePluginId, selectPlugin, selectedPluginId]);
 
   return (
     <PluginBrowser
@@ -97,7 +111,7 @@ export default function PluginsPage() {
           void installPlugin(match);
         }
       }}
-      onOpenLink={(url) => window.open(url, "_blank", "noopener,noreferrer")}
+      onOpenLink={(url) => void openExternalLink(url)}
       onQueryChange={(value) => {
         setQuery(value);
       }}

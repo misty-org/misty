@@ -29,12 +29,13 @@ function safeHubRoute(pathname: string) {
 
 export const useHubRouteMemoryStore = create<HubRouteMemoryStore>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       lastHubRoute: DEFAULT_HUB_ROUTE,
       rememberHubRoute: (pathname) => {
         if (!isRememberableHubRoute(pathname)) {
           return;
         }
+        if (get().lastHubRoute === pathname) return;
         set({ lastHubRoute: pathname });
       },
       resetHubRoute: () => set({ lastHubRoute: DEFAULT_HUB_ROUTE }),

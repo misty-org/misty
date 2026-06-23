@@ -27,6 +27,8 @@ pub struct ClipboardFileRef {
     #[serde(default)]
     pub local_path: String,
     #[serde(default)]
+    pub provider_type: String,
+    #[serde(default)]
     pub remote_name: String,
     #[serde(default)]
     pub remote_path: String,
@@ -138,6 +140,7 @@ mod tests {
             kind: ClipboardPayloadKind::FileRefs,
             file_refs: vec![ClipboardFileRef {
                 display_name: "report.pdf".into(),
+                provider_type: "google_drive".into(),
                 remote_name: "drive".into(),
                 remote_path: "/report.pdf".into(),
                 ..ClipboardFileRef::default()
@@ -146,6 +149,7 @@ mod tests {
         };
         let json = serde_json::to_value(payload).expect("serialize clipboard payload");
         assert_eq!(json["kind"], "file_refs");
+        assert_eq!(json["file_refs"][0]["provider_type"], "google_drive");
         assert_eq!(json["file_refs"][0]["remote_name"], "drive");
     }
 }

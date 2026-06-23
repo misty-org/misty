@@ -35,6 +35,8 @@ pub struct ExplorerLibraryItem {
     pub mime_type: String,
     #[serde(default)]
     pub r#type: i64,
+    #[serde(default)]
+    pub tags: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -60,6 +62,14 @@ pub struct RecordRecentRequest {
 #[serde(rename_all = "camelCase")]
 pub struct RecordLastOpenedRequest {
     pub path: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetTagsRequest {
+    pub item: ExplorerLibraryItem,
+    #[serde(default)]
+    pub tags: Vec<String>,
 }
 
 impl ExplorerLibraryService {
@@ -99,6 +109,18 @@ impl ExplorerLibraryService {
         tokio::task::spawn_blocking(move || {
             let mut snapshot = load_snapshot(path.clone())?;
             snapshot.last_opened_path = request.path;
+            save_snapshot(&path, &snapshot)?;
+            load_snapshot(path)
+        })
+        .await
+        .map_err(|err| ApiError::Message(format!("Explorer library worker failed: {err}")))?
+    }
+
+    pub async fn set_tags(&self, request: SetTagsRequest) -> ApiResult<ExplorerLibrarySnapshot> {
+        let path = self.path.clone();
+        tokio::task::spawn_blocking(move || {
+            let mut snapshot = load_snapshot(path.clone())?;
+            set_item_tags(&mut snapshot, request.item, sanitize_tags(request.tags));
             save_snapshot(&path, &snapshot)?;
             load_snapshot(path)
         })
@@ -170,6 +192,7 @@ fn disk_item_json(item: &ExplorerLibraryItem) -> serde_json::Value {
         "last_modified": item.last_modified,
         "mime_type": item.mime_type,
         "type": item.r#type,
+        "tags": item.tags,
     })
 }
 
@@ -182,6 +205,49 @@ fn add_recent(snapshot: &mut ExplorerLibrarySnapshot, item: ExplorerLibraryItem)
         .retain(|candidate| candidate.path != item.path);
     snapshot.recent_files.insert(0, item);
     snapshot.recent_files.truncate(MAX_RECENT_ITEMS);
+}
+
+fn set_item_tags(
+    snapshot: &mut ExplorerLibrarySnapshot,
+    mut item: ExplorerLibraryItem,
+    tags: Vec<String>,
+) {
+    if item.path.trim().is_empty() {
+        return;
+    }
+    item.tags = tags.clone();
+    upsert_tagged_item(&mut snapshot.recent_files, item.clone());
+    if let Some(starred) = snapshot
+        .starred_files
+        .iter_mut()
+        .find(|candidate| candidate.path == item.path)
+    {
+        starred.tags = tags;
+    }
+}
+
+fn upsert_tagged_item(items: &mut Vec<ExplorerLibraryItem>, item: ExplorerLibraryItem) {
+    if let Some(existing) = items
+        .iter_mut()
+        .find(|candidate| candidate.path == item.path)
+    {
+        *existing = item;
+        return;
+    }
+    items.insert(0, item);
+    items.truncate(MAX_RECENT_ITEMS);
+}
+
+fn sanitize_tags(tags: Vec<String>) -> Vec<String> {
+    let mut normalized = Vec::new();
+    for tag in tags {
+        let tag = tag.trim().to_owned();
+        if tag.is_empty() || normalized.iter().any(|existing| existing == &tag) {
+            continue;
+        }
+        normalized.push(tag);
+    }
+    normalized
 }
 
 #[cfg(test)]
@@ -230,6 +296,33 @@ mod tests {
         fs::remove_dir_all(path.parent().unwrap()).expect("cleanup");
     }
 
+    #[test]
+    fn set_item_tags_upserts_and_deduplicates() {
+        let mut snapshot = ExplorerLibrarySnapshot::default();
+        set_item_tags(
+            &mut snapshot,
+            item("/tmp/demo.txt"),
+            sanitize_tags(vec![
+                "work".to_owned(),
+                " work ".to_owned(),
+                "".to_owned(),
+                "draft".to_owned(),
+            ]),
+        );
+
+        assert_eq!(snapshot.recent_files.len(), 1);
+        assert_eq!(snapshot.recent_files[0].tags, vec!["work", "draft"]);
+
+        set_item_tags(
+            &mut snapshot,
+            item("/tmp/demo.txt"),
+            sanitize_tags(vec!["final".to_owned()]),
+        );
+
+        assert_eq!(snapshot.recent_files.len(), 1);
+        assert_eq!(snapshot.recent_files[0].tags, vec!["final"]);
+    }
+
     fn item(path: &str) -> ExplorerLibraryItem {
         ExplorerLibraryItem {
             path: path.to_owned(),
@@ -240,6 +333,7 @@ mod tests {
             last_modified: String::new(),
             mime_type: String::new(),
             r#type: 0,
+            tags: Vec::new(),
         }
     }
 }

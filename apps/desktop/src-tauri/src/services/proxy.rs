@@ -11,6 +11,7 @@ use rusqlite::{Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use tokio::io::AsyncWriteExt;
 use tokio::sync::RwLock;
+use tokio::time::{sleep, Duration};
 
 use crate::error::{ApiError, ApiResult};
 use crate::services::environment::AppEnvironmentService;
@@ -149,14 +150,59 @@ impl ProxyService {
             .await
     }
 
-    pub async fn upload_file(
+    pub async fn upload_file_with_cancellation(
         &self,
         remote: &str,
         remote_directory: &str,
         local_path: &Path,
         file_name: &str,
+        cancellation: Option<&AtomicBool>,
     ) -> ApiResult<reqwest::Response> {
+        ensure_not_canceled_if(cancellation)?;
         let url = self.url("/api/remote/file/upload")?;
+        let token = self.current_or_refresh_access_token().await;
+        let response = self
+            .upload_file_request(
+                &url,
+                remote,
+                remote_directory,
+                local_path,
+                file_name,
+                token.as_deref(),
+            )
+            .await?
+            .send_with_cancellation(cancellation)
+            .await?;
+        if !should_retry_authenticated_response(response.status())
+            || !self.refresh_access_token().await
+        {
+            return Ok(response);
+        }
+        ensure_not_canceled_if(cancellation)?;
+        let token = self.current_access_token().await;
+        Ok(self
+            .upload_file_request(
+                &url,
+                remote,
+                remote_directory,
+                local_path,
+                file_name,
+                token.as_deref(),
+            )
+            .await?
+            .send_with_cancellation(cancellation)
+            .await?)
+    }
+
+    async fn upload_file_request(
+        &self,
+        url: &str,
+        remote: &str,
+        remote_directory: &str,
+        local_path: &Path,
+        file_name: &str,
+        token: Option<&str>,
+    ) -> ApiResult<RequestBuilder> {
         let file = reqwest::multipart::Part::file(local_path)
             .await
             .map_err(|error| {
@@ -167,10 +213,11 @@ impl ProxyService {
             .text("remote", remote.to_string())
             .text("path", remote_directory.to_string())
             .part("file", file);
-        let request = self
-            .with_current_auth(self.inner.client.post(url).multipart(form))
-            .await;
-        Ok(request.send().await?)
+        let request = self.inner.client.post(url).multipart(form);
+        Ok(match token {
+            Some(token) => request.bearer_auth(token),
+            None => request,
+        })
     }
 
     async fn send_authenticated<F>(
@@ -192,18 +239,13 @@ impl ProxyService {
 
         let token = self.current_or_refresh_access_token().await;
         let response = send(token.as_deref()).send().await?;
-        if response.status() != StatusCode::UNAUTHORIZED || !self.refresh_access_token().await {
+        if !should_retry_authenticated_response(response.status())
+            || !self.refresh_access_token().await
+        {
             return Ok(response);
         }
         let token = self.current_access_token().await;
         Ok(send(token.as_deref()).send().await?)
-    }
-
-    async fn with_current_auth(&self, request: RequestBuilder) -> RequestBuilder {
-        match self.current_or_refresh_access_token().await {
-            Some(token) => request.bearer_auth(token),
-            None => request,
-        }
     }
 
     async fn current_or_refresh_access_token(&self) -> Option<String> {
@@ -289,6 +331,49 @@ impl ProxyService {
     }
 }
 
+trait CancellableRequestBuilder {
+    async fn send_with_cancellation(
+        self,
+        cancellation: Option<&AtomicBool>,
+    ) -> ApiResult<reqwest::Response>;
+}
+
+impl CancellableRequestBuilder for RequestBuilder {
+    async fn send_with_cancellation(
+        self,
+        cancellation: Option<&AtomicBool>,
+    ) -> ApiResult<reqwest::Response> {
+        let Some(cancellation) = cancellation else {
+            return Ok(self.send().await?);
+        };
+        ensure_not_canceled(cancellation)?;
+        tokio::select! {
+            response = self.send() => Ok(response?),
+            _ = wait_for_cancellation(cancellation) => Err(ApiError::Message("Operation canceled.".to_string())),
+        }
+    }
+}
+
+async fn wait_for_cancellation(cancellation: &AtomicBool) {
+    while !cancellation.load(Ordering::SeqCst) {
+        sleep(Duration::from_millis(50)).await;
+    }
+}
+
+fn ensure_not_canceled(cancellation: &AtomicBool) -> ApiResult<()> {
+    if cancellation.load(Ordering::SeqCst) {
+        return Err(ApiError::Message("Operation canceled.".to_string()));
+    }
+    Ok(())
+}
+
+fn ensure_not_canceled_if(cancellation: Option<&AtomicBool>) -> ApiResult<()> {
+    if let Some(cancellation) = cancellation {
+        ensure_not_canceled(cancellation)?;
+    }
+    Ok(())
+}
+
 fn read_current_access_token(database_path: &Path) -> Option<String> {
     if !database_path.exists() {
         return None;
@@ -315,10 +400,21 @@ fn read_current_access_token(database_path: &Path) -> Option<String> {
         .filter(|token| !token.is_empty())
 }
 
+fn should_retry_authenticated_response(status: StatusCode) -> bool {
+    status == StatusCode::UNAUTHORIZED
+}
+
 #[cfg(test)]
 mod tests {
-    use super::read_current_access_token;
+    use super::{read_current_access_token, should_retry_authenticated_response, ProxyService};
+    use crate::error::ApiError;
+    use crate::services::environment::AppEnvironmentService;
+    use reqwest::StatusCode;
     use rusqlite::Connection;
+    use std::{
+        path::Path,
+        sync::atomic::{AtomicBool, Ordering},
+    };
 
     #[test]
     fn reads_latest_unexpired_proxy_access_token() {
@@ -351,5 +447,38 @@ mod tests {
 
         assert_eq!(read_current_access_token(&path).as_deref(), Some("good"));
         let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn retries_only_unauthorized_proxy_responses_after_refresh() {
+        assert!(should_retry_authenticated_response(
+            StatusCode::UNAUTHORIZED
+        ));
+        assert!(!should_retry_authenticated_response(StatusCode::FORBIDDEN));
+        assert!(!should_retry_authenticated_response(
+            StatusCode::INTERNAL_SERVER_ERROR
+        ));
+    }
+
+    #[tokio::test]
+    async fn pre_canceled_upload_returns_canceled_before_proxy_lookup() {
+        let proxy = ProxyService::new(AppEnvironmentService::new());
+        let cancellation = AtomicBool::new(true);
+
+        let result = proxy
+            .upload_file_with_cancellation(
+                "drive",
+                "/",
+                Path::new("/definitely/missing/misty-upload.bin"),
+                "misty-upload.bin",
+                Some(&cancellation),
+            )
+            .await;
+
+        assert!(matches!(
+            result,
+            Err(ApiError::Message(message)) if message.eq_ignore_ascii_case("Operation canceled.")
+        ));
+        assert!(cancellation.load(Ordering::SeqCst));
     }
 }

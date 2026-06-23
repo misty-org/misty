@@ -1,8 +1,22 @@
+import type {
+  ProviderConfigMode,
+  ProviderConfigStep,
+  ProviderWorkflow,
+  ProviderWorkflowOption,
+} from "../../api/types";
+
 export type TokenField = {
   key: string;
   value: string;
   sensitive: boolean;
 };
+
+interface ProviderConnectionLike {
+  mode: ProviderConfigMode;
+  providerType: string;
+  parameters: Record<string, string>;
+  step: ProviderConfigStep | null;
+}
 
 const preferredConfigKeys = [
   "root_folder_id",
@@ -79,6 +93,81 @@ export function updateTokenField(tokenJson: string, key: string, value: string):
   } catch {
     return tokenJson;
   }
+}
+
+export function providerOptionsForConnection(
+  session: ProviderConnectionLike,
+  workflow: ProviderWorkflow | null,
+): ProviderWorkflowOption[] {
+  if (session.step?.option) return [session.step.option];
+  if (shouldUseOneDriveRepairOptions(session)) {
+    return visibleOneDriveRepairOptions(session.parameters);
+  }
+  return workflow?.options ?? [];
+}
+
+export function shouldBootstrapOneDriveRepairContinue(session: ProviderConnectionLike): boolean {
+  return shouldUseOneDriveRepairOptions(session) && session.step == null;
+}
+
+export function shouldContinueExistingOneDriveRepair(session: ProviderConnectionLike): boolean {
+  return shouldUseOneDriveRepairOptions(session);
+}
+
+export function isOneDriveProviderType(value: string): boolean {
+  const normalized = value.toLowerCase().replace(/[^a-z0-9]/g, "");
+  return normalized.includes("onedrive") || normalized.includes("microsoft365");
+}
+
+function shouldUseOneDriveRepairOptions(session: ProviderConnectionLike): boolean {
+  return session.mode === "repair" && isOneDriveProviderType(session.providerType);
+}
+
+function visibleOneDriveRepairOptions(parameters: Record<string, string>): ProviderWorkflowOption[] {
+  const configType = parameters.config_type || "onedrive";
+  const options = oneDriveRepairOptions();
+  if (configType === "driveid") return options;
+  return options.filter((option) => option.name !== "drive_id" && option.name !== "drive_type");
+}
+
+function oneDriveRepairOptions(): ProviderWorkflowOption[] {
+  return [
+    {
+      name: "config_type",
+      label: "Type of connection",
+      help: "Choose the OneDrive connection type rclone should configure.",
+      defaultValue: "onedrive",
+      required: true,
+      password: false,
+      choices: [
+        { value: "onedrive", help: "OneDrive Personal or Business" },
+        { value: "sharepoint", help: "Root SharePoint site" },
+        { value: "search", help: "Search a SharePoint site" },
+      ],
+    },
+    {
+      name: "drive_id",
+      label: "The ID of the drive to use",
+      help: "Enter the drive ID rclone should save for this remote.",
+      defaultValue: "",
+      required: true,
+      password: false,
+      choices: [],
+    },
+    {
+      name: "drive_type",
+      label: "The type of the drive",
+      help: "Choose the rclone drive type: personal, business, or documentLibrary.",
+      defaultValue: "",
+      required: true,
+      password: false,
+      choices: [
+        { value: "personal", help: "Personal drive" },
+        { value: "business", help: "Business drive" },
+        { value: "documentLibrary", help: "Document library" },
+      ],
+    },
+  ];
 }
 
 function tokenPriority(key: string): number {

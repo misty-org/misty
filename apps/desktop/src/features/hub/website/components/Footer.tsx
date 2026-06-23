@@ -1,6 +1,7 @@
 import { NavLink } from "react-router-dom";
 import { FaDiscord, FaGithub } from "react-icons/fa";
 import { MdOutlineEmail } from "react-icons/md";
+import { handleExternalLinkClick } from "../../../../shared/openExternalLink";
 
 const columns = [
   {
@@ -51,7 +52,15 @@ export default function Footer() {
           </p>
           <div className="flex items-center gap-4 mt-2">
             {socials.map(({ href, icon: Icon, label }) => (
-              <a key={label} href={href} target="_blank" rel="noopener noreferrer" className="text-text-muted/40 hover:text-text-muted transition-colors" aria-label={label}>
+              <a
+                key={label}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-text-muted/40 hover:text-text-muted transition-colors"
+                aria-label={label}
+                onClick={handleExternalLinkClick(href)}
+              >
                 <Icon className="w-4 h-4" />
               </a>
             ))}
@@ -65,7 +74,16 @@ export default function Footer() {
               <span className="text-xs font-medium text-text-muted tracking-[0.14em]">{col.label}</span>
               {col.links.map((link) =>
                 link.to.startsWith("http") || link.to.startsWith("mailto") ? (
-                  <a key={link.text} href={link.to} target="_blank" rel="noopener noreferrer" className="text-sm text-text-muted/60 hover:text-text transition-colors">{link.text}</a>
+                  <a
+                    key={link.text}
+                    href={link.to}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-text-muted/60 hover:text-text transition-colors"
+                    onClick={handleExternalLinkClick(link.to)}
+                  >
+                    {link.text}
+                  </a>
                 ) : (
                   <NavLink key={link.text} to={link.to} className="text-sm text-text-muted/60 hover:text-text transition-colors">{link.text}</NavLink>
                 )

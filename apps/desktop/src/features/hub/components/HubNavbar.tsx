@@ -1,9 +1,9 @@
 import { BookOpen, Gauge, Home, Package2, User2 } from "lucide-react";
-import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState } from "react";
 import { FaDiscord, FaGithub, FaXTwitter } from "react-icons/fa6";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
+import { openExternalLink } from "../../../shared/openExternalLink";
 import { useAuth } from "../AuthContext";
 import hubLogo from "../media/misty-hub.png";
 import { useSetupStore } from "../store/useSetupStore";
@@ -68,11 +68,7 @@ export function HubNavbar() {
   }, [profileOpen]);
 
   async function openCommunityLink(href: string) {
-    try {
-      await invoke("open_external_url", { url: href });
-    } catch {
-      window.open(href, "_blank", "noopener,noreferrer");
-    }
+    await openExternalLink(href);
   }
 
   return (

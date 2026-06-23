@@ -9,24 +9,29 @@ use crate::core::clipboard::{
 use crate::core::explorer::{
     CreateItemRequest, DeleteItemsRequest, DirectoryListing, ExplorerOperationResult,
     ExplorerPreviewPayload, ListDirectoryRequest, PasteBlobRequest, PasteItem, PasteItemsRequest,
-    PasteTextRequest, PrepareOpenItemRequest, PreparedOpenItem, RenameItemRequest,
-    RenameItemsRequest,
+    PasteTextRequest, PrepareDragItemsRequest, PrepareOpenItemRequest, PreparedDragItemsResult,
+    PreparedOpenItem, RenameItemRequest, RenameItemsRequest,
 };
 use crate::core::file_sync::FileSyncPair;
 use crate::core::operation_queue::{ConflictPolicy, OperationQueueSnapshot};
 use crate::core::workspace::WorkspaceDocument;
 use crate::error::{ApiError, ApiResult};
 use crate::runtime::MistyRuntime;
+use crate::services::autostart::LaunchOnLoginSnapshot;
+use crate::services::claude::{ClaudeSendRequest, ClaudeStatus, ClaudeStreamEvent};
 use crate::services::commands::{SaveShortcutsRequest, ShortcutsSnapshot};
 use crate::services::devices::DeviceSnapshot;
 use crate::services::environment::AppEnvironmentSnapshot;
 use crate::services::explorer_library::{
-    ExplorerLibrarySnapshot, RecordLastOpenedRequest, RecordRecentRequest,
+    ExplorerLibrarySnapshot, RecordLastOpenedRequest, RecordRecentRequest, SetTagsRequest,
 };
 use crate::services::file_sync::{
     FileSyncApplyRequest, FileSyncApplyResult, FileSyncCompareRequest,
 };
-use crate::services::plugin_commands::PluginCommandsSnapshot;
+use crate::services::plugin_commands::{
+    PluginCommandRunResult, PluginCommandsSnapshot, PluginPanelRenderResult,
+    RenderPluginPanelRequest, RunPluginCommandRequest,
+};
 use crate::services::providers::{
     ProviderConfigRequest, ProviderConfigStep, ProvidersSnapshot, RcloneConfigPaths,
     RemoteEditDraft, RemoteTestResult, SaveRemoteRequest,
@@ -65,6 +70,29 @@ pub async fn app_environment_snapshot(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<AppEnvironmentSnapshot> {
     Ok(state.environment.snapshot())
+}
+
+#[tauri::command]
+pub fn claude_status(state: State<'_, MistyRuntime>) -> ClaudeStatus {
+    state.claude.status()
+}
+
+#[tauri::command]
+pub fn claude_send_message(
+    request: ClaudeSendRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<ClaudeStatus> {
+    state.claude.send_message(request)
+}
+
+#[tauri::command]
+pub fn claude_drain_events(state: State<'_, MistyRuntime>) -> Vec<ClaudeStreamEvent> {
+    state.claude.drain_events()
+}
+
+#[tauri::command]
+pub fn claude_abort(state: State<'_, MistyRuntime>) -> ApiResult<ClaudeStatus> {
+    state.claude.abort()
 }
 
 #[tauri::command]
@@ -229,6 +257,14 @@ pub async fn explorer_prepare_open_item(
 }
 
 #[tauri::command]
+pub async fn explorer_prepare_drag_items(
+    request: PrepareDragItemsRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<PreparedDragItemsResult> {
+    state.explorer.prepare_drag_items(request).await
+}
+
+#[tauri::command]
 pub async fn explorer_preview_item(
     path: String,
     state: State<'_, MistyRuntime>,
@@ -274,6 +310,14 @@ pub async fn explorer_library_record_last_opened(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<ExplorerLibrarySnapshot> {
     state.explorer_library.record_last_opened(request).await
+}
+
+#[tauri::command]
+pub async fn explorer_library_set_tags(
+    request: SetTagsRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<ExplorerLibrarySnapshot> {
+    state.explorer_library.set_tags(request).await
 }
 
 #[tauri::command]
@@ -412,6 +456,16 @@ pub async fn settings_save(
 }
 
 #[tauri::command]
+pub fn settings_launch_on_login_snapshot() -> ApiResult<LaunchOnLoginSnapshot> {
+    Ok(crate::services::autostart::snapshot())
+}
+
+#[tauri::command]
+pub fn settings_apply_launch_on_login(enabled: bool) -> ApiResult<LaunchOnLoginSnapshot> {
+    crate::services::autostart::apply(enabled).map_err(ApiError::Message)
+}
+
+#[tauri::command]
 pub async fn shortcuts_snapshot(state: State<'_, MistyRuntime>) -> ApiResult<ShortcutsSnapshot> {
     state.commands.snapshot().await
 }
@@ -429,6 +483,22 @@ pub async fn plugin_commands_snapshot(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<PluginCommandsSnapshot> {
     state.plugin_commands.snapshot().await
+}
+
+#[tauri::command]
+pub async fn plugin_command_run(
+    request: RunPluginCommandRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<PluginCommandRunResult> {
+    state.plugin_commands.run_command(request).await
+}
+
+#[tauri::command]
+pub async fn plugin_panel_render(
+    request: RenderPluginPanelRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<PluginPanelRenderResult> {
+    state.plugin_commands.render_panel(request).await
 }
 
 #[tauri::command]
@@ -555,6 +625,14 @@ pub async fn operation_queue_cancel(
 }
 
 #[tauri::command]
+pub async fn operation_queue_cancel_batch(
+    batch_id: u64,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<OperationQueueSnapshot> {
+    state.operation_queue.cancel_batch(batch_id).await
+}
+
+#[tauri::command]
 pub async fn operation_queue_retry(
     operation_id: u64,
     state: State<'_, MistyRuntime>,
@@ -568,6 +646,13 @@ pub async fn operation_queue_undo(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<OperationQueueSnapshot> {
     state.operation_queue.undo(undo_token_id).await
+}
+
+#[tauri::command]
+pub async fn operation_queue_redo(
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<OperationQueueSnapshot> {
+    state.operation_queue.redo().await
 }
 
 #[tauri::command]

@@ -1,12 +1,19 @@
 import { memo, useCallback, useEffect, useRef } from "react";
 import type { DragEvent, MouseEvent } from "react";
 import { useShallow } from "zustand/react/shallow";
+import { explorerPrepareDragItems } from "../../../api/misty";
 import { FileBrowser } from "./FileBrowser";
 import { useExplorerStore } from "../state/useExplorerStore";
 import type { FileEntry } from "../../../api/types";
 
 const FOLDER_HOVER_OPEN_DELAY_MS = 3000;
+const DRAG_PREPARATION_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const MAX_PREPARED_DRAG_ITEMS = 256;
 const emptySelectedIds: string[] = [];
+const preparedDragLocalPaths = new Map<string, { localPath: string; preparedAtMs: number }>();
+const preparingDragKeys = new Set<string>();
+const dragPreparationNoticeCooldownMs = 2500;
+let lastDragPreparationNoticeAt = 0;
 
 interface ExplorerPaneProps {
   paneId: string;
@@ -59,6 +66,11 @@ export const ExplorerPane = memo(function ExplorerPane(props: ExplorerPaneProps)
     void useExplorerStore.getState().openEntry(props.paneId, entry);
   }, [props.paneId]);
 
+  const handleDownload = useCallback((entry: FileEntry) => {
+    useExplorerStore.getState().selectEntry(props.paneId, entry.id);
+    void useExplorerStore.getState().downloadSelected(props.paneId);
+  }, [props.paneId]);
+
   const handleContextMenu = useCallback((event: MouseEvent, entry: FileEntry) => {
     event.preventDefault();
     event.stopPropagation();
@@ -68,6 +80,16 @@ export const ExplorerPane = memo(function ExplorerPane(props: ExplorerPaneProps)
   const handleBackgroundContextMenu = useCallback((event: MouseEvent) => {
     event.preventDefault();
     useExplorerStore.getState().openContextMenu(props.paneId, event.clientX, event.clientY, null);
+  }, [props.paneId]);
+
+  const handlePrepareDrag = useCallback((entry: FileEntry) => {
+    const currentPane = useExplorerStore.getState().panes[props.paneId];
+    if (!currentPane?.listing || entry.isDeleted) return;
+    const selected = currentPane.selectedIds.includes(entry.id) ? currentPane.selectedIds : [entry.id];
+    const selectedEntries = currentPane.listing.entries
+      .filter((candidate) => selected.includes(candidate.id))
+      .filter((candidate) => !candidate.isDeleted);
+    prepareRemoteDragItems(selectedEntries, { silentWhenReady: true });
   }, [props.paneId]);
 
   const handleDragStart = useCallback((event: DragEvent, entry: FileEntry) => {
@@ -89,6 +111,7 @@ export const ExplorerPane = memo(function ExplorerPane(props: ExplorerPaneProps)
     event.dataTransfer.setData("application/x-misty-files", JSON.stringify(items));
     event.dataTransfer.setData("text/plain", items.map((item) => item.path).join("\n"));
     setExternalDragData(event, selectedEntries);
+    prepareRemoteDragItems(selectedEntries, { silentWhenReady: false });
     setMistyDragImage(event, items.length);
   }, [props.paneId]);
 
@@ -96,7 +119,13 @@ export const ExplorerPane = memo(function ExplorerPane(props: ExplorerPaneProps)
     event.preventDefault();
     clearHoverNavigation();
     const encoded = event.dataTransfer.getData("application/x-misty-files");
-    if (!encoded) return;
+    if (!encoded) {
+      const paths = droppedNativeFilePaths(event);
+      if (paths.length > 0) {
+        void useExplorerStore.getState().dropExternalPaths(props.paneId, paths, destination);
+      }
+      return;
+    }
     try {
       const items = JSON.parse(encoded) as Array<{ path: string; isDirectory: boolean }>;
       void useExplorerStore.getState().dropItems(
@@ -151,8 +180,10 @@ export const ExplorerPane = memo(function ExplorerPane(props: ExplorerPaneProps)
         onSelect={handleSelect}
         onClearSelection={handleClearSelection}
         onOpen={handleOpen}
+        onDownload={handleDownload}
         onContextMenu={handleContextMenu}
         onBackgroundContextMenu={handleBackgroundContextMenu}
+        onPrepareDrag={handlePrepareDrag}
         onDragStart={handleDragStart}
         onDragEnd={clearHoverNavigation}
         onDragHover={handleDragHover}
@@ -184,19 +215,173 @@ function inlineEditForPane(
   return null;
 }
 
+function droppedNativeFilePaths(event: DragEvent): string[] {
+  return Array.from(event.dataTransfer.files)
+    .map((file) => {
+      const path = (file as File & { path?: unknown }).path;
+      if (typeof path === "string" && path.trim()) return path;
+      return file.webkitRelativePath || "";
+    })
+    .filter((path, index, paths) => path.length > 0 && paths.indexOf(path) === index);
+}
+
 function setExternalDragData(event: DragEvent, entries: FileEntry[]): void {
-  const localEntries = entries.filter((entry) => entry.location.kind === "local");
-  if (localEntries.length === 0) return;
+  const localDragItems = entries
+    .map((entry) => localDragItemForEntry(entry))
+    .filter((item): item is { entry: FileEntry; localPath: string } => Boolean(item));
+  if (localDragItems.length !== entries.length) return;
 
-  const uriList = localEntries.map((entry) => fileUriForPath(entry.path)).join("\r\n");
+  const uriList = localDragItems.map((item) => fileUriForPath(item.localPath)).join("\r\n");
   event.dataTransfer.setData("text/uri-list", `${uriList}\r\n`);
+  event.dataTransfer.setData("text/plain", localDragItems.map((item) => item.localPath).join("\n"));
 
-  const singleFile = localEntries.length === 1 && localEntries[0].kind !== "folder" ? localEntries[0] : null;
+  const singleFile = localDragItems.length === 1 && localDragItems[0].entry.kind !== "folder" ? localDragItems[0] : null;
   if (singleFile) {
     event.dataTransfer.setData(
       "DownloadURL",
-      `${singleFile.mimeType || "application/octet-stream"}:${singleFile.name}:${fileUriForPath(singleFile.path)}`,
+      `${singleFile.entry.mimeType || "application/octet-stream"}:${downloadUrlFileName(singleFile.entry.name)}:${fileUriForPath(singleFile.localPath)}`,
     );
+  }
+}
+
+function localDragItemForEntry(entry: FileEntry): { entry: FileEntry; localPath: string } | null {
+  if (entry.location.kind === "local") return { entry, localPath: entry.path };
+  const key = dragPreparationKey(entry);
+  const prepared = preparedDragLocalPaths.get(key);
+  if (!prepared) return null;
+  if (dragPreparationExpired(prepared, Date.now())) {
+    preparedDragLocalPaths.delete(key);
+    return null;
+  }
+  return { entry, localPath: prepared.localPath };
+}
+
+function prepareRemoteDragItems(
+  entries: FileEntry[],
+  options: { silentWhenReady: boolean },
+): void {
+  prunePreparedDragItems(Date.now());
+  const remoteEntries = entries.filter((entry) => entry.location.kind !== "local");
+  const preparing = remoteEntries.filter((entry) => {
+    const key = dragPreparationKey(entry);
+    return !preparedDragLocalPaths.has(key) && preparingDragKeys.has(key);
+  });
+  const missing = remoteEntries.filter((entry) => {
+    const key = dragPreparationKey(entry);
+    return !preparedDragLocalPaths.has(key) && !preparingDragKeys.has(key);
+  });
+  if (missing.length === 0) {
+    if (!options.silentWhenReady && preparing.length > 0) {
+      notifyDragPreparation(
+        `Still preparing ${preparing.length} remote ${preparing.length === 1 ? "item" : "items"} for drag-out...`,
+        "info",
+        2500,
+        false,
+      );
+    }
+    return;
+  }
+
+  for (const entry of missing) {
+    preparingDragKeys.add(dragPreparationKey(entry));
+  }
+  if (!options.silentWhenReady) {
+    notifyDragPreparation(
+      `Preparing ${missing.length} remote ${missing.length === 1 ? "item" : "items"} for drag-out...`,
+      "info",
+      3500,
+      false,
+    );
+  }
+
+  void explorerPrepareDragItems({
+    items: missing.map((entry) => ({
+      path: entry.path,
+      isDirectory: entry.kind === "folder",
+      sizeBytes: entry.sizeBytes,
+      remoteModified: entry.remoteModified,
+    })),
+  })
+    .then((result) => {
+      for (const entry of missing) {
+        preparingDragKeys.delete(dragPreparationKey(entry));
+      }
+      const preparedAtMs = Date.now();
+      for (const item of result.items) {
+        const match = missing.find((entry) => entry.path === item.sourcePath);
+        if (match) {
+          preparedDragLocalPaths.set(dragPreparationKey(match), {
+            localPath: item.localPath,
+            preparedAtMs,
+          });
+        }
+      }
+      prunePreparedDragItems(preparedAtMs);
+      if (!options.silentWhenReady && result.items.length > 0) {
+        notifyDragPreparation(
+          `Prepared ${result.items.length} remote ${result.items.length === 1 ? "item" : "items"} for drag-out. Drag again to use the local staged ${result.items.length === 1 ? "file" : "files"}.`,
+          "success",
+          6000,
+          false,
+        );
+      }
+      if (result.skipped.length > 0) {
+        notifyDragPreparation(
+          `Could not prepare ${result.skipped.length} remote ${result.skipped.length === 1 ? "item" : "items"} for drag-out.`,
+          "error",
+          6000,
+          true,
+        );
+      }
+    })
+    .catch((error) => {
+      for (const entry of missing) {
+        preparingDragKeys.delete(dragPreparationKey(entry));
+      }
+      notifyDragPreparation(`Remote drag-out preparation failed: ${String(error)}`, "error", 6000, true);
+    });
+}
+
+function notifyDragPreparation(
+  message: string,
+  type: "info" | "success" | "error",
+  durationMs: number,
+  showInActivity: boolean,
+): void {
+  if (type !== "error") {
+    const now = Date.now();
+    if (now - lastDragPreparationNoticeAt < dragPreparationNoticeCooldownMs) return;
+    lastDragPreparationNoticeAt = now;
+  }
+  useExplorerStore.getState().pushNotification(message, type, durationMs, showInActivity);
+}
+
+function dragPreparationKey(entry: FileEntry): string {
+  return [
+    entry.path,
+    entry.kind === "folder" ? "dir" : "file",
+    entry.sizeBytes ?? 0,
+    entry.remoteModified ?? "",
+  ].join("\n");
+}
+
+function dragPreparationExpired(
+  prepared: { preparedAtMs: number },
+  nowMs: number,
+): boolean {
+  return prepared.preparedAtMs <= 0 || nowMs - prepared.preparedAtMs > DRAG_PREPARATION_CACHE_TTL_MS;
+}
+
+function prunePreparedDragItems(nowMs: number): void {
+  for (const [key, prepared] of preparedDragLocalPaths) {
+    if (dragPreparationExpired(prepared, nowMs)) {
+      preparedDragLocalPaths.delete(key);
+    }
+  }
+  while (preparedDragLocalPaths.size > MAX_PREPARED_DRAG_ITEMS) {
+    const oldestKey = preparedDragLocalPaths.keys().next().value;
+    if (!oldestKey) break;
+    preparedDragLocalPaths.delete(oldestKey);
   }
 }
 
@@ -217,4 +402,9 @@ function fileUriForPath(path: string): string {
   }
   const normalized = path.startsWith("/") ? path : `/${path}`;
   return `file://${normalized.split("/").map(encodeURIComponent).join("/")}`;
+}
+
+function downloadUrlFileName(name: string): string {
+  const safe = name.replace(/[\r\n:]/g, "_").trim();
+  return safe || "download";
 }

@@ -2,6 +2,9 @@ import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 import type {
   AppSnapshot,
   AppEnvironmentSnapshot,
+  ClaudeSendRequest,
+  ClaudeStatus,
+  ClaudeStreamEvent,
   ClipboardPayload,
   ClipboardSnapshot,
   CreateItemRequest,
@@ -18,6 +21,7 @@ import type {
   FileSyncCompareRequest,
   FileSyncCompareResult,
   FileSyncPair,
+  LaunchOnLoginSnapshot,
   ListDirectoryRequest,
   NativeWorkspaceDocument,
   OpenWithAssociation,
@@ -27,6 +31,10 @@ import type {
   PasteItem,
   PasteItemsRequest,
   PasteTextRequest,
+  PrepareDragItemsRequest,
+  PreparedDragItemsResult,
+  PluginPanelRenderResult,
+  PluginCommandRunResult,
   PluginCommandsSnapshot,
   PrepareOpenItemRequest,
   PreparedOpenItem,
@@ -41,6 +49,8 @@ import type {
   RemoteTestResult,
   RenameItemRequest,
   RenameItemsRequest,
+  RenderPluginPanelRequest,
+  RunPluginCommandRequest,
   SaveSettingsRequest,
   SaveRemoteRequest,
   SaveShortcutsRequest,
@@ -72,12 +82,18 @@ function browserSmokeFallback<T>(command: string, args?: Record<string, unknown>
       return Promise.resolve({ proxyUrl: null, ready: false, statusCode: null, error: "Browser smoke mode" } as T);
     case "clipboard_snapshot":
       return Promise.resolve({ local: emptyClipboardPayload(), shared: emptyClipboardPayload() } as T);
+    case "claude_status":
+      return Promise.resolve({ installed: false, running: false, sessionId: null, error: "Browser smoke mode" } as T);
+    case "claude_drain_events":
+      return Promise.resolve([] as T);
     case "workspaces_snapshot":
       return Promise.resolve(browserWorkspaceDocument() as T);
     case "workspaces_save":
       return Promise.resolve((args?.document ?? browserWorkspaceDocument()) as T);
     case "explorer_list_directory":
       return Promise.resolve(browserDirectoryListing((args?.request as ListDirectoryRequest | undefined) ?? {}) as T);
+    case "explorer_prepare_drag_items":
+      return Promise.resolve({ items: [], skipped: [] } as T);
     case "devices_snapshot":
       return Promise.resolve({ devices: [] } as T);
     case "providers_snapshot":
@@ -86,19 +102,57 @@ function browserSmokeFallback<T>(command: string, args?: Record<string, unknown>
     case "transfers_snapshot":
       return Promise.resolve({ rows: [], totalCount: 0, dbPath: "" } as T);
     case "operation_queue_snapshot":
+    case "operation_queue_redo":
       return Promise.resolve(browserOperationQueueSnapshot() as T);
     case "explorer_library_snapshot":
       return Promise.resolve({ recent: [], starred: [], trash: [], lastOpenedPath: null } as T);
     case "plugin_commands_snapshot":
-      return Promise.resolve({ roots: [], commands: [] } as T);
+      return Promise.resolve({ roots: [], commands: [], panels: [] } as T);
+    case "plugin_command_run":
+      return Promise.resolve({
+        commandId: (args?.request as RunPluginCommandRequest | undefined)?.commandId ?? "",
+        pluginId: "",
+        pluginName: "",
+        label: "",
+        handled: false,
+        targetRoute: "/hub/plugins",
+        message: "Plugin command execution is only available in the Tauri app.",
+        notifications: [],
+        runtimeStatus: "unavailable",
+      } as T);
+    case "settings_snapshot":
+      return Promise.resolve(browserSettingsSnapshot() as T);
+    case "settings_save":
+      return Promise.resolve(browserSaveSettings((args?.request as SaveSettingsRequest | undefined)?.document ?? {}) as T);
+    case "settings_launch_on_login_snapshot":
+      return Promise.resolve({
+        supported: false,
+        enabled: false,
+        target: "",
+        detail: "Browser smoke mode",
+      } as T);
+    case "settings_apply_launch_on_login":
+      return Promise.resolve({
+        supported: false,
+        enabled: Boolean(args?.enabled),
+        target: "",
+        detail: "Browser smoke mode",
+      } as T);
+    case "settings_open_with_associations":
+      return Promise.resolve([] as T);
+    case "settings_remove_open_with_association":
+      return Promise.resolve(browserSettingsSnapshot() as T);
     case "shortcuts_snapshot":
       return Promise.resolve({ path: "", bindings: [] } as T);
+    case "shortcuts_save":
+      return Promise.resolve({ path: "", bindings: (args?.request as SaveShortcutsRequest | undefined)?.bindings ?? [] } as T);
     default:
       return null;
   }
 }
 
 const browserSmokeHome = "/Users/misty";
+const browserSettingsStorageKey = "misty.browser-smoke.settings";
 
 function browserAppSnapshot(): AppSnapshot {
   const mistyDir = `${browserSmokeHome}/.misty`;
@@ -128,6 +182,40 @@ function browserAppSnapshot(): AppSnapshot {
       derivedEnv: {},
     },
   };
+}
+
+function browserSettingsSnapshot(): SettingsSnapshot {
+  return {
+    path: browserAppSnapshot().environment.settingsPath,
+    document: browserSettingsDocument(),
+  };
+}
+
+function browserSaveSettings(document: Record<string, unknown>): SettingsSnapshot {
+  try {
+    window.localStorage.setItem(browserSettingsStorageKey, JSON.stringify(document));
+  } catch {
+    // Smoke mode can still run without writable localStorage.
+  }
+  return {
+    path: browserAppSnapshot().environment.settingsPath,
+    document,
+  };
+}
+
+function browserSettingsDocument(): Record<string, unknown> {
+  try {
+    const raw = window.localStorage.getItem(browserSettingsStorageKey);
+    if (raw) {
+      const parsed = JSON.parse(raw) as unknown;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    }
+  } catch {
+    // Ignore malformed smoke-mode data.
+  }
+  return {};
 }
 
 function emptyClipboardPayload(): ClipboardPayload {
@@ -224,6 +312,7 @@ function browserOperationQueueSnapshot(): OperationQueueSnapshot {
     },
     activeCount: 0,
     maxConcurrent: 4,
+    redoAvailable: false,
   };
 }
 
@@ -314,6 +403,22 @@ export function proxySnapshot(): Promise<ProxySnapshot> {
   return invoke("proxy_snapshot");
 }
 
+export function claudeStatus(): Promise<ClaudeStatus> {
+  return invoke("claude_status");
+}
+
+export function claudeSendMessage(request: ClaudeSendRequest): Promise<ClaudeStatus> {
+  return invoke("claude_send_message", { request });
+}
+
+export function claudeDrainEvents(): Promise<ClaudeStreamEvent[]> {
+  return invoke("claude_drain_events");
+}
+
+export function claudeAbort(): Promise<ClaudeStatus> {
+  return invoke("claude_abort");
+}
+
 export function clipboardSnapshot(): Promise<ClipboardSnapshot> {
   return invoke("clipboard_snapshot");
 }
@@ -379,6 +484,10 @@ export function explorerPrepareOpenItem(request: PrepareOpenItemRequest): Promis
   return invoke("explorer_prepare_open_item", { request });
 }
 
+export function explorerPrepareDragItems(request: PrepareDragItemsRequest): Promise<PreparedDragItemsResult> {
+  return invoke("explorer_prepare_drag_items", { request });
+}
+
 export function explorerPreviewItem(path: string): Promise<ExplorerPreviewPayload> {
   return invoke("explorer_preview_item", { path });
 }
@@ -401,6 +510,10 @@ export function explorerLibraryRecordRecent(item: ExplorerLibraryItem): Promise<
 
 export function explorerLibraryRecordLastOpened(path: string): Promise<ExplorerLibrarySnapshot> {
   return invoke("explorer_library_record_last_opened", { request: { path } });
+}
+
+export function explorerLibrarySetTags(item: ExplorerLibraryItem, tags: string[]): Promise<ExplorerLibrarySnapshot> {
+  return invoke("explorer_library_set_tags", { request: { item, tags } });
 }
 
 export function explorerOpenWith(applicationPath: string, filePath: string): Promise<void> {
@@ -459,6 +572,14 @@ export function settingsSave(request: SaveSettingsRequest): Promise<SettingsSnap
   return invoke("settings_save", { request });
 }
 
+export function settingsLaunchOnLoginSnapshot(): Promise<LaunchOnLoginSnapshot> {
+  return invoke("settings_launch_on_login_snapshot");
+}
+
+export function settingsApplyLaunchOnLogin(enabled: boolean): Promise<LaunchOnLoginSnapshot> {
+  return invoke("settings_apply_launch_on_login", { enabled });
+}
+
 export function settingsOpenWithAssociations(): Promise<OpenWithAssociation[]> {
   return invoke("settings_open_with_associations");
 }
@@ -477,6 +598,18 @@ export function shortcutsSave(request: SaveShortcutsRequest): Promise<ShortcutsS
 
 export function pluginCommandsSnapshot(): Promise<PluginCommandsSnapshot> {
   return invoke("plugin_commands_snapshot");
+}
+
+export function pluginCommandRun(request: RunPluginCommandRequest): Promise<PluginCommandRunResult> {
+  return invoke("plugin_command_run", { request });
+}
+
+export function pluginPanelRender(request: RenderPluginPanelRequest): Promise<PluginPanelRenderResult> {
+  return invoke("plugin_panel_render", { request });
+}
+
+export function openExternalUrl(url: string): Promise<void> {
+  return invoke("open_external_url", { url });
 }
 
 export function providersSnapshot(): Promise<ProvidersSnapshot> {
@@ -531,12 +664,20 @@ export function operationQueueCancel(operationId: number): Promise<OperationQueu
   return invoke("operation_queue_cancel", { operationId });
 }
 
+export function operationQueueCancelBatch(batchId: number): Promise<OperationQueueSnapshot> {
+  return invoke("operation_queue_cancel_batch", { batchId });
+}
+
 export function operationQueueRetry(operationId: number): Promise<OperationQueueSnapshot> {
   return invoke("operation_queue_retry", { operationId });
 }
 
 export function operationQueueUndo(undoTokenId: number): Promise<OperationQueueSnapshot> {
   return invoke("operation_queue_undo", { undoTokenId });
+}
+
+export function operationQueueRedo(): Promise<OperationQueueSnapshot> {
+  return invoke("operation_queue_redo");
 }
 
 export function operationQueueResolveConflict(

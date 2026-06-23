@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { openExternalLink } from "../../../../../shared/openExternalLink";
 import { PluginBrowser } from "./PluginBrowser";
 import { loadPluginCatalog, pluginCatalogBaseUrl } from "./catalog";
 import { SAMPLE_PLUGINS } from "./data";
@@ -59,7 +60,7 @@ export default function Plugins() {
       installedPlugins={[]}
       marketplacePlugins={plugins}
       notice={loading ? "Loading plugin catalog..." : notice}
-      onOpenLink={(url) => window.open(url, "_blank", "noopener,noreferrer")}
+      onOpenLink={(url) => void openExternalLink(url)}
       onPrimaryAction={() => {
         window.location.assign("/download");
       }}

@@ -11,11 +11,13 @@ import {
   FileText,
   FileVideo,
   Folder,
+  Download,
   Trash2,
 } from "lucide-react";
 import { memo, useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent, MouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import type { DirectoryListing, FileEntry } from "../../../api/types";
+import { selectAppearancePreferences, useSettingsStore } from "../../settings/useSettingsStore";
 import type {
   ExplorerInlineEditState,
   ExplorerSortColumn,
@@ -79,8 +81,10 @@ interface FileBrowserProps {
   onSelect: (entryId: string, event: MouseEvent, visibleEntryIds: string[]) => void;
   onClearSelection: () => void;
   onOpen: (entry: FileEntry) => void;
+  onDownload: (entry: FileEntry) => void;
   onContextMenu: (event: MouseEvent, entry: FileEntry) => void;
   onBackgroundContextMenu: (event: MouseEvent) => void;
+  onPrepareDrag: (entry: FileEntry) => void;
   onDragStart: (event: DragEvent, entry: FileEntry) => void;
   onDragEnd: () => void;
   onDragHover: (destination: string) => void;
@@ -126,7 +130,7 @@ export const FileBrowser = memo(function FileBrowser(props: FileBrowserProps) {
       }}
       onContextMenu={props.onBackgroundContextMenu}
       onDragOver={(event) => {
-        if (event.dataTransfer.types.includes("application/x-misty-files")) event.preventDefault();
+        if (isMistyFileDrag(event) || isExternalFileDrag(event)) event.preventDefault();
       }}
       onDrop={(event) => props.onDrop(event, props.listing!.path)}
     >
@@ -172,6 +176,9 @@ function FileBrowserSkeleton(props: { viewMode: ExplorerViewMode }) {
 }
 
 function FileTable(props: FileBrowserProps & { listing: DirectoryListing }) {
+  const compactModeEnabled = useSettingsStore((state) =>
+    selectAppearancePreferences(state.settings?.document).compactModeEnabled,
+  );
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const scrollFrameRef = useRef<number | null>(null);
   const viewportHeightRef = useRef(0);
@@ -185,14 +192,15 @@ function FileTable(props: FileBrowserProps & { listing: DirectoryListing }) {
   const visibleEntryIds = useMemo(() => props.listing.entries.map((entry) => entry.id), [props.listing.entries]);
   const passiveRenameDrafts = useMemo(() => passiveRenameDraftsFor(props.inlineEdit, props.paneId), [props.inlineEdit, props.paneId]);
   const activeInlineEdit = props.inlineEdit?.paneId === props.paneId ? props.inlineEdit : null;
+  const rowHeight = compactModeEnabled ? 28 : TABLE_ROW_HEIGHT;
   const rowCount = props.listing.entries.length;
   const tableWidth = columnOrder.reduce((sum, column) => sum + columnWidths[column], 0);
-  const visibleCapacity = Math.max(1, Math.ceil(viewportHeight / TABLE_ROW_HEIGHT));
-  const startIndex = Math.max(0, Math.floor(scrollTop / TABLE_ROW_HEIGHT) - TABLE_OVERSCAN_ROWS);
+  const visibleCapacity = Math.max(1, Math.ceil(viewportHeight / rowHeight));
+  const startIndex = Math.max(0, Math.floor(scrollTop / rowHeight) - TABLE_OVERSCAN_ROWS);
   const endIndex = Math.min(rowCount, startIndex + visibleCapacity + TABLE_OVERSCAN_ROWS * 2);
   const visibleEntries = props.listing.entries.slice(startIndex, endIndex);
-  const topSpacerHeight = startIndex * TABLE_ROW_HEIGHT;
-  const bottomSpacerHeight = Math.max(0, (rowCount - endIndex) * TABLE_ROW_HEIGHT);
+  const topSpacerHeight = startIndex * rowHeight;
+  const bottomSpacerHeight = Math.max(0, (rowCount - endIndex) * rowHeight);
 
   const updateViewport = useCallback(() => {
     const element = scrollRef.current;
@@ -232,13 +240,13 @@ function FileTable(props: FileBrowserProps & { listing: DirectoryListing }) {
     const index = props.listing.entries.findIndex((entry) => entry.id === edit.entryId);
     const element = scrollRef.current;
     if (index < 0 || !element) return;
-    const rowTop = index * TABLE_ROW_HEIGHT;
-    const rowBottom = rowTop + TABLE_ROW_HEIGHT;
+    const rowTop = index * rowHeight;
+    const rowBottom = rowTop + rowHeight;
     if (rowTop < element.scrollTop) element.scrollTo({ top: rowTop });
     else if (rowBottom > element.scrollTop + element.clientHeight) {
       element.scrollTo({ top: rowBottom - element.clientHeight });
     }
-  }, [props.inlineEdit?.entryId, props.inlineEdit?.kind, props.listing.path]);
+  }, [props.inlineEdit?.entryId, props.inlineEdit?.kind, props.listing.path, rowHeight]);
 
   const handleScroll = useCallback(() => {
     if (scrollFrameRef.current !== null) return;
@@ -343,7 +351,9 @@ function FileTable(props: FileBrowserProps & { listing: DirectoryListing }) {
               selected={selectedIds.has(entry.id)}
               onSelect={handleSelect}
               onOpen={props.onOpen}
+              onDownload={props.onDownload}
               onContextMenu={props.onContextMenu}
+              onPrepareDrag={props.onPrepareDrag}
               onDragStart={props.onDragStart}
               onDragEnd={props.onDragEnd}
               onDragHover={props.onDragHover}
@@ -422,7 +432,9 @@ const FileTableRow = memo(function FileTableRow(props: {
   selected: boolean;
   onSelect: FileBrowserProps["onSelect"];
   onOpen: FileBrowserProps["onOpen"];
+  onDownload: FileBrowserProps["onDownload"];
   onContextMenu: FileBrowserProps["onContextMenu"];
+  onPrepareDrag: FileBrowserProps["onPrepareDrag"];
   onDragStart: FileBrowserProps["onDragStart"];
   onDragEnd: FileBrowserProps["onDragEnd"];
   onDragHover: FileBrowserProps["onDragHover"];
@@ -444,6 +456,12 @@ const FileTableRow = memo(function FileTableRow(props: {
         if (!entry.isDeleted) props.onOpen(entry);
       }}
       onContextMenu={(event) => props.onContextMenu(event, entry)}
+      onPointerDown={() => {
+        if (!entry.isDeleted) props.onPrepareDrag(entry);
+      }}
+      onFocus={() => {
+        if (!entry.isDeleted) props.onPrepareDrag(entry);
+      }}
       draggable={!props.inlineEdit && !entry.isDeleted}
       onDragStart={(event) => props.onDragStart(event, entry)}
       onDragEnd={props.onDragEnd}
@@ -466,6 +484,7 @@ const FileTableRow = memo(function FileTableRow(props: {
           entry={entry}
           inlineEdit={props.inlineEdit}
           passiveRename={props.passiveRename}
+          onDownload={props.onDownload}
           onInlineEditChange={props.onInlineEditChange}
           onInlineEditCommit={props.onInlineEditCommit}
           onInlineEditCancel={props.onInlineEditCancel}
@@ -480,6 +499,7 @@ function FileTableCell(props: {
   entry: FileEntry;
   inlineEdit: ExplorerInlineEditState | null;
   passiveRename: PassiveRenameDraft | null;
+  onDownload: FileBrowserProps["onDownload"];
   onInlineEditChange: FileBrowserProps["onInlineEditChange"];
   onInlineEditCommit: FileBrowserProps["onInlineEditCommit"];
   onInlineEditCancel: FileBrowserProps["onInlineEditCancel"];
@@ -507,11 +527,33 @@ function FileTableCell(props: {
       return <td>{formatBytes(props.entry.sizeBytes)}</td>;
     case "type":
       if (props.entry.isDeleted) return <td>Deleted</td>;
-      return <td>{props.entry.kind === "folder" ? "Folder" : props.entry.mimeType || props.entry.extension || props.entry.kind}</td>;
+      return (
+        <td>
+          <span>{props.entry.kind === "folder" ? "Folder" : props.entry.mimeType || props.entry.extension || props.entry.kind}</span>
+          {isDownloadableRemoteFile(props.entry) ? (
+            <button
+              type="button"
+              className="file-row-download"
+              title="Download"
+              aria-label={`Download ${props.entry.name}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                props.onDownload(props.entry);
+              }}
+              onPointerDown={(event) => event.stopPropagation()}
+            >
+              <Download size={15} />
+            </button>
+          ) : null}
+        </td>
+      );
   }
 }
 
 function FileGrid(props: FileBrowserProps & { listing: DirectoryListing }) {
+  const compactModeEnabled = useSettingsStore((state) =>
+    selectAppearancePreferences(state.settings?.document).compactModeEnabled,
+  );
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const scrollFrameRef = useRef<number | null>(null);
   const viewportHeightRef = useRef(0);
@@ -526,13 +568,17 @@ function FileGrid(props: FileBrowserProps & { listing: DirectoryListing }) {
   const activeInlineEdit = props.inlineEdit?.paneId === props.paneId ? props.inlineEdit : null;
   const createOffset = props.inlineEdit?.kind === "create" ? 1 : 0;
   const itemCount = props.listing.entries.length + createOffset;
-  const usableWidth = Math.max(1, viewportWidth - GRID_PADDING * 2);
-  const columns = Math.max(1, Math.floor((usableWidth + GRID_GAP) / (GRID_MIN_ITEM_WIDTH + GRID_GAP)));
-  const rowStride = GRID_ITEM_HEIGHT + GRID_GAP;
+  const gridPadding = compactModeEnabled ? 10 : GRID_PADDING;
+  const gridGap = compactModeEnabled ? 6 : GRID_GAP;
+  const gridItemHeight = compactModeEnabled ? 92 : GRID_ITEM_HEIGHT;
+  const gridMinItemWidth = compactModeEnabled ? 92 : GRID_MIN_ITEM_WIDTH;
+  const usableWidth = Math.max(1, viewportWidth - gridPadding * 2);
+  const columns = Math.max(1, Math.floor((usableWidth + gridGap) / (gridMinItemWidth + gridGap)));
+  const rowStride = gridItemHeight + gridGap;
   const rowCount = Math.ceil(itemCount / columns);
-  const totalHeight = GRID_PADDING * 2 + Math.max(0, rowCount * GRID_ITEM_HEIGHT + Math.max(0, rowCount - 1) * GRID_GAP);
+  const totalHeight = gridPadding * 2 + Math.max(0, rowCount * gridItemHeight + Math.max(0, rowCount - 1) * gridGap);
   const visibleRowCapacity = Math.max(1, Math.ceil(viewportHeight / rowStride));
-  const startRow = Math.max(0, Math.floor(Math.max(0, scrollTop - GRID_PADDING) / rowStride) - GRID_OVERSCAN_ROWS);
+  const startRow = Math.max(0, Math.floor(Math.max(0, scrollTop - gridPadding) / rowStride) - GRID_OVERSCAN_ROWS);
   const endRow = Math.min(rowCount, startRow + visibleRowCapacity + GRID_OVERSCAN_ROWS * 2);
   const startIndex = startRow * columns;
   const endIndex = Math.min(itemCount, endRow * columns);
@@ -548,7 +594,7 @@ function FileGrid(props: FileBrowserProps & { listing: DirectoryListing }) {
     }
     return items;
   }, [createOffset, endIndex, props.listing.entries, startIndex]);
-  const gridTop = GRID_PADDING + startRow * rowStride;
+  const gridTop = gridPadding + startRow * rowStride;
 
   const updateViewport = useCallback(() => {
     const element = scrollRef.current;
@@ -593,13 +639,13 @@ function FileGrid(props: FileBrowserProps & { listing: DirectoryListing }) {
     const element = scrollRef.current;
     if (index < 0 || !element) return;
     const itemIndex = index + createOffset;
-    const rowTop = GRID_PADDING + Math.floor(itemIndex / columns) * rowStride;
-    const rowBottom = rowTop + GRID_ITEM_HEIGHT;
+    const rowTop = gridPadding + Math.floor(itemIndex / columns) * rowStride;
+    const rowBottom = rowTop + gridItemHeight;
     if (rowTop < element.scrollTop) element.scrollTo({ top: rowTop });
     else if (rowBottom > element.scrollTop + element.clientHeight) {
       element.scrollTo({ top: rowBottom - element.clientHeight });
     }
-  }, [columns, createOffset, props.inlineEdit?.entryId, props.inlineEdit?.kind, props.listing.path, rowStride]);
+  }, [columns, createOffset, gridItemHeight, gridPadding, props.inlineEdit?.entryId, props.inlineEdit?.kind, props.listing.path, rowStride]);
 
   const handleScroll = useCallback(() => {
     if (scrollFrameRef.current !== null) return;
@@ -624,7 +670,7 @@ function FileGrid(props: FileBrowserProps & { listing: DirectoryListing }) {
         <div
           className="file-grid"
           style={{
-            gridTemplateColumns: `repeat(${columns}, minmax(0, ${GRID_MIN_ITEM_WIDTH}px))`,
+            gridTemplateColumns: `repeat(${columns}, minmax(0, ${gridMinItemWidth}px))`,
             top: gridTop,
           }}
         >
@@ -653,7 +699,9 @@ function FileGrid(props: FileBrowserProps & { listing: DirectoryListing }) {
                 passiveRename={passiveRenameDrafts.get(item.entry.id) ?? null}
                 onSelect={handleSelect}
                 onOpen={props.onOpen}
+                onDownload={props.onDownload}
                 onContextMenu={props.onContextMenu}
+                onPrepareDrag={props.onPrepareDrag}
                 onDragStart={props.onDragStart}
                 onDragEnd={props.onDragEnd}
                 onDragHover={props.onDragHover}
@@ -677,7 +725,9 @@ const FileGridItem = memo(function FileGridItem(props: {
   passiveRename: PassiveRenameDraft | null;
   onSelect: FileBrowserProps["onSelect"];
   onOpen: FileBrowserProps["onOpen"];
+  onDownload: FileBrowserProps["onDownload"];
   onContextMenu: FileBrowserProps["onContextMenu"];
+  onPrepareDrag: FileBrowserProps["onPrepareDrag"];
   onDragStart: FileBrowserProps["onDragStart"];
   onDragEnd: FileBrowserProps["onDragEnd"];
   onDragHover: FileBrowserProps["onDragHover"];
@@ -702,6 +752,12 @@ const FileGridItem = memo(function FileGridItem(props: {
         if (event.key === "Enter" && !entry.isDeleted) props.onOpen(entry);
       }}
       onContextMenu={(event) => props.onContextMenu(event, entry)}
+      onPointerDown={() => {
+        if (!entry.isDeleted) props.onPrepareDrag(entry);
+      }}
+      onFocus={() => {
+        if (!entry.isDeleted) props.onPrepareDrag(entry);
+      }}
       draggable={!props.inlineEdit && !entry.isDeleted}
       onDragStart={(event) => props.onDragStart(event, entry)}
       onDragEnd={props.onDragEnd}
@@ -717,6 +773,21 @@ const FileGridItem = memo(function FileGridItem(props: {
         props.onDrop(event, entry.path);
       }}
     >
+      {isDownloadableRemoteFile(entry) ? (
+        <button
+          type="button"
+          className="file-grid-download"
+          title="Download"
+          aria-label={`Download ${entry.name}`}
+          onClick={(event) => {
+            event.stopPropagation();
+            props.onDownload(entry);
+          }}
+          onPointerDown={(event) => event.stopPropagation()}
+        >
+          <Download size={15} />
+        </button>
+      ) : null}
       <FileIcon entry={entry} size={32} />
       {props.inlineEdit ? (
         <InlineNameEditor
@@ -731,6 +802,10 @@ const FileGridItem = memo(function FileGridItem(props: {
     </div>
   );
 });
+
+function isDownloadableRemoteFile(entry: FileEntry): boolean {
+  return entry.location.kind === "remote" && entry.kind !== "folder" && !entry.isDeleted;
+}
 
 function InlineCreateTableRow(props: {
   edit: ExplorerInlineEditState;
@@ -908,6 +983,14 @@ function entryMatchesQuery(entry: FileEntry, query: string): boolean {
     entry.location.providerType ?? "",
   ].join(" ").toLowerCase();
   return haystack.includes(query);
+}
+
+function isMistyFileDrag(event: DragEvent): boolean {
+  return event.dataTransfer.types.includes("application/x-misty-files");
+}
+
+function isExternalFileDrag(event: DragEvent): boolean {
+  return event.dataTransfer.types.includes("Files");
 }
 
 function passiveRenameDraftsFor(edit: ExplorerInlineEditState | null, paneId: string): Map<string, PassiveRenameDraft> {

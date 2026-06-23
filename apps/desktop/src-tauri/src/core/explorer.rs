@@ -96,11 +96,49 @@ pub struct PrepareOpenItemRequest {
     pub remote_modified: Option<String>,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PrepareDragItemsRequest {
+    pub items: Vec<PrepareDragItemRequest>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PrepareDragItemRequest {
+    pub path: String,
+    pub is_directory: bool,
+    pub size_bytes: Option<i64>,
+    pub remote_modified: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PreparedOpenItem {
     pub local_path: String,
     pub cached: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PreparedDragItemsResult {
+    pub items: Vec<PreparedDragItem>,
+    pub skipped: Vec<PreparedDragSkippedItem>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PreparedDragItem {
+    pub source_path: String,
+    pub local_path: String,
+    pub is_directory: bool,
+    pub cached: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PreparedDragSkippedItem {
+    pub source_path: String,
+    pub reason: String,
 }
 
 #[derive(Debug, Clone, Serialize)]

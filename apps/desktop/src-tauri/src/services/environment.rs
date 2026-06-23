@@ -6,6 +6,7 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 #[derive(Clone)]
 pub struct AppEnvironmentService {
@@ -133,6 +134,13 @@ impl AppEnvironmentService {
     pub fn workspaces_path(&self) -> PathBuf {
         self.inner.workspaces_path.clone()
     }
+
+    #[cfg(test)]
+    pub fn for_test_home(home_dir: PathBuf) -> Self {
+        Self {
+            inner: Arc::new(AppEnvironment::for_home(home_dir)),
+        }
+    }
 }
 
 impl AppEnvironment {
@@ -150,6 +158,10 @@ impl AppEnvironment {
         let misty_config_path = config_dir.join("misty.json");
         let workspaces_path = config_dir.join("workspaces.json");
         let commands_path = config_dir.join("commands.msy");
+        let grpc_address = settings_advanced_string(&settings_path, "server_address")
+            .unwrap_or_else(|| "localhost:50051".to_owned());
+        let mount_path = settings_advanced_string(&settings_path, "mount_path")
+            .unwrap_or_else(|| ".misty/mnt".to_owned());
 
         let parsed_config = read_misty_config(&misty_config_path);
         let config_proxy_url = parsed_config
@@ -185,9 +197,50 @@ impl AppEnvironment {
             commands_path,
             proxy_url,
             server_url,
-            grpc_address: "localhost:50051".to_owned(),
-            mount_path: ".misty/mnt".to_owned(),
+            grpc_address,
+            mount_path,
             config_exists: misty_config_path.exists(),
+        }
+    }
+
+    #[cfg(test)]
+    fn for_home(home_dir: PathBuf) -> Self {
+        let misty_dir = home_dir.join(".misty");
+        let config_dir = misty_dir.join("config");
+        let db_dir = misty_dir.join("db");
+        let cache_dir = misty_dir.join(".cache");
+        let tmp_dir = misty_dir.join("tmp");
+        let assets_dir = misty_dir.join("assets");
+        let plugins_public_dir = misty_dir.join("plugins").join("public");
+        let plugins_private_dir = misty_dir.join("plugins").join("private");
+        let settings_path = config_dir.join("settings.json");
+        let misty_config_path = config_dir.join("misty.json");
+        let workspaces_path = config_dir.join("workspaces.json");
+        let commands_path = config_dir.join("commands.msy");
+        let grpc_address = settings_advanced_string(&settings_path, "server_address")
+            .unwrap_or_else(|| "localhost:50051".to_owned());
+        let mount_path = settings_advanced_string(&settings_path, "mount_path")
+            .unwrap_or_else(|| ".misty/mnt".to_owned());
+
+        Self {
+            home_dir,
+            misty_dir,
+            config_dir,
+            db_dir,
+            cache_dir,
+            tmp_dir,
+            assets_dir,
+            plugins_public_dir,
+            plugins_private_dir,
+            settings_path,
+            misty_config_path,
+            workspaces_path,
+            commands_path,
+            proxy_url: None,
+            server_url: None,
+            grpc_address,
+            mount_path,
+            config_exists: false,
         }
     }
 
@@ -231,6 +284,23 @@ fn read_misty_config(path: &Path) -> Option<MistyConfig> {
     serde_json::from_str(&raw).ok()
 }
 
+fn settings_advanced_string(path: &Path, key: &str) -> Option<String> {
+    let raw = fs::read_to_string(path).ok()?;
+    let document: Value = serde_json::from_str(&raw).ok()?;
+    let value = document
+        .get("advanced")
+        .and_then(Value::as_object)
+        .and_then(|advanced| advanced.get(key))
+        .and_then(Value::as_str)?
+        .trim()
+        .to_owned();
+    if value.is_empty() {
+        None
+    } else {
+        Some(value)
+    }
+}
+
 fn resolve_home_dir() -> Option<PathBuf> {
     env::var_os("HOME")
         .or_else(|| env::var_os("USERPROFILE"))
@@ -244,6 +314,15 @@ fn display_path(path: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn unique_test_home(name: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        env::temp_dir().join(format!("misty-env-{name}-{nanos}"))
+    }
 
     #[test]
     fn proxy_token_database_uses_shared_data_db() {
@@ -276,5 +355,37 @@ mod tests {
             root.join(".misty/db/data.db")
         );
         assert_eq!(service.misty_db_path(), root.join(".misty/db/misty.db"));
+    }
+
+    #[test]
+    fn environment_uses_saved_advanced_connection_settings() {
+        let root = unique_test_home("advanced-settings");
+        let settings_path = root.join(".misty/config/settings.json");
+        fs::create_dir_all(settings_path.parent().expect("settings parent"))
+            .expect("create settings parent");
+        fs::write(
+            &settings_path,
+            r#"{
+              "advanced": {
+                "server_address": "127.0.0.1:60051",
+                "mount_path": "/Volumes/Misty"
+              }
+            }"#,
+        )
+        .expect("write settings");
+
+        let environment = AppEnvironment::for_home(root);
+        let snapshot = environment.snapshot();
+
+        assert_eq!(snapshot.grpc_address, "127.0.0.1:60051");
+        assert_eq!(snapshot.mount_path, "/Volumes/Misty");
+        assert_eq!(
+            snapshot.derived_env.get("MISTY_GRPC_ADDRESS"),
+            Some(&"127.0.0.1:60051".to_owned()),
+        );
+        assert_eq!(
+            snapshot.derived_env.get("MISTY_MOUNT_PATH"),
+            Some(&"/Volumes/Misty".to_owned()),
+        );
     }
 }

@@ -3,12 +3,12 @@ use std::sync::Arc;
 use crate::core::clipboard::{ClipboardService, SharedClipboardClient};
 use crate::core::file_sync::FileSyncPairStore;
 use crate::services::{
-    commands::CommandService, devices::DeviceService, environment::AppEnvironmentService,
-    explorer::ExplorerService, explorer_library::ExplorerLibraryService,
-    file_sync::FileSyncService, operation_queue::OperationQueueService,
-    plugin_commands::PluginCommandService, providers::ProviderService, proxy::ProxyService,
-    proxy_clipboard::ProxyClipboardClient, settings::SettingsService, transfers::TransferService,
-    workspaces::WorkspaceService,
+    claude::ClaudeService, commands::CommandService, devices::DeviceService,
+    environment::AppEnvironmentService, explorer::ExplorerService,
+    explorer_library::ExplorerLibraryService, file_sync::FileSyncService,
+    operation_queue::OperationQueueService, plugin_commands::PluginCommandService,
+    providers::ProviderService, proxy::ProxyService, proxy_clipboard::ProxyClipboardClient,
+    settings::SettingsService, transfers::TransferService, workspaces::WorkspaceService,
 };
 
 pub struct MistyRuntime {
@@ -28,6 +28,7 @@ pub struct MistyRuntime {
     pub explorer_library: ExplorerLibraryService,
     pub workspaces: WorkspaceService,
     pub operation_queue: OperationQueueService,
+    pub claude: ClaudeService,
 }
 
 impl MistyRuntime {
@@ -59,6 +60,7 @@ impl MistyRuntime {
             explorer_library.clone(),
         );
         let operation_queue = OperationQueueService::new(explorer.clone(), transfers.clone());
+        let claude = ClaudeService::new();
         let file_sync = FileSyncService::new(
             environment.clone(),
             explorer.clone(),
@@ -84,6 +86,7 @@ impl MistyRuntime {
             explorer_library,
             workspaces,
             operation_queue,
+            claude,
         }
     }
 }

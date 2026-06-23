@@ -2,16 +2,64 @@ import { create } from "zustand";
 import {
   settingsOpenWithAssociations,
   settingsRemoveOpenWithAssociation,
+  settingsApplyLaunchOnLogin,
+  settingsLaunchOnLoginSnapshot,
   settingsSave,
   settingsSnapshot,
   shortcutsSave,
   shortcutsSnapshot,
 } from "../../api/misty";
-import type { OpenWithAssociation, ShortcutsSnapshot, SettingsSnapshot } from "../../api/types";
+import type { LaunchOnLoginSnapshot, OpenWithAssociation, ShortcutsSnapshot, SettingsSnapshot } from "../../api/types";
 import { errorText } from "../../shared/format";
+import { settingsIndexToThemeMode, useAppThemeStore } from "../../app/useAppThemeStore";
 
-type SettingsSection = "general" | "appearance" | "privacy" | "sync" | "notifications" | "shortcuts" | "advanced";
+type SettingsSection = "general" | "appearance" | "account" | "privacy" | "sync" | "notifications" | "shortcuts" | "advanced";
 type SettingValue = string | number | boolean | Array<Record<string, unknown>>;
+
+export type SettingsScaleToken = "small" | "default" | "large";
+
+export interface CustomFontPreference {
+  label: string;
+  path: string;
+}
+
+export interface AppearancePreferences {
+  compactModeEnabled: boolean;
+  fontSize: SettingsScaleToken;
+  reducedMotionEnabled: boolean;
+  thumbnailPreviewsEnabled: boolean;
+  uiScale: SettingsScaleToken;
+}
+
+export interface NotificationPreferences {
+  badgeCountEnabled: boolean;
+  desktopNotificationsEnabled: boolean;
+  digestNotificationsEnabled: boolean;
+  inAppNotificationsEnabled: boolean;
+  quietHoursEnabled: boolean;
+  soundNotificationsEnabled: boolean;
+}
+
+export interface GeneralPreferences {
+  confirmDestructiveActions: boolean;
+  defaultFileActionIndex: number;
+  defaultTransferBehaviorIndex: number;
+  openLinksExternally: boolean;
+  preferredWorkspaceRoot: string;
+  reopenLastSession: boolean;
+  startupViewIndex: number;
+}
+
+export interface ShortcutPreferences {
+  customShortcutsEnabled: boolean;
+  keymapIndex: number;
+  shortcutHintsEnabled: boolean;
+}
+
+export interface AdvancedPreferences {
+  mountPath: string;
+  serverAddress: string;
+}
 
 interface SettingsStore {
   activeSection: SettingsSection;
@@ -19,6 +67,7 @@ interface SettingsStore {
   settingsText: string;
   openWithAssociations: OpenWithAssociation[];
   shortcuts: ShortcutsSnapshot | null;
+  loaded: boolean;
   working: boolean;
   error: string | null;
   message: string | null;
@@ -32,12 +81,15 @@ interface SettingsStore {
   saveShortcuts: () => Promise<void>;
 }
 
+let settingsSaveSequence = 0;
+
 export const useSettingsStore = create<SettingsStore>((set, get) => ({
   activeSection: "general",
   settings: null,
   settingsText: "{}",
   openWithAssociations: [],
   shortcuts: null,
+  loaded: false,
   working: false,
   error: null,
   message: null,
@@ -45,21 +97,27 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   load: async () => {
     set({ working: true, error: null });
     try {
-      const [settings, shortcuts, openWithAssociations] = await Promise.all([
+      const [settings, shortcuts, openWithAssociations, launchOnLogin] = await Promise.all([
         settingsSnapshot(),
         shortcutsSnapshot(),
         settingsOpenWithAssociations(),
+        settingsLaunchOnLoginSnapshot(),
       ]);
+      const normalizedSettings = settingsWithLaunchOnLoginSnapshot(settings, launchOnLogin);
+      applySettingsSideEffects(normalizedSettings.document);
       set({
-        settings,
-        settingsText: JSON.stringify(settings.document, null, 2),
+        settings: normalizedSettings,
+        settingsText: JSON.stringify(normalizedSettings.document, null, 2),
         openWithAssociations,
         shortcuts,
       });
+      if (normalizedSettings !== settings) {
+        void settingsSave({ document: normalizedSettings.document }).catch(() => undefined);
+      }
     } catch (error) {
       set({ error: errorText(error) });
     } finally {
-      set({ working: false });
+      set({ working: false, loaded: true });
     }
   },
 
@@ -68,6 +126,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   setSettingsText: (settingsText) => set({ settingsText }),
 
   updateSetting: (section, key, value) => {
+    const requestId = ++settingsSaveSequence;
     const current = get().settings;
     const document = cloneDocument(current?.document ?? {});
     const sectionValue = document[section];
@@ -85,16 +144,32 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       message: null,
     });
 
-    void settingsSave({ document })
+    const applyNativeSetting = section === "general" && key === "launch_on_login"
+      ? settingsApplyLaunchOnLogin(Boolean(value)).then(() => undefined)
+      : Promise.resolve();
+
+    void applyNativeSetting
+      .then(() => settingsSave({ document }))
       .then((settings) => {
+        if (requestId !== settingsSaveSequence) return;
+        applySettingsSideEffects(settings.document);
         set({
           settings,
           settingsText: JSON.stringify(settings.document, null, 2),
           message: "Settings saved.",
         });
       })
-      .catch((error) => set({ error: errorText(error) }))
-      .finally(() => set({ working: false }));
+      .catch((error) => {
+        if (requestId !== settingsSaveSequence) return;
+        set({
+          settings: current,
+          settingsText: JSON.stringify(current?.document ?? {}, null, 2),
+          error: errorText(error),
+        });
+      })
+      .finally(() => {
+        if (requestId === settingsSaveSequence) set({ working: false });
+      });
   },
 
   saveSettingsDocument: async () => {
@@ -104,7 +179,9 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") {
         throw new Error("Settings must be a JSON object.");
       }
+      await applyLaunchOnLoginFromDocument(parsed as Record<string, unknown>);
       const settings = await settingsSave({ document: parsed as Record<string, unknown> });
+      applySettingsSideEffects(settings.document);
       set({
         settings,
         settingsText: JSON.stringify(settings.document, null, 2),
@@ -168,4 +245,156 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
 
 function cloneDocument(document: Record<string, unknown>): Record<string, unknown> {
   return JSON.parse(JSON.stringify(document)) as Record<string, unknown>;
+}
+
+function settingsWithLaunchOnLoginSnapshot(
+  settings: SettingsSnapshot,
+  launchOnLogin: LaunchOnLoginSnapshot,
+): SettingsSnapshot {
+  if (!launchOnLogin.supported) return settings;
+  const current = settingsBoolean(settings.document, "general", "launch_on_login", false);
+  if (current === launchOnLogin.enabled) return settings;
+
+  const document = cloneDocument(settings.document);
+  const sectionValue = document.general;
+  document.general = sectionValue && typeof sectionValue === "object" && !Array.isArray(sectionValue)
+    ? { ...sectionValue as Record<string, unknown>, launch_on_login: launchOnLogin.enabled }
+    : { launch_on_login: launchOnLogin.enabled };
+  return { ...settings, document };
+}
+
+function applySettingsSideEffects(document: Record<string, unknown>): void {
+  useAppThemeStore
+    .getState()
+    .setThemeMode(settingsIndexToThemeMode(settingsNumber(document, "appearance", "theme_index", 0)));
+}
+
+async function applyLaunchOnLoginFromDocument(document: Record<string, unknown>): Promise<void> {
+  await settingsApplyLaunchOnLogin(settingsBoolean(document, "general", "launch_on_login", false));
+}
+
+export function selectAppearancePreferences(
+  document: Record<string, unknown> | null | undefined,
+): AppearancePreferences {
+  const source = document ?? {};
+  return {
+    compactModeEnabled: settingsBoolean(source, "appearance", "compact_mode_enabled", false),
+    fontSize: settingsScaleToken(settingsNumber(source, "appearance", "font_size_index", 1)),
+    reducedMotionEnabled: settingsBoolean(source, "appearance", "reduced_motion_enabled", false),
+    thumbnailPreviewsEnabled: settingsBoolean(source, "appearance", "thumbnail_previews_enabled", true),
+    uiScale: settingsScaleToken(settingsNumber(source, "appearance", "ui_scale_index", 1)),
+  };
+}
+
+export function selectCustomFontPreferences(
+  document: Record<string, unknown> | null | undefined,
+): CustomFontPreference[] {
+  const value = settingsSectionRecord(document ?? {}, "appearance").custom_fonts;
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry) => {
+      if (!entry || typeof entry !== "object" || Array.isArray(entry)) return null;
+      const record = entry as Record<string, unknown>;
+      const path = typeof record.path === "string" ? record.path.trim() : "";
+      const label = typeof record.label === "string" ? record.label.trim() : "";
+      return path ? { label: label || fontLabelFromPath(path), path } : null;
+    })
+    .filter((entry): entry is CustomFontPreference => entry !== null);
+}
+
+export function fontLabelFromPath(path: string): string {
+  const fileName = path.split(/[\\/]/).filter(Boolean).pop() ?? path;
+  const dotIndex = fileName.lastIndexOf(".");
+  return dotIndex > 0 ? fileName.slice(0, dotIndex) : fileName;
+}
+
+export function selectNotificationPreferences(
+  document: Record<string, unknown> | null | undefined,
+): NotificationPreferences {
+  const source = document ?? {};
+  return {
+    badgeCountEnabled: settingsBoolean(source, "notifications", "badge_count_enabled", true),
+    desktopNotificationsEnabled: settingsBoolean(source, "notifications", "desktop_notifications_enabled", true),
+    digestNotificationsEnabled: settingsBoolean(source, "notifications", "digest_notifications_enabled", false),
+    inAppNotificationsEnabled: settingsBoolean(source, "notifications", "in_app_notifications_enabled", true),
+    quietHoursEnabled: settingsBoolean(source, "notifications", "quiet_hours_enabled", false),
+    soundNotificationsEnabled: settingsBoolean(source, "notifications", "sound_notifications_enabled", false),
+  };
+}
+
+export function selectGeneralPreferences(
+  document: Record<string, unknown> | null | undefined,
+): GeneralPreferences {
+  const source = document ?? {};
+  return {
+    confirmDestructiveActions: settingsBoolean(source, "general", "confirm_destructive_actions", true),
+    defaultFileActionIndex: settingsNumber(source, "general", "default_file_action_index", 0),
+    defaultTransferBehaviorIndex: settingsNumber(source, "general", "default_transfer_behavior_index", 0),
+    openLinksExternally: settingsBoolean(source, "general", "open_links_externally", true),
+    preferredWorkspaceRoot: settingsString(source, "general", "preferred_workspace_root", ""),
+    reopenLastSession: settingsBoolean(source, "general", "reopen_last_session", true),
+    startupViewIndex: settingsNumber(source, "general", "startup_view_index", 0),
+  };
+}
+
+export function selectShortcutPreferences(
+  document: Record<string, unknown> | null | undefined,
+): ShortcutPreferences {
+  const source = document ?? {};
+  return {
+    customShortcutsEnabled: settingsBoolean(source, "shortcuts", "custom_shortcuts_enabled", false),
+    keymapIndex: settingsNumber(source, "shortcuts", "keymap_index", 0),
+    shortcutHintsEnabled: settingsBoolean(source, "shortcuts", "shortcut_hints_enabled", true),
+  };
+}
+
+export function selectAdvancedPreferences(
+  document: Record<string, unknown> | null | undefined,
+): AdvancedPreferences {
+  const source = document ?? {};
+  return {
+    mountPath: settingsString(source, "advanced", "mount_path", ".misty/mnt"),
+    serverAddress: settingsString(source, "advanced", "server_address", "localhost:50051"),
+  };
+}
+
+export function settingsNumber(
+  document: Record<string, unknown>,
+  section: string,
+  key: string,
+  fallback: number,
+): number {
+  const value = settingsSectionRecord(document, section)[key];
+  return typeof value === "number" ? value : fallback;
+}
+
+export function settingsBoolean(
+  document: Record<string, unknown>,
+  section: string,
+  key: string,
+  fallback: boolean,
+): boolean {
+  const value = settingsSectionRecord(document, section)[key];
+  return typeof value === "boolean" ? value : fallback;
+}
+
+export function settingsString(
+  document: Record<string, unknown>,
+  section: string,
+  key: string,
+  fallback: string,
+): string {
+  const value = settingsSectionRecord(document, section)[key];
+  return typeof value === "string" ? value : fallback;
+}
+
+function settingsScaleToken(index: number): SettingsScaleToken {
+  if (index === 0) return "small";
+  if (index === 2) return "large";
+  return "default";
+}
+
+function settingsSectionRecord(document: Record<string, unknown>, section: string): Record<string, unknown> {
+  const value = document[section];
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }

@@ -1,4 +1,5 @@
 import { NavLink } from "react-router-dom";
+import { handleExternalLinkClick } from "../../../../../shared/openExternalLink";
 
 const CheckIcon = ({ muted }: { muted?: boolean }) => (
   <svg
@@ -83,6 +84,7 @@ export default function PricingCard({
             href={ctaHref}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={handleExternalLinkClick(ctaHref)}
             className="w-full text-center px-6 py-2.5 bg-white hover:bg-zinc-200 text-black font-medium rounded-xl transition-colors duration-300 shadow-lg"
           >
             {ctaLabel}
