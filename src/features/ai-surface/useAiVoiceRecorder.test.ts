@@ -3,8 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { transcribeVoice } = vi.hoisted(() => ({ transcribeVoice: vi.fn() }));
 
-vi.mock("@/api/agents/api", () => ({
-  agentsApi: { transcribeVoice },
+vi.mock("@/features/agents/agentsRuntime", () => ({
+  runtimeAgentsApi: { transcribeVoice },
 }));
 
 import { useAiVoiceRecorder } from "./useAiVoiceRecorder";

@@ -7,7 +7,7 @@ Misty is a React product with native Tauri shells for desktop and Apple mobile d
 - `src/application/` — bootstrap, routing, layouts, providers, telemetry lifecycle, and error boundaries.
 - `src/features/` — product-owned UI, hooks, types, and Zustand state. A feature exposes its intentional public API from `index.ts` and owns its implementation details.
 - `src/api/` — neutral authenticated Misty client and domain-specific endpoint modules. Space-only connectivity policy remains inside `src/api/spaces/`.
-- `src/native/` — small shared Tauri/OS integrations. Desktop-only filesystem IPC lives with the Files feature at `src/features/files/native.ts`.
+- `src/native/` — small shared Tauri/OS integrations. Desktop filesystem IPC is exposed through `src/native/filesystem.ts`; Files and Browser workspace behavior belongs to their downloaded packages.
 - `src/telemetry/` — error reporting and product telemetry.
 - `src/shared/` — generic UI, hooks, utilities, drag infrastructure, and assets with no feature or native-runtime knowledge.
 - `src/styles/` — global styling and design tokens.
@@ -130,7 +130,7 @@ Each profile gets a separate app identifier, browser storage, and auth vault ent
 
 The existing `mobile` build mode is the universal iOS packaging target for iPhone and iPad on iOS 15+. It mounts `MobileLayout`, preserves desktop pane and virtual-window state, and presents one active workspace surface at a time. Downloadable extensions and the Store are desktop-only. Android packages currently retain their existing tablet-oriented packaging constraints.
 
-Browser agent access is device-local and opt-in per tab. Selecting an Agent creates a visible, revocable eight-hour grant for inspect, navigate, click, and download-status tools; grants never survive an app restart. External pages receive no Tauri API permissions, and downloads are assigned collision-safe names in the operating system Downloads folder by the native WebView handler.
+Native personal agents are built into Misty. Assign installed apps per Space, then explicitly choose Agent mode for the main work surface or Team mode for a separate native window. The host and server enforce short-lived task authority and app assignments independently of model decisions; stopping or losing execution revokes that authority. Legacy per-tab browser grants remain for older clients. External integration pages receive no Tauri API permissions. See [the implementation and acceptance record](docs/implementation/native-misty-agents.md) for supported behavior, recovery, and validation limits.
 
 Desktop cleanup, icons, Windows staging, and manual releases are owned by the
 separate `misty-cli` repository. Its Apple-first mobile commands cover Xcode

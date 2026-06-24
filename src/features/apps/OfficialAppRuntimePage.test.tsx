@@ -21,6 +21,7 @@ vi.mock("./desktop-package-runtime", () => ({
   officialDesktopPackageReady: async () => false,
   installOfficialDesktopPackage: mocks.download,
 }));
+vi.mock("@/features/agents/AgentsPage", () => ({ default: () => <div>Agents</div> }));
 vi.mock("./MiniAppRuntime", () => ({ MiniAppRuntime: () => <div>App running</div> }));
 vi.mock("./DownloadedAppSurface", () => ({ DownloadedAppSurface: () => <div>App running</div> }));
 vi.mock("./TrustedAppSurface", () => ({ TrustedAppSurface: () => <div>App running</div> }));
@@ -50,13 +51,11 @@ beforeEach(() => {
   useAppConsent.setState({ agreed: {} });
   useAppsStore.setState({
     accountId: "member",
-    spaceId: "family",
+    ready: true,
     catalog: [app],
     error: "",
     load: mocks.load,
-    prefetchSpaceAccess: mocks.load,
-    bySpace: {
-      family: [
+    installations: [
         {
           app_id: app.id,
           state: "installed",
@@ -66,7 +65,6 @@ beforeEach(() => {
           authority_generation: 1,
         },
       ] as never,
-    },
   });
 });
 afterEach(() => {
@@ -99,7 +97,7 @@ it("does not download or start a Space-enabled app until this member agrees", as
   expect(screen.queryByRole("dialog")).toBeNull();
   expect(mocks.download).not.toHaveBeenCalled();
   act(() => useAppConsent.getState().agree("member", app));
-  await waitFor(() => expect(mocks.session).toHaveBeenCalledExactlyOnceWith(app.id, "family", 1));
+  await waitFor(() => expect(mocks.session).toHaveBeenCalledExactlyOnceWith(app.id, undefined, 1));
   expect(mocks.download).toHaveBeenCalledExactlyOnceWith(app);
   expect(await screen.findByText("App running")).toBeTruthy();
 });
@@ -141,7 +139,7 @@ it("does not retry a failed session when catalog and installation objects are re
     await act(async () =>
       useAppsStore.setState((state) => ({
         catalog: structuredClone(state.catalog),
-        bySpace: structuredClone(state.bySpace),
+        installations: structuredClone(state.installations),
       })),
     );
   }
@@ -154,9 +152,95 @@ it("does not retry a failed session when catalog and installation objects are re
 it("rejects malformed expiry instead of scheduling immediate session refreshes", async () => {
   mocks.session.mockResolvedValue({ expires_at: "invalid" });
   useAppConsent.getState().agree("member", app);
-  render(<MemoryRouter><OfficialAppRuntimePage appId={app.id} spaceId="family" /></MemoryRouter>);
+  render(
+    <MemoryRouter>
+      <OfficialAppRuntimePage appId={app.id} spaceId="family" />
+    </MemoryRouter>,
+  );
   await screen.findByText("The server returned an expired app session. Try again.");
   expect(mocks.session).toHaveBeenCalledTimes(1);
   expect(screen.queryByText("App running")).toBeNull();
   mocks.session.mockResolvedValue({ expires_at: new Date(Date.now() + 120_000).toISOString() });
+});
+
+function installPersonalApp(
+  id: "files" | "browser",
+  runtime: OfficialApp["desktop"]["runtime"] = "downloaded",
+) {
+  const personalApp = {
+    ...app,
+    id,
+    app_id: `com.misty.${id}`,
+    name: id === "files" ? "Files" : "Browser",
+    desktop: { runtime, entry: "https://apps.test/app.zip" },
+  } as OfficialApp;
+  useAppsStore.setState({
+    catalog: [personalApp],
+    installations: [
+        {
+          ...useAppsStore.getState().installations[0],
+          app_id: id,
+        },
+      ],
+  });
+  useAppConsent.getState().agree("member", personalApp);
+  return personalApp;
+}
+
+it.each(["files", "browser"] as const)(
+  "waits for the %s download before starting its app session",
+  async (id) => {
+    const personalApp = installPersonalApp(id);
+    let finish!: () => void;
+    mocks.download.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    render(
+      <MemoryRouter>
+        <OfficialAppRuntimePage appId={id} />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(mocks.download).toHaveBeenCalledWith(personalApp));
+    expect(mocks.session).not.toHaveBeenCalled();
+    expect(screen.queryByText("App running")).toBeNull();
+    await act(async () => finish());
+    expect(await screen.findByText("App running")).toBeTruthy();
+  },
+);
+
+it.each(["files", "browser"] as const)(
+  "does not reinstall removed %s just because its global shortcut is opened",
+  (id) => {
+    installPersonalApp(id);
+    useAppDownloads.setState({ removed: { [id]: true } });
+    render(
+      <MemoryRouter>
+        <OfficialAppRuntimePage appId={id} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("button", { name: "Get app" })).toBeTruthy();
+    expect(mocks.download).not.toHaveBeenCalled();
+    expect(mocks.session).not.toHaveBeenCalled();
+  },
+);
+
+it.each([
+  ["files", "embedded"],
+  ["browser", "embedded"],
+  ["files", "hosted"],
+  ["browser", "hosted"],
+] as const)("rejects the %s %s desktop fallback", (id, runtime) => {
+  installPersonalApp(id, runtime);
+  render(
+    <MemoryRouter>
+      <OfficialAppRuntimePage appId={id} />
+    </MemoryRouter>,
+  );
+  expect(screen.getByText(/Get the downloadable .* package from Discover/)).toBeTruthy();
+  expect(screen.queryByText("App running")).toBeNull();
+  expect(mocks.session).not.toHaveBeenCalled();
+  expect(mocks.download).not.toHaveBeenCalled();
 });

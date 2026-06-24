@@ -6,7 +6,7 @@ use std::collections::BTreeSet;
 #[path = "mini_app_permission_vault.rs"]
 mod permission_vault;
 #[cfg(test)]
-const SERVICE: &str = "com.misty.native-app.permissions.v2";
+const SERVICE: &str = "com.misty.permissions";
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Record {
@@ -43,18 +43,35 @@ impl From<&PermissionSet> for Snapshot {
     }
 }
 fn record(p: &Snapshot, vault: &dyn Vault) -> Result<Record, String> {
-    let value = p
-        .owner_namespace
-        .as_deref()
-        .map(|owner| vault.read(owner))
-        .transpose()?
-        .flatten();
+    let value = match p.owner_namespace.as_deref() {
+        Some(owner) => match vault.read(owner) {
+            Ok(value) => value,
+            Err(err)
+                if err == "Saved app permissions could not be authenticated."
+                    || err == "Invalid encrypted app permissions."
+                    || err == "Invalid saved app permissions." =>
+            {
+                eprintln!("Resetting unauthenticated saved permissions for {owner}: {err}");
+                None
+            }
+            Err(err) => return Err(err),
+        },
+        None => None,
+    };
     if let Some(value) = value {
         if value.len() > 65536 {
             return Err("Invalid saved app permissions.".into());
         }
-        let record: Record =
-            serde_json::from_str(&value).map_err(|_| "Invalid saved app permissions.")?;
+        let record: Record = match serde_json::from_str(&value) {
+            Ok(rec) => rec,
+            Err(_) => {
+                eprintln!("Resetting corrupted saved permissions JSON");
+                Record {
+                    declaration: p.consent_declaration.clone(),
+                    grants: BTreeSet::new(),
+                }
+            }
+        };
         if record.declaration == p.consent_declaration && record.grants.len() <= 128 {
             return Ok(record);
         }
@@ -212,7 +229,7 @@ pub(super) async fn decide_instance(
     capability: &str,
     allowed: bool,
 ) -> Result<(), String> {
-    // Revoke live authority immediately, even when another Keychain dialog is pending.
+    // Revoke live authority immediately, even when another credential write is pending.
     if !allowed {
         let revoked = {
             let mut registry = state.0.lock().map_err(|_| "App registry unavailable.")?;
@@ -430,7 +447,7 @@ mod tests {
         struct Cleanup(String);
         impl Drop for Cleanup {
             fn drop(&mut self) {
-                let _ = keyring::Entry::new(SERVICE, &self.0).and_then(|e| e.delete_credential());
+                let _ = crate::infra::credential_store::delete(SERVICE, &self.0);
             }
         }
         let _cleanup = Cleanup(owner.clone());
@@ -492,7 +509,7 @@ mod tests {
         }
     }
     #[tokio::test]
-    async fn pending_keychain_does_not_lock_registry_and_late_approval_cannot_restore_revoked_access(
+    async fn pending_credential_io_does_not_lock_registry_and_late_approval_cannot_restore_revoked_access(
     ) {
         let state = std::sync::Arc::new(super::super::super::MiniAppState::default());
         state.0.lock().unwrap().insert(
@@ -522,7 +539,7 @@ mod tests {
             let mut registry = state
                 .0
                 .try_lock()
-                .expect("Keychain must not hold the registry");
+                .expect("Credential I/O must not hold the registry");
             registry
                 .get_mut("view")
                 .unwrap()
@@ -539,5 +556,27 @@ mod tests {
         let saved: Record =
             serde_json::from_str(vault.value.lock().unwrap().as_ref().unwrap()).unwrap();
         assert!(saved.grants.is_empty());
+    }
+    #[test]
+    fn unauthenticated_or_corrupt_vault_record_gracefully_resets_grants_without_failing() {
+        struct FailingVault(&'static str);
+        impl Vault for FailingVault {
+            fn read(&self, _: &str) -> Result<Option<String>, String> {
+                Err(self.0.into())
+            }
+            fn write(&self, _: &str, _: &str) -> Result<(), String> {
+                Ok(())
+            }
+        }
+        for error in [
+            "Saved app permissions could not be authenticated.",
+            "Invalid encrypted app permissions.",
+            "Invalid saved app permissions.",
+        ] {
+            let mut p = app("alice", serde_json::json!(["files.read"]));
+            restore(&mut p, &FailingVault(error)).expect("Must self-heal on unauthenticated data");
+            assert!(p.authorize("files.read").is_err());
+            assert!(p.consent_loaded);
+        }
     }
 }

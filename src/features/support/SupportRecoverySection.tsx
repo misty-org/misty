@@ -45,7 +45,7 @@ const initialDraft: FeedbackDraft = {
 const supportDisabledControlClass =
   "disabled:border-charcoal-border/80 disabled:bg-charcoal-bg disabled:text-cream-muted disabled:opacity-100 disabled:shadow-none";
 
-export function SupportRecoverySection() {
+export function SupportRecoverySection({ onClose }: { onClose?: () => void } = {}) {
   const { user } = useAuth();
   const [draft, setDraft] = useState(initialDraft);
   const [notice, setNotice] = useState("");
@@ -54,6 +54,7 @@ export function SupportRecoverySection() {
   const [reloadArmed, setReloadArmed] = useState(false);
 
   const replayTour = () => {
+    onClose?.();
     window.dispatchEvent(new CustomEvent("misty:close-settings"));
     useTourStore.getState().resetTour(user?.id);
   };

@@ -17,7 +17,7 @@ const selectedApps = selected.length
   ? catalog.apps.filter((app) => selected.includes(app.id))
   : catalog.apps;
 const apps = selectedApps.filter(
-  (app) => app.desktop.runtime === "downloaded" || app.mobile.runtime === "hosted",
+  (app) => app.id!=="agents" && (app.desktop.runtime === "downloaded" || app.mobile.runtime === "hosted"),
 );
 
 if (!apps.length) {

@@ -38,19 +38,22 @@ export function createAssistantApi(
         semantic_enrichment_used?: boolean;
       }>(`/search/global?${params.toString()}`);
     },
-    visualSearch: <T>(attachmentId: string, query = "", limit = 40) =>
+    visualSearch: <T>(attachmentId: string, query = "", limit = 40, spaceId?: string) =>
       apiRequest<{ hits: T[]; request_id: string; semantic_enrichment_used: boolean }>(
         "/search/global/visual",
-        { method: "POST", body: JSON.stringify({ attachment_id: attachmentId, query, limit }) },
+        {
+          method: "POST",
+          body: JSON.stringify({ attachment_id: attachmentId, query, limit, space_id: spaceId }),
+        },
       ),
     conversations: <T>(query = "") =>
       apiRequest<{ conversations: T[] }>(
         `/misty/conversations${query ? `?q=${encodeURIComponent(query)}` : ""}`,
       ),
-    createConversation: <T>(title: string, spaceId?: string) =>
+    createConversation: <T>(title: string, spaceId?: string,agentId?:string) =>
       apiRequest<T>("/misty/conversations", {
         method: "POST",
-        body: JSON.stringify({ title, space_id: spaceId }),
+        body: JSON.stringify({ title, space_id: spaceId,agent_id:agentId }),
       }),
     deleteConversation: (conversationId: string) =>
       apiRequest(`/misty/conversations/${encodeURIComponent(conversationId)}`, {

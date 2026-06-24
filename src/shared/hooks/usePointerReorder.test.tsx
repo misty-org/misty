@@ -9,10 +9,12 @@ afterEach(async () => {
 });
 function List({
   scope = "test",
+  shown = true,
   drop = vi.fn(),
   click = vi.fn(),
 }: {
   scope?: string;
+  shown?: boolean;
   drop?: (id: string, target: string, after: boolean) => void;
   click?: () => void;
 }) {
@@ -30,7 +32,7 @@ function List({
       if (target) setIds(reorderIds(ids, [id], target, direction === 1));
     },
   });
-  return (
+  return shown ? (
     <div {...drag} data-testid="list">
       {ids.map((id) => (
         <div key={id} data-reorder-item={id}>
@@ -41,7 +43,7 @@ function List({
         </div>
       ))}
     </div>
-  );
+  ) : null;
 }
 function bounds() {
   vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (
@@ -261,3 +263,33 @@ it("places whole apps by their header position even when the target has tall sub
   pointer(window, "pointerup", 200, 28);
   expect(drop).toHaveBeenCalledWith(expect.objectContaining({ id: "files" }), "social", true);
 });
+
+it("configures regular pointer cursor for tabs and grabbing for drag gestures in pointerReorder.css", async () => {
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const filePath = path.resolve(process.cwd(), "src/shared/hooks/pointerReorder.css");
+  const css = fs.readFileSync(filePath, "utf-8");
+  expect(css).toMatch(/\[data-reorder-list\]\s*\[data-reorder-handle\]\s*\{\s*cursor:\s*pointer;/);
+  expect(css).toMatch(
+    /\[data-reorder-list\]\s*\[data-reorder-handle\]:active\s*\{\s*cursor:\s*grabbing;/,
+  );
+  expect(css).toMatch(/html\[data-pointer-dragging="true"\]/);
+});
+
+it.each([false, true])(
+  "reorders after a category is opened (initially open: %s)",
+  (initiallyOpen) => {
+    bounds();
+    const drop = vi.fn();
+    const ui = render(<List shown={initiallyOpen} drop={drop} />);
+    if (initiallyOpen) ui.rerender(<List shown={false} drop={drop} />);
+    ui.rerender(<List shown drop={drop} />);
+    pointer(ui.getByText("a"), "pointerdown", 10, 10);
+    pointer(window, "pointermove", 10, 110);
+    pointer(window, "pointerup", 10, 110);
+    expect(drop).toHaveBeenCalledExactlyOnceWith("a", "c", true);
+    expect(
+      [...ui.getByTestId("list").children].map((item) => item.getAttribute("data-reorder-item")),
+    ).toEqual(["b", "c", "a"]);
+  },
+);

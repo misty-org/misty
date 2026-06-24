@@ -2,6 +2,7 @@ import type { WorkspaceVirtualWindow } from "@/features/workspace";
 import { PanelBottomDashed, PanelRightDashed } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { WorkspaceWindowMenu } from "./WorkspaceWindowMenu";
 
 export const dockActionClass = [
   "grid size-7 place-items-center rounded text-cream-muted outline-none",
@@ -42,7 +43,7 @@ export function WindowsWorkspaceTitlebarControls(props: {
         title="Split right"
         onClick={() => props.onSplitPane(props.paneId, "right")}
       >
-        <PanelRightDashed size={18} />
+        <PanelRightDashed size={16} />
       </button>
       <button
         type="button"
@@ -52,8 +53,18 @@ export function WindowsWorkspaceTitlebarControls(props: {
         title="Split down"
         onClick={() => props.onSplitPane(props.paneId, "down")}
       >
-        <PanelBottomDashed size={18} />
+        <PanelBottomDashed size={16} />
       </button>
+      <WorkspaceWindowMenu
+        windows={props.windows}
+        activeWindowId={props.activeWindowId}
+        canReopen={props.canReopen}
+        canCloseWindow={props.canCloseWindow}
+        onSelect={props.onSelectWindow}
+        onCreate={props.onCreateWindow}
+        onClose={props.onCloseWindow}
+        onReopen={props.onReopenWindow}
+      />
     </>,
     target,
   );

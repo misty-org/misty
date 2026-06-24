@@ -3,9 +3,9 @@ import { messageReplyPreviewText } from "@/features/spaces/chat";
 import { socialProvider, socialProviderPath, useSpacesStore } from "@/features/spaces";
 import type { SearchResult } from "@/native/contracts";
 import { spacesApi } from "@/api/spaces/api";
-import type { GlobalSearchContextItem, GlobalSearchDocument, GlobalSearchResult } from "./types";
+import type { GlobalSearchDocument, GlobalSearchResult } from "./types";
 
-export {globalSearchContext} from "./globalSearchContext";
+export { globalSearchContext } from "./globalSearchContext";
 export function buildLocalIndex(accountId: string): GlobalSearchDocument[] {
   const state = useSpacesStore.getState();
   const spacesById = new Map(state.spaces.map((space) => [space.id, space]));

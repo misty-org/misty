@@ -28,8 +28,8 @@ import { browserHomeUrl } from "@/features/workspace/browserHome";
 import { appOwnedRoute } from "../appCapabilityGateway";
 import { officialAppSlug } from "../appRoute";
 
-import { browserRuntimeIdForTabId } from "@/features/browser/browserRuntime";
-import { openBrowserPopup } from "@/features/browser/openBrowserPopup";
+import { browserRuntimeIdForTabId } from "@/features/webviews/browserRuntime";
+import { openBrowserPopup } from "@/features/webviews/openBrowserPopup";
 
 const workspaceRevisions = new Map<string, { users: number; value: number; content: string }>();
 

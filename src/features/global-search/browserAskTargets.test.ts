@@ -4,8 +4,8 @@ import type { BrowserAskSnapshot } from "./browserAskContext";
 const f = vi.hoisted(() => ({ api: vi.fn(), native: vi.fn(), profile: {} as any, scope: "view", assertSession: vi.fn() }));
 vi.mock("@/api/client", () => ({ apiRequest: f.api, readApiSessionGeneration: () => 1, assertStableApiSession: f.assertSession }));
 vi.mock("@/features/apps/rpc/nativeBackend", () => ({ nativeRpcBackend: { invoke: f.native } }));
-vi.mock("@/features/browser/browserProviders", () => ({ providerBrowserProfile: () => f.profile }));
-vi.mock("@/features/browser/browserRuntime", () => ({ browserRuntimeIdForScope: () => f.scope }));
+vi.mock("@/features/webviews/browserProviders", () => ({ providerBrowserProfile: () => f.profile }));
+vi.mock("@/features/webviews/browserRuntime", () => ({ browserRuntimeIdForScope: () => f.scope }));
 import { bindBrowserAskTarget } from "./browserAskTargets";
 
 const profileID = "a".repeat(64);

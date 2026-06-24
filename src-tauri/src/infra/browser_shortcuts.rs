@@ -80,13 +80,13 @@ pub(super) fn forward_navigation(app: &AppHandle, id: &str, url: &Url) -> bool {
     // owning dock tab before dispatching so a shortcut can never act on a
     // different split while native focus is still catching up.
     let _ = app.emit_to(
-        "main",
+        crate::infra::browser::browser_owner_label(app,id),
         "misty://browser-focus",
         BrowserShortcutFocusEvent { id: id.to_owned() },
     );
     let flag = |key: &str| value(key) == "true";
     let _ = app.emit_to(
-        "main",
+        crate::infra::browser::browser_owner_label(app,id),
         "misty://browser-shortcut",
         BrowserShortcutEvent {
             id: id.to_owned(),

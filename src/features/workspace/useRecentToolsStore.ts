@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { homeApi } from "@/api/home/api";
 import type { LucideIcon } from "lucide-react";
-import { appIcons } from "@/shared/ui/app-icons";
+import { appIcon, appIcons } from "@/shared/ui/app-icons";
 import type { WorkspaceSurfaceId, WorkspaceTab } from "./model";
 import { spaceWorkspaceToolFromRoute } from "./routeSurface";
 
@@ -19,7 +19,9 @@ export type WorkspaceToolId =
   | "transfers"
   | "terminal"
   | "agents"
-  | "marketplace";
+  | "marketplace"
+  | "music"
+  | "media";
 
 export interface WorkspaceToolMeta {
   id: WorkspaceToolId;
@@ -33,7 +35,12 @@ export const WORKSPACE_TOOLS_META: Record<WorkspaceToolId, WorkspaceToolMeta> = 
   journal: { id: "journal", label: "Journal", surfaceId: "space", icon: appIcons.journal },
   planner: { id: "planner", label: "Planner", surfaceId: "space", icon: appIcons.planner },
   social: { id: "social", label: "Social", surfaceId: "space", icon: appIcons.social },
-  library: { id: "library", label: "Library", surfaceId: "space", icon: appIcons.library },
+  library: {
+    id: "library",
+    label: "Library",
+    surfaceId: "space",
+    icon: appIcon("library", "space")!,
+  },
   inbox: { id: "inbox", label: "Inbox", surfaceId: "inbox", icon: appIcons.inbox },
   browser: { id: "browser", label: "Browser", surfaceId: "browser", icon: appIcons.browser },
   code: { id: "code", label: "Code", surfaceId: "code", icon: appIcons.code },
@@ -52,6 +59,8 @@ export const WORKSPACE_TOOLS_META: Record<WorkspaceToolId, WorkspaceToolMeta> = 
     surfaceId: "marketplace",
     icon: appIcons.marketplace,
   },
+  music: { id: "music", label: "Music", surfaceId: "official-app", icon: appIcons.music },
+  media: { id: "media", label: "Media", surfaceId: "official-app", icon: appIcons.media },
 };
 
 export function isWorkspaceToolId(value: string): value is WorkspaceToolId {

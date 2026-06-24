@@ -1,0 +1,201 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-17T13:48:07.067008+00:00",
+  "title": "Design System: Misty Agents Roster and Profile Editor",
+  "extensions": {
+    "colorMeta": {
+      "canvas-charcoal": {
+        "role": "neutral",
+        "displayName": "Canvas Charcoal",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "structural-line": {
+        "role": "neutral",
+        "displayName": "Structural Line",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "active-charcoal": {
+        "role": "primary",
+        "displayName": "Active Charcoal",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "primary-cream": {
+        "role": "primary",
+        "displayName": "Primary Cream",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "muted-ash": {
+        "role": "neutral",
+        "displayName": "Muted Ash",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      }
+    },
+    "breakpoints": [
+      {
+        "name": "md",
+        "value": "48rem"
+      }
+    ],
+    "evidence": {
+      "artifact": "../AgentsPage.tsx",
+      "incumbent": [
+        "../../../../PRODUCT.md",
+        "../../../../DESIGN.md",
+        "../../../styles/styles.css"
+      ],
+      "mode": "Isolated browser rendering with explicitly labeled synthetic data",
+      "captures": [
+        "/tmp/misty-native-agents-preview/screenshots/profile-desktop.png",
+        "/tmp/misty-native-agents-preview/screenshots/profile-narrow.png",
+        "/tmp/misty-native-agents-preview/screenshots/profile-focus-final.png",
+        "/tmp/misty-native-agents-preview/screenshots/create-disabled-final.png"
+      ],
+      "limitations": [
+        "No native execution or native window evidence.",
+        "No live account or backend permission validation.",
+        "No raster assets.",
+        "Synthesized neutral tonal ramps are preview metadata, not additional product tokens."
+      ]
+    },
+    "review": {
+      "disposition": "fix",
+      "resolved": [
+        "Neutral checkbox selection",
+        "Readable disabled action state"
+      ],
+      "unresolved": [
+        "Visible keyboard focus is suppressed by important global outline and Tailwind ring overrides."
+      ],
+      "nextRound": "Permission pending",
+      "sampleFocus": "Samples show component-local focus declarations only. They exclude global suppression and do not demonstrate a host-page fix."
+    }
+  },
+  "components": [
+    {
+      "name": "Save action",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Component-local styles; host keyboard focus remains unresolved.",
+      "html": "<button class=\"ds-primary\">Save changes</button>",
+      "css": ".ds-primary {font:400 14px/20px system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif;border:1px solid var(--misty-theme-border,#262626);border-radius:6px;padding:8px 12px;color:var(--misty-theme-text,#e0e0e0);background:var(--misty-theme-active,#3e3e3e);} .ds-primary:enabled:hover {background:var(--misty-theme-active,#3e3e3e);} .ds-primary:focus-visible { box-shadow:0 0 0 2px var(--misty-theme-text-muted,#8c8c8c); } .ds-primary:disabled {background:var(--misty-theme-bg,#131313);color:var(--misty-theme-text-muted,#8c8c8c);opacity:1;cursor:not-allowed;}"
+    },
+    {
+      "name": "Secondary action",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Component-local styles; host keyboard focus remains unresolved.",
+      "html": "<button class=\"ds-secondary\">Save changes</button>",
+      "css": ".ds-secondary {font:400 14px/20px system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif;border:1px solid var(--misty-theme-border,#262626);border-radius:6px;padding:8px 12px;color:var(--misty-theme-text,#e0e0e0);background:transparent;} .ds-secondary:enabled:hover {background:var(--misty-theme-active,#3e3e3e);} .ds-secondary:focus-visible { box-shadow:0 0 0 2px var(--misty-theme-text-muted,#8c8c8c); } .ds-secondary:disabled {background:var(--misty-theme-bg,#131313);color:var(--misty-theme-text-muted,#8c8c8c);opacity:1;cursor:not-allowed;}"
+    },
+    {
+      "name": "Disabled action",
+      "kind": "button",
+      "refersTo": "button-disabled",
+      "description": "Component-local styles; host keyboard focus remains unresolved.",
+      "html": "<button class=\"ds-disabled\" disabled>Save changes</button>",
+      "css": ".ds-disabled {font:400 14px/20px system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif;border:1px solid var(--misty-theme-border,#262626);border-radius:6px;padding:8px 12px;color:var(--misty-theme-text,#e0e0e0);background:var(--misty-theme-bg,#131313);} .ds-disabled:enabled:hover {background:var(--misty-theme-active,#3e3e3e);} .ds-disabled:focus-visible { box-shadow:0 0 0 2px var(--misty-theme-text-muted,#8c8c8c); } .ds-disabled:disabled {background:var(--misty-theme-bg,#131313);color:var(--misty-theme-text-muted,#8c8c8c);opacity:1;cursor:not-allowed;}"
+    },
+    {
+      "name": "Profile field",
+      "kind": "input",
+      "refersTo": "input-default",
+      "description": "Shared profile text field with a visible label; isolated focus declaration only.",
+      "html": "<label class=\"ds-label\">Name<input class=\"ds-field\" value=\"Example agent\"></label>",
+      "css": ".ds-label {display:block;font:400 14px/20px system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif;color:var(--misty-theme-text,#e0e0e0);} .ds-field {font:400 14px/20px system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif;border:1px solid var(--misty-theme-border,#262626);border-radius:6px;padding:8px 12px;color:var(--misty-theme-text,#e0e0e0);display:block;width:100%;background:var(--misty-theme-bg,#131313);outline:none;} .ds-field:focus-visible { box-shadow:0 0 0 2px var(--misty-theme-text-muted,#8c8c8c); }"
+    },
+    {
+      "name": "Selected roster row",
+      "kind": "nav",
+      "refersTo": "roster-selected",
+      "description": "Selected agent with secondary responsibility, using synthetic content.",
+      "html": "<button class=\"ds-roster\" aria-pressed=\"true\"><span>Example agent</span><small class=\"ds-role\">Personal agent</small></button>",
+      "css": ".ds-roster {font:400 14px/20px system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif;border:1px solid var(--misty-theme-border,#262626);border-radius:6px;padding:8px 12px;color:var(--misty-theme-text,#e0e0e0);padding:12px;display:block;width:100%;text-align:left;font-weight:500;border:0;background:var(--misty-theme-active,#3e3e3e);} .ds-roster:hover {background:var(--misty-theme-active,#3e3e3e);} .ds-roster:focus-visible { box-shadow:0 0 0 2px var(--misty-theme-text-muted,#8c8c8c); } .ds-role {display:block;font:400 12px/16px system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif;color:var(--misty-theme-text-muted,#8c8c8c);}"
+    },
+    {
+      "name": "App assignment",
+      "kind": "custom",
+      "description": "Native cream checkbox with explicit app label; isolated outline declaration only.",
+      "html": "<label class=\"ds-assignment\"><input type=\"checkbox\" checked>Example app</label>",
+      "css": ".ds-assignment {display:flex;align-items:center;gap:12px;padding:8px 0;font:400 14px/20px system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif;color:var(--misty-theme-text,#e0e0e0);} .ds-assignment input {width:16px;height:16px;accent-color:var(--misty-theme-text,#e0e0e0);} .ds-assignment input:focus-visible {outline:2px solid var(--misty-theme-text-muted,#8c8c8c);outline-offset:3px;}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Quiet Operating Desk",
+    "overview": "This scoped record extends the incumbent root DESIGN.md for the roster and profile editor in AgentsPage.tsx. It preserves Misty's restrained charcoal workspace, compact controls, familiar labels, and clear distinction between personal identity and Space app assignments. Root PRODUCT.md and DESIGN.md remain the wider product authority.\n\nThe evidence is source code and isolated browser renders of the actual React component with explicitly labeled synthetic profiles, assignments, and memories. It covers desktop and narrow profile layout, neutral checkbox selection, and readable disabled actions. It does not establish native execution, native window behavior, live account integration, or backend permission enforcement. Activity, connection sheets, conversations, and other Agents surfaces are outside this record. No raster assets were created or adopted.",
+    "keyCharacteristics": [
+      "Compact charcoal surfaces with cream text and muted metadata.",
+      "A roster beside a bounded form, stacking at narrow widths.",
+      "Flat sections separated by hairlines and spacing.",
+      "Explicit personal and Space context in concise labels."
+    ],
+    "rules": [
+      {
+        "name": "The Neutral Selection Rule",
+        "body": "App selection and roster selection use the established cream and charcoal palette.",
+        "section": "colors"
+      },
+      {
+        "name": "The Flat-at-Rest Rule",
+        "body": "Use spacing, a divider, or a tonal step for profile structure; do not add shadows to resting rows and fields.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** reuse the incumbent semantic charcoal and cream theme variables.",
+      "**Do** keep profile sections flat, compact, and separated by spacing or a single divider.",
+      "**Do** retain explicit personal and Space context in labels.",
+      "**Do** preserve readable disabled labels and full control shape."
+    ],
+    "donts": [
+      "**Don't** introduce marketing styling, decorative glows, or a new identity into the profile editor.",
+      "**Don't** make selected app checkboxes a new colored accent.",
+      "**Don't** treat suppressed keyboard focus as a reusable design decision.",
+      "**Don't** present synthetic browser captures as native or live-account validation."
+    ]
+  }
+}

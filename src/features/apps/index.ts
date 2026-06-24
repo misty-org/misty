@@ -8,3 +8,5 @@ export * from "./InstalledAppBoundary";
 export * from "./MiniAppRuntime";
 export * from "./desktopPackages";
 export * from "./useAppsStore";
+
+export { packageRoute } from "./package/routes";

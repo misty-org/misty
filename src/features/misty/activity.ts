@@ -1,5 +1,6 @@
 export interface MistyActivityEntry {
   id: string;
+  agent_id?: string;
   kind: "invocation" | "run";
   state: string;
   conversation_id: string;

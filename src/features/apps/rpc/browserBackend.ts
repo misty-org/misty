@@ -1,3 +1,4 @@
+import {integrationDestinationKey} from "@/features/agents/integrationDestinations";
 import { allLayoutPanes } from "@/features/workspace/layoutTabs";
 import {
   browserProviders,
@@ -7,7 +8,7 @@ import {
   popupBrowserProfile,
   consumePopupBrowserInstance,
   forgetProviderProfile,
-} from "@/features/browser/browserProviders";
+} from "@/features/webviews/browserProviders";
 import type {
   MistyBrowserBounds,
   MistyBrowserEvent,
@@ -20,7 +21,7 @@ import { parseBrowserTabState, type WorkspaceTab } from "@/features/workspace/mo
 import { selectPaneFocusPreferences } from "@/features/workspace/paneFocus";
 import { useSettingsStore } from "@/features/settings";
 import { useAppThemeStore } from "@/features/settings";
-import { appZoomChangedEvent, getAppliedAppZoom } from "@/shared/hooks/useAppZoom";
+import { appZoomChangedEvent, getAppliedAppRenderScale } from "@/shared/hooks/useAppZoom";
 import {
   browserRuntimeId,
   browserRuntimeResumeEvent,
@@ -31,7 +32,7 @@ import {
   setBrowserWebviewsSuspended,
   useBrowserRuntimeStore,
   syncBrowserWebview,
-} from "@/features/browser/browserRuntime";
+} from "@/features/webviews/browserRuntime";
 import { nativeRpcBackend } from "./nativeBackend";
 import { browserProfileId, constrainBrowserBounds, providerOAuthCallback } from "./browserIdentity";
 import { AppRpcError, type AppRpcScope } from "./session";
@@ -95,7 +96,7 @@ export function createBrowserRpcBackend(
   const nativeId = (id: string) =>
     browserRuntimeId({ id: scope.identity.instanceId, instanceKey: nativeKeys.get(id) ?? id });
   const nativeBounds = (bounds: MistyBrowserBounds) => {
-    const zoom = getAppliedAppZoom();
+    const zoom = getAppliedAppRenderScale();
     return Object.fromEntries(
       Object.entries(bounds).map(([key, value]) => [key, Math.round(value * zoom * 2) / 2]),
     ) as MistyBrowserBounds;
@@ -148,13 +149,22 @@ export function createBrowserRpcBackend(
     }
   };
   return {
+    async setDestinations(destinations){
+      scope.assert("browser.navigate");
+      if(!scope.identity.spaceId)throw new AppRpcError("space_required","Select a Space before registering integrations.");
+      const entries=destinations.map(({provider,label,url})=>{
+        if(!providerBelongsToApp(scope.identity.appId,provider.id)||!providerUrlAllowed(provider.id,url))throw new AppRpcError("provider_denied","The destination must belong to this app.");
+        return {id:`${scope.identity.appId}:${provider.id}:${provider.accountId}`,appId:scope.identity.appId,providerId:provider.id,accountId:provider.accountId,label,url};
+      });
+      localStorage.setItem(integrationDestinationKey(serverBase,scope.identity.accountId,scope.identity.spaceId,scope.identity.appId),JSON.stringify(entries));
+    },
     async availability() {
       scope.assert();
-      if (!/Mac/.test(navigator.platform))
+      if (!/Mac|Win/.test(navigator.platform))
         return {
           available: false,
           persistent: false,
-          reason: "Provider websites require Misty on a Mac.",
+          reason: "Provider websites require Misty on macOS or Windows.",
         };
       // Native website views are a host capability owned by the requesting app.
       // Sharing their implementation does not require installing the Browser app.
@@ -232,11 +242,6 @@ export function createBrowserRpcBackend(
         const availability = await this.availability!();
         if (!availability.available)
           throw new AppRpcError("webview_unavailable", availability.reason!);
-        if (
-          !providerUrlAllowed(provider.id, input.url) &&
-          !(inherited?.popupInstanceKey && input.url === "about:blank")
-        )
-          throw new AppRpcError("provider_denied", "Open this link in a Browser tab.");
       }
       const profileId =
         inherited &&
@@ -328,15 +333,6 @@ export function createBrowserRpcBackend(
     },
     async navigate(id, url) {
       const item = record(id);
-      if (
-        scope.identity.appId !== "browser" &&
-        item.provider &&
-        !providerUrlAllowed(item.provider.id, url)
-      )
-        throw new AppRpcError(
-          "provider_boundary",
-          "This link is outside the current provider website.",
-        );
       const oauthCallback = item.provider
         ? providerOAuthCallback(item.provider.id, url, serverBase)
         : undefined;

@@ -1,3 +1,10 @@
+import {useLocalExecution} from "@/features/agents/localExecution";
+import { AgentChatControls } from "@/features/agents/AgentChatControls";
+import { readOptionalSurfaceContext } from "./optionalSurfaceContext";
+import { useMistyStore } from "@/features/misty/useMistyStore";
+import { installMistyContextBridge } from "@/features/misty/contextBridge";
+import { hasTauriInternals } from "@/shared/platform/tauri";
+import { MistyContextBar } from "@/features/misty/MistyContextBar";
 import { requestEmbeddedBrowserSuspension } from "@/shared/platform/browserSuspensionSignal";
 import { SystemErrorActivity } from "@/features/activity";
 import { useAiSurfaceStore } from "@/features/ai-surface/store";
@@ -56,7 +63,8 @@ function clamp(value: number, minimum: number, maximum: number) {
   return Math.max(minimum, Math.min(maximum, value));
 }
 
-export function GlobalMisty(props: {
+export function GlobalMistySurface(props: {
+  controller?: "search" | "misty";
   accountId: string;
   currentPath: string;
   activePaneId: string;
@@ -87,6 +95,9 @@ export function GlobalMisty(props: {
     onContentVisibilityChange,
     onVoiceActivityChange,
   } = props;
+  const execution = useLocalExecution(s=>s.execution);
+  const taskSurface = props.controller === "misty" && !!execution;
+  const useController = props.controller === "misty" ? useMistyStore : useGlobalSearchStore;
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const panelDragRef = useRef<PanelDragState | null>(null);
@@ -129,7 +140,7 @@ export function GlobalMisty(props: {
     rejectAction,
     cancelAgentTask,
     approveAgentTask,
-  } = useGlobalSearchStore(
+  } = useController(
     useShallow((state) => ({
       panel: state.panel,
       mode: state.mode,
@@ -169,14 +180,20 @@ export function GlobalMisty(props: {
   );
   const aiPaneId = props.activeWorkspacePaneId ?? props.activePaneId;
   const aiRegistration = useAiSurfaceStore((state) =>
-    Object.values(state.registrations).find((registration) => registration.paneId === aiPaneId),
+    Object.values(state.registrations).find(
+      (registration) =>
+        registration.accountId === props.accountId && registration.paneId === aiPaneId,
+    ),
   );
-  const registeredAiContext = useMemo(
-    () => aiRegistration?.adapter.getContext() ?? [],
-    [aiRegistration],
+  // An SDK adapter may be denied, revoked or closed while its pane is mounted.
+  // Optional context must never throw through the workspace render boundary.
+  const surfaceSnapshot = useMemo(
+    () => readOptionalSurfaceContext(includeCurrentContext ? aiRegistration?.adapter : undefined),
+    [aiRegistration, includeCurrentContext, panel, query],
   );
-  const browserRequest = useGlobalSearchStore((state) => state.browserRequest);
-  const registeredAiSelection = browserRequest?.selection ?? aiRegistration?.adapter.getSelection?.() ?? null;
+  const registeredAiContext = surfaceSnapshot.context;
+  const browserRequest = useController((state) => state.browserRequest);
+  const registeredAiSelection = browserRequest?.selection ?? surfaceSnapshot.selection;
   const currentContext = useMemo(
     () =>
       !includeCurrentContext
@@ -204,7 +221,7 @@ export function GlobalMisty(props: {
     return buildUnifiedMistyCandidates(query.trim() || "Visual search", results, filters).filter(
       (candidate) =>
         activeMode === "search"
-          ? candidate.type !== "answer" && candidate.type !== "agent_task"
+          ? candidate.type !== "agent_task"
           : candidate.type === "answer" || candidate.type === "agent_task",
     );
   }, [activeMode, attachments.length, filters, query, results]);
@@ -219,8 +236,8 @@ export function GlobalMisty(props: {
   const wasOpenRef = useRef(false);
   const voice = useAiVoiceRecorder({
     onTranscript: (transcript) => {
-      const current = useGlobalSearchStore.getState().query.trim();
-      useGlobalSearchStore.getState().setQuery(`${current}${current ? " " : ""}${transcript}`);
+      const current = useController.getState().query.trim();
+      useController.getState().setQuery(`${current}${current ? " " : ""}${transcript}`);
       window.setTimeout(() => inputRef.current?.focus(), 0);
     },
     onError: setVoiceError,
@@ -237,17 +254,21 @@ export function GlobalMisty(props: {
   useEffect(() => setAccount(props.accountId), [props.accountId, setAccount]);
   useEffect(() => {
     if (!open) return;
-    if (!useGlobalSearchStore.getState().browserRequest) {
-      setContext(mergeGlobalMistyContext(useGlobalSearchStore.getState().context, currentContext));
+    if (
+      props.controller !== "misty" &&
+      !useController.getState().browserRequest &&
+      !useController.getState().handoff
+    ) {
+      setContext(mergeGlobalMistyContext(useController.getState().context, currentContext));
     }
     const focusTimer = window.setTimeout(() => inputRef.current?.focus(), 0);
     return () => window.clearTimeout(focusTimer);
-  }, [currentContext, open, setContext]);
+  }, [currentContext, open, setContext, useController, props.controller]);
   useEffect(() => {
     if (!open || activeMode !== "ask") return;
-    const state = useGlobalSearchStore.getState();
+    const state = useController.getState();
     if (!state.conversations.length && !state.conversationsLoading) void loadConversations();
-  }, [activeMode, loadConversations, open]);
+  }, [activeMode, loadConversations, open, useController]);
   useEffect(() => {
     if (panel !== "results") return;
     const visual =
@@ -275,10 +296,10 @@ export function GlobalMisty(props: {
     return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [closePanel, open]);
   useEffect(() => {
-    if (!suspendBrowserWebviews) return;
+    if (!suspendBrowserWebviews || taskSurface) return;
     requestEmbeddedBrowserSuspension(open, "global-misty");
     return () => requestEmbeddedBrowserSuspension(false, "global-misty");
-  }, [open, suspendBrowserWebviews]);
+  }, [open, suspendBrowserWebviews, taskSurface]);
   useEffect(() => {
     if (wasOpenRef.current && !open) onClosed?.();
     wasOpenRef.current = open;
@@ -333,6 +354,10 @@ export function GlobalMisty(props: {
     [onRequestDrag],
   );
 
+  const sendAnswer = async (prompt: string) => {
+    await submitAnswer(prompt, attachmentState.attachments, registeredAiSelection ?? undefined);
+    if (!useController.getState().query) attachmentState.consume();
+  };
   const activateCandidate = (candidate?: UnifiedMistyCandidate) => {
     if (!candidate || working) return;
     if (candidate.type === "object" || candidate.type === "navigation") {
@@ -340,11 +365,7 @@ export function GlobalMisty(props: {
       return;
     }
     if (candidate.type === "answer") {
-      void submitAnswer(
-        candidate.prompt,
-        attachmentState.consume(),
-        registeredAiSelection ?? undefined,
-      );
+      void sendAnswer(candidate.prompt);
       return;
     }
     if (candidate.type === "agent_task") {
@@ -372,7 +393,7 @@ export function GlobalMisty(props: {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
       if (activeMode === "ask") {
-        void submitAnswer(query, attachmentState.consume(), registeredAiSelection ?? undefined);
+        void sendAnswer(query);
       } else activateCandidate(candidates[selectedIndex] ?? candidates[0]);
       return;
     }
@@ -395,46 +416,49 @@ export function GlobalMisty(props: {
   };
 
   const composer = (
-    <GlobalMistyComposerBar
-      query={query}
-      onQuery={setQuery}
-      mode={activeMode}
-      conversationActive={conversationActive}
-      textareaRef={inputRef}
-      attachments={attachments}
-      onModeChange={attachmentState.changeMode}
-      onAddFiles={attachmentState.addFiles}
-      onRemoveAttachment={attachmentState.remove}
-      onSubmit={() => {
-        if (activeMode === "ask") {
-          void submitAnswer(query, attachmentState.consume(), registeredAiSelection ?? undefined);
-        } else activateCandidate(candidates[selectedIndex] ?? candidates[0]);
-      }}
-      onKeyDown={onInputKeyDown}
-      onCapture={allowCapture ? () => setCapturingRegion(true) : undefined}
-      busy={searching || working}
-      working={working}
-      conversation={conversation}
-      activeConversationId={activeConversationId}
-      voice={voice}
-      onError={setVoiceError}
-      onClose={closePanel}
-      onRequestDrag={requestPanelDrag}
-      onSwitchToPet={onSwitchToPet}
-      onPointerDown={onHeaderPointerDown}
-      onModelChange={(settings) =>
-        useGlobalSearchStore.setState((state) => ({
-          conversations: state.conversations.map((item) =>
-            item.id === activeConversationId ? { ...item, ...settings } : item,
-          ),
-        }))
-      }
-    />
+    <>
+      {props.controller === "misty" && <MistyContextBar />}
+      <GlobalMistyComposerBar
+        query={query}
+        onQuery={setQuery}
+        mode={activeMode}
+        conversationActive={conversationActive}
+        textareaRef={inputRef}
+        attachments={attachments}
+        onModeChange={attachmentState.changeMode}
+        onAddFiles={attachmentState.addFiles}
+        onRemoveAttachment={attachmentState.remove}
+        onSubmit={() => {
+          if (activeMode === "ask") {
+            void sendAnswer(query);
+          } else activateCandidate(candidates[selectedIndex] ?? candidates[0]);
+        }}
+        onKeyDown={onInputKeyDown}
+        onCapture={allowCapture ? () => setCapturingRegion(true) : undefined}
+        busy={searching || working}
+        working={working}
+        conversation={conversation}
+        activeConversationId={activeConversationId}
+        voice={voice}
+        onError={setVoiceError}
+        onClose={closePanel}
+        onRequestDrag={requestPanelDrag}
+        onSwitchToPet={onSwitchToPet}
+        onPointerDown={onHeaderPointerDown}
+        onModelChange={(settings) =>
+          useController.setState((state) => ({
+            conversations: state.conversations.map((item) =>
+              item.id === activeConversationId ? { ...item, ...settings } : item,
+            ),
+          }))
+        }
+      />
+    </>
   );
 
   return (
     <div
-      className="pointer-events-none fixed inset-0 z-[2147482500] flex flex-col items-center pt-[9vh]"
+      className={taskSurface?"pointer-events-none fixed right-2 top-16 z-[2147482500] flex w-[424px] flex-col items-center":"pointer-events-none fixed inset-0 z-[2147482500] flex flex-col items-center pt-[9vh]"}
       data-global-misty-root
     >
       {error || voiceError ? (
@@ -455,11 +479,11 @@ export function GlobalMisty(props: {
               initial={{ opacity: 0, scale: 0.94 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.94 }}
-              style={{ translate: `${panelOffset.x}px ${panelOffset.y}px` }}
+              style={taskSurface?{width:"100%"}:{ translate: `${panelOffset.x}px ${panelOffset.y}px` }}
               className="group/misty-window pointer-events-none flex origin-center flex-col items-center gap-2"
               data-html2canvas-ignore="true"
             >
-              {conversationActive ? (
+              {conversationActive && !taskSurface ? (
                 <GlobalMistyVoiceIsland
                   voice={voice}
                   conversations={conversations}
@@ -479,16 +503,20 @@ export function GlobalMisty(props: {
               ) : null}
               <section
                 className={cn(
-                  panelClass,
-                  conversationActive && "h-[min(640px,calc(100dvh-120px))]",
+                  taskSurface?"pointer-events-auto flex w-full h-[calc(100dvh-164px)] max-h-[calc(100dvh-164px)] flex-col overflow-hidden rounded-lg border border-charcoal-border bg-charcoal-card text-cream":panelClass,
+                  conversationActive && !taskSurface && "h-[min(640px,calc(100dvh-120px))]",
                   showShadow && panelShadowClass,
                 )}
                 aria-label="Misty Search"
                 data-misty-conversation={conversationActive ? "true" : undefined}
                 data-misty-content={contentVisible ? "true" : "false"}
               >
+                {props.controller === "misty" ? <AgentChatControls accountId={props.accountId} /> : null}
                 {browserNotice ? (
-                  <p role="status" className="border-b border-white/10 px-4 py-3 text-sm text-cream/70">
+                  <p
+                    role="status"
+                    className="border-b border-white/10 px-4 py-3 text-sm text-cream/70"
+                  >
                     {browserNotice} You can still ask about the attached content.
                   </p>
                 ) : null}
@@ -564,5 +592,43 @@ export function GlobalMisty(props: {
         </Suspense>
       ) : null}
     </div>
+  );
+}
+
+export function GlobalMisty(props: Parameters<typeof GlobalMistySurface>[0]) {
+  const [bridgeError, setBridgeError] = useState("");
+  useEffect(() => {
+    if (props.controller === "misty") return;
+    let disposed = false;
+    let cleanup: (() => void) | undefined;
+    void installMistyContextBridge()
+      .then((remove) => {
+        if (disposed) remove();
+        else cleanup = remove;
+      })
+      .catch((error) => {
+        if (!disposed)
+          setBridgeError(error instanceof Error ? error.message : "Misty context could not start.");
+      });
+    return () => {
+      disposed = true;
+      cleanup?.();
+    };
+  }, [props.controller]);
+  return (
+    <>
+      {bridgeError && (
+        <SystemErrorActivity
+          accountId={props.accountId}
+          error={bridgeError}
+          scope="misty:context-bridge"
+          title="Misty context could not start"
+        />
+      )}
+      <GlobalMistySurface {...props} />
+      {!props.controller && (
+        <GlobalMistySurface {...props} controller="misty" />
+      )}
+    </>
   );
 }

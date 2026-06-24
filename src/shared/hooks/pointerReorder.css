@@ -7,7 +7,10 @@
   touch-action: none;
 }
 [data-reorder-list] [data-reorder-handle] {
-  cursor: grab;
+  cursor: pointer;
+}
+[data-reorder-list] [data-reorder-handle]:active {
+  cursor: grabbing;
 }
 [data-reorder-dragging="true"] {
   opacity: 0.5;

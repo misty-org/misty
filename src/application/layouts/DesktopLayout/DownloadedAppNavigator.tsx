@@ -1,3 +1,4 @@
+import { addNavigatorIntegration } from "@/features/apps/addNavigatorIntegration";
 import { removeNavigatorPin } from "@/features/apps/removeNavigatorPin";
 import { Renameable } from "@/features/navigation-names/Renameable";
 import { useNavigationName, sectionNameKey, itemNameKey } from "@/features/navigation-names/store";
@@ -5,13 +6,12 @@ import { usePointerReorder } from "@/shared/hooks/usePointerReorder";
 import { useNavigatorResume } from "./useNavigatorResume";
 import { useNavigatorOrder } from "./useNavigatorOrder";
 import { WebsiteBrandIcon } from "../../../../../misty-apps/apps/shared/WebsiteBrandIcon";
-import { brandIconAsset } from "../../../../../misty-apps/apps/shared/brandIcons";
 import {
   websiteIntegrations,
   type WebsiteIntegrationId,
 } from "../../../../../misty-apps/apps/shared/websiteIntegrations";
 import { ProviderBrandIcon } from "../../../../../misty-apps/apps/shared/ProviderBrandIcon";
-import { providerFromRoute } from "../../../../../misty-apps/apps/shared/providers";
+import { providers, providerFromRoute } from "../../../../../misty-apps/apps/shared/providers";
 import {
   NotesDestinationIcon,
   DrawingsDestinationIcon,
@@ -28,17 +28,20 @@ import {
 } from "./NavigatorDestinationIcons";
 import { MistyBrandIcon } from "@/features/workspace/MistyBrandIcon";
 import { MailProviderIcon } from "@/shared/ui/mail-provider-icon";
-import { Link2, PinOff, Plug, Plus } from "lucide-react";
+import { Search, Link2, PinOff, Plug } from "lucide-react";
 import { BotMessageSquare, Workflow } from "lucide-react";
 import type { MistyNavigationItem } from "@misty/sdk";
 import { FileText } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useId, useRef, useState } from "react";
 import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+  Input,
   Collapsible,
   CollapsibleContent,
   NavigationSectionButton,
-  navigationMenuRowClass,
   navigationMenuActionClass,
   NavigationTreeItem,
   navigationMenuGroupClass,
@@ -67,11 +70,10 @@ export function DownloadedAppNavigator(props: {
     if (props.active) setOpen(true);
   }, [props.active, setOpen]);
   const integrations =
-    ["social", "inbox", "planner", "journal", "library"].includes(props.appId) &&
+    ["social", "inbox", "planner", "journal", "library", "music", "media"].includes(props.appId) &&
     /Mac/.test(navigator.platform);
-  // Drop the retired native Inbox entry even from cached package navigation.
-  const destinations =
-    props.appId === "inbox" ? props.items.filter((item) => item.id !== "misty") : props.items;
+  // Built-in collaboration belongs to Spaces, including old cached registrations.
+  const destinations = props.items.filter((item) => item.id !== "misty");
   const visible = integrations
     ? destinations.filter((item) => item.id !== "integrations")
     : destinations;
@@ -79,20 +81,69 @@ export function DownloadedAppNavigator(props: {
   // subsections are shortcuts the user explicitly pinned, including pin groups.
   const items = visible.map((item) =>
     item.id !== "misty" &&
-    ["social", "inbox", "planner", "journal", "library"].includes(props.appId) &&
-    brandIconAsset(item.id)
+    ["social", "inbox", "planner", "journal", "library", "music", "media"].includes(props.appId)
       ? { ...item, children: pinnedDestinations(item.children) }
       : item,
   );
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [adding, setAdding] = useState<string>();
+  const [sourceError, setSourceError] = useState("");
+  const addingRef = useRef(false);
+  const family = props.appId === "social" ? "chat" : props.appId;
+  const catalogSources: MistyNavigationItem[] = Object.entries(providers)
+    .filter(([, provider]) => provider.family === family)
+    .map(([id, provider]) => ({
+      id,
+      label: provider.label,
+      route: `/apps/${props.appId}?provider=${encodeURIComponent(id)}`,
+    }));
+  const sources = [
+    ...items,
+    ...catalogSources.filter((candidate) => !items.some((item) => item.id === candidate.id)),
+  ];
+  const filteredSources = sources.filter((item) => {
+    const description = websiteIntegrations[item.id as WebsiteIntegrationId]?.description ?? "";
+    return `${item.label} ${description}`.toLowerCase().includes(query.trim().toLowerCase());
+  });
+  const navigate = useNavigate();
+  const [selectedSourceId, setSelectedSourceId] = useState<string>();
+  const activeUrl = new URL(props.activeRoute || `/apps/${props.appId}`, "https://misty.local");
+  const activeProvider = activeUrl.searchParams.get("provider");
+  const routeSource =
+    activeUrl.pathname === `/apps/${props.appId}`
+      ? sources.find(
+          (item) =>
+            sameRoute(item.route, props.activeRoute) ||
+            hasSelectedDescendant(item.children, props.activeRoute) ||
+            (activeProvider &&
+              new URL(item.route, "https://misty.local").searchParams.get("provider") ===
+                activeProvider),
+        )
+      : undefined;
+  const source = routeSource ?? sources.find((item) => item.id === selectedSourceId) ?? items[0];
+  const sourceDestinations =
+    source?.id === "misty" ? (source.children ?? []) : pinnedDestinations(source?.children);
+  const routeSourceId = routeSource?.id;
+  useEffect(() => {
+    if (routeSourceId) setSelectedSourceId(routeSourceId);
+  }, [routeSourceId]);
+  const openRoute = (destination: string) => {
+    const surface = workspaceSurfaceFromRoute(destination);
+    if (surface) {
+      const tab = useWorkspaceStore.getState().openSurface({ ...surface, syncExistingRoute: true });
+      navigate(tab.route);
+    }
+  };
+  const defaultRoute = ["social", "planner", "journal", "library"].includes(props.appId)
+    ? `/apps/${props.appId}?view=integrations`
+    : `/apps/${props.appId}`;
   const route =
     props.appId === "browser"
       ? "/apps/browser"
       : props.active && props.activeRoute.startsWith(`/apps/${props.appId}`)
         ? props.activeRoute
-        : (items[0]?.route ?? `/apps/${props.appId}`);
-  const drawer = new URL(route, "https://misty.local");
-  drawer.searchParams.set("drawer", "integrations");
-  const drawerRoute = `${drawer.pathname}${drawer.search}${drawer.hash}`;
+        : (source?.route ?? defaultRoute);
   const resume = useNavigatorResume({
     accountId: props.accountId,
     key: props.appId,
@@ -114,51 +165,163 @@ export function DownloadedAppNavigator(props: {
       data-navigator-disclosure={props.appId}
     >
       <Renameable nameKey={sectionNameKey(props.appId)} automatic={props.label}>
-        <div className={`${navigationMenuRowClass} flex items-center`} data-reorder-preview="true">
+        <div
+          className="group/app-row flex h-8 w-full min-w-0 items-center rounded-md"
+          data-reorder-preview="true"
+        >
           <NavigationSectionButton
             icon={<WorkspaceAppIcon appId={props.appId} size="nav" />}
             label={label}
             open={open}
             aria-label={label}
-            aria-current={
-              props.appId === "browser" &&
-              props.active &&
-              !items.some((item) => sameRoute(item.route, props.activeRoute))
-                ? "page"
-                : undefined
-            }
             aria-controls={contentId}
             data-navigator-disclosure-trigger="true"
-            className="min-w-0 flex-1 !w-auto !bg-transparent"
+            data-active={props.active || undefined}
+            className="min-w-0 flex-1 !w-auto hover:bg-transparent group-hover/app-row:text-cream-bright"
             title={`${label} · Drag to reorder · Alt+Shift+↑/↓`}
             onClick={activate}
           />
           {integrations && (
-            <Link
-              className={navigationMenuActionClass}
-              data-reorder-ignore="true"
-              aria-label={`Configure ${label} integrations`}
-              title={`${label} integrations`}
-              to={drawerRoute}
-              onClick={() => {
-                const surface = workspaceSurfaceFromRoute(drawerRoute);
-                if (surface) useWorkspaceStore.getState().openSurface(surface);
+            <Popover
+              open={pickerOpen}
+              onOpenChange={(next) => {
+                setPickerOpen(next);
+                if (next) {
+                  setQuery("");
+                  setSourceError("");
+                }
               }}
             >
-              <Plus aria-hidden className="size-4" />
-            </Link>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  data-reorder-ignore="true"
+                  data-misty-window-drag-block="true"
+                  aria-label={`${label} source: ${source?.label ?? "Choose integration"}`}
+                  title={`Switch ${label} source`}
+                  className="mr-1 flex h-[22px] min-w-0 max-w-[50%] shrink-0 items-center gap-1 rounded-full bg-charcoal-hover px-2 text-[13px] font-medium text-cream outline-none cursor-pointer transition-colors duration-150 hover:bg-charcoal-card focus-visible:bg-charcoal-card focus-visible:ring-1 focus-visible:ring-cream-muted active:bg-charcoal-bg data-[state=open]:bg-charcoal-card motion-reduce:transition-none [&_svg]:!size-3.5 [&_img]:!size-3.5"
+                >
+                  {source ? (
+                    <DestinationIcon appId={props.appId} item={source} />
+                  ) : (
+                    <Plug aria-hidden="true" />
+                  )}
+                  <span className="truncate">{source?.label ?? "Connect"}</span>
+                </button>
+              </PopoverTrigger>
+              <PopoverContent
+                side="right"
+                sideOffset={12}
+                align="start"
+                className="w-[300px] overflow-hidden p-0"
+              >
+                <div className="border-b border-charcoal-border p-2">
+                  <div className="relative">
+                    <Search
+                      aria-hidden
+                      size={14}
+                      className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-cream-muted"
+                    />
+                    <Input
+                      autoFocus
+                      aria-label={`Search ${label} integrations`}
+                      placeholder="Search integrations…"
+                      value={query}
+                      onChange={(event) => setQuery(event.target.value)}
+                      className="h-8 pl-8 text-sm"
+                    />
+                  </div>
+                </div>
+                <div
+                  className="misty-transient-scrollbar max-h-[360px] overflow-y-auto p-1"
+                  role="group"
+                  aria-label={`${label} integrations`}
+                  aria-busy={!!adding}
+                >
+                  {filteredSources.map((item) => {
+                    const selected = source?.id === item.id;
+                    const added = items.some((existing) => existing.id === item.id);
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        aria-label={`${added ? "Switch to" : "Add"} ${item.label}`}
+                        aria-pressed={selected}
+                        disabled={!!adding}
+                        className="group/integration flex min-h-9 w-full items-center gap-2 rounded-md px-2 py-1 text-left text-sm text-cream outline-none disabled:pointer-events-none disabled:opacity-50"
+                        onClick={async () => {
+                          if (addingRef.current) return;
+                          addingRef.current = true;
+                          setAdding(item.id);
+                          setSourceError("");
+                          try {
+                            if (!added)
+                              await addNavigatorIntegration(props.accountId, props.appId, item.id);
+                            setSelectedSourceId(item.id);
+                            setOpen(true);
+                            openRoute(item.route);
+                            setPickerOpen(false);
+                          } catch (error) {
+                            setSourceError(
+                              error instanceof Error
+                                ? error.message
+                                : "Couldn’t add integration. Try again.",
+                            );
+                          } finally {
+                            addingRef.current = false;
+                            setAdding(undefined);
+                          }
+                        }}
+                      >
+                        <span className="flex size-5 shrink-0 items-center justify-center [&_svg]:!size-[18px] [&_img]:!size-[18px] [&_[data-brand-icon=x]]:!size-[18px] [&_[data-brand-icon=discord]]:!size-[21px] [&_[data-brand-icon=discord]]:max-w-none">
+                          <DestinationIcon appId={props.appId} item={item} />
+                        </span>
+                        <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                        {adding === item.id ? (
+                          <span className="text-xs text-cream-muted">Opening…</span>
+                        ) : added ? (
+                          <span className="inline-flex h-7 w-14 shrink-0 items-center justify-center rounded-md border border-cream/20 text-xs font-medium text-cream transition-colors hover:bg-charcoal-active group-focus-visible/integration:ring-2 group-focus-visible/integration:ring-cream-muted">
+                            Open
+                          </span>
+                        ) : !added ? (
+                          <span className="inline-flex h-7 w-14 shrink-0 items-center justify-center rounded-md border border-transparent bg-cream-bright text-xs font-medium text-charcoal-bg transition-colors hover:bg-cream-action-hover group-focus-visible/integration:ring-2 group-focus-visible/integration:ring-cream-muted">
+                            Add
+                          </span>
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                  {!filteredSources.length && (
+                    <p className="px-3 py-6 text-center text-xs text-cream-muted">
+                      No integrations found.
+                    </p>
+                  )}
+                </div>
+                {sourceError && (
+                  <p
+                    role="alert"
+                    className="border-t border-charcoal-border px-3 py-2 text-xs text-cream"
+                  >
+                    {sourceError}
+                  </p>
+                )}
+              </PopoverContent>
+            </Popover>
           )}
         </div>
       </Renameable>
       <CollapsibleContent id={contentId}>
         {props.appId === "browser" && !items.length && (
-          <p className="px-5 py-2 text-xs text-cream-muted">Pin pages from the toolbar.</p>
+          <p className="px-5 py-2 text-xs text-cream-muted">No pinned pages...</p>
+        )}
+        {integrations && source && source.id !== "misty" && !sourceDestinations.length && (
+          <p className="px-5 py-2 text-xs text-cream-muted">No pinned pages...</p>
         )}
         <AppItems
           accountId={props.accountId}
-          path={[]}
+          path={integrations && source ? [source.id] : []}
           appId={props.appId}
-          items={items}
+          items={integrations ? sourceDestinations : items}
           activeRoute={props.active ? props.activeRoute : ""}
           label={`${label} destinations`}
         />
@@ -307,7 +470,7 @@ function AppItem(props: AppItemsProps & { item: MistyNavigationItem; last: boole
             pinned ? (
               <button
                 type="button"
-                className={`${navigationMenuActionClass} !opacity-0 group-hover/tree-row:!opacity-100 group-focus-within/tree-row:!opacity-100 [@media(hover:none)]:!opacity-100 disabled:cursor-wait`}
+                className={`${navigationMenuActionClass} !bg-transparent hover:!bg-transparent active:!bg-transparent transition-colors hover:text-cream-bright focus-visible:text-cream-bright !opacity-0 group-hover/tree-row:!opacity-100 group-focus-within/tree-row:!opacity-100 [@media(hover:none)]:!opacity-100 disabled:cursor-wait`}
                 aria-label={`Unpin ${label}`}
                 title="Unpin"
                 aria-busy={unpinning || undefined}
@@ -396,10 +559,14 @@ export function DestinationIcon({
     const Icon = nativeIcon;
     return <Icon aria-hidden />;
   }
-  if (item.id === "integrations" && (appId === "social" || appId === "inbox"))
+  if (
+    item.id === "integrations" &&
+    (appId === "social" || appId === "inbox" || appId === "music" || appId === "media")
+  )
     return <Plug aria-hidden />;
-  if (appId === "social" || appId === "inbox") {
-    const provider = providerFromRoute(item.route, appId === "social" ? "chat" : "inbox");
+  if (appId === "social" || appId === "inbox" || appId === "music" || appId === "media") {
+    const family = appId === "social" ? "chat" : appId;
+    const provider = providerFromRoute(item.route, family);
     if (provider) return <ProviderBrandIcon provider={provider} size={18} />;
   }
   if (appId === "inbox") {
@@ -408,10 +575,11 @@ export function DestinationIcon({
     if (provider === "google" || provider === "microsoft")
       return <MailProviderIcon provider={provider} />;
   }
-  if (appId === "social") {
+  if (appId === "social" || appId === "music" || appId === "media") {
+    const family = appId === "social" ? "chat" : appId;
     const provider = providerFromRoute(
-      `/apps/social?provider=${encodeURIComponent(item.id)}`,
-      "chat",
+      `/apps/${appId}?provider=${encodeURIComponent(item.id)}`,
+      family,
     );
     if (provider) return <ProviderBrandIcon provider={provider} size={18} />;
   }

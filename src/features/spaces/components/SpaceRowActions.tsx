@@ -1,18 +1,20 @@
 import type { Space } from "@/api/spaces/dto/interfaces/types";
-import { Button } from "@/shared/ui";
+import { Button, cn } from "@/shared/ui";
 import { Gauge, Settings2, UsersRound } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { SpaceMembersPopover } from "../members";
 import { SpaceUsagePopover } from "./SpaceUsagePopover";
 
-/**
- * Usage, Team, and Settings for one Space, revealed on row hover.
- *
- * These used to sit behind an ellipsis menu, which cost a click and a menu
- * paint to reach three fixed destinations. The row already reveals its actions
- * on hover, so the three icons go straight there.
- */
-export function SpaceRowActions({ space }: { space: Space }) {
+/** Direct usage, members, and settings controls for a Space. */
+export function SpaceRowActions({
+  space,
+  onClose,
+  actionClassName,
+}: {
+  space: Space;
+  onClose?: () => void;
+  actionClassName?: string;
+}) {
   const location = useLocation();
   const encodedSpaceId = encodeURIComponent(space.id);
   const settingsState = {
@@ -20,7 +22,7 @@ export function SpaceRowActions({ space }: { space: Space }) {
   };
 
   return (
-    <div className="flex items-center gap-0.5">
+    <div className="flex shrink-0 items-center gap-0.5">
       <SpaceUsagePopover
         space={space}
         trigger={
@@ -28,7 +30,7 @@ export function SpaceRowActions({ space }: { space: Space }) {
             type="button"
             variant="ghost"
             size="icon-sm"
-            className={spaceRowActionClass}
+            className={cn(spaceRowActionClass, actionClassName)}
             aria-label={`${space.name} usage`}
             title="Usage"
           >
@@ -43,9 +45,9 @@ export function SpaceRowActions({ space }: { space: Space }) {
             type="button"
             variant="ghost"
             size="icon-sm"
-            className={spaceRowActionClass}
-            aria-label={`${space.name} team`}
-            title="Team"
+            className={cn(spaceRowActionClass, actionClassName)}
+            aria-label={`${space.name} members`}
+            title="Members"
           >
             <UsersRound size={16} strokeWidth={1.75} aria-hidden="true" />
           </Button>
@@ -55,11 +57,15 @@ export function SpaceRowActions({ space }: { space: Space }) {
         asChild
         variant="ghost"
         size="icon-sm"
-        className={spaceRowActionClass}
+        className={cn(spaceRowActionClass, actionClassName)}
         aria-label={`${space.name} settings`}
         title="Settings"
       >
-        <Link to={`/spaces/${encodedSpaceId}/settings/general`} state={settingsState}>
+        <Link
+          to={`/spaces/${encodedSpaceId}/settings/general`}
+          state={settingsState}
+          onClick={onClose}
+        >
           <Settings2 size={16} strokeWidth={1.75} aria-hidden="true" />
         </Link>
       </Button>

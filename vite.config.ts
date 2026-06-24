@@ -10,8 +10,8 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import posthog from "@posthog/rollup-plugin";
 import { publicSdkDevelopmentUpdates } from "./scripts/vite-public-sdk.mjs";
+import { materialIconProjection, copyMaterialIcons } from "./scripts/material-icon-assets.mjs";
 import {
-  cpSync,
   createReadStream,
   existsSync,
   readFileSync,
@@ -33,9 +33,8 @@ const materialIconThemeDir = dirname(
 const materialIconThemeIconsDir = join(materialIconThemeDir, "icons");
 const materialIconThemePublicPath = "/assets/material-icon-theme/";
 
-// These SVGs are static runtime assets, not JavaScript modules. Keeping all
-// 1,250 icons out of Rollup's module graph substantially lowers peak build
-// memory while preserving the full Material Icon Theme lookup table.
+// Keep SVGs outside Rollup's module graph. Copy only assets referenced by
+// Misty's file/folder associations; editor-specific theme variants stay out.
 function materialIconThemeAssets(): Plugin {
   let resolvedConfig: ResolvedConfig;
 
@@ -79,11 +78,7 @@ function materialIconThemeAssets(): Plugin {
       const outputDir = outputOptions.dir
         ? resolve(outputOptions.dir)
         : resolve(resolvedConfig.root, resolvedConfig.build.outDir);
-      cpSync(
-        materialIconThemeIconsDir,
-        join(outputDir, resolvedConfig.build.assetsDir, "material-icon-theme"),
-        { recursive: true },
-      );
+      copyMaterialIcons(join(outputDir, resolvedConfig.build.assetsDir, "material-icon-theme"));
     },
   };
 }
@@ -251,7 +246,9 @@ export default defineConfig(({ command, mode }) => {
   const posthogProjectId = env.POSTHOG_PROJECT_ID?.trim();
   const sourceMapKey = env.POSTHOG_API_KEY?.trim();
   const publicApiUrl = (env.MISTY_PUBLIC_API_URL ?? env.VITE_MISTY_PUBLIC_API_URL)?.trim();
-  const publicUrl = (env.MISTY_PUBLIC_URL ?? env.VITE_MISTY_PUBLIC_URL)?.trim();
+  const isDev = command === "serve" || mode.includes("dev") || process.env.NODE_ENV !== "production";
+  const defaultPublicUrl = isDev ? "http://localhost:5174" : "https://mistysys.com";
+  const publicUrl = (env.MISTY_PUBLIC_URL ?? env.VITE_MISTY_PUBLIC_URL)?.trim() || defaultPublicUrl;
   const appsDirectory =
     command === "serve" && mode === "desktop"
       ? localAppsDirectory(env.VITE_MISTY_APPS_DIRECTORY ?? env.MISTY_APPS_DIRECTORY, process.cwd())
@@ -306,11 +303,30 @@ export default defineConfig(({ command, mode }) => {
       publicSdkDevelopmentUpdates(),
       react(),
       tailwindcss(),
-      materialIconThemeAssets(),
+      ...((mode === "mobile" || mode === "android") ? [materialIconThemeAssets()] : []),
+      materialIconProjection(),
       ...(mode !== "mobile" && mode !== "android"
         ? [
             {
               name: "misty-downloaded-app-host-boundary",
+              enforce: "pre",
+              resolveId(source, importer) {
+                if (mode === "desktop" && ["darwin", "macos"].includes(process.env.TAURI_ENV_PLATFORM || process.platform) &&
+                    /(?:^|\/)FilePicker(?:\.tsx)?$/.test(source))
+                  return resolve(process.cwd(), "src/features/picker/HostFilePicker.tsx");
+                if (/(?:^|\/)FileBrowserIcons(?:\.tsx)?$/.test(source))
+                  return resolve(process.cwd(), "src/features/apps/HostFileIcons.tsx");
+                if (/(?:^|\/)PhotoEditorView(?:\.tsx)?$/.test(source))
+                  return resolve(process.cwd(), "src/features/apps/FilePhotoEditor.tsx");
+                if (importer?.includes("/apps/files/workspace/") &&
+                    /(?:^|\/)VideoAnnotator(?:\.tsx)?$/.test(source))
+                  return resolve(process.cwd(), "src/features/apps/FileVideoPreview.tsx");
+                if (importer?.includes("/apps/files/workspace/") &&
+                    /(?:^|\/)PdfViewerView(?:\.tsx)?$/.test(source))
+                  return resolve(process.cwd(), "src/features/apps/FilePdfPreview.tsx");
+              },
+              // Space collaboration screens and Yjs are bundled with Misty.
+              // Personal app runtimes remain separately packaged.
               generateBundle(_options, bundle) {
                 const forbidden = Object.values(bundle).flatMap((item) =>
                   item.type === "chunk"
@@ -318,16 +334,17 @@ export default defineConfig(({ command, mode }) => {
                         .filter(
                           ([id, details]) =>
                             details.renderedLength > 0 &&
-                            /\/(?:TerminalWorkspace(?:View)?|SpaceTasksView|SpaceAgendaView|SpaceRoadmapView)\.tsx$/.test(
-                              id,
-                            ),
+                            !id.endsWith("/src/features/agents/AgentsPage.tsx") &&
+                            ((mode === "desktop" && ["darwin", "macos"].includes(process.env.TAURI_ENV_PLATFORM || process.platform) && /\/node_modules\/html2canvas\//.test(id)) || /\/(?:TrustedAppSurface\.mobile|NativeAppSurface|BrowserWorkspace|PinnedBrowserWorkspace|SDKBrowserView|AgentsPage|TerminalWorkspace(?:View)?|PdfViewerView|PhotoEditorView|VideoAnnotator)\.tsx$/.test(id) ||
+                              /\/apps\/(?:files|browser)\//.test(id) ||
+                              /\/node_modules\/(?:material-icon-theme|@noble\/hashes|mammoth|jszip|react-pdf|pdfjs-dist|react-filerobot-image-editor|react-konva|konva)\//.test(id)),
                         )
                         .map(([id]) => id)
                     : [],
                 );
                 if (forbidden.length)
                   this.error(
-                    `Downloaded app screens must not ship inside the desktop Host:\n${forbidden.join("\n")}`,
+                    `Downloaded app screens must not ship inside the desktop Host:\n${forbidden.map(id => `${id} <- ${this.getModuleInfo(id)?.importers.join(", ")}`).join("\n")}`,
                   );
               },
             } satisfies Plugin,
@@ -354,6 +371,8 @@ export default defineConfig(({ command, mode }) => {
         : []),
     ],
     define: {
+      "import.meta.env.MISTY_SHELL_MACOS": JSON.stringify(mode === "desktop" && ["darwin", "macos"].includes(process.env.TAURI_ENV_PLATFORM || process.platform)),
+      "import.meta.env.MISTY_NATIVE_MACOS_CAPTURE": JSON.stringify(mode === "desktop" && ["darwin", "macos"].includes(process.env.TAURI_ENV_PLATFORM || process.platform)),
       ...publicAppEnv(env),
       "import.meta.env.VITE_POSTHOG_PROJECT_TOKEN": JSON.stringify(posthogToken ?? ""),
       "import.meta.env.VITE_POSTHOG_HOST": JSON.stringify(posthogHost ?? ""),
@@ -385,6 +404,12 @@ export default defineConfig(({ command, mode }) => {
       alias: {
         ...appSourceAliases(process.cwd()),
         "@misty/browser-view": resolve(appSourceRoot(process.cwd()), "apps/browser/workspace/SDKBrowserView.tsx"),
+        "@/features/apps/TrustedAppSurface": new URL(
+          mode === "mobile" || mode === "android"
+            ? "./src/features/apps/TrustedAppSurface.mobile.tsx"
+            : "./src/features/apps/TrustedAppSurface.tsx",
+          import.meta.url,
+        ).pathname,
         "@/features/apps/EmbeddedPlanner": new URL(
           mode === "mobile" || mode === "android"
             ? "./src/features/apps/EmbeddedPlanner.mobile.tsx"

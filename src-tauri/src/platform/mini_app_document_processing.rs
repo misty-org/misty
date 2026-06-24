@@ -177,7 +177,7 @@ async fn execute_operation(
             let app = registry.get_mut(instance).ok_or("App is closed.")?;
             let p = &mut app.permissions;
             p.authorize("files.read")?;
-            if p.owner_namespace.is_none() || !p.space_owned {
+            if p.owner_namespace.is_none() || !p.account_owned {
                 return Err("Open this app in a Space before processing a document.".into());
             }
             let file = p
@@ -516,7 +516,7 @@ pub(super) mod tests {
         .unwrap();
         permissions.decide("files.read", true).unwrap();
         permissions.owner_namespace = Some("member-space".into());
-        permissions.space_owned = true;
+        permissions.account_owned = true;
         permissions.files.insert(
             "owned".into(),
             super::super::FileGrant {
@@ -566,7 +566,7 @@ pub(super) mod tests {
             .get_mut("test")
             .unwrap()
             .permissions
-            .space_owned = false;
+            .account_owned = false;
         assert!(execute(&state, "test", request.clone())
             .await
             .unwrap_err()
@@ -600,7 +600,7 @@ pub(super) mod tests {
         let (state, root) = fixture();
         let mut permissions=super::super::PermissionSet::from_document("files",
             &serde_json::json!({"version":"1","runtime_capabilities":["files.read","connections.read"]}),None).unwrap();
-        permissions.space_owned = true;
+        permissions.account_owned = true;
         permissions.owner_namespace = Some("alice-family".into());
         permissions.decide("files.read", true).unwrap();
         permissions.decide("connections.read", true).unwrap();
@@ -703,7 +703,7 @@ pub(super) mod tests {
             let (state, root) = fixture();
             let mut permissions = super::super::PermissionSet::from_document("files",
                 &serde_json::json!({"version":"1","runtime_capabilities":["files.read","connections.read"]}), None).unwrap();
-            permissions.space_owned = true;
+            permissions.account_owned = true;
             permissions.owner_namespace = Some(format!("{member}-family"));
             permissions.decide("files.read", true).unwrap();
             permissions.decide("connections.read", true).unwrap();
@@ -998,7 +998,7 @@ pub(super) mod tests {
             let (state, root) = fixture();
             let mut permissions = super::super::PermissionSet::from_document("files",
                 &serde_json::json!({"version":"1","runtime_capabilities":["files.read","connections.read"]}), None).unwrap();
-            permissions.space_owned = true;
+            permissions.account_owned = true;
             permissions.owner_namespace = Some(namespace.into());
             permissions.decide("files.read", true).unwrap();
             state.0.lock().unwrap().get_mut("test").unwrap().permissions = permissions;
@@ -1152,7 +1152,7 @@ pub(super) mod tests {
         let (state, root) = fixture();
         let mut permissions = super::super::PermissionSet::from_document("code",
             &serde_json::json!({"version":"1","runtime_capabilities":["files.read","code.execute"]}), None).unwrap();
-        permissions.space_owned = true;
+        permissions.account_owned = true;
         permissions.owner_namespace = Some("member-family".into());
         permissions.decide("code.execute", true).unwrap();
         state.0.lock().unwrap().get_mut("test").unwrap().permissions = permissions;
@@ -1214,7 +1214,7 @@ pub(super) mod tests {
         )
         .unwrap();
         permissions.owner_namespace = Some("member-family".into());
-        permissions.space_owned = true;
+        permissions.account_owned = true;
         state.0.lock().unwrap().get_mut("test").unwrap().permissions = permissions;
         service_receipt(root.path(), b"worker", "sdk-shell", "terminal", 1);
         assert!(ServiceLease::acquire_terminal(&state, "test")
@@ -1270,7 +1270,7 @@ pub(super) mod tests {
             )
             .unwrap();
             permissions.owner_namespace = Some(namespace.into());
-            permissions.space_owned = true;
+            permissions.account_owned = true;
             state.0.lock().unwrap().get_mut("test").unwrap().permissions = permissions;
             (state, root)
         }
@@ -1970,7 +1970,7 @@ impl ServiceLease {
                 let registry = state.0.lock().map_err(|_| "App registry unavailable.")?;
                 let app = registry.get(instance).ok_or("App is closed.")?;
                 let p = &app.permissions;
-                if !p.space_owned || p.owner_namespace.is_none() || p.app_id != expected_app {
+                if !p.account_owned || p.owner_namespace.is_none() || p.app_id != expected_app {
                     return Err("The native service belongs to another app or Space.".into());
                 }
                 p.authorize(capability)?;
@@ -2050,7 +2050,7 @@ impl ServiceLease {
                 .space_id
                 .as_deref()
                 .filter(|v| !v.is_empty())
-                .ok_or("Missing native Space.")?,
+                .unwrap_or("personal"),
             installed_version: &self.version,
             authority_generation: generation as i64,
         })
@@ -2085,7 +2085,7 @@ impl ServiceLease {
             || p.app_id != self.app_id
             || p.version != self.version
             || p.native_owner != self.native_owner
-            || !p.space_owned
+            || !p.account_owned
             || p.owner_namespace.as_deref() != Some(self.namespace.as_str())
         {
             return Err("Document service permission changed.".into());

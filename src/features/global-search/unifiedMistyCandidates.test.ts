@@ -26,36 +26,36 @@ describe("unified Misty candidates", () => {
     expect(candidates[0]).toMatchObject({ type: "object", title: "Launch plan" });
   });
 
-  it("promotes grounded answers for conversational intent", () => {
+  it("keeps retrieved objects first for conversational queries", () => {
     const candidates = buildUnifiedMistyCandidates(
       "How did we decide pricing?",
       [result("Pricing notes")],
       filters,
     );
-    expect(candidates[0]?.type).toBe("answer");
+    expect(candidates[0]?.type).toBe("object");
   });
 
-  it("promotes autonomous work for explicit imperative intent", () => {
+  it("keeps retrieved objects first for action queries", () => {
     const candidates = buildUnifiedMistyCandidates(
       "Organize these notes into a launch plan",
       [result("Launch notes")],
       filters,
     );
-    expect(candidates[0]?.type).toBe("agent_task");
+    expect(candidates[0]?.type).toBe("object");
   });
 
-  it("treats polite action requests as work instead of informational questions", () => {
+  it("keeps an explicit handoff for polite requests", () => {
     const candidates = buildUnifiedMistyCandidates(
       "Can you create a launch plan?",
       [result("Launch notes")],
       filters,
     );
-    expect(candidates[0]?.type).toBe("agent_task");
+    expect(candidates[0]?.type).toBe("object");
   });
 
   it("routes direct drawing requests to Misty work", () => {
     const candidates = buildUnifiedMistyCandidates("Draw a cat", [], filters);
-    expect(candidates[0]?.type).toBe("agent_task");
+    expect(candidates[0]?.type).toBe("answer");
   });
 
   it("routes explicit Excalidraw creation to Misty work", () => {
@@ -64,7 +64,7 @@ describe("unified Misty candidates", () => {
       [],
       filters,
     );
-    expect(candidates[0]?.type).toBe("agent_task");
+    expect(candidates[0]?.type).toBe("answer");
   });
 
   it("turns navigation language into direct navigation candidates", () => {

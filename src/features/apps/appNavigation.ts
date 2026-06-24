@@ -34,7 +34,7 @@ export function savedProviderNavigation(
   return entries.find(
     (entry) =>
       entry.identity.accountId === identity.accountId &&
-      entry.identity.spaceId === identity.spaceId &&
+      (entry.identity.spaceId ?? "") === (identity.spaceId ?? "") &&
       entry.identity.appId === identity.appId,
   );
 }
@@ -52,16 +52,24 @@ export function createAppNavigationRegistration(scope: AppRpcScope) {
       scope.assert("navigation.write");
       const copy = structuredClone(items);
       useAppNavigationStore.setState((state) => ({
-        ...(["browser", "chat", "inbox", "planner", "journal", "library", "agents"].includes(
-          scope.identity.appId,
-        )
+        ...([
+          "browser",
+          "chat",
+          "inbox",
+          "planner",
+          "journal",
+          "library",
+          "agents",
+          "music",
+          "media",
+        ].includes(scope.identity.appId)
           ? {
               providerCache: [
                 ...state.providerCache.filter(
                   (entry) =>
                     !(
                       entry.identity.accountId === scope.identity.accountId &&
-                      entry.identity.spaceId === scope.identity.spaceId &&
+                      (entry.identity.spaceId ?? "") === (scope.identity.spaceId ?? "") &&
                       entry.identity.appId === scope.identity.appId
                     ),
                 ),
@@ -93,7 +101,7 @@ export function appNavigationFor(
   const matching = entries.filter(
     (entry) =>
       entry.identity.accountId === identity.accountId &&
-      entry.identity.spaceId === identity.spaceId &&
+      (entry.identity.spaceId ?? "") === (identity.spaceId ?? "") &&
       entry.identity.appId === identity.appId,
   );
   return (

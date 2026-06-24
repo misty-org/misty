@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
+import { useState } from "react";
 import { clearNavigationRestoreHistory } from "@/features/navigation-names/clearHistory";
+import { Renameable } from "@/features/navigation-names/Renameable";
+import { useNavigationNames, windowNameKey } from "@/features/navigation-names/store";
 import type { WorkspaceVirtualWindow } from "@/features/workspace";
 import {
   DropdownMenu,
@@ -13,7 +14,6 @@ import {
 import { AppWindow, ChevronDown, Plus, RotateCcw, Trash2, X } from "lucide-react";
 
 export function WorkspaceWindowMenu(props: {
-  titlebar?: boolean;
   windows: WorkspaceVirtualWindow[];
   activeWindowId: string;
   canReopen: boolean;
@@ -23,18 +23,15 @@ export function WorkspaceWindowMenu(props: {
   onClose: (windowId: string) => void;
   onReopen: () => void;
 }) {
-  const [target, setTarget] = useState<HTMLElement | null>(null);
-  useEffect(() => {
-    setTarget(props.titlebar ? document.getElementById("misty-virtual-window-controls") : null);
-  }, [props.titlebar]);
   const [error, setError] = useState("");
+  const names = useNavigationNames((state) => state.names);
   const canClose = (workspaceWindow: WorkspaceVirtualWindow) =>
     props.windows.length > 1 && (!props.canCloseWindow || props.canCloseWindow(workspaceWindow));
   const activeWindow = props.windows.find(
     (workspaceWindow) => workspaceWindow.id === props.activeWindowId,
   );
 
-  const menu = (
+  return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
@@ -44,48 +41,56 @@ export function WorkspaceWindowMenu(props: {
           title="Manage virtual windows"
           data-tour-target="workspace-window-menu"
         >
-          <AppWindow className="size-[18px]" />
+          <AppWindow className="size-4" />
           <ChevronDown className="size-3" aria-hidden="true" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"
-        className="w-60 min-w-0 max-w-[calc(100vw-16px)] gap-0 p-1.5 font-[system-ui] text-[13px]"
+        className="w-60 min-w-0 max-w-[calc(100vw-16px)] gap-1 p-1.5 font-[system-ui] text-[13px]"
       >
         {props.windows.map((workspaceWindow) => {
           const isActive = workspaceWindow.id === props.activeWindowId;
+          const nameKey = windowNameKey(workspaceWindow.id);
+          const title = names[nameKey] ?? workspaceWindow.title;
           return (
-            <DropdownMenuItem
+            <Renameable
               key={workspaceWindow.id}
-              onSelect={() => props.onSelect(workspaceWindow.id)}
-              className={cn(
-                menuItemClass,
-                "group/window",
-                isActive && "bg-charcoal-hover text-cream-bright",
-              )}
+              portalEditor={false}
+              nameKey={nameKey}
+              automatic={workspaceWindow.title}
             >
-              <AppWindow className="size-[15px]" />
-              <span className="min-w-0 flex-1 truncate">{workspaceWindow.title}</span>
-              {canClose(workspaceWindow) ? (
-                <button
-                  type="button"
-                  className={cn(
-                    "grid size-[18px] shrink-0 place-items-center rounded text-cream-muted opacity-0",
-                    "hover:bg-charcoal-active hover:text-cream group-hover/window:opacity-100",
-                    "group-data-[highlighted]/window:opacity-100",
-                    "focus:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-cream-muted",
-                  )}
-                  aria-label={`Close ${workspaceWindow.title}`}
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    props.onClose(workspaceWindow.id);
-                  }}
-                >
-                  <X className="size-3" />
-                </button>
-              ) : null}
-            </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => props.onSelect(workspaceWindow.id)}
+                className={cn(
+                  menuItemClass,
+                  "group/window",
+                  isActive && "bg-charcoal-hover text-cream-bright",
+                )}
+              >
+                <AppWindow className="size-[15px]" />
+                <span className="min-w-0 flex-1 truncate">{title}</span>
+                {canClose(workspaceWindow) ? (
+                  <button
+                    type="button"
+                    className={cn(
+                      "grid size-[18px] shrink-0 place-items-center rounded text-cream-muted opacity-0",
+                      "hover:bg-charcoal-active hover:text-cream group-hover/window:opacity-100",
+                      "group-data-[highlighted]/window:opacity-100",
+                      "focus:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-cream-muted",
+                    )}
+                    aria-label={`Close ${title}`}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      props.onClose(workspaceWindow.id);
+                    }}
+                  >
+                    <X className="size-3" />
+                  </button>
+                ) : null}
+              </DropdownMenuItem>
+            </Renameable>
           );
         })}
         {error && (
@@ -123,13 +128,12 @@ export function WorkspaceWindowMenu(props: {
       </DropdownMenuContent>
     </DropdownMenu>
   );
-  return target ? createPortal(menu, target) : menu;
 }
 
 const menuItemClass =
   "min-h-8 min-w-0 cursor-pointer gap-2 rounded-[5px] px-[9px] py-[7px] text-[13px] leading-[18px] data-[disabled]:opacity-40";
 
 const dockActionClass = [
-  "flex h-7 shrink-0 items-center justify-center gap-1 px-1 rounded text-cream-muted outline-none",
+  "flex h-7 shrink-0 items-center justify-center gap-1 px-1.5 rounded text-cream-muted outline-none",
   "hover:bg-charcoal-card hover:text-cream focus:outline-none focus-visible:ring-1 focus-visible:ring-cream-muted",
 ].join(" ");

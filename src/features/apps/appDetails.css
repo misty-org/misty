@@ -129,7 +129,7 @@
 }
 
 .discover-action-primary:hover:not(:disabled) {
-  background: var(--misty-theme-text);
+  background: color-mix(in srgb, var(--misty-theme-text-bright) 85%, var(--misty-theme-bg));
   color: var(--misty-theme-bg);
 }
 
@@ -539,7 +539,7 @@
 }
 .discover-detail-primary-action .discover-add-trigger.discover-action-primary {
   --add-background: var(--misty-theme-text-bright);
-  --add-highlight: var(--misty-theme-text);
+  --add-highlight: color-mix(in srgb, var(--misty-theme-text-bright) 85%, var(--misty-theme-bg));
 }
 .discover-detail-primary-action .discover-add-trigger:hover:not(:disabled),
 .discover-detail-primary-action .discover-add-trigger:active:not(:disabled) {

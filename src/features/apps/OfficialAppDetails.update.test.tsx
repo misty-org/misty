@@ -1,3 +1,4 @@
+import { MemoryRouter } from "react-router-dom";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { OfficialAppDetails } from "./OfficialAppDetails";
@@ -31,14 +32,12 @@ it("offers Update for a downloaded app with an older Space release and applies i
   } as unknown as SpaceAppInstallation;
   useAppsStore.setState({
     accountId: "test",
-    spaceId: "family",
-    bySpace: { family: [installation] },
-    prefetchSpaceAccess: async () => {},
+    installations: [installation],
   });
   useAppConsent.setState({ agreed: {} });
   const install = vi.fn().mockResolvedValue(undefined);
   render(
-    <OfficialAppDetails
+    <MemoryRouter><OfficialAppDetails
       app={app}
       installation={installation}
       actionAppId=""
@@ -48,7 +47,7 @@ it("offers Update for a downloaded app with an older Space release and applies i
       onRestoreFocus={vi.fn()}
       onInstall={install}
       onRemove={vi.fn()}
-    />,
+    /></MemoryRouter>,
   );
   fireEvent.click(screen.getByRole("button", { name: "Update" }));
   expect(install).not.toHaveBeenCalled();

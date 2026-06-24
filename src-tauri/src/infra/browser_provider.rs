@@ -1,4 +1,4 @@
-//! Provider admission and automation rules. Ordinary website redirects may leave these origins.
+//! Provider account and automation rules. Human browsing uses the shared Browser URL policy.
 use url::Url;
 pub fn domains(provider: &str) -> Option<Vec<&'static str>> {
     static POLICIES: std::sync::OnceLock<serde_json::Value> = std::sync::OnceLock::new();
@@ -115,7 +115,7 @@ pub fn authentication_required(provider: Option<&str>, url: &Url) -> bool {
         "x" => segment("/i/flow/login") || segment("/i/jf/onboarding") || segment("/account/access"),
         "slack" => segment("/signin") || segment("/checkcookie") || segment("/ssb/signin_redirect"),
         "messenger" => segment("/login") || segment("/checkpoint"),
-        _ => false,
+        _ => segment("/login") || segment("/signin") || segment("/auth/login") || segment("/-/login"),
     }
 }
 
@@ -131,14 +131,49 @@ mod authentication_tests {
             ("discord", "https://discord.com/login"),
             ("x", "https://x.com/i/flow/login"),
             ("slack", "https://workspace.slack.com/signin"),
+            ("dropbox", "https://www.dropbox.com/login"),
+            ("onedrive", "https://onedrive.live.com/login/"),
+            ("notion", "https://www.notion.so/login"),
+            ("todoist", "https://app.todoist.com/auth/login"),
+            ("trello", "https://trello.com/login"),
+            ("asana", "https://app.asana.com/-/login"),
+            ("microsoft-word", "https://www.office.com/login?ru=%2Flaunch%2Fword"),
+            ("microsoft-onenote", "https://www.office.com/login?ru=%2Flaunch%2Fonenote"),
         ] { assert!(authentication_required(Some(provider), &Url::parse(raw).unwrap()), "{provider}"); }
         for (provider, raw) in [
             (Some("google"), "https://mail.google.com/mail/u/0/"),
             (Some("messenger"), "https://www.facebook.com/messages/t/123"),
             (Some("google"), "https://accounts.google.com.evil.invalid/login"),
             (Some("discord"), "https://discord.com/login-history"),
+            (Some("notion"), "https://www.notion.so/login-history"),
+            (Some("asana"), "https://example.org/-/login"),
             (Some("unknown"), "https://accounts.google.com/ServiceLogin"),
             (None, "https://example.org/login"),
         ] { assert!(!authentication_required(provider, &Url::parse(raw).unwrap())); }
+    }
+}
+
+/// Unknown blank popups can be OAuth launchers populated after window.open.
+/// Keep those and known authentication endpoints attached to their opener.
+pub fn authentication_popup(provider: Option<&str>, url: &Url) -> bool {
+    if url.as_str() == "about:blank" || authentication_required(provider, url) { return true; }
+    let Some(provider) = provider else { return false; };
+    if !allows(provider, url) { return false; }
+    url.path().split('/').any(|part| matches!(part, "oauth" | "oauth2" | "authorize" | "signin" | "login"))
+}
+
+#[cfg(test)]
+mod popup_routing_tests {
+    use super::*;
+    #[test]
+    fn ordinary_service_and_external_popups_are_browser_tabs() {
+        for raw in ["https://discord.com/channels/123/456", "https://example.org/article"] {
+            assert!(!authentication_popup(Some("discord"), &Url::parse(raw).unwrap()));
+        }
+        for raw in ["about:blank", "https://discord.com/login", "https://discord.com/oauth2/authorize"] {
+            assert!(authentication_popup(Some("discord"), &Url::parse(raw).unwrap()));
+        }
+        assert!(authentication_popup(Some("google"), &Url::parse("https://accounts.google.com/ServiceLogin").unwrap()));
+        assert!(!authentication_popup(Some("google"), &Url::parse("https://example.org/oauth2/authorize").unwrap()));
     }
 }

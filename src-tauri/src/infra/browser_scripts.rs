@@ -76,10 +76,12 @@ pub(super) const BROWSER_VIEWPORT_SCRIPT: &str = r#"
   // active workspace pane before shell shortcuts are evaluated.
   document.addEventListener('pointerdown', (event) => {
     if (!event.isTrusted) return;
-    const params = new URLSearchParams({ token: shortcutToken });
-    window.location.href = `misty-focus:event?${params}`;
+    window.webkit?.messageHandlers?.mistyFocus?.postMessage(shortcutToken);
   }, true);
 
+  const sendPointer = (pointer) => {
+    window.webkit?.messageHandlers?.mistyFocus?.postMessage(JSON.stringify({ token: shortcutToken, pointer }));
+  };
   const reportPointer = (event) => {
     if (!pointerTrackingEnabled || !event?.isTrusted) return;
     const now = performance.now();
@@ -87,12 +89,12 @@ pub(super) const BROWSER_VIEWPORT_SCRIPT: &str = r#"
     lastPointerReport = now;
     const x = Math.max(0, Math.min(window.innerWidth, Number(event.clientX) || 0));
     const y = Math.max(0, Math.min(window.innerHeight, Number(event.clientY) || 0));
-    window.location.href = `misty-pointer:move?x=${Math.round(x * 10) / 10}&y=${Math.round(y * 10) / 10}`;
+    sendPointer({ x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, inside: true });
   };
 
   const reportPointerLeave = () => {
     if (!pointerTrackingEnabled) return;
-    window.location.href = 'misty-pointer:leave';
+    sendPointer({ x: 0, y: 0, inside: false });
   };
 
   const flush = () => {
@@ -109,21 +111,16 @@ pub(super) const BROWSER_VIEWPORT_SCRIPT: &str = r#"
   };
 
   const handleLinkClick = (event) => {
-    if (!event.isTrusted) return;
+    if (!event.isTrusted || event.defaultPrevented) return;
     const isMiddleClick = event.type === 'auxclick' && event.button === 1;
     const isLeftClick = event.type === 'click' && event.button === 0;
     const isModifierClick =
       isLeftClick && (event.metaKey || event.ctrlKey);
     const anchor = event.target?.closest?.('a[href]');
     if (!anchor) return;
-    const target = (anchor.getAttribute('target') || '').trim().toLowerCase();
-    const isNewWindowTarget =
-      isLeftClick &&
-      (target === '_blank' ||
-        target === '_new' ||
-        (target && target !== '_self' && target !== '_top' && target !== '_parent'));
-
-    if (!isMiddleClick && !isModifierClick && !isNewWindowTarget) return;
+    // Let the site's router and WebKit handle ordinary links and named targets.
+    // Only explicit new-tab gestures need host assistance.
+    if (!isMiddleClick && !isModifierClick) return;
 
     const href = anchor.getAttribute('href');
     if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
@@ -136,8 +133,8 @@ pub(super) const BROWSER_VIEWPORT_SCRIPT: &str = r#"
       }
     } catch (_) {}
   };
-  document.addEventListener('click', handleLinkClick, true);
-  document.addEventListener('auxclick', handleLinkClick, true);
+  document.addEventListener('click', handleLinkClick);
+  document.addEventListener('auxclick', handleLinkClick);
   document.addEventListener('pointerover', track, true);
   document.addEventListener('pointermove', track, true);
   document.addEventListener('pointerout', (event) => {
@@ -159,6 +156,22 @@ pub(super) const BROWSER_COMPANION_SCRIPT: &str = r#"
 
 pub(super) fn browser_viewport_script(shortcut_token: &str, pointer_tracking: bool) -> String {
     BROWSER_VIEWPORT_SCRIPT
+        .replace(
+            "window.webkit?.messageHandlers?.mistyFocus?.postMessage(JSON.stringify({ token: shortcutToken, pointer }));",
+            if cfg!(target_os = "macos") {
+                "window.webkit?.messageHandlers?.mistyFocus?.postMessage(JSON.stringify({ token: shortcutToken, pointer }));"
+            } else {
+                "window.location.href = pointer.inside ? `misty-pointer:move?x=${pointer.x}&y=${pointer.y}` : 'misty-pointer:leave';"
+            },
+        )
+        .replace(
+            "window.webkit?.messageHandlers?.mistyFocus?.postMessage(shortcutToken);",
+            if cfg!(target_os = "macos") {
+                "window.webkit?.messageHandlers?.mistyFocus?.postMessage(shortcutToken);"
+            } else {
+                "window.location.href = `misty-focus:event?${new URLSearchParams({ token: shortcutToken })}`;"
+            },
+        )
         .replace("__MISTY_CONTEXT_MENU_PLACEHOLDER__", if cfg!(target_os = "macos") { include_str!("browser_context_menu.js") } else { "" })
         .replace("__MISTY_CONTEXT_SEMANTIC_PLACEHOLDER__", include_str!("browser_semantic_snapshot.js"))
         .replace(
@@ -228,7 +241,7 @@ struct BrowserPointerEvent {
 
 pub(super) fn emit_browser_pointer(app: &AppHandle, id: &str, pointer: BrowserPointerNavigation) {
     let _ = app.emit_to(
-        "main",
+        crate::infra::browser::browser_owner_label(app,id),
         "misty://browser-pointer",
         BrowserPointerEvent {
             id: id.to_owned(),
@@ -282,8 +295,9 @@ mod tests {
         assert!(!BROWSER_VIEWPORT_SCRIPT.contains("misty-cursor:"));
         assert!(!BROWSER_VIEWPORT_SCRIPT.contains("document.createElement('a')"));
         assert!(!BROWSER_VIEWPORT_SCRIPT.contains("__TAURI_INTERNALS__"));
-        assert!(BROWSER_VIEWPORT_SCRIPT.contains("misty-pointer:move"));
-        assert!(BROWSER_VIEWPORT_SCRIPT.contains("misty-focus:event"));
+        assert!(!BROWSER_VIEWPORT_SCRIPT.contains("misty-pointer:"));
+        assert!(BROWSER_VIEWPORT_SCRIPT.contains("mistyFocus?.postMessage(shortcutToken)"));
+        assert!(!BROWSER_VIEWPORT_SCRIPT.contains("misty-focus:event"));
     }
 
     #[test]

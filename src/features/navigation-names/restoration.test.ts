@@ -1,9 +1,16 @@
+import { dockTabs } from "@/features/workspace/dockTree";
+import { allLayoutViews } from "@/features/workspace/layoutTabs";
 import { beforeEach, expect, it, vi } from "vitest";
 import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
-import { dockTabs } from "@/features/workspace/dockTree";
 import { normalizeWorkspaceLayout } from "@/features/workspace/virtualWindows";
 import { clearNavigationRestoreHistory } from "./clearHistory";
-import { navigationName, tabNameKey, groupNameKey, useNavigationNames } from "./store";
+import {
+  navigationName,
+  tabNameKey,
+  groupNameKey,
+  useNavigationNames,
+  windowNameKey,
+} from "./store";
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(async (command, args) => {
     if (command === "navigation_names_update") {
@@ -28,7 +35,7 @@ it("retains names through automatic updates, navigation, Spaces, restoration and
     route: "/browser",
     instancePolicy: "multiple",
   });
-  const persisted = dockTabs(useWorkspaceStore.getState().layout.root).find(
+  const persisted = allLayoutViews(useWorkspaceStore.getState().layout).find(
     (t) => t.id === tab.id,
   )!;
   useNavigationNames.setState({
@@ -76,7 +83,7 @@ it("only prunes discarded restore aliases and keeps open group and sidebar alias
     route: "/browser",
     instancePolicy: "multiple",
   });
-  const group = dockTabs(useWorkspaceStore.getState().layout.root).find(
+  const group = allLayoutViews(useWorkspaceStore.getState().layout).find(
     (t) => t.id === open.id,
   )!.groupInstanceId!;
   useNavigationNames.setState({
@@ -95,4 +102,23 @@ it("only prunes discarded restore aliases and keeps open group and sidebar alias
     "section:browser": "Web",
   });
   expect(useWorkspaceStore.getState().closedTabs).toEqual([]);
+});
+
+it("keeps window names on reopen and clears only discarded window history", async () => {
+  const store = useWorkspaceStore.getState();
+  const openId = store.activeVirtualWindowId;
+  const closed = store.createVirtualWindow("Window 2");
+  useNavigationNames.setState({
+    names: {
+      [windowNameKey(openId)]: "Writing",
+      [windowNameKey(closed.id)]: "Research",
+      "window:expired": "Old window",
+    },
+  });
+  expect(store.closeVirtualWindow(closed.id)).toBe(true);
+  expect(store.reopenClosedVirtualWindow()?.id).toBe(closed.id);
+  expect(navigationName(windowNameKey(closed.id), closed.title)).toBe("Research");
+  expect(store.closeVirtualWindow(closed.id)).toBe(true);
+  await clearNavigationRestoreHistory();
+  expect(useNavigationNames.getState().names).toEqual({ [windowNameKey(openId)]: "Writing" });
 });

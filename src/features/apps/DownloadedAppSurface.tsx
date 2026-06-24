@@ -1,9 +1,8 @@
+import { Notification } from "@/shared/ui/notification";
+import { LoadingScreen } from "@/shared/ui/loading-screen";
 import { createPackagedTerminalBackend } from "./rpc/packagedTerminalBackend";
 import { supportsPackagedDocuments as supportsPackagedNativeServices } from "@/shared/platform/nativeServices";
 import { useAppsStore } from "./useAppsStore";
-import { createPortal } from "react-dom";
-import { FileWorkspaceSurface } from "./FileWorkspaceSurface";
-import { createFileWorkspaceMount, type FileWorkspaceRegistration } from "./rpc/fileWorkspace";
 import { createFileSystemRpc } from "./rpc/fileSystem";
 import { retainAppView } from "./appUpdateSafety";
 import { createCodeControlsRpc } from "./rpc/codeControls";
@@ -25,7 +24,6 @@ import { useAiSurfaceAdapter, type AiSurfaceAdapter } from "@/features/ai-surfac
 import { createAppUiRpc } from "./rpc/appUi";
 import { createAppUiBackend } from "./rpc/appUiBackend";
 import { useEffect, useRef, useState } from "react";
-import { LoaderCircle } from "lucide-react";
 import {
   isMistyCodeLspMethod,
   isMistyAppUiMethod,
@@ -99,6 +97,7 @@ export function DownloadedAppSurface(props: Props) {
     props.app.version,
     props.app.desktop.sha256,
     props.session.space_id,
+    props.session.authority_generation,
     props.tab?.id,
     [...props.session.scopes].sort(),
   ]);
@@ -116,8 +115,11 @@ function ComponentInstance(props: Props) {
   const theme = useAppThemeStore((state) => state.resolvedTheme);
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);
-  const [notice, setNotice] = useState("");
-  const [fileWorkspace, setFileWorkspace] = useState<FileWorkspaceRegistration | null>(null);
+  const [notice, setNotice] = useState<{
+    message: string;
+    tone: "neutral" | "success" | "error";
+    id: number;
+  } | null>(null);
   const [surface, setSurface] = useState<AiSurfaceAdapter | null>(null);
   useAiSurfaceAdapter(surface);
   const permissions = useNativeAppPermissions(props.app.name);
@@ -159,11 +161,9 @@ function ComponentInstance(props: Props) {
     scopeRef.current = scope;
     const installationAtMount = useAppsStore
       .getState()
-      .bySpace[props.session.space_id ?? ""]?.find((app) => app.app_id === props.app.id);
+      .installations.find((app) => app.app_id === props.app.id);
     const installationCurrent = () => {
-      const next = useAppsStore
-        .getState()
-        .bySpace[props.session.space_id ?? ""]?.find((app) => app.app_id === props.app.id);
+      const next = useAppsStore.getState().installations.find((app) => app.app_id === props.app.id);
       return (
         !!installationAtMount &&
         next?.state === "installed" &&
@@ -269,10 +269,13 @@ function ComponentInstance(props: Props) {
     const filesHost = createFilesHostRpc(
       scope,
       createFilesHostBackend(scope, {
-        peer: props.app.id === "files" && supportsPackagedNativeServices() ? {
-          installedVersion: props.app.version,
-          authorityGeneration: props.session.authority_generation ?? 0,
-        } : undefined,
+        peer:
+          props.app.id === "files" && supportsPackagedNativeServices()
+            ? {
+                installedVersion: props.app.version,
+                authorityGeneration: props.session.authority_generation ?? 0,
+              }
+            : undefined,
         serverBase: props.serverBase,
         instance: deviceInstance,
         native: executeDevice,
@@ -327,7 +330,10 @@ function ComponentInstance(props: Props) {
     );
     const fileSystem = createFileSystemRpc(scope, nativeRpcBackend.invoke);
     const transport = {
-      mountFileWorkspace: createFileWorkspaceMount(scope, root, setFileWorkspace),
+      // Older Files packages must update; the host no longer contains their UI.
+      mountFileWorkspace: async () => {
+        throw new Error("Update the Files app from Discover to open this workspace.");
+      },
       registerSurface: surfaces.register,
       async request(message: { method: string; params?: unknown }) {
         scope.assert();
@@ -384,7 +390,7 @@ function ComponentInstance(props: Props) {
             signal: scope.signal,
             navigate: now.onNavigate,
             setNavigationItems: navigation.setItems,
-            showToast: (message) => setNotice(message),
+            showToast: (message, tone) => setNotice({ message, tone, id: Date.now() }),
           },
           message.method,
           message.params,
@@ -492,10 +498,7 @@ function ComponentInstance(props: Props) {
     <div className="relative h-full min-h-0" data-misty-component-app={props.app.id}>
       <div ref={container} className="h-full min-h-0" />
       {!ready && !error ? (
-        <div className="absolute inset-0 grid place-items-center" role="status">
-          <LoaderCircle size={22} className="animate-spin text-cream-muted" />
-          <span className="sr-only">Opening {props.app.name}</span>
-        </div>
+        <LoadingScreen className="absolute inset-0" label={`Opening ${props.app.name}`} />
       ) : null}
       {error ? (
         <div
@@ -505,29 +508,18 @@ function ComponentInstance(props: Props) {
           {error}
         </div>
       ) : null}
-      {notice ? <div role="status">{notice}</div> : null}
-      {fileWorkspace
-        ? createPortal(
-            <FileWorkspaceSurface
-              tab={
-                props.tab ?? {
-                  id: instanceId,
-                  surfaceId: "official-app",
-                  groupKey: "app:files",
-                  instanceKey: "files",
-                  title: "Explorer",
-                  route: props.route,
-                  sidebarVisible: true,
-                  state: null,
-                  createdAt: 0,
-                  lastFocusedAt: 0,
-                }
-              }
-              options={fileWorkspace.options}
-            />,
-            fileWorkspace.root,
-          )
-        : null}
+      {notice ? (
+        <Notification
+          key={notice.id}
+          title={props.app.name}
+          tone={notice.tone}
+          active={props.active !== false}
+          duration={notice.tone === "error" ? 0 : 6000}
+          onDismiss={() => setNotice(null)}
+        >
+          {notice.message}
+        </Notification>
+      ) : null}
       {permissions.controls}
     </div>
   );

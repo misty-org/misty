@@ -5,12 +5,12 @@ import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
 import { workspaceSurfaceFromRoute } from "@/features/workspace/routeSurface";
 import { createAppRpcScope } from "./session";
 import { createAppUiBackend } from "./appUiBackend";
-import { popupBrowserProfile } from "@/features/browser/browserProviders";
+import { popupBrowserProfile } from "@/features/webviews/browserProviders";
 import { createBrowserRpcBackend, providerOAuthCallback } from "./browserBackend";
 import { useAppsStore } from "../useAppsStore";
 import { dockLeaves } from "@/features/workspace/dockTree";
-import { openBrowserPopup } from "@/features/browser/openBrowserPopup";
-import { browserRuntimeIdForTabId } from "@/features/browser/browserRuntime";
+import { openBrowserPopup } from "@/features/webviews/openBrowserPopup";
+import { browserRuntimeIdForTabId } from "@/features/webviews/browserRuntime";
 const invoke = vi.hoisted(() =>
   vi.fn<(command: string, args?: unknown) => Promise<unknown>>(async (command) =>
     command === "browser_webview_reconcile" ? true : undefined,
@@ -27,8 +27,9 @@ afterEach(async () => {
   document.body.innerHTML = "";
 });
 async function fixture(
-  appId: "browser" | "chat" | "inbox" | "journal" | "planner" = "browser",
+  appId: "browser" | "chat" | "inbox" | "journal" | "planner" | "library" | "music" | "media" = "browser",
   socialProvider: MistyBrowserProvider["id"] = "instagram",
+  initialUrl?: string,
 ) {
   vi.stubGlobal("crypto", webcrypto);
   vi.spyOn(navigator, "platform", "get").mockReturnValue("MacIntel");
@@ -53,24 +54,31 @@ async function fixture(
   const id = `sdk-${crypto.randomUUID()}`,
     scopeId = crypto.randomUUID();
   const providerId =
-    appId === "journal"
-      ? "google-docs"
-      : appId === "planner"
-        ? "jira"
-        : appId === "inbox"
-          ? socialProvider === "microsoft"
-            ? "microsoft"
-            : "google"
-          : socialProvider;
+    appId === "library"
+      ? "google-drive"
+      : appId === "journal"
+        ? "google-docs"
+        : appId === "planner"
+          ? "jira"
+          : appId === "inbox"
+            ? socialProvider === "microsoft"
+              ? "microsoft"
+              : "google"
+            : appId === "music"
+              ? "youtube-music"
+              : appId === "media"
+                ? "youtube"
+                : socialProvider;
   await backend.create({
     id,
     scopeId,
     url:
-      appId === "browser"
+      initialUrl ??
+      (appId === "browser"
         ? "https://example.com"
         : providerId === "jira"
           ? "https://team.atlassian.net/jira/your-work"
-          : mistyBrowserProviders[providerId].url,
+          : mistyBrowserProviders[providerId].url),
     ...(appId === "browser" ? {} : { provider: { id: providerId, accountId: "personal" } }),
     bounds: { x: 0, y: 50, width: 500, height: 300 },
     nativeLiveResize: false,
@@ -81,6 +89,49 @@ async function fixture(
   });
   return { backend, id, scopeId, scope, root };
 }
+it.each(["chat", "inbox", "journal", "planner", "library", "music", "media"] as const)(
+  "%s uses Browser navigation for landing pages and third-party sign-in without losing its profile",
+  async (appId) => {
+    const landing = "https://workspace.google.com/intl/en-US/gmail/";
+    const f = await fixture(appId, "instagram", landing);
+    const created = invoke.mock.calls.find(
+      ([command]) => command === "browser_webview_create",
+    )![1] as {
+      request: { id: string; profileId: string; providerId: string };
+    };
+    const destination = "https://tenant.identity.example/continue";
+    await f.backend.navigate(f.id, destination);
+    // A detached native view must restore the current external page, not the
+    // integration's landing URL, with the same isolated account profile.
+    invoke.mockResolvedValueOnce(false);
+    await f.backend.layout({
+      id: f.id,
+      visible: true,
+      bounds: { x: 0, y: 50, width: 499, height: 300 },
+      nativeLiveResize: false,
+    });
+    expect(invoke).toHaveBeenCalledWith("browser_webview_navigate", {
+      request: { id: created.request.id, url: destination },
+    });
+    const layouts = invoke.mock.calls.filter(([command]) => command === "browser_webview_create");
+    expect(layouts[layouts.length - 1][1]).toMatchObject({
+      request: {
+        id: created.request.id,
+        profileId: created.request.profileId,
+        providerId: created.request.providerId,
+        url: destination,
+      },
+    });
+    await expect(f.backend.request!(f.id, "/account")).rejects.toMatchObject({
+      code: "authentication_required",
+    });
+    expect(
+      dockLeaves(useWorkspaceStore.getState().layout.root)
+        .flatMap((pane) => pane.tabs)
+        .some((tab) => tab.groupKey === "app:browser"),
+    ).toBe(false);
+  },
+);
 it.each([
   ["microsoft", "https://login.microsoftonline.com/common/oauth2/authorize"],
   ["microsoft", "https://tenant.identity.example/sign-in"],
@@ -249,9 +300,13 @@ it("navigates Inbox consent in its existing native view with an exact deployment
       oauthCallback: { url: callback, state: "fixture" },
     },
   });
-  await expect(f.backend.navigate(f.id, "https://example.net/")).rejects.toThrow(
-    "outside the current provider",
-  );
+  await f.backend.navigate(f.id, "https://example.net/");
+  expect(invoke).toHaveBeenLastCalledWith("browser_webview_navigate", {
+    request: {
+      id: browserRuntimeIdForTabId(f.scope.identity.instanceId),
+      url: "https://example.net/",
+    },
+  });
 });
 it.each([
   "https://elsewhere.example/oauth/connections/google/callback",
@@ -384,3 +439,24 @@ it("dims an unfocused native pane without hiding or suspending the browser", asy
     expect.objectContaining({ strength: 0 }),
   );
 });
+
+it.each([
+  [0.8, 44, 440, 264],
+  [1, 55, 550, 330],
+  [1.2, 66, 660, 396],
+])(
+  "converts browser geometry at UI zoom %s using the actual render scale",
+  async (zoom, y, width, height) => {
+    const { getAppliedAppZoom, setAppZoom } = await import("@/shared/hooks/useAppZoom");
+    const previous = getAppliedAppZoom();
+    setAppZoom(zoom);
+    try {
+      await fixture("browser");
+      expect(invoke).toHaveBeenCalledWith("browser_webview_create", {
+        request: expect.objectContaining({ x: 0, y, width, height }),
+      });
+    } finally {
+      setAppZoom(previous);
+    }
+  },
+);

@@ -213,10 +213,10 @@ pub async fn mini_app_open(
     let (root, entry, query) = package_source(&request.source)?;
     let mut permissions = permissions::PermissionSet::load(&root, request.scope_limit.as_deref())?;
     permissions.native_owner = request.owner.clone();
-    permissions.space_owned = request
+    permissions.account_owned = request
         .owner
         .as_ref()
-        .is_some_and(|owner| owner.space_id.is_some());
+        .is_some_and(|owner| owner.deployment.is_some() && owner.authority_generation.is_some());
     permissions.owner_namespace = request
         .owner
         .as_ref()
@@ -330,10 +330,10 @@ pub fn mini_widget_open(
     }
     let mut permissions = permissions::PermissionSet::load(&root, request.scope_limit.as_deref())?;
     permissions.native_owner = request.owner.clone();
-    permissions.space_owned = request
+    permissions.account_owned = request
         .owner
         .as_ref()
-        .is_some_and(|owner| owner.space_id.is_some());
+        .is_some_and(|owner| owner.deployment.is_some() && owner.authority_generation.is_some());
     permissions.owner_namespace = request
         .owner
         .as_ref()

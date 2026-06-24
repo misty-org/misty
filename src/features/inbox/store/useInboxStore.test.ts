@@ -146,7 +146,7 @@ describe("Inbox store", () => {
 
     await useInboxStore.getState().load();
 
-    expect(useInboxStore.getState().accounts[0]?.status).toBeUndefined();
+    expect(useInboxStore.getState().accounts[0]?.status).toBe("needs_attention");
     expect(useInboxStore.getState().accountErrorCodes.good).toBe(
       "mail_provider_authorization_failed",
     );

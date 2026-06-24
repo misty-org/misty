@@ -1,3 +1,4 @@
+import { openActivityPanel } from "@/features/activity/activityPanelState";
 import type { AppTab } from "@/features/app-shell";
 import { useAppStore } from "@/features/app-shell";
 import { ActivityBridge, useActivityStore } from "@/features/activity";
@@ -41,7 +42,7 @@ import { MobileNotificationBridge } from "./MobileNotificationBridge";
 // The bridge is a platform host service, not App UI. Browser App commands will
 // move behind a dedicated SDK capability as the compatibility package migrates.
 const LazyBrowserRuntimeBridge = lazy(() =>
-  import("@/features/browser/BrowserRuntimeBridge").then((module) => ({
+  import("@/features/webviews/BrowserRuntimeBridge").then((module) => ({
     default: module.BrowserRuntimeBridge,
   })),
 );
@@ -74,6 +75,7 @@ export function MobileLayout(props: { getRouteId: (pathname: string) => AppTab }
     [activeScopeKey, virtualWindowsByScope],
   );
   const activeVirtualWindowId = useWorkspaceStore((state) => state.activeVirtualWindowId);
+  const hasUnseenHistory = useActivityStore((state) => state.hasUnseenHistory);
   const attentionCount = useActivityStore((state) => state.attentionCount);
   const loadApp = useAppStore((state) => state.loadApp);
   const loadSettings = useSettingsStore((state) => state.load);
@@ -182,6 +184,10 @@ export function MobileLayout(props: { getRouteId: (pathname: string) => AppTab }
 
   const openPath = useCallback(
     (path: string) => {
+      if (path === "/activity") {
+        openActivityPanel();
+        return;
+      }
       if (path === "/settings") {
         setSettingsOpen(true);
         return;
@@ -335,6 +341,7 @@ export function MobileLayout(props: { getRouteId: (pathname: string) => AppTab }
                   standalone ? standaloneTitle(location.pathname) : activeTab?.title || "Misty"
                 }
                 attentionCount={attentionCount}
+                hasUnseenHistory={hasUnseenHistory}
                 tabCount={projections.length}
                 onBack={() => navigate(-1)}
                 onActivity={() => openPath("/activity")}

@@ -56,6 +56,11 @@
 
   --color-cream: var(--misty-theme-text);
   --color-cream-bright: var(--misty-theme-text-bright);
+  --color-cream-action-hover: color-mix(
+    in srgb,
+    var(--misty-theme-text-bright) 85%,
+    var(--misty-theme-bg)
+  );
   --color-cream-muted: var(--misty-theme-text-muted);
   --color-notification-red: var(--misty-theme-danger);
 

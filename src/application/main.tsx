@@ -42,6 +42,11 @@ const root = ReactDOM.createRoot(document.getElementById("root") as HTMLElement)
 export const startup = bootstrap();
 
 async function bootstrap() {
+  if(new URLSearchParams(location.search).has("agent_worker") && hasTauriInternals()){
+    const [{AgentWorkerRoot}]=await Promise.all([import("@/features/agents/AgentWorkerRoot"),import("@/styles/styles.css")]);
+    root.render(<TelemetryErrorBoundary><AgentWorkerRoot/></TelemetryErrorBoundary>);
+    return;
+  }
   const desktopSurface = mistyDesktopSurface();
   if (desktopSurface === "pet") {
     const { bootstrapDemoSession } = await import("@/features/auth");
