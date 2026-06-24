@@ -8,13 +8,15 @@ use crate::services::{
     explorer_library::ExplorerLibraryService, file_sync::FileSyncService,
     operation_queue::OperationQueueService, plugin_commands::PluginCommandService,
     providers::ProviderService, proxy::ProxyService, proxy_clipboard::ProxyClipboardClient,
-    settings::SettingsService, transfers::TransferService, workspaces::WorkspaceService,
+    proxy_runtime::ProxyRuntimeService, settings::SettingsService, transfers::TransferService,
+    workspaces::WorkspaceService,
 };
 
 pub struct MistyRuntime {
     pub environment: AppEnvironmentService,
     pub clipboard: Arc<ClipboardService>,
     pub proxy_clipboard: Arc<ProxyClipboardClient>,
+    pub proxy_runtime: ProxyRuntimeService,
     pub proxy: ProxyService,
     pub providers: ProviderService,
     pub transfers: TransferService,
@@ -34,8 +36,12 @@ pub struct MistyRuntime {
 impl MistyRuntime {
     pub fn new() -> Self {
         let environment = AppEnvironmentService::new();
+        let proxy_runtime = ProxyRuntimeService::start(&environment);
+        let proxy_url = proxy_runtime
+            .proxy_url()
+            .or_else(|| environment.proxy_url());
         let proxy_clipboard = ProxyClipboardClient::new(
-            environment.proxy_url(),
+            proxy_url.clone(),
             "local".to_owned(),
             "This Misty".to_owned(),
         );
@@ -43,7 +49,7 @@ impl MistyRuntime {
         let clipboard = ClipboardService::new(None, Some(shared_clipboard_client));
         clipboard.set_device_identity("local".to_owned(), "This Misty".to_owned());
         proxy_clipboard.start(clipboard.clone());
-        let proxy = ProxyService::new(environment.clone());
+        let proxy = ProxyService::new_with_proxy_url(environment.clone(), proxy_url);
         let providers = ProviderService::new(proxy.clone());
         let transfers = TransferService::new(environment.clone());
         let sync_pairs = FileSyncPairStore::new(environment.misty_db_path());
@@ -73,6 +79,7 @@ impl MistyRuntime {
             environment,
             clipboard,
             proxy_clipboard,
+            proxy_runtime,
             proxy,
             providers,
             transfers,

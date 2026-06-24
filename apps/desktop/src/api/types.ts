@@ -4,6 +4,7 @@ export interface AppSnapshot {
   appName: string;
   migrationStage: string;
   proxyUrl: string | null;
+  proxyRuntime: ProxyRuntimeSnapshot;
   environment: AppEnvironmentSnapshot;
 }
 
@@ -33,6 +34,15 @@ export interface ProxySnapshot {
   proxyUrl: string | null;
   ready: boolean;
   statusCode: number | null;
+  error: string | null;
+}
+
+export type ProxyRuntimeMode = "external" | "spawn" | "embedded" | "disabled";
+
+export interface ProxyRuntimeSnapshot {
+  mode: ProxyRuntimeMode;
+  proxyUrl: string | null;
+  ready: boolean;
   error: string | null;
 }
 

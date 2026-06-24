@@ -37,6 +37,7 @@ use crate::services::providers::{
     RemoteEditDraft, RemoteTestResult, SaveRemoteRequest,
 };
 use crate::services::proxy::ProxySnapshot;
+use crate::services::proxy_runtime::ProxyRuntimeSnapshot;
 use crate::services::settings::{OpenWithAssociation, SaveSettingsRequest, SettingsSnapshot};
 use crate::services::transfers::{TransferFilter, TransferPage};
 
@@ -46,6 +47,7 @@ pub struct AppSnapshot {
     app_name: &'static str,
     migration_stage: &'static str,
     proxy_url: Option<String>,
+    proxy_runtime: ProxyRuntimeSnapshot,
     environment: AppEnvironmentSnapshot,
 }
 
@@ -61,6 +63,7 @@ pub async fn app_snapshot(state: State<'_, MistyRuntime>) -> ApiResult<AppSnapsh
         app_name: "Misty",
         migration_stage: "Tauri migration shell",
         proxy_url: state.proxy.proxy_url(),
+        proxy_runtime: state.proxy_runtime.snapshot(),
         environment: state.environment.snapshot(),
     })
 }

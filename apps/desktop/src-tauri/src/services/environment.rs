@@ -8,6 +8,8 @@ use std::{
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::services::paths;
+
 #[derive(Clone)]
 pub struct AppEnvironmentService {
     inner: Arc<AppEnvironment>,
@@ -88,6 +90,10 @@ impl AppEnvironmentService {
 
     pub fn proxy_url(&self) -> Option<String> {
         self.inner.proxy_url.clone()
+    }
+
+    pub fn misty_config_path(&self) -> PathBuf {
+        self.inner.misty_config_path.clone()
     }
 
     pub fn misty_db_path(&self) -> PathBuf {
@@ -302,9 +308,7 @@ fn settings_advanced_string(path: &Path, key: &str) -> Option<String> {
 }
 
 fn resolve_home_dir() -> Option<PathBuf> {
-    env::var_os("HOME")
-        .or_else(|| env::var_os("USERPROFILE"))
-        .map(PathBuf::from)
+    paths::misty_data_root()
 }
 
 fn display_path(path: &Path) -> String {

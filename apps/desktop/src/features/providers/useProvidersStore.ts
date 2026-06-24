@@ -19,7 +19,7 @@ import type {
   RemoteEditDraft,
 } from "../../api/types";
 import { errorText } from "../../shared/format";
-import { openSystemExternalLink } from "../../shared/openExternalLink";
+import { openProviderAuthorizationLink } from "../../shared/openExternalLink";
 import {
   configPriority,
   providerOptionsForConnection,
@@ -642,7 +642,7 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
         && step.authorizeUrl !== current.openedAuthorizeUrl;
       if (shouldOpenAuthorizeUrl) {
         try {
-          await openSystemExternalLink(step.authorizeUrl);
+          await openProviderAuthorizationLink(step.authorizeUrl);
           next.openedAuthorizeUrl = step.authorizeUrl;
         } catch (error) {
           next.error = `Could not open browser sign-in: ${errorText(error)}`;
@@ -698,7 +698,7 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
       return;
     }
     try {
-      await openSystemExternalLink(authorizeUrl);
+      await openProviderAuthorizationLink(authorizeUrl);
       const current = get().connection;
       if (!current || current.step?.authorizeUrl !== authorizeUrl) return;
       set({
