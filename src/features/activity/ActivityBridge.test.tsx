@@ -38,6 +38,7 @@ describe("ActivityBridge", () => {
     ).IS_REACT_ACT_ENVIRONMENT = true;
     localStorage.clear();
     useActivityStore.persist.clearStorage();
+    useActivityStore.setState(useActivityStore.getInitialState(), true);
     useActivityStore.setState({
       accountId: "account-1",
       sourceItems: [],
@@ -53,6 +54,7 @@ describe("ActivityBridge", () => {
       error: null,
     });
     useSpacesStore.setState({
+      inboxError: null,
       inbox: { unreads: [], mentions: [] },
       invitations: [],
       loadInbox: vi.fn(async () => undefined),
@@ -67,6 +69,41 @@ describe("ActivityBridge", () => {
     container.remove();
   });
 
+  it("loads independent requests when the Spaces inbox is unavailable", async () => {
+    useSpacesStore.setState({
+      loadInbox: vi.fn(async () => {
+        useSpacesStore.setState({ inboxError: "Offline" });
+      }),
+    });
+    vi.mocked(agentInterventionsApi.list).mockResolvedValue({
+      waits: [
+        {
+          id: "offline-request",
+          runId: "run",
+          scopeId: "scope",
+          deviceId: "device",
+          targetLabel: "Browser",
+          action: "sign_in",
+          reason: "",
+          state: "pending",
+          expiresAt: "2099-01-01T00:00:00Z",
+        },
+      ],
+    });
+    await act(async () => {
+      root.render(
+        <MemoryRouter>
+          <ActivityBridge />
+        </MemoryRouter>,
+      );
+    });
+    expect(
+      useActivityStore
+        .getState()
+        .attentionItems.some((item) => item.sourceId === "offline-request"),
+    ).toBe(true);
+    vi.mocked(agentInterventionsApi.list).mockResolvedValue({ waits: [] });
+  });
   it("adds browser requests to global attention without opening Activity or notifying twice", async () => {
     await act(async () => {
       root.render(
@@ -109,7 +146,7 @@ describe("ActivityBridge", () => {
     ).toBe(false);
   });
 
-  it("renders no centralized UI and clears an update on its owning page", async () => {
+  it("renders no centralized UI and does not read items from broad route visits", async () => {
     useActivityStore.getState().ingestLocal({
       id: "file-error",
       kind: "failure",
@@ -128,6 +165,6 @@ describe("ActivityBridge", () => {
     });
 
     expect(container.childElementCount).toBe(0);
-    expect(useActivityStore.getState().allItems[0]?.readAt).toBeTruthy();
+    expect(useActivityStore.getState().allItems[0]?.readAt).toBeUndefined();
   });
 });

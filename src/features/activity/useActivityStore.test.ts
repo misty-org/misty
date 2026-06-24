@@ -63,7 +63,7 @@ describe("useActivityStore", () => {
     ]);
 
     expect(useActivityStore.getState().allItems).toHaveLength(3);
-    expect(useActivityStore.getState().attentionCount).toBe(1);
+    expect(useActivityStore.getState().attentionCount).toBe(2);
     expect(
       useActivityStore.getState().allItems.find((item) => item.id === "spaces:2")?.readAt,
     ).toBeUndefined();

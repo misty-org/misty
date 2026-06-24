@@ -39,8 +39,8 @@ export function paneIdInDirection(
 }
 
 export function paneBoundsFromDocument(): PaneBounds[] {
-  return Array.from(document.querySelectorAll<HTMLElement>("[data-workspace-pane]")).map(
-    (element) => {
+  return Array.from(document.querySelectorAll<HTMLElement>("[data-workspace-pane]"))
+    .map((element) => {
       const bounds = element.getBoundingClientRect();
       return {
         id: element.dataset.workspacePane ?? "",
@@ -49,8 +49,8 @@ export function paneBoundsFromDocument(): PaneBounds[] {
         width: bounds.width,
         height: bounds.height,
       };
-    },
-  );
+    })
+    .filter((pane) => pane.width > 0 && pane.height > 0);
 }
 
 function center(bounds: PaneBounds) {

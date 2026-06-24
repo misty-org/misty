@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { dockTabs } from "./dockTree";
+import { allLayoutViews } from "./layoutTabs";
 import { useWorkspaceStore } from "./useWorkspaceStore";
 
 describe("useWorkspaceStore - space scoping", () => {
@@ -21,7 +21,7 @@ describe("useWorkspaceStore - space scoping", () => {
     });
     const spaceATab2 = store.openBrowserTab({ url: "https://example-a.com" });
 
-    expect(dockTabs(useWorkspaceStore.getState().layout.root).map((t) => t.id)).toEqual([
+    expect(allLayoutViews(useWorkspaceStore.getState().layout).map((t) => t.id)).toEqual([
       spaceATab1.id,
       spaceATab2.id,
     ]);
@@ -35,28 +35,28 @@ describe("useWorkspaceStore - space scoping", () => {
       route: "/spaces/space-b/planner",
       scopeKey: "space:space-b",
     });
-    const spaceBTab2 = useWorkspaceStore.getState().openSurface({
+    const spaceBTab2 = useWorkspaceStore.getState().addSurface({
       surfaceId: "terminal",
       groupKey: "tool:terminal",
       title: "Terminal",
       route: "/terminal",
     });
 
-    expect(dockTabs(useWorkspaceStore.getState().layout.root).map((t) => t.id)).toEqual([
+    expect(allLayoutViews(useWorkspaceStore.getState().layout).map((t) => t.id)).toEqual([
       spaceBTab1.id,
       spaceBTab2.id,
     ]);
 
     // 3. Switch back to Space A - Space A's tabs are restored
     useWorkspaceStore.getState().setScope("space:space-a");
-    expect(dockTabs(useWorkspaceStore.getState().layout.root).map((t) => t.id)).toEqual([
+    expect(allLayoutViews(useWorkspaceStore.getState().layout).map((t) => t.id)).toEqual([
       spaceATab1.id,
       spaceATab2.id,
     ]);
 
     // 4. Switch back to Space B - Space B's tabs are restored
     useWorkspaceStore.getState().setScope("space:space-b");
-    expect(dockTabs(useWorkspaceStore.getState().layout.root).map((t) => t.id)).toEqual([
+    expect(allLayoutViews(useWorkspaceStore.getState().layout).map((t) => t.id)).toEqual([
       spaceBTab1.id,
       spaceBTab2.id,
     ]);
@@ -67,20 +67,20 @@ describe("useWorkspaceStore - space scoping", () => {
 
     // 1. Space A has only an Inbox tab
     store.setScope("space:space-a");
-    const inboxTab = store.openSurface({
+    const inboxTab = store.addSurface({
       surfaceId: "inbox",
       groupKey: "tool:inbox",
       title: "Inbox",
       route: "/inbox",
     });
-    expect(dockTabs(useWorkspaceStore.getState().layout.root).map((t) => t.surfaceId)).toEqual([
+    expect(allLayoutViews(useWorkspaceStore.getState().layout).map((t) => t.surfaceId)).toEqual([
       "space",
       "inbox",
     ]);
 
     // 2. Switch to Space B and open Journal
     useWorkspaceStore.getState().setScope("space:space-b");
-    useWorkspaceStore.getState().openSurface({
+    useWorkspaceStore.getState().addSurface({
       surfaceId: "space",
       groupKey: "space:space-b:journal",
       title: "Journal",
@@ -90,7 +90,7 @@ describe("useWorkspaceStore - space scoping", () => {
 
     // 3. Switch back to Space A
     useWorkspaceStore.getState().setScope("space:space-a");
-    const tabsInA = dockTabs(useWorkspaceStore.getState().layout.root);
+    const tabsInA = allLayoutViews(useWorkspaceStore.getState().layout);
     expect(tabsInA.map((t) => t.surfaceId)).toEqual(["space", "inbox"]);
     expect(tabsInA.find((tab) => tab.surfaceId === "inbox")?.id).toBe(inboxTab.id);
   });

@@ -1,10 +1,12 @@
-import { createDockLeaf, dockLeaves, findDockLeaf, mapDockLeaf } from "./dockTree";
+import { createDockLeaf, dockLeaves, findDockLeaf, insertDockSplit } from "./dockTree";
 import {
   maxWorkspacePanels,
   type DockSplitDirection,
   type WorkspaceDockNode,
   type WorkspaceLayout,
+  type WorkspaceLayoutTab,
   type WorkspaceTab,
+  type WorkspacePane,
 } from "./model";
 
 export interface ClosedPanelPlacement {
@@ -15,6 +17,9 @@ export interface ClosedPanelPlacement {
 }
 
 export interface ClosedWorkspaceTab {
+  layoutTab?: WorkspaceLayoutTab;
+  layoutTabId?: string;
+  pane?: WorkspacePane;
   tab: WorkspaceTab;
   windowId: string;
   paneId: string;
@@ -33,6 +38,7 @@ export function rememberClosedWorkspaceTab(
     tab,
     windowId,
     paneId: pane?.id ?? "",
+    pane,
     panelPlacement:
       pane?.tabs.length === 1 ? findClosedPanelPlacement(layout.root, pane.id) : undefined,
   };
@@ -43,35 +49,25 @@ export function restoreClosedWorkspaceTab(
   closed: ClosedWorkspaceTab,
   tab: WorkspaceTab,
 ): WorkspaceLayout {
-  if (closed.paneId && findDockLeaf(layout.root, closed.paneId)) {
-    return {
-      ...layout,
-      focusedPaneId: closed.paneId,
-      root: mapDockLeaf(layout.root, closed.paneId, (pane) => ({
-        ...pane,
-        activeTabId: tab.id,
-        tabs: [...pane.tabs, tab],
-      })),
-    };
-  }
-
   const placement = closed.panelPlacement;
   if (placement && dockLeaves(layout.root).length < maxWorkspacePanels) {
-    const pane = createDockLeaf([tab]);
+    const pane = closed.pane
+      ? { ...closed.pane, tabs: [tab], activeTabId: tab.id }
+      : createDockLeaf([tab]);
     if (closed.paneId) pane.id = closed.paneId;
     const root = restorePanelAtAnchor(layout.root, placement, pane);
     if (root !== layout.root) return { root, focusedPaneId: pane.id };
   }
 
-  const pane = findDockLeaf(layout.root, layout.focusedPaneId) ?? dockLeaves(layout.root)[0];
+  const anchor = findDockLeaf(layout.root, layout.focusedPaneId) ?? dockLeaves(layout.root)[0];
+  const pane = closed.pane
+    ? { ...closed.pane, tabs: [tab], activeTabId: tab.id }
+    : createDockLeaf([tab]);
+  if (closed.paneId && !findDockLeaf(layout.root, closed.paneId)) pane.id = closed.paneId;
   return {
     ...layout,
+    root: insertDockSplit(layout.root, anchor.id, pane, "right"),
     focusedPaneId: pane.id,
-    root: mapDockLeaf(layout.root, pane.id, (candidate) => ({
-      ...candidate,
-      activeTabId: tab.id,
-      tabs: [...candidate.tabs, tab],
-    })),
   };
 }
 
