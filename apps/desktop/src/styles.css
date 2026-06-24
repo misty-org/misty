@@ -8065,6 +8065,32 @@ input {
   margin-top: 4px;
 }
 
+.mobile-provider-auth-debug {
+  width: 100%;
+  min-width: 0;
+  margin-top: 6px;
+  text-align: left;
+}
+
+.mobile-provider-auth-debug .mobile-debug-event {
+  width: 100%;
+}
+
+.mobile-debug-copy {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid rgba(220, 232, 255, 0.12);
+  border-radius: 10px;
+  background: #101720;
+  color: #eef3fb;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 720;
+}
+
 .mobile-empty-icon.success {
   color: #9ee6b2;
   background: rgba(121, 217, 154, 0.1);

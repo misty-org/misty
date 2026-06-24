@@ -19,7 +19,10 @@ import type {
   RemoteEditDraft,
 } from "../../api/types";
 import { errorText } from "../../shared/format";
-import { openProviderAuthorizationLink } from "../../shared/openExternalLink";
+import {
+  openProviderAuthorizationLink,
+  type ProviderAuthorizationOpenResult,
+} from "../../shared/openExternalLink";
 import {
   configPriority,
   providerOptionsForConnection,
@@ -41,6 +44,9 @@ export interface ProviderConnectionSession {
   inFlight: boolean;
   polling: boolean;
   openedAuthorizeUrl: string | null;
+  authorizeOpenAttempts: number;
+  authorizeOpenResult: ProviderAuthorizationOpenResult | null;
+  authorizeOpenError: string | null;
   authPollAttempts: number;
   error: string | null;
 }
@@ -642,10 +648,16 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
         && step.authorizeUrl !== current.openedAuthorizeUrl;
       if (shouldOpenAuthorizeUrl) {
         try {
-          await openProviderAuthorizationLink(step.authorizeUrl);
+          const openResult = await openProviderAuthorizationLink(step.authorizeUrl);
           next.openedAuthorizeUrl = step.authorizeUrl;
+          next.authorizeOpenAttempts = current.authorizeOpenAttempts + 1;
+          next.authorizeOpenResult = openResult;
+          next.authorizeOpenError = null;
         } catch (error) {
-          next.error = `Could not open browser sign-in: ${errorText(error)}`;
+          const message = errorText(error);
+          next.authorizeOpenAttempts = current.authorizeOpenAttempts + 1;
+          next.authorizeOpenError = message;
+          next.error = `Could not open browser sign-in: ${message}`;
         }
       }
       set({ connection: next });
@@ -698,13 +710,16 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
       return;
     }
     try {
-      await openProviderAuthorizationLink(authorizeUrl);
+      const openResult = await openProviderAuthorizationLink(authorizeUrl);
       const current = get().connection;
       if (!current || current.step?.authorizeUrl !== authorizeUrl) return;
       set({
         connection: {
           ...current,
           openedAuthorizeUrl: authorizeUrl,
+          authorizeOpenAttempts: current.authorizeOpenAttempts + 1,
+          authorizeOpenResult: openResult,
+          authorizeOpenError: null,
           error: null,
         },
       });
@@ -714,6 +729,8 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
       set({
         connection: {
           ...current,
+          authorizeOpenAttempts: current.authorizeOpenAttempts + 1,
+          authorizeOpenError: errorText(error),
           error: `Could not open browser sign-in: ${errorText(error)}`,
         },
       });
@@ -904,6 +921,9 @@ function createConnectionSession(mode: ProviderConfigMode, remote?: ProviderRemo
     inFlight: false,
     polling: false,
     openedAuthorizeUrl: null,
+    authorizeOpenAttempts: 0,
+    authorizeOpenResult: null,
+    authorizeOpenError: null,
     authPollAttempts: 0,
     error: null,
   };
