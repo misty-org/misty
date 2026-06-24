@@ -1,13 +1,16 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { DesktopAppShell } from "./DesktopAppShell";
 import { MobileAppShell } from "./MobileAppShell";
 import { WelcomeOnboarding } from "../features/onboarding/WelcomeOnboarding";
 import { useSetupStore } from "../features/hub/store/useSetupStore";
 import type { CurrentLicense, CurrentUser } from "../features/hub/types/setup";
+import { installMistyDeepLinkHandler } from "./deepLinks";
 import { detectAppFormFactor, subscribeAppFormFactor, type AppFormFactor } from "./platform";
 
 export function AppShell() {
+  const navigate = useNavigate();
   const [formFactor, setFormFactor] = useState<AppFormFactor>(() => detectAppFormFactor());
   const setupLoadStarted = useRef(false);
   const {
@@ -23,6 +26,8 @@ export function AppShell() {
   })));
 
   useEffect(() => subscribeAppFormFactor(setFormFactor), []);
+
+  useEffect(() => installMistyDeepLinkHandler(formFactor, navigate), [formFactor, navigate]);
 
   useEffect(() => {
     const root = document.documentElement;

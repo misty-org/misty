@@ -47,5 +47,16 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>misty</string>
+			</array>
+			<key>CFBundleURLName</key>
+			<string>misty</string>
+		</dict>
+	</array>
 </dict>
 </plist>

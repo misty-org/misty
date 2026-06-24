@@ -3,6 +3,13 @@ import { platform } from "@tauri-apps/plugin-os";
 import { selectGeneralPreferences, useSettingsStore } from "../features/settings/useSettingsStore";
 import type { MouseEvent } from "react";
 
+export interface ProviderAuthorizationOpenResult {
+  strategy: "in-app-browser" | "system-browser" | "window-open";
+  platform: string;
+  attemptedAt: number;
+  fallbackReason?: string;
+}
+
 export async function openExternalLink(url: string): Promise<void> {
   const href = url.trim();
   if (!href) return;
@@ -37,21 +44,58 @@ export async function openSystemExternalLink(url: string): Promise<void> {
   window.open(href, "_blank", "noopener,noreferrer");
 }
 
-export async function openProviderAuthorizationLink(url: string): Promise<void> {
+export async function openProviderAuthorizationLink(url: string): Promise<ProviderAuthorizationOpenResult> {
   const href = url.trim();
-  if (!href) return;
+  const attemptedAt = Date.now();
+  if (!href) {
+    throw new Error("Provider authorization URL is empty.");
+  }
 
-  if (isNativeMobilePlatform()) {
+  const currentPlatform = nativePlatform();
+  if (currentPlatform === "ios" || currentPlatform === "android") {
     try {
       await openUrl(href, "inAppBrowser");
-      return;
-    } catch {
-      await openSystemExternalLink(href);
-      return;
+      return {
+        strategy: "in-app-browser",
+        platform: currentPlatform,
+        attemptedAt,
+      };
+    } catch (error) {
+      try {
+        await openNativeUrl(href);
+        return {
+          strategy: "system-browser",
+          platform: currentPlatform,
+          attemptedAt,
+          fallbackReason: errorTextForOpen(error),
+        };
+      } catch (fallbackError) {
+        if (hasTauriInternals()) {
+          throw new Error(
+            `inAppBrowser failed: ${errorTextForOpen(error)}; system browser failed: ${errorTextForOpen(fallbackError)}`,
+          );
+        }
+        window.open(href, "_blank", "noopener,noreferrer");
+        return {
+          strategy: "window-open",
+          platform: currentPlatform,
+          attemptedAt,
+          fallbackReason: `${errorTextForOpen(error)}; ${errorTextForOpen(fallbackError)}`,
+        };
+      }
     }
   }
 
-  await openSystemExternalLink(href);
+  try {
+    await openSystemExternalLink(href);
+    return {
+      strategy: "system-browser",
+      platform: currentPlatform,
+      attemptedAt,
+    };
+  } catch (error) {
+    throw new Error(`system browser failed: ${errorTextForOpen(error)}`);
+  }
 }
 
 export function handleExternalLinkClick(url: string): (event: MouseEvent<HTMLAnchorElement>) => void {
@@ -69,12 +113,11 @@ async function openNativeUrl(url: string): Promise<void> {
   await openUrl(url);
 }
 
-function isNativeMobilePlatform(): boolean {
+function nativePlatform(): string {
   try {
-    const currentPlatform = platform();
-    return currentPlatform === "ios" || currentPlatform === "android";
+    return platform();
   } catch {
-    return false;
+    return "browser";
   }
 }
 
@@ -83,4 +126,14 @@ function hasTauriInternals(): boolean {
     __TAURI_INTERNALS__?: { invoke?: unknown };
   }).__TAURI_INTERNALS__;
   return typeof internals?.invoke === "function";
+}
+
+function errorTextForOpen(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
 }

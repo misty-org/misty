@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   ChevronRight,
   Cloud,
+  Copy,
   ExternalLink,
   FolderPlus,
   PlugZap,
@@ -12,7 +13,8 @@ import {
   Wrench,
   X,
 } from "lucide-react";
-import { useEffect } from "react";
+import { writeText } from "@tauri-apps/plugin-clipboard-manager";
+import { useEffect, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import type { ProviderRemote, ProviderWorkflow, ProviderWorkflowOption } from "../../../api/types";
 import { providerIconForType } from "../../../shared/assets/icons";
@@ -446,6 +448,28 @@ function ProviderAuthorizeState(props: {
   session: ProviderConnectionSession;
   onOpenAuthorize: () => void;
 }) {
+  const authorizeUrl = props.session.step?.authorizeUrl ?? "";
+  const [copyStatus, setCopyStatus] = useState<string | null>(null);
+
+  async function copyAuthorizeUrl() {
+    if (!authorizeUrl) return;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(authorizeUrl);
+      } else {
+        await writeText(authorizeUrl);
+      }
+      setCopyStatus("Copied");
+    } catch {
+      try {
+        await writeText(authorizeUrl);
+        setCopyStatus("Copied");
+      } catch {
+        setCopyStatus("Copy failed");
+      }
+    }
+  }
+
   return (
     <div className="mobile-provider-authorize">
       <div className="mobile-empty-icon">
@@ -463,8 +487,41 @@ function ProviderAuthorizeState(props: {
           <ExternalLink size={16} /> {props.session.openedAuthorizeUrl ? "Reopen sign in" : "Open sign in"}
         </button>
       ) : null}
+      <div className="mobile-provider-auth-debug">
+        <div className="mobile-debug-event">
+          <strong>Provider auth debug</strong>
+          <p>Attempts: {props.session.authorizeOpenAttempts}</p>
+          <p>URL: {authorizeUrl ? "present" : "missing"}</p>
+          {props.session.authorizeOpenResult ? (
+            <>
+              <p>Platform: {props.session.authorizeOpenResult.platform}</p>
+              <p>Opened with: {props.session.authorizeOpenResult.strategy}</p>
+              <time>{formatDebugTime(props.session.authorizeOpenResult.attemptedAt)}</time>
+              {props.session.authorizeOpenResult.fallbackReason ? (
+                <code>{props.session.authorizeOpenResult.fallbackReason}</code>
+              ) : null}
+            </>
+          ) : null}
+          {props.session.authorizeOpenError ? <code>{props.session.authorizeOpenError}</code> : null}
+          {authorizeUrl ? <code>{authorizeUrl}</code> : null}
+          {authorizeUrl ? (
+            <button type="button" className="mobile-debug-copy" onClick={() => void copyAuthorizeUrl()}>
+              <Copy size={14} /> {copyStatus ?? "Copy URL"}
+            </button>
+          ) : null}
+        </div>
+      </div>
     </div>
   );
+}
+
+function formatDebugTime(value: number): string {
+  if (!value) return "";
+  return new Date(value).toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+  });
 }
 
 function MobileProviderProgress(props: { session: ProviderConnectionSession }) {
