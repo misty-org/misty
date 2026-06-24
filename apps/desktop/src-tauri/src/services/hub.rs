@@ -21,6 +21,8 @@ use std::{
 use uuid::Uuid;
 use zip::ZipArchive;
 
+use crate::services::paths;
+
 #[derive(Debug, Serialize)]
 pub struct NativeSystemInfo {
     os: String,
@@ -1945,9 +1947,7 @@ fn current_license() -> Result<Option<CurrentLicense>, String> {
 }
 
 fn misty_home_dir() -> Result<PathBuf, String> {
-    dirs::home_dir()
-        .map(|home| home.join(".misty"))
-        .ok_or_else(|| "Could not resolve home directory".to_string())
+    paths::misty_home_dir().ok_or_else(|| "Could not resolve Misty data directory".to_string())
 }
 
 fn misty_logs_dir() -> Result<PathBuf, String> {

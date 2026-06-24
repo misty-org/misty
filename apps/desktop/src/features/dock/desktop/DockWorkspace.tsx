@@ -1,0 +1,1 @@
+export { DockWorkspace } from "../DockWorkspace";

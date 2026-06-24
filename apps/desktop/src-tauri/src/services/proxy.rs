@@ -39,7 +39,13 @@ pub struct ProxySnapshot {
 
 impl ProxyService {
     pub fn new(environment: AppEnvironmentService) -> Self {
-        let proxy_url = environment.proxy_url();
+        Self::new_with_proxy_url(environment.clone(), environment.proxy_url())
+    }
+
+    pub fn new_with_proxy_url(
+        environment: AppEnvironmentService,
+        proxy_url: Option<String>,
+    ) -> Self {
         let database_path = environment.proxy_token_db_path();
         let snapshot = ProxySnapshot {
             proxy_url: proxy_url.clone(),

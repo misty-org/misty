@@ -160,6 +160,12 @@ function browserAppSnapshot(): AppSnapshot {
     appName: "Misty",
     migrationStage: "Browser smoke mode",
     proxyUrl: null,
+    proxyRuntime: {
+      mode: "disabled",
+      proxyUrl: null,
+      ready: false,
+      error: "Browser smoke mode",
+    },
     environment: {
       homeDir: browserSmokeHome,
       mistyDir,

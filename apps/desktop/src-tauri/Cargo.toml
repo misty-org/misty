@@ -26,6 +26,7 @@ tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
 tauri-plugin-clipboard-manager = "2"
 tauri-plugin-opener = "2"
+tauri-plugin-os = "2"
 thiserror = "1"
 tokio = { version = "1", features = ["fs", "io-util", "macros", "rt-multi-thread", "sync", "time"] }
 reqwest = { version = "0.12", features = ["blocking", "json", "multipart", "stream"] }
@@ -35,6 +36,7 @@ image = { version = "0.25.10", default-features = false, features = ["hdr", "png
 libloading = "0.8"
 zip = { version = "2", default-features = false, features = ["deflate"] }
 zune-psd = "0.5.1"
+tauri-plugin-keystore = "2.1.0-alpha.1"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6.4"
@@ -43,3 +45,4 @@ objc2-foundation = { version = "0.3.2", default-features = false, features = ["s
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]
+embedded-proxy-go = []
