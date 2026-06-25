@@ -51,6 +51,7 @@ import {
   useAppNavigationStore,
 } from "@/features/apps/appNavigation";
 import { DownloadedAppNavigator } from "./DownloadedAppNavigator";
+import { OpenAppViewsNavigator } from "./OpenAppViewsNavigator";
 
 type NavigatorToolItem = {
   id: NavigatorAppId;
@@ -369,9 +370,26 @@ export function GlobalNavigator(props: {
         />
       );
 
+    if (!item.disabled && (item.id === "code" || item.id === "terminal")) {
+      return (
+        <DownloadedAppNavigator
+          accountId={accountId}
+          appId={item.id}
+          label={item.label}
+          active={active}
+          activeRoute={activeRoute}
+          items={[]}
+        >
+          <OpenAppViewsNavigator appId={item.id} />
+        </DownloadedAppNavigator>
+      );
+    }
+
     if (
       !item.disabled &&
-      ["browser", "social", "inbox", "planner", "journal", "library", "music", "media"].includes(item.id)
+      ["browser", "social", "inbox", "planner", "journal", "library", "music", "media"].includes(
+        item.id,
+      )
     ) {
       const saved = savedProviderNavigation(providerCache, {
         accountId,
