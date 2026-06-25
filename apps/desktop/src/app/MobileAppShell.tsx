@@ -115,6 +115,7 @@ export function MobileAppShell() {
           <Route path="/files" element={mobileRouteElements.files} />
           <Route path="/transfers" element={mobileRouteElements.transfers} />
           <Route path="/providers" element={mobileRouteElements.providers} />
+          <Route path="/dock" element={<Navigate to="/files" replace />} />
           <Route path="/hub" element={mobileRouteElements.hub} />
           <Route path="/hub/account" element={<Navigate to="/account" replace />} />
           <Route path="/hub/signin" element={<Navigate to="/account/signin" replace />} />
@@ -125,16 +126,16 @@ export function MobileAppShell() {
           <Route path="/account" element={mobileRouteElements.account} />
           <Route path="/account/signin" element={mobileRouteElements.account} />
           <Route path="/account/register" element={mobileRouteElements.account} />
-          <Route path="/settings" element={desktopRequiredElement("Settings")} />
-          <Route path="/dock" element={desktopRequiredElement("Plugin panels")} />
-          <Route path="/diagnostics" element={desktopRequiredElement("Diagnostics")} />
+          <Route path="/account/settings" element={mobileRouteElements.settings} />
+          <Route path="/settings" element={<Navigate to="/account/settings" replace />} />
+          <Route path="/diagnostics" element={mobileRouteElements.diagnostics} />
           <Route path="/activity" element={<Navigate to="/files" replace />} />
           <Route path="*" element={<Navigate to="/files" replace />} />
         </Routes>
       </section>
 
       <nav className="mobile-tabbar" aria-label="Primary">
-        {mobileNavRoutes.map((item) => {
+        {mobileNavRoutes.filter((item) => item.nav).map((item) => {
           const Icon = item.icon;
           return (
             <NavLink
@@ -175,7 +176,9 @@ function normalizeMobileRoute(pathname: string): string {
   if (pathname.startsWith("/transfers")) return "/transfers";
   if (pathname.startsWith("/providers")) return "/providers";
   if (pathname.startsWith("/hub")) return "/hub";
+  if (pathname.startsWith("/account/settings")) return "/account/settings";
   if (pathname.startsWith("/account")) return "/account";
+  if (pathname.startsWith("/settings")) return "/account/settings";
   if (pathname.startsWith("/files")) return "/files";
   return pathname;
 }
@@ -246,9 +249,11 @@ function MobileActivityEntry(props: { entry: ExplorerNotification }) {
 
 function mobileTitle(pathname: string): string {
   if (pathname.startsWith("/transfers")) return "Transfers";
-  if (pathname.startsWith("/providers")) return "Providers";
+  if (pathname.startsWith("/providers")) return "Remotes";
   if (pathname.startsWith("/hub")) return "Hub";
+  if (pathname.startsWith("/account/settings") || pathname.startsWith("/settings")) return "Settings";
   if (pathname.startsWith("/account")) return "Account";
+  if (pathname.startsWith("/diagnostics")) return "Diagnostics";
   if (pathname !== "/" && !pathname.startsWith("/files")) return "Desktop only";
   return "Files";
 }

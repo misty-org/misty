@@ -5,29 +5,41 @@ import {
   ChevronRight,
   Cloud,
   Copy,
+  Eye,
+  EyeOff,
   ExternalLink,
+  FileText,
   FolderPlus,
   PlugZap,
   RefreshCcw,
+  Save,
   ShieldCheck,
+  Trash2,
+  Unplug,
   Wrench,
   X,
 } from "lucide-react";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import type { ProviderRemote, ProviderWorkflow, ProviderWorkflowOption } from "../../../api/types";
+import type { ProviderRemote, ProviderWorkflow, ProviderWorkflowOption, RcloneConfigPaths, RemoteEditDraft } from "../../../api/types";
 import { providerIconForType } from "../../../shared/assets/icons";
 import { AssetIcon } from "../../../shared/components/AssetIcon";
-import { providerOptionsForConnection } from "../providerUtils";
+import { prettyLabel } from "../../../shared/format";
+import { isSecretKey, parseTokenFields, providerOptionsForConnection } from "../providerUtils";
 import {
+  createProvidersWorkspaceState,
+  isProviderWorkspaceStale,
   selectProviderDerived,
+  selectProviderWorkspaceDerived,
   useProvidersStore,
   type ProviderConnectionSession,
+  type ProvidersWorkspaceState,
 } from "../useProvidersStore";
 
 const EMPTY_REMOTES: ProviderRemote[] = [];
 const EMPTY_WORKFLOWS: ProviderWorkflow[] = [];
+const mobileProviderWorkspaceId = "mobile-providers";
 
 export function MobileProvidersPage() {
   const {
@@ -40,7 +52,11 @@ export function MobileProvidersPage() {
     error,
     message,
     connection,
+    disconnectTarget,
+    workspaces,
+    remoteRevisions,
     load,
+    ensureWorkspace,
     openAddRemote,
     openReconnectRemote,
     openRepairRemote,
@@ -51,6 +67,18 @@ export function MobileProvidersPage() {
     advanceConnection,
     submitConnection,
     reopenConnectionAuthorization,
+    selectRemoteInWorkspace,
+    reloadWorkspaceRemote,
+    setWorkspaceDraftName,
+    setWorkspaceConfigField,
+    setWorkspaceTokenField,
+    setWorkspaceTokenVisible,
+    testWorkspaceConnection,
+    revealWorkspaceConfig,
+    saveWorkspaceRemote,
+    requestDisconnect,
+    cancelDisconnect,
+    confirmDisconnect,
   } = useProvidersStore(useShallow((state) => ({
     providers: state.providers,
     remotes: state.providers?.remotes ?? EMPTY_REMOTES,
@@ -61,7 +89,11 @@ export function MobileProvidersPage() {
     error: state.error,
     message: state.message,
     connection: state.connection,
+    disconnectTarget: state.disconnectTarget,
+    workspaces: state.workspaces,
+    remoteRevisions: state.remoteRevisions,
     load: state.load,
+    ensureWorkspace: state.ensureWorkspace,
     openAddRemote: state.openAddRemote,
     openReconnectRemote: state.openReconnectRemote,
     openRepairRemote: state.openRepairRemote,
@@ -72,15 +104,48 @@ export function MobileProvidersPage() {
     advanceConnection: state.advanceConnection,
     submitConnection: state.submitConnection,
     reopenConnectionAuthorization: state.reopenConnectionAuthorization,
+    selectRemoteInWorkspace: state.selectRemoteInWorkspace,
+    reloadWorkspaceRemote: state.reloadWorkspaceRemote,
+    setWorkspaceDraftName: state.setWorkspaceDraftName,
+    setWorkspaceConfigField: state.setWorkspaceConfigField,
+    setWorkspaceTokenField: state.setWorkspaceTokenField,
+    setWorkspaceTokenVisible: state.setWorkspaceTokenVisible,
+    testWorkspaceConnection: state.testWorkspaceConnection,
+    revealWorkspaceConfig: state.revealWorkspaceConfig,
+    saveWorkspaceRemote: state.saveWorkspaceRemote,
+    requestDisconnect: state.requestDisconnect,
+    cancelDisconnect: state.cancelDisconnect,
+    confirmDisconnect: state.confirmDisconnect,
   })));
+  const [managedRemoteName, setManagedRemoteName] = useState<string | null>(null);
 
   useEffect(() => {
+    ensureWorkspace(mobileProviderWorkspaceId);
     void load(false);
-  }, [load]);
+  }, [ensureWorkspace, load]);
 
   const health = providers?.health ?? null;
   const providerCount = health?.availableProviders ?? workflows.length;
   const connectedCount = health?.connectedProviders ?? remotes.length;
+  const workspace = workspaces[mobileProviderWorkspaceId] ?? createProvidersWorkspaceState();
+  const workspaceDerived = useMemo(() => selectProviderWorkspaceDerived(workspace), [workspace]);
+  const stale = useMemo(
+    () => isProviderWorkspaceStale(workspace, remoteRevisions, remotes),
+    [remoteRevisions, remotes, workspace],
+  );
+  const managedRemote = managedRemoteName
+    ? remotes.find((remote) => remote.name === managedRemoteName) ?? null
+    : null;
+
+  const closeManageSheet = () => {
+    if (workspaceDerived.dirty && !window.confirm("Discard unsaved remote edits?")) return;
+    setManagedRemoteName(null);
+  };
+
+  const openManageSheet = (remote: ProviderRemote) => {
+    setManagedRemoteName(remote.name);
+    void selectRemoteInWorkspace(mobileProviderWorkspaceId, remote.name);
+  };
 
   return (
     <section className="mobile-page mobile-providers-page">
@@ -146,6 +211,7 @@ export function MobileProvidersPage() {
                 disabled={working || Boolean(connection)}
                 onReconnect={() => void openReconnectRemote(remote)}
                 onRepair={() => void openRepairRemote(remote)}
+                onManage={() => openManageSheet(remote)}
               />
             ))}
           </div>
@@ -179,6 +245,42 @@ export function MobileProvidersPage() {
           onOpenAuthorize={() => void reopenConnectionAuthorization()}
         />
       ) : null}
+
+      {managedRemoteName ? (
+        <MobileRemoteManageSheet
+          remote={managedRemote}
+          workspace={workspace}
+          configKeys={workspaceDerived.configKeys}
+          dirty={workspaceDerived.dirty}
+          validRemoteName={workspaceDerived.validRemoteName}
+          stale={stale}
+          working={working}
+          onClose={closeManageSheet}
+          onDraftName={(name) => setWorkspaceDraftName(mobileProviderWorkspaceId, name)}
+          onConfigField={(key, value) => setWorkspaceConfigField(mobileProviderWorkspaceId, key, value)}
+          onTokenField={(key, value) => setWorkspaceTokenField(mobileProviderWorkspaceId, key, value)}
+          onTokenVisible={(visible) => setWorkspaceTokenVisible(mobileProviderWorkspaceId, visible)}
+          onReconnect={(remote) => void openReconnectRemote(remote)}
+          onRepair={(remote) => void openRepairRemote(remote)}
+          onDisconnect={(name) => requestDisconnect(name)}
+          onTest={() => void testWorkspaceConnection(mobileProviderWorkspaceId)}
+          onReveal={() => void revealWorkspaceConfig(mobileProviderWorkspaceId)}
+          onSave={() => void saveWorkspaceRemote(mobileProviderWorkspaceId)}
+          onReload={() => {
+            if (workspaceDerived.dirty && !window.confirm("Reload this remote and discard unsaved edits?")) return;
+            void reloadWorkspaceRemote(mobileProviderWorkspaceId);
+          }}
+        />
+      ) : null}
+
+      {disconnectTarget ? (
+        <MobileProviderDisconnectSheet
+          remoteName={disconnectTarget}
+          working={working}
+          onClose={cancelDisconnect}
+          onConfirm={() => void confirmDisconnect()}
+        />
+      ) : null}
     </section>
   );
 }
@@ -188,6 +290,7 @@ function MobileRemoteCard(props: {
   disabled: boolean;
   onReconnect: () => void;
   onRepair: () => void;
+  onManage: () => void;
 }) {
   const providerIcon = providerIconForType(props.remote.type);
   const healthy = !props.remote.needsReconnect && !props.remote.error;
@@ -209,6 +312,9 @@ function MobileRemoteCard(props: {
       </div>
       {issueMessage ? <p className="mobile-provider-issue">{issueMessage}</p> : null}
       <div className="mobile-provider-actions">
+        <button type="button" disabled={props.disabled} onClick={props.onManage}>
+          <Wrench size={15} /> Manage
+        </button>
         {props.remote.needsReconnect ? (
           <button type="button" disabled={props.disabled} onClick={props.onReconnect}>
             <RefreshCcw size={15} /> Reconnect
@@ -219,6 +325,251 @@ function MobileRemoteCard(props: {
         </button>
       </div>
     </article>
+  );
+}
+
+function MobileRemoteManageSheet(props: {
+  remote: ProviderRemote | null;
+  workspace: ProvidersWorkspaceState;
+  configKeys: string[];
+  dirty: boolean;
+  validRemoteName: boolean;
+  stale: boolean;
+  working: boolean;
+  onClose: () => void;
+  onDraftName: (name: string) => void;
+  onConfigField: (key: string, value: string) => void;
+  onTokenField: (key: string, value: string) => void;
+  onTokenVisible: (visible: boolean) => void;
+  onReconnect: (remote: ProviderRemote) => void;
+  onRepair: (remote: ProviderRemote) => void;
+  onDisconnect: (name: string) => void;
+  onTest: () => void;
+  onReveal: () => void;
+  onSave: () => void;
+  onReload: () => void;
+}) {
+  const loading = Boolean(props.workspace.loadingRemoteName);
+  const draft = props.workspace.draft;
+  const remote = props.remote;
+  return (
+    <div className="mobile-sheet-backdrop" role="presentation" onClick={props.onClose}>
+      <section
+        className="mobile-detail-sheet mobile-provider-manage-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-label={draft ? `Manage ${draft.name}` : "Manage remote"}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <header>
+          <div>
+            <span>{loading ? "Loading" : "Remote"}</span>
+            <h2>{loading ? props.workspace.loadingRemoteName : draft?.name ?? remote?.name ?? "Remote"}</h2>
+          </div>
+          <button type="button" className="mobile-icon-button" aria-label="Close" disabled={props.working} onClick={props.onClose}>
+            <X size={20} />
+          </button>
+        </header>
+
+        {loading ? (
+          <div className="mobile-provider-card skeleton" />
+        ) : draft ? (
+          <>
+            <div className="mobile-provider-manage-status">
+              {props.stale ? <span className="warn">Stale</span> : null}
+              {props.dirty ? <span>Unsaved</span> : null}
+              {!props.dirty && !props.stale ? <span className="good">Saved</span> : null}
+            </div>
+
+            {props.stale ? (
+              <div className="mobile-error">
+                This remote changed elsewhere. Reload before saving.
+              </div>
+            ) : null}
+
+            <MobileRemoteConfigForm
+              draft={draft}
+              configKeys={props.configKeys}
+              configPaths={props.workspace.configPaths}
+              tokenVisible={props.workspace.tokenVisible}
+              onDraftName={props.onDraftName}
+              onConfigField={props.onConfigField}
+              onTokenField={props.onTokenField}
+              onTokenVisible={props.onTokenVisible}
+            />
+
+            <div className="mobile-provider-manage-actions">
+              <button type="button" disabled={props.working} onClick={props.onTest}>
+                <Cloud size={16} /> Test
+              </button>
+              <button type="button" disabled={props.working} onClick={props.onReveal}>
+                <FileText size={16} /> Config
+              </button>
+              <button
+                type="button"
+                disabled={props.working || props.stale || !props.dirty || !props.validRemoteName}
+                onClick={props.onSave}
+              >
+                <Save size={16} /> Save
+              </button>
+              <button type="button" disabled={props.working} onClick={props.onReload}>
+                <RefreshCcw size={16} /> Reload
+              </button>
+              {remote ? (
+                <>
+                  <button type="button" disabled={props.working} onClick={() => props.onRepair(remote)}>
+                    <Wrench size={16} /> Repair
+                  </button>
+                  <button type="button" disabled={props.working} onClick={() => props.onReconnect(remote)}>
+                    <RefreshCcw size={16} /> Reconnect
+                  </button>
+                </>
+              ) : null}
+              <button type="button" className="danger" disabled={props.working} onClick={() => props.onDisconnect(draft.originalName)}>
+                <Unplug size={16} /> Disconnect
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="mobile-empty-state compact">
+            <div className="mobile-empty-icon">
+              <Cloud size={28} strokeWidth={1.7} />
+            </div>
+            <h3>Remote unavailable</h3>
+            <p>Refresh Remotes and try again.</p>
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function MobileRemoteConfigForm(props: {
+  draft: RemoteEditDraft;
+  configKeys: string[];
+  configPaths: RcloneConfigPaths | null;
+  tokenVisible: boolean;
+  onDraftName: (name: string) => void;
+  onConfigField: (key: string, value: string) => void;
+  onTokenField: (key: string, value: string) => void;
+  onTokenVisible: (visible: boolean) => void;
+}) {
+  return (
+    <div className="mobile-provider-edit-form">
+      <label className="mobile-input-group">
+        <span>Name</span>
+        <input value={props.draft.name} onChange={(event) => props.onDraftName(event.target.value)} />
+      </label>
+      <label className="mobile-input-group">
+        <span>Type</span>
+        <input value={props.draft.providerType || props.draft.config.type || ""} readOnly />
+      </label>
+      {props.configKeys.map((key) => (
+        <MobileRemoteConfigField
+          key={key}
+          configKey={key}
+          value={props.draft.config[key] ?? ""}
+          tokenVisible={props.tokenVisible}
+          onConfigField={props.onConfigField}
+          onTokenField={props.onTokenField}
+          onTokenVisible={props.onTokenVisible}
+        />
+      ))}
+      {props.configPaths ? (
+        <div className="mobile-provider-config-paths">
+          <div><span>Config</span><strong>{props.configPaths.configPath ?? "--"}</strong></div>
+          <div><span>Cache</span><strong>{props.configPaths.cachePath ?? "--"}</strong></div>
+          <div><span>Temp</span><strong>{props.configPaths.tempPath ?? "--"}</strong></div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function MobileRemoteConfigField(props: {
+  configKey: string;
+  value: string;
+  tokenVisible: boolean;
+  onConfigField: (key: string, value: string) => void;
+  onTokenField: (key: string, value: string) => void;
+  onTokenVisible: (visible: boolean) => void;
+}) {
+  if (props.configKey === "token") {
+    const fields = parseTokenFields(props.value);
+    if (fields.length > 0) {
+      return (
+        <fieldset className="mobile-provider-token-fields">
+          <legend>
+            <span>Authentication</span>
+            <button type="button" onClick={() => props.onTokenVisible(!props.tokenVisible)}>
+              {props.tokenVisible ? <EyeOff size={15} /> : <Eye size={15} />}
+              {props.tokenVisible ? "Hide" : "Show"}
+            </button>
+          </legend>
+          {fields.map((field) => (
+            <label key={field.key} className="mobile-input-group">
+              <span>{prettyLabel(field.key)}</span>
+              <input
+                value={field.value}
+                type={field.sensitive && !props.tokenVisible ? "password" : "text"}
+                onChange={(event) => props.onTokenField(field.key, event.target.value)}
+              />
+            </label>
+          ))}
+        </fieldset>
+      );
+    }
+  }
+
+  return (
+    <label className="mobile-input-group">
+      <span>{prettyLabel(props.configKey)}</span>
+      <input
+        value={props.value}
+        type={isSecretKey(props.configKey) ? "password" : "text"}
+        onChange={(event) => props.onConfigField(props.configKey, event.target.value)}
+      />
+    </label>
+  );
+}
+
+function MobileProviderDisconnectSheet(props: {
+  remoteName: string;
+  working: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className="mobile-sheet-backdrop" role="presentation" onClick={props.onClose}>
+      <section
+        className="mobile-detail-sheet mobile-provider-disconnect-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Disconnect ${props.remoteName}`}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <header>
+          <div>
+            <span>Disconnect</span>
+            <h2>{props.remoteName}</h2>
+          </div>
+          <button type="button" className="mobile-icon-button" aria-label="Close" disabled={props.working} onClick={props.onClose}>
+            <X size={20} />
+          </button>
+        </header>
+        <p className="mobile-file-action-note">
+          This removes the remote from Misty. Files already on the provider are not deleted.
+        </p>
+        <div className="mobile-action-stack">
+          <button type="button" className="mobile-secondary-action danger" disabled={props.working} onClick={props.onConfirm}>
+            <Trash2 size={17} /> {props.working ? "Disconnecting..." : "Disconnect"}
+          </button>
+          <button type="button" className="mobile-secondary-action" disabled={props.working} onClick={props.onClose}>
+            Cancel
+          </button>
+        </div>
+      </section>
+    </div>
   );
 }
 

@@ -23,7 +23,8 @@
     "proxy:archive:ios": "MISTY_PROXY_GO_TARGET=ios-arm64 node scripts/build-embedded-proxy.mjs",
     "proxy:archive:ios-simulator": "MISTY_PROXY_GO_TARGET=ios-simulator-arm64 node scripts/build-embedded-proxy.mjs",
     "tauri:ios:device:embedded": "npm run proxy:archive:ios && SWIFT_RS_CLANG=$(xcrun --sdk iphoneos --find clang) MISTY_PROXY_RUNTIME=embedded MISTY_PROXY_GO_LIB_DIR=src-tauri/target/misty-proxy/ios-arm64 MISTY_PROXY_GO_LIB_NAME=misty_proxy npm run tauri -- ios dev --host --features=embedded-proxy-go",
-    "tauri:ios:simulator:embedded": "npm run proxy:archive:ios-simulator && SWIFT_RS_CLANG=$(xcrun --sdk iphonesimulator --find clang) MISTY_PROXY_RUNTIME=embedded MISTY_PROXY_GO_LIB_DIR=src-tauri/target/misty-proxy/ios-simulator-arm64 MISTY_PROXY_GO_LIB_NAME=misty_proxy npm run tauri -- ios dev \"${TAURI_IOS_SIMULATOR_DEVICE:-iPhone 17}\" --features=embedded-proxy-go",
+    "tauri:ios:simulator:embedded": "node scripts/run-ios-simulator.mjs",
+    "tauri:ios:simulator:raw": "npm run proxy:archive:ios-simulator && SWIFT_RS_CLANG=$(xcrun --sdk iphonesimulator --find clang) MISTY_PROXY_RUNTIME=embedded MISTY_PROXY_GO_LIB_DIR=src-tauri/target/misty-proxy/ios-simulator-arm64 MISTY_PROXY_GO_LIB_NAME=misty_proxy npm run tauri -- ios dev \"${TAURI_IOS_SIMULATOR_DEVICE:-iPhone 17}\" --features=embedded-proxy-go",
     "tauri:ios:build:embedded": "npm run proxy:archive:ios && SWIFT_RS_CLANG=$(xcrun --sdk iphoneos --find clang) MISTY_PROXY_RUNTIME=embedded MISTY_PROXY_GO_LIB_DIR=src-tauri/target/misty-proxy/ios-arm64 MISTY_PROXY_GO_LIB_NAME=misty_proxy npm run tauri -- ios build --features=embedded-proxy-go"
   },
   "dependencies": {

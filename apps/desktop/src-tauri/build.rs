@@ -71,7 +71,11 @@ fn default_go_archive_target() -> &'static str {
     let target_abi = env::var("CARGO_CFG_TARGET_ABI").unwrap_or_default();
     let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default();
 
-    match (target_os.as_str(), target_abi.as_str(), target_arch.as_str()) {
+    match (
+        target_os.as_str(),
+        target_abi.as_str(),
+        target_arch.as_str(),
+    ) {
         ("ios", "sim", "aarch64") => "ios-simulator-arm64",
         ("ios", "sim", "x86_64") => "ios-simulator-amd64",
         ("ios", _, "aarch64") => "ios-arm64",
@@ -83,7 +87,9 @@ fn default_go_archive_target() -> &'static str {
 fn apple_clang_runtime_dir() -> Option<PathBuf> {
     let sdk = match (
         env::var("CARGO_CFG_TARGET_OS").ok()?.as_str(),
-        env::var("CARGO_CFG_TARGET_ABI").unwrap_or_default().as_str(),
+        env::var("CARGO_CFG_TARGET_ABI")
+            .unwrap_or_default()
+            .as_str(),
     ) {
         ("ios", "sim") => "iphonesimulator",
         ("ios", _) => "iphoneos",
