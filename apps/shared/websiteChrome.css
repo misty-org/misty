@@ -1,0 +1,343 @@
+@import "./browserChrome.css";
+
+.integration-app-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+  container-type: inline-size;
+  background: var(--misty-theme-bg, #131313);
+  color: var(--misty-theme-text, #e0e0e0);
+  font: 13px system-ui;
+}
+.integration-app-content {
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.integration-app-chrome {
+  display: contents;
+}
+.website-header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--misty-theme-border, #303030);
+  min-width: 0;
+  container-type: inline-size;
+}
+.website-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  height: 30px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--misty-theme-text-muted, #aaa);
+  cursor: pointer;
+}
+.website-icon-button {
+  width: 30px;
+  padding: 0;
+}
+.website-icon-button:hover {
+  background: var(--misty-theme-hover, #2b2b2b);
+  color: var(--misty-theme-text, #e0e0e0);
+}
+.website-icon-button:disabled {
+  opacity: 0.35;
+  pointer-events: none;
+}
+.website-address {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  padding: 0 9px;
+  margin-inline: 3px;
+  background: var(--misty-theme-card, #1d1d1d);
+  border: 1px solid var(--misty-theme-border, #303030);
+  border-radius: 6px;
+  color: var(--misty-theme-text-muted, #aaa);
+  font-size: 12px;
+}
+.website-address > svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
+}
+.website-address > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.website-header-menu {
+  width: 240px !important;
+  padding: 6px !important;
+  font: 13px system-ui;
+  color: var(--misty-theme-text, #e0e0e0);
+  background: var(--misty-theme-card, #202020) !important;
+}
+.website-header-menu p {
+  font-size: 11px;
+  color: var(--misty-theme-text-muted, #aaa);
+  margin: 6px 8px;
+}
+.website-header-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 32px;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.website-header-menu button:hover,
+.website-header-menu button[aria-pressed="true"] {
+  background: var(--misty-theme-hover, #303030);
+}
+.website-header-menu button:disabled {
+  opacity: 0.4;
+}
+.website-header-menu hr {
+  border: 0;
+  border-top: 1px solid var(--misty-theme-border, #333);
+  margin: 5px 0;
+}
+.integration-dialog {
+  width: min(884px, calc(100vw - 32px));
+  max-width: 884px;
+  min-height: min(520px, calc(100dvh - 48px));
+  max-height: min(988px, calc(100dvh - 48px));
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 32px;
+  color: var(--misty-theme-text, #e0e0e0);
+  background: var(--misty-theme-card, #191919);
+  font: 13px system-ui;
+}
+.integration-back {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 14px 0;
+  background: none;
+  border: 0;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.integration-back {
+  font-size: 12px;
+  color: var(--misty-theme-text-muted, #aaa);
+}
+.website-workspace > .website-management {
+  position: absolute;
+  z-index: 2;
+  inset: 44px 0 0 auto;
+  width: min(380px, 100%);
+  padding: 22px;
+  background: var(--misty-theme-card, #191919);
+  border-left: 1px solid var(--misty-theme-border, #303030);
+}
+.website-workspace > .website-management .website-account-row,
+.website-workspace > .website-management .website-pin-row {
+  flex-wrap: wrap;
+}
+.website-workspace > .website-management .website-account-row label {
+  flex-basis: 100%;
+}
+.provider-canvas > .provider-panel {
+  z-index: 2;
+  inset: 0 0 0 auto;
+  width: min(380px, 100%);
+  background: var(--misty-theme-card, #191919);
+  border-left: 1px solid var(--misty-theme-border, #303030);
+}
+.provider-source-controls.provider-source-drawer {
+  position: absolute;
+  inset: 44px 0 0 auto;
+  z-index: 3;
+  width: min(380px, 100%);
+  padding: 20px;
+  background: var(--misty-theme-card, #191919);
+  border-left: 1px solid var(--misty-theme-border, #303030);
+  overflow: auto;
+}
+.provider-source-drawer .provider-source-panel {
+  max-height: none;
+  overflow: visible;
+}
+.provider-source-drawer .provider-source-panel dl {
+  grid-template-columns: 1fr;
+  gap: 4px;
+}
+.provider-source-drawer .provider-source-panel dd {
+  margin-bottom: 8px;
+}
+@container (max-width:700px) {
+  .website-page-title {
+    display: none;
+  }
+  .website-external-button {
+    display: none;
+  }
+  .website-header {
+    padding-inline: 6px;
+    gap: 2px;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .website-refreshing {
+    animation: website-refresh 1s linear infinite;
+  }
+}
+@keyframes website-refresh {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@layer base {
+  .integration-app-shell :is(button, input, select):focus-visible,
+  .website-header-menu button:focus-visible {
+    outline: 2px solid var(--misty-theme-text-muted, #aaa) !important;
+    outline-offset: 2px;
+  }
+}
+
+.provider-pins-heading {
+  margin-top: 24px !important;
+}
+
+/* Only the native page path is transparent. App chrome and panels keep their
+   own backgrounds when the Browser moves the page below Misty's renderer. */
+.website-header {
+  background: var(--misty-theme-bg, #131313);
+}
+
+/* Catalog and provider details share the same modal layout. */
+.platform-panel-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-right: 28px;
+}
+.platform-panel-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.integration-dialog .provider-panel {
+  position: static;
+  width: auto;
+  max-width: none;
+  max-height: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: visible;
+}
+.integration-dialog .website-account-row {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 18px 0;
+}
+.integration-dialog .website-account-row label {
+  margin: 0;
+  flex: 1;
+  min-width: 180px;
+}
+.integration-dialog .website-account-row input {
+  width: 100%;
+}
+.integration-dialog .website-account-form {
+  margin-top: 24px;
+}
+@media (max-width: 600px) {
+  .integration-dialog {
+    padding: 24px;
+    gap: 20px;
+  }
+}
+
+.integration-dialog.platform-action-dialog {
+  width: min(440px, calc(100vw - 32px));
+  max-width: 440px;
+  min-height: 0;
+  padding: 24px;
+}
+.website-header-menu {
+  max-height: calc(100dvh - 80px);
+  overflow-y: auto;
+}
+.platform-action-dialog :is(input, select) {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--misty-theme-border, #333);
+  border-radius: 6px;
+  background: var(--misty-theme-bg, #131313);
+  color: inherit;
+}
+.platform-action-dialog :is(input, select):focus-visible {
+  outline: 2px solid var(--misty-theme-text-muted, #8c8c8c);
+  outline-offset: 2px;
+}
+
+.website-pin-button[aria-pressed="true"] {
+  background: var(--misty-theme-hover, #2b2b2b);
+  color: var(--misty-theme-text, #e0e0e0);
+}
+.website-pin-button:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+/* Artwork stays proportional to the label; buttons retain their full hit area. */
+.website-address-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+}
+.website-address-icon :is(svg, img, [data-brand-icon]),
+.website-address-icon > * {
+  width: 16px !important;
+  height: 16px !important;
+  flex-shrink: 0;
+}
+.website-address-title {
+  min-width: 0;
+}
+.website-address .website-address-count {
+  flex: none;
+  font-size: 10px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.website-icon-button > svg {
+  width: 16px;
+  height: 16px;
+}

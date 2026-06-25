@@ -466,3 +466,49 @@ it("uses dark provider and Connect pills with light text", () => {
   );
   expect(ui.queryByText("Open Google Drive")).toBeNull();
 });
+
+it("shows Connect button on hover of nav row, but keeps integration always visible", () => {
+  vi.spyOn(navigator, "platform", "get").mockReturnValue("MacIntel");
+  const ui = render(
+    <MemoryRouter>
+      <DownloadedAppNavigator
+        accountId="test-account"
+        appId="library"
+        label="Storage"
+        active={false}
+        activeRoute="/home"
+        items={[]}
+      />
+    </MemoryRouter>,
+  );
+  const connect = ui.getByRole("button", { name: "Storage source: Choose integration" });
+  expect(connect.textContent).toBe("Connect");
+  expect(connect.className).toContain("opacity-0");
+  expect(connect.className).toContain("pointer-events-none");
+  expect(connect.className).toContain("group-hover/app-row:opacity-100");
+  expect(connect.className).toContain("group-hover/app-row:pointer-events-auto");
+
+  ui.rerender(
+    <MemoryRouter>
+      <DownloadedAppNavigator
+        accountId="test-account"
+        appId="library"
+        label="Storage"
+        active={false}
+        activeRoute="/home"
+        items={[
+          {
+            id: "google-drive",
+            label: "Google Drive",
+            route: "/apps/library?provider=google-drive",
+          },
+        ]}
+      />
+    </MemoryRouter>,
+  );
+  const integration = ui.getByRole("button", { name: "Storage source: Google Drive" });
+  expect(integration.textContent).toBe("Google Drive");
+  expect(integration.className).not.toContain("opacity-0");
+  expect(integration.className).not.toContain("group-hover/app-row:opacity-100");
+});
+

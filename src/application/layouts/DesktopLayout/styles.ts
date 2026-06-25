@@ -84,34 +84,33 @@ export const navigatorPrimaryRowLayoutClass = navigationMenuPrimaryLayoutClass;
 export const navigatorSubsectionIconClass =
   "misty-navigator-subsection-icon pointer-events-none grid size-6 shrink-0 place-items-center text-cream-bright [contain:layout_paint] [&_img]:!size-5 [&_svg]:!size-5";
 
-// The account controls stay visually separate from the scrolling app list so
-// they remain a stable, floating account island at the bottom of the rail.
+// Every navigation identity uses the same surface, inset, and control sizing.
 export const navigatorFloatingIslandClass = [
-  "flex items-center gap-1 rounded-xl border border-charcoal-border/60 bg-charcoal-card p-1",
+  "flex min-w-0 items-center gap-0.5 rounded-xl border border-charcoal-border/60 bg-charcoal-hover p-1.25",
   "shadow-[0_12px_30px_rgba(0,0,0,0.5)]",
 ].join(" ");
 
 export const navigatorIslandActionClass = [
-  "misty-navigator-icon-target grid size-9 shrink-0 place-items-center rounded-lg border-0 bg-transparent",
+  "misty-navigator-icon-target grid size-8 shrink-0 place-items-center rounded-lg border-0 bg-transparent p-0",
   "text-cream-muted no-underline outline-none transition-colors",
   "hover:bg-charcoal-active hover:text-cream-bright",
   navigatorFocusRingClass,
 ].join(" ");
 
-// Hierarchy headers share the profile island's surface with tighter controls.
-export const navigatorHierarchyIslandClass = cn(
-  navigatorFloatingIslandClass,
-  "min-w-0 gap-0.5 px-1 py-0.5",
-);
+export const navigatorHierarchyIslandClass = navigatorFloatingIslandClass;
+
+export const navigatorIslandIdentityLayoutClass =
+  "box-border flex h-8 min-w-0 items-center gap-2.5 px-1 py-1";
 
 export const navigatorHierarchyTriggerClass = [
-  "misty-navigator-hierarchy-trigger misty-navigator-row-target box-border flex h-8 min-w-0 items-center gap-2.5 rounded-lg border-0 bg-transparent px-1.25",
+  navigatorIslandIdentityLayoutClass,
+  "misty-navigator-hierarchy-trigger misty-navigator-row-target rounded-lg border-0 bg-transparent",
   "text-left text-cream no-underline outline-none transition-colors duration-150 motion-reduce:transition-none",
   "hover:text-cream-bright focus-visible:text-cream-bright active:text-cream-bright data-[state=open]:text-cream-bright",
   navigatorFocusRingClass,
 ].join(" ");
 
-export const navigatorHierarchyActionClass = cn(navigatorIslandActionClass, "size-8");
+export const navigatorHierarchyActionClass = navigatorIslandActionClass;
 
 export function navigatorRowClass(active: boolean): string {
   return cn(

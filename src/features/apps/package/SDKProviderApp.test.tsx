@@ -1,9 +1,9 @@
-import { providerLoginUrls } from "../../../../../misty-apps/apps/shared/providerLoginUrls";
+import { providerLoginUrls } from "../../../.././apps/shared/providerLoginUrls";
 import { act } from "react";
 import { fireEvent, waitFor, within } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import type { MistyComponentContext } from "@misty/sdk";
-import { createProviderApp } from "../../../../../misty-apps/apps/shared/createProviderApp";
+import { createProviderApp } from "../../../.././apps/shared/createProviderApp";
 import { mountAppComponent } from "../rpc/component";
 import { createAppRpcScope } from "../rpc/session";
 import { createBrowserRpc, type BrowserRpcBackend } from "../rpc/browser";

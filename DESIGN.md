@@ -224,7 +224,7 @@ Misty is a full-height workspace with two deliberate shells. Desktop is split-ca
 - Inputs remain at least 16px. The shell supports a 320px minimum width, landscape rotation, large text, coarse pointers, and reduced motion.
 - Desktop-only splits, resizers, pane movement, tab dragging, window chrome, pet controls, extension storefronts, and shortcut configuration do not appear in the mobile hierarchy.
 
-Use an 8px control rhythm and 12–16px row or section rhythm. Major tool areas align to shared vertical boundaries. Sidebars should be narrow enough to preserve the canvas, but labels must truncate predictably and icons must remain stable. Large empty regions are acceptable in boards, previews, and editors when they represent working space; do not fill them with decorative cards.
+Use an 8px control rhythm and 12–16px row or section rhythm. Major tool areas align to shared vertical boundaries. Sidebars should be narrow enough to preserve the canvas, but labels must truncate predictably and icons must remain stable. Single-line text that exceeds its available width fades over the final 18px instead of showing an ellipsis; text that fits remains fully opaque. Keep full label text available to assistive technology. Large empty regions are acceptable in boards, previews, and editors when they represent working space; do not fill them with decorative cards.
 
 On tablets, preserve the same hierarchy and tonal language while allowing navigation and supporting panes to overlay or collapse. Maintain comfortable touch targets for primary actions even when visual density remains compact. Never rely on hover to reveal the only path to an action.
 

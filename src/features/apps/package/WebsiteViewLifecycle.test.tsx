@@ -1,7 +1,7 @@
 import { act, cleanup, render, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import type { MistyAppSDK, MistyBrowserEvent, MistyComponentContext } from "@misty/sdk";
-import { SDKBrowserView } from "../../../../../misty-apps/apps/browser/workspace/SDKBrowserView";
+import { SDKBrowserView } from "../../../.././apps/browser/workspace/SDKBrowserView";
 
 afterEach(() => {
   cleanup();

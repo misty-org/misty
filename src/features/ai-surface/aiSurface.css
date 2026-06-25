@@ -283,7 +283,7 @@
   color: var(--color-cream-muted);
   font-size: 10px;
   font-weight: 600;
-  text-overflow: ellipsis;
+  text-overflow: clip;
   white-space: nowrap;
 }
 

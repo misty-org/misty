@@ -67,7 +67,9 @@ export default function SignIn() {
         setEmail(account.email);
         setPassword("");
         setMode("login");
-        setError(`Your session for ${account.email} has expired. Please sign in again.`);
+        setError(
+          `Your saved sign-in for ${account.email} is no longer available. Please sign in again.`,
+        );
       } else {
         const detail =
           resumeError instanceof Error

@@ -1,4 +1,4 @@
-import { appSourceRoot } from "./scripts/app-source-paths.mjs";
+import { appSourceRoot } from "./cli/tasks/app-source-paths.ts";
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [

@@ -1,6 +1,6 @@
 import activityCheck from "@/assets/icons/activity-check-svgrepo.svg";
 import cloud24 from "@/assets/icons/cloud-24.svg";
-import { brandIcons } from "../../../../misty-apps/apps/shared/brandIcons";
+import { brandIcons } from "../../.././apps/shared/brandIcons";
 import eye16 from "@/assets/icons/eye-16.svg";
 import eyeClosed16 from "@/assets/icons/eye-closed-16.svg";
 import fileDirectoryFill16 from "@/assets/icons/file-directory-fill-16.svg";

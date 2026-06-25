@@ -1863,7 +1863,7 @@ impl ServiceLease {
     #[cfg(all(test, target_os = "macos"))]
     pub(super) fn fixture_worker(service: &'static str) -> Arc<Self> {
         let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../misty-apps/native-services")
+            .join(".././apps/native-services")
             .join(service)
             .join("target/debug")
             .join(format!("misty-{service}"));

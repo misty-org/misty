@@ -3,11 +3,11 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { BrandIcon } from "../../../../misty-apps/apps/shared/BrandIcon";
-import { brandIconAsset, brandIcons } from "../../../../misty-apps/apps/shared/brandIcons";
-import { providers } from "../../../../misty-apps/apps/shared/providers";
-import { ProviderBrandIcon } from "../../../../misty-apps/apps/shared/ProviderBrandIcon";
-import { websiteIntegrations } from "../../../../misty-apps/apps/shared/websiteIntegrations";
+import { BrandIcon } from "../../.././apps/shared/BrandIcon";
+import { brandIconAsset, brandIcons } from "../../.././apps/shared/brandIcons";
+import { providers } from "../../.././apps/shared/providers";
+import { ProviderBrandIcon } from "../../.././apps/shared/ProviderBrandIcon";
+import { websiteIntegrations } from "../../.././apps/shared/websiteIntegrations";
 import { DestinationIcon } from "@/application/layouts/DesktopLayout/DownloadedAppNavigator";
 import { WorkspaceTabGroupButton } from "@/application/layouts/DesktopLayout/WorkspaceTabGroupButton";
 import { MarketplaceCatalogIcon } from "@/features/marketplace/components/MarketplaceCatalogIcon";
@@ -101,7 +101,7 @@ describe("integration brand artwork", () => {
 
   it.each(Object.keys(brandIcons))("ships %s as self-contained vector artwork", (id) => {
     const source = readFileSync(
-      resolve(process.cwd(), `../misty-apps/apps/shared/brand-icons/${id}.svg`),
+      resolve(process.cwd(), `./apps/shared/brand-icons/${id}.svg`),
       "utf8",
     );
     const svg = new DOMParser().parseFromString(source, "image/svg+xml");

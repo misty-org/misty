@@ -62,10 +62,10 @@ tauri-plugin-deep-link = "2"
 percent-encoding = "2"
 notify = { version = "6", default-features = false, features = ["macos_fsevent"] }
 cap-std = "4.0.3"
+portable-pty = "0.9"
 
 [target.'cfg(not(target_os = "macos"))'.dependencies]
 iroh = "1.0.3"
-portable-pty = "0.9"
 image = { version = "0.25.10", default-features = false, features = ["bmp", "gif", "jpeg", "tga", "webp"] }
 zune-psd = "0.5.1"
 tantivy = "0.25"

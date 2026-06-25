@@ -1,11 +1,52 @@
-export type {
-  SpaceChatMessagesProps,
-  SpaceChatStarter,
-} from "@/api/spaces/dto/interfaces/components/SpaceChatMessages";
+import type { FormEvent, RefObject, UIEventHandler } from "react";
+import type {
+  SpaceLibraryItem,
+  SpaceMessage,
+  SpaceNode,
+} from "@/api/spaces/dto/interfaces/types";
+import type { SpaceActionSuggestionBatch } from "@/api/spaces/dto/interfaces/actionSuggestionTypes";
+
+export type SpaceChatStarter = "mention" | "files" | "library";
+
+export interface SpaceChatMessagesProps {
+  error: string;
+  loading: boolean;
+  messages: SpaceMessage[];
+  /** Agent turns still in flight; drives the typing indicator. */
+  actionSuggestions?: SpaceActionSuggestionBatch[];
+  onActionSuggestionsChanged?: () => void;
+  currentUserId?: string;
+  isOwner: boolean;
+  canWrite: boolean;
+  editingMessageId: string;
+  editingText: string;
+  editSaving: boolean;
+  nodes: SpaceNode[];
+  libraryItems: SpaceLibraryItem[];
+  canCopyLibrary: boolean;
+  canAddToLibrary: boolean;
+  spaceId: string;
+  endRef: RefObject<HTMLDivElement | null>;
+  scrollRef: RefObject<HTMLDivElement | null>;
+  onScroll: UIEventHandler<HTMLDivElement>;
+  onEditingText: (value: string) => void;
+  onCancelEditing: (messageId: string) => void;
+  onSaveEdited: (event: FormEvent, message: SpaceMessage) => void;
+  onReply: (messageId: string) => void;
+  onToggleReaction: (message: SpaceMessage, emoji: string, reacted: boolean) => void;
+  onBeginEditing: (message: SpaceMessage) => void;
+  onDelete: (message: SpaceMessage) => void;
+  onOpenNode: (nodeId: string) => void;
+  onError: (message: string) => void;
+  onLibraryItem: (item: SpaceLibraryItem) => void;
+  onReload: () => void;
+  spaceName?: string;
+  directRecipient?: { userId: string; name: string };
+  onStarter?: (starter: SpaceChatStarter) => void;
+}
+
 export { DeleteMessageDialog } from "./DeleteMessageDialog";
 export { messageReplyPreviewText } from "./messageHelpers";
-
-import type { SpaceChatMessagesProps } from "@/api/spaces/dto/interfaces/components/SpaceChatMessages";
 import {
   SocialError as SystemErrorActivity,
   socialErrorMessage as systemErrorMessage,

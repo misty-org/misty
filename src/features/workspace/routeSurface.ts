@@ -67,13 +67,23 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
   if (pathname.startsWith(`${routes.apps}/`)) {
     const appId = appIdFromRoute(pathname);
     if (!appId) return null;
+    const spaceId = spaceIdFromAppRoute(pathname);
     return {
       ...request("official-app", `app:${appId}`, appTitle(appId), pathname, appId, "multiple"),
+      ...(spaceId ? { scopeKey: `space:${spaceId}` as const } : {}),
     };
   }
   if (pathname.startsWith(routes.discover))
     return request("marketplace", "tool:marketplace", "Discover", pathname, undefined, "single");
   return null;
+}
+
+function spaceIdFromAppRoute(route: string): string {
+  try {
+    return new URL(route, "https://misty.local").searchParams.get("space")?.trim() ?? "";
+  } catch {
+    return "";
+  }
 }
 
 function appIdFromRoute(route: string): string {

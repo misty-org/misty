@@ -1,0 +1,4 @@
+.misty-excalidraw .default-sidebar,
+.misty-excalidraw .default-sidebar-trigger {
+  display: none !important;
+}
