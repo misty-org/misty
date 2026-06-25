@@ -656,34 +656,38 @@ impl ExplorerService {
     ) -> ApiResult<ExplorerOperationResult> {
         ensure_not_canceled_if(cancellation)?;
         if let Some(target) = self.remote_target(&request.directory) {
-            if !matches!(request.kind, crate::core::explorer::CreateItemKind::Folder) {
-                return Err(ApiError::Message(
-                    "Creating an empty remote file is not supported by the rclone file API."
-                        .to_string(),
-                ));
-            }
-            let name = validate_remote_name(&request.name)?;
-            let remote_path = normalize_remote_path(&join_remote_path(&target.remote_path, name))?;
+            let name = validate_remote_name(&request.name)?.to_string();
+            let remote_path = normalize_remote_path(&join_remote_path(&target.remote_path, &name))?;
             let mut record = FileTransferRecord::new(
                 FileTransferType::Create,
                 FileTransferItemType::Remote,
-                name,
+                &name,
             );
             record.remote_dest_name = target.remote_name.clone();
             record.remote_dest_path = remote_path.clone();
-            record.detail_message = "Creating remote folder".to_string();
+            record.detail_message = match request.kind {
+                crate::core::explorer::CreateItemKind::Folder => "Creating remote folder",
+                crate::core::explorer::CreateItemKind::File => "Creating remote file",
+            }
+            .to_string();
             let transfer_id = self.begin_transfer(record).await;
-            self.finish_transfer(
-                transfer_id,
-                self.start_json_job(
-                    "/api/remote/file/mkdir",
-                    serde_json::json!({ "remote": target.remote_name, "path": remote_path }),
-                    transfer_id,
-                    cancellation,
-                )
-                .await,
-            )
-            .await?;
+            let operation = match request.kind {
+                crate::core::explorer::CreateItemKind::Folder => {
+                    self.start_json_job(
+                        "/api/remote/file/mkdir",
+                        serde_json::json!({ "remote": target.remote_name, "path": remote_path }),
+                        transfer_id,
+                        cancellation,
+                    )
+                    .await
+                    .map(|_| ())
+                }
+                crate::core::explorer::CreateItemKind::File => {
+                    self.create_empty_remote_file(&target, &name, transfer_id, cancellation)
+                        .await
+                }
+            };
+            self.finish_transfer(transfer_id, operation).await?;
             self.listing_cache
                 .clear(&target.remote_name, &target.remote_path)
                 .await?;
@@ -706,6 +710,47 @@ impl ExplorerService {
         ensure_not_canceled_if(cancellation)?;
         let result = create_local_item_cancellable(request, cancellation).await;
         self.finish_transfer(transfer_id, result).await
+    }
+
+    async fn create_empty_remote_file(
+        &self,
+        target: &RemoteBrowseTarget,
+        name: &str,
+        transfer_id: Option<u64>,
+        cancellation: Option<&AtomicBool>,
+    ) -> ApiResult<()> {
+        ensure_not_canceled_if(cancellation)?;
+        tokio::fs::create_dir_all(&self.clipboard_text_cache_dir)
+            .await
+            .map_err(|error| {
+                ApiError::Message(format!(
+                    "Failed to prepare remote file cache {}: {error}",
+                    self.clipboard_text_cache_dir.display()
+                ))
+            })?;
+        let stage_path = self.clipboard_text_cache_dir.join(format!(
+            "empty-{}-{}",
+            now_epoch_ms(),
+            sanitize_drag_file_name(name)
+        ));
+        tokio::fs::write(&stage_path, []).await.map_err(|error| {
+            ApiError::Message(format!(
+                "Failed to stage empty remote file {}: {error}",
+                stage_path.display()
+            ))
+        })?;
+        let result = self
+            .upload_remote_file(
+                &stage_path,
+                &target.remote_name,
+                &target.remote_path,
+                name,
+                transfer_id,
+                cancellation,
+            )
+            .await;
+        let _ = tokio::fs::remove_file(&stage_path).await;
+        result
     }
 
     pub async fn rename_item(

@@ -4,13 +4,12 @@ import type { AppFormFactor } from "./platform";
 
 const mistyDeepLinkScheme = "misty:";
 const ignoredMistyHosts = new Set(["recent", "starred", "trash"]);
-const mobileRoutePrefixes = ["/files", "/transfers", "/providers", "/hub", "/account"];
+const mobileRoutePrefixes = ["/files", "/transfers", "/providers", "/hub", "/account", "/diagnostics"];
 const desktopRoutePrefixes = [
   ...mobileRoutePrefixes,
+  "/activity",
   "/dock",
   "/settings",
-  "/diagnostics",
-  "/activity",
 ];
 
 export function installMistyDeepLinkHandler(

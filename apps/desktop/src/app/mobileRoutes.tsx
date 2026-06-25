@@ -1,14 +1,16 @@
 import type { LucideIcon } from "lucide-react";
-import { ArrowRightLeft, Blocks, Folder, PlugZap, UserCircle } from "lucide-react";
+import { ArrowRightLeft, Blocks, Folder, PlugZap, Settings, UserCircle } from "lucide-react";
+import { MobileDiagnosticsPage } from "../features/diagnostics/mobile/MobileDiagnosticsPage";
 import { MobileFilesPage } from "../features/explorer/mobile/MobileFilesPage";
 import { MobileHubPage } from "../features/hub/mobile/MobileHubPage";
 import { MobileDesktopRequiredPage } from "../features/mobile/MobileDesktopRequiredPage";
 import { MobileAccountPage } from "../features/account/mobile/MobileAccountPage";
 import { MobileProvidersPage } from "../features/providers/mobile/MobileProvidersPage";
+import { MobileSettingsPage } from "../features/settings/mobile/MobileSettingsPage";
 import { MobileTransfersPage } from "../features/transfers/mobile/MobileTransfersPage";
 import type { AppTab } from "./types";
 
-export type MobileRouteId = "files" | "transfers" | "hub" | "account" | "providers" | "desktop-required";
+export type MobileRouteId = "files" | "transfers" | "hub" | "account" | "providers" | "settings" | "diagnostics" | "desktop-required";
 
 export interface MobileRouteDefinition {
   id: MobileRouteId;
@@ -22,9 +24,11 @@ export interface MobileRouteDefinition {
 export const mobileNavRoutes = [
   { id: "files", label: "Files", path: "/files", icon: Folder, nav: true, element: <MobileFilesPage /> },
   { id: "transfers", label: "Transfers", path: "/transfers", icon: ArrowRightLeft, nav: true, element: <MobileTransfersPage /> },
-  { id: "providers", label: "Providers", path: "/providers", icon: PlugZap, nav: true, element: <MobileProvidersPage /> },
+  { id: "providers", label: "Remotes", path: "/providers", icon: PlugZap, nav: true, element: <MobileProvidersPage /> },
   { id: "hub", label: "Hub", path: "/hub", icon: Blocks, nav: true, element: <MobileHubPage /> },
   { id: "account", label: "Account", path: "/account", icon: UserCircle, nav: true, element: <MobileAccountPage /> },
+  { id: "settings", label: "Settings", path: "/account/settings", icon: Settings, nav: false, element: <MobileSettingsPage /> },
+  { id: "diagnostics", label: "Diagnostics", path: "/diagnostics", icon: Settings, nav: false, element: <MobileDiagnosticsPage /> },
 ] satisfies MobileRouteDefinition[];
 
 export const mobileAllowedRoutes = new Set(mobileNavRoutes.map((route) => route.path));
@@ -35,6 +39,8 @@ export function mobileRouteIdFromPath(pathname: string): AppTab {
   if (pathname.startsWith("/providers")) return "providers";
   if (pathname.startsWith("/hub")) return "hub";
   if (pathname.startsWith("/account")) return "account";
+  if (pathname.startsWith("/settings")) return "account";
+  if (pathname.startsWith("/diagnostics")) return "diagnostics";
   return "files";
 }
 

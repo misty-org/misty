@@ -1,0 +1,95 @@
+import { existsSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { spawnSync } from "node:child_process";
+
+const appDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const deviceName = process.env.TAURI_IOS_SIMULATOR_DEVICE ?? "iPhone 17";
+const bundleId = process.env.TAURI_IOS_BUNDLE_ID ?? "com.misty.desktop";
+
+function run(command, args, options = {}) {
+  const result = spawnSync(command, args, {
+    cwd: appDir,
+    stdio: "inherit",
+    env: { ...process.env, ...options.env },
+  });
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    process.exit(result.status ?? 1);
+  }
+}
+
+function output(command, args) {
+  const result = spawnSync(command, args, {
+    cwd: appDir,
+    encoding: "utf8",
+    env: process.env,
+  });
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    process.stderr.write(result.stderr);
+    process.exit(result.status ?? 1);
+  }
+  return result.stdout.trim();
+}
+
+function simulatorUdid(name) {
+  const json = output("xcrun", ["simctl", "list", "devices", "available", "--json"]);
+  const payload = JSON.parse(json);
+  const candidates = Object.values(payload.devices ?? {})
+    .flat()
+    .filter((device) => device?.name === name && device?.isAvailable);
+  const booted = candidates.find((device) => device.state === "Booted");
+  const selected = booted ?? candidates[0];
+  if (!selected?.udid) {
+    console.error(`Could not find an available iOS simulator named "${name}".`);
+    process.exit(1);
+  }
+  return selected.udid;
+}
+
+function simulatorAppPath() {
+  const candidates = [
+    "src-tauri/gen/apple/build/misty-desktop_iOS.xcarchive/Products/Applications/Misty.app",
+    "src-tauri/gen/apple/build/Payload/Misty.app",
+  ].map((path) => resolve(appDir, path));
+  const appPath = candidates.find((path) => existsSync(path));
+  if (!appPath) {
+    console.error("Could not find the built Misty.app simulator bundle.");
+    process.exit(1);
+  }
+  return appPath;
+}
+
+const clang = output("xcrun", ["--sdk", "iphonesimulator", "--find", "clang"]);
+run("npm", ["run", "proxy:archive:ios-simulator"]);
+run("npm", [
+  "run",
+  "tauri",
+  "--",
+  "ios",
+  "build",
+  "--debug",
+  "--target",
+  "aarch64-sim",
+  "--features",
+  "embedded-proxy-go",
+  "--no-sign",
+  "--archive-only",
+], {
+  env: {
+    SWIFT_RS_CLANG: clang,
+    MISTY_PROXY_RUNTIME: "embedded",
+    MISTY_PROXY_GO_LIB_DIR: "src-tauri/target/misty-proxy/ios-simulator-arm64",
+    MISTY_PROXY_GO_LIB_NAME: "misty_proxy",
+  },
+});
+
+const udid = simulatorUdid(deviceName);
+const appPath = simulatorAppPath();
+
+run("xcrun", ["simctl", "boot", udid]);
+run("open", ["-a", "Simulator"]);
+run("xcrun", ["simctl", "install", udid, appPath]);
+run("xcrun", ["simctl", "launch", udid, bundleId]);
+

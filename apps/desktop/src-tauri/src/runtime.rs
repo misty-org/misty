@@ -49,7 +49,11 @@ impl MistyRuntime {
         let clipboard = ClipboardService::new(None, Some(shared_clipboard_client));
         clipboard.set_device_identity("local".to_owned(), "This Misty".to_owned());
         proxy_clipboard.start(clipboard.clone());
-        let proxy = ProxyService::new_with_proxy_url(environment.clone(), proxy_url);
+        let proxy = ProxyService::new_with_proxy_runtime(
+            environment.clone(),
+            Some(proxy_runtime.clone()),
+            proxy_url,
+        );
         let providers = ProviderService::new(proxy.clone());
         let transfers = TransferService::new(environment.clone());
         let sync_pairs = FileSyncPairStore::new(environment.misty_db_path());

@@ -9,6 +9,7 @@ import {
   LogOut,
   Mail,
   MonitorSmartphone,
+  Settings,
   Shield,
   Trash2,
   User,
@@ -222,24 +223,30 @@ export function MobileAccountPage() {
               user={user}
               license={license}
               disabled={disabled}
+              onSettings={() => navigate("/account/settings")}
               onSignOut={() => void handleSignOut()}
             />
           ) : (
-            <section className="mobile-panel">
-              <header>
-                <LogIn size={20} strokeWidth={1.8} />
-                <h3>Sign in to Misty</h3>
-              </header>
-              <p>Use your Misty account to unlock license status and account-backed features on this device.</p>
-              <div className="mobile-action-stack">
-                <button type="button" className="mobile-primary-action" onClick={() => navigate("/account/signin")}>
-                  <LogIn size={17} /> Sign in
-                </button>
-                <button type="button" className="mobile-secondary-action" onClick={() => navigate("/account/register")}>
-                  <UserPlus size={17} /> Create account
-                </button>
-              </div>
-            </section>
+            <>
+              <section className="mobile-panel">
+                <header>
+                  <LogIn size={20} strokeWidth={1.8} />
+                  <h3>Sign in to Misty</h3>
+                </header>
+                <p>Use your Misty account to unlock license status and account-backed features on this device.</p>
+                <div className="mobile-action-stack">
+                  <button type="button" className="mobile-primary-action" onClick={() => navigate("/account/signin")}>
+                    <LogIn size={17} /> Sign in
+                  </button>
+                  <button type="button" className="mobile-secondary-action" onClick={() => navigate("/account/register")}>
+                    <UserPlus size={17} /> Create account
+                  </button>
+                </div>
+              </section>
+              <AccountSection title="Preferences">
+                <AccountRow icon={Settings} label="Settings" onClick={() => navigate("/account/settings")} />
+              </AccountSection>
+            </>
           )}
         </>
       ) : null}
@@ -253,6 +260,7 @@ function MobileAccountOverview(props: {
   user: CurrentUser;
   license: CurrentLicense | null;
   disabled: boolean;
+  onSettings: () => void;
   onSignOut: () => void;
 }) {
   const displayName = props.user.name || "Misty user";
@@ -280,6 +288,7 @@ function MobileAccountOverview(props: {
       </AccountSection>
 
       <AccountSection title="Preferences">
+        <AccountRow icon={Settings} label="Settings" onClick={props.onSettings} />
         <AccountRow icon={Bell} label="Notifications" />
         <AccountRow icon={Lock} label="Privacy" />
       </AccountSection>
@@ -309,10 +318,11 @@ function AccountRow(props: {
   icon: LucideIcon;
   label: string;
   detail?: string;
+  onClick?: () => void;
 }) {
   const Icon = props.icon;
   return (
-    <button type="button" className="mobile-account-row">
+    <button type="button" className="mobile-account-row" onClick={props.onClick}>
       <span className="mobile-account-row-icon">
         <Icon size={22} strokeWidth={1.85} />
       </span>
