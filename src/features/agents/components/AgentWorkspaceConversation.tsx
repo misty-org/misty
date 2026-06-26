@@ -6,6 +6,8 @@ import { MistyComposer } from "@/features/global-search/MistyComposer";
 import { useAiVoiceRecorder } from "@/features/ai-surface/useAiVoiceRecorder";
 import { useGlobalMistyAttachments } from "@/features/global-search/useGlobalMistyAttachments";
 import { aiSurfaceApi } from "@/features/ai-surface/api";
+import { finishLocalExecution } from "@/features/agents/localExecution";
+import { hasTauriInternals } from "@/shared/platform/tauri";
 import { AgentConversationView } from "./AgentConversationView";
 
 const suggestions = [
@@ -53,6 +55,15 @@ export function AgentWorkspaceConversation({
   const conversation = scoped.find((c) => c.id === state.activeConversationId);
 
   const reportError = (error: string) => useMistyStore.setState({ error: error || null });
+  const executionMode = state.executionMode ?? "user";
+  const isDesktop = hasTauriInternals() && /Mac|Win/.test(navigator.platform);
+
+  const handleModeChange = (mode: "user" | "agent" | "team") => {
+    void finishLocalExecution()
+      .then(() => useMistyStore.setState({ executionMode: mode }))
+      .catch((reason) => useMistyStore.setState({ error: String(reason) }));
+  };
+
   const voice = useAiVoiceRecorder({
     onTranscript: (text) => {
       setDraft((previous) => (previous ? `${previous} ${text}` : text));
@@ -231,6 +242,53 @@ export function AgentWorkspaceConversation({
           <p className="agent-compose-hint">
             This agent is disabled. Enable it in Settings to start a conversation.
           </p>
+        )}
+        {isDesktop && (
+          <div className="agent-mode-bar">
+            <span className="agent-mode-label">Mode</span>
+            <div className="agent-mode-selector" role="radiogroup" aria-label="Work mode">
+              <button
+                type="button"
+                role="radio"
+                aria-checked={executionMode === "user"}
+                className={`agent-mode-pill ${executionMode === "user" ? "active" : ""}`}
+                disabled={state.working}
+                onClick={() => handleModeChange("user")}
+                title="Discuss and draft — read-only apps"
+              >
+                User
+              </button>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={executionMode === "agent"}
+                className={`agent-mode-pill ${executionMode === "agent" ? "active" : ""}`}
+                disabled={state.working}
+                onClick={() => handleModeChange("agent")}
+                title="Work in this window — full browser and connected app actions"
+              >
+                Agent
+              </button>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={executionMode === "team"}
+                className={`agent-mode-pill ${executionMode === "team" ? "active" : ""}`}
+                disabled={state.working}
+                onClick={() => handleModeChange("team")}
+                title="Work in separate window — dedicated background worker"
+              >
+                Team
+              </button>
+            </div>
+            <span className="agent-mode-description">
+              {executionMode === "user"
+                ? "Discuss & draft"
+                : executionMode === "agent"
+                  ? "Work in this window (browser & apps)"
+                  : "Work in dedicated window"}
+            </span>
+          </div>
         )}
         <MistyComposer
           className="agent-workspace-composer"

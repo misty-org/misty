@@ -29,12 +29,10 @@ export async function readInvocationStream(
       reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
-      while (!signal.aborted) {
-        const chunk = await reader.read();
-        if (chunk.done) throw new Error("Misty’s response was interrupted. Please try again.");
-        buffer += decoder.decode(chunk.value, { stream: true });
-        // Normalize after buffering: CRLF may span two network chunks.
-        buffer = buffer.replace(/\r\n/g, "\n");
+      const processBuffer = (final = false): boolean => {
+        if (final && buffer.trim() && !buffer.endsWith("\n\n")) {
+          buffer += "\n\n";
+        }
         let boundary = buffer.indexOf("\n\n");
         while (boundary >= 0) {
           const block = buffer.slice(0, boundary);
@@ -65,10 +63,24 @@ export async function readInvocationStream(
                 lastEventId = id;
               }
             }
-            if (terminalEvents.has(event.type)) return;
+            if (terminalEvents.has(event.type)) return true;
           }
           boundary = buffer.indexOf("\n\n");
         }
+        return false;
+      };
+      while (!signal.aborted) {
+        const chunk = await reader.read();
+        if (chunk.done) {
+          buffer += decoder.decode();
+          buffer = buffer.replace(/\r\n/g, "\n");
+          if (processBuffer(true)) return;
+          throw new Error("Misty’s response was interrupted. Please try again.");
+        }
+        buffer += decoder.decode(chunk.value, { stream: true });
+        // Normalize after buffering: CRLF may span two network chunks.
+        buffer = buffer.replace(/\r\n/g, "\n");
+        if (processBuffer(false)) return;
       }
     } catch (error) {
       if (signal.aborted) return;
