@@ -1,0 +1,295 @@
+@import "tailwindcss";
+@source "./**/*.{ts,tsx}";
+
+:root {
+  color-scheme: dark;
+  --misty-bg: #07090b;
+  --misty-bg-soft: #090c10;
+  --misty-surface: #0b0d0f;
+  --misty-surface-2: #111317;
+  --misty-surface-3: #18181b;
+  --misty-surface-hover: #202126;
+  --misty-border: #27272a;
+  --misty-border-strong: rgba(255, 255, 255, 0.14);
+  --misty-border-soft: rgba(255, 255, 255, 0.08);
+  --misty-text: #ffffff;
+  --misty-text-muted: #d4d4d8;
+  --misty-text-subtle: #8f8f8f;
+  --misty-primary: #e4e4e7;
+  --misty-primary-hover: #f4f4f5;
+  --misty-primary-active: #d4d4d8;
+  --misty-primary-contrast: #07090b;
+  --misty-accent: #e4e4e7;
+  --misty-success: #22c55e;
+  --misty-warning: #eab308;
+  --misty-danger: #ef4444;
+  --misty-shadow: rgba(0, 0, 0, 0.42);
+  --misty-focus-ring: rgba(244, 244, 245, 0.18);
+  --misty-glass: rgba(11, 13, 15, 0.88);
+  --misty-glass-border: rgba(255, 255, 255, 0.08);
+  --misty-radius-xs: 8px;
+  --misty-radius-sm: 10px;
+  --misty-radius-md: 12px;
+  --misty-radius-lg: 16px;
+  --misty-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --misty-transition-fast: 160ms var(--misty-ease-out);
+  --misty-transition-page: 320ms var(--misty-ease-out);
+  --misty-grid-bg:
+    linear-gradient(rgba(228, 228, 231, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(228, 228, 231, 0.03) 1px, transparent 1px);
+  --misty-grid-size: 60px 60px;
+  --misty-safe-top: env(safe-area-inset-top, 0px);
+  --misty-safe-right: env(safe-area-inset-right, 0px);
+  --misty-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --misty-safe-left: env(safe-area-inset-left, 0px);
+  --misty-mobile-edge: 16px;
+  --misty-mobile-page-top: 14px;
+  --misty-mobile-page-bottom: 18px;
+  --misty-mobile-tabbar-height: 72px;
+  --misty-route-margin: 18px;
+  --misty-body-font-size: 15px;
+  --misty-font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--misty-font-family);
+  background: var(--misty-bg);
+  color: var(--misty-text);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --misty-bg: #f5f2ec;
+  --misty-bg-soft: #ede8df;
+  --misty-surface: #fffaf2;
+  --misty-surface-2: #f8f3eb;
+  --misty-surface-3: #ebe4d9;
+  --misty-border: #d8cec0;
+  --misty-border-soft: rgba(49, 42, 34, 0.13);
+  --misty-text: #1b1a18;
+  --misty-text-muted: #5f594f;
+  --misty-text-subtle: #847a6c;
+  --misty-primary: #1f1e1c;
+  --misty-primary-contrast: #fffaf2;
+  --misty-accent: #246dc5;
+  --misty-success: #217447;
+  --misty-warning: #9a6a15;
+  --misty-danger: #b4444e;
+  --misty-shadow: rgba(68, 54, 35, 0.16);
+  --misty-focus-ring: rgba(36, 109, 197, 0.22);
+  --misty-glass: rgba(255, 250, 242, 0.9);
+}
+
+:root[data-ui-scale="small"] {
+  --misty-route-margin: 14px;
+}
+
+:root[data-ui-scale="large"] {
+  --misty-route-margin: 22px;
+}
+
+:root[data-font-size="small"] {
+  --misty-body-font-size: 14px;
+}
+
+:root[data-font-size="large"] {
+  --misty-body-font-size: 16px;
+}
+
+:root[data-reduced-motion="true"] *,
+:root[data-reduced-motion="true"] *::before,
+:root[data-reduced-motion="true"] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  scroll-behavior: auto !important;
+  transition-duration: 0.001ms !important;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 900px;
+  min-height: 600px;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--misty-bg);
+  color: var(--misty-text);
+  font-size: var(--misty-body-font-size);
+}
+
+#root {
+  height: 100vh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: 32px;
+  line-height: 1.1;
+  font-weight: 650;
+}
+
+h2 {
+  font-size: 18px;
+  line-height: 1.2;
+  font-weight: 620;
+}
+
+p {
+  color: var(--misty-text-muted);
+  margin-top: 6px;
+}
+
+button:disabled,
+input:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+@keyframes shimmer {
+  to { background-position: -220% 0; }
+}
+
+label {
+  display: grid;
+  gap: 6px;
+  color: var(--misty-text-muted);
+  text-transform: capitalize;
+}
+
+input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--misty-border);
+  border-radius: 8px;
+  background: var(--misty-surface);
+  color: var(--misty-text);
+  padding: 9px 10px;
+}
+
+@media (max-width: 980px) {
+  body {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 720px) {
+  :root {
+    --misty-route-margin: 0px;
+    --misty-body-font-size: 14px;
+  }
+
+  :root[data-theme="light"] {
+    color-scheme: dark;
+    --misty-bg: #070707;
+    --misty-bg-soft: #0c0c0c;
+    --misty-surface: #101010;
+    --misty-surface-2: #171717;
+    --misty-surface-3: #222222;
+    --misty-border: #313131;
+    --misty-border-soft: rgba(232, 232, 232, 0.1);
+    --misty-text: #f1f1f1;
+    --misty-text-muted: #b8b8b8;
+    --misty-text-subtle: #8c8c8c;
+    --misty-primary: #f1f1f1;
+    --misty-primary-contrast: #070707;
+    --misty-accent: #b7b7b7;
+    --misty-success: #b8b8b8;
+    --misty-warning: #bfbfbf;
+    --misty-danger: #b0b0b0;
+    --misty-shadow: rgba(0, 0, 0, 0.45);
+    --misty-focus-ring: rgba(183, 183, 183, 0.35);
+    --misty-glass: rgba(12, 12, 12, 0.9);
+  }
+
+  body,
+  #root {
+    height: 100dvh;
+  }
+
+  body {
+    min-height: 0;
+    overflow: hidden;
+    background: #070707;
+  }
+
+}
+
+:root[data-form-factor="mobile"],
+:root[data-form-factor="mobile"] body,
+:root[data-form-factor="mobile"] #root {
+  width: 100%;
+  height: 100dvh;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: #070707;
+  color: #f1f1f1;
+}
+
+:root[data-form-factor="mobile"] {
+  color-scheme: dark;
+  --misty-bg: #070707;
+  --misty-bg-soft: #0c0c0c;
+  --misty-surface: #101010;
+  --misty-surface-2: #171717;
+  --misty-surface-3: #222222;
+  --misty-border: #313131;
+  --misty-border-soft: rgba(232, 232, 232, 0.1);
+  --misty-text: #f1f1f1;
+  --misty-text-muted: #b8b8b8;
+  --misty-text-subtle: #8c8c8c;
+  --misty-accent: #b7b7b7;
+}
+
+/* Misty website design-system application layer.
+   Keep new app/mobile surfaces on these tokens unless a feature needs a domain-specific accent. */
+:root[data-form-factor="mobile"],
+:root[data-form-factor="mobile"] body,
+:root[data-form-factor="mobile"] #root {
+  background: var(--misty-bg);
+  color: var(--misty-text);
+}
+
+:root[data-form-factor="mobile"] {
+  --misty-bg: #07090b;
+  --misty-bg-soft: #090c10;
+  --misty-surface: #0b0d0f;
+  --misty-surface-2: #111317;
+  --misty-surface-3: #18181b;
+  --misty-surface-hover: #202126;
+  --misty-border: #27272a;
+  --misty-border-strong: rgba(255, 255, 255, 0.14);
+  --misty-border-soft: rgba(255, 255, 255, 0.08);
+  --misty-text: #ffffff;
+  --misty-text-muted: #d4d4d8;
+  --misty-text-subtle: #8f8f8f;
+  --misty-primary: #e4e4e7;
+  --misty-primary-hover: #f4f4f5;
+  --misty-primary-active: #d4d4d8;
+  --misty-primary-contrast: #07090b;
+  --misty-accent: #e4e4e7;
+  --misty-focus-ring: rgba(244, 244, 245, 0.18);
+  --misty-glass: rgba(11, 13, 15, 0.88);
+}
+
+/* Compact mobile surface pass: keep the app readable, but remove decorative card stacks. */
+:root[data-form-factor="mobile"] {
+  --misty-mobile-page-top: 10px;
+  --misty-mobile-page-bottom: 12px;
+}
