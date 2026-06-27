@@ -1,6 +1,7 @@
 import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import type { AppFormFactor } from "./platform";
+import { hasTauriInternals } from "../shared/tauri";
 
 const mistyDeepLinkScheme = "misty:";
 const ignoredMistyHosts = new Set(["recent", "starred", "trash"]);
@@ -32,6 +33,7 @@ export function installMistyDeepLinkHandler(
 
   void (async () => {
     try {
+      if (!hasTauriInternals()) return;
       handleUrls(await getCurrent());
       unlisten = await onOpenUrl(handleUrls);
     } catch {

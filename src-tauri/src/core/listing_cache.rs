@@ -108,7 +108,7 @@ impl ListingCache {
 }
 
 pub fn encode_path(path: &str) -> String {
-    if path.is_empty() {
+    if path.is_empty() || path == "/" {
         return "__root__".to_string();
     }
     let mut encoded = String::new();
@@ -142,6 +142,7 @@ mod tests {
     fn encodes_remote_paths_as_single_components() {
         assert_eq!(encode_path("/Documents/Work"), "%2FDocuments%2FWork");
         assert_eq!(encode_path(""), "__root__");
+        assert_eq!(encode_path("/"), "__root__");
         assert_eq!(encode_path("safe-name_1.txt"), "safe-name_1.txt");
     }
 }

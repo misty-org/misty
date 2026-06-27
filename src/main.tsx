@@ -1,8 +1,16 @@
 import ReactDOM from "react-dom/client";
-import { App } from "./App";
 import { installClientDebugging } from "./shared/debug/clientDebug";
-import "./styles.css";
 
 installClientDebugging();
 
-ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(<App />);
+const root = ReactDOM.createRoot(document.getElementById("root") as HTMLElement);
+
+void bootstrap();
+
+async function bootstrap() {
+  const [{ App }] = await Promise.all([
+    import("./App"),
+    import("./styles.css"),
+  ]);
+  root.render(<App />);
+}
