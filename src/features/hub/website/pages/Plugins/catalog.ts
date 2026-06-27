@@ -1,10 +1,12 @@
 import type { PluginBrowserEntry, PluginBrowserLauncher, PluginBrowserLink } from "./types";
 
 const DEFAULT_CATALOG_BASE_URL =
-  "https://raw.githubusercontent.com/misty-org/misty-plugins/main/catalog";
+  "https://raw.githubusercontent.com/misty-org/misty-extensions/main/catalog";
 
 export const pluginCatalogBaseUrl =
-  import.meta.env.VITE_PLUGIN_CATALOG_BASE_URL ?? DEFAULT_CATALOG_BASE_URL;
+  import.meta.env.VITE_EXTENSION_CATALOG_BASE_URL
+  ?? import.meta.env.VITE_PLUGIN_CATALOG_BASE_URL
+  ?? DEFAULT_CATALOG_BASE_URL;
 
 type PluginCatalogIndexEntry = {
   id: string;
@@ -57,7 +59,7 @@ function catalogEntryUrl(entry: PluginCatalogIndexEntry) {
   );
   if (githubRepoMatch) {
     const [, owner, repo] = githubRepoMatch;
-    return `https://raw.githubusercontent.com/${owner}/${repo}/main/catalog/plugins/${entry.id}.json`;
+    return `https://raw.githubusercontent.com/${owner}/${repo}/main/catalog/extensions/${entry.id}.json`;
   }
 
   return resolveUrl(entry.url);
@@ -96,7 +98,7 @@ function normalizeCatalogEntry(
 export async function loadPluginCatalog() {
   const indexResponse = await fetch(`${pluginCatalogBaseUrl}/index.json`);
   if (!indexResponse.ok) {
-    throw new Error(`Could not load plugin catalog index: ${indexResponse.status}`);
+    throw new Error(`Could not load extension catalog index: ${indexResponse.status}`);
   }
 
   const index = (await indexResponse.json()) as PluginCatalogIndexEntry[];
@@ -104,7 +106,7 @@ export async function loadPluginCatalog() {
     index.map(async (entry) => {
       const response = await fetch(catalogEntryUrl(entry));
       if (!response.ok) {
-        throw new Error(`Could not load plugin catalog entry ${entry.id}: ${response.status}`);
+        throw new Error(`Could not load extension catalog entry ${entry.id}: ${response.status}`);
       }
       return normalizeCatalogEntry(entry, (await response.json()) as RawPluginCatalogFile);
     }),

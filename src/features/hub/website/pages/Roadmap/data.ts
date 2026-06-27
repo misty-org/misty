@@ -35,7 +35,7 @@ export const phases: RoadmapPhase[] = [
       "S3-compatible storage support",
       "Shared workspaces & team accounts",
       "Mobile companion app",
-      "Plugin / extension system",
+      "Extension system",
       "Offline mode with sync queue",
     ],
   },

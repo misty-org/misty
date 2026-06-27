@@ -51,6 +51,12 @@ pub struct RenameItemsRequest {
 #[serde(rename_all = "camelCase")]
 pub struct DeleteItemsRequest {
     pub paths: Vec<String>,
+    #[serde(default = "default_delete_permanent")]
+    pub permanent: bool,
+}
+
+fn default_delete_permanent() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Deserialize)]

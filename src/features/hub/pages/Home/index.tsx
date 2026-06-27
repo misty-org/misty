@@ -223,6 +223,7 @@ export default function HomePage() {
 }
 
 function HubHomeLoading() {
+  const skeletonBlockClass = "misty-skeleton rounded-md";
   return (
     <div className="mx-auto flex w-full max-w-300 flex-1 flex-col px-5 py-4">
       <div className="border-b border-white/[0.07] pb-4">
@@ -237,11 +238,11 @@ function HubHomeLoading() {
             className="flex h-[20rem] min-h-0 flex-col overflow-hidden rounded-[2rem] border border-white/10 bg-[#0a0d10]/95 p-6 shadow-2xl shadow-black/25"
             key={index}
           >
-            <div className="h-5 w-32 animate-pulse rounded-md bg-white/[0.08]" />
+            <div className={`${skeletonBlockClass} h-5 w-32`} />
             <div className="mt-8 grid gap-3">
-              <div className="h-4 w-3/4 animate-pulse rounded-md bg-white/[0.06]" />
-              <div className="h-4 w-1/2 animate-pulse rounded-md bg-white/[0.06]" />
-              <div className="h-4 w-2/3 animate-pulse rounded-md bg-white/[0.06]" />
+              <div className={`${skeletonBlockClass} h-4 w-3/4`} />
+              <div className={`${skeletonBlockClass} h-4 w-1/2`} />
+              <div className={`${skeletonBlockClass} h-4 w-2/3`} />
             </div>
             <div className="mt-auto text-sm text-text-muted">
               Checking Misty Hub status...

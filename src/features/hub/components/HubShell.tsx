@@ -6,6 +6,8 @@ import { HubNavbar } from "./HubNavbar";
 const titleByPath = new Map([
   ["/hub", "Misty Hub - Home"],
   ["/hub/dashboard", "Misty Hub - Dashboard"],
+  ["/hub/extensions", "Misty Hub - Extensions"],
+  ["/hub/plugins", "Misty Hub - Extensions"],
   ["/hub/resources/changelog", "Misty Hub - Changelog"],
   ["/hub/signin", "Misty Hub - Sign In"],
   ["/hub/register", "Misty Hub - Register"],

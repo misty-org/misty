@@ -138,9 +138,9 @@ impl ProxyService {
     }
 
     pub fn url(&self, path: &str) -> ApiResult<String> {
-        Err(ApiError::Unavailable(
-            format!("Local proxy URLs are disabled; use embedded proxy invoke for {path}."),
-        ))
+        Err(ApiError::Unavailable(format!(
+            "Local proxy URLs are disabled; use embedded proxy invoke for {path}."
+        )))
     }
 
     pub async fn get_with_query<Q>(&self, path: &str, query: &Q) -> ApiResult<ProxyResponse>

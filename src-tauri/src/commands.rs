@@ -38,6 +38,7 @@ use crate::services::providers::{
 };
 use crate::services::proxy::ProxySnapshot;
 use crate::services::proxy_runtime::ProxyRuntimeSnapshot;
+use crate::services::search::{SearchQueryRequest, SearchResult, SearchScanRequest, SearchStatus};
 use crate::services::settings::{OpenWithAssociation, SaveSettingsRequest, SettingsSnapshot};
 use crate::services::transfers::{TransferFilter, TransferPage};
 
@@ -217,6 +218,37 @@ pub async fn explorer_list_directory(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<DirectoryListing> {
     state.explorer.list_directory(request).await
+}
+
+#[tauri::command]
+pub async fn search_init(state: State<'_, MistyRuntime>) -> ApiResult<SearchStatus> {
+    state.search.init().await
+}
+
+#[tauri::command]
+pub async fn search_get_status(state: State<'_, MistyRuntime>) -> ApiResult<SearchStatus> {
+    state.search.status().await
+}
+
+#[tauri::command]
+pub async fn search_start_scan(
+    request: SearchScanRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<SearchStatus> {
+    state.search.start_scan(request).await
+}
+
+#[tauri::command]
+pub async fn search_cancel_scan(state: State<'_, MistyRuntime>) -> ApiResult<SearchStatus> {
+    state.search.cancel_scan().await
+}
+
+#[tauri::command]
+pub async fn search_query(
+    request: SearchQueryRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<Vec<SearchResult>> {
+    state.search.query(request).await
 }
 
 #[tauri::command]

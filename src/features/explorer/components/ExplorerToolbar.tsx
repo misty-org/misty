@@ -7,24 +7,24 @@ import {
   Copy,
   Command,
   FilePlus,
+  Folder,
   FolderPlus,
-  FolderUp,
   Grid2X2,
-  GitCompareArrows,
   List,
   MoreHorizontal,
   Pencil,
   Plus,
-  RefreshCcw,
   Scissors,
   Search,
   Trash2,
-  Upload,
+  Redo2,
+  Undo2,
 } from "lucide-react";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { CSSProperties } from "react";
-import type { PluginCommandEntry } from "../../../api/types";
+import { searchQuery } from "../../../api/misty";
+import type { PluginCommandEntry, SearchResult } from "../../../api/types";
 import type { ExplorerViewMode } from "../state/useExplorerStore";
 import { breadcrumbSegments } from "../utils/fileFormat";
 
@@ -59,7 +59,6 @@ export type ExplorerCommandId =
   | "explorer.paste"
   | "explorer.undo"
   | "explorer.redo"
-  | "explorer.toggle_hidden"
   | "explorer.preview.toggle"
   | "explorer.sidebar.toggle"
   | "explorer.toggle_chat"
@@ -79,7 +78,7 @@ interface ExplorerCommandPaletteEntry {
   id: string;
   label: string;
   hint: string;
-  group?: "Explorer" | "Plugin";
+  group?: "Explorer" | "Extension";
   pluginName?: string;
 }
 
@@ -106,7 +105,6 @@ const explorerCommands: ExplorerCommandPaletteEntry[] = [
   { id: "explorer.paste", label: "Paste", hint: "Paste into the active folder" },
   { id: "explorer.undo", label: "Undo", hint: "Undo the latest completed rename or move" },
   { id: "explorer.redo", label: "Redo", hint: "Redo the latest undone rename or move" },
-  { id: "explorer.toggle_hidden", label: "Toggle Hidden Files", hint: "Show or hide hidden files" },
   { id: "explorer.preview.toggle", label: "Toggle Preview", hint: "Show or hide the preview/details panel" },
   { id: "explorer.sidebar.toggle", label: "Toggle Sidebar", hint: "Show or hide the navigation sidebar" },
   { id: "explorer.toggle_chat", label: "Toggle Chat", hint: "Open or close the explorer chat overlay" },
@@ -133,7 +131,6 @@ const toolbarStyles = {
   actionRight: "flex min-w-0 flex-none items-center gap-2",
   toolbarButton:
     "inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-md border-0 bg-transparent px-2 py-1 leading-none text-[#adadad] hover:bg-[#212121] hover:text-[#eeeeee] disabled:cursor-default disabled:opacity-45 disabled:hover:bg-transparent disabled:hover:text-[#adadad]",
-  toolbarButtonSelected: "bg-[#212121] text-[#eeeeee]",
   pathBar:
     "flex h-8 min-w-0 items-center gap-0.5 overflow-x-auto overflow-y-hidden rounded-lg border border-[#2f2f2f] bg-[#1b1b1b] px-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
   pathBarEditing: "border-[#828282] shadow-[inset_0_0_0_1px_rgba(131,131,131,0.24)]",
@@ -151,6 +148,8 @@ const toolbarStyles = {
   paletteTitle: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-semibold",
   paletteSubtitle: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs text-[#979797]",
   paletteEmpty: "p-2.5 text-xs text-[#979797]",
+  paletteDivider: "my-1 h-px bg-[#292929]",
+  paletteSection: "px-2 pb-1 pt-1 text-[10px] font-bold uppercase tracking-normal text-[#777777]",
   newButton:
     "inline-flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-[#323232] bg-[#1b1b1b] px-3 py-0 leading-none text-[#eeeeee] hover:bg-[#212121]",
   newMenu: "grid w-52 gap-0.5 rounded-[13px] border border-[#323232] bg-[rgba(17, 17, 17, 0.96)] p-2 shadow-[0_18px_40px_rgba(0,0,0,0.45)] backdrop-blur-xl",
@@ -169,7 +168,6 @@ interface ExplorerToolbarProps {
   path: string;
   commandQuery: string;
   viewMode: ExplorerViewMode;
-  showHidden: boolean;
   locationResults: ExplorerLocationResult[];
   pluginCommands: PluginCommandEntry[];
   onNavigate: (path: string) => void;
@@ -178,13 +176,15 @@ interface ExplorerToolbarProps {
   canGoForward: boolean;
   canCreateFile: boolean;
   canCreateFolder: boolean;
+  canUndo: boolean;
+  canRedo: boolean;
+  undoTitle: string;
+  redoTitle: string;
   onBack: () => void;
   onForward: () => void;
   onParent: () => void;
-  onRefresh: () => void;
   onCommandQuery: (value: string) => void;
   onViewMode: (mode: ExplorerViewMode) => void;
-  onToggleHidden: () => void;
   onCreateFile: () => void;
   onCreateFolder: () => void;
   onCut: () => void;
@@ -192,9 +192,8 @@ interface ExplorerToolbarProps {
   onPaste: () => void;
   onRename: () => void;
   onDelete: () => void;
-  onUploadFiles: () => void;
-  onUploadFolder: () => void;
-  onCompare: () => void;
+  onUndo: () => void;
+  onRedo: () => void;
   onRunCommand: (commandId: string) => void;
 }
 
@@ -208,6 +207,9 @@ export const ExplorerToolbar = memo(function ExplorerToolbar(props: ExplorerTool
     left: 0,
     top: 0,
   });
+  const [indexedResults, setIndexedResults] = useState<SearchResult[]>([]);
+  const [indexedSearching, setIndexedSearching] = useState(false);
+  const [indexedError, setIndexedError] = useState<string | null>(null);
   const newMenuPopupRef = useRef<HTMLDivElement | null>(null);
   const newButtonRef = useRef<HTMLButtonElement | null>(null);
   const commandSearchRef = useRef<HTMLLabelElement | null>(null);
@@ -227,7 +229,7 @@ export const ExplorerToolbar = memo(function ExplorerToolbar(props: ExplorerTool
         id: command.id,
         label: command.label,
         hint: command.hint,
-        group: "Plugin",
+        group: "Extension",
         pluginName: command.pluginName,
       })),
     ],
@@ -253,7 +255,49 @@ export const ExplorerToolbar = memo(function ExplorerToolbar(props: ExplorerTool
     },
     [locationFilter, props.locationResults],
   );
-  const locationMode = searchFocused && !commandMode && filteredLocations.length > 0;
+  const locationMode = searchFocused
+    && !commandMode
+    && Boolean(locationFilter)
+    && (filteredLocations.length > 0 || indexedResults.length > 0 || indexedSearching || Boolean(indexedError));
+
+  useEffect(() => {
+    let canceled = false;
+    const query = locationFilter.trim();
+    if (!query) {
+      setIndexedResults([]);
+      setIndexedSearching(false);
+      setIndexedError(null);
+      return;
+    }
+    setIndexedSearching(true);
+    setIndexedError(null);
+    const timer = window.setTimeout(() => {
+      void searchQuery({
+        query,
+        scope: "everything",
+        currentPath: props.path,
+        includeFiles: true,
+        includeDirectories: true,
+        includeHidden: false,
+        limit: 8,
+      })
+        .then((results) => {
+          if (canceled) return;
+          setIndexedResults(results);
+          setIndexedSearching(false);
+        })
+        .catch((error: unknown) => {
+          if (canceled) return;
+          setIndexedResults([]);
+          setIndexedSearching(false);
+          setIndexedError(error instanceof Error ? error.message : String(error));
+        });
+    }, 160);
+    return () => {
+      canceled = true;
+      window.clearTimeout(timer);
+    };
+  }, [locationFilter, props.path]);
 
   useEffect(() => {
     if (!pathEditing) setPathDraft(props.path);
@@ -381,6 +425,13 @@ export const ExplorerToolbar = memo(function ExplorerToolbar(props: ExplorerTool
     props.onCommandQuery("");
   };
 
+  const runIndexedResult = (result: SearchResult) => {
+    const target = searchResultNavigationPath(result);
+    props.onNavigateLocation(target);
+    setSearchFocused(false);
+    props.onCommandQuery("");
+  };
+
   const beginPathEdit = useCallback(() => {
     setPathDraft(props.path);
     setPathEditing(true);
@@ -407,7 +458,6 @@ export const ExplorerToolbar = memo(function ExplorerToolbar(props: ExplorerTool
           <button className={toolbarStyles.toolbarButton} disabled={!props.canGoBack} onClick={props.onBack}><ChevronLeft size={18} /></button>
           <button className={toolbarStyles.toolbarButton} disabled={!props.canGoForward} onClick={props.onForward}><ChevronRight size={18} /></button>
           <button className={toolbarStyles.toolbarButton} onClick={props.onParent}><ArrowUp size={18} /></button>
-          <button className={toolbarStyles.toolbarButton} onClick={props.onRefresh}><RefreshCcw size={18} /></button>
         </div>
 
         <div
@@ -472,6 +522,9 @@ export const ExplorerToolbar = memo(function ExplorerToolbar(props: ExplorerTool
               } else if (locationMode && event.key === "Enter" && filteredLocations[0]) {
                 event.preventDefault();
                 runLocation(filteredLocations[0].path);
+              } else if (locationMode && event.key === "Enter" && indexedResults[0]) {
+                event.preventDefault();
+                runIndexedResult(indexedResults[0]);
               }
             }}
           />
@@ -500,7 +553,7 @@ export const ExplorerToolbar = memo(function ExplorerToolbar(props: ExplorerTool
                     <Command size={16} />
                     <span className={toolbarStyles.paletteText}>
                       <strong className={toolbarStyles.paletteTitle}>{command.label}</strong>
-                      <small className={toolbarStyles.paletteSubtitle}>{command.group === "Plugin" && command.pluginName ? `${command.pluginName} · ${command.hint}` : command.hint}</small>
+                      <small className={toolbarStyles.paletteSubtitle}>{command.group === "Extension" && command.pluginName ? `${command.pluginName} · ${command.hint}` : command.hint}</small>
                     </span>
                   </button>
                 )) : <div className={toolbarStyles.paletteEmpty}>No explorer commands found.</div>}
@@ -521,21 +574,51 @@ export const ExplorerToolbar = memo(function ExplorerToolbar(props: ExplorerTool
                 }}
                 className={toolbarStyles.palette}
               >
-                {filteredLocations.map((location) => (
-                  <button
-                    key={location.id}
-                    type="button"
-                    role="menuitem"
-                    className={toolbarStyles.paletteButton}
-                    onClick={() => runLocation(location.path)}
-                  >
-                    <FolderUp size={16} />
-                    <span className={toolbarStyles.paletteText}>
-                      <strong className={toolbarStyles.paletteTitle}>{location.label}</strong>
-                      <small className={toolbarStyles.paletteSubtitle}>{location.badge} · {location.subtitle}</small>
-                    </span>
-                  </button>
-                ))}
+                {filteredLocations.length > 0 ? (
+                  <>
+                    <span className={toolbarStyles.paletteSection}>Locations</span>
+                    {filteredLocations.map((location) => (
+                      <button
+                        key={location.id}
+                        type="button"
+                        role="menuitem"
+                        className={toolbarStyles.paletteButton}
+                        onClick={() => runLocation(location.path)}
+                      >
+                        <Folder size={16} />
+                        <span className={toolbarStyles.paletteText}>
+                          <strong className={toolbarStyles.paletteTitle}>{location.label}</strong>
+                          <small className={toolbarStyles.paletteSubtitle}>{location.badge} · {location.subtitle}</small>
+                        </span>
+                      </button>
+                    ))}
+                  </>
+                ) : null}
+                {filteredLocations.length > 0 && (indexedResults.length > 0 || indexedSearching || indexedError) ? <span className={toolbarStyles.paletteDivider} /> : null}
+                {indexedResults.length > 0 ? (
+                  <>
+                    <span className={toolbarStyles.paletteSection}>Indexed Search</span>
+                    {indexedResults.map((result) => (
+                      <button
+                        key={`${result.sourceKind}:${result.entry.path}`}
+                        type="button"
+                        role="menuitem"
+                        className={toolbarStyles.paletteButton}
+                        onClick={() => runIndexedResult(result)}
+                      >
+                        <Search size={16} />
+                        <span className={toolbarStyles.paletteText}>
+                          <strong className={toolbarStyles.paletteTitle}>{result.entry.name}</strong>
+                          <small className={toolbarStyles.paletteSubtitle}>{searchResultSubtitle(result)}</small>
+                        </span>
+                      </button>
+                    ))}
+                  </>
+                ) : indexedSearching ? (
+                  <div className={toolbarStyles.paletteEmpty}>Searching index...</div>
+                ) : indexedError ? (
+                  <div className={toolbarStyles.paletteEmpty}>Search index unavailable.</div>
+                ) : null}
               </div>,
               document.body,
             )
@@ -603,15 +686,13 @@ export const ExplorerToolbar = memo(function ExplorerToolbar(props: ExplorerTool
                 )
               : null}
           </div>
+          <button className={toolbarStyles.toolbarButton} type="button" title={props.undoTitle} disabled={!props.canUndo} onClick={props.onUndo}><Undo2 size={18} /></button>
+          <button className={toolbarStyles.toolbarButton} type="button" title={props.redoTitle} disabled={!props.canRedo} onClick={props.onRedo}><Redo2 size={18} /></button>
           <button className={toolbarStyles.toolbarButton} type="button" title="Cut" onClick={props.onCut}><Scissors size={18} /></button>
           <button className={toolbarStyles.toolbarButton} type="button" title="Copy" onClick={props.onCopy}><Copy size={18} /></button>
           <button className={toolbarStyles.toolbarButton} type="button" title="Paste" onClick={props.onPaste}><Clipboard size={18} /></button>
           <button className={toolbarStyles.toolbarButton} type="button" title="Rename" onClick={props.onRename}><Pencil size={18} /></button>
           <button className={toolbarStyles.toolbarButton} type="button" title="Delete" onClick={props.onDelete}><Trash2 size={18} /></button>
-          <button className={toolbarStyles.toolbarButton} type="button" title="Upload files" onClick={props.onUploadFiles}><Upload size={18} /></button>
-          <button className={toolbarStyles.toolbarButton} type="button" title="Upload folder" onClick={props.onUploadFolder}><FolderUp size={18} /></button>
-          <button className={toolbarStyles.toolbarButton} type="button" title="Compare folders" onClick={props.onCompare}><GitCompareArrows size={18} /></button>
-          <button className={cx(toolbarStyles.toolbarButton, props.showHidden && toolbarStyles.toolbarButtonSelected)} onClick={props.onToggleHidden}>Hidden</button>
         </div>
 
         <div className={toolbarStyles.actionRight}>
@@ -639,4 +720,37 @@ function fuzzyIncludes(haystack: string, needle: string): boolean {
     index += 1;
   }
   return true;
+}
+
+function parentPath(path: string): string {
+  const normalized = path.replace(/\/+/g, "/");
+  const index = normalized.lastIndexOf("/");
+  if (index <= 0) return "/";
+  return normalized.slice(0, index);
+}
+
+function searchResultSubtitle(result: SearchResult): string {
+  const entry = result.entry;
+  const source = entry.location.kind === "remote"
+    ? entry.location.remoteName ?? "Remote"
+    : "Local";
+  return `${source} · ${entry.kind} · ${entry.path}`;
+}
+
+function searchResultNavigationPath(result: SearchResult): string {
+  const entry = result.entry;
+  if (entry.kind === "folder") return entry.path;
+  const remotePath = entry.location.remotePath;
+  if (entry.location.kind !== "remote" || !remotePath) {
+    return parentPath(entry.path);
+  }
+  const remoteParent = parentPath(remotePath);
+  const suffix = remotePath === "/" ? "" : remotePath.replace(/^\/+/, "");
+  const normalizedPath = entry.path.replace(/\/+/g, "/");
+  if (!suffix || !normalizedPath.endsWith(`/${suffix}`)) {
+    return parentPath(entry.path);
+  }
+  const remoteRoot = normalizedPath.slice(0, -suffix.length).replace(/\/$/, "");
+  if (remoteParent === "/") return remoteRoot;
+  return `${remoteRoot}${remoteParent}`;
 }

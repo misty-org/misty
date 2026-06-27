@@ -15,6 +15,7 @@ pub mod providers;
 pub mod proxy;
 pub mod proxy_clipboard;
 pub mod proxy_runtime;
+pub mod search;
 pub mod settings;
 pub mod transfers;
 pub mod workspaces;

@@ -45,10 +45,9 @@ impl ProxyRuntimeService {
                 ready: false,
                 error: Some("Misty proxy runtime is disabled.".to_owned()),
             },
-            ProxyRuntimeMode::External | ProxyRuntimeMode::Spawn => start_embedded_runtime(
-                environment,
-                ProxyRuntimeMode::Embedded,
-            ),
+            ProxyRuntimeMode::External | ProxyRuntimeMode::Spawn => {
+                start_embedded_runtime(environment, ProxyRuntimeMode::Embedded)
+            }
         };
         Self {
             inner: Arc::new(ProxyRuntimeState {

@@ -1,14 +1,12 @@
 import {
   AppWindow,
   Blocks,
-  ChevronDown,
   Clipboard,
   Copy,
   Download,
   FilePlus,
   Eye,
   FolderPlus,
-  GitCompareArrows,
   MessageSquare,
   PanelLeft,
   PanelRight,
@@ -51,24 +49,24 @@ import { ExplorerPane } from "./components/ExplorerPane";
 import { ExplorerSidebar } from "./components/ExplorerSidebar";
 import { ExplorerToolbar } from "./components/ExplorerToolbar";
 import type { ExplorerLocationResult } from "./components/ExplorerToolbar";
+import { DeepSearchOverlay } from "./components/DeepSearchOverlay";
 import { FileInspector } from "./components/FileInspector";
 import {
   explorerWorkspaceNeedsSave,
   scheduleExplorerWorkspaceSave,
   selectedEntryForPane,
+  selectedDeletePathsForPane,
   selectedPathsForPane,
   useExplorerStore,
 } from "./state/useExplorerStore";
 import type { ExplorerInlineEditState, ExplorerNotification } from "./state/useExplorerStore";
 import { useClaudeSessionStore } from "./state/useClaudeSessionStore";
+import { useSearchStore } from "./state/useSearchStore";
 import { useMultiPanelStore } from "../../shared/multipanel/useMultiPanelStore";
 import { useProvidersStore } from "../providers/useProvidersStore";
 import type {
   ClipboardPayload,
   ExplorerLibrarySnapshot,
-  FileSyncEndpoint,
-  FileSyncCompareSide,
-  FileSyncPlannedAction,
   MountedDevice,
   PluginCommandEntry,
   PluginPanelElement,
@@ -78,7 +76,6 @@ import type {
   TransferRecord,
 } from "../../api/types";
 import type { MultiPanelTab } from "../../shared/multipanel/types";
-import { useFileSyncStore } from "./state/useFileSyncStore";
 import { useOperationQueueStore } from "../transfers/useOperationQueueStore";
 import { useTransfersStore } from "../transfers/useTransfersStore";
 import { shortcutMapFromBindings, shortcutMatchesEvent } from "../../shared/shortcuts";
@@ -88,7 +85,6 @@ import { errorText } from "../../shared/format";
 import { pluginCatalogChangedEvent } from "../plugins/pluginEvents";
 import { publishPluginNotifications } from "../plugins/pluginNotifications";
 import { clipboardImagePng } from "./utils/clipboardImage";
-import { formatBytes } from "./utils/fileFormat";
 
 const minSidebarWidth = 212;
 const maxSidebarWidth = 380;
@@ -713,6 +709,9 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
     [pluginCommands, pluginPanels],
   );
   const inspector = useMemo(() => (previewVisible ? <ConnectedFileInspector /> : undefined), [previewVisible]);
+  const openSidebarPathInNewTab = useCallback((path: string, title?: string) => {
+    useMultiPanelStore.getState().addTab(path, title);
+  }, []);
   const explorerSidebar = useMemo(() => (sidebarVisible ? (
     <ExplorerSidebar
       homePath={homePath}
@@ -732,6 +731,8 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
       onCreateWorkspace={handleCreateWorkspace}
       onRenameWorkspace={handleRenameWorkspace}
       onDeleteWorkspace={handleDeleteWorkspace}
+      onOpenInNewTab={openSidebarPathInNewTab}
+      onUnpinPinnedPath={useExplorerStore.getState().togglePinnedPath}
     />
   ) : undefined), [
     activePath,
@@ -746,6 +747,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
     mountRoot,
     mountedDevices,
     navigateSidebar,
+    openSidebarPathInNewTab,
     pinnedPaths,
     providersLoading,
     refreshDevices,
@@ -753,10 +755,6 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
     sidebarVisible,
     workspaceEntries,
   ]);
-  const renderContextHeader = useCallback(
-    (tab: MultiPanelTab) => tab.mode === "compare" ? <FileSyncCompareBar tab={tab} mountRoot={mountRoot} /> : null,
-    [mountRoot],
-  );
   const renderTabActions = useCallback(
     () => (
       <ExplorerPluginTabMenu
@@ -784,7 +782,6 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
           className="explorer-multipanel"
           renderTabActions={renderTabActions}
           renderToolbar={renderToolbar}
-          renderContextHeader={renderContextHeader}
           renderNavigationAside={explorerSidebar}
           onNavigationAsideResizeStart={startSidebarResize}
           renderAside={inspector}
@@ -806,6 +803,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
       />
       <ExplorerRenameStatus edit={inlineEdit} />
       <ExplorerNotifications notifications={notifications} onDismiss={dismissNotification} />
+      <DeepSearchOverlay activePaneId={activePaneId} currentPath={activePath} />
       {chatOverlayOpen ? <ExplorerChatOverlay /> : null}
       <ExplorerContextMenu />
       <ExplorerDialog />
@@ -956,7 +954,7 @@ function ExplorerPluginTabMenu(props: {
 
   const browsePlugins = useCallback(() => {
     setOpen(false);
-    navigate("/hub/plugins");
+    navigate("/hub/extensions");
   }, [navigate]);
 
   return (
@@ -965,29 +963,28 @@ function ExplorerPluginTabMenu(props: {
         ref={buttonRef}
         className={pluginTabMenuStyles.trigger}
         type="button"
-        title="Plugins"
+        title="Extensions"
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
       >
         <Puzzle size={16} />
-        <ChevronDown size={13} />
       </button>
       {open ? createPortal((
-        <div ref={menuRef} className={pluginTabMenuStyles.menu} style={menuStyle} role="menu" aria-label="Plugins">
+        <div ref={menuRef} className={pluginTabMenuStyles.menu} style={menuStyle} role="menu" aria-label="Extensions">
           <header className={pluginTabMenuStyles.header}>
             <span className={pluginTabMenuStyles.headerTitle}>
               <Puzzle size={16} />
-              <strong>Plugins</strong>
+              <strong>Extensions</strong>
             </span>
             <span className={pluginTabMenuStyles.headerMeta}>{highlightedCount} usable</span>
           </header>
           <label className={pluginTabMenuStyles.searchLabel}>
-            <span className="sr-only">Search plugins</span>
+            <span className="sr-only">Search extensions</span>
             <input
               className={pluginTabMenuStyles.searchInput}
               value={query}
-              placeholder="Search plugins..."
+              placeholder="Search extensions..."
               onChange={(event) => setQuery(event.target.value)}
             />
           </label>
@@ -1007,26 +1004,26 @@ function ExplorerPluginTabMenu(props: {
                     <small>{pluginMenuSubtitle(plugin)}</small>
                   </span>
                   <span className={cx(pluginTabMenuStyles.areaPill, plugin.usable && pluginTabMenuStyles.areaPillUsable)}>
-                    {plugin.usable ? "Files" : plugin.primaryArea}
+                    {plugin.usable ? "Files" : extensionAreaLabel(plugin.primaryArea)}
                   </span>
                 </button>
               ))}
               {visiblePlugins.length === 0 ? (
                 <div className={pluginTabMenuStyles.empty}>
                   <Puzzle size={20} />
-                  <span>No plugins match the current search.</span>
+                  <span>No extensions match the current search.</span>
                 </div>
               ) : null}
             </div>
           ) : (
             <div className={pluginTabMenuStyles.empty}>
               <Puzzle size={20} />
-              <span>No installed plugin panels or commands found.</span>
+              <span>No installed extension panels or commands found.</span>
             </div>
           )}
           <button className={pluginTabMenuStyles.footerItem} type="button" role="menuitem" onClick={browsePlugins}>
             <Puzzle size={15} />
-            <span>Browse plugins</span>
+            <span>Browse extensions</span>
           </button>
         </div>
       ), document.body) : null}
@@ -1129,6 +1126,10 @@ function normalizedPluginArea(area: string): string {
   return normalized;
 }
 
+function extensionAreaLabel(area: string): string {
+  return normalizedPluginArea(area) === "plugins" ? "Extensions" : area;
+}
+
 function pluginMenuSubtitle(plugin: PluginMenuItem): string {
   const panelCount = plugin.panels.length;
   const commandCount = plugin.commands.length;
@@ -1180,12 +1181,12 @@ function ExplorerPluginTabHeader(props: {
         <Puzzle size={18} />
         <div>
           <strong>{title}</strong>
-          <span>{plugin ? pluginMenuSubtitle(plugin) : "Plugin"}</span>
+          <span>{plugin ? pluginMenuSubtitle(plugin) : "Extension"}</span>
         </div>
       </div>
       {plugin ? (
         <span className={cx(pluginTabHostStyles.statusPill, plugin.usable && pluginTabHostStyles.statusPillUsable)}>
-          {plugin.usable ? "Usable in Files" : `Area: ${plugin.primaryArea}`}
+          {plugin.usable ? "Usable in Files" : `Area: ${extensionAreaLabel(plugin.primaryArea)}`}
         </span>
       ) : null}
     </div>
@@ -1233,8 +1234,8 @@ function ExplorerPluginTabContent(props: {
     return (
       <div className={pluginTabHostStyles.empty}>
         <Puzzle size={26} />
-        <h3>Plugin unavailable</h3>
-        <p>This plugin no longer exposes panels or commands.</p>
+        <h3>Extension unavailable</h3>
+        <p>This extension no longer exposes panels or commands.</p>
       </div>
     );
   }
@@ -1339,10 +1340,10 @@ function ExplorerPluginPanelHost(props: {
       {rendered && rendered.runtimeStatus !== "native_rendered" ? (
         <div className={pluginTabHostStyles.notice}>
           <Puzzle size={20} />
-          <span>{rendered.message || "Plugin panel unavailable."}</span>
+          <span>{rendered.message || "Extension panel unavailable."}</span>
         </div>
       ) : null}
-      {!rendered && !renderError ? <div className={pluginTabHostStyles.loading}>Loading plugin panel...</div> : null}
+      {!rendered && !renderError ? <div className={pluginTabHostStyles.loading}>Loading extension panel...</div> : null}
       {rendered?.runtimeStatus === "native_rendered" ? (
         <div className={pluginTabHostStyles.elements}>
           {rendered.elements.map((element) => (
@@ -1430,7 +1431,7 @@ const notificationStyles = {
 
 const pluginTabMenuStyles = {
   trigger:
-    "grid h-[26px] w-[34px] grid-cols-[1fr_auto] items-center justify-center gap-px rounded-md border-0 bg-transparent px-[7px] text-[#adadad] hover:bg-[#1d1d1d] hover:text-[#eeeeee] aria-expanded:bg-[#1d1d1d] aria-expanded:text-[#eeeeee] max-[720px]:h-7 max-[720px]:w-[38px]",
+    "grid h-[26px] w-[28px] place-items-center rounded-md border-0 bg-transparent p-0 text-[#adadad] hover:bg-[#1d1d1d] hover:text-[#eeeeee] aria-expanded:bg-[#1d1d1d] aria-expanded:text-[#eeeeee] max-[720px]:h-7 max-[720px]:w-8",
   menu:
     "fixed z-[2147483000] grid overflow-auto rounded-[11px] border border-[#323232] bg-[rgba(17,17,17,0.98)] p-1.5 text-[#eeeeee] shadow-[0_18px_42px_rgba(0,0,0,0.48)] backdrop-blur-xl",
   header:
@@ -1703,177 +1704,6 @@ function ExplorerDialog() {
   );
 }
 
-const compareActions: Array<{ value: FileSyncPlannedAction; label: string }> = [
-  { value: "skip", label: "Skip" },
-  { value: "copy_left_to_right", label: "Copy Left -> Right" },
-  { value: "copy_right_to_left", label: "Copy Right -> Left" },
-  { value: "delete_left", label: "Delete Left" },
-  { value: "delete_right", label: "Delete Right" },
-];
-
-const compareStyles = {
-  strip: "min-w-0 border-b border-[#292929] bg-[#111111] px-3 py-[7px] text-[#dddddd]",
-  main: "flex min-w-0 items-center gap-[7px] overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-  title: "mr-[3px] flex min-w-0 flex-none items-center gap-[7px]",
-  status: "rounded-full px-[7px] py-[3px] text-[11px]",
-  statusReady: "bg-[#313131] text-[#b8b8b8]",
-  statusStale: "bg-[#313131] text-[#c6c6c6]",
-  statusWorking: "bg-[#2d2d2d] text-[#c4c4c4]",
-  control: "h-[30px] flex-none rounded-[7px] border border-[#333333] bg-[#181818] px-[9px] text-[#dddddd]",
-  select: "w-[170px]",
-  input: "w-[180px]",
-  primary: "border-[#626262] bg-[#545454] text-white",
-  watch: "flex min-w-0 flex-none grid-flow-col items-center gap-[5px] normal-case text-[#b4b4b4]",
-  checkbox: "h-[15px] w-[15px]",
-  summary: "mt-1.5 flex min-w-0 items-center gap-[13px] overflow-x-auto whitespace-nowrap text-[11px] text-[#979797] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-  error: "text-[#9b9b9b]",
-  success: "text-[#b8b8b8]",
-  results: "mt-1.5 border-t border-[#292929] pt-1.5",
-  resultsSummary: "cursor-pointer text-xs text-[#b4b4b4]",
-  resultsScroll:
-    "mt-1.5 max-h-[210px] overflow-auto [&_select]:h-[27px] [&_select]:rounded-md [&_select]:border [&_select]:border-[#333333] [&_select]:bg-[#181818] [&_select]:text-[#dddddd] [&_table]:w-full [&_table]:min-w-[620px] [&_table]:border-collapse [&_table]:text-xs [&_td]:border-b [&_td]:border-[#262626] [&_td]:px-2 [&_td]:py-[5px] [&_td]:text-left [&_th]:border-b [&_th]:border-[#262626] [&_th]:px-2 [&_th]:py-[5px] [&_th]:text-left",
-} as const;
-
-function FileSyncCompareBar(props: { tab: MultiPanelTab; mountRoot: string }) {
-  const leftPane = props.tab.panes[0];
-  const rightPane = props.tab.panes[1];
-  const left = endpointFromExplorerPath(leftPane?.path ?? props.tab.path, props.mountRoot);
-  const right = endpointFromExplorerPath(rightPane?.path ?? props.tab.path, props.mountRoot);
-  const session = useFileSyncStore((state) => state.sessions[props.tab.id]);
-  const pairs = useFileSyncStore((state) => state.pairs);
-  const loadingPairs = useFileSyncStore((state) => state.loadingPairs);
-  const pairError = useFileSyncStore((state) => state.pairError);
-
-  useEffect(() => {
-    useFileSyncStore.getState().ensureSession(props.tab.id, left, right);
-    void useFileSyncStore.getState().loadPairs();
-  }, [left.kind, left.localPath, left.providerType, left.remoteName, left.remotePath, props.tab.id,
-    right.kind, right.localPath, right.providerType, right.remoteName, right.remotePath]);
-
-  if (!session) return <div className={compareStyles.strip}><span>Preparing compare workspace...</span></div>;
-  const counts = compareCounts(session.rows);
-  const plannedCount = session.rows.filter((row) => row.action !== "skip").length;
-
-  const navigateToPair = (pairId: number) => {
-    const pair = pairs.find((candidate) => candidate.id === pairId);
-    if (!pair || !leftPane || !rightPane) return;
-    useFileSyncStore.getState().selectPair(props.tab.id, pairId);
-    void useExplorerStore.getState().navigatePane(leftPane.id, explorerPathFromEndpoint(pair.left, props.mountRoot));
-    void useExplorerStore.getState().navigatePane(rightPane.id, explorerPathFromEndpoint(pair.right, props.mountRoot));
-  };
-
-  const swap = () => {
-    if (!leftPane || !rightPane) return;
-    useFileSyncStore.getState().swapRoots(props.tab.id);
-    void useExplorerStore.getState().navigatePane(leftPane.id, explorerPathFromEndpoint(session.right, props.mountRoot));
-    void useExplorerStore.getState().navigatePane(rightPane.id, explorerPathFromEndpoint(session.left, props.mountRoot));
-  };
-
-  const apply = async () => {
-    const result = await useFileSyncStore.getState().apply(props.tab.id);
-    if (result && leftPane && rightPane) {
-      await Promise.all([
-        useExplorerStore.getState().refreshPane(leftPane.id),
-        useExplorerStore.getState().refreshPane(rightPane.id),
-      ]);
-    }
-  };
-
-  return (
-    <section className={compareStyles.strip}>
-      <div className={compareStyles.main}>
-        <div className={compareStyles.title}>
-          <GitCompareArrows size={17} />
-          <strong>Compare</strong>
-          <span className={cx(
-            compareStyles.status,
-            session.comparing ? compareStyles.statusWorking : session.stale ? compareStyles.statusStale : compareStyles.statusReady,
-          )}>
-            {session.comparing ? "Comparing..." : session.stale ? "Needs review" : "Ready"}
-          </span>
-        </div>
-        <select
-          className={cx(compareStyles.control, compareStyles.select)}
-          aria-label="Saved sync pair"
-          value={session.activePairId ?? ""}
-          disabled={loadingPairs}
-          onChange={(event) => event.target.value && navigateToPair(Number(event.target.value))}
-        >
-          <option value="">Saved pairs</option>
-          {pairs.map((pair) => <option key={pair.id} value={pair.id}>{pair.name}</option>)}
-        </select>
-        <input
-          className={cx(compareStyles.control, compareStyles.input)}
-          aria-label="Sync pair name"
-          value={session.pairName}
-          placeholder="Saved pair name"
-          onChange={(event) => useFileSyncStore.getState().setPairName(props.tab.id, event.target.value)}
-        />
-        <button className={compareStyles.control} type="button" onClick={() => void useFileSyncStore.getState().savePair(props.tab.id)}>Save Pair</button>
-        <label className={compareStyles.watch}>
-          <input
-            className={compareStyles.checkbox}
-            type="checkbox"
-            checked={session.watchMode}
-            onChange={(event) => void useFileSyncStore.getState().setWatchMode(props.tab.id, event.target.checked)}
-          />
-          Watch
-        </label>
-        <button className={compareStyles.control} type="button" onClick={swap}>Swap</button>
-        <button className={compareStyles.control} type="button" onClick={() => void useFileSyncStore.getState().compare(props.tab.id)} disabled={session.comparing}>
-          Compare
-        </button>
-        <button className={cx(compareStyles.control, compareStyles.primary)} type="button" onClick={() => void apply()} disabled={session.applying || plannedCount === 0}>
-          {session.applying ? "Applying..." : `Apply${plannedCount ? ` ${plannedCount}` : ""}`}
-        </button>
-      </div>
-      <div className={compareStyles.summary}>
-        <span>Left: {leftPane?.path ?? "--"}</span>
-        <span>Right: {rightPane?.path ?? "--"}</span>
-        <span>Left only: {counts.left_only}</span>
-        <span>Right only: {counts.right_only}</span>
-        <span>Different: {counts.different}</span>
-        <span>Conflict: {counts.conflict}</span>
-        {session.error || pairError ? <span className={compareStyles.error}>{session.error ?? pairError}</span> : null}
-        {session.message ? <span className={compareStyles.success}>{session.message}</span> : null}
-      </div>
-      {session.rows.length > 0 ? (
-        <details className={compareStyles.results}>
-          <summary className={compareStyles.resultsSummary}>{session.rows.length} comparison results</summary>
-          <div className={compareStyles.resultsScroll}>
-            <table>
-              <thead><tr><th>Path</th><th>Type</th><th>State</th><th>Left</th><th>Right</th><th>Action</th></tr></thead>
-              <tbody>
-                {session.rows.map((row) => (
-                  <tr key={row.relativePath}>
-                    <td>{row.relativePath}</td>
-                    <td>{row.kind}</td>
-                    <td>{row.disposition.replace(/_/g, " ")}</td>
-                    <td title={compareSideTitle(row.left)}>{compareSideSummary(row.left)}</td>
-                    <td title={compareSideTitle(row.right)}>{compareSideSummary(row.right)}</td>
-                    <td>
-                      <select
-                        value={row.action}
-                        onChange={(event) => useFileSyncStore.getState().setRowAction(
-                          props.tab.id,
-                          row.relativePath,
-                          event.target.value as FileSyncPlannedAction,
-                        )}
-                      >
-                        {compareActions.map((action) => <option key={action.value} value={action.value}>{action.label}</option>)}
-                      </select>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </details>
-      ) : null}
-    </section>
-  );
-}
-
 const ConnectedExplorerToolbar = memo(function ConnectedExplorerToolbar(props: {
   paneId: string;
   fallbackPath: string;
@@ -1887,13 +1717,37 @@ const ConnectedExplorerToolbar = memo(function ConnectedExplorerToolbar(props: {
       path: pane?.listing?.path ?? props.fallbackPath,
       commandQuery: pane?.commandQuery ?? "",
       viewMode: explorer.paneViewModes[props.paneId] ?? explorer.viewMode,
-      showHidden: explorer.paneShowHidden[props.paneId] ?? explorer.showHidden,
       canGoBack: Boolean(pane?.backHistory.length),
       canGoForward: Boolean(pane?.forwardHistory.length),
       canCreateFile: explorer.canCreateItem(props.paneId, "file"),
       canCreateFolder: explorer.canCreateItem(props.paneId, "folder"),
     };
   }));
+  const operationQueue = useOperationQueueStore(useShallow((queue) => ({
+    snapshot: queue.snapshot,
+    working: queue.working,
+  })));
+  const transfers = useTransfersStore((transferState) => transferState.transfers);
+  const latestUndoable = useMemo(
+    () => newestUndoableTransfer(transfers?.rows ?? []),
+    [transfers?.rows],
+  );
+  const canUndo = Boolean(latestUndoable) && !operationQueue.working;
+  const canRedo = Boolean(operationQueue.snapshot?.redoAvailable) && !operationQueue.working;
+  const undoTitle = latestUndoable
+    ? `Undo ${latestUndoable.fileName || transferTypeLabel(latestUndoable.transferType)}`
+    : "Undo";
+
+  useEffect(() => {
+    const refreshHistory = () => {
+      void useTransfersStore.getState().load(undefined, { silent: true });
+      void useOperationQueueStore.getState().load({ silent: true });
+    };
+    refreshHistory();
+    const interval = window.setInterval(refreshHistory, 5000);
+    return () => window.clearInterval(interval);
+  }, []);
+
   const onNavigate = useCallback((path: string) => {
     void useExplorerStore.getState().navigatePane(props.paneId, path);
   }, [props.paneId]);
@@ -1909,14 +1763,8 @@ const ConnectedExplorerToolbar = memo(function ConnectedExplorerToolbar(props: {
   const onParent = useCallback(() => {
     void useExplorerStore.getState().navigateParent(props.paneId);
   }, [props.paneId]);
-  const onRefresh = useCallback(() => {
-    void useExplorerStore.getState().refreshPane(props.paneId);
-  }, [props.paneId]);
   const onCommandQuery = useCallback((query: string) => {
     useExplorerStore.getState().setCommandQuery(props.paneId, query);
-  }, [props.paneId]);
-  const onToggleHidden = useCallback(() => {
-    void useExplorerStore.getState().toggleHidden(props.paneId);
   }, [props.paneId]);
   const onViewMode = useCallback((mode: "grid" | "list") => {
     useExplorerStore.getState().setViewMode(mode, props.paneId);
@@ -1942,16 +1790,12 @@ const ConnectedExplorerToolbar = memo(function ConnectedExplorerToolbar(props: {
   const onDelete = useCallback(() => {
     void useExplorerStore.getState().deleteSelected(props.paneId);
   }, [props.paneId]);
-  const onUploadFiles = useCallback(() => {
-    void useExplorerStore.getState().uploadIntoPane(props.paneId, "files");
-  }, [props.paneId]);
-  const onUploadFolder = useCallback(() => {
-    void useExplorerStore.getState().uploadIntoPane(props.paneId, "folders");
-  }, [props.paneId]);
-  const onCompare = useCallback(() => {
-    const path = useExplorerStore.getState().panes[props.paneId]?.listing?.path ?? props.fallbackPath;
-    useMultiPanelStore.getState().addCompareTab(path, path);
-  }, [props.fallbackPath, props.paneId]);
+  const onUndo = useCallback(() => {
+    void undoLatestTransferOperation();
+  }, []);
+  const onRedo = useCallback(() => {
+    void redoLatestTransferOperation();
+  }, []);
   const pluginCommandById = useMemo(
     () => new Map(props.pluginCommands.map((command) => [command.id, command])),
     [props.pluginCommands],
@@ -1975,11 +1819,13 @@ const ConnectedExplorerToolbar = memo(function ConnectedExplorerToolbar(props: {
       onNavigateLocation={onNavigateLocation}
       onBack={onBack}
       onForward={onForward}
+      canUndo={canUndo}
+      canRedo={canRedo}
+      undoTitle={undoTitle}
+      redoTitle="Redo"
       onParent={onParent}
-      onRefresh={onRefresh}
       onCommandQuery={onCommandQuery}
       onViewMode={onViewMode}
-      onToggleHidden={onToggleHidden}
       onCreateFile={onCreateFile}
       onCreateFolder={onCreateFolder}
       onCut={onCut}
@@ -1987,9 +1833,8 @@ const ConnectedExplorerToolbar = memo(function ConnectedExplorerToolbar(props: {
       onPaste={onPaste}
       onRename={onRename}
       onDelete={onDelete}
-      onUploadFiles={onUploadFiles}
-      onUploadFolder={onUploadFolder}
-      onCompare={onCompare}
+      onUndo={onUndo}
+      onRedo={onRedo}
       onRunCommand={onRunCommand}
     />
   );
@@ -2029,7 +1874,7 @@ function runExplorerCommand(commandId: string, paneId: string, navigateRoute: (p
   }
   switch (commandId) {
     case "search.toggle":
-      focusExplorerSearch(paneId, "search");
+      openDeepSearch(paneId);
       break;
     case "explorer.open_palette":
       focusExplorerSearch(paneId, "command");
@@ -2098,9 +1943,6 @@ function runExplorerCommand(commandId: string, paneId: string, navigateRoute: (p
     case "explorer.redo":
       void redoLatestTransferOperation();
       break;
-    case "explorer.toggle_hidden":
-      void explorer.toggleHidden(paneId);
-      break;
     case "explorer.preview.toggle":
       explorer.setPreviewVisible(!explorer.previewVisible);
       break;
@@ -2154,11 +1996,11 @@ async function runPluginCommand(
       return;
     }
     useExplorerStore.setState({
-      operationError: `Plugin command "${result.label}" could not run: ${result.message}`,
+      operationError: `Extension command "${result.label}" could not run: ${result.message}`,
     });
   } catch (error) {
     useExplorerStore.setState({
-      operationError: `Plugin command "${command.label}" failed: ${errorText(error)}`,
+      operationError: `Extension command "${command.label}" failed: ${errorText(error)}`,
     });
   }
 }
@@ -2177,11 +2019,11 @@ async function runPluginCommandById(
       return;
     }
     useExplorerStore.setState({
-      operationError: `Plugin command "${result.label}" could not run: ${result.message}`,
+      operationError: `Extension command "${result.label}" could not run: ${result.message}`,
     });
   } catch (error) {
     useExplorerStore.setState({
-      operationError: `Plugin command "${commandId}" failed: ${errorText(error)}`,
+      operationError: `Extension command "${commandId}" failed: ${errorText(error)}`,
     });
   }
 }
@@ -2189,6 +2031,12 @@ async function runPluginCommandById(
 function focusExplorerSearch(paneId: string, mode: "search" | "command"): void {
   useExplorerStore.getState().setCommandQuery(paneId, mode === "command" ? ">" : "");
   window.dispatchEvent(new CustomEvent(explorerSearchFocusEvent, { detail: { paneId, mode } }));
+}
+
+function openDeepSearch(paneId: string): void {
+  const pane = useExplorerStore.getState().panes[paneId];
+  const currentPath = pane?.listing?.path ?? "";
+  void useSearchStore.getState().openSearch(currentPath);
 }
 
 async function undoLatestTransferOperation(): Promise<void> {
@@ -2427,7 +2275,7 @@ function remoteClipboardMountPath(ref: {
   const homePath = app?.environment.homeDir ?? "/";
   const settingsMountPath = selectAdvancedPreferences(useSettingsStore.getState().settings?.document).mountPath;
   const mountRoot = resolveMountRoot(homePath, settingsMountPath || app?.environment.mountPath || ".misty/mnt");
-  return joinPath(mountRoot, ref.providerType, ref.remoteName, ref.remotePath);
+  return joinPath(mountRoot, ref.remoteName, ref.remotePath);
 }
 
 function clipboardRefValue(value: string): string {
@@ -2813,6 +2661,9 @@ const ExplorerContextMenu = memo(function ExplorerContextMenu() {
     hasRemoteSelection,
     targetPinned,
     targetCanOpenWith,
+    inTrash,
+    canTrashSelection,
+    hasPermanentDeleteSelection,
     canCreateFile,
     canCreateFolder,
   } = useExplorerStore(useShallow((state) => {
@@ -2823,6 +2674,8 @@ const ExplorerContextMenu = memo(function ExplorerContextMenu() {
       : null;
     const selectedCount = open ? selectedActionableEntryCount(targetPane) : 0;
     const remoteSelectedCount = open ? selectedRemoteEntryCount(targetPane) : 0;
+    const trashableCount = open ? selectedDeletePathsForPane(targetPane, false).length : 0;
+    const permanentDeleteCount = open ? selectedDeletePathsForPane(targetPane, true).length : 0;
     const pinnedPaths = open && entryId ? state.pinnedPaths : emptyPinnedPaths;
     return {
       open,
@@ -2837,6 +2690,9 @@ const ExplorerContextMenu = memo(function ExplorerContextMenu() {
       hasRemoteSelection: Boolean(remoteSelectedCount),
       targetPinned: Boolean(targetEntry && !targetEntry.isDeleted && pinnedPaths.some((path) => normalizedPath(path) === normalizedPath(targetEntry.path))),
       targetCanOpenWith: Boolean(targetEntry && !targetEntry.isDeleted && targetEntry.kind !== "folder" && targetEntry.kind !== "symlink"),
+      inTrash: targetPane?.listing?.path === "misty://trash",
+      canTrashSelection: trashableCount > 0 && trashableCount === selectedCount,
+      hasPermanentDeleteSelection: permanentDeleteCount > 0,
       canCreateFile: state.canCreateItem(paneId, "file"),
       canCreateFolder: state.canCreateItem(paneId, "folder"),
     };
@@ -2930,13 +2786,22 @@ const ExplorerContextMenu = memo(function ExplorerContextMenu() {
         disabledReason={selectionDisabledReason}
         onRun={() => run(() => void useExplorerStore.getState().renameSelected(paneId))}
       />
+      {!inTrash ? (
+        <ContextMenuItem
+          icon={<Trash2 size={17} />}
+          label="Trash"
+          shortcut={shortcut("Del")}
+          disabled={!canTrashSelection}
+          disabledReason={hasSelection ? "Trash is only available for local files and folders." : selectionDisabledReason}
+          onRun={() => run(() => void useExplorerStore.getState().deleteSelected(paneId, "trash"))}
+        />
+      ) : null}
       <ContextMenuItem
-        icon={<Trash2 size={17} />}
-        label="Delete"
-        shortcut={shortcut("Del")}
-        disabled={!hasSelection}
-        disabledReason={selectionDisabledReason}
-        onRun={() => run(() => void useExplorerStore.getState().deleteSelected(paneId))}
+        icon={<X size={17} />}
+        label="Delete Permanently"
+        disabled={!hasPermanentDeleteSelection}
+        disabledReason={hasPermanentDeleteSelection ? undefined : selectionDisabledReason}
+        onRun={() => run(() => void useExplorerStore.getState().deleteSelected(paneId, "permanent"))}
       />
       <ContextMenuItem
         icon={<Download size={17} />}
@@ -3066,58 +2931,6 @@ function ExplorerBottomBar(props: {
   );
 }
 
-function endpointFromExplorerPath(path: string, mountRoot: string): FileSyncEndpoint {
-  const cleanPath = normalizedPath(path);
-  const cleanMount = normalizedPath(mountRoot);
-  if (cleanPath === cleanMount || cleanPath.startsWith(`${cleanMount}/`)) {
-    const parts = cleanPath.slice(cleanMount.length).split("/").filter(Boolean);
-    if (parts.length >= 2) {
-      return {
-        kind: "remote",
-        providerType: parts[0],
-        remoteName: parts[1],
-        remotePath: parts.length > 2 ? `/${parts.slice(2).join("/")}` : "/",
-        localPath: "",
-      };
-    }
-  }
-  return { kind: "local", localPath: path, remoteName: "", remotePath: "", providerType: "" };
-}
-
-function explorerPathFromEndpoint(endpoint: FileSyncEndpoint, mountRoot: string): string {
-  if (endpoint.kind === "local") return endpoint.localPath;
-  const suffix = endpoint.remotePath.replace(/^\/+/, "");
-  return [normalizedPath(mountRoot), endpoint.providerType, endpoint.remoteName, suffix]
-    .filter(Boolean)
-    .join("/");
-}
-
-function compareCounts(rows: Array<{ disposition: string }>): Record<string, number> {
-  const counts: Record<string, number> = {
-    left_only: 0,
-    right_only: 0,
-    different: 0,
-    same: 0,
-    conflict: 0,
-  };
-  for (const row of rows) counts[row.disposition] = (counts[row.disposition] ?? 0) + 1;
-  return counts;
-}
-
-function compareSideSummary(side: FileSyncCompareSide): string {
-  if (!side.present) return "--";
-  const suffix = side.lastModified ? ` - ${side.lastModified}` : "";
-  if (side.isDir) return `Folder${suffix}`;
-  const size = side.size > 0 ? formatBytes(side.size) : "-";
-  return `${size}${suffix}`;
-}
-
-function compareSideTitle(side: FileSyncCompareSide): string | undefined {
-  if (!side.present) return undefined;
-  if (side.isRemote) return `${side.remoteName}:${side.remotePath || "/"}`;
-  return side.absolutePath || undefined;
-}
-
 function buildExplorerLocationResults(
   homePath: string,
   mountRoot: string,
@@ -3161,7 +2974,7 @@ function buildExplorerLocationResults(
     add(item.name || titleFromPath(item.path), item.path, "Recent");
   }
   for (const remote of remotes) {
-    add(remote.name, joinPath(mountRoot, remote.type, remote.name), remote.type);
+    add(remote.name, joinPath(mountRoot, remote.name), remote.type);
   }
 
   return results;

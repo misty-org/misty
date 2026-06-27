@@ -25,10 +25,20 @@
       "assetProtocol": {
         "enable": true,
         "scope": [
+          "$HOME/**",
+          "$DESKTOP/**",
+          "$DOCUMENT/**",
+          "$DOWNLOAD/**",
+          "$PICTURE/**",
+          "$VIDEO/**",
+          "$AUDIO/**",
           "$APPDATA/**",
           "$APPLOCALDATA/**",
           "$APPCACHE/**",
-          "$TEMP/**"
+          "$TEMP/**",
+          "/Volumes/**",
+          "/media/**",
+          "/mnt/**"
         ]
       }
     }

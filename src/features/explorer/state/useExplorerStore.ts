@@ -60,6 +60,7 @@ export type ExplorerViewMode = "list" | "grid";
 export type ExplorerSortColumn = "name" | "modified" | "size" | "type";
 export type ExplorerSortDirection = "asc" | "desc";
 export type ExplorerUploadSourceKind = "files" | "folders";
+export type ExplorerDeleteMode = "trash" | "permanent";
 
 export interface ExplorerWorkspaceEntry {
   id: string;
@@ -139,7 +140,7 @@ export interface ExplorerBatchRenameItem {
 }
 
 export type ExplorerDialogState =
-  | { kind: "delete"; paneId: string; paths: string[] }
+  | { kind: "delete"; paneId: string; paths: string[]; permanent: boolean }
   | { kind: "batchRename"; paneId: string; items: ExplorerBatchRenameItem[] }
   | null;
 
@@ -197,7 +198,7 @@ interface ExplorerStore {
   canCreateItem: (paneId: string, kind: CreateItemKind) => boolean;
   createItem: (paneId: string, kind: CreateItemKind, name?: string) => Promise<void>;
   renameSelected: (paneId: string, name?: string) => Promise<void>;
-  deleteSelected: (paneId: string) => Promise<void>;
+  deleteSelected: (paneId: string, mode?: ExplorerDeleteMode) => Promise<void>;
   downloadSelected: (paneId: string) => Promise<void>;
   copySelected: (paneId: string) => void;
   cutSelected: (paneId: string) => void;
@@ -760,7 +761,8 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     const defaultFileAction = selectGeneralPreferences(
       useSettingsStore.getState().settings?.document,
     ).defaultFileActionIndex;
-    if (defaultFileAction === 1 || defaultFileAction === 2) {
+    const isRemoteFile = entry.location.kind !== "local";
+    if (!isRemoteFile && (defaultFileAction === 1 || defaultFileAction === 2)) {
       set({ previewVisible: true, operationError: null });
       if (defaultFileAction === 1) {
         get().pushNotification("Preview opened", "info", 1800, false);
@@ -769,12 +771,18 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     }
     try {
       set({ operationError: null });
+      if (isRemoteFile) {
+        get().pushNotification(`Downloading ${entry.name}...`, "info", 2500, false);
+      }
       const localPath = await localPathForEntry(entry);
       const applicationPath = await associationForPath(entry.path);
       if (applicationPath) {
         await explorerOpenWith(applicationPath, localPath);
       } else {
         await explorerOpenPath(localPath);
+      }
+      if (isRemoteFile) {
+        get().pushNotification(`Downloaded ${entry.name}`, "success", 2200, false);
       }
       void get().recordLibraryRecent(entry);
     } catch (error) {
@@ -879,16 +887,21 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     }
   },
 
-  deleteSelected: async (paneId) => {
+  deleteSelected: async (paneId, mode) => {
     const pane = get().panes[paneId];
-    const paths = selectedPathsForPane(pane);
+    const permanent = deleteModeForPaneSelection(pane, mode) === "permanent";
+    const paths = selectedDeletePathsForPane(pane, permanent);
     if (paths.length === 0) return;
-    if (!selectGeneralPreferences(useSettingsStore.getState().settings?.document).confirmDestructiveActions) {
+    const isTrashPane = pane?.listing?.path === "misty://trash";
+    const shouldConfirm = permanent
+      && !isTrashPane
+      && selectGeneralPreferences(useSettingsStore.getState().settings?.document).confirmDestructiveActions;
+    if (!shouldConfirm) {
       try {
         set({ operationError: null });
         const directory = pane?.listing?.path;
-        await explorerQueueDeleteItems({ paths });
-        get().pushNotification(`Queued delete for ${itemCountLabel(paths.length)}`, "success");
+        await explorerQueueDeleteItems({ paths, permanent });
+        get().pushNotification(deleteQueuedMessage(paths.length, permanent), "success");
         get().clearSelection(paneId);
         if (directory) queuePaneRefresh(paneId, directory);
       } catch (error) {
@@ -896,7 +909,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       }
       return;
     }
-    set({ dialog: { kind: "delete", paneId, paths } });
+    set({ dialog: { kind: "delete", paneId, paths, permanent } });
   },
 
   downloadSelected: async (paneId) => {
@@ -929,8 +942,8 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
       try {
         set({ operationError: null });
         const directory = get().panes[dialog.paneId]?.listing?.path;
-        await explorerQueueDeleteItems({ paths: dialog.paths });
-        get().pushNotification(`Queued delete for ${itemCountLabel(dialog.paths.length)}`, "success");
+        await explorerQueueDeleteItems({ paths: dialog.paths, permanent: dialog.permanent });
+        get().pushNotification(deleteQueuedMessage(dialog.paths.length, dialog.permanent), "success");
         get().clearSelection(dialog.paneId);
         if (directory) queuePaneRefresh(dialog.paneId, directory);
       } catch (error) {
@@ -1186,11 +1199,11 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
   },
 
   togglePinnedPath: (path) => {
-    const normalized = path.replace(/\/+$/, "");
-    const current = get().pinnedPaths;
+    const normalized = normalizedPath(path);
+    const current = normalizePinnedPaths(get().pinnedPaths);
     const pinnedPaths = current.some((candidate) => samePath(candidate, normalized))
       ? current.filter((candidate) => !samePath(candidate, normalized))
-      : [...current, normalized];
+      : normalizePinnedPaths([...current, normalized]);
     if (arraysEqual(current, pinnedPaths)) return;
     window.localStorage.setItem("misty.explorer.pinnedPaths", JSON.stringify(pinnedPaths));
     set({ pinnedPaths });
@@ -1589,6 +1602,19 @@ export function selectedPathsForPane(pane: PaneExplorerState | undefined): strin
     .map((entry) => entry.path);
 }
 
+export function selectedDeletePathsForPane(pane: PaneExplorerState | undefined, permanent: boolean): string[] {
+  if (!pane?.listing) return [];
+  const selected = new Set(pane.selectedIds);
+  const inTrash = pane.listing.path === "misty://trash";
+  return pane.listing.entries
+    .filter((entry) => {
+      if (!selected.has(entry.id)) return false;
+      if (inTrash) return permanent && entry.isDeleted;
+      return permanent ? !entry.isDeleted : !entry.isDeleted && entry.location.kind === "local";
+    })
+    .map((entry) => entry.path);
+}
+
 export function selectedPasteItemsForPane(pane: PaneExplorerState | undefined): PasteItem[] {
   if (!pane?.listing) return [];
   if (pane.listing.path === "misty://trash") return [];
@@ -1600,6 +1626,23 @@ export function selectedPasteItemsForPane(pane: PaneExplorerState | undefined): 
 
 function isFileMasterEntry(entry: FileEntry): boolean {
   return !entry.isDeleted;
+}
+
+function deleteModeForPaneSelection(
+  pane: PaneExplorerState | undefined,
+  requestedMode: ExplorerDeleteMode | undefined,
+): ExplorerDeleteMode {
+  if (requestedMode) return requestedMode;
+  if (pane?.listing?.path === "misty://trash") return "permanent";
+  const selected = new Set(pane?.selectedIds ?? []);
+  const hasRemoteSelection = Boolean(pane?.listing?.entries.some((entry) =>
+    selected.has(entry.id) && !entry.isDeleted && entry.location.kind === "remote"
+  ));
+  return hasRemoteSelection ? "permanent" : "trash";
+}
+
+function deleteQueuedMessage(count: number, permanent: boolean): string {
+  return `Queued ${permanent ? "permanent delete" : "trash"} for ${itemCountLabel(count)}`;
 }
 
 async function localPathForEntry(entry: FileEntry): Promise<string> {
@@ -1911,11 +1954,11 @@ function pasteItemFromClipboardRef(fileRef: ClipboardPayload["file_refs"][number
 
 function remoteClipboardVirtualPath(
   mountPath: string,
-  providerType: string,
+  _providerType: string,
   remoteName: string,
   remotePath: string,
 ): string {
-  const base = [mountPath, providerType, remoteName]
+  const base = [mountPath, remoteName]
     .map((part, index) => index === 0 ? part.replace(/\/+$/, "") : part.replace(/^\/+|\/+$/g, ""))
     .filter(Boolean)
     .join("/");
@@ -2080,10 +2123,24 @@ function libraryItemFromEntry(entry: FileEntry): ExplorerLibraryItem {
 function loadPinnedPaths(): string[] {
   try {
     const parsed = JSON.parse(window.localStorage.getItem("misty.explorer.pinnedPaths") ?? "[]");
-    return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === "string") : [];
+    const pinnedPaths = Array.isArray(parsed)
+      ? normalizePinnedPaths(parsed.filter((value): value is string => typeof value === "string"))
+      : [];
+    window.localStorage.setItem("misty.explorer.pinnedPaths", JSON.stringify(pinnedPaths));
+    return pinnedPaths;
   } catch {
     return [];
   }
+}
+
+function normalizePinnedPaths(paths: string[]): string[] {
+  const normalized: string[] = [];
+  for (const path of paths) {
+    const candidate = normalizedPath(path.trim());
+    if (!candidate || normalized.some((existing) => samePath(existing, candidate))) continue;
+    normalized.push(candidate);
+  }
+  return normalized;
 }
 
 export function scheduleExplorerWorkspaceSave(): void {
@@ -2166,10 +2223,10 @@ function remoteBrowseTargetForPath(path: string, mountRoot: string): { remoteNam
   const cleanMount = normalizedPath(mountRoot);
   if (cleanPath !== cleanMount && !cleanPath.startsWith(`${cleanMount}/`)) return null;
   const parts = cleanPath.slice(cleanMount.length).split("/").filter(Boolean);
-  if (parts.length < 2) return null;
+  if (parts.length < 1) return null;
   return {
-    remoteName: parts[1],
-    remotePath: parts.length > 2 ? `/${parts.slice(2).join("/")}` : "/",
+    remoteName: parts[0],
+    remotePath: parts.length > 1 ? `/${parts.slice(1).join("/")}` : "/",
   };
 }
 

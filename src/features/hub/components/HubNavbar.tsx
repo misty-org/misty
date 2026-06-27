@@ -1,12 +1,12 @@
-import { Gauge, Home } from "lucide-react";
+import { Gauge, Home, Puzzle } from "lucide-react";
 import { FaDiscord, FaGithub, FaXTwitter } from "react-icons/fa6";
-import { Link, NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import { openExternalLink } from "../../../shared/openExternalLink";
-import hubLogo from "../media/misty-hub.png";
 
 const navLinks = [
   { label: "Home", to: "/hub", icon: Home, exact: true },
   { label: "Dashboard", to: "/hub/dashboard", icon: Gauge },
+  { label: "Extensions", to: "/hub/extensions", icon: Puzzle },
 ];
 
 const communityLinks = [
@@ -16,7 +16,7 @@ const communityLinks = [
 ];
 
 function railLinkClass(isActive: boolean) {
-  return `group flex h-12 w-12 items-center justify-center rounded-2xl text-sm font-medium transition-all duration-200 ${
+  return `group flex h-11 w-11 items-center justify-center rounded-xl text-sm font-medium transition-all duration-200 ${
     isActive
       ? "bg-white/[0.08] text-white"
       : "text-text-muted hover:bg-white/[0.05] hover:text-white"
@@ -51,24 +51,9 @@ export function HubNavbar() {
         );
       })}
     </nav>
-    <aside className="glass fixed inset-y-0 right-0 z-40 hidden w-20 flex-col border-l border-border/40 md:flex">
-      <div className="flex h-full flex-col px-3 py-4">
-        <div className="flex items-center justify-center">
-          <Link
-            aria-label="Misty Hub Home"
-            className="flex min-w-0 items-center justify-center transition hover:text-white"
-            title="Misty Hub"
-            to="/hub"
-          >
-            <img
-              alt="Misty Hub logo"
-              className="h-14 w-14 shrink-0 object-contain"
-              src={hubLogo}
-            />
-          </Link>
-        </div>
-
-        <div className="mt-8 flex flex-col items-center gap-2">
+    <aside className="glass fixed inset-y-0 right-0 z-40 hidden w-16 flex-col border-l border-border/40 md:flex">
+      <div className="flex h-full flex-col px-2 py-2">
+        <div className="flex flex-col items-center gap-1.5">
           {navLinks.map(({ label, to, icon: Icon, exact }) => (
             <NavLink
               aria-label={label}
@@ -79,18 +64,18 @@ export function HubNavbar() {
               title={label}
               to={to}
             >
-              <Icon className="h-5 w-5 shrink-0" />
+              <Icon className="h-6 w-6 shrink-0" />
             </NavLink>
           ))}
         </div>
 
-        <div className="mt-auto pt-6">
-          <div className="flex flex-col items-center gap-4 border-t border-white/8 pt-4">
-            <div className="flex flex-col gap-3">
+        <div className="mt-auto pt-3">
+          <div className="flex flex-col items-center gap-2 border-t border-white/8 pt-3">
+            <div className="flex flex-col gap-1.5">
               {communityLinks.map(({ href, icon: Icon, label }) => (
                 <button
                   aria-label={label}
-                  className="flex h-12 w-12 items-center justify-center rounded-2xl text-text-muted transition-colors hover:bg-white/[0.05] hover:text-zinc-200"
+                  className="flex h-11 w-11 items-center justify-center rounded-xl text-text-muted transition-colors hover:bg-white/[0.05] hover:text-zinc-200"
                   key={label}
                   onClick={() => {
                     void openCommunityLink(href);
@@ -98,7 +83,7 @@ export function HubNavbar() {
                   title={label}
                   type="button"
                 >
-                  <Icon className="h-6 w-6" />
+                  <Icon className="h-7 w-7" />
                 </button>
               ))}
             </div>

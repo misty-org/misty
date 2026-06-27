@@ -44,6 +44,8 @@ const VIRTUAL_PATH_RECENT: &str = "misty://recent";
 const VIRTUAL_PATH_STARRED: &str = "misty://starred";
 const VIRTUAL_PATH_TRASH: &str = "misty://trash";
 const MAX_PREVIEW_BYTES: u64 = 32 * 1024 * 1024;
+const REMOTE_INVENTORY_WAIT_ATTEMPTS: usize = 30;
+const REMOTE_INVENTORY_WAIT_INTERVAL: Duration = Duration::from_millis(100);
 
 #[derive(Clone)]
 pub struct ExplorerService {
@@ -72,13 +74,14 @@ impl ExplorerService {
         explorer_library: ExplorerLibraryService,
     ) -> Self {
         let cache_dir = environment.cache_dir();
+        let mount_root = environment.mount_root();
         let mut remote_open_cache = ClipboardCache::new(cache_dir.join("remote-open").join("v1"));
         remote_open_cache.cleanup_expired();
         let drag_stage_dir = cache_dir.join("drag-out").join("v1");
         cleanup_expired_drag_stage_dirs(&drag_stage_dir);
         Self {
             home_dir: environment.home_dir(),
-            mount_root: environment.mount_root(),
+            mount_root,
             proxy,
             providers,
             transfers,
@@ -577,7 +580,7 @@ impl ExplorerService {
         source: &RemoteBrowseTarget,
         size_bytes: Option<i64>,
         remote_modified: Option<&str>,
-        detail_message: &str,
+        _detail_message: &str,
     ) -> ApiResult<PreparedOpenItem> {
         let file_name = Path::new(&source.remote_path)
             .file_name()
@@ -591,46 +594,109 @@ impl ExplorerService {
             last_modified: remote_modified.unwrap_or_default().to_string(),
             is_dir: false,
         };
-        let cache_id = ClipboardCache::remote_file_key(&cache_key);
-        let temp_path = {
+        let final_path = source.virtual_path(&self.mount_root);
+        if let Some(path) = self
+            .remote_open_cache
+            .lock()
+            .await
+            .lookup_remote_file(&cache_key)
+        {
+            return Ok(PreparedOpenItem {
+                local_path: display_path(&path),
+                cached: true,
+            });
+        }
+        if downloaded_file_exists(&final_path).await {
             let mut cache = self.remote_open_cache.lock().await;
-            if let Some(path) = cache.lookup_remote_file(&cache_key) {
-                return Ok(PreparedOpenItem {
-                    local_path: display_path(&path),
-                    cached: true,
-                });
-            }
-            cache.temp_path_for(&cache_id, &file_name)
-        };
+            let local_path = cache
+                .copy_remote_file_into_cache(&cache_key, &final_path, &file_name)
+                .unwrap_or_else(|_| final_path.clone());
+            return Ok(PreparedOpenItem {
+                local_path: display_path(&local_path),
+                cached: true,
+            });
+        }
 
-        let mut record = FileTransferRecord::new(
-            FileTransferType::Download,
-            FileTransferItemType::Remote,
-            &file_name,
-        );
-        record.remote_source_name = source.remote_name.clone();
-        record.remote_source_path = source.remote_path.clone();
-        record.local_dest_path = display_path(&temp_path);
-        record.total_bytes = size_bytes.unwrap_or_default();
-        record.detail_message = detail_message.to_string();
-        let transfer_id = self.begin_transfer(record).await;
+        let temp_path = self
+            .remote_open_cache
+            .lock()
+            .await
+            .temp_path_for(&ClipboardCache::remote_file_key(&cache_key), &file_name);
         let result = self
-            .download_remote_item(source, false, &temp_path, transfer_id, None)
+            .download_remote_item(source, false, &temp_path, None, None)
             .await;
-        self.finish_transfer(transfer_id, result).await?;
-
+        if let Err(error) = result {
+            let _ = tokio::fs::remove_file(&temp_path).await;
+            return Err(error);
+        }
+        if !downloaded_file_exists(&temp_path).await {
+            let _ = tokio::fs::remove_file(&temp_path).await;
+            let retry_temp_path = self
+                .remote_open_cache
+                .lock()
+                .await
+                .temp_path_for(&ClipboardCache::remote_file_key(&cache_key), &file_name);
+            let retry_result = self
+                .download_remote_item(source, false, &retry_temp_path, None, None)
+                .await;
+            if let Err(error) = retry_result {
+                let _ = tokio::fs::remove_file(&retry_temp_path).await;
+                return Err(error);
+            }
+            if !downloaded_file_exists(&retry_temp_path).await {
+                let _ = tokio::fs::remove_file(&retry_temp_path).await;
+                return Err(ApiError::Message(format!(
+                    "Remote download completed but did not create cached file for {file_name}"
+                )));
+            }
+            let local_path = self
+                .remote_open_cache
+                .lock()
+                .await
+                .store_remote_file(&cache_key, &retry_temp_path, &file_name)
+                .map_err(|error| {
+                    ApiError::Message(format!("Failed to cache remote file {file_name}: {error}"))
+                })?;
+            return Ok(PreparedOpenItem {
+                local_path: display_path(&local_path),
+                cached: false,
+            });
+        };
         let local_path = self
             .remote_open_cache
             .lock()
             .await
             .store_remote_file(&cache_key, &temp_path, &file_name)
-            .ok_or_else(|| {
-                ApiError::Message(format!("Failed to cache remote file {file_name}."))
+            .map_err(|error| {
+                ApiError::Message(format!("Failed to cache remote file {file_name}: {error}"))
             })?;
         Ok(PreparedOpenItem {
             local_path: display_path(&local_path),
             cached: false,
         })
+    }
+
+    async fn cache_downloaded_remote_file(&self, source: &RemoteBrowseTarget, local_path: &Path) {
+        let size = tokio::fs::metadata(local_path)
+            .await
+            .map(|metadata| metadata.len().min(i64::MAX as u64) as i64)
+            .unwrap_or_default();
+        let cache_key = ClipboardRemoteFileCacheKey {
+            remote_name: source.remote_name.clone(),
+            remote_path: source.remote_path.clone(),
+            size,
+            last_modified: String::new(),
+            is_dir: false,
+        };
+        let file_name = Path::new(&source.remote_path)
+            .file_name()
+            .and_then(|value| value.to_str())
+            .unwrap_or("item");
+        let _ = self
+            .remote_open_cache
+            .lock()
+            .await
+            .copy_remote_file_into_cache(&cache_key, local_path, file_name);
     }
 
     pub async fn create_item(
@@ -882,12 +948,18 @@ impl ExplorerService {
         cancellation: Option<&AtomicBool>,
     ) -> ApiResult<ExplorerOperationResult> {
         ensure_not_canceled_if(cancellation)?;
+        let permanent = request.permanent;
         let mut local_paths = Vec::new();
         let mut affected_paths = Vec::new();
         let mut parent_path = None;
         for path in request.paths {
             ensure_not_canceled_if(cancellation)?;
             if let Some(target) = self.remote_target(&path) {
+                if !permanent {
+                    return Err(ApiError::Message(
+                        "Remote items can only be deleted permanently.".to_string(),
+                    ));
+                }
                 if target.remote_path == "/" {
                     return Err(ApiError::Message(
                         "Disconnect remotes from the Providers workspace.".to_string(),
@@ -943,14 +1015,23 @@ impl ExplorerService {
                 .filter(|metadata| metadata.is_file())
                 .map(|metadata| metadata.len().min(i64::MAX as u64) as i64)
                 .unwrap_or_default();
-            record.detail_message = "Deleting local item".to_string();
+            record.detail_message = if permanent {
+                "Deleting local item".to_string()
+            } else {
+                "Moving local item to Trash".to_string()
+            };
             let transfer_id = self.begin_transfer(record).await;
-            let local_result = delete_local_path_cancellable(Path::new(&local_path), cancellation)
-                .await
-                .map(|()| ExplorerOperationResult {
-                    affected_paths: vec![local_path.clone()],
-                    parent_path: Path::new(&local_path).parent().map(display_path),
-                });
+            let local_result = if permanent {
+                delete_local_path_cancellable(Path::new(&local_path), cancellation).await
+            } else {
+                trash_local_path_cancellable(Path::new(&local_path), &self.trash_dir, cancellation)
+                    .await
+                    .map(|_| ())
+            }
+            .map(|()| ExplorerOperationResult {
+                affected_paths: vec![local_path.clone()],
+                parent_path: Path::new(&local_path).parent().map(display_path),
+            });
             let local_result = self.finish_transfer(transfer_id, local_result).await?;
             if parent_path.is_none() {
                 parent_path = local_result.parent_path.clone();
@@ -1152,6 +1233,10 @@ impl ExplorerService {
                 };
                 self.finish_transfer(transfer_id, operation).await?;
                 ensure_not_canceled_if(cancellation)?;
+                if !item.is_directory {
+                    self.cache_downloaded_remote_file(&source, &local_path)
+                        .await;
+                }
                 affected_paths.push(display_path(&local_path));
             }
             return Ok(ExplorerOperationResult {
@@ -1399,20 +1484,20 @@ impl ExplorerService {
         let remotes = self.remote_inventory().await?;
 
         match parts.len() {
-            0 => Ok(self.provider_root_listing(remotes, show_hidden)),
-            1 => Ok(self.provider_listing(path, &parts[0], remotes, show_hidden)),
+            0 => Ok(self.remote_root_listing(remotes, show_hidden)),
             _ => {
-                let target = RemoteBrowseTarget::from_virtual_path(&self.mount_root, path)
+                let mut target = RemoteBrowseTarget::from_virtual_path(&self.mount_root, path)
                     .ok_or_else(|| ApiError::Message("Invalid remote browse path".to_string()))?;
-                if !remotes.iter().any(|remote| {
-                    remote.name == target.remote_name
-                        && remote.provider_type == target.provider_type
-                }) {
+                let Some(remote) = remotes
+                    .iter()
+                    .find(|remote| remote.name == target.remote_name)
+                else {
                     return Err(ApiError::Message(format!(
                         "Remote \"{}\" was not found.",
                         target.remote_name
                     )));
-                }
+                };
+                target.provider_type = remote.provider_type.clone();
                 self.remote_listing(target, show_hidden, force_remote_refresh)
                     .await
             }
@@ -1420,35 +1505,41 @@ impl ExplorerService {
     }
 
     async fn remote_inventory(&self) -> ApiResult<Vec<ProviderRemote>> {
-        let snapshot = self.providers.snapshot().await?;
-        if !snapshot.remotes.is_empty() || snapshot.loading {
-            return Ok(snapshot.remotes);
+        for _ in 0..REMOTE_INVENTORY_WAIT_ATTEMPTS {
+            let snapshot = self.providers.snapshot().await?;
+            if !snapshot.remotes.is_empty() {
+                return Ok(snapshot.remotes);
+            }
+            if !snapshot.loading {
+                break;
+            }
+            tokio::time::sleep(REMOTE_INVENTORY_WAIT_INTERVAL).await;
         }
         Ok(self.providers.refresh().await?.remotes)
     }
 
-    fn provider_root_listing(
+    fn remote_root_listing(
         &self,
-        remotes: Vec<ProviderRemote>,
+        mut remotes: Vec<ProviderRemote>,
         show_hidden: bool,
     ) -> DirectoryListing {
-        let providers = remotes
+        remotes.sort_by(|left, right| left.name.to_lowercase().cmp(&right.name.to_lowercase()));
+        let hidden_count = remotes
             .iter()
-            .map(|remote| remote.provider_type.clone())
-            .filter(|provider| !provider.is_empty())
-            .collect::<BTreeSet<_>>();
-        let entries = providers
+            .filter(|remote| remote.name.starts_with('.'))
+            .count();
+        let entries = remotes
             .into_iter()
-            .filter(|provider| show_hidden || !provider.starts_with('.'))
-            .map(|provider| {
+            .filter(|remote| show_hidden || !remote.name.starts_with('.'))
+            .map(|remote| {
                 virtual_folder_entry(
-                    self.mount_root.join(&provider),
-                    provider.clone(),
+                    self.mount_root.join(&remote.name),
+                    remote.name.clone(),
                     ExplorerLocation {
-                        kind: ExplorerLocationKind::RemoteProvider,
-                        provider_type: Some(provider),
-                        remote_name: None,
-                        remote_path: None,
+                        kind: ExplorerLocationKind::Remote,
+                        provider_type: Some(remote.provider_type),
+                        remote_name: Some(remote.name),
+                        remote_path: Some("/".to_string()),
                     },
                 )
             })
@@ -1459,53 +1550,6 @@ impl ExplorerService {
             location: ExplorerLocation {
                 kind: ExplorerLocationKind::RemoteProvider,
                 provider_type: None,
-                remote_name: None,
-                remote_path: None,
-            },
-            total_count: entries.len(),
-            hidden_count: 0,
-            entries,
-        }
-    }
-
-    fn provider_listing(
-        &self,
-        path: &Path,
-        provider_type: &str,
-        remotes: Vec<ProviderRemote>,
-        show_hidden: bool,
-    ) -> DirectoryListing {
-        let mut matching = remotes
-            .into_iter()
-            .filter(|remote| remote.provider_type == provider_type)
-            .collect::<Vec<_>>();
-        matching.sort_by(|left, right| left.name.to_lowercase().cmp(&right.name.to_lowercase()));
-        let hidden_count = matching
-            .iter()
-            .filter(|remote| remote.name.starts_with('.'))
-            .count();
-        let entries = matching
-            .into_iter()
-            .filter(|remote| show_hidden || !remote.name.starts_with('.'))
-            .map(|remote| {
-                virtual_folder_entry(
-                    path.join(&remote.name),
-                    remote.name.clone(),
-                    ExplorerLocation {
-                        kind: ExplorerLocationKind::Remote,
-                        provider_type: Some(provider_type.to_string()),
-                        remote_name: Some(remote.name),
-                        remote_path: Some("/".to_string()),
-                    },
-                )
-            })
-            .collect::<Vec<_>>();
-        DirectoryListing {
-            path: display_path(path),
-            parent_path: Some(display_path(&self.mount_root)),
-            location: ExplorerLocation {
-                kind: ExplorerLocationKind::RemoteProvider,
-                provider_type: Some(provider_type.to_string()),
                 remote_name: None,
                 remote_path: None,
             },
@@ -1858,7 +1902,8 @@ impl ExplorerService {
         cancellation: Option<&AtomicBool>,
     ) -> ApiResult<()> {
         ensure_not_canceled_if(cancellation)?;
-        if let Some(response) = self
+        let mut direct_download_error = None;
+        match self
             .proxy
             .start_download_to_file_with_cancellation(
                 &source.remote_name,
@@ -1866,13 +1911,31 @@ impl ExplorerService {
                 destination,
                 cancellation,
             )
-            .await?
+            .await
         {
-            let start: RemoteJobStart =
-                response_json(response, "start embedded remote download").await?;
-            self.wait_for_job(&start.job_id, transfer_id, cancellation)
-                .await?;
-            return Ok(());
+            Ok(Some(response)) => {
+                let direct_result = async {
+                    let start: RemoteJobStart =
+                        response_json(response, "start embedded remote download").await?;
+                    self.wait_for_job(&start.job_id, transfer_id, cancellation)
+                        .await?;
+                    ensure_not_canceled_if(cancellation)?;
+                    if downloaded_file_exists(destination).await {
+                        return Ok(());
+                    }
+                    Err(ApiError::Message(format!(
+                        "Embedded direct download completed but did not create {}",
+                        destination.display()
+                    )))
+                }
+                .await;
+                match direct_result {
+                    Ok(()) => return Ok(()),
+                    Err(error) => direct_download_error = Some(error.to_string()),
+                }
+            }
+            Ok(None) => {}
+            Err(error) => direct_download_error = Some(error.to_string()),
         }
         let response = self
             .proxy
@@ -1894,7 +1957,18 @@ impl ExplorerService {
                 destination,
                 cancellation,
             )
-            .await
+            .await?;
+        ensure_not_canceled_if(cancellation)?;
+        if downloaded_file_exists(destination).await {
+            return Ok(());
+        }
+        let detail = direct_download_error
+            .map(|error| format!(" Direct download also failed: {error}"))
+            .unwrap_or_default();
+        Err(ApiError::Message(format!(
+            "Remote download completed but did not create {}.{detail}",
+            destination.display()
+        )))
     }
 
     async fn fetch_remote_items(
@@ -2531,6 +2605,69 @@ async fn move_local_path_cancellable(
     }
 }
 
+async fn trash_local_path_cancellable(
+    source: &Path,
+    trash_dir: &Path,
+    cancellation: Option<&AtomicBool>,
+) -> ApiResult<PathBuf> {
+    ensure_not_canceled_if(cancellation)?;
+    tokio::fs::symlink_metadata(source).await.map_err(|error| {
+        ApiError::Message(format!("Failed to inspect {}: {error}", source.display()))
+    })?;
+    if source == trash_dir {
+        return Err(ApiError::Message(
+            "The Misty trash directory cannot be moved to Trash.".to_string(),
+        ));
+    }
+    tokio::fs::create_dir_all(trash_dir)
+        .await
+        .map_err(|error| {
+            ApiError::Message(format!(
+                "Failed to create trash directory {}: {error}",
+                trash_dir.display()
+            ))
+        })?;
+    let destination = available_trash_destination(trash_dir, source)?;
+    let uncanceled = AtomicBool::new(false);
+    let cancellation = cancellation.unwrap_or(&uncanceled);
+    move_local_path_cancellable(source, &destination, cancellation).await?;
+    ensure_not_canceled(cancellation)?;
+    Ok(destination)
+}
+
+fn available_trash_destination(trash_dir: &Path, source: &Path) -> ApiResult<PathBuf> {
+    let file_name = source
+        .file_name()
+        .and_then(|value| value.to_str())
+        .filter(|value| !value.is_empty())
+        .unwrap_or("item");
+    let first_candidate = trash_dir.join(file_name);
+    if !first_candidate.exists() {
+        return Ok(first_candidate);
+    }
+
+    let stem = source
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .filter(|value| !value.is_empty())
+        .unwrap_or(file_name);
+    let extension = source.extension().and_then(|value| value.to_str());
+    for index in 1..10_000 {
+        let name = match extension {
+            Some(extension) if !extension.is_empty() => format!("{stem} {index}.{extension}"),
+            _ => format!("{stem} {index}"),
+        };
+        let candidate = trash_dir.join(name);
+        if !candidate.exists() {
+            return Ok(candidate);
+        }
+    }
+    Err(ApiError::Message(format!(
+        "Could not create a unique Trash name for {}.",
+        source.display()
+    )))
+}
+
 fn ensure_not_canceled(cancellation: &AtomicBool) -> ApiResult<()> {
     if cancellation.load(Ordering::SeqCst) {
         return Err(ApiError::Message("Operation canceled.".to_string()));
@@ -2564,6 +2701,13 @@ async fn cleanup_partial_destination_on_cancel<T>(
         let _ = remove_local_path(destination, is_directory).await;
     }
     result
+}
+
+async fn downloaded_file_exists(destination: &Path) -> bool {
+    tokio::fs::metadata(destination)
+        .await
+        .map(|metadata| metadata.is_file())
+        .unwrap_or(false)
 }
 
 async fn delete_local_path_cancellable(
@@ -3007,6 +3151,38 @@ mod tests {
     use super::*;
     use crate::services::environment::AppEnvironmentService;
     use std::sync::atomic::AtomicBool;
+
+    #[tokio::test]
+    async fn soft_delete_uses_unique_trash_name() {
+        let root = unique_test_dir("trash-local-path");
+        let source = root.join("notes.txt");
+        let trash_dir = root.join("trash");
+        let original_trash_item = trash_dir.join("notes.txt");
+        let unique_trash_item = trash_dir.join("notes 1.txt");
+        tokio::fs::create_dir_all(&root).await.unwrap();
+        tokio::fs::write(&source, b"first").await.unwrap();
+
+        let destination = trash_local_path_cancellable(&source, &trash_dir, None)
+            .await
+            .unwrap();
+        assert_eq!(destination, original_trash_item);
+        assert!(!source.exists());
+        assert_eq!(tokio::fs::read(&destination).await.unwrap(), b"first");
+
+        tokio::fs::write(&source, b"second").await.unwrap();
+        let destination = trash_local_path_cancellable(&source, &trash_dir, None)
+            .await
+            .unwrap();
+        assert_eq!(destination, unique_trash_item);
+        assert!(!source.exists());
+        assert_eq!(tokio::fs::read(&destination).await.unwrap(), b"second");
+        assert_eq!(
+            tokio::fs::read(&original_trash_item).await.unwrap(),
+            b"first"
+        );
+
+        let _ = tokio::fs::remove_dir_all(&root).await;
+    }
 
     #[test]
     fn remote_conflict_lookup_accepts_relative_and_full_list_paths() {
@@ -3521,6 +3697,57 @@ mod tests {
         let transfers = TransferService::new(environment.clone());
         let explorer_library = ExplorerLibraryService::new(environment.clone());
         ExplorerService::new(environment, proxy, providers, transfers, explorer_library)
+    }
+
+    fn test_explorer_service_for_home(home_dir: PathBuf) -> ExplorerService {
+        let environment = AppEnvironmentService::for_test_home(home_dir);
+        if let Some(db_dir) = environment.misty_db_path().parent() {
+            let _ = std::fs::create_dir_all(db_dir);
+        }
+        let proxy = ProxyService::new(environment.clone());
+        let providers = ProviderService::new(proxy.clone());
+        let transfers = TransferService::new(environment.clone());
+        let explorer_library = ExplorerLibraryService::new(environment.clone());
+        ExplorerService::new(environment, proxy, providers, transfers, explorer_library)
+    }
+
+    #[tokio::test]
+    async fn prepared_remote_file_reuses_mounted_file_as_cache() {
+        let home = unique_test_dir("remote-open-cache-home");
+        let service = test_explorer_service_for_home(home.clone());
+        let source = RemoteBrowseTarget {
+            provider_type: "drive".into(),
+            remote_name: "work".into(),
+            remote_path: "/Photos/IMG_7313.PNG".into(),
+        };
+        let mounted_file = source.virtual_path(&service.mount_root);
+        tokio::fs::create_dir_all(mounted_file.parent().unwrap())
+            .await
+            .unwrap();
+        tokio::fs::write(&mounted_file, b"cached image")
+            .await
+            .unwrap();
+
+        let prepared = service
+            .prepare_remote_file_for_local_use(
+                &source,
+                Some(b"cached image".len() as i64),
+                Some("2026-06-26T21:58:36Z"),
+                "Preparing remote file to open",
+            )
+            .await
+            .unwrap();
+
+        let prepared_path = PathBuf::from(&prepared.local_path);
+        assert!(prepared.cached);
+        assert_ne!(prepared_path, mounted_file);
+        assert!(prepared_path.starts_with(home.join(".misty/.cache/remote-open/v1")));
+        assert_eq!(
+            tokio::fs::read(prepared_path).await.unwrap(),
+            b"cached image"
+        );
+
+        let _ = tokio::fs::remove_dir_all(home).await;
     }
 
     async fn wait_until_path_exists(path: &Path) {

@@ -190,13 +190,13 @@ export function DockWorkspace() {
 
   return (
     <section className={dockStyles.workspace}>
-      <aside className={dockStyles.launcher} aria-label="Plugin panels">
+      <aside className={dockStyles.launcher} aria-label="Extension panels">
         <header className={dockStyles.launcherHeader}>
           <div>
-            <h2>Plugins</h2>
-            <p className={dockStyles.launcherDescription}>Dock panels from installed plugins.</p>
+            <h2>Extensions</h2>
+            <p className={dockStyles.launcherDescription}>Dock panels from installed extensions.</p>
           </div>
-          <button className={dockStyles.iconButton} type="button" title="Refresh plugins" onClick={load}>
+          <button className={dockStyles.iconButton} type="button" title="Refresh extensions" onClick={load}>
             <RefreshCcw size={16} />
           </button>
         </header>
@@ -206,7 +206,7 @@ export function DockWorkspace() {
         {!loading && dockPanels.length === 0 && commandOnlyGroups.length === 0 ? (
           <div className={dockStyles.empty}>
             <Puzzle size={26} />
-            <p>No installed plugin panels or commands were discovered.</p>
+            <p>No installed extension panels or commands were discovered.</p>
           </div>
         ) : (
           <div className={dockStyles.panelList}>
@@ -260,8 +260,8 @@ export function DockWorkspace() {
           />
         ) : (
           <div className={dockStyles.hostEmpty}>
-            <h2>Plugins</h2>
-            <p>Install a plugin with panels or commands to use the Dock workspace.</p>
+            <h2>Extensions</h2>
+            <p>Install an extension with panels or commands to use the Dock workspace.</p>
           </div>
         )}
       </main>
@@ -352,7 +352,7 @@ const PluginPanelHost = memo(function PluginPanelHost(props: {
           <div className={dockStyles.runtimeNotice}>
             <Puzzle size={22} />
             <div>
-              <h3 className={dockStyles.runtimeHeading}>Plugin panel unavailable</h3>
+              <h3 className={dockStyles.runtimeHeading}>Extension panel unavailable</h3>
               <p className={dockStyles.runtimeText}>{rendered.message}</p>
             </div>
           </div>
@@ -371,12 +371,12 @@ const PluginPanelHost = memo(function PluginPanelHost(props: {
       <dl className={dockStyles.details}>
         <dt className={dockStyles.detailTerm}>Panel ID</dt>
         <dd className={dockStyles.detailValue}>{props.panel.id}</dd>
-        <dt className={dockStyles.detailTerm}>Plugin ID</dt>
+        <dt className={dockStyles.detailTerm}>Extension ID</dt>
         <dd className={dockStyles.detailValue}>{props.panel.pluginId}</dd>
         <dt className={dockStyles.detailTerm}>Default size</dt>
         <dd className={dockStyles.detailValue}>{Math.round(props.panel.defaultWidth)} x {Math.round(props.panel.defaultHeight)}</dd>
         <dt className={dockStyles.detailTerm}>Views</dt>
-        <dd className={dockStyles.detailValue}>{props.panel.launcherViews.join(", ") || "Plugins"}</dd>
+        <dd className={dockStyles.detailValue}>{extensionViewLabels(props.panel.launcherViews).join(", ") || "Extensions"}</dd>
         <dt className={dockStyles.detailTerm}>Library</dt>
         <dd className={dockStyles.detailValue}>{props.panel.libraryPath || "No platform runtime library advertised"}</dd>
         <dt className={dockStyles.detailTerm}>Manifest</dt>
@@ -408,7 +408,7 @@ const PluginPanelHost = memo(function PluginPanelHost(props: {
           ))}
         </section>
       ) : null}
-      <Link className={dockStyles.link} to={`/hub/plugins?plugin=${encodeURIComponent(props.panel.pluginId)}`}>
+      <Link className={dockStyles.link} to={`/hub/extensions?plugin=${encodeURIComponent(props.panel.pluginId)}`}>
         Manage in Hub
         <ExternalLink size={14} />
       </Link>
@@ -434,7 +434,7 @@ const PluginCommandOnlyHost = memo(function PluginCommandOnlyHost(props: {
       <section className={dockStyles.runtimeNotice}>
         <Terminal size={22} />
         <div>
-          <h3 className={dockStyles.runtimeHeading}>Command-only plugin</h3>
+          <h3 className={dockStyles.runtimeHeading}>Command-only extension</h3>
           <p className={dockStyles.runtimeText}>
             {props.selectedPath
               ? `Commands will run with ${props.selectedPath}.`
@@ -466,7 +466,7 @@ const PluginCommandOnlyHost = memo(function PluginCommandOnlyHost(props: {
           </div>
         ))}
       </section>
-      <Link className={dockStyles.link} to={`/hub/plugins?plugin=${encodeURIComponent(props.group.pluginId)}`}>
+      <Link className={dockStyles.link} to={`/hub/extensions?plugin=${encodeURIComponent(props.group.pluginId)}`}>
         Manage in Hub
         <ExternalLink size={14} />
       </Link>
@@ -509,7 +509,7 @@ const PluginPanelElementView = memo(function PluginPanelElementView(props: {
           className={dockStyles.nativeInput}
           value={props.value}
           disabled={props.disabled}
-          aria-label={element.id || "Plugin input"}
+          aria-label={element.id || "Extension input"}
           onChange={(event) => props.onInput(element.id, event.target.value)}
         />
       );
@@ -741,6 +741,10 @@ function pluginCommandOnlyOpensLauncher(command: PluginCommandEntry): boolean {
 
 function pluginCommandNeedsSelection(command: PluginCommandEntry, selectedPath: string): boolean {
   return command.requiresSelectedFile && !selectedPath.trim();
+}
+
+function extensionViewLabels(views: string[]): string[] {
+  return views.map((view) => view.trim().toLowerCase() === "plugins" ? "Extensions" : view);
 }
 
 function notificationLevelClass(level: string): string {

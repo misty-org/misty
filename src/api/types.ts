@@ -153,6 +153,58 @@ export interface FileEntry {
   location: ExplorerLocation;
 }
 
+export type SearchSourceKind = "local" | "remote";
+export type SearchScanPhase = "idle" | "scanning" | "canceling" | "committing";
+export type SearchScanOutcome = "completed" | "canceled" | "failed";
+export type SearchQueryScope = "current" | "local" | "remotes" | "everything";
+
+export interface SearchScanError {
+  source: string;
+  message: string;
+}
+
+export interface SearchStatus {
+  scanInProgress: boolean;
+  scanPhase: SearchScanPhase;
+  lastScanTimeMs: number | null;
+  lastScanOutcome: SearchScanOutcome | null;
+  lastScanError: string | null;
+  indexedItemCount: number;
+  scanIndexedItemCount: number;
+  indexSizeBytes: number;
+  currentSource: string | null;
+  currentPath: string | null;
+  scanErrors: SearchScanError[];
+  indexedLocalRoots: string[];
+  indexedRemoteNames: string[];
+}
+
+export interface SearchScanRequest {
+  roots?: string[];
+  includeLocal?: boolean;
+  includeRemotes?: boolean;
+  remoteNames?: string[];
+  maxDepth?: number | null;
+  ignoredPaths?: string[];
+}
+
+export interface SearchQueryRequest {
+  query: string;
+  currentPath?: string | null;
+  scope?: SearchQueryScope;
+  includeFiles?: boolean;
+  includeDirectories?: boolean;
+  includeHidden?: boolean;
+  limit?: number | null;
+}
+
+export interface SearchResult {
+  entry: FileEntry;
+  score: number;
+  sourceKind: SearchSourceKind;
+  indexedAtMs: number;
+}
+
 export interface DirectoryListing {
   path: string;
   parentPath: string | null;
@@ -193,6 +245,7 @@ export interface RenameItemsRequest {
 
 export interface DeleteItemsRequest {
   paths: string[];
+  permanent?: boolean;
 }
 
 export type ClipboardOperation = "copy" | "move";

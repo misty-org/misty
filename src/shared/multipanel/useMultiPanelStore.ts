@@ -24,7 +24,6 @@ export interface MultiPanelStore {
   nextTabIndex: number;
   initialize: (path: string, title?: string) => void;
   addTab: (path: string, title?: string) => string;
-  addCompareTab: (leftPath: string, rightPath?: string) => string;
   reorderTabs: (tabId: string, fromIndex: number, toIndex: number) => void;
   closeTab: (tabId: string) => void;
   restoreTab: () => void;
@@ -100,30 +99,6 @@ export function createMultiPanelStore(options: MultiPanelStoreOptions = {}) {
         activeTabId: tabId,
         activePaneId: paneId,
         nextPaneIndex: state.nextPaneIndex + 1,
-        nextTabIndex: state.nextTabIndex + 1,
-      });
-      return tabId;
-    },
-
-    addCompareTab: (leftPath, rightPath = leftPath) => {
-      const state = get();
-      const tabId = tabIdFor(state.nextTabIndex);
-      const leftPane = createPane(paneIdFor(state.nextPaneIndex), leftPath, titleFromPath(leftPath));
-      const rightPane = createPane(paneIdFor(state.nextPaneIndex + 1), rightPath, titleFromPath(rightPath));
-      const tab: MultiPanelTab = {
-        id: tabId,
-        title: "Compare",
-        path: leftPath,
-        panes: [leftPane, rightPane],
-        activePaneId: leftPane.id,
-        layout: defaultLayout("vertical", [leftPane.id, rightPane.id]),
-        mode: "compare",
-      };
-      set({
-        tabs: [...state.tabs, tab],
-        activeTabId: tabId,
-        activePaneId: leftPane.id,
-        nextPaneIndex: state.nextPaneIndex + 2,
         nextTabIndex: state.nextTabIndex + 1,
       });
       return tabId;
@@ -341,7 +316,7 @@ export function createMultiPanelStore(options: MultiPanelStoreOptions = {}) {
     collapseDuplicateBrowsePanes: () => {
       set((state) => {
         const activeTab = activeMultiPanelTab(state);
-        if (!activeTab || activeTab.mode === "compare" || activeTab.panes.length <= 1) return state;
+        if (!activeTab || activeTab.panes.length <= 1) return state;
         const pane = activeTab.panes.find((candidate) => candidate.id === activeTab.activePaneId) ?? activeTab.panes[0];
         const nextTab: MultiPanelTab = {
           ...activeTab,
@@ -472,7 +447,7 @@ function normalizeSnapshot(snapshot: {
 function normalizeTab(tab: MultiPanelTab): MultiPanelTab | null {
   let panes = tab.panes.filter(validPane).slice(0, maxPanesPerTab);
   if (panes.length === 0) return null;
-  if (tab.mode !== "compare" && panes.length > 1) {
+  if (panes.length > 1) {
     const preferredPane = panes.find((pane) => pane.id === tab.activePaneId) ?? panes[0];
     panes = [preferredPane];
   }
@@ -485,6 +460,7 @@ function normalizeTab(tab: MultiPanelTab): MultiPanelTab | null {
   const orientation: SplitOrientation = lanes.length > 1 ? "vertical" : "horizontal";
   return {
     ...tab,
+    mode: "browse",
     title: tab.title || activePane.title,
     path: tab.path || activePane.path,
     panes,

@@ -2,12 +2,15 @@ use std::{
     fs,
     io::{Read, Write},
     path::{Path, PathBuf},
+    sync::atomic::{AtomicU64, Ordering},
     time::{SystemTime, UNIX_EPOCH},
 };
 
 use serde_json::{json, Map, Value};
 
 use crate::services::paths;
+
+static PARTIAL_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ClipboardRemoteFileCacheKey {
@@ -77,24 +80,15 @@ impl ClipboardCache {
         self.cleanup_expired();
         let cache_key = Self::remote_file_key(key);
         let mut index = self.read_index();
-        let entry = index
-            .get_mut("entries")?
-            .as_object_mut()?
-            .get_mut(&cache_key)?;
-        if entry.get("type").and_then(Value::as_str) != Some("remote_file") {
-            return None;
-        }
-        let path = PathBuf::from(entry.get("path")?.as_str()?);
-        if !path.exists() {
-            if let Some(entries) = index.get_mut("entries").and_then(Value::as_object_mut) {
-                entries.remove(&cache_key);
-            }
+        if let Some(path) = self.lookup_remote_file_exact(&mut index, &cache_key) {
             self.write_index(&index);
-            return None;
+            return Some(path);
         }
-        entry["last_access_unix_ms"] = json!(self.now_unix_ms());
-        self.write_index(&index);
-        Some(path)
+        let path = self.lookup_remote_file_by_source(&mut index, key);
+        if path.is_some() {
+            self.write_index(&index);
+        }
+        path
     }
 
     pub fn lookup_image_blob(&mut self, key: &ClipboardImageBlobCacheKey) -> Option<Vec<u8>> {
@@ -120,9 +114,16 @@ impl ClipboardCache {
     }
 
     pub fn temp_path_for(&self, key: &str, file_name: &str) -> PathBuf {
-        let directory = self.root.join("partial");
+        let directory = self.root.join("staging");
         let _ = fs::create_dir_all(&directory);
-        directory.join(format!("{key}-{}.partial", sanitize_file_name(file_name)))
+        let unique = PARTIAL_FILE_COUNTER.fetch_add(1, Ordering::Relaxed);
+        directory.join(format!(
+            "{key}.{:x}.{}.{}-{}",
+            self.now_unix_ms(),
+            std::process::id(),
+            unique,
+            sanitize_file_name(file_name)
+        ))
     }
 
     pub fn store_remote_file(
@@ -130,22 +131,149 @@ impl ClipboardCache {
         key: &ClipboardRemoteFileCacheKey,
         temp_path: &Path,
         file_name: &str,
-    ) -> Option<PathBuf> {
+    ) -> Result<PathBuf, String> {
         if key.is_dir {
-            return None;
+            return Err("remote directories are not stored in the file cache".to_string());
+        }
+        if !temp_path.is_file() {
+            return Err(format!(
+                "downloaded file was not found at {}",
+                temp_path.display()
+            ));
         }
         self.cleanup_expired();
         let cache_key = Self::remote_file_key(key);
         let directory = self.root.join("remote-files").join(&cache_key);
         let final_path = directory.join(sanitize_file_name(file_name));
-        fs::create_dir_all(&directory).ok()?;
+        fs::create_dir_all(&directory)
+            .map_err(|error| format!("create cache directory {}: {error}", directory.display()))?;
         let _ = fs::remove_file(&final_path);
         if fs::rename(temp_path, &final_path).is_err() {
-            fs::copy(temp_path, &final_path).ok()?;
-            let _ = fs::remove_file(temp_path);
+            fs::copy(temp_path, &final_path).map_err(|error| {
+                format!(
+                    "copy downloaded file from {} to {}: {error}",
+                    temp_path.display(),
+                    final_path.display()
+                )
+            })?;
+            fs::remove_file(temp_path).map_err(|error| {
+                format!("remove temporary download {}: {error}", temp_path.display())
+            })?;
         }
-        self.record_entry(&cache_key, "remote_file", &final_path);
-        Some(final_path)
+        self.record_remote_file_entry(&cache_key, key, &final_path);
+        Ok(final_path)
+    }
+
+    pub fn store_remote_file_at_path(
+        &mut self,
+        key: &ClipboardRemoteFileCacheKey,
+        temp_path: &Path,
+        final_path: &Path,
+    ) -> Result<PathBuf, String> {
+        if key.is_dir {
+            return Err("remote directories are not stored in the file cache".to_string());
+        }
+        if !temp_path.is_file() {
+            return Err(format!(
+                "downloaded file was not found at {}",
+                temp_path.display()
+            ));
+        }
+        self.cleanup_expired();
+        let Some(directory) = final_path.parent() else {
+            return Err(format!(
+                "cache path has no parent: {}",
+                final_path.display()
+            ));
+        };
+        fs::create_dir_all(directory)
+            .map_err(|error| format!("create cache directory {}: {error}", directory.display()))?;
+        let _ = fs::remove_file(final_path);
+        if fs::rename(temp_path, final_path).is_err() {
+            fs::copy(temp_path, final_path).map_err(|error| {
+                format!(
+                    "copy downloaded file from {} to {}: {error}",
+                    temp_path.display(),
+                    final_path.display()
+                )
+            })?;
+            fs::remove_file(temp_path).map_err(|error| {
+                format!("remove temporary download {}: {error}", temp_path.display())
+            })?;
+        }
+        self.record_remote_file_entry(&Self::remote_file_key(key), key, final_path);
+        Ok(final_path.to_path_buf())
+    }
+
+    pub fn copy_remote_file_into_cache(
+        &mut self,
+        key: &ClipboardRemoteFileCacheKey,
+        source_path: &Path,
+        file_name: &str,
+    ) -> Result<PathBuf, String> {
+        if key.is_dir {
+            return Err("remote directories are not stored in the file cache".to_string());
+        }
+        if !source_path.is_file() {
+            return Err(format!(
+                "downloaded file was not found at {}",
+                source_path.display()
+            ));
+        }
+        self.cleanup_expired();
+        let cache_key = Self::remote_file_key(key);
+        let directory = self.root.join("remote-files").join(&cache_key);
+        let final_path = directory.join(sanitize_file_name(file_name));
+        fs::create_dir_all(&directory)
+            .map_err(|error| format!("create cache directory {}: {error}", directory.display()))?;
+        let _ = fs::remove_file(&final_path);
+        fs::copy(source_path, &final_path).map_err(|error| {
+            format!(
+                "copy downloaded file from {} to {}: {error}",
+                source_path.display(),
+                final_path.display()
+            )
+        })?;
+        self.record_remote_file_entry(&cache_key, key, &final_path);
+        Ok(final_path)
+    }
+
+    pub fn copy_remote_file_to_path(
+        &mut self,
+        key: &ClipboardRemoteFileCacheKey,
+        source_path: &Path,
+        final_path: &Path,
+    ) -> Result<PathBuf, String> {
+        if key.is_dir {
+            return Err("remote directories are not stored in the file cache".to_string());
+        }
+        if !source_path.is_file() {
+            return Err(format!(
+                "downloaded file was not found at {}",
+                source_path.display()
+            ));
+        }
+        self.cleanup_expired();
+        let Some(directory) = final_path.parent() else {
+            return Err(format!(
+                "cache path has no parent: {}",
+                final_path.display()
+            ));
+        };
+        fs::create_dir_all(directory)
+            .map_err(|error| format!("create cache directory {}: {error}", directory.display()))?;
+        if source_path != final_path {
+            let _ = fs::remove_file(final_path);
+            fs::copy(source_path, final_path).map_err(|error| {
+                format!(
+                    "copy downloaded file from {} to {}: {error}",
+                    source_path.display(),
+                    final_path.display()
+                )
+            })?;
+        }
+        self.record_remote_file_entry(&Self::remote_file_key(key), key, final_path);
+        Ok(final_path.to_path_buf())
     }
 
     pub fn store_image_blob(&mut self, key: &ClipboardImageBlobCacheKey, bytes: &[u8]) -> bool {
@@ -180,7 +308,7 @@ impl ClipboardCache {
         let mut index = self.read_index();
         let now_ms = self.now_unix_ms();
         let ttl_ms = Self::DEFAULT_TTL_HOURS * 60 * 60 * 1000;
-        self.cleanup_partial_files(now_ms, ttl_ms);
+        self.cleanup_staging_files(now_ms, ttl_ms);
         let Some(entries) = index.get_mut("entries").and_then(Value::as_object_mut) else {
             return;
         };
@@ -195,22 +323,27 @@ impl ClipboardCache {
                 .and_then(Value::as_str)
                 .map(PathBuf::from)
                 .unwrap_or_default();
-            if path.as_os_str().is_empty()
-                || !path.exists()
-                || last_access <= 0
-                || now_ms.saturating_sub(last_access) > ttl_ms
-            {
-                if path_under_root(&self.root, &path) {
-                    if entry.get("type").and_then(Value::as_str) == Some("remote_file") {
-                        if let Some(parent) = path.parent() {
-                            let _ = fs::remove_dir_all(parent);
-                        }
-                    } else {
-                        let _ = fs::remove_file(path);
-                    }
-                }
+            if path.as_os_str().is_empty() || !path.exists() || last_access <= 0 {
                 remove.push(key.clone());
+                continue;
             }
+            if now_ms.saturating_sub(last_access) <= ttl_ms {
+                continue;
+            }
+            let is_remote_file = entry.get("type").and_then(Value::as_str) == Some("remote_file");
+            if is_remote_file && !path_under_root(&self.root, &path) {
+                continue;
+            }
+            if path_under_root(&self.root, &path) {
+                if is_remote_file {
+                    if let Some(parent) = path.parent() {
+                        let _ = fs::remove_dir_all(parent);
+                    }
+                } else {
+                    let _ = fs::remove_file(path);
+                }
+            }
+            remove.push(key.clone());
         }
         if remove.is_empty() {
             return;
@@ -221,9 +354,13 @@ impl ClipboardCache {
         self.write_index(&index);
     }
 
-    fn cleanup_partial_files(&self, now_ms: i64, ttl_ms: i64) {
-        let partial_dir = self.root.join("partial");
-        let Ok(entries) = fs::read_dir(&partial_dir) else {
+    fn cleanup_staging_files(&self, now_ms: i64, ttl_ms: i64) {
+        self.cleanup_staging_directory(&self.root.join("staging"), now_ms, ttl_ms);
+        self.cleanup_staging_directory(&self.root.join("partial"), now_ms, ttl_ms);
+    }
+
+    fn cleanup_staging_directory(&self, directory: &Path, now_ms: i64, ttl_ms: i64) {
+        let Ok(entries) = fs::read_dir(directory) else {
             return;
         };
         for entry in entries.flatten() {
@@ -246,6 +383,65 @@ impl ClipboardCache {
         }
     }
 
+    fn lookup_remote_file_exact(&self, index: &mut Value, cache_key: &str) -> Option<PathBuf> {
+        let entries = index.get_mut("entries")?.as_object_mut()?;
+        let entry = entries.get_mut(cache_key)?;
+        if entry.get("type").and_then(Value::as_str) != Some("remote_file") {
+            return None;
+        }
+        let path = PathBuf::from(entry.get("path")?.as_str()?);
+        if !path.exists() {
+            entries.remove(cache_key);
+            return None;
+        }
+        entry["last_access_unix_ms"] = json!(self.now_unix_ms());
+        Some(path)
+    }
+
+    fn lookup_remote_file_by_source(
+        &self,
+        index: &mut Value,
+        key: &ClipboardRemoteFileCacheKey,
+    ) -> Option<PathBuf> {
+        let entries = index.get_mut("entries")?.as_object_mut()?;
+        let mut stale_keys = Vec::new();
+        let mut matched_key = None;
+        let mut matched_path = None;
+        for (entry_key, entry) in entries.iter_mut() {
+            if entry.get("type").and_then(Value::as_str) != Some("remote_file") {
+                continue;
+            }
+            let Some(path) = entry.get("path").and_then(Value::as_str).map(PathBuf::from) else {
+                continue;
+            };
+            if !path.exists() {
+                stale_keys.push(entry_key.clone());
+                continue;
+            }
+            if !remote_file_entry_matches(entry, key, &path) {
+                continue;
+            }
+            entry["last_access_unix_ms"] = json!(self.now_unix_ms());
+            entry["remote_name"] = json!(&key.remote_name);
+            entry["remote_path"] = json!(&key.remote_path);
+            entry["remote_size"] = json!(key.size);
+            entry["remote_last_modified"] = json!(&key.last_modified);
+            entry["is_dir"] = json!(key.is_dir);
+            matched_key = Some(entry_key.clone());
+            matched_path = Some(path);
+            break;
+        }
+        for key in stale_keys {
+            entries.remove(&key);
+        }
+        if let (Some(entry_key), Some(path)) = (matched_key, matched_path) {
+            let entry = entries.remove(&entry_key)?;
+            entries.insert(Self::remote_file_key(key), entry);
+            return Some(path);
+        }
+        None
+    }
+
     pub fn set_now_for_tests(&mut self, now_unix_ms: i64) {
         self.now_override_ms = Some(now_unix_ms);
     }
@@ -263,6 +459,33 @@ impl ClipboardCache {
             "created_unix_ms": now_ms,
             "last_access_unix_ms": now_ms,
             "ttl_hours": Self::DEFAULT_TTL_HOURS,
+        });
+        self.write_index(&index);
+    }
+
+    fn record_remote_file_entry(
+        &self,
+        cache_key: &str,
+        key: &ClipboardRemoteFileCacheKey,
+        path: &Path,
+    ) {
+        let mut index = self.read_index();
+        index["version"] = json!(1);
+        if !index.get("entries").is_some_and(Value::is_object) {
+            index["entries"] = Value::Object(Map::new());
+        }
+        let now_ms = self.now_unix_ms();
+        index["entries"][cache_key] = json!({
+            "type": "remote_file",
+            "path": path.display().to_string(),
+            "created_unix_ms": now_ms,
+            "last_access_unix_ms": now_ms,
+            "ttl_hours": Self::DEFAULT_TTL_HOURS,
+            "remote_name": &key.remote_name,
+            "remote_path": &key.remote_path,
+            "remote_size": key.size,
+            "remote_last_modified": &key.last_modified,
+            "is_dir": key.is_dir,
         });
         self.write_index(&index);
     }
@@ -349,6 +572,65 @@ fn path_under_root(root: &Path, candidate: &Path) -> bool {
         return false;
     };
     candidate.starts_with(root)
+}
+
+fn remote_file_entry_matches(
+    entry: &Value,
+    key: &ClipboardRemoteFileCacheKey,
+    path: &Path,
+) -> bool {
+    let remote_name = entry.get("remote_name").and_then(Value::as_str);
+    let remote_path = entry.get("remote_path").and_then(Value::as_str);
+    if remote_name.is_some() || remote_path.is_some() {
+        if remote_name != Some(key.remote_name.as_str())
+            || remote_path != Some(key.remote_path.as_str())
+            || entry
+                .get("is_dir")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+                != key.is_dir
+        {
+            return false;
+        }
+        if key.size > 0
+            && entry
+                .get("remote_size")
+                .and_then(Value::as_i64)
+                .is_some_and(|size| size > 0 && size != key.size)
+        {
+            return false;
+        }
+        if !key.last_modified.trim().is_empty()
+            && entry
+                .get("remote_last_modified")
+                .and_then(Value::as_str)
+                .is_some_and(|modified| {
+                    !modified.trim().is_empty() && modified != key.last_modified
+                })
+        {
+            return false;
+        }
+        return true;
+    }
+
+    let Some(expected_name) = Path::new(&key.remote_path)
+        .file_name()
+        .and_then(|value| value.to_str())
+    else {
+        return false;
+    };
+    let Some(cached_name) = path.file_name().and_then(|value| value.to_str()) else {
+        return false;
+    };
+    if cached_name != sanitize_file_name(expected_name) {
+        return false;
+    }
+    if key.size > 0 {
+        return fs::metadata(path)
+            .map(|metadata| metadata.len() == key.size as u64)
+            .unwrap_or(false);
+    }
+    true
 }
 
 fn xxh64(input: &[u8], seed: u64) -> u64 {
@@ -484,6 +766,136 @@ mod tests {
             .store_remote_file(&key, &temp, "List.h")
             .expect("store remote cache file");
         assert_eq!(cache.lookup_remote_file(&key), Some(stored));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn downloaded_remote_file_is_copied_into_cache() {
+        let root = root("remote-copy");
+        let mut cache = ClipboardCache::new(root.clone());
+        let key = remote_key("Projects/List.h");
+        let downloaded = root.join("Downloads").join("List.h");
+        fs::create_dir_all(downloaded.parent().unwrap()).expect("create downloads dir");
+        fs::write(&downloaded, b"downloaded payload").expect("write downloaded file");
+
+        let stored = cache
+            .copy_remote_file_into_cache(&key, &downloaded, "List.h")
+            .expect("copy downloaded file into cache");
+
+        assert!(downloaded.exists());
+        assert_eq!(
+            fs::read(&stored).expect("read cached file"),
+            b"downloaded payload",
+        );
+        assert_eq!(cache.lookup_remote_file(&key), Some(stored));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn remote_file_can_be_stored_at_mounted_route() {
+        let cache_root = root("remote-mounted-route-cache");
+        let mount_root = root("remote-mounted-route-mnt");
+        let mut cache = ClipboardCache::new(cache_root.clone());
+        let key = remote_key("Projects/List.h");
+        let temp = cache.temp_path_for(&ClipboardCache::remote_file_key(&key), "List.h");
+        let mounted_file = mount_root
+            .join("mattdev727")
+            .join("Projects")
+            .join("List.h");
+        fs::write(&temp, b"mounted route payload").expect("write staging file");
+
+        let stored = cache
+            .store_remote_file_at_path(&key, &temp, &mounted_file)
+            .expect("store remote file at mounted path");
+
+        assert_eq!(stored, mounted_file);
+        assert!(!temp.exists());
+        assert_eq!(
+            fs::read(&stored).expect("read mounted cached file"),
+            b"mounted route payload",
+        );
+        assert_eq!(cache.lookup_remote_file(&key), Some(stored.clone()));
+        let _ = fs::remove_dir_all(cache_root);
+        let _ = fs::remove_dir_all(mount_root);
+    }
+
+    #[test]
+    fn mounted_route_cache_entry_persists_while_visible_file_exists() {
+        let cache_root = root("remote-mounted-expiry-cache");
+        let mount_root = root("remote-mounted-expiry-mnt");
+        let mut cache = ClipboardCache::new(cache_root.clone());
+        let key = remote_key("Projects/List.h");
+        let mounted_file = mount_root
+            .join("mattdev727")
+            .join("Projects")
+            .join("List.h");
+        fs::create_dir_all(mounted_file.parent().unwrap()).expect("create mounted parent");
+        fs::write(&mounted_file, b"visible payload").expect("write mounted file");
+        cache.set_now_for_tests(1000 * 60 * 60 * 1000);
+        cache
+            .copy_remote_file_to_path(&key, &mounted_file, &mounted_file)
+            .expect("record mounted cache entry");
+
+        cache.set_now_for_tests(1000 * 60 * 60 * 1000 + 73 * 60 * 60 * 1000);
+        cache.cleanup_expired();
+
+        assert!(mounted_file.exists());
+        assert_eq!(cache.lookup_remote_file(&key), Some(mounted_file.clone()));
+        let _ = fs::remove_dir_all(cache_root);
+        let _ = fs::remove_dir_all(mount_root);
+    }
+
+    #[test]
+    fn remote_file_lookup_reuses_legacy_cache_entry_for_same_file() {
+        let root = root("remote-legacy");
+        let mut cache = ClipboardCache::new(root.clone());
+        let stored = root
+            .join("remote-files")
+            .join("legacy-key")
+            .join("Melissa Chen_Ryman Arts.jpg");
+        fs::create_dir_all(stored.parent().unwrap()).expect("create legacy cache directory");
+        fs::write(&stored, b"legacy image payload").expect("write legacy cache file");
+        cache.record_entry("legacy-key", "remote_file", &stored);
+
+        let mut key = remote_key("Photos/Melissa Chen_Ryman Arts.jpg");
+        key.size = b"legacy image payload".len() as i64;
+        key.last_modified = "2026-06-26T01:02:03Z".into();
+
+        assert_eq!(cache.lookup_remote_file(&key), Some(stored.clone()));
+        assert_eq!(cache.lookup_remote_file(&key), Some(stored));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn remote_file_lookup_rejects_stale_source_metadata() {
+        let root = root("remote-stale-source");
+        let mut cache = ClipboardCache::new(root.clone());
+        let key = remote_key("Projects/List.h");
+        let temp = cache.temp_path_for(&ClipboardCache::remote_file_key(&key), "List.h");
+        fs::write(&temp, b"payload").expect("write staging file");
+        cache
+            .store_remote_file(&key, &temp, "List.h")
+            .expect("store remote cache file");
+
+        let mut changed = key.clone();
+        changed.size = 9001;
+
+        assert_eq!(cache.lookup_remote_file(&changed), None);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn temp_paths_are_unique_for_parallel_downloads() {
+        let root = root("unique-partial");
+        let mut cache = ClipboardCache::new(root.clone());
+        cache.set_now_for_tests(1_800_000_000_000);
+        let cache_key = ClipboardCache::remote_file_key(&remote_key("Photos/IMG_0481.jpeg"));
+
+        let first = cache.temp_path_for(&cache_key, "IMG_0481.jpeg");
+        let second = cache.temp_path_for(&cache_key, "IMG_0481.jpeg");
+
+        assert_ne!(first, second);
+        assert_eq!(first.parent(), second.parent());
         let _ = fs::remove_dir_all(root);
     }
 

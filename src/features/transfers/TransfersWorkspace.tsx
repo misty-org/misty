@@ -58,7 +58,7 @@ const transferDefaultColumnWidths: TransferColumnWidths = {
   progress: 130,
   time: 130,
   remote: 180,
-  actions: 240,
+  actions: 300,
 };
 const transferMinimumColumnWidths: TransferColumnWidths = {
   transfer: 190,
@@ -67,7 +67,7 @@ const transferMinimumColumnWidths: TransferColumnWidths = {
   progress: 110,
   time: 105,
   remote: 140,
-  actions: 190,
+  actions: 250,
 };
 const TRANSFER_CHECKBOX_COLUMN_WIDTH = 46;
 const TRANSFERS_MULTIPANEL_STORAGE_KEY = "misty.transfers.multipanel.v1";
@@ -88,7 +88,7 @@ const transferStyles = {
     "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-semibold text-[var(--misty-text)]",
   headerMeta:
     "ml-2 text-xs font-normal text-[var(--misty-text-muted)]",
-  toolbar: "flex min-w-0 items-center justify-end",
+  toolbar: "flex min-w-0 items-center justify-end gap-2",
   toolbarButton:
     "inline-flex min-h-[38px] items-center gap-[7px] rounded-[10px] border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] px-[11px] py-2 text-[var(--misty-text)]",
   toolbarDanger:
@@ -286,6 +286,7 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
   const {
     transfers,
     workspaces,
+    working,
     load,
     ensureWorkspace,
     setSearch,
@@ -299,9 +300,13 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
     setPageIndex,
     clearFilters,
     setFocusedTransfer,
+    deleteIds,
+    deleteSelected,
+    deleteAll,
   } = useTransfersStore(useShallow((state) => ({
     transfers: state.transfers,
     workspaces: state.workspaces,
+    working: state.working,
     load: state.load,
     ensureWorkspace: state.ensureWorkspace,
     setSearch: state.setSearch,
@@ -315,6 +320,9 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
     setPageIndex: state.setPageIndex,
     clearFilters: state.clearFilters,
     setFocusedTransfer: state.setFocusedTransfer,
+    deleteIds: state.deleteIds,
+    deleteSelected: state.deleteSelected,
+    deleteAll: state.deleteAll,
   })));
   const workspace = workspaces[props.workspaceId] ?? createTransferWorkspaceState();
   const {
@@ -395,6 +403,7 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
   }, [queueSnapshot?.operations]);
   const pageIds = useMemo(() => pageRows.map((row) => row.id), [pageRows]);
   const pageSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
+  const selectedCount = selectedIds.size;
   const tableScrollRef = useRef<HTMLDivElement | null>(null);
   const tableScrollFrameRef = useRef<number | null>(null);
   const tableViewportHeightRef = useRef(0);
@@ -480,6 +489,18 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
     (operationId: number) => refreshAfterQueueMutation(retryOperation(operationId)),
     [refreshAfterQueueMutation, retryOperation],
   );
+  const handleDeleteTransfer = useCallback(
+    (transferId: number) => {
+      void deleteIds(props.workspaceId, [transferId]);
+    },
+    [deleteIds, props.workspaceId],
+  );
+  const handleDeleteSelected = useCallback(() => {
+    void deleteSelected(props.workspaceId);
+  }, [deleteSelected, props.workspaceId]);
+  const handleDeleteAll = useCallback(() => {
+    void deleteAll();
+  }, [deleteAll]);
   const beginColumnResize = useCallback((column: TransferTableColumn, event: ReactPointerEvent) => {
     event.preventDefault();
     event.stopPropagation();
@@ -546,6 +567,25 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
             <Search size={16} />
             <input value={search} placeholder="Search transfers" onChange={(event) => setSearch(props.workspaceId, event.target.value)} />
           </label>
+          <button
+            className={`${transferStyles.toolbarButton} ${transferStyles.toolbarDanger}`}
+            type="button"
+            disabled={selectedCount === 0 || working}
+            onClick={handleDeleteSelected}
+            title="Delete selected transfer history"
+          >
+            <Trash2 size={16} />
+            {selectedCount > 0 ? `Delete ${selectedCount}` : "Delete"}
+          </button>
+          <button
+            className={transferStyles.toolbarButton}
+            type="button"
+            disabled={!transfers || transfers.totalCount === 0 || working}
+            onClick={handleDeleteAll}
+            title="Delete all transfer history"
+          >
+            Clear all
+          </button>
         </div>
       </div>
 
@@ -625,11 +665,13 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
                       selected={selectedIds.has(row.id)}
                       focused={focusedTransfer?.id === row.id}
                       queueWorking={queueWorking}
+                      historyWorking={working}
                       onSelect={(id, checked) => toggleTransfer(props.workspaceId, id, checked)}
                       onFocus={(id) => setFocusedTransfer(props.workspaceId, id)}
                       onCancel={handleCancelOperation}
                       onRetry={handleRetryOperation}
                       onUndo={handleUndo}
+                      onDelete={handleDeleteTransfer}
                     />
                   );
                 })}
@@ -675,9 +717,11 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
                 transfer={focusedTransfer}
                 operation={focusedTransfer ? queueOperationsByTransfer.get(focusedTransfer.id) : undefined}
                 working={queueWorking}
+                historyWorking={working}
                 onCancel={handleCancelOperation}
                 onRetry={handleRetryOperation}
                 onUndo={handleUndo}
+                onDelete={handleDeleteTransfer}
               />
             </aside>
           ) : null}
@@ -829,11 +873,13 @@ const TransferTableRow = memo(function TransferTableRow(props: {
   selected: boolean;
   focused: boolean;
   queueWorking: boolean;
+  historyWorking: boolean;
   onSelect: (id: number, checked: boolean) => void;
   onFocus: (id: number | null) => void;
   onCancel: (operationId: number) => Promise<void>;
   onRetry: (operationId: number) => Promise<void>;
   onUndo: (undoTokenId: number) => void;
+  onDelete: (transferId: number) => void;
 }) {
   return (
     <tr
@@ -855,9 +901,11 @@ const TransferTableRow = memo(function TransferTableRow(props: {
           row={props.row}
           operation={props.operation}
           queueWorking={props.queueWorking}
+          historyWorking={props.historyWorking}
           onCancel={props.onCancel}
           onRetry={props.onRetry}
           onUndo={props.onUndo}
+          onDelete={props.onDelete}
         />
       ))}
     </tr>
@@ -869,9 +917,11 @@ const TransferTableCell = memo(function TransferTableCell(props: {
   row: TransferRecord;
   operation?: OperationDescriptor;
   queueWorking: boolean;
+  historyWorking: boolean;
   onCancel: (operationId: number) => Promise<void>;
   onRetry: (operationId: number) => Promise<void>;
   onUndo: (undoTokenId: number) => void;
+  onDelete: (transferId: number) => void;
 }) {
   switch (props.column) {
     case "transfer":
@@ -921,6 +971,14 @@ const TransferTableCell = memo(function TransferTableCell(props: {
             onClick={() => props.onUndo(props.row.undoTokenId)}
           >
             Undo
+          </button>
+          <button
+            className={`${transferStyles.rowActionButton} ${transferStyles.toolbarDanger}`}
+            type="button"
+            disabled={props.historyWorking}
+            onClick={() => props.onDelete(props.row.id)}
+          >
+            Delete
           </button>
         </td>
       );
@@ -1053,9 +1111,11 @@ function TransferDetail(props: {
   transfer: TransferRecord | null;
   operation?: OperationDescriptor;
   working: boolean;
+  historyWorking: boolean;
   onCancel: (operationId: number) => Promise<void>;
   onRetry: (operationId: number) => Promise<void>;
   onUndo: (undoTokenId: number) => void;
+  onDelete: (transferId: number) => void;
 }) {
   const row = props.transfer;
   if (!row) {
@@ -1114,6 +1174,14 @@ function TransferDetail(props: {
             Undo
           </button>
         ) : null}
+        <button
+          className={`${transferStyles.smallButton} ${transferStyles.toolbarDanger}`}
+          type="button"
+          disabled={props.historyWorking}
+          onClick={() => props.onDelete(row.id)}
+        >
+          Delete History Row
+        </button>
       </div>
     </div>
   );

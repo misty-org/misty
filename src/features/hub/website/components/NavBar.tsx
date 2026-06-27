@@ -10,7 +10,7 @@ const navItems = [
 
 
 const resourcesLinks = [
-  { to: "/plugins", label: "Plugins" },
+  { to: "/extensions", label: "Extensions" },
   { to: "/changelog", label: "Changelog" },
   { to: "/blog", label: "Blog" },
   { to: "/roadmap", label: "Roadmap" },

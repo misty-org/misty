@@ -8,8 +8,8 @@ use crate::services::{
     explorer_library::ExplorerLibraryService, file_sync::FileSyncService,
     operation_queue::OperationQueueService, plugin_commands::PluginCommandService,
     providers::ProviderService, proxy::ProxyService, proxy_clipboard::ProxyClipboardClient,
-    proxy_runtime::ProxyRuntimeService, settings::SettingsService, transfers::TransferService,
-    workspaces::WorkspaceService,
+    proxy_runtime::ProxyRuntimeService, search::SearchService, settings::SettingsService,
+    transfers::TransferService, workspaces::WorkspaceService,
 };
 
 pub struct MistyRuntime {
@@ -26,6 +26,7 @@ pub struct MistyRuntime {
     pub commands: CommandService,
     pub devices: DeviceService,
     pub plugin_commands: PluginCommandService,
+    pub search: SearchService,
     pub explorer: ExplorerService,
     pub explorer_library: ExplorerLibraryService,
     pub workspaces: WorkspaceService,
@@ -60,6 +61,7 @@ impl MistyRuntime {
         let devices = DeviceService::new();
         let plugin_commands = PluginCommandService::new(environment.clone());
         let explorer_library = ExplorerLibraryService::new(environment.clone());
+        let search = SearchService::new(environment.clone(), providers.clone(), proxy.clone());
         let explorer = ExplorerService::new(
             environment.clone(),
             proxy.clone(),
@@ -91,6 +93,7 @@ impl MistyRuntime {
             commands,
             devices,
             plugin_commands,
+            search,
             explorer,
             explorer_library,
             workspaces,

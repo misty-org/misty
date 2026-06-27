@@ -22,9 +22,9 @@ const tabs = [
     images: [{ src: `${PUBLIC_ASSET_BASE_URL}/providers/provider1.png`, alt: "Misty providers view" }],
   },
   {
-    label: "Plugins",
-    key: "plugins",
-    images: [{ src: "/misty-plugins.png", alt: "Misty plugins view" }],
+    label: "Extensions",
+    key: "extensions",
+    images: [{ src: "/misty-plugins.png", alt: "Misty extensions view" }],
   },
   {
     label: "Vault",

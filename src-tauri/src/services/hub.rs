@@ -505,7 +505,9 @@ pub async fn get_clipboard_proxy_snapshot(
 }
 
 #[tauri::command]
-pub fn launch_misty(state: tauri::State<'_, crate::runtime::MistyRuntime>) -> Result<String, String> {
+pub fn launch_misty(
+    state: tauri::State<'_, crate::runtime::MistyRuntime>,
+) -> Result<String, String> {
     let runtime = state.proxy_runtime.snapshot();
     if runtime.ready {
         Ok("Embedded Misty runtime is already running.".to_string())
@@ -635,7 +637,8 @@ pub fn scan_local_plugins() -> Result<Vec<LocalPluginRecord>, String> {
         let entries = fs::read_dir(&root_dir)
             .map_err(|error| format!("Could not read {}: {error}", root_dir.display()))?;
         for entry in entries {
-            let entry = entry.map_err(|error| format!("Could not read plugin entry: {error}"))?;
+            let entry =
+                entry.map_err(|error| format!("Could not read extension entry: {error}"))?;
             let plugin_dir = entry.path();
             if !plugin_dir.is_dir() {
                 continue;
@@ -657,41 +660,41 @@ pub async fn install_plugin_bundle(
     url: String,
 ) -> Result<String, String> {
     if plugin_id.trim().is_empty() {
-        return Err("Plugin id is required.".to_string());
+        return Err("Extension id is required.".to_string());
     }
     if !matches!(root.as_str(), "public" | "private") {
-        return Err(format!("Unsupported plugin root: {root}"));
+        return Err(format!("Unsupported extension root: {root}"));
     }
     if url.trim().is_empty() {
-        return Err("Plugin artifact URL is required.".to_string());
+        return Err("Extension artifact URL is required.".to_string());
     }
     if !url.to_ascii_lowercase().ends_with(".zip") {
-        return Err("Plugin install currently expects a .zip bundle.".to_string());
+        return Err("Extension install currently expects a .zip bundle.".to_string());
     }
 
     let client = reqwest::Client::new();
     let bytes = authed_get(&client, &url)
         .send()
         .await
-        .map_err(|error| format!("Could not download plugin bundle: {error}"))?
+        .map_err(|error| format!("Could not download extension bundle: {error}"))?
         .error_for_status()
-        .map_err(|error| format!("Plugin download failed: {error}"))?
+        .map_err(|error| format!("Extension download failed: {error}"))?
         .bytes()
         .await
-        .map_err(|error| format!("Could not read plugin bundle: {error}"))?;
+        .map_err(|error| format!("Could not read extension bundle: {error}"))?;
 
     let root_dir = misty_plugin_root_dir(&root)?;
     fs::create_dir_all(&root_dir).map_err(|error| {
         format!(
-            "Could not create plugin root {}: {error}",
+            "Could not create extension root {}: {error}",
             root_dir.display()
         )
     })?;
     extract_plugin_zip_archive(&bytes, &root_dir, &plugin_id)
-        .map_err(|error| format!("Could not extract plugin bundle: {error}"))?;
+        .map_err(|error| format!("Could not extract extension bundle: {error}"))?;
 
     Ok(format!(
-        "Installed plugin {plugin_id} into {}.",
+        "Installed extension {plugin_id} into {}.",
         root_dir.join(&plugin_id).display()
     ))
 }
@@ -699,18 +702,18 @@ pub async fn install_plugin_bundle(
 #[tauri::command]
 pub fn uninstall_plugin(plugin_id: String, root: String) -> Result<String, String> {
     if plugin_id.trim().is_empty() {
-        return Err("Plugin id is required.".to_string());
+        return Err("Extension id is required.".to_string());
     }
     let plugin_dir = misty_plugin_root_dir(&root)?.join(&plugin_id);
     if !plugin_dir.exists() {
         return Err(format!(
-            "Plugin directory was not found at {}.",
+            "Extension directory was not found at {}.",
             plugin_dir.display()
         ));
     }
     fs::remove_dir_all(&plugin_dir)
         .map_err(|error| format!("Could not remove {}: {error}", plugin_dir.display()))?;
-    Ok(format!("Removed plugin {plugin_id}."))
+    Ok(format!("Removed extension {plugin_id}."))
 }
 
 #[tauri::command]
@@ -720,7 +723,7 @@ pub fn set_plugin_enabled(
     enabled: bool,
 ) -> Result<String, String> {
     if plugin_id.trim().is_empty() {
-        return Err("Plugin id is required.".to_string());
+        return Err("Extension id is required.".to_string());
     }
 
     let manifest_path = misty_plugin_root_dir(&root)?
@@ -738,12 +741,12 @@ pub fn set_plugin_enabled(
     })?;
     object.insert("enabled".to_string(), json!(enabled));
     let next_manifest = serde_json::to_string_pretty(&manifest_json)
-        .map_err(|error| format!("Could not serialize plugin manifest: {error}"))?;
+        .map_err(|error| format!("Could not serialize extension manifest: {error}"))?;
     fs::write(&manifest_path, format!("{next_manifest}\n"))
         .map_err(|error| format!("Could not write {}: {error}", manifest_path.display()))?;
 
     Ok(format!(
-        "{} plugin {plugin_id}.",
+        "{} extension {plugin_id}.",
         if enabled { "Enabled" } else { "Disabled" }
     ))
 }
@@ -1280,7 +1283,7 @@ fn extract_plugin_zip_archive(
     if !target_dir.join("manifest.json").is_file() {
         return Err(io::Error::new(
             io::ErrorKind::InvalidData,
-            "Plugin bundle did not contain manifest.json",
+            "Extension bundle did not contain manifest.json",
         ));
     }
 
@@ -1327,7 +1330,7 @@ fn misty_plugin_root_dir(root: &str) -> Result<PathBuf, String> {
     match root {
         "public" => misty_home_dir().map(|home| home.join("plugins").join("public")),
         "private" => misty_home_dir().map(|home| home.join("plugins").join("private")),
-        _ => Err(format!("Unsupported plugin root: {root}")),
+        _ => Err(format!("Unsupported extension root: {root}")),
     }
 }
 
@@ -1350,7 +1353,7 @@ fn read_local_plugin_record(
         .transpose()
         .map_err(|error| {
             format!(
-                "Could not read plugin metadata in {}: {error}",
+                "Could not read extension metadata in {}: {error}",
                 plugin_dir.display()
             )
         })?
