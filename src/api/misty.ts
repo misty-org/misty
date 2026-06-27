@@ -54,6 +54,10 @@ import type {
   SaveSettingsRequest,
   SaveRemoteRequest,
   SaveShortcutsRequest,
+  SearchQueryRequest,
+  SearchResult,
+  SearchScanRequest,
+  SearchStatus,
   SettingsSnapshot,
   ShortcutsSnapshot,
   TransferFilter,
@@ -115,8 +119,8 @@ function browserSmokeFallback<T>(command: string, args?: Record<string, unknown>
         pluginName: "",
         label: "",
         handled: false,
-        targetRoute: "/hub/plugins",
-        message: "Plugin command execution is only available in the Tauri app.",
+        targetRoute: "/hub/extensions",
+        message: "Extension command execution is only available in the Tauri app.",
         notifications: [],
         runtimeStatus: "unavailable",
       } as T);
@@ -468,6 +472,26 @@ export function devicesSnapshot(): Promise<DeviceSnapshot> {
 
 export function explorerListDirectory(request: ListDirectoryRequest): Promise<DirectoryListing> {
   return invoke("explorer_list_directory", { request });
+}
+
+export function searchInit(): Promise<SearchStatus> {
+  return invoke("search_init");
+}
+
+export function searchGetStatus(): Promise<SearchStatus> {
+  return invoke("search_get_status");
+}
+
+export function searchStartScan(request: SearchScanRequest): Promise<SearchStatus> {
+  return invoke("search_start_scan", { request });
+}
+
+export function searchCancelScan(): Promise<SearchStatus> {
+  return invoke("search_cancel_scan");
+}
+
+export function searchQuery(request: SearchQueryRequest): Promise<SearchResult[]> {
+  return invoke("search_query", { request });
 }
 
 export function explorerCreateItem(request: CreateItemRequest): Promise<ExplorerOperationResult> {

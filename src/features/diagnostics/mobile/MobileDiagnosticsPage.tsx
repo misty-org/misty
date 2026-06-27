@@ -102,7 +102,7 @@ function mobileDiagnosticPathRows(environment: AppEnvironmentSnapshot): Array<[s
     ["Cache", environment.cacheDir],
     ["Temporary files", environment.tmpDir],
     ["Assets", environment.assetsDir],
-    ["Public plugins", environment.pluginsPublicDir],
-    ["Private plugins", environment.pluginsPrivateDir],
+    ["Public extensions", environment.pluginsPublicDir],
+    ["Private extensions", environment.pluginsPrivateDir],
   ];
 }

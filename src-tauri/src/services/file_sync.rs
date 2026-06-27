@@ -347,11 +347,6 @@ impl FileSyncService {
                 "Remote compare root is missing a remote name.".into(),
             ));
         }
-        if endpoint.provider_type.is_empty() {
-            return Err(ApiError::Message(
-                "Remote compare root is missing its provider type.".into(),
-            ));
-        }
         let root = self.endpoint_path(endpoint);
         let mut pending = vec![root.clone()];
         let mut snapshot = FileSyncSnapshot::new();
@@ -420,10 +415,7 @@ impl FileSyncService {
         match endpoint.kind {
             FileSyncEndpointKind::Local => PathBuf::from(&endpoint.local_path),
             FileSyncEndpointKind::Remote => {
-                let mut path = self
-                    .mount_root
-                    .join(&endpoint.provider_type)
-                    .join(&endpoint.remote_name);
+                let mut path = self.mount_root.join(&endpoint.remote_name);
                 for component in
                     Path::new(endpoint.remote_path.trim_start_matches('/')).components()
                 {

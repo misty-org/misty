@@ -335,9 +335,9 @@ function prepareRemoteDragItems(
       }
       if (result.skipped.length > 0) {
         notifyDragPreparation(
-          `Could not prepare ${result.skipped.length} remote ${result.skipped.length === 1 ? "item" : "items"} for drag-out.`,
+          skippedDragPreparationMessage(result.skipped),
           "error",
-          6000,
+          8000,
           true,
         );
       }
@@ -362,6 +362,21 @@ function notifyDragPreparation(
     lastDragPreparationNoticeAt = now;
   }
   useExplorerStore.getState().pushNotification(message, type, durationMs, showInActivity);
+}
+
+function skippedDragPreparationMessage(skipped: { sourcePath: string; reason: string }[]): string {
+  const count = skipped.length;
+  const itemText = count === 1 ? "item" : "items";
+  const first = skipped[0];
+  const detail = first?.reason?.trim();
+  if (!detail) return `Could not prepare ${count} remote ${itemText} for drag-out.`;
+
+  const name = first.sourcePath.split(/[\\/]/).filter(Boolean).pop();
+  const prefix = name
+    ? `Could not prepare ${name} for drag-out`
+    : `Could not prepare ${count} remote ${itemText} for drag-out`;
+  const suffix = count > 1 ? ` (${count - 1} more ${count === 2 ? "item" : "items"} failed)` : "";
+  return `${prefix}: ${detail}${suffix}`;
 }
 
 function dragPreparationKey(entry: FileEntry): string {

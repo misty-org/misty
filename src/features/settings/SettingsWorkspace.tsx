@@ -1,4 +1,4 @@
-import { memo, type ChangeEvent, type ReactNode } from "react";
+import { memo, useEffect, type ChangeEvent, type ReactNode } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useShallow } from "zustand/react/shallow";
 import {
@@ -10,6 +10,7 @@ import {
   Lock,
   RefreshCcw,
   Rows3,
+  Search,
   Settings2,
   Trash2,
   type LucideIcon,
@@ -27,8 +28,10 @@ import {
   useSettingsStore,
   type CustomFontPreference,
 } from "./useSettingsStore";
+import { useSearchStore } from "../explorer/state/useSearchStore";
+import { formatBytes, formatDate } from "../explorer/utils/fileFormat";
 
-type SettingsSection = "general" | "appearance" | "privacy" | "sync" | "notifications" | "shortcuts" | "advanced";
+type SettingsSection = "general" | "appearance" | "privacy" | "sync" | "search" | "notifications" | "shortcuts" | "advanced";
 type SettingValue = string | number | boolean | Array<Record<string, unknown>>;
 
 interface NavItem {
@@ -42,6 +45,7 @@ const appNavItems: NavItem[] = [
   { id: "appearance", label: "Appearance", icon: Eye },
   { id: "privacy", label: "Privacy", icon: Lock },
   { id: "sync", label: "Sync", icon: RefreshCcw },
+  { id: "search", label: "Search", icon: Search },
   { id: "notifications", label: "Notifications", icon: Bell },
   { id: "shortcuts", label: "Shortcuts", icon: Keyboard },
   { id: "advanced", label: "Advanced", icon: Settings2 },
@@ -53,7 +57,7 @@ const navGroups = [
 
 const navItems = appNavItems;
 
-const startupViewOptions = ["Files", "Remotes", "Transfers", "Plugins", "Hub", "Settings"];
+const startupViewOptions = ["Files", "Remotes", "Transfers", "Extensions", "Hub", "Settings"];
 const releaseChannelOptions = ["Stable"];
 const defaultFileActionOptions = ["Open", "Preview", "Show Details"];
 const transferBehaviorOptions = ["Ask Every Time", "Use Default Location"];
@@ -201,6 +205,7 @@ export const SettingsWorkspace = memo(function SettingsWorkspace() {
           {activeSection === "appearance" ? <AppearanceSettings {...controlProps} /> : null}
           {activeSection === "privacy" ? <PrivacySettings {...controlProps} /> : null}
           {activeSection === "sync" ? <SyncSettings {...controlProps} /> : null}
+          {activeSection === "search" ? <SearchSettings {...controlProps} /> : null}
           {activeSection === "notifications" ? <NotificationsSettings {...controlProps} /> : null}
           {activeSection === "shortcuts" ? <ShortcutsSettings {...controlProps} /> : null}
           {activeSection === "advanced" ? <AdvancedSettings {...controlProps} /> : null}
@@ -576,6 +581,112 @@ function SyncSettings(props: SettingsContentProps) {
         </SettingsRow>
       </SettingsSectionBlock>
     </>
+  );
+}
+
+function SearchSettings(_props: SettingsContentProps) {
+  const { status, error, initialize, refreshStatus, startScan, cancelScan } = useSearchStore(useShallow((state) => ({
+    status: state.status,
+    error: state.error,
+    initialize: state.initialize,
+    refreshStatus: state.refreshStatus,
+    startScan: state.startScan,
+    cancelScan: state.cancelScan,
+  })));
+
+  useEffect(() => {
+    void initialize();
+    const timer = window.setInterval(() => {
+      void refreshStatus();
+    }, status?.scanInProgress ? 700 : 5000);
+    return () => window.clearInterval(timer);
+  }, [initialize, refreshStatus, status?.scanInProgress]);
+
+  const scanActive = Boolean(status?.scanInProgress);
+  const indexedItems = status?.indexedItemCount ?? 0;
+  const indexedLocalRoots = status?.indexedLocalRoots ?? [];
+  const indexedRemoteNames = status?.indexedRemoteNames ?? [];
+  const scanProgress = status?.scanIndexedItemCount ?? 0;
+  const lastIndexed = status?.lastScanTimeMs ? formatDate(status.lastScanTimeMs) : "Never";
+  const phase = status?.scanPhase ? status.scanPhase.replace(/_/g, " ") : "idle";
+
+  return (
+    <>
+      <SettingsSectionBlock title="Indexing">
+        <SettingsNote>Misty searches file and folder names from a local metadata index. Remote scans refresh provider listings through the existing Misty remote runtime.</SettingsNote>
+        <div className="mt-3 grid grid-cols-4 gap-3">
+          <SearchStatCard label="Indexed items" value={indexedItems.toLocaleString()} />
+          <SearchStatCard label="Drives / roots" value={indexedLocalRoots.length.toLocaleString()} />
+          <SearchStatCard label="Remotes" value={indexedRemoteNames.length.toLocaleString()} />
+          <SearchStatCard label="Index size" value={formatBytes(status?.indexSizeBytes ?? 0)} />
+        </div>
+        <div className="mt-3 grid min-h-[46px] grid-cols-[minmax(0,1fr)_auto] items-center gap-4 border-y border-[#27272a] py-3">
+          <div className="grid min-w-0 gap-1">
+            <strong className="text-[15px] font-[560] text-[#f1eee8]">Search index</strong>
+            <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm text-[#9e988f]">
+              {scanActive
+                ? `${phase} · ${scanProgress.toLocaleString()} items scanned${status?.currentPath ? ` · ${status.currentPath}` : ""}`
+                : `Last indexed ${lastIndexed}`}
+            </span>
+            {error || status?.lastScanError ? (
+              <span className="text-sm text-[#d6a0a0]">{error || status?.lastScanError}</span>
+            ) : null}
+          </div>
+          <div className="flex items-center gap-2">
+            {scanActive ? (
+              <button type="button" className={settingsControlButtonCompactClass} onClick={() => void cancelScan()}>
+                Cancel
+              </button>
+            ) : (
+              <button type="button" className={settingsPrimaryButtonClass} onClick={() => void startScan("")}>
+                Reindex
+              </button>
+            )}
+            <button type="button" className={settingsControlButtonCompactClass} onClick={() => void refreshStatus()}>
+              Refresh
+            </button>
+          </div>
+        </div>
+      </SettingsSectionBlock>
+
+      <SettingsSectionBlock title="Indexed Sources">
+        <SettingsRow label="Local roots" description="Local drives or folders included in the most recent completed index.">
+          <ValueText value={indexedLocalRoots.length ? indexedLocalRoots.join(", ") : "None indexed"} muted={!indexedLocalRoots.length} />
+        </SettingsRow>
+        <SettingsRow label="Remotes" description="Connected remotes included in the most recent completed index.">
+          <ValueText value={indexedRemoteNames.length ? indexedRemoteNames.join(", ") : "None indexed"} muted={!indexedRemoteNames.length} />
+        </SettingsRow>
+        <SettingsRow label="Last outcome" description="Result of the most recent indexing run." last>
+          <ValueText value={status?.lastScanOutcome ?? "Not run"} muted={!status?.lastScanOutcome} />
+        </SettingsRow>
+      </SettingsSectionBlock>
+
+      {status?.scanErrors.length ? (
+        <SettingsSectionBlock title="Indexing Errors">
+          <div className={settingsReferenceListClass}>
+            <div className={`${settingsReferenceRowClass} ${settingsReferenceHeaderClass}`}>
+              <span>Source</span>
+              <span>Error</span>
+            </div>
+            {status.scanErrors.map((scanError) => (
+              <div className={settingsReferenceRowClass} key={`${scanError.source}:${scanError.message}`}>
+                <span className={settingsReferenceSpanClass}>{scanError.source}</span>
+                <span className="min-w-0 [overflow-wrap:anywhere] text-[#d6a0a0]">{scanError.message}</span>
+              </div>
+            ))}
+          </div>
+        </SettingsSectionBlock>
+      ) : null}
+    </>
+  );
+}
+
+function SearchStatCard(props: { label: string; value: string }) {
+  return (
+    <div className="grid min-h-[76px] content-center gap-1 rounded-lg border border-[#27272a] bg-[#101216] px-3">
+      <strong className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[21px] font-[720] text-[#f1eee8]">{props.value}</strong>
+      <span className="text-xs text-[#9e988f]">{props.label}</span>
+    </div>
   );
 }
 

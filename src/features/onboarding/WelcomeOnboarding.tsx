@@ -36,11 +36,11 @@ const welcomePages = [
     imageAlt: "Misty providers workspace",
   },
   {
-    word: "Plugins",
+    word: "Extensions",
     label: "Extend",
     body: "Shape Misty around the workflows you care about with focused tools and extensions.",
     imageSrc: mistyHubImage,
-    imageAlt: "Misty Hub plugin workspace",
+    imageAlt: "Misty Hub extensions workspace",
   },
 ] as const;
 

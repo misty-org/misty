@@ -15,7 +15,7 @@ const columns = [
   {
     label: "Resources",
     links: [
-      { to: "/plugins", text: "Plugins" },
+      { to: "/extensions", text: "Extensions" },
       { to: "/changelog", text: "Changelog" },
       { to: "/blog", text: "Blog" },
       { to: "/roadmap", text: "Roadmap" },

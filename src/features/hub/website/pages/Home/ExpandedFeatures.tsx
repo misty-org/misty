@@ -93,7 +93,7 @@ export default function ExpandedFeatures() {
           <div className="overflow-hidden rounded-xl border border-border/70 bg-[#120f0e] shadow-[0_22px_50px_rgba(0,0,0,0.28)]">
             <img
               src="/misty-plugins.png"
-              alt="Misty plugins browser screenshot"
+              alt="Misty extensions browser screenshot"
               className="block h-full w-full object-cover object-top"
             />
           </div>
@@ -107,17 +107,17 @@ export default function ExpandedFeatures() {
               </div>
             </div>
             <h2 className="mb-3 text-2xl font-bold tracking-tight text-text md:text-3xl">
-              Plugins, built in.
+              Extensions, built in.
             </h2>
             <p className="mb-4 max-w-xl text-pretty text-text-muted">
               Add tools and panels that fit the way you work.
             </p>
             <div className="mt-auto flex justify-start">
               <a
-                href="/plugins"
+                href="/extensions"
                 className="text-xs text-text-muted underline underline-offset-4 transition-colors hover:text-white"
               >
-                Explore plugins
+                Explore extensions
               </a>
             </div>
           </div>

@@ -23,7 +23,7 @@ export interface MultiPanelTab {
   panes: MultiPanelPane[];
   activePaneId: string;
   layout: MultiPanelLayout;
-  mode?: "browse" | "compare";
+  mode?: "browse";
 }
 
 export interface MultiPanelLayout {

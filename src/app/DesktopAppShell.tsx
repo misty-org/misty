@@ -16,9 +16,11 @@ import { HubWorkspace } from "../features/hub/desktop/HubWorkspace";
 import HubAccountPage from "../features/hub/pages/Account";
 import HubDashboardPage from "../features/hub/pages/Dashboard";
 import HubHomePage from "../features/hub/pages/Home";
+import HubExtensionsPage from "../features/hub/pages/Plugins";
 import HubRegisterPage from "../features/hub/pages/Register";
 import HubSignInPage from "../features/hub/pages/SignIn";
 import { useAuth } from "../features/hub/AuthContext";
+import { usePluginsStore } from "../features/hub/store/usePluginsStore";
 import {
   isRememberableHubRoute,
   useHubRouteMemoryStore,
@@ -46,6 +48,7 @@ import {
 import { useAppStore } from "./useAppStore";
 import { useAppThemeStore } from "./useAppThemeStore";
 import type { AppTab } from "./types";
+import type { TransferRecord } from "../api/types";
 
 const primaryNavItems = [
   { id: "files", label: "Files", path: "/files", icon: Folder },
@@ -67,7 +70,7 @@ const desktopNavbarClass =
   "relative col-start-1 row-start-1 flex min-h-0 flex-col items-center overflow-hidden border-r border-[var(--misty-border-soft)] bg-[var(--misty-bg)] px-1 pb-2.5 pt-2";
 
 const desktopRouteShellClass =
-  "col-start-2 h-screen min-h-0 overflow-hidden";
+  "relative col-start-2 h-screen min-h-0 overflow-hidden";
 
 const navbarGroupClass =
   "flex w-full flex-col items-center gap-2.5";
@@ -98,6 +101,15 @@ const profileMenuItemClass =
 
 const globalBannerBaseClass =
   "mx-[18px] mb-0 mt-3 rounded-xl border px-3.5 py-2.5 text-sm shadow-[0_14px_36px_rgba(0,0,0,0.28)]";
+
+const globalNoticeLayerClass =
+  "pointer-events-none absolute inset-x-0 top-0 z-[2147482800]";
+
+const workStatusPopupClass =
+  "pointer-events-none fixed right-4 top-4 z-[2147482850] grid max-w-[min(360px,calc(100vw-96px))] grid-cols-[10px_minmax(0,1fr)] items-center gap-3 rounded-lg border border-[var(--misty-border-soft)] bg-[color-mix(in_srgb,var(--misty-surface)_94%,transparent)] px-3.5 py-2.5 text-sm text-[var(--misty-text)] shadow-[0_18px_48px_var(--misty-shadow)] backdrop-blur-xl";
+
+const workStatusPulseClass =
+  "size-2.5 rounded-full bg-[var(--misty-success)] shadow-[0_0_18px_color-mix(in_srgb,var(--misty-success)_72%,transparent)]";
 
 const activityPanelClass =
   "grid h-[min(560px,calc(100vh-24px))] w-[420px] min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-lg border border-[#27272a] bg-[#0b0d0f] shadow-[0_24px_64px_rgba(0,0,0,0.42)]";
@@ -301,7 +313,8 @@ export function DesktopAppShell() {
           <Route path="/hub" element={<HubWorkspace />}>
             <Route index element={<HubHomePage />} />
             <Route path="dashboard" element={<HubDashboardPage />} />
-            <Route path="plugins" element={<Navigate to="/hub" replace />} />
+            <Route path="extensions" element={<HubExtensionsPage />} />
+            <Route path="plugins" element={<HubExtensionsPage />} />
             <Route path="resources/changelog" element={<HubChangelogPage />} />
             <Route path="signin" element={<HubSignInPage />} />
             <Route path="register" element={<HubRegisterPage />} />
@@ -313,6 +326,7 @@ export function DesktopAppShell() {
         </Routes>
       </section>
 
+      <WorkStatusPopup />
       <FramePacingOverlay enabled={framePacingOverlayEnabled} />
       <ActivityPopover
         anchorRef={activityAnchorRef}
@@ -377,8 +391,10 @@ const RouteNotice = memo(function RouteNotice(props: { routeId: AppTab }) {
   const showMessage = notificationPreferences.inAppNotificationsEnabled
     && !notificationPreferences.quietHoursEnabled;
 
+  if (!notice.error && !(showMessage && notice.message)) return null;
+
   return (
-    <>
+    <div className={globalNoticeLayerClass}>
       {notice.error ? (
         <div className={`${globalBannerBaseClass} border-[color-mix(in_srgb,var(--misty-danger)_42%,var(--misty-border-soft))] bg-[color-mix(in_srgb,var(--misty-danger)_10%,var(--misty-surface))] text-[var(--misty-danger)]`}>
           {notice.error}
@@ -389,7 +405,7 @@ const RouteNotice = memo(function RouteNotice(props: { routeId: AppTab }) {
           {notice.message}
         </div>
       ) : null}
-    </>
+    </div>
   );
 });
 
@@ -451,6 +467,42 @@ const AppNoticePublisher = memo(function AppNoticePublisher() {
   ]);
 
   return null;
+});
+
+const activeWorkStatuses = new Set<TransferRecord["status"]>(["queued", "pending", "in_progress"]);
+const emptyTransferRows: TransferRecord[] = [];
+
+const WorkStatusPopup = memo(function WorkStatusPopup() {
+  const rows = useTransfersStore((state) => state.transfers?.rows ?? emptyTransferRows);
+  const loadTransfers = useTransfersStore((state) => state.load);
+  const setupInstalling = useSetupStore((state) => state.installState === "installing" || state.busy);
+  const pluginInstalling = usePluginsStore((state) => Boolean(state.actionPluginId));
+
+  useEffect(() => {
+    let disposed = false;
+    const refresh = () => {
+      if (!disposed) void loadTransfers(undefined, { silent: true });
+    };
+    refresh();
+    const interval = window.setInterval(refresh, 2000);
+    return () => {
+      disposed = true;
+      window.clearInterval(interval);
+    };
+  }, [loadTransfers]);
+
+  const summary = workStatusSummary(rows, setupInstalling || pluginInstalling);
+  if (!summary) return null;
+
+  return (
+    <aside className={workStatusPopupClass} role="status" aria-live="polite">
+      <span className={workStatusPulseClass} />
+      <span className="min-w-0">
+        <strong className="block truncate text-[13px] font-semibold leading-tight">{summary.title}</strong>
+        <span className="block truncate text-xs leading-tight text-[var(--misty-text-muted)]">{summary.detail}</span>
+      </span>
+    </aside>
+  );
 });
 
 function DiagnosticsRoute() {
@@ -621,7 +673,11 @@ function ProfilePopover(props: {
     const width = 286;
     const left = Math.min(Math.max(8, rect.right + 10), window.innerWidth - width - 8);
     const top = Math.min(Math.max(8, rect.bottom - 220), window.innerHeight - 236);
-    setMenuStyle({ left, top, width });
+    setMenuStyle((current) => (
+      current.left === left && current.top === top && current.width === width
+        ? current
+        : { left, top, width }
+    ));
   }, [props.anchorRef]);
 
   useEffect(() => {
@@ -644,7 +700,7 @@ function ProfilePopover(props: {
       window.removeEventListener("keydown", closeOnEscape);
       window.removeEventListener("resize", updatePosition);
     };
-  }, [props, updatePosition]);
+  }, [props.anchorRef, props.onClose, props.open, updatePosition]);
 
   if (!props.open) return null;
 
@@ -757,13 +813,16 @@ function ActivityPopover(props: {
       if (!rect) return;
       const panelWidth = 420;
       const panelHeight = Math.min(560, window.innerHeight - 24);
-      setPosition({
-        left: Math.min(window.innerWidth - panelWidth - 12, rect.right + 10),
-        top: Math.min(
+      const left = Math.min(window.innerWidth - panelWidth - 12, rect.right + 10);
+      const top = Math.min(
           Math.max(12, rect.top + rect.height / 2 - panelHeight / 2),
           window.innerHeight - panelHeight - 12,
-        ),
-      });
+        );
+      setPosition((current) => (
+        current.left === left && current.top === top
+          ? current
+          : { left, top }
+      ));
     };
     syncPosition();
     window.addEventListener("resize", syncPosition);
@@ -790,7 +849,7 @@ function ActivityPopover(props: {
       window.removeEventListener("pointerdown", onPointerDown);
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [props]);
+  }, [props.anchorRef, props.onClose, props.open]);
   const clearActivityHistory = () => {
     if (
       confirmDestructiveActions
@@ -980,8 +1039,9 @@ function routeIdFromPath(pathname: string): AppTab {
 function startupRouteForIndex(index: number): string {
   if (index === 1) return "/providers";
   if (index === 2) return "/transfers";
-  if (index === 3) return "/hub";
-  if (index === 4 || index === 5) return "/settings";
+  if (index === 3) return "/hub/extensions";
+  if (index === 4) return "/hub";
+  if (index === 5) return "/settings";
   return "/files";
 }
 
@@ -1011,4 +1071,39 @@ function appNoticeSourceLabel(source: AppNoticeSource): string {
 
 function appNoticeType(kind: AppNoticeKind): ExplorerNotificationType {
   return kind === "error" ? "error" : "success";
+}
+
+function workStatusSummary(
+  rows: TransferRecord[],
+  installing: boolean,
+): { title: string; detail: string } | null {
+  const active = rows.filter((row) => activeWorkStatuses.has(row.status));
+  const downloads = active.filter((row) => row.transferType === "download").length;
+  const uploads = active.filter((row) => row.transferType === "upload").length;
+
+  if (downloads > 0 && uploads > 0) {
+    return {
+      title: "Transferring...",
+      detail: `${downloads} ${downloads === 1 ? "download" : "downloads"}, ${uploads} ${uploads === 1 ? "upload" : "uploads"}`,
+    };
+  }
+  if (downloads > 0) {
+    return {
+      title: "Downloading...",
+      detail: `${downloads} active ${downloads === 1 ? "download" : "downloads"}`,
+    };
+  }
+  if (uploads > 0) {
+    return {
+      title: "Uploading...",
+      detail: `${uploads} active ${uploads === 1 ? "upload" : "uploads"}`,
+    };
+  }
+  if (installing) {
+    return {
+      title: "Installing...",
+      detail: "Setting up Misty components",
+    };
+  }
+  return null;
 }

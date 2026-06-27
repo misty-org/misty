@@ -352,7 +352,7 @@ impl PluginCommandService {
         let roots = self.roots.clone();
         tokio::task::spawn_blocking(move || snapshot_plugin_commands(roots))
             .await
-            .map_err(|err| ApiError::Message(format!("Plugin command worker failed: {err}")))?
+            .map_err(|err| ApiError::Message(format!("Extension command worker failed: {err}")))?
     }
 
     pub async fn run_command(
@@ -362,7 +362,7 @@ impl PluginCommandService {
         let roots = self.roots.clone();
         tokio::task::spawn_blocking(move || run_plugin_command(roots, request))
             .await
-            .map_err(|err| ApiError::Message(format!("Plugin command worker failed: {err}")))?
+            .map_err(|err| ApiError::Message(format!("Extension command worker failed: {err}")))?
     }
 
     pub async fn render_panel(
@@ -372,7 +372,7 @@ impl PluginCommandService {
         let roots = self.roots.clone();
         tokio::task::spawn_blocking(move || render_plugin_panel(roots, request))
             .await
-            .map_err(|err| ApiError::Message(format!("Plugin panel worker failed: {err}")))?
+            .map_err(|err| ApiError::Message(format!("Extension panel worker failed: {err}")))?
     }
 }
 
@@ -382,14 +382,16 @@ fn render_plugin_panel(
 ) -> ApiResult<PluginPanelRenderResult> {
     let panel_id = request.panel_id.trim();
     if panel_id.is_empty() {
-        return Err(ApiError::Message("Plugin panel id is required.".to_owned()));
+        return Err(ApiError::Message(
+            "Extension panel id is required.".to_owned(),
+        ));
     }
     let snapshot = snapshot_plugin_commands(roots)?;
     let panel = snapshot
         .panels
         .into_iter()
         .find(|panel| panel_matches_render_request(panel, panel_id, request.plugin_id.trim()))
-        .ok_or_else(|| ApiError::Message(format!("Plugin panel {panel_id} was not found.")))?;
+        .ok_or_else(|| ApiError::Message(format!("Extension panel {panel_id} was not found.")))?;
     Ok(render_result_for_panel(panel, request))
 }
 
@@ -421,7 +423,7 @@ fn render_result_for_panel(
         drop(library);
         return panel_render_failure(
             panel,
-            "The native plugin did not register this panel for the current platform.".to_owned(),
+            "The native extension did not register this panel for the current platform.".to_owned(),
             "native_panel_missing",
         );
     };
@@ -429,7 +431,7 @@ fn render_result_for_panel(
         drop(library);
         return panel_render_failure(
             panel,
-            "The native plugin panel does not expose a render callback.".to_owned(),
+            "The native extension panel does not expose a render callback.".to_owned(),
             "native_render_missing",
         );
     };
@@ -505,7 +507,7 @@ fn run_plugin_command(
     let command_id = request.command_id.trim();
     if command_id.is_empty() {
         return Err(ApiError::Message(
-            "Plugin command id is required.".to_owned(),
+            "Extension command id is required.".to_owned(),
         ));
     }
     let snapshot = snapshot_plugin_commands(roots)?;
@@ -513,7 +515,9 @@ fn run_plugin_command(
         .commands
         .into_iter()
         .find(|command| command.id == command_id)
-        .ok_or_else(|| ApiError::Message(format!("Plugin command {command_id} was not found.")))?;
+        .ok_or_else(|| {
+            ApiError::Message(format!("Extension command {command_id} was not found."))
+        })?;
     Ok(run_result_for_command(command, request.selected_paths))
 }
 
@@ -573,7 +577,10 @@ fn run_result_for_command(
         plugin_name: command.plugin_name,
         label: command.label,
         handled: false,
-        target_route: format!("/hub/plugins?plugin={}", route_encode(&command.plugin_id)),
+        target_route: format!(
+            "/hub/extensions?plugin={}",
+            route_encode(&command.plugin_id)
+        ),
         message: "No runtime library was advertised for this platform.".to_owned(),
         notifications: Vec::new(),
         runtime_status: "native_runtime_unavailable".to_owned(),
@@ -607,7 +614,8 @@ fn run_native_plugin_command(
         drop(library);
         return native_plugin_failure(
             command,
-            "The native plugin did not register this command for the current platform.".to_owned(),
+            "The native extension did not register this command for the current platform."
+                .to_owned(),
             "native_command_missing",
         );
     };
@@ -615,7 +623,7 @@ fn run_native_plugin_command(
         drop(library);
         return native_plugin_failure(
             command,
-            "The native plugin command does not expose an invoke callback.".to_owned(),
+            "The native extension command does not expose an invoke callback.".to_owned(),
             "native_invoke_missing",
         );
     };
@@ -715,7 +723,10 @@ fn native_plugin_failure(
         plugin_name: command.plugin_name,
         label: command.label,
         handled: false,
-        target_route: format!("/hub/plugins?plugin={}", route_encode(&command.plugin_id)),
+        target_route: format!(
+            "/hub/extensions?plugin={}",
+            route_encode(&command.plugin_id)
+        ),
         message,
         notifications: Vec::new(),
         runtime_status: runtime_status.to_owned(),
@@ -731,7 +742,7 @@ fn snapshot_plugin_commands(roots: Vec<PathBuf>) -> ApiResult<PluginCommandsSnap
         }
         let entries = fs::read_dir(root).map_err(|err| {
             ApiError::Message(format!(
-                "Failed to read plugin root {}: {err}",
+                "Failed to read extension root {}: {err}",
                 root.display()
             ))
         })?;
@@ -849,7 +860,7 @@ fn plugin_entries_for_plugin_dir(plugin_dir: &Path) -> ApiResult<PluginEntries> 
             id: launcher_command_id(&metadata.id),
             label: format!("Open {}", metadata.name),
             hint: if metadata.description.is_empty() {
-                "Open plugin from the launcher".to_owned()
+                "Open extension from the launcher".to_owned()
             } else {
                 metadata.description.clone()
             },
@@ -905,7 +916,7 @@ fn plugin_metadata(
                 .collect::<Vec<_>>()
         })
         .filter(|views| !views.is_empty())
-        .unwrap_or_else(|| vec!["Plugins".to_owned(), "Dock".to_owned()]);
+        .unwrap_or_else(|| vec!["Extensions".to_owned(), "Dock".to_owned()]);
     let launcher_open_mode = launcher_field(detail, manifest, "open_mode")
         .and_then(Value::as_str)
         .unwrap_or("tab")
@@ -1152,16 +1163,16 @@ fn panel_launcher_views(panel: &Value) -> Option<Vec<String>> {
 
 fn load_native_plugin(library_path: &str) -> Result<(Library, NativePluginRegistry), String> {
     let library = unsafe { Library::new(library_path) }
-        .map_err(|error| format!("Could not load plugin library {library_path}: {error}"))?;
+        .map_err(|error| format!("Could not load extension library {library_path}: {error}"))?;
     let abi = unsafe {
         let abi: libloading::Symbol<'_, MistyPluginAbiVersionFn> = library
             .get(b"misty_plugin_abi_version")
-            .map_err(|error| format!("Plugin ABI symbol is missing: {error}"))?;
+            .map_err(|error| format!("Extension ABI symbol is missing: {error}"))?;
         abi()
     };
     if abi != MISTY_PLUGIN_ABI_VERSION {
         return Err(format!(
-            "Plugin ABI version {abi} is not supported by this Misty build."
+            "Extension ABI version {abi} is not supported by this Misty build."
         ));
     }
 
@@ -1177,11 +1188,11 @@ fn load_native_plugin(library_path: &str) -> Result<(Library, NativePluginRegist
     let registered = unsafe {
         let register: libloading::Symbol<'_, MistyPluginRegisterFn> = library
             .get(b"misty_plugin_register")
-            .map_err(|error| format!("Plugin register symbol is missing: {error}"))?;
+            .map_err(|error| format!("Extension register symbol is missing: {error}"))?;
         register(&context)
     };
     if registered == 0 {
-        return Err("Plugin registration failed.".to_owned());
+        return Err("Extension registration failed.".to_owned());
     }
     Ok((library, registry))
 }
@@ -1375,7 +1386,7 @@ unsafe extern "C" fn registry_register_command(
     }
     registry.commands.push(NativePluginCommand {
         id,
-        title: c_string(command.title).unwrap_or_else(|| "Plugin Command".to_owned()),
+        title: c_string(command.title).unwrap_or_else(|| "Extension Command".to_owned()),
         default_shortcut: c_string(command.default_shortcut).unwrap_or_default(),
         invoke: command.invoke,
         user_data: command.user_data,
@@ -1400,7 +1411,7 @@ unsafe extern "C" fn registry_register_panel(
     }
     registry.panels.push(NativePluginPanel {
         id,
-        title: c_string(panel.title).unwrap_or_else(|| "Plugin Panel".to_owned()),
+        title: c_string(panel.title).unwrap_or_else(|| "Extension Panel".to_owned()),
         window_type: panel.window_type,
         default_width: panel.default_width,
         default_height: panel.default_height,
@@ -2080,7 +2091,7 @@ mod tests {
             "status": "installed",
             "launcher": {
                 "show_in_launcher": true,
-                "views": ["Plugins", "Dock"]
+                "views": ["Extensions", "Dock"]
             },
             "panels": [
                 {
@@ -2105,7 +2116,7 @@ mod tests {
         assert_eq!(entries.panels.len(), 3);
         assert_eq!(entries.panels[0].launcher_views, vec!["Dock"]);
         assert_eq!(entries.panels[1].launcher_views, vec!["Settings"]);
-        assert_eq!(entries.panels[2].launcher_views, vec!["Plugins", "Dock"]);
+        assert_eq!(entries.panels[2].launcher_views, vec!["Extensions", "Dock"]);
     }
 
     #[test]
@@ -2317,9 +2328,9 @@ mod tests {
         let result = run_result_for_command(command, vec!["/tmp/input.mov".to_owned()]);
 
         assert!(!result.handled);
-        assert_eq!(result.target_route, "/hub/plugins?plugin=convert");
+        assert_eq!(result.target_route, "/hub/extensions?plugin=convert");
         assert_eq!(result.runtime_status, "native_load_failed");
-        assert!(result.message.contains("Could not load plugin library"));
+        assert!(result.message.contains("Could not load extension library"));
     }
 
     #[test]

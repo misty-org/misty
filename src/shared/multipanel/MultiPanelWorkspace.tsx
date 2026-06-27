@@ -1,4 +1,4 @@
-import { Columns2, PanelTopClose, Rows2, RotateCcw } from "lucide-react";
+import { Columns2, PanelTopClose, Rows2 } from "lucide-react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties, PointerEvent, ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
@@ -94,13 +94,11 @@ export const MultiPanelWorkspace = memo(function MultiPanelWorkspace(props: Mult
     tabs,
     activeTabId,
     activePaneId,
-    closedPanes,
     addTab,
     closeTab,
     selectTab,
     splitPane,
     closePane,
-    restorePane,
     collapseDuplicateBrowsePanes,
     reorderTabs,
     setActivePane,
@@ -109,13 +107,11 @@ export const MultiPanelWorkspace = memo(function MultiPanelWorkspace(props: Mult
     tabs: state.tabs,
     activeTabId: state.activeTabId,
     activePaneId: state.activePaneId,
-    closedPanes: state.closedPanes,
     addTab: state.addTab,
     closeTab: state.closeTab,
     selectTab: state.selectTab,
     splitPane: state.splitPane,
     closePane: state.closePane,
-    restorePane: state.restorePane,
     collapseDuplicateBrowsePanes: state.collapseDuplicateBrowsePanes,
     reorderTabs: state.reorderTabs,
     setActivePane: state.setActivePane,
@@ -125,7 +121,6 @@ export const MultiPanelWorkspace = memo(function MultiPanelWorkspace(props: Mult
   const [draggingSplitter, setDraggingSplitter] = useState<"grid" | "lane0" | "lane1" | null>(null);
   const activeTab = activeMultiPanelTab({ tabs, activeTabId });
   const canSplit = Boolean(activeTab && activeTab.panes.length < maxMultiPanelPanes());
-  const canRestore = Boolean(activeTab && canSplit && closedPanes.some((closedPane) => closedPane.tabId === activeTab.id));
   const lanes = activeTab ? normalizedLanes(activeTab) : [];
   const paneCount = lanes.flat().length;
   const gridSplitRatio = clampRatio(activeTab?.layout.gridSplitRatio ?? 0.5);
@@ -219,15 +214,6 @@ export const MultiPanelWorkspace = memo(function MultiPanelWorkspace(props: Mult
           </button>
           <button className={multiPanelStyles.paneActionButton} type="button" title="Close pane" onClick={() => handleClosePane(activePaneId)} disabled={activeTab.panes.length <= 1}>
             <PanelTopClose size={16} />
-          </button>
-          <button
-            className={multiPanelStyles.paneActionButton}
-            type="button"
-            title="Restore pane"
-            onClick={() => restorePane()}
-            disabled={!canRestore}
-          >
-            <RotateCcw size={16} />
           </button>
           </div>
         )}

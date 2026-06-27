@@ -44,6 +44,7 @@ interface TransfersStore {
   setPageIndex: (workspaceId: string, pageIndex: number) => void;
   clearFilters: (workspaceId: string) => void;
   setFocusedTransfer: (workspaceId: string, id: number | null) => void;
+  deleteIds: (workspaceId: string, ids: number[]) => Promise<void>;
   deleteSelected: (workspaceId: string) => Promise<void>;
   deleteAll: () => Promise<void>;
 }
@@ -204,14 +205,14 @@ export const useTransfersStore = create<TransfersStore>((set, get) => ({
       workspace.focusedTransferId === focusedTransferId ? workspace : { ...workspace, focusedTransferId });
   },
 
-  deleteSelected: async (workspaceId) => {
-    const ids = [...(get().workspaces[workspaceId]?.selectedIds ?? new Set<number>())];
+  deleteIds: async (workspaceId, idsInput) => {
+    const ids = [...new Set(idsInput)].filter((id) => Number.isFinite(id));
     if (ids.length === 0) return;
     const shouldConfirm = selectGeneralPreferences(useSettingsStore.getState().settings?.document).confirmDestructiveActions;
     if (
       shouldConfirm &&
       !window.confirm(
-        `Delete ${ids.length} selected transfer history ${ids.length === 1 ? "row" : "rows"}? Active file operations are not canceled.`,
+        `Delete ${ids.length} transfer history ${ids.length === 1 ? "row" : "rows"}? Active file operations are not canceled.`,
       )
     ) {
       return;
@@ -219,12 +220,16 @@ export const useTransfersStore = create<TransfersStore>((set, get) => ({
     set({ working: true, error: null, message: null });
     try {
       await transfersDeleteSelected(ids);
+      const deletedIds = new Set(ids);
       set((state) => ({
         ...withWorkspace(state, workspaceId, {
-        ...(state.workspaces[workspaceId] ?? createTransferWorkspaceState()),
-        selectedIds: new Set(),
+          ...(state.workspaces[workspaceId] ?? createTransferWorkspaceState()),
+          selectedIds: new Set([...(state.workspaces[workspaceId]?.selectedIds ?? [])].filter((id) => !deletedIds.has(id))),
+          focusedTransferId: deletedIds.has(state.workspaces[workspaceId]?.focusedTransferId ?? -1)
+            ? null
+            : state.workspaces[workspaceId]?.focusedTransferId ?? null,
         }),
-        message: "Selected transfer history deleted.",
+        message: ids.length === 1 ? "Transfer history row deleted." : "Transfer history rows deleted.",
       }));
       await get().load();
     } catch (error) {
@@ -232,6 +237,11 @@ export const useTransfersStore = create<TransfersStore>((set, get) => ({
     } finally {
       set({ working: false });
     }
+  },
+
+  deleteSelected: async (workspaceId) => {
+    const ids = [...(get().workspaces[workspaceId]?.selectedIds ?? new Set<number>())];
+    await get().deleteIds(workspaceId, ids);
   },
 
   deleteAll: async () => {

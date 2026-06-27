@@ -116,6 +116,21 @@ const mobileTrashPath = "misty://trash";
 const smokeHome = "/Users/misty";
 const EMPTY_PROVIDER_REMOTES: ProviderRemote[] = [];
 const maxMobilePreviewBytes = 32 * 1024 * 1024;
+const mobileImagePreviewLoadAttempts = 5;
+const mobileImagePreviewRetryDelayMs = 80;
+const mobileBrowserImageMimeTypes: Record<string, string> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  bmp: "image/bmp",
+  webp: "image/webp",
+  avif: "image/avif",
+  ico: "image/x-icon",
+  svg: "image/svg+xml",
+  heic: "image/heic",
+  heif: "image/heif",
+};
 const mobileSortColumns: MobileFilesSortColumn[] = ["name", "modified", "size", "type"];
 const maxMobileFileTabs = 9;
 const maxMobileClosedFileTabs = 8;
@@ -392,7 +407,7 @@ export function MobileFilesPage() {
 
   useEffect(() => {
     return () => {
-      if (preview?.url) URL.revokeObjectURL(preview.url);
+      revokeMobileObjectUrl(preview?.url);
     };
   }, [preview?.url]);
 
@@ -671,8 +686,8 @@ export function MobileFilesPage() {
     setError(null);
     try {
       if (mediaInfo.kind === "image") {
-        const payload = await explorerPreviewItem(entry.path);
-        const url = URL.createObjectURL(new Blob([new Uint8Array(payload.bytes)], { type: payload.mimeType || mediaInfo.mimeType }));
+        const localPath = await localPathForMobileEntry(entry);
+        const url = await loadMobileImageAssetUrl(localPath);
         setMedia((current) => {
           revokeMobileObjectUrl(current?.url);
           return {
@@ -680,7 +695,7 @@ export function MobileFilesPage() {
             loading: false,
             error: null,
             url,
-            mimeType: payload.mimeType || mediaInfo.mimeType,
+            mimeType: mediaInfo.mimeType,
             kind: mediaInfo.kind,
           };
         });
@@ -1318,7 +1333,7 @@ export function MobileFilesPage() {
     if (!isPreviewableEntry(entry)) return;
     setContextEntry(null);
     setPreview((current) => {
-      if (current?.url) URL.revokeObjectURL(current.url);
+      revokeMobileObjectUrl(current?.url);
       return {
         entry,
         loading: true,
@@ -1329,6 +1344,20 @@ export function MobileFilesPage() {
       };
     });
     try {
+      const imageMimeType = mobilePreviewImageMimeType(entry);
+      if (imageMimeType) {
+        const localPath = await localPathForMobileEntry(entry);
+        const url = await loadMobileImageAssetUrl(localPath);
+        setPreview({
+          entry,
+          loading: false,
+          error: null,
+          text: null,
+          url,
+          mimeType: imageMimeType,
+        });
+        return;
+      }
       const payload = await explorerPreviewItem(entry.path);
       const bytes = new Uint8Array(payload.bytes);
       if (previewPayloadIsText(payload.mimeType)) {
@@ -1344,7 +1373,7 @@ export function MobileFilesPage() {
       }
       const url = URL.createObjectURL(new Blob([bytes], { type: payload.mimeType }));
       setPreview((current) => {
-        if (current?.url) URL.revokeObjectURL(current.url);
+        revokeMobileObjectUrl(current?.url);
         return {
           entry,
           loading: false,
@@ -2135,7 +2164,7 @@ function MobileFilesSidebar(props: {
           ) : (
             <div className="grid gap-0">
               {props.remotes.map((remote) => {
-                const path = joinMobilePath(props.mountRoot, remote.type, remote.name);
+                const path = joinMobilePath(props.mountRoot, remote.name);
                 return (
                   <MobileSidebarButton
                     key={`${remote.type}:${remote.name}`}
@@ -4132,7 +4161,7 @@ async function mobileSharedClipboardRemotePasteItems(payload: ClipboardPayload, 
   try {
     const prepared = await explorerPrepareDragItems({
       items: remoteRefs.map((ref) => ({
-        path: joinMobilePath(mountRoot, ref.providerType, ref.remoteName, ref.remotePath),
+        path: joinMobilePath(mountRoot, ref.remoteName, ref.remotePath),
         isDirectory: ref.isDirectory,
       })),
     });
@@ -4198,8 +4227,7 @@ function emptyListing(path: string): DirectoryListing {
 }
 
 function remoteRootListing(mountRoot: string, remotes: ProviderRemote[]): DirectoryListing {
-  const providers = Array.from(new Set(remotes.map((remote) => remote.type).filter(Boolean)))
-    .sort((left, right) => remoteProviderLabel(left).localeCompare(remoteProviderLabel(right)));
+  const sortedRemotes = [...remotes].sort((left, right) => left.name.localeCompare(right.name));
   return {
     path: mountRoot,
     parentPath: null,
@@ -4209,11 +4237,11 @@ function remoteRootListing(mountRoot: string, remotes: ProviderRemote[]): Direct
       remoteName: null,
       remotePath: null,
     },
-    entries: providers.map((provider): FileEntry => {
-      const path = joinMobilePath(mountRoot, provider);
+    entries: sortedRemotes.map((remote): FileEntry => {
+      const path = joinMobilePath(mountRoot, remote.name);
       return {
-        id: `remote-provider:${provider}`,
-        name: remoteProviderLabel(provider),
+        id: `remote:${remote.name}`,
+        name: remote.name,
         path,
         extension: "",
         mimeType: null,
@@ -4225,14 +4253,14 @@ function remoteRootListing(mountRoot: string, remotes: ProviderRemote[]): Direct
         readonly: true,
         hidden: false,
         location: {
-          kind: "remote_provider",
-          providerType: provider,
-          remoteName: null,
-          remotePath: null,
+          kind: "remote",
+          providerType: remote.type,
+          remoteName: remote.name,
+          remotePath: "/",
         },
       };
     }),
-    totalCount: providers.length,
+    totalCount: sortedRemotes.length,
     hiddenCount: 0,
   };
 }
@@ -4272,34 +4300,23 @@ function isMobileMediaEntry(entry: FileEntry): boolean {
 function mobileMediaInfo(entry: FileEntry): { kind: "image" | "video"; mimeType: string } | null {
   if (entry.kind === "folder" || entry.kind === "symlink" || entry.isDeleted || isVirtualRemoteEntry(entry)) return null;
   const extension = entry.extension.toLowerCase().replace(/^\./, "");
-  const imageMimeTypes: Record<string, string> = {
-    png: "image/png",
-    jpg: "image/jpeg",
-    jpeg: "image/jpeg",
-    gif: "image/gif",
-    bmp: "image/bmp",
-    webp: "image/webp",
-    svg: "image/svg+xml",
-    heic: "image/heic",
-    heif: "image/heif",
-  };
   const videoMimeTypes: Record<string, string> = {
     mp4: "video/mp4",
     m4v: "video/x-m4v",
     mov: "video/quicktime",
     webm: "video/webm",
   };
-  if (imageMimeTypes[extension]) return { kind: "image", mimeType: imageMimeTypes[extension] };
+  if (mobileBrowserImageMimeTypes[extension]) return { kind: "image", mimeType: mobileBrowserImageMimeTypes[extension] };
   if (videoMimeTypes[extension]) return { kind: "video", mimeType: videoMimeTypes[extension] };
   return null;
 }
 
 function isPreviewableEntry(entry: FileEntry): boolean {
   if (entry.kind === "folder" || entry.isDeleted || isVirtualRemoteEntry(entry)) return false;
-  if (entry.sizeBytes != null && entry.sizeBytes > maxMobilePreviewBytes) return false;
+  if (!mobilePreviewImageMimeType(entry) && entry.sizeBytes != null && entry.sizeBytes > maxMobilePreviewBytes) return false;
   const extension = entry.extension.toLowerCase().replace(/^\./, "");
-  return [
-    "png", "jpg", "jpeg", "gif", "bmp", "webp", "svg", "pdf", "psd", "tga", "hdr", "pic", "pbm", "pgm", "pnm", "ppm",
+  return Boolean(mobilePreviewImageMimeType(entry)) || [
+    "pdf",
     "txt", "text", "log", "md", "markdown", "toml", "yaml", "yml", "ini", "conf", "cfg",
     "csv", "tsv", "rs", "go", "js", "jsx", "ts", "tsx", "css", "html", "xml", "sh",
     "zsh", "bash", "fish", "py", "rb", "java", "c", "h", "cpp", "hpp", "swift", "kt",
@@ -4307,8 +4324,63 @@ function isPreviewableEntry(entry: FileEntry): boolean {
   ].includes(extension);
 }
 
+function mobilePreviewImageMimeType(entry: FileEntry): string | null {
+  if (entry.kind === "folder" || entry.kind === "symlink") return null;
+  const extension = entry.extension.toLowerCase().replace(/^\./, "");
+  return mobileBrowserImageMimeTypes[extension] ?? null;
+}
+
 function previewPayloadIsText(mimeType: string): boolean {
   return mimeType.startsWith("text/") || mimeType.startsWith("application/json");
+}
+
+async function localPathForMobileEntry(entry: FileEntry): Promise<string> {
+  if (entry.location.kind === "local") return entry.path;
+  return (await explorerPrepareOpenItem({
+    path: entry.path,
+    sizeBytes: entry.sizeBytes,
+    remoteModified: entry.remoteModified,
+  })).localPath;
+}
+
+async function loadMobileImageAssetUrl(path: string): Promise<string> {
+  const baseUrl = convertFileSrc(path);
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < mobileImagePreviewLoadAttempts; attempt += 1) {
+    const url = attempt === 0 ? baseUrl : mobileCacheBustedUrl(baseUrl, attempt);
+    try {
+      await waitForMobileImage(url);
+      return url;
+    } catch (error) {
+      lastError = error;
+      if (attempt + 1 < mobileImagePreviewLoadAttempts) {
+        await mobileSleep(mobileImagePreviewRetryDelayMs * (attempt + 1));
+      }
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("Unable to load image preview.");
+}
+
+function waitForMobileImage(url: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const image = new window.Image();
+    image.decoding = "async";
+    image.onload = () => {
+      const decode = image.decode ? image.decode().catch(() => undefined) : Promise.resolve();
+      void decode.then(() => resolve());
+    };
+    image.onerror = () => reject(new Error("Unable to load image preview."));
+    image.src = url;
+  });
+}
+
+function mobileCacheBustedUrl(url: string, attempt: number): string {
+  const separator = url.includes("?") ? "&" : "?";
+  return `${url}${separator}mistyPreviewAttempt=${attempt}-${Date.now()}`;
+}
+
+function mobileSleep(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 function revokeMobileObjectUrl(url?: string | null) {
@@ -4678,13 +4750,12 @@ function mobileRemotePathInfo(
   const suffix = normalizedPath === normalizedMount
     ? ""
     : normalizedPath.slice(normalizedMount.length + 1);
-  const [providerType = "", remoteName = "", ...remoteParts] = suffix.split("/").filter(Boolean);
-  const remote = remotes.find((candidate) => candidate.type === providerType && candidate.name === remoteName);
-  const providerLabel = remoteProviderLabel(providerType);
-  if (providerType && !remoteName) return { title: providerLabel, label: `Remote › ${providerLabel}`, remoteName: null };
+  const [remoteName = "", ...remoteParts] = suffix.split("/").filter(Boolean);
+  const remote = remotes.find((candidate) => candidate.name === remoteName);
+  const providerLabel = remoteProviderLabel(remote?.type ?? "");
   if (!remoteName) return { title: "Remote", label: "Remote folders", remoteName: null };
   const title = remoteParts.length > 0 ? displayPathPart(remoteParts[remoteParts.length - 1]) : remote?.name ?? remoteName;
-  const labelParts = ["Remote", providerLabel, remote?.name ?? remoteName, ...remoteParts.map(displayPathPart)];
+  const labelParts = ["Remote", providerLabel, remote?.name ?? remoteName, ...remoteParts.map(displayPathPart)].filter(Boolean);
   return {
     title,
     label: labelParts.join(" › "),
@@ -4746,8 +4817,8 @@ function MobileFileSkeleton() {
     <>
       {Array.from({ length: 8 }, (_, index) => (
         <div className="grid min-h-[82px] grid-cols-[42px_minmax(0,1fr)] items-center gap-4 py-2" key={index}>
-          <span className="h-6 rounded-lg bg-[#1b1b1b]" />
-          <span className="h-6 rounded-lg bg-[#1b1b1b]" />
+          <span className="misty-skeleton h-6 rounded-lg" />
+          <span className="misty-skeleton h-6 rounded-lg" />
         </div>
       ))}
     </>

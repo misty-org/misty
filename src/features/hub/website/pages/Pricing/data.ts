@@ -9,7 +9,7 @@ export const personalFeatures = [
   "Everything in Free",
   "Up to 5 devices",
   "Unlimited cloud providers",
-  "Access to the plugins ecosystem",
+  "Access to the extensions ecosystem",
   "AI file workflows, including summarization and more",
   "Shared clipboard access across your local devices",
   "Encrypted backups for your files with vault",
@@ -47,7 +47,7 @@ export const pricingFaqs: PricingFaq[] = [
   },
   {
     q: "What's the difference between Personal and Unlimited?",
-    a: "Personal is $25 and includes up to 5 devices, the plugin ecosystem, AI file workflows, Vault backups, and the shared LAN Misty clipboard. Unlimited is $89, removes the device cap, adds premium support during PST work hours, and gets faster incremental bug-fix updates.",
+    a: "Personal is $25 and includes up to 5 devices, the extension ecosystem, AI file workflows, Vault backups, and the shared LAN Misty clipboard. Unlimited is $89, removes the device cap, adds premium support during PST work hours, and gets faster incremental bug-fix updates.",
   },
   {
     q: "What if I get a new computer?",

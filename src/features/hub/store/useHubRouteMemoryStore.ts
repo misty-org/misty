@@ -2,6 +2,8 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
 const DEFAULT_HUB_ROUTE = "/hub";
+const LEGACY_HUB_EXTENSIONS_ROUTE = "/hub/plugins";
+const HUB_EXTENSIONS_ROUTE = "/hub/extensions";
 const HUB_ROUTE_MEMORY_STORAGE_KEY = "misty:hub-route-memory";
 
 type HubRouteMemoryStore = {
@@ -14,11 +16,16 @@ export function isRememberableHubRoute(pathname: string) {
   return (
     pathname === "/hub" ||
     pathname === "/hub/dashboard" ||
+    pathname === HUB_EXTENSIONS_ROUTE ||
+    pathname === LEGACY_HUB_EXTENSIONS_ROUTE ||
     pathname === "/hub/resources/changelog"
   );
 }
 
 function safeHubRoute(pathname: string) {
+  if (pathname === LEGACY_HUB_EXTENSIONS_ROUTE) {
+    return HUB_EXTENSIONS_ROUTE;
+  }
   return isRememberableHubRoute(pathname) ? pathname : DEFAULT_HUB_ROUTE;
 }
 

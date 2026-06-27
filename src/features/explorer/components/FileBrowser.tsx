@@ -35,6 +35,7 @@ const GRID_PADDING = 14;
 const GRID_OVERSCAN_ROWS = 4;
 const TABLE_COLUMN_STORAGE_KEY = "misty.explorer.fileTable.columnWidths";
 const TABLE_COLUMN_ORDER_STORAGE_KEY = "misty.explorer.fileTable.columnOrder";
+const DRAG_PREPARE_POINTER_THRESHOLD_PX = 6;
 const emptyEntries: FileEntry[] = [];
 
 const fileBrowserStyles = {
@@ -48,7 +49,7 @@ const fileBrowserStyles = {
   tableSkeletonHeader: "h-10 bg-[#171717]",
   tableSkeletonRow: "h-9 [[data-compact-mode=true]_&]:h-8",
   skeletonCell:
-    "relative overflow-hidden rounded-md bg-[#171717] after:absolute after:inset-0 after:-translate-x-full after:animate-[provider-skeleton-sweep_1.2s_ease-in-out_infinite] after:bg-[linear-gradient(90deg,transparent,rgba(255, 255, 255, 0.06),transparent)] after:content-['']",
+    "relative overflow-hidden rounded-md bg-[#171717] after:absolute after:inset-0 after:-translate-x-full after:animate-[misty-skeleton-sweep_1.15s_ease-in-out_infinite] after:bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.11),transparent)] after:content-['']",
   tableSkeletonHeaderCell: "h-[13px]",
   tableSkeletonCell: "h-3 first:h-4",
   gridSkeleton:
@@ -70,16 +71,16 @@ const fileBrowserStyles = {
   tableResizeHandle:
     "absolute right-[-3px] top-0 z-[2] h-full w-[7px] cursor-col-resize after:absolute after:bottom-[7px] after:left-[3px] after:top-[7px] after:w-px after:bg-transparent after:content-[''] group-hover/header:after:bg-[#404040] max-[720px]:hidden",
   tableRow:
-    "h-11 cursor-default select-text hover:bg-[#1e1e1e] [[data-compact-mode=true]_&]:h-9",
+    "h-11 cursor-default select-none hover:bg-[#1e1e1e] [[data-compact-mode=true]_&]:h-9",
   tableRowSelected: "bg-[#1e1e1e]",
   tableRowDeleted: "text-[#a2a2a2]",
   tableRowInlineEditing: "relative z-[3]",
   tableCell:
-    "cursor-default select-text overflow-hidden text-ellipsis whitespace-nowrap px-2.5 py-2 text-left text-sm leading-7 [[data-compact-mode=true]_&]:py-1.5 [[data-compact-mode=true]_&]:leading-6 max-[720px]:px-2 max-[720px]:py-1.5 max-[720px]:text-xs",
+    "cursor-default select-none overflow-hidden text-ellipsis whitespace-nowrap px-2.5 py-2 text-left text-sm leading-7 [[data-compact-mode=true]_&]:py-1.5 [[data-compact-mode=true]_&]:leading-6 max-[720px]:px-2 max-[720px]:py-1.5 max-[720px]:text-xs",
   tableNameCell:
-    "flex cursor-default select-text items-center gap-3 overflow-hidden text-ellipsis whitespace-nowrap px-2.5 py-2 text-left text-sm leading-7 [[data-compact-mode=true]_&]:gap-2 [[data-compact-mode=true]_&]:py-1.5 [[data-compact-mode=true]_&]:leading-6 max-[720px]:px-2 max-[720px]:py-1.5 max-[720px]:text-xs",
+    "flex cursor-default select-none items-center gap-3 overflow-hidden text-ellipsis whitespace-nowrap px-2.5 py-2 text-left text-sm leading-7 [[data-compact-mode=true]_&]:gap-2 [[data-compact-mode=true]_&]:py-1.5 [[data-compact-mode=true]_&]:leading-6 max-[720px]:px-2 max-[720px]:py-1.5 max-[720px]:text-xs",
   tableNameCellEditing: "overflow-visible",
-  tableNameText: "min-w-0 cursor-default select-text overflow-hidden text-ellipsis",
+  tableNameText: "min-w-0 cursor-default select-none overflow-hidden text-ellipsis",
   downloadButton:
     "inline-grid size-6 place-items-center rounded-md border border-transparent bg-transparent text-[#a5a5a5] hover:border-[#3e3e3e] hover:bg-[#272727] hover:text-[#efefef]",
   rowDownloadButton: "ml-2 align-middle",
@@ -544,6 +545,47 @@ const FileTableRow = memo(function FileTableRow(props: {
   onInlineEditCancel: FileBrowserProps["onInlineEditCancel"];
 }) {
   const { entry } = props;
+  const pendingDragPreparationRef = useRef<{
+    entry: FileEntry;
+    pointerId: number;
+    startX: number;
+    startY: number;
+    prepared: boolean;
+  } | null>(null);
+  const handlePointerDown = useCallback((event: ReactPointerEvent) => {
+    if (entry.isDeleted || event.button !== 0) {
+      pendingDragPreparationRef.current = null;
+      return;
+    }
+    pendingDragPreparationRef.current = {
+      entry,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      prepared: false,
+    };
+  }, [entry]);
+  const handlePointerMove = useCallback((event: ReactPointerEvent) => {
+    const pending = pendingDragPreparationRef.current;
+    if (!pending || pending.prepared || pending.pointerId !== event.pointerId || (event.buttons & 1) === 0) return;
+    const distance = Math.hypot(event.clientX - pending.startX, event.clientY - pending.startY);
+    if (distance < DRAG_PREPARE_POINTER_THRESHOLD_PX) return;
+    pending.prepared = true;
+    props.onPrepareDrag(pending.entry);
+  }, [props.onPrepareDrag]);
+  const clearPendingDragPreparation = useCallback(() => {
+    pendingDragPreparationRef.current = null;
+  }, []);
+  const handleDragStart = useCallback((event: DragEvent) => {
+    const pending = pendingDragPreparationRef.current;
+    if (!pending?.prepared) {
+      event.preventDefault();
+      clearPendingDragPreparation();
+      return;
+    }
+    props.onDragStart(event, entry);
+  }, [clearPendingDragPreparation, entry, props.onDragStart]);
+
   return (
     <tr
       className={`${fileBrowserStyles.tableRow} ${props.selected ? fileBrowserStyles.tableRowSelected : ""} ${props.inlineEdit ? fileBrowserStyles.tableRowInlineEditing : ""} ${entry.isDeleted ? fileBrowserStyles.tableRowDeleted : ""}`}
@@ -554,15 +596,16 @@ const FileTableRow = memo(function FileTableRow(props: {
         if (!entry.isDeleted) props.onOpen(entry);
       }}
       onContextMenu={(event) => props.onContextMenu(event, entry)}
-      onPointerDown={() => {
-        if (!entry.isDeleted) props.onPrepareDrag(entry);
-      }}
-      onFocus={() => {
-        if (!entry.isDeleted) props.onPrepareDrag(entry);
-      }}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={clearPendingDragPreparation}
+      onPointerCancel={clearPendingDragPreparation}
       draggable={!props.inlineEdit && !entry.isDeleted}
-      onDragStart={(event) => props.onDragStart(event, entry)}
-      onDragEnd={props.onDragEnd}
+      onDragStart={handleDragStart}
+      onDragEnd={() => {
+        clearPendingDragPreparation();
+        props.onDragEnd();
+      }}
       onDragOver={(event) => {
         if (!entry.isDeleted && entry.kind === "folder") {
           event.preventDefault();
@@ -839,6 +882,47 @@ const FileGridItem = memo(function FileGridItem(props: {
   onInlineEditCancel: FileBrowserProps["onInlineEditCancel"];
 }) {
   const { entry } = props;
+  const pendingDragPreparationRef = useRef<{
+    entry: FileEntry;
+    pointerId: number;
+    startX: number;
+    startY: number;
+    prepared: boolean;
+  } | null>(null);
+  const handlePointerDown = useCallback((event: ReactPointerEvent) => {
+    if (entry.isDeleted || event.button !== 0) {
+      pendingDragPreparationRef.current = null;
+      return;
+    }
+    pendingDragPreparationRef.current = {
+      entry,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      prepared: false,
+    };
+  }, [entry]);
+  const handlePointerMove = useCallback((event: ReactPointerEvent) => {
+    const pending = pendingDragPreparationRef.current;
+    if (!pending || pending.prepared || pending.pointerId !== event.pointerId || (event.buttons & 1) === 0) return;
+    const distance = Math.hypot(event.clientX - pending.startX, event.clientY - pending.startY);
+    if (distance < DRAG_PREPARE_POINTER_THRESHOLD_PX) return;
+    pending.prepared = true;
+    props.onPrepareDrag(pending.entry);
+  }, [props.onPrepareDrag]);
+  const clearPendingDragPreparation = useCallback(() => {
+    pendingDragPreparationRef.current = null;
+  }, []);
+  const handleDragStart = useCallback((event: DragEvent) => {
+    const pending = pendingDragPreparationRef.current;
+    if (!pending?.prepared) {
+      event.preventDefault();
+      clearPendingDragPreparation();
+      return;
+    }
+    props.onDragStart(event, entry);
+  }, [clearPendingDragPreparation, entry, props.onDragStart]);
+
   return (
     <div
       className={`${fileBrowserStyles.gridItem} ${props.selected ? fileBrowserStyles.gridItemSelected : ""} ${entry.isDeleted ? fileBrowserStyles.gridItemDeleted : ""}`}
@@ -854,15 +938,16 @@ const FileGridItem = memo(function FileGridItem(props: {
         if (event.key === "Enter" && !entry.isDeleted) props.onOpen(entry);
       }}
       onContextMenu={(event) => props.onContextMenu(event, entry)}
-      onPointerDown={() => {
-        if (!entry.isDeleted) props.onPrepareDrag(entry);
-      }}
-      onFocus={() => {
-        if (!entry.isDeleted) props.onPrepareDrag(entry);
-      }}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={clearPendingDragPreparation}
+      onPointerCancel={clearPendingDragPreparation}
       draggable={!props.inlineEdit && !entry.isDeleted}
-      onDragStart={(event) => props.onDragStart(event, entry)}
-      onDragEnd={props.onDragEnd}
+      onDragStart={handleDragStart}
+      onDragEnd={() => {
+        clearPendingDragPreparation();
+        props.onDragEnd();
+      }}
       onDragOver={(event) => {
         if (!entry.isDeleted && entry.kind === "folder") {
           event.preventDefault();

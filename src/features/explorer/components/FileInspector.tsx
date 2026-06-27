@@ -1,3 +1,4 @@
+import { convertFileSrc } from "@tauri-apps/api/core";
 import { Download, File, Folder, MoreHorizontal, Tag } from "lucide-react";
 import { useEffect, useState } from "react";
 import { explorerPrepareOpenItem, explorerPreviewItem } from "../../../api/misty";
@@ -24,6 +25,29 @@ interface LoadedPreview {
 }
 
 const MAX_PREVIEW_BYTES = 32 * 1024 * 1024;
+const IMAGE_PREVIEW_LOAD_ATTEMPTS = 5;
+const IMAGE_PREVIEW_RETRY_DELAY_MS = 80;
+
+const browserImageMimeTypes: Record<string, string> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  bmp: "image/bmp",
+  webp: "image/webp",
+  avif: "image/avif",
+  ico: "image/x-icon",
+  svg: "image/svg+xml",
+  heic: "image/heic",
+  heif: "image/heif",
+};
+
+const textPreviewExtensions = new Set([
+  "txt", "text", "log", "md", "markdown", "toml", "yaml", "yml", "ini", "conf", "cfg",
+  "csv", "tsv", "rs", "go", "js", "jsx", "ts", "tsx", "css", "html", "xml", "sh",
+  "zsh", "bash", "fish", "py", "rb", "java", "c", "h", "cpp", "hpp", "swift", "kt",
+  "sql", "json", "jsonc",
+]);
 
 const inspectorStyles = {
   root: "h-full min-w-0 overflow-auto bg-[#151515] px-3.5 py-[18px]",
@@ -210,14 +234,35 @@ function useFilePreview(entry: FileEntry | null, enabled = true): {
       setPreviewLoading(false);
       return () => undefined;
     }
-    const sizeLimitError = previewSizeLimitError(entry);
-    if (sizeLimitError) {
-      setPreviewError(sizeLimitError);
-      setPreviewLoading(false);
-      return () => undefined;
+    const imageMimeType = previewImageMimeType(entry);
+    if (!imageMimeType) {
+      const sizeLimitError = previewSizeLimitError(entry);
+      if (sizeLimitError) {
+        setPreviewError(sizeLimitError);
+        setPreviewLoading(false);
+        return () => undefined;
+      }
     }
 
     setPreviewLoading(true);
+    if (imageMimeType) {
+      void previewPathForEntry(entry)
+        .then((path) => loadImagePreview(path, imageMimeType))
+        .then((loadedPreview) => {
+          if (active) setPreview(loadedPreview);
+        })
+        .catch((error) => {
+          if (active) setPreviewError(errorText(error));
+        })
+        .finally(() => {
+          if (active) setPreviewLoading(false);
+        });
+
+      return () => {
+        active = false;
+      };
+    }
+
     void previewPathForEntry(entry)
       .then((path) => explorerPreviewItem(path))
       .then((payload) => {
@@ -262,13 +307,53 @@ async function previewPathForEntry(entry: FileEntry): Promise<string> {
 
 function previewSupported(entry: FileEntry): boolean {
   const extension = entry.extension.toLowerCase().replace(/^\./, "");
-  return [
-    "png", "jpg", "jpeg", "gif", "bmp", "webp", "svg", "pdf", "psd", "tga", "hdr", "pic", "pbm", "pgm", "pnm", "ppm",
-    "txt", "text", "log", "md", "markdown", "toml", "yaml", "yml", "ini", "conf", "cfg",
-    "csv", "tsv", "rs", "go", "js", "jsx", "ts", "tsx", "css", "html", "xml", "sh",
-    "zsh", "bash", "fish", "py", "rb", "java", "c", "h", "cpp", "hpp", "swift", "kt",
-    "sql", "json", "jsonc",
-  ].includes(extension);
+  return Boolean(previewImageMimeType(entry)) || extension === "pdf" || textPreviewExtensions.has(extension);
+}
+
+function previewImageMimeType(entry: FileEntry): string | null {
+  if (entry.kind === "folder" || entry.kind === "symlink") return null;
+  const extension = entry.extension.toLowerCase().replace(/^\./, "");
+  return browserImageMimeTypes[extension] ?? null;
+}
+
+async function loadImagePreview(path: string, mimeType: string): Promise<LoadedPreview> {
+  const baseUrl = convertFileSrc(path);
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < IMAGE_PREVIEW_LOAD_ATTEMPTS; attempt += 1) {
+    const url = attempt === 0 ? baseUrl : cacheBustedUrl(baseUrl, attempt);
+    try {
+      await waitForImage(url);
+      return { text: null, url, mimeType };
+    } catch (error) {
+      lastError = error;
+      if (attempt + 1 < IMAGE_PREVIEW_LOAD_ATTEMPTS) {
+        await sleep(IMAGE_PREVIEW_RETRY_DELAY_MS * (attempt + 1));
+      }
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("Unable to load image preview.");
+}
+
+function waitForImage(url: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.decoding = "async";
+    image.onload = () => {
+      const decode = image.decode ? image.decode().catch(() => undefined) : Promise.resolve();
+      void decode.then(() => resolve());
+    };
+    image.onerror = () => reject(new Error("Unable to load image preview."));
+    image.src = url;
+  });
+}
+
+function cacheBustedUrl(url: string, attempt: number): string {
+  const separator = url.includes("?") ? "&" : "?";
+  return `${url}${separator}mistyPreviewAttempt=${attempt}-${Date.now()}`;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 function previewSizeLimitError(entry: FileEntry): string | null {

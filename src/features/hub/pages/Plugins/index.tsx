@@ -132,7 +132,7 @@ export default function PluginsPage() {
       }}
       query={query}
       selectedPluginId={selectedPluginId}
-      title="Plugins"
+      title="Extensions"
     />
   );
 }
