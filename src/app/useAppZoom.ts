@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { hasTauriInternals } from "../shared/tauri";
 
 const APP_ZOOM_STORAGE_KEY = "misty.app.zoom";
 const appZoomMin = 0.5;
@@ -89,7 +90,7 @@ async function applyAppZoom(zoom: number): Promise<void> {
   const applySequence = ++zoomApplySequence;
   document.documentElement.dataset.appZoom = String(Math.round(zoom * 100));
 
-  if (nativeZoomSupported !== false) {
+  if (nativeZoomSupported !== false && hasTauriInternals()) {
     try {
       const { getCurrentWebview } = await import("@tauri-apps/api/webview");
       await getCurrentWebview().setZoom(zoom);

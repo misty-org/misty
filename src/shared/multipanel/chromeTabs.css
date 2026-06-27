@@ -1,40 +1,68 @@
-.misty-chrome-tabs.chrome-tabs {
-  height: 46px;
+.misty-chrome-tabs-shell {
+  display: flex;
   min-width: 0;
-  padding: 8px 8px 0;
-  border-radius: 0;
+  height: 46px;
+  overflow: hidden;
   border-bottom: 1px solid #262626;
   background: #0a0a0a;
 }
 
-.misty-chrome-tabs.chrome-tabs .chrome-tabs-content {
+.misty-chrome-tabs.chrome-tabs {
+  flex: 1 1 auto;
+  height: 46px;
   min-width: 0;
+  padding: 8px 8px 0;
+  border-radius: 0;
+  border-bottom: 0;
+  background: transparent;
+  overscroll-behavior-x: contain;
+}
+
+.misty-chrome-tabs.chrome-tabs .chrome-tabs-content {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  overflow: visible;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+
+.misty-chrome-tabs.chrome-tabs .chrome-tabs-content::-webkit-scrollbar {
+  display: none;
 }
 
 .misty-chrome-tabs.chrome-tabs .chrome-tabs-toolbar-right {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: 2px;
   height: 32px;
   margin: 0 0 4px 6px;
-  position: static !important;
+  position: relative !important;
+  z-index: 8 !important;
 }
 
 .misty-chrome-tabs-toolbar {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: 2px;
   height: 100%;
 }
 
-.misty-chrome-tabs-actions-right {
-  position: absolute;
-  z-index: 10;
-  top: 8px;
-  right: 8px;
+.misty-chrome-tabs-tray {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
-  height: 28px;
+  justify-content: flex-end;
+  gap: 2px;
+  height: 32px;
+  margin: 6px 8px 0 4px;
+  padding: 2px;
+  border: 1px solid #242424;
+  border-radius: 11px;
+  background: #141414;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
 }
 
 .misty-chrome-tabs-add {
@@ -74,4 +102,29 @@
 
 .misty-chrome-tabs.chrome-tabs.chrome-tabs-dark-theme .chrome-tab[active] .chrome-tab-title {
   color: #f5f5f5;
+}
+
+.misty-chrome-tabs.chrome-tabs .chrome-tab .chrome-tab-content {
+  min-width: 0;
+}
+
+.misty-chrome-tabs.chrome-tabs .chrome-tab .chrome-tab-title {
+  min-width: 0;
+}
+
+.misty-chrome-tabs.chrome-tabs .chrome-tab .chrome-tab-close {
+  margin-left: auto;
+  margin-right: 0;
+  z-index: 1;
+}
+
+.misty-chrome-tabs.chrome-tabs .chrome-tab[is-mini]:not([active]) .chrome-tab-favicon {
+  display: none;
+}
+
+.misty-chrome-tabs.chrome-tabs .chrome-tab[is-mini]:not([active]) .chrome-tab-close,
+.misty-chrome-tabs.chrome-tabs .chrome-tab[is-mini][active] .chrome-tab-close {
+  display: block;
+  margin-left: auto;
+  margin-right: 0;
 }

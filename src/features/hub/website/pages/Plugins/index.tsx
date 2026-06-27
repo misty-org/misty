@@ -30,7 +30,7 @@ export default function Plugins() {
         }
         setPlugins(catalogPlugins);
         setSelectedPluginId(catalogPlugins[0]?.id ?? "");
-        setNotice(`Loaded plugin catalog from ${pluginCatalogBaseUrl}.`);
+        setNotice(`Loaded extension catalog from ${pluginCatalogBaseUrl}.`);
       } catch (error) {
         if (cancelled) {
           return;
@@ -39,8 +39,8 @@ export default function Plugins() {
         setSelectedPluginId(WEBSITE_FALLBACK_PLUGINS[0]?.id ?? "");
         setNotice(
           error instanceof Error
-            ? `Using sample plugins. ${error.message}`
-            : "Using sample plugins. Could not load plugin catalog.",
+            ? `Using sample extensions. ${error.message}`
+            : "Using sample extensions. Could not load extension catalog.",
         );
       } finally {
         if (!cancelled) {
@@ -60,7 +60,7 @@ export default function Plugins() {
       installedPlugins={[]}
       loading={loading}
       marketplacePlugins={plugins}
-      notice={loading ? "Loading plugin catalog..." : notice}
+      notice={loading ? "Loading extension catalog..." : notice}
       onOpenLink={(url) => void openExternalLink(url)}
       onPrimaryAction={() => {
         window.location.assign("/download");
@@ -70,7 +70,7 @@ export default function Plugins() {
       primaryActionLabel="Open Misty Hub"
       query={query}
       selectedPluginId={selectedPluginId}
-      title="Plugins"
+      title="Extensions"
     />
   );
 }

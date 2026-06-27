@@ -10,6 +10,7 @@
     "frontendDist": "../dist"
   },
   "app": {
+    "macOSPrivateApi": true,
     "windows": [
       {
         "title": "Misty",
@@ -17,6 +18,9 @@
         "height": 820,
         "minWidth": 900,
         "minHeight": 600,
+        "decorations": false,
+        "transparent": true,
+        "shadow": false,
         "dragDropEnabled": false
       }
     ],
@@ -25,10 +29,23 @@
       "assetProtocol": {
         "enable": true,
         "scope": [
+          "$HOME/**",
+          "$DESKTOP/**",
+          "$DOCUMENT/**",
+          "$DOWNLOAD/**",
+          "$PICTURE/**",
+          "$VIDEO/**",
+          "$AUDIO/**",
+          "$HOME/.misty/.cache/**",
+          "$HOME/.misty/mnt/**",
+          "$HOME/.misty/**",
           "$APPDATA/**",
           "$APPLOCALDATA/**",
           "$APPCACHE/**",
-          "$TEMP/**"
+          "$TEMP/**",
+          "/Volumes/**",
+          "/media/**",
+          "/mnt/**"
         ]
       }
     }

@@ -1,4 +1,4 @@
-use std::process::Command;
+use std::{env, path::Path, process::Command};
 
 use serde::{Deserialize, Serialize};
 use tauri::State;
@@ -18,9 +18,11 @@ use crate::core::workspace::WorkspaceDocument;
 use crate::error::{ApiError, ApiResult};
 use crate::runtime::MistyRuntime;
 use crate::services::autostart::LaunchOnLoginSnapshot;
+use crate::services::ai::{AiSendRequest, AiStatus, AiStreamEvent};
 use crate::services::claude::{ClaudeSendRequest, ClaudeStatus, ClaudeStreamEvent};
 use crate::services::commands::{SaveShortcutsRequest, ShortcutsSnapshot};
 use crate::services::devices::DeviceSnapshot;
+use crate::services::directory_size::{DirectorySizeRecord, DirectorySizeRequest};
 use crate::services::environment::AppEnvironmentSnapshot;
 use crate::services::explorer_library::{
     ExplorerLibrarySnapshot, RecordLastOpenedRequest, RecordRecentRequest, SetTagsRequest,
@@ -38,6 +40,7 @@ use crate::services::providers::{
 };
 use crate::services::proxy::ProxySnapshot;
 use crate::services::proxy_runtime::ProxyRuntimeSnapshot;
+use crate::services::search::{SearchQueryRequest, SearchResult, SearchScanRequest, SearchStatus};
 use crate::services::settings::{OpenWithAssociation, SaveSettingsRequest, SettingsSnapshot};
 use crate::services::transfers::{TransferFilter, TransferPage};
 
@@ -73,6 +76,29 @@ pub async fn app_environment_snapshot(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<AppEnvironmentSnapshot> {
     Ok(state.environment.snapshot())
+}
+
+#[tauri::command]
+pub fn ai_status(state: State<'_, MistyRuntime>) -> AiStatus {
+    state.ai.status()
+}
+
+#[tauri::command]
+pub fn ai_send_message(
+    request: AiSendRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<AiStatus> {
+    state.ai.send_message(request)
+}
+
+#[tauri::command]
+pub fn ai_drain_events(state: State<'_, MistyRuntime>) -> Vec<AiStreamEvent> {
+    state.ai.drain_events()
+}
+
+#[tauri::command]
+pub fn ai_abort(state: State<'_, MistyRuntime>) -> ApiResult<AiStatus> {
+    state.ai.abort()
 }
 
 #[tauri::command]
@@ -220,6 +246,53 @@ pub async fn explorer_list_directory(
 }
 
 #[tauri::command]
+pub async fn explorer_directory_size_snapshot(
+    paths: Vec<String>,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<Vec<DirectorySizeRecord>> {
+    state.directory_size.snapshot(paths).await
+}
+
+#[tauri::command]
+pub async fn explorer_calculate_directory_sizes(
+    request: DirectorySizeRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<Vec<DirectorySizeRecord>> {
+    state.directory_size.calculate(request).await
+}
+
+#[tauri::command]
+pub async fn search_init(state: State<'_, MistyRuntime>) -> ApiResult<SearchStatus> {
+    state.search.init().await
+}
+
+#[tauri::command]
+pub async fn search_get_status(state: State<'_, MistyRuntime>) -> ApiResult<SearchStatus> {
+    state.search.status().await
+}
+
+#[tauri::command]
+pub async fn search_start_scan(
+    request: SearchScanRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<SearchStatus> {
+    state.search.start_scan(request).await
+}
+
+#[tauri::command]
+pub async fn search_cancel_scan(state: State<'_, MistyRuntime>) -> ApiResult<SearchStatus> {
+    state.search.cancel_scan().await
+}
+
+#[tauri::command]
+pub async fn search_query(
+    request: SearchQueryRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<Vec<SearchResult>> {
+    state.search.query(request).await
+}
+
+#[tauri::command]
 pub async fn explorer_create_item(
     request: CreateItemRequest,
     state: State<'_, MistyRuntime>,
@@ -335,6 +408,13 @@ pub async fn explorer_open_path(file_path: String) -> ApiResult<()> {
     tokio::task::spawn_blocking(move || open_path_default(&file_path))
         .await
         .map_err(|err| ApiError::Message(format!("Open file worker failed: {err}")))?
+}
+
+#[tauri::command]
+pub async fn open_terminal_at_path(path: String) -> ApiResult<()> {
+    tokio::task::spawn_blocking(move || open_terminal_default(&path))
+        .await
+        .map_err(|err| ApiError::Message(format!("Open terminal worker failed: {err}")))?
 }
 
 #[tauri::command]
@@ -644,6 +724,89 @@ fn open_path_default(file_path: &str) -> ApiResult<()> {
     spawn_result
         .map(|_| ())
         .map_err(|err| ApiError::Message(format!("Failed to open file: {err}")))
+}
+
+fn open_terminal_default(path: &str) -> ApiResult<()> {
+    let trimmed = path.trim();
+    if trimmed.is_empty() {
+        return Err(ApiError::Message("Folder path is required.".to_owned()));
+    }
+    let folder = Path::new(trimmed);
+    if !folder.is_dir() {
+        return Err(ApiError::Message(format!("{trimmed} is not a folder.")));
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        return Command::new("open")
+            .arg("-a")
+            .arg("Terminal")
+            .arg(trimmed)
+            .spawn()
+            .map(|_| ())
+            .map_err(|err| ApiError::Message(format!("Failed to open Terminal: {err}")));
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        match Command::new("wt").arg("-d").arg(trimmed).spawn() {
+            Ok(_) => return Ok(()),
+            Err(wt_err) => {
+                return Command::new("cmd")
+                    .args(["/C", "start", "", "cmd", "/K", "cd", "/d"])
+                    .arg(trimmed)
+                    .spawn()
+                    .map(|_| ())
+                    .map_err(|cmd_err| {
+                        ApiError::Message(format!(
+                            "Failed to open Windows Terminal ({wt_err}) or Command Prompt ({cmd_err})."
+                        ))
+                    });
+            }
+        }
+    }
+
+    #[cfg(all(
+        unix,
+        not(any(target_os = "macos", target_os = "ios", target_os = "android"))
+    ))]
+    {
+        let mut candidates = Vec::<String>::new();
+        if let Ok(terminal) = env::var("TERMINAL") {
+            let terminal = terminal.trim();
+            if !terminal.is_empty() {
+                candidates.push(terminal.to_owned());
+            }
+        }
+        candidates.extend([
+            "x-terminal-emulator".to_owned(),
+            "gnome-terminal".to_owned(),
+            "konsole".to_owned(),
+            "xfce4-terminal".to_owned(),
+            "alacritty".to_owned(),
+            "kitty".to_owned(),
+            "xterm".to_owned(),
+        ]);
+
+        let mut errors = Vec::new();
+        for candidate in candidates {
+            match Command::new(&candidate).current_dir(folder).spawn() {
+                Ok(_) => return Ok(()),
+                Err(err) => errors.push(format!("{candidate}: {err}")),
+            }
+        }
+        return Err(ApiError::Message(format!(
+            "Failed to open a terminal for {trimmed}. Tried: {}",
+            errors.join("; ")
+        )));
+    }
+
+    #[cfg(any(target_os = "ios", target_os = "android"))]
+    {
+        Err(ApiError::Message(
+            "Opening a terminal is not supported on this platform.".to_owned(),
+        ))
+    }
 }
 
 #[tauri::command]

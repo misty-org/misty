@@ -68,24 +68,24 @@ impl RemoteBrowseTarget {
     pub fn from_virtual_path(mount_root: &Path, path: &Path) -> Option<Self> {
         let relative = path.strip_prefix(mount_root).ok()?;
         let parts = normal_components(relative)?;
-        if parts.len() < 2 {
+        if parts.is_empty() {
             return None;
         }
 
-        let remote_path = if parts.len() == 2 {
+        let remote_path = if parts.len() == 1 {
             "/".to_string()
         } else {
-            format!("/{}", parts[2..].join("/"))
+            format!("/{}", parts[1..].join("/"))
         };
         Some(Self {
-            provider_type: parts[0].clone(),
-            remote_name: parts[1].clone(),
+            provider_type: String::new(),
+            remote_name: parts[0].clone(),
             remote_path,
         })
     }
 
     pub fn virtual_path(&self, mount_root: &Path) -> PathBuf {
-        let mut path = mount_root.join(&self.provider_type).join(&self.remote_name);
+        let mut path = mount_root.join(&self.remote_name);
         for part in self.remote_path.trim_start_matches('/').split('/') {
             if !part.is_empty() {
                 path.push(part);
@@ -158,10 +158,10 @@ mod tests {
         let root = Path::new("/Users/test/.misty/mnt");
         let target = RemoteBrowseTarget::from_virtual_path(
             root,
-            Path::new("/Users/test/.misty/mnt/drive/work/Documents/Reports"),
+            Path::new("/Users/test/.misty/mnt/work/Documents/Reports"),
         )
         .expect("remote path");
-        assert_eq!(target.provider_type, "drive");
+        assert_eq!(target.provider_type, "");
         assert_eq!(target.remote_name, "work");
         assert_eq!(target.remote_path, "/Documents/Reports");
     }

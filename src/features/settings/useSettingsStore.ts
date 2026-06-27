@@ -13,7 +13,7 @@ import type { LaunchOnLoginSnapshot, OpenWithAssociation, ShortcutsSnapshot, Set
 import { errorText } from "../../shared/format";
 import { settingsIndexToThemeMode, useAppThemeStore } from "../../app/useAppThemeStore";
 
-type SettingsSection = "general" | "appearance" | "privacy" | "sync" | "notifications" | "shortcuts" | "advanced";
+type SettingsSection = "general" | "appearance" | "privacy" | "sync" | "search" | "notifications" | "shortcuts" | "advanced";
 type SettingValue = string | number | boolean | Array<Record<string, unknown>>;
 
 export type SettingsScaleToken = "small" | "default" | "large";
