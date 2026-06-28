@@ -31,6 +31,12 @@ import {
 import { useSearchStore } from "../explorer/state/useSearchStore";
 import { formatBytes, formatDate } from "../explorer/utils/fileFormat";
 import { hasTauriInternals } from "../../shared/tauri";
+import {
+  defaultTransferProfileId,
+  transferProfileRecords,
+  transferProfileSettingsPayload,
+  type TransferProfileRecord,
+} from "./transferProfiles";
 
 type SettingsSection = "general" | "appearance" | "privacy" | "sync" | "search" | "notifications" | "shortcuts" | "advanced";
 type SettingValue = string | number | boolean | Array<Record<string, unknown>>;
@@ -600,6 +606,41 @@ function PrivacySettings(props: SettingsContentProps) {
 }
 
 function SyncSettings(props: SettingsContentProps) {
+  const transferProfiles = transferProfileRecords(props.document);
+  const defaultProfileId = defaultTransferProfileId(props.document);
+  const defaultProfileIndex = Math.max(0, transferProfiles.findIndex((profile) => profile.id === defaultProfileId));
+  const saveProfiles = (profiles: TransferProfileRecord[]) => {
+    props.onSettingChange("transfer_profiles", "profiles", profiles.map(transferProfileSettingsPayload));
+  };
+  const updateProfile = (id: string, patch: Partial<TransferProfileRecord>) => {
+    saveProfiles(transferProfiles.map((profile) => profile.id === id ? { ...profile, ...patch } : profile));
+  };
+  const addProfile = () => {
+    const id = `profile-${Date.now().toString(36)}`;
+    const base = transferProfiles.find((profile) => profile.id === defaultProfileId) ?? transferProfiles[0];
+    saveProfiles([
+      ...transferProfiles,
+      {
+        id,
+        name: "Custom Profile",
+        transfers: base?.transfers ?? 4,
+        checkers: base?.checkers ?? 8,
+        bandwidthLimit: base?.bandwidthLimit ?? "",
+        retries: base?.retries ?? 3,
+        lowLevelRetries: base?.lowLevelRetries ?? 10,
+        checksum: base?.checksum ?? false,
+        builtIn: false,
+      },
+    ]);
+    props.onSettingChange("transfer_profiles", "default_profile_id", id);
+  };
+  const removeProfile = (id: string) => {
+    const next = transferProfiles.filter((profile) => profile.id !== id);
+    saveProfiles(next);
+    if (defaultProfileId === id) {
+      props.onSettingChange("transfer_profiles", "default_profile_id", next[0]?.id ?? "balanced");
+    }
+  };
   return (
     <>
       <SettingsSectionBlock title="Status">
@@ -652,6 +693,62 @@ function SyncSettings(props: SettingsContentProps) {
             onChange={(value) => props.onSettingChange("sync", "conflict_resolution_index", value)}
           />
         </SettingsRow>
+      </SettingsSectionBlock>
+
+      <SettingsSectionBlock title="Transfer Profiles">
+        <SettingsRow label="Default profile" description="Choose the saved transfer behavior Misty should preselect.">
+          <SelectControl
+            value={defaultProfileIndex}
+            options={transferProfiles.map((profile) => profile.name)}
+            disabled={props.working}
+            onChange={(value) => props.onSettingChange("transfer_profiles", "default_profile_id", transferProfiles[value]?.id ?? "balanced")}
+          />
+        </SettingsRow>
+        <div className={settingsReferenceListClass}>
+          <div className={`${settingsReferenceRowClass} ${settingsReferenceHeaderClass}`}>
+            <span>Name</span>
+            <span>Behavior</span>
+          </div>
+          {transferProfiles.map((profile) => (
+            <div className={settingsReferenceRowClass} key={profile.id}>
+              <span className={settingsReferenceSpanClass}>
+                {profile.builtIn ? (
+                  profile.name
+                ) : (
+                  <TextControl
+                    value={profile.name}
+                    disabled={props.working}
+                    onCommit={(value) => updateProfile(profile.id, { name: value.trim() || "Custom Profile" })}
+                  />
+                )}
+              </span>
+              <span className="grid justify-items-end gap-2 text-right text-[#9e988f]">
+                <span>
+                  {profile.transfers} transfers / {profile.checkers} checks{profile.bandwidthLimit ? ` · ${profile.bandwidthLimit}` : ""}
+                  {profile.checksum ? " · checksum" : ""}
+                </span>
+                {!profile.builtIn ? (
+                  <span className="flex flex-wrap justify-end gap-2">
+                    <ProfileNumberInput label="Transfers" value={profile.transfers} disabled={props.working} onCommit={(value) => updateProfile(profile.id, { transfers: value })} />
+                    <ProfileNumberInput label="Checkers" value={profile.checkers} disabled={props.working} onCommit={(value) => updateProfile(profile.id, { checkers: value })} />
+                    <ProfileTextInput label="Limit" value={profile.bandwidthLimit} disabled={props.working} onCommit={(value) => updateProfile(profile.id, { bandwidthLimit: value })} />
+                    <button className={settingsControlButtonCompactClass} type="button" disabled={props.working} onClick={() => updateProfile(profile.id, { checksum: !profile.checksum })}>
+                      {profile.checksum ? "Checksum" : "Fast"}
+                    </button>
+                    <button className={settingsIconDangerClass} type="button" disabled={props.working} aria-label={`Remove ${profile.name}`} onClick={() => removeProfile(profile.id)}>
+                      <Trash2 size={15} strokeWidth={1.8} />
+                    </button>
+                  </span>
+                ) : null}
+              </span>
+            </div>
+          ))}
+        </div>
+        <div className={settingsInlineActionsClass}>
+          <button className={settingsPrimaryButtonClass} type="button" disabled={props.working} onClick={addProfile}>
+            Add Profile
+          </button>
+        </div>
       </SettingsSectionBlock>
     </>
   );
@@ -1092,6 +1189,63 @@ function TextControl(props: {
         }
       }}
     />
+  );
+}
+
+function ProfileNumberInput(props: {
+  label: string;
+  value: number;
+  disabled: boolean;
+  onCommit: (value: number) => void;
+}) {
+  const handleCommit = (event: ChangeEvent<HTMLInputElement>) => {
+    const next = Math.max(1, Math.round(Number(event.currentTarget.value) || props.value));
+    if (next !== props.value) props.onCommit(next);
+  };
+  return (
+    <label className="grid gap-1 text-left text-[11px] text-[#8f8f95]">
+      {props.label}
+      <input
+        key={props.value}
+        className="h-8 w-[76px] rounded-md border border-[#27272a] bg-[#0b0d0f] px-2 text-sm text-[#f1eee8] outline-none disabled:opacity-55"
+        defaultValue={props.value}
+        disabled={props.disabled}
+        inputMode="numeric"
+        type="number"
+        min={1}
+        onBlur={handleCommit}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") event.currentTarget.blur();
+        }}
+      />
+    </label>
+  );
+}
+
+function ProfileTextInput(props: {
+  label: string;
+  value: string;
+  disabled: boolean;
+  onCommit: (value: string) => void;
+}) {
+  const handleCommit = (event: ChangeEvent<HTMLInputElement>) => {
+    if (event.currentTarget.value !== props.value) props.onCommit(event.currentTarget.value.trim());
+  };
+  return (
+    <label className="grid gap-1 text-left text-[11px] text-[#8f8f95]">
+      {props.label}
+      <input
+        key={props.value}
+        className="h-8 w-[92px] rounded-md border border-[#27272a] bg-[#0b0d0f] px-2 text-sm text-[#f1eee8] outline-none disabled:opacity-55"
+        defaultValue={props.value}
+        disabled={props.disabled}
+        placeholder="None"
+        onBlur={handleCommit}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") event.currentTarget.blur();
+        }}
+      />
+    </label>
   );
 }
 

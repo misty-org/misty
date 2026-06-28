@@ -9,7 +9,7 @@ use tokio::sync::RwLock;
 
 use crate::error::{ApiError, ApiResult};
 
-use super::proxy::ProxyService;
+use super::proxy::{ProxyResponse, ProxyService};
 
 #[derive(Clone)]
 pub struct ProviderService {
@@ -185,6 +185,179 @@ pub struct ProviderConfigStep {
     pub poll_after_ms: u64,
     #[serde(default, alias = "field", alias = "prompt")]
     pub option: Option<ProviderWorkflowOption>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PowerToolEndpoint {
+    pub kind: String,
+    #[serde(default)]
+    pub remote: String,
+    pub path: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct TransferProfileOptions {
+    #[serde(default)]
+    pub transfers: u32,
+    #[serde(default)]
+    pub checkers: u32,
+    #[serde(default)]
+    pub bandwidth_limit: String,
+    #[serde(default)]
+    pub retries: u32,
+    #[serde(default)]
+    pub low_level_retries: u32,
+    #[serde(default)]
+    pub checksum: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct VerifyOptions {
+    #[serde(default)]
+    pub one_way: bool,
+    #[serde(default)]
+    pub download: bool,
+    #[serde(default)]
+    pub profile: TransferProfileOptions,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VerifyStartRequest {
+    pub source: PowerToolEndpoint,
+    pub dest: PowerToolEndpoint,
+    #[serde(default)]
+    pub options: VerifyOptions,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+pub struct ProviderJobStart {
+    pub job_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+pub struct ProviderJobStatus {
+    pub job_id: String,
+    pub operation: String,
+    pub state: String,
+    pub phase: String,
+    pub bytes_completed: i64,
+    pub bytes_total: i64,
+    pub source_remote: Option<String>,
+    pub source_path: Option<String>,
+    pub dest_remote: Option<String>,
+    pub dest_path: Option<String>,
+    pub message: Option<String>,
+    pub result_ready: bool,
+    pub result_kind: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+pub struct VerifyResult {
+    pub success: bool,
+    pub status: Option<String>,
+    pub hash_type: Option<String>,
+    #[serde(default)]
+    pub missing_on_src: Vec<String>,
+    #[serde(default)]
+    pub missing_on_dst: Vec<String>,
+    #[serde(default)]
+    pub r#match: Vec<String>,
+    #[serde(default)]
+    pub differ: Vec<String>,
+    #[serde(default)]
+    pub error: Vec<String>,
+    #[serde(default)]
+    pub combined: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LinkPathRequest {
+    pub remote: String,
+    pub path: String,
+    #[serde(default)]
+    pub expire: String,
+    #[serde(default)]
+    pub link_id: String,
+    #[serde(default)]
+    pub target_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+pub struct PublicLinkRecord {
+    pub id: String,
+    pub url: String,
+    pub target_id: Option<String>,
+    pub provider: String,
+    pub path: String,
+    pub role: Option<String>,
+    pub scope: Option<String>,
+    pub kind: Option<String>,
+    pub expires_at: Option<String>,
+    pub created_at: Option<String>,
+    pub can_revoke: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+pub struct PublicLinkListResult {
+    pub supported: bool,
+    pub provider: String,
+    #[serde(default)]
+    pub links: Vec<PublicLinkRecord>,
+    pub message: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+pub struct PublicLinkActionResult {
+    pub supported: bool,
+    pub provider: String,
+    pub link: Option<PublicLinkRecord>,
+    pub message: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+pub struct BackendAction {
+    pub id: String,
+    pub label: String,
+    pub description: String,
+    pub provider: String,
+    pub destructive: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BackendRunRequest {
+    pub remote: String,
+    pub action_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+pub struct BackendActionResult {
+    pub action_id: String,
+    pub label: String,
+    pub result: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+pub struct ConfigSecurityStatus {
+    pub config_path: Option<String>,
+    pub encrypted: bool,
+    pub unlocked: bool,
+    pub password_present: bool,
+    pub message: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -415,6 +588,151 @@ impl ProviderService {
             temp_path: json_string(&parsed, &["temp", "temp_path", "TempPath"]),
             raw_json: body,
         })
+    }
+
+    pub async fn start_verify(&self, request: VerifyStartRequest) -> ApiResult<ProviderJobStart> {
+        let body = serde_json::json!({
+            "source": endpoint_proxy_body(&request.source),
+            "dest": endpoint_proxy_body(&request.dest),
+            "options": {
+                "one_way": request.options.one_way,
+                "download": request.options.download,
+                "profile": transfer_profile_proxy_body(&request.options.profile),
+            }
+        });
+        self.post_json_value("/api/remote/verify/start", &body)
+            .await
+    }
+
+    pub async fn job_status(&self, job_id: String) -> ApiResult<ProviderJobStatus> {
+        let response = self
+            .inner
+            .proxy
+            .get(&format!("/api/remote/file/jobs/{job_id}"))
+            .await?;
+        parse_proxy_response(response, "Failed to load provider job status").await
+    }
+
+    pub async fn cancel_job(&self, job_id: String) -> ApiResult<serde_json::Value> {
+        let response = self
+            .inner
+            .proxy
+            .delete(&format!("/api/remote/file/jobs/{job_id}"))
+            .await?;
+        parse_proxy_response(response, "Failed to cancel provider job").await
+    }
+
+    pub async fn verify_result(&self, job_id: String) -> ApiResult<VerifyResult> {
+        self.post_json_value(
+            "/api/remote/verify/result",
+            &serde_json::json!({ "job_id": job_id }),
+        )
+        .await
+    }
+
+    pub async fn public_links(&self, request: LinkPathRequest) -> ApiResult<PublicLinkListResult> {
+        self.post_json_value(
+            "/api/remote/links/list",
+            &serde_json::json!({
+                "remote": request.remote,
+                "path": request.path,
+            }),
+        )
+        .await
+    }
+
+    pub async fn create_public_link(
+        &self,
+        request: LinkPathRequest,
+    ) -> ApiResult<PublicLinkActionResult> {
+        self.post_json_value(
+            "/api/remote/links/create",
+            &serde_json::json!({
+                "remote": request.remote,
+                "path": request.path,
+                "expire": request.expire,
+            }),
+        )
+        .await
+    }
+
+    pub async fn revoke_public_link(
+        &self,
+        request: LinkPathRequest,
+    ) -> ApiResult<PublicLinkActionResult> {
+        self.post_json_value(
+            "/api/remote/links/revoke",
+            &serde_json::json!({
+                "remote": request.remote,
+                "path": request.path,
+                "link_id": request.link_id,
+                "target_id": request.target_id,
+            }),
+        )
+        .await
+    }
+
+    pub async fn backend_actions(&self, remote: String) -> ApiResult<Vec<BackendAction>> {
+        self.post_json_value(
+            "/api/remote/backend/actions",
+            &serde_json::json!({ "remote": remote }),
+        )
+        .await
+    }
+
+    pub async fn run_backend_action(
+        &self,
+        request: BackendRunRequest,
+    ) -> ApiResult<BackendActionResult> {
+        self.post_json_value(
+            "/api/remote/backend/run",
+            &serde_json::json!({
+                "remote": request.remote,
+                "action_id": request.action_id,
+            }),
+        )
+        .await
+    }
+
+    pub async fn config_security(&self) -> ApiResult<ConfigSecurityStatus> {
+        self.post_json_value(
+            "/api/remote/config/security",
+            &serde_json::json!({
+                "password_present": crate::services::keychain::has_rclone_config_password(),
+            }),
+        )
+        .await
+    }
+
+    pub async fn harden_config(&self) -> ApiResult<ConfigSecurityStatus> {
+        let password = crate::services::keychain::ensure_rclone_config_password()?;
+        self.post_json_value(
+            "/api/remote/config/harden",
+            &serde_json::json!({
+                "current_password": "",
+                "new_password": password,
+            }),
+        )
+        .await
+    }
+
+    pub async fn repair_config_security(
+        &self,
+        password: String,
+    ) -> ApiResult<ConfigSecurityStatus> {
+        crate::services::keychain::store_rclone_config_password(password.trim())?;
+        let mut status = self.config_security().await?;
+        status.message = Some("Config unlock was repaired in macOS Keychain.".to_owned());
+        Ok(status)
+    }
+
+    async fn post_json_value<T: for<'de> Deserialize<'de>>(
+        &self,
+        path: &str,
+        body: &serde_json::Value,
+    ) -> ApiResult<T> {
+        let response = self.inner.proxy.post_json(path, body).await?;
+        parse_proxy_response(response, "Provider tool failed").await
     }
 
     pub async fn configure_remote(
@@ -785,6 +1103,37 @@ fn proxy_response_error(status: u16, body: &str, fallback: &str) -> ApiError {
         .or_else(|| (!body.trim().is_empty()).then(|| body.trim().to_string()))
         .unwrap_or_else(|| format!("{fallback} (HTTP {status})"));
     ApiError::Message(message)
+}
+
+async fn parse_proxy_response<T: for<'de> Deserialize<'de>>(
+    response: ProxyResponse,
+    fallback: &str,
+) -> ApiResult<T> {
+    let status = response.status();
+    let body = response.text().await.unwrap_or_default();
+    if !status.is_success() {
+        return Err(provider_operation_error(status.as_u16(), &body, fallback));
+    }
+    serde_json::from_str::<T>(&body).map_err(ApiError::from)
+}
+
+fn endpoint_proxy_body(endpoint: &PowerToolEndpoint) -> serde_json::Value {
+    serde_json::json!({
+        "kind": endpoint.kind,
+        "remote": endpoint.remote,
+        "path": endpoint.path,
+    })
+}
+
+fn transfer_profile_proxy_body(profile: &TransferProfileOptions) -> serde_json::Value {
+    serde_json::json!({
+        "transfers": profile.transfers,
+        "checkers": profile.checkers,
+        "bandwidth_limit": profile.bandwidth_limit,
+        "retries": profile.retries,
+        "low_level_retries": profile.low_level_retries,
+        "checksum": profile.checksum,
+    })
 }
 
 fn provider_operation_error(status: u16, body: &str, fallback: &str) -> ApiError {

@@ -653,6 +653,130 @@ export interface RcloneConfigPaths {
   rawJson: string;
 }
 
+export type PowerToolEndpointKind = "local" | "remote";
+
+export interface PowerToolEndpoint {
+  kind: PowerToolEndpointKind;
+  remote?: string;
+  path: string;
+}
+
+export interface TransferProfileOptions {
+  transfers?: number;
+  checkers?: number;
+  bandwidthLimit?: string;
+  retries?: number;
+  lowLevelRetries?: number;
+  checksum?: boolean;
+}
+
+export interface VerifyOptions {
+  oneWay?: boolean;
+  download?: boolean;
+  profile?: TransferProfileOptions;
+}
+
+export interface VerifyStartRequest {
+  source: PowerToolEndpoint;
+  dest: PowerToolEndpoint;
+  options?: VerifyOptions;
+}
+
+export interface ProviderJobStart {
+  jobId: string;
+}
+
+export interface ProviderJobStatus {
+  jobId: string;
+  operation: string;
+  state: string;
+  phase: string;
+  bytesCompleted: number;
+  bytesTotal: number;
+  sourceRemote?: string | null;
+  sourcePath?: string | null;
+  destRemote?: string | null;
+  destPath?: string | null;
+  message?: string | null;
+  resultReady?: boolean;
+  resultKind?: string | null;
+}
+
+export interface VerifyResult {
+  success: boolean;
+  status?: string | null;
+  hashType?: string | null;
+  missingOnSrc: string[];
+  missingOnDst: string[];
+  match: string[];
+  differ: string[];
+  error: string[];
+  combined: string[];
+}
+
+export interface LinkPathRequest {
+  remote: string;
+  path: string;
+  expire?: string;
+  linkId?: string;
+  targetId?: string;
+}
+
+export interface PublicLinkRecord {
+  id: string;
+  url: string;
+  targetId?: string | null;
+  provider: string;
+  path: string;
+  role?: string | null;
+  scope?: string | null;
+  kind?: string | null;
+  expiresAt?: string | null;
+  createdAt?: string | null;
+  canRevoke: boolean;
+}
+
+export interface PublicLinkListResult {
+  supported: boolean;
+  provider: string;
+  links: PublicLinkRecord[];
+  message?: string | null;
+}
+
+export interface PublicLinkActionResult {
+  supported: boolean;
+  provider: string;
+  link?: PublicLinkRecord | null;
+  message?: string | null;
+}
+
+export interface BackendAction {
+  id: string;
+  label: string;
+  description: string;
+  provider: string;
+  destructive: boolean;
+}
+
+export interface BackendRunRequest {
+  remote: string;
+  actionId: string;
+}
+
+export interface BackendActionResult {
+  actionId: string;
+  label: string;
+  result: unknown;
+}
+
+export interface ConfigSecurityStatus {
+  configPath?: string | null;
+  encrypted: boolean;
+  unlocked: boolean;
+  passwordPresent: boolean;
+  message?: string | null;
+}
+
 export type ProviderConfigMode = "add" | "reconnect" | "repair";
 
 export interface ProviderConfigRequest {

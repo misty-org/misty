@@ -204,6 +204,7 @@ mod embedded_go {
         server_url: Option<String>,
         rclone_backend: String,
         rclone_enabled: bool,
+        rclone_config_password: Option<String>,
     }
 
     #[derive(Debug, Deserialize)]
@@ -238,6 +239,7 @@ mod embedded_go {
             server_url: environment.snapshot().server_url,
             rclone_enabled: rclone_backend == "external",
             rclone_backend,
+            rclone_config_password: crate::services::keychain::rclone_config_password(),
         };
         match call_go_proxy_start(&config) {
             Ok(response) => ProxyRuntimeSnapshot {

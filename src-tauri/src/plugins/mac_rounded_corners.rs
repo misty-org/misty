@@ -6,7 +6,7 @@ use tauri::{AppHandle, Runtime, WebviewWindow};
 
 #[cfg(target_os = "macos")]
 use cocoa::{
-    appkit::{NSColor, NSWindow, NSWindowStyleMask, NSView, NSWindowTitleVisibility},
+    appkit::{NSColor, NSView, NSWindow, NSWindowStyleMask, NSWindowTitleVisibility},
     base::{id, nil},
     foundation::{NSPoint, NSString},
 };
@@ -52,30 +52,30 @@ pub fn enable_rounded_corners<R: Runtime>(
                 #[cfg(target_os = "macos")]
                 unsafe {
                     let ns_window = webview.ns_window() as id;
-                    
+
                     let mut style_mask = ns_window.styleMask();
-                    
+
                     // Add necessary styles for rounded corners
                     style_mask |= NSWindowStyleMask::NSFullSizeContentViewWindowMask;
                     style_mask |= NSWindowStyleMask::NSTitledWindowMask;
                     style_mask |= NSWindowStyleMask::NSClosableWindowMask;
                     style_mask |= NSWindowStyleMask::NSMiniaturizableWindowMask;
                     style_mask |= NSWindowStyleMask::NSResizableWindowMask;
-                    
+
                     ns_window.setStyleMask_(style_mask);
                     ns_window.setTitlebarAppearsTransparent_(cocoa::base::YES);
-                    
+
                     let content_view = ns_window.contentView();
                     content_view.setWantsLayer(cocoa::base::YES);
-                    
+
                     position_traffic_lights(ns_window, config.offset_x, config.offset_y);
                 }
             })
             .map_err(|e| e.to_string())?;
-        
+
         Ok(())
     }
-    
+
     #[cfg(not(target_os = "macos"))]
     {
         Ok(())
@@ -107,15 +107,15 @@ pub fn enable_modern_window_style<R: Runtime>(
                 #[cfg(target_os = "macos")]
                 unsafe {
                     let ns_window = webview.ns_window() as id;
-                    
+
                     let mut style_mask = ns_window.styleMask();
-                    
+
                     style_mask |= NSWindowStyleMask::NSFullSizeContentViewWindowMask;
                     style_mask |= NSWindowStyleMask::NSTitledWindowMask;
                     style_mask |= NSWindowStyleMask::NSClosableWindowMask;
                     style_mask |= NSWindowStyleMask::NSMiniaturizableWindowMask;
                     style_mask |= NSWindowStyleMask::NSResizableWindowMask;
-                    
+
                     ns_window.setStyleMask_(style_mask);
                     ns_window.setTitlebarAppearsTransparent_(cocoa::base::YES);
                     ns_window.setTitleVisibility_(NSWindowTitleVisibility::NSWindowTitleHidden);
@@ -129,10 +129,10 @@ pub fn enable_modern_window_style<R: Runtime>(
                 }
             })
             .map_err(|e| e.to_string())?;
-        
+
         Ok(())
     }
-    
+
     #[cfg(not(target_os = "macos"))]
     {
         Ok(())
@@ -202,10 +202,10 @@ pub fn reposition_traffic_lights<R: Runtime>(
                 }
             })
             .map_err(|e| e.to_string())?;
-        
+
         Ok(())
     }
-    
+
     #[cfg(not(target_os = "macos"))]
     {
         Ok(())
@@ -225,7 +225,8 @@ unsafe fn apply_continuous_corner_mask(ns_window: id, radius: f64) {
     let _: () = msg_send![layer, setCornerRadius: radius];
     let _: () = msg_send![layer, setMasksToBounds: cocoa::base::YES];
 
-    let supports_continuous_corners: bool = msg_send![layer, respondsToSelector: sel!(setCornerCurve:)];
+    let supports_continuous_corners: bool =
+        msg_send![layer, respondsToSelector: sel!(setCornerCurve:)];
     if supports_continuous_corners {
         let continuous = NSString::alloc(nil).init_str("continuous");
         let _: () = msg_send![layer, setCornerCurve: continuous];
@@ -236,38 +237,31 @@ unsafe fn apply_continuous_corner_mask(ns_window: id, radius: f64) {
 unsafe fn position_traffic_lights(ns_window: id, offset_x: f64, offset_y: f64) {
     let default_x = 20.0;
     let default_y = 0.0;
-    
+
     let close_button: id = msg_send![ns_window, standardWindowButton: 0];
     let miniaturize_button: id = msg_send![ns_window, standardWindowButton: 1];
     let zoom_button: id = msg_send![ns_window, standardWindowButton: 2];
-    
+
     let new_x = default_x + offset_x;
     let new_y = default_y - offset_y;
-    
+
     if !close_button.is_null() {
         let frame: cocoa::foundation::NSRect = msg_send![close_button, frame];
-        let new_frame = cocoa::foundation::NSRect::new(
-            NSPoint::new(new_x, new_y),
-            frame.size,
-        );
+        let new_frame = cocoa::foundation::NSRect::new(NSPoint::new(new_x, new_y), frame.size);
         let _: () = msg_send![close_button, setFrame: new_frame];
     }
-    
+
     if !miniaturize_button.is_null() {
         let frame: cocoa::foundation::NSRect = msg_send![miniaturize_button, frame];
-        let new_frame = cocoa::foundation::NSRect::new(
-            NSPoint::new(new_x + 20.0, new_y),
-            frame.size,
-        );
+        let new_frame =
+            cocoa::foundation::NSRect::new(NSPoint::new(new_x + 20.0, new_y), frame.size);
         let _: () = msg_send![miniaturize_button, setFrame: new_frame];
     }
-    
+
     if !zoom_button.is_null() {
         let frame: cocoa::foundation::NSRect = msg_send![zoom_button, frame];
-        let new_frame = cocoa::foundation::NSRect::new(
-            NSPoint::new(new_x + 40.0, new_y),
-            frame.size,
-        );
+        let new_frame =
+            cocoa::foundation::NSRect::new(NSPoint::new(new_x + 40.0, new_y), frame.size);
         let _: () = msg_send![zoom_button, setFrame: new_frame];
     }
 }

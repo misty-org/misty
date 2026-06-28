@@ -1,4 +1,10 @@
-const authTokenStorageKey = "misty:hub-auth-token";
+import {
+  clearAccountAuthToken,
+  readAccountAuthToken,
+  saveAccountAuthToken,
+} from "../../account/shared/authTokenStore";
+
+const legacyHubAuthTokenStorageKey = "misty:hub-auth-token";
 
 export function hubApiBase(): string {
   const base = normalizeBaseUrl(import.meta.env.VITE_API_BASE)
@@ -7,38 +13,32 @@ export function hubApiBase(): string {
   return /\/api$/i.test(base) ? base : `${base}/api`;
 }
 
-export function readHubAuthToken(): string | null {
-  try {
-    return localStorage.getItem(authTokenStorageKey);
-  } catch {
-    return null;
-  }
-}
-
-export function saveHubAuthToken(token: string | null | undefined): void {
+export async function saveHubAuthToken(token: string | null | undefined): Promise<void> {
+  clearLegacyHubAuthToken();
   if (!token) return;
-  try {
-    localStorage.setItem(authTokenStorageKey, token);
-  } catch {
-    // Auth still works for cookie-based servers when localStorage is unavailable.
-  }
+  await saveAccountAuthToken(token);
 }
 
-export function clearHubAuthToken(): void {
-  try {
-    localStorage.removeItem(authTokenStorageKey);
-  } catch {
-    // Nothing to clear when localStorage is unavailable.
-  }
+export async function clearHubAuthToken(): Promise<void> {
+  clearLegacyHubAuthToken();
+  await clearAccountAuthToken();
 }
 
-export function hubApiHeaders(initHeaders?: HeadersInit, authenticated = true): Headers {
+export async function hubApiHeaders(initHeaders?: HeadersInit, authenticated = true): Promise<Headers> {
   const headers = new Headers(initHeaders);
-  const token = authenticated ? readHubAuthToken() : null;
+  const token = authenticated ? await readAccountAuthToken() : null;
   if (token && !headers.has("Authorization")) {
     headers.set("Authorization", `Bearer ${token}`);
   }
   return headers;
+}
+
+function clearLegacyHubAuthToken(): void {
+  try {
+    localStorage.removeItem(legacyHubAuthTokenStorageKey);
+  } catch {
+    // Browser cookie auth and keychain auth do not require localStorage cleanup.
+  }
 }
 
 function normalizeBaseUrl(value: unknown): string {

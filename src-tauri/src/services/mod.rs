@@ -1,5 +1,5 @@
-pub mod autostart;
 pub mod ai;
+pub mod autostart;
 pub mod claude;
 pub mod commands;
 pub mod devices;
@@ -9,6 +9,7 @@ pub mod explorer;
 pub mod explorer_library;
 pub mod file_sync;
 pub mod hub;
+pub mod keychain;
 pub mod native_clipboard;
 pub mod operation_queue;
 pub mod paths;
