@@ -93,7 +93,7 @@ func Login(database *db.Database) http.HandlerFunc {
 			Path:     "/",
 			HttpOnly: true,
 			Secure:   secure,
-			SameSite: http.SameSiteLaxMode,
+			SameSite: sessionCookieSameSite(r, secure),
 			MaxAge:   int(db.SessionTTL.Seconds()),
 		})
 
@@ -101,15 +101,15 @@ func Login(database *db.Database) http.HandlerFunc {
 			"user_id": user.ID,
 			"name":    user.Name,
 			"email":   user.Email,
+			"token":   token,
 		})
 	}
 }
 
 func Logout(database *db.Database) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		cookie, err := r.Cookie(sessionCookieName)
-		if err == nil {
-			tokenHash := security.HashToken(cookie.Value)
+		if token, ok := sessionTokenFromRequest(r); ok {
+			tokenHash := security.HashToken(token)
 			_ = database.DeleteSession(tokenHash)
 		}
 
@@ -120,10 +120,17 @@ func Logout(database *db.Database) http.HandlerFunc {
 			Path:     "/",
 			HttpOnly: true,
 			Secure:   secure,
-			SameSite: http.SameSiteLaxMode,
+			SameSite: sessionCookieSameSite(r, secure),
 			MaxAge:   -1,
 		})
 
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	}
+}
+
+func sessionCookieSameSite(r *http.Request, secure bool) http.SameSite {
+	if secure && r.Header.Get("Origin") != "" {
+		return http.SameSiteNoneMode
+	}
+	return http.SameSiteLaxMode
 }

@@ -31,13 +31,23 @@ func TestAuthLifecycle(t *testing.T) {
 	if !sessionCookie.HttpOnly {
 		t.Fatal("session cookie should be HttpOnly")
 	}
+	loginBody := decodeJSONResponse(t, loginRec)
+	sessionToken, ok := loginBody["token"].(string)
+	if !ok || sessionToken == "" {
+		t.Fatalf("login response missing token: %#v", loginBody)
+	}
 
 	meRec := performJSONRequest(t, api.GetMe(database), http.MethodGet, "/me", nil, sessionCookie)
 	if meRec.Code != http.StatusOK {
 		t.Fatalf("/me status = %d, want %d, body = %q", meRec.Code, http.StatusOK, meRec.Body.String())
 	}
 
-	logoutRec := performJSONRequest(t, api.Logout(database), http.MethodPost, "/logout", nil, sessionCookie)
+	bearerMeRec := performBearerJSONRequest(t, api.GetMe(database), http.MethodGet, "/me", nil, sessionToken)
+	if bearerMeRec.Code != http.StatusOK {
+		t.Fatalf("bearer /me status = %d, want %d, body = %q", bearerMeRec.Code, http.StatusOK, bearerMeRec.Body.String())
+	}
+
+	logoutRec := performBearerJSONRequest(t, api.Logout(database), http.MethodPost, "/logout", nil, sessionToken)
 	if logoutRec.Code != http.StatusOK {
 		t.Fatalf("logout status = %d, want %d", logoutRec.Code, http.StatusOK)
 	}

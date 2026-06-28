@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
+	serverai "github.com/kannachi323/misty/server/ai"
 	"github.com/kannachi323/misty/server/api"
 	"github.com/kannachi323/misty/server/db"
 	"github.com/kannachi323/misty/server/email"
@@ -17,6 +18,7 @@ type Server struct {
 	Router                    *chi.Mux
 	Database                  *db.Database
 	EmailSender               email.Sender
+	AIAgent                   *serverai.Service
 	PasswordResetStartURL     string
 	PasswordResetRedirectURL  string
 	WaitlistNotificationEmail string
@@ -35,6 +37,7 @@ func CreateServer() (*Server, error) {
 	s := &Server{
 		Router:                    chi.NewRouter(),
 		Database:                  &db.Database{},
+		AIAgent:                   serverai.NewService(nil, serverai.NewProviderFromEnv()),
 		PasswordResetStartURL:     passwordResetStartURL,
 		PasswordResetRedirectURL:  passwordResetRedirectURL,
 		WaitlistNotificationEmail: strings.TrimSpace(os.Getenv("WAITLIST_NOTIFY_EMAIL")),
@@ -51,7 +54,11 @@ func CreateServer() (*Server, error) {
 
 func (s *Server) MountHandlers() error {
 	s.Router.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"https://*", "http://*"},
+		AllowedOrigins: []string{
+			"https://*",
+			"http://*",
+			"tauri://localhost",
+		},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
 		AllowCredentials: true,
@@ -67,6 +74,7 @@ func (s *Server) MountHandlers() error {
 	if err != nil {
 		return err
 	}
+	aiService := api.NewAIService(s.Database, s.AIAgent)
 
 	registerHandler := api.Register(s.Database)
 	loginHandler := api.Login(s.Database)
@@ -95,6 +103,7 @@ func (s *Server) MountHandlers() error {
 	s.Router.Put("/me/settings", api.UpdateSettings(s.Database))
 	s.Router.Post("/billing/trial/start", api.StartPersonalTrial(s.Database))
 	s.Router.Post("/billing/checkout-session", api.CreateCheckoutSession(s.Database))
+	s.mountAIRoutes("/ai", aiService)
 
 	// Compatibility routes for clients configured with the /api prefix.
 	s.Router.Post("/api/register", registerHandler)
@@ -112,11 +121,21 @@ func (s *Server) MountHandlers() error {
 	s.Router.Put("/api/me/settings", api.UpdateSettings(s.Database))
 	s.Router.Post("/api/billing/trial/start", api.StartPersonalTrial(s.Database))
 	s.Router.Post("/api/billing/checkout-session", api.CreateCheckoutSession(s.Database))
+	s.mountAIRoutes("/api/ai", aiService)
 
 	// Stripe webhook — called by Stripe on payment events
 	s.Router.Post("/stripe/webhook", api.StripeWebhook(s.Database))
 
 	return nil
+}
+
+func (s *Server) mountAIRoutes(prefix string, aiService *api.AIService) {
+	s.Router.Get(prefix+"/status", aiService.Status())
+	s.Router.Post(prefix+"/sessions", aiService.CreateSession())
+	s.Router.Post(prefix+"/sessions/{sessionID}/messages", aiService.SendMessage())
+	s.Router.Get(prefix+"/sessions/{sessionID}/events", aiService.Events())
+	s.Router.Post(prefix+"/sessions/{sessionID}/tool-results", aiService.SubmitToolResults())
+	s.Router.Post(prefix+"/sessions/{sessionID}/cancel", aiService.Cancel())
 }
 
 func passwordResetRedirectURLFromEnv() (string, error) {
