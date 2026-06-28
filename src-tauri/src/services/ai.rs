@@ -146,10 +146,15 @@ impl AiService {
         let session_id = {
             let mut state = self.state.lock().expect("ai state poisoned");
             if state.running {
-                return Err(ApiError::Message("MistyAI is already running a request.".to_owned()));
+                return Err(ApiError::Message(
+                    "MistyAI is already running a request.".to_owned(),
+                ));
             }
             let session_id = if request.resume_session.unwrap_or(true) {
-                state.session_id.clone().unwrap_or_else(|| self.new_session_id())
+                state
+                    .session_id
+                    .clone()
+                    .unwrap_or_else(|| self.new_session_id())
             } else {
                 self.new_session_id()
             };
@@ -206,7 +211,9 @@ impl AiService {
         }
         let mut state = self.state.lock().expect("ai state poisoned");
         state.running = false;
-        state.events.push(AiStreamEvent::error("MistyAI request aborted."));
+        state
+            .events
+            .push(AiStreamEvent::error("MistyAI request aborted."));
         drop(state);
         Ok(self.status())
     }
@@ -314,11 +321,16 @@ async fn send_openai_request(
     let status = response.status();
     let value: Value = response.json().await?;
     if !status.is_success() {
-        return Err(ApiError::Message(openai_error_message(&value, status.as_u16())));
+        return Err(ApiError::Message(openai_error_message(
+            &value,
+            status.as_u16(),
+        )));
     }
     let text = openai_response_text(&value);
     if text.trim().is_empty() {
-        return Err(ApiError::Message("OpenAI returned an empty response.".to_owned()));
+        return Err(ApiError::Message(
+            "OpenAI returned an empty response.".to_owned(),
+        ));
     }
     Ok(text)
 }

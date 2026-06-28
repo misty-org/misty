@@ -10,6 +10,7 @@ import {
   Eye,
   Folder,
   FolderPlus,
+  Link,
   MessageSquare,
   PanelLeft,
   PanelRight,
@@ -49,6 +50,10 @@ import {
   pluginCommandRun,
   pluginCommandsSnapshot,
   pluginPanelRender,
+  providersCreatePublicLink,
+  providersJobStatus,
+  providersVerifyResult,
+  providersVerifyStart,
   shortcutsSnapshot,
   transfersSnapshot,
 } from "../../api/misty";
@@ -67,7 +72,7 @@ import {
   useExplorerStore,
 } from "./state/useExplorerStore";
 import type { ExplorerInlineEditState, ExplorerNotification, ExplorerSortColumn } from "./state/useExplorerStore";
-import { useAiSessionStore } from "./state/useClaudeSessionStore";
+import { useAiSessionStore, type AiPlanReview, type AiStatus, type AiToolApproval } from "./state/useClaudeSessionStore";
 import { useSearchStore } from "./state/useSearchStore";
 import { maxMultiPanelPanes, useMultiPanelStore } from "../../shared/multipanel/useMultiPanelStore";
 import { ProvidersWorkspacePanel } from "../providers/ProvidersWorkspace";
@@ -2395,6 +2400,62 @@ async function runPluginCommandById(
   }
 }
 
+async function createExplorerPublicLink(remote: string, remotePath: string): Promise<void> {
+  const explorer = useExplorerStore.getState();
+  try {
+    const result = await providersCreatePublicLink({ remote, path: remotePath });
+    if (!result.supported) {
+      explorer.pushNotification(result.message ?? "Shared links are not supported for this provider.", "info", 4500);
+      return;
+    }
+    const url = result.link?.url;
+    if (!url) {
+      explorer.pushNotification(result.message ?? "No link was returned.", "info", 4500);
+      return;
+    }
+    await writeText(url);
+    explorer.pushNotification("Public link copied.", "success", 3500);
+  } catch (error) {
+    explorer.pushNotification(`Share link failed: ${errorText(error)}`, "error", 4500);
+  }
+}
+
+async function verifyExplorerRemotePath(remote: string, remotePath: string): Promise<void> {
+  const explorer = useExplorerStore.getState();
+  const target = window.prompt("Compare against local path or remote path in this provider:", "");
+  if (!target) return;
+  try {
+    const local = target.startsWith("/");
+    const started = await providersVerifyStart({
+      source: { kind: "remote", remote, path: remotePath },
+      dest: { kind: local ? "local" : "remote", remote: local ? undefined : remote, path: target },
+      options: { profile: { transfers: 4, checkers: 8, retries: 3, lowLevelRetries: 10 } },
+    });
+    explorer.pushNotification("Verify started.", "info", 3000);
+    const result = await waitForVerifyResult(started.jobId);
+    const issueCount = result.missingOnSrc.length + result.missingOnDst.length + result.differ.length + result.error.length;
+    explorer.pushNotification(
+      result.success && issueCount === 0 ? "Verify complete. No differences found." : `Verify complete. ${issueCount} ${issueCount === 1 ? "issue" : "issues"} found.`,
+      result.success && issueCount === 0 ? "success" : "info",
+      5500,
+    );
+  } catch (error) {
+    explorer.pushNotification(`Verify failed: ${errorText(error)}`, "error", 5500);
+  }
+}
+
+async function waitForVerifyResult(jobId: string): Promise<Awaited<ReturnType<typeof providersVerifyResult>>> {
+  for (let attempt = 0; attempt < 240; attempt += 1) {
+    const status = await providersJobStatus(jobId);
+    if (status.resultReady) return providersVerifyResult(jobId);
+    if (status.state === "failed" || status.state === "cancelled") {
+      throw new Error(status.message ?? `Verify ${status.state}.`);
+    }
+    await new Promise((resolve) => window.setTimeout(resolve, 1000));
+  }
+  throw new Error("Verify did not finish before the local timeout.");
+}
+
 function focusExplorerSearch(paneId: string, mode: "search" | "command"): void {
   useExplorerStore.getState().setCommandQuery(paneId, mode === "command" ? ">" : "");
   window.dispatchEvent(new CustomEvent(explorerSearchFocusEvent, { detail: { paneId, mode } }));
@@ -2721,6 +2782,45 @@ const assistantPanelStyles = {
   userMessage: "border-[#444444] bg-[#212121]",
   toolMessage: "border-[#3f3f3f] bg-[#181818]",
   errorMessage: "border-[#3f3f3f] bg-[#181818]",
+  planDetails: "grid min-w-0 gap-2",
+  planActions: "flex flex-wrap items-center gap-2",
+  planTableWrap:
+    "min-h-0 overflow-auto rounded-lg border border-[#2f2f2f] bg-[#101010]",
+  planTable:
+    "w-full min-w-[760px] border-separate border-spacing-0 text-left text-xs",
+  planTableHead:
+    "sticky top-0 z-[1] bg-[#151515] text-[11px] font-bold uppercase text-[#9f9f9f]",
+  planTableHeaderCell:
+    "border-b border-[#2f2f2f] px-3 py-2",
+  planTableRow:
+    "align-top text-[#d4d4d4] hover:bg-[#171717]",
+  planTableCell:
+    "border-b border-[#242424] px-3 py-2.5 last:border-b-[#242424]",
+  planTableOperation: "font-bold uppercase text-[#f0f0f0]",
+  planTablePath: "min-w-0 break-words leading-normal text-[#d2d2d2]",
+  planTableReason: "min-w-0 break-words leading-normal text-[#9f9f9f]",
+  planWarningText: "m-0 text-xs leading-normal text-[#f0b3b3]",
+  reviewLayer:
+    "fixed inset-0 z-[2147482600] grid place-items-center bg-[rgba(0,0,0,0.66)] p-8 text-[#e2e2e2] backdrop-blur-[10px]",
+  reviewPanel:
+    "grid h-[min(720px,calc(100vh-64px))] w-[min(900px,calc(100vw-64px))] min-w-0 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-2xl border border-[#242529] bg-[#07090b] shadow-[0_28px_90px_rgba(0,0,0,0.62)]",
+  reviewHeader:
+    "grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4 border-b border-[#242529] px-5 py-4",
+  reviewTitle: "m-0 text-[18px] font-semibold leading-tight text-[#f4f4f4]",
+  reviewSubtitle: "m-0 mt-1 min-w-0 break-words text-sm leading-normal text-[#9f9f9f]",
+  reviewBody: "grid min-h-0 grid-rows-[auto_auto_minmax(0,1fr)] gap-3 overflow-hidden p-5",
+  reviewSummaryGrid: "grid gap-3",
+  reviewSummaryBlock:
+    "grid gap-1 rounded-lg border border-[#242529] bg-[#0d0f12] px-3.5 py-3",
+  reviewSummaryLabel:
+    "text-[11px] font-bold uppercase text-[#8f8f8f]",
+  reviewSummaryText:
+    "m-0 min-w-0 break-words text-sm leading-normal text-[#d7d7d7]",
+  reviewFooter:
+    "flex flex-wrap items-center justify-between gap-3 border-t border-[#242529] px-5 py-4",
+  reviewFooterActions: "flex flex-wrap justify-end gap-2",
+  modeSelect:
+    "min-h-8 rounded-lg border border-[#3f3f3f] bg-[#171717] px-2 text-[#f7f7f7] outline-none",
   messageTitle: "text-xs text-[#f7f7f7]",
   messageText:
     "m-0 whitespace-pre-wrap break-words font-[inherit] leading-normal text-[#d4d4d4]",
@@ -2737,6 +2837,16 @@ const assistantPanelStyles = {
   claudeComposerButton: "px-3.5",
   secondaryButton: "bg-transparent text-[#b3b3b3]",
 } as const;
+
+function assistantStatusText(status: AiStatus | null): string {
+  if (!status) return "Checking MistyAI...";
+  if (status.configured) return `Ready (${status.provider}/${status.model})`;
+  return "Configure the MistyAI backend to enable assistant actions";
+}
+
+function assistantPlaceholder(configured: boolean, fallback: string): string {
+  return configured ? fallback : "Configure MistyAI backend to continue";
+}
 
 function assistantMessageClass(role: string, density: "chat" | "claude"): string {
   return cx(
@@ -2757,14 +2867,20 @@ const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
       selectedEntry: selectedEntryForPane(pane),
     };
   }));
-  const { status, messages, error, refreshStatus, sendPrompt, abortPrompt, clearConversation } = useAiSessionStore(useShallow((state) => ({
+  const { status, mode, messages, plans, toolApprovals, error, refreshStatus, setMode, sendPrompt, abortPrompt, clearConversation, approvePlan, approveToolRequest } = useAiSessionStore(useShallow((state) => ({
     status: state.status,
+    mode: state.mode,
     messages: state.messages,
+    plans: state.plans,
+    toolApprovals: state.toolApprovals,
     error: state.error,
     refreshStatus: state.refreshStatus,
+    setMode: state.setMode,
     sendPrompt: state.sendPrompt,
     abortPrompt: state.abortPrompt,
     clearConversation: state.clearConversation,
+    approvePlan: state.approvePlan,
+    approveToolRequest: state.approveToolRequest,
   })));
   const [prompt, setPrompt] = useState("");
   const logRef = useRef<HTMLDivElement | null>(null);
@@ -2788,6 +2904,7 @@ const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
       displayPrompt: trimmed,
       prompt: buildClaudePrompt(trimmed, workingDirectory, selectedEntry?.path ?? null),
       cwd: workingDirectory || null,
+      selectedPaths: selectedEntry ? [selectedEntry.name] : [],
     });
   }, [prompt, running, selectedEntry?.path, sendPrompt, workingDirectory]);
 
@@ -2820,7 +2937,7 @@ const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
         <div className={cx(assistantPanelStyles.status, assistantPanelStyles.chatStatus)}>
           <dl className={assistantPanelStyles.chatDetails}>
             <dt className={assistantPanelStyles.detailLabel}>Status</dt>
-            <dd className={assistantPanelStyles.chatDetailValue}>{status ? (configured ? `Ready (${status.provider}/${status.model})` : "Set OPENAI_API_KEY to enable MistyAI") : "Checking MistyAI..."}</dd>
+            <dd className={assistantPanelStyles.chatDetailValue}>{assistantStatusText(status)}</dd>
             <dt className={assistantPanelStyles.detailLabel}>Folder</dt>
             <dd className={assistantPanelStyles.chatDetailValue}>{workingDirectory || "No active folder"}</dd>
             <dt className={assistantPanelStyles.detailLabel}>Selection</dt>
@@ -2835,6 +2952,8 @@ const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
             <article key={message.id} className={assistantMessageClass(message.role, "chat")}>
               <strong className={assistantPanelStyles.messageTitle}>{message.role === "user" ? "You" : message.role === "tool" ? "Tool" : message.role === "error" ? "Error" : "MistyAI"}</strong>
               <pre className={assistantPanelStyles.messageText}>{message.text || (message.role === "assistant" && running ? "Thinking..." : "")}</pre>
+              {message.toolRequestId ? <AssistantToolActions requestId={message.toolRequestId} approvals={toolApprovals} onApprove={approveToolRequest} /> : null}
+              {message.planId ? <AssistantPlanActions planId={message.planId} plans={plans} onApply={approvePlan} /> : null}
             </article>
           ))}
         </div>
@@ -2849,7 +2968,7 @@ const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
             className={assistantPanelStyles.textarea}
             value={prompt}
             rows={3}
-            placeholder={configured ? "Ask Misty..." : "Set OPENAI_API_KEY to enable MistyAI"}
+            placeholder={assistantPlaceholder(configured, "Ask Misty...")}
             disabled={!configured || running}
             onChange={(event) => setPrompt(event.target.value)}
             onKeyDown={(event) => {
@@ -2860,6 +2979,11 @@ const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
             }}
           />
           <div className={assistantPanelStyles.composerActions}>
+            <select className={assistantPanelStyles.modeSelect} value={mode} aria-label="MistyAI mode" onChange={(event) => setMode(event.target.value as Parameters<typeof setMode>[0])}>
+              <option value="ask">Ask</option>
+              <option value="auto">Auto</option>
+              <option value="full">Full</option>
+            </select>
             <button type="button" className={cx(assistantPanelStyles.composerButton, assistantPanelStyles.secondaryButton)} onClick={openPanel}>Open Panel</button>
             {running ? (
               <button className={assistantPanelStyles.composerButton} type="button" onClick={abortPrompt}>Stop</button>
@@ -2882,13 +3006,19 @@ const ExplorerClaudePanel = memo(function ExplorerClaudePanel() {
       selectedEntry: selectedEntryForPane(pane),
     };
   }));
-  const { status, messages, error, refreshStatus, sendPrompt, abortPrompt } = useAiSessionStore(useShallow((state) => ({
+  const { status, mode, messages, plans, toolApprovals, error, refreshStatus, setMode, sendPrompt, abortPrompt, approvePlan, approveToolRequest } = useAiSessionStore(useShallow((state) => ({
     status: state.status,
+    mode: state.mode,
     messages: state.messages,
+    plans: state.plans,
+    toolApprovals: state.toolApprovals,
     error: state.error,
     refreshStatus: state.refreshStatus,
+    setMode: state.setMode,
     sendPrompt: state.sendPrompt,
     abortPrompt: state.abortPrompt,
+    approvePlan: state.approvePlan,
+    approveToolRequest: state.approveToolRequest,
   })));
   const [prompt, setPrompt] = useState("");
   const logRef = useRef<HTMLDivElement | null>(null);
@@ -2913,6 +3043,7 @@ const ExplorerClaudePanel = memo(function ExplorerClaudePanel() {
       displayPrompt: trimmed,
       prompt: requestPrompt,
       cwd: workingDirectory || null,
+      selectedPaths: selectedEntry ? [selectedEntry.name] : [],
     });
   }, [prompt, running, selectedEntry?.path, sendPrompt, workingDirectory]);
 
@@ -2932,7 +3063,7 @@ const ExplorerClaudePanel = memo(function ExplorerClaudePanel() {
         <div className={cx(assistantPanelStyles.status, assistantPanelStyles.claudeStatus)}>
           <dl className={assistantPanelStyles.claudeDetails}>
             <dt className={cx(assistantPanelStyles.detailLabel, assistantPanelStyles.claudeDetailLabel)}>Status</dt>
-            <dd className={assistantPanelStyles.claudeDetailValue}>{status ? (configured ? `Ready (${status.provider}/${status.model})` : "Set OPENAI_API_KEY to enable MistyAI") : "Checking MistyAI..."}</dd>
+            <dd className={assistantPanelStyles.claudeDetailValue}>{assistantStatusText(status)}</dd>
             <dt className={cx(assistantPanelStyles.detailLabel, assistantPanelStyles.claudeDetailLabel)}>Working directory</dt>
             <dd className={assistantPanelStyles.claudeDetailValue}>{workingDirectory || "No active folder"}</dd>
             <dt className={cx(assistantPanelStyles.detailLabel, assistantPanelStyles.claudeDetailLabel)}>Selection</dt>
@@ -2947,6 +3078,8 @@ const ExplorerClaudePanel = memo(function ExplorerClaudePanel() {
             <article key={message.id} className={assistantMessageClass(message.role, "claude")}>
               <strong className={assistantPanelStyles.messageTitle}>{message.role === "user" ? "You" : message.role === "tool" ? "Tool" : message.role === "error" ? "Error" : "MistyAI"}</strong>
               <pre className={assistantPanelStyles.messageText}>{message.text || (message.role === "assistant" && running ? "Thinking..." : "")}</pre>
+              {message.toolRequestId ? <AssistantToolActions requestId={message.toolRequestId} approvals={toolApprovals} onApprove={approveToolRequest} /> : null}
+              {message.planId ? <AssistantPlanActions planId={message.planId} plans={plans} onApply={approvePlan} /> : null}
             </article>
           ))}
         </div>
@@ -2961,7 +3094,7 @@ const ExplorerClaudePanel = memo(function ExplorerClaudePanel() {
             className={assistantPanelStyles.textarea}
             value={prompt}
             rows={3}
-            placeholder={configured ? "Ask about this folder..." : "Set OPENAI_API_KEY to enable MistyAI"}
+            placeholder={assistantPlaceholder(configured, "Ask about this folder...")}
             disabled={!configured || running}
             onChange={(event) => setPrompt(event.target.value)}
             onKeyDown={(event) => {
@@ -2972,6 +3105,11 @@ const ExplorerClaudePanel = memo(function ExplorerClaudePanel() {
             }}
           />
           <div className={cx(assistantPanelStyles.composerActions, assistantPanelStyles.claudeComposerActions)}>
+            <select className={assistantPanelStyles.modeSelect} value={mode} aria-label="MistyAI mode" onChange={(event) => setMode(event.target.value as Parameters<typeof setMode>[0])}>
+              <option value="ask">Ask</option>
+              <option value="auto">Auto</option>
+              <option value="full">Full</option>
+            </select>
             {running ? (
               <button className={cx(assistantPanelStyles.composerButton, assistantPanelStyles.claudeComposerButton)} type="button" onClick={abortPrompt}>Stop</button>
             ) : (
@@ -2983,6 +3121,187 @@ const ExplorerClaudePanel = memo(function ExplorerClaudePanel() {
     </aside>
   );
 });
+
+function AssistantPlanActions(props: {
+  planId: string;
+  plans: AiPlanReview[];
+  onApply: (planId: string) => Promise<void>;
+}) {
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const plan = props.plans.find((candidate) => candidate.id === props.planId);
+  if (!plan) return null;
+  const blocked = plan.blockedReasons.length > 0;
+  return (
+    <div className={assistantPanelStyles.planDetails}>
+      <div className={assistantPanelStyles.planActions}>
+        <span className={assistantPanelStyles.runningBadge}>
+          {plan.plan.operations.length} operations{blocked ? " blocked" : plan.applied ? " applied" : ""}
+        </span>
+        <button
+          className={cx(assistantPanelStyles.composerButton, assistantPanelStyles.secondaryButton)}
+          type="button"
+          aria-haspopup="dialog"
+          onClick={() => setReviewOpen(true)}
+        >
+          {plan.applied ? "View" : "Review & Apply"}
+        </button>
+      </div>
+      {reviewOpen ? (
+        <AssistantPlanReviewDialog
+          plan={plan}
+          onApply={props.onApply}
+          onClose={() => setReviewOpen(false)}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+type AssistantPlanOperation = AiPlanReview["plan"]["operations"][number];
+
+function planOperationDetail(operation: AssistantPlanOperation): string {
+  if (operation.type === "mkdir") return operation.path;
+  return `${operation.from} -> ${operation.to}`;
+}
+
+function planOperationSource(operation: AssistantPlanOperation): string {
+  if (operation.type === "mkdir") return "-";
+  return operation.from;
+}
+
+function planOperationDestination(operation: AssistantPlanOperation): string {
+  if (operation.type === "mkdir") return operation.path;
+  return operation.to;
+}
+
+function AssistantPlanReviewDialog(props: {
+  plan: AiPlanReview;
+  onApply: (planId: string) => Promise<void>;
+  onClose: () => void;
+}) {
+  const blocked = props.plan.blockedReasons.length > 0;
+  const warnings = [
+    ...props.plan.plan.warnings.map((warning) => `Warning: ${warning}`),
+    ...props.plan.blockedReasons.map((reason) => `Blocked: ${reason}`),
+  ];
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") props.onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [props.onClose]);
+
+  const applyPlan = async () => {
+    await props.onApply(props.plan.id);
+    props.onClose();
+  };
+
+  return createPortal(
+    <div
+      className={assistantPanelStyles.reviewLayer}
+      role="presentation"
+      onPointerDown={(event) => {
+        if (event.target === event.currentTarget) props.onClose();
+      }}
+    >
+      <section className={assistantPanelStyles.reviewPanel} role="dialog" aria-modal="true" aria-labelledby="misty-ai-plan-review-title">
+        <header className={assistantPanelStyles.reviewHeader}>
+          <div>
+            <h2 className={assistantPanelStyles.reviewTitle} id="misty-ai-plan-review-title">Review File Operations</h2>
+            <p className={assistantPanelStyles.reviewSubtitle}>{props.plan.plan.operations.length} proposed operations</p>
+          </div>
+          <button className={assistantPanelStyles.headerButton} type="button" aria-label="Close review" onClick={props.onClose}>
+            <X size={16} />
+          </button>
+        </header>
+        <div className={assistantPanelStyles.reviewBody}>
+          <div className={assistantPanelStyles.reviewSummaryGrid}>
+            <section className={assistantPanelStyles.reviewSummaryBlock} aria-label="Summary of what MistyAI will do">
+              <span className={assistantPanelStyles.reviewSummaryLabel}>What MistyAI Will Do</span>
+              <p className={assistantPanelStyles.reviewSummaryText}>{props.plan.plan.summary}</p>
+            </section>
+            {props.plan.appliedSummary ? (
+              <section className={assistantPanelStyles.reviewSummaryBlock} aria-label="Summary of what MistyAI did">
+                <span className={assistantPanelStyles.reviewSummaryLabel}>What Misty Did</span>
+                <p className={assistantPanelStyles.reviewSummaryText}>{props.plan.appliedSummary}</p>
+              </section>
+            ) : null}
+          </div>
+          {warnings.length > 0 ? (
+            <p className={assistantPanelStyles.planWarningText}>{warnings.join(" ")}</p>
+          ) : null}
+          <div className={assistantPanelStyles.planTableWrap}>
+            <table className={assistantPanelStyles.planTable}>
+              <thead className={assistantPanelStyles.planTableHead}>
+                <tr>
+                  <th className={assistantPanelStyles.planTableHeaderCell} scope="col">Operation</th>
+                  <th className={assistantPanelStyles.planTableHeaderCell} scope="col">Source</th>
+                  <th className={assistantPanelStyles.planTableHeaderCell} scope="col">Destination</th>
+                  <th className={assistantPanelStyles.planTableHeaderCell} scope="col">Reason</th>
+                </tr>
+              </thead>
+              <tbody>
+                {props.plan.plan.operations.map((operation, index) => (
+                  <tr key={`${operation.type}-${index}-${planOperationDetail(operation)}`} className={assistantPanelStyles.planTableRow}>
+                    <td className={cx(assistantPanelStyles.planTableCell, assistantPanelStyles.planTableOperation)}>{operation.type}</td>
+                    <td className={cx(assistantPanelStyles.planTableCell, assistantPanelStyles.planTablePath)}>{planOperationSource(operation)}</td>
+                    <td className={cx(assistantPanelStyles.planTableCell, assistantPanelStyles.planTablePath)}>{planOperationDestination(operation)}</td>
+                    <td className={cx(assistantPanelStyles.planTableCell, assistantPanelStyles.planTableReason)}>{operation.reason || "-"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <footer className={assistantPanelStyles.reviewFooter}>
+          <span className={assistantPanelStyles.runningBadge}>
+            {props.plan.plan.operations.length} operations{blocked ? " blocked" : props.plan.applied ? " applied" : ""}
+          </span>
+          <div className={assistantPanelStyles.reviewFooterActions}>
+            <button className={cx(assistantPanelStyles.composerButton, assistantPanelStyles.secondaryButton)} type="button" onClick={props.onClose}>
+              Cancel
+            </button>
+            <button
+              className={assistantPanelStyles.composerButton}
+              type="button"
+              disabled={blocked || props.plan.applied || props.plan.applying}
+              onClick={() => void applyPlan()}
+            >
+              {props.plan.applying ? "Applying..." : props.plan.applied ? "Applied" : "Apply"}
+            </button>
+          </div>
+        </footer>
+      </section>
+    </div>,
+    document.body,
+  );
+}
+
+function AssistantToolActions(props: {
+  requestId: string;
+  approvals: AiToolApproval[];
+  onApprove: (requestId: string) => Promise<void>;
+}) {
+  const approval = props.approvals.find((candidate) => candidate.id === props.requestId);
+  if (!approval) return null;
+  return (
+    <div className={assistantPanelStyles.planActions}>
+      <span className={assistantPanelStyles.runningBadge}>
+        {approval.completed ? "Completed" : approval.error ? "Blocked" : "Needs approval"}
+      </span>
+      <button
+        className={cx(assistantPanelStyles.composerButton, assistantPanelStyles.secondaryButton)}
+        type="button"
+        disabled={approval.running || approval.completed}
+        onClick={() => void props.onApprove(props.requestId)}
+      >
+        {approval.running ? "Running..." : approval.completed ? "Ran" : "Run"}
+      </button>
+    </div>
+  );
+}
 
 function buildClaudePrompt(userPrompt: string, workingDirectory: string, selectedPath: string | null): string {
   const context = [
@@ -3010,7 +3329,9 @@ const ExplorerContextMenu = memo(function ExplorerContextMenu() {
     hasRemoteSelection,
     canCalculateDirectorySizes,
     targetPinned,
-    targetCanOpenWith,
+  targetCanOpenWith,
+    targetRemoteName,
+    targetRemotePath,
     inTrash,
     canTrashSelection,
     hasPermanentDeleteSelection,
@@ -3042,6 +3363,8 @@ const ExplorerContextMenu = memo(function ExplorerContextMenu() {
       canCalculateDirectorySizes: selectedFolderCount > 0,
       targetPinned: Boolean(targetEntry && !targetEntry.isDeleted && pinnedPaths.some((path) => normalizedPath(path) === normalizedPath(targetEntry.path))),
       targetCanOpenWith: Boolean(targetEntry && !targetEntry.isDeleted && targetEntry.kind !== "folder" && targetEntry.kind !== "symlink"),
+      targetRemoteName: targetEntry?.location.kind === "remote" ? targetEntry.location.remoteName : null,
+      targetRemotePath: targetEntry?.location.kind === "remote" ? targetEntry.location.remotePath : null,
       inTrash: targetPane?.listing?.path === "misty://trash",
       canTrashSelection: trashableCount > 0 && trashableCount === selectedCount,
       hasPermanentDeleteSelection: permanentDeleteCount > 0,
@@ -3161,6 +3484,20 @@ const ExplorerContextMenu = memo(function ExplorerContextMenu() {
         disabled={!hasRemoteSelection}
         disabledReason="Download is available for remote files and folders."
         onRun={() => run(() => void useExplorerStore.getState().downloadSelected(paneId))}
+      />
+      <ContextMenuItem
+        icon={<Link size={17} />}
+        label="Share link..."
+        disabled={!targetRemoteName || !targetRemotePath}
+        disabledReason="Share links are available for provider files and folders."
+        onRun={() => run(() => targetRemoteName && targetRemotePath && void createExplorerPublicLink(targetRemoteName, targetRemotePath))}
+      />
+      <ContextMenuItem
+        icon={<ArrowRightLeft size={17} />}
+        label="Verify against..."
+        disabled={!targetRemoteName || !targetRemotePath}
+        disabledReason="Verify is available for provider files and folders."
+        onRun={() => run(() => targetRemoteName && targetRemotePath && void verifyExplorerRemotePath(targetRemoteName, targetRemotePath))}
       />
       {entryId ? (
         <>

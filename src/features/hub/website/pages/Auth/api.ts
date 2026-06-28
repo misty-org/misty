@@ -21,7 +21,7 @@ interface LoginResponse {
 async function request<T>(path: string, body: unknown): Promise<T> {
   const response = await fetch(`${hubApiBase()}${path}`, {
     method: "POST",
-    headers: hubApiHeaders({ "Content-Type": "application/json" }, path !== "/login" && path !== "/register"),
+    headers: await hubApiHeaders({ "Content-Type": "application/json" }, path !== "/login" && path !== "/register"),
     body: JSON.stringify(body),
     credentials: "include",
   });
@@ -46,7 +46,7 @@ async function request<T>(path: string, body: unknown): Promise<T> {
 async function getRequest<T>(path: string): Promise<T> {
   const response = await fetch(`${hubApiBase()}${path}`, {
     method: "GET",
-    headers: hubApiHeaders(),
+    headers: await hubApiHeaders(),
     credentials: "include",
   });
 
@@ -73,7 +73,7 @@ export async function signInRequest(email: string, password: string): Promise<Au
   if (!id) {
     throw new Error("Sign-in response did not include a user id.");
   }
-  saveHubAuthToken(data.token);
+  await saveHubAuthToken(data.token);
   return {
     id,
     name: data.name,
