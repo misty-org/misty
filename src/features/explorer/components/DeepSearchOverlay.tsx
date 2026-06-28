@@ -3,8 +3,8 @@ import { memo, useEffect, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
 import type { SearchQueryScope, SearchResult } from "../../../api/types";
 import { formatBytes, formatDate } from "../utils/fileFormat";
-import { useExplorerStore } from "../state/useExplorerStore";
 import { useSearchStore } from "../state/useSearchStore";
+import { revealSearchResultInPane, searchResultNavigationTarget } from "../utils/searchNavigation";
 
 const scopeOptions: Array<{ value: SearchQueryScope; label: string }> = [
   { value: "everything", label: "All" },
@@ -179,8 +179,7 @@ function SearchResultRow(props: { result: SearchResult; activePaneId: string }) 
       className={overlayStyles.result}
       type="button"
       onClick={() => {
-        const target = searchResultNavigationPath(result);
-        void useExplorerStore.getState().navigatePane(props.activePaneId, target);
+        void revealSearchResultInPane(props.activePaneId, searchResultNavigationTarget(result));
         useSearchStore.getState().closeSearch();
       }}
     >
@@ -192,29 +191,4 @@ function SearchResultRow(props: { result: SearchResult; activePaneId: string }) 
       <span className={overlayStyles.resultMeta}>{meta}</span>
     </button>
   );
-}
-
-function parentPath(path: string): string {
-  const normalized = path.replace(/\/+/g, "/");
-  const index = normalized.lastIndexOf("/");
-  if (index <= 0) return "/";
-  return normalized.slice(0, index);
-}
-
-function searchResultNavigationPath(result: SearchResult): string {
-  const entry = result.entry;
-  if (entry.kind === "folder") return entry.path;
-  const remotePath = entry.location.remotePath;
-  if (entry.location.kind !== "remote" || !remotePath) {
-    return parentPath(entry.path);
-  }
-  const remoteParent = parentPath(remotePath);
-  const suffix = remotePath === "/" ? "" : remotePath.replace(/^\/+/, "");
-  const normalizedPath = entry.path.replace(/\/+/g, "/");
-  if (!suffix || !normalizedPath.endsWith(`/${suffix}`)) {
-    return parentPath(entry.path);
-  }
-  const remoteRoot = normalizedPath.slice(0, -suffix.length).replace(/\/$/, "");
-  if (remoteParent === "/") return remoteRoot;
-  return `${remoteRoot}${remoteParent}`;
 }

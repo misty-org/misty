@@ -91,6 +91,61 @@ impl ClipboardCache {
         path
     }
 
+    pub fn import_remote_file_entries_from(&mut self, legacy_root: &Path) {
+        if legacy_root == self.root {
+            return;
+        }
+        let legacy_index = fs::read(legacy_root.join("index.json"))
+            .ok()
+            .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
+            .filter(Value::is_object)
+            .unwrap_or_else(|| json!({}));
+        let Some(legacy_entries) = legacy_index.get("entries").and_then(Value::as_object) else {
+            return;
+        };
+        let mut index = self.read_index();
+        index["version"] = json!(1);
+        if !index.get("entries").is_some_and(Value::is_object) {
+            index["entries"] = Value::Object(Map::new());
+        }
+        let Some(entries) = index.get_mut("entries").and_then(Value::as_object_mut) else {
+            return;
+        };
+        let now_ms = self.now_unix_ms();
+        let mut changed = false;
+        for (cache_key, legacy_entry) in legacy_entries {
+            if legacy_entry.get("type").and_then(Value::as_str) != Some("remote_file") {
+                continue;
+            }
+            let Some(path) = legacy_entry
+                .get("path")
+                .and_then(Value::as_str)
+                .map(PathBuf::from)
+            else {
+                continue;
+            };
+            if !path.exists() {
+                continue;
+            }
+            if entries
+                .get(cache_key)
+                .and_then(|entry| entry.get("path"))
+                .and_then(Value::as_str)
+                .map(PathBuf::from)
+                .is_some_and(|existing_path| existing_path.exists())
+            {
+                continue;
+            }
+            let mut migrated = legacy_entry.clone();
+            migrated["last_access_unix_ms"] = json!(now_ms);
+            entries.insert(cache_key.clone(), migrated);
+            changed = true;
+        }
+        if changed {
+            self.write_index(&index);
+        }
+    }
+
     pub fn lookup_image_blob(&mut self, key: &ClipboardImageBlobCacheKey) -> Option<Vec<u8>> {
         self.cleanup_expired();
         let cache_key = Self::image_blob_key(key);
@@ -143,7 +198,7 @@ impl ClipboardCache {
         }
         self.cleanup_expired();
         let cache_key = Self::remote_file_key(key);
-        let directory = self.root.join("remote-files").join(&cache_key);
+        let directory = self.root.join(&cache_key);
         let final_path = directory.join(sanitize_file_name(file_name));
         fs::create_dir_all(&directory)
             .map_err(|error| format!("create cache directory {}: {error}", directory.display()))?;
@@ -222,7 +277,7 @@ impl ClipboardCache {
         }
         self.cleanup_expired();
         let cache_key = Self::remote_file_key(key);
-        let directory = self.root.join("remote-files").join(&cache_key);
+        let directory = self.root.join(&cache_key);
         let final_path = directory.join(sanitize_file_name(file_name));
         fs::create_dir_all(&directory)
             .map_err(|error| format!("create cache directory {}: {error}", directory.display()))?;
@@ -788,6 +843,94 @@ mod tests {
             b"downloaded payload",
         );
         assert_eq!(cache.lookup_remote_file(&key), Some(stored));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn remote_file_cache_imports_legacy_remote_open_entries() {
+        let root = root("remote-import");
+        let legacy_root = root.join("remote-open").join("v1");
+        let current_root = root.join("remote-files").join("v1");
+        let key = remote_key("Projects/List.h");
+        let cache_key = ClipboardCache::remote_file_key(&key);
+        let legacy_file = legacy_root
+            .join("remote-files")
+            .join(&cache_key)
+            .join("List.h");
+        fs::create_dir_all(legacy_file.parent().unwrap()).expect("create legacy cache dir");
+        fs::write(&legacy_file, b"legacy payload").expect("write legacy file");
+        fs::create_dir_all(&legacy_root).expect("create legacy root");
+        fs::write(
+            legacy_root.join("index.json"),
+            serde_json::to_vec_pretty(&json!({
+                "version": 1,
+                "entries": {
+                    cache_key: {
+                        "type": "remote_file",
+                        "path": legacy_file.display().to_string(),
+                        "created_unix_ms": 1,
+                        "last_access_unix_ms": 1,
+                        "ttl_hours": ClipboardCache::DEFAULT_TTL_HOURS,
+                        "remote_name": key.remote_name,
+                        "remote_path": key.remote_path,
+                        "remote_size": key.size,
+                        "remote_last_modified": key.last_modified,
+                        "is_dir": key.is_dir,
+                    }
+                }
+            }))
+            .unwrap(),
+        )
+        .expect("write legacy index");
+
+        let mut cache = ClipboardCache::new(current_root.clone());
+        cache.import_remote_file_entries_from(&legacy_root);
+
+        assert_eq!(
+            cache.lookup_remote_file(&remote_key("Projects/List.h")),
+            Some(legacy_file)
+        );
+        assert!(current_root.join("index.json").exists());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn remote_file_cache_imports_metadata_light_legacy_entries() {
+        let root = root("remote-import-light");
+        let legacy_root = root.join("remote-open").join("v1");
+        let current_root = root.join("remote-files").join("v1");
+        let legacy_file = legacy_root
+            .join("remote-files")
+            .join("legacy-key")
+            .join("List.h");
+        fs::create_dir_all(legacy_file.parent().unwrap()).expect("create legacy cache dir");
+        fs::write(&legacy_file, vec![0; 42]).expect("write legacy file");
+        fs::create_dir_all(&legacy_root).expect("create legacy root");
+        fs::write(
+            legacy_root.join("index.json"),
+            serde_json::to_vec_pretty(&json!({
+                "version": 1,
+                "entries": {
+                    "legacy-key": {
+                        "type": "remote_file",
+                        "path": legacy_file.display().to_string(),
+                        "created_unix_ms": 1,
+                        "last_access_unix_ms": 1,
+                        "ttl_hours": ClipboardCache::DEFAULT_TTL_HOURS,
+                    }
+                }
+            }))
+            .unwrap(),
+        )
+        .expect("write legacy index");
+
+        let mut cache = ClipboardCache::new(current_root);
+        cache.import_remote_file_entries_from(&legacy_root);
+
+        assert_eq!(
+            cache.lookup_remote_file(&remote_key("Projects/List.h")),
+            Some(legacy_file)
+        );
         let _ = fs::remove_dir_all(root);
     }
 

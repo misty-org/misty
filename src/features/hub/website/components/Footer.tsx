@@ -2,6 +2,7 @@ import { NavLink } from "react-router-dom";
 import { FaDiscord, FaGithub } from "react-icons/fa";
 import { MdOutlineEmail } from "react-icons/md";
 import { handleExternalLinkClick } from "../../../../shared/openExternalLink";
+import mistyLogo from "../../../../assets/misty.png";
 
 const columns = [
   {
@@ -44,7 +45,7 @@ export default function Footer() {
         {/* Brand */}
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-1">
-            <img src="/misty_full.png" alt="Misty logo" className="w-12 h-12 opacity-60" />
+            <img src={mistyLogo} alt="Misty logo" className="w-12 h-12 opacity-60" />
             <span className="text-sm font-medium text-text-muted">Misty</span>
           </div>
           <p className="text-sm text-text-muted/60 max-w-xs">

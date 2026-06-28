@@ -1,11 +1,15 @@
 import {
+  AppWindow,
   ArrowUp,
+  Check,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   Clipboard,
   Copy,
   Command,
+  Download,
+  Eye,
   FilePlus,
   Folder,
   FolderPlus,
@@ -14,6 +18,7 @@ import {
   MoreHorizontal,
   Pencil,
   Plus,
+  RefreshCcw,
   Scissors,
   Search,
   Trash2,
@@ -22,11 +27,13 @@ import {
 } from "lucide-react";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { searchQuery } from "../../../api/misty";
 import type { PluginCommandEntry, SearchResult } from "../../../api/types";
-import type { ExplorerViewMode } from "../state/useExplorerStore";
+import type { ExplorerSortColumn, ExplorerSortState, ExplorerViewMode } from "../state/useExplorerStore";
 import { breadcrumbSegments } from "../utils/fileFormat";
+import { searchResultNavigationTarget } from "../utils/searchNavigation";
+import type { ExplorerSearchNavigationTarget } from "../utils/searchNavigation";
 
 export interface ExplorerLocationResult {
   id: string;
@@ -83,7 +90,7 @@ interface ExplorerCommandPaletteEntry {
 }
 
 const explorerCommands: ExplorerCommandPaletteEntry[] = [
-  { id: "app.toggle_transfers", label: "Open Transfers", hint: "Switch to transfer history and active work" },
+  { id: "app.toggle_transfers", label: "Open Transfers", hint: "Show transfer history and active work" },
   { id: "app.open_settings", label: "Open Settings", hint: "Switch to application settings" },
   { id: "app.toggle_plugin_launcher", label: "Open Hub", hint: "Open Misty Hub" },
   { id: "clipboard.publish_shared", label: "Publish Shared Clipboard", hint: "Send the current clipboard to shared devices" },
@@ -108,7 +115,7 @@ const explorerCommands: ExplorerCommandPaletteEntry[] = [
   { id: "explorer.preview.toggle", label: "Toggle Preview", hint: "Show or hide the preview/details panel" },
   { id: "explorer.sidebar.toggle", label: "Toggle Sidebar", hint: "Show or hide the navigation sidebar" },
   { id: "explorer.toggle_chat", label: "Toggle Chat", hint: "Open or close the explorer chat overlay" },
-  { id: "explorer.toggle_claude", label: "Toggle Claude", hint: "Open the Claude assistant panel when available" },
+  { id: "explorer.toggle_claude", label: "Toggle MistyAI", hint: "Open the MistyAI assistant panel when configured" },
   { id: "explorer.next_workspace", label: "Next Workspace", hint: "Cycle to the next explorer tab" },
   { id: "explorer.tab_1", label: "Select Tab 1", hint: "Switch to tab 1" },
   { id: "explorer.tab_2", label: "Select Tab 2", hint: "Switch to tab 2" },
@@ -128,7 +135,6 @@ const toolbarStyles = {
   actionRow: "grid min-h-12 min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center justify-between gap-3 overflow-hidden border-t border-[#262626] px-3 py-1.5",
   navButtons: "flex min-w-0 flex-none items-center gap-1",
   actionLeft: "flex min-w-0 items-center gap-1.5 overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-  actionRight: "flex min-w-0 flex-none items-center gap-2",
   toolbarButton:
     "inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-md border-0 bg-transparent px-2 py-1 leading-none text-[#adadad] hover:bg-[#212121] hover:text-[#eeeeee] disabled:cursor-default disabled:opacity-45 disabled:hover:bg-transparent disabled:hover:text-[#adadad]",
   pathBar:
@@ -155,23 +161,54 @@ const toolbarStyles = {
   newMenu: "grid w-52 gap-0.5 rounded-[13px] border border-[#323232] bg-[rgba(17, 17, 17, 0.96)] p-2 shadow-[0_18px_40px_rgba(0,0,0,0.45)] backdrop-blur-xl",
   newItem:
     "flex h-12 w-full items-center justify-start gap-3 rounded-[9px] border-0 bg-transparent px-3 py-0 text-left text-base text-[#dddddd] hover:bg-[#222222] hover:text-[#eeeeee] disabled:cursor-default disabled:opacity-45 disabled:hover:bg-transparent disabled:hover:text-[#dddddd]",
-  viewToggle: "flex overflow-hidden rounded-lg bg-[#1a1a1a]",
-  viewToggleSelected: "bg-[#333333]",
+  overflowMenu: "grid w-60 gap-0.5 rounded-[13px] border border-[#323232] bg-[rgba(17,17,17,0.98)] p-2 shadow-[0_18px_40px_rgba(0,0,0,0.45)] backdrop-blur-xl",
+  overflowSection: "px-2 pb-1 pt-1.5 text-[10px] font-bold uppercase tracking-normal text-[#777777]",
+  overflowItem:
+    "grid min-h-9 w-full grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-2 rounded-[8px] border-0 bg-transparent px-2 py-1.5 text-left text-sm text-[#dddddd] hover:bg-[#222222] hover:text-[#eeeeee] disabled:cursor-default disabled:opacity-45 disabled:hover:bg-transparent disabled:hover:text-[#dddddd]",
+  overflowItemText: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap",
+  overflowItemMeta: "flex-none text-xs text-[#8f8f8f]",
+  overflowItemIcon: "grid size-5 place-items-center text-[#a8a8a8]",
+  overflowItemTrailing: "flex min-w-4 flex-none items-center justify-end gap-1.5",
+  overflowItemCheck: "grid size-4 place-items-center text-[#d8d8d8]",
+  overflowSeparator: "mx-1 my-1 h-px bg-[#292929]",
+} as const;
+
+const paneToolbarActionStyles = {
+  section:
+    "flex h-7 flex-none items-center gap-px overflow-hidden rounded-lg border border-[#242424] bg-[#171717] p-0.5",
+  button:
+    "grid h-[22px] w-7 place-items-center rounded-md border-0 bg-transparent p-0 text-[#a7a7a7] hover:bg-[#252525] hover:text-[#eeeeee] disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-[#a7a7a7]",
+  buttonActive: "bg-[#242424] text-[#eeeeee]",
 } as const;
 
 function cx(...classes: Array<string | false | null | undefined>): string {
   return classes.filter(Boolean).join(" ");
 }
 
+const toolbarSortOptions: Array<{ column: ExplorerSortColumn; label: string }> = [
+  { column: "name", label: "Name" },
+  { column: "modified", label: "Modified" },
+  { column: "size", label: "Size" },
+  { column: "type", label: "Type" },
+];
+
 interface ExplorerToolbarProps {
   paneId: string;
   path: string;
   commandQuery: string;
   viewMode: ExplorerViewMode;
+  sort: ExplorerSortState;
+  showHidden: boolean;
+  selectedCount: number;
+  selectedEntryPath: string | null;
+  hasRemoteSelection: boolean;
+  canOpenWithSelected: boolean;
+  canCalculateDirectorySizes: boolean;
   locationResults: ExplorerLocationResult[];
   pluginCommands: PluginCommandEntry[];
   onNavigate: (path: string) => void;
   onNavigateLocation: (path: string) => void;
+  onNavigateSearchResult: (target: ExplorerSearchNavigationTarget) => void;
   canGoBack: boolean;
   canGoForward: boolean;
   canCreateFile: boolean;
@@ -194,7 +231,34 @@ interface ExplorerToolbarProps {
   onDelete: () => void;
   onUndo: () => void;
   onRedo: () => void;
+  onSort: (column: ExplorerSortColumn) => void;
+  onToggleHidden: () => void;
+  onRefresh: () => void;
+  onCalculateDirectorySizes: () => void;
+  onDownload: () => void;
+  onOpenWith: () => void;
+  onCopyPath: (path: string) => void;
   onRunCommand: (commandId: string) => void;
+}
+
+export interface ExplorerPaneToolbarActionsProps {
+  path: string;
+  viewMode: ExplorerViewMode;
+  sort: ExplorerSortState;
+  showHidden: boolean;
+  selectedCount: number;
+  selectedEntryPath: string | null;
+  hasRemoteSelection: boolean;
+  canOpenWithSelected: boolean;
+  canCalculateDirectorySizes: boolean;
+  onViewMode: (mode: ExplorerViewMode) => void;
+  onSort: (column: ExplorerSortColumn) => void;
+  onToggleHidden: () => void;
+  onRefresh: () => void;
+  onCalculateDirectorySizes: () => void;
+  onDownload: () => void;
+  onOpenWith: () => void;
+  onCopyPath: (path: string) => void;
 }
 
 export const ExplorerToolbar = memo(function ExplorerToolbar(props: ExplorerToolbarProps) {
@@ -426,8 +490,7 @@ export const ExplorerToolbar = memo(function ExplorerToolbar(props: ExplorerTool
   };
 
   const runIndexedResult = (result: SearchResult) => {
-    const target = searchResultNavigationPath(result);
-    props.onNavigateLocation(target);
+    props.onNavigateSearchResult(searchResultNavigationTarget(result));
     setSearchFocused(false);
     props.onCommandQuery("");
   };
@@ -695,21 +758,232 @@ export const ExplorerToolbar = memo(function ExplorerToolbar(props: ExplorerTool
           <button className={toolbarStyles.toolbarButton} type="button" title="Delete" onClick={props.onDelete}><Trash2 size={18} /></button>
         </div>
 
-        <div className={toolbarStyles.actionRight}>
-          <div className={toolbarStyles.viewToggle}>
-            <button className={cx(toolbarStyles.toolbarButton, props.viewMode === "grid" && toolbarStyles.viewToggleSelected)} onClick={() => props.onViewMode("grid")}>
-              <Grid2X2 size={18} />
-            </button>
-            <button className={cx(toolbarStyles.toolbarButton, props.viewMode === "list" && toolbarStyles.viewToggleSelected)} onClick={() => props.onViewMode("list")}>
-              <List size={18} />
-            </button>
-          </div>
-          <button className={toolbarStyles.toolbarButton}><MoreHorizontal size={20} /></button>
-        </div>
       </div>
     </header>
   );
 });
+
+export const ExplorerPaneToolbarActions = memo(function ExplorerPaneToolbarActions(props: ExplorerPaneToolbarActionsProps) {
+  const [overflowMenuOpen, setOverflowMenuOpen] = useState(false);
+  const [overflowMenuPosition, setOverflowMenuPosition] = useState<CSSProperties>({
+    left: 0,
+    top: 0,
+  });
+  const overflowMenuRef = useRef<HTMLDivElement | null>(null);
+  const overflowButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  const positionOverflowMenu = useCallback(() => {
+    const rect = overflowButtonRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    const menuWidth = 240;
+    const viewportPadding = 8;
+    const nextPosition = {
+      left: Math.max(viewportPadding, Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - viewportPadding)),
+      top: rect.bottom + 6,
+    };
+    setOverflowMenuPosition((current) => {
+      if (current.left === nextPosition.left && current.top === nextPosition.top) return current;
+      return nextPosition;
+    });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (overflowMenuOpen) positionOverflowMenu();
+  }, [overflowMenuOpen, positionOverflowMenu]);
+
+  useEffect(() => {
+    if (!overflowMenuOpen) return;
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (!overflowButtonRef.current?.contains(target) && !overflowMenuRef.current?.contains(target)) {
+        setOverflowMenuOpen(false);
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOverflowMenuOpen(false);
+        overflowButtonRef.current?.focus();
+      }
+    };
+    window.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("resize", positionOverflowMenu);
+    return () => {
+      window.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("resize", positionOverflowMenu);
+    };
+  }, [overflowMenuOpen, positionOverflowMenu]);
+
+  const toggleOverflowMenu = () => {
+    setOverflowMenuOpen((open) => !open);
+  };
+
+  const runOverflowAction = (action: () => void) => {
+    setOverflowMenuOpen(false);
+    action();
+  };
+
+  return (
+    <>
+      <div className={paneToolbarActionStyles.section}>
+        <button
+          className={cx(paneToolbarActionStyles.button, props.viewMode === "grid" && paneToolbarActionStyles.buttonActive)}
+          type="button"
+          title="View as grid"
+          aria-label="View as grid"
+          onClick={() => props.onViewMode("grid")}
+        >
+          <Grid2X2 size={15} />
+        </button>
+        <button
+          className={cx(paneToolbarActionStyles.button, props.viewMode === "list" && paneToolbarActionStyles.buttonActive)}
+          type="button"
+          title="View as list"
+          aria-label="View as list"
+          onClick={() => props.onViewMode("list")}
+        >
+          <List size={15} />
+        </button>
+        <button
+          ref={overflowButtonRef}
+          className={cx(paneToolbarActionStyles.button, overflowMenuOpen && paneToolbarActionStyles.buttonActive)}
+          type="button"
+          title="More file actions"
+          aria-label="More file actions"
+          aria-haspopup="menu"
+          aria-expanded={overflowMenuOpen}
+          onClick={toggleOverflowMenu}
+        >
+          <MoreHorizontal size={16} />
+        </button>
+      </div>
+      {overflowMenuOpen
+        ? createPortal(
+            <div
+              ref={overflowMenuRef}
+              role="menu"
+              aria-label="More file actions"
+              style={{
+                ...overflowMenuPosition,
+                position: "fixed",
+                zIndex: 2147483000,
+              }}
+              className={toolbarStyles.overflowMenu}
+            >
+              <span className={toolbarStyles.overflowSection}>View</span>
+              <OverflowMenuItem
+                icon={<Grid2X2 size={16} />}
+                label="View as Grid"
+                active={props.viewMode === "grid"}
+                onRun={() => runOverflowAction(() => props.onViewMode("grid"))}
+              />
+              <OverflowMenuItem
+                icon={<List size={16} />}
+                label="View as List"
+                active={props.viewMode === "list"}
+                onRun={() => runOverflowAction(() => props.onViewMode("list"))}
+              />
+              <div className={toolbarStyles.overflowSeparator} />
+              {toolbarSortOptions.map((option) => {
+                const active = props.sort.column === option.column;
+                return (
+                  <OverflowMenuItem
+                    key={option.column}
+                    label={`Sort by ${option.label}`}
+                    active={active}
+                    meta={active ? (props.sort.direction === "asc" ? "Asc" : "Desc") : undefined}
+                    onRun={() => runOverflowAction(() => props.onSort(option.column))}
+                  />
+                );
+              })}
+              <OverflowMenuItem
+                icon={<Eye size={16} />}
+                label={props.showHidden ? "Hide Hidden Files" : "Show Hidden Files"}
+                active={props.showHidden}
+                onRun={() => runOverflowAction(props.onToggleHidden)}
+              />
+              <div className={toolbarStyles.overflowSeparator} />
+              <span className={toolbarStyles.overflowSection}>Location</span>
+              <OverflowMenuItem
+                icon={<RefreshCcw size={16} />}
+                label="Refresh"
+                onRun={() => runOverflowAction(props.onRefresh)}
+              />
+              <OverflowMenuItem
+                icon={<Copy size={16} />}
+                label="Copy Current Path"
+                onRun={() => runOverflowAction(() => props.onCopyPath(props.path))}
+              />
+              <OverflowMenuItem
+                icon={<Folder size={16} />}
+                label="Calculate Folder Sizes"
+                disabled={!props.canCalculateDirectorySizes}
+                onRun={() => runOverflowAction(props.onCalculateDirectorySizes)}
+              />
+              {props.selectedCount > 0 ? (
+                <>
+                  <div className={toolbarStyles.overflowSeparator} />
+                  <span className={toolbarStyles.overflowSection}>
+                    {props.selectedCount === 1 ? "Selection" : `${props.selectedCount} Selected`}
+                  </span>
+                  <OverflowMenuItem
+                    icon={<AppWindow size={16} />}
+                    label="Open With..."
+                    disabled={!props.canOpenWithSelected}
+                    onRun={() => runOverflowAction(props.onOpenWith)}
+                  />
+                  <OverflowMenuItem
+                    icon={<Download size={16} />}
+                    label="Download"
+                    disabled={!props.hasRemoteSelection}
+                    onRun={() => runOverflowAction(props.onDownload)}
+                  />
+                  <OverflowMenuItem
+                    icon={<Copy size={16} />}
+                    label="Copy Selected Path"
+                    disabled={props.selectedCount !== 1 || !props.selectedEntryPath}
+                    onRun={() => {
+                      if (!props.selectedEntryPath) return;
+                      runOverflowAction(() => props.onCopyPath(props.selectedEntryPath!));
+                    }}
+                  />
+                </>
+              ) : null}
+            </div>,
+            document.body,
+          )
+        : null}
+    </>
+  );
+});
+
+function OverflowMenuItem(props: {
+  icon?: ReactNode;
+  label: string;
+  meta?: string;
+  active?: boolean;
+  disabled?: boolean;
+  onRun: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      className={toolbarStyles.overflowItem}
+      disabled={props.disabled}
+      onClick={props.onRun}
+    >
+      <span className={toolbarStyles.overflowItemIcon}>{props.icon}</span>
+      <span className={toolbarStyles.overflowItemText}>{props.label}</span>
+      <span className={toolbarStyles.overflowItemTrailing}>
+        {props.meta ? <span className={toolbarStyles.overflowItemMeta}>{props.meta}</span> : null}
+        {props.active ? <span className={toolbarStyles.overflowItemCheck}><Check size={14} /></span> : null}
+      </span>
+    </button>
+  );
+}
 
 function fuzzyIncludes(haystack: string, needle: string): boolean {
   if (haystack.includes(needle)) return true;
@@ -722,35 +996,10 @@ function fuzzyIncludes(haystack: string, needle: string): boolean {
   return true;
 }
 
-function parentPath(path: string): string {
-  const normalized = path.replace(/\/+/g, "/");
-  const index = normalized.lastIndexOf("/");
-  if (index <= 0) return "/";
-  return normalized.slice(0, index);
-}
-
 function searchResultSubtitle(result: SearchResult): string {
   const entry = result.entry;
   const source = entry.location.kind === "remote"
     ? entry.location.remoteName ?? "Remote"
     : "Local";
   return `${source} · ${entry.kind} · ${entry.path}`;
-}
-
-function searchResultNavigationPath(result: SearchResult): string {
-  const entry = result.entry;
-  if (entry.kind === "folder") return entry.path;
-  const remotePath = entry.location.remotePath;
-  if (entry.location.kind !== "remote" || !remotePath) {
-    return parentPath(entry.path);
-  }
-  const remoteParent = parentPath(remotePath);
-  const suffix = remotePath === "/" ? "" : remotePath.replace(/^\/+/, "");
-  const normalizedPath = entry.path.replace(/\/+/g, "/");
-  if (!suffix || !normalizedPath.endsWith(`/${suffix}`)) {
-    return parentPath(entry.path);
-  }
-  const remoteRoot = normalizedPath.slice(0, -suffix.length).replace(/\/$/, "");
-  if (remoteParent === "/") return remoteRoot;
-  return `${remoteRoot}${remoteParent}`;
 }

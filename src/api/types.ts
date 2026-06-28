@@ -46,6 +46,34 @@ export interface ProxyRuntimeSnapshot {
   error: string | null;
 }
 
+export interface AiStatus {
+  configured: boolean;
+  provider: string;
+  model: string;
+  running: boolean;
+  sessionId: string | null;
+  error: string | null;
+}
+
+export interface AiSendRequest {
+  prompt: string;
+  cwd?: string | null;
+  resumeSession?: boolean;
+}
+
+export type AiEventKind = "system" | "text" | "tool_use" | "tool_result" | "result" | "error";
+
+export interface AiStreamEvent {
+  kind: AiEventKind;
+  sessionId: string | null;
+  text: string;
+  toolName: string;
+  toolInput: string;
+  toolUseId: string;
+  toolResult: string;
+  costUsd: number;
+}
+
 export interface ClaudeStatus {
   installed: boolean;
   running: boolean;
@@ -151,6 +179,21 @@ export interface FileEntry {
   hidden: boolean;
   isDeleted?: boolean;
   location: ExplorerLocation;
+}
+
+export type DirectorySizeStatus = "unknown" | "calculating" | "ready" | "failed";
+
+export interface DirectorySizeRecord {
+  path: string;
+  sizeBytes: number | null;
+  status: DirectorySizeStatus;
+  calculatedAtMs: number | null;
+  error?: string | null;
+}
+
+export interface DirectorySizeRequest {
+  paths: string[];
+  force?: boolean;
 }
 
 export type SearchSourceKind = "local" | "remote";
@@ -299,6 +342,9 @@ export interface PrepareDragItemRequest {
 export interface PreparedOpenItem {
   localPath: string;
   cached: boolean;
+  sourcePath?: string | null;
+  cachePath?: string | null;
+  cacheHit?: boolean;
 }
 
 export interface PreparedDragItemsResult {
@@ -385,6 +431,8 @@ export interface NativeWorkspaceExplorerSnapshot {
 export interface NativeWorkspaceFileTabSnapshot {
   idx: number;
   title: string;
+  sidebar_visible: boolean;
+  inspector_visible: boolean;
   explorer: NativeWorkspaceExplorerSnapshot;
 }
 

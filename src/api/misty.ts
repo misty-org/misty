@@ -1,5 +1,8 @@
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 import type {
+  AiSendRequest,
+  AiStatus,
+  AiStreamEvent,
   AppSnapshot,
   AppEnvironmentSnapshot,
   ClaudeSendRequest,
@@ -10,6 +13,8 @@ import type {
   CreateItemRequest,
   DeleteItemsRequest,
   DeviceSnapshot,
+  DirectorySizeRecord,
+  DirectorySizeRequest,
   DirectoryListing,
   ExplorerOperationResult,
   ExplorerPreviewPayload,
@@ -63,17 +68,38 @@ import type {
   TransferFilter,
   TransferPage,
 } from "./types";
+import { hasTauriInternals } from "../shared/tauri";
 
 function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
-  const internals = (window as typeof window & {
-    __TAURI_INTERNALS__?: { invoke?: unknown };
-  }).__TAURI_INTERNALS__;
-  if (typeof internals?.invoke !== "function") {
+  if (!hasTauriInternals()) {
+    const bridge = browserNativeBridgeInvoke<T>(command, args);
+    if (bridge) return bridge;
     const fallback = browserSmokeFallback<T>(command, args);
     if (fallback) return fallback;
     return Promise.reject(new Error(`Native command "${command}" is only available in the Tauri app.`));
   }
   return tauriInvoke<T>(command, args);
+}
+
+function browserNativeBridgeInvoke<T>(command: string, args?: Record<string, unknown>): Promise<T> | null {
+  const baseUrl = import.meta.env.VITE_MISTY_NATIVE_BRIDGE_URL?.trim();
+  if (!baseUrl) return null;
+
+  return fetch(`${baseUrl.replace(/\/+$/, "")}/invoke/${encodeURIComponent(command)}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(args ?? {}),
+  }).then(async (response) => {
+    const text = await response.text();
+    const payload = text ? JSON.parse(text) as unknown : null;
+    if (!response.ok) {
+      const message = payload && typeof payload === "object" && "error" in payload
+        ? String((payload as { error: unknown }).error)
+        : `Native bridge command "${command}" failed with ${response.status}.`;
+      throw new Error(message);
+    }
+    return payload as T;
+  });
 }
 
 function browserSmokeFallback<T>(command: string, args?: Record<string, unknown>): Promise<T> | null {
@@ -82,6 +108,17 @@ function browserSmokeFallback<T>(command: string, args?: Record<string, unknown>
       return Promise.resolve(browserAppSnapshot() as T);
     case "app_environment_snapshot":
       return Promise.resolve(browserAppSnapshot().environment as T);
+    case "ai_status":
+      return Promise.resolve({
+        configured: false,
+        provider: "openai",
+        model: "gpt-5.5",
+        running: false,
+        sessionId: null,
+        error: "Browser smoke mode",
+      } as T);
+    case "ai_drain_events":
+      return Promise.resolve([] as T);
     case "proxy_snapshot":
       return Promise.resolve({ proxyUrl: null, ready: false, statusCode: null, error: "Browser smoke mode" } as T);
     case "clipboard_snapshot":
@@ -96,6 +133,27 @@ function browserSmokeFallback<T>(command: string, args?: Record<string, unknown>
       return Promise.resolve((args?.document ?? browserWorkspaceDocument()) as T);
     case "explorer_list_directory":
       return Promise.resolve(browserDirectoryListing((args?.request as ListDirectoryRequest | undefined) ?? {}) as T);
+    case "explorer_directory_size_snapshot": {
+      const paths = Array.isArray(args?.paths) ? args.paths as string[] : [];
+      return Promise.resolve(paths.map((path) => ({
+        path,
+        sizeBytes: null,
+        status: "unknown",
+        calculatedAtMs: null,
+        error: null,
+      })) as T);
+    }
+    case "explorer_calculate_directory_sizes": {
+      const request = args?.request as DirectorySizeRequest | undefined;
+      const paths = Array.isArray(request?.paths) ? request.paths : [];
+      return Promise.resolve(paths.map((path) => ({
+        path,
+        sizeBytes: null,
+        status: "unknown",
+        calculatedAtMs: null,
+        error: "Native directory size calculation is unavailable in browser smoke mode.",
+      })) as T);
+    }
     case "explorer_prepare_drag_items":
       return Promise.resolve({ items: [], skipped: [] } as T);
     case "devices_snapshot":
@@ -413,6 +471,22 @@ export function proxySnapshot(): Promise<ProxySnapshot> {
   return invoke("proxy_snapshot");
 }
 
+export function aiStatus(): Promise<AiStatus> {
+  return invoke("ai_status");
+}
+
+export function aiSendMessage(request: AiSendRequest): Promise<AiStatus> {
+  return invoke("ai_send_message", { request });
+}
+
+export function aiDrainEvents(): Promise<AiStreamEvent[]> {
+  return invoke("ai_drain_events");
+}
+
+export function aiAbort(): Promise<AiStatus> {
+  return invoke("ai_abort");
+}
+
 export function claudeStatus(): Promise<ClaudeStatus> {
   return invoke("claude_status");
 }
@@ -472,6 +546,14 @@ export function devicesSnapshot(): Promise<DeviceSnapshot> {
 
 export function explorerListDirectory(request: ListDirectoryRequest): Promise<DirectoryListing> {
   return invoke("explorer_list_directory", { request });
+}
+
+export function explorerDirectorySizeSnapshot(paths: string[]): Promise<DirectorySizeRecord[]> {
+  return invoke("explorer_directory_size_snapshot", { paths });
+}
+
+export function explorerCalculateDirectorySizes(request: DirectorySizeRequest): Promise<DirectorySizeRecord[]> {
+  return invoke("explorer_calculate_directory_sizes", { request });
 }
 
 export function searchInit(): Promise<SearchStatus> {
@@ -552,6 +634,10 @@ export function explorerOpenWith(applicationPath: string, filePath: string): Pro
 
 export function explorerOpenPath(filePath: string): Promise<void> {
   return invoke("explorer_open_path", { filePath });
+}
+
+export function openTerminalAtPath(path: string): Promise<void> {
+  return invoke("open_terminal_at_path", { path });
 }
 
 export function explorerOpenAssociation(filePath: string): Promise<string | null> {

@@ -24,6 +24,8 @@ export interface MultiPanelTab {
   activePaneId: string;
   layout: MultiPanelLayout;
   mode?: "browse";
+  sidebarVisible?: boolean;
+  previewVisible?: boolean;
 }
 
 export interface MultiPanelLayout {

@@ -122,6 +122,9 @@ pub struct PrepareDragItemRequest {
 pub struct PreparedOpenItem {
     pub local_path: String,
     pub cached: bool,
+    pub source_path: Option<String>,
+    pub cache_path: Option<String>,
+    pub cache_hit: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]

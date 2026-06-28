@@ -3,7 +3,6 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { useShallow } from "zustand/react/shallow";
 import {
   Bell,
-  Check,
   ChevronDown,
   Eye,
   Keyboard,
@@ -13,6 +12,7 @@ import {
   Search,
   Settings2,
   Trash2,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import { useAppStore } from "../../app/useAppStore";
@@ -30,6 +30,7 @@ import {
 } from "./useSettingsStore";
 import { useSearchStore } from "../explorer/state/useSearchStore";
 import { formatBytes, formatDate } from "../explorer/utils/fileFormat";
+import { hasTauriInternals } from "../../shared/tauri";
 
 type SettingsSection = "general" | "appearance" | "privacy" | "sync" | "search" | "notifications" | "shortcuts" | "advanced";
 type SettingValue = string | number | boolean | Array<Record<string, unknown>>;
@@ -69,6 +70,9 @@ const conflictOptions = ["Keep Newest", "Ask Me", "Keep Both"];
 const settingsGridClass =
   "grid h-screen min-h-0 min-w-0 grid-cols-[180px_1px_minmax(0,1fr)] overflow-hidden bg-[var(--misty-bg)] text-[var(--misty-text)] max-[980px]:grid-cols-[150px_1px_minmax(720px,1fr)] max-[980px]:overflow-x-auto max-[980px]:overflow-y-hidden";
 
+const settingsOverlayGridClass =
+  "grid h-full min-h-0 min-w-0 grid-cols-[214px_1px_minmax(0,1fr)] overflow-hidden bg-[#07090b] text-[var(--misty-text)] max-[980px]:grid-cols-[180px_1px_minmax(620px,1fr)] max-[980px]:overflow-x-auto max-[980px]:overflow-y-hidden";
+
 const settingsSidebarClass =
   "flex min-h-0 flex-col gap-[5px] bg-[#07090b] p-5 max-[980px]:px-2.5 max-[980px]:py-4";
 
@@ -79,10 +83,25 @@ const settingsNavItemSelectedClass =
   "bg-[#393a41] text-white";
 
 const settingsContentClass =
+  "min-h-0 min-w-0 overflow-auto bg-[#07090b] px-7 py-6 [scrollbar-color:#3d3d42_transparent] [scrollbar-width:thin]";
+
+const settingsOverlayContentShellClass =
+  "grid min-h-0 min-w-0 grid-rows-[72px_minmax(0,1fr)] bg-[#07090b]";
+
+const settingsOverlayHeaderClass =
+  "flex min-h-0 items-center justify-between gap-4 border-b border-[#1f2024] px-7";
+
+const settingsOverlayContentClass =
   "min-h-0 min-w-0 overflow-auto bg-[#07090b] px-7 py-5 [scrollbar-color:#3d3d42_transparent] [scrollbar-width:thin]";
 
 const settingsScrollSurfaceClass =
   "w-[min(100%,934px)] min-w-[720px]";
+
+const settingsOverlayScrollSurfaceClass =
+  "w-[min(100%,720px)] min-w-[560px]";
+
+const settingsOverlayCloseClass =
+  "grid size-8 place-items-center rounded-md border-0 bg-transparent p-0 text-[#8d8d8d] transition hover:bg-[#202126] hover:text-[#f1eee8]";
 
 const settingsActionStackClass =
   "grid w-[220px] justify-items-end gap-[7px]";
@@ -100,10 +119,10 @@ const settingsMetaClass =
   "grid gap-0.5 text-right";
 
 const settingsReferenceListClass =
-  "mt-2.5 grid min-w-0";
+  "grid min-w-0";
 
 const settingsReferenceRowClass =
-  "grid min-h-[46px] grid-cols-[minmax(0,0.52fr)_minmax(220px,0.48fr)] items-center gap-[18px] border-b border-[#27272a] py-[5px] text-sm text-[#f1eee8]";
+  "grid min-h-[54px] grid-cols-[minmax(0,0.52fr)_minmax(220px,0.48fr)] items-center gap-[18px] border-b border-[#232429] px-7 py-[7px] text-sm text-[#f1eee8]";
 
 const settingsReferenceHeaderClass =
   "min-h-[42px] text-[15px]";
@@ -118,18 +137,21 @@ const settingsIconDangerClass =
   "grid h-[30px] w-[30px] place-items-center rounded-md border border-[#493039] bg-[#171116] text-[#ffb4b4] disabled:opacity-55";
 
 const settingsInlineActionsClass =
-  "mt-3.5 flex items-center gap-3";
+  "flex items-center gap-3 px-7 py-4";
 
 const settingsEmptyClass =
-  "mt-3 text-sm text-[#9e988f]";
+  "px-7 py-4 text-sm text-[#9e988f]";
 
 const settingsFontRowClass =
-  "grid min-h-[46px] grid-cols-[minmax(110px,0.24fr)_minmax(0,1fr)_32px] items-center gap-[18px] border-b border-[#27272a] py-[5px] text-sm text-[#f1eee8]";
+  "grid min-h-[54px] grid-cols-[minmax(110px,0.24fr)_minmax(0,1fr)_32px] items-center gap-[18px] border-b border-[#232429] px-7 py-[7px] text-sm text-[#f1eee8]";
 
 const settingsAssociationRowClass =
-  "grid min-h-[46px] grid-cols-[minmax(110px,0.22fr)_minmax(0,1fr)_32px] items-center gap-[18px] border-b border-[#27272a] py-[5px] text-sm text-[#f1eee8]";
+  "grid min-h-[54px] grid-cols-[minmax(110px,0.22fr)_minmax(0,1fr)_32px] items-center gap-[18px] border-b border-[#232429] px-7 py-[7px] text-sm text-[#f1eee8]";
 
-export const SettingsWorkspace = memo(function SettingsWorkspace() {
+export const SettingsWorkspace = memo(function SettingsWorkspace(props: {
+  presentation?: "page" | "overlay";
+  onClose?: () => void;
+}) {
   const {
     activeSection,
     settings,
@@ -158,6 +180,9 @@ export const SettingsWorkspace = memo(function SettingsWorkspace() {
   const app = useAppStore((state) => state.app);
   const document = settings?.document ?? {};
   const title = navItems.find((item) => item.id === activeSection)?.label ?? "General";
+  const activeIcon = navItems.find((item) => item.id === activeSection)?.icon ?? Settings2;
+  const ActiveIcon = activeIcon;
+  const overlay = props.presentation === "overlay";
 
   const controlProps = {
     document,
@@ -173,12 +198,12 @@ export const SettingsWorkspace = memo(function SettingsWorkspace() {
   };
 
   return (
-    <section className={settingsGridClass} aria-label="Settings">
+    <section className={overlay ? settingsOverlayGridClass : settingsGridClass} aria-label="Settings">
       <aside className={settingsSidebarClass} aria-label="Settings sections">
         {navGroups.map((group) => (
           <div className="grid gap-[5px]" key={group.label}>
-            <span className="px-2 pb-1 pt-2 text-[10px] font-bold uppercase tracking-normal text-[#767676]">
-              {group.label}
+            <span className="px-2 pb-3 pt-2 text-[10px] font-bold uppercase tracking-normal text-[#767676]">
+              {overlay ? "Settings" : group.label}
             </span>
             {group.items.map((item) => {
               const Icon = item.icon;
@@ -198,22 +223,69 @@ export const SettingsWorkspace = memo(function SettingsWorkspace() {
         ))}
       </aside>
       <div className="w-px bg-[#27272a]" />
-      <main className={settingsContentClass}>
-        <div className={settingsScrollSurfaceClass}>
-          <h1 className="mb-[18px] mt-1 text-[28px] font-[760] leading-[1.15] tracking-normal text-[#f1eee8]">{title}</h1>
-          {activeSection === "general" ? <GeneralSettings {...controlProps} /> : null}
-          {activeSection === "appearance" ? <AppearanceSettings {...controlProps} /> : null}
-          {activeSection === "privacy" ? <PrivacySettings {...controlProps} /> : null}
-          {activeSection === "sync" ? <SyncSettings {...controlProps} /> : null}
-          {activeSection === "search" ? <SearchSettings {...controlProps} /> : null}
-          {activeSection === "notifications" ? <NotificationsSettings {...controlProps} /> : null}
-          {activeSection === "shortcuts" ? <ShortcutsSettings {...controlProps} /> : null}
-          {activeSection === "advanced" ? <AdvancedSettings {...controlProps} /> : null}
-        </div>
-      </main>
+      {overlay ? (
+        <main className={settingsOverlayContentShellClass}>
+          <header className={settingsOverlayHeaderClass}>
+            <div className="flex min-w-0 items-center gap-3">
+              <ActiveIcon size={17} strokeWidth={1.8} className="shrink-0 text-[#8d8d8d]" />
+              <h1 className="m-0 min-w-0 truncate text-[15px] font-[740] leading-tight tracking-normal text-[#f1eee8]">{title}</h1>
+            </div>
+            <button
+              type="button"
+              className={settingsOverlayCloseClass}
+              aria-label="Close settings"
+              title="Close settings"
+              onClick={props.onClose}
+            >
+              <X size={17} strokeWidth={1.8} />
+            </button>
+          </header>
+          <SettingsContent
+            activeSection={activeSection}
+            className={settingsOverlayContentClass}
+            controlProps={controlProps}
+            surfaceClassName={settingsOverlayScrollSurfaceClass}
+            title={null}
+          />
+        </main>
+      ) : (
+        <SettingsContent
+          activeSection={activeSection}
+          className={settingsContentClass}
+          controlProps={controlProps}
+          surfaceClassName={settingsScrollSurfaceClass}
+          title={title}
+        />
+      )}
     </section>
   );
 });
+
+function SettingsContent(props: {
+  activeSection: SettingsSection;
+  className: string;
+  controlProps: SettingsContentProps;
+  surfaceClassName: string;
+  title: string | null;
+}) {
+  return (
+    <main className={props.className}>
+      <div className={props.surfaceClassName}>
+        {props.title ? (
+          <h1 className="mb-[18px] mt-1 text-[28px] font-[760] leading-[1.15] tracking-normal text-[#f1eee8]">{props.title}</h1>
+        ) : null}
+        {props.activeSection === "general" ? <GeneralSettings {...props.controlProps} /> : null}
+        {props.activeSection === "appearance" ? <AppearanceSettings {...props.controlProps} /> : null}
+        {props.activeSection === "privacy" ? <PrivacySettings {...props.controlProps} /> : null}
+        {props.activeSection === "sync" ? <SyncSettings {...props.controlProps} /> : null}
+        {props.activeSection === "search" ? <SearchSettings {...props.controlProps} /> : null}
+        {props.activeSection === "notifications" ? <NotificationsSettings {...props.controlProps} /> : null}
+        {props.activeSection === "shortcuts" ? <ShortcutsSettings {...props.controlProps} /> : null}
+        {props.activeSection === "advanced" ? <AdvancedSettings {...props.controlProps} /> : null}
+      </div>
+    </main>
+  );
+}
 
 interface SettingsContentProps {
   document: Record<string, unknown>;
@@ -371,6 +443,7 @@ function AppearanceSettings(props: SettingsContentProps) {
     props.onSettingChange("appearance", "custom_fonts", fonts.map((font) => ({ label: font.label, path: font.path })));
   };
   const addCustomFont = async () => {
+    if (!hasTauriInternals()) return;
     const selection = await open({
       title: "Select Font",
       multiple: false,
@@ -920,9 +993,8 @@ function AdvancedSettings(props: SettingsContentProps) {
 
 function SettingsSectionBlock(props: { title: string; children: ReactNode }) {
   return (
-    <section className="mb-[18px] grid gap-0">
-      <h2 className="mb-2 text-xl font-[730] leading-[1.2] tracking-normal text-[#f1eee8]">{props.title}</h2>
-      <div className="h-px bg-[#27272a]" />
+    <section className="mb-3.5 overflow-hidden rounded-[10px] border border-[#202126] bg-[#111214] shadow-[0_1px_0_rgba(255,255,255,0.02)_inset]">
+      <h2 className="border-b border-[#202126] px-7 py-4 text-[11px] font-[760] uppercase leading-none tracking-normal text-[#7a7a7d]">{props.title}</h2>
       {props.children}
     </section>
   );
@@ -930,10 +1002,10 @@ function SettingsSectionBlock(props: { title: string; children: ReactNode }) {
 
 function SettingsRow(props: { label: string; description: string; children: ReactNode; last?: boolean }) {
   return (
-    <div className={`grid min-h-[57px] grid-cols-[minmax(0,0.52fr)_minmax(220px,0.48fr)] items-center gap-[18px] border-b border-[#27272a] py-[9px] ${props.last ? "border-b-0" : ""}`}>
+    <div className={`grid min-h-[68px] grid-cols-[minmax(0,0.52fr)_minmax(220px,0.48fr)] items-center gap-[18px] border-b border-[#202126] px-7 py-3 ${props.last ? "border-b-0" : ""}`}>
       <div className="grid min-w-0 gap-1">
         <strong className="text-[15px] font-[520] leading-[1.1] text-[#f1eee8]">{props.label}</strong>
-        <span className="text-[15px] leading-[1.25] text-[#9e988f]">{props.description}</span>
+        <span className="text-[14px] leading-[1.25] text-[#77777b]">{props.description}</span>
       </div>
       <div className="flex min-w-0 items-center justify-end">{props.children}</div>
     </div>
@@ -941,7 +1013,7 @@ function SettingsRow(props: { label: string; description: string; children: Reac
 }
 
 function SettingsNote(props: { children: ReactNode }) {
-  return <p className="my-3 max-w-[560px] text-[15px] leading-[1.25] text-[#9e988f]">{props.children}</p>;
+  return <p className="m-0 max-w-[620px] px-7 py-4 text-[14px] leading-[1.35] text-[#77777b]">{props.children}</p>;
 }
 
 function SelectControl(props: {
@@ -975,11 +1047,21 @@ function SwitchControl(props: { checked: boolean; disabled: boolean; onChange: (
       type="button"
       role="switch"
       aria-checked={props.checked}
-      className={`flex h-[30px] w-[52px] items-center rounded-full border p-px ${props.checked ? "justify-end border-[#4898f7] bg-[#4898f7]" : "justify-start border-[#7d8798] bg-[#566276]"}`}
+      className={`relative h-[22px] w-[40px] rounded-full border p-0 transition-colors duration-150 disabled:opacity-50 ${
+        props.checked
+          ? "border-[#6f9f76] bg-[#79ad80]"
+          : "border-[#34363d] bg-[#202126]"
+      }`}
       disabled={props.disabled}
       onClick={() => props.onChange(!props.checked)}
     >
-      <span className="grid h-[26px] w-[26px] place-items-center rounded-full bg-[#eef3fb] text-[#4898f7] shadow-[0_1px_2px_rgba(0,0,0,0.38)]">{props.checked ? <Check size={14} strokeWidth={2.5} /> : null}</span>
+      <span
+        className={`absolute top-1/2 size-[18px] -translate-y-1/2 rounded-full transition-transform duration-150 ${
+          props.checked
+            ? "translate-x-[19px] bg-[#071008] shadow-[0_1px_4px_rgba(0,0,0,0.42)]"
+            : "translate-x-[2px] bg-[#b9bec8] shadow-[0_1px_4px_rgba(0,0,0,0.32)]"
+        }`}
+      />
     </button>
   );
 }

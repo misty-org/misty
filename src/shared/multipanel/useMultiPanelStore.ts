@@ -34,6 +34,7 @@ export interface MultiPanelStore {
   restorePane: () => void;
   collapseDuplicateBrowsePanes: () => void;
   setActivePane: (paneId: string) => void;
+  setTabPanelVisibility: (tabId: string, visibility: { sidebarVisible?: boolean; previewVisible?: boolean }) => void;
   setSplitRatio: (tabId: string, ratioKind: "grid" | "lane0" | "lane1", ratio: number) => void;
   hydrate: (snapshot: {
     tabs: MultiPanelTab[];
@@ -352,6 +353,23 @@ export function createMultiPanelStore(options: MultiPanelStoreOptions = {}) {
               : tab,
           ),
         };
+    });
+    },
+
+    setTabPanelVisibility: (tabId, visibility) => {
+      set((state) => {
+        let changed = false;
+        const tabs = state.tabs.map((tab) => {
+          if (tab.id !== tabId) return tab;
+          const sidebarVisible = visibility.sidebarVisible ?? tab.sidebarVisible ?? true;
+          const previewVisible = visibility.previewVisible ?? tab.previewVisible ?? true;
+          if ((tab.sidebarVisible ?? true) === sidebarVisible && (tab.previewVisible ?? true) === previewVisible) {
+            return tab;
+          }
+          changed = true;
+          return { ...tab, sidebarVisible, previewVisible };
+        });
+        return changed ? { tabs } : state;
       });
     },
 
@@ -399,6 +417,8 @@ function createTab(id: string, paneId: string, path: string, title: string): Mul
     activePaneId: paneId,
     layout: defaultLayout("vertical", [paneId]),
     mode: "browse",
+    sidebarVisible: true,
+    previewVisible: true,
   };
 }
 
@@ -465,6 +485,8 @@ function normalizeTab(tab: MultiPanelTab): MultiPanelTab | null {
     path: tab.path || activePane.path,
     panes,
     activePaneId,
+    sidebarVisible: tab.sidebarVisible ?? true,
+    previewVisible: tab.previewVisible ?? true,
     layout: {
       orientation,
       lanes,

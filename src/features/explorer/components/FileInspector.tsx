@@ -1,27 +1,30 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
-import { Download, File, Folder, MoreHorizontal, Tag } from "lucide-react";
-import { useEffect, useState } from "react";
+import { File, Folder } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
 import { explorerPrepareOpenItem, explorerPreviewItem } from "../../../api/misty";
-import type { DirectoryListing, FileEntry } from "../../../api/types";
+import type { DirectoryListing, DirectorySizeRecord, FileEntry, PreparedOpenItem } from "../../../api/types";
 import { errorText } from "../../../shared/format";
 import { selectAppearancePreferences, useSettingsStore } from "../../settings/useSettingsStore";
+import { directorySizeRecordForPath } from "../state/useExplorerStore";
 import { formatBytes, formatDate } from "../utils/fileFormat";
 
 interface FileInspectorProps {
   listing: DirectoryListing | null;
   selectedEntry: FileEntry | null;
   selectedCount: number;
-  tags: string[];
-  onOpen: () => void;
-  onDownload: () => void;
-  onMore: (x: number, y: number) => void;
-  onTagsChange: (tags: string[]) => void;
+  directorySizes: Record<string, DirectorySizeRecord>;
+  onCalculateSize: (path: string) => void;
 }
 
 interface LoadedPreview {
   text: string | null;
   url: string;
   mimeType: string;
+}
+
+interface PreparedPreviewPath {
+  path: string;
+  prepared: PreparedOpenItem | null;
 }
 
 const MAX_PREVIEW_BYTES = 32 * 1024 * 1024;
@@ -50,38 +53,24 @@ const textPreviewExtensions = new Set([
 ]);
 
 const inspectorStyles = {
-  root: "h-full min-w-0 overflow-auto bg-[#151515] px-3.5 py-[18px]",
+  root: "h-full min-w-0 overflow-auto bg-[#17181b] px-3 py-3 text-[#d8d8d8] [scrollbar-color:#44464d_transparent] [scrollbar-width:thin]",
   previewCard:
-    "grid h-[180px] place-items-center overflow-hidden rounded-[7px] bg-[#1d1d1d] text-[#949494]",
+    "grid h-[238px] place-items-center overflow-hidden rounded-[7px] bg-[linear-gradient(145deg,#202126,#191a1d)] text-[#52606a] shadow-[0_1px_0_rgba(255,255,255,0.035)_inset]",
   previewMedia: "h-full w-full border-0 object-contain",
   previewText:
-    "m-0 h-full w-full overflow-auto whitespace-pre-wrap break-words p-3 text-left font-mono text-[11px] leading-[1.45] text-[#dedede]",
-  icon: "grid h-[108px] place-items-center",
-  hero: "grid justify-items-center gap-2 px-1 pb-[18px] pt-2.5",
+    "m-0 h-full w-full overflow-auto whitespace-pre-wrap break-words p-3 text-left font-mono text-[11px] leading-[1.45] text-[#d5d5d5]",
+  previewStatus: "text-sm font-medium text-[#8c8e94]",
+  hero: "grid grid-cols-[48px_minmax(0,1fr)] items-center gap-3 border-b border-[#2c2d32] px-5 py-5",
+  heroIcon: "grid size-10 place-items-center text-[#7da2b4]",
   heroTitle:
-    "max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-[17px]",
-  heroKind: "text-[#949494]",
-  actions:
-    "mb-4 grid grid-cols-[repeat(auto-fit,minmax(70px,1fr))] gap-px overflow-hidden rounded-lg bg-[#1d1d1d]",
-  actionButton:
-    "grid justify-items-center gap-1.5 border-0 bg-transparent p-3 text-[#adadad] disabled:opacity-40",
-  detailsCard: "overflow-hidden rounded-lg bg-[#1d1d1d]",
-  detailsTitle: "border-b border-[#3f3f3f] px-3 py-2.5 text-sm",
-  detailRow: "grid gap-1.5 p-3",
-  detailLabel: "text-[#949494]",
-  detailValue: "min-w-0 [overflow-wrap:anywhere] font-medium",
-  tags: "grid gap-2 border-t border-[#333333] p-3",
-  tagsTitle: "font-medium text-[#eeeeee]",
-  tagsEmpty: "text-[#949494]",
-  tagList: "flex flex-wrap gap-1.5",
-  tagButton:
-    "inline-flex min-h-[26px] items-center gap-1.5 rounded-full border border-[#3e3e3e] bg-[#202020] px-[9px] py-1 text-xs text-[#d6d6d6] disabled:opacity-55",
-  tagRemoveIcon: "font-bold text-[#838383]",
-  tagForm: "grid grid-cols-[minmax(0,1fr)_auto] gap-2",
-  tagInput:
-    "min-w-0 rounded-md border border-[#3e3e3e] bg-[#181818] px-2 py-1.5 text-[#eeeeee] outline-none focus:border-[#b1b1b1] disabled:opacity-55",
-  tagSubmit:
-    "inline-flex min-h-7 w-max items-center gap-1.5 rounded-md border-0 bg-[#242424] px-[9px] py-[5px] text-[#c1c1c1] disabled:opacity-55",
+    "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[18px] font-[720] leading-tight text-[#d4d4d4]",
+  heroKind: "mt-1 text-sm text-[#8f9096]",
+  detailsCard: "grid",
+  detailRow: "grid gap-2 px-5 py-3.5",
+  detailLabel: "text-[12px] font-[720] uppercase leading-none tracking-normal text-[#999aa1]",
+  detailValue: "min-w-0 [overflow-wrap:anywhere] text-[17px] font-[650] leading-[1.25] text-[#d1d1d1]",
+  dots: "inline-flex h-5 items-center gap-1",
+  dot: "size-1.5 rounded-full bg-[#aeb0b6] motion-safe:animate-bounce",
 } as const;
 
 export function FileInspector(props: FileInspectorProps) {
@@ -97,120 +86,73 @@ export function FileInspector(props: FileInspectorProps) {
     props.selectedEntry,
     thumbnailPreviewsEnabled,
   );
-  const [tagDraft, setTagDraft] = useState("");
-  const canEditTags = Boolean(props.selectedEntry && !multiple);
-  const canDownload = Boolean(props.selectedEntry?.location.kind === "remote" && !multiple);
-  const addTag = () => {
-    const nextTag = tagDraft.trim();
-    if (!nextTag || props.tags.includes(nextTag)) {
-      setTagDraft("");
-      return;
-    }
-    props.onTagsChange([...props.tags, nextTag]);
-    setTagDraft("");
-  };
-  const removeTag = (tag: string) => {
-    props.onTagsChange(props.tags.filter((candidate) => candidate !== tag));
-  };
+  const displayDirectorySize = displayEntry?.kind === "folder"
+    ? directorySizeRecordForPath(props.directorySizes, displayEntry.path)
+    : undefined;
+  const shouldCalculateDirectorySize = Boolean(
+    displayEntry
+      && !multiple
+      && canCalculateFolderSize(displayEntry)
+      && (!displayDirectorySize || displayDirectorySize.status === "unknown"),
+  );
+
+  useEffect(() => {
+    if (!shouldCalculateDirectorySize || !displayEntry) return;
+    props.onCalculateSize(displayEntry.path);
+  }, [displayEntry?.path, props.onCalculateSize, shouldCalculateDirectorySize]);
 
   return (
     <aside className={inspectorStyles.root}>
-      {preview || previewError || previewLoading ? (
-        <div className={inspectorStyles.previewCard}>
-          {previewLoading ? <span>Loading preview...</span> : null}
-          {preview?.mimeType === "application/pdf" ? (
-            <object className={inspectorStyles.previewMedia} data={preview.url} type={preview.mimeType} aria-label={`Preview of ${title}`} />
-          ) : preview?.text != null ? (
-            <pre className={inspectorStyles.previewText}>{preview.text}</pre>
-          ) : preview ? (
-            <img className={inspectorStyles.previewMedia} src={preview.url} alt={`Preview of ${title}`} />
-          ) : null}
-          {previewError ? <span>{previewError}</span> : null}
-        </div>
-      ) : (
-        <div className={inspectorStyles.icon}>
-          {displayEntry?.kind === "folder" ? <Folder size={92} className="text-[#b9b9b9]" /> : <File size={92} className="text-[#a2a2a2]" />}
-        </div>
-      )}
-
-      <div className={inspectorStyles.hero}>
-        <strong className={inspectorStyles.heroTitle} title={title}>{title}</strong>
-        <span className={inspectorStyles.heroKind}>{kind}</span>
+      <div className={inspectorStyles.previewCard}>
+        {previewLoading ? <span className={inspectorStyles.previewStatus}>Loading preview...</span> : null}
+        {preview?.mimeType === "application/pdf" ? (
+          <object className={inspectorStyles.previewMedia} data={preview.url} type={preview.mimeType} aria-label={`Preview of ${title}`} />
+        ) : preview?.text != null ? (
+          <pre className={inspectorStyles.previewText}>{preview.text}</pre>
+        ) : preview ? (
+          <img className={inspectorStyles.previewMedia} src={preview.url} alt={`Preview of ${title}`} />
+        ) : previewError ? (
+          <span className={inspectorStyles.previewStatus}>{previewError}</span>
+        ) : (
+          <PreviewIcon entry={displayEntry} multiple={multiple} size={78} />
+        )}
       </div>
 
-      <div className={inspectorStyles.actions}>
-        <button className={inspectorStyles.actionButton} type="button" disabled={!props.selectedEntry || multiple} onClick={props.onOpen}>
-          <Folder size={18} />
-          Open
-        </button>
-        <button className={inspectorStyles.actionButton} type="button" disabled={!canDownload} onClick={props.onDownload}>
-          <Download size={18} />
-          Download
-        </button>
-        <button
-          className={inspectorStyles.actionButton}
-          type="button"
-          onClick={(event) => {
-            const bounds = event.currentTarget.getBoundingClientRect();
-            props.onMore(bounds.left, bounds.bottom + 4);
-          }}
-        >
-          <MoreHorizontal size={18} />
-          More
-        </button>
+      <div className={inspectorStyles.hero}>
+        <span className={inspectorStyles.heroIcon}>
+          <PreviewIcon entry={displayEntry} multiple={multiple} size={36} />
+        </span>
+        <span className="min-w-0">
+          <strong className={inspectorStyles.heroTitle} title={title}>{title}</strong>
+          <span className={inspectorStyles.heroKind}>{kind}</span>
+        </span>
       </div>
 
       <section className={inspectorStyles.detailsCard}>
-        <h2 className={inspectorStyles.detailsTitle}>Details</h2>
-        {props.selectedEntry && !multiple ? (
-          <>
-            <Detail label="Path" value={props.selectedEntry.path} />
-            <Detail label="Modified" value={props.selectedEntry.remoteModified || formatDate(props.selectedEntry.modifiedMs)} />
-            <Detail label="Created" value={formatDate(props.selectedEntry.createdMs)} />
-            <Detail label="Size" value={props.selectedEntry.kind === "folder" ? "--" : formatBytes(props.selectedEntry.sizeBytes)} />
-            <Detail label="Kind" value={kindLabel(props.selectedEntry)} />
-          </>
+        {multiple ? (
+          <Detail label="Selection" value={`${props.selectedCount} items`} />
         ) : (
           <>
-            <Detail label="Path" value={props.listing?.path ?? "--"} />
-            <Detail label="Modified" value="--" />
-            <Detail label="Created" value="--" />
-            <Detail label="Items" value={props.listing ? String(props.listing.totalCount) : "--"} />
-            <Detail label="Available" value="--" />
+            <Detail
+              label="Size"
+              valueNode={sizeDetailValue(displayEntry, displayDirectorySize)}
+            />
+            <Detail label="Type" value={kindLabel(displayEntry)} />
+            <Detail label="Path" value={displayEntry?.path ?? props.listing?.path ?? "-"} />
+            <Detail label="Items" value={itemsLabel(displayEntry, props.listing)} />
+            <Detail label={displayEntry?.kind === "folder" ? "Modified Contents" : "Modified"} value={formatDate(displayEntry?.remoteModified ?? displayEntry?.modifiedMs)} />
+            <Detail label="Created" value={formatDate(displayEntry?.createdMs)} />
+            <Detail label="Location" value={locationLabel(displayEntry?.location ?? props.listing?.location ?? null)} />
+            {displayEntry?.kind !== "folder" ? (
+              <>
+                <Detail label="Extension" value={displayEntry?.extension ? displayEntry.extension.replace(/^\./, "").toUpperCase() : "-"} />
+                <Detail label="MIME Type" value={displayEntry?.mimeType ?? "-"} />
+              </>
+            ) : null}
+            <Detail label="Hidden" value={displayEntry?.hidden ? "Yes" : "No"} />
+            <Detail label="Read Only" value={displayEntry?.readonly ? "Yes" : "No"} />
           </>
         )}
-        <div className={inspectorStyles.tags}>
-          <span className={inspectorStyles.tagsTitle}>Tags</span>
-          {props.tags.length > 0 ? (
-            <div className={inspectorStyles.tagList}>
-              {props.tags.map((tag) => (
-                <button className={inspectorStyles.tagButton} key={tag} type="button" disabled={!canEditTags} title={`Remove ${tag}`} onClick={() => removeTag(tag)}>
-                  {tag}
-                  <span className={inspectorStyles.tagRemoveIcon} aria-hidden="true">x</span>
-                </button>
-              ))}
-            </div>
-          ) : <small className={inspectorStyles.tagsEmpty}>No tags</small>}
-          <form
-            className={inspectorStyles.tagForm}
-            onSubmit={(event) => {
-              event.preventDefault();
-              addTag();
-            }}
-          >
-            <input
-              className={inspectorStyles.tagInput}
-              value={tagDraft}
-              disabled={!canEditTags}
-              placeholder="Add tag"
-              onChange={(event) => setTagDraft(event.target.value)}
-            />
-            <button className={inspectorStyles.tagSubmit} type="submit" disabled={!canEditTags || !tagDraft.trim()}>
-              <Tag size={14} />
-              Add
-            </button>
-          </form>
-        </div>
       </section>
     </aside>
   );
@@ -247,7 +189,16 @@ function useFilePreview(entry: FileEntry | null, enabled = true): {
     setPreviewLoading(true);
     if (imageMimeType) {
       void previewPathForEntry(entry)
-        .then((path) => loadImagePreview(path, imageMimeType))
+        .then(async (preparedPath) => {
+          try {
+            return await loadImagePreview(preparedPath, imageMimeType);
+          } catch (directLoadError) {
+            const loadedPreview = await loadNativeImagePreview(preparedPath);
+            objectUrl = loadedPreview.url;
+            if (!loadedPreview.url) throw directLoadError;
+            return loadedPreview;
+          }
+        })
         .then((loadedPreview) => {
           if (active) setPreview(loadedPreview);
         })
@@ -260,11 +211,12 @@ function useFilePreview(entry: FileEntry | null, enabled = true): {
 
       return () => {
         active = false;
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
       };
     }
 
     void previewPathForEntry(entry)
-      .then((path) => explorerPreviewItem(path))
+      .then((preparedPath) => explorerPreviewItem(preparedPath.path))
       .then((payload) => {
         if (!active) return;
         const bytes = new Uint8Array(payload.bytes);
@@ -295,14 +247,14 @@ function useFilePreview(entry: FileEntry | null, enabled = true): {
   return { preview, previewError, previewLoading };
 }
 
-async function previewPathForEntry(entry: FileEntry): Promise<string> {
-  if (entry.location.kind !== "remote") return entry.path;
+async function previewPathForEntry(entry: FileEntry): Promise<PreparedPreviewPath> {
+  if (entry.location.kind !== "remote") return { path: entry.path, prepared: null };
   const prepared = await explorerPrepareOpenItem({
     path: entry.path,
     sizeBytes: entry.sizeBytes,
     remoteModified: entry.remoteModified,
   });
-  return prepared.localPath;
+  return { path: prepared.localPath, prepared };
 }
 
 function previewSupported(entry: FileEntry): boolean {
@@ -316,8 +268,8 @@ function previewImageMimeType(entry: FileEntry): string | null {
   return browserImageMimeTypes[extension] ?? null;
 }
 
-async function loadImagePreview(path: string, mimeType: string): Promise<LoadedPreview> {
-  const baseUrl = convertFileSrc(path);
+async function loadImagePreview(preparedPath: PreparedPreviewPath, mimeType: string): Promise<LoadedPreview> {
+  const baseUrl = convertFileSrc(preparedPath.path);
   let lastError: unknown = null;
   for (let attempt = 0; attempt < IMAGE_PREVIEW_LOAD_ATTEMPTS; attempt += 1) {
     const url = attempt === 0 ? baseUrl : cacheBustedUrl(baseUrl, attempt);
@@ -331,7 +283,21 @@ async function loadImagePreview(path: string, mimeType: string): Promise<LoadedP
       }
     }
   }
-  throw lastError instanceof Error ? lastError : new Error("Unable to load image preview.");
+  const baseMessage = lastError instanceof Error ? lastError.message : "Unable to load image preview.";
+  throw new Error(`${baseMessage}${previewDiagnosticSuffix(preparedPath)}`);
+}
+
+async function loadNativeImagePreview(preparedPath: PreparedPreviewPath): Promise<LoadedPreview> {
+  const payload = await explorerPreviewItem(preparedPath.path);
+  const bytes = new Uint8Array(payload.bytes);
+  const url = URL.createObjectURL(new Blob([bytes], { type: payload.mimeType }));
+  return { text: null, url, mimeType: payload.mimeType };
+}
+
+function previewDiagnosticSuffix(preparedPath: PreparedPreviewPath): string {
+  const prepared = preparedPath.prepared;
+  if (!prepared) return "";
+  return ` Cache hit: ${prepared.cacheHit ?? prepared.cached}. Local: ${preparedPath.path}. Source: ${prepared.sourcePath ?? "unknown"}. Cache: ${prepared.cachePath ?? "unknown"}.`;
 }
 
 function waitForImage(url: string): Promise<void> {
@@ -369,19 +335,76 @@ function previewPayloadIsText(mimeType: string): boolean {
 
 function kindLabel(entry: FileEntry | null): string {
   if (!entry) return "Folder";
-  if (entry.kind === "folder") return "Folder";
+  if (entry.kind === "folder") return "Directory";
   if (entry.kind === "symlink") return "Link";
   const extension = entry.extension.toUpperCase().replace(/^\./, "");
   return extension ? `${extension} File` : entry.kind === "file" ? "File" : "Item";
 }
 
-function Detail(props: { label: string; value: string }) {
+function Detail(props: { label: string; value?: string; valueNode?: ReactNode }) {
   return (
     <div className={inspectorStyles.detailRow}>
       <span className={inspectorStyles.detailLabel}>{props.label}</span>
-      <strong className={inspectorStyles.detailValue}>{props.value}</strong>
+      <div className={inspectorStyles.detailValue}>{props.valueNode ?? props.value}</div>
     </div>
   );
+}
+
+function PreviewIcon(props: { entry: FileEntry | null; multiple: boolean; size: number }) {
+  const className = props.entry?.kind === "folder" || props.multiple ? "text-[#7899aa]" : "text-[#8f929a]";
+  if (props.entry?.kind === "folder" || props.multiple) {
+    return <Folder size={props.size} strokeWidth={1.7} className={className} />;
+  }
+  return <File size={props.size} strokeWidth={1.7} className={className} />;
+}
+
+function sizeDetailValue(
+  entry: FileEntry | null,
+  directorySize: DirectorySizeRecord | undefined,
+): ReactNode {
+  if (!entry) return "-";
+  if (entry.kind !== "folder") return formatBytes(entry.sizeBytes);
+  if (directorySize?.status === "ready") return formatBytes(directorySize.sizeBytes);
+  if (directorySize?.status === "calculating") return <DirectorySizeDots />;
+  if (!canCalculateFolderSize(entry)) return "-";
+  if (directorySize?.status === "failed") return "-";
+  return <DirectorySizeDots />;
+}
+
+function DirectorySizeDots() {
+  return (
+    <span className={inspectorStyles.dots} aria-label="Calculating folder size">
+      {[0, 1, 2].map((index) => (
+        <span
+          key={index}
+          className={inspectorStyles.dot}
+          style={{ animationDelay: `${index * 110}ms` }}
+        />
+      ))}
+    </span>
+  );
+}
+
+function canCalculateFolderSize(entry: FileEntry): boolean {
+  return entry.kind === "folder"
+    && entry.location.kind !== "remote_provider"
+    && !entry.path.includes("://");
+}
+
+function itemsLabel(entry: FileEntry | null, listing: DirectoryListing | null): string {
+  if (!entry) return "-";
+  if (listing && entry.path === listing.path) {
+    return `${listing.totalCount} ${listing.totalCount === 1 ? "item" : "items"}`;
+  }
+  return entry.kind === "folder" ? "-" : "1 item";
+}
+
+function locationLabel(location: FileEntry["location"] | null): string {
+  if (!location) return "-";
+  if (location.kind === "local") return "Local";
+  if (location.kind === "remote_provider") return "Remote provider";
+  const remote = location.remoteName ? `: ${location.remoteName}` : "";
+  return `Remote${remote}`;
 }
 
 function listingEntry(listing: DirectoryListing | null): FileEntry | null {

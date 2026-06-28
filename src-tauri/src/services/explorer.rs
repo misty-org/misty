@@ -56,7 +56,7 @@ pub struct ExplorerService {
     transfers: TransferService,
     explorer_library: ExplorerLibraryService,
     listing_cache: ListingCache,
-    remote_open_cache: Arc<Mutex<ClipboardCache>>,
+    remote_file_cache: Arc<Mutex<ClipboardCache>>,
     drag_stage_dir: PathBuf,
     clipboard_text_cache_dir: PathBuf,
     clipboard_blob_cache_dir: PathBuf,
@@ -75,8 +75,10 @@ impl ExplorerService {
     ) -> Self {
         let cache_dir = environment.cache_dir();
         let mount_root = environment.mount_root();
-        let mut remote_open_cache = ClipboardCache::new(cache_dir.join("remote-open").join("v1"));
-        remote_open_cache.cleanup_expired();
+        let mut remote_file_cache = ClipboardCache::new(cache_dir.join("remote-files").join("v1"));
+        remote_file_cache
+            .import_remote_file_entries_from(&cache_dir.join("remote-open").join("v1"));
+        remote_file_cache.cleanup_expired();
         let drag_stage_dir = cache_dir.join("drag-out").join("v1");
         cleanup_expired_drag_stage_dirs(&drag_stage_dir);
         Self {
@@ -87,7 +89,7 @@ impl ExplorerService {
             transfers,
             explorer_library,
             listing_cache: ListingCache::new(cache_dir.join("remotes"), cache_dir.join("listings")),
-            remote_open_cache: Arc::new(Mutex::new(remote_open_cache)),
+            remote_file_cache: Arc::new(Mutex::new(remote_file_cache)),
             drag_stage_dir,
             clipboard_text_cache_dir: cache_dir.join("clipboard-paste").join("text"),
             clipboard_blob_cache_dir: cache_dir.join("clipboard-paste").join("blob"),
@@ -439,6 +441,9 @@ impl ExplorerService {
             return Ok(PreparedOpenItem {
                 local_path: request.path,
                 cached: true,
+                source_path: None,
+                cache_path: None,
+                cache_hit: true,
             });
         };
         if self.item_is_directory(&request.path).await? != Some(false) {
@@ -596,7 +601,7 @@ impl ExplorerService {
         };
         let final_path = source.virtual_path(&self.mount_root);
         if let Some(path) = self
-            .remote_open_cache
+            .remote_file_cache
             .lock()
             .await
             .lookup_remote_file(&cache_key)
@@ -604,21 +609,27 @@ impl ExplorerService {
             return Ok(PreparedOpenItem {
                 local_path: display_path(&path),
                 cached: true,
+                source_path: Some(display_path(&final_path)),
+                cache_path: Some(display_path(&path)),
+                cache_hit: true,
             });
         }
         if downloaded_file_exists(&final_path).await {
-            let mut cache = self.remote_open_cache.lock().await;
+            let mut cache = self.remote_file_cache.lock().await;
             let local_path = cache
                 .copy_remote_file_into_cache(&cache_key, &final_path, &file_name)
                 .unwrap_or_else(|_| final_path.clone());
             return Ok(PreparedOpenItem {
                 local_path: display_path(&local_path),
                 cached: true,
+                source_path: Some(display_path(&final_path)),
+                cache_path: Some(display_path(&local_path)),
+                cache_hit: true,
             });
         }
 
         let temp_path = self
-            .remote_open_cache
+            .remote_file_cache
             .lock()
             .await
             .temp_path_for(&ClipboardCache::remote_file_key(&cache_key), &file_name);
@@ -632,7 +643,7 @@ impl ExplorerService {
         if !downloaded_file_exists(&temp_path).await {
             let _ = tokio::fs::remove_file(&temp_path).await;
             let retry_temp_path = self
-                .remote_open_cache
+                .remote_file_cache
                 .lock()
                 .await
                 .temp_path_for(&ClipboardCache::remote_file_key(&cache_key), &file_name);
@@ -646,11 +657,13 @@ impl ExplorerService {
             if !downloaded_file_exists(&retry_temp_path).await {
                 let _ = tokio::fs::remove_file(&retry_temp_path).await;
                 return Err(ApiError::Message(format!(
-                    "Remote download completed but did not create cached file for {file_name}"
+                    "Remote download completed but did not create cached file for {file_name}. source={}, cache={}, cache_hit=false",
+                    source.remote_path,
+                    retry_temp_path.display()
                 )));
             }
             let local_path = self
-                .remote_open_cache
+                .remote_file_cache
                 .lock()
                 .await
                 .store_remote_file(&cache_key, &retry_temp_path, &file_name)
@@ -660,10 +673,13 @@ impl ExplorerService {
             return Ok(PreparedOpenItem {
                 local_path: display_path(&local_path),
                 cached: false,
+                source_path: Some(display_path(&final_path)),
+                cache_path: Some(display_path(&local_path)),
+                cache_hit: false,
             });
         };
         let local_path = self
-            .remote_open_cache
+            .remote_file_cache
             .lock()
             .await
             .store_remote_file(&cache_key, &temp_path, &file_name)
@@ -673,6 +689,9 @@ impl ExplorerService {
         Ok(PreparedOpenItem {
             local_path: display_path(&local_path),
             cached: false,
+            source_path: Some(display_path(&final_path)),
+            cache_path: Some(display_path(&local_path)),
+            cache_hit: false,
         })
     }
 
@@ -693,7 +712,7 @@ impl ExplorerService {
             .and_then(|value| value.to_str())
             .unwrap_or("item");
         let _ = self
-            .remote_open_cache
+            .remote_file_cache
             .lock()
             .await
             .copy_remote_file_into_cache(&cache_key, local_path, file_name);
@@ -1481,17 +1500,25 @@ impl ExplorerService {
         let parts = virtual_path_parts(&self.mount_root, path).ok_or_else(|| {
             ApiError::Message(format!("Invalid remote mount path: {}", path.display()))
         })?;
-        let remotes = self.remote_inventory().await?;
+        let mut remotes = self.remote_inventory().await?;
 
         match parts.len() {
             0 => Ok(self.remote_root_listing(remotes, show_hidden)),
             _ => {
                 let mut target = RemoteBrowseTarget::from_virtual_path(&self.mount_root, path)
                     .ok_or_else(|| ApiError::Message("Invalid remote browse path".to_string()))?;
-                let Some(remote) = remotes
+                let mut remote = remotes
                     .iter()
                     .find(|remote| remote.name == target.remote_name)
-                else {
+                    .cloned();
+                if remote.is_none() {
+                    remotes = self.providers.refresh().await?.remotes;
+                    remote = remotes
+                        .iter()
+                        .find(|remote| remote.name == target.remote_name)
+                        .cloned();
+                }
+                let Some(remote) = remote else {
                     return Err(ApiError::Message(format!(
                         "Remote \"{}\" was not found.",
                         target.remote_name
@@ -3466,7 +3493,7 @@ mod tests {
     }
 
     #[test]
-    fn drag_stage_expiration_uses_remote_open_cache_ttl() {
+    fn drag_stage_expiration_uses_remote_file_cache_ttl() {
         let ttl_ms = ClipboardCache::DEFAULT_TTL_HOURS * 60 * 60 * 1000;
         let now_ms = ttl_ms * 2;
 
@@ -3713,7 +3740,7 @@ mod tests {
 
     #[tokio::test]
     async fn prepared_remote_file_reuses_mounted_file_as_cache() {
-        let home = unique_test_dir("remote-open-cache-home");
+        let home = unique_test_dir("remote-files-cache-home");
         let service = test_explorer_service_for_home(home.clone());
         let source = RemoteBrowseTarget {
             provider_type: "drive".into(),
@@ -3740,8 +3767,18 @@ mod tests {
 
         let prepared_path = PathBuf::from(&prepared.local_path);
         assert!(prepared.cached);
+        assert!(prepared.cache_hit);
         assert_ne!(prepared_path, mounted_file);
-        assert!(prepared_path.starts_with(home.join(".misty/.cache/remote-open/v1")));
+        assert!(prepared_path.starts_with(home.join(".misty/.cache/remote-files/v1")));
+        assert!(!prepared_path.starts_with(home.join(".misty/.cache/remote-files/v1/remote-files")));
+        assert_eq!(
+            prepared.source_path.as_deref(),
+            Some(mounted_file.to_string_lossy().as_ref())
+        );
+        assert_eq!(
+            prepared.cache_path.as_deref(),
+            Some(prepared.local_path.as_str())
+        );
         assert_eq!(
             tokio::fs::read(prepared_path).await.unwrap(),
             b"cached image"

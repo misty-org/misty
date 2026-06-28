@@ -140,7 +140,7 @@ const transferStyles = {
   sortDirection: "grid grid-cols-2 gap-2",
   sortButtonSelected:
     "border-[var(--misty-accent)] bg-[color-mix(in_srgb,var(--misty-accent)_16%,var(--misty-surface))]",
-  tableWrap: "h-auto min-h-0 overflow-auto p-0 [overscroll-behavior:contain]",
+  tableWrap: "h-full min-h-0 overflow-auto p-0 [overscroll-behavior:contain]",
   table: "border-collapse table-fixed",
   tableHeader:
     "sticky top-0 z-[2] select-none border-b border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] px-3 py-[11px] text-left align-middle font-semibold text-[var(--misty-text-muted)]",
@@ -239,6 +239,10 @@ export const TransfersWorkspace = memo(function TransfersWorkspace() {
       renderPane={(paneId) => <TransferWorkspacePane workspaceId={paneId} />}
     />
   );
+});
+
+export const TransfersWorkspacePanel = memo(function TransfersWorkspacePanel(props: { workspaceId: string }) {
+  return <TransferWorkspacePane workspaceId={props.workspaceId} />;
 });
 
 function snapshotTransfersMultiPanel(state: MultiPanelStore): TransfersMultiPanelSnapshot {
@@ -427,7 +431,11 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
   }), [detailVisible, filtersVisible]);
   const rowCount = pageRows.length;
   const visibleCapacity = Math.max(1, Math.ceil(tableViewportHeight / TRANSFER_ROW_HEIGHT));
-  const startIndex = Math.max(0, Math.floor(tableScrollTop / TRANSFER_ROW_HEIGHT) - TRANSFER_OVERSCAN_ROWS);
+  const maxStartIndex = Math.max(0, rowCount - visibleCapacity - TRANSFER_OVERSCAN_ROWS);
+  const startIndex = Math.min(
+    maxStartIndex,
+    Math.max(0, Math.floor(tableScrollTop / TRANSFER_ROW_HEIGHT) - TRANSFER_OVERSCAN_ROWS),
+  );
   const endIndex = Math.min(rowCount, startIndex + visibleCapacity + TRANSFER_OVERSCAN_ROWS * 2);
   const visibleRows = pageRows.slice(startIndex, endIndex);
   const topSpacerHeight = startIndex * TRANSFER_ROW_HEIGHT;

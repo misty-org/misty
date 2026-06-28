@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { HiOutlineSparkles, HiOutlinePuzzlePiece } from "react-icons/hi2";
+import mistyHubImage from "../../../media/misty-hub.png";
 
 const conversations = [
   {
@@ -92,8 +93,10 @@ export default function ExpandedFeatures() {
         <div className="border-t border-border/70 bg-[#0f0d0c] p-3 md:border-r md:border-t-0 md:p-4">
           <div className="overflow-hidden rounded-xl border border-border/70 bg-[#120f0e] shadow-[0_22px_50px_rgba(0,0,0,0.28)]">
             <img
-              src="/misty-plugins.png"
+              src={mistyHubImage}
               alt="Misty extensions browser screenshot"
+              decoding="async"
+              loading="lazy"
               className="block h-full w-full object-cover object-top"
             />
           </div>

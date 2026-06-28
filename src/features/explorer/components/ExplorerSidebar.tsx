@@ -12,9 +12,11 @@ import {
   Check,
   Monitor,
   MoreHorizontal,
+  Pencil,
   PinOff,
   Plus,
   RefreshCcw,
+  SlidersHorizontal,
   Star,
   Trash2,
   X,
@@ -36,13 +38,13 @@ const sidebarStyles = {
   root:
     "h-full min-h-0 min-w-0 overflow-auto border-r border-[#292929] bg-[#141414] px-3.5 py-4 max-[980px]:hidden",
   section: "[&+&]:mt-4",
-  sectionTitle: "mb-2.5 flex items-center justify-between gap-2",
+  sectionTitle: "mb-2.5 flex min-w-0 items-center gap-2",
   sectionToggle:
-    "flex min-w-0 flex-1 items-center justify-between gap-2 rounded-md border-0 bg-transparent py-[3px] pl-0 pr-1 text-left text-[#d5d5d5] hover:text-[#eeeeee]",
+    "inline-flex min-w-0 items-center gap-1.5 rounded-md border-0 bg-transparent py-[3px] pl-0 pr-1 text-left text-[#d5d5d5] hover:text-[#eeeeee]",
   sectionToggleLabel:
     "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[15px] font-medium",
-  sectionChevron: "text-[#949494]",
-  sectionActions: "flex flex-none items-center gap-[3px]",
+  sectionChevron: "flex-none text-[#949494]",
+  sectionActions: "ml-auto flex flex-none items-center gap-[3px]",
   sectionActionButton:
     "grid size-6 place-items-center rounded-md border-0 bg-transparent p-0 text-[#949494] hover:bg-[#1f1f1f] hover:text-[#dddddd]",
   spinning: "[&>svg]:animate-spin",
@@ -82,6 +84,15 @@ const sidebarStyles = {
   menuButton:
     "flex h-[34px] items-center gap-2 rounded-lg border-0 bg-transparent px-2.5 text-left text-[#dddddd] hover:bg-[#222222] hover:text-[#eeeeee] disabled:cursor-default disabled:opacity-40",
   menuButtonSelected: "bg-[#292929] text-[#eeeeee]",
+  workspaceMenuRow:
+    "group/workspace flex h-[34px] min-w-0 items-center gap-1 rounded-lg border-0 bg-transparent text-[#dddddd] hover:bg-[#222222] hover:text-[#eeeeee]",
+  workspaceMenuSelect:
+    "flex h-full min-w-0 flex-1 items-center gap-2 border-0 bg-transparent px-2.5 text-left text-inherit",
+  workspaceMenuActions:
+    "mr-1 flex flex-none items-center gap-px opacity-0 group-hover/workspace:opacity-100 group-focus-within/workspace:opacity-100",
+  workspaceMenuIconButton:
+    "grid size-7 place-items-center rounded-md border-0 bg-transparent p-0 text-[#a9a9a9] hover:bg-[#303030] hover:text-[#eeeeee] disabled:cursor-default disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-[#a9a9a9]",
+  menuButtonIcon: "grid size-[17px] flex-none place-items-center text-[#bdbdbd]",
   menuButtonTruncate: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap",
   menuButtonCheck: "w-[17px] flex-none text-[#d8d8d8]",
   menuSeparator: "mx-1 my-[5px] h-px bg-[#292929]",
@@ -118,6 +129,8 @@ interface ExplorerSidebarProps {
   onRenameWorkspace: (workspaceId: string, title: string) => void;
   onDeleteWorkspace: (workspaceId: string) => void;
   onOpenInNewTab: (path: string, title?: string) => void;
+  onManageRemotes: () => void;
+  onAddRemote: () => void;
   onUnpinPinnedPath: (path: string) => void;
 }
 
@@ -135,6 +148,7 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
   const [workspaceDraft, setWorkspaceDraft] = useState("");
   const [hiddenQuickAccessPaths, setHiddenQuickAccessPaths] = useState<string[]>(loadHiddenQuickAccessPaths);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const workspaceButtonRef = useRef<HTMLButtonElement | null>(null);
   const workspaceMenuRef = useRef<HTMLDivElement | null>(null);
   const quickAccessMenuRef = useRef<HTMLDivElement | null>(null);
   const quickAccess = useMemo(() => [
@@ -176,6 +190,7 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
     const closeOnOutside = (event: PointerEvent) => {
       const target = event.target as Node | null;
       if (target && menuRef.current?.contains(target)) return;
+      if (target && workspaceButtonRef.current?.contains(target)) return;
       if (target && workspaceMenuRef.current?.contains(target)) return;
       if (target && quickAccessMenuRef.current?.contains(target)) return;
       setDeviceMenu(null);
@@ -272,8 +287,9 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
         : addHiddenQuickAccessPath(paths, path)
     );
   };
-  const openWorkspaceDialog = (kind: "create" | "rename" | "delete") => {
-    const active = props.workspaceEntries.find((workspace) => workspace.id === props.activeWorkspaceId)
+  const openWorkspaceDialog = (kind: "create" | "rename" | "delete", target?: ExplorerWorkspaceEntry) => {
+    const active = target
+      ?? props.workspaceEntries.find((workspace) => workspace.id === props.activeWorkspaceId)
       ?? (props.activeWorkspaceId ? { id: props.activeWorkspaceId, title: props.activeWorkspaceTitle } : null);
     setWorkspaceMenu(null);
     setWorkspaceDialog(kind === "rename" && active
@@ -301,6 +317,7 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
       <section className={sidebarStyles.section}>
         <button
           type="button"
+          ref={workspaceButtonRef}
           className={sidebarStyles.workspaceSelect}
           aria-haspopup="menu"
           aria-expanded={Boolean(workspaceMenu)}
@@ -402,6 +419,34 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
           title="Remote"
           collapsed={collapsedSections.remote}
           onToggle={() => toggleSection("remote")}
+          actions={(
+            <>
+              <button
+                type="button"
+                title="Manage remotes"
+                aria-label="Manage remotes"
+                className={sidebarStyles.sectionActionButton}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  props.onManageRemotes();
+                }}
+              >
+                <SlidersHorizontal size={15} />
+              </button>
+              <button
+                type="button"
+                title="Add remote"
+                aria-label="Add remote"
+                className={sidebarStyles.sectionActionButton}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  props.onAddRemote();
+                }}
+              >
+                <Plus size={15} />
+              </button>
+            </>
+          )}
         />
         {!collapsedSections.remote ? (
           props.remoteLoading && props.remotes.length === 0 ? (
@@ -520,31 +565,52 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
               role="menu"
             >
               {(props.workspaceEntries.length > 0 ? props.workspaceEntries : [{ id: props.activeWorkspaceId || "workspace_0", title: props.activeWorkspaceTitle }]).map((workspace) => (
-                <button
+                <div
                   key={workspace.id}
-                  type="button"
-                  role="menuitemradio"
-                  aria-checked={workspace.id === props.activeWorkspaceId}
-                  className={`${sidebarStyles.menuButton} ${sidebarStyles.menuButtonTruncate} ${workspace.id === props.activeWorkspaceId ? sidebarStyles.menuButtonSelected : ""}`}
-                  onClick={() => {
-                    setWorkspaceMenu(null);
-                    props.onSelectWorkspace(workspace.id);
-                  }}
+                  className={`${sidebarStyles.workspaceMenuRow} ${workspace.id === props.activeWorkspaceId ? sidebarStyles.menuButtonSelected : ""}`}
                 >
-                  {workspace.title}
-                </button>
+                  <button
+                    className={sidebarStyles.workspaceMenuSelect}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={workspace.id === props.activeWorkspaceId}
+                    onClick={() => {
+                      setWorkspaceMenu(null);
+                      props.onSelectWorkspace(workspace.id);
+                    }}
+                  >
+                    <span className={sidebarStyles.menuButtonCheck}>
+                      {workspace.id === props.activeWorkspaceId ? <Check size={15} /> : null}
+                    </span>
+                    <span className={sidebarStyles.menuButtonTruncate}>{workspace.title}</span>
+                  </button>
+                  <span className={sidebarStyles.workspaceMenuActions}>
+                    <button
+                      className={sidebarStyles.workspaceMenuIconButton}
+                      type="button"
+                      title={`Rename ${workspace.title}`}
+                      aria-label={`Rename ${workspace.title}`}
+                      onClick={() => openWorkspaceDialog("rename", workspace)}
+                    >
+                      <Pencil size={14} />
+                    </button>
+                    <button
+                      className={sidebarStyles.workspaceMenuIconButton}
+                      type="button"
+                      title={`Delete ${workspace.title}`}
+                      aria-label={`Delete ${workspace.title}`}
+                      onClick={() => openWorkspaceDialog("delete", workspace)}
+                      disabled={props.workspaceEntries.length <= 1}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </span>
+                </div>
               ))}
               <div className={sidebarStyles.menuSeparator} />
-              <button className={sidebarStyles.menuButton} type="button" role="menuitem" onClick={() => openWorkspaceDialog("create")}>New Workspace</button>
-              <button className={sidebarStyles.menuButton} type="button" role="menuitem" onClick={() => openWorkspaceDialog("rename")} disabled={!props.activeWorkspaceId}>Rename Workspace</button>
-              <button
-                className={sidebarStyles.menuButton}
-                type="button"
-                role="menuitem"
-                onClick={() => openWorkspaceDialog("delete")}
-                disabled={!props.activeWorkspaceId || props.workspaceEntries.length <= 1}
-              >
-                Delete Workspace
+              <button className={sidebarStyles.menuButton} type="button" role="menuitem" onClick={() => openWorkspaceDialog("create")}>
+                <span className={sidebarStyles.menuButtonIcon}><Plus size={15} /></span>
+                <span>New</span>
               </button>
             </div>,
             document.body,

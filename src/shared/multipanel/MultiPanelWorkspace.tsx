@@ -15,7 +15,9 @@ interface MultiPanelWorkspaceProps {
   className?: string;
   store?: MultiPanelStoreHook;
   renderToolbar?: (paneId: string, path: string) => ReactNode;
+  renderBottomBar?: (tab: MultiPanelTab) => ReactNode;
   renderTabActions?: () => ReactNode;
+  showDefaultPaneControls?: boolean;
   renderContextHeader?: (tab: MultiPanelTab) => ReactNode;
   renderNavigationAside?: ReactNode;
   onNavigationAsideResizeStart?: (event: PointerEvent<HTMLDivElement>) => void;
@@ -33,20 +35,24 @@ const multiPanelStyles = {
     "grid h-full min-h-0 w-full min-w-0 overflow-hidden bg-[#0b0b0b] max-[720px]:bg-[#070707]",
   workspaceRows:
     "grid-rows-[46px_minmax(0,1fr)] max-[720px]:grid-rows-[38px_minmax(0,1fr)]",
+  workspaceRowsWithBottom:
+    "grid-rows-[46px_minmax(0,1fr)_auto] max-[720px]:grid-rows-[38px_minmax(0,1fr)_auto]",
   workspaceWithToolbar:
     "grid-rows-[46px_auto_minmax(0,1fr)] max-[720px]:grid-rows-[38px_auto_minmax(0,1fr)]",
+  workspaceWithToolbarAndBottom:
+    "grid-rows-[46px_auto_minmax(0,1fr)_auto] max-[720px]:grid-rows-[38px_auto_minmax(0,1fr)_auto]",
   tools: "relative z-[2] grid min-w-0 min-h-[92px]",
   body: "grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] overflow-hidden",
   bodyWithNavigation:
-    "grid-cols-[var(--explorer-sidebar-width,260px)_5px_minmax(0,1fr)] max-[980px]:grid-cols-[minmax(0,1fr)]",
+    "grid-cols-[var(--explorer-sidebar-width,260px)_2px_minmax(0,1fr)] max-[980px]:grid-cols-[minmax(0,1fr)]",
   bodyWithAside:
-    "grid-cols-[minmax(0,1fr)_5px_var(--preview-width,280px)] max-[980px]:grid-cols-[minmax(0,1fr)]",
+    "grid-cols-[minmax(0,1fr)_2px_var(--preview-width,280px)] max-[980px]:grid-cols-[minmax(0,1fr)]",
   bodyWithNavigationAndAside:
-    "grid-cols-[var(--explorer-sidebar-width,260px)_5px_minmax(0,1fr)_5px_var(--preview-width,280px)] max-[980px]:grid-cols-[minmax(0,1fr)]",
+    "grid-cols-[var(--explorer-sidebar-width,260px)_2px_minmax(0,1fr)_2px_var(--preview-width,280px)] max-[980px]:grid-cols-[minmax(0,1fr)]",
   panel:
-    "relative grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)] gap-px overflow-hidden bg-[#292929] [contain:layout_paint]",
+    "relative grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)] overflow-hidden bg-transparent [contain:layout_paint]",
   lane:
-    "relative grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)] gap-px overflow-hidden",
+    "relative grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)] overflow-hidden",
   splitter:
     "absolute z-[6] bg-transparent after:absolute after:bg-transparent after:content-[''] hover:after:bg-[#888888]",
   splitterActive: "after:bg-[#888888]",
@@ -55,19 +61,19 @@ const multiPanelStyles = {
   splitterHorizontal:
     "left-0 right-0 h-[11px] -translate-y-[5px] cursor-row-resize after:left-0 after:right-0 after:top-[5px] after:h-px",
   aside:
-    "min-h-0 min-w-0 overflow-hidden border-l border-[#292929] max-[980px]:hidden",
+    "min-h-0 min-w-0 overflow-hidden max-[980px]:hidden",
   asideResizer:
-    "min-h-0 min-w-0 cursor-col-resize border-l border-[#292929] bg-[#0f0f0f] hover:bg-[#303030] max-[980px]:hidden",
+    "relative min-h-0 min-w-0 cursor-col-resize bg-transparent after:absolute after:bottom-0 after:left-1/2 after:top-0 after:w-px after:-translate-x-1/2 after:bg-[#222222] after:content-[''] hover:after:bg-[#3a3a3a] max-[980px]:hidden",
   navigationAside:
     "min-h-0 min-w-0 overflow-hidden max-[980px]:hidden",
   navigationAsideResizer:
-    "min-h-0 min-w-0 cursor-col-resize border-r border-[#292929] bg-[#0f0f0f] hover:bg-[#303030] max-[980px]:hidden",
+    "relative min-h-0 min-w-0 cursor-col-resize bg-transparent after:absolute after:bottom-0 after:left-1/2 after:top-0 after:w-px after:-translate-x-1/2 after:bg-[#222222] after:content-[''] hover:after:bg-[#3a3a3a] max-[980px]:hidden",
   pane:
     "grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)] overflow-hidden bg-[#111111] [container-type:inline-size]",
-  paneActive: "outline outline-1 -outline-offset-1 outline-[#434343]",
+  paneActive: "",
   paneContent: "min-h-0 min-w-0 overflow-hidden",
   paneActions:
-    "flex flex-none items-center gap-0.5 overflow-hidden max-[720px]:gap-px",
+    "flex flex-none items-center gap-1 overflow-hidden px-2 py-1 max-[720px]:gap-0.5 max-[720px]:px-1.5",
   paneActionButton:
     "grid h-[26px] w-7 place-items-center rounded-md border-0 bg-transparent text-[#adadad] hover:bg-[#1d1d1d] hover:text-[#eeeeee] max-[720px]:h-7 max-[720px]:w-[30px]",
 } as const;
@@ -82,11 +88,13 @@ export const MultiPanelWorkspace = memo(function MultiPanelWorkspace(props: Mult
     onDidClosePane,
     onDidCloseTab,
     renderAside,
+    renderBottomBar,
     renderContextHeader,
     renderNavigationAside,
     renderPane,
     renderTabActions,
     renderToolbar,
+    showDefaultPaneControls = true,
     store: providedStore,
   } = props;
   const store = providedStore ?? useMultiPanelStore;
@@ -189,9 +197,35 @@ export const MultiPanelWorkspace = memo(function MultiPanelWorkspace(props: Mult
     hasNavigationAside && !hasAside && multiPanelStyles.bodyWithNavigation,
     !hasNavigationAside && hasAside && multiPanelStyles.bodyWithAside,
   );
+  const toolbarContent = renderToolbar ? renderToolbar(activeTab.activePaneId, activeTab.path) : null;
+  const contextHeaderContent = renderContextHeader ? renderContextHeader(activeTab) : null;
+  const bottomBarContent = renderBottomBar ? renderBottomBar(activeTab) : null;
+  const hasTools = Boolean(toolbarContent || contextHeaderContent);
+  const hasBottomBar = Boolean(bottomBarContent);
+  const workspaceRowsClass = hasTools
+    ? (hasBottomBar ? multiPanelStyles.workspaceWithToolbarAndBottom : multiPanelStyles.workspaceWithToolbar)
+    : (hasBottomBar ? multiPanelStyles.workspaceRowsWithBottom : multiPanelStyles.workspaceRows);
+  const tabStripActions = renderTabActions || showDefaultPaneControls ? (
+    <div className={multiPanelStyles.paneActions}>
+      {renderTabActions ? <MultiPanelTabActionsSlot renderTabActions={renderTabActions} /> : null}
+      {showDefaultPaneControls ? (
+        <>
+          <button className={multiPanelStyles.paneActionButton} type="button" title="Split vertically" onClick={() => splitPane(activePaneId, "vertical")} disabled={!canSplit}>
+            <Columns2 size={16} />
+          </button>
+          <button className={multiPanelStyles.paneActionButton} type="button" title="Split horizontally" onClick={() => splitPane(activePaneId, "horizontal")} disabled={!canSplit}>
+            <Rows2 size={16} />
+          </button>
+          <button className={multiPanelStyles.paneActionButton} type="button" title="Close pane" onClick={() => handleClosePane(activePaneId)} disabled={activeTab.panes.length <= 1}>
+            <PanelTopClose size={16} />
+          </button>
+        </>
+      ) : null}
+    </div>
+  ) : null;
 
   return (
-    <section className={`${multiPanelStyles.workspace} ${renderToolbar || renderContextHeader ? multiPanelStyles.workspaceWithToolbar : multiPanelStyles.workspaceRows}${className ? ` ${className}` : ""}`}>
+    <section className={`${multiPanelStyles.workspace} ${workspaceRowsClass}${className ? ` ${className}` : ""}`}>
       <ChromeTabStrip
         tabs={tabs}
         activeTabId={activeTabId}
@@ -203,30 +237,13 @@ export const MultiPanelWorkspace = memo(function MultiPanelWorkspace(props: Mult
         }}
         onReorderTab={reorderTabs}
         onAddTab={() => addTab(activeTab.path, activeTab.title)}
-        actions={(
-          <div className={multiPanelStyles.paneActions}>
-          {renderTabActions ? <MultiPanelTabActionsSlot renderTabActions={renderTabActions} /> : null}
-          <button className={multiPanelStyles.paneActionButton} type="button" title="Split vertically" onClick={() => splitPane(activePaneId, "vertical")} disabled={!canSplit}>
-            <Columns2 size={16} />
-          </button>
-          <button className={multiPanelStyles.paneActionButton} type="button" title="Split horizontally" onClick={() => splitPane(activePaneId, "horizontal")} disabled={!canSplit}>
-            <Rows2 size={16} />
-          </button>
-          <button className={multiPanelStyles.paneActionButton} type="button" title="Close pane" onClick={() => handleClosePane(activePaneId)} disabled={activeTab.panes.length <= 1}>
-            <PanelTopClose size={16} />
-          </button>
-          </div>
-        )}
+        actions={tabStripActions}
       />
 
-      {renderToolbar || renderContextHeader ? (
+      {hasTools ? (
         <div className={multiPanelStyles.tools}>
-          {renderToolbar ? (
-            <MultiPanelToolbarSlot renderToolbar={renderToolbar} paneId={activeTab.activePaneId} path={activeTab.path} />
-          ) : null}
-          {renderContextHeader ? (
-            <MultiPanelContextHeaderSlot renderContextHeader={renderContextHeader} tab={activeTab} />
-          ) : null}
+          {toolbarContent}
+          {contextHeaderContent}
         </div>
       ) : null}
 
@@ -296,29 +313,15 @@ export const MultiPanelWorkspace = memo(function MultiPanelWorkspace(props: Mult
           </>
         ) : null}
       </div>
+      {bottomBarContent}
     </section>
   );
 });
-
-function MultiPanelToolbarSlot(props: {
-  renderToolbar: NonNullable<MultiPanelWorkspaceProps["renderToolbar"]>;
-  paneId: string;
-  path: string;
-}) {
-  return <>{props.renderToolbar(props.paneId, props.path)}</>;
-}
 
 function MultiPanelTabActionsSlot(props: {
   renderTabActions: NonNullable<MultiPanelWorkspaceProps["renderTabActions"]>;
 }) {
   return <>{props.renderTabActions()}</>;
-}
-
-function MultiPanelContextHeaderSlot(props: {
-  renderContextHeader: NonNullable<MultiPanelWorkspaceProps["renderContextHeader"]>;
-  tab: MultiPanelTab;
-}) {
-  return <>{props.renderContextHeader(props.tab)}</>;
 }
 
 function MultiPanelPaneSlot(props: {

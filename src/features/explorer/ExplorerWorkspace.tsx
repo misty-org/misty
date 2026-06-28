@@ -1,19 +1,24 @@
 import {
   AppWindow,
+  ArrowRightLeft,
   Blocks,
   Clipboard,
+  Columns2,
   Copy,
   Download,
   FilePlus,
   Eye,
+  Folder,
   FolderPlus,
   MessageSquare,
   PanelLeft,
   PanelRight,
+  PanelTopClose,
   Pencil,
   Pin,
   Puzzle,
   RefreshCcw,
+  Rows2,
   Scissors,
   Terminal,
   Trash2,
@@ -27,6 +32,7 @@ import { readText, writeHtml, writeImage, writeText } from "@tauri-apps/plugin-c
 import { useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { MultiPanelWorkspace } from "../../shared/multipanel/MultiPanelWorkspace";
+import { hasTauriInternals } from "../../shared/tauri";
 import { useAppStore } from "../../app/useAppStore";
 import {
   clipboardApplyShared,
@@ -37,6 +43,7 @@ import {
   clipboardWriteFileRefs,
   devicesSnapshot,
   explorerPrepareDragItems,
+  openTerminalAtPath,
   operationQueueRedo,
   operationQueueUndo,
   pluginCommandRun,
@@ -47,7 +54,7 @@ import {
 } from "../../api/misty";
 import { ExplorerPane } from "./components/ExplorerPane";
 import { ExplorerSidebar } from "./components/ExplorerSidebar";
-import { ExplorerToolbar } from "./components/ExplorerToolbar";
+import { ExplorerPaneToolbarActions, ExplorerToolbar } from "./components/ExplorerToolbar";
 import type { ExplorerLocationResult } from "./components/ExplorerToolbar";
 import { DeepSearchOverlay } from "./components/DeepSearchOverlay";
 import { FileInspector } from "./components/FileInspector";
@@ -59,10 +66,11 @@ import {
   selectedPathsForPane,
   useExplorerStore,
 } from "./state/useExplorerStore";
-import type { ExplorerInlineEditState, ExplorerNotification } from "./state/useExplorerStore";
-import { useClaudeSessionStore } from "./state/useClaudeSessionStore";
+import type { ExplorerInlineEditState, ExplorerNotification, ExplorerSortColumn } from "./state/useExplorerStore";
+import { useAiSessionStore } from "./state/useClaudeSessionStore";
 import { useSearchStore } from "./state/useSearchStore";
-import { useMultiPanelStore } from "../../shared/multipanel/useMultiPanelStore";
+import { maxMultiPanelPanes, useMultiPanelStore } from "../../shared/multipanel/useMultiPanelStore";
+import { ProvidersWorkspacePanel } from "../providers/ProvidersWorkspace";
 import { useProvidersStore } from "../providers/useProvidersStore";
 import type {
   ClipboardPayload,
@@ -78,6 +86,7 @@ import type {
 import type { MultiPanelTab } from "../../shared/multipanel/types";
 import { useOperationQueueStore } from "../transfers/useOperationQueueStore";
 import { useTransfersStore } from "../transfers/useTransfersStore";
+import { TransfersWorkspacePanel } from "../transfers/TransfersWorkspace";
 import { shortcutMapFromBindings, shortcutMatchesEvent } from "../../shared/shortcuts";
 import type { ShortcutMap } from "../../shared/shortcuts";
 import { selectAdvancedPreferences, selectGeneralPreferences, selectShortcutPreferences, useSettingsStore } from "../settings/useSettingsStore";
@@ -85,6 +94,8 @@ import { errorText } from "../../shared/format";
 import { pluginCatalogChangedEvent } from "../plugins/pluginEvents";
 import { publishPluginNotifications } from "../plugins/pluginNotifications";
 import { clipboardImagePng } from "./utils/clipboardImage";
+import { revealSearchResultInPane } from "./utils/searchNavigation";
+import type { ExplorerSearchNavigationTarget } from "./utils/searchNavigation";
 
 const minSidebarWidth = 212;
 const maxSidebarWidth = 380;
@@ -95,16 +106,17 @@ const maxClaudePanelWidth = 600;
 const folderHoverOpenDelayMs = 3000;
 const transferRefreshPollMs = 12000;
 const explorerSearchFocusEvent = "misty:explorer-search-focus";
+const transfersTabPath = "misty-transfers://history";
+const remotesTabPath = "misty-remotes://manage";
 const emptyPinnedPaths: string[] = [];
 const emptyProviderRemotes: ProviderRemote[] = [];
 const emptyPluginCommands: PluginCommandEntry[] = [];
 const emptyPluginPanels: PluginPanelEntry[] = [];
 const emptyMountedDevices: MountedDevice[] = [];
-const emptyInspectorTags: string[] = [];
 
 const explorerShellStyles = {
   workspaceBase:
-    "relative grid h-full min-h-0 overflow-hidden grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)_22px] max-[980px]:grid-cols-1 max-[720px]:h-full max-[720px]:grid-rows-[minmax(0,1fr)] max-[720px]:bg-[#070707]",
+    "relative grid h-full min-h-0 overflow-hidden grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)] max-[980px]:grid-cols-1 max-[720px]:h-full max-[720px]:bg-[#070707]",
   workspaceClaudeOpen:
     "grid-cols-[minmax(0,1fr)_5px_var(--claude-panel-width,380px)] max-[980px]:grid-cols-1",
   workspaceCollapsed: "sidebar-collapsed grid-cols-[minmax(0,1fr)]",
@@ -113,10 +125,16 @@ const explorerShellStyles = {
   main:
     "col-start-1 row-start-1 min-h-0 min-w-0 overflow-hidden max-[980px]:row-start-1 max-[980px]:min-w-0",
   bottomBar:
-    "col-span-full row-start-2 flex min-w-0 items-center justify-between border-t border-[#292929] bg-[#080808] px-2 max-[720px]:hidden",
+    "flex min-h-[22px] min-w-0 items-center justify-between border-t border-[#292929] bg-[#080808] px-2 max-[720px]:hidden",
   bottomButton:
     "grid h-5 w-[22px] place-items-center rounded border-0 bg-transparent p-0 text-[#868686] hover:bg-[#171717] hover:text-[#dddddd]",
   bottomButtonSelected: "bg-[#171717] text-[#dddddd]",
+  paneActionButton:
+    "grid h-[22px] w-7 place-items-center rounded-md border-0 bg-transparent p-0 text-[#a7a7a7] hover:bg-[#252525] hover:text-[#eeeeee] disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-[#a7a7a7]",
+  paneHeaderActions:
+    "flex h-full flex-none items-center gap-2.5",
+  paneHeaderActionSection:
+    "flex h-7 flex-none items-center gap-px overflow-hidden rounded-lg border border-[#242424] bg-[#171717] p-0.5",
 } as const;
 
 const executableShortcutCommands = [
@@ -250,8 +268,6 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
   const app = useAppStore((state) => state.app);
   const {
     initialize,
-    sidebarVisible,
-    previewVisible,
     sidebarWidth,
     previewWidth,
     pinnedPaths,
@@ -273,8 +289,6 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
     claudePanelWidth,
   } = useExplorerStore(useShallow((state) => ({
     initialize: state.initialize,
-    sidebarVisible: state.sidebarVisible,
-    previewVisible: state.previewVisible,
     sidebarWidth: state.sidebarWidth,
     previewWidth: state.previewWidth,
     pinnedPaths: state.pinnedPaths,
@@ -299,12 +313,24 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
     providersLoading: state.loading,
     sidebarRemotes: state.providers?.remotes ?? emptyProviderRemotes,
   })));
-  const { activePaneId, workspacePathSignature } = useMultiPanelStore(useShallow((state) => ({
-    activePaneId: state.activePaneId,
-    workspacePathSignature: state.tabs
-      .flatMap((tab) => [tab.path, ...tab.panes.map((pane) => pane.path)])
-      .join("\n"),
-  })));
+  const {
+    activePaneId,
+    activeTabPath,
+    activeTabPreviewVisible,
+    activeTabSidebarVisible,
+    workspacePathSignature,
+  } = useMultiPanelStore(useShallow((state) => {
+    const activeTab = state.tabs.find((tab) => tab.id === state.activeTabId) ?? state.tabs[0];
+    return {
+      activePaneId: state.activePaneId,
+      activeTabPath: activeTab?.path ?? "",
+      activeTabPreviewVisible: activeTab?.previewVisible ?? true,
+      activeTabSidebarVisible: activeTab?.sidebarVisible ?? true,
+      workspacePathSignature: state.tabs
+        .flatMap((tab) => [tab.path, ...tab.panes.map((pane) => pane.path)])
+        .join("\n"),
+    };
+  }));
   const workspaceRef = useRef<HTMLElement | null>(null);
   const mainRef = useRef<HTMLElement | null>(null);
   const resizeFrameRef = useRef<number | null>(null);
@@ -353,6 +379,9 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
     "--preview-width": `${previewWidth}px`,
     "--claude-panel-width": `${claudePanelWidth}px`,
   } as CSSProperties), [claudePanelWidth, previewWidth, sidebarWidth]);
+  const activeTabSupportsSidePanels = !isChromeTabPath(activeTabPath);
+  const sidebarVisible = activeTabSupportsSidePanels && activeTabSidebarVisible;
+  const previewVisible = activeTabSupportsSidePanels && activeTabPreviewVisible;
 
   useEffect(() => {
     activePaneIdRef.current = activePaneId;
@@ -603,6 +632,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
         }
       }, folderHoverOpenDelayMs);
     };
+    if (!hasTauriInternals()) return;
     let webview;
     try {
       webview = getCurrentWebview();
@@ -670,6 +700,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
 
   const renderToolbar = useCallback(
     (paneId: string, path: string) => {
+      if (isChromeTabPath(path)) return null;
       const pluginTab = parsePluginTabPath(path);
       if (pluginTab) {
         return (
@@ -694,6 +725,13 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
   );
   const renderPane = useCallback(
     (paneId: string, path: string) => {
+      const paneActions = activePaneId === paneId ? <ExplorerPaneHeaderActions paneId={paneId} /> : undefined;
+      if (isTransfersTabPath(path)) {
+        return <TransfersWorkspacePanel workspaceId={paneId} />;
+      }
+      if (isRemotesTabPath(path)) {
+        return <ProvidersWorkspacePanel workspaceId={paneId} />;
+      }
       const pluginTab = parsePluginTabPath(path);
       if (pluginTab) {
         return (
@@ -704,13 +742,20 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
           />
         );
       }
-      return <ExplorerPane paneId={paneId} path={path} />;
+      return <ExplorerPane paneId={paneId} path={path} isActive={activePaneId === paneId} paneActions={paneActions} />;
     },
-    [pluginCommands, pluginPanels],
+    [activePaneId, pluginCommands, pluginPanels],
   );
   const inspector = useMemo(() => (previewVisible ? <ConnectedFileInspector /> : undefined), [previewVisible]);
   const openSidebarPathInNewTab = useCallback((path: string, title?: string) => {
     useMultiPanelStore.getState().addTab(path, title);
+  }, []);
+  const handleManageRemotes = useCallback(() => {
+    openRemotesTab();
+  }, []);
+  const handleAddRemote = useCallback(() => {
+    openRemotesTab();
+    void useProvidersStore.getState().openAddRemote();
   }, []);
   const explorerSidebar = useMemo(() => (sidebarVisible ? (
     <ExplorerSidebar
@@ -732,6 +777,8 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
       onRenameWorkspace={handleRenameWorkspace}
       onDeleteWorkspace={handleDeleteWorkspace}
       onOpenInNewTab={openSidebarPathInNewTab}
+      onManageRemotes={handleManageRemotes}
+      onAddRemote={handleAddRemote}
       onUnpinPinnedPath={useExplorerStore.getState().togglePinnedPath}
     />
   ) : undefined), [
@@ -743,6 +790,8 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
     handleDeleteWorkspace,
     handleRenameWorkspace,
     handleSelectWorkspace,
+    handleAddRemote,
+    handleManageRemotes,
     homePath,
     mountRoot,
     mountedDevices,
@@ -757,13 +806,32 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
   ]);
   const renderTabActions = useCallback(
     () => (
-      <ExplorerPluginTabMenu
+      <ExplorerTray
+        aiOpen={claudePanelOpen}
         commands={pluginCommands}
         panels={pluginPanels}
         selectedPath={activeSelectedPath}
+        terminalEnabled={activeTabSupportsSidePanels && canOpenTerminalPath(activeTabPath) && canOpenTerminalPath(activePath)}
+        terminalPath={activePath}
+        onOpenTransfers={openTransfersTab}
+        onToggleAi={() => useExplorerStore.getState().toggleClaudePanel()}
       />
     ),
-    [activeSelectedPath, pluginCommands, pluginPanels],
+    [activePath, activeSelectedPath, activeTabPath, activeTabSupportsSidePanels, claudePanelOpen, pluginCommands, pluginPanels],
+  );
+  const renderBottomBar = useCallback(
+    (tab: MultiPanelTab) => {
+      if (isChromeTabPath(tab.path)) return null;
+      return (
+        <ExplorerBottomBar
+          sidebarVisible={tab.sidebarVisible ?? true}
+          previewVisible={tab.previewVisible ?? true}
+          onToggleSidebar={() => useMultiPanelStore.getState().setTabPanelVisibility(tab.id, { sidebarVisible: !(tab.sidebarVisible ?? true) })}
+          onTogglePreview={() => useMultiPanelStore.getState().setTabPanelVisibility(tab.id, { previewVisible: !(tab.previewVisible ?? true) })}
+        />
+      );
+    },
+    [],
   );
 
   return (
@@ -780,8 +848,10 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
       <main ref={mainRef} className={explorerShellStyles.main}>
         <MultiPanelWorkspace
           className="explorer-multipanel"
+          renderBottomBar={renderBottomBar}
           renderTabActions={renderTabActions}
           renderToolbar={renderToolbar}
+          showDefaultPaneControls={false}
           renderNavigationAside={explorerSidebar}
           onNavigationAsideResizeStart={startSidebarResize}
           renderAside={inspector}
@@ -795,12 +865,6 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
           <ExplorerClaudePanel />
         </>
       ) : null}
-      <ExplorerBottomBar
-        sidebarVisible={sidebarVisible}
-        previewVisible={previewVisible}
-        onToggleSidebar={() => useExplorerStore.getState().setSidebarVisible(!sidebarVisible)}
-        onTogglePreview={() => useExplorerStore.getState().setPreviewVisible(!previewVisible)}
-      />
       <ExplorerRenameStatus edit={inlineEdit} />
       <ExplorerNotifications notifications={notifications} onDismiss={dismissNotification} />
       <DeepSearchOverlay activePaneId={activePaneId} currentPath={activePath} />
@@ -819,6 +883,95 @@ function ExplorerRenameStatus(props: { edit: ExplorerInlineEditState | null }) {
       <span className={renameStatusStyles.text}>{summary.text}</span>
     </div>
   );
+}
+
+const transferBadgeStatuses = new Set<TransferRecord["status"]>([
+  "queued",
+  "pending",
+  "in_progress",
+  "waiting_for_resolution",
+  "failed",
+  "interrupted",
+]);
+
+function ExplorerTray(props: {
+  aiOpen: boolean;
+  commands: PluginCommandEntry[];
+  panels: PluginPanelEntry[];
+  selectedPath: string;
+  terminalEnabled: boolean;
+  terminalPath: string;
+  onOpenTransfers: () => void;
+  onToggleAi: () => void;
+}) {
+  const openTerminal = useCallback(() => {
+    if (!props.terminalEnabled) return;
+    void openTerminalAtPath(props.terminalPath).catch((error: unknown) => {
+      useExplorerStore.getState().pushNotification(`Terminal unavailable: ${errorText(error)}`, "error", 4500);
+    });
+  }, [props.terminalEnabled, props.terminalPath]);
+
+  return (
+    <>
+      <ExplorerTransfersTabButton onClick={props.onOpenTransfers} />
+      <button
+        className={cx(explorerTrayStyles.trigger, props.aiOpen && explorerTrayStyles.triggerActive)}
+        type="button"
+        title="MistyAI"
+        aria-label="MistyAI"
+        aria-pressed={props.aiOpen}
+        onClick={props.onToggleAi}
+      >
+        <MessageSquare size={16} />
+      </button>
+      <button
+        className={explorerTrayStyles.trigger}
+        type="button"
+        title={props.terminalEnabled ? "Open terminal" : "Terminal unavailable for this view"}
+        aria-label="Open terminal"
+        disabled={!props.terminalEnabled}
+        onClick={openTerminal}
+      >
+        <Terminal size={16} />
+      </button>
+      <ExplorerPluginTabMenu
+        commands={props.commands}
+        panels={props.panels}
+        selectedPath={props.selectedPath}
+      />
+    </>
+  );
+}
+
+function ExplorerTransfersTabButton(props: {
+  onClick: () => void;
+}) {
+  const rows = useTransfersStore((state) => state.transfers?.rows ?? []);
+  const active = useMultiPanelStore((state) => {
+    const tab = state.tabs.find((candidate) => candidate.id === state.activeTabId);
+    return Boolean(tab && isTransfersTabPath(tab.path));
+  });
+  const badgeCount = rows.filter((row) => transferBadgeStatuses.has(row.status)).length;
+  return (
+    <span className={explorerTrayStyles.triggerWrap}>
+      <button
+        className={cx(explorerTrayStyles.trigger, active && explorerTrayStyles.triggerActive)}
+        type="button"
+        title="Transfers"
+        aria-label="Transfers"
+        onClick={props.onClick}
+      >
+        <ArrowRightLeft size={16} />
+      </button>
+      {badgeCount > 0 ? (
+        <span className={explorerTrayStyles.badge}>{formatTransferBadgeCount(badgeCount)}</span>
+      ) : null}
+    </span>
+  );
+}
+
+function formatTransferBadgeCount(count: number): string {
+  return count > 99 ? "99+" : String(count);
 }
 
 function renameStatusSummary(edit: ExplorerInlineEditState): { text: string; tone: "ready" | "warning" } {
@@ -961,7 +1114,7 @@ function ExplorerPluginTabMenu(props: {
     <>
       <button
         ref={buttonRef}
-        className={pluginTabMenuStyles.trigger}
+        className={cx(explorerTrayStyles.trigger, open && explorerTrayStyles.triggerActive)}
         type="button"
         title="Extensions"
         aria-haspopup="menu"
@@ -1148,6 +1301,56 @@ function pluginTabPathForMenuItem(plugin: PluginMenuItem, selectedPath: string):
     return `${pluginTabProtocol}//panel?${params.toString()}`;
   }
   return `${pluginTabProtocol}//commands?${params.toString()}`;
+}
+
+function isTransfersTabPath(path: string): boolean {
+  return path === transfersTabPath;
+}
+
+function isRemotesTabPath(path: string): boolean {
+  return path === remotesTabPath;
+}
+
+function isChromeTabPath(path: string): boolean {
+  return isTransfersTabPath(path) || isRemotesTabPath(path);
+}
+
+function canOpenTerminalPath(path: string): boolean {
+  const trimmed = path.trim();
+  return Boolean(trimmed) && !trimmed.includes("://");
+}
+
+function openTransfersTab(): void {
+  const multi = useMultiPanelStore.getState();
+  const existing = multi.tabs.find((tab) => isTransfersTabPath(tab.path));
+  if (existing) {
+    multi.selectTab(existing.id);
+    return;
+  }
+  const tabId = multi.addTab(transfersTabPath, "Transfers");
+  useMultiPanelStore.getState().setTabPanelVisibility(tabId, { sidebarVisible: false, previewVisible: false });
+}
+
+function openRemotesTab(): void {
+  const multi = useMultiPanelStore.getState();
+  const existing = multi.tabs.find((tab) => isRemotesTabPath(tab.path));
+  if (existing) {
+    multi.selectTab(existing.id);
+    return;
+  }
+  const tabId = multi.addTab(remotesTabPath, "Remotes");
+  useMultiPanelStore.getState().setTabPanelVisibility(tabId, { sidebarVisible: false, previewVisible: false });
+}
+
+function toggleActiveTabPanelVisibility(panel: "sidebar" | "preview"): void {
+  const multi = useMultiPanelStore.getState();
+  const activeTab = multi.tabs.find((tab) => tab.id === multi.activeTabId) ?? multi.tabs[0];
+  if (!activeTab || isChromeTabPath(activeTab.path)) return;
+  if (panel === "sidebar") {
+    multi.setTabPanelVisibility(activeTab.id, { sidebarVisible: !(activeTab.sidebarVisible ?? true) });
+  } else {
+    multi.setTabPanelVisibility(activeTab.id, { previewVisible: !(activeTab.previewVisible ?? true) });
+  }
 }
 
 function parsePluginTabPath(path: string): PluginTabState | null {
@@ -1430,8 +1633,6 @@ const notificationStyles = {
 } as const;
 
 const pluginTabMenuStyles = {
-  trigger:
-    "grid h-[26px] w-[28px] place-items-center rounded-md border-0 bg-transparent p-0 text-[#adadad] hover:bg-[#1d1d1d] hover:text-[#eeeeee] aria-expanded:bg-[#1d1d1d] aria-expanded:text-[#eeeeee] max-[720px]:h-7 max-[720px]:w-8",
   menu:
     "fixed z-[2147483000] grid overflow-auto rounded-[11px] border border-[#323232] bg-[rgba(17,17,17,0.98)] p-1.5 text-[#eeeeee] shadow-[0_18px_42px_rgba(0,0,0,0.48)] backdrop-blur-xl",
   header:
@@ -1459,6 +1660,15 @@ const pluginTabMenuStyles = {
     "grid justify-items-center gap-2 px-4 py-5 text-center text-xs text-[#adadad]",
   footerItem:
     "mt-1 flex h-9 w-full items-center gap-2 rounded-lg border-0 border-t border-[#292929] bg-transparent px-2.5 text-left text-xs font-semibold text-[#cfcfcf] hover:bg-[#222222] hover:text-[#f7f7f7]",
+} as const;
+
+const explorerTrayStyles = {
+  triggerWrap: "relative grid place-items-center",
+  trigger:
+    "relative grid h-[26px] w-[30px] place-items-center rounded-md border-0 bg-transparent p-0 text-[#adadad] hover:bg-[#1d1d1d] hover:text-[#eeeeee] disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-[#adadad] aria-expanded:bg-[#1d1d1d] aria-expanded:text-[#eeeeee] max-[720px]:h-7 max-[720px]:w-8",
+  triggerActive: "bg-[#1d1d1d] text-[#eeeeee]",
+  badge:
+    "pointer-events-none absolute right-0 top-0 grid h-[14px] min-w-[14px] translate-x-1/3 -translate-y-1/4 place-items-center rounded-full bg-[#d83e3e] px-[3px] text-[9px] font-bold leading-none text-white shadow-[0_0_0_2px_#101010]",
 } as const;
 
 const pluginTabHostStyles = {
@@ -1713,10 +1923,20 @@ const ConnectedExplorerToolbar = memo(function ConnectedExplorerToolbar(props: {
 }) {
   const state = useExplorerStore(useShallow((explorer) => {
     const pane = explorer.panes[props.paneId];
+    const selectedIds = new Set(pane?.selectedIds ?? []);
+    const selectedEntries = pane?.listing?.entries.filter((entry) => selectedIds.has(entry.id) && !entry.isDeleted) ?? [];
+    const selectedEntry = selectedEntries.length === 1 ? selectedEntries[0] : null;
     return {
       path: pane?.listing?.path ?? props.fallbackPath,
       commandQuery: pane?.commandQuery ?? "",
       viewMode: explorer.paneViewModes[props.paneId] ?? explorer.viewMode,
+      sort: explorer.paneSorts[props.paneId] ?? explorer.sort,
+      showHidden: explorer.paneShowHidden[props.paneId] ?? explorer.showHidden,
+      selectedCount: selectedEntries.length,
+      selectedEntryPath: selectedEntry?.path ?? null,
+      hasRemoteSelection: selectedEntries.some((entry) => entry.location.kind === "remote"),
+      canOpenWithSelected: Boolean(selectedEntry && selectedEntry.kind !== "folder" && selectedEntry.kind !== "symlink"),
+      canCalculateDirectorySizes: Boolean(pane?.listing?.entries.some((entry) => !entry.isDeleted && entry.kind === "folder")),
       canGoBack: Boolean(pane?.backHistory.length),
       canGoForward: Boolean(pane?.forwardHistory.length),
       canCreateFile: explorer.canCreateItem(props.paneId, "file"),
@@ -1754,6 +1974,9 @@ const ConnectedExplorerToolbar = memo(function ConnectedExplorerToolbar(props: {
   const onNavigateLocation = useCallback((path: string) => {
     void useExplorerStore.getState().navigatePane(props.paneId, path);
   }, [props.paneId]);
+  const onNavigateSearchResult = useCallback((target: ExplorerSearchNavigationTarget) => {
+    void revealSearchResultInPane(props.paneId, target);
+  }, [props.paneId]);
   const onBack = useCallback(() => {
     void useExplorerStore.getState().navigateBack(props.paneId);
   }, [props.paneId]);
@@ -1768,6 +1991,18 @@ const ConnectedExplorerToolbar = memo(function ConnectedExplorerToolbar(props: {
   }, [props.paneId]);
   const onViewMode = useCallback((mode: "grid" | "list") => {
     useExplorerStore.getState().setViewMode(mode, props.paneId);
+  }, [props.paneId]);
+  const onSort = useCallback((column: ExplorerSortColumn) => {
+    useExplorerStore.getState().setSort(column, props.paneId);
+  }, [props.paneId]);
+  const onToggleHidden = useCallback(() => {
+    void useExplorerStore.getState().toggleHidden(props.paneId);
+  }, [props.paneId]);
+  const onRefresh = useCallback(() => {
+    void useExplorerStore.getState().refreshPane(props.paneId);
+  }, [props.paneId]);
+  const onCalculateDirectorySizes = useCallback(() => {
+    void useExplorerStore.getState().calculatePaneDirectorySizes(props.paneId, { force: true, notify: true });
   }, [props.paneId]);
   const onCreateFile = useCallback(() => {
     void useExplorerStore.getState().createItem(props.paneId, "file");
@@ -1790,6 +2025,15 @@ const ConnectedExplorerToolbar = memo(function ConnectedExplorerToolbar(props: {
   const onDelete = useCallback(() => {
     void useExplorerStore.getState().deleteSelected(props.paneId);
   }, [props.paneId]);
+  const onDownload = useCallback(() => {
+    void useExplorerStore.getState().downloadSelected(props.paneId);
+  }, [props.paneId]);
+  const onOpenWith = useCallback(() => {
+    void useExplorerStore.getState().openWithSelected(props.paneId);
+  }, [props.paneId]);
+  const onCopyPath = useCallback((path: string) => {
+    void useExplorerStore.getState().copyPath(path);
+  }, []);
   const onUndo = useCallback(() => {
     void undoLatestTransferOperation();
   }, []);
@@ -1817,6 +2061,7 @@ const ConnectedExplorerToolbar = memo(function ConnectedExplorerToolbar(props: {
       pluginCommands={props.pluginCommands}
       onNavigate={onNavigate}
       onNavigateLocation={onNavigateLocation}
+      onNavigateSearchResult={onNavigateSearchResult}
       onBack={onBack}
       onForward={onForward}
       canUndo={canUndo}
@@ -1826,6 +2071,10 @@ const ConnectedExplorerToolbar = memo(function ConnectedExplorerToolbar(props: {
       onParent={onParent}
       onCommandQuery={onCommandQuery}
       onViewMode={onViewMode}
+      onSort={onSort}
+      onToggleHidden={onToggleHidden}
+      onRefresh={onRefresh}
+      onCalculateDirectorySizes={onCalculateDirectorySizes}
       onCreateFile={onCreateFile}
       onCreateFolder={onCreateFolder}
       onCut={onCut}
@@ -1833,10 +2082,128 @@ const ConnectedExplorerToolbar = memo(function ConnectedExplorerToolbar(props: {
       onPaste={onPaste}
       onRename={onRename}
       onDelete={onDelete}
+      onDownload={onDownload}
+      onOpenWith={onOpenWith}
+      onCopyPath={onCopyPath}
       onUndo={onUndo}
       onRedo={onRedo}
       onRunCommand={onRunCommand}
     />
+  );
+});
+
+const ExplorerPaneHeaderActions = memo(function ExplorerPaneHeaderActions(props: { paneId: string }) {
+  return (
+    <div className={explorerShellStyles.paneHeaderActions}>
+      <div className={explorerShellStyles.paneHeaderActionSection}>
+        <ExplorerPaneControls paneId={props.paneId} />
+      </div>
+      <ConnectedExplorerPaneToolbarActions paneId={props.paneId} />
+    </div>
+  );
+});
+
+const ConnectedExplorerPaneToolbarActions = memo(function ConnectedExplorerPaneToolbarActions(props: { paneId: string }) {
+  const state = useExplorerStore(useShallow((explorer) => {
+    const pane = explorer.panes[props.paneId];
+    const selectedIds = new Set(pane?.selectedIds ?? []);
+    const selectedEntries = pane?.listing?.entries.filter((entry) => selectedIds.has(entry.id) && !entry.isDeleted) ?? [];
+    const selectedEntry = selectedEntries.length === 1 ? selectedEntries[0] : null;
+    return {
+      path: pane?.listing?.path ?? "",
+      viewMode: explorer.paneViewModes[props.paneId] ?? explorer.viewMode,
+      sort: explorer.paneSorts[props.paneId] ?? explorer.sort,
+      showHidden: explorer.paneShowHidden[props.paneId] ?? explorer.showHidden,
+      selectedCount: selectedEntries.length,
+      selectedEntryPath: selectedEntry?.path ?? null,
+      hasRemoteSelection: selectedEntries.some((entry) => entry.location.kind === "remote"),
+      canOpenWithSelected: Boolean(selectedEntry && selectedEntry.kind !== "folder" && selectedEntry.kind !== "symlink"),
+      canCalculateDirectorySizes: Boolean(pane?.listing?.entries.some((entry) => !entry.isDeleted && entry.kind === "folder")),
+    };
+  }));
+  const onViewMode = useCallback((mode: "grid" | "list") => {
+    useExplorerStore.getState().setViewMode(mode, props.paneId);
+  }, [props.paneId]);
+  const onSort = useCallback((column: ExplorerSortColumn) => {
+    useExplorerStore.getState().setSort(column, props.paneId);
+  }, [props.paneId]);
+  const onToggleHidden = useCallback(() => {
+    void useExplorerStore.getState().toggleHidden(props.paneId);
+  }, [props.paneId]);
+  const onRefresh = useCallback(() => {
+    void useExplorerStore.getState().refreshPane(props.paneId);
+  }, [props.paneId]);
+  const onCalculateDirectorySizes = useCallback(() => {
+    void useExplorerStore.getState().calculatePaneDirectorySizes(props.paneId, { force: true, notify: true });
+  }, [props.paneId]);
+  const onDownload = useCallback(() => {
+    void useExplorerStore.getState().downloadSelected(props.paneId);
+  }, [props.paneId]);
+  const onOpenWith = useCallback(() => {
+    void useExplorerStore.getState().openWithSelected(props.paneId);
+  }, [props.paneId]);
+  const onCopyPath = useCallback((path: string) => {
+    void useExplorerStore.getState().copyPath(path);
+  }, []);
+
+  return (
+    <ExplorerPaneToolbarActions
+      {...state}
+      onViewMode={onViewMode}
+      onSort={onSort}
+      onToggleHidden={onToggleHidden}
+      onRefresh={onRefresh}
+      onCalculateDirectorySizes={onCalculateDirectorySizes}
+      onDownload={onDownload}
+      onOpenWith={onOpenWith}
+      onCopyPath={onCopyPath}
+    />
+  );
+});
+
+const ExplorerPaneControls = memo(function ExplorerPaneControls(props: { paneId: string }) {
+  const { tabs, activeTabId, splitPane, closePane } = useMultiPanelStore(useShallow((state) => ({
+    tabs: state.tabs,
+    activeTabId: state.activeTabId,
+    splitPane: state.splitPane,
+    closePane: state.closePane,
+  })));
+  const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? tabs[0];
+  const paneCount = activeTab?.panes.length ?? 0;
+  const paneIsInActiveTab = Boolean(activeTab?.panes.some((pane) => pane.id === props.paneId));
+  const canSplit = paneIsInActiveTab && paneCount < maxMultiPanelPanes();
+  const canClose = paneIsInActiveTab && paneCount > 1;
+
+  return (
+    <>
+      <button
+        className={explorerShellStyles.paneActionButton}
+        type="button"
+        title="Split vertically"
+        onClick={() => splitPane(props.paneId, "vertical")}
+        disabled={!canSplit}
+      >
+        <Columns2 size={15} />
+      </button>
+      <button
+        className={explorerShellStyles.paneActionButton}
+        type="button"
+        title="Split horizontally"
+        onClick={() => splitPane(props.paneId, "horizontal")}
+        disabled={!canSplit}
+      >
+        <Rows2 size={15} />
+      </button>
+      <button
+        className={explorerShellStyles.paneActionButton}
+        type="button"
+        title="Close pane"
+        onClick={() => closePane(props.paneId)}
+        disabled={!canClose}
+      >
+        <PanelTopClose size={15} />
+      </button>
+    </>
   );
 });
 
@@ -1880,7 +2247,7 @@ function runExplorerCommand(commandId: string, paneId: string, navigateRoute: (p
       focusExplorerSearch(paneId, "command");
       break;
     case "app.toggle_transfers":
-      navigateRoute("/transfers");
+      openTransfersTab();
       break;
     case "app.open_settings":
       navigateRoute("/settings");
@@ -1944,14 +2311,14 @@ function runExplorerCommand(commandId: string, paneId: string, navigateRoute: (p
       void redoLatestTransferOperation();
       break;
     case "explorer.preview.toggle":
-      explorer.setPreviewVisible(!explorer.previewVisible);
+      toggleActiveTabPanelVisibility("preview");
       break;
     case "explorer.sidebar.toggle":
-      explorer.setSidebarVisible(!explorer.sidebarVisible);
+      toggleActiveTabPanelVisibility("sidebar");
       break;
     case "explorer.toggle_chat":
-      if (explorer.chatOverlayOpen && !useClaudeSessionStore.getState().status?.running) {
-        useClaudeSessionStore.getState().clearConversation();
+      if (explorer.chatOverlayOpen && !useAiSessionStore.getState().status?.running) {
+        useAiSessionStore.getState().clearConversation();
       }
       explorer.toggleChatOverlay();
       break;
@@ -2284,52 +2651,34 @@ function clipboardRefValue(value: string): string {
 
 const ConnectedFileInspector = memo(function ConnectedFileInspector() {
   const activePaneId = useMultiPanelStore((state) => state.activePaneId);
-  const { listing, selectedEntry, selectedCount, tags } = useExplorerStore(useShallow((state) => {
+  const { directorySizes, listing, selectedEntry, selectedCount } = useExplorerStore(useShallow((state) => {
     const pane = state.panes[activePaneId];
     const selectedCount = pane?.selectedIds.length ?? 0;
     const selectedEntry = selectedCount === 1 ? selectedEntryForPane(pane) : null;
-    const libraryItem = selectedEntry
-      ? [
-        ...(state.library?.recentFiles ?? []),
-        ...(state.library?.starredFiles ?? []),
-      ].find((item) => item.path === selectedEntry.path)
-      : undefined;
     return {
+      directorySizes: state.directorySizes,
       listing: pane?.listing ?? null,
       selectedEntry,
       selectedCount,
-      tags: libraryItem?.tags ?? emptyInspectorTags,
     };
   }));
-  const onOpen = useCallback(() => {
-    if (selectedEntry) void useExplorerStore.getState().openEntry(activePaneId, selectedEntry);
-  }, [activePaneId, selectedEntry]);
-  const onDownload = useCallback(() => {
-    void useExplorerStore.getState().downloadSelected(activePaneId);
-  }, [activePaneId]);
-  const onMore = useCallback((x: number, y: number) => {
-    useExplorerStore.getState().openContextMenu(activePaneId, x, y, selectedEntry?.id ?? null);
-  }, [activePaneId, selectedEntry?.id]);
-  const onTagsChange = useCallback((nextTags: string[]) => {
-    if (selectedEntry) void useExplorerStore.getState().setLibraryTags(selectedEntry, nextTags);
-  }, [selectedEntry]);
+  const onCalculateSize = useCallback((path: string) => {
+    void useExplorerStore.getState().calculateDirectorySizes([path], { force: false, notify: false });
+  }, []);
   return (
     <FileInspector
+      directorySizes={directorySizes}
       listing={listing}
       selectedEntry={selectedEntry}
       selectedCount={selectedCount}
-      tags={tags}
-      onOpen={onOpen}
-      onDownload={onDownload}
-      onMore={onMore}
-      onTagsChange={onTagsChange}
+      onCalculateSize={onCalculateSize}
     />
   );
 });
 
 const assistantPanelStyles = {
   claudeResizer:
-    "col-start-2 row-start-1 cursor-col-resize border-x border-[#292929] bg-[#0f0f0f] hover:bg-[#303030] max-[980px]:hidden",
+    "relative col-start-2 row-start-1 cursor-col-resize bg-transparent after:absolute after:bottom-0 after:left-1/2 after:top-0 after:w-px after:-translate-x-1/2 after:bg-[#222222] after:content-[''] hover:after:bg-[#3a3a3a] max-[980px]:hidden",
   claudePanel:
     "col-start-3 row-start-1 grid min-h-0 min-w-0 grid-rows-[42px_minmax(0,1fr)] overflow-hidden bg-[#111111] text-[#e2e2e2] max-[980px]:absolute max-[980px]:bottom-[22px] max-[980px]:right-0 max-[980px]:top-0 max-[980px]:z-20 max-[980px]:w-[min(var(--claude-panel-width,380px),100%)] max-[980px]:border-l max-[980px]:border-[#292929] max-[980px]:shadow-[-16px_0_38px_rgba(0,0,0,0.34)]",
   chatOverlay:
@@ -2408,7 +2757,7 @@ const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
       selectedEntry: selectedEntryForPane(pane),
     };
   }));
-  const { status, messages, error, refreshStatus, sendPrompt, abortPrompt, clearConversation } = useClaudeSessionStore(useShallow((state) => ({
+  const { status, messages, error, refreshStatus, sendPrompt, abortPrompt, clearConversation } = useAiSessionStore(useShallow((state) => ({
     status: state.status,
     messages: state.messages,
     error: state.error,
@@ -2421,7 +2770,7 @@ const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
   const logRef = useRef<HTMLDivElement | null>(null);
   const workingDirectory = listing?.path ?? "";
   const running = status?.running ?? false;
-  const installed = status?.installed ?? false;
+  const configured = status?.configured ?? false;
 
   useEffect(() => {
     void refreshStatus();
@@ -2471,7 +2820,7 @@ const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
         <div className={cx(assistantPanelStyles.status, assistantPanelStyles.chatStatus)}>
           <dl className={assistantPanelStyles.chatDetails}>
             <dt className={assistantPanelStyles.detailLabel}>Status</dt>
-            <dd className={assistantPanelStyles.chatDetailValue}>{status ? (installed ? "Claude CLI ready" : "Claude CLI not found") : "Checking Claude CLI..."}</dd>
+            <dd className={assistantPanelStyles.chatDetailValue}>{status ? (configured ? `Ready (${status.provider}/${status.model})` : "Set OPENAI_API_KEY to enable MistyAI") : "Checking MistyAI..."}</dd>
             <dt className={assistantPanelStyles.detailLabel}>Folder</dt>
             <dd className={assistantPanelStyles.chatDetailValue}>{workingDirectory || "No active folder"}</dd>
             <dt className={assistantPanelStyles.detailLabel}>Selection</dt>
@@ -2484,7 +2833,7 @@ const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
             <p className={assistantPanelStyles.emptyLog}>Ask about the active folder or selected file.</p>
           ) : messages.map((message) => (
             <article key={message.id} className={assistantMessageClass(message.role, "chat")}>
-              <strong className={assistantPanelStyles.messageTitle}>{message.role === "user" ? "You" : message.role === "tool" ? "Tool" : message.role === "error" ? "Error" : "Claude"}</strong>
+              <strong className={assistantPanelStyles.messageTitle}>{message.role === "user" ? "You" : message.role === "tool" ? "Tool" : message.role === "error" ? "Error" : "MistyAI"}</strong>
               <pre className={assistantPanelStyles.messageText}>{message.text || (message.role === "assistant" && running ? "Thinking..." : "")}</pre>
             </article>
           ))}
@@ -2500,8 +2849,8 @@ const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
             className={assistantPanelStyles.textarea}
             value={prompt}
             rows={3}
-            placeholder={installed ? "Ask Misty..." : "Install Claude Code CLI to enable chat"}
-            disabled={!installed || running}
+            placeholder={configured ? "Ask Misty..." : "Set OPENAI_API_KEY to enable MistyAI"}
+            disabled={!configured || running}
             onChange={(event) => setPrompt(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
@@ -2515,7 +2864,7 @@ const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
             {running ? (
               <button className={assistantPanelStyles.composerButton} type="button" onClick={abortPrompt}>Stop</button>
             ) : (
-              <button className={assistantPanelStyles.composerButton} type="submit" disabled={!installed || !prompt.trim()}>Send</button>
+              <button className={assistantPanelStyles.composerButton} type="submit" disabled={!configured || !prompt.trim()}>Send</button>
             )}
           </div>
         </form>
@@ -2533,7 +2882,7 @@ const ExplorerClaudePanel = memo(function ExplorerClaudePanel() {
       selectedEntry: selectedEntryForPane(pane),
     };
   }));
-  const { status, messages, error, refreshStatus, sendPrompt, abortPrompt } = useClaudeSessionStore(useShallow((state) => ({
+  const { status, messages, error, refreshStatus, sendPrompt, abortPrompt } = useAiSessionStore(useShallow((state) => ({
     status: state.status,
     messages: state.messages,
     error: state.error,
@@ -2545,7 +2894,7 @@ const ExplorerClaudePanel = memo(function ExplorerClaudePanel() {
   const logRef = useRef<HTMLDivElement | null>(null);
   const workingDirectory = listing?.path ?? "";
   const running = status?.running ?? false;
-  const installed = status?.installed ?? false;
+  const configured = status?.configured ?? false;
 
   useEffect(() => {
     void refreshStatus();
@@ -2568,14 +2917,14 @@ const ExplorerClaudePanel = memo(function ExplorerClaudePanel() {
   }, [prompt, running, selectedEntry?.path, sendPrompt, workingDirectory]);
 
   return (
-    <aside className={assistantPanelStyles.claudePanel} aria-label="Claude">
+    <aside className={assistantPanelStyles.claudePanel} aria-label="MistyAI">
       <header className={cx(assistantPanelStyles.header, assistantPanelStyles.claudeHeader)}>
         <span className={assistantPanelStyles.headerTitle}>
           <MessageSquare size={16} />
-          Claude
+          MistyAI
           {running ? <small className={assistantPanelStyles.runningBadge}>Running</small> : null}
         </span>
-        <button className={assistantPanelStyles.headerButton} type="button" aria-label="Close Claude" onClick={() => useExplorerStore.getState().setClaudePanelOpen(false)}>
+        <button className={assistantPanelStyles.headerButton} type="button" aria-label="Close MistyAI" onClick={() => useExplorerStore.getState().setClaudePanelOpen(false)}>
           <X size={16} />
         </button>
       </header>
@@ -2583,7 +2932,7 @@ const ExplorerClaudePanel = memo(function ExplorerClaudePanel() {
         <div className={cx(assistantPanelStyles.status, assistantPanelStyles.claudeStatus)}>
           <dl className={assistantPanelStyles.claudeDetails}>
             <dt className={cx(assistantPanelStyles.detailLabel, assistantPanelStyles.claudeDetailLabel)}>Status</dt>
-            <dd className={assistantPanelStyles.claudeDetailValue}>{status ? (installed ? "Claude CLI ready" : "Claude CLI not found") : "Checking Claude CLI..."}</dd>
+            <dd className={assistantPanelStyles.claudeDetailValue}>{status ? (configured ? `Ready (${status.provider}/${status.model})` : "Set OPENAI_API_KEY to enable MistyAI") : "Checking MistyAI..."}</dd>
             <dt className={cx(assistantPanelStyles.detailLabel, assistantPanelStyles.claudeDetailLabel)}>Working directory</dt>
             <dd className={assistantPanelStyles.claudeDetailValue}>{workingDirectory || "No active folder"}</dd>
             <dt className={cx(assistantPanelStyles.detailLabel, assistantPanelStyles.claudeDetailLabel)}>Selection</dt>
@@ -2593,10 +2942,10 @@ const ExplorerClaudePanel = memo(function ExplorerClaudePanel() {
         </div>
         <div ref={logRef} className={cx(assistantPanelStyles.log, assistantPanelStyles.claudeLog)} aria-live="polite">
           {messages.length === 0 ? (
-            <p className={assistantPanelStyles.emptyLog}>Ask Claude about the active folder or selected file.</p>
+            <p className={assistantPanelStyles.emptyLog}>Ask MistyAI about the active folder or selected file.</p>
           ) : messages.map((message) => (
             <article key={message.id} className={assistantMessageClass(message.role, "claude")}>
-              <strong className={assistantPanelStyles.messageTitle}>{message.role === "user" ? "You" : message.role === "tool" ? "Tool" : message.role === "error" ? "Error" : "Claude"}</strong>
+              <strong className={assistantPanelStyles.messageTitle}>{message.role === "user" ? "You" : message.role === "tool" ? "Tool" : message.role === "error" ? "Error" : "MistyAI"}</strong>
               <pre className={assistantPanelStyles.messageText}>{message.text || (message.role === "assistant" && running ? "Thinking..." : "")}</pre>
             </article>
           ))}
@@ -2612,8 +2961,8 @@ const ExplorerClaudePanel = memo(function ExplorerClaudePanel() {
             className={assistantPanelStyles.textarea}
             value={prompt}
             rows={3}
-            placeholder={installed ? "Ask about this folder..." : "Install Claude Code CLI to enable this panel"}
-            disabled={!installed || running}
+            placeholder={configured ? "Ask about this folder..." : "Set OPENAI_API_KEY to enable MistyAI"}
+            disabled={!configured || running}
             onChange={(event) => setPrompt(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
@@ -2626,7 +2975,7 @@ const ExplorerClaudePanel = memo(function ExplorerClaudePanel() {
             {running ? (
               <button className={cx(assistantPanelStyles.composerButton, assistantPanelStyles.claudeComposerButton)} type="button" onClick={abortPrompt}>Stop</button>
             ) : (
-              <button className={cx(assistantPanelStyles.composerButton, assistantPanelStyles.claudeComposerButton)} type="submit" disabled={!installed || !prompt.trim()}>Send</button>
+              <button className={cx(assistantPanelStyles.composerButton, assistantPanelStyles.claudeComposerButton)} type="submit" disabled={!configured || !prompt.trim()}>Send</button>
             )}
           </div>
         </form>
@@ -2659,6 +3008,7 @@ const ExplorerContextMenu = memo(function ExplorerContextMenu() {
     targetEntry,
     hasSelection,
     hasRemoteSelection,
+    canCalculateDirectorySizes,
     targetPinned,
     targetCanOpenWith,
     inTrash,
@@ -2673,6 +3023,7 @@ const ExplorerContextMenu = memo(function ExplorerContextMenu() {
       ? targetPane?.listing?.entries.find((entry) => entry.id === entryId) ?? null
       : null;
     const selectedCount = open ? selectedActionableEntryCount(targetPane) : 0;
+    const selectedFolderCount = open ? selectedFolderEntryCount(targetPane) : 0;
     const remoteSelectedCount = open ? selectedRemoteEntryCount(targetPane) : 0;
     const trashableCount = open ? selectedDeletePathsForPane(targetPane, false).length : 0;
     const permanentDeleteCount = open ? selectedDeletePathsForPane(targetPane, true).length : 0;
@@ -2688,6 +3039,7 @@ const ExplorerContextMenu = memo(function ExplorerContextMenu() {
       targetEntry,
       hasSelection: Boolean(entryId && selectedCount),
       hasRemoteSelection: Boolean(remoteSelectedCount),
+      canCalculateDirectorySizes: selectedFolderCount > 0,
       targetPinned: Boolean(targetEntry && !targetEntry.isDeleted && pinnedPaths.some((path) => normalizedPath(path) === normalizedPath(targetEntry.path))),
       targetCanOpenWith: Boolean(targetEntry && !targetEntry.isDeleted && targetEntry.kind !== "folder" && targetEntry.kind !== "symlink"),
       inTrash: targetPane?.listing?.path === "misty://trash",
@@ -2827,6 +3179,13 @@ const ExplorerContextMenu = memo(function ExplorerContextMenu() {
             disabledReason="Only folders can be pinned."
             onRun={() => run(() => targetEntry && useExplorerStore.getState().togglePinnedPath(targetEntry.path))}
           />
+          <ContextMenuItem
+            icon={<Folder size={17} />}
+            label="Calculate Folder Sizes"
+            disabled={!canCalculateDirectorySizes}
+            disabledReason="Select one or more folders."
+            onRun={() => run(() => calculateSelectedFolderSizes(paneId))}
+          />
           <div className={contextMenuStyles.separator} />
           <ContextMenuItem
             icon={<Copy size={17} />}
@@ -2895,12 +3254,30 @@ function selectedActionableEntryCount(pane: ReturnType<typeof useExplorerStore.g
   return pane.listing.entries.filter((entry) => selected.has(entry.id) && !entry.isDeleted).length;
 }
 
+function selectedFolderEntryCount(pane: ReturnType<typeof useExplorerStore.getState>["panes"][string] | undefined): number {
+  if (!pane?.listing) return 0;
+  const selected = new Set(pane.selectedIds);
+  return pane.listing.entries.filter((entry) =>
+    selected.has(entry.id) && !entry.isDeleted && entry.kind === "folder"
+  ).length;
+}
+
 function selectedRemoteEntryCount(pane: ReturnType<typeof useExplorerStore.getState>["panes"][string] | undefined): number {
   if (!pane?.listing) return 0;
   const selected = new Set(pane.selectedIds);
   return pane.listing.entries.filter((entry) =>
     selected.has(entry.id) && !entry.isDeleted && entry.location.kind === "remote"
   ).length;
+}
+
+function calculateSelectedFolderSizes(paneId: string): void {
+  const pane = useExplorerStore.getState().panes[paneId];
+  if (!pane?.listing) return;
+  const selected = new Set(pane.selectedIds);
+  const paths = pane.listing.entries
+    .filter((entry) => selected.has(entry.id) && !entry.isDeleted && entry.kind === "folder")
+    .map((entry) => entry.path);
+  void useExplorerStore.getState().calculateDirectorySizes(paths, { force: true, notify: true });
 }
 
 function ExplorerBottomBar(props: {

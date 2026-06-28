@@ -242,6 +242,9 @@ impl ProxyService {
             "/api/remote/file/list" | "/api/remotes/file/list" => {
                 self.invoke_embedded("remote.file.list", params).await
             }
+            "/api/remote/file/size" | "/api/remotes/file/size" => {
+                self.invoke_embedded("remote.file.size", params).await
+            }
             "/api/remote/file/download" | "/api/remotes/file/download" => {
                 self.invoke_embedded("remote.file.download", params).await
             }
