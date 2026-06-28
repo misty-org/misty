@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useRef } from "react";
-import type { DragEvent, MouseEvent } from "react";
+import type { DragEvent, MouseEvent, ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { explorerPrepareDragItems } from "../../../api/misty";
 import { FileBrowser } from "./FileBrowser";
@@ -13,9 +13,15 @@ const dragPreviewClassName =
   "pointer-events-none fixed -left-[10000px] -top-[10000px] z-[2147483000] rounded-lg border border-[#3a3a3a] bg-[rgba(20, 20, 20, 0.96)] px-[11px] py-2 text-[13px] font-medium leading-none text-[#f0f0f0] shadow-[0_12px_28px_rgba(0,0,0,0.36)]";
 const paneStyles = {
   shell:
-    "grid h-full min-h-0 w-full min-w-0 grid-rows-[28px_minmax(0,1fr)] overflow-hidden max-[720px]:grid-rows-[28px_minmax(0,1fr)]",
+    "grid h-full min-h-0 w-full min-w-0 grid-rows-[38px_minmax(0,1fr)] overflow-hidden max-[720px]:grid-rows-[36px_minmax(0,1fr)]",
+  shellInactive:
+    "[&_button]:!text-[#5b5b5b] [&_button:hover]:!text-[#666666] [&_footer]:!text-[#555555] [&_img]:opacity-45 [&_span]:!text-[#5b5b5b] [&_svg]:!text-[#5b5b5b] [&_td]:!text-[#5b5b5b] [&_th]:!text-[#606060]",
   path:
-    "flex min-w-0 items-center overflow-hidden text-ellipsis whitespace-nowrap border-b border-[#262626] bg-[#131313] px-3 text-xs text-[#8f8f8f] max-[720px]:min-h-7 max-[720px]:bg-[#121212] max-[720px]:px-2.5 max-[720px]:text-[11px] max-[720px]:text-[#999999]",
+    "grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 overflow-hidden bg-[#111111] py-0 pl-3 pr-3 text-xs text-[#8f8f8f] max-[720px]:min-h-8 max-[720px]:pl-2.5 max-[720px]:pr-2.5 max-[720px]:text-[11px] max-[720px]:text-[#999999]",
+  pathText:
+    "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap",
+  pathActions:
+    "flex h-full flex-none items-center overflow-hidden",
 } as const;
 const emptySelectedIds: string[] = [];
 const preparedDragLocalPaths = new Map<string, { localPath: string; preparedAtMs: number }>();
@@ -26,15 +32,19 @@ let lastDragPreparationNoticeAt = 0;
 interface ExplorerPaneProps {
   paneId: string;
   path: string;
+  isActive?: boolean;
+  paneActions?: ReactNode;
 }
 
 export const ExplorerPane = memo(function ExplorerPane(props: ExplorerPaneProps) {
-  const { pane, viewMode, sort, inlineEdit } = useExplorerStore(useShallow((state) => ({
+  const { pane, viewMode, sort, showHidden, inlineEdit } = useExplorerStore(useShallow((state) => ({
     pane: state.panes[props.paneId],
     viewMode: state.paneViewModes[props.paneId] ?? state.viewMode,
     sort: state.paneSorts[props.paneId] ?? state.sort,
+    showHidden: state.paneShowHidden[props.paneId] ?? state.showHidden,
     inlineEdit: inlineEditForPane(state.inlineEdit, props.paneId),
   })));
+  const directorySizes = useExplorerStore((state) => state.directorySizes);
   const listing = pane?.listing ?? null;
   const hoverTimerRef = useRef<number | null>(null);
   const hoverTargetRef = useRef<string | null>(null);
@@ -170,9 +180,10 @@ export const ExplorerPane = memo(function ExplorerPane(props: ExplorerPaneProps)
   }, []);
 
   return (
-    <div className={paneStyles.shell} data-explorer-pane-id={props.paneId}>
-      <div className={paneStyles.path} title={props.path}>
-        {compactPanePath(props.path)}
+    <div className={`${paneStyles.shell} ${props.isActive === false ? paneStyles.shellInactive : ""}`} data-explorer-pane-id={props.paneId}>
+      <div className={paneStyles.path}>
+        <span className={paneStyles.pathText} title={props.path}>{compactPanePath(props.path)}</span>
+        {props.paneActions ? <div className={paneStyles.pathActions}>{props.paneActions}</div> : null}
       </div>
       <FileBrowser
         paneId={props.paneId}
@@ -182,9 +193,12 @@ export const ExplorerPane = memo(function ExplorerPane(props: ExplorerPaneProps)
         error={pane?.error ?? null}
         viewMode={viewMode}
         sort={sort}
+        showHidden={showHidden}
         commandQuery={pane?.commandQuery ?? ""}
+        directorySizes={directorySizes}
         inlineEdit={inlineEdit}
         onSort={(column) => useExplorerStore.getState().setSort(column, props.paneId)}
+        onToggleHidden={() => void useExplorerStore.getState().toggleHidden(props.paneId)}
         onSelect={handleSelect}
         onClearSelection={handleClearSelection}
         onOpen={handleOpen}

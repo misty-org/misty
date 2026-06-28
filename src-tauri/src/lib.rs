@@ -3,15 +3,18 @@
 mod commands;
 mod core;
 mod error;
+mod plugins;
 mod runtime;
 mod services;
 
 use commands::{
-    app_environment_snapshot, app_snapshot, claude_abort, claude_drain_events, claude_send_message,
-    claude_status, clipboard_apply_shared, clipboard_native_file_refs,
+    ai_abort, ai_drain_events, ai_send_message, ai_status, app_environment_snapshot, app_snapshot,
+    claude_abort, claude_drain_events, claude_send_message, claude_status, clipboard_apply_shared,
+    clipboard_native_file_refs,
     clipboard_publish_image_bytes, clipboard_publish_shared, clipboard_set_local,
     clipboard_shared_image_bytes, clipboard_snapshot, clipboard_write_file_refs, devices_snapshot,
-    explorer_create_item, explorer_delete_items, explorer_library_record_last_opened,
+    explorer_calculate_directory_sizes, explorer_create_item, explorer_delete_items,
+    explorer_directory_size_snapshot, explorer_library_record_last_opened,
     explorer_library_record_recent, explorer_library_set_tags, explorer_library_snapshot,
     explorer_list_directory, explorer_open_association, explorer_open_path, explorer_open_with,
     explorer_paste_items, explorer_path_exists, explorer_path_is_directory,
@@ -20,18 +23,20 @@ use commands::{
     explorer_queue_paste_items, explorer_queue_paste_text, explorer_queue_rename_item,
     explorer_queue_rename_items, explorer_rename_item, explorer_set_open_association,
     file_sync_apply, file_sync_compare, file_sync_pair_remove, file_sync_pair_save,
-    file_sync_pairs_snapshot, operation_queue_cancel, operation_queue_cancel_batch,
-    operation_queue_clear_terminal, operation_queue_redo, operation_queue_resolve_conflict,
-    operation_queue_retry, operation_queue_snapshot, operation_queue_undo, plugin_command_run,
-    plugin_commands_snapshot, plugin_panel_render, providers_config_paths,
-    providers_configure_remote, providers_disconnect_remote, providers_refresh,
-    providers_save_remote, providers_select_remote, providers_snapshot, providers_test_remote,
-    proxy_snapshot, search_cancel_scan, search_get_status, search_init, search_query,
-    search_start_scan, settings_apply_launch_on_login, settings_launch_on_login_snapshot,
-    settings_open_with_associations, settings_remove_open_with_association, settings_save,
-    settings_snapshot, shortcuts_save, shortcuts_snapshot, transfers_delete_all,
-    transfers_delete_selected, transfers_snapshot, workspaces_save, workspaces_snapshot,
+    file_sync_pairs_snapshot, open_terminal_at_path, operation_queue_cancel,
+    operation_queue_cancel_batch, operation_queue_clear_terminal, operation_queue_redo,
+    operation_queue_resolve_conflict, operation_queue_retry, operation_queue_snapshot,
+    operation_queue_undo, plugin_command_run, plugin_commands_snapshot, plugin_panel_render,
+    providers_config_paths, providers_configure_remote, providers_disconnect_remote,
+    providers_refresh, providers_save_remote, providers_select_remote, providers_snapshot,
+    providers_test_remote, proxy_snapshot, search_cancel_scan, search_get_status, search_init,
+    search_query, search_start_scan, settings_apply_launch_on_login,
+    settings_launch_on_login_snapshot, settings_open_with_associations,
+    settings_remove_open_with_association, settings_save, settings_snapshot, shortcuts_save,
+    shortcuts_snapshot, transfers_delete_all, transfers_delete_selected, transfers_snapshot,
+    workspaces_save, workspaces_snapshot,
 };
+use plugins::mac_rounded_corners;
 use runtime::MistyRuntime;
 use services::hub::{
     check_system, ensure_local_access_token, ensure_misty_folders, get_clipboard_proxy_snapshot,
@@ -51,9 +56,35 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_os::init())
         .manage(MistyRuntime::new())
+        .on_window_event(|window, event| {
+            if window.label() != "main" {
+                return;
+            }
+
+            let tauri::WindowEvent::Resized(size) = event else {
+                return;
+            };
+
+            let Some(webview) = window.webviews().into_iter().find(|webview| webview.label() == "main") else {
+                return;
+            };
+
+            let _ = webview.set_bounds(tauri::Rect {
+                position: tauri::Position::Physical(tauri::PhysicalPosition::new(0, 0)),
+                size: tauri::Size::Physical(*size),
+            });
+        })
         .invoke_handler(tauri::generate_handler![
+            mac_rounded_corners::enable_rounded_corners,
+            mac_rounded_corners::enable_modern_window_style,
+            mac_rounded_corners::enable_custom_titlebar_window_style,
+            mac_rounded_corners::reposition_traffic_lights,
             app_snapshot,
             app_environment_snapshot,
+            ai_status,
+            ai_send_message,
+            ai_drain_events,
+            ai_abort,
             claude_status,
             claude_send_message,
             claude_drain_events,
@@ -88,6 +119,8 @@ pub fn run() {
             clipboard_write_file_refs,
             devices_snapshot,
             explorer_list_directory,
+            explorer_directory_size_snapshot,
+            explorer_calculate_directory_sizes,
             explorer_create_item,
             explorer_rename_item,
             explorer_delete_items,
@@ -146,6 +179,7 @@ pub fn run() {
             transfers_snapshot,
             transfers_delete_selected,
             transfers_delete_all,
+            open_terminal_at_path,
             operation_queue_snapshot,
             operation_queue_cancel,
             operation_queue_cancel_batch,

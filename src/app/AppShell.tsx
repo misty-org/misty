@@ -79,3 +79,4 @@ function AppZoomIndicator(props: { visible: boolean; percent: number }) {
     </div>
   );
 }
+  

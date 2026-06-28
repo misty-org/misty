@@ -10,6 +10,7 @@
     "frontendDist": "../dist"
   },
   "app": {
+    "macOSPrivateApi": true,
     "windows": [
       {
         "title": "Misty",
@@ -17,6 +18,9 @@
         "height": 820,
         "minWidth": 900,
         "minHeight": 600,
+        "decorations": false,
+        "transparent": true,
+        "shadow": false,
         "dragDropEnabled": false
       }
     ],
@@ -32,6 +36,9 @@
           "$PICTURE/**",
           "$VIDEO/**",
           "$AUDIO/**",
+          "$HOME/.misty/.cache/**",
+          "$HOME/.misty/mnt/**",
+          "$HOME/.misty/**",
           "$APPDATA/**",
           "$APPLOCALDATA/**",
           "$APPCACHE/**",

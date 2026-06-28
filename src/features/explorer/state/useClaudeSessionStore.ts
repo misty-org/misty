@@ -1,31 +1,31 @@
 import { create } from "zustand";
 import {
-  claudeAbort,
-  claudeDrainEvents,
-  claudeSendMessage,
-  claudeStatus,
+  aiAbort,
+  aiDrainEvents,
+  aiSendMessage,
+  aiStatus,
 } from "../../../api/misty";
-import type { ClaudeStatus, ClaudeStreamEvent } from "../../../api/types";
+import type { AiStatus, AiStreamEvent } from "../../../api/types";
 import { errorText } from "../../../shared/format";
 
-export type ClaudePanelMessage = {
+export type AiPanelMessage = {
   id: string;
   role: "user" | "assistant" | "tool" | "error";
   text: string;
 };
 
-interface SendClaudePromptRequest {
+interface SendAiPromptRequest {
   displayPrompt: string;
   prompt: string;
   cwd: string | null;
 }
 
-interface ClaudeSessionStore {
-  status: ClaudeStatus | null;
-  messages: ClaudePanelMessage[];
+interface AiSessionStore {
+  status: AiStatus | null;
+  messages: AiPanelMessage[];
   error: string | null;
   refreshStatus: () => Promise<void>;
-  sendPrompt: (request: SendClaudePromptRequest) => Promise<void>;
+  sendPrompt: (request: SendAiPromptRequest) => Promise<void>;
   abortPrompt: () => Promise<void>;
   clearConversation: () => void;
 }
@@ -34,16 +34,16 @@ let pollTimer: number | null = null;
 let finalDrainAttempts = 0;
 let nextMessageId = 1;
 
-export const useClaudeSessionStore = create<ClaudeSessionStore>((set, get) => ({
+export const useAiSessionStore = create<AiSessionStore>((set, get) => ({
   status: null,
   messages: [],
   error: null,
 
   refreshStatus: async () => {
     try {
-      const status = await claudeStatus();
+      const status = await aiStatus();
       set({ status, error: status.error });
-      if (status.running) ensureClaudePolling(set, get);
+      if (status.running) ensureAiPolling(set, get);
     } catch (error) {
       set({ error: errorText(error) });
     }
@@ -56,31 +56,31 @@ export const useClaudeSessionStore = create<ClaudeSessionStore>((set, get) => ({
     set((state) => ({
       messages: [
         ...state.messages,
-        { id: claudeMessageId("user"), role: "user", text: trimmed },
-        { id: claudeMessageId("assistant"), role: "assistant", text: "" },
+        { id: aiMessageId("user"), role: "user", text: trimmed },
+        { id: aiMessageId("assistant"), role: "assistant", text: "" },
       ],
       error: null,
     }));
     finalDrainAttempts = 0;
-    ensureClaudePolling(set, get);
+    ensureAiPolling(set, get);
 
     try {
-      set({ status: await claudeSendMessage({ prompt, cwd, resumeSession: true }) });
+      set({ status: await aiSendMessage({ prompt, cwd, resumeSession: true }) });
     } catch (error) {
       const message = errorText(error);
-      stopClaudePolling();
+      stopAiPolling();
       set((state) => ({
         error: message,
-        messages: appendClaudeEvents(removePendingAssistantMessage(state.messages), [claudeErrorEvent(message)]),
+        messages: appendAiEvents(removePendingAssistantMessage(state.messages), [aiErrorEvent(message)]),
       }));
     }
   },
 
   abortPrompt: async () => {
     try {
-      set({ status: await claudeAbort() });
+      set({ status: await aiAbort() });
       finalDrainAttempts = 0;
-      ensureClaudePolling(set, get);
+      ensureAiPolling(set, get);
     } catch (error) {
       set({ error: errorText(error) });
     }
@@ -91,27 +91,29 @@ export const useClaudeSessionStore = create<ClaudeSessionStore>((set, get) => ({
   },
 }));
 
-function ensureClaudePolling(
-  set: (partial: Partial<ClaudeSessionStore> | ((state: ClaudeSessionStore) => Partial<ClaudeSessionStore>)) => void,
-  get: () => ClaudeSessionStore,
+export const useClaudeSessionStore = useAiSessionStore;
+
+function ensureAiPolling(
+  set: (partial: Partial<AiSessionStore> | ((state: AiSessionStore) => Partial<AiSessionStore>)) => void,
+  get: () => AiSessionStore,
 ): void {
   if (pollTimer !== null || typeof window === "undefined") return;
   pollTimer = window.setInterval(() => {
-    void drainClaudeEvents(set, get);
+    void drainAiEvents(set, get);
   }, 400);
 }
 
-async function drainClaudeEvents(
-  set: (partial: Partial<ClaudeSessionStore> | ((state: ClaudeSessionStore) => Partial<ClaudeSessionStore>)) => void,
-  _get: () => ClaudeSessionStore,
+async function drainAiEvents(
+  set: (partial: Partial<AiSessionStore> | ((state: AiSessionStore) => Partial<AiSessionStore>)) => void,
+  _get: () => AiSessionStore,
 ): Promise<void> {
   try {
-    const events = await claudeDrainEvents();
+    const events = await aiDrainEvents();
     if (events.length > 0) {
-      set((state) => ({ messages: appendClaudeEvents(state.messages, events) }));
+      set((state) => ({ messages: appendAiEvents(state.messages, events) }));
     }
 
-    const status = await claudeStatus();
+    const status = await aiStatus();
     set({ status, error: status.error });
 
     if (status.running) {
@@ -119,7 +121,7 @@ async function drainClaudeEvents(
       return;
     }
     if (finalDrainAttempts >= 2) {
-      stopClaudePolling();
+      stopAiPolling();
       return;
     }
     finalDrainAttempts += 1;
@@ -128,13 +130,13 @@ async function drainClaudeEvents(
   }
 }
 
-function stopClaudePolling(): void {
+function stopAiPolling(): void {
   if (pollTimer === null || typeof window === "undefined") return;
   window.clearInterval(pollTimer);
   pollTimer = null;
 }
 
-function appendClaudeEvents(messages: ClaudePanelMessage[], events: ClaudeStreamEvent[]): ClaudePanelMessage[] {
+function appendAiEvents(messages: AiPanelMessage[], events: AiStreamEvent[]): AiPanelMessage[] {
   let next = messages;
   for (const event of events) {
     if (event.kind === "text") {
@@ -144,35 +146,35 @@ function appendClaudeEvents(messages: ClaudePanelMessage[], events: ClaudeStream
       if (last?.role === "assistant") {
         next = [...next.slice(0, -1), { ...last, text: `${last.text}${text}` }];
       } else {
-        next = [...next, { id: claudeMessageId("assistant"), role: "assistant", text }];
+        next = [...next, { id: aiMessageId("assistant"), role: "assistant", text }];
       }
     } else if (event.kind === "result") {
       const text = event.text;
       if (!text) continue;
       const last = next[next.length - 1];
       if (last?.role !== "assistant" || !last.text.includes(text)) {
-        next = [...next, { id: claudeMessageId("assistant-result"), role: "assistant", text }];
+        next = [...next, { id: aiMessageId("assistant-result"), role: "assistant", text }];
       }
     } else if (event.kind === "tool_use") {
       next = [...next, {
-        id: claudeMessageId("tool"),
+        id: aiMessageId("tool"),
         role: "tool",
         text: `${event.toolName}${event.toolInput ? `\n${event.toolInput}` : ""}`,
       }];
     } else if (event.kind === "tool_result" && event.toolResult) {
       next = [...next, {
-        id: claudeMessageId("tool-result"),
+        id: aiMessageId("tool-result"),
         role: "tool",
         text: event.toolResult,
       }];
     } else if (event.kind === "error" && event.text) {
-      next = [...next, { id: claudeMessageId("error"), role: "error", text: event.text }];
+      next = [...next, { id: aiMessageId("error"), role: "error", text: event.text }];
     }
   }
   return next;
 }
 
-function removePendingAssistantMessage(messages: ClaudePanelMessage[]): ClaudePanelMessage[] {
+function removePendingAssistantMessage(messages: AiPanelMessage[]): AiPanelMessage[] {
   const last = messages[messages.length - 1];
   if (last?.role === "assistant" && last.text.trim().length === 0) {
     return messages.slice(0, -1);
@@ -180,13 +182,13 @@ function removePendingAssistantMessage(messages: ClaudePanelMessage[]): ClaudePa
   return messages;
 }
 
-function claudeMessageId(prefix: string): string {
+function aiMessageId(prefix: string): string {
   const id = `${prefix}-${Date.now()}-${nextMessageId}`;
   nextMessageId += 1;
   return id;
 }
 
-function claudeErrorEvent(message: string): ClaudeStreamEvent {
+function aiErrorEvent(message: string): AiStreamEvent {
   return {
     kind: "error",
     sessionId: null,

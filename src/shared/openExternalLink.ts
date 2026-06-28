@@ -2,6 +2,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { platform } from "@tauri-apps/plugin-os";
 import { selectGeneralPreferences, useSettingsStore } from "../features/settings/useSettingsStore";
 import type { MouseEvent } from "react";
+import { hasTauriInternals } from "./tauri";
 
 export interface ProviderAuthorizationOpenResult {
   strategy: "in-app-browser" | "system-browser" | "window-open";
@@ -115,17 +116,10 @@ async function openNativeUrl(url: string): Promise<void> {
 
 function nativePlatform(): string {
   try {
-    return platform();
+    return hasTauriInternals() ? platform() : "browser";
   } catch {
     return "browser";
   }
-}
-
-function hasTauriInternals(): boolean {
-  const internals = (window as typeof window & {
-    __TAURI_INTERNALS__?: { invoke?: unknown };
-  }).__TAURI_INTERNALS__;
-  return typeof internals?.invoke === "function";
 }
 
 function errorTextForOpen(error: unknown): string {

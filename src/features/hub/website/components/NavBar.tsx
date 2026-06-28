@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../AuthContext";
 import { useUserStore } from "../store/userStore";
+import mistyLogo from "../../../../assets/misty.png";
 
 const navItems = [
   { to: "/download", label: "Download" },
@@ -66,7 +67,7 @@ export default function Navbar() {
         className="w-full mx-auto h-16 flex items-center justify-between px-3 sm:px-4"
       >
         <NavLink to="/" className="group flex items-center gap-1">
-          <img src="/misty.png" alt="Misty logo" className="w-13 h-13" />
+          <img src={mistyLogo} alt="Misty logo" className="w-13 h-13" />
           <span className="text-lg font-semibold text-text tracking-tight">Misty</span>
         </NavLink>
 

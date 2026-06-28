@@ -13,6 +13,7 @@ scripts/.signing.env
 
 **/build/
 **/dist/
+**/dist-web/
 **/node_modules/
 **/target/
 **/src-tauri/gen/*

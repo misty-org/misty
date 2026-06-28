@@ -37,7 +37,6 @@ export function isRememberableAppRoute(path: string): boolean {
     pathname === "/providers" ||
     pathname === "/transfers" ||
     pathname === "/account" ||
-    pathname === "/settings" ||
     pathname === "/diagnostics"
   );
 }

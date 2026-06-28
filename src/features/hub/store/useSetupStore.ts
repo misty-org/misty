@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
+import { hasTauriInternals } from "../../../shared/tauri";
 import { fetchMe, type MeResponse } from "../website/pages/Dashboard/api";
 import {
   buildInstallerStatus,
@@ -89,6 +90,9 @@ function browserSystemFallback(): InstallerStatus {
 }
 
 async function loadInstallerStatus(nativeOverride?: NativeSystemInfo) {
+  if (!hasTauriInternals()) {
+    return browserSystemFallback();
+  }
   const native = nativeOverride ?? (await invoke<NativeSystemInfo>("check_system"));
   const folderProbes = await invoke<PathProbe[]>("ensure_misty_folders", {
     folders: requiredMistyFolders,
@@ -147,6 +151,10 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
   addEvent: (event) => set((state) => ({ events: [...state.events, event] })),
   loadSystem: async () => {
     try {
+      if (!hasTauriInternals()) {
+        set({ status: browserSystemFallback(), systemError: "" });
+        return;
+      }
       let native = await invoke<NativeSystemInfo>("check_system");
       if (native.current_user) {
         native = await refreshLocalAccessToken();
@@ -165,6 +173,7 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
   },
   refreshLocalAccessToken: async () => {
     try {
+      if (!hasTauriInternals()) return;
       const native = await refreshLocalAccessToken();
       if (!native.current_user) {
         return;
@@ -177,6 +186,19 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
     }
   },
   saveAuthenticatedUser: async (user, license) => {
+    if (!hasTauriInternals()) {
+      const status = {
+        ...browserSystemFallback(),
+        current_user: user,
+        current_license: license ?? null,
+      };
+      set((state) => ({
+        status,
+        systemError: "",
+        events: [...state.events, { level: "info", source: "installer", message: `Signed in as ${user.email}.` }],
+      }));
+      return;
+    }
     const native = await invoke<NativeSystemInfo>("save_authenticated_user", {
       user,
       license: license ?? null,
@@ -191,6 +213,9 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
   setSelectedVersion: (selectedVersion) => set({ selectedVersion }),
   launchMisty: async () => {
     try {
+      if (!hasTauriInternals()) {
+        throw new Error("Launching Misty is only available in the Tauri app.");
+      }
       const result = await invoke<string>("launch_misty");
       set((state) => ({
         events: [...state.events, { level: "info", source: "launcher", message: result }],
@@ -203,6 +228,9 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
   },
   restartMisty: async () => {
     try {
+      if (!hasTauriInternals()) {
+        throw new Error("Restarting Misty is only available in the Tauri app.");
+      }
       const result = await invoke<string>("restart_misty");
       set((state) => ({
         events: [...state.events, { level: "info", source: "launcher", message: result }],
@@ -215,6 +243,14 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
   },
   signOut: async () => {
     try {
+      if (!hasTauriInternals()) {
+        const status = browserSystemFallback();
+        set((state) => ({
+          status,
+          events: [...state.events, { level: "info", source: "installer", message: "Signed out of Misty." }],
+        }));
+        return;
+      }
       const native = await invoke<NativeSystemInfo>("sign_out_misty");
       const status = await loadInstallerStatus(native);
       set((state) => ({
@@ -231,6 +267,14 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
     const { saveAuthenticatedUser, status, selectedRelease } = get();
     const release = selectedRelease();
     const installUser = status?.current_user ?? userOverride ?? null;
+
+    if (!hasTauriInternals()) {
+      set({
+        installState: "error",
+        events: [{ level: "error", source: "installer", message: "Installing Misty is only available in the Tauri app." }],
+      });
+      return;
+    }
 
     if (!installUser) {
       set({

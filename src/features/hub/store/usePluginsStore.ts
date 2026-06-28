@@ -1,5 +1,6 @@
-import { convertFileSrc, invoke, isTauri } from "@tauri-apps/api/core";
+import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
+import { hasTauriInternals, safeTauriAssetUrl } from "../../../shared/tauri";
 import type {
   LocalPluginRecord,
   PluginArtifact,
@@ -181,8 +182,8 @@ function resolveLocalAssetUrl(path: string | undefined) {
   if (/^(https?:|asset:|file:)/i.test(path)) {
     return path;
   }
-  if (isTauri()) {
-    return convertFileSrc(path);
+  if (hasTauriInternals()) {
+    return safeTauriAssetUrl(path);
   }
   return path;
 }
@@ -276,6 +277,9 @@ function chooseSelectedPluginId(
 }
 
 async function scanLocalPlugins() {
+  if (!hasTauriInternals()) {
+    return [];
+  }
   const plugins = await invoke<LocalPluginRecord[]>("scan_local_plugins");
   return dedupeLocalPlugins(plugins);
 }
@@ -456,6 +460,10 @@ export const usePluginsStore = create<PluginsStore>((set, get) => ({
     await refreshPlugins(set, get, platform);
   },
   installPlugin: async (plugin) => {
+    if (!hasTauriInternals()) {
+      set({ error: "Installing extensions is only available in the Tauri app." });
+      return;
+    }
     if (!plugin.artifact?.url) {
       set({ error: `No install bundle is configured for ${plugin.name}.` });
       return;
@@ -478,6 +486,10 @@ export const usePluginsStore = create<PluginsStore>((set, get) => ({
   },
   selectPlugin: (selectedPluginId) => set({ selectedPluginId }),
   setPluginEnabled: async (plugin, enabled) => {
+    if (!hasTauriInternals()) {
+      set({ error: "Managing installed extensions is only available in the Tauri app." });
+      return;
+    }
     set({ actionPluginId: plugin.id, error: "", notice: "" });
     try {
       const result = await invoke<string>("set_plugin_enabled", {
@@ -498,6 +510,10 @@ export const usePluginsStore = create<PluginsStore>((set, get) => ({
     void rebuildCatalogState(set, get, { query, loading: false });
   },
   uninstallPlugin: async (plugin) => {
+    if (!hasTauriInternals()) {
+      set({ error: "Uninstalling extensions is only available in the Tauri app." });
+      return;
+    }
     set({ actionPluginId: plugin.id, error: "", notice: "" });
     try {
       const result = await invoke<string>("uninstall_plugin", {

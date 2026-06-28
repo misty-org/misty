@@ -1,4 +1,3 @@
-import { convertFileSrc } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { readText, writeHtml, writeImage, writeText } from "@tauri-apps/plugin-clipboard-manager";
 import {
@@ -83,6 +82,7 @@ import type {
   FileSyncPlannedAction,
   OperationQueueSnapshot,
   PasteItem,
+  PreparedOpenItem,
   ProviderRemote,
   TransferRecord,
   TransferType,
@@ -98,11 +98,12 @@ import { errorText } from "../../../shared/format";
 import { selectAdvancedPreferences, selectGeneralPreferences, useSettingsStore } from "../../settings/useSettingsStore";
 import { useProvidersStore } from "../../providers/useProvidersStore";
 import { useExplorerStore } from "../state/useExplorerStore";
-import { useClaudeSessionStore } from "../state/useClaudeSessionStore";
+import { useAiSessionStore } from "../state/useClaudeSessionStore";
 import { useFileSyncStore } from "../state/useFileSyncStore";
 import type { FileSyncSession } from "../state/useFileSyncStore";
 import { clipboardImagePng } from "../utils/clipboardImage";
 import { formatBytes, formatDate } from "../utils/fileFormat";
+import { hasTauriInternals, safeTauriAssetUrl } from "../../../shared/tauri";
 
 const mobileFilesLastPathStorageKey = "misty.mobile.files.lastPath";
 const mobileFilesTabsStorageKey = "misty.mobile.files.tabs";
@@ -686,7 +687,7 @@ export function MobileFilesPage() {
     setError(null);
     try {
       if (mediaInfo.kind === "image") {
-        const localPath = await localPathForMobileEntry(entry);
+        const localPath = await preparedPreviewPathForMobileEntry(entry);
         const url = await loadMobileImageAssetUrl(localPath);
         setMedia((current) => {
           revokeMobileObjectUrl(current?.url);
@@ -713,7 +714,7 @@ export function MobileFilesPage() {
         entry,
         loading: false,
         error: null,
-        url: convertFileSrc(localPath),
+        url: safeTauriAssetUrl(localPath),
         mimeType: mediaInfo.mimeType,
         kind: mediaInfo.kind,
       });
@@ -734,6 +735,10 @@ export function MobileFilesPage() {
 
   const openFileWith = async (entry: FileEntry) => {
     if (!isMobileOpenWithEntry(entry)) return;
+    if (!hasTauriInternals()) {
+      setError("Choosing a local application is only available in the Tauri app.");
+      return;
+    }
     setOpening(true);
     setError(null);
     try {
@@ -981,6 +986,10 @@ export function MobileFilesPage() {
 
   const uploadIntoCurrentFolder = async (sourceKind: "files" | "folders") => {
     if (!canAddInCurrentFolder) return;
+    if (!hasTauriInternals()) {
+      setError("Uploading local files is only available in the Tauri app.");
+      return;
+    }
     setActionBusy(true);
     setError(null);
     let debugId: string | null = null;
@@ -1346,7 +1355,7 @@ export function MobileFilesPage() {
     try {
       const imageMimeType = mobilePreviewImageMimeType(entry);
       if (imageMimeType) {
-        const localPath = await localPathForMobileEntry(entry);
+        const localPath = await preparedPreviewPathForMobileEntry(entry);
         const url = await loadMobileImageAssetUrl(localPath);
         setPreview({
           entry,
@@ -1852,7 +1861,7 @@ export function MobileFilesPage() {
               </div>
               <div className="grid gap-1">
                 <dt className="text-[11px] font-bold uppercase text-[#919191]">Modified</dt>
-                <dd className="m-0 min-w-0 break-words text-[13px] text-[#ededed]">{formatDate(detailEntry.modifiedMs)}</dd>
+                <dd className="m-0 min-w-0 break-words text-[13px] text-[#ededed]">{formatDate(detailEntry.remoteModified ?? detailEntry.modifiedMs)}</dd>
               </div>
               <div className="grid gap-1">
                 <dt className="text-[11px] font-bold uppercase text-[#919191]">Type</dt>
@@ -2458,7 +2467,7 @@ function MobileClaudeSheet(props: {
   selectedPath: string | null;
   onClose: () => void;
 }) {
-  const { status, messages, error, refreshStatus, sendPrompt, abortPrompt, clearConversation } = useClaudeSessionStore(useShallow((state) => ({
+  const { status, messages, error, refreshStatus, sendPrompt, abortPrompt, clearConversation } = useAiSessionStore(useShallow((state) => ({
     status: state.status,
     messages: state.messages,
     error: state.error,
@@ -2470,7 +2479,7 @@ function MobileClaudeSheet(props: {
   const [prompt, setPrompt] = useState("");
   const logRef = useRef<HTMLDivElement | null>(null);
   const running = status?.running ?? false;
-  const installed = status?.installed ?? false;
+  const configured = status?.configured ?? false;
 
   useEffect(() => {
     void refreshStatus();
@@ -2497,15 +2506,15 @@ function MobileClaudeSheet(props: {
         className={`${mobileSheetClass} grid max-h-[min(calc(100dvh-var(--misty-safe-top)-18px),760px)] grid-rows-[auto_auto_minmax(160px,1fr)_auto] gap-3`}
         role="dialog"
         aria-modal="true"
-        aria-label="Claude"
+        aria-label="MistyAI"
         onClick={(event) => event.stopPropagation()}
       >
-        <MobileSheetHeader eyebrow="Assistant" title="Claude" closeLabel="Close Claude" onClose={props.onClose} />
+        <MobileSheetHeader eyebrow="Assistant" title="MistyAI" closeLabel="Close MistyAI" onClose={props.onClose} />
         <div className="grid gap-2 rounded-[14px] border border-white/10 bg-[#0f0f0f] p-[11px]">
           <dl className="m-0 grid gap-2">
             <div className="grid min-w-0 gap-[3px]">
               <dt className="text-[11px] font-extrabold uppercase tracking-normal text-[#919191]">Status</dt>
-              <dd className="m-0 min-w-0 break-words text-[13px] leading-[1.35] text-[#f3f3f3]">{status ? (installed ? "Claude CLI ready" : "Claude CLI not found") : "Checking Claude CLI..."}</dd>
+              <dd className="m-0 min-w-0 break-words text-[13px] leading-[1.35] text-[#f3f3f3]">{status ? (configured ? `Ready (${status.provider}/${status.model})` : "Set OPENAI_API_KEY to enable MistyAI") : "Checking MistyAI..."}</dd>
             </div>
             <div className="grid min-w-0 gap-[3px]">
               <dt className="text-[11px] font-extrabold uppercase tracking-normal text-[#919191]">Folder</dt>
@@ -2520,7 +2529,7 @@ function MobileClaudeSheet(props: {
         </div>
         <div ref={logRef} className="grid min-h-40 content-start gap-[9px] overflow-auto rounded-[14px] border border-white/10 bg-[#080808] p-2.5 [-webkit-overflow-scrolling:touch]" aria-live="polite">
           {messages.length === 0 ? (
-            <p className="m-0 text-[13px] leading-[1.4] text-[#919191]">Ask Claude about the current folder or selected file.</p>
+            <p className="m-0 text-[13px] leading-[1.4] text-[#919191]">Ask MistyAI about the current folder or selected file.</p>
           ) : messages.map((message) => (
             <article
               key={message.id}
@@ -2531,7 +2540,7 @@ function MobileClaudeSheet(props: {
                 message.role !== "user" && message.role !== "error" ? "border-white/10 bg-[#0f0f0f]" : "",
               ].filter(Boolean).join(" ")}
             >
-              <strong className="text-xs font-extrabold text-[#f0f0f0]">{message.role === "user" ? "You" : message.role === "tool" ? "Tool" : message.role === "error" ? "Error" : "Claude"}</strong>
+              <strong className="text-xs font-extrabold text-[#f0f0f0]">{message.role === "user" ? "You" : message.role === "tool" ? "Tool" : message.role === "error" ? "Error" : "MistyAI"}</strong>
               <pre className="m-0 break-words font-sans text-xs leading-[1.45] text-[#cfcfcf] [white-space:pre-wrap]">{message.text || (message.role === "assistant" && running ? "Thinking..." : "")}</pre>
             </article>
           ))}
@@ -2547,8 +2556,8 @@ function MobileClaudeSheet(props: {
             className="min-w-0 resize-none rounded-[14px] border border-white/10 bg-[#080808] p-3 font-inherit leading-[1.4] text-[#f0f0f0] outline-none focus:border-[#b2b2b26b] focus:shadow-[0_0_0_3px_rgba(183,183,183,0.12)] disabled:opacity-60"
             value={prompt}
             rows={3}
-            placeholder={installed ? "Ask about this folder..." : "Install Claude Code CLI to enable this panel"}
-            disabled={!installed || running}
+            placeholder={configured ? "Ask about this folder..." : "Set OPENAI_API_KEY to enable MistyAI"}
+            disabled={!configured || running}
             onChange={(event) => setPrompt(event.target.value)}
           />
           <div className="grid grid-cols-2 gap-2">
@@ -2558,7 +2567,7 @@ function MobileClaudeSheet(props: {
             {running ? (
               <button type="button" className={mobileDangerActionClass} onClick={abortPrompt}>Stop</button>
             ) : (
-              <button type="submit" className={mobilePrimaryActionClass} disabled={!installed || !prompt.trim()}>Send</button>
+              <button type="submit" className={mobilePrimaryActionClass} disabled={!configured || !prompt.trim()}>Send</button>
             )}
           </div>
         </form>
@@ -2685,7 +2694,7 @@ function MobileFilesActionsSheet(props: {
           />
           <MobileFileActionButton
             icon={MessageSquare}
-            label="Claude"
+            label="MistyAI"
             note={props.claudeOpen ? "Already open" : undefined}
             onClick={props.onClaude}
           />
@@ -3498,7 +3507,7 @@ function mobileFileIconStyleClass(entry: FileEntry, viewMode: MobileFilesViewMod
 }
 
 function mobileFileMeta(entry: FileEntry): string {
-  const modified = formatDate(entry.modifiedMs);
+  const modified = formatDate(entry.remoteModified ?? entry.modifiedMs);
   if (entry.kind === "folder") return modified ? `Modified ${modified}` : "Folder";
   return modified ? `Modified ${modified}` : formatBytes(entry.sizeBytes);
 }
@@ -4334,6 +4343,11 @@ function previewPayloadIsText(mimeType: string): boolean {
   return mimeType.startsWith("text/") || mimeType.startsWith("application/json");
 }
 
+interface MobilePreparedPreviewPath {
+  path: string;
+  prepared: PreparedOpenItem | null;
+}
+
 async function localPathForMobileEntry(entry: FileEntry): Promise<string> {
   if (entry.location.kind === "local") return entry.path;
   return (await explorerPrepareOpenItem({
@@ -4343,8 +4357,18 @@ async function localPathForMobileEntry(entry: FileEntry): Promise<string> {
   })).localPath;
 }
 
-async function loadMobileImageAssetUrl(path: string): Promise<string> {
-  const baseUrl = convertFileSrc(path);
+async function preparedPreviewPathForMobileEntry(entry: FileEntry): Promise<MobilePreparedPreviewPath> {
+  if (entry.location.kind === "local") return { path: entry.path, prepared: null };
+  const prepared = await explorerPrepareOpenItem({
+    path: entry.path,
+    sizeBytes: entry.sizeBytes,
+    remoteModified: entry.remoteModified,
+  });
+  return { path: prepared.localPath, prepared };
+}
+
+async function loadMobileImageAssetUrl(preparedPath: MobilePreparedPreviewPath): Promise<string> {
+  const baseUrl = safeTauriAssetUrl(preparedPath.path);
   let lastError: unknown = null;
   for (let attempt = 0; attempt < mobileImagePreviewLoadAttempts; attempt += 1) {
     const url = attempt === 0 ? baseUrl : mobileCacheBustedUrl(baseUrl, attempt);
@@ -4358,7 +4382,14 @@ async function loadMobileImageAssetUrl(path: string): Promise<string> {
       }
     }
   }
-  throw lastError instanceof Error ? lastError : new Error("Unable to load image preview.");
+  const baseMessage = lastError instanceof Error ? lastError.message : "Unable to load image preview.";
+  throw new Error(`${baseMessage}${mobilePreviewDiagnosticSuffix(preparedPath)}`);
+}
+
+function mobilePreviewDiagnosticSuffix(preparedPath: MobilePreparedPreviewPath): string {
+  const prepared = preparedPath.prepared;
+  if (!prepared) return "";
+  return ` Cache hit: ${prepared.cacheHit ?? prepared.cached}. Local: ${preparedPath.path}. Source: ${prepared.sourcePath ?? "unknown"}. Cache: ${prepared.cachePath ?? "unknown"}.`;
 }
 
 function waitForMobileImage(url: string): Promise<void> {

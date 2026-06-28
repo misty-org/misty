@@ -1,4 +1,5 @@
 import { useState } from "react";
+import mistyHubImage from "../../../media/misty-hub.png";
 
 const PUBLIC_ASSET_BASE_URL =
   import.meta.env.VITE_PUBLIC_ASSET_BASE_URL || "https://public.mistysys.com";
@@ -24,12 +25,12 @@ const tabs = [
   {
     label: "Extensions",
     key: "extensions",
-    images: [{ src: "/misty-plugins.png", alt: "Misty extensions view" }],
+    images: [{ src: mistyHubImage, alt: "Misty extensions view" }],
   },
   {
     label: "Vault",
     key: "vault",
-    images: [{ src: "/misty-backup.png", alt: "Misty vault view" }],
+    images: [{ src: mistyHubImage, alt: "Misty vault view" }],
   },
 ];
 
@@ -85,10 +86,6 @@ export default function FeatureDemo() {
 
       {/* Content Area — preload all images, show active tab as a carousel */}
       <div className="group w-full overflow-hidden border-none relative">
-        {tabs.flatMap((tab) =>
-          tab.images.map((img) => <img key={`${tab.key}:${img.src}`} src={img.src} alt="" className="hidden" />),
-        )}
-
         <div className="w-full overflow-hidden">
           <div
             className={`flex transform-gpu will-change-transform ${transitionEnabled ? "transition-transform duration-500 ease-out" : ""}`}
@@ -127,7 +124,14 @@ export default function FeatureDemo() {
                 className="shrink-0"
                 style={{ width: totalSlides > 0 ? `${100 / totalSlides}%` : "100%" }}
               >
-                <img src={img.src} alt={img.alt} className="w-full block select-none" draggable={false} />
+                <img
+                  src={img.src}
+                  alt={img.alt}
+                  className="w-full block select-none"
+                  decoding="async"
+                  draggable={false}
+                  loading={Math.abs(idx - virtualIndex) <= 1 ? "eager" : "lazy"}
+                />
               </div>
             ))}
           </div>

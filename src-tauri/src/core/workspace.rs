@@ -105,6 +105,10 @@ pub struct WorkspaceFileTabSnapshot {
     pub idx: i16,
     #[serde(default)]
     pub title: String,
+    #[serde(default = "default_true")]
+    pub sidebar_visible: bool,
+    #[serde(default = "default_true")]
+    pub inspector_visible: bool,
     #[serde(default)]
     pub explorer: WorkspaceExplorerSnapshot,
 }

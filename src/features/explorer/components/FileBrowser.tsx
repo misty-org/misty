@@ -15,15 +15,18 @@ import {
   Trash2,
 } from "lucide-react";
 import { memo, useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { DragEvent, MouseEvent, PointerEvent as ReactPointerEvent } from "react";
-import type { DirectoryListing, FileEntry } from "../../../api/types";
+import type { DragEvent, MouseEvent, PointerEvent as ReactPointerEvent, ReactNode } from "react";
+import { useShallow } from "zustand/react/shallow";
+import type { DirectoryListing, DirectorySizeRecord, FileEntry, FileSyncEndpoint, FileSyncPair } from "../../../api/types";
 import { selectAppearancePreferences, useSettingsStore } from "../../settings/useSettingsStore";
+import { directorySizeRecordForPath, entrySizeBytes } from "../state/useExplorerStore";
 import type {
   ExplorerInlineEditState,
   ExplorerSortColumn,
   ExplorerSortState,
   ExplorerViewMode,
 } from "../state/useExplorerStore";
+import { useFileSyncStore } from "../state/useFileSyncStore";
 import { formatBytes, formatDate } from "../utils/fileFormat";
 
 const TABLE_ROW_HEIGHT = 44;
@@ -40,7 +43,7 @@ const emptyEntries: FileEntry[] = [];
 
 const fileBrowserStyles = {
   browser:
-    "grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)_32px] overflow-hidden",
+    "grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)_36px] overflow-hidden",
   browserLoading: "bg-[#0e0e0e]",
   tableSkeleton:
     "min-h-0 min-w-[720px] overflow-hidden",
@@ -57,19 +60,26 @@ const fileBrowserStyles = {
   gridSkeletonCell:
     "h-[104px] border border-[#222222] [[data-compact-mode=true]_&]:h-[92px]",
   tableWrap:
+    "grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden",
+  tableHeaderWrap:
+    "min-w-0 overflow-hidden bg-[#111111]",
+  tableScroll:
     "min-h-0 min-w-0 overflow-auto [overscroll-behavior:contain] [scrollbar-gutter:stable] max-[720px]:[scrollbar-gutter:auto]",
   table:
-    "w-full min-w-[720px] table-fixed border-collapse max-[720px]:min-w-0 max-[720px]:[&_td:first-child]:w-[64%] max-[720px]:[&_td:nth-child(2)]:w-[36%] max-[720px]:[&_td:nth-child(n+3)]:hidden max-[720px]:[&_th:first-child]:w-[64%] max-[720px]:[&_th:nth-child(2)]:w-[36%] max-[720px]:[&_th:nth-child(n+3)]:hidden",
+    "w-full min-w-[720px] table-fixed border-separate border-spacing-0 max-[720px]:min-w-0 max-[720px]:[&_td:first-child]:w-[64%] max-[720px]:[&_td:nth-child(2)]:w-[36%] max-[720px]:[&_td:nth-child(n+3)]:hidden max-[720px]:[&_th:first-child]:w-[64%] max-[720px]:[&_th:nth-child(2)]:w-[36%] max-[720px]:[&_th:nth-child(n+3)]:hidden",
   tableHeadCell:
-    "group/header sticky top-0 z-[1] cursor-grab overflow-hidden text-ellipsis whitespace-nowrap border-b border-[#262626] bg-[#171717] px-3 py-1 text-left text-sm font-semibold text-[#d5d5d5] max-[720px]:px-2.5 max-[720px]:py-1.5 max-[720px]:text-xs",
+    "group/header relative cursor-grab overflow-hidden whitespace-nowrap bg-[#111111] px-3 py-1 text-left align-middle text-sm font-semibold text-[#d5d5d5] shadow-[inset_0_-1px_#202020] max-[720px]:px-2.5 max-[720px]:py-1.5 max-[720px]:text-xs",
+  tableHeadFiller:
+    "bg-[#111111] p-0 shadow-[inset_0_-1px_#202020] max-[720px]:hidden",
   tableHeadDragging: "cursor-grabbing bg-[#212121] opacity-70",
   tableSort:
-    "flex min-h-7 w-full items-center gap-1.5 border-0 bg-transparent p-0 text-left font-[inherit] text-inherit",
+    "flex min-h-7 w-full min-w-0 items-center gap-1.5 overflow-hidden border-0 bg-transparent p-0 pr-2 text-left font-[inherit] text-inherit",
+  tableSortLabel: "min-w-0 overflow-hidden text-ellipsis",
   tableSortActive: "text-[#efefef]",
   tableSortIndicator:
-    "inline-flex size-[13px] items-center justify-center text-[#a5a5a5]",
+    "inline-flex size-[13px] flex-none items-center justify-center text-[#a5a5a5]",
   tableResizeHandle:
-    "absolute right-[-3px] top-0 z-[2] h-full w-[7px] cursor-col-resize after:absolute after:bottom-[7px] after:left-[3px] after:top-[7px] after:w-px after:bg-transparent after:content-[''] group-hover/header:after:bg-[#404040] max-[720px]:hidden",
+    "absolute right-0 top-0 z-[2] h-full w-[8px] translate-x-1/2 cursor-col-resize after:absolute after:bottom-[8px] after:left-1/2 after:top-[8px] after:w-px after:-translate-x-1/2 after:bg-transparent after:content-[''] group-hover/header:after:bg-[#3a3a3a] max-[720px]:hidden",
   tableRow:
     "h-11 cursor-default select-none hover:bg-[#1e1e1e] [[data-compact-mode=true]_&]:h-9",
   tableRowSelected: "bg-[#1e1e1e]",
@@ -77,6 +87,11 @@ const fileBrowserStyles = {
   tableRowInlineEditing: "relative z-[3]",
   tableCell:
     "cursor-default select-none overflow-hidden text-ellipsis whitespace-nowrap px-2.5 py-2 text-left text-sm leading-7 [[data-compact-mode=true]_&]:py-1.5 [[data-compact-mode=true]_&]:leading-6 max-[720px]:px-2 max-[720px]:py-1.5 max-[720px]:text-xs",
+  directorySizeDots:
+    "inline-flex h-7 w-8 items-center gap-1 align-middle [[data-compact-mode=true]_&]:h-6",
+  directorySizeDot:
+    "size-1.5 rounded-full bg-[#c7c7c7] opacity-85 motion-safe:animate-bounce",
+  tableFillerCell: "p-0 max-[720px]:hidden",
   tableNameCell:
     "flex cursor-default select-none items-center gap-3 overflow-hidden text-ellipsis whitespace-nowrap px-2.5 py-2 text-left text-sm leading-7 [[data-compact-mode=true]_&]:gap-2 [[data-compact-mode=true]_&]:py-1.5 [[data-compact-mode=true]_&]:leading-6 max-[720px]:px-2 max-[720px]:py-1.5 max-[720px]:text-xs",
   tableNameCellEditing: "overflow-visible",
@@ -131,7 +146,20 @@ const fileBrowserStyles = {
   passiveDraftExtension: "flex-none text-[inherit] text-[#989898]",
   passiveDraftCaret:
     "ml-0.5 h-4 w-px flex-none animate-[passive-rename-caret_1.1s_step-end_infinite] bg-[#b3b3b3] opacity-75",
-  footer: "border-t border-[#292929] px-3 py-1.5 text-xs text-[#949494] max-[720px]:min-h-[30px] max-[720px]:px-2.5 max-[720px]:py-0 max-[720px]:text-[11px]",
+  footer:
+    "flex min-h-9 min-w-0 items-center justify-between gap-3 overflow-hidden border-t border-[#202020] px-3 py-1.5 text-xs text-[#949494] max-[720px]:min-h-8 max-[720px]:px-2.5 max-[720px]:py-0 max-[720px]:text-[11px]",
+  footerGroup:
+    "flex min-w-0 items-center gap-2 overflow-hidden",
+  footerRight:
+    "flex min-w-0 flex-none items-center justify-end gap-2 overflow-hidden",
+  footerItem:
+    "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap",
+  footerButton:
+    "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap border-0 bg-transparent p-0 text-[#949494] hover:text-[#eeeeee]",
+  footerButtonActive:
+    "text-[#d0d0d0]",
+  footerSeparator:
+    "h-3 w-px flex-none bg-[#303030]",
   empty: "p-6 text-[#adadad]",
   emptyError: "text-[#a8a8a8]",
 } as const;
@@ -174,9 +202,12 @@ interface FileBrowserProps {
   error: string | null;
   viewMode: ExplorerViewMode;
   sort: ExplorerSortState;
+  showHidden: boolean;
   commandQuery: string;
+  directorySizes: Record<string, DirectorySizeRecord>;
   inlineEdit: ExplorerInlineEditState | null;
   onSort: (column: ExplorerSortColumn) => void;
+  onToggleHidden: () => void;
   onSelect: (entryId: string, event: MouseEvent, visibleEntryIds: string[]) => void;
   onClearSelection: () => void;
   onOpen: (entry: FileEntry) => void;
@@ -202,6 +233,7 @@ export const FileBrowser = memo(function FileBrowser(props: FileBrowserProps) {
     () => query ? sourceEntries.filter((entry) => entryMatchesQuery(entry, query)) : sourceEntries,
     [query, sourceEntries],
   );
+  const syncLabel = usePaneSyncStatus(props.listing);
 
   if (props.error) {
     return <div className={`${fileBrowserStyles.empty} ${fileBrowserStyles.emptyError}`}>{props.error}</div>;
@@ -215,9 +247,12 @@ export const FileBrowser = memo(function FileBrowser(props: FileBrowserProps) {
 
   const queryActive = query.length > 0;
   const displayListing = entries === props.listing.entries ? props.listing : { ...props.listing, entries };
-  const footerLabel = queryActive
-    ? `${entries.length} of ${props.listing.totalCount} items (${props.listing.hiddenCount} hidden)`
-    : `${props.listing.totalCount} items (${props.listing.hiddenCount} hidden)`;
+  const selectedEntries = props.listing.entries.filter((entry) => props.selectedIds.includes(entry.id) && !entry.isDeleted);
+  const selectedBytes = selectedEntries.reduce((sum, entry) => sum + (entrySizeBytes(entry, props.directorySizes) ?? 0), 0);
+  const selectionLabel = selectedEntries.length > 0
+    ? `${selectedEntries.length} selected${selectedBytes > 0 ? ` · ${formatBytes(selectedBytes)}` : ""}`
+    : (queryActive ? `${entries.length} of ${props.listing.totalCount} items` : `${props.listing.totalCount} items`);
+  const locationLabel = locationStatusLabel(props.listing);
 
   return (
     <section
@@ -235,7 +270,23 @@ export const FileBrowser = memo(function FileBrowser(props: FileBrowserProps) {
     >
       {props.viewMode === "grid" ? <FileGrid {...props} listing={displayListing} /> : <FileTable {...props} listing={displayListing} />}
       <footer className={fileBrowserStyles.footer}>
-        {footerLabel}
+        <div className={fileBrowserStyles.footerGroup}>
+          <span className={fileBrowserStyles.footerItem}>{selectionLabel}</span>
+        </div>
+        <div className={fileBrowserStyles.footerRight}>
+          <span className={fileBrowserStyles.footerItem}>{locationLabel}</span>
+          <span className={fileBrowserStyles.footerSeparator} aria-hidden="true" />
+          <button
+            className={`${fileBrowserStyles.footerButton} ${props.showHidden ? fileBrowserStyles.footerButtonActive : ""}`}
+            type="button"
+            title={props.showHidden ? "Hide hidden files" : "Show hidden files"}
+            onClick={props.onToggleHidden}
+          >
+            {props.listing.hiddenCount} hidden
+          </button>
+          <span className={fileBrowserStyles.footerSeparator} aria-hidden="true" />
+          <span className={fileBrowserStyles.footerItem}>{syncLabel}</span>
+        </div>
       </footer>
     </section>
   );
@@ -274,16 +325,73 @@ function FileBrowserSkeleton(props: { viewMode: ExplorerViewMode }) {
   );
 }
 
+function usePaneSyncStatus(listing: DirectoryListing | null): string {
+  const { pairs, loadingPairs, pairsLoaded, loadPairs } = useFileSyncStore(useShallow((state) => ({
+    pairs: state.pairs,
+    loadingPairs: state.loadingPairs,
+    pairsLoaded: state.pairsLoaded,
+    loadPairs: state.loadPairs,
+  })));
+
+  useEffect(() => {
+    if (!pairsLoaded && !loadingPairs) void loadPairs();
+  }, [loadPairs, loadingPairs, pairsLoaded]);
+
+  if (!listing) return "Sync idle";
+  if (loadingPairs && pairs.length === 0) return "Sync...";
+  const pair = pairs.find((candidate) => syncPairCoversListing(candidate, listing));
+  if (!pair) return "Not synced";
+  if (pair.watchMode) return "Sync watching";
+  if (pair.stale) return "Sync stale";
+  return "Sync pair";
+}
+
+function locationStatusLabel(listing: DirectoryListing): string {
+  const location = listing.location;
+  if (location.kind === "local") return "Local";
+  if (location.remoteName) return location.providerType ? `${location.providerType} · ${location.remoteName}` : location.remoteName;
+  return location.providerType ?? "Remote";
+}
+
+function syncPairCoversListing(pair: FileSyncPair, listing: DirectoryListing): boolean {
+  return syncEndpointCoversListing(pair.left, listing) || syncEndpointCoversListing(pair.right, listing);
+}
+
+function syncEndpointCoversListing(endpoint: FileSyncEndpoint, listing: DirectoryListing): boolean {
+  const location = listing.location;
+  if (endpoint.kind === "local") {
+    if (location.kind !== "local") return false;
+    return pathContains(endpoint.localPath, listing.path);
+  }
+  if (location.kind === "local") return false;
+  if (endpoint.remoteName && location.remoteName && endpoint.remoteName !== location.remoteName) return false;
+  return pathContains(endpoint.remotePath || "/", location.remotePath || listing.path);
+}
+
+function pathContains(rootPath: string, candidatePath: string): boolean {
+  const root = normalizeStatusPath(rootPath);
+  const candidate = normalizeStatusPath(candidatePath);
+  return candidate === root || candidate.startsWith(`${root}/`) || root === "/";
+}
+
+function normalizeStatusPath(path: string): string {
+  const normalized = (path || "/").replace(/\/+/g, "/").replace(/\/$/, "");
+  return normalized || "/";
+}
+
 function FileTable(props: FileBrowserProps & { listing: DirectoryListing }) {
   const compactModeEnabled = useSettingsStore((state) =>
     selectAppearancePreferences(state.settings?.document).compactModeEnabled,
   );
+  const headerRef = useRef<HTMLDivElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const scrollFrameRef = useRef<number | null>(null);
   const viewportHeightRef = useRef(0);
+  const viewportWidthRef = useRef(0);
   const scrollTopRef = useRef(0);
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(0);
+  const [viewportWidth, setViewportWidth] = useState(0);
   const [columnWidths, setColumnWidths] = useState<FileTableColumnWidths>(loadColumnWidths);
   const [columnOrder, setColumnOrder] = useState<FileTableColumn[]>(loadColumnOrder);
   const [draggedColumn, setDraggedColumn] = useState<FileTableColumn | null>(null);
@@ -294,6 +402,10 @@ function FileTable(props: FileBrowserProps & { listing: DirectoryListing }) {
   const rowHeight = compactModeEnabled ? 36 : TABLE_ROW_HEIGHT;
   const rowCount = props.listing.entries.length;
   const tableWidth = columnOrder.reduce((sum, column) => sum + columnWidths[column], 0);
+  const fillerColumnWidth = Math.max(0, viewportWidth - tableWidth);
+  const hasFillerColumn = fillerColumnWidth >= 1;
+  const renderedTableWidth = tableWidth + fillerColumnWidth;
+  const tableColumnCount = columnOrder.length + (hasFillerColumn ? 1 : 0);
   const visibleCapacity = Math.max(1, Math.ceil(viewportHeight / rowHeight));
   const startIndex = Math.max(0, Math.floor(scrollTop / rowHeight) - TABLE_OVERSCAN_ROWS);
   const endIndex = Math.min(rowCount, startIndex + visibleCapacity + TABLE_OVERSCAN_ROWS * 2);
@@ -308,9 +420,16 @@ function FileTable(props: FileBrowserProps & { listing: DirectoryListing }) {
       viewportHeightRef.current = element.clientHeight;
       setViewportHeight(element.clientHeight);
     }
+    if (viewportWidthRef.current !== element.clientWidth) {
+      viewportWidthRef.current = element.clientWidth;
+      setViewportWidth(element.clientWidth);
+    }
     if (scrollTopRef.current !== element.scrollTop) {
       scrollTopRef.current = element.scrollTop;
       setScrollTop(element.scrollTop);
+    }
+    if (headerRef.current && headerRef.current.scrollLeft !== element.scrollLeft) {
+      headerRef.current.scrollLeft = element.scrollLeft;
     }
   }, []);
 
@@ -353,6 +472,9 @@ function FileTable(props: FileBrowserProps & { listing: DirectoryListing }) {
       scrollFrameRef.current = null;
       const element = scrollRef.current;
       if (!element) return;
+      if (headerRef.current && headerRef.current.scrollLeft !== element.scrollLeft) {
+        headerRef.current.scrollLeft = element.scrollLeft;
+      }
       if (scrollTopRef.current !== element.scrollTop) {
         scrollTopRef.current = element.scrollTop;
         setScrollTop(element.scrollTop);
@@ -365,6 +487,10 @@ function FileTable(props: FileBrowserProps & { listing: DirectoryListing }) {
     event.stopPropagation();
     const startX = event.clientX;
     const startWidth = columnWidths[column];
+    const previousCursor = document.body.style.cursor;
+    const previousUserSelect = document.body.style.userSelect;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
     let pendingWidth = startWidth;
     let frame: number | null = null;
     const applyWidth = () => {
@@ -380,6 +506,8 @@ function FileTable(props: FileBrowserProps & { listing: DirectoryListing }) {
       const next = { ...columnWidths, [column]: pendingWidth };
       setColumnWidths(next);
       saveColumnWidths(next);
+      document.body.style.cursor = previousCursor;
+      document.body.style.userSelect = previousUserSelect;
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);
     };
@@ -404,69 +532,84 @@ function FileTable(props: FileBrowserProps & { listing: DirectoryListing }) {
   );
 
   return (
-    <div
-      ref={scrollRef}
-      className={fileBrowserStyles.tableWrap}
-      onScroll={handleScroll}
-    >
-      <table className={fileBrowserStyles.table} style={{ width: tableWidth, minWidth: "100%" }}>
-        <colgroup>
-          {columnOrder.map((column) => <col key={column} style={{ width: columnWidths[column] }} />)}
-        </colgroup>
-        <thead>
-          <tr>
-            {columnOrder.map((column) => (
-              <SortableHeader
-                key={column}
-                label={fileTableColumnLabels[column]}
-                column={column}
-                sort={props.sort}
-                dragging={draggedColumn === column}
-                onSort={props.onSort}
-                onResizeStart={beginColumnResize}
-                onDragStart={(dragColumn) => setDraggedColumn(dragColumn)}
-                onDragEnd={() => setDraggedColumn(null)}
-                onColumnDrop={reorderColumn}
+    <div className={fileBrowserStyles.tableWrap}>
+      <div ref={headerRef} className={fileBrowserStyles.tableHeaderWrap}>
+        <table className={fileBrowserStyles.table} style={{ width: renderedTableWidth, minWidth: renderedTableWidth }}>
+          <colgroup>
+            {columnOrder.map((column) => <col key={column} style={{ width: columnWidths[column] }} />)}
+            {hasFillerColumn ? <col style={{ width: fillerColumnWidth }} /> : null}
+          </colgroup>
+          <thead>
+            <tr>
+              {columnOrder.map((column) => (
+                <SortableHeader
+                  key={column}
+                  label={fileTableColumnLabels[column]}
+                  column={column}
+                  sort={props.sort}
+                  dragging={draggedColumn === column}
+                  onSort={props.onSort}
+                  onResizeStart={beginColumnResize}
+                  onDragStart={(dragColumn) => setDraggedColumn(dragColumn)}
+                  onDragEnd={() => setDraggedColumn(null)}
+                  onColumnDrop={reorderColumn}
+                />
+              ))}
+              {hasFillerColumn ? <th className={fileBrowserStyles.tableHeadFiller} aria-hidden="true" /> : null}
+            </tr>
+          </thead>
+        </table>
+      </div>
+      <div
+        ref={scrollRef}
+        className={fileBrowserStyles.tableScroll}
+        onScroll={handleScroll}
+      >
+        <table className={fileBrowserStyles.table} style={{ width: renderedTableWidth, minWidth: renderedTableWidth }}>
+          <colgroup>
+            {columnOrder.map((column) => <col key={column} style={{ width: columnWidths[column] }} />)}
+            {hasFillerColumn ? <col style={{ width: fillerColumnWidth }} /> : null}
+          </colgroup>
+          <tbody>
+            {props.inlineEdit?.kind === "create" ? (
+              <InlineCreateTableRow
+                edit={props.inlineEdit}
+                columns={columnOrder}
+                hasFillerColumn={hasFillerColumn}
+                onChange={props.onInlineEditChange}
+                onCommit={props.onInlineEditCommit}
+                onCancel={props.onInlineEditCancel}
+              />
+            ) : null}
+            {topSpacerHeight > 0 ? <tr aria-hidden="true"><td colSpan={tableColumnCount} style={{ height: topSpacerHeight, padding: 0 }} /></tr> : null}
+            {visibleEntries.map((entry) => (
+              <FileTableRow
+                key={entry.id}
+                entry={entry}
+                columns={columnOrder}
+                hasFillerColumn={hasFillerColumn}
+                selected={selectedIds.has(entry.id)}
+                onSelect={handleSelect}
+                onOpen={props.onOpen}
+                onDownload={props.onDownload}
+                onContextMenu={props.onContextMenu}
+                onPrepareDrag={props.onPrepareDrag}
+                onDragStart={props.onDragStart}
+                onDragEnd={props.onDragEnd}
+                onDragHover={props.onDragHover}
+                onDrop={props.onDrop}
+                inlineEdit={activeInlineEdit?.entryId === entry.id ? activeInlineEdit : null}
+                passiveRename={passiveRenameDrafts.get(entry.id) ?? null}
+                directorySizes={props.directorySizes}
+                onInlineEditChange={props.onInlineEditChange}
+                onInlineEditCommit={props.onInlineEditCommit}
+                onInlineEditCancel={props.onInlineEditCancel}
               />
             ))}
-          </tr>
-        </thead>
-        <tbody>
-          {props.inlineEdit?.kind === "create" ? (
-            <InlineCreateTableRow
-              edit={props.inlineEdit}
-              columns={columnOrder}
-              onChange={props.onInlineEditChange}
-              onCommit={props.onInlineEditCommit}
-              onCancel={props.onInlineEditCancel}
-            />
-          ) : null}
-          {topSpacerHeight > 0 ? <tr aria-hidden="true"><td colSpan={columnOrder.length} style={{ height: topSpacerHeight, padding: 0 }} /></tr> : null}
-          {visibleEntries.map((entry) => (
-            <FileTableRow
-              key={entry.id}
-              entry={entry}
-              columns={columnOrder}
-              selected={selectedIds.has(entry.id)}
-              onSelect={handleSelect}
-              onOpen={props.onOpen}
-              onDownload={props.onDownload}
-              onContextMenu={props.onContextMenu}
-              onPrepareDrag={props.onPrepareDrag}
-              onDragStart={props.onDragStart}
-              onDragEnd={props.onDragEnd}
-              onDragHover={props.onDragHover}
-              onDrop={props.onDrop}
-              inlineEdit={activeInlineEdit?.entryId === entry.id ? activeInlineEdit : null}
-              passiveRename={passiveRenameDrafts.get(entry.id) ?? null}
-              onInlineEditChange={props.onInlineEditChange}
-              onInlineEditCommit={props.onInlineEditCommit}
-              onInlineEditCancel={props.onInlineEditCancel}
-            />
-          ))}
-          {bottomSpacerHeight > 0 ? <tr aria-hidden="true"><td colSpan={columnOrder.length} style={{ height: bottomSpacerHeight, padding: 0 }} /></tr> : null}
-        </tbody>
-      </table>
+            {bottomSpacerHeight > 0 ? <tr aria-hidden="true"><td colSpan={tableColumnCount} style={{ height: bottomSpacerHeight, padding: 0 }} /></tr> : null}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -511,7 +654,7 @@ const SortableHeader = memo(function SortableHeader(props: {
       }}
     >
       <button className={`${fileBrowserStyles.tableSort} ${active ? fileBrowserStyles.tableSortActive : ""}`} onClick={() => props.onSort(props.column)}>
-        <span>{props.label}</span>
+        <span className={fileBrowserStyles.tableSortLabel}>{props.label}</span>
         <span className={fileBrowserStyles.tableSortIndicator}>
           {active ? (direction === "asc" ? <ChevronUp size={13} /> : <ChevronDown size={13} />) : null}
         </span>
@@ -519,7 +662,9 @@ const SortableHeader = memo(function SortableHeader(props: {
       <span
         className={fileBrowserStyles.tableResizeHandle}
         aria-hidden="true"
+        draggable={false}
         onPointerDown={(event) => props.onResizeStart(props.column, event)}
+        onDragStart={(event) => event.preventDefault()}
       />
     </th>
   );
@@ -528,6 +673,7 @@ const SortableHeader = memo(function SortableHeader(props: {
 const FileTableRow = memo(function FileTableRow(props: {
   entry: FileEntry;
   columns: FileTableColumn[];
+  hasFillerColumn: boolean;
   selected: boolean;
   onSelect: FileBrowserProps["onSelect"];
   onOpen: FileBrowserProps["onOpen"];
@@ -540,6 +686,7 @@ const FileTableRow = memo(function FileTableRow(props: {
   onDrop: FileBrowserProps["onDrop"];
   inlineEdit: ExplorerInlineEditState | null;
   passiveRename: PassiveRenameDraft | null;
+  directorySizes: Record<string, DirectorySizeRecord>;
   onInlineEditChange: FileBrowserProps["onInlineEditChange"];
   onInlineEditCommit: FileBrowserProps["onInlineEditCommit"];
   onInlineEditCancel: FileBrowserProps["onInlineEditCancel"];
@@ -625,12 +772,14 @@ const FileTableRow = memo(function FileTableRow(props: {
           entry={entry}
           inlineEdit={props.inlineEdit}
           passiveRename={props.passiveRename}
+          directorySizes={props.directorySizes}
           onDownload={props.onDownload}
           onInlineEditChange={props.onInlineEditChange}
           onInlineEditCommit={props.onInlineEditCommit}
           onInlineEditCancel={props.onInlineEditCancel}
         />
       ))}
+      {props.hasFillerColumn ? <td className={fileBrowserStyles.tableFillerCell} aria-hidden="true" /> : null}
     </tr>
   );
 });
@@ -640,6 +789,7 @@ function FileTableCell(props: {
   entry: FileEntry;
   inlineEdit: ExplorerInlineEditState | null;
   passiveRename: PassiveRenameDraft | null;
+  directorySizes: Record<string, DirectorySizeRecord>;
   onDownload: FileBrowserProps["onDownload"];
   onInlineEditChange: FileBrowserProps["onInlineEditChange"];
   onInlineEditCommit: FileBrowserProps["onInlineEditCommit"];
@@ -666,9 +816,9 @@ function FileTableCell(props: {
         </td>
       );
     case "modified":
-      return <td className={fileBrowserStyles.tableCell}>{props.entry.remoteModified || formatDate(props.entry.modifiedMs)}</td>;
+      return <td className={fileBrowserStyles.tableCell}>{formatDate(props.entry.remoteModified ?? props.entry.modifiedMs)}</td>;
     case "size":
-      return <td className={fileBrowserStyles.tableCell}>{formatBytes(props.entry.sizeBytes)}</td>;
+      return <td className={fileBrowserStyles.tableCell}>{formatEntrySize(props.entry, props.directorySizes)}</td>;
     case "type":
       if (props.entry.isDeleted) return <td className={fileBrowserStyles.tableCell}>Deleted</td>;
       return (
@@ -995,9 +1145,36 @@ function isDownloadableRemoteFile(entry: FileEntry): boolean {
   return entry.location.kind === "remote" && entry.kind !== "folder" && !entry.isDeleted;
 }
 
+function formatEntrySize(
+  entry: FileEntry,
+  directorySizes: Record<string, DirectorySizeRecord>,
+): ReactNode {
+  if (entry.kind !== "folder") return formatBytes(entry.sizeBytes);
+  const record = directorySizeRecordForPath(directorySizes, entry.path);
+  if (record?.status === "calculating") return <DirectorySizeDots />;
+  if (record?.status === "ready") return formatBytes(record.sizeBytes);
+  return formatBytes(null);
+}
+
+function DirectorySizeDots() {
+  return (
+    <span className={fileBrowserStyles.directorySizeDots} aria-label="Calculating folder size">
+      {[0, 1, 2].map((index) => (
+        <span
+          className={fileBrowserStyles.directorySizeDot}
+          style={{ animationDelay: `${index * 120}ms` }}
+          aria-hidden="true"
+          key={index}
+        />
+      ))}
+    </span>
+  );
+}
+
 function InlineCreateTableRow(props: {
   edit: ExplorerInlineEditState;
   columns: FileTableColumn[];
+  hasFillerColumn: boolean;
   onChange: (value: string) => void;
   onCommit: () => void;
   onCancel: () => void;
@@ -1019,6 +1196,7 @@ function InlineCreateTableRow(props: {
         if (column === "type") return <td className={fileBrowserStyles.tableCell} key={column}>{props.edit.itemKind === "folder" ? "Folder" : "File"}</td>;
         return <td className={fileBrowserStyles.tableCell} key={column}>--</td>;
       })}
+      {props.hasFillerColumn ? <td className={fileBrowserStyles.tableFillerCell} aria-hidden="true" /> : null}
     </tr>
   );
 }

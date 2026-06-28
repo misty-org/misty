@@ -1,7 +1,9 @@
 pub mod autostart;
+pub mod ai;
 pub mod claude;
 pub mod commands;
 pub mod devices;
+pub mod directory_size;
 pub mod environment;
 pub mod explorer;
 pub mod explorer_library;
