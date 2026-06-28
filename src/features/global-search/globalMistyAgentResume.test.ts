@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   conversations: vi.fn(),
   run: vi.fn(),
+  decideApproval: vi.fn(),
 }));
 
 vi.mock("./globalMistyApi", () => ({
@@ -12,9 +13,15 @@ vi.mock("./globalMistyApi", () => ({
   },
 }));
 
+vi.mock("@/features/misty/availability", () => ({
+  assertMistyAvailable: vi.fn(async () => {}),
+  currentMistySpace: () => "space-1",
+}));
+
 vi.mock("@/api/agents/api", () => ({
   agentsApi: {
     run: mocks.run,
+    decideApproval: (...args: unknown[]) => mocks.decideApproval(...args),
   },
 }));
 
@@ -72,5 +79,79 @@ describe("Global Misty durable Agent progress", () => {
     expect(mocks.run).toHaveBeenCalledWith("run-1");
     expect(message?.action?.state).toBe("completed");
     expect(message?.content).toContain("finished");
+  });
+
+  it("confirms and rejects personal agent run approvals via agentsApi.decideApproval", async () => {
+    mocks.decideApproval.mockResolvedValue({});
+    useGlobalSearchStore.setState({
+      accountId: "account-1",
+      conversations: [
+        {
+          id: "conversation-approval",
+          title: "Approve action",
+          createdAt: "2026-08-25T05:30:00Z",
+          updatedAt: "2026-08-25T05:30:05Z",
+          remote: true,
+          messages: [
+            {
+              id: "assistant-approval",
+              role: "assistant",
+              mode: "action",
+              content: "Please review",
+              createdAt: "2026-08-25T05:30:05Z",
+              action: {
+                id: "action-approval-1",
+                title: "Create Pull Request",
+                summary: "Will open PR on misty-org/misty",
+                prompt: "Open PR",
+                risk: "write",
+                state: "awaiting_approval",
+                requiresConfirmation: true,
+                runId: "run-42",
+                approvalId: "approval-99",
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    await useGlobalSearchStore.getState().confirmAction("action-approval-1");
+    expect(mocks.decideApproval).toHaveBeenCalledWith("run-42", "approval-99", "approve");
+
+    useGlobalSearchStore.setState({
+      conversations: [
+        {
+          id: "conversation-approval",
+          title: "Approve action",
+          createdAt: "2026-08-25T05:30:00Z",
+          updatedAt: "2026-08-25T05:30:05Z",
+          remote: true,
+          messages: [
+            {
+              id: "assistant-approval",
+              role: "assistant",
+              mode: "action",
+              content: "Please review",
+              createdAt: "2026-08-25T05:30:05Z",
+              action: {
+                id: "action-approval-1",
+                title: "Create Pull Request",
+                summary: "Will open PR on misty-org/misty",
+                prompt: "Open PR",
+                risk: "write",
+                state: "awaiting_approval",
+                requiresConfirmation: true,
+                runId: "run-42",
+                approvalId: "approval-99",
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    useGlobalSearchStore.getState().rejectAction("action-approval-1");
+    expect(mocks.decideApproval).toHaveBeenCalledWith("run-42", "approval-99", "deny");
   });
 });

@@ -152,7 +152,7 @@ describe("useGlobalMistyResults", () => {
 
     expect(closePanel).toHaveBeenCalled();
     expect(mockNavigate).toHaveBeenCalledWith(
-      "/apps/files?path=%2Fhome%2Fuser%2Fdocs%2Fmy-file.pdf",
+      "/apps/files?path=%2Fhome%2Fuser%2Fdocs%2Fmy-file.pdf&select=my-file.pdf",
     );
 
     // The files workspace surface should be focused

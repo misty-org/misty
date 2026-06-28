@@ -561,8 +561,13 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
     set({ working: true, error: null });
     try {
       await assertMistyAvailable(get().accountId, located.spaceId || get().selectedSpaceId || "");
-      const completed = await globalMistyApi.decideProposal(proposalId, true);
-      patchProposal(set, get, proposalId, completed);
+      if (located.runId && located.approvalId) {
+        await agentsApi.decideApproval(located.runId, located.approvalId, "approve");
+        patchProposal(set, get, proposalId, { state: "running" });
+      } else {
+        const completed = await globalMistyApi.decideProposal(proposalId, true);
+        patchProposal(set, get, proposalId, completed);
+      }
     } catch (error) {
       patchProposal(set, get, proposalId, { state: "failed", error: globalMistyError(error) });
     } finally {
@@ -570,7 +575,12 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
     }
   },
   rejectAction: (proposalId) => {
+    const located = findProposal(get().conversations, proposalId);
     patchProposal(set, get, proposalId, { state: "rejected" });
-    void globalMistyApi.decideProposal(proposalId, false).catch(() => undefined);
+    if (located?.runId && located?.approvalId) {
+      void agentsApi.decideApproval(located.runId, located.approvalId, "deny").catch(() => undefined);
+    } else {
+      void globalMistyApi.decideProposal(proposalId, false).catch(() => undefined);
+    }
   },
 }));
