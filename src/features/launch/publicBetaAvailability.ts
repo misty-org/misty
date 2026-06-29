@@ -8,7 +8,7 @@ export const publicBetaAvailability = {
   connectedDevices: false,
   desktopMistyPanel: false,
   extensions: false,
-  mcpConnections: false,
+  mcpConnections: true,
   recurringBriefings: false,
   smartLibraryAnalysis: false,
   transfers: false,
