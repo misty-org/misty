@@ -1,4 +1,4 @@
-package ai
+package agent
 
 import (
 	"fmt"
@@ -8,7 +8,8 @@ import (
 )
 
 type PlanValidationContext struct {
-	KnownPaths []string
+	KnownPaths         []string
+	RequireKnownSource bool
 }
 
 func ValidateFilePlan(plan FileOperationPlan, ctx PlanValidationContext) []string {
@@ -56,7 +57,7 @@ func ValidateFilePlan(plan FileOperationPlan, ctx PlanValidationContext) []strin
 			if sourceOK && targetOK && source == target {
 				problems = append(problems, prefix+": source and destination are the same")
 			}
-			if sourceOK && len(knownPaths) > 0 {
+			if sourceOK && ctx.RequireKnownSource && len(knownPaths) > 0 {
 				if _, exists := knownPaths[source]; !exists {
 					problems = append(problems, prefix+": source is not present in known paths")
 				}

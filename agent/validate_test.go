@@ -1,4 +1,4 @@
-package ai
+package agent
 
 import "testing"
 
@@ -30,8 +30,24 @@ func TestValidateFilePlanRejectsUnsafePlan(t *testing.T) {
 			{Type: "mkdir", Path: ".hidden"},
 		},
 	}
-	problems := ValidateFilePlan(plan, PlanValidationContext{KnownPaths: []string{"invoice.pdf", "notes.txt", "Documents/invoice.pdf"}})
+	problems := ValidateFilePlan(plan, PlanValidationContext{
+		KnownPaths:         []string{"invoice.pdf", "notes.txt", "Documents/invoice.pdf"},
+		RequireKnownSource: true,
+	})
 	if len(problems) < 6 {
 		t.Fatalf("ValidateFilePlan() problems = %#v, want multiple unsafe rejections", problems)
+	}
+}
+
+func TestValidateFilePlanDoesNotRequireKnownSourceByDefault(t *testing.T) {
+	plan := FileOperationPlan{
+		Summary: "Move screenshots.",
+		Operations: []FileOperation{
+			{Type: "move", From: "Screenshot 2026-06-28.png", To: "Screenshots/Screenshot 2026-06-28.png"},
+		},
+	}
+	problems := ValidateFilePlan(plan, PlanValidationContext{KnownPaths: []string{"other-file.txt"}})
+	if len(problems) != 0 {
+		t.Fatalf("ValidateFilePlan() problems = %#v, want none", problems)
 	}
 }

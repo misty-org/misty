@@ -17,6 +17,8 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	aiProvider, aiModel := server.AIAgent.ProviderStatus()
+	log.Printf("MistyAI provider: %s (%s)", aiProvider, aiModel)
 
 	if err := server.Database.Start(); err != nil {
 		panic(err)

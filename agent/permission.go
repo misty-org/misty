@@ -1,4 +1,4 @@
-package ai
+package agent
 
 type PermissionPolicy struct{}
 

@@ -1,7 +1,8 @@
-package ai
+package agent
 
 import (
 	"encoding/json"
+	"path/filepath"
 	"strings"
 )
 
@@ -27,6 +28,13 @@ func NewService(store *SessionStore, provider ModelProvider) *Service {
 
 func (s *Service) Store() *SessionStore {
 	return s.store
+}
+
+func (s *Service) ProviderStatus() (string, string) {
+	if info, ok := s.provider.(ProviderInfo); ok {
+		return info.ProviderName(), info.ModelName()
+	}
+	return ProviderMock, "mock"
 }
 
 func (s *Service) CreateSession(userID string) *Session {
@@ -140,9 +148,7 @@ func collectKnownPathsFromValue(session *Session, value any) {
 	case map[string]any:
 		for _, key := range []string{"relativePath", "relative_path", "path", "name"} {
 			if raw, ok := typed[key].(string); ok {
-				if normalized, ok := normalizeRelativePath(raw); ok {
-					session.KnownPaths[normalized] = struct{}{}
-				}
+				collectKnownPathString(session, raw)
 			}
 		}
 		for _, child := range typed {
@@ -151,6 +157,26 @@ func collectKnownPathsFromValue(session *Session, value any) {
 	case []any:
 		for _, child := range typed {
 			collectKnownPathsFromValue(session, child)
+		}
+	}
+}
+
+func collectKnownPathString(session *Session, value string) {
+	if normalized, ok := normalizeRelativePath(value); ok {
+		session.KnownPaths[normalized] = struct{}{}
+		return
+	}
+	root := strings.TrimRight(strings.TrimSpace(session.ActiveRoot), "/")
+	candidate := strings.TrimSpace(strings.ReplaceAll(value, "\\", "/"))
+	if root != "" && strings.HasPrefix(candidate, root+"/") {
+		if normalized, ok := normalizeRelativePath(strings.TrimPrefix(candidate, root+"/")); ok {
+			session.KnownPaths[normalized] = struct{}{}
+			return
+		}
+	}
+	if base := filepath.Base(candidate); base != "." && base != "/" {
+		if normalized, ok := normalizeRelativePath(base); ok {
+			session.KnownPaths[normalized] = struct{}{}
 		}
 	}
 }

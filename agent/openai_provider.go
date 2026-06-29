@@ -1,4 +1,4 @@
-package ai
+package agent
 
 import (
 	"bytes"
@@ -42,6 +42,14 @@ func NewOpenAIProvider(config OpenAIProviderConfig) *OpenAIProvider {
 		model:   model,
 		client:  client,
 	}
+}
+
+func (p *OpenAIProvider) ProviderName() string {
+	return ProviderOpenAI
+}
+
+func (p *OpenAIProvider) ModelName() string {
+	return p.model
 }
 
 func (p *OpenAIProvider) Next(request ModelRequest) (ModelResponse, error) {

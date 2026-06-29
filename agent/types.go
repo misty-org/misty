@@ -1,4 +1,4 @@
-package ai
+package agent
 
 import (
 	"encoding/json"
@@ -70,9 +70,10 @@ type ToolResult struct {
 }
 
 type FileOperationPlan struct {
-	Summary    string          `json:"summary"`
-	Operations []FileOperation `json:"operations"`
-	Warnings   []string        `json:"warnings"`
+	Summary           string          `json:"summary"`
+	CompletionSummary string          `json:"completion_summary"`
+	Operations        []FileOperation `json:"operations"`
+	Warnings          []string        `json:"warnings"`
 }
 
 type FileOperation struct {
@@ -108,4 +109,9 @@ type ModelResponse struct {
 
 type ModelProvider interface {
 	Next(request ModelRequest) (ModelResponse, error)
+}
+
+type ProviderInfo interface {
+	ProviderName() string
+	ModelName() string
 }

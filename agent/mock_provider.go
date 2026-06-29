@@ -1,15 +1,24 @@
-package ai
+package agent
 
 import (
 	"encoding/json"
 	"path"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
 )
 
 type MockProvider struct{}
+
+func (MockProvider) ProviderName() string {
+	return ProviderMock
+}
+
+func (MockProvider) ModelName() string {
+	return "mock"
+}
 
 func (MockProvider) Next(request ModelRequest) (ModelResponse, error) {
 	lastUser := ""
@@ -106,10 +115,35 @@ func organizePlanFromKnownPaths(paths []string) FileOperationPlan {
 		})
 	}
 	return FileOperationPlan{
-		Summary:    "Organized loose files into broad document, image, and archive folders.",
-		Operations: operations,
-		Warnings:   []string{},
+		Summary:           mockPlanSummary(operations),
+		CompletionSummary: mockCompletionSummary(operations),
+		Operations:        operations,
+		Warnings:          []string{},
 	}
+}
+
+func mockPlanSummary(operations []FileOperation) string {
+	return "I will create broad Documents, Images, and Archives folders, then move matching loose files into those folders based on extension."
+}
+
+func mockCompletionSummary(operations []FileOperation) string {
+	counts := mockOperationCounts(operations)
+	return "Created " + pluralize(counts["mkdir"], "folder", "folders") + " and queued " + pluralize(counts["move"], "file move", "file moves") + " for Misty to apply locally."
+}
+
+func mockOperationCounts(operations []FileOperation) map[string]int {
+	counts := map[string]int{}
+	for _, operation := range operations {
+		counts[operation.Type]++
+	}
+	return counts
+}
+
+func pluralize(count int, singular string, plural string) string {
+	if count == 1 {
+		return "1 " + singular
+	}
+	return strconv.Itoa(count) + " " + plural
 }
 
 func mockCategoryFor(name string) string {

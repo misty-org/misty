@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/kannachi323/misty/server/ai"
+	"github.com/kannachi323/misty/server/agent"
 	"github.com/kannachi323/misty/server/db"
 )
 
@@ -17,11 +17,11 @@ const maxAIJSONBodyBytes = 2 << 20
 
 type AIService struct {
 	database *db.Database
-	agent    *ai.Service
+	runtime  *agent.Service
 }
 
-func NewAIService(database *db.Database, agent *ai.Service) *AIService {
-	return &AIService{database: database, agent: agent}
+func NewAIService(database *db.Database, runtime *agent.Service) *AIService {
+	return &AIService{database: database, runtime: runtime}
 }
 
 func (s *AIService) Status() http.HandlerFunc {
@@ -29,10 +29,11 @@ func (s *AIService) Status() http.HandlerFunc {
 		if _, ok := s.requireUser(w, r); !ok {
 			return
 		}
+		provider, model := s.runtime.ProviderStatus()
 		writeJSON(w, http.StatusOK, map[string]any{
 			"configured": true,
-			"provider":   "Misty Server",
-			"model":      "mock",
+			"provider":   provider,
+			"model":      model,
 			"running":    false,
 			"session_id": nil,
 			"error":      nil,
@@ -46,7 +47,7 @@ func (s *AIService) CreateSession() http.HandlerFunc {
 		if !ok {
 			return
 		}
-		session := s.agent.CreateSession(userID)
+		session := s.runtime.CreateSession(userID)
 		writeJSON(w, http.StatusCreated, map[string]any{
 			"session_id": session.ID,
 		})
@@ -60,12 +61,12 @@ func (s *AIService) SendMessage() http.HandlerFunc {
 			return
 		}
 		sessionID := strings.TrimSpace(chi.URLParam(r, "sessionID"))
-		var body ai.AgentMessageRequest
+		var body agent.AgentMessageRequest
 		if err := decodeAIJSON(w, r, &body); err != nil {
 			http.Error(w, "invalid request", http.StatusBadRequest)
 			return
 		}
-		if err := s.agent.SendMessage(sessionID, userID, body); err != nil {
+		if err := s.runtime.SendMessage(sessionID, userID, body); err != nil {
 			writeAIError(w, err)
 			return
 		}
@@ -81,7 +82,7 @@ func (s *AIService) Events() http.HandlerFunc {
 		}
 		sessionID := strings.TrimSpace(chi.URLParam(r, "sessionID"))
 		after, _ := strconv.ParseInt(strings.TrimSpace(r.URL.Query().Get("after")), 10, 64)
-		events, err := s.agent.Events(sessionID, userID, after)
+		events, err := s.runtime.Events(sessionID, userID, after)
 		if err != nil {
 			writeAIError(w, err)
 			return
@@ -98,13 +99,13 @@ func (s *AIService) SubmitToolResults() http.HandlerFunc {
 		}
 		sessionID := strings.TrimSpace(chi.URLParam(r, "sessionID"))
 		var body struct {
-			Results []ai.ToolResult `json:"results"`
+			Results []agent.ToolResult `json:"results"`
 		}
 		if err := decodeAIJSON(w, r, &body); err != nil {
 			http.Error(w, "invalid request", http.StatusBadRequest)
 			return
 		}
-		if err := s.agent.SubmitToolResults(sessionID, userID, body.Results); err != nil {
+		if err := s.runtime.SubmitToolResults(sessionID, userID, body.Results); err != nil {
 			writeAIError(w, err)
 			return
 		}
@@ -119,7 +120,7 @@ func (s *AIService) Cancel() http.HandlerFunc {
 			return
 		}
 		sessionID := strings.TrimSpace(chi.URLParam(r, "sessionID"))
-		if err := s.agent.Cancel(sessionID, userID); err != nil {
+		if err := s.runtime.Cancel(sessionID, userID); err != nil {
 			writeAIError(w, err)
 			return
 		}
@@ -155,7 +156,7 @@ func decodeAIJSON(w http.ResponseWriter, r *http.Request, dst any) error {
 
 func writeAIError(w http.ResponseWriter, err error) {
 	switch {
-	case errors.Is(err, ai.ErrSessionNotFound):
+	case errors.Is(err, agent.ErrSessionNotFound):
 		http.Error(w, "session not found", http.StatusNotFound)
 	case isAIInvalidRequest(err):
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -165,6 +166,6 @@ func writeAIError(w http.ResponseWriter, err error) {
 }
 
 func isAIInvalidRequest(err error) bool {
-	var invalid ai.ErrInvalidRequest
+	var invalid agent.ErrInvalidRequest
 	return errors.As(err, &invalid)
 }

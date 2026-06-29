@@ -8,7 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
-	serverai "github.com/kannachi323/misty/server/ai"
+	serveragent "github.com/kannachi323/misty/server/agent"
 	"github.com/kannachi323/misty/server/api"
 	"github.com/kannachi323/misty/server/db"
 	"github.com/kannachi323/misty/server/email"
@@ -18,7 +18,7 @@ type Server struct {
 	Router                    *chi.Mux
 	Database                  *db.Database
 	EmailSender               email.Sender
-	AIAgent                   *serverai.Service
+	AIAgent                   *serveragent.Service
 	PasswordResetStartURL     string
 	PasswordResetRedirectURL  string
 	WaitlistNotificationEmail string
@@ -37,7 +37,7 @@ func CreateServer() (*Server, error) {
 	s := &Server{
 		Router:                    chi.NewRouter(),
 		Database:                  &db.Database{},
-		AIAgent:                   serverai.NewService(nil, serverai.NewProviderFromEnv()),
+		AIAgent:                   serveragent.NewService(nil, serveragent.NewProviderFromEnv()),
 		PasswordResetStartURL:     passwordResetStartURL,
 		PasswordResetRedirectURL:  passwordResetRedirectURL,
 		WaitlistNotificationEmail: strings.TrimSpace(os.Getenv("WAITLIST_NOTIFY_EMAIL")),

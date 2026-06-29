@@ -5,12 +5,12 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/kannachi323/misty/server/ai"
+	"github.com/kannachi323/misty/server/agent"
 	"github.com/kannachi323/misty/server/db"
 )
 
 func TestAIHandlersRequireAuthentication(t *testing.T) {
-	service := NewAIService(&db.Database{}, ai.NewService(nil, nil))
+	service := NewAIService(&db.Database{}, agent.NewService(nil, nil))
 	tests := []struct {
 		name    string
 		handler http.HandlerFunc
