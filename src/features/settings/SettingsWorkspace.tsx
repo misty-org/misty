@@ -1153,10 +1153,10 @@ function SwitchControl(props: { checked: boolean; disabled: boolean; onChange: (
       onClick={() => props.onChange(!props.checked)}
     >
       <span
-        className={`absolute top-1/2 size-[18px] -translate-y-1/2 rounded-full transition-transform duration-150 ${
+        className={`absolute left-[2px] top-1/2 size-[18px] -translate-y-1/2 rounded-full transition-transform duration-150 ${
           props.checked
-            ? "translate-x-[19px] bg-[#071008] shadow-[0_1px_4px_rgba(0,0,0,0.42)]"
-            : "translate-x-[2px] bg-[#b9bec8] shadow-[0_1px_4px_rgba(0,0,0,0.32)]"
+            ? "translate-x-[18px] bg-[#071008] shadow-[0_1px_4px_rgba(0,0,0,0.42)]"
+            : "translate-x-0 bg-[#b9bec8] shadow-[0_1px_4px_rgba(0,0,0,0.32)]"
         }`}
       />
     </button>

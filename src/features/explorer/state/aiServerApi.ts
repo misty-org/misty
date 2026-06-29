@@ -120,7 +120,7 @@ async function aiRequest<T = unknown>(path: string, init?: RequestInit): Promise
   });
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(text.trim() || `MistyAI ${path} failed: ${response.status}`);
+    throw new Error(text.trim() || `Mika ${path} failed: ${response.status}`);
   }
   if (response.status === 204) return undefined as T;
   const contentType = response.headers.get("Content-Type") ?? "";

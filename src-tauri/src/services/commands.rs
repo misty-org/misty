@@ -408,7 +408,7 @@ fn default_command_entries() -> &'static [DefaultCommandEntry] {
                 shortcut: "Cmd+J",
             },
             DefaultCommandEntry {
-                id: "explorer.toggle_claude",
+                id: "explorer.toggle_mika",
                 shortcut: "Cmd+Shift+A",
             },
             DefaultCommandEntry {
@@ -571,7 +571,7 @@ fn default_command_entries() -> &'static [DefaultCommandEntry] {
                 shortcut: "Ctrl+J",
             },
             DefaultCommandEntry {
-                id: "explorer.toggle_claude",
+                id: "explorer.toggle_mika",
                 shortcut: "Ctrl+Shift+A",
             },
             DefaultCommandEntry {

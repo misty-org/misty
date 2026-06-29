@@ -1,4 +1,11 @@
-import { forwardRef, memo, useCallback, useEffect, useRef, useState } from "react";
+import {
+  forwardRef,
+  memo,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import type {
   CSSProperties,
   MouseEvent as ReactMouseEvent,
@@ -10,16 +17,41 @@ import { invoke } from "@tauri-apps/api/core";
 import { PhysicalPosition, PhysicalSize } from "@tauri-apps/api/dpi";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { currentMonitor, getCurrentWindow, primaryMonitor } from "@tauri-apps/api/window";
-import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from "react-router-dom";
-import { Bell, Blocks, Folder, Inbox, LogOut, Repeat2, Settings as SettingsIcon, UserCircle } from "lucide-react";
+import {
+  currentMonitor,
+  getCurrentWindow,
+  primaryMonitor,
+} from "@tauri-apps/api/window";
+import {
+  Navigate,
+  NavLink,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
+import {
+  Bell,
+  Folder,
+  Gauge,
+  Home,
+  Inbox,
+  LogOut,
+  Puzzle,
+  Repeat2,
+  Settings as SettingsIcon,
+  UserCircle,
+} from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import mistyLogo from "../assets/misty.png";
 import { DiagnosticsWorkspace } from "../features/diagnostics/desktop/DiagnosticsWorkspace";
 import { DockWorkspace } from "../features/dock/desktop/DockWorkspace";
 import { ExplorerWorkspace } from "../features/explorer/desktop/ExplorerWorkspace";
 import { useExplorerStore } from "../features/explorer/state/useExplorerStore";
-import type { ExplorerNotification, ExplorerNotificationType } from "../features/explorer/state/useExplorerStore";
+import type {
+  ExplorerNotification,
+  ExplorerNotificationType,
+} from "../features/explorer/state/useExplorerStore";
 import { HubWorkspace } from "../features/hub/desktop/HubWorkspace";
 import HubAccountPage from "../features/hub/pages/Account";
 import HubDashboardPage from "../features/hub/pages/Dashboard";
@@ -59,10 +91,41 @@ import { useAppThemeStore } from "./useAppThemeStore";
 import type { AppTab } from "./types";
 import type { TransferRecord } from "../api/types";
 
+type DesktopNavItem = {
+  id: string;
+  label: string;
+  path: string;
+  icon: typeof Folder;
+  exact?: boolean;
+  active?: (pathname: string) => boolean;
+};
+
 const primaryNavItems = [
+  {
+    id: "hub-home",
+    label: "Home",
+    path: "/hub",
+    icon: Home,
+    active: (pathname) =>
+      pathname === "/hub" || pathname.startsWith("/hub/resources"),
+  },
   { id: "files", label: "Files", path: "/files", icon: Folder },
-  { id: "hub", label: "Hub", path: "/hub", icon: Blocks },
-] satisfies Array<{ id: AppTab; label: string; path: string; icon: typeof Folder }>;
+  {
+    id: "hub-dashboard",
+    label: "Dashboard",
+    path: "/hub/dashboard",
+    icon: Gauge,
+  },
+  {
+    id: "hub-extensions",
+    label: "Extensions",
+    path: "/hub/extensions",
+    icon: Puzzle,
+    active: (pathname) =>
+      pathname.startsWith("/hub/extensions") ||
+      pathname.startsWith("/hub/plugins"),
+  },
+] satisfies DesktopNavItem[];
 
 const DEFAULT_FONT_STACK = `Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
 
@@ -87,26 +150,22 @@ const desktopNavbarClass =
 const desktopRouteShellClass =
   "relative col-start-2 row-start-2 min-h-0 overflow-hidden";
 
-const navbarGroupClass =
-  "flex w-full flex-col items-center gap-2.5";
+const navbarGroupClass = "flex w-full flex-col items-center gap-3";
 
-const navbarBottomClass =
-  `${navbarGroupClass} mt-auto`;
+const navbarBottomClass = `${navbarGroupClass} mt-auto`;
 
 const navLinkBaseClass =
-  "flex min-h-[62px] w-16 flex-col items-center justify-center gap-[5px] text-[11px] leading-[1.1] text-[var(--misty-text-muted)] no-underline";
+  "grid h-[58px] w-16 place-items-center text-[var(--misty-text-muted)] no-underline";
 
-const navLinkActiveClass =
-  "text-[var(--misty-text)]";
+const navLinkActiveClass = "text-[var(--misty-text)]";
 
 const navIconTileBaseClass =
-  "relative grid h-[46px] w-[46px] place-items-center rounded-[9px] text-[var(--misty-text)] group-hover:bg-[var(--misty-surface-2)]";
+  "relative grid h-[52px] w-[52px] place-items-center rounded-[12px] text-[var(--misty-text)] group-hover:bg-[var(--misty-surface-2)]";
 
-const navIconTileActiveClass =
-  "bg-[var(--misty-surface-3)]";
+const navIconTileActiveClass = "bg-[var(--misty-surface-3)]";
 
 const profileDockClass =
-  "relative grid h-10 w-10 place-items-center rounded-full border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] p-0 text-sm font-bold text-[var(--misty-text)] transition hover:bg-[var(--misty-surface-3)]";
+  "relative grid h-[48px] w-[48px] place-items-center rounded-full border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] p-0 text-base font-bold text-[var(--misty-text)] transition hover:bg-[var(--misty-surface-3)]";
 
 const profilePopoverClass =
   "fixed z-[2147482900] grid w-[286px] overflow-hidden rounded-xl border border-[var(--misty-border-soft)] bg-[color-mix(in_srgb,var(--misty-surface)_96%,transparent)] p-2 text-[var(--misty-text)] shadow-[0_18px_52px_var(--misty-shadow)] backdrop-blur-xl";
@@ -129,8 +188,7 @@ const workStatusPulseClass =
 const activityPanelClass =
   "grid h-[min(560px,calc(100vh-24px))] w-[420px] min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-lg border border-[#27272a] bg-[#0b0d0f] shadow-[0_24px_64px_rgba(0,0,0,0.42)]";
 
-const activityPopoverClass =
-  "fixed z-[2147482900] max-w-[calc(100vw-96px)]";
+const activityPopoverClass = "fixed z-[2147482900] max-w-[calc(100vw-96px)]";
 
 const activityButtonClass =
   "min-h-7 rounded-md border border-[#303640] bg-[#121820] px-2.5 py-1 text-[13px] text-[#d8dde6] disabled:opacity-50";
@@ -141,8 +199,7 @@ const desktopTitlebarClass =
 const desktopTitlebarTitleClass =
   "pointer-events-none absolute inset-x-[112px] top-0 flex h-full min-w-0 items-center justify-center truncate text-[13px] font-semibold leading-none text-[var(--misty-text-muted)]";
 
-const desktopTitlebarDoubleClickLayerClass =
-  "absolute inset-0 cursor-default";
+const desktopTitlebarDoubleClickLayerClass = "absolute inset-0 cursor-default";
 
 const desktopTitlebarActionsClass =
   "absolute right-2 top-0 z-[2] flex h-full min-w-0 items-center justify-end gap-1";
@@ -164,60 +221,114 @@ const settingsOverlayPanelClass =
 
 const frameOverlayLevelClass: Record<FramePacingState["level"], string> = {
   idle: "border-[color-mix(in_srgb,var(--misty-success)_45%,var(--misty-border-soft))]",
-  light: "border-[color-mix(in_srgb,var(--misty-warning)_52%,var(--misty-border-soft))]",
-  heavy: "border-[color-mix(in_srgb,var(--misty-danger)_58%,var(--misty-border-soft))]",
+  light:
+    "border-[color-mix(in_srgb,var(--misty-warning)_52%,var(--misty-border-soft))]",
+  heavy:
+    "border-[color-mix(in_srgb,var(--misty-danger)_58%,var(--misty-border-soft))]",
 };
 
 export function DesktopAppShell() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { app, loadApp } = useAppStore(useShallow((state) => ({
-    app: state.app,
-    loadApp: state.loadApp,
-  })));
+  const { app, loadApp } = useAppStore(
+    useShallow((state) => ({
+      app: state.app,
+      loadApp: state.loadApp,
+    })),
+  );
   const providerLoad = useProvidersStore((state) => state.load);
   const transferLoad = useTransfersStore((state) => state.load);
-  const { settings, settingsLoad } = useSettingsStore(useShallow((state) => ({
-    settings: state.settings,
-    settingsLoad: state.load,
-  })));
-  const unreadActivityCount = useExplorerStore((state) => state.notificationHistory.filter((notification) => !notification.read).length);
-  const { resolvedTheme, setSystemTheme, themeMode } = useAppThemeStore(useShallow((state) => ({
-    resolvedTheme: state.resolvedTheme,
-    setSystemTheme: state.setSystemTheme,
-    themeMode: state.themeMode,
-  })));
-  const appearancePreferences = useSettingsStore(useShallow((state) =>
-    selectAppearancePreferences(state.settings?.document),
-  ));
+  const { settings, settingsLoad } = useSettingsStore(
+    useShallow((state) => ({
+      settings: state.settings,
+      settingsLoad: state.load,
+    })),
+  );
+  const unreadActivityCount = useExplorerStore(
+    (state) =>
+      state.notificationHistory.filter((notification) => !notification.read)
+        .length,
+  );
+  const { resolvedTheme, setSystemTheme, themeMode } = useAppThemeStore(
+    useShallow((state) => ({
+      resolvedTheme: state.resolvedTheme,
+      setSystemTheme: state.setSystemTheme,
+      themeMode: state.themeMode,
+    })),
+  );
+  const appearancePreferences = useSettingsStore(
+    useShallow((state) =>
+      selectAppearancePreferences(state.settings?.document),
+    ),
+  );
   const customFontSignature = useSettingsStore((state) =>
     JSON.stringify(selectCustomFontPreferences(state.settings?.document)),
   );
-  const notificationPreferences = useSettingsStore(useShallow((state) =>
-    selectNotificationPreferences(state.settings?.document),
-  ));
-  const framePacingOverlayEnabled = useSettingsStore((state) =>
-    settingsBoolean(state.settings?.document ?? {}, "advanced", "frame_pacing_overlay_enabled", false),
+  const notificationPreferences = useSettingsStore(
+    useShallow((state) =>
+      selectNotificationPreferences(state.settings?.document),
+    ),
   );
-  const lastHubRoute = useHubRouteMemoryStore((state) => state.lastHubRoute);
-  const rememberHubRoute = useHubRouteMemoryStore((state) => state.rememberHubRoute);
-  const rememberAppRoute = useAppRouteMemoryStore((state) => state.rememberAppRoute);
+  const framePacingOverlayEnabled = useSettingsStore((state) =>
+    settingsBoolean(
+      state.settings?.document ?? {},
+      "advanced",
+      "frame_pacing_overlay_enabled",
+      false,
+    ),
+  );
+  const rememberHubRoute = useHubRouteMemoryStore(
+    (state) => state.rememberHubRoute,
+  );
+  const rememberAppRoute = useAppRouteMemoryStore(
+    (state) => state.rememberAppRoute,
+  );
   const lastAppRoute = useAppRouteMemoryStore((state) => state.lastAppRoute);
   const routeId = routeIdFromPath(location.pathname);
   const appLoadStarted = useRef(false);
   const loadedRoutes = useRef(new Set<AppTab>());
-  const titlebarActivityAnchorRef = useRef<HTMLButtonElement | null>(null);
+  const activityAnchorRef = useRef<HTMLButtonElement | null>(null);
+  const titlebarInboxAnchorRef = useRef<HTMLButtonElement | null>(null);
   const profileAnchorRef = useRef<HTMLButtonElement | null>(null);
-  const lastNonSettingsRouteRef = useRef(settingsFallbackRoute("/files", lastAppRoute));
+  const lastNonSettingsRouteRef = useRef(
+    settingsFallbackRoute("/files", lastAppRoute),
+  );
   const customZoomRestoreBoundsRef = useRef<WindowBounds | null>(null);
   const customZoomedRef = useRef(false);
   const customZoomAnimatingRef = useRef(false);
   const [activityOpen, setActivityOpen] = useState(false);
+  const [appInboxEntries, setAppInboxEntries] = useState<AppInboxEntry[]>([]);
+  const [inboxOpen, setInboxOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const navItems = primaryNavItems.map((item) =>
-    item.id === "hub" ? { ...item, path: lastHubRoute } : item,
+  const navItems = primaryNavItems;
+  const unreadInboxCount = appInboxEntries.filter(
+    (entry) => !entry.read,
+  ).length;
+  const publishAppInboxEntry = useCallback(
+    (entry: Omit<AppInboxEntry, "id" | "createdAtMs" | "read">) => {
+      setAppInboxEntries((current) =>
+        [
+          ...current,
+          {
+            ...entry,
+            id: nextAppInboxEntryId++,
+            createdAtMs: Date.now(),
+            read: false,
+          },
+        ].slice(-100),
+      );
+    },
+    [],
   );
+  const markInboxRead = useCallback(() => {
+    setAppInboxEntries((current) =>
+      current.map((entry) => (entry.read ? entry : { ...entry, read: true })),
+    );
+  }, []);
+  const clearInbox = useCallback(() => {
+    setAppInboxEntries([]);
+  }, []);
   const openSettingsOverlay = useCallback(() => {
     setSettingsOpen(true);
     void settingsLoad();
@@ -236,7 +347,11 @@ export function DesktopAppShell() {
   useEffect(() => {
     if (loadedRoutes.current.has(routeId)) return;
     loadedRoutes.current.add(routeId);
-    if (routeId === "files" || routeId === "providers" || routeId === "diagnostics") {
+    if (
+      routeId === "files" ||
+      routeId === "providers" ||
+      routeId === "diagnostics"
+    ) {
       void providerLoad(routeId === "providers");
     }
     if (routeId === "transfers") void transferLoad("");
@@ -264,7 +379,10 @@ export function DesktopAppShell() {
   useEffect(() => {
     if (!location.pathname.startsWith("/settings")) return;
     openSettingsOverlay();
-    navigate(settingsFallbackRoute(lastNonSettingsRouteRef.current, lastAppRoute), { replace: true });
+    navigate(
+      settingsFallbackRoute(lastNonSettingsRouteRef.current, lastAppRoute),
+      { replace: true },
+    );
   }, [lastAppRoute, location.pathname, navigate, openSettingsOverlay]);
 
   useEffect(() => {
@@ -273,21 +391,28 @@ export function DesktopAppShell() {
     root.dataset.themeMode = themeMode;
     root.dataset.compactMode = String(appearancePreferences.compactModeEnabled);
     root.dataset.fontSize = appearancePreferences.fontSize;
-    root.dataset.reducedMotion = String(appearancePreferences.reducedMotionEnabled);
-    root.dataset.thumbnailPreviews = String(appearancePreferences.thumbnailPreviewsEnabled);
+    root.dataset.reducedMotion = String(
+      appearancePreferences.reducedMotionEnabled,
+    );
+    root.dataset.thumbnailPreviews = String(
+      appearancePreferences.thumbnailPreviewsEnabled,
+    );
     root.dataset.uiScale = appearancePreferences.uiScale;
     root.style.colorScheme = resolvedTheme;
   }, [appearancePreferences, resolvedTheme, themeMode]);
 
   useEffect(() => {
-    const badgeCount = notificationPreferences.badgeCountEnabled && unreadActivityCount > 0
-      ? unreadActivityCount
-      : undefined;
+    const badgeCount =
+      notificationPreferences.badgeCountEnabled && unreadActivityCount > 0
+        ? unreadActivityCount
+        : undefined;
     try {
       if (!hasTauriInternals()) return;
-      void getCurrentWindow().setBadgeCount(badgeCount).catch(() => {
-        // Some platforms or browser test contexts do not support app badge counts.
-      });
+      void getCurrentWindow()
+        .setBadgeCount(badgeCount)
+        .catch(() => {
+          // Some platforms or browser test contexts do not support app badge counts.
+        });
     } catch {
       // Some platforms or browser test contexts do not support app badge counts.
     }
@@ -300,7 +425,10 @@ export function DesktopAppShell() {
     existing?.remove();
 
     if (customFonts.length === 0) {
-      document.documentElement.style.setProperty("--misty-font-family", DEFAULT_FONT_STACK);
+      document.documentElement.style.setProperty(
+        "--misty-font-family",
+        DEFAULT_FONT_STACK,
+      );
       return;
     }
 
@@ -315,8 +443,13 @@ export function DesktopAppShell() {
     style.textContent = rules;
     document.head.appendChild(style);
 
-    const customStack = customFonts.map((_, index) => cssString(customFontFamilyName(index))).join(", ");
-    document.documentElement.style.setProperty("--misty-font-family", `${customStack}, ${DEFAULT_FONT_STACK}`);
+    const customStack = customFonts
+      .map((_, index) => cssString(customFontFamilyName(index)))
+      .join(", ");
+    document.documentElement.style.setProperty(
+      "--misty-font-family",
+      `${customStack}, ${DEFAULT_FONT_STACK}`,
+    );
 
     return () => {
       style.remove();
@@ -325,7 +458,8 @@ export function DesktopAppShell() {
 
   useEffect(() => {
     const query = window.matchMedia("(prefers-color-scheme: light)");
-    const syncSystemTheme = () => setSystemTheme(query.matches ? "light" : "dark");
+    const syncSystemTheme = () =>
+      setSystemTheme(query.matches ? "light" : "dark");
     syncSystemTheme();
     query.addEventListener("change", syncSystemTheme);
     return () => query.removeEventListener("change", syncSystemTheme);
@@ -333,7 +467,9 @@ export function DesktopAppShell() {
 
   useEffect(() => {
     if (!hasTauriInternals()) return;
-    void getCurrentWebview().setAutoResize(true).catch(() => undefined);
+    void getCurrentWebview()
+      .setAutoResize(true)
+      .catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -341,63 +477,75 @@ export function DesktopAppShell() {
     void invoke("enable_modern_window_style", {
       window: getCurrentWebviewWindow(),
       offsetX: -6,
-      offsetY: 0,
+      offsetY: -12,
     }).catch(() => undefined);
   }, []);
 
-  const startTitlebarDrag = useCallback((event: ReactPointerEvent<HTMLElement>) => {
-    if (event.button !== 0 || event.detail > 1) {
-      return;
-    }
+  const startTitlebarDrag = useCallback(
+    (event: ReactPointerEvent<HTMLElement>) => {
+      if (event.button !== 0 || event.detail > 1) {
+        return;
+      }
 
-    const target = event.target as HTMLElement | null;
-    if (target?.closest("button,a,input,textarea,select,[role='button']")) {
-      return;
-    }
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("button,a,input,textarea,select,[role='button']")) {
+        return;
+      }
 
-    event.preventDefault();
-    if (!hasTauriInternals()) return;
-    void getCurrentWindow().startDragging().catch(() => undefined);
-  }, []);
+      event.preventDefault();
+      if (!hasTauriInternals()) return;
+      void getCurrentWindow()
+        .startDragging()
+        .catch(() => undefined);
+    },
+    [],
+  );
 
-  const animateWindowRect = useCallback((from: WindowRect, to: WindowRect, durationMs = 500) => {
-    if (!hasTauriInternals()) {
-      return Promise.resolve();
-    }
-    if (customZoomAnimatingRef.current) {
-      return Promise.resolve();
-    }
+  const animateWindowRect = useCallback(
+    (from: WindowRect, to: WindowRect, durationMs = 500) => {
+      if (!hasTauriInternals()) {
+        return Promise.resolve();
+      }
+      if (customZoomAnimatingRef.current) {
+        return Promise.resolve();
+      }
 
-    customZoomAnimatingRef.current = true;
-    const window = getCurrentWindow();
-    const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+      customZoomAnimatingRef.current = true;
+      const window = getCurrentWindow();
+      const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
 
-    return new Promise<void>((resolve) => {
-      const start = performance.now();
+      return new Promise<void>((resolve) => {
+        const start = performance.now();
 
-      const step = (now: number) => {
-        const progress = Math.min(1, (now - start) / durationMs);
-        const eased = easeOutCubic(progress);
-        const x = Math.round(from.x + (to.x - from.x) * eased);
-        const y = Math.round(from.y + (to.y - from.y) * eased);
-        const width = Math.round(from.width + (to.width - from.width) * eased);
-        const height = Math.round(from.height + (to.height - from.height) * eased);
+        const step = (now: number) => {
+          const progress = Math.min(1, (now - start) / durationMs);
+          const eased = easeOutCubic(progress);
+          const x = Math.round(from.x + (to.x - from.x) * eased);
+          const y = Math.round(from.y + (to.y - from.y) * eased);
+          const width = Math.round(
+            from.width + (to.width - from.width) * eased,
+          );
+          const height = Math.round(
+            from.height + (to.height - from.height) * eased,
+          );
 
-        void window.setPosition(new PhysicalPosition(x, y));
-        void window.setSize(new PhysicalSize(width, height));
+          void window.setPosition(new PhysicalPosition(x, y));
+          void window.setSize(new PhysicalSize(width, height));
 
-        if (progress < 1) {
-          requestAnimationFrame(step);
-          return;
-        }
+          if (progress < 1) {
+            requestAnimationFrame(step);
+            return;
+          }
 
-        customZoomAnimatingRef.current = false;
-        resolve();
-      };
+          customZoomAnimatingRef.current = false;
+          resolve();
+        };
 
-      requestAnimationFrame(step);
-    });
-  }, []);
+        requestAnimationFrame(step);
+      });
+    },
+    [],
+  );
 
   const togglePseudoMaximize = useCallback(async () => {
     if (!hasTauriInternals()) return;
@@ -412,7 +560,12 @@ export function DesktopAppShell() {
       currentMonitor().then((current) => current ?? primaryMonitor()),
     ]);
 
-    const currentRect = { x: position.x, y: position.y, width: size.width, height: size.height };
+    const currentRect = {
+      x: position.x,
+      y: position.y,
+      width: size.width,
+      height: size.height,
+    };
 
     if (!customZoomedRef.current) {
       if (!monitor) {
@@ -420,15 +573,12 @@ export function DesktopAppShell() {
       }
 
       customZoomRestoreBoundsRef.current = { position, size };
-      await animateWindowRect(
-        currentRect,
-        {
-          x: monitor.workArea.position.x,
-          y: monitor.workArea.position.y,
-          width: monitor.workArea.size.width,
-          height: monitor.workArea.size.height,
-        },
-      );
+      await animateWindowRect(currentRect, {
+        x: monitor.workArea.position.x,
+        y: monitor.workArea.position.y,
+        width: monitor.workArea.size.width,
+        height: monitor.workArea.size.height,
+      });
       customZoomedRef.current = true;
       return;
     }
@@ -439,23 +589,23 @@ export function DesktopAppShell() {
       return;
     }
 
-    await animateWindowRect(
-      currentRect,
-      {
-        x: restoreBounds.position.x,
-        y: restoreBounds.position.y,
-        width: restoreBounds.size.width,
-        height: restoreBounds.size.height,
-      },
-    );
+    await animateWindowRect(currentRect, {
+      x: restoreBounds.position.x,
+      y: restoreBounds.position.y,
+      width: restoreBounds.size.width,
+      height: restoreBounds.size.height,
+    });
     customZoomedRef.current = false;
   }, [animateWindowRect]);
 
-  const expandTitlebarWindow = useCallback((event: ReactMouseEvent<HTMLElement>) => {
-    event.stopPropagation();
-    event.preventDefault();
-    void togglePseudoMaximize().catch(() => undefined);
-  }, [togglePseudoMaximize]);
+  const expandTitlebarWindow = useCallback(
+    (event: ReactMouseEvent<HTMLElement>) => {
+      event.stopPropagation();
+      event.preventDefault();
+      void togglePseudoMaximize().catch(() => undefined);
+    },
+    [togglePseudoMaximize],
+  );
 
   return (
     <main className={desktopFrameClass}>
@@ -471,26 +621,46 @@ export function DesktopAppShell() {
         <span className={desktopTitlebarTitleClass}>Misty</span>
         <div className={desktopTitlebarActionsClass}>
           <TitlebarActivityButton
-            ref={titlebarActivityAnchorRef}
-            open={activityOpen}
-            badge={notificationPreferences.badgeCountEnabled ? unreadActivityCount : 0}
-            onClick={() => setActivityOpen((open) => !open)}
+            ref={titlebarInboxAnchorRef}
+            open={inboxOpen}
+            badge={
+              notificationPreferences.badgeCountEnabled ? unreadInboxCount : 0
+            }
+            onClick={() => {
+              setActivityOpen(false);
+              setInboxOpen((open) => !open);
+            }}
           />
         </div>
       </header>
 
       <nav className={desktopNavbarClass} aria-label="Primary">
-        <div className="mb-3 grid h-[62px] w-[62px] place-items-center" title={app?.migrationStage ?? "Misty"}>
-          <img className="h-[58px] w-[58px] object-contain" src={mistyLogo} alt="Misty" />
+        <div
+          className="mb-3 grid h-[62px] w-[62px] place-items-center"
+          title={app?.migrationStage ?? "Misty"}
+        >
+          <img
+            className="h-[58px] w-[58px] object-contain"
+            src={mistyLogo}
+            alt="Misty"
+          />
         </div>
         <div className={navbarGroupClass}>
           <NavGroup currentPath={location.pathname} items={navItems} />
         </div>
         <div className={navbarBottomClass}>
           <ActivityNavButton
+            ref={activityAnchorRef}
             open={activityOpen}
-            badge={notificationPreferences.badgeCountEnabled ? unreadActivityCount : 0}
-            onClick={() => setActivityOpen((open) => !open)}
+            badge={
+              notificationPreferences.badgeCountEnabled
+                ? unreadActivityCount
+                : 0
+            }
+            onClick={() => {
+              setInboxOpen(false);
+              setActivityOpen((open) => !open);
+            }}
           />
           <SettingsNavButton
             open={settingsOpen || location.pathname.startsWith("/settings")}
@@ -505,7 +675,7 @@ export function DesktopAppShell() {
       </nav>
 
       <section className={`${desktopRouteShellClass} route-shell`}>
-        <AppNoticePublisher />
+        <AppNoticePublisher onPublish={publishAppInboxEntry} />
         <RouteNotice routeId={routeId} />
 
         <Routes>
@@ -515,8 +685,14 @@ export function DesktopAppShell() {
           <Route path="/transfers" element={<TransfersWorkspace />} />
           <Route path="/dock" element={<DockWorkspace />} />
           <Route path="/account" element={<HubAccountPage />} />
-          <Route path="/hub/account" element={<Navigate to="/account" replace />} />
-          <Route path="/hub/settings" element={<Navigate to="/account" replace />} />
+          <Route
+            path="/hub/account"
+            element={<Navigate to="/account" replace />}
+          />
+          <Route
+            path="/hub/settings"
+            element={<Navigate to="/account" replace />}
+          />
           <Route path="/hub" element={<HubWorkspace />}>
             <Route index element={<HubHomePage />} />
             <Route path="dashboard" element={<HubDashboardPage />} />
@@ -536,9 +712,17 @@ export function DesktopAppShell() {
       <WorkStatusPopup />
       <FramePacingOverlay enabled={framePacingOverlayEnabled} />
       <ActivityPopover
-        anchorRef={titlebarActivityAnchorRef}
+        anchorRef={activityAnchorRef}
         open={activityOpen}
         onClose={() => setActivityOpen(false)}
+      />
+      <InboxPopover
+        anchorRef={titlebarInboxAnchorRef}
+        entries={appInboxEntries}
+        open={inboxOpen}
+        onClear={clearInbox}
+        onClose={() => setInboxOpen(false)}
+        onMarkRead={markInboxRead}
       />
       <ProfilePopover
         anchorRef={profileAnchorRef}
@@ -552,15 +736,18 @@ export function DesktopAppShell() {
   );
 }
 
-function parseCustomFontSignature(signature: string): Array<{ label: string; path: string }> {
+function parseCustomFontSignature(
+  signature: string,
+): Array<{ label: string; path: string }> {
   try {
     const value = JSON.parse(signature) as unknown;
     if (!Array.isArray(value)) return [];
-    return value.filter((entry): entry is { label: string; path: string } =>
-      !!entry &&
-      typeof entry === "object" &&
-      typeof (entry as Record<string, unknown>).label === "string" &&
-      typeof (entry as Record<string, unknown>).path === "string",
+    return value.filter(
+      (entry): entry is { label: string; path: string } =>
+        !!entry &&
+        typeof entry === "object" &&
+        typeof (entry as Record<string, unknown>).label === "string" &&
+        typeof (entry as Record<string, unknown>).path === "string",
     );
   } catch {
     return [];
@@ -588,29 +775,36 @@ const RouteNotice = memo(function RouteNotice(props: { routeId: AppTab }) {
   const transferMessage = useTransfersStore((state) => state.message);
   const settingsError = useSettingsStore((state) => state.error);
   const settingsMessage = useSettingsStore((state) => state.message);
-  const notificationPreferences = useSettingsStore(useShallow((state) =>
-    selectNotificationPreferences(state.settings?.document),
-  ));
+  const notificationPreferences = useSettingsStore(
+    useShallow((state) =>
+      selectNotificationPreferences(state.settings?.document),
+    ),
+  );
   const notice = noticeForRoute(props.routeId, {
     app: { error: appError, message: appMessage },
     providers: { error: providerError, message: providerMessage },
     transfers: { error: transferError, message: transferMessage },
     settings: { error: settingsError, message: settingsMessage },
   });
-  const showMessage = notificationPreferences.inAppNotificationsEnabled
-    && !notificationPreferences.quietHoursEnabled;
+  const showMessage =
+    notificationPreferences.inAppNotificationsEnabled &&
+    !notificationPreferences.quietHoursEnabled;
 
   if (!notice.error && !(showMessage && notice.message)) return null;
 
   return (
     <div className={globalNoticeLayerClass}>
       {notice.error ? (
-        <div className={`${globalBannerBaseClass} border-[color-mix(in_srgb,var(--misty-danger)_42%,var(--misty-border-soft))] bg-[color-mix(in_srgb,var(--misty-danger)_10%,var(--misty-surface))] text-[var(--misty-danger)]`}>
+        <div
+          className={`${globalBannerBaseClass} border-[color-mix(in_srgb,var(--misty-danger)_42%,var(--misty-border-soft))] bg-[color-mix(in_srgb,var(--misty-danger)_10%,var(--misty-surface))] text-[var(--misty-danger)]`}
+        >
           {notice.error}
         </div>
       ) : null}
       {showMessage && notice.message ? (
-        <div className={`${globalBannerBaseClass} border-[color-mix(in_srgb,var(--misty-success)_38%,var(--misty-border-soft))] bg-[color-mix(in_srgb,var(--misty-success)_10%,var(--misty-surface))] text-[var(--misty-success)]`}>
+        <div
+          className={`${globalBannerBaseClass} border-[color-mix(in_srgb,var(--misty-success)_38%,var(--misty-border-soft))] bg-[color-mix(in_srgb,var(--misty-success)_10%,var(--misty-surface))] text-[var(--misty-success)]`}
+        >
           {notice.message}
         </div>
       ) : null}
@@ -621,8 +815,23 @@ const RouteNotice = memo(function RouteNotice(props: { routeId: AppTab }) {
 type AppNoticeSource = "app" | "providers" | "transfers" | "settings";
 type AppNoticeKind = "error" | "message";
 type AppNoticeEntry = readonly [AppNoticeSource, AppNoticeKind, string | null];
+type AppInboxEntry = {
+  id: number;
+  source: AppNoticeSource;
+  kind: AppNoticeKind;
+  message: string;
+  createdAtMs: number;
+  read: boolean;
+};
 
-const AppNoticePublisher = memo(function AppNoticePublisher() {
+let nextAppInboxEntryId = 1;
+
+const AppNoticePublisher = memo(function AppNoticePublisher(props: {
+  onPublish: (
+    entry: Omit<AppInboxEntry, "id" | "createdAtMs" | "read">,
+  ) => void;
+}) {
+  const { onPublish } = props;
   const appError = useAppStore((state) => state.error);
   const appMessage = useAppStore((state) => state.message);
   const providerError = useProvidersStore((state) => state.error);
@@ -657,16 +866,18 @@ const AppNoticePublisher = memo(function AppNoticePublisher() {
       const signature = `${kind}:${message}`;
       if (lastPublished.current[key] === signature) continue;
       lastPublished.current[key] = signature;
+      onPublish({ source, kind, message });
       pushNotification(
         `${appNoticeSourceLabel(source)}: ${message}`,
         appNoticeType(kind),
         kind === "error" ? 5500 : 3500,
-        true,
+        false,
       );
     }
   }, [
     appError,
     appMessage,
+    onPublish,
     providerError,
     providerMessage,
     transferError,
@@ -678,14 +889,24 @@ const AppNoticePublisher = memo(function AppNoticePublisher() {
   return null;
 });
 
-const activeWorkStatuses = new Set<TransferRecord["status"]>(["queued", "pending", "in_progress"]);
+const activeWorkStatuses = new Set<TransferRecord["status"]>([
+  "queued",
+  "pending",
+  "in_progress",
+]);
 const emptyTransferRows: TransferRecord[] = [];
 
 const WorkStatusPopup = memo(function WorkStatusPopup() {
-  const rows = useTransfersStore((state) => state.transfers?.rows ?? emptyTransferRows);
+  const rows = useTransfersStore(
+    (state) => state.transfers?.rows ?? emptyTransferRows,
+  );
   const loadTransfers = useTransfersStore((state) => state.load);
-  const setupInstalling = useSetupStore((state) => state.installState === "installing" || state.busy);
-  const pluginInstalling = usePluginsStore((state) => Boolean(state.actionPluginId));
+  const setupInstalling = useSetupStore(
+    (state) => state.installState === "installing" || state.busy,
+  );
+  const pluginInstalling = usePluginsStore((state) =>
+    Boolean(state.actionPluginId),
+  );
 
   useEffect(() => {
     let disposed = false;
@@ -707,8 +928,12 @@ const WorkStatusPopup = memo(function WorkStatusPopup() {
     <aside className={workStatusPopupClass} role="status" aria-live="polite">
       <span className={workStatusPulseClass} />
       <span className="min-w-0">
-        <strong className="block truncate text-[13px] font-semibold leading-tight">{summary.title}</strong>
-        <span className="block truncate text-xs leading-tight text-[var(--misty-text-muted)]">{summary.detail}</span>
+        <strong className="block truncate text-[13px] font-semibold leading-tight">
+          {summary.title}
+        </strong>
+        <span className="block truncate text-xs leading-tight text-[var(--misty-text-muted)]">
+          {summary.detail}
+        </span>
       </span>
     </aside>
   );
@@ -721,9 +946,16 @@ function DiagnosticsRoute() {
     if (!providers) return "Starting";
     return providers.health.ready
       ? `Ready${providers.health.version ? ` · ${providers.health.version}` : ""}`
-      : providers.health.error || providers.error || "Remote service unavailable";
+      : providers.health.error ||
+          providers.error ||
+          "Remote service unavailable";
   });
-  return <DiagnosticsWorkspace environment={environment} proxyStatus={providerStatus} />;
+  return (
+    <DiagnosticsWorkspace
+      environment={environment}
+      proxyStatus={providerStatus}
+    />
+  );
 }
 
 function SettingsRoutePlaceholder() {
@@ -731,62 +963,66 @@ function SettingsRoutePlaceholder() {
 }
 
 function StartupRedirect() {
-  const { loaded, settings } = useSettingsStore(useShallow((state) => ({
-    loaded: state.loaded,
-    settings: state.settings,
-  })));
+  const { loaded, settings } = useSettingsStore(
+    useShallow((state) => ({
+      loaded: state.loaded,
+      settings: state.settings,
+    })),
+  );
   const lastAppRoute = useAppRouteMemoryStore((state) => state.lastAppRoute);
 
   if (!loaded) {
     return (
-      <section className="m-[var(--misty-route-margin)] min-h-[calc(100vh-(var(--misty-route-margin)*2))]" aria-label="Loading Misty">
-        <div className="m-[18px] text-[var(--misty-text-muted)]">Loading...</div>
+      <section
+        className="m-[var(--misty-route-margin)] min-h-[calc(100vh-(var(--misty-route-margin)*2))]"
+        aria-label="Loading Misty"
+      >
+        <div className="m-[18px] text-[var(--misty-text-muted)]">
+          Loading...
+        </div>
       </section>
     );
   }
 
   const generalPreferences = selectGeneralPreferences(settings?.document);
-  const target = generalPreferences.reopenLastSession && isRememberableAppRoute(lastAppRoute)
-    ? lastAppRoute
-    : startupRouteForIndex(generalPreferences.startupViewIndex);
+  const target =
+    generalPreferences.reopenLastSession && isRememberableAppRoute(lastAppRoute)
+      ? lastAppRoute
+      : startupRouteForIndex(generalPreferences.startupViewIndex);
 
   return <Navigate to={target} replace />;
 }
 
 function NavGroup(props: {
-  items: Array<{ id: AppTab; label: string; path: string; icon: typeof Folder }>;
-  badges?: Partial<Record<AppTab, number>>;
+  items: DesktopNavItem[];
+  badges?: Partial<Record<string, number>>;
   currentPath: string;
 }) {
   return (
     <>
       {props.items.map((item) => {
         const Icon = item.icon;
-        const isHubActive = item.id === "hub" && props.currentPath.startsWith("/hub");
+        const selected = isNavItemActive(item, props.currentPath);
         return (
           <NavLink
-            className={({ isActive }) =>
-              `group ${navLinkBaseClass} ${isHubActive || isActive ? navLinkActiveClass : ""}`
-            }
+            aria-current={selected ? "page" : undefined}
+            aria-label={item.label}
+            className={`group ${navLinkBaseClass} ${selected ? navLinkActiveClass : ""}`}
+            end={item.exact}
             key={item.id}
+            title={item.label}
             to={item.path}
           >
-            {({ isActive }) => {
-              const selected = isHubActive || isActive;
-              return (
-                <>
-                  <span className={`${navIconTileBaseClass} ${selected ? navIconTileActiveClass : ""}`}>
-                    <Icon size={22} strokeWidth={1.85} />
-                    {props.badges?.[item.id] ? (
-                      <span className="absolute right-px top-0.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-[#d83e3e] px-[5px] text-[10px] font-bold leading-none text-white shadow-[0_0_0_2px_var(--misty-bg)]">
-                        {formatBadgeCount(props.badges[item.id] ?? 0)}
-                      </span>
-                    ) : null}
-                  </span>
-                  <span>{item.label}</span>
-                </>
-              );
-            }}
+            <span
+              className={`${navIconTileBaseClass} ${selected ? navIconTileActiveClass : ""}`}
+            >
+              <Icon size={24} strokeWidth={1.85} />
+              {props.badges?.[item.id] ? (
+                <span className="absolute right-px top-0.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-[#d83e3e] px-[5px] text-[10px] font-bold leading-none text-white shadow-[0_0_0_2px_var(--misty-bg)]">
+                  {formatBadgeCount(props.badges[item.id] ?? 0)}
+                </span>
+              ) : null}
+            </span>
           </NavLink>
         );
       })}
@@ -794,64 +1030,79 @@ function NavGroup(props: {
   );
 }
 
-const ActivityNavButton = memo(forwardRef<HTMLButtonElement, {
-  badge: number;
-  open: boolean;
-  onClick: () => void;
-}>(function ActivityNavButton(props, ref) {
-  return (
-    <button
-      ref={ref}
-      className={`group ${navLinkBaseClass} ${props.open ? navLinkActiveClass : ""}`}
-      type="button"
-      aria-haspopup="dialog"
-      aria-expanded={props.open}
-      aria-label="Activity"
-      onClick={props.onClick}
-    >
-      <span className={`${navIconTileBaseClass} ${props.open ? navIconTileActiveClass : ""}`}>
-        <Bell size={22} strokeWidth={1.85} />
+function isNavItemActive(item: DesktopNavItem, pathname: string): boolean {
+  if (item.active) return item.active(pathname);
+  if (item.exact) return pathname === item.path;
+  return pathname === item.path || pathname.startsWith(`${item.path}/`);
+}
+
+const ActivityNavButton = memo(
+  forwardRef<
+    HTMLButtonElement,
+    {
+      badge: number;
+      open: boolean;
+      onClick: () => void;
+    }
+  >(function ActivityNavButton(props, ref) {
+    return (
+      <button
+        ref={ref}
+        className={`group ${navLinkBaseClass} ${props.open ? navLinkActiveClass : ""}`}
+        type="button"
+        aria-haspopup="dialog"
+        aria-expanded={props.open}
+        aria-label="Activity"
+        title="Activity"
+        onClick={props.onClick}
+      >
+        <span
+          className={`${navIconTileBaseClass} ${props.open ? navIconTileActiveClass : ""}`}
+        >
+          <Bell size={29} strokeWidth={1.85} />
+          {props.badge ? (
+            <span className="absolute right-px top-0.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-[#d83e3e] px-[5px] text-[10px] font-bold leading-none text-white shadow-[0_0_0_2px_var(--misty-bg)]">
+              {formatBadgeCount(props.badge)}
+            </span>
+          ) : null}
+        </span>
+      </button>
+    );
+  }),
+);
+
+const TitlebarActivityButton = memo(
+  forwardRef<
+    HTMLButtonElement,
+    {
+      badge: number;
+      open: boolean;
+      onClick: () => void;
+    }
+  >(function TitlebarActivityButton(props, ref) {
+    return (
+      <button
+        ref={ref}
+        className={`${titlebarActivityButtonClass} ${props.open ? "bg-[var(--misty-surface-2)] text-[var(--misty-text)]" : ""}`}
+        type="button"
+        aria-haspopup="dialog"
+        aria-expanded={props.open}
+        aria-label="Inbox"
+        title="Inbox"
+        onClick={props.onClick}
+      >
+        <Inbox size={16} strokeWidth={1.9} />
         {props.badge ? (
-          <span className="absolute right-px top-0.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-[#d83e3e] px-[5px] text-[10px] font-bold leading-none text-white shadow-[0_0_0_2px_var(--misty-bg)]">
+          <span className="absolute right-0 top-0 grid h-[14px] min-w-[14px] place-items-center rounded-full bg-[#d83e3e] px-[3px] text-[9px] font-bold leading-none text-white shadow-[0_0_0_2px_var(--misty-bg)]">
             {formatBadgeCount(props.badge)}
           </span>
         ) : null}
-      </span>
-      <span>Activity</span>
-    </button>
-  );
-}));
+      </button>
+    );
+  }),
+);
 
-const TitlebarActivityButton = memo(forwardRef<HTMLButtonElement, {
-  badge: number;
-  open: boolean;
-  onClick: () => void;
-}>(function TitlebarActivityButton(props, ref) {
-  return (
-    <button
-      ref={ref}
-      className={`${titlebarActivityButtonClass} ${props.open ? "bg-[var(--misty-surface-2)] text-[var(--misty-text)]" : ""}`}
-      type="button"
-      aria-haspopup="dialog"
-      aria-expanded={props.open}
-      aria-label="Inbox"
-      title="Inbox"
-      onClick={props.onClick}
-    >
-      <Inbox size={16} strokeWidth={1.9} />
-      {props.badge ? (
-        <span className="absolute right-0 top-0 grid h-[14px] min-w-[14px] place-items-center rounded-full bg-[#d83e3e] px-[3px] text-[9px] font-bold leading-none text-white shadow-[0_0_0_2px_var(--misty-bg)]">
-          {formatBadgeCount(props.badge)}
-        </span>
-      ) : null}
-    </button>
-  );
-}));
-
-function SettingsNavButton(props: {
-  open: boolean;
-  onClick: () => void;
-}) {
+function SettingsNavButton(props: { open: boolean; onClick: () => void }) {
   return (
     <button
       className={`group ${navLinkBaseClass} ${props.open ? navLinkActiveClass : ""}`}
@@ -859,51 +1110,64 @@ function SettingsNavButton(props: {
       aria-haspopup="dialog"
       aria-expanded={props.open}
       aria-label="Settings"
+      title="Settings"
       onClick={props.onClick}
     >
-      <span className={`${navIconTileBaseClass} ${props.open ? navIconTileActiveClass : ""}`}>
-        <SettingsIcon size={22} strokeWidth={1.85} />
+      <span
+        className={`${navIconTileBaseClass} ${props.open ? navIconTileActiveClass : ""}`}
+      >
+        <SettingsIcon size={29} strokeWidth={1.85} />
       </span>
-      <span>Settings</span>
     </button>
   );
 }
 
-const ProfileNavButton = memo(forwardRef<HTMLButtonElement, {
-  open: boolean;
-  onClick: () => void;
-}>(function ProfileNavButton(props, ref) {
-  const currentUser = useSetupStore((state) => state.status?.current_user ?? null);
-  const { user } = useAuth();
-  const me = useUserStore(useShallow((state) => ({
-    email: state.me?.email,
-    name: state.me?.name,
-  })));
-  const account = currentUser ?? user;
-  const email = me.email ?? account?.email ?? "";
-  const displayName = me.name ?? account?.name ?? emailName(email) ?? "Misty";
-  const initials = initialsForProfile(displayName, email);
+const ProfileNavButton = memo(
+  forwardRef<
+    HTMLButtonElement,
+    {
+      open: boolean;
+      onClick: () => void;
+    }
+  >(function ProfileNavButton(props, ref) {
+    const currentUser = useSetupStore(
+      (state) => state.status?.current_user ?? null,
+    );
+    const { user } = useAuth();
+    const me = useUserStore(
+      useShallow((state) => ({
+        email: state.me?.email,
+        name: state.me?.name,
+      })),
+    );
+    const account = currentUser ?? user;
+    const email = me.email ?? account?.email ?? "";
+    const displayName = me.name ?? account?.name ?? emailName(email) ?? "Misty";
+    const initials = initialsForProfile(displayName, email);
 
-  return (
-    <button
-      ref={ref}
-      className={profileDockClass}
-      type="button"
-      aria-label="Profile"
-      aria-haspopup="menu"
-      aria-expanded={props.open}
-      title={account ? `${displayName} (${email})` : "Profile"}
-      onClick={props.onClick}
-    >
-      {initials}
-      <span
-        className={`absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-[var(--misty-bg)] ${
-          account ? "bg-[var(--misty-success)]" : "bg-[var(--misty-text-subtle)]"
-        }`}
-      />
-    </button>
-  );
-}));
+    return (
+      <button
+        ref={ref}
+        className={profileDockClass}
+        type="button"
+        aria-label="Profile"
+        aria-haspopup="menu"
+        aria-expanded={props.open}
+        title={account ? `${displayName} (${email})` : "Profile"}
+        onClick={props.onClick}
+      >
+        {initials}
+        <span
+          className={`absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-[var(--misty-bg)] ${
+            account
+              ? "bg-[var(--misty-success)]"
+              : "bg-[var(--misty-text-subtle)]"
+          }`}
+        />
+      </button>
+    );
+  }),
+);
 
 function ProfilePopover(props: {
   anchorRef: RefObject<HTMLButtonElement | null>;
@@ -913,13 +1177,19 @@ function ProfilePopover(props: {
   onOpenSettings: () => void;
 }) {
   const navigate = useNavigate();
-  const currentUser = useSetupStore((state) => state.status?.current_user ?? null);
+  const currentUser = useSetupStore(
+    (state) => state.status?.current_user ?? null,
+  );
   const { user, logout } = useAuth();
-  const me = useUserStore(useShallow((state) => ({
-    email: state.me?.email,
-    name: state.me?.name,
-  })));
-  const setActiveSettingsSection = useSettingsStore((state) => state.setActiveSection);
+  const me = useUserStore(
+    useShallow((state) => ({
+      email: state.me?.email,
+      name: state.me?.name,
+    })),
+  );
+  const setActiveSettingsSection = useSettingsStore(
+    (state) => state.setActiveSection,
+  );
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [menuStyle, setMenuStyle] = useState<CSSProperties>({});
   const account = currentUser ?? user;
@@ -932,13 +1202,19 @@ function ProfilePopover(props: {
     if (!anchor) return;
     const rect = anchor.getBoundingClientRect();
     const width = 286;
-    const left = Math.min(Math.max(8, rect.right + 10), window.innerWidth - width - 8);
-    const top = Math.min(Math.max(8, rect.bottom - 220), window.innerHeight - 236);
-    setMenuStyle((current) => (
+    const left = Math.min(
+      Math.max(8, rect.right + 10),
+      window.innerWidth - width - 8,
+    );
+    const top = Math.min(
+      Math.max(8, rect.bottom - 220),
+      window.innerHeight - 236,
+    );
+    setMenuStyle((current) =>
       current.left === left && current.top === top && current.width === width
         ? current
-        : { left, top, width }
-    ));
+        : { left, top, width },
+    );
   }, [props.anchorRef]);
 
   useEffect(() => {
@@ -947,7 +1223,11 @@ function ProfilePopover(props: {
     const closeOnPointerDown = (event: globalThis.PointerEvent) => {
       const target = event.target as Node | null;
       if (!target) return;
-      if (props.anchorRef.current?.contains(target) || menuRef.current?.contains(target)) return;
+      if (
+        props.anchorRef.current?.contains(target) ||
+        menuRef.current?.contains(target)
+      )
+        return;
       props.onClose();
     };
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -981,56 +1261,83 @@ function ProfilePopover(props: {
     logout();
   };
 
-  return (
-    createPortal(
-      <div ref={menuRef} className={profilePopoverClass} style={menuStyle} role="menu" aria-label="Profile">
-        <div className="grid grid-cols-[42px_minmax(0,1fr)] items-center gap-3 border-b border-[var(--misty-border-soft)] px-2 pb-3 pt-1">
-          <span className="relative grid h-10 w-10 place-items-center rounded-full bg-[var(--misty-surface-3)] text-sm font-bold">
-            {initials}
-            <span
-              className={`absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-[var(--misty-surface)] ${
-                account ? "bg-[var(--misty-success)]" : "bg-[var(--misty-text-subtle)]"
-              }`}
-            />
-          </span>
-          <span className="min-w-0">
-            <strong className="block truncate text-sm">{displayName}</strong>
-            <small className="block truncate text-xs text-[var(--misty-text-muted)]">{email || "Not signed in"}</small>
-          </span>
-        </div>
-        <div className="grid gap-1 py-2">
-          <span className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-normal text-[var(--misty-text-subtle)]">User/Profile Settings</span>
-          <button className={profileMenuItemClass} type="button" role="menuitem" onClick={openAccountSettings}>
-            <UserCircle size={17} />
-            <span>Account settings</span>
-          </button>
-          <button className={profileMenuItemClass} type="button" role="menuitem" onClick={switchAccounts}>
-            <Repeat2 size={17} />
-            <span>Switch accounts</span>
-          </button>
-          <button className={profileMenuItemClass} type="button" role="menuitem" onClick={signOut}>
-            <LogOut size={17} />
-            <span>{account ? "Sign out" : "Clear session"}</span>
-          </button>
-          <div className="my-1 h-px bg-[var(--misty-border-soft)]" />
-          <span className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-normal text-[var(--misty-text-subtle)]">Misty App Settings</span>
-          <button
-            className={profileMenuItemClass}
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              setActiveSettingsSection("general");
-              props.onClose();
-              props.onOpenSettings();
-            }}
-          >
-            <SettingsIcon size={17} />
-            <span>Open app settings</span>
-          </button>
-        </div>
-      </div>,
-      document.body,
-    )
+  return createPortal(
+    <div
+      ref={menuRef}
+      className={profilePopoverClass}
+      style={menuStyle}
+      role="menu"
+      aria-label="Profile"
+    >
+      <div className="grid grid-cols-[42px_minmax(0,1fr)] items-center gap-3 border-b border-[var(--misty-border-soft)] px-2 pb-3 pt-1">
+        <span className="relative grid h-10 w-10 place-items-center rounded-full bg-[var(--misty-surface-3)] text-sm font-bold">
+          {initials}
+          <span
+            className={`absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-[var(--misty-surface)] ${
+              account
+                ? "bg-[var(--misty-success)]"
+                : "bg-[var(--misty-text-subtle)]"
+            }`}
+          />
+        </span>
+        <span className="min-w-0">
+          <strong className="block truncate text-sm">{displayName}</strong>
+          <small className="block truncate text-xs text-[var(--misty-text-muted)]">
+            {email || "Not signed in"}
+          </small>
+        </span>
+      </div>
+      <div className="grid gap-1 py-2">
+        <span className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-normal text-[var(--misty-text-subtle)]">
+          User/Profile Settings
+        </span>
+        <button
+          className={profileMenuItemClass}
+          type="button"
+          role="menuitem"
+          onClick={openAccountSettings}
+        >
+          <UserCircle size={17} />
+          <span>Account settings</span>
+        </button>
+        <button
+          className={profileMenuItemClass}
+          type="button"
+          role="menuitem"
+          onClick={switchAccounts}
+        >
+          <Repeat2 size={17} />
+          <span>Switch accounts</span>
+        </button>
+        <button
+          className={profileMenuItemClass}
+          type="button"
+          role="menuitem"
+          onClick={signOut}
+        >
+          <LogOut size={17} />
+          <span>{account ? "Sign out" : "Clear session"}</span>
+        </button>
+        <div className="my-1 h-px bg-[var(--misty-border-soft)]" />
+        <span className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-normal text-[var(--misty-text-subtle)]">
+          Misty App Settings
+        </span>
+        <button
+          className={profileMenuItemClass}
+          type="button"
+          role="menuitem"
+          onClick={() => {
+            setActiveSettingsSection("general");
+            props.onClose();
+            props.onOpenSettings();
+          }}
+        >
+          <SettingsIcon size={17} />
+          <span>Open app settings</span>
+        </button>
+      </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -1057,13 +1364,17 @@ function ActivityPopover(props: {
 }) {
   const panelRef = useRef<HTMLDivElement | null>(null);
   const [position, setPosition] = useState({ left: 84, top: 12 });
-  const { history, clearHistory, markRead } = useExplorerStore(useShallow((state) => ({
-    history: state.notificationHistory,
-    clearHistory: state.clearNotificationHistory,
-    markRead: state.markNotificationsRead,
-  })));
-  const confirmDestructiveActions = useSettingsStore((state) =>
-    selectGeneralPreferences(state.settings?.document).confirmDestructiveActions,
+  const { history, clearHistory, markRead } = useExplorerStore(
+    useShallow((state) => ({
+      history: state.notificationHistory,
+      clearHistory: state.clearNotificationHistory,
+      markRead: state.markNotificationsRead,
+    })),
+  );
+  const confirmDestructiveActions = useSettingsStore(
+    (state) =>
+      selectGeneralPreferences(state.settings?.document)
+        .confirmDestructiveActions,
   );
   const entries = [...history].reverse();
   const hasEntries = entries.length > 0;
@@ -1074,16 +1385,17 @@ function ActivityPopover(props: {
       if (!rect) return;
       const panelWidth = 420;
       const panelHeight = Math.min(560, window.innerHeight - 24);
-      const left = Math.min(window.innerWidth - panelWidth - 12, rect.right + 10);
+      const left = Math.min(
+        window.innerWidth - panelWidth - 12,
+        rect.right + 10,
+      );
       const top = Math.min(
-          Math.max(12, rect.top + rect.height / 2 - panelHeight / 2),
-          window.innerHeight - panelHeight - 12,
-        );
-      setPosition((current) => (
-        current.left === left && current.top === top
-          ? current
-          : { left, top }
-      ));
+        Math.max(12, rect.top + rect.height / 2 - panelHeight / 2),
+        window.innerHeight - panelHeight - 12,
+      );
+      setPosition((current) =>
+        current.left === left && current.top === top ? current : { left, top },
+      );
     };
     syncPosition();
     window.addEventListener("resize", syncPosition);
@@ -1113,8 +1425,8 @@ function ActivityPopover(props: {
   }, [props.anchorRef, props.onClose, props.open]);
   const clearActivityHistory = () => {
     if (
-      confirmDestructiveActions
-      && !window.confirm("Clear all Activity notifications on this device?")
+      confirmDestructiveActions &&
+      !window.confirm("Clear all Activity notifications on this device?")
     ) {
       return;
     }
@@ -1129,32 +1441,195 @@ function ActivityPopover(props: {
       className={activityPopoverClass}
       style={{ left: position.left, top: position.top }}
     >
-      <section className={activityPanelClass} role="dialog" aria-label="Activity">
+      <section
+        className={activityPanelClass}
+        role="dialog"
+        aria-label="Activity"
+      >
         <header className="flex items-start justify-between gap-3.5 border-b border-[#333944] p-4">
           <div>
-            <h2 className="m-0 text-lg font-semibold leading-tight text-[#f1eee8]">Activity</h2>
-            <p className="mt-1.5 text-[var(--misty-text-muted)]">Notifications are local to this device.</p>
+            <h2 className="m-0 text-lg font-semibold leading-tight text-[#f1eee8]">
+              Activity
+            </h2>
+            <p className="mt-1.5 text-[var(--misty-text-muted)]">
+              File work and local action history.
+            </p>
           </div>
           <div className="flex gap-2">
-            <button className={activityButtonClass} type="button" onClick={markRead} disabled={!hasEntries}>
+            <button
+              className={activityButtonClass}
+              type="button"
+              onClick={markRead}
+              disabled={!hasEntries}
+            >
               Mark Read
             </button>
-            <button className={activityButtonClass} type="button" onClick={clearActivityHistory} disabled={!hasEntries}>
+            <button
+              className={activityButtonClass}
+              type="button"
+              onClick={clearActivityHistory}
+              disabled={!hasEntries}
+            >
               Clear
             </button>
           </div>
         </header>
         {hasEntries ? (
           <div className="min-h-0 overflow-auto px-4 py-3">
-            {entries.map((entry) => <ActivityEntry key={entry.id} entry={entry} />)}
+            {entries.map((entry) => (
+              <ActivityEntry key={entry.id} entry={entry} />
+            ))}
           </div>
         ) : (
           <div className="grid content-center justify-items-center gap-2 text-center text-[#9e9890]">
-            <h3 className="m-0 text-lg font-semibold leading-tight text-[#f1eee8]">No notifications</h3>
-            <p className="mt-1.5 text-[#9e9890]">System updates will appear here.</p>
+            <h3 className="m-0 text-lg font-semibold leading-tight text-[#f1eee8]">
+              No notifications
+            </h3>
+            <p className="mt-1.5 text-[#9e9890]">
+              File actions and workspace events will appear here.
+            </p>
           </div>
         )}
-        <footer className="border-t border-[#252b33] px-4 py-[9px] text-xs text-[#9e9890]">Notifications are local to this device.</footer>
+        <footer className="border-t border-[#252b33] px-4 py-[9px] text-xs text-[#9e9890]">
+          Notifications are local to this device.
+        </footer>
+      </section>
+    </div>,
+    document.body,
+  );
+}
+
+function InboxPopover(props: {
+  anchorRef: RefObject<HTMLButtonElement | null>;
+  entries: AppInboxEntry[];
+  open: boolean;
+  onClear: () => void;
+  onClose: () => void;
+  onMarkRead: () => void;
+}) {
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const [position, setPosition] = useState({ left: 84, top: 38 });
+  const confirmDestructiveActions = useSettingsStore(
+    (state) =>
+      selectGeneralPreferences(state.settings?.document)
+        .confirmDestructiveActions,
+  );
+  const entries = [...props.entries].reverse();
+  const hasEntries = entries.length > 0;
+
+  useEffect(() => {
+    if (!props.open) return;
+    const syncPosition = () => {
+      const rect = props.anchorRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const panelWidth = 420;
+      const panelHeight = Math.min(560, window.innerHeight - 24);
+      const left = Math.min(
+        Math.max(12, rect.right - panelWidth),
+        window.innerWidth - panelWidth - 12,
+      );
+      const top = Math.min(
+        Math.max(12, rect.bottom + 8),
+        window.innerHeight - panelHeight - 12,
+      );
+      setPosition((current) =>
+        current.left === left && current.top === top ? current : { left, top },
+      );
+    };
+    syncPosition();
+    window.addEventListener("resize", syncPosition);
+    window.addEventListener("scroll", syncPosition, true);
+    return () => {
+      window.removeEventListener("resize", syncPosition);
+      window.removeEventListener("scroll", syncPosition, true);
+    };
+  }, [props.anchorRef, props.open]);
+
+  useEffect(() => {
+    if (!props.open) return;
+    const onPointerDown = (event: globalThis.PointerEvent) => {
+      const target = event.target as Node | null;
+      if (target && panelRef.current?.contains(target)) return;
+      if (target && props.anchorRef.current?.contains(target)) return;
+      props.onClose();
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") props.onClose();
+    };
+    window.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [props.anchorRef, props.onClose, props.open]);
+
+  const clearInbox = () => {
+    if (
+      confirmDestructiveActions &&
+      !window.confirm("Clear all Inbox notifications on this device?")
+    ) {
+      return;
+    }
+    props.onClear();
+  };
+
+  if (!props.open) return null;
+
+  return createPortal(
+    <div
+      ref={panelRef}
+      className={activityPopoverClass}
+      style={{ left: position.left, top: position.top }}
+    >
+      <section className={activityPanelClass} role="dialog" aria-label="Inbox">
+        <header className="flex items-start justify-between gap-3.5 border-b border-[#333944] p-4">
+          <div>
+            <h2 className="m-0 text-lg font-semibold leading-tight text-[#f1eee8]">
+              Inbox
+            </h2>
+            <p className="mt-1.5 text-[var(--misty-text-muted)]">
+              Misty app notices, updates, and service status.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              className={activityButtonClass}
+              type="button"
+              onClick={props.onMarkRead}
+              disabled={!hasEntries}
+            >
+              Mark Read
+            </button>
+            <button
+              className={activityButtonClass}
+              type="button"
+              onClick={clearInbox}
+              disabled={!hasEntries}
+            >
+              Clear
+            </button>
+          </div>
+        </header>
+        {hasEntries ? (
+          <div className="min-h-0 overflow-auto px-4 py-3">
+            {entries.map((entry) => (
+              <InboxEntry key={entry.id} entry={entry} />
+            ))}
+          </div>
+        ) : (
+          <div className="grid content-center justify-items-center gap-2 text-center text-[#9e9890]">
+            <h3 className="m-0 text-lg font-semibold leading-tight text-[#f1eee8]">
+              Inbox clear
+            </h3>
+            <p className="mt-1.5 text-[#9e9890]">
+              Misty updates and account notices will appear here.
+            </p>
+          </div>
+        )}
+        <footer className="border-t border-[#252b33] px-4 py-[9px] text-xs text-[#9e9890]">
+          Inbox items are local to this device.
+        </footer>
       </section>
     </div>,
     document.body,
@@ -1162,24 +1637,53 @@ function ActivityPopover(props: {
 }
 
 function ActivityEntry(props: { entry: ExplorerNotification }) {
-  const statusColor = props.entry.type === "success"
-    ? "bg-[#6bb878]"
-    : props.entry.type === "error"
-      ? "bg-[#d15757]"
-      : "bg-[#999faa]";
+  const statusColor =
+    props.entry.type === "success"
+      ? "bg-[#6bb878]"
+      : props.entry.type === "error"
+        ? "bg-[#d15757]"
+        : "bg-[#999faa]";
   return (
-    <article className={`${activityEntryBaseClass} ${props.entry.read ? "" : "bg-[rgba(241,238,232,0.035)]"} [&+&]:mt-1`}>
-      <span className={`mx-auto mt-[7px] h-[7px] w-[7px] rounded-full ${statusColor}`} />
-      <p className="m-0 min-w-0 [overflow-wrap:anywhere] leading-[1.35] text-[#f1eee8]">{props.entry.message}</p>
-      <time className="whitespace-nowrap pt-px text-xs text-[#9e9890]">{formatActivityTime(props.entry.createdAtMs)}</time>
+    <article
+      className={`${activityEntryBaseClass} ${props.entry.read ? "" : "bg-[rgba(241,238,232,0.035)]"} [&+&]:mt-1`}
+    >
+      <span
+        className={`mx-auto mt-[7px] h-[7px] w-[7px] rounded-full ${statusColor}`}
+      />
+      <p className="m-0 min-w-0 [overflow-wrap:anywhere] leading-[1.35] text-[#f1eee8]">
+        {props.entry.message}
+      </p>
+      <time className="whitespace-nowrap pt-px text-xs text-[#9e9890]">
+        {formatActivityTime(props.entry.createdAtMs)}
+      </time>
     </article>
   );
 }
 
-function SettingsOverlay(props: {
-  open: boolean;
-  onClose: () => void;
-}) {
+function InboxEntry(props: { entry: AppInboxEntry }) {
+  const statusColor =
+    props.entry.kind === "error" ? "bg-[#d15757]" : "bg-[#6bb878]";
+  return (
+    <article
+      className={`${activityEntryBaseClass} ${props.entry.read ? "" : "bg-[rgba(241,238,232,0.035)]"} [&+&]:mt-1`}
+    >
+      <span
+        className={`mx-auto mt-[7px] h-[7px] w-[7px] rounded-full ${statusColor}`}
+      />
+      <p className="m-0 min-w-0 [overflow-wrap:anywhere] leading-[1.35] text-[#f1eee8]">
+        <span className="block text-[11px] font-semibold uppercase tracking-normal text-[#9e9890]">
+          {appNoticeSourceLabel(props.entry.source)}
+        </span>
+        <span>{props.entry.message}</span>
+      </p>
+      <time className="whitespace-nowrap pt-px text-xs text-[#9e9890]">
+        {formatActivityTime(props.entry.createdAtMs)}
+      </time>
+    </article>
+  );
+}
+
+function SettingsOverlay(props: { open: boolean; onClose: () => void }) {
   const panelRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -1201,7 +1705,13 @@ function SettingsOverlay(props: {
         if (event.target === event.currentTarget) props.onClose();
       }}
     >
-      <div ref={panelRef} className={settingsOverlayPanelClass} role="dialog" aria-modal="true" aria-label="Settings">
+      <div
+        ref={panelRef}
+        className={settingsOverlayPanelClass}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Settings"
+      >
         <SettingsWorkspace presentation="overlay" onClose={props.onClose} />
       </div>
     </div>,
@@ -1258,19 +1768,22 @@ function FramePacingOverlay(props: { enabled: boolean }) {
         const measuredFrames = Math.max(1, frameCount - 1);
         const fps = Math.round((frameCount * 1000) / elapsedMs);
         const averageFrameMs = totalFrameMs / measuredFrames;
-        const slowFramePercent = Math.round((slowFrameCount / measuredFrames) * 100);
-        const level = fps < 45 || slowFramePercent > 25
-          ? "heavy"
-          : fps < 56 || slowFramePercent > 8
-            ? "light"
-            : "idle";
+        const slowFramePercent = Math.round(
+          (slowFrameCount / measuredFrames) * 100,
+        );
+        const level =
+          fps < 45 || slowFramePercent > 25
+            ? "heavy"
+            : fps < 56 || slowFramePercent > 8
+              ? "light"
+              : "idle";
 
         setState((previous) => {
           if (
-            previous.fps === fps
-            && Math.abs(previous.frameMs - averageFrameMs) < 0.1
-            && previous.slowFramePercent === slowFramePercent
-            && previous.level === level
+            previous.fps === fps &&
+            Math.abs(previous.frameMs - averageFrameMs) < 0.1 &&
+            previous.slowFramePercent === slowFramePercent &&
+            previous.level === level
           ) {
             return previous;
           }
@@ -1292,14 +1805,28 @@ function FramePacingOverlay(props: { enabled: boolean }) {
 
   if (!props.enabled) return null;
 
-  const label = state.level === "idle" ? "Idle" : state.level === "light" ? "Light" : "Heavy";
+  const label =
+    state.level === "idle"
+      ? "Idle"
+      : state.level === "light"
+        ? "Light"
+        : "Heavy";
 
   return (
-    <aside className={`${frameOverlayBaseClass} ${frameOverlayLevelClass[state.level]}`} aria-label="Frame pacing overlay">
+    <aside
+      className={`${frameOverlayBaseClass} ${frameOverlayLevelClass[state.level]}`}
+      aria-label="Frame pacing overlay"
+    >
       <strong className="col-span-full text-xs font-extrabold">{label}</strong>
-      <span className="whitespace-nowrap text-[var(--misty-text-muted)] tabular-nums">{state.fps > 0 ? state.fps : "--"} FPS</span>
-      <span className="whitespace-nowrap text-[var(--misty-text-muted)] tabular-nums">{state.frameMs > 0 ? state.frameMs.toFixed(1) : "--"} ms</span>
-      <span className="whitespace-nowrap text-[var(--misty-text-muted)] tabular-nums">{state.slowFramePercent}% slow</span>
+      <span className="whitespace-nowrap text-[var(--misty-text-muted)] tabular-nums">
+        {state.fps > 0 ? state.fps : "--"} FPS
+      </span>
+      <span className="whitespace-nowrap text-[var(--misty-text-muted)] tabular-nums">
+        {state.frameMs > 0 ? state.frameMs.toFixed(1) : "--"} ms
+      </span>
+      <span className="whitespace-nowrap text-[var(--misty-text-muted)] tabular-nums">
+        {state.slowFramePercent}% slow
+      </span>
     </aside>
   );
 }
@@ -1314,7 +1841,9 @@ function PlaceholderPage(props: { title: string; subtitle: string }) {
             <p>{props.subtitle}</p>
           </div>
         </div>
-        <div className="m-[18px] text-[var(--misty-text-muted)]">This route is ready for its panel migration.</div>
+        <div className="m-[18px] text-[var(--misty-text-muted)]">
+          This route is ready for its panel migration.
+        </div>
       </div>
     </section>
   );
@@ -1330,12 +1859,17 @@ function routeIdFromPath(pathname: string): AppTab {
   return "files";
 }
 
-function settingsFallbackRoute(previousRoute: string, rememberedRoute: string): string {
+function settingsFallbackRoute(
+  previousRoute: string,
+  rememberedRoute: string,
+): string {
   const candidates = [previousRoute, rememberedRoute, "/files"];
-  return candidates.find((route) => {
-    if (!route || route.startsWith("/settings")) return false;
-    return isRememberableAppRoute(route);
-  }) ?? "/files";
+  return (
+    candidates.find((route) => {
+      if (!route || route.startsWith("/settings")) return false;
+      return isRememberableAppRoute(route);
+    }) ?? "/files"
+  );
 }
 
 function startupRouteForIndex(index: number): string {
@@ -1349,9 +1883,15 @@ function startupRouteForIndex(index: number): string {
 
 function noticeForRoute(
   route: AppTab,
-  notices: Record<"app" | "providers" | "transfers" | "settings", { error: string | null; message: string | null }>,
+  notices: Record<
+    "app" | "providers" | "transfers" | "settings",
+    { error: string | null; message: string | null }
+  >,
 ) {
-  const scoped = route === "providers" || route === "transfers" || route === "settings" ? notices[route] : notices.app;
+  const scoped =
+    route === "providers" || route === "transfers" || route === "settings"
+      ? notices[route]
+      : notices.app;
   return {
     error: scoped.error ?? notices.app.error,
     message: scoped.message ?? notices.app.message,
@@ -1380,7 +1920,9 @@ function workStatusSummary(
   installing: boolean,
 ): { title: string; detail: string } | null {
   const active = rows.filter((row) => activeWorkStatuses.has(row.status));
-  const downloads = active.filter((row) => row.transferType === "download").length;
+  const downloads = active.filter(
+    (row) => row.transferType === "download",
+  ).length;
   const uploads = active.filter((row) => row.transferType === "upload").length;
 
   if (downloads > 0 && uploads > 0) {

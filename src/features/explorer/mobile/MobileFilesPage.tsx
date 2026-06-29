@@ -98,7 +98,7 @@ import { errorText } from "../../../shared/format";
 import { selectAdvancedPreferences, selectGeneralPreferences, useSettingsStore } from "../../settings/useSettingsStore";
 import { useProvidersStore } from "../../providers/useProvidersStore";
 import { useExplorerStore } from "../state/useExplorerStore";
-import { useAiSessionStore, type AiPlanReview, type AiStatus, type AiToolApproval } from "../state/useClaudeSessionStore";
+import { useMikaSessionStore, type AiPlanReview, type AiStatus, type AiToolApproval } from "../state/useMikaSessionStore";
 import { useFileSyncStore } from "../state/useFileSyncStore";
 import type { FileSyncSession } from "../state/useFileSyncStore";
 import { clipboardImagePng } from "../utils/clipboardImage";
@@ -373,7 +373,7 @@ export function MobileFilesPage() {
   const [actionsSheetOpen, setActionsSheetOpen] = useState(false);
   const [syncSheetOpen, setSyncSheetOpen] = useState(false);
   const [sharedClipboardSheetOpen, setSharedClipboardSheetOpen] = useState(false);
-  const [claudeSheetOpen, setClaudeSheetOpen] = useState(false);
+  const [mikaSheetOpen, setMikaSheetOpen] = useState(false);
   const [createKind, setCreateKind] = useState<CreateItemKind | null>(null);
   const [createName, setCreateName] = useState("");
   const [tagDraft, setTagDraft] = useState("");
@@ -515,7 +515,7 @@ export function MobileFilesPage() {
     () => selectedEntries.filter(isDownloadableRemoteEntry),
     [selectedEntries],
   );
-  const claudeSelectedEntry = useMemo(
+  const mikaSelectedEntry = useMemo(
     () => detailEntry ?? contextEntry ?? (selectedEntries.length === 1 ? selectedEntries[0] : null),
     [contextEntry, detailEntry, selectedEntries],
   );
@@ -786,7 +786,7 @@ export function MobileFilesPage() {
     setActionsSheetOpen(false);
     setSyncSheetOpen(false);
     setSharedClipboardSheetOpen(false);
-    setClaudeSheetOpen(false);
+    setMikaSheetOpen(false);
     setSelectionMode(false);
     setSelectedIds([]);
     setQuery("");
@@ -1641,7 +1641,7 @@ export function MobileFilesPage() {
           selectionMode={selectionMode}
           syncOpen={syncSheetOpen}
           sharedClipboardOpen={sharedClipboardSheetOpen}
-          claudeOpen={claudeSheetOpen}
+          mikaOpen={mikaSheetOpen}
           refreshBusy={loading || (remoteRoot && remoteLoading)}
           onClose={() => setActionsSheetOpen(false)}
           onViewMode={(mode) => {
@@ -1665,8 +1665,8 @@ export function MobileFilesPage() {
             setSharedClipboardSheetOpen(true);
             setActionsSheetOpen(false);
           }}
-          onClaude={() => {
-            setClaudeSheetOpen(true);
+          onMika={() => {
+            setMikaSheetOpen(true);
             setActionsSheetOpen(false);
           }}
           onRefresh={() => {
@@ -1703,11 +1703,11 @@ export function MobileFilesPage() {
         />
       ) : null}
 
-      {claudeSheetOpen ? (
-        <MobileClaudeSheet
+      {mikaSheetOpen ? (
+        <MobileMikaSheet
           workingDirectory={currentPath}
-          selectedPath={claudeSelectedEntry?.path ?? null}
-          onClose={() => setClaudeSheetOpen(false)}
+          selectedPath={mikaSelectedEntry?.path ?? null}
+          onClose={() => setMikaSheetOpen(false)}
         />
       ) : null}
 
@@ -2463,17 +2463,17 @@ function MobileSharedClipboardSheet(props: {
 }
 
 function mobileAssistantStatusText(status: AiStatus | null): string {
-  if (!status) return "Checking MistyAI...";
+  if (!status) return "Checking Mika...";
   if (status.configured) return `Ready (${status.provider}/${status.model})`;
-  return "Configure the MistyAI backend to enable assistant actions";
+  return "Configure the Mika backend to enable assistant actions";
 }
 
-function MobileClaudeSheet(props: {
+function MobileMikaSheet(props: {
   workingDirectory: string;
   selectedPath: string | null;
   onClose: () => void;
 }) {
-  const { status, mode, messages, plans, toolApprovals, error, refreshStatus, setMode, sendPrompt, abortPrompt, clearConversation, approvePlan, approveToolRequest } = useAiSessionStore(useShallow((state) => ({
+  const { status, mode, messages, plans, toolApprovals, error, refreshStatus, setMode, sendPrompt, abortPrompt, clearConversation, approvePlan, approveToolRequest } = useMikaSessionStore(useShallow((state) => ({
     status: state.status,
     mode: state.mode,
     messages: state.messages,
@@ -2507,7 +2507,7 @@ function MobileClaudeSheet(props: {
     setPrompt("");
     void sendPrompt({
       displayPrompt: trimmed,
-      prompt: buildMobileClaudePrompt(trimmed, props.workingDirectory, props.selectedPath),
+      prompt: buildMobileMikaPrompt(trimmed, props.workingDirectory, props.selectedPath),
       cwd: props.workingDirectory || null,
       selectedPaths: props.selectedPath ? [mobileBasename(props.selectedPath)] : [],
     });
@@ -2519,11 +2519,14 @@ function MobileClaudeSheet(props: {
         className={`${mobileSheetClass} grid max-h-[min(calc(100dvh-var(--misty-safe-top)-18px),760px)] grid-rows-[auto_auto_minmax(160px,1fr)_auto] gap-3`}
         role="dialog"
         aria-modal="true"
-        aria-label="MistyAI"
+        aria-label="Mika, Misty Intelligent Knowledge Assistant"
         onClick={(event) => event.stopPropagation()}
       >
-        <MobileSheetHeader eyebrow="Assistant" title="MistyAI" closeLabel="Close MistyAI" onClose={props.onClose} />
+        <MobileSheetHeader eyebrow="Assistant" title="Mika" closeLabel="Close Mika" onClose={props.onClose} />
         <div className="grid gap-2 rounded-[14px] border border-white/10 bg-[#0f0f0f] p-[11px]">
+          <p className="m-0 rounded-[10px] border border-[#4a4030] bg-[#1b1710] px-2.5 py-2 text-xs font-bold leading-normal text-[#e8d5aa]">
+            Mika is beta and experimental. It is focused on file reorganization for now. Please review plans carefully and use cautiously.
+          </p>
           <dl className="m-0 grid gap-2">
             <div className="grid min-w-0 gap-[3px]">
               <dt className="text-[11px] font-extrabold uppercase tracking-normal text-[#919191]">Status</dt>
@@ -2542,7 +2545,7 @@ function MobileClaudeSheet(props: {
         </div>
         <div ref={logRef} className="grid min-h-40 content-start gap-[9px] overflow-auto rounded-[14px] border border-white/10 bg-[#080808] p-2.5 [-webkit-overflow-scrolling:touch]" aria-live="polite">
           {messages.length === 0 ? (
-            <p className="m-0 text-[13px] leading-[1.4] text-[#919191]">Ask MistyAI about the current folder or selected file.</p>
+            <p className="m-0 text-[13px] leading-[1.4] text-[#919191]">Chat with Mika or ask it to reorganize the current folder.</p>
           ) : messages.map((message) => (
             <article
               key={message.id}
@@ -2553,7 +2556,7 @@ function MobileClaudeSheet(props: {
                 message.role !== "user" && message.role !== "error" ? "border-white/10 bg-[#0f0f0f]" : "",
               ].filter(Boolean).join(" ")}
             >
-              <strong className="text-xs font-extrabold text-[#f0f0f0]">{message.role === "user" ? "You" : message.role === "tool" ? "Tool" : message.role === "error" ? "Error" : "MistyAI"}</strong>
+              <strong className="text-xs font-extrabold text-[#f0f0f0]">{message.role === "user" ? "You" : message.role === "tool" ? "Tool" : message.role === "error" ? "Error" : "Mika"}</strong>
               <pre className="m-0 break-words font-sans text-xs leading-[1.45] text-[#cfcfcf] [white-space:pre-wrap]">{message.text || (message.role === "assistant" && running ? "Thinking..." : "")}</pre>
               {message.toolRequestId ? <MobileAiToolActions requestId={message.toolRequestId} approvals={toolApprovals} onApprove={approveToolRequest} /> : null}
               {message.planId ? <MobileAiPlanActions planId={message.planId} plans={plans} onApply={approvePlan} /> : null}
@@ -2571,7 +2574,7 @@ function MobileClaudeSheet(props: {
             className="min-w-0 resize-none rounded-[14px] border border-white/10 bg-[#080808] p-3 font-inherit leading-[1.4] text-[#f0f0f0] outline-none focus:border-[#b2b2b26b] focus:shadow-[0_0_0_3px_rgba(183,183,183,0.12)] disabled:opacity-60"
             value={prompt}
             rows={3}
-            placeholder={configured ? "Ask about this folder..." : "Configure MistyAI backend to continue"}
+            placeholder={configured ? "Ask Mika to organize this folder..." : "Configure Mika backend to continue"}
             disabled={!configured || running}
             onChange={(event) => setPrompt(event.target.value)}
           />
@@ -2579,12 +2582,11 @@ function MobileClaudeSheet(props: {
             <select
               className="min-h-10 rounded-[12px] border border-white/10 bg-[#080808] px-2 text-sm text-[#f0f0f0]"
               value={mode}
-              aria-label="MistyAI mode"
+              aria-label="Mika mode"
               onChange={(event) => setMode(event.target.value as Parameters<typeof setMode>[0])}
             >
               <option value="ask">Ask</option>
               <option value="auto">Auto</option>
-              <option value="full">Full</option>
             </select>
             <button type="button" className={mobileSecondaryActionClass} disabled={messages.length === 0 || running} onClick={clearConversation}>
               Clear
@@ -2665,7 +2667,7 @@ function MobileAiPlanActions(props: {
     <div className="grid min-w-0 gap-2">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-[11px] font-bold uppercase tracking-normal text-[#919191]">
-          {plan.plan.operations.length} operations{blocked ? " blocked" : plan.applied ? " applied" : ""}
+          {plan.plan.operations.length} operations{blocked ? " blocked" : plan.applied ? " queued" : ""}
         </span>
         <button
           type="button"
@@ -2732,7 +2734,7 @@ function MobileAiPlanReviewSheet(props: {
         aria-label="Review file operations"
         onClick={(event) => event.stopPropagation()}
       >
-        <MobileSheetHeader eyebrow="MistyAI" title="Review File Operations" onClose={props.onClose} />
+        <MobileSheetHeader eyebrow="Mika" title="Review File Operations" onClose={props.onClose} />
         <div className="grid min-h-0 gap-3 overflow-hidden">
           <div className="grid gap-2">
             <div className="grid gap-1">
@@ -2741,7 +2743,7 @@ function MobileAiPlanReviewSheet(props: {
             </div>
             {props.plan.appliedSummary ? (
               <div className="grid gap-1">
-                <span className="text-[11px] font-bold uppercase tracking-normal text-[#919191]">Did</span>
+                <span className="text-[11px] font-bold uppercase tracking-normal text-[#919191]">Queued</span>
                 <p className="m-0 break-words text-sm leading-normal text-[#d4d4d4]">{props.plan.appliedSummary}</p>
               </div>
             ) : null}
@@ -2760,7 +2762,7 @@ function MobileAiPlanReviewSheet(props: {
         </div>
         <div className="grid gap-2">
           <span className="text-[11px] font-bold uppercase tracking-normal text-[#919191]">
-            {props.plan.plan.operations.length} operations{blocked ? " blocked" : props.plan.applied ? " applied" : ""}
+            {props.plan.plan.operations.length} operations{blocked ? " blocked" : props.plan.applied ? " queued" : ""}
           </span>
           <div className="grid grid-cols-2 gap-2">
             <button type="button" className={mobileSecondaryActionClass} onClick={props.onClose}>
@@ -2772,7 +2774,7 @@ function MobileAiPlanReviewSheet(props: {
               disabled={blocked || props.plan.applied || props.plan.applying}
               onClick={() => void applyPlan()}
             >
-              {props.plan.applying ? "Applying..." : props.plan.applied ? "Applied" : "Apply"}
+              {props.plan.applying ? "Queueing..." : props.plan.applied ? "Queued" : "Apply"}
             </button>
           </div>
         </div>
@@ -2818,7 +2820,7 @@ function MobileFilesActionsSheet(props: {
   selectionMode: boolean;
   syncOpen: boolean;
   sharedClipboardOpen: boolean;
-  claudeOpen: boolean;
+  mikaOpen: boolean;
   refreshBusy: boolean;
   onClose: () => void;
   onViewMode: (mode: MobileFilesViewMode) => void;
@@ -2826,7 +2828,7 @@ function MobileFilesActionsSheet(props: {
   onSelection: () => void;
   onSync: () => void;
   onSharedClipboard: () => void;
-  onClaude: () => void;
+  onMika: () => void;
   onRefresh: () => void;
 }) {
   return (
@@ -2879,9 +2881,9 @@ function MobileFilesActionsSheet(props: {
           />
           <MobileFileActionButton
             icon={MessageSquare}
-            label="MistyAI"
-            note={props.claudeOpen ? "Already open" : undefined}
-            onClick={props.onClaude}
+            label="Mika"
+            note={props.mikaOpen ? "Already open" : undefined}
+            onClick={props.onMika}
           />
           <MobileFileActionButton
             icon={RefreshCcw}
@@ -4244,9 +4246,12 @@ function mobileTextClipboardPayload(text: string): ClipboardPayload {
   };
 }
 
-function buildMobileClaudePrompt(userPrompt: string, workingDirectory: string, selectedPath: string | null): string {
+function buildMobileMikaPrompt(userPrompt: string, workingDirectory: string, selectedPath: string | null): string {
   const context = [
     "You are helping inside Misty, a file manager.",
+    "Mika is beta and experimental.",
+    "Your main goal is to help reorganize files. You may chat freely, but tool-assisted work should stay focused on listing, searching, validating, and proposing safe file organization plans.",
+    "Do not inspect file contents or ask for preview tools. For changes, propose a file plan with folders, moves, and renames for the user to review.",
     workingDirectory ? `Current folder: ${workingDirectory}` : "Current folder: none",
     selectedPath ? `Selected item: ${selectedPath}` : "Selected item: none",
   ].join("\n");

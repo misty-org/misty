@@ -16,7 +16,9 @@ use crate::core::{
     },
     file_master::RemoteBrowseTarget,
     file_transfer::FileTransferRecord,
-    file_transfer::{FileTransferItemType, FileTransferStatus, FileTransferType},
+    file_transfer::{
+        FileTransferConflictPolicy, FileTransferItemType, FileTransferStatus, FileTransferType,
+    },
     operation_queue::{
         ConflictPolicy, OperationDescriptor, OperationEndpoint, OperationKind, OperationQueue,
         OperationQueueSnapshot, OperationStatus,
@@ -299,7 +301,7 @@ impl OperationQueueService {
         &self,
         label: impl Into<String>,
         preserve_order: bool,
-        descriptors: Vec<OperationDescriptor>,
+        mut descriptors: Vec<OperationDescriptor>,
         payloads: Vec<QueuedExplorerOperation>,
     ) -> ApiResult<(OperationQueueSnapshot, Vec<u64>)> {
         if descriptors.len() != payloads.len() {
@@ -309,6 +311,15 @@ impl OperationQueueService {
         }
         if descriptors.is_empty() {
             return Ok((self.snapshot_with_redo_state().await, Vec::new()));
+        }
+        for descriptor in &mut descriptors {
+            if matches!(descriptor.kind, OperationKind::Create | OperationKind::Rename) {
+                let transfer_id = self
+                    .transfers
+                    .create_transfer(transfer_record_for_operation(descriptor))
+                    .await?;
+                descriptor.transfer_id = transfer_id;
+            }
         }
         self.clear_redo_stack().await;
         let (_, operation_ids) = self
@@ -839,13 +850,28 @@ impl OperationQueueService {
         result: ApiResult<ExecutionOutcome>,
         cancellation: &AtomicBool,
     ) {
+        let transfer_id = self
+            .queue
+            .snapshot()
+            .await
+            .operations
+            .iter()
+            .find(|operation| operation.operation_id == operation_id)
+            .map(|operation| operation.transfer_id)
+            .unwrap_or_default();
         match result {
             Ok(ExecutionOutcome::Completed) => {
                 self.queue.complete(operation_id, None).await;
+                if transfer_id > 0 {
+                    let _ = self.transfers.complete_transfer(transfer_id).await;
+                }
                 self.payloads.lock().await.remove(&operation_id);
             }
             Ok(ExecutionOutcome::Skipped) => {
                 self.queue.skip(operation_id).await;
+                if transfer_id > 0 {
+                    let _ = self.transfers.skip_transfer(transfer_id).await;
+                }
                 self.payloads.lock().await.remove(&operation_id);
             }
             Ok(ExecutionOutcome::WaitingForConflict) => {}
@@ -853,12 +879,22 @@ impl OperationQueueService {
                 if cancellation.load(Ordering::SeqCst) || is_operation_canceled_error(&error) =>
             {
                 self.queue.cancel(operation_id).await;
+                if transfer_id > 0 {
+                    let _ = self
+                        .transfers
+                        .cancel_transfer(transfer_id, "Operation canceled.".to_string())
+                        .await;
+                }
                 self.payloads.lock().await.remove(&operation_id);
             }
             Err(error) => {
+                let message = error.to_string();
                 self.queue
-                    .complete(operation_id, Some(error.to_string()))
+                    .complete(operation_id, Some(message.clone()))
                     .await;
+                if transfer_id > 0 {
+                    let _ = self.transfers.fail_transfer(transfer_id, message).await;
+                }
             }
         }
     }
@@ -881,6 +917,9 @@ impl OperationQueueService {
                 ))
             })?;
         ensure_not_canceled(&cancellation)?;
+        if operation.transfer_id > 0 {
+            let _ = self.transfers.mark_started(operation.transfer_id).await;
+        }
         match payload {
             QueuedExplorerOperation::Create(request) => {
                 if let Some(outcome) = self
@@ -895,7 +934,11 @@ impl OperationQueueService {
                     return Ok(outcome);
                 }
                 self.explorer
-                    .create_item_with_cancellation(request, cancellation.clone())
+                    .create_item_with_cancellation_transfer(
+                        request,
+                        cancellation.clone(),
+                        operation.transfer_id,
+                    )
                     .await?;
             }
             QueuedExplorerOperation::Rename(request) => {
@@ -914,7 +957,11 @@ impl OperationQueueService {
                     }
                 }
                 self.explorer
-                    .rename_item_with_cancellation(request, cancellation.clone())
+                    .rename_item_with_cancellation_transfer(
+                        request,
+                        cancellation.clone(),
+                        operation.transfer_id,
+                    )
                     .await?;
             }
             QueuedExplorerOperation::Delete(request) => {
@@ -1163,6 +1210,64 @@ fn endpoint_for_path(path: String, remote: Option<RemoteBrowseTarget>) -> Operat
     } else {
         local_endpoint(path)
     }
+}
+
+fn transfer_record_for_operation(operation: &OperationDescriptor) -> FileTransferRecord {
+    let transfer_type = match operation.kind {
+        OperationKind::Copy => FileTransferType::Copy,
+        OperationKind::Move => FileTransferType::Move,
+        OperationKind::Create => FileTransferType::Create,
+        OperationKind::Rename => FileTransferType::Rename,
+        OperationKind::Delete => FileTransferType::Delete,
+        OperationKind::Download => FileTransferType::Download,
+    };
+    let item_type = if operation.source.is_remote() || operation.target.is_remote() {
+        FileTransferItemType::Remote
+    } else {
+        FileTransferItemType::Local
+    };
+    let mut record = FileTransferRecord::new(
+        transfer_type,
+        item_type,
+        operation_file_name(operation),
+    );
+    record.status = FileTransferStatus::Queued;
+    record.conflict_policy = match operation.conflict_policy {
+        ConflictPolicy::Ask => FileTransferConflictPolicy::Ask,
+        ConflictPolicy::Replace => FileTransferConflictPolicy::Replace,
+        ConflictPolicy::Skip => FileTransferConflictPolicy::Skip,
+        ConflictPolicy::KeepBoth => FileTransferConflictPolicy::KeepBoth,
+    };
+    record.local_source_path = operation.source.local_path.clone();
+    record.local_dest_path = operation.target.local_path.clone();
+    record.remote_source_name = operation.source.remote_name.clone();
+    record.remote_source_path = operation.source.remote_path.clone();
+    record.remote_dest_name = operation.target.remote_name.clone();
+    record.remote_dest_path = operation.target.remote_path.clone();
+    record.cancelable = true;
+    record.retryable = true;
+    record
+}
+
+fn operation_file_name(operation: &OperationDescriptor) -> String {
+    let target = if operation.target.is_remote() {
+        operation.target.remote_path.as_str()
+    } else {
+        operation.target.local_path.as_str()
+    };
+    let source = if operation.source.is_remote() {
+        operation.source.remote_path.as_str()
+    } else {
+        operation.source.local_path.as_str()
+    };
+    let path = if !target.is_empty() { target } else { source };
+    file_name_for_path(path).unwrap_or_else(|_| {
+        if operation.title.trim().is_empty() {
+            operation_action_label(operation.kind).to_string()
+        } else {
+            operation.title.clone()
+        }
+    })
 }
 
 fn operation_kind_for_paste(

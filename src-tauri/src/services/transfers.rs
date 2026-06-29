@@ -139,6 +139,16 @@ impl TransferService {
         self.mutate(id, move |record| record.cancel(detail)).await
     }
 
+    pub async fn skip_transfer(&self, id: u64) -> ApiResult<()> {
+        self.mutate(id, |record| {
+            record.status = TransferStatus::Skipped;
+            record.completed_at_ms = now_epoch_ms();
+            record.cancelable = false;
+            record.retryable = false;
+        })
+        .await
+    }
+
     pub async fn transfer_by_undo_token(&self, undo_token_id: u64) -> ApiResult<TransferRecord> {
         let db_path = self.db_path.clone();
         let db_lock = self.db_lock.clone();

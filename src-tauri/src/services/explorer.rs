@@ -170,6 +170,8 @@ impl ExplorerService {
             hidden_count: 0,
             total_count,
             entries,
+            modified_ms: None,
+            created_ms: None,
         })
     }
 
@@ -186,6 +188,8 @@ impl ExplorerService {
             hidden_count: 0,
             total_count,
             entries,
+            modified_ms: None,
+            created_ms: None,
         })
     }
 
@@ -722,7 +726,7 @@ impl ExplorerService {
         &self,
         request: CreateItemRequest,
     ) -> ApiResult<ExplorerOperationResult> {
-        self.create_item_impl(request, None).await
+        self.create_item_impl(request, None, None).await
     }
 
     pub async fn create_item_with_cancellation(
@@ -730,14 +734,29 @@ impl ExplorerService {
         request: CreateItemRequest,
         cancellation: Arc<AtomicBool>,
     ) -> ApiResult<ExplorerOperationResult> {
-        self.create_item_impl(request, Some(cancellation.as_ref()))
+        self.create_item_impl(request, Some(cancellation.as_ref()), None)
             .await
+    }
+
+    pub async fn create_item_with_cancellation_transfer(
+        &self,
+        request: CreateItemRequest,
+        cancellation: Arc<AtomicBool>,
+        transfer_id: u64,
+    ) -> ApiResult<ExplorerOperationResult> {
+        self.create_item_impl(
+            request,
+            Some(cancellation.as_ref()),
+            nonzero_transfer_id(transfer_id),
+        )
+        .await
     }
 
     async fn create_item_impl(
         &self,
         request: CreateItemRequest,
         cancellation: Option<&AtomicBool>,
+        existing_transfer_id: Option<u64>,
     ) -> ApiResult<ExplorerOperationResult> {
         ensure_not_canceled_if(cancellation)?;
         if let Some(target) = self.remote_target(&request.directory) {
@@ -755,7 +774,11 @@ impl ExplorerService {
                 crate::core::explorer::CreateItemKind::File => "Creating remote file",
             }
             .to_string();
-            let transfer_id = self.begin_transfer(record).await;
+            let transfer_id = if existing_transfer_id.is_some() {
+                existing_transfer_id
+            } else {
+                self.begin_transfer(record).await
+            };
             let operation = match request.kind {
                 crate::core::explorer::CreateItemKind::Folder => self
                     .start_json_job(
@@ -790,7 +813,11 @@ impl ExplorerService {
         );
         record.local_dest_path = display_path(&Path::new(&request.directory).join(&request.name));
         record.detail_message = "Creating local item".to_string();
-        let transfer_id = self.begin_transfer(record).await;
+        let transfer_id = if existing_transfer_id.is_some() {
+            existing_transfer_id
+        } else {
+            self.begin_transfer(record).await
+        };
         ensure_not_canceled_if(cancellation)?;
         let result = create_local_item_cancellable(request, cancellation).await;
         self.finish_transfer(transfer_id, result).await
@@ -841,7 +868,7 @@ impl ExplorerService {
         &self,
         request: RenameItemRequest,
     ) -> ApiResult<ExplorerOperationResult> {
-        self.rename_item_impl(request, None).await
+        self.rename_item_impl(request, None, None).await
     }
 
     pub async fn rename_item_with_cancellation(
@@ -849,14 +876,29 @@ impl ExplorerService {
         request: RenameItemRequest,
         cancellation: Arc<AtomicBool>,
     ) -> ApiResult<ExplorerOperationResult> {
-        self.rename_item_impl(request, Some(cancellation.as_ref()))
+        self.rename_item_impl(request, Some(cancellation.as_ref()), None)
             .await
+    }
+
+    pub async fn rename_item_with_cancellation_transfer(
+        &self,
+        request: RenameItemRequest,
+        cancellation: Arc<AtomicBool>,
+        transfer_id: u64,
+    ) -> ApiResult<ExplorerOperationResult> {
+        self.rename_item_impl(
+            request,
+            Some(cancellation.as_ref()),
+            nonzero_transfer_id(transfer_id),
+        )
+        .await
     }
 
     async fn rename_item_impl(
         &self,
         request: RenameItemRequest,
         cancellation: Option<&AtomicBool>,
+        existing_transfer_id: Option<u64>,
     ) -> ApiResult<ExplorerOperationResult> {
         ensure_not_canceled_if(cancellation)?;
         if let Some(source) = self.remote_target(&request.path) {
@@ -878,7 +920,11 @@ impl ExplorerService {
             record.remote_dest_name = source.remote_name.clone();
             record.remote_dest_path = destination_path.clone();
             record.detail_message = "Renaming remote item".to_string();
-            let transfer_id = self.begin_transfer(record).await;
+            let transfer_id = if existing_transfer_id.is_some() {
+                existing_transfer_id
+            } else {
+                self.begin_transfer(record).await
+            };
             let operation = if request.source_is_directory.unwrap_or(false) {
                 self.start_json_job(
                     "/api/remote/file/move",
@@ -939,7 +985,11 @@ impl ExplorerService {
         )
         .await;
         record.detail_message = "Renaming local item".to_string();
-        let transfer_id = self.begin_transfer(record).await;
+        let transfer_id = if existing_transfer_id.is_some() {
+            existing_transfer_id
+        } else {
+            self.begin_transfer(record).await
+        };
         ensure_not_canceled_if(cancellation)?;
         let result = rename_local_item_cancellable(request, cancellation).await;
         self.finish_transfer(transfer_id, result).await
@@ -1583,6 +1633,8 @@ impl ExplorerService {
             total_count: entries.len() + hidden_count,
             hidden_count,
             entries,
+            modified_ms: None,
+            created_ms: None,
         }
     }
 
@@ -1713,6 +1765,8 @@ impl ExplorerService {
             entries,
             total_count,
             hidden_count,
+            modified_ms: None,
+            created_ms: None,
         })
     }
 
@@ -2713,6 +2767,14 @@ fn is_cancellation_error(error: &ApiError) -> bool {
     error
         .to_string()
         .eq_ignore_ascii_case("Operation canceled.")
+}
+
+fn nonzero_transfer_id(transfer_id: u64) -> Option<u64> {
+    if transfer_id == 0 {
+        None
+    } else {
+        Some(transfer_id)
+    }
 }
 
 fn remote_job_path(job_id: &str) -> String {

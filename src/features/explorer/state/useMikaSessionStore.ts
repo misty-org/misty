@@ -1,8 +1,7 @@
 import { create } from "zustand";
 import {
+  explorerCreateItem,
   explorerListDirectory,
-  explorerPreviewItem,
-  explorerQueueCreateItem,
   explorerQueuePasteItems,
   explorerQueueRenameItem,
   searchQuery,
@@ -87,19 +86,21 @@ let nextPlanId = 1;
 let activeSessionId: string | null = null;
 let lastEventSequence = 0;
 let activeRoot: string | null = null;
+let drainInFlight: Promise<void> | null = null;
+const processedEventSequences = new Set<number>();
+const processedToolRequestIds = new Set<string>();
 const aiToolTimeoutMs = 15000;
 
 const toolManifest: ToolManifest = {
   tools: [
     { name: "list_directory", risk: "read" },
     { name: "search_files", risk: "read" },
-    { name: "preview_file", risk: "read" },
     { name: "validate_file_plan", risk: "read" },
     { name: "apply_file_plan", risk: "write" },
   ],
 };
 
-export const useAiSessionStore = create<AiSessionStore>((set, get) => ({
+export const useMikaSessionStore = create<AiSessionStore>((set, get) => ({
   status: serverStatus(false),
   mode: "auto",
   messages: [],
@@ -113,13 +114,13 @@ export const useAiSessionStore = create<AiSessionStore>((set, get) => ({
       set({ status: serverStatusFromResponse(status), error: status.error });
     } catch (error) {
       const message = errorText(error);
-      recordAiDebug("error", "MistyAI status check failed.", message);
+      recordAiDebug("error", "Mika status check failed.", message);
       set({ status: serverStatus(false, message, false), error: message });
     }
   },
 
   setMode: (mode) => {
-    set({ mode });
+    set({ mode: mode === "full" ? "auto" : mode });
   },
 
   sendPrompt: async ({ displayPrompt, prompt, cwd, selectedPaths }) => {
@@ -145,7 +146,7 @@ export const useAiSessionStore = create<AiSessionStore>((set, get) => ({
     } catch (error) {
       stopAiPolling();
       const message = errorText(error);
-      recordAiDebug("error", "MistyAI send failed.", message);
+      recordAiDebug("error", "Mika send failed.", message);
       set((state) => ({
         error: message,
         status: serverStatus(false, message),
@@ -177,7 +178,7 @@ export const useAiSessionStore = create<AiSessionStore>((set, get) => ({
       await drainAiEvents(set, get);
     } catch (error) {
       const message = errorText(error);
-      recordAiDebug("error", "MistyAI approved tool failed.", message);
+      recordAiDebug("error", "Mika approved tool failed.", message);
       set((state) => ({
         error: message,
         status: serverStatus(false, message),
@@ -203,7 +204,7 @@ export const useAiSessionStore = create<AiSessionStore>((set, get) => ({
     }));
     try {
       await applyFilePlan(plan.plan);
-      const appliedSummary = completionSummaryForPlan(plan.plan);
+      const appliedSummary = queuedSummaryForPlan(plan.plan);
       set((state) => ({
         plans: state.plans.map((candidate) => candidate.id === planId ? { ...candidate, applied: true, applying: false, appliedSummary } : candidate),
         messages: [...state.messages, { id: aiMessageId("assistant"), role: "assistant", text: appliedSummary }],
@@ -222,6 +223,7 @@ export const useAiSessionStore = create<AiSessionStore>((set, get) => ({
     try {
       if (activeSessionId) await cancelAgentSession(activeSessionId);
       stopAiPolling();
+      drainInFlight = null;
       set({ status: serverStatus(false) });
     } catch (error) {
       set({ error: errorText(error) });
@@ -232,11 +234,14 @@ export const useAiSessionStore = create<AiSessionStore>((set, get) => ({
     stopAiPolling();
     activeSessionId = null;
     lastEventSequence = 0;
+    drainInFlight = null;
+    processedEventSequences.clear();
+    processedToolRequestIds.clear();
     set({ messages: [], plans: [], toolApprovals: [], error: null, status: serverStatus(false) });
   },
 }));
 
-export const useClaudeSessionStore = useAiSessionStore;
+export const useAiSessionStore = useMikaSessionStore;
 
 function ensureAiPolling(
   set: (partial: Partial<AiSessionStore> | ((state: AiSessionStore) => Partial<AiSessionStore>)) => void,
@@ -246,7 +251,7 @@ function ensureAiPolling(
   pollTimer = window.setInterval(() => {
     void drainAiEvents(set, get).catch((error) => {
       const message = errorText(error);
-      recordAiDebug("error", "MistyAI polling failed.", message);
+      recordAiDebug("error", "Mika polling failed.", message);
       stopAiPolling();
       set((state) => ({
         error: message,
@@ -261,13 +266,30 @@ async function drainAiEvents(
   set: (partial: Partial<AiSessionStore> | ((state: AiSessionStore) => Partial<AiSessionStore>)) => void,
   get: () => AiSessionStore,
 ): Promise<void> {
+  if (drainInFlight) return drainInFlight;
+  drainInFlight = drainAiEventsOnce(set, get).finally(() => {
+    drainInFlight = null;
+  });
+  return drainInFlight;
+}
+
+async function drainAiEventsOnce(
+  set: (partial: Partial<AiSessionStore> | ((state: AiSessionStore) => Partial<AiSessionStore>)) => void,
+  get: () => AiSessionStore,
+): Promise<void> {
   const sessionId = activeSessionId;
   if (!sessionId) return;
-  const { events } = await fetchAgentEvents(sessionId, lastEventSequence);
-  recordAiDebug("info", "Fetched MistyAI events.", `session=${sessionId} count=${events.length} after=${lastEventSequence}`);
-  if (events.length === 0) {
-    set({ status: serverStatus(false) });
-    stopAiPolling();
+  const afterSequence = lastEventSequence;
+  const { events } = await fetchAgentEvents(sessionId, afterSequence);
+  const nextEvents = events.filter((event) => {
+    if (event.sequence <= lastEventSequence) return false;
+    if (processedEventSequences.has(event.sequence)) return false;
+    processedEventSequences.add(event.sequence);
+    return true;
+  });
+  recordAiDebug("info", "Fetched Mika events.", `session=${sessionId} count=${events.length} new=${nextEvents.length} after=${afterSequence}`);
+  if (nextEvents.length === 0) {
+    await settleEmptyEventPoll(set);
     return;
   }
 
@@ -275,7 +297,7 @@ async function drainAiEvents(
   const nextMessages: AiPanelMessage[] = [];
   const nextPlans: AiPlanReview[] = [];
   const nextToolApprovals: AiToolApproval[] = [];
-  for (const event of events) {
+  for (const event of nextEvents) {
     lastEventSequence = Math.max(lastEventSequence, event.sequence);
     if (event.type === "assistant_message" && event.text) {
       nextMessages.push({ id: aiMessageId("assistant"), role: "assistant", text: event.text });
@@ -283,6 +305,8 @@ async function drainAiEvents(
       nextMessages.push({ id: aiMessageId("error"), role: "error", text: event.message });
     } else if (event.type === "tool_request") {
       for (const request of event.tool_requests ?? []) {
+        if (processedToolRequestIds.has(request.id)) continue;
+        processedToolRequestIds.add(request.id);
         nextMessages.push({
           id: aiMessageId("tool"),
           role: "tool",
@@ -290,7 +314,7 @@ async function drainAiEvents(
           text: request.approval_required ? `Approval required: ${request.name}` : `Running ${request.name}`,
         });
         if (!request.approval_required || get().mode === "full") {
-          recordAiDebug("info", "Running MistyAI tool request.", `${request.name} ${request.id}`);
+          recordAiDebug("info", "Running Mika tool request.", `${request.name} ${request.id}`);
           toolResults.push(await runToolRequestWithTimeout(request));
         } else {
           nextToolApprovals.push({ id: request.id, request, running: false, completed: false, error: null });
@@ -311,10 +335,26 @@ async function drainAiEvents(
   }));
   if (toolResults.length > 0) {
     await submitToolResults(sessionId, toolResults);
-    await drainAiEvents(set, get);
+    await drainAiEventsOnce(set, get);
     return;
   }
-  set({ status: serverStatus(false) });
+  await settleEmptyEventPoll(set);
+}
+
+async function settleEmptyEventPoll(
+  set: (partial: Partial<AiSessionStore> | ((state: AiSessionStore) => Partial<AiSessionStore>)) => void,
+): Promise<void> {
+  try {
+    const status = await fetchAgentStatus();
+    if (status.running) {
+      set({ status: serverStatusFromResponse(status) });
+      ensureAiPolling(set, useMikaSessionStore.getState);
+      return;
+    }
+    set({ status: serverStatusFromResponse(status) });
+  } catch {
+    set({ status: serverStatus(false) });
+  }
   stopAiPolling();
 }
 
@@ -329,18 +369,18 @@ async function ensureSession(): Promise<string> {
   const session = await createAgentSession();
   activeSessionId = session.session_id;
   lastEventSequence = 0;
-  recordAiDebug("info", "Created MistyAI session.", activeSessionId);
+  recordAiDebug("info", "Created Mika session.", activeSessionId);
   return activeSessionId;
 }
 
 async function sendAgentMessageWithSessionRetry(body: Parameters<typeof sendAgentMessage>[1]): Promise<void> {
   let sessionId = await ensureSession();
   try {
-    recordAiDebug("info", "Sending message to MistyAI server.", `session=${sessionId} cwd=${activeRoot ?? ""}`);
+    recordAiDebug("info", "Sending message to Mika server.", `session=${sessionId} cwd=${activeRoot ?? ""}`);
     await sendAgentMessage(sessionId, body);
   } catch (error) {
     if (!isSessionNotFoundError(error)) throw error;
-    recordAiDebug("warn", "MistyAI session expired; creating a new session.", sessionId);
+    recordAiDebug("warn", "Mika session expired; creating a new session.", sessionId);
     resetActiveSession();
     sessionId = await ensureSession();
     await sendAgentMessage(sessionId, body);
@@ -350,6 +390,9 @@ async function sendAgentMessageWithSessionRetry(body: Parameters<typeof sendAgen
 function resetActiveSession(): void {
   activeSessionId = null;
   lastEventSequence = 0;
+  drainInFlight = null;
+  processedEventSequences.clear();
+  processedToolRequestIds.clear();
 }
 
 function isSessionNotFoundError(error: unknown): boolean {
@@ -383,12 +426,6 @@ async function runToolRequest(request: ToolRequest): Promise<ToolResult> {
           limit: numberArg(args.limit) ?? 50,
         });
         return toolOK(request, { results });
-      }
-      case "preview_file": {
-        const path = absoluteFromMaybeRelative(stringArg(args.path));
-        const preview = await explorerPreviewItem(path);
-        const text = previewBytesToText(preview.mimeType, preview.bytes);
-        return toolOK(request, { path: relativeToRoot(path), mimeType: preview.mimeType, text });
       }
       case "validate_file_plan": {
         const plan = args.plan as FileOperationPlan | undefined;
@@ -430,10 +467,10 @@ async function runToolRequestWithTimeout(request: ToolRequest): Promise<ToolResu
 async function applyFilePlan(plan: FileOperationPlan): Promise<void> {
   const root = activeRoot;
   if (!root) throw new Error("No active root is available for this file plan.");
+  await preparePlanFolders(plan);
   for (const operation of plan.operations) {
     if (operation.type === "mkdir") {
-      const target = absoluteFromRelative(operation.path);
-      await explorerQueueCreateItem({ directory: dirname(target), name: basename(target), kind: "folder" });
+      continue;
     } else if (operation.type === "rename") {
       const from = absoluteFromRelative(operation.from);
       const to = absoluteFromRelative(operation.to);
@@ -458,6 +495,28 @@ async function applyFilePlan(plan: FileOperationPlan): Promise<void> {
       });
     }
   }
+}
+
+async function preparePlanFolders(plan: FileOperationPlan): Promise<void> {
+  const folderPaths = new Set<string>();
+  for (const operation of plan.operations) {
+    if (operation.type === "mkdir" && safeRelativePath(operation.path)) {
+      folderPaths.add(cleanRelativePath(operation.path));
+    }
+  }
+  const orderedFolders = [...folderPaths].sort((left, right) => left.split("/").length - right.split("/").length);
+  for (const relativeFolder of orderedFolders) {
+    const target = absoluteFromRelative(relativeFolder);
+    try {
+      await explorerCreateItem({ directory: dirname(target), name: basename(target), kind: "folder" });
+    } catch (error) {
+      if (!isAlreadyExistsError(error)) throw error;
+    }
+  }
+}
+
+function isAlreadyExistsError(error: unknown): boolean {
+  return errorText(error).toLowerCase().includes("already exists");
 }
 
 function validateClientPlan(plan: FileOperationPlan): string[] {
@@ -489,18 +548,16 @@ function planSummary(plan: FileOperationPlan, blockedReasons: string[]): string 
   return `${plan.summary}\n${plan.operations.length} proposed operations.${blocked}`;
 }
 
-function completionSummaryForPlan(plan: FileOperationPlan): string {
-  const modelSummary = plan.completion_summary?.trim();
-  if (modelSummary) return modelSummary;
+function queuedSummaryForPlan(plan: FileOperationPlan): string {
   const counts = operationCounts(plan);
   const parts = [
-    counts.mkdir > 0 ? pluralize(counts.mkdir, "folder", "folders") + " created" : "",
+    counts.mkdir > 0 ? pluralize(counts.mkdir, "folder", "folders") + " prepared" : "",
     counts.move > 0 ? pluralize(counts.move, "file move", "file moves") + " queued" : "",
     counts.rename > 0 ? pluralize(counts.rename, "rename", "renames") + " queued" : "",
   ].filter(Boolean);
   return parts.length > 0
     ? `${parts.join(", ")}. You can track the operations in Transfers.`
-    : "Applied the file plan. You can track the operations in Transfers.";
+    : "Queued the file plan. You can track the operations in Transfers.";
 }
 
 function operationCounts(plan: FileOperationPlan): { mkdir: number; move: number; rename: number } {
@@ -566,25 +623,12 @@ function numberArg(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-function previewBytesToText(mimeType: string, bytes: number[]): string {
-  if (!mimeType.startsWith("text/") && mimeType !== "application/json") return "";
-  try {
-    return new TextDecoder().decode(new Uint8Array(bytes)).slice(0, 6000);
-  } catch {
-    return "";
-  }
-}
-
 function relativeToRoot(path: string): string {
   const root = activeRoot?.replace(/\/+$/, "");
   if (!root) return path;
   if (path === root) return "";
   if (path.startsWith(`${root}/`)) return path.slice(root.length + 1);
   return path;
-}
-
-function absoluteFromMaybeRelative(path: string): string {
-  return path.startsWith("/") ? path : absoluteFromRelative(path);
 }
 
 function absoluteFromRelative(path: string): string {
@@ -622,5 +666,5 @@ function basename(path: string): string {
 }
 
 function recordAiDebug(level: "info" | "warn" | "error", message: string, detail?: string): void {
-  recordClientDebugEvent({ level, scope: "misty-ai", message, detail });
+  recordClientDebugEvent({ level, scope: "mika", message, detail });
 }
