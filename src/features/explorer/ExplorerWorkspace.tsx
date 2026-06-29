@@ -1,15 +1,19 @@
 import {
   AppWindow,
+  ArrowUp,
   ArrowRightLeft,
   Blocks,
   Clipboard,
   Columns2,
   Copy,
   Download,
+  File,
   FilePlus,
   Eye,
+  FlaskConical,
   Folder,
   FolderPlus,
+  Info,
   Link,
   MessageSquare,
   PanelLeft,
@@ -21,6 +25,7 @@ import {
   RefreshCcw,
   Rows2,
   Scissors,
+  Sparkles,
   Terminal,
   Trash2,
   X,
@@ -72,7 +77,7 @@ import {
   useExplorerStore,
 } from "./state/useExplorerStore";
 import type { ExplorerInlineEditState, ExplorerNotification, ExplorerSortColumn } from "./state/useExplorerStore";
-import { useAiSessionStore, type AiPlanReview, type AiStatus, type AiToolApproval } from "./state/useClaudeSessionStore";
+import { useMikaSessionStore, type AiPlanReview, type AiStatus, type AiToolApproval } from "./state/useMikaSessionStore";
 import { useSearchStore } from "./state/useSearchStore";
 import { maxMultiPanelPanes, useMultiPanelStore } from "../../shared/multipanel/useMultiPanelStore";
 import { ProvidersWorkspacePanel } from "../providers/ProvidersWorkspace";
@@ -106,8 +111,8 @@ const minSidebarWidth = 212;
 const maxSidebarWidth = 380;
 const minPreviewWidth = 240;
 const maxPreviewWidth = 420;
-const minClaudePanelWidth = 280;
-const maxClaudePanelWidth = 600;
+const minMikaPanelWidth = 280;
+const maxMikaPanelWidth = 600;
 const folderHoverOpenDelayMs = 3000;
 const transferRefreshPollMs = 12000;
 const explorerSearchFocusEvent = "misty:explorer-search-focus";
@@ -122,11 +127,11 @@ const emptyMountedDevices: MountedDevice[] = [];
 const explorerShellStyles = {
   workspaceBase:
     "relative grid h-full min-h-0 overflow-hidden grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)] max-[980px]:grid-cols-1 max-[720px]:h-full max-[720px]:bg-[#070707]",
-  workspaceClaudeOpen:
-    "grid-cols-[minmax(0,1fr)_5px_var(--claude-panel-width,380px)] max-[980px]:grid-cols-1",
+  workspaceMikaOpen:
+    "grid-cols-[minmax(0,1fr)_5px_var(--mika-panel-width,380px)] max-[980px]:grid-cols-1",
   workspaceCollapsed: "sidebar-collapsed grid-cols-[minmax(0,1fr)]",
-  workspaceCollapsedClaudeOpen:
-    "sidebar-collapsed grid-cols-[minmax(0,1fr)_5px_var(--claude-panel-width,380px)] max-[980px]:grid-cols-1",
+  workspaceCollapsedMikaOpen:
+    "sidebar-collapsed grid-cols-[minmax(0,1fr)_5px_var(--mika-panel-width,380px)] max-[980px]:grid-cols-1",
   main:
     "col-start-1 row-start-1 min-h-0 min-w-0 overflow-hidden max-[980px]:row-start-1 max-[980px]:min-w-0",
   bottomBar:
@@ -166,7 +171,7 @@ const executableShortcutCommands = [
   "explorer.split_vertical",
   "explorer.split_horizontal",
   "explorer.toggle_chat",
-  "explorer.toggle_claude",
+  "explorer.toggle_mika",
   "explorer.next_workspace",
   "explorer.tab_1",
   "explorer.tab_2",
@@ -195,7 +200,7 @@ const defaultMacExplorerShortcuts: ShortcutMap = {
   "explorer.rename": "F2",
   "explorer.refresh": "Cmd+R",
   "explorer.toggle_chat": "Cmd+J",
-  "explorer.toggle_claude": "Cmd+Shift+A",
+  "explorer.toggle_mika": "Cmd+Shift+A",
   "explorer.next_workspace": "Cmd+Shift+Grave",
   "explorer.new_tab": "Cmd+T",
   "explorer.restore_tab": "Cmd+Shift+T",
@@ -230,7 +235,7 @@ const defaultNonMacExplorerShortcuts: ShortcutMap = {
   "explorer.rename": "F2",
   "explorer.refresh": "Ctrl+R",
   "explorer.toggle_chat": "Ctrl+J",
-  "explorer.toggle_claude": "Ctrl+Shift+A",
+  "explorer.toggle_mika": "Ctrl+Shift+A",
   "explorer.next_workspace": "Ctrl+Shift+Grave",
   "explorer.new_tab": "Ctrl+T",
   "explorer.restore_tab": "Ctrl+Shift+T",
@@ -261,7 +266,7 @@ const finderExplorerShortcutOverrides: ShortcutMap = {
   "explorer.rename": "Enter",
 };
 
-type ResizeTarget = "sidebar" | "preview" | "claude" | null;
+type ResizeTarget = "sidebar" | "preview" | "mika" | null;
 type ExternalDropTarget = {
   paneId: string;
   destination: string;
@@ -290,8 +295,8 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
     pushNotification,
     dismissNotification,
     chatOverlayOpen,
-    claudePanelOpen,
-    claudePanelWidth,
+    mikaPanelOpen,
+    mikaPanelWidth,
   } = useExplorerStore(useShallow((state) => ({
     initialize: state.initialize,
     sidebarWidth: state.sidebarWidth,
@@ -311,8 +316,8 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
     pushNotification: state.pushNotification,
     dismissNotification: state.dismissNotification,
     chatOverlayOpen: state.chatOverlayOpen,
-    claudePanelOpen: state.claudePanelOpen,
-    claudePanelWidth: state.claudePanelWidth,
+    mikaPanelOpen: state.mikaPanelOpen,
+    mikaPanelWidth: state.mikaPanelWidth,
   })));
   const { providersLoading, sidebarRemotes } = useProvidersStore(useShallow((state) => ({
     providersLoading: state.loading,
@@ -382,8 +387,8 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
   const workspaceStyle = useMemo(() => ({
     "--explorer-sidebar-width": `${sidebarWidth}px`,
     "--preview-width": `${previewWidth}px`,
-    "--claude-panel-width": `${claudePanelWidth}px`,
-  } as CSSProperties), [claudePanelWidth, previewWidth, sidebarWidth]);
+    "--mika-panel-width": `${mikaPanelWidth}px`,
+  } as CSSProperties), [mikaPanelWidth, previewWidth, sidebarWidth]);
   const activeTabSupportsSidePanels = !isChromeTabPath(activeTabPath);
   const sidebarVisible = activeTabSupportsSidePanels && activeTabSidebarVisible;
   const previewVisible = activeTabSupportsSidePanels && activeTabPreviewVisible;
@@ -583,9 +588,9 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
       } else if (resizeTarget === "preview") {
         const rect = mainRef.current?.getBoundingClientRect();
         if (rect) useExplorerStore.getState().setPreviewWidth(clamp(rect.right - clientX, minPreviewWidth, maxPreviewWidth));
-      } else if (resizeTarget === "claude") {
+      } else if (resizeTarget === "mika") {
         const rect = workspaceRef.current?.getBoundingClientRect();
-        if (rect) useExplorerStore.getState().setClaudePanelWidth(clamp(rect.right - clientX, minClaudePanelWidth, maxClaudePanelWidth));
+        if (rect) useExplorerStore.getState().setMikaPanelWidth(clamp(rect.right - clientX, minMikaPanelWidth, maxMikaPanelWidth));
       }
     };
 
@@ -682,9 +687,9 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
     event.preventDefault();
     setResizeTarget("preview");
   }, []);
-  const startClaudeResize = useCallback((event: PointerEvent<HTMLDivElement>) => {
+  const startMikaResize = useCallback((event: PointerEvent<HTMLDivElement>) => {
     event.preventDefault();
-    setResizeTarget("claude");
+    setResizeTarget("mika");
   }, []);
   const navigateSidebar = useCallback((path: string) => {
     const paneId = useMultiPanelStore.getState().activePaneId;
@@ -812,17 +817,17 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
   const renderTabActions = useCallback(
     () => (
       <ExplorerTray
-        aiOpen={claudePanelOpen}
+        aiOpen={mikaPanelOpen}
         commands={pluginCommands}
         panels={pluginPanels}
         selectedPath={activeSelectedPath}
         terminalEnabled={activeTabSupportsSidePanels && canOpenTerminalPath(activeTabPath) && canOpenTerminalPath(activePath)}
         terminalPath={activePath}
         onOpenTransfers={openTransfersTab}
-        onToggleAi={() => useExplorerStore.getState().toggleClaudePanel()}
+        onToggleAi={() => useExplorerStore.getState().toggleMikaPanel()}
       />
     ),
-    [activePath, activeSelectedPath, activeTabPath, activeTabSupportsSidePanels, claudePanelOpen, pluginCommands, pluginPanels],
+    [activePath, activeSelectedPath, activeTabPath, activeTabSupportsSidePanels, mikaPanelOpen, pluginCommands, pluginPanels],
   );
   const renderBottomBar = useCallback(
     (tab: MultiPanelTab) => {
@@ -844,9 +849,9 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
       ref={workspaceRef}
       className={cx(
         explorerShellStyles.workspaceBase,
-        sidebarVisible && claudePanelOpen && explorerShellStyles.workspaceClaudeOpen,
-        !sidebarVisible && !claudePanelOpen && explorerShellStyles.workspaceCollapsed,
-        !sidebarVisible && claudePanelOpen && explorerShellStyles.workspaceCollapsedClaudeOpen,
+        sidebarVisible && mikaPanelOpen && explorerShellStyles.workspaceMikaOpen,
+        !sidebarVisible && !mikaPanelOpen && explorerShellStyles.workspaceCollapsed,
+        !sidebarVisible && mikaPanelOpen && explorerShellStyles.workspaceCollapsedMikaOpen,
       )}
       style={workspaceStyle}
     >
@@ -864,10 +869,10 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
           renderPane={renderPane}
         />
       </main>
-      {claudePanelOpen ? (
+      {mikaPanelOpen ? (
         <>
-          <div className={assistantPanelStyles.claudeResizer} onPointerDown={startClaudeResize} />
-          <ExplorerClaudePanel />
+          <div className={assistantPanelStyles.mikaResizer} onPointerDown={startMikaResize} />
+          <ExplorerMikaPanel />
         </>
       ) : null}
       <ExplorerRenameStatus edit={inlineEdit} />
@@ -922,8 +927,8 @@ function ExplorerTray(props: {
       <button
         className={cx(explorerTrayStyles.trigger, props.aiOpen && explorerTrayStyles.triggerActive)}
         type="button"
-        title="MistyAI"
-        aria-label="MistyAI"
+        title="Mika"
+        aria-label="Mika"
         aria-pressed={props.aiOpen}
         onClick={props.onToggleAi}
       >
@@ -2258,7 +2263,7 @@ function runExplorerCommand(commandId: string, paneId: string, navigateRoute: (p
       navigateRoute("/settings");
       break;
     case "app.toggle_plugin_launcher":
-      navigateRoute("/hub");
+      navigateRoute("/hub/extensions");
       break;
     case "clipboard.publish_shared":
       void publishSharedClipboard();
@@ -2322,13 +2327,13 @@ function runExplorerCommand(commandId: string, paneId: string, navigateRoute: (p
       toggleActiveTabPanelVisibility("sidebar");
       break;
     case "explorer.toggle_chat":
-      if (explorer.chatOverlayOpen && !useAiSessionStore.getState().status?.running) {
-        useAiSessionStore.getState().clearConversation();
+      if (explorer.chatOverlayOpen && !useMikaSessionStore.getState().status?.running) {
+        useMikaSessionStore.getState().clearConversation();
       }
       explorer.toggleChatOverlay();
       break;
-    case "explorer.toggle_claude":
-      explorer.toggleClaudePanel();
+    case "explorer.toggle_mika":
+      explorer.toggleMikaPanel();
       break;
     case "explorer.next_workspace": {
       if (multi.tabs.length <= 1) break;
@@ -2738,47 +2743,75 @@ const ConnectedFileInspector = memo(function ConnectedFileInspector() {
 });
 
 const assistantPanelStyles = {
-  claudeResizer:
+  mikaResizer:
     "relative col-start-2 row-start-1 cursor-col-resize bg-transparent after:absolute after:bottom-0 after:left-1/2 after:top-0 after:w-px after:-translate-x-1/2 after:bg-[#222222] after:content-[''] hover:after:bg-[#3a3a3a] max-[980px]:hidden",
-  claudePanel:
-    "col-start-3 row-start-1 grid min-h-0 min-w-0 grid-rows-[42px_minmax(0,1fr)] overflow-hidden bg-[#111111] text-[#e2e2e2] max-[980px]:absolute max-[980px]:bottom-[22px] max-[980px]:right-0 max-[980px]:top-0 max-[980px]:z-20 max-[980px]:w-[min(var(--claude-panel-width,380px),100%)] max-[980px]:border-l max-[980px]:border-[#292929] max-[980px]:shadow-[-16px_0_38px_rgba(0,0,0,0.34)]",
+  mikaPanel:
+    "col-start-3 row-start-1 grid min-h-0 min-w-0 grid-rows-[54px_minmax(0,1fr)] overflow-hidden border-l border-[#242424] bg-[#090a0b] text-[#e2e2e2] shadow-[-18px_0_38px_rgba(0,0,0,0.28)] max-[980px]:absolute max-[980px]:bottom-[22px] max-[980px]:right-0 max-[980px]:top-0 max-[980px]:z-20 max-[980px]:w-[min(var(--mika-panel-width,380px),100%)]",
   chatOverlay:
     "absolute bottom-[76px] right-[18px] z-[19] grid max-h-[min(620px,calc(100vh_-_120px))] w-[min(420px,calc(100vw_-_180px))] grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-xl border border-[#323232] bg-[rgba(17, 17, 17, 0.96)] text-[#e2e2e2] shadow-[0_18px_42px_rgba(0,0,0,0.44)] backdrop-blur-[14px]",
   header:
     "flex h-[42px] min-w-0 items-center justify-between gap-2.5 border-b border-[#292929] py-0 pr-2.5",
   chatHeader: "pl-[13px]",
-  claudeHeader: "pl-3.5",
+  mikaHeader: "pl-3.5",
+  mikaPanelHeader:
+    "relative !h-[54px] border-b border-[#242424] bg-[rgba(7,8,10,0.96)] !pl-5 pr-3",
   headerTitle:
     "inline-flex min-w-0 items-center gap-2 overflow-hidden text-ellipsis whitespace-nowrap font-semibold",
+  mikaHeaderTitle:
+    "gap-3 text-[19px] font-bold text-[#f4f4f4] [&_svg]:text-[#f2f2f2]",
+  headerActions: "flex flex-none items-center gap-1.5",
   runningBadge: "text-[11px] font-semibold text-[#c1c1c1]",
   headerButton:
     "inline-flex size-[30px] flex-none items-center justify-center gap-2 rounded-lg border-0 bg-transparent p-0 text-[#b3b3b3] hover:bg-[#252525] hover:text-[#f7f7f7]",
+  mikaHeaderButton:
+    "size-9 rounded-[10px] border border-[#2f3238] bg-[#111316] text-[#b9bcc4] hover:bg-[#1c1f24] hover:text-[#f7f7f7] aria-expanded:bg-[#1c1f24] aria-expanded:text-[#f7f7f7]",
+  contextPopover:
+    "absolute right-3 top-[62px] z-30 grid w-[min(360px,calc(100vw_-_32px))] gap-3 rounded-xl border border-[#2c3036] bg-[rgba(9,10,12,0.98)] p-3.5 text-[#e2e2e2] shadow-[0_20px_54px_rgba(0,0,0,0.56)] backdrop-blur-xl",
+  contextSection: "grid gap-1.5 border-b border-[#24262a] pb-3 last:border-b-0 last:pb-0",
+  contextLabel: "text-[11px] font-bold uppercase tracking-normal text-[#8e929a]",
+  contextValueRow: "grid grid-cols-[22px_minmax(0,1fr)_34px] items-center gap-2",
+  contextValueText: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-semibold text-[#f1f1f1]",
+  contextSubText: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs text-[#8f939b]",
+  contextCopyButton:
+    "grid size-8 place-items-center rounded-lg border border-[#30343a] bg-[#111316] text-[#b9bcc4] hover:bg-[#1c1f24] hover:text-[#f7f7f7]",
+  statusDot: "size-2.5 rounded-full bg-[#46d05a] shadow-[0_0_14px_rgba(70,208,90,0.48)]",
   chatBody:
     "grid min-h-0 grid-rows-[auto_minmax(90px,1fr)_auto] gap-2.5 overflow-hidden p-[13px]",
-  claudeBody:
-    "grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-3 overflow-auto p-4",
+  mikaBody:
+    "grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_auto_auto] gap-3 overflow-hidden bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[length:18px_18px] p-5",
   status:
     "grid border-b border-[#292929]",
   chatStatus: "gap-2 pb-2.5",
-  claudeStatus: "gap-2.5 pb-3",
+  mikaStatus: "gap-2.5 pb-3",
   chatDetails:
     "m-0 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1.5",
-  claudeDetails: "m-0 grid gap-[7px]",
+  mikaDetails: "m-0 grid gap-[7px]",
+  betaNotice:
+    "m-0 grid grid-cols-[24px_minmax(0,1fr)] items-start gap-3 rounded-xl border border-[#6f4f19] bg-[rgba(27,20,8,0.64)] px-4 py-3.5 text-sm font-medium leading-relaxed text-[#e8ded0] shadow-[0_0_28px_rgba(111,79,25,0.08)_inset]",
+  betaIcon: "mt-0.5 text-[#efb33d]",
   detailLabel: "text-[#898989]",
-  claudeDetailLabel: "text-xs uppercase",
+  mikaDetailLabel: "text-xs uppercase",
   chatDetailValue:
     "m-0 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap",
-  claudeDetailValue: "m-0 min-w-0 break-words",
+  mikaDetailValue: "m-0 min-w-0 break-words",
   errorText: "m-0 text-[#b0b0b0]",
   log:
     "grid min-h-0 content-start overflow-auto pr-0.5",
   chatLog: "gap-2",
-  claudeLog: "min-w-0 gap-2.5",
+  mikaLog: "min-w-0 gap-2.5",
+  mikaEmpty:
+    "grid min-h-0 place-items-center px-3 py-8 text-center",
+  mikaEmptyInner: "grid max-w-[260px] justify-items-center gap-3",
+  mikaEmptyIcon:
+    "relative grid size-[74px] place-items-center rounded-[24px] border border-[#3a3d44] bg-[linear-gradient(145deg,#17191e,#0b0c0f)] text-[#bfc3ca] shadow-[0_18px_42px_rgba(0,0,0,0.34)]",
+  mikaEmptySpark: "absolute -right-1 top-0 text-[#ffd76b]",
+  mikaEmptyTitle: "m-0 text-[22px] font-bold leading-tight text-[#f3f3f3]",
+  mikaEmptyText: "m-0 text-sm leading-relaxed text-[#94979f]",
   emptyLog: "m-[18px] text-[var(--misty-text-muted)]",
   message:
     "grid min-w-0 rounded-lg border border-[#292929] bg-[#161616]",
   chatMessage: "gap-[5px] p-[9px]",
-  claudeMessage: "gap-1.5 p-2.5",
+  mikaMessage: "gap-1.5 p-2.5",
   userMessage: "border-[#444444] bg-[#212121]",
   toolMessage: "border-[#3f3f3f] bg-[#181818]",
   errorMessage: "border-[#3f3f3f] bg-[#181818]",
@@ -2827,31 +2860,35 @@ const assistantPanelStyles = {
   composer:
     "grid border-t border-[#292929]",
   chatComposer: "gap-[9px] pt-2.5",
-  claudeComposer: "gap-2.5 pt-3",
+  mikaComposer: "gap-2.5 pt-3",
   textarea:
-    "min-w-0 resize-y rounded-lg border border-[#2f2f2f] bg-[#0b0b0b] px-2.5 py-[9px] font-[inherit] leading-snug text-[#f7f7f7] disabled:text-[#898989]",
+    "min-w-0 resize-y rounded-xl border border-[#343840] bg-[rgba(7,8,10,0.92)] px-3.5 py-3 font-[inherit] leading-snug text-[#f7f7f7] outline-none placeholder:text-[#777b84] focus:border-[#6a707c] focus:shadow-[0_0_0_3px_rgba(122,129,143,0.16)] disabled:text-[#898989]",
   composerActions: "flex justify-end gap-2",
-  claudeComposerActions: "gap-0",
+  mikaComposerActions: "gap-2",
   composerButton:
     "min-h-8 rounded-lg border border-[#3f3f3f] bg-[#252525] px-3 font-semibold text-[#f7f7f7] hover:not-disabled:bg-[#303030] disabled:opacity-55",
-  claudeComposerButton: "px-3.5",
+  mikaComposerButton: "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl px-3.5",
+  mikaPrimaryButton:
+    "border-[#ececec] bg-[#e8e8e8] text-[#242424] hover:not-disabled:bg-[#f5f5f5]",
+  mikaFooter:
+    "flex min-h-10 items-center justify-center gap-2 border-t border-[#24262a] pt-3 text-xs font-semibold text-[#777b84]",
   secondaryButton: "bg-transparent text-[#b3b3b3]",
 } as const;
 
 function assistantStatusText(status: AiStatus | null): string {
-  if (!status) return "Checking MistyAI...";
+  if (!status) return "Checking Mika...";
   if (status.configured) return `Ready (${status.provider}/${status.model})`;
-  return "Configure the MistyAI backend to enable assistant actions";
+  return "Configure the Mika backend to enable assistant actions";
 }
 
 function assistantPlaceholder(configured: boolean, fallback: string): string {
-  return configured ? fallback : "Configure MistyAI backend to continue";
+  return configured ? fallback : "Configure Mika backend to continue";
 }
 
-function assistantMessageClass(role: string, density: "chat" | "claude"): string {
+function assistantMessageClass(role: string, density: "chat" | "mika"): string {
   return cx(
     assistantPanelStyles.message,
-    density === "chat" ? assistantPanelStyles.chatMessage : assistantPanelStyles.claudeMessage,
+    density === "chat" ? assistantPanelStyles.chatMessage : assistantPanelStyles.mikaMessage,
     role === "user" && assistantPanelStyles.userMessage,
     role === "tool" && assistantPanelStyles.toolMessage,
     role === "error" && assistantPanelStyles.errorMessage,
@@ -2860,14 +2897,10 @@ function assistantMessageClass(role: string, density: "chat" | "claude"): string
 
 const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
   const activePaneId = useMultiPanelStore((state) => state.activePaneId);
-  const { listing, selectedEntry } = useExplorerStore(useShallow((state) => {
-    const pane = state.panes[activePaneId];
-    return {
-      listing: pane?.listing ?? null,
-      selectedEntry: selectedEntryForPane(pane),
-    };
-  }));
-  const { status, mode, messages, plans, toolApprovals, error, refreshStatus, setMode, sendPrompt, abortPrompt, clearConversation, approvePlan, approveToolRequest } = useAiSessionStore(useShallow((state) => ({
+  const panes = useExplorerStore((state) => state.panes);
+  const listing = useExplorerStore((state) => state.panes[activePaneId]?.listing ?? null);
+  const selectedPaths = useMemo(() => selectedPathsAcrossPanes(panes), [panes]);
+  const { status, mode, messages, plans, toolApprovals, error, refreshStatus, setMode, sendPrompt, abortPrompt, clearConversation, approvePlan, approveToolRequest } = useMikaSessionStore(useShallow((state) => ({
     status: state.status,
     mode: state.mode,
     messages: state.messages,
@@ -2902,15 +2935,15 @@ const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
     setPrompt("");
     void sendPrompt({
       displayPrompt: trimmed,
-      prompt: buildClaudePrompt(trimmed, workingDirectory, selectedEntry?.path ?? null),
+      prompt: buildMikaPrompt(trimmed, workingDirectory, selectedPaths),
       cwd: workingDirectory || null,
-      selectedPaths: selectedEntry ? [selectedEntry.name] : [],
+      selectedPaths,
     });
-  }, [prompt, running, selectedEntry?.path, sendPrompt, workingDirectory]);
+  }, [prompt, running, selectedPaths, sendPrompt, workingDirectory]);
 
   const openPanel = useCallback(() => {
     useExplorerStore.getState().toggleChatOverlay();
-    useExplorerStore.getState().setClaudePanelOpen(true);
+    useExplorerStore.getState().setMikaPanelOpen(true);
   }, []);
 
   const closeOverlay = useCallback(() => {
@@ -2935,22 +2968,26 @@ const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
       </header>
       <div className={assistantPanelStyles.chatBody}>
         <div className={cx(assistantPanelStyles.status, assistantPanelStyles.chatStatus)}>
+          <p className={assistantPanelStyles.betaNotice}>
+            <FlaskConical className={assistantPanelStyles.betaIcon} size={22} />
+            <span>Mika is beta and experimental. It is focused on file reorganization for now. Please review plans carefully and use cautiously.</span>
+          </p>
           <dl className={assistantPanelStyles.chatDetails}>
             <dt className={assistantPanelStyles.detailLabel}>Status</dt>
             <dd className={assistantPanelStyles.chatDetailValue}>{assistantStatusText(status)}</dd>
             <dt className={assistantPanelStyles.detailLabel}>Folder</dt>
             <dd className={assistantPanelStyles.chatDetailValue}>{workingDirectory || "No active folder"}</dd>
             <dt className={assistantPanelStyles.detailLabel}>Selection</dt>
-            <dd className={assistantPanelStyles.chatDetailValue}>{selectedEntry?.path ?? "None"}</dd>
+            <dd className={assistantPanelStyles.chatDetailValue}>{mikaSelectionSummary(selectedPaths)}</dd>
           </dl>
           {error ? <p className={assistantPanelStyles.errorText}>{error}</p> : null}
         </div>
         <div ref={logRef} className={cx(assistantPanelStyles.log, assistantPanelStyles.chatLog)} aria-live="polite">
           {messages.length === 0 ? (
-            <p className={assistantPanelStyles.emptyLog}>Ask about the active folder or selected file.</p>
+            <p className={assistantPanelStyles.emptyLog}>Chat with Mika or ask for help reorganizing the active folder.</p>
           ) : messages.map((message) => (
             <article key={message.id} className={assistantMessageClass(message.role, "chat")}>
-              <strong className={assistantPanelStyles.messageTitle}>{message.role === "user" ? "You" : message.role === "tool" ? "Tool" : message.role === "error" ? "Error" : "MistyAI"}</strong>
+              <strong className={assistantPanelStyles.messageTitle}>{message.role === "user" ? "You" : message.role === "tool" ? "Tool" : message.role === "error" ? "Error" : "Mika"}</strong>
               <pre className={assistantPanelStyles.messageText}>{message.text || (message.role === "assistant" && running ? "Thinking..." : "")}</pre>
               {message.toolRequestId ? <AssistantToolActions requestId={message.toolRequestId} approvals={toolApprovals} onApprove={approveToolRequest} /> : null}
               {message.planId ? <AssistantPlanActions planId={message.planId} plans={plans} onApply={approvePlan} /> : null}
@@ -2968,7 +3005,7 @@ const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
             className={assistantPanelStyles.textarea}
             value={prompt}
             rows={3}
-            placeholder={assistantPlaceholder(configured, "Ask Misty...")}
+            placeholder={assistantPlaceholder(configured, "Ask Mika to organize files...")}
             disabled={!configured || running}
             onChange={(event) => setPrompt(event.target.value)}
             onKeyDown={(event) => {
@@ -2979,10 +3016,9 @@ const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
             }}
           />
           <div className={assistantPanelStyles.composerActions}>
-            <select className={assistantPanelStyles.modeSelect} value={mode} aria-label="MistyAI mode" onChange={(event) => setMode(event.target.value as Parameters<typeof setMode>[0])}>
+            <select className={assistantPanelStyles.modeSelect} value={mode} aria-label="Mika mode" onChange={(event) => setMode(event.target.value as Parameters<typeof setMode>[0])}>
               <option value="ask">Ask</option>
               <option value="auto">Auto</option>
-              <option value="full">Full</option>
             </select>
             <button type="button" className={cx(assistantPanelStyles.composerButton, assistantPanelStyles.secondaryButton)} onClick={openPanel}>Open Panel</button>
             {running ? (
@@ -2997,16 +3033,12 @@ const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
   );
 });
 
-const ExplorerClaudePanel = memo(function ExplorerClaudePanel() {
+const ExplorerMikaPanel = memo(function ExplorerMikaPanel() {
   const activePaneId = useMultiPanelStore((state) => state.activePaneId);
-  const { listing, selectedEntry } = useExplorerStore(useShallow((state) => {
-    const pane = state.panes[activePaneId];
-    return {
-      listing: pane?.listing ?? null,
-      selectedEntry: selectedEntryForPane(pane),
-    };
-  }));
-  const { status, mode, messages, plans, toolApprovals, error, refreshStatus, setMode, sendPrompt, abortPrompt, approvePlan, approveToolRequest } = useAiSessionStore(useShallow((state) => ({
+  const panes = useExplorerStore((state) => state.panes);
+  const listing = useExplorerStore((state) => state.panes[activePaneId]?.listing ?? null);
+  const selectedPaths = useMemo(() => selectedPathsAcrossPanes(panes), [panes]);
+  const { status, mode, messages, plans, toolApprovals, error, refreshStatus, setMode, sendPrompt, abortPrompt, approvePlan, approveToolRequest } = useMikaSessionStore(useShallow((state) => ({
     status: state.status,
     mode: state.mode,
     messages: state.messages,
@@ -3021,7 +3053,9 @@ const ExplorerClaudePanel = memo(function ExplorerClaudePanel() {
     approveToolRequest: state.approveToolRequest,
   })));
   const [prompt, setPrompt] = useState("");
+  const [contextOpen, setContextOpen] = useState(false);
   const logRef = useRef<HTMLDivElement | null>(null);
+  const contextRef = useRef<HTMLDivElement | null>(null);
   const workingDirectory = listing?.path ?? "";
   const running = status?.running ?? false;
   const configured = status?.configured ?? false;
@@ -3034,49 +3068,81 @@ const ExplorerClaudePanel = memo(function ExplorerClaudePanel() {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight });
   }, [messages]);
 
+  useEffect(() => {
+    if (!contextOpen) return;
+    const closeOnOutsidePointer = (event: globalThis.PointerEvent) => {
+      const target = event.target as Node | null;
+      if (target && contextRef.current?.contains(target)) return;
+      setContextOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setContextOpen(false);
+    };
+    window.addEventListener("pointerdown", closeOnOutsidePointer);
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.removeEventListener("pointerdown", closeOnOutsidePointer);
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [contextOpen]);
+
   const submitPrompt = useCallback(() => {
     const trimmed = prompt.trim();
     if (!trimmed || running) return;
-    const requestPrompt = buildClaudePrompt(trimmed, workingDirectory, selectedEntry?.path ?? null);
+    const requestPrompt = buildMikaPrompt(trimmed, workingDirectory, selectedPaths);
     setPrompt("");
     void sendPrompt({
       displayPrompt: trimmed,
       prompt: requestPrompt,
       cwd: workingDirectory || null,
-      selectedPaths: selectedEntry ? [selectedEntry.name] : [],
+      selectedPaths,
     });
-  }, [prompt, running, selectedEntry?.path, sendPrompt, workingDirectory]);
+  }, [prompt, running, selectedPaths, sendPrompt, workingDirectory]);
 
   return (
-    <aside className={assistantPanelStyles.claudePanel} aria-label="MistyAI">
-      <header className={cx(assistantPanelStyles.header, assistantPanelStyles.claudeHeader)}>
-        <span className={assistantPanelStyles.headerTitle}>
-          <MessageSquare size={16} />
-          MistyAI
+    <aside className={assistantPanelStyles.mikaPanel} aria-label="Mika, Misty Intelligent Knowledge Assistant" title="Misty Intelligent Knowledge Assistant">
+      <header className={cx(assistantPanelStyles.header, assistantPanelStyles.mikaHeader, assistantPanelStyles.mikaPanelHeader)}>
+        <span className={cx(assistantPanelStyles.headerTitle, assistantPanelStyles.mikaHeaderTitle)}>
+          <MessageSquare size={24} strokeWidth={1.9} />
+          Mika
           {running ? <small className={assistantPanelStyles.runningBadge}>Running</small> : null}
         </span>
-        <button className={assistantPanelStyles.headerButton} type="button" aria-label="Close MistyAI" onClick={() => useExplorerStore.getState().setClaudePanelOpen(false)}>
-          <X size={16} />
-        </button>
+        <div ref={contextRef} className={assistantPanelStyles.headerActions}>
+          <button
+            className={cx(assistantPanelStyles.headerButton, assistantPanelStyles.mikaHeaderButton)}
+            type="button"
+            aria-label="Mika context"
+            aria-expanded={contextOpen}
+            onClick={() => setContextOpen((open) => !open)}
+          >
+            <Info size={17} />
+          </button>
+          <button className={cx(assistantPanelStyles.headerButton, assistantPanelStyles.mikaHeaderButton)} type="button" aria-label="Close Mika" onClick={() => useExplorerStore.getState().setMikaPanelOpen(false)}>
+            <X size={18} />
+          </button>
+          {contextOpen ? (
+            <MikaContextPopover
+              status={status}
+              workingDirectory={workingDirectory}
+              selectedPaths={selectedPaths}
+            />
+          ) : null}
+        </div>
       </header>
-      <div className={assistantPanelStyles.claudeBody}>
-        <div className={cx(assistantPanelStyles.status, assistantPanelStyles.claudeStatus)}>
-          <dl className={assistantPanelStyles.claudeDetails}>
-            <dt className={cx(assistantPanelStyles.detailLabel, assistantPanelStyles.claudeDetailLabel)}>Status</dt>
-            <dd className={assistantPanelStyles.claudeDetailValue}>{assistantStatusText(status)}</dd>
-            <dt className={cx(assistantPanelStyles.detailLabel, assistantPanelStyles.claudeDetailLabel)}>Working directory</dt>
-            <dd className={assistantPanelStyles.claudeDetailValue}>{workingDirectory || "No active folder"}</dd>
-            <dt className={cx(assistantPanelStyles.detailLabel, assistantPanelStyles.claudeDetailLabel)}>Selection</dt>
-            <dd className={assistantPanelStyles.claudeDetailValue}>{selectedEntry?.path ?? "None"}</dd>
-          </dl>
+      <div className={assistantPanelStyles.mikaBody}>
+        <div className={cx(assistantPanelStyles.status, assistantPanelStyles.mikaStatus)}>
+          <p className={assistantPanelStyles.betaNotice}>
+            <FlaskConical className={assistantPanelStyles.betaIcon} size={22} />
+            <span>Mika is beta and experimental. It is focused on file reorganization for now. Please review plans carefully and use cautiously.</span>
+          </p>
           {error ? <p className={assistantPanelStyles.errorText}>{error}</p> : null}
         </div>
-        <div ref={logRef} className={cx(assistantPanelStyles.log, assistantPanelStyles.claudeLog)} aria-live="polite">
+        <div ref={logRef} className={cx(assistantPanelStyles.log, assistantPanelStyles.mikaLog)} aria-live="polite">
           {messages.length === 0 ? (
-            <p className={assistantPanelStyles.emptyLog}>Ask MistyAI about the active folder or selected file.</p>
+            <MikaEmptyState />
           ) : messages.map((message) => (
-            <article key={message.id} className={assistantMessageClass(message.role, "claude")}>
-              <strong className={assistantPanelStyles.messageTitle}>{message.role === "user" ? "You" : message.role === "tool" ? "Tool" : message.role === "error" ? "Error" : "MistyAI"}</strong>
+            <article key={message.id} className={assistantMessageClass(message.role, "mika")}>
+              <strong className={assistantPanelStyles.messageTitle}>{message.role === "user" ? "You" : message.role === "tool" ? "Tool" : message.role === "error" ? "Error" : "Mika"}</strong>
               <pre className={assistantPanelStyles.messageText}>{message.text || (message.role === "assistant" && running ? "Thinking..." : "")}</pre>
               {message.toolRequestId ? <AssistantToolActions requestId={message.toolRequestId} approvals={toolApprovals} onApprove={approveToolRequest} /> : null}
               {message.planId ? <AssistantPlanActions planId={message.planId} plans={plans} onApply={approvePlan} /> : null}
@@ -3084,7 +3150,7 @@ const ExplorerClaudePanel = memo(function ExplorerClaudePanel() {
           ))}
         </div>
         <form
-          className={cx(assistantPanelStyles.composer, assistantPanelStyles.claudeComposer)}
+          className={cx(assistantPanelStyles.composer, assistantPanelStyles.mikaComposer)}
           onSubmit={(event) => {
             event.preventDefault();
             submitPrompt();
@@ -3094,7 +3160,7 @@ const ExplorerClaudePanel = memo(function ExplorerClaudePanel() {
             className={assistantPanelStyles.textarea}
             value={prompt}
             rows={3}
-            placeholder={assistantPlaceholder(configured, "Ask about this folder...")}
+            placeholder={assistantPlaceholder(configured, "Ask Mika to organize this folder...")}
             disabled={!configured || running}
             onChange={(event) => setPrompt(event.target.value)}
             onKeyDown={(event) => {
@@ -3104,19 +3170,25 @@ const ExplorerClaudePanel = memo(function ExplorerClaudePanel() {
               }
             }}
           />
-          <div className={cx(assistantPanelStyles.composerActions, assistantPanelStyles.claudeComposerActions)}>
-            <select className={assistantPanelStyles.modeSelect} value={mode} aria-label="MistyAI mode" onChange={(event) => setMode(event.target.value as Parameters<typeof setMode>[0])}>
+          <div className={cx(assistantPanelStyles.composerActions, assistantPanelStyles.mikaComposerActions)}>
+            <select className={assistantPanelStyles.modeSelect} value={mode} aria-label="Mika mode" onChange={(event) => setMode(event.target.value as Parameters<typeof setMode>[0])}>
               <option value="ask">Ask</option>
               <option value="auto">Auto</option>
-              <option value="full">Full</option>
             </select>
             {running ? (
-              <button className={cx(assistantPanelStyles.composerButton, assistantPanelStyles.claudeComposerButton)} type="button" onClick={abortPrompt}>Stop</button>
+              <button className={cx(assistantPanelStyles.composerButton, assistantPanelStyles.mikaComposerButton)} type="button" onClick={abortPrompt}>Stop</button>
             ) : (
-              <button className={cx(assistantPanelStyles.composerButton, assistantPanelStyles.claudeComposerButton)} type="submit" disabled={!configured || !prompt.trim()}>Send</button>
+              <button className={cx(assistantPanelStyles.composerButton, assistantPanelStyles.mikaComposerButton, assistantPanelStyles.mikaPrimaryButton)} type="submit" disabled={!configured || !prompt.trim()}>
+                <ArrowUp size={17} />
+                Send
+              </button>
             )}
           </div>
         </form>
+        <footer className={assistantPanelStyles.mikaFooter}>
+          <Sparkles size={15} />
+          Misty Intelligent Knowledge Assistant
+        </footer>
       </div>
     </aside>
   );
@@ -3135,7 +3207,7 @@ function AssistantPlanActions(props: {
     <div className={assistantPanelStyles.planDetails}>
       <div className={assistantPanelStyles.planActions}>
         <span className={assistantPanelStyles.runningBadge}>
-          {plan.plan.operations.length} operations{blocked ? " blocked" : plan.applied ? " applied" : ""}
+          {plan.plan.operations.length} operations{blocked ? " blocked" : plan.applied ? " queued" : ""}
         </span>
         <button
           className={cx(assistantPanelStyles.composerButton, assistantPanelStyles.secondaryButton)}
@@ -3206,10 +3278,10 @@ function AssistantPlanReviewDialog(props: {
         if (event.target === event.currentTarget) props.onClose();
       }}
     >
-      <section className={assistantPanelStyles.reviewPanel} role="dialog" aria-modal="true" aria-labelledby="misty-ai-plan-review-title">
+      <section className={assistantPanelStyles.reviewPanel} role="dialog" aria-modal="true" aria-labelledby="mika-plan-review-title">
         <header className={assistantPanelStyles.reviewHeader}>
           <div>
-            <h2 className={assistantPanelStyles.reviewTitle} id="misty-ai-plan-review-title">Review File Operations</h2>
+            <h2 className={assistantPanelStyles.reviewTitle} id="mika-plan-review-title">Review File Operations</h2>
             <p className={assistantPanelStyles.reviewSubtitle}>{props.plan.plan.operations.length} proposed operations</p>
           </div>
           <button className={assistantPanelStyles.headerButton} type="button" aria-label="Close review" onClick={props.onClose}>
@@ -3218,13 +3290,13 @@ function AssistantPlanReviewDialog(props: {
         </header>
         <div className={assistantPanelStyles.reviewBody}>
           <div className={assistantPanelStyles.reviewSummaryGrid}>
-            <section className={assistantPanelStyles.reviewSummaryBlock} aria-label="Summary of what MistyAI will do">
-              <span className={assistantPanelStyles.reviewSummaryLabel}>What MistyAI Will Do</span>
+            <section className={assistantPanelStyles.reviewSummaryBlock} aria-label="Summary of what Mika will do">
+              <span className={assistantPanelStyles.reviewSummaryLabel}>What Mika Will Do</span>
               <p className={assistantPanelStyles.reviewSummaryText}>{props.plan.plan.summary}</p>
             </section>
             {props.plan.appliedSummary ? (
-              <section className={assistantPanelStyles.reviewSummaryBlock} aria-label="Summary of what MistyAI did">
-                <span className={assistantPanelStyles.reviewSummaryLabel}>What Misty Did</span>
+              <section className={assistantPanelStyles.reviewSummaryBlock} aria-label="Summary of what Misty queued">
+                <span className={assistantPanelStyles.reviewSummaryLabel}>What Misty Queued</span>
                 <p className={assistantPanelStyles.reviewSummaryText}>{props.plan.appliedSummary}</p>
               </section>
             ) : null}
@@ -3257,7 +3329,7 @@ function AssistantPlanReviewDialog(props: {
         </div>
         <footer className={assistantPanelStyles.reviewFooter}>
           <span className={assistantPanelStyles.runningBadge}>
-            {props.plan.plan.operations.length} operations{blocked ? " blocked" : props.plan.applied ? " applied" : ""}
+            {props.plan.plan.operations.length} operations{blocked ? " blocked" : props.plan.applied ? " queued" : ""}
           </span>
           <div className={assistantPanelStyles.reviewFooterActions}>
             <button className={cx(assistantPanelStyles.composerButton, assistantPanelStyles.secondaryButton)} type="button" onClick={props.onClose}>
@@ -3269,7 +3341,7 @@ function AssistantPlanReviewDialog(props: {
               disabled={blocked || props.plan.applied || props.plan.applying}
               onClick={() => void applyPlan()}
             >
-              {props.plan.applying ? "Applying..." : props.plan.applied ? "Applied" : "Apply"}
+              {props.plan.applying ? "Queueing..." : props.plan.applied ? "Queued" : "Apply"}
             </button>
           </div>
         </footer>
@@ -3303,11 +3375,140 @@ function AssistantToolActions(props: {
   );
 }
 
-function buildClaudePrompt(userPrompt: string, workingDirectory: string, selectedPath: string | null): string {
+function MikaContextPopover(props: {
+  status: AiStatus | null;
+  workingDirectory: string;
+  selectedPaths: string[];
+}) {
+  const configured = props.status?.configured ?? false;
+  const statusLabel = props.status
+    ? configured ? "Ready" : "Not configured"
+    : "Checking";
+  const statusMeta = props.status && configured ? `${props.status.provider}/${props.status.model}` : "";
+  const selectionText = props.selectedPaths.length > 0 ? props.selectedPaths.join("\n") : "";
+  const firstSelection = props.selectedPaths[0] ?? "";
+  return (
+    <div className={assistantPanelStyles.contextPopover} role="dialog" aria-label="Mika context">
+      <section className={assistantPanelStyles.contextSection}>
+        <span className={assistantPanelStyles.contextLabel}>Status</span>
+        <div className={assistantPanelStyles.contextValueRow}>
+          <span className={assistantPanelStyles.statusDot} />
+          <span className={assistantPanelStyles.contextValueText}>
+            {statusLabel}
+            {statusMeta ? <small className="ml-2 text-[#8f939b]">{statusMeta}</small> : null}
+          </span>
+          <span />
+        </div>
+      </section>
+      <section className={assistantPanelStyles.contextSection}>
+        <span className={assistantPanelStyles.contextLabel}>Working Directory</span>
+        <div className={assistantPanelStyles.contextValueRow}>
+          <Folder size={20} className="text-[#c8ccd4]" />
+          <span className={assistantPanelStyles.contextValueText} title={props.workingDirectory || undefined}>
+            {props.workingDirectory || "No active folder"}
+          </span>
+          <button
+            className={assistantPanelStyles.contextCopyButton}
+            type="button"
+            aria-label="Copy working directory"
+            disabled={!props.workingDirectory}
+            onClick={() => void copyMikaContextValue(props.workingDirectory, "Working directory")}
+          >
+            <Copy size={16} />
+          </button>
+        </div>
+      </section>
+      <section className={assistantPanelStyles.contextSection}>
+        <span className={assistantPanelStyles.contextLabel}>Selection</span>
+        <div className={assistantPanelStyles.contextValueRow}>
+          <File size={20} className="text-[#c8ccd4]" />
+          <span className="grid min-w-0 gap-0.5">
+            <strong className={assistantPanelStyles.contextValueText} title={firstSelection || undefined}>
+              {mikaSelectionSummary(props.selectedPaths)}
+            </strong>
+            {firstSelection ? (
+              <small className={assistantPanelStyles.contextSubText} title={firstSelection}>{firstSelection}</small>
+            ) : null}
+          </span>
+          <button
+            className={assistantPanelStyles.contextCopyButton}
+            type="button"
+            aria-label="Copy selection"
+            disabled={!selectionText}
+            onClick={() => void copyMikaContextValue(selectionText, "Selection")}
+          >
+            <Copy size={16} />
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function MikaEmptyState() {
+  return (
+    <div className={assistantPanelStyles.mikaEmpty}>
+      <div className={assistantPanelStyles.mikaEmptyInner}>
+        <span className={assistantPanelStyles.mikaEmptyIcon}>
+          <MessageSquare size={42} strokeWidth={1.5} />
+          <Sparkles className={assistantPanelStyles.mikaEmptySpark} size={18} />
+        </span>
+        <h3 className={assistantPanelStyles.mikaEmptyTitle}>Ready to help</h3>
+        <p className={assistantPanelStyles.mikaEmptyText}>Chat with Mika or ask it to reorganize the active folder.</p>
+      </div>
+    </div>
+  );
+}
+
+async function copyMikaContextValue(value: string, label: string): Promise<void> {
+  const trimmed = value.trim();
+  if (!trimmed) return;
+  try {
+    await writeText(trimmed);
+    useExplorerStore.getState().pushNotification(`${label} copied.`, "success");
+  } catch (error) {
+    useExplorerStore.getState().pushNotification(errorText(error), "error");
+  }
+}
+
+function selectedPathsAcrossPanes(panes: ReturnType<typeof useExplorerStore.getState>["panes"]): string[] {
+  const selected = new Set<string>();
+  for (const pane of Object.values(panes)) {
+    for (const path of selectedPathsForPane(pane)) {
+      if (path) selected.add(path);
+    }
+  }
+  return [...selected];
+}
+
+function selectedCountAcrossPanes(panes: ReturnType<typeof useExplorerStore.getState>["panes"]): number {
+  return selectedPathsAcrossPanes(panes).length;
+}
+
+function clearSelectionsAcrossPanes(): void {
+  const store = useExplorerStore.getState();
+  for (const paneId of Object.keys(store.panes)) {
+    store.clearSelection(paneId);
+  }
+}
+
+function mikaSelectionSummary(selectedPaths: string[]): string {
+  if (selectedPaths.length === 0) return "None";
+  if (selectedPaths.length === 1) return titleFromPath(selectedPaths[0]);
+  return `${selectedPaths.length} items selected`;
+}
+
+function buildMikaPrompt(userPrompt: string, workingDirectory: string, selectedPaths: string[]): string {
+  const selectedContext = selectedPaths.length > 0
+    ? [`Selected items (${selectedPaths.length}):`, ...selectedPaths.map((path) => `- ${path}`)]
+    : ["Selected items: none"];
   const context = [
     "You are helping inside Misty, a desktop file manager.",
+    "Mika is beta and experimental.",
+    "Your main goal is to help reorganize files. You may chat freely, but tool-assisted work should stay focused on listing, searching, validating, and proposing safe file organization plans.",
+    "Do not inspect file contents or ask for preview tools. For changes, propose a file plan with folders, moves, and renames for the user to review.",
     workingDirectory ? `Current folder: ${workingDirectory}` : "Current folder: none",
-    selectedPath ? `Selected item: ${selectedPath}` : "Selected item: none",
+    ...selectedContext,
   ].join("\n");
   return `${context}\n\nUser request:\n${userPrompt}`;
 }
@@ -3326,6 +3527,7 @@ const ExplorerContextMenu = memo(function ExplorerContextMenu() {
     showHidden,
     targetEntry,
     hasSelection,
+    selectedAcrossPanesCount,
     hasRemoteSelection,
     canCalculateDirectorySizes,
     targetPinned,
@@ -3359,6 +3561,7 @@ const ExplorerContextMenu = memo(function ExplorerContextMenu() {
       showHidden: state.paneShowHidden[paneId] ?? state.showHidden,
       targetEntry,
       hasSelection: Boolean(entryId && selectedCount),
+      selectedAcrossPanesCount: open ? selectedCountAcrossPanes(state.panes) : 0,
       hasRemoteSelection: Boolean(remoteSelectedCount),
       canCalculateDirectorySizes: selectedFolderCount > 0,
       targetPinned: Boolean(targetEntry && !targetEntry.isDeleted && pinnedPaths.some((path) => normalizedPath(path) === normalizedPath(targetEntry.path))),
@@ -3451,6 +3654,13 @@ const ExplorerContextMenu = memo(function ExplorerContextMenu() {
         disabled={!hasClipboard}
         disabledReason={hasClipboard ? undefined : "Copy or cut something first."}
         onRun={() => run(() => void useExplorerStore.getState().pasteIntoPane(paneId))}
+      />
+      <ContextMenuItem
+        icon={<X size={17} />}
+        label="Deselect All"
+        disabled={selectedAcrossPanesCount === 0}
+        disabledReason="No selected items."
+        onRun={() => run(clearSelectionsAcrossPanes)}
       />
       <div className={contextMenuStyles.separator} />
       <ContextMenuItem

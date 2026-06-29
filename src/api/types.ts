@@ -255,6 +255,8 @@ export interface DirectoryListing {
   entries: FileEntry[];
   totalCount: number;
   hiddenCount: number;
+  modifiedMs?: number | null;
+  createdMs?: number | null;
 }
 
 export interface ExplorerPreviewPayload {

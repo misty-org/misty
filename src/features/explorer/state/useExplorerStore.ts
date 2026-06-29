@@ -58,6 +58,8 @@ import {
   selectNotificationPreferences,
   useSettingsStore,
 } from "../../settings/useSettingsStore";
+import { useOperationQueueStore } from "../../transfers/useOperationQueueStore";
+import { useTransfersStore } from "../../transfers/useTransfersStore";
 import { clipboardImagePng } from "../utils/clipboardImage";
 
 export type ExplorerViewMode = "list" | "grid";
@@ -161,8 +163,8 @@ interface ExplorerStore {
   notifications: ExplorerNotification[];
   notificationHistory: ExplorerNotification[];
   chatOverlayOpen: boolean;
-  claudePanelOpen: boolean;
-  claudePanelWidth: number;
+  mikaPanelOpen: boolean;
+  mikaPanelWidth: number;
   clipboard: ExplorerClipboardState | null;
   pinnedPaths: string[];
   contextMenu: ExplorerContextMenuState;
@@ -231,9 +233,9 @@ interface ExplorerStore {
   setSidebarWidth: (width: number) => void;
   setPreviewWidth: (width: number) => void;
   toggleChatOverlay: () => void;
-  toggleClaudePanel: () => void;
-  setClaudePanelOpen: (open: boolean) => void;
-  setClaudePanelWidth: (width: number) => void;
+  toggleMikaPanel: () => void;
+  setMikaPanelOpen: (open: boolean) => void;
+  setMikaPanelWidth: (width: number) => void;
   pushNotification: (message: string, type?: ExplorerNotificationType, durationMs?: number, showInActivity?: boolean) => number;
   dismissNotification: (id: number) => void;
   markNotificationsRead: () => void;
@@ -295,8 +297,8 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
   sort: { column: "name", direction: "asc" },
   paneSorts: {},
   chatOverlayOpen: false,
-  claudePanelOpen: false,
-  claudePanelWidth: 380,
+  mikaPanelOpen: false,
+  mikaPanelWidth: 380,
 
   loadLibrary: async () => {
     try {
@@ -927,6 +929,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     try {
       set({ operationError: null });
       await explorerQueueCreateItem({ directory, name: requestedName, kind });
+      refreshTransferViews();
       get().pushNotification(`Queued ${kind === "folder" ? "folder" : "file"} creation`, "success");
       queuePaneRefresh(paneId, directory);
     } catch (error) {
@@ -954,7 +957,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         originalName: targetEntry.name,
         value,
         lockedExtension,
-        batchItems: renameItems.length > 1 ? renameItems.map((item) => ({ ...item, value })) : undefined,
+        batchItems: renameItems.length > 1 ? renameItems : undefined,
         error: null,
       };
       set({ inlineEdit: withInlineEditValidation(inlineEdit, targetPane) });
@@ -970,6 +973,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         newName: requestedName,
         sourceIsDirectory: entry.kind === "folder",
       });
+      refreshTransferViews();
       get().pushNotification(`Queued rename to ${requestedName}`, "success");
       get().clearSelection(paneId);
       queuePaneRefresh(paneId, pane?.listing?.path ?? entry.path);
@@ -992,6 +996,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         set({ operationError: null });
         const directory = pane?.listing?.path;
         await explorerQueueDeleteItems({ paths, permanent });
+        refreshTransferViews();
         get().pushNotification(deleteQueuedMessage(paths.length, permanent), "success");
         get().clearSelection(paneId);
         if (directory) queuePaneRefresh(paneId, directory);
@@ -1016,6 +1021,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         destinationDirectory: downloadsDirectory,
         operation: "copy",
       });
+      refreshTransferViews();
       get().pushNotification(`Queued download for ${itemCountLabel(items.length)}`, "success");
       if (pane?.listing && samePath(pane.listing.path, downloadsDirectory)) {
         queuePaneRefresh(paneId, downloadsDirectory);
@@ -1034,6 +1040,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         set({ operationError: null });
         const directory = get().panes[dialog.paneId]?.listing?.path;
         await explorerQueueDeleteItems({ paths: dialog.paths, permanent: dialog.permanent });
+        refreshTransferViews();
         get().pushNotification(deleteQueuedMessage(dialog.paths.length, dialog.permanent), "success");
         get().clearSelection(dialog.paneId);
         if (directory) queuePaneRefresh(dialog.paneId, directory);
@@ -1064,6 +1071,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     try {
       set({ operationError: null });
       await explorerQueueRenameItems({ items });
+      refreshTransferViews();
       get().pushNotification(`Queued rename for ${itemCountLabel(items.length)}`, "success");
       refreshAndClearRenamePanes(validatedItems);
     } catch (error) {
@@ -1114,7 +1122,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         dialog: {
           kind: "batchRename",
           paneId: validated.paneId,
-          items: validateBatchRenameItems(validated.batchItems.map((item) => ({ ...item, value: validated.value }))),
+          items: validateBatchRenameItems(validated.batchItems),
         },
       });
       return;
@@ -1173,6 +1181,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
           destinationDirectory: directory,
           operation: clipboard.operation,
         });
+        refreshTransferViews();
         get().pushNotification(`Queued move for ${itemCountLabel(clipboard.items.length)}`, "success");
         set({ clipboard: null });
         queuePaneRefresh(paneId, directory);
@@ -1189,6 +1198,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         destinationDirectory: directory,
         operation: clipboard.operation,
       });
+      refreshTransferViews();
       get().pushNotification(`Queued copy for ${itemCountLabel(clipboard.items.length)}`, "success");
       queuePaneRefresh(paneId, directory);
     } catch (error) {
@@ -1213,6 +1223,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         destinationDirectory: directory,
         operation: "copy",
       });
+      refreshTransferViews();
       get().pushNotification(`Queued upload for ${itemCountLabel(paths.length)}`, "success");
       queuePaneRefresh(paneId, directory);
     } catch (error) {
@@ -1229,6 +1240,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         destinationDirectory: destination,
         operation,
       });
+      refreshTransferViews();
       get().pushNotification(`Queued ${operation === "move" ? "move" : "copy"} for ${itemCountLabel(items.length)}`, "success");
       const current = get().panes[paneId]?.listing?.path;
       if (current) queuePaneRefresh(paneId, current);
@@ -1251,6 +1263,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
         destinationDirectory: destination,
         operation: "copy",
       });
+      refreshTransferViews();
       get().pushNotification(`Queued drop for ${itemCountLabel(sources.length)}`, "success");
       const current = get().panes[paneId]?.listing?.path;
       if (current) queuePaneRefresh(paneId, current);
@@ -1343,11 +1356,11 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => ({
     return state.previewWidth === width ? state : { previewWidth: width };
   }),
   toggleChatOverlay: () => set((state) => ({ chatOverlayOpen: !state.chatOverlayOpen })),
-  toggleClaudePanel: () => set((state) => ({ claudePanelOpen: !state.claudePanelOpen })),
-  setClaudePanelOpen: (claudePanelOpen) => set((state) => state.claudePanelOpen === claudePanelOpen ? state : { claudePanelOpen }),
-  setClaudePanelWidth: (claudePanelWidth) => set((state) => {
-    const width = Math.round(claudePanelWidth);
-    return state.claudePanelWidth === width ? state : { claudePanelWidth: width };
+  toggleMikaPanel: () => set((state) => ({ mikaPanelOpen: !state.mikaPanelOpen })),
+  setMikaPanelOpen: (mikaPanelOpen) => set((state) => state.mikaPanelOpen === mikaPanelOpen ? state : { mikaPanelOpen }),
+  setMikaPanelWidth: (mikaPanelWidth) => set((state) => {
+    const width = Math.round(mikaPanelWidth);
+    return state.mikaPanelWidth === width ? state : { mikaPanelWidth: width };
   }),
   pushNotification: (message, type = "info", durationMs = 3000, showInActivity = true) => {
     const trimmed = message.trim();
@@ -1661,22 +1674,28 @@ function refreshAndClearRenamePanes(items: ExplorerBatchRenameItem[]): void {
   }
 }
 
+function refreshTransferViews(): void {
+  void useTransfersStore.getState().load(undefined, { silent: true });
+  void useOperationQueueStore.getState().load({ silent: true });
+}
+
 function withInlineEditValidation(
   edit: ExplorerInlineEditState,
   pane: PaneExplorerState | undefined,
 ): ExplorerInlineEditState {
   if (edit.kind === "rename" && edit.batchItems && edit.batchItems.length > 1) {
-    const batchItems = validateBatchRenameItems(edit.batchItems.map((item) => ({ ...item, value: edit.value })));
+    const batchItems = validateBatchRenameItems(edit.batchItems.map((item) =>
+      item.paneId === edit.paneId && item.entryId === edit.entryId
+        ? { ...item, value: edit.value }
+        : item
+    ));
     const focused = batchItems.find((item) => item.paneId === edit.paneId && item.entryId === edit.entryId);
     const invalidCount = batchItems.filter((item) => item.error).length;
     const error = focused?.error
       ?? (invalidCount > 0 ? `${invalidCount} selected ${invalidCount === 1 ? "item needs" : "items need"} review.` : null);
     return { ...edit, batchItems, error };
   }
-  let error = validateRenameValue(edit.value, edit.lockedExtension, edit.originalName, edit.entryId, pane);
-  if (!error && edit.kind === "create" && edit.itemKind === "file" && pane?.listing?.location.kind === "remote") {
-    error = "Creating an empty remote file is not supported.";
-  }
+  const error = validateRenameValue(edit.value, edit.lockedExtension, edit.originalName, edit.entryId, pane);
   return { ...edit, error };
 }
 
@@ -1687,7 +1706,7 @@ function canCreateItemInPane(
 ): boolean {
   if (inlineEdit || !pane?.listing) return false;
   if (pane.listing.path.startsWith("misty://")) return false;
-  if (kind === "file" && pane.listing.location.kind === "remote") return false;
+  if (pane.listing.location.kind === "remote_provider") return false;
   return true;
 }
 
@@ -1768,6 +1787,7 @@ async function pasteSystemClipboardTextIntoPane(paneId: string, directory: strin
       destinationDirectory: directory,
       operation: "copy",
     });
+    refreshTransferViews();
     queuePaneRefresh(paneId, directory);
     return true;
   }
@@ -1779,6 +1799,7 @@ async function pasteSystemClipboardTextIntoPane(paneId: string, directory: strin
       destinationDirectory: directory,
       operation: "copy",
     });
+    refreshTransferViews();
     queuePaneRefresh(paneId, directory);
     return true;
   }
@@ -1790,6 +1811,7 @@ async function pasteSystemClipboardTextIntoPane(paneId: string, directory: strin
       text: html,
       preferredName: "clipboard.html",
     });
+    refreshTransferViews();
     queuePaneRefresh(paneId, directory);
     return true;
   }
@@ -1803,6 +1825,7 @@ async function pasteSystemClipboardTextIntoPane(paneId: string, directory: strin
         destinationDirectory: directory,
         operation: "copy",
       });
+      refreshTransferViews();
       queuePaneRefresh(paneId, directory);
       return true;
     }
@@ -1812,6 +1835,7 @@ async function pasteSystemClipboardTextIntoPane(paneId: string, directory: strin
         text,
         preferredName: "clipboard.txt",
       });
+      refreshTransferViews();
       queuePaneRefresh(paneId, directory);
       return true;
     }
@@ -1890,6 +1914,7 @@ async function pasteSystemClipboardImageIntoPane(paneId: string, directory: stri
     bytes: [...image.bytes],
     preferredName: "clipboard.png",
   });
+  refreshTransferViews();
   queuePaneRefresh(paneId, directory);
   return true;
 }

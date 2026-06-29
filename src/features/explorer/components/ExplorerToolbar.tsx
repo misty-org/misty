@@ -69,7 +69,7 @@ export type ExplorerCommandId =
   | "explorer.preview.toggle"
   | "explorer.sidebar.toggle"
   | "explorer.toggle_chat"
-  | "explorer.toggle_claude"
+  | "explorer.toggle_mika"
   | "explorer.next_workspace"
   | "explorer.tab_1"
   | "explorer.tab_2"
@@ -115,7 +115,7 @@ const explorerCommands: ExplorerCommandPaletteEntry[] = [
   { id: "explorer.preview.toggle", label: "Toggle Preview", hint: "Show or hide the preview/details panel" },
   { id: "explorer.sidebar.toggle", label: "Toggle Sidebar", hint: "Show or hide the navigation sidebar" },
   { id: "explorer.toggle_chat", label: "Toggle Chat", hint: "Open or close the explorer chat overlay" },
-  { id: "explorer.toggle_claude", label: "Toggle MistyAI", hint: "Open the MistyAI assistant panel when configured" },
+  { id: "explorer.toggle_mika", label: "Toggle Mika", hint: "Open Mika, Misty Intelligent Knowledge Assistant" },
   { id: "explorer.next_workspace", label: "Next Workspace", hint: "Cycle to the next explorer tab" },
   { id: "explorer.tab_1", label: "Select Tab 1", hint: "Switch to tab 1" },
   { id: "explorer.tab_2", label: "Select Tab 2", hint: "Switch to tab 2" },
@@ -521,6 +521,15 @@ export const ExplorerToolbar = memo(function ExplorerToolbar(props: ExplorerTool
           <button className={toolbarStyles.toolbarButton} disabled={!props.canGoBack} onClick={props.onBack}><ChevronLeft size={18} /></button>
           <button className={toolbarStyles.toolbarButton} disabled={!props.canGoForward} onClick={props.onForward}><ChevronRight size={18} /></button>
           <button className={toolbarStyles.toolbarButton} onClick={props.onParent}><ArrowUp size={18} /></button>
+          <button
+            className={toolbarStyles.toolbarButton}
+            type="button"
+            title="Refresh current folder"
+            aria-label="Refresh current folder"
+            onClick={props.onRefresh}
+          >
+            <RefreshCcw size={17} />
+          </button>
         </div>
 
         <div

@@ -36,7 +36,7 @@ const QUICK_ACCESS_HIDDEN_STORAGE_KEY = "misty.explorer.sidebar.quickAccessHidde
 
 const sidebarStyles = {
   root:
-    "h-full min-h-0 min-w-0 overflow-auto border-r border-[#292929] bg-[#141414] px-3.5 py-4 max-[980px]:hidden",
+    "h-full min-h-0 min-w-0 overflow-x-hidden overflow-y-auto border-r border-[#292929] bg-[#141414] px-3.5 py-4 [overscroll-behavior:contain] [scrollbar-gutter:stable] [scrollbar-width:thin] max-[980px]:hidden",
   section: "[&+&]:mt-4",
   sectionTitle: "mb-2.5 flex min-w-0 items-center gap-2",
   sectionToggle:
@@ -51,7 +51,7 @@ const sidebarStyles = {
   itemButton:
     "flex w-full items-center gap-2.5 rounded-lg border border-transparent bg-transparent px-[11px] py-2.5 text-left text-[#d5d5d5] hover:bg-[#2b2b2b] hover:text-[#bdbdbd]",
   itemSelected: "bg-[#2b2b2b] text-[#bdbdbd]",
-  remoteIcon: "grid size-[18px] flex-none place-items-center",
+  remoteIcon: "grid size-6 flex-none place-items-center",
   pinnedRow:
     "group/pin flex min-w-0 items-center rounded-lg border border-transparent bg-transparent text-[#d5d5d5] hover:bg-[#2b2b2b] hover:text-[#bdbdbd]",
   pinnedButton:
@@ -334,7 +334,7 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
             });
           }}
         >
-          <Briefcase size={18} />
+          <Briefcase size={20} />
           <span className={sidebarStyles.workspaceSelectLabel}>{props.activeWorkspaceTitle}</span>
           <ChevronDown size={15} />
         </button>
@@ -366,7 +366,7 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
                     onClick={() => props.onNavigate(item.path)}
                     title={item.path}
                   >
-                    <Icon size={18} />
+                    <Icon size={20} />
                     <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{item.label}</span>
                   </button>
                   <button
@@ -396,7 +396,7 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
                   onClick={() => props.onNavigate(path)}
                   title={path}
                 >
-                  <Folder size={18} />
+                  <Folder size={20} />
                   <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{pinnedPathLabel(path)}</span>
                 </button>
                 <button
@@ -466,7 +466,7 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
                     title={`${remote.type}: ${remote.name}`}
                   >
                     <span className={sidebarStyles.remoteIcon}>
-                      <AssetIcon src={providerIcon.src} color={providerIcon.color} size={18} />
+                      <AssetIcon src={providerIcon.src} color={providerIcon.color} size={24} />
                     </span>
                     <span>{remote.name}</span>
                   </button>
@@ -525,7 +525,7 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
                       onClick={() => props.onNavigate(device.mountPath)}
                       title={`${device.name} · ${device.mountPath}`}
                     >
-                      <HardDrive size={18} />
+                      <HardDrive size={20} />
                       <span className={sidebarStyles.deviceCopy}>
                         <strong className={sidebarStyles.deviceName}>{device.name}</strong>
                         <small className={sidebarStyles.deviceMeta}>{deviceCapacityLabel(usedBytes, device.totalBytes, device.fsType || device.mountPath)}</small>
