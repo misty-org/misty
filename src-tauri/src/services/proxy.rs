@@ -279,8 +279,21 @@ impl ProxyService {
             "/api/remote/config/get" | "/api/remotes/config/get" => "remote.config.get",
             "/api/remote/config/update" | "/api/remotes/config/update" => "remote.config.update",
             "/api/remote/config/paths" | "/api/remotes/config/paths" => "remote.config.paths",
+            "/api/remote/config/security" | "/api/remotes/config/security" => {
+                "remote.config.security"
+            }
+            "/api/remote/config/harden" | "/api/remotes/config/harden" => "remote.config.harden",
             "/api/remote/about" | "/api/remotes/about" => "remote.about",
             "/api/remote/rename" | "/api/remotes/rename" => "remote.rename",
+            "/api/remote/verify/start" | "/api/remotes/verify/start" => "remote.verify.start",
+            "/api/remote/verify/result" | "/api/remotes/verify/result" => "remote.verify.result",
+            "/api/remote/links/list" | "/api/remotes/links/list" => "remote.links.list",
+            "/api/remote/links/create" | "/api/remotes/links/create" => "remote.links.create",
+            "/api/remote/links/revoke" | "/api/remotes/links/revoke" => "remote.links.revoke",
+            "/api/remote/backend/actions" | "/api/remotes/backend/actions" => {
+                "remote.backend.actions"
+            }
+            "/api/remote/backend/run" | "/api/remotes/backend/run" => "remote.backend.run",
             "/api/remote/file/mkdir" | "/api/remotes/file/mkdir" => "remote.file.mkdir",
             "/api/remote/file/rename" | "/api/remotes/file/rename" => "remote.file.rename",
             "/api/remote/file/copy" | "/api/remotes/file/copy" => "remote.file.copy",

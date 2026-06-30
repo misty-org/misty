@@ -255,6 +255,8 @@ export interface DirectoryListing {
   entries: FileEntry[];
   totalCount: number;
   hiddenCount: number;
+  modifiedMs?: number | null;
+  createdMs?: number | null;
 }
 
 export interface ExplorerPreviewPayload {
@@ -374,6 +376,7 @@ export interface ExplorerLibraryItem {
   mimeType: string;
   type: number;
   tags: string[];
+  comments: string;
 }
 
 export interface ExplorerLibrarySnapshot {
@@ -394,6 +397,26 @@ export interface RecordLastOpenedRequest {
 export interface SetExplorerTagsRequest {
   item: ExplorerLibraryItem;
   tags: string[];
+  comments?: string;
+}
+
+export interface FileMetadataField {
+  label: string;
+  value: string;
+}
+
+export interface FileMetadataSnapshot {
+  path: string;
+  kind: string;
+  sizeBytes?: number | null;
+  readonly: boolean;
+  hidden: boolean;
+  createdMs?: number | null;
+  modifiedMs?: number | null;
+  accessedMs?: number | null;
+  osTags: string[];
+  fields: FileMetadataField[];
+  extracted: FileMetadataField[];
 }
 
 export interface NativeWorkspaceTabSnapshot {
@@ -597,6 +620,7 @@ export interface ProviderRemote {
   statusLabel: string;
   needsReconnect: boolean;
   error: string | null;
+  configSource: string;
 }
 
 export interface ProviderWorkflowOption {
@@ -653,6 +677,130 @@ export interface RcloneConfigPaths {
   rawJson: string;
 }
 
+export type PowerToolEndpointKind = "local" | "remote";
+
+export interface PowerToolEndpoint {
+  kind: PowerToolEndpointKind;
+  remote?: string;
+  path: string;
+}
+
+export interface TransferProfileOptions {
+  transfers?: number;
+  checkers?: number;
+  bandwidthLimit?: string;
+  retries?: number;
+  lowLevelRetries?: number;
+  checksum?: boolean;
+}
+
+export interface VerifyOptions {
+  oneWay?: boolean;
+  download?: boolean;
+  profile?: TransferProfileOptions;
+}
+
+export interface VerifyStartRequest {
+  source: PowerToolEndpoint;
+  dest: PowerToolEndpoint;
+  options?: VerifyOptions;
+}
+
+export interface ProviderJobStart {
+  jobId: string;
+}
+
+export interface ProviderJobStatus {
+  jobId: string;
+  operation: string;
+  state: string;
+  phase: string;
+  bytesCompleted: number;
+  bytesTotal: number;
+  sourceRemote?: string | null;
+  sourcePath?: string | null;
+  destRemote?: string | null;
+  destPath?: string | null;
+  message?: string | null;
+  resultReady?: boolean;
+  resultKind?: string | null;
+}
+
+export interface VerifyResult {
+  success: boolean;
+  status?: string | null;
+  hashType?: string | null;
+  missingOnSrc: string[];
+  missingOnDst: string[];
+  match: string[];
+  differ: string[];
+  error: string[];
+  combined: string[];
+}
+
+export interface LinkPathRequest {
+  remote: string;
+  path: string;
+  expire?: string;
+  linkId?: string;
+  targetId?: string;
+}
+
+export interface PublicLinkRecord {
+  id: string;
+  url: string;
+  targetId?: string | null;
+  provider: string;
+  path: string;
+  role?: string | null;
+  scope?: string | null;
+  kind?: string | null;
+  expiresAt?: string | null;
+  createdAt?: string | null;
+  canRevoke: boolean;
+}
+
+export interface PublicLinkListResult {
+  supported: boolean;
+  provider: string;
+  links: PublicLinkRecord[];
+  message?: string | null;
+}
+
+export interface PublicLinkActionResult {
+  supported: boolean;
+  provider: string;
+  link?: PublicLinkRecord | null;
+  message?: string | null;
+}
+
+export interface BackendAction {
+  id: string;
+  label: string;
+  description: string;
+  provider: string;
+  destructive: boolean;
+}
+
+export interface BackendRunRequest {
+  remote: string;
+  actionId: string;
+}
+
+export interface BackendActionResult {
+  actionId: string;
+  label: string;
+  result: unknown;
+}
+
+export interface ConfigSecurityStatus {
+  configPath?: string | null;
+  encrypted: boolean;
+  unlocked: boolean;
+  passwordPresent: boolean;
+  message?: string | null;
+}
+
 export type ProviderConfigMode = "add" | "reconnect" | "repair";
 
 export interface ProviderConfigRequest {
@@ -686,7 +834,8 @@ export type TransferType =
   | "copy"
   | "move"
   | "rename"
-  | "delete";
+  | "delete"
+  | "archive";
 
 export type TransferStatus =
   | "queued"
@@ -738,8 +887,17 @@ export interface TransferPage {
   dbPath: string;
 }
 
-export type OperationKind = "copy" | "move" | "create" | "rename" | "delete" | "download";
+export type OperationKind =
+  | "copy"
+  | "move"
+  | "create"
+  | "rename"
+  | "delete"
+  | "upload"
+  | "download"
+  | "archive";
 export type OperationConflictPolicy = "ask" | "replace" | "skip" | "keep_both";
+export type OperationPriority = "low" | "normal" | "high";
 export type OperationStatus =
   | "queued"
   | "in_progress"
@@ -773,6 +931,8 @@ export interface OperationDescriptor {
   title: string;
   errorMessage: string;
   attempt: number;
+  paused: boolean;
+  priority: OperationPriority;
 }
 
 export interface OperationBatch {
@@ -804,6 +964,244 @@ export interface OperationQueueSnapshot {
   activeCount: number;
   maxConcurrent: number;
   redoAvailable: boolean;
+  paused: boolean;
+  bandwidthLimit: string;
+  transferProfileId: string;
+  transferProfileName: string;
+}
+
+export interface ArchiveListRequest {
+  path: string;
+}
+
+export interface ArchiveEntry {
+  path: string;
+  isDir: boolean;
+  compressedSize: number;
+  uncompressedSize: number;
+}
+
+export interface ArchiveListResult {
+  archivePath: string;
+  format: string;
+  entries: ArchiveEntry[];
+  message: string;
+}
+
+export interface ArchiveCreateRequest {
+  paths: string[];
+  destinationPath: string;
+}
+
+export interface ArchiveExtractRequest {
+  archivePath: string;
+  destinationDir: string;
+}
+
+export interface ArchiveActionResult {
+  archivePath: string;
+  destinationPath: string;
+  affectedPaths: string[];
+  message: string;
+}
+
+export interface DuplicateScanRequest {
+  roots: string[];
+  hashAll?: boolean;
+}
+
+export interface DuplicateCandidate {
+  path: string;
+  sizeBytes: number;
+  modifiedMs: number;
+  sha256?: string | null;
+  remote: boolean;
+}
+
+export interface DuplicateGroup {
+  key: string;
+  sizeBytes: number;
+  items: DuplicateCandidate[];
+}
+
+export interface DuplicateScanResult {
+  scanId: string;
+  groups: DuplicateGroup[];
+  scannedCount: number;
+  hashedCount: number;
+  remoteCandidateCount: number;
+  remoteHashingApproved: boolean;
+  canceled: boolean;
+  message: string;
+}
+
+export interface SavedSearchRule {
+  field: string;
+  operator: string;
+  value: string;
+}
+
+export interface SavedSearch {
+  id: string;
+  name: string;
+  query: string;
+  rules: SavedSearchRule[];
+  updatedAtMs: number;
+}
+
+export interface SavedSearchesSnapshot {
+  searches: SavedSearch[];
+}
+
+export interface CompareFilesRequest {
+  leftPath: string;
+  rightPath: string;
+}
+
+export interface CompareFilesResult {
+  leftPath: string;
+  rightPath: string;
+  leftSha256: string;
+  rightSha256: string;
+  same: boolean;
+  kind: string;
+  message: string;
+}
+
+export interface CompareFoldersRequest {
+  leftPath: string;
+  rightPath: string;
+}
+
+export interface CompareFolderRow {
+  relativePath: string;
+  disposition: string;
+  leftSize?: number | null;
+  rightSize?: number | null;
+}
+
+export interface CompareFoldersResult {
+  leftPath: string;
+  rightPath: string;
+  rows: CompareFolderRow[];
+  message: string;
+}
+
+export interface FileToolsChecksumRequest {
+  path: string;
+}
+
+export interface FileToolsChecksumResult {
+  path: string;
+  sha256: string;
+  sizeBytes: number;
+}
+
+export interface FileToolsReadonlyRequest {
+  path: string;
+  readonly: boolean;
+}
+
+export interface FileToolsChmodRequest {
+  path: string;
+  mode: number;
+}
+
+export interface FileToolsSymlinkRequest {
+  targetPath: string;
+  linkPath: string;
+}
+
+export interface FileToolsSymlinkTargetRequest {
+  path: string;
+}
+
+export interface FileToolsSymlinkTargetResult {
+  path: string;
+  targetPath: string;
+  resolvedTargetPath: string;
+  targetExists: boolean;
+  targetIsDir: boolean;
+}
+
+export interface FileToolsActionResult {
+  path: string;
+  message: string;
+}
+
+export interface AutomationRule {
+  id: string;
+  name: string;
+  enabled: boolean;
+  roots: string[];
+  conditions: SavedSearchRule[];
+  actions: string[];
+  updatedAtMs: number;
+}
+
+export interface AutomationRulesSnapshot {
+  rules: AutomationRule[];
+  activity: AutomationActivityEntry[];
+}
+
+export interface AutomationWatchSnapshot {
+  active: boolean;
+  pollIntervalMs: number;
+  watchedRuleCount: number;
+  watchedRoots: string[];
+  remoteRootCount: number;
+  lastScanMs: number;
+  lastRunMs: number;
+  lastMessage: string;
+}
+
+export interface AutomationActionResult {
+  action: string;
+  status: string;
+  message: string;
+  affectedPaths: string[];
+  queuedCount: number;
+}
+
+export interface AutomationActivityEntry {
+  id: string;
+  ruleId: string;
+  ruleName: string;
+  startedAtMs: number;
+  dryRun: boolean;
+  matchedCount: number;
+  queuedCount: number;
+  message: string;
+  actionResults: AutomationActionResult[];
+}
+
+export interface AutomationRunResult {
+  ruleId: string;
+  activityId: string;
+  dryRun: boolean;
+  matchedPaths: string[];
+  queuedCount: number;
+  actionResults: AutomationActionResult[];
+  message: string;
+}
+
+export interface PluginDiagnosticsEntry {
+  pluginId: string;
+  pluginName: string;
+  pluginDir: string;
+  installed: boolean;
+  enabled: boolean;
+  runtimeStatus: string;
+  commands: PluginCommandEntry[];
+  panels: PluginPanelEntry[];
+  missingDependencies: string[];
+  errors: string[];
+}
+
+export interface PluginDiagnosticsSnapshot {
+  roots: string[];
+  plugins: PluginDiagnosticsEntry[];
+  removedIds: string[];
 }
 
 export type FileSyncEndpointKind = "local" | "remote";

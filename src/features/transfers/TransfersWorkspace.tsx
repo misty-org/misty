@@ -1,8 +1,14 @@
 import {
+  ArrowDown,
+  ArrowUp,
+  Filter,
+  MoreVertical,
   PanelLeftClose,
   PanelLeftOpen,
   PanelRightClose,
   PanelRightOpen,
+  Pause,
+  Play,
   RefreshCcw,
   RotateCcw,
   Search,
@@ -10,14 +16,17 @@ import {
   XCircle,
 } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
+import { createPortal } from "react-dom";
+import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
-import type { OperationDescriptor, TransferRecord, TransferType } from "../../api/types";
+import type { OperationDescriptor, OperationPriority, TransferRecord, TransferType } from "../../api/types";
 import { prettyLabel } from "../../shared/format";
 import { MultiPanelWorkspace } from "../../shared/multipanel/MultiPanelWorkspace";
 import type { MultiPanelClosedPane, MultiPanelTab } from "../../shared/multipanel/types";
 import { createMultiPanelStore, type MultiPanelStore } from "../../shared/multipanel/useMultiPanelStore";
 import { useProvidersStore } from "../providers/useProvidersStore";
+import { transferProfileRecords } from "../settings/transferProfiles";
+import { useSettingsStore } from "../settings/useSettingsStore";
 import { relativeTime, remoteSummary, transferProgress } from "./transferUtils";
 import { useOperationQueueStore } from "./useOperationQueueStore";
 import {
@@ -26,75 +35,105 @@ import {
   TRANSFERS_PAGE_SIZE,
   transferStatusMatchesFilter,
   transferTypes,
+  type TransferSortDirection,
+  type TransferSortKey,
   useTransfersStore,
 } from "./useTransfersStore";
 
 const useTransfersMultiPanelStore = createMultiPanelStore({ idPrefix: "transfers", defaultTitle: "Transfers" });
 
-type TransferTableColumn = "transfer" | "operation" | "status" | "progress" | "time" | "remote" | "actions";
+type TransferTableColumn = "transfer" | "operation" | "status" | "time" | "remote" | "actions";
 
 type TransferColumnWidths = Record<TransferTableColumn, number>;
+type TransferActionMenuState = {
+  x: number;
+  y: number;
+  rowId: number | null;
+} | null;
+type TransferSortMenuState = {
+  x: number;
+  y: number;
+} | null;
+type TransferSortableKey = Exclude<TransferSortKey, "none">;
 
-const transferTableColumns: TransferTableColumn[] = ["transfer", "operation", "status", "progress", "time", "remote", "actions"];
+const transferTableColumns: TransferTableColumn[] = ["transfer", "operation", "status", "time", "remote", "actions"];
 const transferColumnLabels: Record<TransferTableColumn, string> = {
   transfer: "Transfer",
   operation: "Operation",
   status: "Status",
-  progress: "Progress",
   time: "Time",
   remote: "Remote",
   actions: "Actions",
 };
-const transferSortByColumn: Partial<Record<TransferTableColumn, "time" | "name" | "operation" | "status">> = {
+const transferSortByColumn: Partial<Record<TransferTableColumn, TransferSortableKey>> = {
   transfer: "name",
   operation: "operation",
   status: "status",
   time: "time",
 };
+const transferSortOptions: Array<{ key: TransferSortableKey; label: string }> = [
+  { key: "time", label: "Time" },
+  { key: "name", label: "Name" },
+  { key: "operation", label: "Operation" },
+  { key: "status", label: "Status" },
+];
 const transferDefaultColumnWidths: TransferColumnWidths = {
   transfer: 280,
   operation: 135,
   status: 135,
-  progress: 130,
   time: 130,
   remote: 180,
-  actions: 300,
+  actions: 160,
 };
 const transferMinimumColumnWidths: TransferColumnWidths = {
   transfer: 190,
   operation: 110,
   status: 110,
-  progress: 110,
   time: 105,
   remote: 140,
-  actions: 250,
+  actions: 148,
 };
-const TRANSFER_CHECKBOX_COLUMN_WIDTH = 46;
+const TRANSFER_CHECKBOX_COLUMN_WIDTH = 38;
 const TRANSFERS_MULTIPANEL_STORAGE_KEY = "misty.transfers.multipanel.v1";
 const TRANSFER_COLUMN_WIDTHS_STORAGE_KEY = "misty.transfers.table.columnWidths";
 const TRANSFER_COLUMN_ORDER_STORAGE_KEY = "misty.transfers.table.columnOrder";
 const TRANSFER_PANEL_VISIBILITY_STORAGE_KEY = "misty.transfers.panelVisibility";
-const TRANSFER_ROW_HEIGHT = 64;
+const TRANSFER_ROW_HEIGHT = 46;
 const TRANSFER_OVERSCAN_ROWS = 8;
 
 const transferStyles = {
   workspace:
     "bg-[var(--misty-bg)]",
   pane:
-    "grid h-full min-h-0 min-w-0 grid-rows-[48px_minmax(0,1fr)_24px] overflow-hidden bg-[var(--misty-bg)]",
+    "grid h-full min-h-0 min-w-0 grid-rows-[48px_auto_minmax(0,1fr)_24px] overflow-hidden bg-[var(--misty-bg)]",
   header:
-    "flex min-w-0 items-center justify-between gap-3 border-b border-[var(--misty-border-soft)] px-3",
-  headerTitle:
-    "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-semibold text-[var(--misty-text)]",
-  headerMeta:
-    "ml-2 text-xs font-normal text-[var(--misty-text-muted)]",
-  toolbar: "flex min-w-0 items-center justify-end gap-2",
+    "flex min-w-0 items-center justify-end gap-3 border-b border-[var(--misty-border-soft)] px-3",
+  toolbar: "relative flex min-w-0 items-center justify-end gap-2",
   toolbarButton:
     "inline-flex min-h-[38px] items-center gap-[7px] rounded-[10px] border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] px-[11px] py-2 text-[var(--misty-text)]",
+  iconToolbarButton:
+    "grid size-8 place-items-center rounded-lg border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] p-0 text-[var(--misty-text)] hover:bg-[var(--misty-surface-3)] disabled:opacity-45",
   toolbarDanger:
     "border-[color-mix(in_srgb,var(--misty-danger)_42%,var(--misty-border))] text-[var(--misty-danger)]",
   searchBox:
     "!flex !h-8 w-[min(340px,34vw)] min-w-52 !items-center !gap-2 rounded-lg border border-[var(--misty-border)] bg-[var(--misty-surface)] px-2.5 text-[var(--misty-text-muted)] !normal-case [&>input]:!h-full [&>input]:!min-w-0 [&>input]:!flex-1 [&>input]:!rounded-none [&>input]:!border-0 [&>input]:!bg-transparent [&>input]:!p-0 [&>input]:!text-sm [&>input]:!leading-none [&>input]:!text-[var(--misty-text)] [&>input]:!shadow-none [&>input]:!outline-none [&>input]:placeholder:!text-[var(--misty-text-subtle)]",
+  sortMenu:
+    "fixed z-[2147483000] grid w-44 gap-1 rounded-[10px] border border-[var(--misty-border)] bg-[var(--misty-surface)] p-1.5 shadow-[0_16px_38px_rgba(0,0,0,0.38)]",
+  sortMenuLabel:
+    "px-2.5 py-1 text-[11px] font-bold uppercase text-[var(--misty-text-subtle)]",
+  sortMenuItem:
+    "flex h-8 min-w-0 items-center justify-between gap-2 rounded-lg border-0 bg-transparent px-2.5 text-left text-sm text-[var(--misty-text)] hover:bg-[var(--misty-surface-3)]",
+  sortMenuItemActive:
+    "bg-[var(--misty-surface-3)]",
+  sortMenuIcon:
+    "grid size-4 shrink-0 place-items-center text-[var(--misty-text-muted)]",
+  actionMenu:
+    "fixed z-[2147483000] grid w-52 gap-1 rounded-[10px] border border-[var(--misty-border)] bg-[var(--misty-surface)] p-1.5 shadow-[0_16px_38px_rgba(0,0,0,0.38)]",
+  actionMenuItem:
+    "flex h-8 min-w-0 items-center gap-2 rounded-lg border-0 bg-transparent px-2.5 text-left text-sm text-[var(--misty-text)] hover:bg-[var(--misty-surface-3)] disabled:opacity-45",
+  actionMenuDanger:
+    "text-[var(--misty-danger)]",
+  actionMenuSeparator: "my-1 h-px bg-[var(--misty-border-soft)]",
   activeFilterPill:
     "inline-flex min-h-[38px] items-center gap-[7px] whitespace-nowrap rounded-full border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] px-[11px] py-[7px] text-[var(--misty-text-muted)]",
   summary: "grid grid-cols-2 gap-2",
@@ -115,10 +154,10 @@ const transferStyles = {
   listPanelNoRight:
     "border-r-0",
   pagination:
-    "flex min-w-0 items-center justify-between gap-3 border-t border-[var(--misty-border-soft)] pt-[11px] text-[13px] text-[var(--misty-text-muted)]",
-  paginationButtons: "flex gap-2",
+    "flex min-w-0 items-center justify-between gap-2 border-t border-[var(--misty-border-soft)] px-2 py-1.5 text-xs text-[var(--misty-text-muted)]",
+  paginationButtons: "flex gap-1.5",
   paginationButton:
-    "min-h-[30px] rounded-[7px] border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] px-[11px] py-[5px] text-[var(--misty-text)] disabled:opacity-40",
+    "min-h-[26px] rounded-[7px] border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] px-2.5 py-1 text-[var(--misty-text)] disabled:opacity-40",
   contentScroll: "h-full overflow-auto p-3",
   filterHeading: "mb-3 flex items-center justify-between gap-2.5",
   filterTitle: "text-sm font-semibold text-[var(--misty-text)]",
@@ -140,29 +179,34 @@ const transferStyles = {
   sortDirection: "grid grid-cols-2 gap-2",
   sortButtonSelected:
     "border-[var(--misty-accent)] bg-[color-mix(in_srgb,var(--misty-accent)_16%,var(--misty-surface))]",
-  tableWrap: "h-full min-h-0 overflow-auto p-0 [overscroll-behavior:contain]",
+  tableWrap: "h-full min-h-0 overflow-auto p-0 [overscroll-behavior:contain] [scrollbar-gutter:stable]",
   table: "border-collapse table-fixed",
   tableHeader:
-    "sticky top-0 z-[2] select-none border-b border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] px-3 py-[11px] text-left align-middle font-semibold text-[var(--misty-text-muted)]",
+    "sticky top-0 z-[2] select-none border-b border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] px-2.5 py-2 text-left align-middle text-[13px] font-semibold leading-none text-[var(--misty-text-muted)]",
   tableHeaderDragging: "opacity-60",
   tableHeaderControl:
     "inline-block min-w-0 max-w-full overflow-hidden text-ellipsis whitespace-nowrap border-0 bg-transparent p-0 align-middle font-[inherit] text-inherit",
   tableResizeHandle:
     "absolute right-[-3px] top-0 z-[3] h-full w-[7px] cursor-col-resize hover:bg-[rgba(79,141,255,0.34)]",
   tableRow:
-    "h-16 hover:bg-[color-mix(in_srgb,var(--misty-surface-3)_76%,transparent)]",
+    "group h-[46px] hover:bg-[color-mix(in_srgb,var(--misty-surface-3)_76%,transparent)]",
   tableRowFocused:
     "bg-[color-mix(in_srgb,var(--misty-accent)_14%,var(--misty-surface))]",
   tableCell:
-    "min-w-0 overflow-hidden text-ellipsis border-b border-[var(--misty-border-soft)] px-3 py-[11px] text-left align-middle",
-  tablePrimary: "block",
-  tableSecondary: "mt-[3px] block text-[var(--misty-text-subtle)]",
+    "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap border-b border-[var(--misty-border-soft)] px-2.5 py-1.5 text-left align-middle text-[13px] leading-[16px]",
+  tablePrimary: "block min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-semibold leading-[17px]",
+  tableSecondary:
+    "mt-px block min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[12px] leading-[15px] text-[var(--misty-text-subtle)]",
   checkboxCell:
-    "w-[46px] min-w-[46px] max-w-[46px] border-b border-[var(--misty-border-soft)] px-3 py-[11px] text-center align-middle",
-  checkboxInput: "size-[18px]",
-  rowActions: "whitespace-nowrap",
-  rowActionButton:
-    "ml-1.5 min-h-[30px] rounded-[9px] border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] px-[9px] py-[5px] text-[var(--misty-text)] first:ml-0 disabled:opacity-45",
+    "w-[38px] min-w-[38px] max-w-[38px] border-b border-[var(--misty-border-soft)] px-2 py-1.5 text-center align-middle",
+  checkboxInput: "size-4",
+  rowActions: "flex h-full items-center gap-2 whitespace-nowrap opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-within:opacity-100",
+  rowActionGroup:
+    "inline-flex h-[30px] overflow-hidden rounded-[8px] border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)]",
+  rowActionIconButton:
+    "grid h-[28px] w-[30px] place-items-center border-0 border-r border-[var(--misty-border-soft)] bg-transparent p-0 text-[var(--misty-text)] last:border-r-0 hover:bg-[var(--misty-surface-3)] disabled:text-[var(--misty-text-subtle)] disabled:opacity-40",
+  rowActionDangerButton:
+    "grid h-[30px] w-[32px] place-items-center rounded-[8px] border border-[color-mix(in_srgb,var(--misty-danger)_42%,var(--misty-border))] bg-[var(--misty-surface-2)] p-0 text-[var(--misty-danger)] hover:bg-[color-mix(in_srgb,var(--misty-danger)_12%,var(--misty-surface-2))] disabled:opacity-40",
   detailContent: "grid h-full content-start gap-2.5 overflow-auto p-3.5",
   detailEmpty: "h-full overflow-auto p-3.5",
   detailHeader: "grid gap-2 border-b border-[var(--misty-border-soft)] pb-3",
@@ -175,7 +219,7 @@ const transferStyles = {
   detailDangerValue:
     "min-w-0 [overflow-wrap:anywhere] font-medium text-[var(--misty-danger)]",
   statusBadge:
-    "inline-flex w-fit rounded-full bg-[var(--misty-surface-2)] px-[9px] py-[5px] text-[var(--misty-text-muted)] capitalize",
+    "inline-flex w-fit rounded-full bg-[var(--misty-surface-2)] px-2 py-[3px] text-xs leading-4 text-[var(--misty-text-muted)] capitalize",
   statusCompleted:
     "bg-[color-mix(in_srgb,var(--misty-success)_15%,var(--misty-surface))] text-[var(--misty-success)]",
   statusFailed:
@@ -190,6 +234,10 @@ const transferStyles = {
   operationActions: "flex min-w-0 flex-wrap items-center gap-2",
   operationButton:
     "inline-flex min-h-[30px] items-center gap-1.5 rounded-[7px] border border-[var(--misty-border-soft)] bg-[var(--misty-surface-2)] px-[9px] py-[5px] text-[var(--misty-text)] disabled:opacity-50",
+  operationInput:
+    "h-[30px] w-28 rounded-[7px] border border-[var(--misty-border-soft)] bg-[var(--misty-surface)] px-2 text-xs text-[var(--misty-text)] outline-none",
+  operationSelect:
+    "h-[30px] rounded-[7px] border border-[var(--misty-border-soft)] bg-[var(--misty-surface)] px-2 text-xs text-[var(--misty-text)] outline-none",
   conflictRow:
     "grid min-w-0 grid-cols-[minmax(220px,1fr)_auto_auto_auto_auto_auto] items-center gap-2 rounded-lg border border-[color-mix(in_srgb,var(--misty-warning)_46%,var(--misty-border))] bg-[color-mix(in_srgb,var(--misty-warning)_10%,var(--misty-surface))] p-2 max-[980px]:grid-cols-[minmax(0,1fr)_auto_auto]",
   conflictMain: "grid min-w-0 gap-[3px] max-[980px]:col-span-full",
@@ -199,7 +247,7 @@ const transferStyles = {
   conflictText: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[var(--misty-text-subtle)]",
   operationList: "grid gap-1.5",
   operationRow:
-    "grid min-w-0 grid-cols-[minmax(160px,1fr)_150px_minmax(180px,1.1fr)_minmax(180px,1.1fr)_auto_auto] items-center gap-2 border-t border-[var(--misty-border-soft)] pt-[7px]",
+    "grid min-w-0 grid-cols-[minmax(160px,1fr)_120px_minmax(160px,1fr)_minmax(160px,1fr)_auto_auto_auto_auto] items-center gap-2 border-t border-[var(--misty-border-soft)] pt-[7px]",
   operationCell: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[var(--misty-text-subtle)]",
   bottomBar:
     "flex min-w-0 items-center justify-between border-t border-[var(--misty-border-soft)] bg-[var(--misty-bg)] px-2",
@@ -405,6 +453,9 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
     }
     return operations;
   }, [queueSnapshot?.operations]);
+  const [actionMenu, setActionMenu] = useState<TransferActionMenuState>(null);
+  const actionMenuTransfer = actionMenu?.rowId ? rows.find((row) => row.id === actionMenu.rowId) ?? null : null;
+  const actionMenuOperation = actionMenuTransfer ? queueOperationsByTransfer.get(actionMenuTransfer.id) : undefined;
   const pageIds = useMemo(() => pageRows.map((row) => row.id), [pageRows]);
   const pageSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
   const selectedCount = selectedIds.size;
@@ -418,6 +469,7 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
   const [columnOrder, setColumnOrder] = useState<TransferTableColumn[]>(loadTransferColumnOrder);
   const [draggedColumn, setDraggedColumn] = useState<TransferTableColumn | null>(null);
   const [panelVisibility, setPanelVisibility] = useState(loadTransferPanelVisibility);
+  const [sortMenu, setSortMenu] = useState<TransferSortMenuState>(null);
   const filtersVisible = panelVisibility.filters;
   const detailVisible = panelVisibility.detail;
   const visibleColumnOrder = useMemo(() => columnOrder.filter((column) => column !== "remote"), [columnOrder]);
@@ -509,6 +561,59 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
   const handleDeleteAll = useCallback(() => {
     void deleteAll();
   }, [deleteAll]);
+  const openToolbarActionMenu = useCallback((event: ReactMouseEvent<HTMLButtonElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    setActionMenu({
+      x: Math.max(8, Math.min(rect.right - 208, window.innerWidth - 216)),
+      y: Math.max(8, Math.min(rect.bottom + 6, window.innerHeight - 180)),
+      rowId: null,
+    });
+  }, []);
+  const openSortMenu = useCallback((event: ReactMouseEvent<HTMLButtonElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    setSortMenu({
+      x: Math.max(8, Math.min(rect.right - 176, window.innerWidth - 184)),
+      y: Math.max(8, Math.min(rect.bottom + 6, window.innerHeight - 180)),
+    });
+  }, []);
+  const openRowActionMenu = useCallback((event: ReactMouseEvent, row: TransferRecord) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setFocusedTransfer(props.workspaceId, row.id);
+    setActionMenu({
+      x: Math.max(8, Math.min(event.clientX, window.innerWidth - 216)),
+      y: Math.max(8, Math.min(event.clientY, window.innerHeight - 180)),
+      rowId: row.id,
+    });
+  }, [props.workspaceId, setFocusedTransfer]);
+  const closeActionMenu = useCallback(() => setActionMenu(null), []);
+  const closeSortMenu = useCallback(() => setSortMenu(null), []);
+  useEffect(() => {
+    if (!actionMenu) return;
+    const close = () => setActionMenu(null);
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") close();
+    };
+    window.addEventListener("pointerdown", close);
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.removeEventListener("pointerdown", close);
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [actionMenu]);
+  useEffect(() => {
+    if (!sortMenu) return;
+    const close = () => setSortMenu(null);
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") close();
+    };
+    window.addEventListener("pointerdown", close);
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.removeEventListener("pointerdown", close);
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [sortMenu]);
   const beginColumnResize = useCallback((column: TransferTableColumn, event: ReactPointerEvent) => {
     event.preventDefault();
     event.stopPropagation();
@@ -564,38 +669,61 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
   return (
     <div className={transferStyles.pane}>
       <div className={transferStyles.header}>
-        <h2 className={transferStyles.headerTitle}>
-          Transfers
-          <span className={transferStyles.headerMeta}>
-            {transfers ? `${filteredRows.length} visible · ${transfers.totalCount} total` : "Loading"}
-          </span>
-        </h2>
         <div className={transferStyles.toolbar}>
           <label className={transferStyles.searchBox}>
             <Search size={16} />
             <input value={search} placeholder="Search transfers" onChange={(event) => setSearch(props.workspaceId, event.target.value)} />
           </label>
           <button
-            className={`${transferStyles.toolbarButton} ${transferStyles.toolbarDanger}`}
+            className={transferStyles.iconToolbarButton}
             type="button"
-            disabled={selectedCount === 0 || working}
-            onClick={handleDeleteSelected}
-            title="Delete selected transfer history"
+            aria-label="Sort transfers"
+            aria-haspopup="menu"
+            aria-expanded={Boolean(sortMenu)}
+            title="Sort transfers"
+            onClick={openSortMenu}
           >
-            <Trash2 size={16} />
-            {selectedCount > 0 ? `Delete ${selectedCount}` : "Delete"}
+            <Filter size={16} />
           </button>
           <button
-            className={transferStyles.toolbarButton}
+            className={transferStyles.iconToolbarButton}
             type="button"
-            disabled={!transfers || transfers.totalCount === 0 || working}
-            onClick={handleDeleteAll}
-            title="Delete all transfer history"
+            aria-label="More transfer actions"
+            aria-haspopup="menu"
+            aria-expanded={Boolean(actionMenu && actionMenu.rowId === null)}
+            onClick={openToolbarActionMenu}
           >
-            Clear all
+            <MoreVertical size={16} />
           </button>
         </div>
       </div>
+      <TransferSortMenu
+        menu={sortMenu}
+        sortKey={sortKey}
+        sortDirection={sortDirection}
+        onClose={closeSortMenu}
+        onSort={(key) => setSort(props.workspaceId, key)}
+      />
+      <TransferActionMenu
+        menu={actionMenu}
+        row={actionMenuTransfer}
+        operation={actionMenuOperation}
+        selectedCount={selectedCount}
+        hasTransfers={Boolean(transfers && transfers.totalCount > 0)}
+        historyWorking={working}
+        queueWorking={queueWorking}
+        onClose={closeActionMenu}
+        onCancel={handleCancelOperation}
+        onRetry={handleRetryOperation}
+        onDeleteRow={handleDeleteTransfer}
+        onDeleteSelected={handleDeleteSelected}
+        onDeleteAll={handleDeleteAll}
+      />
+      <OperationQueueStrip
+        onQueueChanged={() => {
+          void load(undefined, { silent: true });
+        }}
+      />
 
       <div className={transferStyles.panelsScroll}>
         <div className={transferStyles.threePanel} style={panelGridStyle}>
@@ -680,6 +808,7 @@ const TransferWorkspacePane = memo(function TransferWorkspacePane(props: { works
                       onRetry={handleRetryOperation}
                       onUndo={handleUndo}
                       onDelete={handleDeleteTransfer}
+                      onContextMenu={openRowActionMenu}
                     />
                   );
                 })}
@@ -781,6 +910,146 @@ function TransfersBottomBar(props: {
   );
 }
 
+function TransferSortMenu(props: {
+  menu: TransferSortMenuState;
+  sortKey: TransferSortKey;
+  sortDirection: TransferSortDirection;
+  onClose: () => void;
+  onSort: (key: TransferSortableKey) => void;
+}) {
+  if (!props.menu) return null;
+  const run = (key: TransferSortableKey) => {
+    props.onClose();
+    props.onSort(key);
+  };
+  return createPortal(
+    <div
+      className={transferStyles.sortMenu}
+      style={{ left: props.menu.x, top: props.menu.y }}
+      role="menu"
+      onPointerDown={(event) => event.stopPropagation()}
+    >
+      <span className={transferStyles.sortMenuLabel}>Sort By</span>
+      {transferSortOptions.map((option) => {
+        const active = props.sortKey === option.key;
+        const DirectionIcon = props.sortDirection === "asc" ? ArrowUp : ArrowDown;
+        const currentLabel = active
+          ? props.sortDirection === "asc" ? "sorted ascending" : "sorted descending"
+          : "not sorted";
+        const nextLabel = !active
+          ? "sort ascending"
+          : props.sortDirection === "asc" ? "sort descending" : "clear sorting";
+        return (
+          <button
+            key={option.key}
+            className={`${transferStyles.sortMenuItem} ${active ? transferStyles.sortMenuItemActive : ""}`}
+            type="button"
+            role="menuitemcheckbox"
+            aria-checked={active}
+            aria-label={`${option.label}, ${currentLabel}. Activate to ${nextLabel}.`}
+            onClick={() => run(option.key)}
+          >
+            <span>{option.label}</span>
+            <span className={transferStyles.sortMenuIcon} aria-hidden="true">
+              {active ? <DirectionIcon size={15} strokeWidth={2.4} /> : null}
+            </span>
+          </button>
+        );
+      })}
+    </div>,
+    document.body,
+  );
+}
+
+function TransferActionMenu(props: {
+  menu: TransferActionMenuState;
+  row: TransferRecord | null;
+  operation?: OperationDescriptor;
+  selectedCount: number;
+  hasTransfers: boolean;
+  historyWorking: boolean;
+  queueWorking: boolean;
+  onClose: () => void;
+  onCancel: (operationId: number) => Promise<void>;
+  onRetry: (operationId: number) => Promise<void>;
+  onDeleteRow: (transferId: number) => void;
+  onDeleteSelected: () => void;
+  onDeleteAll: () => void;
+}) {
+  if (!props.menu) return null;
+  const run = (action: () => void) => {
+    props.onClose();
+    action();
+  };
+  const canCancel = Boolean(props.operation?.cancelable && !props.queueWorking);
+  const canRetry = Boolean(props.operation?.retryable && props.operation.status === "failed" && !props.queueWorking);
+  return createPortal(
+    <div
+      className={transferStyles.actionMenu}
+      style={{ left: props.menu.x, top: props.menu.y }}
+      role="menu"
+      onPointerDown={(event) => event.stopPropagation()}
+    >
+      {props.row ? (
+        <>
+          <button
+            className={transferStyles.actionMenuItem}
+            type="button"
+            role="menuitem"
+            disabled={!canCancel}
+            onClick={() => props.operation && run(() => void props.onCancel(props.operation!.operationId))}
+          >
+            <XCircle size={14} />
+            Cancel
+          </button>
+          <button
+            className={transferStyles.actionMenuItem}
+            type="button"
+            role="menuitem"
+            disabled={!canRetry}
+            onClick={() => props.operation && run(() => void props.onRetry(props.operation!.operationId))}
+          >
+            <RotateCcw size={14} />
+            Retry
+          </button>
+          <div className={transferStyles.actionMenuSeparator} />
+          <button
+            className={`${transferStyles.actionMenuItem} ${transferStyles.actionMenuDanger}`}
+            type="button"
+            role="menuitem"
+            disabled={props.historyWorking}
+            onClick={() => run(() => props.onDeleteRow(props.row!.id))}
+          >
+            <Trash2 size={14} />
+            Delete history row
+          </button>
+        </>
+      ) : null}
+      <button
+        className={`${transferStyles.actionMenuItem} ${transferStyles.actionMenuDanger}`}
+        type="button"
+        role="menuitem"
+        disabled={props.selectedCount === 0 || props.historyWorking}
+        onClick={() => run(props.onDeleteSelected)}
+      >
+        <Trash2 size={14} />
+        {props.selectedCount > 0 ? `Delete selected (${props.selectedCount})` : "Delete selected"}
+      </button>
+      <button
+        className={`${transferStyles.actionMenuItem} ${transferStyles.actionMenuDanger}`}
+        type="button"
+        role="menuitem"
+        disabled={!props.hasTransfers || props.historyWorking}
+        onClick={() => run(props.onDeleteAll)}
+      >
+        <Trash2 size={14} />
+        Clear all history
+      </button>
+    </div>,
+    document.body,
+  );
+}
+
 function summarizeTransfers(rows: TransferRecord[]) {
   let active = 0;
   let completed = 0;
@@ -822,10 +1091,10 @@ const TransferSummaryCards = memo(function TransferSummaryCards(props: {
 const TransferTableHeader = memo(function TransferTableHeader(props: {
   column: TransferTableColumn;
   label: string;
-  sortKey: string;
-  sortDirection: "asc" | "desc";
+  sortKey: TransferSortKey;
+  sortDirection: TransferSortDirection;
   dragging: boolean;
-  onSort: (key: "time" | "name" | "operation" | "status") => void;
+  onSort: (key: TransferSortableKey) => void;
   onResizeStart: (column: TransferTableColumn, event: ReactPointerEvent) => void;
   onDragStart: (column: TransferTableColumn) => void;
   onDragEnd: () => void;
@@ -888,11 +1157,13 @@ const TransferTableRow = memo(function TransferTableRow(props: {
   onRetry: (operationId: number) => Promise<void>;
   onUndo: (undoTokenId: number) => void;
   onDelete: (transferId: number) => void;
+  onContextMenu: (event: ReactMouseEvent, row: TransferRecord) => void;
 }) {
   return (
     <tr
       className={`${transferStyles.tableRow} ${props.focused ? transferStyles.tableRowFocused : ""}`}
       onClick={() => props.onFocus(props.row.id)}
+      onContextMenu={(event) => props.onContextMenu(event, props.row)}
     >
       <td className={transferStyles.checkboxCell} onClick={(event) => event.stopPropagation()}>
         <input
@@ -944,50 +1215,60 @@ const TransferTableCell = memo(function TransferTableCell(props: {
     case "status":
       return (
         <td className={transferStyles.tableCell}>
-          <span className={statusBadgeClass(props.row.status)}>{prettyLabel(props.row.status)}</span>
+          <span className={statusBadgeClass(props.row.status)}>{tableStatusLabel(props.row.status)}</span>
         </td>
       );
-    case "progress":
-      return <td className={transferStyles.tableCell}>{transferProgress(props.row)}</td>;
     case "time":
       return <td className={transferStyles.tableCell}>{relativeTime(transferTime(props.row))}</td>;
     case "remote":
       return <td className={transferStyles.tableCell}>{remoteSummary(props.row)}</td>;
     case "actions":
       return (
-        <td className={`${transferStyles.tableCell} ${transferStyles.rowActions}`} onClick={(event) => event.stopPropagation()}>
-          <button
-            className={transferStyles.rowActionButton}
-            type="button"
-            disabled={!props.operation?.cancelable || props.queueWorking}
-            onClick={() => props.operation && void props.onCancel(props.operation.operationId)}
-          >
-            Cancel
-          </button>
-          <button
-            className={transferStyles.rowActionButton}
-            type="button"
-            disabled={!props.operation?.retryable || props.operation.status !== "failed" || props.queueWorking}
-            onClick={() => props.operation && void props.onRetry(props.operation.operationId)}
-          >
-            Retry
-          </button>
-          <button
-            className={transferStyles.rowActionButton}
-            type="button"
-            disabled={!props.row.undoable || !props.row.undoTokenId || props.queueWorking}
-            onClick={() => props.onUndo(props.row.undoTokenId)}
-          >
-            Undo
-          </button>
-          <button
-            className={`${transferStyles.rowActionButton} ${transferStyles.toolbarDanger}`}
-            type="button"
-            disabled={props.historyWorking}
-            onClick={() => props.onDelete(props.row.id)}
-          >
-            Delete
-          </button>
+        <td className={transferStyles.tableCell} onClick={(event) => event.stopPropagation()}>
+          <div className={transferStyles.rowActions}>
+            <div className={transferStyles.rowActionGroup} role="group" aria-label="Transfer operation actions">
+              <button
+                className={transferStyles.rowActionIconButton}
+                type="button"
+                aria-label="Cancel transfer"
+                title="Cancel transfer"
+                disabled={!props.operation?.cancelable || props.queueWorking}
+                onClick={() => props.operation && void props.onCancel(props.operation.operationId)}
+              >
+                <XCircle aria-hidden="true" size={14} />
+              </button>
+              <button
+                className={transferStyles.rowActionIconButton}
+                type="button"
+                aria-label="Retry transfer"
+                title="Retry transfer"
+                disabled={!props.operation?.retryable || props.operation.status !== "failed" || props.queueWorking}
+                onClick={() => props.operation && void props.onRetry(props.operation.operationId)}
+              >
+                <RotateCcw aria-hidden="true" size={14} />
+              </button>
+              <button
+                className={transferStyles.rowActionIconButton}
+                type="button"
+                aria-label="Undo transfer"
+                title="Undo transfer"
+                disabled={!props.row.undoable || !props.row.undoTokenId || props.queueWorking}
+                onClick={() => props.onUndo(props.row.undoTokenId)}
+              >
+                <RefreshCcw aria-hidden="true" size={14} />
+              </button>
+            </div>
+            <button
+              className={transferStyles.rowActionDangerButton}
+              type="button"
+              aria-label="Delete transfer history row"
+              title="Delete transfer history row"
+              disabled={props.historyWorking}
+              onClick={() => props.onDelete(props.row.id)}
+            >
+              <Trash2 aria-hidden="true" size={14} />
+            </button>
+          </div>
         </td>
       );
   }
@@ -999,14 +1280,14 @@ function TransferFilters(props: {
   typeFilters: Set<TransferType>;
   locationScope: string;
   statusFilter: string;
-  sortKey: string;
-  sortDirection: "asc" | "desc";
+  sortKey: TransferSortKey;
+  sortDirection: TransferSortDirection;
   activeFilterCount: number;
   onToggleProvider: (provider: string) => void;
   onToggleType: (type: TransferType) => void;
   onLocationScope: (scope: "all" | "local" | "remote") => void;
   onStatusFilter: (filter: "all" | "active" | "completed" | "failed") => void;
-  onSort: (key: "time" | "name" | "operation" | "status", direction?: "asc" | "desc") => void;
+  onSort: (key: TransferSortKey, direction?: TransferSortDirection) => void;
   onClear: () => void;
 }) {
   return (
@@ -1078,8 +1359,12 @@ function TransferFilters(props: {
         <select
           className={transferStyles.filterSelect}
           value={props.sortKey}
-          onChange={(event) => props.onSort(event.target.value as "time" | "name" | "operation" | "status", props.sortDirection)}
+          onChange={(event) => {
+            const key = event.target.value as TransferSortKey;
+            props.onSort(key, key === "none" ? undefined : props.sortDirection);
+          }}
         >
+          <option value="none">No sort</option>
           <option value="time">Time</option>
           <option value="name">Name</option>
           <option value="operation">Operation</option>
@@ -1088,15 +1373,21 @@ function TransferFilters(props: {
         <div className={transferStyles.sortDirection}>
           <button
             type="button"
-            className={`${transferStyles.smallButton} ${props.sortDirection === "asc" ? transferStyles.sortButtonSelected : ""}`}
-            onClick={() => props.onSort(props.sortKey as "time" | "name" | "operation" | "status", "asc")}
+            className={`${transferStyles.smallButton} ${props.sortKey !== "none" && props.sortDirection === "asc" ? transferStyles.sortButtonSelected : ""}`}
+            disabled={props.sortKey === "none"}
+            onClick={() => {
+              if (props.sortKey !== "none") props.onSort(props.sortKey, "asc");
+            }}
           >
             Asc
           </button>
           <button
             type="button"
-            className={`${transferStyles.smallButton} ${props.sortDirection === "desc" ? transferStyles.sortButtonSelected : ""}`}
-            onClick={() => props.onSort(props.sortKey as "time" | "name" | "operation" | "status", "desc")}
+            className={`${transferStyles.smallButton} ${props.sortKey !== "none" && props.sortDirection === "desc" ? transferStyles.sortButtonSelected : ""}`}
+            disabled={props.sortKey === "none"}
+            onClick={() => {
+              if (props.sortKey !== "none") props.onSort(props.sortKey, "desc");
+            }}
           >
             Desc
           </button>
@@ -1172,24 +1463,6 @@ function TransferDetail(props: {
             Retry
           </button>
         ) : null}
-        {row.undoable && row.undoTokenId ? (
-          <button
-            className={transferStyles.smallButton}
-            type="button"
-            disabled={props.working}
-            onClick={() => props.onUndo(row.undoTokenId)}
-          >
-            Undo
-          </button>
-        ) : null}
-        <button
-          className={`${transferStyles.smallButton} ${transferStyles.toolbarDanger}`}
-          type="button"
-          disabled={props.historyWorking}
-          onClick={() => props.onDelete(row.id)}
-        >
-          Delete History Row
-        </button>
       </div>
     </div>
   );
@@ -1248,8 +1521,8 @@ function filterAndSortTransfers(
     typeFilters: Set<TransferType>;
     locationScope: string;
     statusFilter: "all" | "active" | "completed" | "failed";
-    sortKey: string;
-    sortDirection: "asc" | "desc";
+    sortKey: TransferSortKey;
+    sortDirection: TransferSortDirection;
   },
 ): TransferRecord[] {
   const filtered = rows.filter((row) => {
@@ -1262,11 +1535,13 @@ function filterAndSortTransfers(
     return true;
   });
 
+  const sortKey = filters.sortKey;
+  if (sortKey === "none") return filtered;
   const direction = filters.sortDirection === "asc" ? 1 : -1;
-  return [...filtered].sort((left, right) => direction * compareTransfers(left, right, filters.sortKey));
+  return [...filtered].sort((left, right) => direction * compareTransfers(left, right, sortKey));
 }
 
-function compareTransfers(left: TransferRecord, right: TransferRecord, key: string): number {
+function compareTransfers(left: TransferRecord, right: TransferRecord, key: TransferSortableKey): number {
   if (key === "name") return primaryTransferLabel(left).localeCompare(primaryTransferLabel(right));
   if (key === "operation") return left.transferType.localeCompare(right.transferType);
   if (key === "status") return left.status.localeCompare(right.status);
@@ -1318,7 +1593,7 @@ function timestampLabel(timestamp: number): string {
   return new Date(timestamp).toLocaleString();
 }
 
-function sortIndicator(activeKey: string, direction: string, key: string): string {
+function sortIndicator(activeKey: TransferSortKey, direction: TransferSortDirection, key: TransferSortableKey): string {
   if (activeKey !== key) return "";
   return direction === "asc" ? "↑" : "↓";
 }
@@ -1332,6 +1607,19 @@ function statusBadgeClass(status: string): string {
     return `${transferStyles.statusBadge} ${transferStyles.statusActive}`;
   }
   return transferStyles.statusBadge;
+}
+
+function tableStatusLabel(status: string): string {
+  if (status === "completed") return "Completed";
+  if (status === "failed" || status === "canceled" || status === "interrupted") return "Failed";
+  if (status === "queued" || status === "pending" || status === "in_progress" || status === "waiting_for_resolution") return "Pending";
+  return prettyLabel(status);
+}
+
+function canPauseResumeOperation(operation: OperationDescriptor): boolean {
+  return operation.paused
+    || operation.status === "queued"
+    || operation.status === "waiting_for_resolution";
 }
 
 function isTransferTableColumn(value: string): value is TransferTableColumn {
@@ -1401,21 +1689,36 @@ function saveTransferPanelVisibility(visibility: { filters: boolean; detail: boo
 }
 
 function OperationQueueStrip(props: { onQueueChanged: () => void }) {
-  const { snapshot, working, error, load, cancel, cancelBatch, retry, redo, resolveConflict, clearTerminal } = useOperationQueueStore(useShallow((state) => ({
+  const { snapshot, working, error, load, cancel, cancelBatch, pause, resume, pauseBatch, resumeBatch, pauseAll, resumeAll, setPriority, setBandwidthLimit, setTransferProfile, retry, redo, resolveConflict, clearTerminal } = useOperationQueueStore(useShallow((state) => ({
     snapshot: state.snapshot,
     working: state.working,
     error: state.error,
     load: state.load,
     cancel: state.cancel,
     cancelBatch: state.cancelBatch,
+    pause: state.pause,
+    resume: state.resume,
+    pauseBatch: state.pauseBatch,
+    resumeBatch: state.resumeBatch,
+    pauseAll: state.pauseAll,
+    resumeAll: state.resumeAll,
+    setPriority: state.setPriority,
+    setBandwidthLimit: state.setBandwidthLimit,
+    setTransferProfile: state.setTransferProfile,
     retry: state.retry,
     redo: state.redo,
     resolveConflict: state.resolveConflict,
     clearTerminal: state.clearTerminal,
   })));
+  const settingsDocument = useSettingsStore((state) => state.settings?.document ?? {});
+  const transferProfiles = useMemo(() => transferProfileRecords(settingsDocument), [settingsDocument]);
   const operations = snapshot?.operations ?? [];
   const active = operations.filter((operation) => operation.status === "queued" || operation.status === "in_progress" || operation.status === "waiting_for_resolution");
   const terminal = operations.length - active.length;
+  const activeBatches = useMemo(() => {
+    const activeBatchIds = new Set(active.map((operation) => operation.batchId));
+    return (snapshot?.batches ?? []).filter((batch) => activeBatchIds.has(batch.batchId));
+  }, [active, snapshot?.batches]);
   const conflict = snapshot?.conflictDialog;
   const conflictBatch = conflict?.open ? snapshot?.batches.find((batch) => batch.batchId === conflict.batchId) : null;
   const canApplyConflictToBatch = Boolean(conflictBatch && conflictBatch.operationIds.length > 1);
@@ -1428,16 +1731,29 @@ function OperationQueueStrip(props: { onQueueChanged: () => void }) {
       )),
   );
   const [applyConflictToBatch, setApplyConflictToBatch] = useState(conflict?.applyToBatch ?? true);
+  const [bandwidthDraft, setBandwidthDraft] = useState(snapshot?.bandwidthLimit ?? "");
 
   useEffect(() => {
     if (conflict?.open) {
       setApplyConflictToBatch(conflict.applyToBatch);
     }
   }, [conflict?.operationId, conflict?.applyToBatch, conflict?.open]);
+  useEffect(() => {
+    setBandwidthDraft(snapshot?.bandwidthLimit ?? "");
+  }, [snapshot?.bandwidthLimit]);
   const runQueueMutation = useCallback(async (action: Promise<void>) => {
     await action;
     props.onQueueChanged();
-  }, [props]);
+  }, [props.onQueueChanged]);
+  const applyBandwidthLimit = useCallback(() => {
+    void runQueueMutation(setBandwidthLimit(bandwidthDraft.trim()));
+  }, [bandwidthDraft, runQueueMutation, setBandwidthLimit]);
+  const applyTransferProfile = useCallback((profileId: string) => {
+    const profile = transferProfiles.find((candidate) => candidate.id === profileId);
+    if (!profile) return;
+    setBandwidthDraft(profile.bandwidthLimit);
+    void runQueueMutation(setTransferProfile(profile));
+  }, [runQueueMutation, setTransferProfile, transferProfiles]);
 
   return (
     <section className={transferStyles.operationStrip}>
@@ -1452,6 +1768,44 @@ function OperationQueueStrip(props: { onQueueChanged: () => void }) {
         <button className={transferStyles.operationButton} type="button" onClick={() => void load()} disabled={working}>
           <RefreshCcw size={14} />
           Refresh
+        </button>
+        <button
+          className={transferStyles.operationButton}
+          type="button"
+          onClick={() => void runQueueMutation(snapshot?.paused ? resumeAll() : pauseAll())}
+          disabled={working || !snapshot}
+        >
+          {snapshot?.paused ? <Play size={14} /> : <Pause size={14} />}
+          {snapshot?.paused ? "Resume All" : "Pause All"}
+        </button>
+        <select
+          className={transferStyles.operationInput}
+          value={snapshot?.transferProfileId ?? ""}
+          aria-label="Transfer profile"
+          onChange={(event) => applyTransferProfile(event.target.value)}
+          disabled={working || !snapshot || transferProfiles.length === 0}
+        >
+          {transferProfiles.length === 0 ? (
+            <option value="">Profiles unavailable</option>
+          ) : null}
+          {transferProfiles.map((profile) => (
+            <option key={profile.id} value={profile.id}>
+              {profile.name}
+            </option>
+          ))}
+        </select>
+        <input
+          className={transferStyles.operationInput}
+          value={bandwidthDraft}
+          placeholder="Bandwidth"
+          aria-label="Bandwidth limit"
+          onChange={(event) => setBandwidthDraft(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") applyBandwidthLimit();
+          }}
+        />
+        <button className={transferStyles.operationButton} type="button" onClick={applyBandwidthLimit} disabled={working || !snapshot}>
+          Apply Limit
         </button>
         <button className={transferStyles.operationButton} type="button" onClick={() => void runQueueMutation(redo())} disabled={working || !snapshot?.redoAvailable}>
           <RotateCcw size={14} />
@@ -1511,6 +1865,33 @@ function OperationQueueStrip(props: { onQueueChanged: () => void }) {
           ) : null}
         </div>
       ) : null}
+      {activeBatches.length > 0 ? (
+        <div className={transferStyles.operationActions}>
+          {activeBatches.slice(0, 3).map((batch) => (
+            <span key={batch.batchId} className={transferStyles.operationActions}>
+              <span className={transferStyles.operationMeta}>{batch.label || `Batch ${batch.batchId}`}</span>
+              <button
+                className={transferStyles.operationButton}
+                type="button"
+                disabled={working}
+                onClick={() => void runQueueMutation(batch.paused ? resumeBatch(batch.batchId) : pauseBatch(batch.batchId))}
+              >
+                {batch.paused ? <Play size={14} /> : <Pause size={14} />}
+                {batch.paused ? "Resume Batch" : "Pause Batch"}
+              </button>
+              <button
+                className={transferStyles.operationButton}
+                type="button"
+                disabled={working}
+                onClick={() => void runQueueMutation(cancelBatch(batch.batchId))}
+              >
+                <XCircle size={14} />
+                Cancel Batch
+              </button>
+            </span>
+          ))}
+        </div>
+      ) : null}
       {operations.length > 0 ? (
         <div className={transferStyles.operationList}>
           {operations.slice(0, 5).map((operation) => (
@@ -1519,6 +1900,26 @@ function OperationQueueStrip(props: { onQueueChanged: () => void }) {
               <span className={statusBadgeClass(operation.status)}>{prettyLabel(operation.status)}</span>
               <span className={transferStyles.operationCell}>{operation.source.localPath || `${operation.source.remoteName}:${operation.source.remotePath}`}</span>
               <span className={transferStyles.operationCell}>{operation.target.localPath || `${operation.target.remoteName}:${operation.target.remotePath}`}</span>
+              <select
+                className={transferStyles.operationSelect}
+                aria-label="Operation priority"
+                value={operation.priority}
+                disabled={working}
+                onChange={(event) => void runQueueMutation(setPriority(operation.operationId, event.target.value as OperationPriority))}
+              >
+                <option value="high">High</option>
+                <option value="normal">Normal</option>
+                <option value="low">Low</option>
+              </select>
+              <button
+                className={transferStyles.operationButton}
+                type="button"
+                disabled={working || !canPauseResumeOperation(operation)}
+                onClick={() => void runQueueMutation(operation.paused ? resume(operation.operationId) : pause(operation.operationId))}
+              >
+                {operation.paused ? <Play size={14} /> : <Pause size={14} />}
+                {operation.paused ? "Resume" : "Pause"}
+              </button>
               <button className={transferStyles.operationButton} type="button" disabled={!operation.cancelable || working} onClick={() => void runQueueMutation(cancel(operation.operationId))}>
                 <XCircle size={14} />
                 Cancel

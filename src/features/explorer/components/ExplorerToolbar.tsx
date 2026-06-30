@@ -30,8 +30,9 @@ import { createPortal } from "react-dom";
 import type { CSSProperties, ReactNode } from "react";
 import { searchQuery } from "../../../api/misty";
 import type { PluginCommandEntry, SearchResult } from "../../../api/types";
-import type { ExplorerSortColumn, ExplorerSortState, ExplorerViewMode } from "../state/useExplorerStore";
+import { useExplorerStore, type ExplorerSortColumn, type ExplorerSortState, type ExplorerViewMode } from "../state/useExplorerStore";
 import { breadcrumbSegments } from "../utils/fileFormat";
+import { mergeLibrarySearchResults } from "../utils/librarySearch";
 import { searchResultNavigationTarget } from "../utils/searchNavigation";
 import type { ExplorerSearchNavigationTarget } from "../utils/searchNavigation";
 
@@ -58,6 +59,10 @@ export type ExplorerCommandId =
   | "explorer.split_horizontal"
   | "explorer.refresh"
   | "explorer.rename"
+  | "explorer.batch_rename"
+  | "explorer.duplicate_finder"
+  | "explorer.compare_with"
+  | "explorer.automation_rules"
   | "explorer.delete"
   | "explorer.download"
   | "explorer.open_with"
@@ -69,7 +74,7 @@ export type ExplorerCommandId =
   | "explorer.preview.toggle"
   | "explorer.sidebar.toggle"
   | "explorer.toggle_chat"
-  | "explorer.toggle_claude"
+  | "explorer.toggle_mika"
   | "explorer.next_workspace"
   | "explorer.tab_1"
   | "explorer.tab_2"
@@ -104,6 +109,10 @@ const explorerCommands: ExplorerCommandPaletteEntry[] = [
   { id: "explorer.split_horizontal", label: "Split Horizontally", hint: "Add a stacked pane for the active folder" },
   { id: "explorer.refresh", label: "Refresh", hint: "Reload the active folder" },
   { id: "explorer.rename", label: "Rename", hint: "Rename the selected item" },
+  { id: "explorer.batch_rename", label: "Batch Rename", hint: "Preview and queue renames for selected items" },
+  { id: "explorer.duplicate_finder", label: "Find Duplicates", hint: "Scan folders and queue reviewed cleanup" },
+  { id: "explorer.compare_with", label: "Compare With", hint: "Compare the selected file or folder against another path" },
+  { id: "explorer.automation_rules", label: "Automation Rules", hint: "Create rules and preview matched files" },
   { id: "explorer.delete", label: "Delete", hint: "Delete the selected items" },
   { id: "explorer.download", label: "Download", hint: "Download selected remote items to Downloads" },
   { id: "explorer.open_with", label: "Open With", hint: "Choose an app for the selected file" },
@@ -115,7 +124,7 @@ const explorerCommands: ExplorerCommandPaletteEntry[] = [
   { id: "explorer.preview.toggle", label: "Toggle Preview", hint: "Show or hide the preview/details panel" },
   { id: "explorer.sidebar.toggle", label: "Toggle Sidebar", hint: "Show or hide the navigation sidebar" },
   { id: "explorer.toggle_chat", label: "Toggle Chat", hint: "Open or close the explorer chat overlay" },
-  { id: "explorer.toggle_claude", label: "Toggle MistyAI", hint: "Open the MistyAI assistant panel when configured" },
+  { id: "explorer.toggle_mika", label: "Toggle Mika", hint: "Open Mika, Misty Intelligent Knowledge Assistant" },
   { id: "explorer.next_workspace", label: "Next Workspace", hint: "Cycle to the next explorer tab" },
   { id: "explorer.tab_1", label: "Select Tab 1", hint: "Switch to tab 1" },
   { id: "explorer.tab_2", label: "Select Tab 2", hint: "Switch to tab 2" },
@@ -347,14 +356,25 @@ export const ExplorerToolbar = memo(function ExplorerToolbar(props: ExplorerTool
       })
         .then((results) => {
           if (canceled) return;
-          setIndexedResults(results);
+          setIndexedResults(mergeLibrarySearchResults(
+            results,
+            useExplorerStore.getState().library,
+            query,
+            { scope: "everything", currentPath: props.path, limit: 8 },
+          ));
           setIndexedSearching(false);
         })
         .catch((error: unknown) => {
           if (canceled) return;
-          setIndexedResults([]);
+          const results = mergeLibrarySearchResults(
+            [],
+            useExplorerStore.getState().library,
+            query,
+            { scope: "everything", currentPath: props.path, limit: 8 },
+          );
+          setIndexedResults(results);
           setIndexedSearching(false);
-          setIndexedError(error instanceof Error ? error.message : String(error));
+          setIndexedError(results.length > 0 ? null : error instanceof Error ? error.message : String(error));
         });
     }, 160);
     return () => {
@@ -521,6 +541,15 @@ export const ExplorerToolbar = memo(function ExplorerToolbar(props: ExplorerTool
           <button className={toolbarStyles.toolbarButton} disabled={!props.canGoBack} onClick={props.onBack}><ChevronLeft size={18} /></button>
           <button className={toolbarStyles.toolbarButton} disabled={!props.canGoForward} onClick={props.onForward}><ChevronRight size={18} /></button>
           <button className={toolbarStyles.toolbarButton} onClick={props.onParent}><ArrowUp size={18} /></button>
+          <button
+            className={toolbarStyles.toolbarButton}
+            type="button"
+            title="Refresh current folder"
+            aria-label="Refresh current folder"
+            onClick={props.onRefresh}
+          >
+            <RefreshCcw size={17} />
+          </button>
         </div>
 
         <div

@@ -4,6 +4,7 @@ import { AssetIcon } from "../../../shared/components/AssetIcon";
 import { Panel, PanelHeader } from "../../../shared/components/Panel";
 import { RemoteConfigForm } from "./RemoteConfigForm";
 import { RemoteEditActions } from "./RemoteEditActions";
+import { RemotePowerTools } from "./RemotePowerTools";
 
 const dirtyPillClass =
   "rounded-full border border-[color-mix(in_srgb,var(--misty-warning)_48%,var(--misty-border))] bg-[color-mix(in_srgb,var(--misty-warning)_12%,var(--misty-surface))] px-[9px] py-[5px] text-xs text-[var(--misty-warning)]";
@@ -85,6 +86,7 @@ export function RemoteEditPanel(props: RemoteEditPanelProps) {
             onReveal={props.onReveal}
             onSave={props.onSave}
           />
+          <RemotePowerTools draft={draft} working={props.working} />
         </>
       ) : (
         <div className="empty inline-flex max-w-[560px] items-center gap-[9px]">
@@ -92,7 +94,7 @@ export function RemoteEditPanel(props: RemoteEditPanelProps) {
           <span>
             {props.serviceError
               ? "Start or reconnect the Misty remote service, then refresh Remotes."
-              : "Select a remote to view and edit its rclone configuration."}
+              : "Select a remote to view and edit its provider configuration."}
           </span>
         </div>
       )}

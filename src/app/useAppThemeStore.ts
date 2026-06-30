@@ -3,12 +3,20 @@ import { createJSONStorage, persist } from "zustand/middleware";
 
 export type AppThemeMode = "system" | "dark" | "light";
 export type ResolvedAppTheme = "dark" | "light";
+export type MistyThemeId =
+  | "misty-dark"
+  | "misty-light"
+  | "graphite"
+  | "aurora"
+  | "copper";
 
 type AppThemeStore = {
   resolvedTheme: ResolvedAppTheme;
   systemTheme: ResolvedAppTheme;
+  themeId: MistyThemeId;
   themeMode: AppThemeMode;
   setSystemTheme: (theme: ResolvedAppTheme) => void;
+  setThemeId: (themeId: MistyThemeId) => void;
   setThemeMode: (mode: AppThemeMode) => void;
 };
 
@@ -34,36 +42,91 @@ function safeThemeMode(value: unknown): AppThemeMode {
   return value === "dark" || value === "light" || value === "system" ? value : "system";
 }
 
+function safeThemeId(value: unknown): MistyThemeId {
+  return value === "misty-light"
+    || value === "graphite"
+    || value === "aurora"
+    || value === "copper"
+    || value === "misty-dark"
+    ? value
+    : "misty-dark";
+}
+
+export function themeBaseMode(themeId: MistyThemeId): ResolvedAppTheme {
+  return themeId === "misty-light" ? "light" : "dark";
+}
+
+export function themeIdForExtensionAction(actionId: string): MistyThemeId | null {
+  switch (actionId) {
+    case "apply_light":
+      return "misty-light";
+    case "apply_graphite":
+      return "graphite";
+    case "apply_aurora":
+      return "aurora";
+    case "apply_copper":
+      return "copper";
+    case "apply_dark":
+      return "misty-dark";
+    default:
+      return null;
+  }
+}
+
+export function applyMistyThemeFromExtensionAction(actionId: string): boolean {
+  const themeId = themeIdForExtensionAction(actionId);
+  if (!themeId) return false;
+  const store = useAppThemeStore.getState();
+  store.setThemeMode(themeBaseMode(themeId));
+  store.setThemeId(themeId);
+  return true;
+}
+
 export const useAppThemeStore = create<AppThemeStore>()(
   persist(
     (set, get) => ({
       resolvedTheme: "dark",
       systemTheme: "dark",
+      themeId: "misty-dark",
       themeMode: "system",
       setSystemTheme: (systemTheme) => {
+        const resolvedTheme = resolveTheme(get().themeMode, systemTheme);
         set({
+          themeId: get().themeMode === "system"
+            ? resolvedTheme === "light" ? "misty-light" : "misty-dark"
+            : get().themeId,
           systemTheme,
-          resolvedTheme: resolveTheme(get().themeMode, systemTheme),
+          resolvedTheme,
         });
       },
       setThemeMode: (themeMode) => {
+        const resolvedTheme = resolveTheme(themeMode, get().systemTheme);
         set({
+          themeId: resolvedTheme === "light" ? "misty-light" : "misty-dark",
           themeMode,
-          resolvedTheme: resolveTheme(themeMode, get().systemTheme),
+          resolvedTheme,
         });
+      },
+      setThemeId: (themeId) => {
+        set({ themeId });
       },
     }),
     {
       name: THEME_STORAGE_KEY,
       storage: createJSONStorage(() => localStorage),
-      partialize: (state) => ({ themeMode: state.themeMode }),
+      partialize: (state) => ({ themeMode: state.themeMode, themeId: state.themeId }),
       merge: (persisted, current) => {
         const themeMode =
           persisted && typeof persisted === "object" && "themeMode" in persisted
             ? safeThemeMode(persisted.themeMode)
             : current.themeMode;
+        const themeId =
+          persisted && typeof persisted === "object" && "themeId" in persisted
+            ? safeThemeId(persisted.themeId)
+            : current.themeId;
         return {
           ...current,
+          themeId,
           themeMode,
           resolvedTheme: resolveTheme(themeMode, current.systemTheme),
         };

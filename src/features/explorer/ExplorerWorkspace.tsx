@@ -1,16 +1,26 @@
 import {
+  Archive,
   AppWindow,
+  ArrowUp,
   ArrowRightLeft,
-  Blocks,
+  ChevronRight,
   Clipboard,
   Columns2,
   Copy,
   Download,
+  ExternalLink,
+  File,
+  FileArchive,
   FilePlus,
   Eye,
+  FlaskConical,
   Folder,
   FolderPlus,
+  Hash,
+  Info,
+  Link,
   MessageSquare,
+  MoreHorizontal,
   PanelLeft,
   PanelRight,
   PanelTopClose,
@@ -20,6 +30,8 @@ import {
   RefreshCcw,
   Rows2,
   Scissors,
+  Search,
+  Sparkles,
   Terminal,
   Trash2,
   X,
@@ -41,14 +53,42 @@ import {
   clipboardSetLocal,
   clipboardSharedImageBytes,
   clipboardWriteFileRefs,
+  archiveCreate,
+  archiveExtract,
+  archiveList,
+  automationRulesDelete,
+  automationRulesRunNow,
+  automationRulesSave,
+  automationRulesSnapshot,
+  automationWatchSnapshot,
+  automationWatchStart,
+  automationWatchStop,
   devicesSnapshot,
+  compareApplyTextMerge,
+  compareFiles,
+  compareFolders,
+  duplicatesCancel,
+  duplicatesHashRemoteCandidates,
+  duplicatesScan,
+  explorerPreviewItem,
   explorerPrepareDragItems,
+  explorerQueueDeleteItems,
+  explorerQueuePasteItems,
+  fileToolsChmod,
+  fileToolsChecksum,
+  fileToolsCreateSymlink,
+  fileToolsReadSymlink,
+  fileToolsSetReadonly,
   openTerminalAtPath,
   operationQueueRedo,
   operationQueueUndo,
   pluginCommandRun,
   pluginCommandsSnapshot,
   pluginPanelRender,
+  providersCreatePublicLink,
+  providersJobStatus,
+  providersVerifyResult,
+  providersVerifyStart,
   shortcutsSnapshot,
   transfersSnapshot,
 } from "../../api/misty";
@@ -65,9 +105,10 @@ import {
   selectedDeletePathsForPane,
   selectedPathsForPane,
   useExplorerStore,
+  validateBatchRenameItems,
 } from "./state/useExplorerStore";
-import type { ExplorerInlineEditState, ExplorerNotification, ExplorerSortColumn } from "./state/useExplorerStore";
-import { useAiSessionStore } from "./state/useClaudeSessionStore";
+import type { ExplorerBatchRenameItem, ExplorerDialogState, ExplorerInlineEditState, ExplorerNotification, ExplorerSortColumn } from "./state/useExplorerStore";
+import { useMikaSessionStore, type AiPlanReview, type AiStatus, type AiToolApproval } from "./state/useMikaSessionStore";
 import { useSearchStore } from "./state/useSearchStore";
 import { maxMultiPanelPanes, useMultiPanelStore } from "../../shared/multipanel/useMultiPanelStore";
 import { ProvidersWorkspacePanel } from "../providers/ProvidersWorkspace";
@@ -75,6 +116,7 @@ import { useProvidersStore } from "../providers/useProvidersStore";
 import type {
   ClipboardPayload,
   ExplorerLibrarySnapshot,
+  FileEntry,
   MountedDevice,
   PluginCommandEntry,
   PluginPanelElement,
@@ -82,6 +124,16 @@ import type {
   PluginPanelRenderResult,
   ProviderRemote,
   TransferRecord,
+  DuplicateGroup,
+  DuplicateScanResult,
+  CompareFilesResult,
+  CompareFolderRow,
+  CompareFoldersResult,
+  PasteItem,
+  AutomationRule,
+  AutomationRunResult,
+  AutomationWatchSnapshot,
+  SavedSearchRule,
 } from "../../api/types";
 import type { MultiPanelTab } from "../../shared/multipanel/types";
 import { useOperationQueueStore } from "../transfers/useOperationQueueStore";
@@ -91,9 +143,12 @@ import { shortcutMapFromBindings, shortcutMatchesEvent } from "../../shared/shor
 import type { ShortcutMap } from "../../shared/shortcuts";
 import { selectAdvancedPreferences, selectGeneralPreferences, selectShortcutPreferences, useSettingsStore } from "../settings/useSettingsStore";
 import { errorText } from "../../shared/format";
+import { applyMistyThemeFromExtensionAction } from "../../app/useAppThemeStore";
+import { ExtensionCatalogIcon } from "../plugins/ExtensionCatalogIcon";
 import { pluginCatalogChangedEvent } from "../plugins/pluginEvents";
 import { publishPluginNotifications } from "../plugins/pluginNotifications";
 import { clipboardImagePng } from "./utils/clipboardImage";
+import { formatBytes, formatDate } from "./utils/fileFormat";
 import { revealSearchResultInPane } from "./utils/searchNavigation";
 import type { ExplorerSearchNavigationTarget } from "./utils/searchNavigation";
 
@@ -101,11 +156,14 @@ const minSidebarWidth = 212;
 const maxSidebarWidth = 380;
 const minPreviewWidth = 240;
 const maxPreviewWidth = 420;
-const minClaudePanelWidth = 280;
-const maxClaudePanelWidth = 600;
+const minMikaPanelWidth = 280;
+const maxMikaPanelWidth = 600;
 const folderHoverOpenDelayMs = 3000;
 const transferRefreshPollMs = 12000;
 const explorerSearchFocusEvent = "misty:explorer-search-focus";
+const explorerDuplicateFinderEvent = "misty:explorer-duplicate-finder";
+const explorerCompareWithEvent = "misty:explorer-compare-with";
+const explorerAutomationManagerEvent = "misty:explorer-automation-manager";
 const transfersTabPath = "misty-transfers://history";
 const remotesTabPath = "misty-remotes://manage";
 const emptyPinnedPaths: string[] = [];
@@ -117,11 +175,11 @@ const emptyMountedDevices: MountedDevice[] = [];
 const explorerShellStyles = {
   workspaceBase:
     "relative grid h-full min-h-0 overflow-hidden grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)] max-[980px]:grid-cols-1 max-[720px]:h-full max-[720px]:bg-[#070707]",
-  workspaceClaudeOpen:
-    "grid-cols-[minmax(0,1fr)_5px_var(--claude-panel-width,380px)] max-[980px]:grid-cols-1",
+  workspaceMikaOpen:
+    "grid-cols-[minmax(0,1fr)_5px_var(--mika-panel-width,380px)] max-[980px]:grid-cols-1",
   workspaceCollapsed: "sidebar-collapsed grid-cols-[minmax(0,1fr)]",
-  workspaceCollapsedClaudeOpen:
-    "sidebar-collapsed grid-cols-[minmax(0,1fr)_5px_var(--claude-panel-width,380px)] max-[980px]:grid-cols-1",
+  workspaceCollapsedMikaOpen:
+    "sidebar-collapsed grid-cols-[minmax(0,1fr)_5px_var(--mika-panel-width,380px)] max-[980px]:grid-cols-1",
   main:
     "col-start-1 row-start-1 min-h-0 min-w-0 overflow-hidden max-[980px]:row-start-1 max-[980px]:min-w-0",
   bottomBar:
@@ -153,6 +211,10 @@ const executableShortcutCommands = [
   "explorer.delete",
   "explorer.download",
   "explorer.rename",
+  "explorer.batch_rename",
+  "explorer.duplicate_finder",
+  "explorer.compare_with",
+  "explorer.automation_rules",
   "explorer.refresh",
   "explorer.new_tab",
   "explorer.restore_tab",
@@ -161,7 +223,7 @@ const executableShortcutCommands = [
   "explorer.split_vertical",
   "explorer.split_horizontal",
   "explorer.toggle_chat",
-  "explorer.toggle_claude",
+  "explorer.toggle_mika",
   "explorer.next_workspace",
   "explorer.tab_1",
   "explorer.tab_2",
@@ -190,7 +252,7 @@ const defaultMacExplorerShortcuts: ShortcutMap = {
   "explorer.rename": "F2",
   "explorer.refresh": "Cmd+R",
   "explorer.toggle_chat": "Cmd+J",
-  "explorer.toggle_claude": "Cmd+Shift+A",
+  "explorer.toggle_mika": "Cmd+Shift+A",
   "explorer.next_workspace": "Cmd+Shift+Grave",
   "explorer.new_tab": "Cmd+T",
   "explorer.restore_tab": "Cmd+Shift+T",
@@ -225,7 +287,7 @@ const defaultNonMacExplorerShortcuts: ShortcutMap = {
   "explorer.rename": "F2",
   "explorer.refresh": "Ctrl+R",
   "explorer.toggle_chat": "Ctrl+J",
-  "explorer.toggle_claude": "Ctrl+Shift+A",
+  "explorer.toggle_mika": "Ctrl+Shift+A",
   "explorer.next_workspace": "Ctrl+Shift+Grave",
   "explorer.new_tab": "Ctrl+T",
   "explorer.restore_tab": "Ctrl+Shift+T",
@@ -256,7 +318,7 @@ const finderExplorerShortcutOverrides: ShortcutMap = {
   "explorer.rename": "Enter",
 };
 
-type ResizeTarget = "sidebar" | "preview" | "claude" | null;
+type ResizeTarget = "sidebar" | "preview" | "mika" | null;
 type ExternalDropTarget = {
   paneId: string;
   destination: string;
@@ -285,8 +347,8 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
     pushNotification,
     dismissNotification,
     chatOverlayOpen,
-    claudePanelOpen,
-    claudePanelWidth,
+    mikaPanelOpen,
+    mikaPanelWidth,
   } = useExplorerStore(useShallow((state) => ({
     initialize: state.initialize,
     sidebarWidth: state.sidebarWidth,
@@ -306,8 +368,8 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
     pushNotification: state.pushNotification,
     dismissNotification: state.dismissNotification,
     chatOverlayOpen: state.chatOverlayOpen,
-    claudePanelOpen: state.claudePanelOpen,
-    claudePanelWidth: state.claudePanelWidth,
+    mikaPanelOpen: state.mikaPanelOpen,
+    mikaPanelWidth: state.mikaPanelWidth,
   })));
   const { providersLoading, sidebarRemotes } = useProvidersStore(useShallow((state) => ({
     providersLoading: state.loading,
@@ -349,6 +411,12 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
   const pluginCommandsRef = useRef<PluginCommandEntry[]>(emptyPluginCommands);
   const [mountedDevices, setMountedDevices] = useState<MountedDevice[]>(emptyMountedDevices);
   const [devicesLoading, setDevicesLoading] = useState(false);
+  const [duplicateFinderPaneId, setDuplicateFinderPaneId] = useState<string | null>(null);
+  const [compareDialog, setCompareDialog] = useState<CompareDialogSeed | null>(null);
+  const [automationManagerOpen, setAutomationManagerOpen] = useState(false);
+  const [extensionsPanelOpen, setExtensionsPanelOpen] = useState(false);
+  const [openExtensionPluginIds, setOpenExtensionPluginIds] = useState<string[]>([]);
+  const [selectedExtensionPluginId, setSelectedExtensionPluginId] = useState<string | null>(null);
   const { preferredWorkspaceRoot, settingsLoaded, settingsMountPath } = useSettingsStore(useShallow((state) => ({
     preferredWorkspaceRoot: selectGeneralPreferences(state.settings?.document).preferredWorkspaceRoot,
     settingsMountPath: selectAdvancedPreferences(state.settings?.document).mountPath,
@@ -377,16 +445,41 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
   const workspaceStyle = useMemo(() => ({
     "--explorer-sidebar-width": `${sidebarWidth}px`,
     "--preview-width": `${previewWidth}px`,
-    "--claude-panel-width": `${claudePanelWidth}px`,
-  } as CSSProperties), [claudePanelWidth, previewWidth, sidebarWidth]);
+    "--mika-panel-width": `${mikaPanelWidth}px`,
+  } as CSSProperties), [mikaPanelWidth, previewWidth, sidebarWidth]);
   const activeTabSupportsSidePanels = !isChromeTabPath(activeTabPath);
   const sidebarVisible = activeTabSupportsSidePanels && activeTabSidebarVisible;
   const previewVisible = activeTabSupportsSidePanels && activeTabPreviewVisible;
+  const extensionsVisible = activeTabSupportsSidePanels && extensionsPanelOpen;
 
   useEffect(() => {
     activePaneIdRef.current = activePaneId;
     activePathRef.current = activePath;
   }, [activePaneId, activePath]);
+
+  useEffect(() => {
+    const openDuplicateFinder = (event: Event) => {
+      const detail = (event as CustomEvent<{ paneId?: string }>).detail;
+      setDuplicateFinderPaneId(detail?.paneId || activePaneIdRef.current);
+    };
+    window.addEventListener(explorerDuplicateFinderEvent, openDuplicateFinder);
+    return () => window.removeEventListener(explorerDuplicateFinderEvent, openDuplicateFinder);
+  }, []);
+
+  useEffect(() => {
+    const openCompareWith = (event: Event) => {
+      const detail = (event as CustomEvent<CompareDialogSeed>).detail;
+      setCompareDialog(detail ?? compareSeedForPane(activePaneIdRef.current));
+    };
+    window.addEventListener(explorerCompareWithEvent, openCompareWith);
+    return () => window.removeEventListener(explorerCompareWithEvent, openCompareWith);
+  }, []);
+
+  useEffect(() => {
+    const openAutomationManager = () => setAutomationManagerOpen(true);
+    window.addEventListener(explorerAutomationManagerEvent, openAutomationManager);
+    return () => window.removeEventListener(explorerAutomationManagerEvent, openAutomationManager);
+  }, []);
 
   useEffect(() => {
     if (app?.environment.homeDir && settingsLoaded) {
@@ -578,9 +671,9 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
       } else if (resizeTarget === "preview") {
         const rect = mainRef.current?.getBoundingClientRect();
         if (rect) useExplorerStore.getState().setPreviewWidth(clamp(rect.right - clientX, minPreviewWidth, maxPreviewWidth));
-      } else if (resizeTarget === "claude") {
+      } else if (resizeTarget === "mika") {
         const rect = workspaceRef.current?.getBoundingClientRect();
-        if (rect) useExplorerStore.getState().setClaudePanelWidth(clamp(rect.right - clientX, minClaudePanelWidth, maxClaudePanelWidth));
+        if (rect) useExplorerStore.getState().setMikaPanelWidth(clamp(rect.right - clientX, minMikaPanelWidth, maxMikaPanelWidth));
       }
     };
 
@@ -677,9 +770,9 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
     event.preventDefault();
     setResizeTarget("preview");
   }, []);
-  const startClaudeResize = useCallback((event: PointerEvent<HTMLDivElement>) => {
+  const startMikaResize = useCallback((event: PointerEvent<HTMLDivElement>) => {
     event.preventDefault();
-    setResizeTarget("claude");
+    setResizeTarget("mika");
   }, []);
   const navigateSidebar = useCallback((path: string) => {
     const paneId = useMultiPanelStore.getState().activePaneId;
@@ -746,7 +839,62 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
     },
     [activePaneId, pluginCommands, pluginPanels],
   );
-  const inspector = useMemo(() => (previewVisible ? <ConnectedFileInspector /> : undefined), [previewVisible]);
+  const explorerExtensionItems = useMemo(
+    () => pluginMenuItems(pluginPanels, pluginCommands, activeSelectedPath),
+    [activeSelectedPath, pluginCommands, pluginPanels],
+  );
+  useEffect(() => {
+    setOpenExtensionPluginIds((current) => {
+      const available = new Set(explorerExtensionItems.map((plugin) => plugin.pluginId));
+      const next = current.filter((pluginId) => available.has(pluginId));
+      return stringArraysEqual(current, next) ? current : next;
+    });
+  }, [explorerExtensionItems]);
+  useEffect(() => {
+    if (!extensionsVisible) return;
+    if (openExtensionPluginIds.length === 0) {
+      setExtensionsPanelOpen(false);
+      return;
+    }
+    if (!selectedExtensionPluginId || !openExtensionPluginIds.includes(selectedExtensionPluginId)) {
+      setSelectedExtensionPluginId(openExtensionPluginIds[0] ?? null);
+    }
+  }, [extensionsVisible, openExtensionPluginIds, selectedExtensionPluginId]);
+  const inspector = useMemo(() => {
+    if (extensionsVisible) {
+      return (
+        <ExplorerExtensionsPanel
+          openPluginIds={openExtensionPluginIds}
+          plugins={explorerExtensionItems}
+          selectedPath={activeSelectedPath}
+          selectedPluginId={selectedExtensionPluginId}
+          onSelectPlugin={setSelectedExtensionPluginId}
+          onClosePlugin={(pluginId) => {
+            setOpenExtensionPluginIds((current) => current.filter((candidate) => candidate !== pluginId));
+            setSelectedExtensionPluginId((current) => current === pluginId ? null : current);
+          }}
+          onClose={() => setExtensionsPanelOpen(false)}
+        />
+      );
+    }
+    return previewVisible ? <ConnectedFileInspector /> : undefined;
+  }, [
+    activeSelectedPath,
+    explorerExtensionItems,
+    extensionsVisible,
+    openExtensionPluginIds,
+    previewVisible,
+    selectedExtensionPluginId,
+  ]);
+  const handleToggleExtensionFromTray = useCallback((pluginId: string) => {
+    if (extensionsVisible && selectedExtensionPluginId === pluginId) {
+      setExtensionsPanelOpen(false);
+      return;
+    }
+    setOpenExtensionPluginIds((current) => current.includes(pluginId) ? current : [...current, pluginId]);
+    setSelectedExtensionPluginId(pluginId);
+    setExtensionsPanelOpen(true);
+  }, [extensionsVisible, selectedExtensionPluginId]);
   const openSidebarPathInNewTab = useCallback((path: string, title?: string) => {
     useMultiPanelStore.getState().addTab(path, title);
   }, []);
@@ -764,6 +912,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
       mountRoot={mountRoot}
       remotes={sidebarRemotes}
       remoteLoading={providersLoading}
+      library={library}
       devices={mountedDevices}
       devicesLoading={devicesLoading}
       pinnedPaths={pinnedPaths}
@@ -793,6 +942,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
     handleAddRemote,
     handleManageRemotes,
     homePath,
+    library,
     mountRoot,
     mountedDevices,
     navigateSidebar,
@@ -807,17 +957,32 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
   const renderTabActions = useCallback(
     () => (
       <ExplorerTray
-        aiOpen={claudePanelOpen}
+        aiOpen={mikaPanelOpen}
         commands={pluginCommands}
         panels={pluginPanels}
         selectedPath={activeSelectedPath}
+        selectedExtensionPluginId={selectedExtensionPluginId}
+        extensionsOpen={extensionsVisible}
         terminalEnabled={activeTabSupportsSidePanels && canOpenTerminalPath(activeTabPath) && canOpenTerminalPath(activePath)}
         terminalPath={activePath}
         onOpenTransfers={openTransfersTab}
-        onToggleAi={() => useExplorerStore.getState().toggleClaudePanel()}
+        onOpenAutomation={() => openAutomationManager()}
+        onToggleAi={() => useExplorerStore.getState().toggleMikaPanel()}
+        onToggleExtensionPlugin={handleToggleExtensionFromTray}
       />
     ),
-    [activePath, activeSelectedPath, activeTabPath, activeTabSupportsSidePanels, claudePanelOpen, pluginCommands, pluginPanels],
+    [
+      activePath,
+      activeSelectedPath,
+      activeTabPath,
+      activeTabSupportsSidePanels,
+      extensionsVisible,
+      handleToggleExtensionFromTray,
+      mikaPanelOpen,
+      pluginCommands,
+      pluginPanels,
+      selectedExtensionPluginId,
+    ],
   );
   const renderBottomBar = useCallback(
     (tab: MultiPanelTab) => {
@@ -825,13 +990,33 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
       return (
         <ExplorerBottomBar
           sidebarVisible={tab.sidebarVisible ?? true}
-          previewVisible={tab.previewVisible ?? true}
+          previewVisible={(tab.previewVisible ?? true) && !extensionsVisible}
+          extensionsVisible={extensionsVisible}
           onToggleSidebar={() => useMultiPanelStore.getState().setTabPanelVisibility(tab.id, { sidebarVisible: !(tab.sidebarVisible ?? true) })}
-          onTogglePreview={() => useMultiPanelStore.getState().setTabPanelVisibility(tab.id, { previewVisible: !(tab.previewVisible ?? true) })}
+          onTogglePreview={() => {
+            setExtensionsPanelOpen(false);
+            useMultiPanelStore.getState().setTabPanelVisibility(tab.id, { previewVisible: !(tab.previewVisible ?? true) });
+          }}
+          onToggleExtensions={() => {
+            if (extensionsVisible) {
+              setExtensionsPanelOpen(false);
+              return;
+            }
+            const fallbackPluginId = selectedExtensionPluginId
+              ?? openExtensionPluginIds[0]
+              ?? explorerExtensionItems.find((plugin) => plugin.usable)?.pluginId
+              ?? explorerExtensionItems[0]?.pluginId
+              ?? null;
+            if (fallbackPluginId) {
+              setOpenExtensionPluginIds((current) => current.includes(fallbackPluginId) ? current : [...current, fallbackPluginId]);
+              setSelectedExtensionPluginId(fallbackPluginId);
+            }
+            setExtensionsPanelOpen(true);
+          }}
         />
       );
     },
-    [],
+    [explorerExtensionItems, extensionsVisible, openExtensionPluginIds, selectedExtensionPluginId],
   );
 
   return (
@@ -839,9 +1024,9 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
       ref={workspaceRef}
       className={cx(
         explorerShellStyles.workspaceBase,
-        sidebarVisible && claudePanelOpen && explorerShellStyles.workspaceClaudeOpen,
-        !sidebarVisible && !claudePanelOpen && explorerShellStyles.workspaceCollapsed,
-        !sidebarVisible && claudePanelOpen && explorerShellStyles.workspaceCollapsedClaudeOpen,
+        sidebarVisible && mikaPanelOpen && explorerShellStyles.workspaceMikaOpen,
+        !sidebarVisible && !mikaPanelOpen && explorerShellStyles.workspaceCollapsed,
+        !sidebarVisible && mikaPanelOpen && explorerShellStyles.workspaceCollapsedMikaOpen,
       )}
       style={workspaceStyle}
     >
@@ -859,15 +1044,24 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace() {
           renderPane={renderPane}
         />
       </main>
-      {claudePanelOpen ? (
+      {mikaPanelOpen ? (
         <>
-          <div className={assistantPanelStyles.claudeResizer} onPointerDown={startClaudeResize} />
-          <ExplorerClaudePanel />
+          <div className={assistantPanelStyles.mikaResizer} onPointerDown={startMikaResize} />
+          <ExplorerMikaPanel />
         </>
       ) : null}
       <ExplorerRenameStatus edit={inlineEdit} />
       <ExplorerNotifications notifications={notifications} onDismiss={dismissNotification} />
       <DeepSearchOverlay activePaneId={activePaneId} currentPath={activePath} />
+      {duplicateFinderPaneId ? (
+        <DuplicateFinderDialog
+          paneId={duplicateFinderPaneId}
+          defaultRoot={useExplorerStore.getState().panes[duplicateFinderPaneId]?.listing?.path ?? activePath}
+          onClose={() => setDuplicateFinderPaneId(null)}
+        />
+      ) : null}
+      {compareDialog ? <CompareDialog seed={compareDialog} onClose={() => setCompareDialog(null)} /> : null}
+      {automationManagerOpen ? <AutomationManagerDialog defaultRoot={activePath} onClose={() => setAutomationManagerOpen(false)} /> : null}
       {chatOverlayOpen ? <ExplorerChatOverlay /> : null}
       <ExplorerContextMenu />
       <ExplorerDialog />
@@ -899,10 +1093,14 @@ function ExplorerTray(props: {
   commands: PluginCommandEntry[];
   panels: PluginPanelEntry[];
   selectedPath: string;
+  selectedExtensionPluginId: string | null;
+  extensionsOpen: boolean;
   terminalEnabled: boolean;
   terminalPath: string;
   onOpenTransfers: () => void;
+  onOpenAutomation: () => void;
   onToggleAi: () => void;
+  onToggleExtensionPlugin: (pluginId: string) => void;
 }) {
   const openTerminal = useCallback(() => {
     if (!props.terminalEnabled) return;
@@ -915,10 +1113,19 @@ function ExplorerTray(props: {
     <>
       <ExplorerTransfersTabButton onClick={props.onOpenTransfers} />
       <button
+        className={explorerTrayStyles.trigger}
+        type="button"
+        title="Automation"
+        aria-label="Automation"
+        onClick={props.onOpenAutomation}
+      >
+        <FlaskConical size={16} />
+      </button>
+      <button
         className={cx(explorerTrayStyles.trigger, props.aiOpen && explorerTrayStyles.triggerActive)}
         type="button"
-        title="MistyAI"
-        aria-label="MistyAI"
+        title="Mika"
+        aria-label="Mika"
         aria-pressed={props.aiOpen}
         onClick={props.onToggleAi}
       >
@@ -935,9 +1142,12 @@ function ExplorerTray(props: {
         <Terminal size={16} />
       </button>
       <ExplorerPluginTabMenu
+        activePluginId={props.selectedExtensionPluginId}
         commands={props.commands}
+        extensionsOpen={props.extensionsOpen}
         panels={props.panels}
         selectedPath={props.selectedPath}
+        onTogglePlugin={props.onToggleExtensionPlugin}
       />
     </>
   );
@@ -1040,9 +1250,12 @@ function ExplorerNotifications(props: {
 }
 
 function ExplorerPluginTabMenu(props: {
+  activePluginId: string | null;
   commands: PluginCommandEntry[];
+  extensionsOpen: boolean;
   panels: PluginPanelEntry[];
   selectedPath: string;
+  onTogglePlugin: (pluginId: string) => void;
 }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -1099,11 +1312,10 @@ function ExplorerPluginTabMenu(props: {
     };
   }, [open, updateMenuPosition]);
 
-  const openPluginTab = useCallback((plugin: PluginMenuItem) => {
-    const tabPath = pluginTabPathForMenuItem(plugin, props.selectedPath);
+  const togglePluginPanel = useCallback((plugin: PluginMenuItem) => {
     setOpen(false);
-    useMultiPanelStore.getState().addTab(tabPath, plugin.pluginName);
-  }, [props.selectedPath]);
+    props.onTogglePlugin(plugin.pluginId);
+  }, [props.onTogglePlugin]);
 
   const browsePlugins = useCallback(() => {
     setOpen(false);
@@ -1114,7 +1326,7 @@ function ExplorerPluginTabMenu(props: {
     <>
       <button
         ref={buttonRef}
-        className={cx(explorerTrayStyles.trigger, open && explorerTrayStyles.triggerActive)}
+        className={cx(explorerTrayStyles.trigger, (open || props.extensionsOpen) && explorerTrayStyles.triggerActive)}
         type="button"
         title="Extensions"
         aria-haspopup="menu"
@@ -1147,11 +1359,15 @@ function ExplorerPluginTabMenu(props: {
                 <button
                   key={plugin.pluginId}
                   type="button"
-                  className={cx(pluginTabMenuStyles.item, plugin.usable && pluginTabMenuStyles.itemUsable)}
+                  className={cx(
+                    pluginTabMenuStyles.item,
+                    plugin.usable && pluginTabMenuStyles.itemUsable,
+                    props.extensionsOpen && props.activePluginId === plugin.pluginId && pluginTabMenuStyles.itemSelected,
+                  )}
                   role="menuitem"
-                  onClick={() => openPluginTab(plugin)}
+                  onClick={() => togglePluginPanel(plugin)}
                 >
-                  {plugin.kind === "panel" ? <Blocks size={16} /> : <Terminal size={16} />}
+                  <PluginIcon pluginId={plugin.pluginId} pluginName={plugin.pluginName} fallback={plugin.kind} size={16} />
                   <span className={pluginTabMenuStyles.itemText}>
                     <strong>{plugin.pluginName}</strong>
                     <small>{pluginMenuSubtitle(plugin)}</small>
@@ -1181,6 +1397,131 @@ function ExplorerPluginTabMenu(props: {
         </div>
       ), document.body) : null}
     </>
+  );
+}
+
+function ExplorerExtensionsPanel(props: {
+  openPluginIds: string[];
+  plugins: PluginMenuItem[];
+  selectedPath: string;
+  selectedPluginId: string | null;
+  onSelectPlugin: (pluginId: string) => void;
+  onClosePlugin: (pluginId: string) => void;
+  onClose: () => void;
+}) {
+  const navigate = useNavigate();
+  const openPlugins = useMemo(
+    () => props.openPluginIds
+      .map((pluginId) => props.plugins.find((plugin) => plugin.pluginId === pluginId))
+      .filter((plugin): plugin is PluginMenuItem => Boolean(plugin)),
+    [props.openPluginIds, props.plugins],
+  );
+  const selectedPlugin = openPlugins.find((plugin) => plugin.pluginId === props.selectedPluginId)
+    ?? openPlugins[0]
+    ?? null;
+  const selectedPanel = selectedPlugin
+    ? selectedPlugin.panels.find(pluginPanelUsableInCurrentArea) ?? selectedPlugin.panels[0] ?? null
+    : null;
+
+  const browsePlugins = useCallback(() => {
+    navigate("/hub/extensions");
+  }, [navigate]);
+
+  return (
+    <aside className={extensionsPanelStyles.root} aria-label="Extensions">
+      <header className={extensionsPanelStyles.header}>
+        <div className={extensionsPanelStyles.headerTitle}>
+          <Puzzle size={17} />
+          <div>
+            <strong>Extensions</strong>
+            <span>{openPlugins.length} open</span>
+          </div>
+        </div>
+        <button className={extensionsPanelStyles.iconButton} type="button" title="Close extensions" onClick={props.onClose}>
+          <X size={16} />
+        </button>
+      </header>
+      <div className={extensionsPanelStyles.body}>
+        <nav className={extensionsPanelStyles.list} aria-label="Installed extensions" role="tablist">
+          {openPlugins.map((plugin) => (
+            <button
+              key={plugin.pluginId}
+              type="button"
+              role="tab"
+              aria-selected={selectedPlugin?.pluginId === plugin.pluginId}
+              className={cx(
+                extensionsPanelStyles.item,
+                selectedPlugin?.pluginId === plugin.pluginId && extensionsPanelStyles.itemSelected,
+              )}
+              onClick={() => props.onSelectPlugin(plugin.pluginId)}
+            >
+              <PluginIcon pluginId={plugin.pluginId} pluginName={plugin.pluginName} fallback={plugin.kind} size={20} />
+              <span className={extensionsPanelStyles.itemText}>
+                <strong>{plugin.pluginName}</strong>
+                <small>{plugin.panels[0]?.title ?? (plugin.usable ? "Ready in Files" : "No file panel")}</small>
+              </span>
+              <span
+                className={extensionsPanelStyles.tabClose}
+                role="button"
+                tabIndex={0}
+                title={`Close ${plugin.pluginName}`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  props.onClosePlugin(plugin.pluginId);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    props.onClosePlugin(plugin.pluginId);
+                  }
+                }}
+              >
+                <X size={13} />
+              </span>
+            </button>
+          ))}
+        </nav>
+        <section className={extensionsPanelStyles.host}>
+          {selectedPlugin ? (
+            <>
+              <div className={extensionsPanelStyles.selectedHeader}>
+                <PluginIcon pluginId={selectedPlugin.pluginId} pluginName={selectedPlugin.pluginName} fallback={selectedPlugin.kind} size={24} />
+                <div className={extensionsPanelStyles.selectedTitle}>
+                  <strong>{selectedPlugin.pluginName}</strong>
+                  <span>{selectedPanel?.title ?? "No file panel available"}</span>
+                </div>
+              </div>
+              {props.selectedPath ? (
+                <div className={extensionsPanelStyles.selectionPill} title={props.selectedPath}>
+                  {props.selectedPath}
+                </div>
+              ) : null}
+              {selectedPanel ? (
+                <ExplorerPluginPanelHost
+                  panel={selectedPanel}
+                  selectedPath={props.selectedPath}
+                />
+              ) : (
+                <div className={extensionsPanelStyles.empty}>
+                  <Puzzle size={22} />
+                  <span>This extension does not expose a file panel yet.</span>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className={extensionsPanelStyles.empty}>
+              <Puzzle size={24} />
+              <span>Choose an extension from the tray dropdown to open it here.</span>
+            </div>
+          )}
+        </section>
+      </div>
+      <button className={extensionsPanelStyles.footerButton} type="button" onClick={browsePlugins}>
+        Manage extensions
+        <ExternalLink size={14} />
+      </button>
+    </aside>
   );
 }
 
@@ -1270,13 +1611,21 @@ function filterPluginMenuItems(items: PluginMenuItem[], query: string): PluginMe
 
 function pluginPanelUsableInCurrentArea(panel: PluginPanelEntry): boolean {
   if (panel.launcherViews.length === 0) return true;
-  return panel.launcherViews.some((view) => normalizedPluginArea(view) === currentPluginArea);
+  return panel.launcherViews.some((view) => {
+    const area = normalizedPluginArea(view);
+    return area === "all" || area === currentPluginArea;
+  });
 }
 
 function normalizedPluginArea(area: string): string {
   const normalized = area.trim().toLowerCase();
   if (normalized === "explorer") return "files";
   return normalized;
+}
+
+function stringArraysEqual(left: readonly string[], right: readonly string[]): boolean {
+  if (left.length !== right.length) return false;
+  return left.every((value, index) => value === right[index]);
 }
 
 function extensionAreaLabel(area: string): string {
@@ -1381,7 +1730,7 @@ function ExplorerPluginTabHeader(props: {
   return (
     <div className={pluginTabHostStyles.header}>
       <div className={pluginTabHostStyles.headerTitle}>
-        <Puzzle size={18} />
+        <PluginIcon pluginId={props.tab.pluginId} pluginName={title} fallback={props.tab.kind} size={18} />
         <div>
           <strong>{title}</strong>
           <span>{plugin ? pluginMenuSubtitle(plugin) : "Extension"}</span>
@@ -1503,6 +1852,9 @@ function ExplorerPluginPanelHost(props: {
     })
       .then((result) => {
         setRendered(result);
+        if (props.panel.pluginId === "themes" && clickedButton) {
+          applyMistyThemeFromExtensionAction(clickedButton);
+        }
         publishPluginNotifications(result.notifications);
       })
       .catch((error) => setRenderError(errorText(error)))
@@ -1553,7 +1905,7 @@ function ExplorerPluginPanelHost(props: {
             <PluginPanelElementView
               key={element.id}
               element={element}
-              value={inputs[element.id] ?? ""}
+              value={inputs[element.id] ?? element.text}
               disabled={rendering}
               onInput={(value) => setInputs((current) => ({ ...current, [element.id]: value }))}
               onButton={() => renderPanel(element.id)}
@@ -1579,7 +1931,7 @@ function PluginPanelElementView(props: {
       </button>
     );
   }
-  if (props.element.kind === "input") {
+  if (props.element.kind === "input" || props.element.kind === "inputText") {
     return (
       <input
         className={pluginTabHostStyles.input}
@@ -1609,6 +1961,23 @@ function pluginCommandOnlyOpensLauncher(command: PluginCommandEntry): boolean {
 
 function pluginCommandNeedsSelection(command: PluginCommandEntry, selectedPath: string): boolean {
   return command.requiresSelectedFile && !selectedPath.trim();
+}
+
+function PluginIcon(props: {
+  pluginId: string;
+  pluginName?: string;
+  fallback: "panel" | "commands";
+  size: number;
+}) {
+  return (
+    <ExtensionCatalogIcon
+      pluginId={props.pluginId}
+      pluginName={props.pluginName}
+      size={Math.max(props.size + 4, 20)}
+      roundedClassName="rounded-md"
+      textClassName="text-[8px] font-bold text-white"
+    />
+  );
 }
 
 function cx(...classes: Array<string | false | null | undefined>): string {
@@ -1650,6 +2019,8 @@ const pluginTabMenuStyles = {
     "grid min-h-11 w-full grid-cols-[22px_minmax(0,1fr)_auto] items-center gap-2 rounded-lg border border-transparent bg-transparent px-2.5 py-2 text-left text-[#a8a8a8] hover:bg-[#222222] hover:text-[#f7f7f7]",
   itemUsable:
     "border-[#3d3d3d] bg-[#1a1a1a] text-[#eeeeee]",
+  itemSelected:
+    "border-[#5a5a5a] bg-[#242424] text-[#ffffff] shadow-[inset_2px_0_0_#8f8f8f]",
   itemText:
     "grid min-w-0 gap-0.5 [&>small]:min-w-0 [&>small]:overflow-hidden [&>small]:text-ellipsis [&>small]:whitespace-nowrap [&>small]:text-xs [&>small]:font-medium [&>small]:text-[#9f9f9f] [&>strong]:min-w-0 [&>strong]:overflow-hidden [&>strong]:text-ellipsis [&>strong]:whitespace-nowrap [&>strong]:text-[13px]",
   areaPill:
@@ -1660,6 +2031,44 @@ const pluginTabMenuStyles = {
     "grid justify-items-center gap-2 px-4 py-5 text-center text-xs text-[#adadad]",
   footerItem:
     "mt-1 flex h-9 w-full items-center gap-2 rounded-lg border-0 border-t border-[#292929] bg-transparent px-2.5 text-left text-xs font-semibold text-[#cfcfcf] hover:bg-[#222222] hover:text-[#f7f7f7]",
+} as const;
+
+const extensionsPanelStyles = {
+  root:
+    "grid h-full min-h-0 w-full grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden bg-[#111111] text-[#eeeeee]",
+  header:
+    "flex min-h-[52px] items-center justify-between gap-3 border-b border-[#292929] bg-[#101010] px-3.5",
+  headerTitle:
+    "flex min-w-0 items-center gap-2.5 [&_strong]:block [&_strong]:truncate [&_strong]:text-[14px] [&_span]:mt-0.5 [&_span]:block [&_span]:truncate [&_span]:text-xs [&_span]:text-[#8f8f8f]",
+  iconButton:
+    "grid size-8 flex-none place-items-center rounded-md border border-[#303030] bg-[#171717] text-[#bdbdbd] hover:bg-[#222222] hover:text-[#f7f7f7]",
+  searchLabel: "block border-b border-[#292929] px-3 py-2.5",
+  searchInput:
+    "h-8 w-full rounded-md border border-[#303030] bg-[#0c0c0c] px-2.5 text-[13px] text-[#eeeeee] outline-none placeholder:text-[#777777] focus:border-[#686868]",
+  body:
+    "grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden",
+  list:
+    "flex min-w-0 gap-0 overflow-x-auto border-b border-[#292929] bg-[#0d0d0d] px-2 pt-2",
+  item:
+    "relative -mb-px grid min-h-11 w-[164px] shrink-0 grid-cols-[24px_minmax(0,1fr)_22px] items-center gap-2 rounded-t-md border border-transparent border-b-[#292929] px-2 py-1.5 text-left text-[#a8a8a8] hover:bg-[#1b1b1b] hover:text-[#f7f7f7]",
+  itemSelected:
+    "z-[1] border-[#3d3d3d] border-b-[#111111] bg-[#111111] text-[#eeeeee] shadow-[0_-1px_0_rgba(255,255,255,0.05)]",
+  itemText:
+    "grid min-w-0 gap-0.5 [&>small]:min-w-0 [&>small]:overflow-hidden [&>small]:text-ellipsis [&>small]:whitespace-nowrap [&>small]:text-[11px] [&>small]:font-medium [&>small]:text-[#8f8f8f] [&>strong]:min-w-0 [&>strong]:overflow-hidden [&>strong]:text-ellipsis [&>strong]:whitespace-nowrap [&>strong]:text-[13px]",
+  tabClose:
+    "grid size-[19px] place-items-center rounded-full text-[#8f8f8f] hover:bg-[#2b2b2b] hover:text-[#f7f7f7]",
+  host:
+    "grid min-h-0 content-start gap-3 overflow-auto p-3",
+  selectedHeader:
+    "grid min-w-0 grid-cols-[32px_minmax(0,1fr)] items-center gap-2.5",
+  selectedTitle:
+    "grid min-w-0 gap-0.5 [&>span]:min-w-0 [&>span]:overflow-hidden [&>span]:text-ellipsis [&>span]:whitespace-nowrap [&>span]:text-xs [&>span]:text-[#8f8f8f] [&>strong]:min-w-0 [&>strong]:overflow-hidden [&>strong]:text-ellipsis [&>strong]:whitespace-nowrap [&>strong]:text-[15px]",
+  selectionPill:
+    "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap rounded-md border border-[#303030] bg-[#151515] px-2.5 py-1.5 font-mono text-[11px] text-[#bdbdbd]",
+  empty:
+    "grid justify-items-center gap-2 rounded-md border border-[#303030] bg-[#151515] px-4 py-5 text-center text-xs text-[#adadad]",
+  footerButton:
+    "flex h-10 items-center justify-center gap-2 border-0 border-t border-[#292929] bg-[#101010] text-xs font-semibold text-[#cfcfcf] hover:bg-[#1d1d1d] hover:text-[#f7f7f7]",
 } as const;
 
 const explorerTrayStyles = {
@@ -1714,7 +2123,7 @@ const pluginTabHostStyles = {
 const dialogStyles = {
   backdrop: "fixed inset-0 z-[2147483200] grid place-items-center bg-[rgba(6, 6, 6, 0.58)] p-6 backdrop-blur-[3px]",
   dialog: "grid w-[min(380px,100%)] gap-4 rounded-[10px] border border-[#353535] bg-[#141414] p-[18px] shadow-[0_24px_64px_rgba(0,0,0,0.55)]",
-  wide: "max-h-[min(620px,calc(100vh-48px))] w-[min(720px,100%)] grid-rows-[auto_auto_minmax(0,1fr)_auto]",
+  wide: "max-h-[min(680px,calc(100vh-48px))] w-[min(780px,100%)] grid-rows-[auto_auto_auto_minmax(0,1fr)_auto]",
   title: "m-0 text-[17px] font-semibold",
   text: "m-0 leading-normal text-[#b2b2b2]",
   actions: "flex justify-end gap-2",
@@ -1723,6 +2132,11 @@ const dialogStyles = {
   input: "h-[38px] w-full rounded-[7px] border border-[#3f3f3f] bg-[#0e0e0e] px-[11px] text-[#f0f0f0] outline-none focus:border-[#787878] focus:shadow-[0_0_0_2px_rgba(120,120,120,0.18)]",
   batchHeader: "flex items-start justify-between gap-4",
   batchBadge: "flex-none rounded-full border border-[#4a4a4a] bg-[rgba(49, 49, 49, 0.52)] px-[9px] py-1 text-xs text-[#c6c6c6]",
+  batchControls: "grid grid-cols-4 gap-2.5 rounded-lg border border-[#292929] bg-[#101010] p-3 max-[720px]:grid-cols-2 max-[520px]:grid-cols-1",
+  batchField: "grid min-w-0 gap-1.5 text-xs font-medium uppercase tracking-normal text-[#9e9e9e]",
+  batchSelect: "h-[38px] w-full rounded-[7px] border border-[#3f3f3f] bg-[#0e0e0e] px-[9px] text-[#f0f0f0] outline-none focus:border-[#787878]",
+  batchToggle: "flex min-h-[38px] items-center gap-2 rounded-[7px] border border-[#303030] bg-[#151515] px-2.5 text-sm text-[#d3d3d3]",
+  batchCheckbox: "size-4 accent-[#d8d8d8]",
   batchHead: "grid grid-cols-[minmax(140px,0.85fr)_minmax(220px,1.25fr)] gap-3 rounded-t-lg border border-b-0 border-[#292929] bg-[#171717] px-2.5 py-2 text-xs font-semibold uppercase text-[#b2b2b2] max-[640px]:grid-cols-1 max-[640px]:gap-1.5",
   batchList: "grid max-h-[min(320px,48vh)] gap-0 overflow-auto rounded-b-lg border border-t-0 border-[#292929] bg-[#101010]",
   batchRow: "grid grid-cols-[minmax(140px,0.85fr)_minmax(220px,1.25fr)] items-start gap-3 border-b border-[#292929] bg-[#101010] px-2.5 py-2 last:border-b-0 max-[640px]:grid-cols-1 max-[640px]:gap-1.5",
@@ -1736,10 +2150,90 @@ const dialogStyles = {
   batchReady: "text-[#adadad]",
 } as const;
 
+const duplicateFinderStyles = {
+  body: "grid min-h-0 gap-3",
+  controls: "grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3 max-[640px]:grid-cols-1",
+  optionRow: "flex flex-wrap items-center gap-3 text-sm text-[#cfcfcf]",
+  checkbox: "size-4 accent-[#d8d8d8]",
+  rootsInput:
+    "min-h-[82px] w-full resize-y rounded-[7px] border border-[#3f3f3f] bg-[#0e0e0e] px-[11px] py-2.5 text-[#f0f0f0] outline-none focus:border-[#787878] focus:shadow-[0_0_0_2px_rgba(120,120,120,0.18)]",
+  summary: "grid gap-1 rounded-lg border border-[#292929] bg-[#101010] p-3 text-sm text-[#cfcfcf]",
+  groupList: "grid max-h-[min(340px,44vh)] gap-2 overflow-auto pr-1",
+  group: "grid gap-2 rounded-lg border border-[#292929] bg-[#101010] p-3",
+  groupHeader: "flex min-w-0 flex-wrap items-center justify-between gap-2 text-sm text-[#d8d8d8]",
+  groupMeta: "text-xs text-[#9c9c9c]",
+  candidate: "grid grid-cols-[18px_minmax(0,1fr)_auto] items-start gap-2 rounded-md bg-[#151515] px-2.5 py-2 text-sm text-[#d8d8d8]",
+  candidatePath: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap",
+  candidateMeta: "text-xs text-[#9c9c9c]",
+  empty: "rounded-lg border border-[#292929] bg-[#101010] p-4 text-center text-sm text-[#9c9c9c]",
+  warning: "rounded-lg border border-[#4b3f2c] bg-[#211b12] px-3 py-2 text-sm text-[#f1d39a]",
+  error: "rounded-lg border border-[#4b3434] bg-[#211414] px-3 py-2 text-sm text-[#ffb7b7]",
+} as const;
+
+const compareStyles = {
+  body: "grid min-h-0 gap-3",
+  fields: "grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3 max-[640px]:grid-cols-1",
+  modeRow: "flex flex-wrap items-center gap-2 text-sm text-[#d0d0d0]",
+  modeButton: "h-[32px] rounded-[7px] border border-[#333333] bg-[#171717] px-3 text-[#d6d6d6] hover:bg-[#222222] disabled:opacity-45",
+  modeButtonActive: "border-[#686868] bg-[#2a2a2a] text-[#f2f2f2]",
+  result: "grid gap-2 rounded-lg border border-[#292929] bg-[#101010] p-3 text-sm text-[#d0d0d0]",
+  hash: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap rounded-md bg-[#151515] px-2 py-1 font-mono text-xs text-[#bdbdbd]",
+  diffShell: "grid gap-2 rounded-lg border border-[#292929] bg-[#101010] p-2.5",
+  diffHeader: "flex min-w-0 flex-wrap items-center justify-between gap-2 text-sm text-[#d0d0d0]",
+  diffActions: "flex flex-wrap items-center gap-1.5",
+  diffGrid: "grid max-h-[min(420px,46vh)] grid-cols-[minmax(0,1fr)_minmax(0,1fr)] overflow-auto rounded-md border border-[#252525] bg-[#0d0d0d] text-xs max-[760px]:grid-cols-1",
+  diffPane: "grid min-w-0 content-start border-r border-[#252525] last:border-r-0 max-[760px]:border-r-0 max-[760px]:border-b max-[760px]:last:border-b-0",
+  diffPaneTitle: "sticky top-0 z-[1] border-b border-[#252525] bg-[#141414] px-2.5 py-1.5 font-medium text-[#d7d7d7]",
+  diffLine: "grid min-h-[24px] grid-cols-[42px_minmax(0,1fr)] gap-2 px-2.5 py-1 font-mono leading-relaxed",
+  diffLineNumber: "select-none text-right text-[#747474]",
+  diffText: "min-w-0 whitespace-pre-wrap break-words text-[#d5d5d5]",
+  diffSame: "bg-transparent",
+  diffAdded: "bg-[#102016]",
+  diffRemoved: "bg-[#241414]",
+  diffChanged: "bg-[#242010]",
+  imageGrid: "grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2 rounded-lg border border-[#292929] bg-[#101010] p-2.5 max-[760px]:grid-cols-1",
+  imagePane: "grid min-w-0 content-start gap-2",
+  imageFrame: "grid min-h-[180px] place-items-center overflow-hidden rounded-md border border-[#252525] bg-[#0d0d0d]",
+  imagePreview: "max-h-[320px] max-w-full object-contain",
+  imageMeta: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs text-[#9c9c9c]",
+  rowList: "grid max-h-[min(340px,44vh)] gap-1 overflow-auto rounded-lg border border-[#292929] bg-[#101010] p-1.5",
+  row: "grid grid-cols-[minmax(0,1fr)_100px_100px_110px] items-center gap-2 rounded-md px-2 py-2 text-sm text-[#d4d4d4] hover:bg-[#171717] max-[720px]:grid-cols-1",
+  rowPath: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap",
+  rowMeta: "text-xs text-[#9d9d9d]",
+  rowActions: "flex items-center justify-end gap-1 max-[720px]:justify-start",
+  miniButton: "h-[28px] rounded-md border border-[#333333] bg-[#181818] px-2 text-xs text-[#d6d6d6] hover:bg-[#242424] disabled:opacity-40",
+  empty: "rounded-lg border border-[#292929] bg-[#101010] p-4 text-center text-sm text-[#9c9c9c]",
+  error: "rounded-lg border border-[#4b3434] bg-[#211414] px-3 py-2 text-sm text-[#ffb7b7]",
+} as const;
+
+const automationStyles = {
+  layout: "grid min-h-0 grid-cols-[220px_minmax(0,1fr)] gap-3 max-[760px]:grid-cols-1",
+  list: "grid max-h-[min(480px,58vh)] content-start gap-1 overflow-auto rounded-lg border border-[#292929] bg-[#101010] p-1.5",
+  listItem: "grid gap-1 rounded-lg border border-transparent bg-transparent px-2.5 py-2 text-left text-[#d6d6d6] hover:bg-[#1c1c1c]",
+  listItemActive: "border-[#4a4a4a] bg-[#202020]",
+  itemMeta: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs text-[#9c9c9c]",
+  editor: "grid min-h-0 gap-3",
+  grid2: "grid grid-cols-[minmax(0,1fr)_130px] gap-3 max-[640px]:grid-cols-1",
+  textarea: "min-h-[76px] w-full resize-y rounded-[7px] border border-[#3f3f3f] bg-[#0e0e0e] px-[11px] py-2.5 text-[#f0f0f0] outline-none focus:border-[#787878]",
+  ruleList: "grid gap-2 rounded-lg border border-[#292929] bg-[#101010] p-2.5",
+  ruleRow: "grid grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1fr)_30px] gap-2 max-[640px]:grid-cols-1",
+  select: "h-[38px] w-full rounded-[7px] border border-[#3f3f3f] bg-[#0e0e0e] px-2 text-[#f0f0f0] outline-none focus:border-[#787878]",
+  actionTemplates: "flex flex-wrap gap-2",
+  templateButton: "h-[30px] rounded-md border border-[#333333] bg-[#181818] px-2.5 text-xs text-[#d6d6d6] hover:bg-[#242424]",
+  dryRun: "grid max-h-[160px] gap-1 overflow-auto rounded-lg border border-[#292929] bg-[#101010] p-2.5 text-sm text-[#d0d0d0]",
+  toggle: "flex min-h-[38px] items-center gap-2 rounded-[7px] border border-[#303030] bg-[#151515] px-2.5 text-sm text-[#d3d3d3]",
+  checkbox: "size-4 accent-[#d8d8d8]",
+  error: "rounded-lg border border-[#4b3434] bg-[#211414] px-3 py-2 text-sm text-[#ffb7b7]",
+  empty: "rounded-lg border border-[#292929] bg-[#101010] p-4 text-center text-sm text-[#9c9c9c]",
+} as const;
+
 const contextMenuStyles = {
   menu: "fixed z-[1000] w-[250px] overflow-auto rounded-[11px] border border-[#323232] bg-[rgba(17, 17, 17, 0.97)] p-1.5 shadow-[0_18px_40px_rgba(0,0,0,0.45)] backdrop-blur-xl",
+  submenu: "fixed z-[1001] w-[246px] overflow-auto rounded-[11px] border border-[#323232] bg-[rgba(17, 17, 17, 0.98)] p-1.5 shadow-[0_18px_40px_rgba(0,0,0,0.48)] backdrop-blur-xl",
   item:
     "grid h-9 w-full grid-cols-[19px_minmax(0,1fr)_auto] items-center gap-2.5 rounded-lg border-0 bg-transparent px-2.5 text-left text-[#dddddd] hover:not-disabled:bg-[#222222] hover:not-disabled:text-[#eeeeee] disabled:opacity-45 [&:hover:not(:disabled)_.context-menu-icon]:text-[#d0d0d0] [&:hover:not(:disabled)_.context-menu-shortcut]:text-[#d0d0d0]",
+  itemActive:
+    "bg-[#242424] text-[#eeeeee] [&_.context-menu-icon]:text-[#d0d0d0] [&_.context-menu-shortcut]:text-[#d0d0d0]",
   icon: "context-menu-icon inline-flex items-center justify-center text-[#b6b6b6]",
   label: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap",
   shortcut: "context-menu-shortcut text-xs text-[#898989]",
@@ -1747,6 +2241,60 @@ const contextMenuStyles = {
 } as const;
 
 const contextMenuViewportMargin = 8;
+const contextMenuMaxHeight = 340;
+const contextSubmenuWidth = 246;
+
+type ContextMenuLeafItem = {
+  id: string;
+  icon: ReactNode;
+  label: string;
+  shortcut?: string;
+  disabled?: boolean;
+  disabledReason?: string;
+  onRun: () => void;
+};
+
+type ContextMenuBranchItem = {
+  id: string;
+  icon: ReactNode;
+  label: string;
+  items: ContextMenuLeafItem[];
+};
+
+type ContextMenuEntry = ContextMenuLeafItem | ContextMenuBranchItem;
+
+type ContextSubmenuState = {
+  id: string;
+  x: number;
+  y: number;
+  maxHeight: number;
+  items: ContextMenuLeafItem[];
+} | null;
+
+function isContextMenuBranch(item: ContextMenuEntry): item is ContextMenuBranchItem {
+  return "items" in item;
+}
+
+function contextSubmenuPosition(anchor: DOMRect, itemCount: number): Pick<NonNullable<ContextSubmenuState>, "x" | "y" | "maxHeight"> {
+  const viewport = window.visualViewport;
+  const viewportLeft = viewport?.offsetLeft ?? 0;
+  const viewportTop = viewport?.offsetTop ?? 0;
+  const viewportWidth = viewport?.width ?? window.innerWidth;
+  const viewportHeight = viewport?.height ?? window.innerHeight;
+  const minLeft = viewportLeft + contextMenuViewportMargin;
+  const minTop = viewportTop + contextMenuViewportMargin;
+  const maxHeight = Math.max(120, Math.min(contextMenuMaxHeight, viewportHeight - contextMenuViewportMargin * 2));
+  const estimatedHeight = Math.min(maxHeight, 12 + itemCount * 36);
+  const viewportRight = viewportLeft + viewportWidth - contextMenuViewportMargin;
+  const viewportBottom = viewportTop + viewportHeight - contextMenuViewportMargin;
+  const rightLeft = anchor.right + 6;
+  const leftLeft = anchor.left - contextSubmenuWidth - 6;
+  const x = rightLeft + contextSubmenuWidth <= viewportRight
+    ? rightLeft
+    : Math.max(minLeft, Math.min(leftLeft, viewportRight - contextSubmenuWidth));
+  const y = Math.min(Math.max(anchor.top - 6, minTop), Math.max(minTop, viewportBottom - estimatedHeight));
+  return { x, y, maxHeight };
+}
 
 function useViewportAnchoredMenu(open: boolean, x: number, y: number) {
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -1772,7 +2320,7 @@ function useViewportAnchoredMenu(open: boolean, x: number, y: number) {
     const maxTop = Math.max(minTop, viewportTop + viewportHeight - rect.height - contextMenuViewportMargin);
     const nextLeft = Math.min(Math.max(x, minLeft), maxLeft);
     const nextTop = Math.min(Math.max(y, minTop), maxTop);
-    const maxHeight = Math.max(120, viewportHeight - contextMenuViewportMargin * 2);
+    const maxHeight = Math.max(120, Math.min(contextMenuMaxHeight, viewportHeight - contextMenuViewportMargin * 2));
 
     setStyle((current) => {
       if (
@@ -1816,74 +2364,1056 @@ function useViewportAnchoredMenu(open: boolean, x: number, y: number) {
   return { menuRef, style };
 }
 
+type BatchRenameCaseMode = "none" | "lower" | "upper" | "title";
+type CompareMode = "file" | "folder";
+
+interface CompareDialogSeed {
+  paneId: string;
+  leftPath: string;
+  mode: CompareMode;
+}
+
+type CompareTextDiffKind = "same" | "added" | "removed" | "changed";
+
+interface CompareTextDiffRow {
+  id: string;
+  leftLine: number | null;
+  rightLine: number | null;
+  leftText: string;
+  rightText: string;
+  kind: CompareTextDiffKind;
+}
+
+interface CompareTextDiffState {
+  leftText: string;
+  rightText: string;
+  rows: CompareTextDiffRow[];
+  truncated: boolean;
+}
+
+interface CompareImagePreview {
+  src: string;
+  mimeType: string;
+  byteLength: number;
+}
+
+interface CompareImageState {
+  left: CompareImagePreview;
+  right: CompareImagePreview;
+}
+
+interface BatchRenameOptions {
+  findText: string;
+  replaceText: string;
+  prefix: string;
+  suffix: string;
+  caseMode: BatchRenameCaseMode;
+  lockExtensions: boolean;
+  sequenceEnabled: boolean;
+  sequenceStart: number;
+  sequencePad: number;
+  manualValues: Record<string, string>;
+}
+
+function batchRenameItemKey(item: ExplorerBatchRenameItem): string {
+  return `${item.paneId}:${item.entryId}`;
+}
+
+function applyBatchRenameCase(value: string, mode: BatchRenameCaseMode): string {
+  if (mode === "lower") return value.toLocaleLowerCase();
+  if (mode === "upper") return value.toLocaleUpperCase();
+  if (mode === "title") {
+    return value
+      .toLocaleLowerCase()
+      .replace(/(^|[\s._-])([a-z])/g, (_match, boundary: string, character: string) => `${boundary}${character.toLocaleUpperCase()}`);
+  }
+  return value;
+}
+
+function previewBatchRenameItem(
+  item: ExplorerBatchRenameItem,
+  index: number,
+  options: BatchRenameOptions,
+): ExplorerBatchRenameItem {
+  const lockedExtension = options.lockExtensions ? item.lockedExtension : "";
+  const manualValue = options.manualValues[batchRenameItemKey(item)];
+  if (manualValue != null) {
+    return { ...item, value: manualValue, lockedExtension };
+  }
+
+  let value = options.lockExtensions ? item.value : `${item.value}${item.lockedExtension}`;
+  if (options.findText) {
+    value = value.split(options.findText).join(options.replaceText);
+  }
+  value = applyBatchRenameCase(value, options.caseMode);
+  value = `${options.prefix}${value}${options.suffix}`;
+  if (options.sequenceEnabled) {
+    const sequence = String(Math.max(0, options.sequenceStart) + index).padStart(Math.max(1, options.sequencePad), "0");
+    value = `${value}${sequence}`;
+  }
+  return { ...item, value, lockedExtension };
+}
+
+function CompareDialog(props: {
+  seed: CompareDialogSeed;
+  onClose: () => void;
+}) {
+  const [mode, setMode] = useState<CompareMode>(props.seed.mode);
+  const [leftPath, setLeftPath] = useState(props.seed.leftPath);
+  const [rightPath, setRightPath] = useState("");
+  const [running, setRunning] = useState(false);
+  const [applyingMerge, setApplyingMerge] = useState<"left" | "right" | null>(null);
+  const [fileResult, setFileResult] = useState<CompareFilesResult | null>(null);
+  const [folderResult, setFolderResult] = useState<CompareFoldersResult | null>(null);
+  const [textDiff, setTextDiff] = useState<CompareTextDiffState | null>(null);
+  const [imageCompare, setImageCompare] = useState<CompareImageState | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const changedRows = folderResult?.rows.filter((row) => row.disposition !== "same") ?? [];
+
+  const runCompare = useCallback(async () => {
+    if (!leftPath.trim() || !rightPath.trim()) {
+      setError("Choose both paths before comparing.");
+      return;
+    }
+    setRunning(true);
+    setError(null);
+    setFileResult(null);
+    setFolderResult(null);
+    setTextDiff(null);
+    setImageCompare(null);
+    try {
+      if (mode === "folder") {
+        setFolderResult(await compareFolders({ leftPath: leftPath.trim(), rightPath: rightPath.trim() }));
+      } else {
+        const result = await compareFiles({ leftPath: leftPath.trim(), rightPath: rightPath.trim() });
+        setFileResult(result);
+        const nextTextDiff = await loadCompareTextDiff(leftPath.trim(), rightPath.trim());
+        setTextDiff(nextTextDiff);
+        if (!nextTextDiff) setImageCompare(await loadCompareImagePreview(leftPath.trim(), rightPath.trim()));
+      }
+    } catch (compareError) {
+      setError(errorText(compareError));
+    } finally {
+      setRunning(false);
+    }
+  }, [leftPath, mode, rightPath]);
+
+  const applyTextMerge = useCallback(async (target: "left" | "right") => {
+    if (!textDiff) return;
+    const targetPath = target === "left" ? leftPath.trim() : rightPath.trim();
+    const mergedText = target === "left" ? textDiff.rightText : textDiff.leftText;
+    if (!targetPath || !window.confirm(`Replace ${targetPath} with the ${target === "left" ? "right" : "left"} text?`)) return;
+    setApplyingMerge(target);
+    setError(null);
+    try {
+      await compareApplyTextMerge(mergedText, targetPath);
+      useExplorerStore.getState().pushNotification("Applied text merge.", "success", 3500);
+      void runCompare();
+    } catch (mergeError) {
+      setError(errorText(mergeError));
+    } finally {
+      setApplyingMerge(null);
+    }
+  }, [leftPath, rightPath, runCompare, textDiff]);
+
+  const queueFolderCopy = useCallback(async (row: CompareFolderRow, direction: "left_to_right" | "right_to_left") => {
+    if (!folderResult) return;
+    const sourceRoot = direction === "left_to_right" ? folderResult.leftPath : folderResult.rightPath;
+    const destinationRoot = direction === "left_to_right" ? folderResult.rightPath : folderResult.leftPath;
+    const sourcePath = joinLocalPath(sourceRoot, row.relativePath);
+    const destinationDirectory = parentPath(joinLocalPath(destinationRoot, row.relativePath));
+    const source: PasteItem = { path: sourcePath, isDirectory: false };
+    try {
+      await explorerQueuePasteItems({ sources: [source], destinationDirectory, operation: "copy" });
+      useExplorerStore.getState().pushNotification("Queued compare copy.", "success");
+      void useOperationQueueStore.getState().load({ silent: true });
+    } catch (copyError) {
+      setError(errorText(copyError));
+    }
+  }, [folderResult]);
+
+  const queueFolderDelete = useCallback(async (row: CompareFolderRow, side: "left" | "right") => {
+    if (!folderResult) return;
+    const path = joinLocalPath(side === "left" ? folderResult.leftPath : folderResult.rightPath, row.relativePath);
+    try {
+      await explorerQueueDeleteItems({ paths: [path], permanent: false });
+      useExplorerStore.getState().pushNotification("Queued compare cleanup.", "success");
+      void useOperationQueueStore.getState().load({ silent: true });
+    } catch (deleteError) {
+      setError(errorText(deleteError));
+    }
+  }, [folderResult]);
+
+  return createPortal(
+    <div className={dialogStyles.backdrop} role="presentation">
+      <form
+        className={cx(dialogStyles.dialog, dialogStyles.wide)}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="compare-dialog-title"
+        onPointerDown={(event) => event.stopPropagation()}
+        onSubmit={(event) => {
+          event.preventDefault();
+          void runCompare();
+        }}
+      >
+        <header className={dialogStyles.batchHeader}>
+          <div>
+            <h2 className={dialogStyles.title} id="compare-dialog-title">Compare With</h2>
+            <p className={dialogStyles.text}>Compare files by hash or folders by relative inventory.</p>
+          </div>
+          <span className={dialogStyles.batchBadge}>{mode === "folder" ? "Folder" : "File"}</span>
+        </header>
+        <div className={compareStyles.body}>
+          <div className={compareStyles.modeRow}>
+            <button className={cx(compareStyles.modeButton, mode === "file" && compareStyles.modeButtonActive)} type="button" onClick={() => setMode("file")}>Files</button>
+            <button className={cx(compareStyles.modeButton, mode === "folder" && compareStyles.modeButtonActive)} type="button" onClick={() => setMode("folder")}>Folders</button>
+          </div>
+          <div className={compareStyles.fields}>
+            <label className={dialogStyles.batchField}>
+              <span>Left</span>
+              <input className={dialogStyles.input} value={leftPath} onChange={(event) => setLeftPath(event.target.value)} />
+            </label>
+            <label className={dialogStyles.batchField}>
+              <span>Right</span>
+              <input className={dialogStyles.input} autoFocus value={rightPath} onChange={(event) => setRightPath(event.target.value)} />
+            </label>
+          </div>
+          {error ? <div className={compareStyles.error}>{error}</div> : null}
+          {fileResult ? (
+            <div className={compareStyles.result}>
+              <strong>{fileResult.message}</strong>
+              <span>{textDiff ? "text compare" : `${fileResult.kind} compare`}</span>
+              <span>Left SHA-256</span>
+              <span className={compareStyles.hash} title={fileResult.leftSha256}>{fileResult.leftSha256}</span>
+              <span>Right SHA-256</span>
+              <span className={compareStyles.hash} title={fileResult.rightSha256}>{fileResult.rightSha256}</span>
+            </div>
+          ) : null}
+          {textDiff ? (
+            <div className={compareStyles.diffShell}>
+              <div className={compareStyles.diffHeader}>
+                <span>{textDiff.rows.filter((row) => row.kind !== "same").length} changed lines{textDiff.truncated ? " shown from the first 800 lines" : ""}</span>
+                <span className={compareStyles.diffActions}>
+                  <button className={compareStyles.miniButton} type="button" disabled={Boolean(applyingMerge)} onClick={() => void applyTextMerge("right")}>
+                    {applyingMerge === "right" ? "Applying" : "Apply L to R"}
+                  </button>
+                  <button className={compareStyles.miniButton} type="button" disabled={Boolean(applyingMerge)} onClick={() => void applyTextMerge("left")}>
+                    {applyingMerge === "left" ? "Applying" : "Apply R to L"}
+                  </button>
+                </span>
+              </div>
+              <div className={compareStyles.diffGrid}>
+                <div className={compareStyles.diffPane}>
+                  <span className={compareStyles.diffPaneTitle}>Left</span>
+                  {textDiff.rows.map((row) => (
+                    <CompareDiffLine key={`left:${row.id}`} lineNumber={row.leftLine} text={row.leftText} kind={leftDiffKind(row)} />
+                  ))}
+                </div>
+                <div className={compareStyles.diffPane}>
+                  <span className={compareStyles.diffPaneTitle}>Right</span>
+                  {textDiff.rows.map((row) => (
+                    <CompareDiffLine key={`right:${row.id}`} lineNumber={row.rightLine} text={row.rightText} kind={rightDiffKind(row)} />
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : null}
+          {imageCompare ? (
+            <div className={compareStyles.imageGrid}>
+              <div className={compareStyles.imagePane}>
+                <span className={compareStyles.imageMeta}>Left · {imageCompare.left.mimeType} · {formatBytes(imageCompare.left.byteLength)}</span>
+                <span className={compareStyles.imageFrame}>
+                  <img className={compareStyles.imagePreview} src={imageCompare.left.src} alt="Left file preview" />
+                </span>
+              </div>
+              <div className={compareStyles.imagePane}>
+                <span className={compareStyles.imageMeta}>Right · {imageCompare.right.mimeType} · {formatBytes(imageCompare.right.byteLength)}</span>
+                <span className={compareStyles.imageFrame}>
+                  <img className={compareStyles.imagePreview} src={imageCompare.right.src} alt="Right file preview" />
+                </span>
+              </div>
+            </div>
+          ) : null}
+          {folderResult ? (
+            <>
+              <div className={compareStyles.result}>
+                <strong>{folderResult.message}</strong>
+                <span>{changedRows.length} changed, {folderResult.rows.length - changedRows.length} same.</span>
+              </div>
+              {changedRows.length === 0 ? <div className={compareStyles.empty}>No folder differences found.</div> : (
+                <div className={compareStyles.rowList}>
+                  {changedRows.slice(0, 250).map((row) => (
+                    <div className={compareStyles.row} key={`${row.disposition}:${row.relativePath}`}>
+                      <span className={compareStyles.rowPath} title={row.relativePath}>{row.relativePath}</span>
+                      <span className={compareStyles.rowMeta}>{row.disposition.replace(/_/g, " ")}</span>
+                      <span className={compareStyles.rowMeta}>{formatBytes(row.leftSize ?? null)} / {formatBytes(row.rightSize ?? null)}</span>
+                      <span className={compareStyles.rowActions}>
+                        {row.leftSize != null ? <button className={compareStyles.miniButton} type="button" onClick={() => void queueFolderCopy(row, "left_to_right")}>Copy R</button> : null}
+                        {row.rightSize != null ? <button className={compareStyles.miniButton} type="button" onClick={() => void queueFolderCopy(row, "right_to_left")}>Copy L</button> : null}
+                        {row.leftSize != null ? <button className={compareStyles.miniButton} type="button" onClick={() => void queueFolderDelete(row, "left")}>Trash L</button> : null}
+                        {row.rightSize != null ? <button className={compareStyles.miniButton} type="button" onClick={() => void queueFolderDelete(row, "right")}>Trash R</button> : null}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : null}
+        </div>
+        <div className={dialogStyles.actions}>
+          <button className={dialogStyles.actionButton} type="button" onClick={props.onClose}>Close</button>
+          <button className={dialogStyles.actionButton} type="submit" disabled={running}>{running ? "Comparing" : "Compare"}</button>
+        </div>
+      </form>
+    </div>,
+    document.body,
+  );
+}
+
+function CompareDiffLine(props: {
+  lineNumber: number | null;
+  text: string;
+  kind: CompareTextDiffKind;
+}) {
+  return (
+    <span className={cx(compareStyles.diffLine, diffLineStyle(props.kind))}>
+      <span className={compareStyles.diffLineNumber}>{props.lineNumber ?? ""}</span>
+      <span className={compareStyles.diffText}>{props.text || " "}</span>
+    </span>
+  );
+}
+
+function AutomationManagerDialog(props: {
+  defaultRoot: string;
+  onClose: () => void;
+}) {
+  const [rules, setRules] = useState<AutomationRule[]>([]);
+  const [draft, setDraft] = useState<AutomationRule>(() => newAutomationRule(props.defaultRoot));
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [runResult, setRunResult] = useState<AutomationRunResult | null>(null);
+  const [watchSnapshot, setWatchSnapshot] = useState<AutomationWatchSnapshot | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let disposed = false;
+    void Promise.all([automationRulesSnapshot(), automationWatchSnapshot()])
+      .then(([snapshot, watcher]) => {
+        if (disposed) return;
+        setRules(snapshot.rules);
+        setWatchSnapshot(watcher);
+        setDraft(snapshot.rules[0] ?? newAutomationRule(props.defaultRoot));
+        setError(null);
+      })
+      .catch((loadError) => {
+        if (!disposed) setError(errorText(loadError));
+      })
+      .finally(() => {
+        if (!disposed) setLoading(false);
+      });
+    return () => {
+      disposed = true;
+    };
+  }, [props.defaultRoot]);
+
+  const selectRule = useCallback((rule: AutomationRule) => {
+    setDraft(rule);
+    setRunResult(null);
+    setError(null);
+  }, []);
+  const saveRule = useCallback(async () => {
+    if (!draft.name.trim()) {
+      setError("Name the automation rule before saving.");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      const snapshot = await automationRulesSave({
+        ...draft,
+        roots: cleanAutomationLines(draft.roots),
+        conditions: cleanAutomationConditions(draft.conditions),
+        actions: cleanAutomationLines(draft.actions),
+        updatedAtMs: Date.now(),
+      });
+      setRules(snapshot.rules);
+      setDraft(snapshot.rules.find((rule) => rule.id === draft.id) ?? snapshot.rules[0] ?? newAutomationRule(props.defaultRoot));
+      useExplorerStore.getState().pushNotification("Automation rule saved.", "success");
+    } catch (saveError) {
+      setError(errorText(saveError));
+    } finally {
+      setSaving(false);
+    }
+  }, [draft, props.defaultRoot]);
+  const deleteRule = useCallback(async () => {
+    if (!draft.id) return;
+    setError(null);
+    try {
+      const snapshot = await automationRulesDelete(draft.id);
+      setRules(snapshot.rules);
+      setDraft(snapshot.rules[0] ?? newAutomationRule(props.defaultRoot));
+      setRunResult(null);
+      useExplorerStore.getState().pushNotification("Automation rule deleted.", "success");
+    } catch (deleteError) {
+      setError(errorText(deleteError));
+    }
+  }, [draft.id, props.defaultRoot]);
+  const runAutomation = useCallback(async (dryRun: boolean) => {
+    if (!draft.id) {
+      await saveRule();
+      return;
+    }
+    if (!dryRun && !window.confirm("Execute this automation rule and queue matching file actions?")) return;
+    setError(null);
+    try {
+      const result = await automationRulesRunNow(draft.id, dryRun);
+      setRunResult(result);
+      useExplorerStore.getState().pushNotification(result.message, dryRun ? "info" : "success", 4500);
+    } catch (runError) {
+      setError(errorText(runError));
+    }
+  }, [draft.id, saveRule]);
+  const toggleWatcher = useCallback(async () => {
+    setError(null);
+    try {
+      const next = watchSnapshot?.active
+        ? await automationWatchStop()
+        : await automationWatchStart();
+      setWatchSnapshot(next);
+      useExplorerStore.getState().pushNotification(next.lastMessage, next.active ? "success" : "info", 3500);
+    } catch (watchError) {
+      setError(errorText(watchError));
+    }
+  }, [watchSnapshot?.active]);
+  const addCondition = useCallback(() => {
+    setDraft((current) => ({ ...current, conditions: [...current.conditions, defaultAutomationCondition()] }));
+  }, []);
+  const updateCondition = useCallback((index: number, patch: Partial<SavedSearchRule>) => {
+    setDraft((current) => ({
+      ...current,
+      conditions: current.conditions.map((condition, conditionIndex) =>
+        conditionIndex === index ? { ...condition, ...patch } : condition
+      ),
+    }));
+  }, []);
+  const removeCondition = useCallback((index: number) => {
+    setDraft((current) => ({
+      ...current,
+      conditions: current.conditions.length <= 1
+        ? [defaultAutomationCondition()]
+        : current.conditions.filter((_condition, conditionIndex) => conditionIndex !== index),
+    }));
+  }, []);
+  const appendAction = useCallback((action: string) => {
+    setDraft((current) => ({ ...current, actions: [...current.actions, action] }));
+  }, []);
+
+  return createPortal(
+    <div className={dialogStyles.backdrop} role="presentation">
+      <form
+        className={cx(dialogStyles.dialog, dialogStyles.wide)}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="automation-manager-title"
+        onPointerDown={(event) => event.stopPropagation()}
+        onSubmit={(event) => {
+          event.preventDefault();
+          void saveRule();
+        }}
+      >
+        <header className={dialogStyles.batchHeader}>
+          <div>
+            <h2 className={dialogStyles.title} id="automation-manager-title">Automation Rules</h2>
+            <p className={dialogStyles.text}>Create rules for watched roots, dry-run previews, and queued file actions.</p>
+          </div>
+          <span className={dialogStyles.batchBadge}>{rules.length} rules</span>
+        </header>
+        <div className={automationStyles.layout}>
+          <aside className={automationStyles.list}>
+            <button
+              className={automationStyles.listItem}
+              type="button"
+              onClick={() => {
+                setDraft(newAutomationRule(props.defaultRoot));
+                setRunResult(null);
+              }}
+            >
+              <strong>New Rule</strong>
+              <small className={automationStyles.itemMeta}>Start from current folder</small>
+            </button>
+            {loading ? <div className={automationStyles.empty}>Loading rules...</div> : null}
+            {!loading && rules.length === 0 ? <div className={automationStyles.empty}>No automation rules yet</div> : null}
+            {rules.map((rule) => (
+              <button
+                className={cx(automationStyles.listItem, draft.id === rule.id && automationStyles.listItemActive)}
+                type="button"
+                key={rule.id}
+                onClick={() => selectRule(rule)}
+              >
+                <strong>{rule.name}</strong>
+                <small className={automationStyles.itemMeta}>{rule.enabled ? "Enabled" : "Paused"} · {rule.roots.length} roots · {rule.actions.length} actions</small>
+              </button>
+            ))}
+          </aside>
+          <section className={automationStyles.editor}>
+            {watchSnapshot ? (
+              <div className={automationStyles.dryRun}>
+                <strong>{watchSnapshot.active ? "Watcher active" : "Watcher stopped"}</strong>
+                <span>{watchSnapshot.lastMessage}</span>
+                <span>{watchSnapshot.watchedRuleCount} enabled rules · {watchSnapshot.watchedRoots.length} local roots · {watchSnapshot.remoteRootCount} remote roots · every {Math.round(watchSnapshot.pollIntervalMs / 1000)}s</span>
+                {watchSnapshot.remoteRootCount > 0 ? <span>Remote roots are polled with fresh provider listings.</span> : null}
+              </div>
+            ) : null}
+            <div className={automationStyles.grid2}>
+              <label className={dialogStyles.batchField}>
+                <span>Name</span>
+                <input className={dialogStyles.input} value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} />
+              </label>
+              <label className={automationStyles.toggle}>
+                <input className={automationStyles.checkbox} type="checkbox" checked={draft.enabled} onChange={(event) => setDraft((current) => ({ ...current, enabled: event.target.checked }))} />
+                <span>Enabled</span>
+              </label>
+            </div>
+            <label className={dialogStyles.batchField}>
+              <span>Roots</span>
+              <textarea className={automationStyles.textarea} value={draft.roots.join("\n")} onChange={(event) => setDraft((current) => ({ ...current, roots: parseAutomationLines(event.target.value) }))} />
+            </label>
+            <div className={automationStyles.ruleList}>
+              {draft.conditions.map((condition, index) => (
+                <div className={automationStyles.ruleRow} key={`automation-condition:${index}`}>
+                  <select className={automationStyles.select} value={condition.field} onChange={(event) => updateCondition(index, { field: event.target.value })}>
+                    <option value="path">Path</option>
+                    <option value="name">Name</option>
+                  </select>
+                  <select className={automationStyles.select} value={condition.operator} onChange={(event) => updateCondition(index, { operator: event.target.value })}>
+                    <option value="contains">contains</option>
+                    <option value="ends_with">ends with</option>
+                  </select>
+                  <input className={dialogStyles.input} value={condition.value} onChange={(event) => updateCondition(index, { value: event.target.value })} />
+                  <button className={compareStyles.miniButton} type="button" aria-label="Remove condition" onClick={() => removeCondition(index)}>X</button>
+                </div>
+              ))}
+              <button className={automationStyles.templateButton} type="button" onClick={addCondition}>Add Condition</button>
+            </div>
+            <label className={dialogStyles.batchField}>
+              <span>Actions</span>
+              <textarea className={automationStyles.textarea} value={draft.actions.join("\n")} onChange={(event) => setDraft((current) => ({ ...current, actions: parseAutomationLines(event.target.value) }))} />
+            </label>
+            <div className={automationStyles.actionTemplates}>
+              {automationActionTemplates.map((action) => (
+                <button className={automationStyles.templateButton} type="button" key={action} onClick={() => appendAction(action)}>{action}</button>
+              ))}
+            </div>
+            {runResult ? (
+              <div className={automationStyles.dryRun}>
+                <strong>{runResult.message}</strong>
+                {runResult.actionResults.map((result) => (
+                  <span className={compareStyles.rowPath} title={result.message} key={`${result.action}:${result.status}`}>
+                    {result.status.replace(/_/g, " ")} · {result.action} · {result.message}
+                  </span>
+                ))}
+                {runResult.matchedPaths.slice(0, 80).map((path) => <span className={compareStyles.rowPath} title={path} key={path}>{path}</span>)}
+                {runResult.matchedPaths.length > 80 ? <em className={dialogStyles.text}>Showing first 80 matches.</em> : null}
+              </div>
+            ) : null}
+            {error ? <div className={automationStyles.error}>{error}</div> : null}
+          </section>
+        </div>
+        <div className={dialogStyles.actions}>
+          <button className={dialogStyles.actionButton} type="button" onClick={props.onClose}>Close</button>
+          <button className={dialogStyles.actionButton} type="button" disabled={!draft.id} onClick={() => void deleteRule()}>Delete</button>
+          <button className={dialogStyles.actionButton} type="button" onClick={() => void toggleWatcher()}>{watchSnapshot?.active ? "Stop Watch" : "Watch"}</button>
+          <button className={dialogStyles.actionButton} type="button" onClick={() => void runAutomation(true)}>Dry Run</button>
+          <button className={dialogStyles.actionButton} type="button" disabled={!draft.id} onClick={() => void runAutomation(false)}>Execute</button>
+          <button className={dialogStyles.actionButton} type="submit" disabled={saving}>{saving ? "Saving" : "Save"}</button>
+        </div>
+      </form>
+    </div>,
+    document.body,
+  );
+}
+
+function DuplicateFinderDialog(props: {
+  paneId: string;
+  defaultRoot: string;
+  onClose: () => void;
+}) {
+  const initialRoot = props.defaultRoot || "/";
+  const [rootsText, setRootsText] = useState(initialRoot);
+  const [hashAll, setHashAll] = useState(true);
+  const [scanning, setScanning] = useState(false);
+  const [remoteApprovalPending, setRemoteApprovalPending] = useState(false);
+  const [result, setResult] = useState<DuplicateScanResult | null>(null);
+  const [selectedCleanupPaths, setSelectedCleanupPaths] = useState<string[]>([]);
+  const [cleanupMode, setCleanupMode] = useState<"trash" | "move">("trash");
+  const [cleanupMoveDestination, setCleanupMoveDestination] = useState(initialRoot.startsWith("misty://") ? "/" : initialRoot);
+  const [error, setError] = useState<string | null>(null);
+  const selectedSet = useMemo(() => new Set(selectedCleanupPaths), [selectedCleanupPaths]);
+  const roots = useMemo(() => parseDuplicateRoots(rootsText), [rootsText]);
+  const cleanupCount = selectedCleanupPaths.length;
+  const cleanupBytes = useMemo(
+    () => duplicateCleanupBytes(result?.groups ?? [], selectedSet),
+    [result?.groups, selectedSet],
+  );
+
+  const runScan = useCallback(async () => {
+    if (roots.length === 0) {
+      setError("Add at least one folder to scan.");
+      return;
+    }
+    setScanning(true);
+    setError(null);
+    setRemoteApprovalPending(false);
+    try {
+      const next = await duplicatesScan({ roots, hashAll });
+      setResult(next);
+      setSelectedCleanupPaths(defaultDuplicateCleanupPaths(next.groups));
+      setRemoteApprovalPending(next.remoteCandidateCount > 0 && !next.remoteHashingApproved);
+    } catch (scanError) {
+      setError(errorText(scanError));
+    } finally {
+      setScanning(false);
+    }
+  }, [hashAll, roots]);
+
+  const cancelScan = useCallback(() => {
+    if (!result?.scanId) return;
+    void duplicatesCancel(result.scanId).catch(() => undefined);
+    setScanning(false);
+  }, [result?.scanId]);
+
+  const approveRemoteHash = useCallback(async () => {
+    if (!result?.scanId) return;
+    setError(null);
+    try {
+      const next = await duplicatesHashRemoteCandidates(result.scanId);
+      setResult(next);
+      setSelectedCleanupPaths(defaultDuplicateCleanupPaths(next.groups));
+      setRemoteApprovalPending(next.remoteCandidateCount > 0 && !next.remoteHashingApproved);
+    } catch (approvalError) {
+      setError(errorText(approvalError));
+    }
+  }, [result?.scanId]);
+
+  const toggleCleanupPath = useCallback((group: DuplicateGroup, path: string) => {
+    setSelectedCleanupPaths((current) => {
+      const currentSet = new Set(current);
+      if (currentSet.has(path)) {
+        currentSet.delete(path);
+        return [...currentSet];
+      }
+      const selectedInGroup = group.items.filter((item) => currentSet.has(item.path)).length;
+      if (selectedInGroup >= group.items.length - 1) return current;
+      currentSet.add(path);
+      return [...currentSet];
+    });
+  }, []);
+
+  const queueCleanup = useCallback(async () => {
+    if (selectedCleanupPaths.length === 0) return;
+    const safeItems = duplicateSafeCleanupItems(result?.groups ?? [], selectedSet);
+    if (safeItems.length === 0) {
+      setError("Keep at least one file in every duplicate group.");
+      return;
+    }
+    const safePaths = safeItems.map((item) => item.path);
+    try {
+      if (cleanupMode === "move") {
+        const destinationDirectory = cleanupMoveDestination.trim();
+        if (!destinationDirectory) {
+          setError("Choose a destination folder for move cleanup.");
+          return;
+        }
+        const localItems = safeItems.filter((item) => !item.remote);
+        const remoteItems = safeItems.filter((item) => item.remote);
+        for (const items of [localItems, remoteItems]) {
+          if (items.length === 0) continue;
+          await explorerQueuePasteItems({
+            sources: items.map((item): PasteItem => ({ path: item.path, isDirectory: false })),
+            destinationDirectory,
+            operation: "move",
+          });
+        }
+      } else {
+        await explorerQueueDeleteItems({ paths: safePaths, permanent: false });
+      }
+      void useTransfersStore.getState().load(undefined, { silent: true });
+      void useOperationQueueStore.getState().load({ silent: true });
+      useExplorerStore.getState().pushNotification(`Queued ${cleanupMode} cleanup for ${duplicateItemCountLabel(safePaths.length)}`, "success");
+      void useExplorerStore.getState().refreshPane(props.paneId);
+      props.onClose();
+    } catch (cleanupError) {
+      setError(errorText(cleanupError));
+    }
+  }, [cleanupMode, cleanupMoveDestination, props, result?.groups, selectedCleanupPaths.length, selectedSet]);
+
+  return createPortal(
+    <div className={dialogStyles.backdrop} role="presentation">
+      <form
+        className={cx(dialogStyles.dialog, dialogStyles.wide)}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="duplicate-finder-title"
+        onPointerDown={(event) => event.stopPropagation()}
+        onSubmit={(event) => {
+          event.preventDefault();
+          void runScan();
+        }}
+      >
+        <header className={dialogStyles.batchHeader}>
+          <div>
+            <h2 className={dialogStyles.title} id="duplicate-finder-title">Duplicate Finder</h2>
+            <p className={dialogStyles.text}>Scan folders, review duplicate candidates, then queue cleanup.</p>
+          </div>
+          <span className={dialogStyles.batchBadge}>{result ? `${result.groups.length} groups` : "Preview first"}</span>
+        </header>
+        <div className={duplicateFinderStyles.body}>
+          <div className={duplicateFinderStyles.controls}>
+            <label className={dialogStyles.batchField}>
+              <span>Scan roots</span>
+              <textarea
+                className={duplicateFinderStyles.rootsInput}
+                value={rootsText}
+                spellCheck={false}
+                onChange={(event) => setRootsText(event.target.value)}
+              />
+            </label>
+            <div className="grid gap-2">
+              <button className={dialogStyles.actionButton} type="submit" disabled={scanning}>
+                {scanning ? "Scanning" : "Scan"}
+              </button>
+              <button className={dialogStyles.actionButton} type="button" disabled={!scanning || !result?.scanId} onClick={cancelScan}>Cancel</button>
+            </div>
+          </div>
+          <label className={duplicateFinderStyles.optionRow}>
+            <input className={duplicateFinderStyles.checkbox} type="checkbox" checked={hashAll} onChange={(event) => setHashAll(event.target.checked)} />
+            <span>Hash all duplicate-size candidates for exact matches</span>
+          </label>
+          {remoteApprovalPending ? (
+            <div className={duplicateFinderStyles.warning}>
+              {result?.remoteCandidateCount ?? 0} remote candidates need explicit download approval before hashing.
+              <button className={dialogStyles.actionButton} type="button" onClick={approveRemoteHash}>Approve Remote Hashing</button>
+            </div>
+          ) : null}
+          {error ? <div className={duplicateFinderStyles.error}>{error}</div> : null}
+          {result ? (
+            <div className={duplicateFinderStyles.summary}>
+              <span>{result.message}</span>
+              <span>{result.scannedCount} scanned, {result.hashedCount} hashed, {cleanupCount} selected for cleanup ({formatBytes(cleanupBytes)}).</span>
+            </div>
+          ) : null}
+          {result && result.groups.length === 0 ? (
+            <div className={duplicateFinderStyles.empty}>No duplicate candidates found for the current scan.</div>
+          ) : null}
+          {result && result.groups.length > 0 ? (
+            <div className={duplicateFinderStyles.groupList}>
+              {result.groups.map((group) => (
+                <section className={duplicateFinderStyles.group} key={group.key}>
+                  <header className={duplicateFinderStyles.groupHeader}>
+                    <strong>{group.items.length} copies · {formatBytes(group.sizeBytes)}</strong>
+                    <span className={duplicateFinderStyles.groupMeta}>{group.key}</span>
+                  </header>
+                  {group.items.map((item) => {
+                    const selected = selectedSet.has(item.path);
+                    return (
+                      <label className={duplicateFinderStyles.candidate} key={item.path}>
+                        <input
+                          className={duplicateFinderStyles.checkbox}
+                          type="checkbox"
+                          checked={selected}
+                          onChange={() => toggleCleanupPath(group, item.path)}
+                        />
+                        <span className="grid min-w-0 gap-1">
+                          <span className={duplicateFinderStyles.candidatePath} title={item.path}>{item.path}</span>
+                          <small className={duplicateFinderStyles.candidateMeta}>{formatDate(item.modifiedMs)}{item.sha256 ? ` · ${item.sha256.slice(0, 12)}` : ""}</small>
+                        </span>
+                        <span className={duplicateFinderStyles.groupMeta}>{selected ? (cleanupMode === "move" ? "Move" : "Trash") : "Keep"}</span>
+                      </label>
+                    );
+                  })}
+                </section>
+              ))}
+            </div>
+          ) : null}
+        </div>
+        <div className={dialogStyles.actions}>
+          <select className={dialogStyles.input} value={cleanupMode} onChange={(event) => setCleanupMode(event.target.value === "move" ? "move" : "trash")}>
+            <option value="trash">Trash selected</option>
+            <option value="move">Move selected</option>
+          </select>
+          {cleanupMode === "move" ? (
+            <input
+              className={dialogStyles.input}
+              value={cleanupMoveDestination}
+              placeholder="Destination folder"
+              aria-label="Duplicate cleanup destination"
+              onChange={(event) => setCleanupMoveDestination(event.target.value)}
+            />
+          ) : null}
+          <button className={dialogStyles.actionButton} type="button" onClick={props.onClose}>Close</button>
+          <button className={dialogStyles.actionButton} type="button" disabled={cleanupCount === 0} onClick={() => void queueCleanup()}>Queue Cleanup</button>
+        </div>
+      </form>
+    </div>,
+    document.body,
+  );
+}
+
+function parseDuplicateRoots(value: string): string[] {
+  const seen = new Set<string>();
+  const roots: string[] = [];
+  for (const line of value.split(/\r?\n|,/)) {
+    const root = line.trim();
+    if (!root || seen.has(root)) continue;
+    seen.add(root);
+    roots.push(root);
+  }
+  return roots;
+}
+
+function defaultDuplicateCleanupPaths(groups: DuplicateGroup[]): string[] {
+  return groups.flatMap((group) => group.items.slice(1).map((item) => item.path));
+}
+
+function duplicateSafeCleanupItems(groups: DuplicateGroup[], selected: Set<string>) {
+  const items: DuplicateGroup["items"] = [];
+  for (const group of groups) {
+    const selectedInGroup = group.items.filter((item) => selected.has(item.path));
+    if (selectedInGroup.length >= group.items.length) continue;
+    items.push(...selectedInGroup);
+  }
+  return items;
+}
+
+function duplicateSafeCleanupPaths(groups: DuplicateGroup[], selected: Set<string>): string[] {
+  return duplicateSafeCleanupItems(groups, selected).map((item) => item.path);
+}
+
+function duplicateCleanupBytes(groups: DuplicateGroup[], selected: Set<string>): number {
+  return duplicateSafeCleanupItems(groups, selected).reduce((total, item) => total + (item.sizeBytes ?? 0), 0);
+}
+
+function duplicateItemCountLabel(count: number): string {
+  return `${count} ${count === 1 ? "item" : "items"}`;
+}
+
+const automationActionTemplates = [
+  "rename:{name}",
+  "move:/path/to/folder",
+  "copy:/path/to/folder",
+  "compress:/path/to/archive.zip",
+  "upload:remote:/path",
+] as const;
+
+function newAutomationRule(defaultRoot: string): AutomationRule {
+  return {
+    id: "",
+    name: "New Automation",
+    enabled: true,
+    roots: [defaultRoot && !defaultRoot.startsWith("misty://") ? defaultRoot : "/"],
+    conditions: [defaultAutomationCondition()],
+    actions: ["move:/path/to/folder"],
+    updatedAtMs: Date.now(),
+  };
+}
+
+function defaultAutomationCondition(): SavedSearchRule {
+  return { field: "path", operator: "contains", value: "" };
+}
+
+function parseAutomationLines(value: string): string[] {
+  return value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+}
+
+function cleanAutomationLines(values: string[]): string[] {
+  return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
+}
+
+function cleanAutomationConditions(conditions: SavedSearchRule[]): SavedSearchRule[] {
+  return conditions
+    .map((condition) => ({
+      field: condition.field.trim() || "path",
+      operator: condition.operator.trim() || "contains",
+      value: condition.value.trim(),
+    }))
+    .filter((condition) => condition.value);
+}
+
+function BatchRenameDialog(props: {
+  dialog: NonNullable<ExplorerDialogState> & { kind: "batchRename" };
+}) {
+  const { dialog } = props;
+  const [findText, setFindText] = useState("");
+  const [replaceText, setReplaceText] = useState("");
+  const [prefix, setPrefix] = useState("");
+  const [suffix, setSuffix] = useState("");
+  const [caseMode, setCaseMode] = useState<BatchRenameCaseMode>("none");
+  const [lockExtensions, setLockExtensions] = useState(true);
+  const [sequenceEnabled, setSequenceEnabled] = useState(false);
+  const [sequenceStart, setSequenceStart] = useState(1);
+  const [sequencePad, setSequencePad] = useState(2);
+  const [manualValues, setManualValues] = useState<Record<string, string>>({});
+  const options = useMemo<BatchRenameOptions>(() => ({
+    findText,
+    replaceText,
+    prefix,
+    suffix,
+    caseMode,
+    lockExtensions,
+    sequenceEnabled,
+    sequenceStart,
+    sequencePad,
+    manualValues,
+  }), [caseMode, findText, lockExtensions, manualValues, prefix, replaceText, sequenceEnabled, sequencePad, sequenceStart, suffix]);
+  const previewItems = useMemo(
+    () => validateBatchRenameItems(dialog.items.map((item, index) => previewBatchRenameItem(item, index, options))),
+    [dialog.items, options],
+  );
+  const invalidCount = previewItems.filter((item) => item.error).length;
+  const firstInvalidIndex = previewItems.findIndex((item) => item.error);
+  const readyCount = previewItems.filter((item) => !item.error && `${item.value.trim()}${item.lockedExtension}` !== item.originalName).length;
+  const unchangedCount = previewItems.length - readyCount - invalidCount;
+  const updateManualValue = useCallback((item: ExplorerBatchRenameItem, value: string) => {
+    setManualValues((current) => ({ ...current, [batchRenameItemKey(item)]: value }));
+  }, []);
+  const applyPreview = useCallback(() => {
+    const store = useExplorerStore.getState();
+    store.setBatchRenameItems(dialog.paneId, previewItems);
+    void store.confirmDialog();
+  }, [dialog.paneId, previewItems]);
+
+  return createPortal(
+    <div className={dialogStyles.backdrop} role="presentation">
+      <form
+        className={cx(dialogStyles.dialog, dialogStyles.wide)}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="explorer-dialog-title"
+        onPointerDown={(event) => event.stopPropagation()}
+        onSubmit={(event) => {
+          event.preventDefault();
+          applyPreview();
+        }}
+      >
+        <header className={dialogStyles.batchHeader}>
+          <div>
+            <h2 className={dialogStyles.title} id="explorer-dialog-title">Batch Rename</h2>
+            <p className={dialogStyles.text}>{readyCount} ready, {unchangedCount} unchanged, {invalidCount} need fixes.</p>
+          </div>
+          <span className={dialogStyles.batchBadge}>{invalidCount > 0 ? `${invalidCount} need fixes` : `${previewItems.length} selected`}</span>
+        </header>
+        <div className={dialogStyles.batchControls}>
+          <label className={dialogStyles.batchField}>
+            <span>Find</span>
+            <input className={dialogStyles.input} value={findText} autoComplete="off" onChange={(event) => setFindText(event.target.value)} />
+          </label>
+          <label className={dialogStyles.batchField}>
+            <span>Replace</span>
+            <input className={dialogStyles.input} value={replaceText} autoComplete="off" onChange={(event) => setReplaceText(event.target.value)} />
+          </label>
+          <label className={dialogStyles.batchField}>
+            <span>Prefix</span>
+            <input className={dialogStyles.input} value={prefix} autoComplete="off" onChange={(event) => setPrefix(event.target.value)} />
+          </label>
+          <label className={dialogStyles.batchField}>
+            <span>Suffix</span>
+            <input className={dialogStyles.input} value={suffix} autoComplete="off" onChange={(event) => setSuffix(event.target.value)} />
+          </label>
+          <label className={dialogStyles.batchField}>
+            <span>Case</span>
+            <select className={dialogStyles.batchSelect} value={caseMode} onChange={(event) => setCaseMode(event.target.value as BatchRenameCaseMode)}>
+              <option value="none">Unchanged</option>
+              <option value="lower">lowercase</option>
+              <option value="upper">UPPERCASE</option>
+              <option value="title">Title Case</option>
+            </select>
+          </label>
+          <label className={dialogStyles.batchField}>
+            <span>Start</span>
+            <input
+              className={dialogStyles.input}
+              type="number"
+              min={0}
+              value={sequenceStart}
+              onChange={(event) => setSequenceStart(Number.parseInt(event.target.value, 10) || 0)}
+            />
+          </label>
+          <label className={dialogStyles.batchField}>
+            <span>Pad</span>
+            <input
+              className={dialogStyles.input}
+              type="number"
+              min={1}
+              max={8}
+              value={sequencePad}
+              onChange={(event) => setSequencePad(Math.min(8, Math.max(1, Number.parseInt(event.target.value, 10) || 1)))}
+            />
+          </label>
+          <label className={dialogStyles.batchToggle}>
+            <input className={dialogStyles.batchCheckbox} type="checkbox" checked={sequenceEnabled} onChange={(event) => setSequenceEnabled(event.target.checked)} />
+            <span>Number suffix</span>
+          </label>
+          <label className={dialogStyles.batchToggle}>
+            <input
+              className={dialogStyles.batchCheckbox}
+              type="checkbox"
+              checked={lockExtensions}
+              onChange={(event) => {
+                setManualValues({});
+                setLockExtensions(event.target.checked);
+              }}
+            />
+            <span>Lock extensions</span>
+          </label>
+        </div>
+        <div className={dialogStyles.batchHead} aria-hidden="true">
+          <span>Before</span>
+          <span>After</span>
+        </div>
+        <div className={dialogStyles.batchList}>
+          {previewItems.map((item, index) => (
+            <label className={cx(dialogStyles.batchRow, item.error && dialogStyles.batchRowInvalid)} key={batchRenameItemKey(item)}>
+              <span className={dialogStyles.batchBefore} title={item.originalName}>{item.originalName}</span>
+              <div>
+                <div className={dialogStyles.batchInputWrap}>
+                  <input
+                    className={cx(dialogStyles.input, dialogStyles.batchInput)}
+                    value={item.value}
+                    autoComplete="off"
+                    aria-invalid={Boolean(item.error)}
+                    autoFocus={invalidCount > 0 ? index === firstInvalidIndex : false}
+                    onChange={(event) => updateManualValue(item, event.target.value)}
+                  />
+                  {item.lockedExtension ? <small className={dialogStyles.batchExtension}>{item.lockedExtension}</small> : null}
+                </div>
+                {item.error ? <em className={dialogStyles.batchError}>{item.error}</em> : (
+                  <em className={cx(
+                    dialogStyles.batchError,
+                    `${item.value.trim()}${item.lockedExtension}` === item.originalName ? dialogStyles.batchMuted : dialogStyles.batchReady,
+                  )}>
+                    {`${item.value.trim()}${item.lockedExtension}` === item.originalName ? "Unchanged" : "Ready"}
+                  </em>
+                )}
+              </div>
+            </label>
+          ))}
+        </div>
+        <div className={dialogStyles.actions}>
+          <button className={dialogStyles.actionButton} type="button" onClick={() => useExplorerStore.getState().closeDialog()}>Cancel</button>
+          <button className={dialogStyles.actionButton} type="submit" disabled={readyCount === 0 || invalidCount > 0}>Apply</button>
+        </div>
+      </form>
+    </div>,
+    document.body,
+  );
+}
+
 function ExplorerDialog() {
   const dialog = useExplorerStore((state) => state.dialog);
   if (!dialog) return null;
   if (dialog.kind === "batchRename") {
-    const invalidCount = dialog.items.filter((item) => item.error).length;
-    const firstInvalidIndex = dialog.items.findIndex((item) => item.error);
-    const readyCount = dialog.items.filter((item) => !item.error && `${item.value.trim()}${item.lockedExtension}` !== item.originalName).length;
-    const unchangedCount = dialog.items.length - readyCount - invalidCount;
-    return createPortal(
-      <div className={dialogStyles.backdrop} role="presentation">
-        <form
-          className={cx(dialogStyles.dialog, dialogStyles.wide)}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="explorer-dialog-title"
-          onPointerDown={(event) => event.stopPropagation()}
-          onSubmit={(event) => {
-            event.preventDefault();
-            void useExplorerStore.getState().confirmDialog();
-          }}
-        >
-          <header className={dialogStyles.batchHeader}>
-            <div>
-              <h2 className={dialogStyles.title} id="explorer-dialog-title">Review Renames</h2>
-              <p className={dialogStyles.text}>{readyCount} ready, {unchangedCount} unchanged, {invalidCount} need fixes.</p>
-            </div>
-            {invalidCount > 0 ? <span className={dialogStyles.batchBadge}>{invalidCount} need fixes</span> : null}
-          </header>
-          <div className={dialogStyles.batchHead} aria-hidden="true">
-            <span>Before</span>
-            <span>After</span>
-          </div>
-          <div className={dialogStyles.batchList}>
-            {dialog.items.map((item, index) => (
-              <label className={cx(dialogStyles.batchRow, item.error && dialogStyles.batchRowInvalid)} key={`${item.paneId}:${item.entryId}`}>
-                <span className={dialogStyles.batchBefore} title={item.originalName}>{item.originalName}</span>
-                <div>
-                  <div className={dialogStyles.batchInputWrap}>
-                    <input
-                      className={cx(dialogStyles.input, dialogStyles.batchInput)}
-                      value={item.value}
-                      autoComplete="off"
-                      autoFocus={invalidCount > 0 ? index === firstInvalidIndex : index === 0}
-                      aria-invalid={Boolean(item.error)}
-                      onChange={(event) => useExplorerStore.getState().setBatchRenameValue(item.paneId, item.entryId, event.target.value)}
-                    />
-                    {item.lockedExtension ? <small className={dialogStyles.batchExtension}>{item.lockedExtension}</small> : null}
-                  </div>
-                  {item.error ? <em className={dialogStyles.batchError}>{item.error}</em> : (
-                    <em className={cx(
-                      dialogStyles.batchError,
-                      `${item.value.trim()}${item.lockedExtension}` === item.originalName ? dialogStyles.batchMuted : dialogStyles.batchReady,
-                    )}>
-                      {`${item.value.trim()}${item.lockedExtension}` === item.originalName ? "Unchanged" : "Ready"}
-                    </em>
-                  )}
-                </div>
-              </label>
-            ))}
-          </div>
-          <div className={dialogStyles.actions}>
-            <button className={dialogStyles.actionButton} type="button" onClick={() => useExplorerStore.getState().closeDialog()}>Cancel</button>
-            <button className={dialogStyles.actionButton} type="submit" disabled={readyCount === 0}>Confirm</button>
-          </div>
-        </form>
-      </div>,
-      document.body,
-    );
+    return <BatchRenameDialog dialog={dialog} />;
   }
   const deleteLabel = dialog.paths.length === 1
     ? dialog.paths[0].split("/").filter(Boolean).pop() ?? dialog.paths[0]
@@ -2253,7 +3783,7 @@ function runExplorerCommand(commandId: string, paneId: string, navigateRoute: (p
       navigateRoute("/settings");
       break;
     case "app.toggle_plugin_launcher":
-      navigateRoute("/hub");
+      navigateRoute("/hub/extensions");
       break;
     case "clipboard.publish_shared":
       void publishSharedClipboard();
@@ -2286,6 +3816,18 @@ function runExplorerCommand(commandId: string, paneId: string, navigateRoute: (p
     case "explorer.rename":
       void explorer.renameSelected(paneId);
       break;
+    case "explorer.batch_rename":
+      explorer.openBatchRenameDialog(paneId);
+      break;
+    case "explorer.duplicate_finder":
+      openDuplicateFinder(paneId);
+      break;
+    case "explorer.compare_with":
+      openCompareWith(paneId);
+      break;
+    case "explorer.automation_rules":
+      openAutomationManager();
+      break;
     case "explorer.delete":
       void explorer.deleteSelected(paneId);
       break;
@@ -2317,13 +3859,13 @@ function runExplorerCommand(commandId: string, paneId: string, navigateRoute: (p
       toggleActiveTabPanelVisibility("sidebar");
       break;
     case "explorer.toggle_chat":
-      if (explorer.chatOverlayOpen && !useAiSessionStore.getState().status?.running) {
-        useAiSessionStore.getState().clearConversation();
+      if (explorer.chatOverlayOpen && !useMikaSessionStore.getState().status?.running) {
+        useMikaSessionStore.getState().clearConversation();
       }
       explorer.toggleChatOverlay();
       break;
-    case "explorer.toggle_claude":
-      explorer.toggleClaudePanel();
+    case "explorer.toggle_mika":
+      explorer.toggleMikaPanel();
       break;
     case "explorer.next_workspace": {
       if (multi.tabs.length <= 1) break;
@@ -2395,6 +3937,62 @@ async function runPluginCommandById(
   }
 }
 
+async function createExplorerPublicLink(remote: string, remotePath: string): Promise<void> {
+  const explorer = useExplorerStore.getState();
+  try {
+    const result = await providersCreatePublicLink({ remote, path: remotePath });
+    if (!result.supported) {
+      explorer.pushNotification(result.message ?? "Shared links are not supported for this provider.", "info", 4500);
+      return;
+    }
+    const url = result.link?.url;
+    if (!url) {
+      explorer.pushNotification(result.message ?? "No link was returned.", "info", 4500);
+      return;
+    }
+    await writeText(url);
+    explorer.pushNotification("Public link copied.", "success", 3500);
+  } catch (error) {
+    explorer.pushNotification(`Share link failed: ${errorText(error)}`, "error", 4500);
+  }
+}
+
+async function verifyExplorerRemotePath(remote: string, remotePath: string): Promise<void> {
+  const explorer = useExplorerStore.getState();
+  const target = window.prompt("Compare against local path or remote path in this provider:", "");
+  if (!target) return;
+  try {
+    const local = target.startsWith("/");
+    const started = await providersVerifyStart({
+      source: { kind: "remote", remote, path: remotePath },
+      dest: { kind: local ? "local" : "remote", remote: local ? undefined : remote, path: target },
+      options: { profile: { transfers: 4, checkers: 8, retries: 3, lowLevelRetries: 10 } },
+    });
+    explorer.pushNotification("Verify started.", "info", 3000);
+    const result = await waitForVerifyResult(started.jobId);
+    const issueCount = result.missingOnSrc.length + result.missingOnDst.length + result.differ.length + result.error.length;
+    explorer.pushNotification(
+      result.success && issueCount === 0 ? "Verify complete. No differences found." : `Verify complete. ${issueCount} ${issueCount === 1 ? "issue" : "issues"} found.`,
+      result.success && issueCount === 0 ? "success" : "info",
+      5500,
+    );
+  } catch (error) {
+    explorer.pushNotification(`Verify failed: ${errorText(error)}`, "error", 5500);
+  }
+}
+
+async function waitForVerifyResult(jobId: string): Promise<Awaited<ReturnType<typeof providersVerifyResult>>> {
+  for (let attempt = 0; attempt < 240; attempt += 1) {
+    const status = await providersJobStatus(jobId);
+    if (status.resultReady) return providersVerifyResult(jobId);
+    if (status.state === "failed" || status.state === "cancelled") {
+      throw new Error(status.message ?? `Verify ${status.state}.`);
+    }
+    await new Promise((resolve) => window.setTimeout(resolve, 1000));
+  }
+  throw new Error("Verify did not finish before the local timeout.");
+}
+
 function focusExplorerSearch(paneId: string, mode: "search" | "command"): void {
   useExplorerStore.getState().setCommandQuery(paneId, mode === "command" ? ">" : "");
   window.dispatchEvent(new CustomEvent(explorerSearchFocusEvent, { detail: { paneId, mode } }));
@@ -2404,6 +4002,30 @@ function openDeepSearch(paneId: string): void {
   const pane = useExplorerStore.getState().panes[paneId];
   const currentPath = pane?.listing?.path ?? "";
   void useSearchStore.getState().openSearch(currentPath);
+}
+
+function openDuplicateFinder(paneId: string): void {
+  window.dispatchEvent(new CustomEvent(explorerDuplicateFinderEvent, { detail: { paneId } }));
+}
+
+function openCompareWith(paneId: string): void {
+  window.dispatchEvent(new CustomEvent(explorerCompareWithEvent, { detail: compareSeedForPane(paneId) }));
+}
+
+function openAutomationManager(): void {
+  window.dispatchEvent(new CustomEvent(explorerAutomationManagerEvent));
+}
+
+function compareSeedForPane(paneId: string): CompareDialogSeed {
+  const pane = useExplorerStore.getState().panes[paneId];
+  const selectedIds = new Set(pane?.selectedIds ?? []);
+  const selected = pane?.listing?.entries.find((entry) => selectedIds.has(entry.id) && !entry.isDeleted);
+  const leftPath = selected?.path ?? pane?.listing?.path ?? "";
+  return {
+    paneId,
+    leftPath,
+    mode: selected?.kind === "folder" ? "folder" : "file",
+  };
 }
 
 async function undoLatestTransferOperation(): Promise<void> {
@@ -2651,97 +4273,196 @@ function clipboardRefValue(value: string): string {
 
 const ConnectedFileInspector = memo(function ConnectedFileInspector() {
   const activePaneId = useMultiPanelStore((state) => state.activePaneId);
-  const { directorySizes, listing, selectedEntry, selectedCount } = useExplorerStore(useShallow((state) => {
+  const { directorySizes, library, listing, selectedEntry, selectedCount } = useExplorerStore(useShallow((state) => {
     const pane = state.panes[activePaneId];
     const selectedCount = pane?.selectedIds.length ?? 0;
     const selectedEntry = selectedCount === 1 ? selectedEntryForPane(pane) : null;
     return {
       directorySizes: state.directorySizes,
+      library: state.library,
       listing: pane?.listing ?? null,
       selectedEntry,
       selectedCount,
     };
   }));
+  const mistyMetadata = selectedEntry ? libraryMetadataForEntry(selectedEntry, library) : { tags: [], comments: "" };
   const onCalculateSize = useCallback((path: string) => {
     void useExplorerStore.getState().calculateDirectorySizes([path], { force: false, notify: false });
+  }, []);
+  const onSaveMetadata = useCallback((entry: FileEntry, tags: string[], comments: string) => {
+    void useExplorerStore.getState().setLibraryMetadata(entry, tags, comments);
   }, []);
   return (
     <FileInspector
       directorySizes={directorySizes}
       listing={listing}
+      mistyComments={mistyMetadata.comments}
+      mistyTags={mistyMetadata.tags}
       selectedEntry={selectedEntry}
       selectedCount={selectedCount}
       onCalculateSize={onCalculateSize}
+      onSaveMetadata={onSaveMetadata}
     />
   );
 });
 
+function libraryMetadataForEntry(
+  entry: FileEntry,
+  library: ExplorerLibrarySnapshot | null,
+): { tags: string[]; comments: string } {
+  if (!library) return { tags: [], comments: "" };
+  const item = [...library.recentFiles, ...library.starredFiles]
+    .find((candidate) => normalizedPath(candidate.path) === normalizedPath(entry.path));
+  return { tags: item?.tags ?? [], comments: item?.comments ?? "" };
+}
+
 const assistantPanelStyles = {
-  claudeResizer:
+  mikaResizer:
     "relative col-start-2 row-start-1 cursor-col-resize bg-transparent after:absolute after:bottom-0 after:left-1/2 after:top-0 after:w-px after:-translate-x-1/2 after:bg-[#222222] after:content-[''] hover:after:bg-[#3a3a3a] max-[980px]:hidden",
-  claudePanel:
-    "col-start-3 row-start-1 grid min-h-0 min-w-0 grid-rows-[42px_minmax(0,1fr)] overflow-hidden bg-[#111111] text-[#e2e2e2] max-[980px]:absolute max-[980px]:bottom-[22px] max-[980px]:right-0 max-[980px]:top-0 max-[980px]:z-20 max-[980px]:w-[min(var(--claude-panel-width,380px),100%)] max-[980px]:border-l max-[980px]:border-[#292929] max-[980px]:shadow-[-16px_0_38px_rgba(0,0,0,0.34)]",
+  mikaPanel:
+    "col-start-3 row-start-1 grid min-h-0 min-w-0 grid-rows-[54px_minmax(0,1fr)] overflow-hidden border-l border-[#242424] bg-[#090a0b] text-[#e2e2e2] shadow-[-18px_0_38px_rgba(0,0,0,0.28)] max-[980px]:absolute max-[980px]:bottom-[22px] max-[980px]:right-0 max-[980px]:top-0 max-[980px]:z-20 max-[980px]:w-[min(var(--mika-panel-width,380px),100%)]",
   chatOverlay:
     "absolute bottom-[76px] right-[18px] z-[19] grid max-h-[min(620px,calc(100vh_-_120px))] w-[min(420px,calc(100vw_-_180px))] grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-xl border border-[#323232] bg-[rgba(17, 17, 17, 0.96)] text-[#e2e2e2] shadow-[0_18px_42px_rgba(0,0,0,0.44)] backdrop-blur-[14px]",
   header:
     "flex h-[42px] min-w-0 items-center justify-between gap-2.5 border-b border-[#292929] py-0 pr-2.5",
   chatHeader: "pl-[13px]",
-  claudeHeader: "pl-3.5",
+  mikaHeader: "pl-3.5",
+  mikaPanelHeader:
+    "relative !h-[54px] border-b border-[#242424] bg-[rgba(7,8,10,0.96)] !pl-5 pr-3",
   headerTitle:
     "inline-flex min-w-0 items-center gap-2 overflow-hidden text-ellipsis whitespace-nowrap font-semibold",
+  mikaHeaderTitle:
+    "gap-3 text-[19px] font-bold text-[#f4f4f4] [&_svg]:text-[#f2f2f2]",
+  headerActions: "flex flex-none items-center gap-1.5",
   runningBadge: "text-[11px] font-semibold text-[#c1c1c1]",
   headerButton:
     "inline-flex size-[30px] flex-none items-center justify-center gap-2 rounded-lg border-0 bg-transparent p-0 text-[#b3b3b3] hover:bg-[#252525] hover:text-[#f7f7f7]",
+  mikaHeaderButton:
+    "size-9 rounded-[10px] border border-[#2f3238] bg-[#111316] text-[#b9bcc4] hover:bg-[#1c1f24] hover:text-[#f7f7f7] aria-expanded:bg-[#1c1f24] aria-expanded:text-[#f7f7f7]",
+  contextPopover:
+    "absolute right-3 top-[62px] z-30 grid w-[min(360px,calc(100vw_-_32px))] gap-3 rounded-xl border border-[#2c3036] bg-[rgba(9,10,12,0.98)] p-3.5 text-[#e2e2e2] shadow-[0_20px_54px_rgba(0,0,0,0.56)] backdrop-blur-xl",
+  contextSection: "grid gap-1.5 border-b border-[#24262a] pb-3 last:border-b-0 last:pb-0",
+  contextLabel: "text-[11px] font-bold uppercase tracking-normal text-[#8e929a]",
+  contextValueRow: "grid grid-cols-[22px_minmax(0,1fr)_34px] items-center gap-2",
+  contextValueText: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-semibold text-[#f1f1f1]",
+  contextSubText: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs text-[#8f939b]",
+  contextCopyButton:
+    "grid size-8 place-items-center rounded-lg border border-[#30343a] bg-[#111316] text-[#b9bcc4] hover:bg-[#1c1f24] hover:text-[#f7f7f7]",
+  statusDot: "size-2.5 rounded-full bg-[#46d05a] shadow-[0_0_14px_rgba(70,208,90,0.48)]",
   chatBody:
     "grid min-h-0 grid-rows-[auto_minmax(90px,1fr)_auto] gap-2.5 overflow-hidden p-[13px]",
-  claudeBody:
-    "grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-3 overflow-auto p-4",
+  mikaBody:
+    "grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_auto_auto] gap-3 overflow-hidden bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[length:18px_18px] p-5",
   status:
     "grid border-b border-[#292929]",
   chatStatus: "gap-2 pb-2.5",
-  claudeStatus: "gap-2.5 pb-3",
+  mikaStatus: "gap-2.5 pb-3",
   chatDetails:
     "m-0 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1.5",
-  claudeDetails: "m-0 grid gap-[7px]",
+  mikaDetails: "m-0 grid gap-[7px]",
+  betaNotice:
+    "m-0 grid grid-cols-[24px_minmax(0,1fr)] items-start gap-3 rounded-xl border border-[#6f4f19] bg-[rgba(27,20,8,0.64)] px-4 py-3.5 text-sm font-medium leading-relaxed text-[#e8ded0] shadow-[0_0_28px_rgba(111,79,25,0.08)_inset]",
+  betaIcon: "mt-0.5 text-[#efb33d]",
   detailLabel: "text-[#898989]",
-  claudeDetailLabel: "text-xs uppercase",
+  mikaDetailLabel: "text-xs uppercase",
   chatDetailValue:
     "m-0 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap",
-  claudeDetailValue: "m-0 min-w-0 break-words",
+  mikaDetailValue: "m-0 min-w-0 break-words",
   errorText: "m-0 text-[#b0b0b0]",
   log:
     "grid min-h-0 content-start overflow-auto pr-0.5",
   chatLog: "gap-2",
-  claudeLog: "min-w-0 gap-2.5",
+  mikaLog: "min-w-0 gap-2.5",
+  mikaEmpty:
+    "grid min-h-0 place-items-center px-3 py-8 text-center",
+  mikaEmptyInner: "grid max-w-[260px] justify-items-center gap-3",
+  mikaEmptyIcon:
+    "relative grid size-[74px] place-items-center rounded-[24px] border border-[#3a3d44] bg-[linear-gradient(145deg,#17191e,#0b0c0f)] text-[#bfc3ca] shadow-[0_18px_42px_rgba(0,0,0,0.34)]",
+  mikaEmptySpark: "absolute -right-1 top-0 text-[#ffd76b]",
+  mikaEmptyTitle: "m-0 text-[22px] font-bold leading-tight text-[#f3f3f3]",
+  mikaEmptyText: "m-0 text-sm leading-relaxed text-[#94979f]",
   emptyLog: "m-[18px] text-[var(--misty-text-muted)]",
   message:
     "grid min-w-0 rounded-lg border border-[#292929] bg-[#161616]",
   chatMessage: "gap-[5px] p-[9px]",
-  claudeMessage: "gap-1.5 p-2.5",
+  mikaMessage: "gap-1.5 p-2.5",
   userMessage: "border-[#444444] bg-[#212121]",
   toolMessage: "border-[#3f3f3f] bg-[#181818]",
   errorMessage: "border-[#3f3f3f] bg-[#181818]",
+  planDetails: "grid min-w-0 gap-2",
+  planActions: "flex flex-wrap items-center gap-2",
+  planTableWrap:
+    "min-h-0 overflow-auto rounded-lg border border-[#2f2f2f] bg-[#101010]",
+  planTable:
+    "w-full min-w-[760px] border-separate border-spacing-0 text-left text-xs",
+  planTableHead:
+    "sticky top-0 z-[1] bg-[#151515] text-[11px] font-bold uppercase text-[#9f9f9f]",
+  planTableHeaderCell:
+    "border-b border-[#2f2f2f] px-3 py-2",
+  planTableRow:
+    "align-top text-[#d4d4d4] hover:bg-[#171717]",
+  planTableCell:
+    "border-b border-[#242424] px-3 py-2.5 last:border-b-[#242424]",
+  planTableOperation: "font-bold uppercase text-[#f0f0f0]",
+  planTablePath: "min-w-0 break-words leading-normal text-[#d2d2d2]",
+  planTableReason: "min-w-0 break-words leading-normal text-[#9f9f9f]",
+  planWarningText: "m-0 text-xs leading-normal text-[#f0b3b3]",
+  reviewLayer:
+    "fixed inset-0 z-[2147482600] grid place-items-center bg-[rgba(0,0,0,0.66)] p-8 text-[#e2e2e2] backdrop-blur-[10px]",
+  reviewPanel:
+    "grid h-[min(720px,calc(100vh-64px))] w-[min(900px,calc(100vw-64px))] min-w-0 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-2xl border border-[#242529] bg-[#07090b] shadow-[0_28px_90px_rgba(0,0,0,0.62)]",
+  reviewHeader:
+    "grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4 border-b border-[#242529] px-5 py-4",
+  reviewTitle: "m-0 text-[18px] font-semibold leading-tight text-[#f4f4f4]",
+  reviewSubtitle: "m-0 mt-1 min-w-0 break-words text-sm leading-normal text-[#9f9f9f]",
+  reviewBody: "grid min-h-0 grid-rows-[auto_auto_minmax(0,1fr)] gap-3 overflow-hidden p-5",
+  reviewSummaryGrid: "grid gap-3",
+  reviewSummaryBlock:
+    "grid gap-1 rounded-lg border border-[#242529] bg-[#0d0f12] px-3.5 py-3",
+  reviewSummaryLabel:
+    "text-[11px] font-bold uppercase text-[#8f8f8f]",
+  reviewSummaryText:
+    "m-0 min-w-0 break-words text-sm leading-normal text-[#d7d7d7]",
+  reviewFooter:
+    "flex flex-wrap items-center justify-between gap-3 border-t border-[#242529] px-5 py-4",
+  reviewFooterActions: "flex flex-wrap justify-end gap-2",
+  modeSelect:
+    "min-h-8 rounded-lg border border-[#3f3f3f] bg-[#171717] px-2 text-[#f7f7f7] outline-none",
   messageTitle: "text-xs text-[#f7f7f7]",
   messageText:
     "m-0 whitespace-pre-wrap break-words font-[inherit] leading-normal text-[#d4d4d4]",
   composer:
     "grid border-t border-[#292929]",
   chatComposer: "gap-[9px] pt-2.5",
-  claudeComposer: "gap-2.5 pt-3",
+  mikaComposer: "gap-2.5 pt-3",
   textarea:
-    "min-w-0 resize-y rounded-lg border border-[#2f2f2f] bg-[#0b0b0b] px-2.5 py-[9px] font-[inherit] leading-snug text-[#f7f7f7] disabled:text-[#898989]",
+    "min-w-0 resize-y rounded-xl border border-[#343840] bg-[rgba(7,8,10,0.92)] px-3.5 py-3 font-[inherit] leading-snug text-[#f7f7f7] outline-none placeholder:text-[#777b84] focus:border-[#6a707c] focus:shadow-[0_0_0_3px_rgba(122,129,143,0.16)] disabled:text-[#898989]",
   composerActions: "flex justify-end gap-2",
-  claudeComposerActions: "gap-0",
+  mikaComposerActions: "gap-2",
   composerButton:
     "min-h-8 rounded-lg border border-[#3f3f3f] bg-[#252525] px-3 font-semibold text-[#f7f7f7] hover:not-disabled:bg-[#303030] disabled:opacity-55",
-  claudeComposerButton: "px-3.5",
+  mikaComposerButton: "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl px-3.5",
+  mikaPrimaryButton:
+    "border-[#ececec] bg-[#e8e8e8] text-[#242424] hover:not-disabled:bg-[#f5f5f5]",
+  mikaFooter:
+    "flex min-h-10 items-center justify-center gap-2 border-t border-[#24262a] pt-3 text-xs font-semibold text-[#777b84]",
   secondaryButton: "bg-transparent text-[#b3b3b3]",
 } as const;
 
-function assistantMessageClass(role: string, density: "chat" | "claude"): string {
+function assistantStatusText(status: AiStatus | null): string {
+  if (!status) return "Checking Mika...";
+  if (status.configured) return `Ready (${status.provider}/${status.model})`;
+  return "Configure the Mika backend to enable assistant actions";
+}
+
+function assistantPlaceholder(configured: boolean, fallback: string): string {
+  return configured ? fallback : "Configure Mika backend to continue";
+}
+
+function assistantMessageClass(role: string, density: "chat" | "mika"): string {
   return cx(
     assistantPanelStyles.message,
-    density === "chat" ? assistantPanelStyles.chatMessage : assistantPanelStyles.claudeMessage,
+    density === "chat" ? assistantPanelStyles.chatMessage : assistantPanelStyles.mikaMessage,
     role === "user" && assistantPanelStyles.userMessage,
     role === "tool" && assistantPanelStyles.toolMessage,
     role === "error" && assistantPanelStyles.errorMessage,
@@ -2750,21 +4471,23 @@ function assistantMessageClass(role: string, density: "chat" | "claude"): string
 
 const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
   const activePaneId = useMultiPanelStore((state) => state.activePaneId);
-  const { listing, selectedEntry } = useExplorerStore(useShallow((state) => {
-    const pane = state.panes[activePaneId];
-    return {
-      listing: pane?.listing ?? null,
-      selectedEntry: selectedEntryForPane(pane),
-    };
-  }));
-  const { status, messages, error, refreshStatus, sendPrompt, abortPrompt, clearConversation } = useAiSessionStore(useShallow((state) => ({
+  const panes = useExplorerStore((state) => state.panes);
+  const listing = useExplorerStore((state) => state.panes[activePaneId]?.listing ?? null);
+  const selectedPaths = useMemo(() => selectedPathsAcrossPanes(panes), [panes]);
+  const { status, mode, messages, plans, toolApprovals, error, refreshStatus, setMode, sendPrompt, abortPrompt, clearConversation, approvePlan, approveToolRequest } = useMikaSessionStore(useShallow((state) => ({
     status: state.status,
+    mode: state.mode,
     messages: state.messages,
+    plans: state.plans,
+    toolApprovals: state.toolApprovals,
     error: state.error,
     refreshStatus: state.refreshStatus,
+    setMode: state.setMode,
     sendPrompt: state.sendPrompt,
     abortPrompt: state.abortPrompt,
     clearConversation: state.clearConversation,
+    approvePlan: state.approvePlan,
+    approveToolRequest: state.approveToolRequest,
   })));
   const [prompt, setPrompt] = useState("");
   const logRef = useRef<HTMLDivElement | null>(null);
@@ -2786,14 +4509,15 @@ const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
     setPrompt("");
     void sendPrompt({
       displayPrompt: trimmed,
-      prompt: buildClaudePrompt(trimmed, workingDirectory, selectedEntry?.path ?? null),
+      prompt: buildMikaPrompt(trimmed, workingDirectory, selectedPaths),
       cwd: workingDirectory || null,
+      selectedPaths,
     });
-  }, [prompt, running, selectedEntry?.path, sendPrompt, workingDirectory]);
+  }, [prompt, running, selectedPaths, sendPrompt, workingDirectory]);
 
   const openPanel = useCallback(() => {
     useExplorerStore.getState().toggleChatOverlay();
-    useExplorerStore.getState().setClaudePanelOpen(true);
+    useExplorerStore.getState().setMikaPanelOpen(true);
   }, []);
 
   const closeOverlay = useCallback(() => {
@@ -2818,23 +4542,29 @@ const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
       </header>
       <div className={assistantPanelStyles.chatBody}>
         <div className={cx(assistantPanelStyles.status, assistantPanelStyles.chatStatus)}>
+          <p className={assistantPanelStyles.betaNotice}>
+            <FlaskConical className={assistantPanelStyles.betaIcon} size={22} />
+            <span>Mika is beta and experimental. It is focused on file reorganization for now. Please review plans carefully and use cautiously.</span>
+          </p>
           <dl className={assistantPanelStyles.chatDetails}>
             <dt className={assistantPanelStyles.detailLabel}>Status</dt>
-            <dd className={assistantPanelStyles.chatDetailValue}>{status ? (configured ? `Ready (${status.provider}/${status.model})` : "Set OPENAI_API_KEY to enable MistyAI") : "Checking MistyAI..."}</dd>
+            <dd className={assistantPanelStyles.chatDetailValue}>{assistantStatusText(status)}</dd>
             <dt className={assistantPanelStyles.detailLabel}>Folder</dt>
             <dd className={assistantPanelStyles.chatDetailValue}>{workingDirectory || "No active folder"}</dd>
             <dt className={assistantPanelStyles.detailLabel}>Selection</dt>
-            <dd className={assistantPanelStyles.chatDetailValue}>{selectedEntry?.path ?? "None"}</dd>
+            <dd className={assistantPanelStyles.chatDetailValue}>{mikaSelectionSummary(selectedPaths)}</dd>
           </dl>
           {error ? <p className={assistantPanelStyles.errorText}>{error}</p> : null}
         </div>
         <div ref={logRef} className={cx(assistantPanelStyles.log, assistantPanelStyles.chatLog)} aria-live="polite">
           {messages.length === 0 ? (
-            <p className={assistantPanelStyles.emptyLog}>Ask about the active folder or selected file.</p>
+            <p className={assistantPanelStyles.emptyLog}>Chat with Mika or ask for help reorganizing the active folder.</p>
           ) : messages.map((message) => (
             <article key={message.id} className={assistantMessageClass(message.role, "chat")}>
-              <strong className={assistantPanelStyles.messageTitle}>{message.role === "user" ? "You" : message.role === "tool" ? "Tool" : message.role === "error" ? "Error" : "MistyAI"}</strong>
+              <strong className={assistantPanelStyles.messageTitle}>{message.role === "user" ? "You" : message.role === "tool" ? "Tool" : message.role === "error" ? "Error" : "Mika"}</strong>
               <pre className={assistantPanelStyles.messageText}>{message.text || (message.role === "assistant" && running ? "Thinking..." : "")}</pre>
+              {message.toolRequestId ? <AssistantToolActions requestId={message.toolRequestId} approvals={toolApprovals} onApprove={approveToolRequest} /> : null}
+              {message.planId ? <AssistantPlanActions planId={message.planId} plans={plans} onApply={approvePlan} /> : null}
             </article>
           ))}
         </div>
@@ -2849,7 +4579,7 @@ const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
             className={assistantPanelStyles.textarea}
             value={prompt}
             rows={3}
-            placeholder={configured ? "Ask Misty..." : "Set OPENAI_API_KEY to enable MistyAI"}
+            placeholder={assistantPlaceholder(configured, "Ask Mika to organize files...")}
             disabled={!configured || running}
             onChange={(event) => setPrompt(event.target.value)}
             onKeyDown={(event) => {
@@ -2860,6 +4590,10 @@ const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
             }}
           />
           <div className={assistantPanelStyles.composerActions}>
+            <select className={assistantPanelStyles.modeSelect} value={mode} aria-label="Mika mode" onChange={(event) => setMode(event.target.value as Parameters<typeof setMode>[0])}>
+              <option value="ask">Ask</option>
+              <option value="auto">Auto</option>
+            </select>
             <button type="button" className={cx(assistantPanelStyles.composerButton, assistantPanelStyles.secondaryButton)} onClick={openPanel}>Open Panel</button>
             {running ? (
               <button className={assistantPanelStyles.composerButton} type="button" onClick={abortPrompt}>Stop</button>
@@ -2873,25 +4607,29 @@ const ExplorerChatOverlay = memo(function ExplorerChatOverlay() {
   );
 });
 
-const ExplorerClaudePanel = memo(function ExplorerClaudePanel() {
+const ExplorerMikaPanel = memo(function ExplorerMikaPanel() {
   const activePaneId = useMultiPanelStore((state) => state.activePaneId);
-  const { listing, selectedEntry } = useExplorerStore(useShallow((state) => {
-    const pane = state.panes[activePaneId];
-    return {
-      listing: pane?.listing ?? null,
-      selectedEntry: selectedEntryForPane(pane),
-    };
-  }));
-  const { status, messages, error, refreshStatus, sendPrompt, abortPrompt } = useAiSessionStore(useShallow((state) => ({
+  const panes = useExplorerStore((state) => state.panes);
+  const listing = useExplorerStore((state) => state.panes[activePaneId]?.listing ?? null);
+  const selectedPaths = useMemo(() => selectedPathsAcrossPanes(panes), [panes]);
+  const { status, mode, messages, plans, toolApprovals, error, refreshStatus, setMode, sendPrompt, abortPrompt, approvePlan, approveToolRequest } = useMikaSessionStore(useShallow((state) => ({
     status: state.status,
+    mode: state.mode,
     messages: state.messages,
+    plans: state.plans,
+    toolApprovals: state.toolApprovals,
     error: state.error,
     refreshStatus: state.refreshStatus,
+    setMode: state.setMode,
     sendPrompt: state.sendPrompt,
     abortPrompt: state.abortPrompt,
+    approvePlan: state.approvePlan,
+    approveToolRequest: state.approveToolRequest,
   })));
   const [prompt, setPrompt] = useState("");
+  const [contextOpen, setContextOpen] = useState(false);
   const logRef = useRef<HTMLDivElement | null>(null);
+  const contextRef = useRef<HTMLDivElement | null>(null);
   const workingDirectory = listing?.path ?? "";
   const running = status?.running ?? false;
   const configured = status?.configured ?? false;
@@ -2904,54 +4642,89 @@ const ExplorerClaudePanel = memo(function ExplorerClaudePanel() {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight });
   }, [messages]);
 
+  useEffect(() => {
+    if (!contextOpen) return;
+    const closeOnOutsidePointer = (event: globalThis.PointerEvent) => {
+      const target = event.target as Node | null;
+      if (target && contextRef.current?.contains(target)) return;
+      setContextOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setContextOpen(false);
+    };
+    window.addEventListener("pointerdown", closeOnOutsidePointer);
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.removeEventListener("pointerdown", closeOnOutsidePointer);
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [contextOpen]);
+
   const submitPrompt = useCallback(() => {
     const trimmed = prompt.trim();
     if (!trimmed || running) return;
-    const requestPrompt = buildClaudePrompt(trimmed, workingDirectory, selectedEntry?.path ?? null);
+    const requestPrompt = buildMikaPrompt(trimmed, workingDirectory, selectedPaths);
     setPrompt("");
     void sendPrompt({
       displayPrompt: trimmed,
       prompt: requestPrompt,
       cwd: workingDirectory || null,
+      selectedPaths,
     });
-  }, [prompt, running, selectedEntry?.path, sendPrompt, workingDirectory]);
+  }, [prompt, running, selectedPaths, sendPrompt, workingDirectory]);
 
   return (
-    <aside className={assistantPanelStyles.claudePanel} aria-label="MistyAI">
-      <header className={cx(assistantPanelStyles.header, assistantPanelStyles.claudeHeader)}>
-        <span className={assistantPanelStyles.headerTitle}>
-          <MessageSquare size={16} />
-          MistyAI
+    <aside className={assistantPanelStyles.mikaPanel} aria-label="Mika, Misty Intelligent Knowledge Assistant" title="Misty Intelligent Knowledge Assistant">
+      <header className={cx(assistantPanelStyles.header, assistantPanelStyles.mikaHeader, assistantPanelStyles.mikaPanelHeader)}>
+        <span className={cx(assistantPanelStyles.headerTitle, assistantPanelStyles.mikaHeaderTitle)}>
+          <MessageSquare size={24} strokeWidth={1.9} />
+          Mika
           {running ? <small className={assistantPanelStyles.runningBadge}>Running</small> : null}
         </span>
-        <button className={assistantPanelStyles.headerButton} type="button" aria-label="Close MistyAI" onClick={() => useExplorerStore.getState().setClaudePanelOpen(false)}>
-          <X size={16} />
-        </button>
+        <div ref={contextRef} className={assistantPanelStyles.headerActions}>
+          <button
+            className={cx(assistantPanelStyles.headerButton, assistantPanelStyles.mikaHeaderButton)}
+            type="button"
+            aria-label="Mika context"
+            aria-expanded={contextOpen}
+            onClick={() => setContextOpen((open) => !open)}
+          >
+            <Info size={17} />
+          </button>
+          <button className={cx(assistantPanelStyles.headerButton, assistantPanelStyles.mikaHeaderButton)} type="button" aria-label="Close Mika" onClick={() => useExplorerStore.getState().setMikaPanelOpen(false)}>
+            <X size={18} />
+          </button>
+          {contextOpen ? (
+            <MikaContextPopover
+              status={status}
+              workingDirectory={workingDirectory}
+              selectedPaths={selectedPaths}
+            />
+          ) : null}
+        </div>
       </header>
-      <div className={assistantPanelStyles.claudeBody}>
-        <div className={cx(assistantPanelStyles.status, assistantPanelStyles.claudeStatus)}>
-          <dl className={assistantPanelStyles.claudeDetails}>
-            <dt className={cx(assistantPanelStyles.detailLabel, assistantPanelStyles.claudeDetailLabel)}>Status</dt>
-            <dd className={assistantPanelStyles.claudeDetailValue}>{status ? (configured ? `Ready (${status.provider}/${status.model})` : "Set OPENAI_API_KEY to enable MistyAI") : "Checking MistyAI..."}</dd>
-            <dt className={cx(assistantPanelStyles.detailLabel, assistantPanelStyles.claudeDetailLabel)}>Working directory</dt>
-            <dd className={assistantPanelStyles.claudeDetailValue}>{workingDirectory || "No active folder"}</dd>
-            <dt className={cx(assistantPanelStyles.detailLabel, assistantPanelStyles.claudeDetailLabel)}>Selection</dt>
-            <dd className={assistantPanelStyles.claudeDetailValue}>{selectedEntry?.path ?? "None"}</dd>
-          </dl>
+      <div className={assistantPanelStyles.mikaBody}>
+        <div className={cx(assistantPanelStyles.status, assistantPanelStyles.mikaStatus)}>
+          <p className={assistantPanelStyles.betaNotice}>
+            <FlaskConical className={assistantPanelStyles.betaIcon} size={22} />
+            <span>Mika is beta and experimental. It is focused on file reorganization for now. Please review plans carefully and use cautiously.</span>
+          </p>
           {error ? <p className={assistantPanelStyles.errorText}>{error}</p> : null}
         </div>
-        <div ref={logRef} className={cx(assistantPanelStyles.log, assistantPanelStyles.claudeLog)} aria-live="polite">
+        <div ref={logRef} className={cx(assistantPanelStyles.log, assistantPanelStyles.mikaLog)} aria-live="polite">
           {messages.length === 0 ? (
-            <p className={assistantPanelStyles.emptyLog}>Ask MistyAI about the active folder or selected file.</p>
+            <MikaEmptyState />
           ) : messages.map((message) => (
-            <article key={message.id} className={assistantMessageClass(message.role, "claude")}>
-              <strong className={assistantPanelStyles.messageTitle}>{message.role === "user" ? "You" : message.role === "tool" ? "Tool" : message.role === "error" ? "Error" : "MistyAI"}</strong>
+            <article key={message.id} className={assistantMessageClass(message.role, "mika")}>
+              <strong className={assistantPanelStyles.messageTitle}>{message.role === "user" ? "You" : message.role === "tool" ? "Tool" : message.role === "error" ? "Error" : "Mika"}</strong>
               <pre className={assistantPanelStyles.messageText}>{message.text || (message.role === "assistant" && running ? "Thinking..." : "")}</pre>
+              {message.toolRequestId ? <AssistantToolActions requestId={message.toolRequestId} approvals={toolApprovals} onApprove={approveToolRequest} /> : null}
+              {message.planId ? <AssistantPlanActions planId={message.planId} plans={plans} onApply={approvePlan} /> : null}
             </article>
           ))}
         </div>
         <form
-          className={cx(assistantPanelStyles.composer, assistantPanelStyles.claudeComposer)}
+          className={cx(assistantPanelStyles.composer, assistantPanelStyles.mikaComposer)}
           onSubmit={(event) => {
             event.preventDefault();
             submitPrompt();
@@ -2961,7 +4734,7 @@ const ExplorerClaudePanel = memo(function ExplorerClaudePanel() {
             className={assistantPanelStyles.textarea}
             value={prompt}
             rows={3}
-            placeholder={configured ? "Ask about this folder..." : "Set OPENAI_API_KEY to enable MistyAI"}
+            placeholder={assistantPlaceholder(configured, "Ask Mika to organize this folder...")}
             disabled={!configured || running}
             onChange={(event) => setPrompt(event.target.value)}
             onKeyDown={(event) => {
@@ -2971,24 +4744,345 @@ const ExplorerClaudePanel = memo(function ExplorerClaudePanel() {
               }
             }}
           />
-          <div className={cx(assistantPanelStyles.composerActions, assistantPanelStyles.claudeComposerActions)}>
+          <div className={cx(assistantPanelStyles.composerActions, assistantPanelStyles.mikaComposerActions)}>
+            <select className={assistantPanelStyles.modeSelect} value={mode} aria-label="Mika mode" onChange={(event) => setMode(event.target.value as Parameters<typeof setMode>[0])}>
+              <option value="ask">Ask</option>
+              <option value="auto">Auto</option>
+            </select>
             {running ? (
-              <button className={cx(assistantPanelStyles.composerButton, assistantPanelStyles.claudeComposerButton)} type="button" onClick={abortPrompt}>Stop</button>
+              <button className={cx(assistantPanelStyles.composerButton, assistantPanelStyles.mikaComposerButton)} type="button" onClick={abortPrompt}>Stop</button>
             ) : (
-              <button className={cx(assistantPanelStyles.composerButton, assistantPanelStyles.claudeComposerButton)} type="submit" disabled={!configured || !prompt.trim()}>Send</button>
+              <button className={cx(assistantPanelStyles.composerButton, assistantPanelStyles.mikaComposerButton, assistantPanelStyles.mikaPrimaryButton)} type="submit" disabled={!configured || !prompt.trim()}>
+                <ArrowUp size={17} />
+                Send
+              </button>
             )}
           </div>
         </form>
+        <footer className={assistantPanelStyles.mikaFooter}>
+          <Sparkles size={15} />
+          Misty Intelligent Knowledge Assistant
+        </footer>
       </div>
     </aside>
   );
 });
 
-function buildClaudePrompt(userPrompt: string, workingDirectory: string, selectedPath: string | null): string {
+function AssistantPlanActions(props: {
+  planId: string;
+  plans: AiPlanReview[];
+  onApply: (planId: string) => Promise<void>;
+}) {
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const plan = props.plans.find((candidate) => candidate.id === props.planId);
+  if (!plan) return null;
+  const blocked = plan.blockedReasons.length > 0;
+  return (
+    <div className={assistantPanelStyles.planDetails}>
+      <div className={assistantPanelStyles.planActions}>
+        <span className={assistantPanelStyles.runningBadge}>
+          {plan.plan.operations.length} operations{blocked ? " blocked" : plan.applied ? " queued" : ""}
+        </span>
+        <button
+          className={cx(assistantPanelStyles.composerButton, assistantPanelStyles.secondaryButton)}
+          type="button"
+          aria-haspopup="dialog"
+          onClick={() => setReviewOpen(true)}
+        >
+          {plan.applied ? "View" : "Review & Apply"}
+        </button>
+      </div>
+      {reviewOpen ? (
+        <AssistantPlanReviewDialog
+          plan={plan}
+          onApply={props.onApply}
+          onClose={() => setReviewOpen(false)}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+type AssistantPlanOperation = AiPlanReview["plan"]["operations"][number];
+
+function planOperationDetail(operation: AssistantPlanOperation): string {
+  if (operation.type === "mkdir") return operation.path;
+  return `${operation.from} -> ${operation.to}`;
+}
+
+function planOperationSource(operation: AssistantPlanOperation): string {
+  if (operation.type === "mkdir") return "-";
+  return operation.from;
+}
+
+function planOperationDestination(operation: AssistantPlanOperation): string {
+  if (operation.type === "mkdir") return operation.path;
+  return operation.to;
+}
+
+function AssistantPlanReviewDialog(props: {
+  plan: AiPlanReview;
+  onApply: (planId: string) => Promise<void>;
+  onClose: () => void;
+}) {
+  const blocked = props.plan.blockedReasons.length > 0;
+  const warnings = [
+    ...props.plan.plan.warnings.map((warning) => `Warning: ${warning}`),
+    ...props.plan.blockedReasons.map((reason) => `Blocked: ${reason}`),
+  ];
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") props.onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [props.onClose]);
+
+  const applyPlan = async () => {
+    await props.onApply(props.plan.id);
+    props.onClose();
+  };
+
+  return createPortal(
+    <div
+      className={assistantPanelStyles.reviewLayer}
+      role="presentation"
+      onPointerDown={(event) => {
+        if (event.target === event.currentTarget) props.onClose();
+      }}
+    >
+      <section className={assistantPanelStyles.reviewPanel} role="dialog" aria-modal="true" aria-labelledby="mika-plan-review-title">
+        <header className={assistantPanelStyles.reviewHeader}>
+          <div>
+            <h2 className={assistantPanelStyles.reviewTitle} id="mika-plan-review-title">Review File Operations</h2>
+            <p className={assistantPanelStyles.reviewSubtitle}>{props.plan.plan.operations.length} proposed operations</p>
+          </div>
+          <button className={assistantPanelStyles.headerButton} type="button" aria-label="Close review" onClick={props.onClose}>
+            <X size={16} />
+          </button>
+        </header>
+        <div className={assistantPanelStyles.reviewBody}>
+          <div className={assistantPanelStyles.reviewSummaryGrid}>
+            <section className={assistantPanelStyles.reviewSummaryBlock} aria-label="Summary of what Mika will do">
+              <span className={assistantPanelStyles.reviewSummaryLabel}>What Mika Will Do</span>
+              <p className={assistantPanelStyles.reviewSummaryText}>{props.plan.plan.summary}</p>
+            </section>
+            {props.plan.appliedSummary ? (
+              <section className={assistantPanelStyles.reviewSummaryBlock} aria-label="Summary of what Misty queued">
+                <span className={assistantPanelStyles.reviewSummaryLabel}>What Misty Queued</span>
+                <p className={assistantPanelStyles.reviewSummaryText}>{props.plan.appliedSummary}</p>
+              </section>
+            ) : null}
+          </div>
+          {warnings.length > 0 ? (
+            <p className={assistantPanelStyles.planWarningText}>{warnings.join(" ")}</p>
+          ) : null}
+          <div className={assistantPanelStyles.planTableWrap}>
+            <table className={assistantPanelStyles.planTable}>
+              <thead className={assistantPanelStyles.planTableHead}>
+                <tr>
+                  <th className={assistantPanelStyles.planTableHeaderCell} scope="col">Operation</th>
+                  <th className={assistantPanelStyles.planTableHeaderCell} scope="col">Source</th>
+                  <th className={assistantPanelStyles.planTableHeaderCell} scope="col">Destination</th>
+                  <th className={assistantPanelStyles.planTableHeaderCell} scope="col">Reason</th>
+                </tr>
+              </thead>
+              <tbody>
+                {props.plan.plan.operations.map((operation, index) => (
+                  <tr key={`${operation.type}-${index}-${planOperationDetail(operation)}`} className={assistantPanelStyles.planTableRow}>
+                    <td className={cx(assistantPanelStyles.planTableCell, assistantPanelStyles.planTableOperation)}>{operation.type}</td>
+                    <td className={cx(assistantPanelStyles.planTableCell, assistantPanelStyles.planTablePath)}>{planOperationSource(operation)}</td>
+                    <td className={cx(assistantPanelStyles.planTableCell, assistantPanelStyles.planTablePath)}>{planOperationDestination(operation)}</td>
+                    <td className={cx(assistantPanelStyles.planTableCell, assistantPanelStyles.planTableReason)}>{operation.reason || "-"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <footer className={assistantPanelStyles.reviewFooter}>
+          <span className={assistantPanelStyles.runningBadge}>
+            {props.plan.plan.operations.length} operations{blocked ? " blocked" : props.plan.applied ? " queued" : ""}
+          </span>
+          <div className={assistantPanelStyles.reviewFooterActions}>
+            <button className={cx(assistantPanelStyles.composerButton, assistantPanelStyles.secondaryButton)} type="button" onClick={props.onClose}>
+              Cancel
+            </button>
+            <button
+              className={assistantPanelStyles.composerButton}
+              type="button"
+              disabled={blocked || props.plan.applied || props.plan.applying}
+              onClick={() => void applyPlan()}
+            >
+              {props.plan.applying ? "Queueing..." : props.plan.applied ? "Queued" : "Apply"}
+            </button>
+          </div>
+        </footer>
+      </section>
+    </div>,
+    document.body,
+  );
+}
+
+function AssistantToolActions(props: {
+  requestId: string;
+  approvals: AiToolApproval[];
+  onApprove: (requestId: string) => Promise<void>;
+}) {
+  const approval = props.approvals.find((candidate) => candidate.id === props.requestId);
+  if (!approval) return null;
+  return (
+    <div className={assistantPanelStyles.planActions}>
+      <span className={assistantPanelStyles.runningBadge}>
+        {approval.completed ? "Completed" : approval.error ? "Blocked" : "Needs approval"}
+      </span>
+      <button
+        className={cx(assistantPanelStyles.composerButton, assistantPanelStyles.secondaryButton)}
+        type="button"
+        disabled={approval.running || approval.completed}
+        onClick={() => void props.onApprove(props.requestId)}
+      >
+        {approval.running ? "Running..." : approval.completed ? "Ran" : "Run"}
+      </button>
+    </div>
+  );
+}
+
+function MikaContextPopover(props: {
+  status: AiStatus | null;
+  workingDirectory: string;
+  selectedPaths: string[];
+}) {
+  const configured = props.status?.configured ?? false;
+  const statusLabel = props.status
+    ? configured ? "Ready" : "Not configured"
+    : "Checking";
+  const statusMeta = props.status && configured ? `${props.status.provider}/${props.status.model}` : "";
+  const selectionText = props.selectedPaths.length > 0 ? props.selectedPaths.join("\n") : "";
+  const firstSelection = props.selectedPaths[0] ?? "";
+  return (
+    <div className={assistantPanelStyles.contextPopover} role="dialog" aria-label="Mika context">
+      <section className={assistantPanelStyles.contextSection}>
+        <span className={assistantPanelStyles.contextLabel}>Status</span>
+        <div className={assistantPanelStyles.contextValueRow}>
+          <span className={assistantPanelStyles.statusDot} />
+          <span className={assistantPanelStyles.contextValueText}>
+            {statusLabel}
+            {statusMeta ? <small className="ml-2 text-[#8f939b]">{statusMeta}</small> : null}
+          </span>
+          <span />
+        </div>
+      </section>
+      <section className={assistantPanelStyles.contextSection}>
+        <span className={assistantPanelStyles.contextLabel}>Working Directory</span>
+        <div className={assistantPanelStyles.contextValueRow}>
+          <Folder size={20} className="text-[#c8ccd4]" />
+          <span className={assistantPanelStyles.contextValueText} title={props.workingDirectory || undefined}>
+            {props.workingDirectory || "No active folder"}
+          </span>
+          <button
+            className={assistantPanelStyles.contextCopyButton}
+            type="button"
+            aria-label="Copy working directory"
+            disabled={!props.workingDirectory}
+            onClick={() => void copyMikaContextValue(props.workingDirectory, "Working directory")}
+          >
+            <Copy size={16} />
+          </button>
+        </div>
+      </section>
+      <section className={assistantPanelStyles.contextSection}>
+        <span className={assistantPanelStyles.contextLabel}>Selection</span>
+        <div className={assistantPanelStyles.contextValueRow}>
+          <File size={20} className="text-[#c8ccd4]" />
+          <span className="grid min-w-0 gap-0.5">
+            <strong className={assistantPanelStyles.contextValueText} title={firstSelection || undefined}>
+              {mikaSelectionSummary(props.selectedPaths)}
+            </strong>
+            {firstSelection ? (
+              <small className={assistantPanelStyles.contextSubText} title={firstSelection}>{firstSelection}</small>
+            ) : null}
+          </span>
+          <button
+            className={assistantPanelStyles.contextCopyButton}
+            type="button"
+            aria-label="Copy selection"
+            disabled={!selectionText}
+            onClick={() => void copyMikaContextValue(selectionText, "Selection")}
+          >
+            <Copy size={16} />
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function MikaEmptyState() {
+  return (
+    <div className={assistantPanelStyles.mikaEmpty}>
+      <div className={assistantPanelStyles.mikaEmptyInner}>
+        <span className={assistantPanelStyles.mikaEmptyIcon}>
+          <MessageSquare size={42} strokeWidth={1.5} />
+          <Sparkles className={assistantPanelStyles.mikaEmptySpark} size={18} />
+        </span>
+        <h3 className={assistantPanelStyles.mikaEmptyTitle}>Ready to help</h3>
+        <p className={assistantPanelStyles.mikaEmptyText}>Chat with Mika or ask it to reorganize the active folder.</p>
+      </div>
+    </div>
+  );
+}
+
+async function copyMikaContextValue(value: string, label: string): Promise<void> {
+  const trimmed = value.trim();
+  if (!trimmed) return;
+  try {
+    await writeText(trimmed);
+    useExplorerStore.getState().pushNotification(`${label} copied.`, "success");
+  } catch (error) {
+    useExplorerStore.getState().pushNotification(errorText(error), "error");
+  }
+}
+
+function selectedPathsAcrossPanes(panes: ReturnType<typeof useExplorerStore.getState>["panes"]): string[] {
+  const selected = new Set<string>();
+  for (const pane of Object.values(panes)) {
+    for (const path of selectedPathsForPane(pane)) {
+      if (path) selected.add(path);
+    }
+  }
+  return [...selected];
+}
+
+function selectedCountAcrossPanes(panes: ReturnType<typeof useExplorerStore.getState>["panes"]): number {
+  return selectedPathsAcrossPanes(panes).length;
+}
+
+function clearSelectionsAcrossPanes(): void {
+  const store = useExplorerStore.getState();
+  for (const paneId of Object.keys(store.panes)) {
+    store.clearSelection(paneId);
+  }
+}
+
+function mikaSelectionSummary(selectedPaths: string[]): string {
+  if (selectedPaths.length === 0) return "None";
+  if (selectedPaths.length === 1) return titleFromPath(selectedPaths[0]);
+  return `${selectedPaths.length} items selected`;
+}
+
+function buildMikaPrompt(userPrompt: string, workingDirectory: string, selectedPaths: string[]): string {
+  const selectedContext = selectedPaths.length > 0
+    ? [`Selected items (${selectedPaths.length}):`, ...selectedPaths.map((path) => `- ${path}`)]
+    : ["Selected items: none"];
   const context = [
     "You are helping inside Misty, a desktop file manager.",
+    "Mika is beta and experimental.",
+    "Your main goal is to help reorganize files. You may chat freely, but tool-assisted work should stay focused on listing, searching, validating, and proposing safe file organization plans.",
+    "Do not inspect file contents or ask for preview tools. For changes, propose a file plan with folders, moves, and renames for the user to review.",
     workingDirectory ? `Current folder: ${workingDirectory}` : "Current folder: none",
-    selectedPath ? `Selected item: ${selectedPath}` : "Selected item: none",
+    ...selectedContext,
   ].join("\n");
   return `${context}\n\nUser request:\n${userPrompt}`;
 }
@@ -3007,10 +5101,13 @@ const ExplorerContextMenu = memo(function ExplorerContextMenu() {
     showHidden,
     targetEntry,
     hasSelection,
+    selectedAcrossPanesCount,
     hasRemoteSelection,
     canCalculateDirectorySizes,
     targetPinned,
-    targetCanOpenWith,
+  targetCanOpenWith,
+    targetRemoteName,
+    targetRemotePath,
     inTrash,
     canTrashSelection,
     hasPermanentDeleteSelection,
@@ -3038,10 +5135,13 @@ const ExplorerContextMenu = memo(function ExplorerContextMenu() {
       showHidden: state.paneShowHidden[paneId] ?? state.showHidden,
       targetEntry,
       hasSelection: Boolean(entryId && selectedCount),
+      selectedAcrossPanesCount: open ? selectedCountAcrossPanes(state.panes) : 0,
       hasRemoteSelection: Boolean(remoteSelectedCount),
       canCalculateDirectorySizes: selectedFolderCount > 0,
       targetPinned: Boolean(targetEntry && !targetEntry.isDeleted && pinnedPaths.some((path) => normalizedPath(path) === normalizedPath(targetEntry.path))),
       targetCanOpenWith: Boolean(targetEntry && !targetEntry.isDeleted && targetEntry.kind !== "folder" && targetEntry.kind !== "symlink"),
+      targetRemoteName: targetEntry?.location.kind === "remote" ? targetEntry.location.remoteName : null,
+      targetRemotePath: targetEntry?.location.kind === "remote" ? targetEntry.location.remotePath : null,
       inTrash: targetPane?.listing?.path === "misty://trash",
       canTrashSelection: trashableCount > 0 && trashableCount === selectedCount,
       hasPermanentDeleteSelection: permanentDeleteCount > 0,
@@ -3050,12 +5150,19 @@ const ExplorerContextMenu = memo(function ExplorerContextMenu() {
     };
   }));
   const { menuRef, style: menuStyle } = useViewportAnchoredMenu(open, x, y);
+  const submenuRef = useRef<HTMLDivElement | null>(null);
+  const [submenu, setSubmenu] = useState<ContextSubmenuState>(null);
+
+  useEffect(() => {
+    if (!open) setSubmenu(null);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
     const closeOnOutsidePointer = (event: globalThis.PointerEvent) => {
       const target = event.target as Node | null;
       if (target && menuRef.current?.contains(target)) return;
+      if (target && submenuRef.current?.contains(target)) return;
       useExplorerStore.getState().closeContextMenu();
     };
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -3081,140 +5188,341 @@ const ExplorerContextMenu = memo(function ExplorerContextMenu() {
     action();
   };
 
+  const openSubmenu = (event: PointerEvent<HTMLButtonElement>, item: ContextMenuBranchItem) => {
+    const position = contextSubmenuPosition(event.currentTarget.getBoundingClientRect(), item.items.length);
+    setSubmenu({ id: item.id, items: item.items, ...position });
+  };
+
+  const newItems: ContextMenuLeafItem[] = [
+    {
+      id: "new-folder",
+      icon: <FolderPlus size={17} />,
+      label: "New Folder",
+      shortcut: shortcut(`${primaryShortcut}+Shift+N`),
+      disabled: !canCreateFolder,
+      disabledReason: createDisabledReason,
+      onRun: () => run(() => void useExplorerStore.getState().createItem(paneId, "folder")),
+    },
+    {
+      id: "new-file",
+      icon: <FilePlus size={17} />,
+      label: "New File",
+      disabled: !canCreateFile,
+      disabledReason: createDisabledReason,
+      onRun: () => run(() => void useExplorerStore.getState().createItem(paneId, "file")),
+    },
+  ];
+
+  const clipboardItems: ContextMenuLeafItem[] = [
+    {
+      id: "copy",
+      icon: <Copy size={17} />,
+      label: "Copy",
+      shortcut: shortcut(`${primaryShortcut}+C`),
+      disabled: !hasSelection,
+      disabledReason: selectionDisabledReason,
+      onRun: () => run(() => useExplorerStore.getState().copySelected(paneId)),
+    },
+    {
+      id: "cut",
+      icon: <Scissors size={17} />,
+      label: "Cut",
+      shortcut: shortcut(`${primaryShortcut}+X`),
+      disabled: !hasSelection,
+      disabledReason: selectionDisabledReason,
+      onRun: () => run(() => useExplorerStore.getState().cutSelected(paneId)),
+    },
+    {
+      id: "paste",
+      icon: <Clipboard size={17} />,
+      label: "Paste",
+      shortcut: shortcut(`${primaryShortcut}+V`),
+      disabled: !hasClipboard,
+      disabledReason: hasClipboard ? undefined : "Copy or cut something first.",
+      onRun: () => run(() => void useExplorerStore.getState().pasteIntoPane(paneId)),
+    },
+    {
+      id: "deselect",
+      icon: <X size={17} />,
+      label: "Deselect All",
+      disabled: selectedAcrossPanesCount === 0,
+      disabledReason: "No selected items.",
+      onRun: () => run(clearSelectionsAcrossPanes),
+    },
+  ];
+
+  const deleteItems: ContextMenuLeafItem[] = [
+    ...(!inTrash ? [{
+      id: "trash",
+      icon: <Trash2 size={17} />,
+      label: "Trash",
+      shortcut: shortcut("Del"),
+      disabled: !canTrashSelection,
+      disabledReason: hasSelection ? "Trash is only available for local files and folders." : selectionDisabledReason,
+      onRun: () => run(() => void useExplorerStore.getState().deleteSelected(paneId, "trash")),
+    } satisfies ContextMenuLeafItem] : []),
+    {
+      id: "delete-permanent",
+      icon: <X size={17} />,
+      label: "Delete Permanently",
+      disabled: !hasPermanentDeleteSelection,
+      disabledReason: hasPermanentDeleteSelection ? undefined : selectionDisabledReason,
+      onRun: () => run(() => void useExplorerStore.getState().deleteSelected(paneId, "permanent")),
+    },
+  ];
+
+  const remoteItems: ContextMenuLeafItem[] = [
+    {
+      id: "download",
+      icon: <Download size={17} />,
+      label: "Download",
+      disabled: !hasRemoteSelection,
+      disabledReason: "Download is available for remote files and folders.",
+      onRun: () => run(() => void useExplorerStore.getState().downloadSelected(paneId)),
+    },
+    {
+      id: "share-link",
+      icon: <Link size={17} />,
+      label: "Share link...",
+      disabled: !targetRemoteName || !targetRemotePath,
+      disabledReason: "Share links are available for provider files and folders.",
+      onRun: () => run(() => targetRemoteName && targetRemotePath && void createExplorerPublicLink(targetRemoteName, targetRemotePath)),
+    },
+    {
+      id: "verify",
+      icon: <ArrowRightLeft size={17} />,
+      label: "Verify against...",
+      disabled: !targetRemoteName || !targetRemotePath,
+      disabledReason: "Verify is available for provider files and folders.",
+      onRun: () => run(() => targetRemoteName && targetRemotePath && void verifyExplorerRemotePath(targetRemoteName, targetRemotePath)),
+    },
+  ];
+
+  const archiveItems: ContextMenuLeafItem[] = [
+    {
+      id: "archive-preview",
+      icon: <Eye size={17} />,
+      label: "Preview Archive",
+      disabled: !targetEntry || targetEntry.kind !== "file" || !isArchivePath(targetEntry.path),
+      disabledReason: "Choose an archive file.",
+      onRun: () => run(() => targetEntry && void previewArchive(targetEntry.path)),
+    },
+    {
+      id: "compress",
+      icon: <FileArchive size={17} />,
+      label: "Compress to ZIP",
+      disabled: !hasSelection || hasRemoteSelection,
+      disabledReason: hasRemoteSelection ? "Compress is available for local selections." : selectionDisabledReason,
+      onRun: () => run(() => void compressSelectedItems(paneId)),
+    },
+    {
+      id: "extract-here",
+      icon: <Archive size={17} />,
+      label: "Extract Here",
+      disabled: !targetEntry || targetEntry.kind !== "file" || !isArchivePath(targetEntry.path),
+      disabledReason: "Choose an archive file.",
+      onRun: () => run(() => targetEntry && void extractArchiveHere(targetEntry.path)),
+    },
+    {
+      id: "extract-to",
+      icon: <FolderPlus size={17} />,
+      label: "Extract To...",
+      disabled: !targetEntry || targetEntry.kind !== "file" || !isArchivePath(targetEntry.path),
+      disabledReason: "Choose an archive file.",
+      onRun: () => run(() => targetEntry && void extractArchiveTo(targetEntry.path)),
+    },
+  ];
+
+  const fileToolsItems: ContextMenuLeafItem[] = [
+    {
+      id: "sha256",
+      icon: <Hash size={17} />,
+      label: "SHA-256 Checksum",
+      disabled: !targetEntry || targetEntry.kind !== "file" || hasRemoteSelection,
+      disabledReason: "Choose one local file.",
+      onRun: () => run(() => targetEntry && void copySha256Checksum(targetEntry.path)),
+    },
+    {
+      id: "readonly",
+      icon: <File size={17} />,
+      label: targetEntry?.readonly ? "Clear Read Only" : "Mark Read Only",
+      disabled: !targetEntry || hasRemoteSelection,
+      disabledReason: "Readonly changes are available for local files and folders.",
+      onRun: () => run(() => targetEntry && void toggleReadonlyForEntry(targetEntry.path, !targetEntry.readonly, paneId)),
+    },
+    {
+      id: "chmod",
+      icon: <Hash size={17} />,
+      label: "Change Mode...",
+      disabled: !targetEntry || hasRemoteSelection,
+      disabledReason: "chmod is available for local files and folders.",
+      onRun: () => run(() => targetEntry && void chmodEntry(targetEntry.path, paneId)),
+    },
+    {
+      id: "symlink",
+      icon: <Link size={17} />,
+      label: "Create Symlink...",
+      disabled: !targetEntry || hasRemoteSelection,
+      disabledReason: "Symlinks are available for local files and folders.",
+      onRun: () => run(() => targetEntry && void createSymlinkForEntry(targetEntry.path, paneId)),
+    },
+    {
+      id: "reveal-symlink-target",
+      icon: <ExternalLink size={17} />,
+      label: "Reveal Symlink Target",
+      disabled: !targetEntry || targetEntry.kind !== "symlink" || hasRemoteSelection,
+      disabledReason: "Choose one local symlink.",
+      onRun: () => run(() => targetEntry && void revealSymlinkTarget(targetEntry.path, paneId)),
+    },
+    {
+      id: "copy-path",
+      icon: <Copy size={17} />,
+      label: "Copy Path",
+      shortcut: shortcut(`${primaryShortcut}+Alt+C`),
+      disabled: !targetEntry,
+      disabledReason: "Choose an item first.",
+      onRun: () => run(() => targetEntry && void useExplorerStore.getState().copyPath(targetEntry.path)),
+    },
+    {
+      id: "terminal-here",
+      icon: <Terminal size={17} />,
+      label: "Terminal Here",
+      disabled: !targetEntry || hasRemoteSelection,
+      disabledReason: "Terminal is available for local files and folders.",
+      onRun: () => run(() => targetEntry && void openTerminalForEntry(targetEntry.path, targetEntry.kind === "folder")),
+    },
+  ];
+
+  const moreItems: ContextMenuLeafItem[] = entryId ? [
+    {
+      id: "pin",
+      icon: <Pin size={17} />,
+      label: targetPinned ? "Unpin from Quick access" : "Pin to Quick access",
+      disabled: !targetEntry || targetEntry.isDeleted || targetEntry.kind !== "folder",
+      disabledReason: "Only folders can be pinned.",
+      onRun: () => run(() => targetEntry && useExplorerStore.getState().togglePinnedPath(targetEntry.path)),
+    },
+    {
+      id: "folder-sizes",
+      icon: <Folder size={17} />,
+      label: "Calculate Folder Sizes",
+      disabled: !canCalculateDirectorySizes,
+      disabledReason: "Select one or more folders.",
+      onRun: () => run(() => calculateSelectedFolderSizes(paneId)),
+    },
+  ] : [
+    {
+      id: "hidden-files",
+      icon: <Eye size={17} />,
+      label: showHidden ? "Hide Hidden Files" : "Show Hidden Files",
+      shortcut: shortcut(`${primaryShortcut}+Shift+.`),
+      onRun: () => run(() => void useExplorerStore.getState().toggleHidden(paneId)),
+    },
+  ];
+
+  const menuEntries: ContextMenuEntry[] = [
+    { id: "new", icon: <FolderPlus size={17} />, label: "New", items: newItems },
+    { id: "clipboard", icon: <Clipboard size={17} />, label: "Clipboard", items: clipboardItems },
+    {
+      id: "rename",
+      icon: <Pencil size={17} />,
+      label: "Rename",
+      shortcut: shortcut("Enter"),
+      disabled: !hasSelection,
+      disabledReason: selectionDisabledReason,
+      onRun: () => run(() => void useExplorerStore.getState().renameSelected(paneId)),
+    },
+    {
+      id: "batch-rename",
+      icon: <Pencil size={17} />,
+      label: "Batch Rename...",
+      disabled: !hasSelection,
+      disabledReason: selectionDisabledReason,
+      onRun: () => run(() => useExplorerStore.getState().openBatchRenameDialog(paneId)),
+    },
+    {
+      id: "compare-with",
+      icon: <ArrowRightLeft size={17} />,
+      label: "Compare With...",
+      disabled: !hasSelection || hasRemoteSelection,
+      disabledReason: hasRemoteSelection ? "Compare is available for local files and folders." : selectionDisabledReason,
+      onRun: () => run(() => openCompareWith(paneId)),
+    },
+    { id: "delete", icon: <Trash2 size={17} />, label: "Delete", items: deleteItems },
+    { id: "archive", icon: <Archive size={17} />, label: "Archive", items: archiveItems },
+    { id: "file-tools", icon: <Hash size={17} />, label: "File Tools", items: fileToolsItems },
+    { id: "remote", icon: <Link size={17} />, label: "Remote", items: remoteItems },
+    ...(entryId ? [{
+      id: "open-with",
+      icon: <AppWindow size={17} />,
+      label: "Open With...",
+      disabled: !targetCanOpenWith,
+      disabledReason: "Open With is available for files.",
+      onRun: () => run(() => void useExplorerStore.getState().openWithSelected(paneId)),
+    } satisfies ContextMenuLeafItem] : []),
+    { id: "more", icon: <MoreHorizontal size={17} />, label: "More", items: moreItems },
+    {
+      id: "refresh",
+      icon: <RefreshCcw size={17} />,
+      label: "Refresh",
+      shortcut: shortcut(`${primaryShortcut}+R`),
+      onRun: () => run(() => void useExplorerStore.getState().refreshPane(paneId)),
+    },
+  ];
+
   return createPortal(
-    <div
-      ref={menuRef}
-      className={contextMenuStyles.menu}
-      style={menuStyle}
-      onPointerDown={(event) => event.stopPropagation()}
-      role="menu"
-    >
-      <ContextMenuItem
-        icon={<FolderPlus size={17} />}
-        label="New Folder"
-        shortcut={shortcut(`${primaryShortcut}+Shift+N`)}
-        disabled={!canCreateFolder}
-        disabledReason={createDisabledReason}
-        onRun={() => run(() => void useExplorerStore.getState().createItem(paneId, "folder"))}
-      />
-      <ContextMenuItem
-        icon={<FilePlus size={17} />}
-        label="New File"
-        disabled={!canCreateFile}
-        disabledReason={createDisabledReason}
-        onRun={() => run(() => void useExplorerStore.getState().createItem(paneId, "file"))}
-      />
-      <div className={contextMenuStyles.separator} />
-      <ContextMenuItem
-        icon={<Copy size={17} />}
-        label="Copy"
-        shortcut={shortcut(`${primaryShortcut}+C`)}
-        disabled={!hasSelection}
-        disabledReason={selectionDisabledReason}
-        onRun={() => run(() => useExplorerStore.getState().copySelected(paneId))}
-      />
-      <ContextMenuItem
-        icon={<Scissors size={17} />}
-        label="Cut"
-        shortcut={shortcut(`${primaryShortcut}+X`)}
-        disabled={!hasSelection}
-        disabledReason={selectionDisabledReason}
-        onRun={() => run(() => useExplorerStore.getState().cutSelected(paneId))}
-      />
-      <ContextMenuItem
-        icon={<Clipboard size={17} />}
-        label="Paste"
-        shortcut={shortcut(`${primaryShortcut}+V`)}
-        disabled={!hasClipboard}
-        disabledReason={hasClipboard ? undefined : "Copy or cut something first."}
-        onRun={() => run(() => void useExplorerStore.getState().pasteIntoPane(paneId))}
-      />
-      <div className={contextMenuStyles.separator} />
-      <ContextMenuItem
-        icon={<Pencil size={17} />}
-        label="Rename"
-        shortcut={shortcut("Enter")}
-        disabled={!hasSelection}
-        disabledReason={selectionDisabledReason}
-        onRun={() => run(() => void useExplorerStore.getState().renameSelected(paneId))}
-      />
-      {!inTrash ? (
-        <ContextMenuItem
-          icon={<Trash2 size={17} />}
-          label="Trash"
-          shortcut={shortcut("Del")}
-          disabled={!canTrashSelection}
-          disabledReason={hasSelection ? "Trash is only available for local files and folders." : selectionDisabledReason}
-          onRun={() => run(() => void useExplorerStore.getState().deleteSelected(paneId, "trash"))}
-        />
+    <>
+      <div
+        ref={menuRef}
+        className={contextMenuStyles.menu}
+        style={menuStyle}
+        onPointerDown={(event) => event.stopPropagation()}
+        role="menu"
+      >
+        {menuEntries.map((item) => (
+          <ContextMenuItem
+            key={item.id}
+            icon={item.icon}
+            label={item.label}
+            shortcut={isContextMenuBranch(item) ? undefined : item.shortcut}
+            disabled={isContextMenuBranch(item) ? false : item.disabled}
+            disabledReason={isContextMenuBranch(item) ? undefined : item.disabledReason}
+            submenu={isContextMenuBranch(item)}
+            active={submenu?.id === item.id}
+            onPointerEnter={(event) => {
+              if (isContextMenuBranch(item)) openSubmenu(event, item);
+              else setSubmenu(null);
+            }}
+            onRun={() => {
+              if (isContextMenuBranch(item)) return;
+              item.onRun();
+            }}
+          />
+        ))}
+      </div>
+      {submenu ? (
+        <div
+          ref={submenuRef}
+          className={contextMenuStyles.submenu}
+          style={{ left: submenu.x, top: submenu.y, maxHeight: submenu.maxHeight }}
+          onPointerDown={(event) => event.stopPropagation()}
+          role="menu"
+        >
+          {submenu.items.map((item) => (
+            <ContextMenuItem
+              key={item.id}
+              icon={item.icon}
+              label={item.label}
+              shortcut={item.shortcut}
+              disabled={item.disabled}
+              disabledReason={item.disabledReason}
+              onPointerEnter={() => undefined}
+              onRun={item.onRun}
+            />
+          ))}
+        </div>
       ) : null}
-      <ContextMenuItem
-        icon={<X size={17} />}
-        label="Delete Permanently"
-        disabled={!hasPermanentDeleteSelection}
-        disabledReason={hasPermanentDeleteSelection ? undefined : selectionDisabledReason}
-        onRun={() => run(() => void useExplorerStore.getState().deleteSelected(paneId, "permanent"))}
-      />
-      <ContextMenuItem
-        icon={<Download size={17} />}
-        label="Download"
-        disabled={!hasRemoteSelection}
-        disabledReason="Download is available for remote files and folders."
-        onRun={() => run(() => void useExplorerStore.getState().downloadSelected(paneId))}
-      />
-      {entryId ? (
-        <>
-          <div className={contextMenuStyles.separator} />
-          <ContextMenuItem
-            icon={<AppWindow size={17} />}
-            label="Open With..."
-            disabled={!targetCanOpenWith}
-            disabledReason="Open With is available for files."
-            onRun={() => run(() => void useExplorerStore.getState().openWithSelected(paneId))}
-          />
-          <ContextMenuItem
-            icon={<Pin size={17} />}
-            label={targetPinned ? "Unpin from Quick access" : "Pin to Quick access"}
-            disabled={!targetEntry || targetEntry.isDeleted || targetEntry.kind !== "folder"}
-            disabledReason="Only folders can be pinned."
-            onRun={() => run(() => targetEntry && useExplorerStore.getState().togglePinnedPath(targetEntry.path))}
-          />
-          <ContextMenuItem
-            icon={<Folder size={17} />}
-            label="Calculate Folder Sizes"
-            disabled={!canCalculateDirectorySizes}
-            disabledReason="Select one or more folders."
-            onRun={() => run(() => calculateSelectedFolderSizes(paneId))}
-          />
-          <div className={contextMenuStyles.separator} />
-          <ContextMenuItem
-            icon={<Copy size={17} />}
-            label="Copy Path"
-            shortcut={shortcut(`${primaryShortcut}+Alt+C`)}
-            disabled={!targetEntry}
-            disabledReason="Choose an item first."
-            onRun={() => run(() => targetEntry && void useExplorerStore.getState().copyPath(targetEntry.path))}
-          />
-        </>
-      ) : (
-        <>
-          <div className={contextMenuStyles.separator} />
-          <ContextMenuItem
-            icon={<Eye size={17} />}
-            label={showHidden ? "Hide Hidden Files" : "Show Hidden Files"}
-            shortcut={shortcut(`${primaryShortcut}+Shift+.`)}
-            onRun={() => run(() => void useExplorerStore.getState().toggleHidden(paneId))}
-          />
-        </>
-      )}
-      <div className={contextMenuStyles.separator} />
-      <ContextMenuItem
-        icon={<RefreshCcw size={17} />}
-        label="Refresh"
-        shortcut={shortcut(`${primaryShortcut}+R`)}
-        onRun={() => run(() => void useExplorerStore.getState().refreshPane(paneId))}
-      />
-    </div>,
+    </>,
     document.body,
   );
 });
@@ -3225,22 +5533,331 @@ function ContextMenuItem(props: {
   shortcut?: string;
   disabled?: boolean;
   disabledReason?: string;
+  submenu?: boolean;
+  active?: boolean;
+  onPointerEnter?: (event: PointerEvent<HTMLButtonElement>) => void;
   onRun: () => void;
 }) {
   return (
     <button
       type="button"
       role="menuitem"
-      className={contextMenuStyles.item}
+      className={cx(contextMenuStyles.item, props.active && contextMenuStyles.itemActive)}
       disabled={props.disabled}
       title={props.disabled ? props.disabledReason : undefined}
+      aria-haspopup={props.submenu ? "menu" : undefined}
+      aria-expanded={props.submenu ? Boolean(props.active) : undefined}
+      onPointerEnter={props.onPointerEnter}
       onClick={props.onRun}
     >
       <span className={contextMenuStyles.icon}>{props.icon}</span>
       <span className={contextMenuStyles.label}>{props.label}</span>
-      {props.shortcut ? <span className={contextMenuStyles.shortcut}>{props.shortcut}</span> : null}
+      {props.submenu
+        ? <ChevronRight className={contextMenuStyles.shortcut} size={15} aria-hidden="true" />
+        : props.shortcut ? <span className={contextMenuStyles.shortcut}>{props.shortcut}</span> : null}
     </button>
   );
+}
+
+function isArchivePath(path: string) {
+  return /\.(zip|tar|tgz|tar\.gz|tar\.bz2|7z|rar)$/i.test(path);
+}
+
+async function previewArchive(path: string) {
+  const explorer = useExplorerStore.getState();
+  try {
+    const result = await archiveList({ path });
+    explorer.pushNotification(result.message || `Archive has ${result.entries.length} entries.`, "info", 4500);
+  } catch (error) {
+    explorer.pushNotification(`Archive preview failed: ${errorText(error)}`, "error", 5500);
+  }
+}
+
+async function compressSelectedItems(paneId: string) {
+  const explorer = useExplorerStore.getState();
+  const pane = explorer.panes[paneId];
+  const paths = selectedPathsForPane(pane).filter((path) => !path.startsWith("misty://"));
+  if (paths.length === 0) {
+    explorer.pushNotification("Choose one or more local items to compress.", "info", 3500);
+    return;
+  }
+  const parent = parentPath(paths[0]) || pane?.listing?.path || "";
+  const baseName = paths.length === 1 ? fileStem(paths[0]) : "Archive";
+  const destinationPath = `${parent}/${baseName}-${new Date().toISOString().slice(0, 10)}.zip`;
+  try {
+    const result = await archiveCreate({ paths, destinationPath });
+    explorer.pushNotification(result.message, "success", 4500);
+    void explorer.refreshPane(paneId);
+  } catch (error) {
+    explorer.pushNotification(`Compress failed: ${errorText(error)}`, "error", 5500);
+  }
+}
+
+async function extractArchiveHere(path: string) {
+  const explorer = useExplorerStore.getState();
+  const destinationDir = `${parentPath(path)}/${fileStem(path)}`;
+  try {
+    const result = await archiveExtract({ archivePath: path, destinationDir });
+    explorer.pushNotification(result.message, "success", 4500);
+    const paneId = explorer.contextMenu.paneId;
+    if (paneId) void explorer.refreshPane(paneId);
+  } catch (error) {
+    explorer.pushNotification(`Extract failed: ${errorText(error)}`, "error", 5500);
+  }
+}
+
+async function extractArchiveTo(path: string) {
+  const explorer = useExplorerStore.getState();
+  const defaultDestination = `${parentPath(path)}/${fileStem(path)}`;
+  const destinationDir = window.prompt("Extract archive to folder:", defaultDestination);
+  if (!destinationDir?.trim()) return;
+  try {
+    const result = await archiveExtract({ archivePath: path, destinationDir: destinationDir.trim() });
+    explorer.pushNotification(result.message, "success", 4500);
+    const paneId = explorer.contextMenu.paneId;
+    if (paneId) void explorer.refreshPane(paneId);
+  } catch (error) {
+    explorer.pushNotification(`Extract failed: ${errorText(error)}`, "error", 5500);
+  }
+}
+
+async function copySha256Checksum(path: string) {
+  const explorer = useExplorerStore.getState();
+  try {
+    const result = await fileToolsChecksum({ path });
+    await writeText(result.sha256);
+    explorer.pushNotification("SHA-256 copied.", "success", 3500);
+  } catch (error) {
+    explorer.pushNotification(`Checksum failed: ${errorText(error)}`, "error", 5500);
+  }
+}
+
+async function toggleReadonlyForEntry(path: string, readonly: boolean, paneId: string) {
+  const explorer = useExplorerStore.getState();
+  try {
+    const result = await fileToolsSetReadonly({ path, readonly });
+    explorer.pushNotification(result.message, "success", 3500);
+    void explorer.refreshPane(paneId);
+  } catch (error) {
+    explorer.pushNotification(`Readonly update failed: ${errorText(error)}`, "error", 5500);
+  }
+}
+
+async function chmodEntry(path: string, paneId: string) {
+  const modeText = window.prompt("Octal mode, for example 644 or 755:", "644");
+  if (!modeText) return;
+  const normalized = modeText.trim().replace(/^0o?/, "");
+  if (!/^[0-7]{3,4}$/.test(normalized)) {
+    useExplorerStore.getState().pushNotification("Enter an octal mode like 644 or 0755.", "error", 4500);
+    return;
+  }
+  const mode = Number.parseInt(normalized, 8);
+  const explorer = useExplorerStore.getState();
+  try {
+    const result = await fileToolsChmod({ path, mode });
+    explorer.pushNotification(result.message, "success", 3500);
+    void explorer.refreshPane(paneId);
+  } catch (error) {
+    explorer.pushNotification(`chmod failed: ${errorText(error)}`, "error", 5500);
+  }
+}
+
+async function createSymlinkForEntry(targetPath: string, paneId: string) {
+  const defaultLink = `${targetPath}.link`;
+  const linkPath = window.prompt("Create symlink at:", defaultLink);
+  if (!linkPath?.trim()) return;
+  const explorer = useExplorerStore.getState();
+  try {
+    const result = await fileToolsCreateSymlink({ targetPath, linkPath: linkPath.trim() });
+    explorer.pushNotification(result.message, "success", 4500);
+    void explorer.refreshPane(paneId);
+  } catch (error) {
+    explorer.pushNotification(`Symlink failed: ${errorText(error)}`, "error", 5500);
+  }
+}
+
+async function revealSymlinkTarget(path: string, paneId: string) {
+  const explorer = useExplorerStore.getState();
+  try {
+    const result = await fileToolsReadSymlink({ path });
+    const targetPath = result.resolvedTargetPath || result.targetPath;
+    await writeText(targetPath);
+    if (result.targetExists) {
+      const revealPath = result.targetIsDir ? targetPath : parentPath(targetPath);
+      if (revealPath) void explorer.navigatePane(paneId, revealPath);
+      explorer.pushNotification("Symlink target copied and revealed.", "success", 4500);
+    } else {
+      explorer.pushNotification("Symlink target copied, but the target does not exist.", "info", 5000);
+    }
+  } catch (error) {
+    explorer.pushNotification(`Reveal symlink target failed: ${errorText(error)}`, "error", 5500);
+  }
+}
+
+async function openTerminalForEntry(path: string, isDirectory: boolean) {
+  const target = isDirectory ? path : parentPath(path);
+  if (!target) {
+    useExplorerStore.getState().pushNotification("No containing folder was found.", "error", 3500);
+    return;
+  }
+  try {
+    await openTerminalAtPath(target);
+  } catch (error) {
+    useExplorerStore.getState().pushNotification(`Terminal unavailable: ${errorText(error)}`, "error", 4500);
+  }
+}
+
+function parentPath(path: string) {
+  const normalized = path.replace(/\/+$/, "");
+  const index = normalized.lastIndexOf("/");
+  return index > 0 ? normalized.slice(0, index) : "/";
+}
+
+function joinLocalPath(root: string, relativePath: string) {
+  const normalizedRoot = root.replace(/\/+$/, "");
+  const normalizedRelative = relativePath.replace(/^\/+/, "");
+  return normalizedRoot === "/" ? `/${normalizedRelative}` : `${normalizedRoot}/${normalizedRelative}`;
+}
+
+function fileStem(path: string) {
+  const parts = path.split("/").filter(Boolean);
+  const name = parts[parts.length - 1] ?? "Archive";
+  return name.replace(/\.(zip|tar|tgz|tar\.gz|tar\.bz2|7z|rar)$/i, "").replace(/\.[^.]+$/, "") || "Archive";
+}
+
+async function loadCompareTextDiff(leftPath: string, rightPath: string): Promise<CompareTextDiffState | null> {
+  try {
+    const [leftText, rightText] = await Promise.all([
+      previewTextForCompare(leftPath),
+      previewTextForCompare(rightPath),
+    ]);
+    if (leftText == null || rightText == null) return null;
+    return buildCompareTextDiff(leftText, rightText);
+  } catch {
+    return null;
+  }
+}
+
+async function loadCompareImagePreview(leftPath: string, rightPath: string): Promise<CompareImageState | null> {
+  try {
+    const [left, right] = await Promise.all([
+      previewImageForCompare(leftPath),
+      previewImageForCompare(rightPath),
+    ]);
+    if (!left || !right) return null;
+    return { left, right };
+  } catch {
+    return null;
+  }
+}
+
+async function previewTextForCompare(path: string): Promise<string | null> {
+  const payload = await explorerPreviewItem(path);
+  if (!comparePreviewIsText(payload.mimeType)) return null;
+  return new TextDecoder("utf-8").decode(Uint8Array.from(payload.bytes));
+}
+
+async function previewImageForCompare(path: string): Promise<CompareImagePreview | null> {
+  const payload = await explorerPreviewItem(path);
+  if (!payload.mimeType.toLowerCase().startsWith("image/")) return null;
+  return {
+    src: `data:${payload.mimeType};base64,${base64FromBytes(payload.bytes)}`,
+    mimeType: payload.mimeType,
+    byteLength: payload.bytes.length,
+  };
+}
+
+function comparePreviewIsText(mimeType: string): boolean {
+  const normalized = mimeType.toLowerCase();
+  return normalized.startsWith("text/")
+    || normalized.includes("json")
+    || normalized.includes("xml")
+    || normalized.includes("javascript")
+    || normalized.includes("typescript");
+}
+
+function base64FromBytes(bytes: number[]): string {
+  let binary = "";
+  for (let index = 0; index < bytes.length; index += 0x8000) {
+    binary += String.fromCharCode(...bytes.slice(index, index + 0x8000));
+  }
+  return window.btoa(binary);
+}
+
+function buildCompareTextDiff(leftText: string, rightText: string): CompareTextDiffState {
+  const leftAll = splitCompareLines(leftText);
+  const rightAll = splitCompareLines(rightText);
+  const truncated = leftAll.length > 800 || rightAll.length > 800;
+  const leftLines = leftAll.slice(0, 800);
+  const rightLines = rightAll.slice(0, 800);
+  const lcs = Array.from({ length: leftLines.length + 1 }, () => new Uint16Array(rightLines.length + 1));
+  for (let left = leftLines.length - 1; left >= 0; left -= 1) {
+    for (let right = rightLines.length - 1; right >= 0; right -= 1) {
+      lcs[left][right] = leftLines[left] === rightLines[right]
+        ? lcs[left + 1][right + 1] + 1
+        : Math.max(lcs[left + 1][right], lcs[left][right + 1]);
+    }
+  }
+  const rows: CompareTextDiffRow[] = [];
+  let left = 0;
+  let right = 0;
+  while (left < leftLines.length || right < rightLines.length) {
+    if (left < leftLines.length && right < rightLines.length && leftLines[left] === rightLines[right]) {
+      rows.push(compareTextRow(rows.length, left + 1, right + 1, leftLines[left], rightLines[right], "same"));
+      left += 1;
+      right += 1;
+    } else if (right >= rightLines.length || (left < leftLines.length && lcs[left + 1][right] >= lcs[left][right + 1])) {
+      if (right < rightLines.length) {
+        rows.push(compareTextRow(rows.length, left + 1, right + 1, leftLines[left], rightLines[right], "changed"));
+        left += 1;
+        right += 1;
+      } else {
+        rows.push(compareTextRow(rows.length, left + 1, null, leftLines[left], "", "removed"));
+        left += 1;
+      }
+    } else {
+      rows.push(compareTextRow(rows.length, null, right + 1, "", rightLines[right], "added"));
+      right += 1;
+    }
+  }
+  return { leftText, rightText, rows, truncated };
+}
+
+function splitCompareLines(text: string): string[] {
+  return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+}
+
+function compareTextRow(
+  index: number,
+  leftLine: number | null,
+  rightLine: number | null,
+  leftText: string,
+  rightText: string,
+  kind: CompareTextDiffKind,
+): CompareTextDiffRow {
+  return {
+    id: `${index}:${leftLine ?? ""}:${rightLine ?? ""}`,
+    leftLine,
+    rightLine,
+    leftText,
+    rightText,
+    kind,
+  };
+}
+
+function leftDiffKind(row: CompareTextDiffRow): CompareTextDiffKind {
+  return row.kind === "added" ? "changed" : row.kind;
+}
+
+function rightDiffKind(row: CompareTextDiffRow): CompareTextDiffKind {
+  return row.kind === "removed" ? "changed" : row.kind;
+}
+
+function diffLineStyle(kind: CompareTextDiffKind): string {
+  if (kind === "added") return compareStyles.diffAdded;
+  if (kind === "removed") return compareStyles.diffRemoved;
+  if (kind === "changed") return compareStyles.diffChanged;
+  return compareStyles.diffSame;
 }
 
 function primaryShortcutLabel(): string {
@@ -3283,8 +5900,10 @@ function calculateSelectedFolderSizes(paneId: string): void {
 function ExplorerBottomBar(props: {
   sidebarVisible: boolean;
   previewVisible: boolean;
+  extensionsVisible: boolean;
   onToggleSidebar: () => void;
   onTogglePreview: () => void;
+  onToggleExtensions: () => void;
 }) {
   return (
     <footer className={explorerShellStyles.bottomBar}>
@@ -3303,6 +5922,14 @@ function ExplorerBottomBar(props: {
         onClick={props.onTogglePreview}
       >
         <PanelRight size={15} />
+      </button>
+      <button
+        type="button"
+        className={cx(explorerShellStyles.bottomButton, props.extensionsVisible && explorerShellStyles.bottomButtonSelected)}
+        title={props.extensionsVisible ? "Hide extensions" : "Show extensions"}
+        onClick={props.onToggleExtensions}
+      >
+        <Puzzle size={15} />
       </button>
     </footer>
   );
